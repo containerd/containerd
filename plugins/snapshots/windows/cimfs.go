@@ -324,7 +324,7 @@ func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount
 	// add the layer CIM path - this path will only be used if we are extracting an
 	// image layer, in case of scratch snapshots this path MUST be ignored.
 	layerCimPath := s.getLayerCimPath(sn.ID)
-	options = append(options, LayerCimPathFlag+layerCimPath)
+	options = append(options, mount.LayerCimPathFlag+layerCimPath)
 
 	if len(sn.ParentIDs) != 0 {
 		parentLayerPaths := s.parentIDsToParentPaths(sn.ParentIDs)
@@ -333,7 +333,7 @@ func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount
 		parentLayersJSON, _ := json.Marshal(parentLayerPaths)
 		parentLayersOption := mount.ParentLayerPathsFlag + string(parentLayersJSON)
 		parentCimLayersJSON, _ := json.Marshal(parentLayerCimPaths)
-		parentCimLayersOption := ParentLayerCimPathsFlag + string(parentCimLayersJSON)
+		parentCimLayersOption := mount.ParentLayerCimPathsFlag + string(parentCimLayersJSON)
 		options = append(options, parentLayersOption)
 		options = append(options, parentCimLayersOption)
 	}
@@ -341,7 +341,7 @@ func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount
 	mounts := []mount.Mount{
 		{
 			Source:  s.getSnapshotDir(sn.ID),
-			Type:    CimFSMountType,
+			Type:    mount.CimFSMountType,
 			Options: options,
 		},
 	}
@@ -423,66 +423,4 @@ func createScratchVHDs(ctx context.Context, path string) (err error) {
 		return fmt.Errorf("failed to grant vm group access to %s: %w", diffVHDPath, err)
 	}
 	return nil
-}
-
-const (
-	// LayerCimPathFlag is the option flag used to represent the path at which a layer
-	// CIM must be stored. This flag only applies if an image layer is being extracted
-	// onto the snapshot i.e the snapshot key has an UnpackKeyPrefix. For all other
-	// snapshots, this MUST be ignored.
-	LayerCimPathFlag = "cimpath="
-
-	// Similar to ParentLayerPathsFlag this is the optinos flag used to represent the JSON encoded list of
-	// parent layer CIMs
-	ParentLayerCimPathsFlag = "parentCimPaths="
-
-	// string to specify the standard cimfs type of mount
-	CimFSMountType string = "CimFS"
-
-	// string to specify the block CIM type of mount
-	BlockCIMMountType string = "BlockCIM"
-
-	// a flag that specifies the type of a block CIM in case of BlockCIM mounts
-	BlockCIMTypeFlag string = "blockCIMType="
-)
-
-// getOptionByPrefix finds an option that has the provided prefix, cuts the prefix from
-// that option string and return the remaining string. Boolean return is set to true if an
-// option is found with the given prefix. It is set to false otherwise.
-func getOptionByPrefix(m *mount.Mount, prefix string) (string, bool) {
-	for _, option := range m.Options {
-		val, found := strings.CutPrefix(option, prefix)
-		if found {
-			return val, true
-		}
-	}
-	return "", false
-}
-
-// gets the paths of the parent cims of this mount
-func GetParentCimPaths(m *mount.Mount) ([]string, error) {
-	if m.Type != CimFSMountType {
-		return nil, fmt.Errorf("invalid mount type: '%s'", m.Type)
-	}
-	var parentCimPaths []string
-	val, found := getOptionByPrefix(m, ParentLayerCimPathsFlag)
-	if !found {
-		return parentCimPaths, nil
-	}
-	err := json.Unmarshal([]byte(val), &parentCimPaths)
-	return parentCimPaths, err
-}
-
-// Only applies to a snapshot created for image extraction, for such a snapshot provides the
-// path to a cim in which image layer will be extracted.
-func GetCimPath(m *mount.Mount) (string, error) {
-	if m.Type != CimFSMountType {
-		return "", fmt.Errorf("invalid mount type: '%s'", m.Type)
-	}
-	cimPath, found := getOptionByPrefix(m, LayerCimPathFlag)
-	if !found {
-		return "", fmt.Errorf("cim path not found")
-	}
-	return cimPath, nil
-
 }
