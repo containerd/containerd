@@ -37,10 +37,6 @@ compile_fuzzers() {
     done
 }
 
-# This is from https://github.com/AdamKorcz/instrumentation
-cd $SRC/instrumentation
-go run main.go --target_dir $SRC/containerd/images
-
 apt-get update && apt-get install -y wget
 cd $SRC
 wget --quiet https://go.dev/dl/go1.24.4.linux-amd64.tar.gz
