@@ -36,6 +36,7 @@ import (
 
 	apitypes "github.com/containerd/containerd/api/types"
 
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -54,6 +55,7 @@ func init() {
 		ID:   "task",
 		Requires: []plugin.Type{
 			plugins.ShimPlugin,
+			plugins.MountManagerPlugin,
 		},
 		Config: &TaskConfig{
 			Platforms: defaultPlatforms(),
@@ -72,13 +74,20 @@ func init() {
 				return nil, err
 			}
 			shimManager := shimManagerI.(*ShimManager)
+
+			var mounts mount.Manager
+			if mountsI, err := ic.GetSingle(plugins.MountManagerPlugin); err == nil {
+				mounts = mountsI.(mount.Manager)
+			} else if !errors.Is(err, plugin.ErrPluginNotFound) {
+				return nil, err
+			}
 			root, state := ic.Properties[plugins.PropertyRootDir], ic.Properties[plugins.PropertyStateDir]
 			for _, d := range []string{root, state} {
 				if err := os.MkdirAll(d, 0711); err != nil {
 					return nil, err
 				}
 			}
-			return NewTaskManager(ic.Context, root, state, shimManager)
+			return newTaskManager(ic.Context, root, state, shimManager, mounts)
 		},
 	})
 }
@@ -88,6 +97,7 @@ type TaskManager struct {
 	root    string
 	state   string
 	manager *ShimManager
+	mounts  mount.Manager
 }
 
 // NewTaskManager creates a new task manager instance.
@@ -95,6 +105,10 @@ type TaskManager struct {
 // state is the stateDir of TaskManager plugin to store transient data
 // shims is  ShimManager for TaskManager to create/delete shims
 func NewTaskManager(ctx context.Context, root, state string, shims *ShimManager) (*TaskManager, error) {
+	return newTaskManager(ctx, root, state, shims, nil)
+}
+
+func newTaskManager(ctx context.Context, root, state string, shims *ShimManager, mounts mount.Manager) (*TaskManager, error) {
 	if err := shims.LoadExistingShims(ctx, state, root); err != nil {
 		return nil, fmt.Errorf("failed to load existing shims for task manager")
 	}
@@ -102,6 +116,7 @@ func NewTaskManager(ctx context.Context, root, state string, shims *ShimManager)
 		root:    root,
 		state:   state,
 		manager: shims,
+		mounts:  mounts,
 	}
 	return m, nil
 }
@@ -122,6 +137,34 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 			bundle.Delete()
 		}
 	}()
+
+	log.G(ctx).WithFields(log.Fields{
+		"id":      taskID,
+		"runtime": opts.Runtime,
+	}).Debug("creating task")
+
+	activateOpts := []mount.ActivateOpt{
+		mount.WithLabels(map[string]string{
+			"containerd.io/gc.bref.container": taskID,
+		}),
+		// TODO: Pass through runtime name
+	}
+	// Add options based on runtime
+	ai, err := m.mounts.Activate(ctx, taskID, opts.Rootfs, activateOpts...)
+	if err == nil {
+		opts.Rootfs = ai.System
+		defer func() {
+			if retErr != nil {
+				dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+				defer cancel()
+				if err := m.mounts.Deactivate(dctx, taskID); err != nil {
+					log.G(ctx).WithError(err).WithField("task", taskID).Errorf("failed to deactivate mounts")
+				}
+			}
+		}()
+	} else if !errdefs.IsNotImplemented(err) {
+		return nil, err
+	}
 
 	shim, err := m.manager.Start(ctx, taskID, bundle, opts)
 	if err != nil {
@@ -238,6 +281,10 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete task: %w", err)
+	}
+
+	if err := m.mounts.Deactivate(ctx, taskID); err != nil && !errdefs.IsNotImplemented(err) {
+		log.G(ctx).WithError(err).WithField("task", taskID).Errorf("failed to deactivate mounts")
 	}
 
 	return exit, nil
