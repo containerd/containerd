@@ -455,23 +455,30 @@ func readActiveMount(bkt *bolt.Bucket) (mount.ActiveMount, error) {
 	return active, nil
 }
 
-/*
-func createBucketIfNotExists(tx *bolt.Tx, keys ...[]byte) (*bolt.Bucket, error) {
-	bkt, err := tx.CreateBucketIfNotExists(keys[0])
-	if err != nil {
-		return nil, err
+func readActivationInfo(name string, bkt *bolt.Bucket) (mount.ActivationInfo, error) {
+	info := mount.ActivationInfo{
+		Name: name,
 	}
-
-	for _, key := range keys[1:] {
-		bkt, err = bkt.CreateBucketIfNotExists(key)
-		if err != nil {
-			return nil, err
+	if abkt := bkt.Bucket(bucketKeyActive); abkt != nil {
+		if err := abkt.ForEachBucket(func(k []byte) error {
+			active, err := readActiveMount(abkt.Bucket(k))
+			if err != nil {
+				return err
+			}
+			info.Active = append(info.Active, active)
+			return nil
+		}); err != nil {
+			return mount.ActivationInfo{}, err
 		}
 	}
+	lbls, err := boltutil.ReadLabels(bkt)
+	if err != nil {
+		return mount.ActivationInfo{}, err
+	}
+	info.Labels = lbls
 
-	return bkt, nil
+	return info, nil
 }
-*/
 
 func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
 	bkt := tx.Bucket(keys[0])
@@ -587,16 +594,55 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 	return nil
 }
 
-func (mm *mountManager) Info(context.Context, string) (mount.ActivationInfo, error) {
-	return mount.ActivationInfo{}, errdefs.ErrNotImplemented
+func (mm *mountManager) Info(ctx context.Context, name string) (mount.ActivationInfo, error) {
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return mount.ActivationInfo{}, err
+	}
+	var info mount.ActivationInfo
+	if err := mm.db.View(func(tx *bolt.Tx) error {
+		bkt := getBucket(tx, []byte("v1"), []byte(namespace), bucketKeyMounts, []byte(name))
+		if bkt == nil {
+			return fmt.Errorf("mount %q %w", name, errdefs.ErrNotFound)
+		}
+		var err error
+		info, err = readActivationInfo(name, bkt)
+		return err
+	}); err != nil {
+		return mount.ActivationInfo{}, err
+	}
+	return info, nil
 }
 
 func (mm *mountManager) Update(context.Context, mount.ActivationInfo, ...string) (mount.ActivationInfo, error) {
 	return mount.ActivationInfo{}, errdefs.ErrNotImplemented
 }
 
-func (mm *mountManager) List(context.Context, ...string) ([]mount.ActivationInfo, error) {
-	return nil, errdefs.ErrNotImplemented
+func (mm *mountManager) List(ctx context.Context, filters ...string) ([]mount.ActivationInfo, error) {
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var infos []mount.ActivationInfo
+	if err := mm.db.View(func(tx *bolt.Tx) error {
+		mbkt := getBucket(tx, []byte("v1"), []byte(namespace), bucketKeyMounts)
+		if mbkt == nil {
+			return nil
+		}
+
+		return mbkt.ForEachBucket(func(k []byte) error {
+			info, err := readActivationInfo(string(k), mbkt.Bucket(k))
+			if err != nil {
+				return err
+			}
+			infos = append(infos, info)
+			return nil
+		})
+	}); err != nil {
+		return nil, err
+	}
+	return infos, nil
 }
 
 func (mm *mountManager) StartCollection(ctx context.Context) (metadata.CollectionContext, error) {
