@@ -80,11 +80,12 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		return nil, fmt.Errorf("failed to set removing state for container %q: %w", id, err)
 	}
 	defer func() {
-		if retErr != nil {
-			// Reset removing if remove failed.
-			if err := resetContainerRemoving(container); err != nil {
-				log.G(ctx).WithError(err).Errorf("failed to reset removing state for container %q", id)
-			}
+		if retErr == nil {
+			return
+		}
+		// Reset removing if remove failed.
+		if err := resetContainerRemoving(container); err != nil {
+			log.G(ctx).WithError(err).Errorf("failed to reset removing state for container %q", id)
 		}
 	}()
 

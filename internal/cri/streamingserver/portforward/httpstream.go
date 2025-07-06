@@ -271,17 +271,18 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	log.L.WithFields(log.Fields{"request": p.requestID, "port": portString}).Info(
 		"Connection request done invoking forwarder.PortForward for port connection")
 
-	if err != nil {
-		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
-		utilruntime.HandleError(msg)
-		fmt.Fprint(p.errorStream, msg.Error())
-		// receiving an error from a port-forward operation indicates a problem
-		// with data stream most probably, thus we want to reset the streams
-		// indicating there was a problem and allow a new set of streams be
-		// created to mitigate the problem
-		p.dataStream.Reset()  //nolint:errcheck
-		p.errorStream.Reset() //nolint:errcheck
+	if err == nil {
+		return
 	}
+	msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
+	utilruntime.HandleError(msg)
+	fmt.Fprint(p.errorStream, msg.Error())
+	// receiving an error from a port-forward operation indicates a problem
+	// with data stream most probably, thus we want to reset the streams
+	// indicating there was a problem and allow a new set of streams be
+	// created to mitigate the problem
+	p.dataStream.Reset()  //nolint:errcheck
+	p.errorStream.Reset() //nolint:errcheck
 }
 
 // httpStreamPair represents the error and data streams for a port

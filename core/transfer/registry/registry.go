@@ -292,12 +292,14 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 					continue
 				}
 
-				if err := stream.Send(a); err != nil {
-					if !errors.Is(err, io.EOF) {
-						log.G(ctx).WithError(err).Error("unexpected send failure")
-					}
-					return
+				err = stream.Send(a)
+				if err == nil {
+					continue
 				}
+				if !errors.Is(err, io.EOF) {
+					log.G(ctx).WithError(err).Error("unexpected send failure")
+				}
+				return
 			}
 
 		}()

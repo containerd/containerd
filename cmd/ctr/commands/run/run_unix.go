@@ -381,11 +381,11 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		}
 
 		if c := cliContext.String("blockio-class"); c != "" {
-			if linuxBlockIO, err := blockio.OciLinuxBlockIO(c); err == nil {
-				opts = append(opts, oci.WithBlockIO(linuxBlockIO))
-			} else {
+			linuxBlockIO, err := blockio.OciLinuxBlockIO(c)
+			if err != nil {
 				return nil, fmt.Errorf("blockio-class error: %w", err)
 			}
+			opts = append(opts, oci.WithBlockIO(linuxBlockIO))
 		}
 		if c := cliContext.String("rdt-class"); c != "" {
 			opts = append(opts, oci.WithRdt(c, "", ""))

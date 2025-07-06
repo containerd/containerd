@@ -239,12 +239,13 @@ func appendMemoryPodStats(podRuntimeStats *runtime.WindowsContainerStats, contai
 		podRuntimeStats.Memory.WorkingSetBytes.Value += containerRunTimeStats.Memory.WorkingSetBytes.Value
 	}
 
-	if containerRunTimeStats.Memory.CommitMemoryBytes != nil {
-		if podRuntimeStats.Memory.CommitMemoryBytes == nil {
-			podRuntimeStats.Memory.CommitMemoryBytes = &runtime.UInt64Value{Value: 0}
-		}
-		podRuntimeStats.Memory.CommitMemoryBytes.Value += containerRunTimeStats.Memory.CommitMemoryBytes.Value
+	if containerRunTimeStats.Memory.CommitMemoryBytes == nil {
+		return
 	}
+	if podRuntimeStats.Memory.CommitMemoryBytes == nil {
+		podRuntimeStats.Memory.CommitMemoryBytes = &runtime.UInt64Value{Value: 0}
+	}
+	podRuntimeStats.Memory.CommitMemoryBytes.Value += containerRunTimeStats.Memory.CommitMemoryBytes.Value
 }
 
 func (c *criService) listWindowsMetricsForSandbox(ctx context.Context, sandbox sandboxstore.Sandbox) ([]*types.Metric, []containerstore.Container, error) {
