@@ -49,6 +49,10 @@ linters:
         - -ST1021
     revive:
       rules:
+        - name: early-return
+          arguments:
+            - "preserve-scope"
+            - "allow-jump"
         - name: package-comments
           severity: warning
           disabled: true

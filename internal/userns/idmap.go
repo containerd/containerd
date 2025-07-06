@@ -130,13 +130,14 @@ func toHost(contID uint32, idMap []specs.LinuxIDMapping) (uint32, error) {
 		if err != nil {
 			break
 		}
-		if contID >= m.ContainerID && contID < high {
-			hostID, err := safeSum(m.HostID, contID-m.ContainerID)
-			if err != nil || hostID == invalidID {
-				break
-			}
-			return hostID, nil
+		if contID < m.ContainerID || contID >= high {
+			continue
 		}
+		hostID, err := safeSum(m.HostID, contID-m.ContainerID)
+		if err != nil || hostID == invalidID {
+			break
+		}
+		return hostID, nil
 	}
 	return invalidID, fmt.Errorf("container ID %d cannot be mapped to a host ID", contID)
 }

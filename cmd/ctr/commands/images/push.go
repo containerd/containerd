@@ -163,13 +163,14 @@ var pushCommand = &cli.Command{
 				if manifests, err := images.Children(ctx, cs, desc); err == nil && len(manifests) > 0 {
 					matcher := platforms.NewMatcher(p)
 					for _, manifest := range manifests {
-						if manifest.Platform != nil && matcher.Match(*manifest.Platform) {
-							if _, err := images.Children(ctx, cs, manifest); err != nil {
-								return fmt.Errorf("no matching manifest: %w", err)
-							}
-							desc = manifest
-							break
+						if manifest.Platform == nil || !matcher.Match(*manifest.Platform) {
+							continue
 						}
+						if _, err := images.Children(ctx, cs, manifest); err != nil {
+							return fmt.Errorf("no matching manifest: %w", err)
+						}
+						desc = manifest
+						break
 					}
 				}
 			}

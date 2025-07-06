@@ -562,16 +562,17 @@ var unpackCommand = &cli.Command{
 		}
 		var unpacked bool
 		for _, image := range images {
-			if image.Target().Digest == dgst {
-				fmt.Printf("unpacking %s (%s)...", dgst, image.Target().MediaType)
-				if err := image.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs")))); err != nil {
-					fmt.Println()
-					return err
-				}
-				fmt.Println("done")
-				unpacked = true
-				break
+			if image.Target().Digest != dgst {
+				continue
 			}
+			fmt.Printf("unpacking %s (%s)...", dgst, image.Target().MediaType)
+			if err := image.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs")))); err != nil {
+				fmt.Println()
+				return err
+			}
+			fmt.Println("done")
+			unpacked = true
+			break
 		}
 		if !unpacked {
 			return errors.New("manifest not found")

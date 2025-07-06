@@ -341,16 +341,19 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 			d:    &config.GRPC.Address,
 		},
 	} {
-		if s := cliContext.String(v.name); s != "" {
-			*v.d = s
-			if v.name == "root" || v.name == "state" {
-				absPath, err := filepath.Abs(s)
-				if err != nil {
-					return err
-				}
-				*v.d = absPath
-			}
+		s := cliContext.String(v.name)
+		if s == "" {
+			continue
 		}
+		*v.d = s
+		if v.name != "root" && v.name != "state" {
+			continue
+		}
+		absPath, err := filepath.Abs(s)
+		if err != nil {
+			return err
+		}
+		*v.d = absPath
 	}
 
 	applyPlatformFlags(cliContext)
@@ -392,15 +395,16 @@ func dumpStacks(writeToFile bool) {
 	buf = buf[:stackSize]
 	log.L.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 
-	if writeToFile {
-		// Also write to file to aid gathering diagnostics
-		name := filepath.Join(os.TempDir(), fmt.Sprintf("containerd.%d.stacks.log", os.Getpid()))
-		f, err := os.Create(name)
-		if err != nil {
-			return
-		}
-		defer f.Close()
-		f.WriteString(string(buf))
-		log.L.Infof("goroutine stack dump written to %s", name)
+	if !writeToFile {
+		return
 	}
+	// Also write to file to aid gathering diagnostics
+	name := filepath.Join(os.TempDir(), fmt.Sprintf("containerd.%d.stacks.log", os.Getpid()))
+	f, err := os.Create(name)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	f.WriteString(string(buf))
+	log.L.Infof("goroutine stack dump written to %s", name)
 }

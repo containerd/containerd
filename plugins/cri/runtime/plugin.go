@@ -290,11 +290,15 @@ func migrateConfig(dst, src map[string]interface{}) {
 	}
 	for _, v := range runtimesConf.(map[string]interface{}) {
 		runtimeConf := v.(map[string]interface{})
-		if sandboxMode, ok := runtimeConf["sandbox_mode"]; ok {
-			if _, ok := runtimeConf["sandboxer"]; !ok {
-				runtimeConf["sandboxer"] = sandboxMode
-				delete(runtimeConf, "sandbox_mode")
-			}
+		sandboxMode, ok := runtimeConf["sandbox_mode"]
+		if !ok {
+			continue
 		}
+		_, ok = runtimeConf["sandboxer"]
+		if ok {
+			continue
+		}
+		runtimeConf["sandboxer"] = sandboxMode
+		delete(runtimeConf, "sandbox_mode")
 	}
 }

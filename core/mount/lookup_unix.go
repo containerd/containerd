@@ -42,10 +42,11 @@ func Lookup(dir string) (Info, error) {
 	// find the longest matching mount point
 	var idx, maxlen int
 	for i := range m {
-		if len(m[i].Mountpoint) > maxlen {
-			maxlen = len(m[i].Mountpoint)
-			idx = i
+		if len(m[i].Mountpoint) <= maxlen {
+			continue
 		}
+		maxlen = len(m[i].Mountpoint)
+		idx = i
 	}
 	return *m[idx], nil
 }

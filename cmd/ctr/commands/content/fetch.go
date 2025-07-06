@@ -301,10 +301,11 @@ outer:
 					}
 				} else if done {
 					if ok {
-						if status.Status != StatusDone && status.Status != StatusExists {
-							status.Status = StatusDone
-							statuses[key] = status
+						if status.Status == StatusDone || status.Status == StatusExists {
+							continue
 						}
+						status.Status = StatusDone
+						statuses[key] = status
 					} else {
 						statuses[key] = StatusInfo{
 							Ref:    key,

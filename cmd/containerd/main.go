@@ -27,8 +27,10 @@ import (
 
 func main() {
 	app := command.App()
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
-		os.Exit(1)
+	err := app.Run(os.Args)
+	if err == nil {
+		return
 	}
+	fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
+	os.Exit(1)
 }

@@ -329,14 +329,15 @@ func copyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
 				break
 			}
 		}
-		if er != nil {
-			// If an EOF happens after reading fewer than the requested bytes,
-			// ReadAtLeast returns ErrUnexpectedEOF.
-			if er != io.EOF && er != io.ErrUnexpectedEOF {
-				err = er
-			}
-			break
+		if er == nil {
+			continue
 		}
+		// If an EOF happens after reading fewer than the requested bytes,
+		// ReadAtLeast returns ErrUnexpectedEOF.
+		if er != io.EOF && er != io.ErrUnexpectedEOF {
+			err = er
+		}
+		break
 	}
 	return
 }

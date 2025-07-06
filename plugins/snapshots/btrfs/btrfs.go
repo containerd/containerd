@@ -317,10 +317,11 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	)
 
 	defer func() {
-		if removed != "" {
-			if derr := btrfs.SubvolDelete(removed); derr != nil {
-				log.G(ctx).WithError(derr).WithField("subvolume", removed).Warn("failed to delete subvolume")
-			}
+		if removed == "" {
+			return
+		}
+		if derr := btrfs.SubvolDelete(removed); derr != nil {
+			log.G(ctx).WithError(derr).WithField("subvolume", removed).Warn("failed to delete subvolume")
 		}
 	}()
 

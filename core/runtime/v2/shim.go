@@ -351,19 +351,20 @@ func grpcDialContext(
 		gctx := context.Background()
 		sourceState := connectivity.Ready
 		for {
-			if client.WaitForStateChange(gctx, sourceState) {
-				state := client.GetState()
-				if state == connectivity.Idle || state == connectivity.Shutdown {
-					break
-				}
-				// Could be transient failure. Lets see if we can get back to a working
-				// state.
-				log.G(gctx).WithFields(log.Fields{
-					"state": state,
-					"addr":  target,
-				}).Warn("shim grpc connection unexpected state")
-				sourceState = state
+			if !client.WaitForStateChange(gctx, sourceState) {
+				continue
 			}
+			state := client.GetState()
+			if state == connectivity.Idle || state == connectivity.Shutdown {
+				break
+			}
+			// Could be transient failure. Lets see if we can get back to a working
+			// state.
+			log.G(gctx).WithFields(log.Fields{
+				"state": state,
+				"addr":  target,
+			}).Warn("shim grpc connection unexpected state")
+			sourceState = state
 		}
 		onClose()
 		close(done)

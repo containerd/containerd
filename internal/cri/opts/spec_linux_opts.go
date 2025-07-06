@@ -52,10 +52,11 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 		for _, e := range extra {
 			found := false
 			for _, c := range criMounts {
-				if filepath.Clean(e.ContainerPath) == filepath.Clean(c.ContainerPath) {
-					found = true
-					break
+				if filepath.Clean(e.ContainerPath) != filepath.Clean(c.ContainerPath) {
+					continue
 				}
+				found = true
+				break
 			}
 			if !found {
 				mounts = append(mounts, e)

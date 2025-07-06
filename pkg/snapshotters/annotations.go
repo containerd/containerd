@@ -58,15 +58,16 @@ func AppendInfoHandlerWrapper(ref string) func(f images.Handler) images.Handler 
 			if images.IsManifestType(desc.MediaType) {
 				for i := range children {
 					c := &children[i]
-					if images.IsLayerType(c.MediaType) {
-						if c.Annotations == nil {
-							c.Annotations = make(map[string]string)
-						}
-						c.Annotations[TargetRefLabel] = ref
-						c.Annotations[TargetLayerDigestLabel] = c.Digest.String()
-						c.Annotations[TargetImageLayersLabel] = getLayers(ctx, TargetImageLayersLabel, children[i:], labels.Validate)
-						c.Annotations[TargetManifestDigestLabel] = desc.Digest.String()
+					if !images.IsLayerType(c.MediaType) {
+						continue
 					}
+					if c.Annotations == nil {
+						c.Annotations = make(map[string]string)
+					}
+					c.Annotations[TargetRefLabel] = ref
+					c.Annotations[TargetLayerDigestLabel] = c.Digest.String()
+					c.Annotations[TargetImageLayersLabel] = getLayers(ctx, TargetImageLayersLabel, children[i:], labels.Validate)
+					c.Annotations[TargetManifestDigestLabel] = desc.Digest.String()
 				}
 			}
 			return children, nil
@@ -79,18 +80,19 @@ func AppendInfoHandlerWrapper(ref string) func(f images.Handler) images.Handler 
 // as meets the label validation.
 func getLayers(ctx context.Context, key string, descs []ocispec.Descriptor, validate func(k, v string) error) (layers string) {
 	for _, l := range descs {
-		if images.IsLayerType(l.MediaType) {
-			item := l.Digest.String()
-			if layers != "" {
-				item = "," + item
-			}
-			// This avoids the label hits the size limitation.
-			if err := validate(key, layers+item); err != nil {
-				log.G(ctx).WithError(err).WithField("label", key).WithField("digest", l.Digest.String()).Debug("omitting digest in the layers list")
-				break
-			}
-			layers += item
+		if !images.IsLayerType(l.MediaType) {
+			continue
 		}
+		item := l.Digest.String()
+		if layers != "" {
+			item = "," + item
+		}
+		// This avoids the label hits the size limitation.
+		if err := validate(key, layers+item); err != nil {
+			log.G(ctx).WithError(err).WithField("label", key).WithField("digest", l.Digest.String()).Debug("omitting digest in the layers list")
+			break
+		}
+		layers += item
 	}
 	return
 }

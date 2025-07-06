@@ -84,10 +84,12 @@ func Tricolor(roots []Node, refs func(ref Node) ([]Node, error)) (map[Node]struc
 
 		// mark all the referenced objects as gray
 		for _, target := range rs {
-			if _, ok := seen[target]; !ok {
-				grays = append(grays, target)
-				seen[target] = struct{}{}
+			_, ok := seen[target]
+			if ok {
+				continue
 			}
+			grays = append(grays, target)
+			seen[target] = struct{}{}
 		}
 
 		// strip bits above max resource type
@@ -183,10 +185,12 @@ func Sweep(reachable map[Node]struct{}, all []Node, remove func(Node) error) err
 	// All black objects are now reachable, and all white objects are
 	// unreachable. Free those that are white!
 	for _, node := range all {
-		if _, ok := reachable[node]; !ok {
-			if err := remove(node); err != nil {
-				return err
-			}
+		_, ok := reachable[node]
+		if ok {
+			continue
+		}
+		if err := remove(node); err != nil {
+			return err
 		}
 	}
 

@@ -97,10 +97,11 @@ func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) err
 			return err
 		}
 
-		if len(children) > 0 {
-			if err := Walk(ctx, handler, children...); err != nil {
-				return err
-			}
+		if len(children) == 0 {
+			continue
+		}
+		if err := Walk(ctx, handler, children...); err != nil {
+			return err
 		}
 	}
 	return nil

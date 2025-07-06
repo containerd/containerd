@@ -54,13 +54,15 @@ func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) erro
 
 	// We should do defer first, if not we will not do Unmount when only a part of Mounts are failed.
 	defer func() {
-		if uerr = UnmountMounts(mounts, root, 0); uerr != nil {
-			uerr = fmt.Errorf("failed to unmount %s: %w", root, uerr)
-			if err == nil {
-				err = uerr
-			} else {
-				err = fmt.Errorf("%s: %w", uerr.Error(), err)
-			}
+		uerr = UnmountMounts(mounts, root, 0)
+		if uerr == nil {
+			return
+		}
+		uerr = fmt.Errorf("failed to unmount %s: %w", root, uerr)
+		if err == nil {
+			err = uerr
+		} else {
+			err = fmt.Errorf("%s: %w", uerr.Error(), err)
 		}
 	}()
 
@@ -88,13 +90,14 @@ func RemoveVolatileOption(mounts []Mount) []Mount {
 			continue
 		}
 		for j, opt := range m.Options {
-			if opt == "volatile" {
-				if out == nil {
-					out = copyMounts(mounts)
-				}
-				out[i].Options = append(out[i].Options[:j], out[i].Options[j+1:]...)
-				break
+			if opt != "volatile" {
+				continue
 			}
+			if out == nil {
+				out = copyMounts(mounts)
+			}
+			out[i].Options = append(out[i].Options[:j], out[i].Options[j+1:]...)
+			break
 		}
 	}
 
@@ -110,12 +113,13 @@ func RemoveIDMapOption(mounts []Mount) []Mount {
 	var out []Mount
 	for i, m := range mounts {
 		for j, opt := range m.Options {
-			if strings.HasPrefix(opt, "uidmap") || strings.HasPrefix(opt, "gidmap") {
-				if out == nil {
-					out = copyMounts(mounts)
-				}
-				out[i].Options = append(out[i].Options[:j], out[i].Options[j+1:]...)
+			if !strings.HasPrefix(opt, "uidmap") && !strings.HasPrefix(opt, "gidmap") {
+				continue
 			}
+			if out == nil {
+				out = copyMounts(mounts)
+			}
+			out[i].Options = append(out[i].Options[:j], out[i].Options[j+1:]...)
 		}
 	}
 	if out != nil {

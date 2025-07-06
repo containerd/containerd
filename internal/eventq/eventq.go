@@ -99,11 +99,12 @@ func New[T any](discardAfter time.Duration, discardFn func(T)) EventQueue[T] {
 			case s := <-subscriberC:
 				var closed bool
 				for i, event := range discardQueue {
-					if !s.publish(event.event) {
-						discardQueue = discardQueue[i:]
-						closed = true
-						break
+					if s.publish(event.event) {
+						continue
 					}
+					discardQueue = discardQueue[i:]
+					closed = true
+					break
 				}
 				if !closed {
 					discardQueue = nil
@@ -114,12 +115,11 @@ func New[T any](discardAfter time.Duration, discardFn func(T)) EventQueue[T] {
 				toDiscard := discardQueue
 				discardQueue = nil
 				for i, event := range toDiscard {
-					if t.After(event.discardAt) {
-						discardFn(event.event)
-					} else {
+					if !t.After(event.discardAt) {
 						discardQueue = toDiscard[i:]
 						break
 					}
+					discardFn(event.event)
 				}
 				if len(discardQueue) == 0 {
 					discardTime = nil

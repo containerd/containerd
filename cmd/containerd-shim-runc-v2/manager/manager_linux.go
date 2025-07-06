@@ -196,18 +196,21 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 		return params, err
 	}
 	for _, group := range groupLabels {
-		if groupID, ok := spec.Annotations[group]; ok {
-			grouping = groupID
-			break
+		groupID, ok := spec.Annotations[group]
+		if !ok {
+			continue
 		}
+		grouping = groupID
+		break
 	}
 
 	var sockets []*shimSocket
 	defer func() {
-		if retErr != nil {
-			for _, s := range sockets {
-				s.Close()
-			}
+		if retErr == nil {
+			return
+		}
+		for _, s := range sockets {
+			s.Close()
 		}
 	}()
 

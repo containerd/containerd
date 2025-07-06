@@ -464,10 +464,11 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	case nil:
 		// all good
 	case errContentRangeIgnored:
-		if parallelism != 1 {
-			log.G(ctx).WithError(err).Info("remote host ignored content range, forcing parallelism to 1")
-			parallelism = 1
+		if parallelism == 1 {
+			break
 		}
+		log.G(ctx).WithError(err).Info("remote host ignored content range, forcing parallelism to 1")
+		parallelism = 1
 	default:
 		log.G(ctx).WithError(err).Debug("fetch failed")
 		r.Release(1)

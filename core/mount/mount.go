@@ -65,10 +65,12 @@ func UnmountMounts(mounts []Mount, target string, flags int) error {
 			return err
 		}
 
-		if err := UnmountAll(mountpoint, flags); err != nil {
-			if i == len(mounts)-1 { // last mount
-				return err
-			}
+		err = UnmountAll(mountpoint, flags)
+		if err == nil {
+			continue
+		}
+		if i == len(mounts)-1 { // last mount
+			return err
 		}
 	}
 	return nil

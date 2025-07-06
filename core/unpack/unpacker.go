@@ -196,13 +196,14 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 			}
 			configTypes[p.ConfigType] = true
 		}
-		if len(p.LayerTypes) > 0 {
-			if layerTypes == nil {
-				layerTypes = make(map[string]bool)
-			}
-			for _, t := range p.LayerTypes {
-				layerTypes[t] = true
-			}
+		if len(p.LayerTypes) == 0 {
+			continue
+		}
+		if layerTypes == nil {
+			layerTypes = make(map[string]bool)
+		}
+		for _, t := range p.LayerTypes {
+			layerTypes[t] = true
 		}
 	}
 
@@ -316,10 +317,11 @@ func (u *Unpacker) unpack(
 		if (up.ConfigType == "" || images.IsConfigType(up.ConfigType)) && i.RootFS.Type != "" && i.RootFS.Type != "layers" {
 			continue
 		}
-		if up.Platform.Match(imgPlatform) {
-			unpack = up
-			break
+		if !up.Platform.Match(imgPlatform) {
+			continue
 		}
+		unpack = up
+		break
 	}
 
 	if unpack == nil {
@@ -379,24 +381,22 @@ func (u *Unpacker) unpack(
 			// Prepare snapshot with from parent, label as root
 			key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
 			mounts, err = sn.Prepare(ctx, key, parent, opts...)
-			if err != nil {
-				if errdefs.IsAlreadyExists(err) {
-					if _, err := sn.Stat(ctx, chainID); err != nil {
-						if !errdefs.IsNotFound(err) {
-							return fmt.Errorf("failed to stat snapshot %s: %w", chainID, err)
-						}
-						// Try again, this should be rare, log it
-						log.G(ctx).WithField("key", key).WithField("chainid", chainID).Debug("extraction snapshot already exists, chain id not found")
-					} else {
-						// no need to handle, snapshot now found with chain id
-						return nil
-					}
-				} else {
-					return fmt.Errorf("failed to prepare extraction snapshot %q: %w", key, err)
-				}
-			} else {
+			if err == nil {
 				break
 			}
+			if !errdefs.IsAlreadyExists(err) {
+				return fmt.Errorf("failed to prepare extraction snapshot %q: %w", key, err)
+			}
+			_, err := sn.Stat(ctx, chainID)
+			if err == nil {
+				// no need to handle, snapshot now found with chain id
+				return nil
+			}
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to stat snapshot %s: %w", chainID, err)
+			}
+			// Try again, this should be rare, log it
+			log.G(ctx).WithField("key", key).WithField("chainid", chainID).Debug("extraction snapshot already exists, chain id not found")
 		}
 		if err != nil {
 			return fmt.Errorf("unable to prepare extraction snapshot: %w", err)

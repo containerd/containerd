@@ -54,10 +54,11 @@ func (m *Mount) mount(target string) (retErr error) {
 		return fmt.Errorf("failed to activate layer %s: %w", m.Source, err)
 	}
 	defer func() {
-		if retErr != nil {
-			if layerErr := hcsshim.DeactivateLayer(di, layerID); layerErr != nil {
-				log.G(context.TODO()).WithError(layerErr).Error("failed to deactivate layer during mount failure cleanup")
-			}
+		if retErr == nil {
+			return
+		}
+		if layerErr := hcsshim.DeactivateLayer(di, layerID); layerErr != nil {
+			log.G(context.TODO()).WithError(layerErr).Error("failed to deactivate layer during mount failure cleanup")
 		}
 	}()
 
@@ -66,10 +67,11 @@ func (m *Mount) mount(target string) (retErr error) {
 	}
 
 	defer func() {
-		if retErr != nil {
-			if layerErr := hcsshim.UnprepareLayer(di, layerID); layerErr != nil {
-				log.G(context.TODO()).WithError(layerErr).Error("failed to unprepare layer during mount failure cleanup")
-			}
+		if retErr == nil {
+			return
+		}
+		if layerErr := hcsshim.UnprepareLayer(di, layerID); layerErr != nil {
+			log.G(context.TODO()).WithError(layerErr).Error("failed to unprepare layer during mount failure cleanup")
 		}
 	}()
 
@@ -90,10 +92,11 @@ func (m *Mount) mount(target string) (retErr error) {
 		return fmt.Errorf("failed to set volume mount path for layer %s: %w", m.Source, err)
 	}
 	defer func() {
-		if retErr != nil {
-			if bindErr := bindfilter.RemoveFileBinding(target); bindErr != nil {
-				log.G(context.TODO()).WithError(bindErr).Error("failed to remove binding during mount failure cleanup")
-			}
+		if retErr == nil {
+			return
+		}
+		if bindErr := bindfilter.RemoveFileBinding(target); bindErr != nil {
+			log.G(context.TODO()).WithError(bindErr).Error("failed to remove binding during mount failure cleanup")
 		}
 	}()
 
@@ -115,11 +118,12 @@ const ParentLayerPathsFlag = "parentLayerPaths="
 func (m *Mount) GetParentPaths() ([]string, error) {
 	var parentLayerPaths []string
 	for _, option := range m.Options {
-		if strings.HasPrefix(option, ParentLayerPathsFlag) {
-			err := json.Unmarshal([]byte(option[len(ParentLayerPathsFlag):]), &parentLayerPaths)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal parent layer paths from mount: %w", err)
-			}
+		if !strings.HasPrefix(option, ParentLayerPathsFlag) {
+			continue
+		}
+		err := json.Unmarshal([]byte(option[len(ParentLayerPathsFlag):]), &parentLayerPaths)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal parent layer paths from mount: %w", err)
 		}
 	}
 	return parentLayerPaths, nil

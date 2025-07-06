@@ -63,8 +63,8 @@ func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder Po
 		err = handleHTTPStreams(req, w, portForwarder, podName, uid, supportedProtocols, idleTimeout, streamCreationTimeout)
 	}
 
-	if err != nil {
-		runtime.HandleError(err)
+	if err == nil {
 		return
 	}
+	runtime.HandleError(err)
 }

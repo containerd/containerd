@@ -84,11 +84,12 @@ func NewPolicy(policy string) (*Policy, error) {
 		}
 	case "on-failure":
 		policy = policySlice[0]
-		if len(policySlice) > 1 {
-			retryCount, err = strconv.Atoi(policySlice[1])
-			if err != nil {
-				return nil, fmt.Errorf("invalid max retry count: %s", policySlice[1])
-			}
+		if len(policySlice) <= 1 {
+			break
+		}
+		retryCount, err = strconv.Atoi(policySlice[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid max retry count: %s", policySlice[1])
 		}
 	default:
 		return nil, fmt.Errorf("restart policy %q not supported", policy)

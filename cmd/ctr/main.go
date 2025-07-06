@@ -29,8 +29,10 @@ var pluginCmds = []*cli.Command{}
 func main() {
 	app := app.New()
 	app.Commands = append(app.Commands, pluginCmds...)
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "ctr: %s\n", err)
-		os.Exit(1)
+	err := app.Run(os.Args)
+	if err == nil {
+		return
 	}
+	fmt.Fprintf(os.Stderr, "ctr: %s\n", err)
+	os.Exit(1)
 }

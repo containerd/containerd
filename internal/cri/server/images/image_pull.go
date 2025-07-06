@@ -443,26 +443,27 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	labels := img.Labels()
 	criLabels := c.getLabels(ctx, r)
 	for key, value := range criLabels {
-		if labels[key] != value {
-			// Make sure the image has the image id as its unique
-			// identifier that references the image in its lifetime.
-			configDesc, err := img.Config(ctx)
-			if err != nil {
-				return fmt.Errorf("get image id: %w", err)
-			}
-			id := configDesc.Digest.String()
-			if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
-				return fmt.Errorf("create image id reference %q: %w", id, err)
-			}
-			if err := c.imageStore.Update(ctx, id); err != nil {
-				return fmt.Errorf("update image store for %q: %w", id, err)
-			}
-			// The image id is ready, add the label to mark the image as managed.
-			if err := c.createOrUpdateImageReference(ctx, r, img.Target(), criLabels); err != nil {
-				return fmt.Errorf("create managed label: %w", err)
-			}
-			break
+		if labels[key] == value {
+			continue
 		}
+		// Make sure the image has the image id as its unique
+		// identifier that references the image in its lifetime.
+		configDesc, err := img.Config(ctx)
+		if err != nil {
+			return fmt.Errorf("get image id: %w", err)
+		}
+		id := configDesc.Digest.String()
+		if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
+			return fmt.Errorf("create image id reference %q: %w", id, err)
+		}
+		if err := c.imageStore.Update(ctx, id); err != nil {
+			return fmt.Errorf("update image store for %q: %w", id, err)
+		}
+		// The image id is ready, add the label to mark the image as managed.
+		if err := c.createOrUpdateImageReference(ctx, r, img.Target(), criLabels); err != nil {
+			return fmt.Errorf("create managed label: %w", err)
+		}
+		break
 	}
 	if err := c.imageStore.Update(ctx, r); err != nil {
 		return fmt.Errorf("update image store for %q: %w", r, err)
@@ -939,19 +940,22 @@ func (reporter *transferProgressReporter) handleProgress(p transfer.Progress) {
 		// Download may be complete, but waiting for content
 		// to be written. In this case, we no longer consider it
 		// as an active requests.
-		if p.Progress == p.Total {
-			reporter.reqReporter.decRequest()
-			delete(reporter.statuses, p.Name)
+		if p.Progress != p.Total {
+			break
 		}
+		reporter.reqReporter.decRequest()
+		delete(reporter.statuses, p.Name)
 
 	case "complete":
-		if node, exists := reporter.statuses[p.Name]; exists {
-			if curProgress := p.Progress - node.Progress; curProgress > 0 {
-				reporter.IncBytesRead(curProgress)
-			}
-			reporter.reqReporter.decRequest()
-			delete(reporter.statuses, p.Name)
+		node, exists := reporter.statuses[p.Name]
+		if !exists {
+			break
 		}
+		if curProgress := p.Progress - node.Progress; curProgress > 0 {
+			reporter.IncBytesRead(curProgress)
+		}
+		reporter.reqReporter.decRequest()
+		delete(reporter.statuses, p.Name)
 	default:
 		return
 	}
@@ -1019,10 +1023,11 @@ func (reporter *transferProgressReporter) checkProgress(ctx context.Context, rep
 		return
 	}
 
-	if time.Since(lastSeenTimestamp) > reporter.timeout {
-		log.G(ctx).Errorf("cancel pulling image %s because of no progress in %v", reporter.ref, reporter.timeout)
-		reporter.cancel()
+	if time.Since(lastSeenTimestamp) <= reporter.timeout {
+		return
 	}
+	log.G(ctx).Errorf("cancel pulling image %s because of no progress in %v", reporter.ref, reporter.timeout)
+	reporter.cancel()
 }
 
 func (reporter *transferProgressReporter) createProgressFunc(ctx context.Context) transfer.ProgressFunc {

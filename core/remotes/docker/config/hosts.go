@@ -629,19 +629,20 @@ func loadCertFiles(ctx context.Context, certsDir string) ([]hostConfig, error) {
 		if strings.HasSuffix(f.Name(), ".crt") {
 			hosts[0].caCerts = append(hosts[0].caCerts, filepath.Join(certsDir, f.Name()))
 		}
-		if strings.HasSuffix(f.Name(), ".cert") {
-			var pair [2]string
-			certFile := f.Name()
-			pair[0] = filepath.Join(certsDir, certFile)
-			// Check if key also exists
-			keyFile := filepath.Join(certsDir, certFile[:len(certFile)-5]+".key")
-			if _, err := os.Stat(keyFile); err == nil {
-				pair[1] = keyFile
-			} else if !os.IsNotExist(err) {
-				return nil, err
-			}
-			hosts[0].clientPairs = append(hosts[0].clientPairs, pair)
+		if !strings.HasSuffix(f.Name(), ".cert") {
+			continue
 		}
+		var pair [2]string
+		certFile := f.Name()
+		pair[0] = filepath.Join(certsDir, certFile)
+		// Check if key also exists
+		keyFile := filepath.Join(certsDir, certFile[:len(certFile)-5]+".key")
+		if _, err := os.Stat(keyFile); err == nil {
+			pair[1] = keyFile
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
+		hosts[0].clientPairs = append(hosts[0].clientPairs, pair)
 	}
 	return hosts, nil
 }

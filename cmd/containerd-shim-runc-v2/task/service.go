@@ -210,11 +210,12 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 	}
 
 	cleanup = func() {
-		if exits != nil {
-			s.lifecycleMu.Lock()
-			defer s.lifecycleMu.Unlock()
-			delete(s.exitSubscribers, &exits)
+		if exits == nil {
+			return
 		}
+		s.lifecycleMu.Lock()
+		defer s.lifecycleMu.Unlock()
+		delete(s.exitSubscribers, &exits)
 	}
 
 	return handleStarted, cleanup
@@ -515,17 +516,18 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 			Pid: pid,
 		}
 		for _, p := range container.ExecdProcesses() {
-			if p.Pid() == int(pid) {
-				d := &options.ProcessDetails{
-					ExecID: p.ID(),
-				}
-				a, err := typeurl.MarshalAnyToProto(d)
-				if err != nil {
-					return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
-				}
-				pInfo.Info = a
-				break
+			if p.Pid() != int(pid) {
+				continue
 			}
+			d := &options.ProcessDetails{
+				ExecID: p.ID(),
+			}
+			a, err := typeurl.MarshalAnyToProto(d)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
+			}
+			pInfo.Info = a
+			break
 		}
 		processes = append(processes, &pInfo)
 	}
@@ -759,14 +761,16 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 		ExitStatus:  uint32(e.Status),
 		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 	})
-	if _, init := p.(*process.Init); !init {
-		s.lifecycleMu.Lock()
-		s.runningExecs[c]--
-		if ch, ok := s.execCountSubscribers[c]; ok {
-			ch <- s.runningExecs[c]
-		}
-		s.lifecycleMu.Unlock()
+	_, init := p.(*process.Init)
+	if init {
+		return
 	}
+	s.lifecycleMu.Lock()
+	s.runningExecs[c]--
+	if ch, ok := s.execCountSubscribers[c]; ok {
+		ch <- s.runningExecs[c]
+	}
+	s.lifecycleMu.Unlock()
 }
 
 func (s *service) getContainerPids(ctx context.Context, container *runc.Container) ([]uint32, error) {

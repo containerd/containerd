@@ -61,10 +61,11 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	}
 	var paths []string
 	defer func() {
-		if err != nil {
-			for _, d := range paths {
-				os.RemoveAll(d)
-			}
+		if err == nil {
+			return
+		}
+		for _, d := range paths {
+			os.RemoveAll(d)
 		}
 	}()
 	// create state directory for the bundle

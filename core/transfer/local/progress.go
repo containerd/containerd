@@ -97,38 +97,40 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 			log.G(ctx).WithError(err).Error("failed to get statuses for progress")
 		}
 		for dgst, job := range jobs {
-			if job.state != jobComplete {
-				status, ok := active.Status(job.name)
-				if ok {
-					if status.Offset > job.progress {
-						pf(transfer.Progress{
-							Event:    j.transferState,
-							Name:     job.name,
-							Parents:  job.parents,
-							Progress: status.Offset,
-							Total:    status.Total,
-							Desc:     &job.desc,
-						})
-						job.progress = status.Offset
-						job.state = jobInProgress
-						jobs[dgst] = job
-					}
-				} else {
-					ok, err := pt.Check(ctx, job.desc.Digest)
-					if err != nil {
-						log.G(ctx).WithError(err).Error("failed to get statuses for progress")
-					} else if ok {
-						pf(transfer.Progress{
-							Event:    "complete",
-							Name:     job.name,
-							Parents:  job.parents,
-							Progress: job.desc.Size,
-							Total:    job.desc.Size,
-							Desc:     &job.desc,
-						})
-						job.state = jobComplete
-						jobs[dgst] = job
-					}
+			if job.state == jobComplete {
+				continue
+			}
+			status, ok := active.Status(job.name)
+			if ok {
+				if status.Offset <= job.progress {
+					continue
+				}
+				pf(transfer.Progress{
+					Event:    j.transferState,
+					Name:     job.name,
+					Parents:  job.parents,
+					Progress: status.Offset,
+					Total:    status.Total,
+					Desc:     &job.desc,
+				})
+				job.progress = status.Offset
+				job.state = jobInProgress
+				jobs[dgst] = job
+			} else {
+				ok, err := pt.Check(ctx, job.desc.Digest)
+				if err != nil {
+					log.G(ctx).WithError(err).Error("failed to get statuses for progress")
+				} else if ok {
+					pf(transfer.Progress{
+						Event:    "complete",
+						Name:     job.name,
+						Parents:  job.parents,
+						Progress: job.desc.Size,
+						Total:    job.desc.Size,
+						Desc:     &job.desc,
+					})
+					job.state = jobComplete
+					jobs[dgst] = job
 				}
 			}
 		}

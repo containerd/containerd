@@ -188,33 +188,39 @@ func (cc *collectionContext) All(fn func(gc.Node)) {
 }
 
 func (cc *collectionContext) Active(ns string, fn func(gc.Node)) {
-	if nsMap, ok := cc.manager.streams[ns]; ok {
-		for name, stream := range nsMap {
-			// Don't consider leased streams as active, the lease
-			// will determine the status
-			// TODO: expire non-active streams
-			if stream.lease == "" {
-				fn(gc.Node{
-					Type:      metadata.ResourceStream,
-					Namespace: ns,
-					Key:       name,
-				})
-			}
+	nsMap, ok := cc.manager.streams[ns]
+	if !ok {
+		return
+	}
+	for name, stream := range nsMap {
+		// Don't consider leased streams as active, the lease
+		// will determine the status
+		// TODO: expire non-active streams
+		if stream.lease == "" {
+			fn(gc.Node{
+				Type:      metadata.ResourceStream,
+				Namespace: ns,
+				Key:       name,
+			})
 		}
 	}
 }
 
 func (cc *collectionContext) Leased(ns, lease string, fn func(gc.Node)) {
-	if nsMap, ok := cc.manager.byLease[ns]; ok {
-		if lsMap, ok := nsMap[lease]; ok {
-			for name := range lsMap {
-				fn(gc.Node{
-					Type:      metadata.ResourceStream,
-					Namespace: ns,
-					Key:       name,
-				})
-			}
-		}
+	nsMap, ok := cc.manager.byLease[ns]
+	if !ok {
+		return
+	}
+	lsMap, ok := nsMap[lease]
+	if !ok {
+		return
+	}
+	for name := range lsMap {
+		fn(gc.Node{
+			Type:      metadata.ResourceStream,
+			Namespace: ns,
+			Key:       name,
+		})
 	}
 }
 
@@ -241,18 +247,21 @@ func (cc *collectionContext) Finish() error {
 				delete(cc.manager.streams, node.Namespace)
 			}
 		}
-		if lease != "" {
-			if nsMap, ok := cc.manager.byLease[node.Namespace]; ok {
-				if lsMap, ok := nsMap[lease]; ok {
-					delete(lsMap, node.Key)
-					if len(lsMap) == 0 {
-						delete(nsMap, lease)
-					}
-				}
-				if len(nsMap) == 0 {
-					delete(cc.manager.byLease, node.Namespace)
-				}
+		if lease == "" {
+			continue
+		}
+		nsMap, ok := cc.manager.byLease[node.Namespace]
+		if !ok {
+			continue
+		}
+		if lsMap, ok := nsMap[lease]; ok {
+			delete(lsMap, node.Key)
+			if len(lsMap) == 0 {
+				delete(nsMap, lease)
 			}
+		}
+		if len(nsMap) == 0 {
+			delete(cc.manager.byLease, node.Namespace)
 		}
 	}
 	cc.manager.rwlock.Unlock()

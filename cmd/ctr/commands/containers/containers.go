@@ -172,12 +172,14 @@ var deleteCommand = &cli.Command{
 			return fmt.Errorf("must specify at least one container to delete: %w", errdefs.ErrInvalidArgument)
 		}
 		for _, arg := range cliContext.Args().Slice() {
-			if err := deleteContainer(ctx, client, arg, deleteOpts...); err != nil {
-				if exitErr == nil {
-					exitErr = err
-				}
-				log.G(ctx).WithError(err).Errorf("failed to delete container %q", arg)
+			err := deleteContainer(ctx, client, arg, deleteOpts...)
+			if err == nil {
+				continue
 			}
+			if exitErr == nil {
+				exitErr = err
+			}
+			log.G(ctx).WithError(err).Errorf("failed to delete container %q", arg)
 		}
 		return exitErr
 	},

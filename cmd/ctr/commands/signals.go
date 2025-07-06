@@ -42,13 +42,15 @@ func ForwardAllSignals(ctx context.Context, task killer) chan os.Signal {
 				continue
 			}
 			log.L.Debug("forwarding signal ", s)
-			if err := task.Kill(ctx, s.(syscall.Signal)); err != nil {
-				if errdefs.IsNotFound(err) {
-					log.L.WithError(err).Debugf("Not forwarding signal %s", s)
-					return
-				}
-				log.L.WithError(err).Errorf("forward signal %s", s)
+			err := task.Kill(ctx, s.(syscall.Signal))
+			if err == nil {
+				continue
 			}
+			if errdefs.IsNotFound(err) {
+				log.L.WithError(err).Debugf("Not forwarding signal %s", s)
+				return
+			}
+			log.L.WithError(err).Errorf("forward signal %s", s)
 		}
 	}()
 	return sigc

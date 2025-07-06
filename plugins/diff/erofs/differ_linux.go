@@ -178,13 +178,15 @@ func (s erofsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts
 	// committed or closed yet to force a cleanup
 	var errOpen error
 	defer func() {
-		if errOpen != nil {
-			cw.Close()
-			if newReference {
-				if abortErr := s.store.Abort(ctx, config.Reference); abortErr != nil {
-					log.G(ctx).WithError(abortErr).WithField("ref", config.Reference).Warnf("failed to delete diff upload")
-				}
-			}
+		if errOpen == nil {
+			return
+		}
+		cw.Close()
+		if !newReference {
+			return
+		}
+		if abortErr := s.store.Abort(ctx, config.Reference); abortErr != nil {
+			log.G(ctx).WithError(abortErr).WithField("ref", config.Reference).Warnf("failed to delete diff upload")
 		}
 	}()
 	if !newReference {

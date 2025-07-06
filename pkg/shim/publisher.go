@@ -102,10 +102,12 @@ func (l *RemoteEventsPublisher) processQueue() {
 			continue
 		}
 
-		if err := l.forwardRequest(i.ctx, &v1.ForwardRequest{Envelope: i.ev}); err != nil {
-			log.L.WithError(err).Error("forward event")
-			l.queue(i)
+		err := l.forwardRequest(i.ctx, &v1.ForwardRequest{Envelope: i.ev})
+		if err == nil {
+			continue
 		}
+		log.L.WithError(err).Error("forward event")
+		l.queue(i)
 	}
 }
 

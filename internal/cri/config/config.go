@@ -587,18 +587,19 @@ func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
 	}
 
 	for _, config := range localPullOnlyConfigs {
-		if config.IsPresent() {
-			// Fall back to local image pull
-			c.UseLocalImagePull = true
-			log.G(ctx).Warnf(
-				"Found '%s' in CRI config which is incompatible with transfer service (%s). "+
-					"Falling back to local image pull mode.",
-				config.Name,
-				config.Reason,
-			)
-			// Break after first conflict is found
-			break
+		if !config.IsPresent() {
+			continue
 		}
+		// Fall back to local image pull
+		c.UseLocalImagePull = true
+		log.G(ctx).Warnf(
+			"Found '%s' in CRI config which is incompatible with transfer service (%s). "+
+				"Falling back to local image pull mode.",
+			config.Name,
+			config.Reason,
+		)
+		// Break after first conflict is found
+		break
 	}
 }
 

@@ -195,10 +195,12 @@ func Run(ctx context.Context, manager Manager, opts ...BinaryOpts) {
 
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", manager.Name()))
 
-	if err := run(ctx, manager, config); err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %s", manager.Name(), err)
-		os.Exit(1)
+	err := run(ctx, manager, config)
+	if err == nil {
+		return
 	}
+	fmt.Fprintf(os.Stderr, "%s: %s", manager.Name(), err)
+	os.Exit(1)
 }
 
 func runInfo(ctx context.Context, manager Manager) error {
@@ -396,10 +398,11 @@ func run(ctx context.Context, manager Manager, config Config) error {
 			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryServerInterceptor())
 		}
 
-		if result.Registration.ID == "pprof" {
-			if src, ok := instance.(server); ok {
-				pprofHandler = src
-			}
+		if result.Registration.ID != "pprof" {
+			continue
+		}
+		if src, ok := instance.(server); ok {
+			pprofHandler = src
 		}
 	}
 

@@ -748,10 +748,11 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response, 
 	case http.StatusMethodNotAllowed:
 		// Support registries which have not properly implemented the HEAD method for
 		// manifests endpoint
-		if r.method == http.MethodHead && strings.Contains(r.path, "/manifests/") {
-			r.method = http.MethodGet
-			return true, nil
+		if r.method != http.MethodHead || !strings.Contains(r.path, "/manifests/") {
+			break
 		}
+		r.method = http.MethodGet
+		return true, nil
 	case http.StatusRequestTimeout, http.StatusTooManyRequests:
 		return true, nil
 	case http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusInternalServerError:

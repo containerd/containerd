@@ -235,10 +235,10 @@ func (p *PoolDevice) CreateThinDevice(ctx context.Context, deviceName string, vi
 		}
 
 		// We're unable to create the devmapper device, most likely something wrong with the deviceID
-		if devErr != nil {
-			retErr = errors.Join(retErr, p.metadata.MarkFaulty(ctx, info.Name))
+		if devErr == nil {
 			return
 		}
+		retErr = errors.Join(retErr, p.metadata.MarkFaulty(ctx, info.Name))
 	}()
 
 	// Save initial device metadata and allocate new device ID from store
@@ -329,10 +329,10 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 		}
 
 		// We're unable to create the devmapper device, most likely something wrong with the deviceID
-		if devErr != nil {
-			retErr = errors.Join(retErr, p.metadata.MarkFaulty(ctx, snapInfo.Name))
+		if devErr == nil {
 			return
 		}
+		retErr = errors.Join(retErr, p.metadata.MarkFaulty(ctx, snapInfo.Name))
 	}()
 
 	// The base device must be suspend before taking a snapshot to

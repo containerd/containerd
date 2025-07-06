@@ -387,54 +387,53 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 	// An already exists error should indicate the backend found a snapshot
 	// matching a provided target reference.
 	if errdefs.IsAlreadyExists(err) {
-		if target != "" {
-			var tinfo *snapshots.Info
-			filter := fmt.Sprintf(`labels."containerd.io/snapshot.ref"==%s,parent==%q`, target, bparent)
-			if err := s.Snapshotter.Walk(ctx, func(ctx context.Context, i snapshots.Info) error {
-				if tinfo == nil && i.Kind == snapshots.KindCommitted {
-					if i.Labels["containerd.io/snapshot.ref"] != target {
-						// Walk did not respect filter
-						return nil
-					}
-					if i.Parent != bparent {
-						// Walk did not respect filter
-						return nil
-					}
-					tinfo = &i
-				}
-				return nil
-
-			}, filter); err != nil {
-				return nil, fmt.Errorf("failed walking backend snapshots: %w", err)
-			}
-
-			if tinfo == nil {
-				return nil, fmt.Errorf("target snapshot %q in backend: %w", target, errdefs.ErrNotFound)
-			}
-
-			key = target
-			bkey = tinfo.Name
-			bparent = tinfo.Parent
-			base.Created = tinfo.Created
-			base.Updated = tinfo.Updated
-			if base.Labels == nil {
-				base.Labels = tinfo.Labels
-			} else {
-				for k, v := range tinfo.Labels {
-					if _, ok := base.Labels[k]; !ok {
-						base.Labels[k] = v
-					}
-				}
-			}
-
-			// Propagate this error after the final update
-			rerr = fmt.Errorf("target snapshot %q from snapshotter: %w", target, errdefs.ErrAlreadyExists)
-		} else {
+		if target == "" {
 			// This condition is unexpected as the key provided is expected
 			// to be new and unique, return as unknown response from backend
 			// to avoid confusing callers handling already exists.
 			return nil, fmt.Errorf("unexpected error from snapshotter: %v: %w", err, errdefs.ErrUnknown)
 		}
+		var tinfo *snapshots.Info
+		filter := fmt.Sprintf(`labels."containerd.io/snapshot.ref"==%s,parent==%q`, target, bparent)
+		if err := s.Snapshotter.Walk(ctx, func(ctx context.Context, i snapshots.Info) error {
+			if tinfo == nil && i.Kind == snapshots.KindCommitted {
+				if i.Labels["containerd.io/snapshot.ref"] != target {
+					// Walk did not respect filter
+					return nil
+				}
+				if i.Parent != bparent {
+					// Walk did not respect filter
+					return nil
+				}
+				tinfo = &i
+			}
+			return nil
+
+		}, filter); err != nil {
+			return nil, fmt.Errorf("failed walking backend snapshots: %w", err)
+		}
+
+		if tinfo == nil {
+			return nil, fmt.Errorf("target snapshot %q in backend: %w", target, errdefs.ErrNotFound)
+		}
+
+		key = target
+		bkey = tinfo.Name
+		bparent = tinfo.Parent
+		base.Created = tinfo.Created
+		base.Updated = tinfo.Updated
+		if base.Labels == nil {
+			base.Labels = tinfo.Labels
+		} else {
+			for k, v := range tinfo.Labels {
+				if _, ok := base.Labels[k]; !ok {
+					base.Labels[k] = v
+				}
+			}
+		}
+
+		// Propagate this error after the final update
+		rerr = fmt.Errorf("target snapshot %q from snapshotter: %w", target, errdefs.ErrAlreadyExists)
 	} else if err != nil {
 		return nil, err
 	} else {
@@ -816,11 +815,14 @@ func (s *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...str
 			}
 
 			info = overlayInfo(info, pair.info)
-			if filter.Match(adaptSnapshot(info)) {
-				if err := fn(ctx, info); err != nil {
-					return err
-				}
+			if !filter.Match(adaptSnapshot(info)) {
+				continue
 			}
+			err = fn(ctx, info)
+			if err == nil {
+				continue
+			}
+			return err
 		}
 
 		if lastKey == "" {

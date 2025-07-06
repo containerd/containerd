@@ -248,10 +248,11 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		// focused on upgrading from one version at a time.
 		for v := currentVersion; v < version.ConfigVersion; v++ {
 			for _, p := range loaded {
-				if p.ConfigMigration != nil {
-					if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
-						return nil, err
-					}
+				if p.ConfigMigration == nil {
+					continue
+				}
+				if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
+					return nil, err
 				}
 			}
 		}

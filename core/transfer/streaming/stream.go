@@ -130,10 +130,12 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 				// TODO: Send error message on stream before close to allow remote side to return error
 				return
 			}
-			if err := stream.Send(anyType); err != nil {
-				log.G(ctx).WithError(err).Errorf("send failed")
-				return
+			err = stream.Send(anyType)
+			if err == nil {
+				continue
 			}
+			log.G(ctx).WithError(err).Errorf("send failed")
+			return
 		}
 	}()
 }

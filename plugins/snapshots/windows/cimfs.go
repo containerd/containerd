@@ -414,10 +414,11 @@ func createDifferencingScratchVHDs(ctx context.Context, path string) (err error)
 	}
 
 	defer func() {
-		if err != nil {
-			os.RemoveAll(baseVHDPath)
-			os.RemoveAll(diffVHDPath)
+		if err == nil {
+			return
 		}
+		os.RemoveAll(baseVHDPath)
+		os.RemoveAll(diffVHDPath)
 	}()
 
 	if !baseVHDExists {
@@ -471,10 +472,11 @@ func createScratchVHD(ctx context.Context, vhdPath string, opts ...scratchCreati
 		return fmt.Errorf("failed to create VHD: %w", err)
 	}
 	defer func() {
-		if retErr != nil {
-			if rmErr := os.RemoveAll(vhdPath); rmErr != nil {
-				log.G(ctx).WithError(err).Warnf("on error cleanup failed: %s", rmErr)
-			}
+		if retErr == nil {
+			return
+		}
+		if rmErr := os.RemoveAll(vhdPath); rmErr != nil {
+			log.G(ctx).WithError(err).Warnf("on error cleanup failed: %s", rmErr)
 		}
 	}()
 

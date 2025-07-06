@@ -87,10 +87,11 @@ func (d *daemon) waitForStart(ctx context.Context) (*client.Client, error) {
 			}
 			var loadErr error
 			for _, p := range resp.Plugins {
-				if p.InitErr != nil && !strings.Contains(p.InitErr.Message, plugin.ErrSkipPlugin.Error()) {
-					pluginErr := fmt.Errorf("failed to load %s.%s: %s", p.Type, p.ID, p.InitErr.Message)
-					loadErr = errors.Join(loadErr, pluginErr)
+				if p.InitErr == nil || strings.Contains(p.InitErr.Message, plugin.ErrSkipPlugin.Error()) {
+					continue
 				}
+				pluginErr := fmt.Errorf("failed to load %s.%s: %s", p.Type, p.ID, p.InitErr.Message)
+				loadErr = errors.Join(loadErr, pluginErr)
 			}
 			if loadErr != nil {
 				return nil, loadErr

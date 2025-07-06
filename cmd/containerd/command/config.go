@@ -115,10 +115,11 @@ func dumpConfig(cliContext *cli.Context) error {
 	if config.Version < version.ConfigVersion {
 		plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
 		for _, p := range plugins {
-			if p.ConfigMigration != nil {
-				if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
-					return err
-				}
+			if p.ConfigMigration == nil {
+				continue
+			}
+			if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
+				return err
 			}
 		}
 	}

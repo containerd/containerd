@@ -223,14 +223,15 @@ command. As part of this process, we do the following:
 			if err != nil {
 				return err
 			}
-			if cliContext.Bool("print-chainid") {
-				diffIDs, err := i.RootFS(ctx)
-				if err != nil {
-					return err
-				}
-				chainID := identity.ChainID(diffIDs).String()
-				fmt.Printf("image chain ID: %s\n", chainID)
+			if !cliContext.Bool("print-chainid") {
+				continue
 			}
+			diffIDs, err := i.RootFS(ctx)
+			if err != nil {
+				return err
+			}
+			chainID := identity.ChainID(diffIDs).String()
+			fmt.Printf("image chain ID: %s\n", chainID)
 		}
 		fmt.Printf("done: %s\t\n", time.Since(start))
 		return nil
@@ -302,11 +303,12 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 						var parents []string
 						for _, parent := range p.Parents {
 							pStatus, ok := statuses[parent]
-							if ok {
-								parents = append(parents, parent)
-								pStatus.children = append(pStatus.children, node)
-								node.root = false
+							if !ok {
+								continue
 							}
+							parents = append(parents, parent)
+							pStatus.children = append(pStatus.children, node)
+							node.root = false
 						}
 						node.Progress.Parents = parents
 						if node.root {
@@ -320,34 +322,36 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 						var removeRoot bool
 						for _, parent := range p.Parents {
 							pStatus, ok := statuses[parent]
-							if ok {
-								parents = append(parents, parent)
-								var found bool
-								for _, child := range pStatus.children {
-
-									if child.Progress.Name == p.Name {
-										found = true
-										break
-									}
-								}
-								if !found {
-									pStatus.children = append(pStatus.children, node)
-
-								}
-								if node.root {
-									removeRoot = true
-								}
-								node.root = false
+							if !ok {
+								continue
 							}
+							parents = append(parents, parent)
+							var found bool
+							for _, child := range pStatus.children {
+								if child.Progress.Name != p.Name {
+									continue
+								}
+								found = true
+								break
+							}
+							if !found {
+								pStatus.children = append(pStatus.children, node)
+
+							}
+							if node.root {
+								removeRoot = true
+							}
+							node.root = false
 						}
 						p.Parents = parents
 						// Check if needs to remove from root
 						if removeRoot {
 							for i := range roots {
-								if roots[i] == node {
-									roots = append(roots[:i], roots[i+1:]...)
-									break
+								if roots[i] != node {
+									continue
 								}
+								roots = append(roots[:i], roots[i+1:]...)
+								break
 							}
 						}
 

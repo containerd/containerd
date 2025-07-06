@@ -101,16 +101,15 @@ var tagCommand = &cli.Command{
 			image.Name = targetRef
 			// Attempt to create the image first
 			if _, err = imageService.Create(ctx, image); err != nil {
+				if !errdefs.IsAlreadyExists(err) || !cliContext.Bool("force") {
+					return err
+				}
 				// If user has specified force and the image already exists then
 				// delete the original image and attempt to create the new one
-				if errdefs.IsAlreadyExists(err) && cliContext.Bool("force") {
-					if err = imageService.Delete(ctx, targetRef); err != nil {
-						return err
-					}
-					if _, err = imageService.Create(ctx, image); err != nil {
-						return err
-					}
-				} else {
+				if err = imageService.Delete(ctx, targetRef); err != nil {
+					return err
+				}
+				if _, err = imageService.Create(ctx, image); err != nil {
 					return err
 				}
 			}

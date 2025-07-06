@@ -118,10 +118,11 @@ func ReadTimestamps(bkt *bolt.Bucket, created, updated *time.Time) error {
 		{bucketKeyUpdatedAt, updated},
 	} {
 		v := bkt.Get(f.b)
-		if v != nil {
-			if err := f.t.UnmarshalBinary(v); err != nil {
-				return err
-			}
+		if v == nil {
+			continue
+		}
+		if err := f.t.UnmarshalBinary(v); err != nil {
+			return err
 		}
 	}
 	return nil

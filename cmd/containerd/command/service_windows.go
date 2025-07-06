@@ -364,11 +364,14 @@ func initPanicFile(path string) error {
 }
 
 func removePanicFile() {
-	if st, err := panicFile.Stat(); err == nil {
-		if st.Size() == 0 {
-			windows.SetStdHandle(windows.STD_ERROR_HANDLE, oldStderr)
-			panicFile.Close()
-			os.Remove(panicFile.Name())
-		}
+	st, err := panicFile.Stat()
+	if err != nil {
+		return
 	}
+	if st.Size() != 0 {
+		return
+	}
+	windows.SetStdHandle(windows.STD_ERROR_HANDLE, oldStderr)
+	panicFile.Close()
+	os.Remove(panicFile.Name())
 }

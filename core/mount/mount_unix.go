@@ -64,10 +64,12 @@ func UnmountRecursive(target string, flags int) error {
 	})
 
 	for i, target := range targets {
-		if err := UnmountAll(target, flags); err != nil {
-			if i == len(targets)-1 { // last mount
-				return err
-			}
+		err := UnmountAll(target, flags)
+		if err == nil {
+			continue
+		}
+		if i == len(targets)-1 { // last mount
+			return err
 		}
 	}
 	return nil
@@ -120,16 +122,18 @@ func UnmountAll(mount string, flags int) error {
 	}
 
 	for {
-		if err := unmount(mount, flags); err != nil {
-			// EINVAL is returned if the target is not a
-			// mount point, indicating that we are
-			// done. It can also indicate a few other
-			// things (such as invalid flags) which we
-			// unfortunately end up squelching here too.
-			if err == unix.EINVAL {
-				return nil
-			}
-			return err
+		err := unmount(mount, flags)
+		if err == nil {
+			continue
 		}
+		// EINVAL is returned if the target is not a
+		// mount point, indicating that we are
+		// done. It can also indicate a few other
+		// things (such as invalid flags) which we
+		// unfortunately end up squelching here too.
+		if err == unix.EINVAL {
+			return nil
+		}
+		return err
 	}
 }

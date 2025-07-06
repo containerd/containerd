@@ -323,11 +323,12 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	// return error since the transaction is committed with the removal
 	// key no longer available.
 	defer func() {
-		if err == nil {
-			for _, dir := range removals {
-				if err := os.RemoveAll(dir); err != nil {
-					log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
-				}
+		if err != nil {
+			return
+		}
+		for _, dir := range removals {
+			if err := os.RemoveAll(dir); err != nil {
+				log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
 			}
 		}
 	}()
@@ -433,19 +434,23 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	)
 
 	defer func() {
-		if err != nil {
-			if td != "" {
-				if err1 := os.RemoveAll(td); err1 != nil {
-					log.G(ctx).WithError(err1).Warn("failed to cleanup temp snapshot directory")
-				}
-			}
-			if path != "" {
-				if err1 := os.RemoveAll(path); err1 != nil {
-					log.G(ctx).WithError(err1).WithField("path", path).Error("failed to reclaim snapshot directory, directory may need removal")
-					err = fmt.Errorf("failed to remove path: %v: %w", err1, err)
-				}
+		if err == nil {
+			return
+		}
+		if td != "" {
+			if err1 := os.RemoveAll(td); err1 != nil {
+				log.G(ctx).WithError(err1).Warn("failed to cleanup temp snapshot directory")
 			}
 		}
+		if path == "" {
+			return
+		}
+		err1 := os.RemoveAll(path)
+		if err1 == nil {
+			return
+		}
+		log.G(ctx).WithError(err1).WithField("path", path).Error("failed to reclaim snapshot directory, directory may need removal")
+		err = fmt.Errorf("failed to remove path: %v: %w", err1, err)
 	}()
 
 	if err := o.ms.WithTransaction(ctx, true, func(ctx context.Context) (err error) {

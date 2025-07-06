@@ -286,11 +286,11 @@ func (c *criService) buildTaskMetricsRequest(
 
 func matchLabelSelector(selector, labels map[string]string) bool {
 	for k, v := range selector {
-		if val, ok := labels[k]; ok {
-			if v != val {
-				return false
-			}
-		} else {
+		val, ok := labels[k]
+		if !ok {
+			return false
+		}
+		if v != val {
 			return false
 		}
 	}
@@ -485,15 +485,16 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interfac
 			}, nil
 		}
 	case *cg2.Metrics:
-		if metrics.CPU != nil {
-			// convert to nano seconds
-			usageCoreNanoSeconds := metrics.CPU.UsageUsec * 1000
-
-			return &runtime.CpuUsage{
-				Timestamp:            timestamp.UnixNano(),
-				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: usageCoreNanoSeconds},
-			}, nil
+		if metrics.CPU == nil {
+			break
 		}
+		// convert to nano seconds
+		usageCoreNanoSeconds := metrics.CPU.UsageUsec * 1000
+
+		return &runtime.CpuUsage{
+			Timestamp:            timestamp.UnixNano(),
+			UsageCoreNanoSeconds: &runtime.UInt64Value{Value: usageCoreNanoSeconds},
+		}, nil
 	default:
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
@@ -503,39 +504,41 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interfac
 func (c *criService) memoryContainerStats(ID string, stats interface{}, timestamp time.Time) (*runtime.MemoryUsage, error) {
 	switch metrics := stats.(type) {
 	case *cg1.Metrics:
-		if metrics.Memory != nil && metrics.Memory.Usage != nil {
-			workingSetBytes := getWorkingSet(metrics.Memory)
-
-			return &runtime.MemoryUsage{
-				Timestamp: timestamp.UnixNano(),
-				WorkingSetBytes: &runtime.UInt64Value{
-					Value: workingSetBytes,
-				},
-				AvailableBytes:  &runtime.UInt64Value{Value: getAvailableBytes(metrics.Memory, workingSetBytes)},
-				UsageBytes:      &runtime.UInt64Value{Value: metrics.Memory.Usage.Usage},
-				RssBytes:        &runtime.UInt64Value{Value: metrics.Memory.TotalRSS},
-				PageFaults:      &runtime.UInt64Value{Value: metrics.Memory.TotalPgFault},
-				MajorPageFaults: &runtime.UInt64Value{Value: metrics.Memory.TotalPgMajFault},
-			}, nil
+		if metrics.Memory == nil || metrics.Memory.Usage == nil {
+			break
 		}
+		workingSetBytes := getWorkingSet(metrics.Memory)
+
+		return &runtime.MemoryUsage{
+			Timestamp: timestamp.UnixNano(),
+			WorkingSetBytes: &runtime.UInt64Value{
+				Value: workingSetBytes,
+			},
+			AvailableBytes:  &runtime.UInt64Value{Value: getAvailableBytes(metrics.Memory, workingSetBytes)},
+			UsageBytes:      &runtime.UInt64Value{Value: metrics.Memory.Usage.Usage},
+			RssBytes:        &runtime.UInt64Value{Value: metrics.Memory.TotalRSS},
+			PageFaults:      &runtime.UInt64Value{Value: metrics.Memory.TotalPgFault},
+			MajorPageFaults: &runtime.UInt64Value{Value: metrics.Memory.TotalPgMajFault},
+		}, nil
 	case *cg2.Metrics:
-		if metrics.Memory != nil {
-			workingSetBytes := getWorkingSetV2(metrics.Memory)
-
-			return &runtime.MemoryUsage{
-				Timestamp: timestamp.UnixNano(),
-				WorkingSetBytes: &runtime.UInt64Value{
-					Value: workingSetBytes,
-				},
-				AvailableBytes: &runtime.UInt64Value{Value: getAvailableBytesV2(metrics.Memory, workingSetBytes)},
-				UsageBytes:     &runtime.UInt64Value{Value: metrics.Memory.Usage},
-				// Use Anon memory for RSS as cAdvisor on cgroupv2
-				// see https://github.com/google/cadvisor/blob/a9858972e75642c2b1914c8d5428e33e6392c08a/container/libcontainer/handler.go#L799
-				RssBytes:        &runtime.UInt64Value{Value: metrics.Memory.Anon},
-				PageFaults:      &runtime.UInt64Value{Value: metrics.Memory.Pgfault},
-				MajorPageFaults: &runtime.UInt64Value{Value: metrics.Memory.Pgmajfault},
-			}, nil
+		if metrics.Memory == nil {
+			break
 		}
+		workingSetBytes := getWorkingSetV2(metrics.Memory)
+
+		return &runtime.MemoryUsage{
+			Timestamp: timestamp.UnixNano(),
+			WorkingSetBytes: &runtime.UInt64Value{
+				Value: workingSetBytes,
+			},
+			AvailableBytes: &runtime.UInt64Value{Value: getAvailableBytesV2(metrics.Memory, workingSetBytes)},
+			UsageBytes:     &runtime.UInt64Value{Value: metrics.Memory.Usage},
+			// Use Anon memory for RSS as cAdvisor on cgroupv2
+			// see https://github.com/google/cadvisor/blob/a9858972e75642c2b1914c8d5428e33e6392c08a/container/libcontainer/handler.go#L799
+			RssBytes:        &runtime.UInt64Value{Value: metrics.Memory.Anon},
+			PageFaults:      &runtime.UInt64Value{Value: metrics.Memory.Pgfault},
+			MajorPageFaults: &runtime.UInt64Value{Value: metrics.Memory.Pgmajfault},
+		}, nil
 	default:
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}

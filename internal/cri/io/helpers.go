@@ -131,12 +131,13 @@ func newStdioStream(fifos *cio.FIFOSet) (_ *stdioStream, _ *wgCloser, err error)
 		p           = &stdioStream{}
 	)
 	defer func() {
-		if err != nil {
-			for _, f := range set {
-				f.Close()
-			}
-			cancel()
+		if err == nil {
+			return
 		}
+		for _, f := range set {
+			f.Close()
+		}
+		cancel()
 	}()
 
 	if fifos.Stdin != "" {

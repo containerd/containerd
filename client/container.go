@@ -232,10 +232,11 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		return nil, err
 	}
 	defer func() {
-		if retErr != nil && i != nil {
-			i.Cancel()
-			i.Close()
+		if retErr == nil || i == nil {
+			return
 		}
+		i.Cancel()
+		i.Close()
 	}()
 	cfg := i.Config()
 	request := &tasks.CreateTaskRequest{
@@ -373,10 +374,11 @@ func (c *container) Restore(ctx context.Context, ioCreate cio.Creator, rootDir s
 		return errorPid, err
 	}
 	defer func() {
-		if retErr != nil && i != nil {
-			i.Cancel()
-			i.Close()
+		if retErr == nil || i == nil {
+			return
 		}
+		i.Cancel()
+		i.Close()
 	}()
 	cfg := i.Config()
 
@@ -452,11 +454,13 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 
 	// process remaining opts
 	for _, o := range opts {
-		if err := o(ctx, c.client, &info, index, copts); err != nil {
-			err = errgrpc.ToNative(err)
-			if !errdefs.IsAlreadyExists(err) {
-				return nil, err
-			}
+		err := o(ctx, c.client, &info, index, copts)
+		if err == nil {
+			continue
+		}
+		err = errgrpc.ToNative(err)
+		if !errdefs.IsAlreadyExists(err) {
+			return nil, err
 		}
 	}
 
@@ -528,12 +532,14 @@ func loadFifos(response *tasks.GetResponse) *cio.FIFOSet {
 			dirs = map[string]struct{}{}
 		)
 		for _, f := range fifos {
-			if isFifo, _ := fifo.IsFifo(f); isFifo {
-				if rerr := os.Remove(f); err == nil {
-					err = rerr
-				}
-				dirs[filepath.Dir(f)] = struct{}{}
+			isFifo, _ := fifo.IsFifo(f)
+			if !isFifo {
+				continue
 			}
+			if rerr := os.Remove(f); err == nil {
+				err = rerr
+			}
+			dirs[filepath.Dir(f)] = struct{}{}
 		}
 		for dir := range dirs {
 			// we ignore errors here because we don't

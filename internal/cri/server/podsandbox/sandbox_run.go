@@ -62,10 +62,11 @@ type CleanupErr struct {
 func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.ControllerInstance, retErr error) {
 	var cleanupErr error
 	defer func() {
-		if retErr != nil && cleanupErr != nil {
-			log.G(ctx).WithField("id", id).WithError(cleanupErr).Errorf("failed to fully teardown sandbox resources after earlier error: %s", retErr)
-			retErr = errors.Join(retErr, CleanupErr{cleanupErr})
+		if retErr == nil || cleanupErr == nil {
+			return
 		}
+		log.G(ctx).WithField("id", id).WithError(cleanupErr).Errorf("failed to fully teardown sandbox resources after earlier error: %s", retErr)
+		retErr = errors.Join(retErr, CleanupErr{cleanupErr})
 	}()
 	podSandbox := c.store.Get(id)
 	if podSandbox == nil {
@@ -105,12 +106,13 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 			sandboxRootDir, err)
 	}
 	defer func() {
-		if retErr != nil && cleanupErr == nil {
-			// Cleanup the sandbox root directory.
-			if cleanupErr = c.os.RemoveAll(sandboxRootDir); cleanupErr != nil {
-				log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove sandbox root directory %q",
-					sandboxRootDir)
-			}
+		if retErr == nil || cleanupErr != nil {
+			return
+		}
+		// Cleanup the sandbox root directory.
+		if cleanupErr = c.os.RemoveAll(sandboxRootDir); cleanupErr != nil {
+			log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove sandbox root directory %q",
+				sandboxRootDir)
 		}
 	}()
 
@@ -120,14 +122,15 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 			volatileSandboxRootDir, err)
 	}
 	defer func() {
-		if retErr != nil && cleanupErr == nil {
-			deferCtx, deferCancel := ctrdutil.DeferContext()
-			defer deferCancel()
-			// Cleanup the volatile sandbox root directory.
-			if cleanupErr = ensureRemoveAll(deferCtx, volatileSandboxRootDir); cleanupErr != nil {
-				log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove volatile sandbox root directory %q",
-					volatileSandboxRootDir)
-			}
+		if retErr == nil || cleanupErr != nil {
+			return
+		}
+		deferCtx, deferCancel := ctrdutil.DeferContext()
+		defer deferCancel()
+		// Cleanup the volatile sandbox root directory.
+		if cleanupErr = ensureRemoveAll(deferCtx, volatileSandboxRootDir); cleanupErr != nil {
+			log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove volatile sandbox root directory %q",
+				volatileSandboxRootDir)
 		}
 	}()
 
@@ -161,15 +164,17 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		spec.Process.SelinuxLabel = ""
 		// If privileged is enabled, sysfs should have the rw attribute
 		for i, k := range spec.Mounts {
-			if filepath.Clean(k.Destination) == "/sys" {
-				for j, v := range spec.Mounts[i].Options {
-					if v == "ro" {
-						spec.Mounts[i].Options[j] = "rw"
-						break
-					}
+			if filepath.Clean(k.Destination) != "/sys" {
+				continue
+			}
+			for j, v := range spec.Mounts[i].Options {
+				if v != "ro" {
+					continue
 				}
+				spec.Mounts[i].Options[j] = "rw"
 				break
 			}
+			break
 		}
 	}
 
@@ -203,14 +208,15 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	}
 	podSandbox.Container = container
 	defer func() {
-		if retErr != nil && cleanupErr == nil {
-			deferCtx, deferCancel := ctrdutil.DeferContext()
-			defer deferCancel()
-			if cleanupErr = container.Delete(deferCtx, containerd.WithSnapshotCleanup); cleanupErr != nil {
-				log.G(ctx).WithError(cleanupErr).Errorf("Failed to delete containerd container %q", id)
-			}
-			podSandbox.Container = nil
+		if retErr == nil || cleanupErr != nil {
+			return
 		}
+		deferCtx, deferCancel := ctrdutil.DeferContext()
+		defer deferCancel()
+		if cleanupErr = container.Delete(deferCtx, containerd.WithSnapshotCleanup); cleanupErr != nil {
+			log.G(ctx).WithError(cleanupErr).Errorf("Failed to delete containerd container %q", id)
+		}
+		podSandbox.Container = nil
 	}()
 
 	// Setup files required for the sandbox.
@@ -218,11 +224,12 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to setup sandbox files: %w", err)
 	}
 	defer func() {
-		if retErr != nil && cleanupErr == nil {
-			if cleanupErr = c.cleanupSandboxFiles(id, config); cleanupErr != nil {
-				log.G(ctx).WithError(cleanupErr).Errorf("Failed to cleanup sandbox files in %q",
-					sandboxRootDir)
-			}
+		if retErr == nil || cleanupErr != nil {
+			return
+		}
+		if cleanupErr = c.cleanupSandboxFiles(id, config); cleanupErr != nil {
+			log.G(ctx).WithError(cleanupErr).Errorf("Failed to cleanup sandbox files in %q",
+				sandboxRootDir)
 		}
 	}()
 
@@ -246,15 +253,18 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to create containerd task: %w", err)
 	}
 	defer func() {
-		if retErr != nil && cleanupErr == nil {
-			deferCtx, deferCancel := ctrdutil.DeferContext()
-			defer deferCancel()
-			// Cleanup the sandbox container if an error is returned.
-			if _, err := task.Delete(deferCtx, WithNRISandboxDelete(id), containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
-				log.G(ctx).WithError(err).Errorf("Failed to delete sandbox container %q", id)
-				cleanupErr = err
-			}
+		if retErr == nil || cleanupErr != nil {
+			return
 		}
+		deferCtx, deferCancel := ctrdutil.DeferContext()
+		defer deferCancel()
+		// Cleanup the sandbox container if an error is returned.
+		_, err := task.Delete(deferCtx, WithNRISandboxDelete(id), containerd.WithProcessKill)
+		if err == nil || errdefs.IsNotFound(err) {
+			return
+		}
+		log.G(ctx).WithError(err).Errorf("Failed to delete sandbox container %q", id)
+		cleanupErr = err
 	}()
 
 	// wait is a long running background request, no timeout needed.

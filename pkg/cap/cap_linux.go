@@ -47,12 +47,14 @@ func FromBitmap(v uint64) ([]string, []int) {
 		unknown []int
 	)
 	for i := 0; i <= 63; i++ {
-		if b := (v >> i) & 0x1; b == 0x1 {
-			if s := FromNumber(i); s != "" {
-				res = append(res, s)
-			} else {
-				unknown = append(unknown, i)
-			}
+		b := (v >> i) & 0x1
+		if b != 0x1 {
+			continue
+		}
+		if s := FromNumber(i); s != "" {
+			res = append(res, s)
+		} else {
+			unknown = append(unknown, i)
 		}
 	}
 	return res, unknown

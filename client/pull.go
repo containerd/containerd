@@ -126,10 +126,12 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			return nil, fmt.Errorf("unable to initialize unpacker: %w", err)
 		}
 		defer func() {
-			if _, err := unpacker.Wait(); err != nil {
-				if retErr == nil {
-					retErr = fmt.Errorf("unpack: %w", err)
-				}
+			_, err := unpacker.Wait()
+			if err == nil {
+				return
+			}
+			if retErr == nil {
+				retErr = fmt.Errorf("unpack: %w", err)
 			}
 		}()
 		wrapper := pullCtx.HandlerWrapper

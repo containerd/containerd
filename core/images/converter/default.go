@@ -318,10 +318,12 @@ func (c *defaultConverter) convertConfig(ctx context.Context, cs content.Store, 
 		rootfsModified := false
 		c.diffIDMapMu.RLock()
 		for i, oldDiffID := range rootfs.DiffIDs {
-			if newDiffID, ok := c.diffIDMap[oldDiffID]; ok && newDiffID != oldDiffID {
-				rootfs.DiffIDs[i] = newDiffID
-				rootfsModified = true
+			newDiffID, ok := c.diffIDMap[oldDiffID]
+			if !ok || newDiffID == oldDiffID {
+				continue
 			}
+			rootfs.DiffIDs[i] = newDiffID
+			rootfsModified = true
 		}
 		c.diffIDMapMu.RUnlock()
 		if rootfsModified {

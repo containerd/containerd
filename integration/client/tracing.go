@@ -50,12 +50,14 @@ func validateRootSpan(t *testing.T, spanNameExpected string, spans []tracetest.S
 	for _, span := range spans {
 		//We only look for root span
 		//A span is root span if its parent SpanContext is invalid
-		if !span.Parent.IsValid() {
-			if span.Name == spanNameExpected {
-				assert.NotEqual(t, span.Status.Code, codes.Error)
-				return
-			}
+		if span.Parent.IsValid() {
+			continue
 		}
+		if span.Name != spanNameExpected {
+			continue
+		}
+		assert.NotEqual(t, span.Status.Code, codes.Error)
+		return
 	}
 	t.Fatalf("Expected span %s not found", spanNameExpected)
 }

@@ -114,10 +114,11 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 					log.G(ctx).WithError(err).Warnf("event could not be marshaled: %v/%v", p.Event, p.Name)
 					return
 				}
-				if err := stream.Send(progress); err != nil {
-					log.G(ctx).WithError(err).Warnf("event not sent: %v/%v", p.Event, p.Name)
+				err = stream.Send(progress)
+				if err == nil {
 					return
 				}
+				log.G(ctx).WithError(err).Warnf("event not sent: %v/%v", p.Event, p.Name)
 			}
 
 			transferOpts = append(transferOpts, transfer.WithProgress(pf))
