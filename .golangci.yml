@@ -50,6 +50,9 @@ linters:
     revive:
       rules:
         - name: if-return
+        - name: indent-error-flow
+          arguments:
+            - "preserve-scope"
         - name: package-comments
           disabled: true
         - name: superfluous-else
