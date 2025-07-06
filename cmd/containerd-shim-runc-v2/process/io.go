@@ -326,10 +326,11 @@ func (b *binaryIO) CloseAfterStart() error {
 	var result []error
 
 	for _, v := range []*pipe{b.out, b.err} {
-		if v != nil {
-			if err := v.r.Close(); err != nil {
-				result = append(result, err)
-			}
+		if v == nil {
+			continue
+		}
+		if err := v.r.Close(); err != nil {
+			result = append(result, err)
 		}
 	}
 
@@ -340,10 +341,11 @@ func (b *binaryIO) Close() error {
 	var result []error
 
 	for _, v := range []*pipe{b.out, b.err} {
-		if v != nil {
-			if err := v.Close(); err != nil {
-				result = append(result, err)
-			}
+		if v == nil {
+			continue
+		}
+		if err := v.Close(); err != nil {
+			result = append(result, err)
 		}
 	}
 

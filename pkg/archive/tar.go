@@ -337,10 +337,12 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	case tar.TypeDir:
 		// Create directory unless it exists as a directory already.
 		// In that case we just want to merge the two
-		if fi, err := os.Lstat(path); err != nil || !fi.IsDir() {
-			if err := mkdir(path, hdrInfo.Mode()); err != nil {
-				return err
-			}
+		fi, err := os.Lstat(path)
+		if err == nil && fi.IsDir() {
+			break
+		}
+		if err := mkdir(path, hdrInfo.Mode()); err != nil {
+			return err
 		}
 
 	//nolint:staticcheck // TypeRegA is deprecated but we may still receive an external tar with TypeRegA
@@ -404,24 +406,27 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	}
 
 	for key, value := range hdr.PAXRecords {
-		if strings.HasPrefix(key, paxSchilyXattr) {
-			key = key[len(paxSchilyXattr):]
-			if err := setxattr(path, key, value); err != nil {
-				if errors.Is(err, syscall.EPERM) && strings.HasPrefix(key, userXattrPrefix) {
-					// In the user.* namespace, only regular files and directories can have extended attributes.
-					// See https://man7.org/linux/man-pages/man7/xattr.7.html for details.
-					if fi, err := os.Lstat(path); err == nil && (!fi.Mode().IsRegular() && !fi.Mode().IsDir()) {
-						log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
-						continue
-					}
-				}
-				if errors.Is(err, syscall.ENOTSUP) {
-					log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
-					continue
-				}
-				return fmt.Errorf("failed to setxattr %q for key %q: %w", path, key, err)
+		if !strings.HasPrefix(key, paxSchilyXattr) {
+			continue
+		}
+		key = key[len(paxSchilyXattr):]
+		err := setxattr(path, key, value)
+		if err == nil {
+			continue
+		}
+		if errors.Is(err, syscall.EPERM) && strings.HasPrefix(key, userXattrPrefix) {
+			// In the user.* namespace, only regular files and directories can have extended attributes.
+			// See https://man7.org/linux/man-pages/man7/xattr.7.html for details.
+			if fi, err := os.Lstat(path); err == nil && (!fi.Mode().IsRegular() && !fi.Mode().IsDir()) {
+				log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
+				continue
 			}
 		}
+		if errors.Is(err, syscall.ENOTSUP) {
+			log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
+			continue
+		}
+		return fmt.Errorf("failed to setxattr %q for key %q: %w", path, key, err)
 	}
 
 	// call lchmod after lchown since lchown can modify the file mode
@@ -758,12 +763,13 @@ func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written in
 				break
 			}
 		}
-		if er != nil {
-			if er != io.EOF {
-				err = er
-			}
-			break
+		if er == nil {
+			continue
 		}
+		if er != io.EOF {
+			err = er
+		}
+		break
 	}
 	return written, err
 

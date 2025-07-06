@@ -29,10 +29,12 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprint(os.Stderr, err)
-		os.Exit(1)
+	err := run()
+	if err == nil {
+		return
 	}
+	fmt.Fprint(os.Stderr, err)
+	os.Exit(1)
 }
 
 func run() error {

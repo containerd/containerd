@@ -113,12 +113,13 @@ func (m *Monitor) StartLocked(c *exec.Cmd) (chan runc.Exit, error) {
 // command was successful or not.
 func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 	for e := range ec {
-		if e.Pid == c.Process.Pid {
-			// make sure we flush all IO
-			c.Wait()
-			m.Unsubscribe(ec)
-			return e.Status, nil
+		if e.Pid != c.Process.Pid {
+			continue
 		}
+		// make sure we flush all IO
+		c.Wait()
+		m.Unsubscribe(ec)
+		return e.Status, nil
 	}
 	// return no such process if the ec channel is closed and no more exit
 	// events will be sent

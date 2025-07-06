@@ -233,14 +233,15 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		)
 	}
 	defer func() {
-		if retErr != nil {
-			// Cleanup the container root directory.
-			if err := c.os.RemoveAll(containerRootDir); err != nil {
-				log.G(r.ctx).WithError(err).Errorf(
-					"Failed to remove container root directory %q",
-					containerRootDir,
-				)
-			}
+		if retErr == nil {
+			return
+		}
+		// Cleanup the container root directory.
+		if err := c.os.RemoveAll(containerRootDir); err != nil {
+			log.G(r.ctx).WithError(err).Errorf(
+				"Failed to remove container root directory %q",
+				containerRootDir,
+			)
 		}
 	}()
 	volatileContainerRootDir := c.getVolatileContainerRootDir(r.containerID)
@@ -252,14 +253,15 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		)
 	}
 	defer func() {
-		if retErr != nil {
-			// Cleanup the volatile container root directory.
-			if err := c.os.RemoveAll(volatileContainerRootDir); err != nil {
-				log.G(r.ctx).WithError(err).Errorf(
-					"Failed to remove volatile container root directory %q",
-					volatileContainerRootDir,
-				)
-			}
+		if retErr == nil {
+			return
+		}
+		// Cleanup the volatile container root directory.
+		if err := c.os.RemoveAll(volatileContainerRootDir); err != nil {
+			log.G(r.ctx).WithError(err).Errorf(
+				"Failed to remove volatile container root directory %q",
+				volatileContainerRootDir,
+			)
 		}
 	}()
 
@@ -385,10 +387,11 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		return "", fmt.Errorf("failed to create container io: %w", err)
 	}
 	defer func() {
-		if retErr != nil {
-			if err := containerIO.Close(); err != nil {
-				log.G(r.ctx).WithError(err).Errorf("Failed to close container io %q", r.containerID)
-			}
+		if retErr == nil {
+			return
+		}
+		if err := containerIO.Close(); err != nil {
+			log.G(r.ctx).WithError(err).Errorf("Failed to close container io %q", r.containerID)
 		}
 	}()
 
@@ -416,11 +419,12 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 
 	opts = append(opts, c.nri.WithContainerAdjustment())
 	defer func() {
-		if retErr != nil {
-			deferCtx, deferCancel := util.DeferContext()
-			defer deferCancel()
-			c.nri.UndoCreateContainer(deferCtx, r.sandbox, r.containerID, spec)
+		if retErr == nil {
+			return
 		}
+		deferCtx, deferCancel := util.DeferContext()
+		defer deferCancel()
+		c.nri.UndoCreateContainer(deferCtx, r.sandbox, r.containerID, spec)
 	}()
 
 	defer c.nri.BlockPluginSync().Unblock()
@@ -430,12 +434,13 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		return "", fmt.Errorf("failed to create containerd container: %w", err)
 	}
 	defer func() {
-		if retErr != nil {
-			deferCtx, deferCancel := util.DeferContext()
-			defer deferCancel()
-			if err := cntr.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
-				log.G(r.ctx).WithError(err).Errorf("Failed to delete containerd container %q", r.containerID)
-			}
+		if retErr == nil {
+			return
+		}
+		deferCtx, deferCancel := util.DeferContext()
+		defer deferCancel()
+		if err := cntr.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
+			log.G(r.ctx).WithError(err).Errorf("Failed to delete containerd container %q", r.containerID)
 		}
 	}()
 
@@ -450,11 +455,12 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		return "", fmt.Errorf("failed to create internal container object for %q: %w", r.containerID, err)
 	}
 	defer func() {
-		if retErr != nil {
-			// Cleanup container checkpoint on error.
-			if err := container.Delete(); err != nil {
-				log.G(r.ctx).WithError(err).Errorf("Failed to cleanup container checkpoint for %q", r.containerID)
-			}
+		if retErr == nil {
+			return
+		}
+		// Cleanup container checkpoint on error.
+		if err := container.Delete(); err != nil {
+			log.G(r.ctx).WithError(err).Errorf("Failed to cleanup container checkpoint for %q", r.containerID)
 		}
 	}()
 
@@ -861,11 +867,11 @@ func (c *criService) buildLinuxSpec(
 		return nil, fmt.Errorf("failed to set blockio class: %w", err)
 	}
 	if blockIOClass != "" {
-		if linuxBlockIO, err := blockio.ClassNameToLinuxOCI(blockIOClass); err == nil {
-			specOpts = append(specOpts, oci.WithBlockIO(linuxBlockIO))
-		} else {
+		linuxBlockIO, err := blockio.ClassNameToLinuxOCI(blockIOClass)
+		if err != nil {
 			return nil, err
 		}
+		specOpts = append(specOpts, oci.WithBlockIO(linuxBlockIO))
 	}
 
 	// Get RDT class

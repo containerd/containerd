@@ -650,12 +650,14 @@ func (nw *namespacedWriter) Sync() error {
 func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64, expected digest.Digest, opts ...content.Opt) (digest.Digest, int64, error) {
 	var base content.Info
 	for _, opt := range opts {
-		if err := opt(&base); err != nil {
-			if nw.w != nil {
-				nw.w.Close()
-			}
-			return "", 0, err
+		err := opt(&base)
+		if err == nil {
+			continue
 		}
+		if nw.w != nil {
+			nw.w.Close()
+		}
+		return "", 0, err
 	}
 	if err := validateInfo(&base); err != nil {
 		if nw.w != nil {
@@ -948,12 +950,14 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 			return 0, err
 		}
 		for _, status := range statuses {
-			if _, ok := ingestSeen[status.Ref]; !ok {
-				if err = cs.Store.Abort(ctx, status.Ref); err != nil {
-					return
-				}
-				log.G(ctx).WithField("ref", status.Ref).Debug("cleanup aborting ingest")
+			_, ok := ingestSeen[status.Ref]
+			if ok {
+				continue
 			}
+			if err = cs.Store.Abort(ctx, status.Ref); err != nil {
+				return
+			}
+			log.G(ctx).WithField("ref", status.Ref).Debug("cleanup aborting ingest")
 		}
 	}
 	return
