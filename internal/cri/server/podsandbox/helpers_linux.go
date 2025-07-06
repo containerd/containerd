@@ -204,13 +204,15 @@ func unmountRecursive(ctx context.Context, target string) error {
 	})
 
 	for i, m := range toUnmount {
-		if err := mount.UnmountAll(m.Mountpoint, unix.MNT_DETACH); err != nil {
-			if i == len(toUnmount)-1 { // last mount
-				return err
-			}
-			// This is some submount, we can ignore this error for now, the final unmount will fail if this is a real problem
-			log.G(ctx).WithError(err).Debugf("failed to unmount submount %s", m.Mountpoint)
+		err := mount.UnmountAll(m.Mountpoint, unix.MNT_DETACH)
+		if err == nil {
+			continue
 		}
+		if i == len(toUnmount)-1 { // last mount
+			return err
+		}
+		// This is some submount, we can ignore this error for now, the final unmount will fail if this is a real problem
+		log.G(ctx).WithError(err).Debugf("failed to unmount submount %s", m.Mountpoint)
 	}
 	return nil
 }

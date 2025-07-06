@@ -255,15 +255,16 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 	// Iterate in reverse order as seen, parent always uploaded after child
 	for i := len(indexStack) - 1; i >= 0; i-- {
 		err := images.Dispatch(ctx, pushHandler, limiter, indexStack[i])
-		if err != nil {
-			// TODO(estesp): until we have a more complete method for index push, we need to report
-			// missing dependencies in an index/manifest list by sensing the "400 Bad Request"
-			// as a marker for this problem
-			if errors.Unwrap(err) != nil && strings.Contains(errors.Unwrap(err).Error(), "400 Bad Request") {
-				return fmt.Errorf("manifest list/index references to blobs and/or manifests are missing in your target registry: %w", err)
-			}
-			return err
+		if err == nil {
+			continue
 		}
+		// TODO(estesp): until we have a more complete method for index push, we need to report
+		// missing dependencies in an index/manifest list by sensing the "400 Bad Request"
+		// as a marker for this problem
+		if errors.Unwrap(err) != nil && strings.Contains(errors.Unwrap(err).Error(), "400 Bad Request") {
+			return fmt.Errorf("manifest list/index references to blobs and/or manifests are missing in your target registry: %w", err)
+		}
+		return err
 	}
 
 	return nil

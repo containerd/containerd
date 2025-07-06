@@ -200,12 +200,13 @@ func copySourceLabels(ctx context.Context, infoProvider content.InfoProvider, de
 		return desc, err
 	}
 	for k, v := range info.Labels {
-		if strings.HasPrefix(k, labels.LabelDistributionSource) {
-			if desc.Annotations == nil {
-				desc.Annotations = map[string]string{k: v}
-			} else {
-				desc.Annotations[k] = v
-			}
+		if !strings.HasPrefix(k, labels.LabelDistributionSource) {
+			continue
+		}
+		if desc.Annotations == nil {
+			desc.Annotations = map[string]string{k: v}
+		} else {
+			desc.Annotations[k] = v
 		}
 	}
 	return desc, nil
@@ -315,13 +316,15 @@ func Export(ctx context.Context, store content.InfoReaderProvider, writer io.Wri
 				}
 				resolvedIndex[desc.Digest] = d
 			}
-			if d != "" {
-				if name := desc.Annotations[images.AnnotationImageName]; name != "" {
-					mt := dManifests[d]
-					mt.names = append(mt.names, name)
-				}
-
+			if d == "" {
+				continue
 			}
+			name := desc.Annotations[images.AnnotationImageName]
+			if name == "" {
+				continue
+			}
+			mt := dManifests[d]
+			mt.names = append(mt.names, name)
 		} else {
 			return fmt.Errorf("only manifests may be exported: %w", errdefs.ErrInvalidArgument)
 		}

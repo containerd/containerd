@@ -317,14 +317,15 @@ func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
 	}
 	for _, socket := range sockets {
 		conn, err := net.Dial("unix", socket)
-		if err == nil {
-			client := ttrpc.NewClient(conn)
-
-			// TODO(stevvooe): This actually leaks the connection. We were leaking it
-			// before, so may not be a huge deal.
-
-			return client, nil
+		if err != nil {
+			continue
 		}
+		client := ttrpc.NewClient(conn)
+
+		// TODO(stevvooe): This actually leaks the connection. We were leaking it
+		// before, so may not be a huge deal.
+
+		return client, nil
 	}
 
 	return nil, fmt.Errorf("fail to connect to container shim with sockets: %v", sockets)

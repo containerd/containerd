@@ -466,14 +466,16 @@ func (sliceTransformer) Transformer(t reflect.Type) func(dst, src reflect.Value)
 				srcv := src.Index(i)
 				dstv := dst.Index(j)
 				if !srcv.CanInterface() || !dstv.CanInterface() {
-					if srcv.Equal(dstv) {
-						found = true
-						break
+					if !srcv.Equal(dstv) {
+						continue
 					}
-				} else if reflect.DeepEqual(srcv.Interface(), dstv.Interface()) {
 					found = true
 					break
+				} else if !reflect.DeepEqual(srcv.Interface(), dstv.Interface()) {
+					continue
 				}
+				found = true
+				break
 			}
 			if !found {
 				dst.Set(reflect.Append(dst, src.Index(i)))

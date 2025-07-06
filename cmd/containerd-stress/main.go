@@ -227,10 +227,12 @@ func main() {
 
 		return test(config)
 	}
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	err := app.Run(os.Args)
+	if err == nil {
+		return
 	}
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
 }
 
 type config struct {
@@ -458,12 +460,14 @@ func cleanup(ctx context.Context, client *containerd.Client) error {
 		if err == nil {
 			task.Delete(ctx, containerd.WithProcessKill)
 		}
-		if err := c.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-			if derr := c.Delete(ctx); derr == nil {
-				continue
-			}
-			return err
+		err = c.Delete(ctx, containerd.WithSnapshotCleanup)
+		if err == nil {
+			continue
 		}
+		if derr := c.Delete(ctx); derr == nil {
+			continue
+		}
+		return err
 	}
 	return nil
 }
