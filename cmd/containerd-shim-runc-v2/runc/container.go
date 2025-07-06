@@ -111,10 +111,11 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		})
 	}
 	defer func() {
-		if retErr != nil {
-			if err := mount.UnmountMounts(mounts, rootfs, 0); err != nil {
-				log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
-			}
+		if retErr == nil {
+			return
+		}
+		if err := mount.UnmountMounts(mounts, rootfs, 0); err != nil {
+			log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
 		}
 	}()
 	if err := mount.All(mounts, rootfs); err != nil {

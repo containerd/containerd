@@ -94,13 +94,14 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to create lease for sandbox name %q: %w", name, lerr)
 	}
 	defer func() {
-		if retErr != nil {
-			deferCtx, deferCancel := util.DeferContext()
-			defer deferCancel()
+		if retErr == nil {
+			return
+		}
+		deferCtx, deferCancel := util.DeferContext()
+		defer deferCancel()
 
-			if derr := leaseSvc.Delete(deferCtx, ls); derr != nil {
-				log.G(deferCtx).WithError(derr).Error("failed to delete lease during cleanup")
-			}
+		if derr := leaseSvc.Delete(deferCtx, ls); derr != nil {
+			log.G(deferCtx).WithError(derr).Error("failed to delete lease during cleanup")
 		}
 	}()
 
@@ -164,11 +165,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	defer func() {
 		// Put the sandbox into sandbox store when some resources fail to be cleaned.
-		if retErr != nil && cleanupErr != nil {
-			log.G(ctx).WithError(cleanupErr).Errorf("encountered an error cleaning up failed sandbox %q, marking sandbox state as SANDBOX_UNKNOWN", id)
-			if err := c.sandboxStore.Add(sandbox); err != nil {
-				log.G(ctx).WithError(err).Errorf("failed to add sandbox %+v into store", sandbox)
-			}
+		if retErr == nil || cleanupErr == nil {
+			return
+		}
+		log.G(ctx).WithError(cleanupErr).Errorf("encountered an error cleaning up failed sandbox %q, marking sandbox state as SANDBOX_UNKNOWN", id)
+		if err := c.sandboxStore.Add(sandbox); err != nil {
+			log.G(ctx).WithError(err).Errorf("failed to add sandbox %+v into store", sandbox)
 		}
 	}()
 
@@ -213,13 +215,14 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
 		defer func() {
 			// Remove the network namespace only if all the resource cleanup is done
-			if retErr != nil && cleanupErr == nil {
-				if cleanupErr = sandbox.NetNS.Remove(); cleanupErr != nil {
-					log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove network namespace %s for sandbox %q", sandbox.NetNSPath, id)
-					return
-				}
-				sandbox.NetNSPath = ""
+			if retErr == nil || cleanupErr != nil {
+				return
 			}
+			if cleanupErr = sandbox.NetNS.Remove(); cleanupErr != nil {
+				log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove network namespace %s for sandbox %q", sandbox.NetNSPath, id)
+				return
+			}
+			sandbox.NetNSPath = ""
 		}()
 
 		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
@@ -234,19 +237,21 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// creation functions.
 		defer func() {
 			// Remove the network namespace only if all the resource cleanup is done.
-			if retErr != nil && cleanupErr == nil {
-				deferCtx, deferCancel := util.DeferContext()
-				defer deferCancel()
-				// Teardown network if an error is returned.
-				if cleanupErr = c.teardownPodNetwork(deferCtx, sandbox); cleanupErr != nil {
-					log.G(ctx).WithError(cleanupErr).Errorf("Failed to destroy network for sandbox %q", id)
+			if retErr == nil || cleanupErr != nil {
+				return
+			}
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+			// Teardown network if an error is returned.
+			cleanupErr = c.teardownPodNetwork(deferCtx, sandbox)
+			if cleanupErr == nil {
+				return
+			}
+			log.G(ctx).WithError(cleanupErr).Errorf("Failed to destroy network for sandbox %q", id)
 
-					// ignoring failed to destroy networks when we failed to setup networks
-					if sandbox.CNIResult == nil {
-						cleanupErr = nil
-					}
-				}
-
+			// ignoring failed to destroy networks when we failed to setup networks
+			if sandbox.CNIResult == nil {
+				cleanupErr = nil
 			}
 		}()
 
@@ -328,11 +333,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	defer func() {
-		if retErr != nil {
-			deferCtx, deferCancel := util.DeferContext()
-			defer deferCancel()
-			c.nri.RemovePodSandbox(deferCtx, &sandbox)
+		if retErr == nil {
+			return
 		}
+		deferCtx, deferCancel := util.DeferContext()
+		defer deferCancel()
+		c.nri.RemovePodSandbox(deferCtx, &sandbox)
 	}()
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {

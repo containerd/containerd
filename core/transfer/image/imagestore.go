@@ -438,11 +438,12 @@ func unpackFromProto(auc []*transfertypes.UnpackConfiguration) []transfer.Unpack
 	uc := make([]transfer.UnpackConfiguration, len(auc))
 	for i := range auc {
 		uc[i].Snapshotter = auc[i].Snapshotter
-		if auc[i].Platform != nil {
-			uc[i].Platform.OS = auc[i].Platform.OS
-			uc[i].Platform.Architecture = auc[i].Platform.Architecture
-			uc[i].Platform.Variant = auc[i].Platform.Variant
+		if auc[i].Platform == nil {
+			continue
 		}
+		uc[i].Platform.OS = auc[i].Platform.OS
+		uc[i].Platform.Architecture = auc[i].Platform.Architecture
+		uc[i].Platform.Variant = auc[i].Platform.Variant
 	}
 	return uc
 }
