@@ -49,10 +49,9 @@ linters:
         - -ST1021
     revive:
       rules:
+        - name: if-return
         - name: package-comments
-          severity: warning
           disabled: true
-          exclude: [ "" ]
     nolintlint:
       allow-unused: true
   exclusions:
@@ -67,9 +66,6 @@ linters:
         text: unnecessary conversion
       - path: integration[\\/]client
         text: 'dot-imports:'
-      - linters:
-          - revive
-        text: if-return
       - linters:
           - revive
         text: empty-block

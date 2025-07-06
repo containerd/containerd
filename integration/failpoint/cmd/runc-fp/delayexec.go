@@ -39,20 +39,14 @@ import (
 func delayExec(ctx context.Context, method invoker) error {
 	isExec := strings.Contains(strings.Join(os.Args, ","), ",exec,")
 	if !isExec {
-		if err := method(ctx); err != nil {
-			return err
-		}
-		return nil
+		return method(ctx)
 	}
 	logrus.Debug("EXEC!")
 
 	if err := delay(); err != nil {
 		return err
 	}
-	if err := method(ctx); err != nil {
-		return err
-	}
-	return nil
+	return method(ctx)
 }
 
 func delay() error {
