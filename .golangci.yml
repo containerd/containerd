@@ -58,6 +58,9 @@ linters:
         - name: if-return
         - name: package-comments
           disabled: true
+        - name: superfluous-else
+          arguments:
+            - "preserve-scope"
     nolintlint:
       allow-unused: true
   exclusions:
@@ -79,9 +82,6 @@ linters:
       - linters:
           - revive
         text: empty-block
-      - linters:
-          - revive
-        text: superfluous-else
       - linters:
           - revive
         text: unused-parameter
