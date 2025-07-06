@@ -80,10 +80,7 @@ func (c *criService) startSandboxExitMonitor(ctx context.Context, id string, exi
 
 				sb, err := c.sandboxStore.Get(id)
 				if err == nil {
-					if err := c.handleSandboxExit(dctx, sb, exitStatus, exitedAt); err != nil {
-						return err
-					}
-					return nil
+					return c.handleSandboxExit(dctx, sb, exitStatus, exitedAt)
 				} else if !errdefs.IsNotFound(err) {
 					return fmt.Errorf("failed to get sandbox %s: %w", e.SandboxID, err)
 				}
@@ -149,10 +146,7 @@ func (c *criService) startContainerExitMonitor(ctx context.Context, id string, p
 
 				cntr, err := c.containerStore.Get(e.ID)
 				if err == nil {
-					if err := c.handleContainerExit(dctx, e, cntr, cntr.SandboxID); err != nil {
-						return err
-					}
-					return nil
+					return c.handleContainerExit(dctx, e, cntr, cntr.SandboxID)
 				} else if !errdefs.IsNotFound(err) {
 					return fmt.Errorf("failed to get container %s: %w", e.ID, err)
 				}
