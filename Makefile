@@ -478,6 +478,15 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 		fi; \
 	done )
 
+integration-coverage: ## generate coverage profile for integration tests
+	@echo "$(WHALE) $@"
+	@cd "${ROOTDIR}/integration/client" && \
+		$(GO) mod download && \
+		$(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} \
+			-cover -covermode=atomic -coverprofile=coverage.out . && \
+		$(GO) tool cover -func=coverage.out > integration-coverage.txt && \
+		echo "Coverage report saved to integration/client/integration-coverage.txt"
+
 cri-integration-coverage: binaries  ## generate coverage profile for cri integration tests
 	@echo "$(WHALE) $@"
 	@rm -f cri-integration-coverage.txt
@@ -485,6 +494,32 @@ cri-integration-coverage: binaries  ## generate coverage profile for cri integra
 	@bash ./script/test/cri-integration.sh -test.coverprofile=cri-integration-coverage.txt
 	@echo "Coverage profile generated at cri-integration-coverage.txt"
 	@rm -rf bin/cri-integration.test
+
+all-coverage: ## generate combined coverage profile from all tests
+	@echo "$(WHALE) $@"
+	-@$(MAKE) root-coverage
+	-@$(MAKE) integration-coverage
+	-@$(MAKE) cri-integration-coverage
+
+	@echo "Combining coverage profiles into all-coverage.txt"
+	@rm -f all-coverage.txt
+	@touch all-coverage.txt
+
+	@{ \
+		if [ -f coverage.txt ]; then \
+			head -n 1 coverage.txt > all-coverage.txt; \
+		else \
+			echo "mode: atomic" > all-coverage.txt; \
+		fi; \
+	}
+
+	@for f in coverage.txt cri-integration-coverage.txt integration/client/integration-coverage.txt; do \
+		if [ -f $$f ]; then \
+			grep -h -v '^mode:' $$f >> all-coverage.txt; \
+		fi; \
+	done
+
+	@echo "Combined coverage profile generated at all-coverage.txt"
 
 remove-replace:
 	@echo "$(WHALE) $@"
