@@ -44,6 +44,8 @@ type SnapshotterConfig struct {
 	ovlOptions []string
 	// enableFsverity enables fsverity for EROFS layers
 	enableFsverity bool
+	// setImmutable enables IMMUTABLE_FL file attribute for EROFS layers
+	setImmutable bool
 }
 
 // Opt is an option to configure the erofs snapshotter
@@ -63,6 +65,13 @@ func WithFsverity() Opt {
 	}
 }
 
+// WithImmutable enables IMMUTABLE_FL file attribute for EROFS layers
+func WithImmutable() Opt {
+	return func(config *SnapshotterConfig) {
+		config.setImmutable = true
+	}
+}
+
 type MetaStore interface {
 	TransactionContext(ctx context.Context, writable bool) (context.Context, storage.Transactor, error)
 	WithTransaction(ctx context.Context, writable bool, fn storage.TransactionCallback) error
@@ -74,6 +83,7 @@ type snapshotter struct {
 	ms             *storage.MetaStore
 	ovlOptions     []string
 	enableFsverity bool
+	setImmutable   bool
 }
 
 // check if EROFS kernel filesystem is registered or not
@@ -146,6 +156,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		ms:             ms,
 		ovlOptions:     config.ovlOptions,
 		enableFsverity: config.enableFsverity,
+		setImmutable:   config.setImmutable,
 	}, nil
 }
 
@@ -432,9 +443,12 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 				return fmt.Errorf("failed to enable fsverity: %w", err)
 			}
 		}
+
 		// Set IMMUTABLE_FL on the EROFS layer to avoid artificial data loss
-		if err := setImmutable(layerBlob, true); err != nil {
-			log.G(ctx).WithError(err).Warnf("failed to set IMMUTABLE_FL for %s", layerBlob)
+		if s.setImmutable {
+			if err := setImmutable(layerBlob, true); err != nil {
+				log.G(ctx).WithError(err).Warnf("failed to set IMMUTABLE_FL for %s", layerBlob)
+			}
 		}
 		return nil
 	})
