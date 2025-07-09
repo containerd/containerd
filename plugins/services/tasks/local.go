@@ -99,6 +99,7 @@ func init() {
 func initFunc(ic *plugin.InitContext) (interface{}, error) {
 	config := ic.Config.(*Config)
 
+	// TODO: Consider moving mount manager under task
 	v2r, err := ic.GetByID(plugins.RuntimePluginV2, "task")
 	if err != nil {
 		return nil, err
@@ -122,11 +123,17 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		monitor = runtime.NewNoopMonitor()
 	}
 
+	mm, err := ic.GetSingle(plugins.MountManagerPlugin)
+	if err != nil {
+		return nil, err
+	}
+
 	db := m.(*metadata.DB)
 	l := &local{
 		containers: metadata.NewContainerStore(db),
 		store:      db.ContentStore(),
 		publisher:  ep.(events.Publisher),
+		mounts:     mm.(mount.Manager),
 		monitor:    monitor.(runtime.TaskMonitor),
 		v2Runtime:  v2r.(runtime.PlatformRuntime),
 	}
@@ -153,6 +160,7 @@ type local struct {
 	containers containers.Store
 	store      content.Store
 	publisher  events.Publisher
+	mounts     mount.Manager
 
 	monitor   runtime.TaskMonitor
 	v2Runtime runtime.PlatformRuntime
@@ -235,6 +243,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if r.RuntimePath != "" {
 		opts.Runtime = r.RuntimePath
 	}
+
 	for _, m := range r.Rootfs {
 		opts.Rootfs = append(opts.Rootfs, mount.Mount{
 			Type:    m.Type,
@@ -242,6 +251,21 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 			Target:  m.Target,
 			Options: m.Options,
 		})
+	}
+
+	activateOpts := []mount.ActivateOpt{
+		mount.WithLabels(map[string]string{
+			"containerd.io/gc.bref.container": r.ContainerID,
+		}),
+		// TODO: Pass through runtime name
+	}
+	var activeMounts bool
+	ai, err := l.mounts.Activate(ctx, r.ContainerID, opts.Rootfs, activateOpts...)
+	if err == nil {
+		activeMounts = true
+		opts.Rootfs = ai.System
+	} else if !errdefs.IsNotImplemented(err) {
+		return nil, errgrpc.ToGRPC(err)
 	}
 
 	rtime := l.v2Runtime
@@ -253,8 +277,14 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if err == nil {
 		return nil, errgrpc.ToGRPC(fmt.Errorf("task %s: %w", r.ContainerID, errdefs.ErrAlreadyExists))
 	}
+
 	c, err := rtime.Create(ctx, r.ContainerID, opts)
 	if err != nil {
+		if activeMounts {
+			if err := l.mounts.Deactivate(ctx, r.ContainerID); err != nil && !errdefs.IsNotFound(err) {
+				log.G(ctx).WithError(err).Errorf("failed to deactivate mounts for %s", r.ContainerID)
+			}
+		}
 		return nil, errgrpc.ToGRPC(err)
 	}
 	labels := map[string]string{"runtime": container.Runtime.Name}
@@ -295,6 +325,13 @@ func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOp
 }
 
 func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.CallOption) (*api.DeleteResponse, error) {
+	defer func() {
+		err := l.mounts.Deactivate(ctx, r.ContainerID)
+		if err != nil && !errdefs.IsNotFound(err) {
+			log.G(ctx).WithError(err).Errorf("failed to deactivate mounts for %s", r.ContainerID)
+		}
+	}()
+
 	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
