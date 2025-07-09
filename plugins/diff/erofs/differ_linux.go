@@ -58,13 +58,40 @@ type differ interface {
 type erofsDiff struct {
 	store         content.Store
 	mkfsExtraOpts []string
+	// enableTarIndex enables generating tar index for tar content
+	// instead of fully converting the tar to EROFS format
+	enableTarIndex bool
 }
 
-func NewErofsDiffer(store content.Store, mkfsExtraOpts []string) differ {
-	return &erofsDiff{
-		store:         store,
-		mkfsExtraOpts: mkfsExtraOpts,
+// DifferOpt is an option for configuring the erofs differ
+type DifferOpt func(d *erofsDiff)
+
+// WithMkfsOptions sets extra options for mkfs.erofs
+func WithMkfsOptions(opts []string) DifferOpt {
+	return func(d *erofsDiff) {
+		d.mkfsExtraOpts = opts
 	}
+}
+
+// WithTarIndexMode enables tar index mode for EROFS layers
+func WithTarIndexMode() DifferOpt {
+	return func(d *erofsDiff) {
+		d.enableTarIndex = true
+	}
+}
+
+// NewErofsDiffer creates a new EROFS differ with the provided options
+func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
+	d := &erofsDiff{
+		store: store,
+	}
+
+	// Apply all options
+	for _, opt := range opts {
+		opt(d)
+	}
+
+	return d
 }
 
 // A valid EROFS native layer media type should end with ".erofs".
@@ -301,10 +328,22 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		r: io.TeeReader(processor, digester.Hash()),
 	}
 
-	u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+desc.Digest))
-	err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
-	if err != nil {
-		return emptyDesc, fmt.Errorf("failed to convert erofs: %w", err)
+	// Choose between tar index or tar conversion mode
+	if s.enableTarIndex {
+		// Use the tar index method: generate tar index and append tar
+		err = erofsutils.GenerateTarIndexAndAppendTar(ctx, rc, layerBlobPath, s.mkfsExtraOpts)
+		if err != nil {
+			return emptyDesc, fmt.Errorf("failed to generate tar index: %w", err)
+		}
+		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer using tar index mode")
+	} else {
+		// Use the tar method: fully convert tar to EROFS
+		u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+desc.Digest))
+		err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
+		if err != nil {
+			return emptyDesc, fmt.Errorf("failed to convert tar to erofs: %w", err)
+		}
+		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer using tar conversion mode")
 	}
 
 	// Read any trailing data

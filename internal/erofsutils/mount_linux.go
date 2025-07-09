@@ -17,6 +17,7 @@
 package erofsutils
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -43,6 +44,61 @@ func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, m
 		return fmt.Errorf("erofs apply failed: %s: %w", out, err)
 	}
 	log.G(ctx).Infof("running %s %s %v", cmd.Path, cmd.Args, string(out))
+	return nil
+}
+
+// GenerateTarIndexAndAppendTar calculates tar index using --tar=i option
+// and appends the original tar content to create a combined EROFS layer.
+//
+// The `--tar=i` option instructs mkfs.erofs to only generate the tar index
+// for the tar content. The resulting file structure is:
+// [Tar index][Original tar content]
+func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath string, mkfsExtraOpts []string) error {
+	// Create a temporary file for storing the tar content
+	tarFile, err := os.CreateTemp("", "erofs-tar-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary tar file: %w", err)
+	}
+	defer os.Remove(tarFile.Name())
+	defer tarFile.Close()
+
+	// Use TeeReader to process the input once while saving it to disk
+	teeReader := io.TeeReader(r, tarFile)
+
+	// Generate tar index directly to layerPath using --tar=i option
+	args := append([]string{"--tar=i", "--aufs", "--quiet"}, mkfsExtraOpts...)
+	args = append(args, layerPath)
+	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
+	cmd.Stdin = teeReader
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("tar index generation failed with command 'mkfs.erofs %s': %s: %w",
+			strings.Join(args, " "), out, err)
+	}
+
+	// Log the command execution for debugging
+	log.G(ctx).Tracef("Generated tar index with command: %s %s, output: %s",
+		cmd.Path, strings.Join(cmd.Args, " "), string(out))
+
+	// Open layerPath for appending
+	f, err := os.OpenFile(layerPath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open layer file for appending: %w", err)
+	}
+	defer f.Close()
+
+	// Rewind the temporary file
+	if _, err := tarFile.Seek(0, 0); err != nil {
+		return fmt.Errorf("failed to seek to the beginning of tar file: %w", err)
+	}
+
+	// Append tar content
+	if _, err := io.Copy(f, tarFile); err != nil {
+		return fmt.Errorf("failed to append tar to layer: %w", err)
+	}
+
+	log.G(ctx).Infof("Successfully generated EROFS layer with tar index and tar content: %s", layerPath)
+
 	return nil
 }
 
@@ -98,4 +154,16 @@ func MountsToLayer(mounts []mount.Mount) (string, error) {
 		return "", fmt.Errorf("mount layer type must be erofs-layer: %w", errdefs.ErrNotImplemented)
 	}
 	return layer, nil
+}
+
+// SupportGenerateFromTar checks if the installed version of mkfs.erofs supports
+// the tar mode (--tar option).
+func SupportGenerateFromTar() (bool, error) {
+	cmd := exec.Command("mkfs.erofs", "--help")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("failed to run mkfs.erofs --help: %w", err)
+	}
+
+	return bytes.Contains(output, []byte("--tar=")), nil
 }
