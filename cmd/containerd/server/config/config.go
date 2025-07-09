@@ -351,44 +351,32 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 	}
 	defer f.Close()
 
-	if readErr := toml.NewDecoder(f).DisallowUnknownFields().Decode(config); readErr != nil {
-		if runtime.GOOS != "windows" {
-			return handleTOMLDecodeErrors(ctx, f, path, true, readErr)
+	if err := toml.NewDecoder(f).DisallowUnknownFields().Decode(config); err != nil {
+		var serr *toml.StrictMissingError
+		readUtf16 := false
+
+		resetFileOffset := func(fptr *os.File) error {
+			if _, seekerr := fptr.Seek(0, io.SeekStart); seekerr != nil {
+				return fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
+			}
+			return nil
 		}
-		config, readErr = handleTOMLDecodeErrors(ctx, f, path, false, readErr)
-		if readErr == nil {
-			return config, nil
+
+		// Read in UTF-16 if the OS is windows and the error is not StrictMissingError
+		if runtime.GOOS == "windows" && !errors.As(err, &serr) {
+			if seekErrMsg := resetFileOffset(f); seekErrMsg != nil {
+				return nil, seekErrMsg
+			}
+			utf16Err := toml.NewDecoder(getUTF16ReaderForWindows(f)).DisallowUnknownFields().Decode(config)
+			if utf16Err != nil && errors.As(utf16Err, &serr) {
+				err = utf16Err
+				readUtf16 = true
+			}
 		}
 
-		// Try once again for windows with UTF-16LE encoding
-		config = &Config{}
-		if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
-			return nil, fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
-		}
-		asciiErr := toml.NewDecoder(getUTF16ReaderForWindows(f)).DisallowUnknownFields().Decode(config)
-		if asciiErr == nil {
-			return config, nil
-		}
-		return handleTOMLDecodeErrors(ctx, f, path, true, asciiErr)
-	}
-
-	return config, nil
-}
-
-func getUTF16ReaderForWindows(f *os.File) *transform.Reader {
-	winEncoding := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM)
-	utf16Transformer := unicode.BOMOverride(winEncoding.NewDecoder())
-	return transform.NewReader(f, utf16Transformer)
-}
-
-func handleTOMLDecodeErrors(ctx context.Context, f *os.File, path string, isLog bool, err error) (*Config, error) {
-	config := &Config{}
-
-	var serr *toml.StrictMissingError
-	if errors.As(err, &serr) {
-		for _, derr := range serr.Errors {
-			row, col := derr.Position()
-			if isLog {
+		if errors.As(err, &serr) {
+			for _, derr := range serr.Errors {
+				row, col := derr.Position()
 				log.G(ctx).WithFields(log.Fields{
 					"file":   path,
 					"row":    row,
@@ -396,35 +384,42 @@ func handleTOMLDecodeErrors(ctx context.Context, f *os.File, path string, isLog 
 					"key":    strings.Join(derr.Key(), " "),
 				}).WithError(err).Warn("Ignoring unknown key in TOML")
 			}
-		}
 
-		// Try decoding again with unknown fields
-		config = &Config{}
-		if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
-			return nil, fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
+			// Try decoding again with unknown fields
+			config = &Config{}
+			if seekErrMsg := resetFileOffset(f); seekErrMsg != nil {
+				return nil, seekErrMsg
+			}
+			if readUtf16 && runtime.GOOS == "windows" {
+				err = toml.NewDecoder(getUTF16ReaderForWindows(f)).Decode(config)
+			} else {
+				err = toml.NewDecoder(f).Decode(config)
+			}
 		}
-		if runtime.GOOS != "windows" {
-			err = toml.NewDecoder(f).Decode(config)
-		} else {
-			err = toml.NewDecoder(getUTF16ReaderForWindows(f)).Decode(config)
-		}
-	}
-	if err != nil {
-		var derr *toml.DecodeError
-		if errors.As(err, &derr) {
-			row, column := derr.Position()
-			if isLog {
+		if err != nil {
+			var derr *toml.DecodeError
+			if errors.As(err, &derr) {
+				row, column := derr.Position()
 				log.G(ctx).WithFields(log.Fields{
 					"file":   path,
 					"row":    row,
 					"column": column,
 				}).WithError(err).Error("Failure unmarshaling TOML")
+				return nil, fmt.Errorf("failed to unmarshal TOML at row %d column %d: %w", row, column, err)
 			}
-			return nil, fmt.Errorf("failed to unmarshal TOML at row %d column %d: %w", row, column, err)
+			return nil, fmt.Errorf("failed to unmarshal TOML: %w", err)
 		}
-		return nil, fmt.Errorf("failed to unmarshal TOML: %w", err)
+
 	}
+
 	return config, nil
+}
+
+// UTF-16 decoder
+func getUTF16ReaderForWindows(f *os.File) *transform.Reader {
+	winEncoding := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM)
+	utf16Transformer := unicode.BOMOverride(winEncoding.NewDecoder())
+	return transform.NewReader(f, utf16Transformer)
 }
 
 // resolveImports resolves import strings list to absolute paths list:
