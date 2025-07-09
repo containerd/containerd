@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -106,6 +107,16 @@ func (c *criService) recover(ctx context.Context) error {
 		metadata := sandboxstore.Metadata{}
 		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
 		if err != nil {
+			if errors.Is(err, errdefs.ErrNotFound) {
+				log.G(ctx).WithError(err).Errorf("failed to get metadata for stored sandbox %q", sbx.ID)
+				// Since commit https://github.com/containerd/containerd/pull/11612 has been merged metadata may not be nil.
+				// Before 1162 we should delete leaked sandbox from sandbox store to make sure containerd can start successfully.
+				err = c.client.SandboxStore().Delete(ctx, sbx.ID)
+				if err != nil {
+					log.G(ctx).WithError(err).Errorf("failed to delete sandbox %q, in response to failure to retrieve metadata for sandbox", sbx.ID)
+				}
+				continue
+			}
 			return fmt.Errorf("failed to get metadata for stored sandbox %q: %w", sbx.ID, err)
 		}
 
