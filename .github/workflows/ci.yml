@@ -402,36 +402,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y criu
 
-      - name: Build and install erofs-utils from source
+      - if: matrix.os != 'ubuntu-22.04'
+        name: Install erofs-utils
         run: |
           # Install dependencies
           sudo apt-get update
-          sudo apt-get install -y wget make gcc libz-dev liblz4-dev libfuse-dev autoconf libtool pkg-config uuid-dev
+          sudo apt-get install -y erofs-utils
+          # sudo apt-get install -y wget make gcc libz-dev liblz4-dev libfuse-dev autoconf libtool pkg-config uuid-dev
 
-          # Create temporary build directory
-          BUILD_DIR="$(mktemp -d)"
-          cd "$BUILD_DIR"
+          # # Create temporary build directory
+          # BUILD_DIR="$(mktemp -d)"
+          # cd "$BUILD_DIR"
 
-          # get erofs-utils-1.8.8.tar.gz
-          wget https://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs-utils.git/snapshot/erofs-utils-1.8.8.tar.gz
-          tar -xzf erofs-utils-1.8.8.tar.gz
-          cd erofs-utils-1.8.8
+          # # get erofs-utils-1.8.8.tar.gz
+          # wget https://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs-utils.git/snapshot/erofs-utils-1.8.8.tar.gz
+          # tar -xzf erofs-utils-1.8.8.tar.gz
+          # cd erofs-utils-1.8.8
 
-          # Build and install erofs-utils
-          ./autogen.sh
-          ./configure --enable-lz4 --enable-fuse --with-uuid
-          make -j"$(nproc)"
-          sudo make install
-          sudo ldconfig
+          # # Build and install erofs-utils
+          # ./autogen.sh
+          # ./configure --enable-lz4 --enable-fuse --with-uuid
+          # make -j"$(nproc)"
+          # sudo make install
+          # sudo ldconfig
 
-          # Clean up
-          cd -
-          rm -rf "$BUILD_DIR"
+          # # Clean up
+          # cd -
+          # rm -rf "$BUILD_DIR"
 
           # Verify installation
-          mkfs.erofs --version
+          # mkfs.erofs --version
 
-      - name: Load EROFS kernel module
+      - if: matrix.os != 'ubuntu-22.04'
+        name: Load EROFS kernel module
         run: |
           sudo modprobe erofs
 
