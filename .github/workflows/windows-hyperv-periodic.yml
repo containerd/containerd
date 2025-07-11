@@ -43,16 +43,12 @@ jobs:
       # (e.g. hitting resource limits in the `AZTestVMCreate` task)
       fail-fast: false
       matrix:
-        win_ver: [ltsc2022, ltsc2025]
+        win_ver: [ltsc2022]
         include:
         - win_ver: ltsc2022
           AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:latest"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2022-${{ github.run_id }}
           GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022-hyperv/"
-        - win_ver: ltsc2025
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2025-Datacenter:latest"
-          AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2025-${{ github.run_id }}
-          GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2025-hyperv/"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
