@@ -31,7 +31,7 @@ import (
 func TestImageStatus(t *testing.T) {
 	testID := "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4" // #nosec G101
 	image := imagestore.Image{
-		ID:      testID,
+		Key:     imagestore.ImageIDKey{ID: testID, RuntimeHandler: ""},
 		ChainID: "test-chain-id",
 		References: []string{
 			"gcr.io/library/busybox:latest",
@@ -49,6 +49,7 @@ func TestImageStatus(t *testing.T) {
 		RepoTags:    []string{"gcr.io/library/busybox:latest"},
 		RepoDigests: []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"},
 		Size_:       uint64(1234),
+		Spec:        &runtime.ImageSpec{Image: testID, RuntimeHandler: ""},
 		Username:    "user",
 	}
 
