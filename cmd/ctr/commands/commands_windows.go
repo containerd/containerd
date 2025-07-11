@@ -34,6 +34,9 @@ func init() {
 		}, &cli.StringSliceFlag{
 			Name:  "device",
 			Usage: "Identifier of a device to add to the container  (e.g. class://5B45201D-F2F2-4F3B-85BB-30FF1F953599)",
+		}, &cli.StringSliceFlag{
+			Name:  "nvme-device",
+			Usage: "NVMe device to assign to the container using device instance ID or location path (e.g. PCI\\VEN_144D&DEV_A808&SUBSYS_A801144D&REV_00\\...)",
 		})
 }
 

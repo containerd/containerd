@@ -1485,6 +1485,32 @@ func WithWindowsDevice(idType, id string) SpecOpts {
 	}
 }
 
+// WithWindowsNVMeDevice adds an NVMe disk device exposed to a Windows (WCOW or LCOW) Container
+// via Direct Device Assignment (DDA). This is a convenience function for NVMe storage assignment.
+//
+// deviceInstanceID should be the PCI device instance ID of the NVMe controller, e.g.:
+// "PCI\\VEN_144D&DEV_A808&SUBSYS_A801144D&REV_00\\..."
+//
+// locationPath should be the PCI location path of the NVMe controller, e.g.:
+// "PCIROOT(0)#PCI(0300)#PCI(0000)#PCI(0800)#PCI(0000)"
+//
+// Use either deviceInstanceID or locationPath, not both.
+func WithWindowsNVMeDevice(deviceInstanceID, locationPath string) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+		if deviceInstanceID == "" && locationPath == "" {
+			return errors.New("either deviceInstanceID or locationPath must be provided")
+		}
+		if deviceInstanceID != "" && locationPath != "" {
+			return errors.New("provide either deviceInstanceID or locationPath, not both")
+		}
+
+		if deviceInstanceID != "" {
+			return WithWindowsDevice("vpci", deviceInstanceID)(ctx, client, c, s)
+		}
+		return WithWindowsDevice("vpci-location-path", locationPath)(ctx, client, c, s)
+	}
+}
+
 // WithMemorySwap sets the container's swap in bytes. It is a no-op on non-Linux specs.
 func WithMemorySwap(swap int64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {

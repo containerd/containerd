@@ -166,6 +166,11 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			}
 			opts = append(opts, oci.WithWindowsDevice(idType, devID))
 		}
+		for _, nvmeDevice := range cliContext.StringSlice("nvme-device") {
+			// NVMe device can be specified as device instance ID or location path
+			// We'll pass it as-is to the NVMe device assignment function
+			opts = append(opts, oci.WithWindowsNVMeDevice(nvmeDevice, ""))
+		}
 	}
 
 	if cliContext.Bool("cni") {

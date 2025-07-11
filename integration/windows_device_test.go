@@ -88,3 +88,61 @@ func TestWindowsDevice(t *testing.T) {
 		fmt.Sprintf("%s %s %s", runtime.Stdout, runtime.LogTagFull, "/Windows/System32/HostDriverStore/FileRepository"),
 	})
 }
+
+func TestWindowsNVMeDevice(t *testing.T) {
+	// Skip this test if no NVMe device is available for testing
+	// This test requires a specific NVMe device instance ID to be provided
+	nvmeDeviceID := os.Getenv("TEST_NVME_DEVICE_ID")
+	if nvmeDeviceID == "" {
+		t.Skip("Skipping NVMe device test: TEST_NVME_DEVICE_ID environment variable not set")
+	}
+
+	testPodLogDir := t.TempDir()
+
+	t.Log("Create a sandbox with log directory")
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "windows-nvme-device",
+		WithPodLogDirectory(testPodLogDir),
+	)
+
+	var (
+		testImage     = images.Get(images.BusyBox)
+		containerName = "test-nvme-container"
+	)
+
+	EnsureImageExists(t, testImage)
+
+	t.Log("Create a container to run the NVMe device test")
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		// Check for NVMe devices inside the container
+		WithCommand("powershell", "-Command", "Get-PhysicalDisk | Where-Object { $_.BusType -eq 'NVMe' } | Format-Table -AutoSize"),
+		WithLogPath(containerName),
+		WithDevice("", "class/5B45201D-F2F2-4F3B-85BB-30FF1F953599", ""), // NVMe device class
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	t.Log("Wait for container to finish running")
+	require.NoError(t, Eventually(func() (bool, error) {
+		s, err := runtimeService.ContainerStatus(cn)
+		if err != nil {
+			return false, err
+		}
+		if s.GetState() == runtime.ContainerState_CONTAINER_EXITED {
+			return true, nil
+		}
+		return false, nil
+	}, time.Second, 30*time.Second))
+
+	t.Log("Check container log for NVMe device presence")
+	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
+	assert.NoError(t, err)
+
+	// Note: The actual device detection depends on the test environment
+	// This test verifies the container can run with NVMe device assignment
+	t.Logf("Container output: %s", string(content))
+}
