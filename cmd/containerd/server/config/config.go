@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 
 	"dario.cat/mergo"
@@ -41,9 +42,6 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
-
-	"golang.org/x/text/encoding/unicode"
-	"golang.org/x/text/transform"
 )
 
 // migrations hold the migration functions for every prior containerd config version
@@ -353,24 +351,40 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 
 	if err := toml.NewDecoder(f).DisallowUnknownFields().Decode(config); err != nil {
 		var serr *toml.StrictMissingError
-		readUtf16 := false
 
-		resetFileOffset := func(fptr *os.File) error {
-			if _, seekerr := fptr.Seek(0, io.SeekStart); seekerr != nil {
-				return fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
-			}
-			return nil
-		}
-
-		// Read in UTF-16 if the OS is windows and the error is not StrictMissingError
 		if runtime.GOOS == "windows" && !errors.As(err, &serr) {
-			if seekErrMsg := resetFileOffset(f); seekErrMsg != nil {
-				return nil, seekErrMsg
+			if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
+				return nil, fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
 			}
-			utf16Err := toml.NewDecoder(getUTF16ReaderForWindows(f)).DisallowUnknownFields().Decode(config)
-			if utf16Err != nil && errors.As(utf16Err, &serr) {
-				err = utf16Err
-				readUtf16 = true
+
+			byteHeader := make([]byte, 2)
+			n, rerr := f.Read(byteHeader)
+
+			if rerr != nil && rerr != io.EOF {
+				return nil, fmt.Errorf("unable to read file %s", path)
+			}
+			if n == 2 {
+				switch {
+				case byteHeader[0] == 0xFF && byteHeader[1] == 0xFE: // Little Endian
+					return nil, fmt.Errorf("config file '%s' detected as UTF-16 LE encoded, please ensure it is UTF-8 encoded", path)
+				case byteHeader[0] == 0xFE && byteHeader[1] == 0xFF: // Big Endinan
+					return nil, fmt.Errorf("config file '%s' detected as UTF-16 BE encoded, please ensure it is UTF-8 encoded", path)
+				}
+			}
+
+			// Check for null bytes
+			byteHeader = make([]byte, 4096)
+			for {
+				n, rerr := f.Read(byteHeader)
+				if rerr != nil && rerr != io.EOF {
+					return nil, fmt.Errorf("unable to read file %s", path)
+				}
+				if n == 0 {
+					break // EOF
+				}
+				if slices.Contains(byteHeader[:n], 0x00) {
+					return nil, fmt.Errorf("config file '%s' contains unexpected null bytes, please ensure it is UTF-8 encoded", path)
+				}
 			}
 		}
 
@@ -387,14 +401,10 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 
 			// Try decoding again with unknown fields
 			config = &Config{}
-			if seekErrMsg := resetFileOffset(f); seekErrMsg != nil {
-				return nil, seekErrMsg
+			if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
+				return nil, fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
 			}
-			if readUtf16 && runtime.GOOS == "windows" {
-				err = toml.NewDecoder(getUTF16ReaderForWindows(f)).Decode(config)
-			} else {
-				err = toml.NewDecoder(f).Decode(config)
-			}
+			err = toml.NewDecoder(f).Decode(config)
 		}
 		if err != nil {
 			var derr *toml.DecodeError
@@ -413,13 +423,6 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 	}
 
 	return config, nil
-}
-
-// UTF-16 decoder
-func getUTF16ReaderForWindows(f *os.File) *transform.Reader {
-	winEncoding := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM)
-	utf16Transformer := unicode.BOMOverride(winEncoding.NewDecoder())
-	return transform.NewReader(f, utf16Transformer)
 }
 
 // resolveImports resolves import strings list to absolute paths list:
