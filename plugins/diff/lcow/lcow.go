@@ -150,10 +150,11 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 		return emptyDesc, err
 	}
 	defer func() {
-		if err != nil {
-			outFile.Close()
-			os.Remove(layerPath)
+		if err == nil {
+			return
 		}
+		outFile.Close()
+		os.Remove(layerPath)
 	}()
 
 	err = tar2ext4.Convert(rc, outFile, tar2ext4.ConvertWhiteout, tar2ext4.AppendVhdFooter, tar2ext4.MaximumDiskSize(maxLcowVhdSizeGB))

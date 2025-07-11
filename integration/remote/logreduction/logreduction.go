@@ -61,10 +61,11 @@ func NewLogReduction(identicalErrorDelay time.Duration) *LogReduction {
 
 func (l *LogReduction) cleanupErrorTimeouts() {
 	for name, timeout := range l.errorPrinted {
-		if nowfunc().Sub(timeout) >= l.identicalErrorDelay {
-			delete(l.errorPrinted, name)
-			delete(l.lastError, name)
+		if nowfunc().Sub(timeout) < l.identicalErrorDelay {
+			continue
 		}
+		delete(l.errorPrinted, name)
+		delete(l.lastError, name)
 	}
 }
 
