@@ -62,7 +62,7 @@ version = 2
     netns_mounts_under_state_dir = false
     restrict_oom_score_adj = false
     # Default image update in latest
-    sandbox_image = "registry.k8s.io/pause:3.10"
+    sandbox_image = "registry.k8s.io/pause:3.10.1"
     selinux_category_range = 1024
     stats_collect_period = 10
     stream_idle_timeout = "4h0m0s"

@@ -73,7 +73,7 @@ const (
 	ModeShim SandboxControllerMode = "shim"
 	// DefaultSandboxImage is the default image to use for sandboxes when empty or
 	// for default configurations.
-	DefaultSandboxImage = "registry.k8s.io/pause:3.10"
+	DefaultSandboxImage = "registry.k8s.io/pause:3.10.1"
 	// IOTypeFifo is container io implemented by creating named pipe
 	IOTypeFifo = "fifo"
 	// IOTypeStreaming is container io implemented by connecting the streaming api to sandbox endpoint
@@ -298,7 +298,7 @@ type ImageConfig struct {
 	// by other plugins to lookup the current image name.
 	// Image names should be full names including domain and tag
 	// Examples:
-	//   "sandbox": "k8s.gcr.io/pause:3.10"
+	//   "sandbox": "registry.k8s.io/pause:3.10.1"
 	//   "base": "docker.io/library/ubuntu:latest"
 	// Migrated from:
 	// (PluginConfig).SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
