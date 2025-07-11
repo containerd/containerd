@@ -104,7 +104,7 @@ builds, as shown below:
 
 ``` toml
   [plugins."io.containerd.differ.v1.erofs"]
-    mkfs_options = ["-T0 --mkfs-time"]
+    mkfs_options = ["-T0", "--mkfs-time"]
 ```
 
 If erofs-utils is 1.8.2 or higher, it's preferred to append `--sort=none` to
@@ -113,7 +113,7 @@ improved performance, as shown below:
 
 ``` toml
   [plugins."io.containerd.differ.v1.erofs"]
-    mkfs_options = ["-T0 --mkfs-time --sort=none"]
+    mkfs_options = ["-T0", "--mkfs-time", "--sort=none"]
 ```
 
 ### Running a container
@@ -127,6 +127,38 @@ $ ctr image pull docker.io/library/busybox:latest
 $ # run the container with the provides snapshotter
 $ ctr run -rm -t --snapshotter erofs docker.io/library/busybox:latest hello sh
 ```
+
+## Data Integrity
+
+The EROFS snapshotter provides two methods to consolidate data integrity:
+
+### Data Integrity with Immutable File Attribute
+
+By setting `set_immutable = true`, the EROFS snapshotter marks each layer blob
+with `IMMUTABLE_FL`. This ensures that dirty data is flushed immediately and the
+EROFS layer blob cannot be deleted, renamed, or modified.
+
+The immutable file attribute is mainly used to ensure data persistence and
+prevent artificial data loss, but it cannot detect data corruption caused by
+hardware failures. Since it can flush in-memory dirty data, it may significantly
+increase the unpacking time it takes to launch a container: for example, the
+unpacking time for tensorflow:2.19.0 increases by 108.86% (from 10.090s to
+21.074s) on EXT4. However, it has no impact on runtime performance.
+
+### Data Integrity with fs-verity
+
+By setting `enable_fsverity = true`, the EROFS snapshotter will:
+
+ - Enable fs-verity on EROFS layers during commit;
+
+ - Verify the fs-verity status before mounting layers;
+
+ - Skip fs-verity if the filesystem or kernel does not support it.
+
+The fs-verity method guarantees that EROFS blob layers never change, but it
+introduces additional runtime overhead since all container image reads from
+the container will be slower because it needs to verify the Merkle hash tree
+first.
 
 ## How It Works
 
@@ -164,14 +196,6 @@ convert the flat directory into an EROFS layer blob on Commit instead.
 In other words, the EROFS differ can only be used with the EROFS snapshotter;
 otherwise, it will skip to the next differ.  The EROFS snapshotter can work
 with or without the EROFS differ.
-
-## Data Integrity with fsverity
-
-The EROFS snapshotter supports fsverity for data integrity verification of EROFS layers.
-When enabled via `enable_fsverity = true`, the snapshotter will:
-- Enable fsverity on EROFS layers during commit
-- Verify fsverity status before mounting layers
-- Skip fsverity if the filesystem or kernel does not support it
 
 ## Tar Index Mode
 
