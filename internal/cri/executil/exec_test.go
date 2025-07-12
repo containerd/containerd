@@ -158,7 +158,7 @@ func TestTimeout(t *testing.T) {
 	defer cancel()
 
 	err := exec.CommandContext(ctx, "sleep", "2").Run()
-	if err != context.DeadlineExceeded {
+	if ctx.Err() != context.DeadlineExceeded {
 		t.Errorf("expected %v but got %v", context.DeadlineExceeded, err)
 	}
 }
