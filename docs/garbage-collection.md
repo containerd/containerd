@@ -102,6 +102,7 @@ The supported garbage collection labels are:
 | Label key | Label value | Supported Resources | Description |
 |---|---|---|---|
 | `containerd.io/gc.root` | _nonempty_ | Content, Snapshots | Keep this object and anything it references. (Clients may set this to a [rfc3339](https://tools.ietf.org/html/rfc3339) timestamp to indicate when this value was set, however, the garbage collector does not parse the value) |
+| `containerd.io/gc.nonroot` | _timestamp_ formatted as [rfc3339](https://tools.ietf.org/html/rfc3339) | Leases | When to no longer treat a lease as a root object, allowing it to be garbage collected if it is not referenced |
 | `containerd.io/gc.ref.snapshot.<snapshotter>` | `<identifier>` | Content, Snapshots | Resource references the given snapshot `<identifier>` for the snapshotter `<snapshotter>` |
 | `containerd.io/gc.ref.content` | _digest_ | Content, Snapshots, Images, Containers | Resource references the given content blob |
 | `containerd.io/gc.ref.content.<user defined>` | _digest_ | Content, Snapshots, Images, Containers | Resource references the given content blob with a `<user defined>` label key |
