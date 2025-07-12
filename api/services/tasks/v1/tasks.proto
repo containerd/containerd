@@ -89,6 +89,10 @@ message CreateTaskRequest {
 	google.protobuf.Any options = 9;
 
 	string runtime_path = 10;
+	// Path to attachable FIFO for binary stdout
+	string attachable_out = 11;
+	// Path to attachable FIFO for binary stderr
+	string attachable_err = 12;
 }
 
 message CreateTaskResponse {
