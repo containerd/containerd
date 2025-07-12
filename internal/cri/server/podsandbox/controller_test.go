@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/moby/locker"
 	"github.com/stretchr/testify/assert"
 
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -48,6 +49,7 @@ func newControllerService() *Controller {
 		config: testConfig,
 		os:     ostesting.NewFakeOS(),
 		store:  NewStore(),
+		locks:  locker.New(),
 	}
 }
 
