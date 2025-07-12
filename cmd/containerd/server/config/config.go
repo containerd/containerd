@@ -349,45 +349,17 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 	}
 	defer f.Close()
 
+	if runtime.GOOS == "windows" {
+		if isUtf16(f) {
+			return nil, fmt.Errorf("config file '%s' detected as UTF-16 encoded, please ensure it is UTF-8 encoded", path)
+		}
+		if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
+			return nil, fmt.Errorf("unable to seek file to start %w", seekerr)
+		}
+	}
+
 	if err := toml.NewDecoder(f).DisallowUnknownFields().Decode(config); err != nil {
 		var serr *toml.StrictMissingError
-
-		if runtime.GOOS == "windows" && !errors.As(err, &serr) {
-			if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
-				return nil, fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
-			}
-
-			byteHeader := make([]byte, 2)
-			n, rerr := f.Read(byteHeader)
-
-			if rerr != nil && rerr != io.EOF {
-				return nil, fmt.Errorf("unable to read file %s", path)
-			}
-			if n == 2 {
-				switch {
-				case byteHeader[0] == 0xFF && byteHeader[1] == 0xFE: // Little Endian
-					return nil, fmt.Errorf("config file '%s' detected as UTF-16 LE encoded, please ensure it is UTF-8 encoded", path)
-				case byteHeader[0] == 0xFE && byteHeader[1] == 0xFF: // Big Endinan
-					return nil, fmt.Errorf("config file '%s' detected as UTF-16 BE encoded, please ensure it is UTF-8 encoded", path)
-				}
-			}
-
-			// Check for null bytes
-			byteHeader = make([]byte, 4096)
-			for {
-				n, rerr := f.Read(byteHeader)
-				if rerr != nil && rerr != io.EOF {
-					return nil, fmt.Errorf("unable to read file %s", path)
-				}
-				if n == 0 {
-					break // EOF
-				}
-				if slices.Contains(byteHeader[:n], 0x00) {
-					return nil, fmt.Errorf("config file '%s' contains unexpected null bytes, please ensure it is UTF-8 encoded", path)
-				}
-			}
-		}
-
 		if errors.As(err, &serr) {
 			for _, derr := range serr.Errors {
 				row, col := derr.Position()
@@ -423,6 +395,33 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 	}
 
 	return config, nil
+}
+
+func isUtf16(f *os.File) bool {
+	byteHeader := make([]byte, 2)
+	n, rerr := f.Read(byteHeader)
+
+	if rerr != nil && rerr != io.EOF {
+		return false
+	}
+	if n == 2 { // Little Endian & Big Endian
+		return slices.Equal(byteHeader, []byte{0xFF, 0xFE}) || slices.Equal(byteHeader, []byte{0xFE, 0xFF})
+	}
+
+	// Check for null bytes
+	byteHeader = make([]byte, 4096)
+	for {
+		n, rerr := f.Read(byteHeader)
+		if rerr != nil && rerr != io.EOF {
+			return false
+		}
+		if n == 0 {
+			return false
+		}
+		if slices.Contains(byteHeader[:n], 0x00) {
+			return true
+		}
+	}
 }
 
 // resolveImports resolves import strings list to absolute paths list:
