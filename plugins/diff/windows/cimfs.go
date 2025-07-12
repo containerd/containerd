@@ -35,7 +35,6 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/plugins"
-	winsn "github.com/containerd/containerd/v2/plugins/snapshots/windows"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -74,14 +73,15 @@ func init() {
 			plugins.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			if !cimfs.IsBlockCimSupported() {
+				return nil, fmt.Errorf("host OS version doesn't support block CIMs: %w", plugin.ErrSkipPlugin)
+			}
+
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
 
-			if !cimfs.IsBlockCimSupported() {
-				return nil, fmt.Errorf("host OS version doesn't support CimFS: %w", plugin.ErrSkipPlugin)
-			}
 			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 			return NewBlockCimDiff(md.(*metadata.DB).ContentStore())
 		},
@@ -114,7 +114,7 @@ func NewCimDiff(store content.Store) (CompareApplier, error) {
 func (c cimDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
 	if len(mounts) != 1 {
 		return emptyDesc, fmt.Errorf("number of mounts should always be 1 for CimFS layers: %w", errdefs.ErrInvalidArgument)
-	} else if mounts[0].Type != "CimFS" {
+	} else if mounts[0].Type != mount.CimFSMountType {
 		return emptyDesc, fmt.Errorf("cimDiff does not support layer type %s: %w", mounts[0].Type, errdefs.ErrNotImplemented)
 	}
 
@@ -123,11 +123,11 @@ func (c cimDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mo
 	if err != nil {
 		return emptyDesc, err
 	}
-	parentLayerCimPaths, err := winsn.GetParentCimPaths(&m)
+	parentLayerCimPaths, err := mount.GetParentCimPaths(&m)
 	if err != nil {
 		return emptyDesc, err
 	}
-	cimPath, err := winsn.GetCimPath(&m)
+	cimPath, err := mount.GetCimPath(&m)
 	if err != nil {
 		return emptyDesc, err
 	}
@@ -167,14 +167,14 @@ func parseBlockCIMMount(m *mount.Mount) (*cimfs.BlockCIM, []*cimfs.BlockCIM, err
 	)
 
 	for _, option := range m.Options {
-		if val, ok := strings.CutPrefix(option, winsn.ParentLayerCimPathsFlag); ok {
+		if val, ok := strings.CutPrefix(option, mount.ParentLayerCimPathsFlag); ok {
 			err := json.Unmarshal([]byte(val), &parentPaths)
 			if err != nil {
 				return nil, nil, err
 			}
-		} else if val, ok = strings.CutPrefix(option, winsn.BlockCIMTypeFlag); ok {
+		} else if val, ok = strings.CutPrefix(option, mount.BlockCIMTypeFlag); ok {
 			// only support single file for extraction for now
-			if val != "file" {
+			if val != mount.BlockCIMTypeFile {
 				return nil, nil, fmt.Errorf("extraction doesn't support layer type `%s`", val)
 			}
 		}
@@ -206,7 +206,7 @@ func parseBlockCIMMount(m *mount.Mount) (*cimfs.BlockCIM, []*cimfs.BlockCIM, err
 func (c blockCIMDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
 	if len(mounts) != 1 {
 		return emptyDesc, fmt.Errorf("number of mounts should always be 1 for CimFS layers: %w", errdefs.ErrInvalidArgument)
-	} else if mounts[0].Type != winsn.BlockCIMMountType {
+	} else if mounts[0].Type != mount.BlockCIMMountType {
 		return emptyDesc, fmt.Errorf("blockCIMDiff does not support layer type %s: %w", mounts[0].Type, errdefs.ErrNotImplemented)
 	}
 
@@ -221,8 +221,23 @@ func (c blockCIMDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 		return emptyDesc, err
 	}
 
+	enableLayerIntegrity := mount.GetEnableLayerIntegrity(&m)
+	appendVHDFooter := mount.GetAppendVHDFooter(&m)
+
+	// Build import options based on mount configuration
+	var importOpts []ocicimlayer.BlockCIMLayerImportOpt
+	importOpts = append(importOpts, ocicimlayer.WithParentLayers(parentLayers))
+
+	if appendVHDFooter {
+		importOpts = append(importOpts, ocicimlayer.WithVHDFooter())
+	}
+
+	if enableLayerIntegrity {
+		importOpts = append(importOpts, ocicimlayer.WithLayerIntegrity())
+	}
+
 	applyFunc := func(ctx context.Context, r io.Reader) (int64, error) {
-		return ocicimlayer.ImportSingleFileCimLayerFromTar(ctx, r, layer, parentLayers)
+		return ocicimlayer.ImportBlockCIMLayerWithOpts(ctx, r, layer, importOpts...)
 	}
 
 	return applyCIMLayerCommon(ctx, desc, c.store, applyFunc, opts...)
