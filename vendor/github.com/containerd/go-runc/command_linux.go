@@ -29,7 +29,7 @@ func (r *Runc) command(context context.Context, args ...string) *exec.Cmd {
 	if command == "" {
 		command = DefaultCommand
 	}
-	cmd := exec.CommandContext(context, command, append(r.args(), args...)...)
+	cmd := exec.CommandContext(context, command, append(r.args(""), args...)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: r.Setpgid,
 	}
@@ -38,6 +38,22 @@ func (r *Runc) command(context context.Context, args ...string) *exec.Cmd {
 		cmd.SysProcAttr.Pdeathsig = r.PdeathSignal
 	}
 
+	return cmd
+}
+
+func (r *Runc) commandWithCustomLog(context context.Context, logPath string, args ...string) *exec.Cmd {
+	command := r.Command
+	if command == "" {
+		command = DefaultCommand
+	}
+	cmd := exec.CommandContext(context, command, append(r.args(logPath), args...)...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: r.Setpgid,
+	}
+	cmd.Env = filterEnv(os.Environ(), "NOTIFY_SOCKET") // NOTIFY_SOCKET introduces a special behavior in runc but should only be set if invoked from systemd
+	if r.PdeathSignal != 0 {
+		cmd.SysProcAttr.Pdeathsig = r.PdeathSignal
+	}
 	return cmd
 }
 
