@@ -405,7 +405,9 @@ func isUtf16(f *os.File) bool {
 		return false
 	}
 	if n == 2 { // Little Endian & Big Endian
-		return slices.Equal(byteHeader, []byte{0xFF, 0xFE}) || slices.Equal(byteHeader, []byte{0xFE, 0xFF})
+		return slices.Equal(byteHeader, []byte{0xFF, 0xFE}) ||
+			slices.Equal(byteHeader, []byte{0xFE, 0xFF}) ||
+			byteHeader[0] == 0x00 || byteHeader[1] == 0x00
 	}
 
 	// Check for null bytes
