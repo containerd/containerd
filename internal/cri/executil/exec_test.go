@@ -34,6 +34,7 @@ package executil
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	osexec "os/exec"
@@ -158,7 +159,7 @@ func TestTimeout(t *testing.T) {
 	defer cancel()
 
 	err := exec.CommandContext(ctx, "sleep", "2").Run()
-	if err != context.DeadlineExceeded {
+	if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		t.Errorf("expected %v but got %v", context.DeadlineExceeded, err)
 	}
 }
