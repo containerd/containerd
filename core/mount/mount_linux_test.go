@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -394,4 +395,165 @@ func supportsIDMap(path string) bool {
 	}
 
 	return true
+}
+
+func TestBuildIDMappedPaths(t *testing.T) {
+	testCases := []struct {
+		name        string
+		lowerDirs   []string
+		commonDir   string
+		idMappedDir string
+		expected    []string
+	}{
+		{
+			name: "basic path rewriting",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2/fs",
+			},
+			commonDir:   "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+			idMappedDir: "/tmp/idmapped123",
+			expected: []string{
+				"/tmp/idmapped123/1/fs",
+				"/tmp/idmapped123/2/fs",
+			},
+		},
+		{
+			name: "single layer",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs",
+			},
+			commonDir:   "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs",
+			idMappedDir: "/tmp/idmapped789",
+			expected: []string{
+				"/tmp/idmapped789",
+			},
+		},
+		{
+			name: "single layer with ending slash",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs/",
+			},
+			commonDir:   "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs/",
+			idMappedDir: "/tmp/idmapped789",
+			expected: []string{
+				"/tmp/idmapped789",
+			},
+		},
+		{
+			name: "snapshots with common prefix in snapshot id",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/79/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/78/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/77/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/76/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/75/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/73/fs",
+			},
+			commonDir:   "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+			idMappedDir: "/tmp/ovl-idmapped1095187461",
+			expected: []string{
+				"/tmp/ovl-idmapped1095187461/79/fs",
+				"/tmp/ovl-idmapped1095187461/78/fs",
+				"/tmp/ovl-idmapped1095187461/77/fs",
+				"/tmp/ovl-idmapped1095187461/76/fs",
+				"/tmp/ovl-idmapped1095187461/75/fs",
+				"/tmp/ovl-idmapped1095187461/73/fs",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := buildIDMappedPaths(tc.lowerDirs, tc.commonDir, tc.idMappedDir)
+
+			if len(result) != len(tc.expected) {
+				t.Fatalf("expected %d paths, got %d", len(tc.expected), len(result))
+			}
+
+			for i, expected := range tc.expected {
+				if result[i] != expected {
+					t.Errorf("path %d: expected %s, got %s", i, expected, result[i])
+				}
+			}
+		})
+	}
+}
+
+func TestGetCommonDirectory(t *testing.T) {
+	testCases := []struct {
+		name        string
+		lowerDirs   []string
+		expected    string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "no lowerdirs",
+			lowerDirs:   []string{},
+			expectError: true,
+			errorMsg:    "no common prefix found",
+		},
+		{
+			name: "normal snapshots",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/37712/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16590/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585/fs",
+			},
+			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+		},
+		{
+			name: "no common prefix at all",
+			lowerDirs: []string{
+				"/completely/different/path/1",
+				"/totally/unrelated/path/2",
+			},
+			expectError: true,
+			errorMsg:    "invalid common directory:",
+		},
+		{
+			name: "single dir",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585/fs",
+			},
+			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585",
+		},
+		{
+			name: "snapshots with common prefix in snapshot id",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/79/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/78/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/77/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/76/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/75/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/73/fs",
+			},
+			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := getCommonDirectory(tc.lowerDirs)
+
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tc.errorMsg)
+				}
+				if !strings.Contains(err.Error(), tc.errorMsg) {
+					t.Errorf("expected error containing %q, got %q", tc.errorMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if result != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, result)
+			}
+		})
+	}
 }
