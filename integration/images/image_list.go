@@ -51,7 +51,7 @@ func initImages(imageListFile string) {
 	imageList = ImageList{
 		Alpine:           "ghcr.io/containerd/alpine:3.14.0",
 		BusyBox:          "ghcr.io/containerd/busybox:1.36",
-		Pause:            "registry.k8s.io/pause:3.10",
+		Pause:            "registry.k8s.io/pause:3.10.1",
 		ResourceConsumer: "registry.k8s.io/e2e-test-images/resource-consumer:1.10",
 		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.2",
 		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
