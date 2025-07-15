@@ -26,7 +26,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -43,10 +42,6 @@ func assertHasPrefix(t *testing.T, s, prefix string) {
 }
 
 func TestNewFIFOSetInDir(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("NewFIFOSetInDir has different behaviour on windows")
-	}
-
 	root := t.TempDir()
 
 	fifos, err := NewFIFOSetInDir(root, "theid", true)
@@ -76,9 +71,6 @@ func TestNewFIFOSetInDir(t *testing.T) {
 }
 
 func TestNewAttach(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("setupFIFOProducers not yet implemented on windows")
-	}
 	var (
 		expectedStdin  = "this is the stdin"
 		expectedStdout = "this is the stdout"
