@@ -62,12 +62,7 @@ func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), e
 		return options, nil, fmt.Errorf("failed to parse overlay lowerdir's from given options")
 	}
 
-	tempRemountsLocation, err := os.MkdirTemp(tempMountLocation, "ovl-idmapped")
-	if err != nil {
-		return options, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
-	}
-
-	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(tempRemountsLocation, lowerDirs, usernsFd)
+	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(tempMountLocation, lowerDirs, usernsFd)
 	if err != nil {
 		return options, idMapCleanUp, fmt.Errorf("failed to create idmapped mount: %w", err)
 	}
@@ -245,24 +240,24 @@ func getUnprivilegedMountFlags(path string) (int, error) {
 	return flags, nil
 }
 
-func doPrepareIDMappedOverlay(tempRemountsLocation string, lowerDirs []string, usernsFd int) (tmpLowerDirs []string, cleanup func(), retErr error) {
+func doPrepareIDMappedOverlay(tmpDir string, lowerDirs []string, usernsFd int) (_ []string, _ func(), retErr error) {
 	commonDir, err := getCommonDirectory(lowerDirs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to determine common parent: %w", err)
 	}
 
-	cleanup = func() {
-		if err := unix.Unmount(tempRemountsLocation, 0); err != nil {
-			log.L.WithError(err).Warnf("failed to unmount idmapped directory %s", tempRemountsLocation)
-		}
-		// Using os.Remove() so if it's not empty, we don't delete files in the rootfs.
+	tempRemountsLocation, err := os.MkdirTemp(tmpDir, "ovl-idmapped")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
+	}
+	cleanDir := func() {
 		if err := os.Remove(tempRemountsLocation); err != nil {
 			log.L.WithError(err).Infof("failed to remove idmapped directory")
 		}
 	}
 	defer func() {
 		if retErr != nil {
-			cleanup()
+			cleanDir()
 		}
 	}()
 
@@ -270,10 +265,24 @@ func doPrepareIDMappedOverlay(tempRemountsLocation string, lowerDirs []string, u
 	if err := IDMapMountWithAttrs(commonDir, tempRemountsLocation, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
 		return nil, nil, err
 	}
+	cleanMount := func() {
+		if err := unix.Unmount(tempRemountsLocation, 0); err != nil {
+			log.L.WithError(err).Warnf("failed to unmount idmapped directory %s", tempRemountsLocation)
+		}
+	}
+	defer func() {
+		if retErr != nil {
+			cleanMount()
+		}
+	}()
 
 	// Build new lower dir paths through the idmapped directory
-	tmpLowerDirs = buildIDMappedPaths(lowerDirs, commonDir, tempRemountsLocation)
+	tmpLowerDirs := buildIDMappedPaths(lowerDirs, commonDir, tempRemountsLocation)
 
+	cleanup := func() {
+		cleanMount()
+		cleanDir()
+	}
 	return tmpLowerDirs, cleanup, nil
 }
 
