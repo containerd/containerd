@@ -18,7 +18,6 @@ package mount
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -279,15 +278,13 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 
 			cleanup()
 
-			_, err = os.Stat(remountsLocation)
+			err = os.Remove(remountsLocation)
 
 			if tc.injectUmountFault {
 				// We should have failed to remove the remounts location if the unmount failed.
-				assert.NoError(t, err, "expected remounts location to still exist after unmount failure")
+				assert.Error(t, err, "expected remove to fail (dir not empty), expected remount child locations to still exist after unmount failure")
 			} else {
-				pathErr, isPathErr := err.(*fs.PathError)
-				require.True(t, isPathErr, "expected a PathError")
-				assert.Equal(t, unix.ENOENT, pathErr.Err, "temporary remounts should be cleaned up")
+				assert.NoError(t, err, "expected remove to work (dir empty), the child directory should be unmounted and removed")
 			}
 
 			// Original lowerdirs should be unaffected.
