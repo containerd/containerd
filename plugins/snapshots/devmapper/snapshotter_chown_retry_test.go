@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -15,6 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+
+//go:build linux
 
 package devmapper
 
@@ -33,18 +33,18 @@ func TestChownRetryMechanism(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
-
+	
 	t.Run("chown_retry_with_ebusy", func(t *testing.T) {
 		root := t.TempDir()
 		target := filepath.Join(root, "test_file")
-
+		
 		require.NoError(t, os.WriteFile(target, []byte("test content"), 0o644))
-
+		
 		originalChownFunc := fstest.ChownFunc
 		defer func() {
 			fstest.ChownFunc = originalChownFunc
 		}()
-
+		
 		var callCount int32
 		fstest.ChownFunc = func(path string, uid, gid int) error {
 			count := atomic.AddInt32(&callCount, 1)
@@ -53,10 +53,10 @@ func TestChownRetryMechanism(t *testing.T) {
 			}
 			return nil
 		}
-
+		
 		err := fstest.Chown("test_file", 0, 0).Apply(root)
 		require.NoError(t, err, "Chown should succeed after retries")
-
+		
 		finalCount := atomic.LoadInt32(&callCount)
 		require.Equal(t, int32(3), finalCount, "Should have made exactly 3 attempts")
 	})

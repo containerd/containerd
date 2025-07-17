@@ -26,18 +26,18 @@ func Retry(ctx context.Context, maxAttempts int, delay time.Duration, fn func() 
 	if maxAttempts <= 0 {
 		maxAttempts = 1
 	}
-
+	
 	var lastErr error
 	for i := 0; i < maxAttempts; i++ {
 		lastErr = fn()
 		if lastErr == nil {
 			return nil
 		}
-
+		
 		if i == maxAttempts-1 {
 			break
 		}
-
+		
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -45,6 +45,6 @@ func Retry(ctx context.Context, maxAttempts int, delay time.Duration, fn func() 
 			continue
 		}
 	}
-
+	
 	return lastErr
 }
