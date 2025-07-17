@@ -9,7 +9,7 @@ on:
       azure_windows_image_id:
         description: Windows image URN to deploy
         required: true
-        default: MicrosoftWindowsServer:WindowsServer:2025-datacenter:latest
+        default: MicrosoftWindowsServer:WindowsServer:2022-datacenter:latest
       azure_vm_size:
         description: Windows image builder VM size
         required: true
