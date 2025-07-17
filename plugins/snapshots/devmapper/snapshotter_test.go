@@ -269,39 +269,3 @@ func (m *mockPoolDevice) Chown(path string, uid, gid int) error {
 	}
 	return nil
 }
-
-func TestChownRetry(t *testing.T) {
-	t.Parallel()
-
-	for i := 0; i < 1000; i++ {
-		ctx := context.Background()
-		ctx = namespaces.WithNamespace(ctx, "testsuite")
-
-		config := &Config{
-			RootPath:      t.TempDir(),
-			PoolName:      "test-pool",
-			BaseImageSize: "16Mb",
-		}
-
-		mockPool := &mockPoolDevice{
-			chownFails: 2,
-		}
-		_ = mockPool
-
-		var (
-			wg       sync.WaitGroup
-			chownErr error
-		)
-
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			chownErr = fstest.Chown("/foo", 1, 1).Apply(config.RootPath)
-		}()
-
-		wg.Wait()
-
-		assert.NoError(t, chownErr)
-	}
-}

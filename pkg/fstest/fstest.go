@@ -42,8 +42,8 @@ func (fn applyFn) Apply(root string) error {
    --------------------------------------------------------------------
 */
 
-// ChownFunc is used by Chown() to change ownership.  
-// Default: os.Chown.  
+// ChownFunc is used by Chown() to change ownership.
+// Default: os.Chown.
 // Tests can overwrite this variable to inject deterministic errors
 // (e.g. return unix.EBUSY on the first N calls) so that retry logic
 // can be verified without root privileges or special kernel modules.
