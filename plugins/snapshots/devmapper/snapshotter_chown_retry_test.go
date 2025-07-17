@@ -13,9 +13,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TestChownRetry verifies that fstest.Chown() will retry and eventually succeed
+// TestChownRetryMechanismMechanism verifies that fstest.Chown() will retry and eventually succeed
 // after transient EBUSY errors. 1000 iterations ensure the fix is stable.
-func TestChownRetry(t *testing.T) {
+func TestChownRetryMechanismMechanism(t *testing.T) {
 	const loops = 1000
 	for i := 0; i < loops; i++ {
 		root := t.TempDir()
