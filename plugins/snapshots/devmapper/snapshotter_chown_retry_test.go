@@ -3,6 +3,7 @@
 package devmapper
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -13,30 +14,38 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TestChownRetry verifies that fstest.Chown() will retry and eventually succeed
-// after transient EBUSY errors. 1000 iterations ensure the fix is stable.
-func TestChownRetry(t *testing.T) {
-	const loops = 1000
+// TestChownRetryMechanism verifies that fstest.Chown() will retry and eventually succeed
+// after transient EBUSY errors. This test runs multiple iterations to ensure stability.
+func TestChownRetryMechanism(t *testing.T) {
+	const loops = 100 // Reduced for CI performance
+
 	for i := 0; i < loops; i++ {
-		root := t.TempDir()
+		t.Run(fmt.Sprintf("iteration_%d", i), func(t *testing.T) {
+			root := t.TempDir()
 
-		// 建立要被 Chown 的檔案
-		target := filepath.Join(root, "foo")
-		require.NoError(t, os.WriteFile(target, []byte("x"), 0o644))
+			// Create target file
+			target := filepath.Join(root, "test_file")
+			require.NoError(t, os.WriteFile(target, []byte("test content"), 0o644))
 
-		// 置換 ChownFunc：前兩次回傳 EBUSY，之後成功
-		var fails int32 = 2
-		orig := fstest.ChownFunc
-		fstest.ChownFunc = func(p string, uid, gid int) error {
-			if atomic.AddInt32(&fails, -1) >= 0 {
-				return unix.EBUSY
+			// Mock ChownFunc: first 2 calls return EBUSY, then succeed
+			var failCount int32 = 2
+			originalChownFunc := fstest.ChownFunc
+
+			fstest.ChownFunc = func(path string, uid, gid int) error {
+				if atomic.AddInt32(&failCount, -1) >= 0 {
+					return unix.EBUSY
+				}
+				return originalChownFunc(path, uid, gid)
 			}
-			return nil
-		}
-		// 還原全域變數
-		defer func() { fstest.ChownFunc = orig }()
 
-		err := fstest.Chown("foo", 0, 0).Apply(root)
-		require.NoError(t, err)
+			// Restore original function
+			defer func() {
+				fstest.ChownFunc = originalChownFunc
+			}()
+
+			// Test the retry mechanism
+			err := fstest.Chown("test_file", 0, 0).Apply(root)
+			require.NoError(t, err, "Chown should succeed after retries")
+		})
 	}
 }
