@@ -1,0 +1,4 @@
+# 在 Makefile 第 181 行附近，將：
+# @find . -path ./vendor -prune -false -o -name '*.pb.go' | xargs rm
+# 替換為：
+@find . -path ./vendor -prune -o -name '*.pb.go' -print0 | xargs -0 -r rm

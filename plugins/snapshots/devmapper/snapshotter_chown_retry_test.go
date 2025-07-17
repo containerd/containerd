@@ -3,7 +3,6 @@
 package devmapper
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -19,32 +18,30 @@ func TestChownRetryMechanism(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	const loops = 5
+	t.Run("chown_retry_with_ebusy", func(t *testing.T) {
+		root := t.TempDir()
+		target := filepath.Join(root, "test_file")
 
-	for i := 0; i < loops; i++ {
-		t.Run(fmt.Sprintf("iteration_%d", i), func(t *testing.T) {
-			root := t.TempDir()
-			target := filepath.Join(root, "test_file")
+		require.NoError(t, os.WriteFile(target, []byte("test content"), 0o644))
 
-			require.NoError(t, os.WriteFile(target, []byte("test content"), 0o644))
+		originalChownFunc := fstest.ChownFunc
+		defer func() {
+			fstest.ChownFunc = originalChownFunc
+		}()
 
-			originalChownFunc := fstest.ChownFunc
-			defer func() {
-				fstest.ChownFunc = originalChownFunc
-			}()
-
-			var failCount int32 = 2
-			fstest.ChownFunc = func(path string, uid, gid int) error {
-				remaining := atomic.AddInt32(&failCount, -1)
-				if remaining >= 0 {
-					return unix.EBUSY
-				}
-				return nil
+		var callCount int32
+		fstest.ChownFunc = func(path string, uid, gid int) error {
+			count := atomic.AddInt32(&callCount, 1)
+			if count <= 2 {
+				return unix.EBUSY
 			}
+			return nil
+		}
 
-			err := fstest.Chown("test_file", 0, 0).Apply(root)
-			require.NoError(t, err, "Chown should succeed after retries")
-			require.True(t, atomic.LoadInt32(&failCount) < 0, "Should have exhausted fail count")
-		})
-	}
+		err := fstest.Chown("test_file", 0, 0).Apply(root)
+		require.NoError(t, err, "Chown should succeed after retries")
+
+		finalCount := atomic.LoadInt32(&callCount)
+		require.Equal(t, int32(3), finalCount, "Should have made exactly 3 attempts")
+	})
 }

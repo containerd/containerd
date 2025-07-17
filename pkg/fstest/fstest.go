@@ -9,8 +9,13 @@ import (
 	"time"
 )
 
-// Applier is an interface for applying filesystem changes.
+// Applier represents something that can apply changes to a filesystem
 type Applier interface {
+	Apply(root string) error
+}
+
+// FileOp represents a file operation
+type FileOp interface {
 	Apply(root string) error
 }
 
@@ -20,9 +25,18 @@ func (fn applyFn) Apply(root string) error {
 	return fn(root)
 }
 
-// FileOp represents a file operation.
-type FileOp interface {
-	Apply(root string) error
+// baseApplier provides a basic implementation of Applier
+type baseApplier struct {
+	ops []FileOp
+}
+
+func (a *baseApplier) Apply(root string) error {
+	for _, op := range a.ops {
+		if err := op.Apply(root); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ChownFunc is used by Chown() to change ownership.
