@@ -41,7 +41,10 @@ const (
 )
 
 // ErrInUse represents an error mutating a device because it is in use elsewhere
-var ErrInUse = errors.New("device is in use")
+var (
+	ErrInUse = errors.New("device is in use")
+	ErrBusy  = errors.New("device-mapper is busy")
+)
 
 // DeviceInfo represents device info returned by "dmsetup info".
 // dmsetup(8) provides more information on each of these fields.
@@ -376,6 +379,9 @@ func dmsetup(args ...string) (string, error) {
 	if err != nil {
 		// Try find Linux error code otherwise return generic error with dmsetup output
 		if errno, ok := tryGetUnixError(output); ok {
+			if errno == unix.EBUSY {
+				return "", ErrBusy
+			}
 			return "", errno
 		}
 

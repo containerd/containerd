@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
-	"k8s.io/client-go/pkg/apis/clientauthentication/v1"
+	v1 "k8s.io/client-go/pkg/apis/clientauthentication/v1"
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 )
 

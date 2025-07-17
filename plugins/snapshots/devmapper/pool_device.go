@@ -89,7 +89,7 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 func skipRetry(err error) bool {
 	if err == nil {
 		return true // skip retry if no error
-	} else if !errors.Is(err, unix.EBUSY) {
+	} else if !errors.Is(err, dmsetup.ErrBusy) {
 		return true // skip retry if error is not due to device or resource busy
 	}
 	return false

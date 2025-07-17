@@ -65,21 +65,21 @@ type Capabilities interface {
 //
 // Deprecated: Replace with NewPid2.  For example, replace:
 //
-//    c, err := NewPid(0)
-//    if err != nil {
-//      return err
-//    }
+//	c, err := NewPid(0)
+//	if err != nil {
+//	  return err
+//	}
 //
 // with:
 //
-//    c, err := NewPid2(0)
-//    if err != nil {
-//      return err
-//    }
-//    err = c.Load()
-//    if err != nil {
-//      return err
-//    }
+//	c, err := NewPid2(0)
+//	if err != nil {
+//	  return err
+//	}
+//	err = c.Load()
+//	if err != nil {
+//	  return err
+//	}
 func NewPid(pid int) (Capabilities, error) {
 	c, err := newPid(pid)
 	if err != nil {
@@ -101,21 +101,21 @@ func NewPid2(pid int) (Capabilities, error) {
 //
 // Deprecated: Replace with NewFile2.  For example, replace:
 //
-//    c, err := NewFile(path)
-//    if err != nil {
-//      return err
-//    }
+//	c, err := NewFile(path)
+//	if err != nil {
+//	  return err
+//	}
 //
 // with:
 //
-//    c, err := NewFile2(path)
-//    if err != nil {
-//      return err
-//    }
-//    err = c.Load()
-//    if err != nil {
-//      return err
-//    }
+//	c, err := NewFile2(path)
+//	if err != nil {
+//	  return err
+//	}
+//	err = c.Load()
+//	if err != nil {
+//	  return err
+//	}
 func NewFile(path string) (Capabilities, error) {
 	c, err := newFile(path)
 	if err != nil {

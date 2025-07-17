@@ -38,10 +38,10 @@ type Monitor struct {
 // weight of each sample in the exponential moving average (EMA) calculation.
 // The exact formulas are:
 //
-// 	sampleTime = currentTime - prevSampleTime
-// 	sampleRate = byteCount / sampleTime
-// 	weight     = 1 - exp(-sampleTime/windowSize)
-// 	newRate    = weight*sampleRate + (1-weight)*oldRate
+//	sampleTime = currentTime - prevSampleTime
+//	sampleRate = byteCount / sampleTime
+//	weight     = 1 - exp(-sampleTime/windowSize)
+//	newRate    = weight*sampleRate + (1-weight)*oldRate
 //
 // The default values for sampleRate and windowSize (if <= 0) are 100ms and 1s,
 // respectively.
