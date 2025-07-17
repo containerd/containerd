@@ -76,8 +76,8 @@ github.com/cilium/ebpf/link
 ## explicit; go 1.13
 github.com/containerd/aufs
 github.com/containerd/aufs/plugin
-# github.com/containerd/btrfs v1.0.0
-## explicit; go 1.15
+# github.com/containerd/btrfs v1.0.1
+## explicit; go 1.19
 github.com/containerd/btrfs
 # github.com/containerd/cgroups v1.0.4
 ## explicit; go 1.17

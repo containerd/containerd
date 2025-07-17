@@ -15,6 +15,7 @@
 */
 
 #include <stddef.h>
+#include <string.h>
 #include <linux/magic.h>
 #include <btrfs/ioctl.h>
 #include <btrfs/ctree.h>
