@@ -44,9 +44,9 @@ func (ps *pointerReferences) PushPair(vx, vy reflect.Value, d diffMode, deref bo
 	case diffUnknown, diffIdentical:
 		pp = [2]value.Pointer{value.PointerOf(vx), value.PointerOf(vy)}
 	case diffRemoved:
-		pp = [2]value.Pointer{value.PointerOf(vx), value.Pointer{}}
+		pp = [2]value.Pointer{value.PointerOf(vx), {}}
 	case diffInserted:
-		pp = [2]value.Pointer{value.Pointer{}, value.PointerOf(vy)}
+		pp = [2]value.Pointer{{}, value.PointerOf(vy)}
 	}
 	*ps = append(*ps, pp)
 	return pp

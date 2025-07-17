@@ -168,7 +168,7 @@ func (c CurlyRouter) computeWebserviceScore(requestTokens []string, routeTokens 
 				if matchesToken {
 					score++ // extra score for regex match
 				}
-			}			
+			}
 		} else {
 			// not a parameter
 			if eachRequestToken != eachRouteToken {

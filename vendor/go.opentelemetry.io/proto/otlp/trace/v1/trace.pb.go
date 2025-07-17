@@ -21,12 +21,13 @@
 package v1
 
 import (
+	reflect "reflect"
+	sync "sync"
+
 	v11 "go.opentelemetry.io/proto/otlp/common/v1"
 	v1 "go.opentelemetry.io/proto/otlp/resource/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -42,7 +43,7 @@ const (
 // a bit-mask.  To extract the bit-field, for example, use an
 // expression like:
 //
-//   (span.flags & SPAN_FLAGS_TRACE_FLAGS_MASK)
+//	(span.flags & SPAN_FLAGS_TRACE_FLAGS_MASK)
 //
 // See https://www.w3.org/TR/trace-context-2/#trace-flags for the flag definitions.
 //

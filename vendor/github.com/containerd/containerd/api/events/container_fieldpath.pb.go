@@ -3,8 +3,9 @@
 package events
 
 import (
-	v2 "github.com/containerd/typeurl/v2"
 	strings "strings"
+
+	v2 "github.com/containerd/typeurl/v2"
 )
 
 // Field returns the value for the given fieldpath as a string, if defined.

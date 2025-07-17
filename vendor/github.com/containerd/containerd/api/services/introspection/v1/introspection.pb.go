@@ -22,6 +22,9 @@
 package introspection
 
 import (
+	reflect "reflect"
+	sync "sync"
+
 	types "github.com/containerd/containerd/api/types"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -29,8 +32,6 @@ import (
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
