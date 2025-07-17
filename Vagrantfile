@@ -21,6 +21,12 @@ Vagrant.configure("2") do |config|
   # BOX_VERSION is deprecated. Use "BOX=<BOX>@<BOX_VERSION>".
   config.vm.box_version = ENV["BOX_VERSION"] || (ENV["BOX"].split("@")[1] if ENV["BOX"])
 
+  # Set box_url for archive boxes
+  # Workaround for https://github.com/containerd/containerd/issues/12124
+  if config.vm.box.include?("fedora/39-cloud-base")
+    config.vm.box_url = "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/39/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-39-1.5.x86_64.vagrant-libvirt.box"
+  end
+
   memory = 4096
   cpus = 2
   disk_size = 60
