@@ -23,19 +23,20 @@ import (
 	_ "crypto/sha256"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
-
-	"github.com/containerd/continuity/fs/fstest"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
+	"github.com/containerd/containerd/v2/pkg/fstest"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins/snapshots/devmapper/dmsetup"
 	"github.com/containerd/log"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/unix"
 )
 
 func TestSnapshotterSuite(t *testing.T) {
@@ -89,8 +90,9 @@ func testUsage(t *testing.T, snapshotter snapshots.Snapshotter) {
 
 	var (
 		sizeBytes   int64 = 1048576 // 1MB
-		baseApplier       = fstest.Apply(fstest.CreateRandomFile("/a", 12345679, sizeBytes, 0777))
+		baseApplier       = fstest.Apply(fstest.CreateFile("/a", []byte("test"), 0777))
 	)
+	_ = sizeBytes
 
 	mounts, err := snapshotter.Prepare(ctx, "prepare-2", "layer-1")
 	assert.NoError(t, err)
@@ -156,8 +158,7 @@ func TestMultipleXfsMounts(t *testing.T) {
 	defer closer()
 
 	var (
-		sizeBytes   int64 = 1048576 // 1MB
-		baseApplier       = fstest.Apply(fstest.CreateRandomFile("/a", 12345679, sizeBytes, 0777))
+		baseApplier = fstest.Apply(fstest.CreateFile("/a", []byte("test"), 0777))
 	)
 
 	// Create base layer
@@ -211,4 +212,96 @@ func createSnapshotter(ctx context.Context, t *testing.T, config *Config) (snaps
 	snap.cleanupFn = append([]closeFunc{removePool}, snap.cleanupFn...)
 
 	return snap, snap.Close, nil
+}
+
+type mockPoolDevice struct {
+	chownFails int
+}
+
+func (m *mockPoolDevice) CreateThinDevice(ctx context.Context, deviceName string, virtualSizeBytes uint64) error {
+	return nil
+}
+
+func (m *mockPoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName, snapshotName string, virtualSizeBytes uint64) error {
+	return nil
+}
+
+func (m *mockPoolDevice) RemoveDevice(ctx context.Context, deviceName string) error {
+	return nil
+}
+
+func (m *mockPoolDevice) DeactivateDevice(ctx context.Context, deviceName string, deferred, withForce bool) error {
+	return nil
+}
+
+func (m *mockPoolDevice) SuspendDevice(ctx context.Context, deviceName string) error {
+	return nil
+}
+
+func (m *mockPoolDevice) ResumeDevice(ctx context.Context, deviceName string) error {
+	return nil
+}
+
+func (m *mockPoolDevice) GetUsage(deviceName string) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockPoolDevice) IsActivated(deviceName string) bool {
+	return true
+}
+
+func (m *mockPoolDevice) MarkDeviceState(ctx context.Context, name string, state DeviceState) error {
+	return nil
+}
+
+func (m *mockPoolDevice) WalkDevices(ctx context.Context, cb func(info *DeviceInfo) error) error {
+	return nil
+}
+
+func (m *mockPoolDevice) Close() error {
+	return nil
+}
+
+func (m *mockPoolDevice) Chown(path string, uid, gid int) error {
+	if m.chownFails > 0 {
+		m.chownFails--
+		return unix.EBUSY
+	}
+	return nil
+}
+
+func TestChownRetry(t *testing.T) {
+	t.Parallel()
+
+	for i := 0; i < 1000; i++ {
+		ctx := context.Background()
+		ctx = namespaces.WithNamespace(ctx, "testsuite")
+
+		config := &Config{
+			RootPath:      t.TempDir(),
+			PoolName:      "test-pool",
+			BaseImageSize: "16Mb",
+		}
+
+		mockPool := &mockPoolDevice{
+			chownFails: 2,
+		}
+		_ = mockPool
+
+		var (
+			wg       sync.WaitGroup
+			chownErr error
+		)
+
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			chownErr = fstest.Chown("/foo", 1, 1).Apply(config.RootPath)
+		}()
+
+		wg.Wait()
+
+		assert.NoError(t, chownErr)
+	}
 }

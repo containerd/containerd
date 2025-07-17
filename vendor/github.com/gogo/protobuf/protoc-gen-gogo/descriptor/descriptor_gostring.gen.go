@@ -5,13 +5,14 @@ package descriptor
 
 import (
 	fmt "fmt"
-	github_com_gogo_protobuf_proto "github.com/gogo/protobuf/proto"
-	proto "github.com/gogo/protobuf/proto"
 	math "math"
 	reflect "reflect"
 	sort "sort"
 	strconv "strconv"
 	strings "strings"
+
+	github_com_gogo_protobuf_proto "github.com/gogo/protobuf/proto"
+	proto "github.com/gogo/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

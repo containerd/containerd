@@ -1,7 +1,5 @@
 package nl
 
-import ()
-
 // seg6local parameters
 const (
 	SEG6_LOCAL_UNSPEC = iota
