@@ -1,5 +1,21 @@
 //go:build linux
 
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package fstest
 
 import (
@@ -39,7 +55,6 @@ func Chown(path string, uid, gid int) Applier {
 }
 
 // Apply takes FileOp(s) and returns an Applier that can execute them
-// This matches the existing usage: baseApplier = fstest.Apply(fstest.CreateFile(...))
 func Apply(ops ...FileOp) Applier {
 	return applyFn(func(root string) error {
 		for _, op := range ops {
@@ -52,7 +67,6 @@ func Apply(ops ...FileOp) Applier {
 }
 
 // CreateFile creates a file with the given content and permissions.
-// Returns a FileOp that can be used with Apply()
 func CreateFile(path string, data []byte, perm os.FileMode) FileOp {
 	return applyFn(func(root string) error {
 		fullPath := filepath.Join(root, path)
