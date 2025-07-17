@@ -25,20 +25,6 @@ func (fn applyFn) Apply(root string) error {
 	return fn(root)
 }
 
-// baseApplier provides a basic implementation of Applier
-type baseApplier struct {
-	ops []FileOp
-}
-
-func (a *baseApplier) Apply(root string) error {
-	for _, op := range a.ops {
-		if err := op.Apply(root); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // ChownFunc is used by Chown() to change ownership.
 var ChownFunc = os.Chown
 
@@ -52,17 +38,21 @@ func Chown(path string, uid, gid int) Applier {
 	})
 }
 
-// Apply applies a series of file operations to the given root directory.
-func Apply(root string, ops ...FileOp) error {
-	for _, op := range ops {
-		if err := op.Apply(root); err != nil {
-			return err
+// Apply takes FileOp(s) and returns an Applier that can execute them
+// This matches the existing usage: baseApplier = fstest.Apply(fstest.CreateFile(...))
+func Apply(ops ...FileOp) Applier {
+	return applyFn(func(root string) error {
+		for _, op := range ops {
+			if err := op.Apply(root); err != nil {
+				return err
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // CreateFile creates a file with the given content and permissions.
+// Returns a FileOp that can be used with Apply()
 func CreateFile(path string, data []byte, perm os.FileMode) FileOp {
 	return applyFn(func(root string) error {
 		fullPath := filepath.Join(root, path)
