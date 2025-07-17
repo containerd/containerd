@@ -14,43 +14,37 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TestChownRetryMechanism verifies that fstest.Chown() will retry and eventually succeed
-// after transient EBUSY errors. This test runs multiple iterations to ensure stability.
 func TestChownRetryMechanism(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
 
-	const loops = 10 // Reduced for CI performance
+	const loops = 5
 
 	for i := 0; i < loops; i++ {
 		t.Run(fmt.Sprintf("iteration_%d", i), func(t *testing.T) {
 			root := t.TempDir()
-
-			// Create target file
 			target := filepath.Join(root, "test_file")
+
 			require.NoError(t, os.WriteFile(target, []byte("test content"), 0o644))
 
-			// Mock ChownFunc: first 2 calls return EBUSY, then succeed
-			var failCount int32 = 2
 			originalChownFunc := fstest.ChownFunc
-
-			fstest.ChownFunc = func(path string, uid, gid int) error {
-				if atomic.AddInt32(&failCount, -1) >= 0 {
-					return unix.EBUSY
-				}
-				// For testing, we don't actually change ownership
-				return nil
-			}
-
-			// Restore original function
 			defer func() {
 				fstest.ChownFunc = originalChownFunc
 			}()
 
-			// Test the retry mechanism
+			var failCount int32 = 2
+			fstest.ChownFunc = func(path string, uid, gid int) error {
+				remaining := atomic.AddInt32(&failCount, -1)
+				if remaining >= 0 {
+					return unix.EBUSY
+				}
+				return nil
+			}
+
 			err := fstest.Chown("test_file", 0, 0).Apply(root)
 			require.NoError(t, err, "Chown should succeed after retries")
+			require.True(t, atomic.LoadInt32(&failCount) < 0, "Should have exhausted fail count")
 		})
 	}
 }

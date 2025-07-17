@@ -6,21 +6,18 @@ import (
 )
 
 // Retry calls fn up to maxAttempts times with linear back-off.
-// It returns nil on the first successful call, or returns the last error if all attempts fail.
 func Retry(ctx context.Context, maxAttempts int, delay time.Duration, fn func() error) error {
 	if maxAttempts <= 0 {
-		return fn()
+		maxAttempts = 1
 	}
 
 	var lastErr error
 	for i := 0; i < maxAttempts; i++ {
-		if err := fn(); err == nil {
+		lastErr = fn()
+		if lastErr == nil {
 			return nil
-		} else {
-			lastErr = err
 		}
 
-		// Don't wait after the last attempt
 		if i == maxAttempts-1 {
 			break
 		}
@@ -29,7 +26,7 @@ func Retry(ctx context.Context, maxAttempts int, delay time.Duration, fn func() 
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(delay):
-			// Continue to next attempt
+			continue
 		}
 	}
 
