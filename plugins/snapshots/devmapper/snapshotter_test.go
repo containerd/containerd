@@ -23,7 +23,6 @@ import (
 	_ "crypto/sha256"
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 

@@ -14,9 +14,10 @@ func Retry(ctx context.Context, maxAttempts int, delay time.Duration, fn func() 
 
 	var lastErr error
 	for i := 0; i < maxAttempts; i++ {
-		lastErr = fn()
-		if lastErr == nil {
+		if err := fn(); err == nil {
 			return nil
+		} else {
+			lastErr = err
 		}
 
 		// Don't wait after the last attempt
