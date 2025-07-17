@@ -30,8 +30,6 @@ import (
 	"os"
 	"strings"
 	"unsafe"
-
-	"github.com/pkg/errors"
 )
 
 func subvolID(fd uintptr) (uint64, error) {
@@ -95,7 +93,7 @@ func findMountPoint(path string) (string, error) {
 	}
 
 	if mount == "" {
-		return "", errors.Errorf("mount point of %v not found", path)
+		return "", fmt.Errorf("mount point of %v not found", path)
 	}
 
 	return mount, nil
