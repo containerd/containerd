@@ -157,8 +157,8 @@ type criService struct {
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
-	// TODO Should add a stats server here for storing the metrics / stats
-	metricsServer MetricsServer
+	// metricsServer handles metrics collection and caching
+	metricsServer *MetricsServer
 }
 
 type CRIServiceOptions struct {
@@ -200,6 +200,10 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		netPlugin:          make(map[string]cni.CNI),
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
+		metricsServer: &MetricsServer{
+			collectionPeriod: 30 * time.Second,
+			sandboxMetrics:   make(map[string]*SandboxMetrics),
+		},
 	}
 
 	// TODO: Make discard time configurable
