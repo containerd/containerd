@@ -77,7 +77,7 @@ func (c *criService) recover(ctx context.Context) error {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
 	for _, container := range containers {
-		cntr, err := c.loadContainer(ctx, container)
+		cntr, exitCh, pid, err := c.loadContainer(ctx, container)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("Failed to load container %q", container.ID())
 			continue
@@ -86,11 +86,14 @@ func (c *criService) recover(ctx context.Context) error {
 		if err := c.containerStore.Add(cntr); err != nil {
 			return fmt.Errorf("failed to add container %q to store: %w", container.ID(), err)
 		}
+		if exitCh != nil {
+			// Start the exit monitor. This should run after that container has been added to the container store.
+			c.eventMonitor.startContainerExitMonitor(context.Background(), cntr.ID, pid, exitCh)
+		}
 		if err := c.containerNameIndex.Reserve(cntr.Name, cntr.ID); err != nil {
 			return fmt.Errorf("failed to reserve container name %q: %w", cntr.Name, err)
 		}
 	}
-
 	// Recover all images.
 	cImages, err := c.client.ListImages(ctx)
 	if err != nil {
@@ -150,7 +153,9 @@ func (c *criService) recover(ctx context.Context) error {
 const loadContainerTimeout = 10 * time.Second
 
 // loadContainer loads container from containerd and status checkpoint.
-func (c *criService) loadContainer(ctx context.Context, cntr containerd.Container) (containerstore.Container, error) {
+func (c *criService) loadContainer(ctx context.Context, cntr containerd.Container) (containerstore.Container, <-chan containerd.ExitStatus, uint32, error) {
+	var exitCh <-chan containerd.ExitStatus
+	var statusPid uint32
 	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
 	defer cancel()
 	id := cntr.ID()
@@ -160,15 +165,15 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 	// Load container metadata.
 	exts, err := cntr.Extensions(ctx)
 	if err != nil {
-		return container, fmt.Errorf("failed to get container extensions: %w", err)
+		return container, nil, 0, fmt.Errorf("failed to get container extensions: %w", err)
 	}
 	ext, ok := exts[containerMetadataExtension]
 	if !ok {
-		return container, fmt.Errorf("metadata extension %q not found", containerMetadataExtension)
+		return container, nil, 0, fmt.Errorf("metadata extension %q not found", containerMetadataExtension)
 	}
 	data, err := typeurl.UnmarshalAny(&ext)
 	if err != nil {
-		return container, fmt.Errorf("failed to unmarshal metadata extension %q: %w", ext, err)
+		return container, nil, 0, fmt.Errorf("failed to unmarshal metadata extension %q: %w", ext, err)
 	}
 	meta := data.(*containerstore.Metadata)
 
@@ -274,11 +279,13 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 					// before status is checkpointed.
 					status.StartedAt = time.Now().UnixNano()
 					status.Pid = t.Pid()
+					statusPid = t.Pid()
 				}
 				// Wait for the task for exit monitor.
 				// wait is a long running background request, no timeout needed.
-				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
+				exitCh, err = t.Wait(ctrdutil.NamespacedContext())
 				if err != nil {
+					exitCh = nil
 					if !errdefs.IsNotFound(err) {
 						return fmt.Errorf("failed to wait for task: %w", err)
 					}
@@ -287,9 +294,6 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 					status.FinishedAt = time.Now().UnixNano()
 					status.ExitCode = unknownExitCode
 					status.Reason = unknownExitReason
-				} else {
-					// Start exit monitor.
-					c.eventMonitor.startContainerExitMonitor(context.Background(), id, status.Pid, exitCh)
 				}
 			case containerd.Stopped:
 				// Task is stopped. Updata status and delete the task.
@@ -318,7 +322,8 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 	if containerIO != nil {
 		opts = append(opts, containerstore.WithContainerIO(containerIO))
 	}
-	return containerstore.NewContainer(*meta, opts...)
+	container, err = containerstore.NewContainer(*meta, opts...)
+	return container, exitCh, statusPid, err
 }
 
 // loadSandbox loads sandbox from containerd.
