@@ -565,6 +565,11 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 			ReadCloser: io.NopCloser(io.MultiReader(readers...)),
 		}
 	} else {
+		defer func() {
+			if retErr != nil {
+				r.Release(1)
+			}
+		}()
 		body = &fnOnClose{
 			BeforeClose: func() {
 				r.Release(1)
