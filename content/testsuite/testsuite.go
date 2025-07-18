@@ -346,6 +346,15 @@ func checkRefNotAvailable(ctx context.Context, t *testing.T, cs content.Store, r
 	}
 }
 
+func discardWriter(t *testing.T, w content.Writer) {
+	if err := w.Truncate(0); err != nil {
+		t.Errorf("failed to truncate writer: %+v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Errorf("failed to close writer: %+v", err)
+	}
+}
+
 func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
 	_, d2 := createContent(256)
@@ -359,9 +368,7 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 		t.Fatal(err)
 	}
 	if _, err := w.Write(c1); err != nil {
-		if err := w.Close(); err != nil {
-			t.Errorf("Close error: %+v", err)
-		}
+		discardWriter(t, w)
 		t.Fatal(err)
 	}
 
@@ -372,9 +379,7 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 	if err == nil {
 		t.Fatalf("Expected already exists error")
 	} else if !errdefs.IsAlreadyExists(err) {
-		if err := w.Close(); err != nil {
-			t.Errorf("Close error: %+v", err)
-		}
+		discardWriter(t, w)
 		t.Fatalf("Unexpected error: %+v", err)
 	}
 
@@ -386,9 +391,7 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 	checkRefNotAvailable(ctx, t, cs, ref)
 
 	if _, err := w.Write(c1); err != nil {
-		if err := w.Close(); err != nil {
-			t.Errorf("close error: %+v", err)
-		}
+		discardWriter(t, w)
 		t.Fatal(err)
 	}
 
@@ -397,9 +400,7 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 	if err == nil {
 		t.Fatalf("Expected already exists error")
 	} else if !errdefs.IsAlreadyExists(err) {
-		if err := w.Close(); err != nil {
-			t.Errorf("Close error: %+v", err)
-		}
+		discardWriter(t, w)
 		t.Fatalf("Unexpected error: %+v", err)
 	}
 	w.Close()
@@ -412,9 +413,7 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 	checkRefNotAvailable(ctx, t, cs, ref)
 
 	if _, err := w.Write(append(c1, []byte("more")...)); err != nil {
-		if err := w.Close(); err != nil {
-			t.Errorf("close error: %+v", err)
-		}
+		discardWriter(t, w)
 		t.Fatal(err)
 	}
 
@@ -423,10 +422,11 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 	if err == nil {
 		t.Fatalf("Expected error from wrong digest")
 	} else if !errdefs.IsFailedPrecondition(err) {
-		t.Errorf("Unexpected error: %+v", err)
+		discardWriter(t, w)
+		t.Fatalf("Unexpected error: %+v", err)
 	}
-
 	w.Close()
+
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
 		t.Fatal(err)
@@ -439,10 +439,11 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 	if err == nil {
 		t.Fatalf("Expected error from wrong size")
 	} else if !errdefs.IsFailedPrecondition(err) {
-		t.Errorf("Unexpected error: %+v", err)
+		discardWriter(t, w)
+		t.Fatalf("Unexpected error: %+v", err)
 	}
-
 	w.Close()
+
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
 		t.Fatal(err)
@@ -452,13 +453,11 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 
 	// Now expect commit to succeed
 	if err := w.Commit(ctx, int64(len(c1))+4, ""); err != nil {
-		if err := w.Close(); err != nil {
-			t.Errorf("close error: %+v", err)
-		}
+		discardWriter(t, w)
 		t.Fatalf("Failed to commit: %+v", err)
 	}
-
 	w.Close()
+
 	// Create another writer with same reference
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
@@ -466,9 +465,7 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 	}
 
 	if _, err := w.Write(c1); err != nil {
-		if err := w.Close(); err != nil {
-			t.Errorf("close error: %+v", err)
-		}
+		discardWriter(t, w)
 		t.Fatal(err)
 	}
 
@@ -479,13 +476,11 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 	if err == nil {
 		t.Fatalf("Expected already exists error")
 	} else if !errdefs.IsAlreadyExists(err) {
-		if err := w.Close(); err != nil {
-			t.Errorf("close error: %+v", err)
-		}
+		discardWriter(t, w)
 		t.Fatalf("Unexpected error: %+v", err)
 	}
-
 	w.Close()
+
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
 		t.Fatal(err)
@@ -493,6 +488,9 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 
 	checkRefNotAvailable(ctx, t, cs, ref)
 
+	if err := w.Truncate(0); err != nil {
+		t.Fatalf("failed to truncate writer: %+v", err)
+	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close failed: %+v", err)
 	}
@@ -501,6 +499,9 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
 		t.Fatalf("Failed to open writer: %+v", err)
+	}
+	if err := w.Truncate(0); err != nil {
+		t.Fatalf("failed to truncate writer: %+v", err)
 	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close failed: %+v", err)
