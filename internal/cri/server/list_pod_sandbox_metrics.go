@@ -20,18 +20,22 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/log"
+	"golang.org/x/time/rate"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 type MetricsServer struct {
 	collectionPeriod time.Duration
 	sandboxMetrics   map[string]*SandboxMetrics
+	mu               sync.RWMutex
 }
 
 type SandboxMetrics struct {
@@ -54,18 +58,15 @@ type containerMetric struct {
 // this is part of the other go routine that updates the map
 // someone should also take care of removing deleted containers and sandboxes from the map
 func (c *criService) updatePodSandboxMetrics(ctx context.Context, sandboxID string) *SandboxMetrics {
-	sm, ok := c.metricsServer.sandboxMetrics[sandboxID]
-	if ok {
-		return sm
-	}
-
-	sm = &SandboxMetrics{
+	// Always create fresh metrics instead of returning cached ones
+	sm := &SandboxMetrics{
 		metric: &runtime.PodSandboxMetrics{
 			PodSandboxId:     sandboxID,
 			Metrics:          []*runtime.Metric{},
 			ContainerMetrics: []*runtime.ContainerMetrics{},
 		},
 	}
+
 	// generate sandbox metrics
 	request := &tasks.MetricsRequest{Filters: []string{"id==" + sandboxID}}
 	resp, err := c.client.TaskService().Metrics(ctx, request)
@@ -104,29 +105,229 @@ func (c *criService) updatePodSandboxMetrics(ctx context.Context, sandboxID stri
 			sm.metric.ContainerMetrics = append(sm.metric.ContainerMetrics, metrics)
 		}
 	}
-	c.metricsServer.sandboxMetrics[sandboxID] = sm
+	// Safely update the metrics cache
+	if c.metricsServer != nil {
+		c.metricsServer.mu.Lock()
+		if c.metricsServer.sandboxMetrics == nil {
+			c.metricsServer.sandboxMetrics = make(map[string]*SandboxMetrics)
+		}
+		c.metricsServer.sandboxMetrics[sandboxID] = sm
+		c.metricsServer.mu.Unlock()
+	}
 	return sm
 }
 
 // getMetrics is supposed to be called from ListPodSandBoxMetrics
 func (m *MetricsServer) getMetrics(sandBoxID string) *runtime.PodSandboxMetrics {
-	var sm *SandboxMetrics
-	// TODO: akhilerm decide if we should query for metrics if this is not available
+	if m == nil {
+		return nil
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.sandboxMetrics == nil {
+		return nil
+	}
+
 	sm, ok := m.sandboxMetrics[sandBoxID]
-	if !ok {
-		// we should not error, but provide the metrics that are available
+	if !ok || sm == nil {
+		return nil
 	}
 	return sm.metric
 }
 
-func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
-	sandboxList := c.sandboxStore.List()
-	//metricsList := c.sandboxStore.
+// cleanupStoppedSandboxMetrics removes metrics for sandboxes that are no longer running
+func (m *MetricsServer) cleanupStoppedSandboxMetrics(activeSandboxIDs map[string]bool) {
+	if m == nil {
+		return
+	}
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.sandboxMetrics == nil {
+		return
+	}
+
+	for sandboxID := range m.sandboxMetrics {
+		if !activeSandboxIDs[sandboxID] {
+			delete(m.sandboxMetrics, sandboxID)
+		}
+	}
+}
+
+// collectPodSandboxMetrics collects metrics for a specific pod sandbox and its containers
+func (c *criService) collectPodSandboxMetrics(ctx context.Context, sandbox sandboxstore.Sandbox) (*runtime.PodSandboxMetrics, error) {
+	meta := sandbox.Metadata
+	config := sandbox.Config
+
+	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed getting status for sandbox %s: %w", sandbox.ID, err)
+	}
+
+	// Get sandbox stats
+	stats, err := metricsForSandbox(sandbox, cstatus.Info)
+	if err != nil {
+		return nil, fmt.Errorf("failed getting metrics for sandbox %s: %w", sandbox.ID, err)
+	}
+
+	podMetrics := &runtime.PodSandboxMetrics{
+		PodSandboxId: meta.ID,
+		Metrics:      []*runtime.Metric{},
+	}
+
+	timestamp := time.Now().UnixNano()
+
+	// Extract pod-level labels
+	podName := config.GetMetadata().GetName()
+	namespace := config.GetMetadata().GetNamespace()
+	podLabels := []string{podName, namespace, meta.ID}
+
+	if stats != nil {
+		// Collect pod-level network metrics
+		if sandbox.NetNSPath != "" {
+			rxBytes, rxErrors, txBytes, txErrors, rxPackets, rxDropped, txPackets, txDropped := getContainerNetIO(ctx, sandbox.NetNSPath)
+
+			podMetrics.Metrics = append(podMetrics.Metrics, []*runtime.Metric{
+				{
+					Name:        "container_network_receive_bytes_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: rxBytes},
+				},
+				{
+					Name:        "container_network_receive_packets_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: rxPackets},
+				},
+				{
+					Name:        "container_network_receive_packets_dropped_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: rxDropped},
+				},
+				{
+					Name:        "container_network_receive_errors_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: rxErrors},
+				},
+				{
+					Name:        "container_network_transmit_bytes_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: txBytes},
+				},
+				{
+					Name:        "container_network_transmit_packets_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: txPackets},
+				},
+				{
+					Name:        "container_network_transmit_packets_dropped_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: txDropped},
+				},
+				{
+					Name:        "container_network_transmit_errors_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: txErrors},
+				},
+			}...)
+		}
+	}
+
+	// Collect container metrics
+	containers := c.containerStore.List()
+	for _, container := range containers {
+		if container.SandboxID != sandbox.ID {
+			continue
+		}
+
+		containerMetrics, err := c.collectContainerMetrics(ctx, container, podName, namespace)
+		if err != nil {
+			log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to collect container metrics")
+			continue
+		}
+
+		podMetrics.ContainerMetrics = append(podMetrics.ContainerMetrics, containerMetrics)
+	}
+
+	return podMetrics, nil
+}
+
+func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
+	ctx = util.WithNamespace(ctx)
+	sandboxList := c.sandboxStore.List()
 	podMetrics := make([]*runtime.PodSandboxMetrics, 0)
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Rate limiter to prevent overwhelming the system with concurrent requests
+	limiter := rate.NewLimiter(rate.Limit(10), 10) // Allow 10 concurrent requests with burst of 10
+	semaphore := make(chan struct{}, 10)           // Limit to 10 concurrent goroutines
+
+	activeSandboxIDs := make(map[string]bool)
+
 	for _, sandbox := range sandboxList {
-		m := c.metricsServer.getMetrics(sandbox.ID)
-		podMetrics = append(podMetrics, m)
+		// Only collect metrics for ready sandboxes
+		if sandbox.Status.Get().State != sandboxstore.StateReady {
+			continue
+		}
+
+		activeSandboxIDs[sandbox.ID] = true
+
+		// Wait for rate limiter permission
+		if err := limiter.Wait(ctx); err != nil {
+			log.G(ctx).WithError(err).Debug("rate limiter context cancelled")
+			break
+		}
+
+		semaphore <- struct{}{} // Acquire semaphore
+		wg.Add(1)
+		go func(sb sandboxstore.Sandbox) {
+			defer wg.Done()
+			defer func() { <-semaphore }() // Release semaphore
+
+			metrics, err := c.collectPodSandboxMetrics(ctx, sb)
+			if err != nil {
+				switch {
+				case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
+					log.G(ctx).WithField("podsandboxid", sb.ID).WithError(err).Debug("failed to get pod sandbox metrics, this is likely a transient error")
+				case errdefs.IsCanceled(err):
+					log.G(ctx).WithField("podsandboxid", sb.ID).WithError(err).Debug("metrics collection cancelled")
+				default:
+					log.G(ctx).WithField("podsandboxid", sb.ID).WithError(err).Error("failed to collect pod sandbox metrics")
+				}
+				return
+			}
+
+			mu.Lock()
+			podMetrics = append(podMetrics, metrics)
+			mu.Unlock()
+		}(sandbox)
+	}
+
+	wg.Wait()
+
+	// Clean up metrics for stopped sandboxes
+	if c.metricsServer != nil {
+		c.metricsServer.cleanupStoppedSandboxMetrics(activeSandboxIDs)
 	}
 
 	return &runtime.ListPodSandboxMetricsResponse{
@@ -209,23 +410,34 @@ func (c *criService) listContainerMetrics(ctx context.Context, containerID strin
 
 	cpu, err := c.cpuMetrics(ctx, resp.Metrics[0])
 	if err != nil {
-		// log error
+		log.G(ctx).WithError(err).Error("failed to get CPU metrics")
+	} else {
+		cm.Metrics = append(cm.Metrics, generateContainerCPUMetrics(cpu)...)
 	}
-	cm.Metrics = append(cm.Metrics, generateContainerCPUMetrics(cpu)...)
 
 	memory, err := c.memoryMetrics(ctx, resp.Metrics[0])
 	if err != nil {
-		// log error
+		log.G(ctx).WithError(err).Error("failed to get memory metrics")
+	} else {
+		cm.Metrics = append(cm.Metrics, generateContainerMemoryMetrics(memory)...)
 	}
-	cm.Metrics = append(cm.Metrics, generateContainerMemoryMetrics(memory)...)
 
 	diskio, err := c.diskIOMetrics(ctx, resp.Metrics[0])
 	if err != nil {
-		// log error
+		log.G(ctx).WithError(err).Error("failed to get disk I/O metrics")
+	} else {
+		cm.Metrics = append(cm.Metrics, generateDiskIOMetrics(diskio)...)
 	}
-	cm.Metrics = append(cm.Metrics, generateDiskIOMetrics(diskio)...)
 
 	// network metrics are captured only at sandbox level
+
+	// Collect filesystem metrics
+	filesystem, err := c.collectFilesystemMetrics(ctx, containerID)
+	if err != nil {
+		log.G(ctx).WithError(err).Debug("failed to get filesystem metrics")
+	} else {
+		cm.Metrics = append(cm.Metrics, generateFilesystemMetrics(filesystem)...)
+	}
 
 	return cm, nil
 }
