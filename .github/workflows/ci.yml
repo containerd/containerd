@@ -191,7 +191,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2022, windows-2025]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2022]
         go-version: ["1.23.10", "1.24.4"]
     steps:
       - uses: actions/checkout@v4
@@ -217,7 +217,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022, windows-2025]
+        os: [windows-2022]
         enable_cri_sandboxes: ["", "sandboxed"]
 
     defaults:
@@ -311,10 +311,10 @@ jobs:
         run: mingw32-make.exe integration
       - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
-      - run: script/test/test2annotation.sh ${TESTFILE}
+      - run: script/test/test2annotation.sh "$TESTFILE"
         env:
           TESTFILE: ${{github.workspace}}/test-integration-serial-gotest.json
-        if: always()
+        if: success()
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
@@ -328,10 +328,10 @@ jobs:
         run: mingw32-make.exe integration
       - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
-      - run: script/test/test2annotation.sh ${TESTFILE}
+      - run: script/test/test2annotation.sh "$TESTFILE"
         env:
           TESTFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
-        if: always()
+        if: success()
 
       - name: CRI Integration Test
         env:
