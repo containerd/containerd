@@ -168,11 +168,13 @@ func (em *EventMonitor) Start() <-chan error {
 				for _, id := range ids {
 					queue := em.backOff.deBackOff(id)
 					for i, evt := range queue.events {
-						if err := em.eventHandler.HandleEvent(evt); err != nil {
-							log.L.WithError(err).Errorf("Failed to handle backOff event %+v for %s", evt, id)
-							em.backOff.reBackOff(id, queue.events[i:], queue.duration)
-							break
+						err := em.eventHandler.HandleEvent(evt)
+						if err == nil {
+							continue
 						}
+						log.L.WithError(err).Errorf("Failed to handle backOff event %+v for %s", evt, id)
+						em.backOff.reBackOff(id, queue.events[i:], queue.duration)
+						break
 					}
 				}
 			}

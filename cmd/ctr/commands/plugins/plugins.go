@@ -112,11 +112,12 @@ var listCommand = &cli.Command{
 					fmt.Fprintln(w, "Capabilities:\t", strings.Join(plugin.Capabilities, ","))
 				}
 
-				if plugin.InitErr != nil {
-					fmt.Fprintln(w, "Error:\t")
-					fmt.Fprintln(w, "\t Code:\t", codes.Code(plugin.InitErr.Code))
-					fmt.Fprintln(w, "\t Message:\t", plugin.InitErr.Message)
+				if plugin.InitErr == nil {
+					continue
 				}
+				fmt.Fprintln(w, "Error:\t")
+				fmt.Fprintln(w, "\t Code:\t", codes.Code(plugin.InitErr.Code))
+				fmt.Fprintln(w, "\t Message:\t", plugin.InitErr.Message)
 			}
 			return w.Flush()
 		}

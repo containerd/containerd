@@ -84,11 +84,10 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
 		if err := c.sandboxService.StopSandbox(ctx, sandbox.Sandboxer, id); err != nil {
 			// Log and ignore the error if controller already removed the sandbox
-			if errdefs.IsNotFound(err) {
-				log.G(ctx).Warnf("sandbox %q is not found when stopping it", id)
-			} else {
+			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to stop sandbox %q: %w", id, err)
 			}
+			log.G(ctx).Warnf("sandbox %q is not found when stopping it", id)
 		}
 	}
 
