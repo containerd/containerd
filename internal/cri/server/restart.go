@@ -185,7 +185,9 @@ func (c *criService) recover(ctx context.Context) error {
 					WithError(err).
 					WithField("container", container.ID()).
 					Error("Failed to load container")
-
+				if _, ok := err.(containerstore.StoreStatusError); ok {
+					return err
+				}
 				return nil
 			}
 			log.G(ctx2).Debugf("Loaded container %+v", cntr)
@@ -429,6 +431,11 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 		opts = append(opts, containerstore.WithContainerIO(containerIO))
 	}
 	container, err = containerstore.NewContainer(*meta, opts...)
+	defer func() {
+		if err != nil && containerIO != nil {
+			containerIO.Close()
+		}
+	}()
 	return container, exitCh, statusPid, err
 }
 
