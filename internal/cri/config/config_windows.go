@@ -21,6 +21,11 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/platforms"
+)
+
+const (
+	defaultRuntimeName = "runhcs-wcow-process"
 )
 
 func defaultNetworkPluginBinDirs() []string {
@@ -42,6 +47,15 @@ func DefaultImageConfig() ImageConfig {
 	}
 }
 
+func GetDefaultRuntimePlatforms() map[string]ImagePlatform {
+	return map[string]ImagePlatform{
+		defaultRuntimeName: {
+			Snapshotter: defaults.DefaultSnapshotter,
+			Platform:    platforms.FormatAll(platforms.DefaultSpec()),
+		},
+	}
+}
+
 // DefaultRuntimeConfig returns default configurations of cri plugin.
 func DefaultRuntimeConfig() RuntimeConfig {
 	return RuntimeConfig{
@@ -54,7 +68,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 			UseInternalLoopback:        false,
 		},
 		ContainerdConfig: ContainerdConfig{
-			DefaultRuntimeName: "runhcs-wcow-process",
+			DefaultRuntimeName: defaultRuntimeName,
 			Runtimes: map[string]Runtime{
 				"runhcs-wcow-process": {
 					Type:                 "io.containerd.runhcs.v1",
