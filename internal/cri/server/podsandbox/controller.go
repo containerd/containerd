@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
+	"github.com/moby/locker"
 )
 
 func init() {
@@ -86,6 +87,7 @@ func init() {
 				runtimeService: runtimeService,
 				imageService:   criImagePlugin.(ImageService),
 				store:          NewStore(),
+				locks:          locker.New(),
 			}
 
 			eventMonitor := events.NewEventMonitor(&podSandboxEventHandler{
@@ -131,6 +133,7 @@ type Controller struct {
 	eventMonitor *events.EventMonitor
 
 	store *Store
+	locks *locker.Locker
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
@@ -177,7 +180,7 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 		dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 		defer dcancel()
 		event := &eventtypes.TaskExit{ExitStatus: exitStatus, ExitedAt: protobuf.ToTimestamp(exitedAt)}
-		if err := handleSandboxTaskExit(dctx, p, event); err != nil {
+		if err := c.handleSandboxTaskExit(dctx, p, event); err != nil {
 			c.eventMonitor.Backoff(p.ID, event)
 		}
 		return nil
@@ -187,8 +190,10 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 }
 
 // handleSandboxTaskExit handles TaskExit event for sandbox.
-func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventtypes.TaskExit) error {
+func (c *Controller) handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventtypes.TaskExit) error {
 	// No stream attached to sandbox container.
+	c.locks.Lock(sb.ID)
+	defer c.locks.Unlock(sb.ID)
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
