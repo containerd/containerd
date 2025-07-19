@@ -58,6 +58,7 @@ func TestGCRoots(t *testing.T) {
 		)),
 		addImage("ns2", "image4", dgst(12), labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
 		addImage("ns2", "image5", dgst(13), labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
+		addImage("ns2", "image6", dgst(14), labelmap(string(labelGCLeaseRef), "l5")),
 		addContainer("ns1", "container1", "overlay", "sn4", nil),
 		addContainer("ns1", "container2", "overlay", "sn5", labelmap(string(labelGCSnapRef)+"overlay", "sn6")),
 		addContainer("ns1", "container3", "overlay", "sn7", labelmap(
@@ -74,13 +75,15 @@ func TestGCRoots(t *testing.T) {
 		addContent("ns2", dgst(2), labelmap(string(labelGCRoot), "always")),
 		addContent("ns2", dgst(8), nil),
 		addContent("ns2", dgst(9), nil),
+		addContent("ns2", dgst(14), nil),
 		addIngest("ns1", "ingest-1", "", nil),       // will be seen as expired
 		addIngest("ns1", "ingest-2", "", timeIn(0)), // expired
 		addIngest("ns1", "ingest-3", "", timeIn(time.Hour)),
 		addIngest("ns2", "ingest-4", "", nil),
 		addIngest("ns2", "ingest-5", dgst(8), nil),
-		addIngest("ns2", "ingest-6", "", nil),      // added to expired lease
-		addIngest("ns2", "ingest-7", dgst(9), nil), // added to expired lease
+		addIngest("ns2", "ingest-6", "", nil),       // added to expired lease
+		addIngest("ns2", "ingest-7", dgst(9), nil),  // added to expired lease
+		addIngest("ns2", "ingest-8", dgst(15), nil), // added to non-root lease
 		addSnapshot("ns1", "overlay", "sn1", "", nil),
 		addSnapshot("ns1", "overlay", "sn2", "", nil),
 		addSnapshot("ns1", "overlay", "sn3", "", labelmap(string(labelGCRoot), "always")),
@@ -90,6 +93,7 @@ func TestGCRoots(t *testing.T) {
 		addSnapshot("ns1", "overlay", "sn7", "", nil),
 		addSnapshot("ns1", "overlay", "sn8", "", nil),
 		addSnapshot("ns1", "overlay", "sn9", "", nil),
+		addSnapshot("ns2", "overlay", "sn10", "", nil),
 		addLeaseSnapshot("ns2", "l1", "overlay", "sn5"),
 		addLeaseSnapshot("ns2", "l2", "overlay", "sn6"),
 		addLeaseContent("ns2", "l1", dgst(4)),
@@ -106,6 +110,9 @@ func TestGCRoots(t *testing.T) {
 		addLeaseImage("ns2", "l4", "image4"),
 		addLeaseIngest("ns2", "l4", "ingest-6"),
 		addLeaseIngest("ns2", "l4", "ingest-7"),
+		addLease("ns2", "l5", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339), string(labelGCNonRoot), time.Now().Format(time.RFC3339))),
+		addLeaseIngest("ns2", "l5", "ingest-8"),
+		addLeaseSnapshot("ns2", "l5", "overlay", "sn10"),
 
 		addLease("ns3", "l1", labelmap(string(labelGCFlat), time.Now().Add(time.Hour).Format(time.RFC3339))),
 		addLeaseContent("ns3", "l1", dgst(1)),
@@ -122,9 +129,6 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceContent, "ns1", dgst(8).String()),
 		gcnode(ResourceContent, "ns1", dgst(9).String()),
 		gcnode(ResourceContent, "ns2", dgst(2).String()),
-		gcnode(ResourceContent, "ns2", dgst(4).String()),
-		gcnode(ResourceContent, "ns2", dgst(5).String()),
-		gcnode(ResourceContent, "ns2", dgst(6).String()),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn5"),
@@ -132,25 +136,16 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn7"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn8"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn9"),
-		gcnode(ResourceSnapshot, "ns2", "overlay/sn5"),
-		gcnode(ResourceSnapshot, "ns2", "overlay/sn6"),
-		gcnode(ResourceSnapshot, "ns2", "overlay/sn7"),
 		gcnode(ResourceSnapshot, "ns4", "overlay/sn1"),
 		gcnode(ResourceImage, "ns1", "image1"),
 		gcnode(ResourceImage, "ns1", "image2"),
 		gcnode(ResourceImage, "ns2", "image3"),
-		gcnode(ResourceImage, "ns2", "image5"),
+		gcnode(ResourceImage, "ns2", "image6"),
 		gcnode(ResourceLease, "ns2", "l1"),
 		gcnode(ResourceLease, "ns2", "l2"),
 		gcnode(ResourceLease, "ns2", "l3"),
 		gcnode(ResourceIngest, "ns1", "ingest-3"),
-		gcnode(ResourceIngest, "ns2", "ingest-4"),
-		gcnode(ResourceIngest, "ns2", "ingest-5"),
 		gcnode(ResourceLease, "ns3", "l1"),
-		gcnode(ResourceIngest, "ns3", "ingest-1"),
-		gcnode(resourceContentFlat, "ns3", dgst(1).String()),
-		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn1"),
-		gcnode(resourceImageFlat, "ns3", "image1"),
 	}
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -431,11 +426,19 @@ func TestCollectibleResources(t *testing.T) {
 		addImage("ns1", "image2", dgst(2), nil),
 		addLease("ns1", "lease1", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
 		addLease("ns1", "lease2", labelmap(string(labelGCExpire), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
+		addLease("ns1", "lease3", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339), string(labelGCNonRoot), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
 	}
 	refs := map[gc.Node][]gc.Node{
 		gcnode(ResourceContent, "ns1", dgst(1).String()): nil,
 		gcnode(ResourceContent, "ns1", dgst(2).String()): {
 			gcnode(testResource, "ns1", "test2"),
+		},
+		gcnode(ResourceLease, "ns1", "lease1"): {
+			gcnode(testResource, "ns1", "test3"),
+		},
+		gcnode(ResourceLease, "ns1", "lease2"): nil,
+		gcnode(ResourceLease, "ns1", "lease3"): {
+			gcnode(testResource, "ns1", "test5"),
 		},
 	}
 	all := []gc.Node{
@@ -445,18 +448,19 @@ func TestCollectibleResources(t *testing.T) {
 		gcnode(ResourceImage, "ns1", "image2"),
 		gcnode(ResourceLease, "ns1", "lease1"),
 		gcnode(ResourceLease, "ns1", "lease2"),
+		gcnode(ResourceLease, "ns1", "lease3"),
 		gcnode(testResource, "ns1", "test1"),
-		gcnode(testResource, "ns1", "test2"), // 7: Will be removed
+		gcnode(testResource, "ns1", "test2"), // 8: Will be removed
 		gcnode(testResource, "ns1", "test3"),
 		gcnode(testResource, "ns1", "test4"),
+		gcnode(testResource, "ns1", "test5"),
 	}
-	removeIndex := 7
+	removeIndexes := []int{6, 8}
 	roots := []gc.Node{
 		gcnode(ResourceImage, "ns1", "image1"),
 		gcnode(ResourceImage, "ns1", "image2"),
 		gcnode(ResourceLease, "ns1", "lease1"),
 		gcnode(testResource, "ns1", "test1"),
-		gcnode(testResource, "ns1", "test3"),
 	}
 	collector := &testCollector{
 		all: []gc.Node{
@@ -464,6 +468,7 @@ func TestCollectibleResources(t *testing.T) {
 			gcnode(testResource, "ns1", "test2"),
 			gcnode(testResource, "ns1", "test3"),
 			gcnode(testResource, "ns1", "test4"),
+			gcnode(testResource, "ns1", "test5"),
 		},
 		active: []gc.Node{
 			gcnode(testResource, "ns1", "test1"),
@@ -474,6 +479,9 @@ func TestCollectibleResources(t *testing.T) {
 			},
 			"lease2": {
 				gcnode(testResource, "ns1", "test4"),
+			},
+			"lease3": {
+				gcnode(testResource, "ns1", "test5"),
 			},
 		},
 	}
@@ -518,16 +526,24 @@ func TestCollectibleResources(t *testing.T) {
 		return c.scanRoots(ctx, tx, nc)
 	})
 
+	var remaining []gc.Node
 	if err := db.Update(func(tx *bolt.Tx) error {
-		if _, err := c.remove(ctx, tx, all[removeIndex]); err != nil {
-			return err
+		var ri int
+		for i, n := range all {
+			if ri < len(removeIndexes) && i == removeIndexes[ri] {
+				if _, err := c.remove(ctx, tx, n); err != nil {
+					return err
+				}
+				ri++
+			} else {
+				remaining = append(remaining, n)
+			}
 		}
 		return nil
 	}); err != nil {
 		t.Fatalf("Update failed: %+v", err)
 	}
-	all = append(all[:removeIndex], all[removeIndex+1:]...)
-	checkNodes(ctx, t, db, all, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
+	checkNodes(ctx, t, db, remaining, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
 		return c.scanAll(ctx, tx, fn)
 	})
 }
