@@ -170,7 +170,7 @@ func (w *windowsBaseSnapshotter) preRemove(ctx context.Context, key string) (str
 				}
 			)
 
-			if deactivateErr := hcsshim.DeactivateLayer(di, layerID); deactivateErr != nil {
+			if deactivateErr := hcsshim.DeactivateLayer(di, layerID); deactivateErr != nil && !os.IsNotExist(deactivateErr) {
 				return fmt.Errorf("failed to deactivate layer following failed rename: %s: %w", deactivateErr, err)
 			}
 
