@@ -559,6 +559,40 @@ func TestDockerFetcherOpen(t *testing.T) {
 	}
 }
 
+func TestDockerFetcherOpenLimiterDeadlock(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Encoding", "gzip")
+		rw.Write([]byte("bad gzip data"))
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f := dockerFetcher{&dockerBase{
+		repository: "ns",
+		limiter:    semaphore.NewWeighted(int64(1)),
+	}}
+
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
+	req := f.request(host, http.MethodGet)
+	_, err = f.open(context.Background(), req, "", 0, true)
+	assert.Error(t, err)
+
+	// verify that the limiter Release has been successfully called when the last open error occurred
+	_, err = f.open(context.Background(), req, "", 0, true)
+	assert.Error(t, err)
+}
+
 // httpRange specifies the byte range to be sent to the client.
 type httpRange struct {
 	start, length int64
