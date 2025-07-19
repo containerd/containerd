@@ -37,7 +37,7 @@ func getPeerPid(conn stdnet.Conn) (int, error) {
 
 	raw, err := uc.SyscallConn()
 	if err != nil {
-		return 0, fmt.Errorf("failed get raw unix domain connection: %w", err)
+		return 0, fmt.Errorf("failed to get raw unix domain connection: %w", err)
 	}
 
 	ctrlErr := raw.Control(func(fd uintptr) {
