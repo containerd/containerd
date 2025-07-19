@@ -45,7 +45,7 @@ func init() {
 }
 
 func testContext(t testing.TB) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:usetesting // t.Context() breaks the tests
 	ctx = namespaces.WithNamespace(ctx, testNamespace)
 	if t != nil {
 		ctx = logtest.WithT(ctx, t)
