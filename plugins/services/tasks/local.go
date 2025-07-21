@@ -74,6 +74,8 @@ var (
 
 const (
 	stateTimeout = "io.containerd.timeout.task.state"
+	// deferCleanupTimeout is the default timeout for cleanup operations in defer
+	deferCleanupTimeout = 1 * time.Minute
 )
 
 // Config for the tasks service plugin
@@ -246,9 +248,11 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		return nil, errgrpc.ToGRPC(err)
 	}
 	// Error handling for rtime should be added here, as the task was successfully created during runtime.
+	deferCtx, deferCancel := context.WithTimeout(context.Background(), deferCleanupTimeout)
+	defer deferCancel()
 	defer func() {
 		if retErr != nil {
-			if _, err := rtime.Delete(ctx, r.ContainerID); err != nil && !errdefs.IsNotFound(err) {
+			if _, err := rtime.Delete(deferCtx, r.ContainerID); err != nil && !errdefs.IsNotFound(err) {
 				log.G(ctx).WithError(err).Errorf("Failed to delete runtime task %q", r.ContainerID)
 			}
 		}
