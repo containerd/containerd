@@ -17,6 +17,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,10 @@ import (
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"github.com/fsnotify/fsnotify"
+)
+
+var (
+	ErrCNIConfigNotInitialized = errors.New("cni config not initialized")
 )
 
 // cniNetConfSyncer is used to reload cni network conf triggered by fs change
