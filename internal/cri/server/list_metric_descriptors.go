@@ -259,10 +259,6 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				Help:      "Last time a container was seen by the exporter",
 				LabelKeys: baseLabelKeys,
 			}, {
-				Name:      "cadvisor_version_info",
-				Help:      "A metric with a constant '1' value labeled by kernel version, OS version, docker version, cadvisor version & cadvisor revision.",
-				LabelKeys: []string{"kernelVersion", "osVersion", "dockerVersion", "cadvisorVersion", "cadvisorRevision"},
-			}, {
 				Name:      "container_start_time_seconds",
 				Help:      "Start time of the container since unix epoch in seconds.",
 				LabelKeys: baseLabelKeys,
