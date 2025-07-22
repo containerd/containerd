@@ -34,29 +34,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-type MetricsServer struct {
-	collectionPeriod time.Duration
-	sandboxMetrics   map[string]*SandboxMetrics
-	mu               sync.RWMutex
-}
-
-type SandboxMetrics struct {
-	metric *runtime.PodSandboxMetrics
-}
-
-type metricValue struct {
-	value      uint64
-	labels     []string
-	metricType runtime.MetricType
-}
-
-type metricValues []metricValue
-
-type containerMetric struct {
-	desc      *runtime.MetricDescriptor
-	valueFunc func() metricValues
-}
-
 // this is part of the other go routine that updates the map
 // someone should also take care of removing deleted containers and sandboxes from the map
 func (c *criService) updatePodSandboxMetrics(ctx context.Context, sandboxID string) *SandboxMetrics {
@@ -117,46 +94,6 @@ func (c *criService) updatePodSandboxMetrics(ctx context.Context, sandboxID stri
 		c.metricsServer.mu.Unlock()
 	}
 	return sm
-}
-
-// getMetrics is supposed to be called from ListPodSandBoxMetrics
-func (m *MetricsServer) getMetrics(sandBoxID string) *runtime.PodSandboxMetrics {
-	if m == nil {
-		return nil
-	}
-
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.sandboxMetrics == nil {
-		return nil
-	}
-
-	sm, ok := m.sandboxMetrics[sandBoxID]
-	if !ok || sm == nil {
-		return nil
-	}
-	return sm.metric
-}
-
-// cleanupStoppedSandboxMetrics removes metrics for sandboxes that are no longer running
-func (m *MetricsServer) cleanupStoppedSandboxMetrics(activeSandboxIDs map[string]bool) {
-	if m == nil {
-		return
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.sandboxMetrics == nil {
-		return
-	}
-
-	for sandboxID := range m.sandboxMetrics {
-		if !activeSandboxIDs[sandboxID] {
-			delete(m.sandboxMetrics, sandboxID)
-		}
-	}
 }
 
 // collectPodSandboxMetrics collects metrics for a specific pod sandbox and its containers
@@ -335,63 +272,6 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 	return &runtime.ListPodSandboxMetricsResponse{
 		PodMetrics: podMetrics,
 	}, nil
-}
-
-type containerCPUMetrics struct {
-	UsageUsec          uint64
-	UserUsec           uint64
-	SystemUsec         uint64
-	NRPeriods          uint64
-	NRThrottledPeriods uint64
-	ThrottledUsec      uint64
-	//LoadAverage10      uint64
-	//TasksState         uint64
-}
-
-type containerMemoryMetrics struct {
-	Cache        uint64
-	RSS          uint64
-	Swap         uint64
-	KernelUsage  uint64
-	FileMapped   uint64
-	FailCount    uint64
-	MemoryUsage  uint64
-	MaxUsage     uint64
-	WorkingSet   uint64
-	ActiveFile   uint64
-	InactiveFile uint64
-	PgFault      uint64
-	PgMajFault   uint64
-}
-
-type containerNetworkMetrics struct {
-	Name      string
-	RxBytes   uint64
-	RxPackets uint64
-	RxErrors  uint64
-	RxDropped uint64
-	TxBytes   uint64
-	TxPackets uint64
-	TxErrors  uint64
-	TxDropped uint64
-}
-
-type containerPerDiskStats struct {
-	Device string            `json:"device"`
-	Major  uint64            `json:"major"`
-	Minor  uint64            `json:"minor"`
-	Stats  map[string]uint64 `json:"stats"`
-}
-
-type containerDiskIoMetrics struct {
-	IoServiceBytes []containerPerDiskStats `json:"io_service_bytes,omitempty"`
-	IoServiced     []containerPerDiskStats `json:"io_serviced,omitempty"`
-	IoQueued       []containerPerDiskStats `json:"io_queued,omitempty"`
-	Sectors        []containerPerDiskStats `json:"sectors,omitempty"`
-	IoServiceTime  []containerPerDiskStats `json:"io_service_time,omitempty"`
-	IoWaitTime     []containerPerDiskStats `json:"io_wait_time,omitempty"`
-	IoMerged       []containerPerDiskStats `json:"io_merged,omitempty"`
-	IoTime         []containerPerDiskStats `json:"io_time,omitempty"`
 }
 
 // gives the metrics for a given container in a sandbox or a given sandbox
