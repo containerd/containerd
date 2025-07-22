@@ -243,8 +243,8 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		}
 
 		if caps := cliContext.StringSlice("cap-add"); len(caps) > 0 {
-			for _, cap := range caps {
-				if !strings.HasPrefix(cap, "CAP_") {
+			for _, c := range caps {
+				if !strings.HasPrefix(c, "CAP_") {
 					return nil, errors.New("capabilities must be specified with 'CAP_' prefix")
 				}
 			}
@@ -252,8 +252,8 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		}
 
 		if caps := cliContext.StringSlice("cap-drop"); len(caps) > 0 {
-			for _, cap := range caps {
-				if !strings.HasPrefix(cap, "CAP_") {
+			for _, c := range caps {
+				if !strings.HasPrefix(c, "CAP_") {
 					return nil, errors.New("capabilities must be specified with 'CAP_' prefix")
 				}
 			}
