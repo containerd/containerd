@@ -17,8 +17,12 @@
 package os
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/moby/sys/symlink"
 
@@ -90,4 +94,90 @@ func (RealOS) WriteFile(filename string, data []byte, perm os.FileMode) error {
 // Hostname will call os.Hostname to get the hostname of the host.
 func (RealOS) Hostname() (string, error) {
 	return os.Hostname()
+}
+
+// InflightStat represents a Stat call that is in progress for a given path.
+// It is exported so that consumers of the OS interface can use it to coordinate.
+type InflightStat struct {
+	Cond *sync.Cond // Used to signal completion to waiting goroutines.
+	Done bool       // Flag indicating if the Stat call is complete.
+	Err  error      // Resulting error from Stat.
+}
+
+// StatManager wraps an OS interface to provide managed access to Stat calls,
+// specifically to handle in-flight requests gracefully.
+type StatManager struct {
+	os                 OS
+	statTimeout        time.Duration
+	inflightStats      map[string]*InflightStat
+	inflightStatsMutex sync.Mutex
+}
+
+type StatResult struct {
+	Err error
+}
+
+// NewStatManager creates a new StatManager that wraps the provided OS interface.
+func NewStatManager(os OS) *StatManager {
+	return &StatManager{
+		os:                 os,
+		statTimeout:        5 * time.Second,
+		inflightStats:      make(map[string]*InflightStat),
+		inflightStatsMutex: sync.Mutex{},
+	}
+}
+
+// Stat performs a stat on the given name, managing concurrent requests to the same path.
+func (sm *StatManager) Stat(ctx context.Context, path string) error {
+	sm.inflightStatsMutex.Lock()
+	var statError error
+	inflight, isPending := sm.inflightStats[path]
+	if isPending {
+		// Stat for this path is already in progress. We wait on the
+		// condition variable. Wait() atomically unlocks the mutex and
+		// suspends the goroutine. When awakened, it re-locks the mutex
+		// before returning.
+		for !inflight.Done {
+			inflight.Cond.Wait()
+		}
+		statError = inflight.Err
+		sm.inflightStatsMutex.Unlock()
+	} else {
+		// There are no active Stats being made to this path. Create a
+		// record for other goroutines to find and wait on.
+		newInflight := &InflightStat{
+			Cond: sync.NewCond(&sm.inflightStatsMutex),
+		}
+		sm.inflightStats[path] = newInflight
+		sm.inflightStatsMutex.Unlock()
+
+		statCtx, statcancel := context.WithTimeout(ctx, sm.statTimeout)
+		resultChan := make(chan StatResult, 1)
+		go func() {
+			_, err := sm.os.Stat(path)
+			resultChan <- StatResult{Err: err}
+			close(resultChan)
+		}()
+
+		select {
+		case res := <-resultChan: // Stat completed
+			statError = res.Err
+		case <-statCtx.Done(): // timeout / mountpath could be stuck.
+			statError = fmt.Errorf("mountpath (%q) could be stuck", path)
+		}
+		statcancel()
+
+		sm.inflightStatsMutex.Lock()
+		newInflight.Err = statError
+		newInflight.Done = true
+
+		// Delete the src entry from the map so that subsequent requests
+		// can still call a new Stat to the src in case the underlying FS
+		// has recovered and can serve files.
+		delete(sm.inflightStats, path)
+
+		newInflight.Cond.Broadcast()
+		sm.inflightStatsMutex.Unlock()
+	}
+	return statError
 }
