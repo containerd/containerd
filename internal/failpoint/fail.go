@@ -245,12 +245,13 @@ func parseType(term []byte, entry *failpointEntry) ([]byte, error) {
 
 	var found bool
 	for name, typ := range nameToTyp {
-		if bytes.HasPrefix(term, []byte(name)) {
-			found = true
-			term = term[len(name):]
-			entry.typ = typ
-			break
+		if !bytes.HasPrefix(term, []byte(name)) {
+			continue
 		}
+		found = true
+		term = term[len(name):]
+		entry.typ = typ
+		break
 	}
 
 	if !found {

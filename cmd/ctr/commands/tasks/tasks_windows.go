@@ -49,12 +49,13 @@ func HandleConsoleResize(ctx context.Context, task resizer, con console.Console)
 				continue
 			}
 
-			if size.Width != prevSize.Width || size.Height != prevSize.Height {
-				if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
-					log.G(ctx).WithError(err).Error("resize pty")
-				}
-				prevSize = size
+			if size.Width == prevSize.Width && size.Height == prevSize.Height {
+				continue
 			}
+			if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
+				log.G(ctx).WithError(err).Error("resize pty")
+			}
+			prevSize = size
 		}
 	}()
 	return nil

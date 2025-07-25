@@ -96,10 +96,11 @@ func (c *criService) filterCRISandboxes(sandboxes []*runtime.PodSandbox, filter 
 			match := true
 			for k, v := range filter.GetLabelSelector() {
 				got, ok := s.Labels[k]
-				if !ok || got != v {
-					match = false
-					break
+				if ok && got == v {
+					continue
 				}
+				match = false
+				break
 			}
 			if !match {
 				continue

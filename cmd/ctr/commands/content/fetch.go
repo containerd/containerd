@@ -279,11 +279,10 @@ outer:
 						if !errdefs.IsNotFound(err) {
 							log.G(ctx).WithError(err).Error("failed to get content info")
 							continue outer
-						} else {
-							statuses[key] = StatusInfo{
-								Ref:    key,
-								Status: StatusWaiting,
-							}
+						}
+						statuses[key] = StatusInfo{
+							Ref:    key,
+							Status: StatusWaiting,
 						}
 					} else if info.CreatedAt.After(start) {
 						statuses[key] = StatusInfo{
@@ -301,10 +300,11 @@ outer:
 					}
 				} else if done {
 					if ok {
-						if status.Status != StatusDone && status.Status != StatusExists {
-							status.Status = StatusDone
-							statuses[key] = status
+						if status.Status == StatusDone || status.Status == StatusExists {
+							continue
 						}
+						status.Status = StatusDone
+						statuses[key] = status
 					} else {
 						statuses[key] = StatusInfo{
 							Ref:    key,

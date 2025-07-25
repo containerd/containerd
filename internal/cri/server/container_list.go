@@ -100,10 +100,11 @@ func (c *criService) filterCRIContainers(containers []*runtime.Container, filter
 			match := true
 			for k, v := range filter.GetLabelSelector() {
 				got, ok := cntr.Labels[k]
-				if !ok || got != v {
-					match = false
-					break
+				if ok && got == v {
+					continue
 				}
+				match = false
+				break
 			}
 			if !match {
 				continue

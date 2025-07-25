@@ -501,11 +501,7 @@ func addImageLease(ctx context.Context, tx *bolt.Tx, ref string, labels map[stri
 		return err
 	}
 
-	if err := bkt.Put([]byte(ref), nil); err != nil {
-		return err
-	}
-
-	return nil
+	return bkt.Put([]byte(ref), nil)
 }
 
 func removeImageLease(ctx context.Context, tx *bolt.Tx, ref string) error {
@@ -544,13 +540,14 @@ func parseLeaseResource(r leases.Resource) ([]string, string, error) {
 			return nil, "", fmt.Errorf("invalid resource type %s: %w", typ, errdefs.ErrInvalidArgument)
 		}
 
-		if k == string(bucketKeyObjectContent) {
-			dgst, err := digest.Parse(ref)
-			if err != nil {
-				return nil, "", fmt.Errorf("invalid content resource id %s: %v: %w", ref, err, errdefs.ErrInvalidArgument)
-			}
-			ref = dgst.String()
+		if k != string(bucketKeyObjectContent) {
+			break
 		}
+		dgst, err := digest.Parse(ref)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid content resource id %s: %v: %w", ref, err, errdefs.ErrInvalidArgument)
+		}
+		ref = dgst.String()
 	case string(bucketKeyObjectSnapshots):
 		if len(keys) != 2 {
 			return nil, "", fmt.Errorf("invalid snapshot resource type %s: %w", typ, errdefs.ErrInvalidArgument)

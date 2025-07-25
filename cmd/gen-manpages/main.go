@@ -29,10 +29,12 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprint(os.Stderr, err)
-		os.Exit(1)
+	err := run()
+	if err == nil {
+		return
 	}
+	fmt.Fprint(os.Stderr, err)
+	os.Exit(1)
 }
 
 func run() error {
@@ -60,8 +62,5 @@ func run() error {
 		return err
 	}
 	_ = os.MkdirAll(dir, os.ModePerm)
-	if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%s.%s", name, section)), []byte(data), 0644); err != nil {
-		return err
-	}
-	return nil
+	return os.WriteFile(filepath.Join(dir, fmt.Sprintf("%s.%s", name, section)), []byte(data), 0644)
 }

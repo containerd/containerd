@@ -334,22 +334,24 @@ type namespacedEvent struct {
 
 func (m *DB) publishEvents(events []namespacedEvent) {
 	ctx := context.Background()
-	if publisher := m.dbopts.publisher; publisher != nil {
-		for _, ne := range events {
-			ctx := namespaces.WithNamespace(ctx, ne.namespace)
-			var topic string
-			switch ne.event.(type) {
-			case *eventstypes.ImageDelete:
-				topic = "/images/delete"
-			case *eventstypes.SnapshotRemove:
-				topic = "/snapshot/remove"
-			default:
-				log.G(ctx).WithField("event", ne.event).Debug("unhandled event type from garbage collection removal")
-				continue
-			}
-			if err := publisher.Publish(ctx, topic, ne.event); err != nil {
-				log.G(ctx).WithError(err).WithField("topic", topic).Debug("publish event failed")
-			}
+	publisher := m.dbopts.publisher
+	if publisher == nil {
+		return
+	}
+	for _, ne := range events {
+		ctx := namespaces.WithNamespace(ctx, ne.namespace)
+		var topic string
+		switch ne.event.(type) {
+		case *eventstypes.ImageDelete:
+			topic = "/images/delete"
+		case *eventstypes.SnapshotRemove:
+			topic = "/snapshot/remove"
+		default:
+			log.G(ctx).WithField("event", ne.event).Debug("unhandled event type from garbage collection removal")
+			continue
+		}
+		if err := publisher.Publish(ctx, topic, ne.event); err != nil {
+			log.G(ctx).WithError(err).WithField("topic", topic).Debug("publish event failed")
 		}
 	}
 }

@@ -173,17 +173,18 @@ func (t *tcShaper) findCIDRClass(cidr string) (classAndHandleList [][]string, fo
 			filter = line
 			continue
 		}
-		if strings.Contains(line, spec) {
-			// expected tc line:
-			// `filter parent 1: protocol ip pref 1 u32 fh 800::800 order 2048 key ht 800 bkt 0 flowid 1:1` (old version) or
-			// `filter parent 1: protocol ip pref 1 u32 chain 0 fh 800::800 order 2048 key ht 800 bkt 0 flowid 1:1 not_in_hw` (new version)
-			matches := classAndHandleMatcher.FindStringSubmatch(filter)
-			if len(matches) != 3 {
-				return classAndHandleList, false, fmt.Errorf("unexpected output from tc: %s %d (%v)", filter, len(matches), matches)
-			}
-			resultTmp := []string{matches[2], matches[1]}
-			classAndHandleList = append(classAndHandleList, resultTmp)
+		if !strings.Contains(line, spec) {
+			continue
 		}
+		// expected tc line:
+		// `filter parent 1: protocol ip pref 1 u32 fh 800::800 order 2048 key ht 800 bkt 0 flowid 1:1` (old version) or
+		// `filter parent 1: protocol ip pref 1 u32 chain 0 fh 800::800 order 2048 key ht 800 bkt 0 flowid 1:1 not_in_hw` (new version)
+		matches := classAndHandleMatcher.FindStringSubmatch(filter)
+		if len(matches) != 3 {
+			return classAndHandleList, false, fmt.Errorf("unexpected output from tc: %s %d (%v)", filter, len(matches), matches)
+		}
+		resultTmp := []string{matches[2], matches[1]}
+		classAndHandleList = append(classAndHandleList, resultTmp)
 	}
 	if len(classAndHandleList) > 0 {
 		return classAndHandleList, true, nil
@@ -342,19 +343,20 @@ func (t *tcShaper) GetCIDRs() ([]string, error) {
 		if len(line) == 0 {
 			continue
 		}
-		if strings.Contains(line, "match") {
-			parts := strings.Split(line, " ")
-			// expected tc line:
-			// match <cidr> at <number>
-			if len(parts) != 4 {
-				return nil, fmt.Errorf("unexpected output: %v", parts)
-			}
-			cidr, err := asciiCIDR(parts[1])
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, cidr)
+		if !strings.Contains(line, "match") {
+			continue
 		}
+		parts := strings.Split(line, " ")
+		// expected tc line:
+		// match <cidr> at <number>
+		if len(parts) != 4 {
+			return nil, fmt.Errorf("unexpected output: %v", parts)
+		}
+		cidr, err := asciiCIDR(parts[1])
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, cidr)
 	}
 	return result, nil
 }

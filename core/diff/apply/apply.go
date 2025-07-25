@@ -102,12 +102,14 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	}
 
 	for _, p := range processors {
-		if ep, ok := p.(interface {
+		ep, ok := p.(interface {
 			Err() error
-		}); ok {
-			if err := ep.Err(); err != nil {
-				return emptyDesc, err
-			}
+		})
+		if !ok {
+			continue
+		}
+		if err := ep.Err(); err != nil {
+			return emptyDesc, err
 		}
 	}
 	return ocispec.Descriptor{

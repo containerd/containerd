@@ -97,9 +97,10 @@ func (p *process) cleanup(ctx context.Context) {
 			log.G(ctx).WithError(err).Error("failed to close job handle")
 		}
 	}
-	if p.processHandle != nil {
-		if err := windows.CloseHandle(*p.processHandle); err != nil {
-			log.G(ctx).WithError(err).Error("failed to close process handle")
-		}
+	if p.processHandle == nil {
+		return
+	}
+	if err := windows.CloseHandle(*p.processHandle); err != nil {
+		log.G(ctx).WithError(err).Error("failed to close process handle")
 	}
 }

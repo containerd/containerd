@@ -194,15 +194,16 @@ func negativeScaleInt64(base int64, scale Scale) (result int64, exact bool) {
 			fraction = true
 		}
 		value = value / 10
-		if value == 0 {
-			if fraction {
-				if base > 0 {
-					return 1, false
-				}
-				return -1, false
-			}
-			return 0, true
+		if value != 0 {
+			continue
 		}
+		if fraction {
+			if base > 0 {
+				return 1, false
+			}
+			return -1, false
+		}
+		return 0, true
 	}
 	if fraction {
 		if base > 0 {
