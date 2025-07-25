@@ -34,6 +34,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
@@ -217,6 +218,7 @@ func TestRecoverContainer(t *testing.T) {
 	controller := &Controller{
 		config: criconfig.Config{},
 		store:  NewStore(),
+		locker: kmutex.New(),
 	}
 	containers := []struct {
 		container        fakeContainer
