@@ -381,13 +381,14 @@ func (u *Unpacker) unpack(
 			mounts, err = sn.Prepare(ctx, key, parent, opts...)
 			if err != nil {
 				if errdefs.IsAlreadyExists(err) {
-					if _, err := sn.Stat(ctx, chainID); err != nil {
+					if sn, err := sn.Stat(ctx, chainID); err != nil {
 						if !errdefs.IsNotFound(err) {
 							return fmt.Errorf("failed to stat snapshot %s: %w", chainID, err)
 						}
 						// Try again, this should be rare, log it
 						log.G(ctx).WithField("key", key).WithField("chainid", chainID).Debug("extraction snapshot already exists, chain id not found")
 					} else {
+						log.G(ctx).Debugf("snapshot %s with chainID %s already exists skip fetch blob %q ", sn.Name, chainID, desc.Digest)
 						// no need to handle, snapshot now found with chain id
 						return nil
 					}
