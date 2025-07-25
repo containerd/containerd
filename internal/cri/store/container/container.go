@@ -17,6 +17,7 @@
 package container
 
 import (
+	"fmt"
 	"sync"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -70,12 +71,20 @@ func WithContainerIO(io *cio.ContainerIO) Opts {
 	}
 }
 
+type StoreStatusError struct {
+	msg string
+}
+
+func (e StoreStatusError) Error() string {
+	return e.msg
+}
+
 // WithStatus adds status to the container.
 func WithStatus(status Status, root string) Opts {
 	return func(c *Container) error {
 		s, err := StoreStatus(root, c.ID, status)
 		if err != nil {
-			return err
+			return StoreStatusError{msg: fmt.Sprintf("store status:%v", err)}
 		}
 		c.Status = s
 		if s.Get().State() == runtime.ContainerState_CONTAINER_EXITED {
