@@ -278,7 +278,7 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 	var s storage.Snapshot
 	var info snapshots.Info
 	if err := o.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
-		s, err = storage.GetSnapshot(ctx, key)
+		s, err = storage.GetSnapshotWithKind(ctx, key, []snapshots.Kind{})
 		if err != nil {
 			return fmt.Errorf("failed to get active mount: %w", err)
 		}
