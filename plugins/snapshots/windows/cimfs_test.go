@@ -28,17 +28,17 @@ import (
 
 func TestGetOptionByPrefix(t *testing.T) {
 	cimPath := "C:\\fake\\cim\\path.cim"
-	cimPathOpt := LayerCimPathFlag + cimPath
+	cimPathOpt := mount.LayerCimPathFlag + cimPath
 	parentCimPaths := []string{"C:\\fake\\parent1.cim", "C:\\fake\\parent2.cim"}
 	parentCimLayersJSON, _ := json.Marshal(parentCimPaths)
-	parentCimLayersOpt := ParentLayerCimPathsFlag + string(parentCimLayersJSON)
+	parentCimLayersOpt := mount.ParentLayerCimPathsFlag + string(parentCimLayersJSON)
 	m := &mount.Mount{
 		Source:  "C:\\foo\\bar",
-		Type:    "CimFS",
+		Type:    mount.CimFSMountType,
 		Options: []string{cimPathOpt, parentCimLayersOpt},
 	}
 
-	parsedCimPath, err := GetCimPath(m)
+	parsedCimPath, err := mount.GetCimPath(m)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestGetOptionByPrefix(t *testing.T) {
 		t.Errorf("Expected `%s`, got `%s`", cimPath, parsedCimPath)
 	}
 
-	parsedParentCimPaths, err := GetParentCimPaths(m)
+	parsedParentCimPaths, err := mount.GetParentCimPaths(m)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
