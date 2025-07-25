@@ -16,14 +16,44 @@
 
 package server
 
-import (
-	"context"
+import runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-)
+// getMetrics is supposed to be called from ListPodSandBoxMetrics
+func (m *MetricsServer) getMetrics(sandBoxID string) *runtime.PodSandboxMetrics {
+	if m == nil {
+		return nil
+	}
 
-func (c *criService) ListPodSandboxMetrics(context.Context, *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListPodSandboxMetrics not implemented")
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.sandboxMetrics == nil {
+		return nil
+	}
+
+	sm, ok := m.sandboxMetrics[sandBoxID]
+	if !ok || sm == nil {
+		return nil
+	}
+	return sm.metric
+}
+
+// cleanupStoppedSandboxMetrics removes metrics for sandboxes that are no longer running
+func (m *MetricsServer) cleanupStoppedSandboxMetrics(activeSandboxIDs map[string]bool) {
+	if m == nil {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.sandboxMetrics == nil {
+		return
+	}
+
+	for sandboxID := range m.sandboxMetrics {
+		if !activeSandboxIDs[sandboxID] {
+			delete(m.sandboxMetrics, sandboxID)
+		}
+	}
 }
