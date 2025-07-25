@@ -61,7 +61,7 @@ func TestIssue7496(t *testing.T) {
 
 	t.Logf("Create a container config and run container in a pod")
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	containerConfig := ContainerConfig("pausecontainer", pauseImage)
 	cnID, err := runtimeService.CreateContainer(sbID, containerConfig, sbConfig)

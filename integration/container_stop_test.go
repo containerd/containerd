@@ -47,7 +47,7 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 				containerName = "test-container"
 			)
 
-			EnsureImageExists(t, testImage)
+			EnsureImageExists(t, testImage, *runtimeHandler)
 
 			t.Log("Create a multi-process container")
 			cnConfig := ContainerConfig(
@@ -84,7 +84,7 @@ func TestContainerStopCancellation(t *testing.T) {
 		containerName = "test-container"
 	)
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	t.Log("Create a container which traps sigterm")
 	cnConfig := ContainerConfig(

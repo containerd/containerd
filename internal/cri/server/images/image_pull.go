@@ -42,6 +42,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/images"
 	containerdimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
@@ -54,6 +55,10 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/pkg/tracing"
+)
+
+var (
+	imageNameWithRuntimeHandler = "%s,%s"
 )
 
 // For image management:
@@ -120,7 +125,12 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 	return &runtime.PullImageResponse{ImageRef: ref}, nil
 }
 
-func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (_ string, err error) {
+func (c *CRIImageService) PullImage(
+	ctx context.Context,
+	name string,
+	credentials func(string) (string, string, error),
+	sandboxConfig *runtime.PodSandboxConfig,
+	runtimeHandler string) (_ string, err error) {
 	span := tracing.SpanFromContext(ctx)
 	defer func() {
 		// TODO: add domain label for imagePulls metrics, and we may need to provide a mechanism
@@ -165,16 +175,18 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
-	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig)
+	snapshotter, platform, err := c.snapshotterFromPodSandboxConfig(ctx, sandboxConfig, runtimeHandler)
 	if err != nil {
 		return "", err
 	}
 
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s, platform %v", ref, snapshotter, platform)
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
+		tracing.Attribute("platform", platform),
 	)
-	labels := c.getLabels(ctx, ref)
+	labels := c.getLabels(ref)
 
 	// If UseLocalImagePull is true, use client.Pull to pull the image, else use transfer service by default.
 	//
@@ -182,11 +194,10 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	// TODO: Add support for DisableSnapshotAnnotations, DiscardUnpackedLayers, ImagePullWithSyncFs and unpackDuplicationSuppressor
 	var image containerd.Image
 	if c.config.UseLocalImagePull {
-		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, platform, labels, imagePullProgressTimeout)
 	} else {
-		image, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, platform, labels, imagePullProgressTimeout)
 	}
-
 	if err != nil {
 		return "", err
 	}
@@ -211,7 +222,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		// No need to use `updateImage`, because the image reference must
 		// have been managed by the cri plugin.
 		// TODO: Use image service directly
-		if err := c.imageStore.Update(ctx, r); err != nil {
+		if err := c.imageStore.Update(ctx, r, runtimeHandler); err != nil {
 			return "", fmt.Errorf("failed to update image store %q: %w", r, err)
 		}
 	}
@@ -237,6 +248,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	ref string,
 	credentials func(string) (string, string, error),
 	snapshotter string,
+	platform imagespec.Platform,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, error) {
@@ -261,6 +273,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
 			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
 		}),
+		containerd.WithPlatformMatcher(platforms.Only(platform)),
 	}
 
 	// Temporarily removed for v2 upgrade
@@ -291,6 +304,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	ref string,
 	credentials func(string) (string, string, error),
 	snapshotter string,
+	platform imagespec.Platform,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, error) {
@@ -301,7 +315,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 
 	// Set image store opts
 	var sopts []transferimage.StoreOpt
-	sopts = append(sopts, transferimage.WithPlatforms(platforms.DefaultSpec()))
+	sopts = append(sopts, transferimage.WithPlatforms(platform))
 	sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
 	sopts = append(sopts, transferimage.WithImageLabels(labels))
 	is := transferimage.NewStore(ref, sopts...)
@@ -324,7 +338,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	}
 
 	// Image should be pulled, unpacked and present in containerd image store at this moment
-	image, err := c.client.GetImage(ctx, ref)
+	image, err := c.client.GetImageWithPlatform(ctx, ref, platform)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
 	}
@@ -381,6 +395,7 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 		// Add a label to indicate that the image is managed by the cri plugin.
 		Labels: labels,
 	}
+
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
 	// TODO: Call CRIImageService directly
@@ -390,9 +405,10 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 	} else if !errdefs.IsAlreadyExists(err) {
 		return err
 	}
+
 	// Retrieve oldImg from image store here because Create routine returns an
 	// empty image on ErrAlreadyExists
-	oldImg, err := c.images.Get(ctx, name)
+	oldImg, err := c.images.Get(ctx, img.Name)
 	if err != nil {
 		return err
 	}
@@ -412,7 +428,7 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 }
 
 // getLabels get image labels to be added on CRI image
-func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
+func (c *CRIImageService) getLabels(name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
 	for _, pinned := range c.config.PinnedImages {
 		if pinned == name {
@@ -422,50 +438,278 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 	return labels
 }
 
-// updateImage updates image store to reflect the newest state of an image reference
+func buildNewLabels(
+	rootImgLabels map[string]string,
+	criLabels map[string]string,
+	imgInfo images.UnpackedImageInfo,
+) map[string]string {
+	newLabels := make(map[string]string, len(rootImgLabels)+len(criLabels))
+	for key, val := range rootImgLabels {
+		newLabels[key] = val
+	}
+	for key, value := range criLabels {
+		// Ensure to copy the criLabels so they are updated as well. This is important
+		// for images pulled via ctr or transfer service
+		newLabels[key] = value
+	}
+	snapshotLabel := fmt.Sprintf("%s.%s", images.GcSnapshotLabel, imgInfo.Snapshot)
+	newLabels[snapshotLabel] = imgInfo.SnapshotID
+	return newLabels
+}
+
+// findRuntimeHandlers finds all the matching
+// RuntimePlatforms with identical platform and snapshot strings
+func (c *CRIImageService) findRuntimeHandlers(ctx context.Context, platform imagespec.Platform, snapshot string) []string {
+	var runtimeHandlers []string
+	log.G(ctx).Tracef("Find valid runtimeHandlers for platform %v", platform)
+	for handler, runtimePlatform := range c.runtimePlatforms {
+		if runtimePlatform.Platform.Architecture != platform.Architecture ||
+			runtimePlatform.Platform.OS != platform.OS ||
+			!strings.Contains(platform.OSVersion, runtimePlatform.Platform.OSVersion) ||
+			runtimePlatform.Snapshotter != snapshot {
+			continue
+		}
+		runtimeHandlers = append(runtimeHandlers, handler)
+	}
+
+	return runtimeHandlers
+}
+
+// updateRootImgLabels updated rootImg with images.GcExpirationLabel
+// and images.RootImageLabel
+func (c *CRIImageService) updateRootImgLabels(
+	ctx context.Context,
+	rootImg images.Image,
+	imgInfo images.UnpackedImageInfo,
+) error {
+	fieldpaths := []string{"labels"}
+	updateRootImg := containerdimages.Image{
+		Target: rootImg.Target,
+		Labels: rootImg.Labels,
+	}
+	for _, r := range []string{rootImg.Name, imgInfo.ConfigDigest.String()} {
+		updateRootImg.Name = r
+		if updateRootImg.Labels == nil {
+			updateRootImg.Labels = map[string]string{}
+		}
+		updateRootImg.Labels[images.GcExpirationLabel] = time.Now().Format(time.RFC3339)
+		// This label is used to mark it as root image
+		updateRootImg.Labels[images.RootImageLabel] = "nil"
+
+		_, err := c.images.Update(ctx, updateRootImg, fieldpaths...)
+		if err != nil {
+			return fmt.Errorf("failed to update labels on root image %v", rootImg.Name)
+		}
+	}
+	return nil
+}
+
+// updateContentSnapshotLabels adds labels ro corresponding entry in content store.
+// Add a snapshot info label to the configDesc to help subsequent calls identify snapshotID.
+// Remove snapshot gc label on configDesc as it no longer needs to hold reference to it.
+func (c *CRIImageService) updateContentSnapshotLabels(
+	ctx context.Context,
+	imgInfo images.UnpackedImageInfo,
+) error {
+	contentInfo, err := c.content.Info(ctx, imgInfo.ConfigDigest)
+	if err != nil {
+		return fmt.Errorf("failed to get content info for %q: %w", imgInfo.ConfigDigest.String(), err)
+	}
+	if contentInfo.Labels == nil {
+		contentInfo.Labels = make(map[string]string)
+	}
+
+	// Add snapshot info label to the configDesc to help subsequent calls identify snapshotID.
+	// GcSnapshotLabel is removed as the image tuple (ref, runtimehandler) now has reference
+	// to the unpacked snapshot. This helps with correctly garbage collecting the snapshot.
+	snapshotInfoLabel := fmt.Sprintf("%s.%s", images.SnapshotInfoLabel, imgInfo.Snapshot)
+	snapshotGcLabel := fmt.Sprintf("%s.%s", images.GcSnapshotLabel, imgInfo.Snapshot)
+	contentInfo.Labels[snapshotInfoLabel] = imgInfo.SnapshotID
+	delete(contentInfo.Labels, snapshotGcLabel)
+
+	if _, err := c.content.Update(ctx, contentInfo, "labels"); err != nil {
+		return fmt.Errorf("update content store labels for %q: %w", imgInfo.ConfigDigest.String(), err)
+	}
+	return nil
+}
+
+// updateWithValidRuntimeHandlers finds all the matching
+// runtimehandlers for a given image ref, adds new image labels
+// and updates the containerd metadata store with an entry each
+// for (ref, runtimeHandler) tuple.
+// For every matching runtime handler, the following two new
+// image labels are created:
+// a. New snapshot label to point to the unpacked image
+// b. New image label to point to the root image of this ref
+func (c *CRIImageService) updateWithValidRuntimeHandlers(ctx context.Context, ref string) error {
+	rootImg, err := c.images.Get(ctx, ref)
+	if err != nil {
+		// Image not found in containerd store
+		return fmt.Errorf("error getting root image from metdata store: %v", err)
+	}
+
+	// 1. Walk the image from the root and record the
+	// corresponding platform, snapshot and snapshotID
+	// that the image has been unpacked for.
+	imgInfo, err := images.GetUnpackedImageInfo(ctx, c.content, rootImg.Target)
+	if err != nil {
+		log.G(ctx).WithError(err).Debugf("Corresponding platform/snapshot not found for image: %v", ref)
+		return nil
+	}
+
+	// 2. Use imgInfo.Platforms and imgInfo.Snapshots to find
+	// all matching runtime handlers
+	runtimeHandlers := c.findRuntimeHandlers(ctx, imgInfo.Platform, imgInfo.Snapshot)
+	if len(runtimeHandlers) == 0 {
+		runtimeHandlers = append(runtimeHandlers, c.defaultRuntimeName)
+	}
+
+	// 3. Create new entries in containerd image store with name
+	// in the form of tuple (ref, runtimeHandler).
+	// Additionally add two new labels are added to hold reference
+	// to the right objects to help with garbage collection:
+	// a. Add images.GcImageLabel pointing to reference 'r' to
+	// have reference to root image.
+	// b. Add snapshot gc label to the unpacked snapshot
+	// to have a reference to it.
+	// This prevents garbage collection from cleaning up the root
+	// image before all the image entries referencing it are removed.
+	newLabels := buildNewLabels(rootImg.Labels, c.getLabels(ref), imgInfo)
+	imageID := imgInfo.ConfigDigest.String()
+	for _, runtimeHandler := range runtimeHandlers {
+		// Add the (id,runtimeHandler) + (ref,runtimeHandler)
+		for _, r := range []string{ref, imageID} {
+			if r == "" {
+				continue
+			}
+			refWithRuntimeHandler := fmt.Sprintf(imageNameWithRuntimeHandler, r, runtimeHandler)
+			if _, err := c.client.GetImage(ctx, refWithRuntimeHandler); err == nil {
+				continue
+			} else if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("error getting containerd image by reference: %w", err)
+			}
+
+			// Set gc label to root image to keep reference to it.
+			newLabels[images.GcImageLabel] = r
+			if err := c.createOrUpdateImageReference(ctx, refWithRuntimeHandler, rootImg.Target, newLabels); err != nil {
+				return fmt.Errorf("failed to create image reference %q: %w", refWithRuntimeHandler, err)
+			}
+			// Update image store to reflect the newest state in containerd.
+			if err = c.imageStore.Update(ctx, r, runtimeHandler); err != nil {
+				return fmt.Errorf("failed to update CRI cache store for image %v: %w", refWithRuntimeHandler, err)
+			}
+		}
+	}
+
+	// Once new entries have been added, add gc expiration label
+	// to root image in order to facilitate gc cleanup when
+	// all references to it have been removed.
+	if err := c.updateRootImgLabels(ctx, rootImg, imgInfo); err != nil {
+		return err
+	}
+
+	// Add a snapshot info label to the configDesc to help subsequent calls identify snapshotID.
+	// Snapshot gc labels have been appropriately added to the newly added image labels.
+	// They are the ones that truly need to hold reference to the unpacked snapshot.
+	// Therefore, get rid of snapshot gc on the configDesc as it no longer needs to
+	// hold reference to it.
+	if err = c.updateContentSnapshotLabels(ctx, imgInfo); err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetRuntimeHandlerFromRef returns the ref and runtimehandler if specified.
+// ref could be a tuple of (imageRef, runtimeHandler).
+// If no tuple was specified, empty string is returned for runtimehandler.
+func GetRuntimeHandlerFromRef(ref string) (imageName, runtimeHandler string) {
+	parts := strings.SplitN(ref, ",", 2)
+	imageName = parts[0]
+	if len(parts) == 2 && parts[1] != "" {
+		runtimeHandler = parts[1]
+	}
+	return
+}
+
+// UpdateImage updates image store to reflect the newest state of an image reference
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
-	// TODO: Use image service
-	img, err := c.client.GetImage(ctx, r)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("get image by reference: %w", err)
+	// Check if this ref has runtimehandler associated with it
+	ref, runtimeHandler := GetRuntimeHandlerFromRef(r)
+	if runtimeHandler != "" {
+		// TODO: Use image service
+		_, err := c.images.Get(ctx, r)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("get image by reference: %w", err)
+			}
+			// If the image is not found, we should continue updating the cache,
+			// so that all the image, runtimeHandler entries can be removed from the cri cache.
+			if err := c.imageStore.Update(ctx, ref, runtimeHandler); err != nil {
+				return fmt.Errorf("update image store for %q: %w", r, err)
+			}
+			return nil
 		}
-		// If the image is not found, we should continue updating the cache,
-		// so that the image can be removed from the cache.
-		if err := c.imageStore.Update(ctx, r); err != nil {
-			return fmt.Errorf("update image store for %q: %w", r, err)
+		// If entry for this tuple (ref, runtimehandler) was found in containerd
+		// metadata store, then update CRI's image cache accordingly too.
+		err = c.imageStore.Update(ctx, ref, runtimeHandler)
+		if err != nil {
+			return fmt.Errorf("failed to update CRI image cache for image %q: %w", r, err)
 		}
 		return nil
 	}
 
-	labels := img.Labels()
-	criLabels := c.getLabels(ctx, r)
+	// TODO: Use image service
+	rootImg, err := c.client.GetImage(ctx, r)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("get image by reference: %w", err)
+		}
+		log.G(ctx).Debugf("Root image not found. Clean up CRI image cache")
+		// If the root image is not found, we are in a bad state. Remove all references
+		// for this image from CRI cache ad containerd store
+		if err := c.imageStore.RemoveReference(ctx, r); err != nil {
+			return fmt.Errorf("update image store for %q failed: %w", r, err)
+		}
+		return nil
+	}
+
+	// If it has rootImage label set, do not continue as containerd image store
+	// would have already been updated with all the matching runtime handlers previously.
+	rootImgLabels := rootImg.Labels()
+	if rootImgLabels != nil {
+		if _, ok := rootImgLabels[images.RootImageLabel]; ok {
+			return nil
+		}
+	}
+
+	labels := rootImg.Labels()
+	criLabels := c.getLabels(r)
 	for key, value := range criLabels {
 		if labels[key] != value {
 			// Make sure the image has the image id as its unique
 			// identifier that references the image in its lifetime.
-			configDesc, err := img.Config(ctx)
+			configDesc, err := rootImg.Config(ctx)
 			if err != nil {
 				return fmt.Errorf("get image id: %w", err)
 			}
 			id := configDesc.Digest.String()
-			if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
+			if err := c.createOrUpdateImageReference(ctx, id, rootImg.Target(), criLabels); err != nil {
 				return fmt.Errorf("create image id reference %q: %w", id, err)
 			}
-			if err := c.imageStore.Update(ctx, id); err != nil {
-				return fmt.Errorf("update image store for %q: %w", id, err)
-			}
 			// The image id is ready, add the label to mark the image as managed.
-			if err := c.createOrUpdateImageReference(ctx, r, img.Target(), criLabels); err != nil {
+			if err := c.createOrUpdateImageReference(ctx, r, rootImg.Target(), criLabels); err != nil {
 				return fmt.Errorf("create managed label: %w", err)
 			}
 			break
 		}
 	}
-	if err := c.imageStore.Update(ctx, r); err != nil {
-		return fmt.Errorf("update image store for %q: %w", r, err)
+
+	// Update containerd image store and CRI image cache with all valid runtimehandlers for this image.
+	err = c.updateWithValidRuntimeHandlers(ctx, r)
+	if err != nil {
+		return fmt.Errorf("failed to update containerd and CRI image store for valid runtimehandlers: %v", err)
 	}
 	return nil
 }
@@ -792,7 +1036,7 @@ func (reporter *pullRequestReporter) status() (currentReqs int32, totalBytesRead
 //
 // NOTE:
 //
-// Although containerd provides ingester manager to track the progress
+// Although containerd provides ingester maninternal/cri/server/container_create.goager to track the progress
 // of pulling request, for example `ctr image pull` shows the console progress
 // bar, it needs more CPU resources to open/read the ingested files with
 // acquiring containerd metadata plugin's boltdb lock.
@@ -821,35 +1065,6 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 		reqReporter: rt.reqReporter,
 	}
 	return resp, err
-}
-
-// Given that runtime information is not passed from PullImageRequest, we depend on an experimental annotation
-// passed from pod sandbox config to get the runtimeHandler. The annotation key is specified in configuration.
-// Once we know the runtime, try to override default snapshotter if it is set for this runtime.
-// See https://github.com/containerd/containerd/issues/6657
-func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig) (string, error) {
-	snapshotter := c.config.Snapshotter
-	if s == nil || s.Annotations == nil {
-		return snapshotter, nil
-	}
-
-	// TODO(kiashok): honor the new CRI runtime handler field added to v0.29.0
-	// for image pull per runtime class support.
-	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
-	if !ok {
-		return snapshotter, nil
-	}
-
-	// TODO: Ensure error is returned if runtime not found?
-	if c.runtimePlatforms != nil {
-		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
-			snapshotter = p.Snapshotter
-			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
-		}
-	}
-
-	return snapshotter, nil
 }
 
 type criCredentials struct {
@@ -1033,4 +1248,53 @@ func (reporter *transferProgressReporter) createProgressFunc(ctx context.Context
 			return
 		}
 	}
+}
+
+// getInfoFromRuntimePlatforms validates the CRI runtime handler and passed the default
+// snapshotter and platform values if no such runtime handler was defined.
+func (c *CRIImageService) getInfoFromRuntimePlatforms(ctx context.Context, criRuntimeHandler string) (string, imagespec.Platform, error) {
+	defaultSnapshotter := c.config.Snapshotter
+	defaultPlatform := platforms.DefaultSpec()
+
+	if c.runtimePlatforms == nil {
+		log.G(ctx).Debugf("no CRIImageService.runtimePlatforms defined")
+		return defaultSnapshotter, defaultPlatform, nil
+	}
+	if _, ok := c.runtimePlatforms[criRuntimeHandler]; !ok {
+		log.G(ctx).Debugf("CRI runtimehandler %v not found in CRI image config", criRuntimeHandler)
+		return defaultSnapshotter, defaultPlatform, fmt.Errorf("CRI runtimehandler %v not found in CRI image config", criRuntimeHandler)
+	}
+	imagePlatform := c.runtimePlatforms[criRuntimeHandler]
+	return imagePlatform.Snapshotter, imagePlatform.Platform, nil
+}
+
+// RuntimeHandler information is passed through PullImageRequest from cri-api v0.29.0.
+// Therefore, attempt to read the snapshot and runtimeHandler information from PullImageRequest
+// and if one was not specified, try to look for appropriate annotation key. If none are found,
+// return default values for snapshotter and runtime handler.
+func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context,
+	s *runtime.PodSandboxConfig, runtimeHandlerFromCRI string) (string, imagespec.Platform, error) {
+	snapshotter := c.config.Snapshotter
+	platform := platforms.DefaultSpec()
+
+	// Honor the CRI runtime handler field passed through PullImageRequest.
+	// If the runtimeHandler is valid, we have to pass both snapshotter and
+	// platform defined in c.RuntimePlatforms. If either of the fields
+	// in c.RuntimPlatforms[runtimehandler] are empty, fallback to using the
+	// default snapshotter and platform.
+	if runtimeHandlerFromCRI != "" {
+		return c.getInfoFromRuntimePlatforms(ctx, runtimeHandlerFromCRI)
+	}
+
+	if s == nil || s.Annotations == nil {
+		return snapshotter, platform, nil
+	}
+
+	// runtimeHandler from CRI was "", attempt to read runtimeHandler from annotations
+	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
+	if ok {
+		return c.getInfoFromRuntimePlatforms(ctx, runtimeHandler)
+	}
+
+	return snapshotter, platform, nil
 }
