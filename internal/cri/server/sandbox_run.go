@@ -241,8 +241,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 				if cleanupErr = c.teardownPodNetwork(deferCtx, sandbox); cleanupErr != nil {
 					log.G(ctx).WithError(cleanupErr).Errorf("Failed to destroy network for sandbox %q", id)
 
-					// ignoring failed to destroy networks when we failed to setup networks
-					if sandbox.CNIResult == nil {
+					// Ignoring network cleanup error if the CNI config/plugin failed to be initialized.
+					// It is safe to ignore in this scenario as no network plugins should have been executed.
+					if errors.Is(cleanupErr, ErrCNIConfigNotInitialized) ||
+						errors.Is(cleanupErr, cni.ErrCNINotInitialized) {
 						cleanupErr = nil
 					}
 				}
@@ -401,7 +403,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		result    *cni.Result
 	)
 	if netPlugin == nil {
-		return errors.New("cni config not initialized")
+		return ErrCNIConfigNotInitialized
 	}
 	if c.config.UseInternalLoopback {
 		err := c.bringUpLoopback(path)
