@@ -81,12 +81,13 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 		// The CRI's imagePullProgressTimeout relies on responseBody.Close to
 		// update the process monitor's status. If the err is io.EOF, close
 		// the connection since there is no more available data.
-		if hrs.rc != nil {
-			if clsErr := hrs.rc.Close(); clsErr != nil {
-				log.L.WithError(clsErr).Error("httpReadSeeker: failed to close ReadCloser after io.EOF")
-			}
-			hrs.rc = nil
+		if hrs.rc == nil {
+			break
 		}
+		if clsErr := hrs.rc.Close(); clsErr != nil {
+			log.L.WithError(clsErr).Error("httpReadSeeker: failed to close ReadCloser after io.EOF")
+		}
+		hrs.rc = nil
 	}
 	return
 }

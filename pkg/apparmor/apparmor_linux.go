@@ -34,12 +34,16 @@ var (
 func hostSupports() bool {
 	checkAppArmor.Do(func() {
 		// see https://github.com/opencontainers/runc/blob/0d49470392206f40eaab3b2190a57fe7bb3df458/libcontainer/apparmor/apparmor_linux.go
-		if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil && os.Getenv("container") == "" {
-			if _, err = os.Stat("/sbin/apparmor_parser"); err == nil {
-				buf, err := os.ReadFile("/sys/module/apparmor/parameters/enabled")
-				appArmorSupported = err == nil && len(buf) > 1 && buf[0] == 'Y'
-			}
+		_, err := os.Stat("/sys/kernel/security/apparmor")
+		if err != nil || os.Getenv("container") != "" {
+			return
 		}
+		_, err = os.Stat("/sbin/apparmor_parser")
+		if err != nil {
+			return
+		}
+		buf, err := os.ReadFile("/sys/module/apparmor/parameters/enabled")
+		appArmorSupported = err == nil && len(buf) > 1 && buf[0] == 'Y'
 	})
 	return appArmorSupported
 }
