@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -54,6 +55,7 @@ func init() {
 			plugins.SandboxStorePlugin,
 			plugins.CRIServicePlugin,
 			plugins.ServicePlugin,
+			plugins.WarningPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			client, err := containerd.New(
@@ -79,12 +81,19 @@ func init() {
 				return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 			}
 
+			// Get warning service.
+			warningPlugin, err := ic.GetSingle(plugins.WarningPlugin)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load warning service plugin dependency: %w", err)
+			}
+
 			c := Controller{
 				client:         client,
 				config:         runtimeService.Config(),
 				os:             osinterface.RealOS{},
 				runtimeService: runtimeService,
 				imageService:   criImagePlugin.(ImageService),
+				warningService: warningPlugin.(WarningService),
 				store:          NewStore(),
 			}
 
@@ -115,6 +124,11 @@ type ImageService interface {
 	PinnedImage(string) string
 }
 
+// ImageService specifies dependencies to the warning service.
+type WarningService interface {
+	Emit(context.Context, deprecation.Warning)
+}
+
 type Controller struct {
 	// config contains all configurations.
 	config criconfig.Config
@@ -124,6 +138,8 @@ type Controller struct {
 	runtimeService RuntimeService
 	// imageService is a dependency to CRI image service.
 	imageService ImageService
+	// warningService is a dependency to the warning service.
+	warningService WarningService
 	// os is an interface for all required os operations.
 	os osinterface.OS
 	// eventMonitor is the event monitor for podsandbox controller to handle sandbox task exit event
