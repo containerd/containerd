@@ -98,6 +98,7 @@ func (w *watcher) Add(id string, cgx interface{}) error {
 			i := item{id: id}
 			select {
 			case ev := <-eventCh:
+				log.L.Infof("nmx001 env is %v", ev)
 				i.ev = ev
 				w.itemCh <- i
 			case err := <-errCh:

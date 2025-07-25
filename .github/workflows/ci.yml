@@ -604,9 +604,39 @@ jobs:
           fi
       - name: test-integration
         run: sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
-      - name: test-cri-integration
-        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+      # - name: test-cri-integration
+      #   run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
       - name: test-cri
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri2
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri3
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri4
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri5
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri6
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri7
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri8
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri9
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri10
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri11
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri12
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri13
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri14
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri15
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: test-cri16
         run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
 
   tests-cri-in-userns:

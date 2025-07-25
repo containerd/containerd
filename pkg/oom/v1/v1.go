@@ -136,6 +136,7 @@ func (e *epoller) process(ctx context.Context, fd uintptr) {
 		unix.Close(int(fd))
 		return
 	}
+	log.L.Infof("nmx002 id %s %s", i.id, "oom")
 	if err := e.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 		ContainerID: i.id,
 	}); err != nil {
