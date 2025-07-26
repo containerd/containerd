@@ -55,6 +55,11 @@ message CheckpointOptions {
 	string image_path = 8;
 	// checkpoint work path
 	string work_path = 9;
+        // Should the checkpoint archive include the content of /dev/shm?
+        // This is useful for all cases where an external /dev/shm is
+        // bind mounted into the container and the content is necessary
+        // during restore.
+        string dev_shm = 10;
 }
 
 message ProcessDetails {
