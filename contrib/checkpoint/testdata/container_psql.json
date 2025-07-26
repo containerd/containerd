@@ -1,0 +1,48 @@
+{
+	"metadata": {
+		"name": "podsandbox-psql"
+	},
+	"image": {
+		"image": "ghcr.io/cloudnative-pg/postgresql:latest"
+	},
+	"envs": [
+		{
+			"key": "POSTGRES_PASSWORD",
+			"value": "password"
+		},
+		{
+			"key": "GLIBC_TUNABLES",
+			"value": "glibc.pthread.rseq=0"
+		}
+	],
+	"annotations": {
+		"pod": "podsandbox"
+	},
+	"log_path": "log.file",
+	"stdin": false,
+	"stdin_once": false,
+	"tty": false,
+	"linux": {
+		"security_context": {
+			"namespace_options": {
+				"pid": 1
+			},
+			"readonly_rootfs": false
+		},
+		"resources": {
+			"cpu_period": 10000,
+			"cpu_quota": 20000,
+			"cpu_shares": 512,
+			"oom_score_adj": 30,
+			"memory_limit_in_bytes": 268435456
+		}
+	},
+	"mounts": [
+		{
+			"host_path": "",
+			"container_path": "/var/lib/postgresql/data",
+			"readonly": false,
+			"propagation": 0
+		}
+	]
+}

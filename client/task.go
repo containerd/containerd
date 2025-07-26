@@ -41,6 +41,7 @@ import (
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -538,6 +539,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	i := CheckpointTaskInfo{
 		runtime: cr.Runtime.Name,
 	}
+
 	for _, o := range opts {
 		if err := o(&i); err != nil {
 			return nil, err
@@ -578,6 +580,39 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if err := t.checkpointTask(ctx, &index, request); err != nil {
 		return nil, err
 	}
+
+	// If this is set the content of /dev/shm is an external directory
+	// bind mounted in the container. It should be included in the checkpoint
+	// so that it can be reused during restore.
+	ok, devShmPath := isDevShmSet(cr.Runtime.Name, i.Options)
+	if ok {
+		tar := archive.Diff(ctx, "", devShmPath)
+		devShm, errWrite := writeContent(
+			ctx,
+			t.client.ContentStore(),
+			images.MediaTypeContainerdDevShm,
+			devShmPath,
+			tar,
+		)
+		// Close tar immediately after write.
+		if errClose := tar.Close(); errClose != nil {
+			return nil, errClose
+		}
+		if errWrite != nil {
+			return nil, errWrite
+		}
+
+		index.Manifests = append(index.Manifests, v1.Descriptor{
+			MediaType: devShm.MediaType,
+			Size:      devShm.Size,
+			Digest:    devShm.Digest,
+			Platform: &v1.Platform{
+				OS:           goruntime.GOOS,
+				Architecture: goruntime.GOARCH,
+			},
+		})
+	}
+
 	// if checkpoint image path passed, jump checkpoint image,
 	// return an empty image
 	if isCheckpointPathExist(cr.Runtime.Name, i.Options) {
@@ -787,4 +822,20 @@ func isCheckpointPathExist(runtime string, v interface{}) bool {
 	}
 
 	return false
+}
+
+// isDevShmSet only suitable for runc runtime now
+func isDevShmSet(runtime string, v interface{}) (bool, string) {
+	if v == nil {
+		return false, ""
+	}
+
+	switch runtime {
+	case plugins.RuntimeRuncV2:
+		if opts, ok := v.(*options.CheckpointOptions); ok && opts.GetDevShm() != "" {
+			return true, opts.GetDevShm()
+		}
+	}
+
+	return false, ""
 }

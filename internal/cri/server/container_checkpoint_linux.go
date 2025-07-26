@@ -453,7 +453,76 @@ func (c *criService) CRImportCheckpoint(
 			return "", fmt.Errorf("restoring container log file %s failed: %w", containerLog, err)
 		}
 	}
+
+	// Restore /dev/shm (if it exists and if the IPC namespace if per pod)
+	if err := c.restoreDevShm(ctx, meta, containerRootDir); err != nil {
+		return "", err
+	}
+
 	return meta.ID, nil
+}
+
+func (c *criService) restoreDevShm(
+	ctx context.Context,
+	meta *containerstore.Metadata,
+	containerRootDir string,
+) error {
+	// Currently only IPC namespace per pod is handled.
+	if meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() != runtime.NamespaceMode_POD {
+		return nil
+	}
+	devShmArchive := filepath.Join(containerRootDir, crmetadata.DevShmCheckpointTar)
+	_, err := c.os.Stat(devShmArchive)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	numberOfContainersRunningInSandbox := func() int {
+		count := 0
+		for _, cntr := range c.containerStore.List() {
+			if cntr.SandboxID == meta.SandboxID && cntr.Status.Get().State() == runtime.ContainerState_CONTAINER_RUNNING {
+				count++
+			}
+		}
+		return count
+	}()
+
+	if numberOfContainersRunningInSandbox > 0 {
+		errorMessage := fmt.Sprintf(
+			"The checkpoint archive included a /dev/shm snapshot. "+
+				"This can only be restored in a pod with 0 running containers. "+
+				"This pod (%s) contains %d running containers",
+			meta.SandboxID,
+			numberOfContainersRunningInSandbox,
+		)
+		log.G(ctx).WithError(err).Error(errorMessage)
+		return fmt.Errorf("%s", errorMessage)
+	}
+
+	devShmHostPath := c.getSandboxDevShm(meta.SandboxID)
+
+	if devShmHostPath == "" {
+		// In theory this cannot happen because of the check for
+		// != runtime.NamespaceMode_POD. This means there must always
+		// be a /dev/shm which is mounted into the container.
+		log.G(ctx).Warn("Cannot restore /dev/shm, no host path found")
+		return nil
+	}
+
+	devShmArchiveFile, err := os.Open(devShmArchive)
+	if err != nil {
+		return fmt.Errorf("failed to open dev/shm archive %s for import: %w", devShmArchive, err)
+	}
+	defer devShmArchiveFile.Close()
+
+	if _, err = archive.Apply(ctx, devShmHostPath, devShmArchiveFile); err != nil {
+		return fmt.Errorf("unpacking of dev/shm archive %s failed: %w", devShmArchive, err)
+	}
+
+	return nil
 }
 
 func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (*runtime.CheckpointContainerResponse, error) {
@@ -499,6 +568,52 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 		return nil, fmt.Errorf("get container info: %w", err)
 	}
 
+	devShmPath := func() string {
+		// There is currently a problem restoring Kubernetes containers if they
+		// are using /dev/shm. /dev/shm is tmpfs on the outside of the container
+		// bind mounted in the container. This is usually shared between all
+		// containers in a pod. This workaround (hack) here is an approach to
+		// avoid errors during restore concerning missing files in /dev/shm.
+		// Another and maybe cleaner way to solve this would be change Kubernetes
+		// to allow an IPC namespace per container and not just per pod or host.
+		//
+		// The following hack tries to determine if there is only one container
+		// in a pod and if there is only one container in the pod we can include
+		// /dev/shm, which is created on the host and bind mounted into the container,
+		// in the checkpoint archive. If there are multiple containers in a pod it
+		// is not clear which container is using which part in /dev/shm, so adding
+		// /dev/shm is skipped for those cases.
+		//
+		// Mostly LLM containers, which are often single container pods, are currently
+		// the main target for this feature. It is, however, also useful for databases
+		// like postgresql.
+		//
+		// This has been implemented in a similar way in Podman in 2021 for the non-pod
+		// use case.
+
+		// Currently the IPC namespace can be either per node (NamespaceMode_NODE)
+		// or per pod (NamespaceMode_POD). If it is per node
+		// it will not be included in the checkpoint archive.
+		if container.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
+			return ""
+		}
+
+		justOneContainerinPod := func() bool {
+			count := 0
+			for _, cntr := range c.containerStore.List() {
+				if cntr.SandboxID == container.SandboxID {
+					count++
+				}
+			}
+			return (count == 1)
+		}
+
+		if !justOneContainerinPod() {
+			return ""
+		}
+		return c.getSandboxDevShm(container.SandboxID)
+	}
+
 	configJSON, err := json.Marshal(&crmetadata.ContainerConfig{
 		ID:              container.ID,
 		Name:            container.Name,
@@ -517,12 +632,23 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task for container %q: %w", r.GetContainerId(), err)
 	}
-	img, err := task.Checkpoint(ctx, []client.CheckpointTaskOpts{withCheckpointOpts(i.Runtime.Name, c.getContainerRootDir(r.GetContainerId()))}...)
+	img, err := task.Checkpoint(
+		ctx,
+		[]client.CheckpointTaskOpts{
+			withCheckpointOpts(
+				i.Runtime.Name,
+				c.getContainerRootDir(r.GetContainerId()),
+				devShmPath(),
+			),
+		}...,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("checkpointing container %q failed: %w", r.GetContainerId(), err)
 	}
 
-	// the checkpoint image has been provided as an index with manifests representing the tar of criu data, the rw layer, and the config
+	// The checkpoint image has been provided as an index with manifests
+	// representing the tar of criu data, the rw layer, the config and
+	// potentially also the content of /dev/shm.
 	var (
 		index        v1.Index
 		rawIndex     []byte
@@ -616,8 +742,12 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 				return nil, fmt.Errorf("failed to copy CRIU checkpoint blob to checkpoint dir: %w", err)
 			}
 		case v1.MediaTypeImageLayerGzip:
-			if err := writeRootFsDiffTar(ctx, contentStore, manifest, cpPath); err != nil {
+			if err := writeTar(ctx, contentStore, manifest, cpPath, crmetadata.RootFsDiffTar); err != nil {
 				return nil, fmt.Errorf("failed to copy rw filesystem layer blob to checkpoint dir: %w", err)
+			}
+		case images.MediaTypeContainerdDevShm:
+			if err := writeTar(ctx, contentStore, manifest, cpPath, crmetadata.DevShmCheckpointTar); err != nil {
+				return nil, fmt.Errorf("failed to copy dev/shm blob to checkpoint dir: %w", err)
 			}
 		case images.MediaTypeContainerd1CheckpointConfig:
 			if err := writeSpecDumpFile(ctx, contentStore, manifest, cpPath); err != nil {
@@ -650,7 +780,7 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	return &runtime.CheckpointContainerResponse{}, nil
 }
 
-func withCheckpointOpts(rt, rootDir string) client.CheckpointTaskOpts {
+func withCheckpointOpts(rt, rootDir, devShmPath string) client.CheckpointTaskOpts {
 	return func(r *client.CheckpointTaskInfo) error {
 		// Kubernetes currently supports checkpointing of container
 		// as part of the Forensic Container Checkpointing KEP.
@@ -666,6 +796,7 @@ func withCheckpointOpts(rt, rootDir string) client.CheckpointTaskOpts {
 
 			opts.Exit = !leaveRunning
 			opts.WorkPath = rootDir
+			opts.DevShm = devShmPath
 		}
 		return nil
 	}
@@ -710,7 +841,7 @@ func writeCriuCheckpointData(ctx context.Context, store content.Store, desc v1.D
 	return nil
 }
 
-func writeRootFsDiffTar(ctx context.Context, store content.Store, desc v1.Descriptor, cpPath string) error {
+func writeTar(ctx context.Context, store content.Store, desc v1.Descriptor, cpPath string, tarName string) error {
 	ra, err := store.ReaderAt(ctx, desc)
 	if err != nil {
 		return err
@@ -718,7 +849,7 @@ func writeRootFsDiffTar(ctx context.Context, store content.Store, desc v1.Descri
 	defer ra.Close()
 
 	// the rw layer tarball
-	f, err := os.Create(filepath.Join(cpPath, crmetadata.RootFsDiffTar))
+	f, err := os.Create(filepath.Join(cpPath, tarName))
 	if err != nil {
 		return err
 	}
