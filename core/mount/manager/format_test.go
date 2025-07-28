@@ -108,6 +108,23 @@ func TestFormatMount(t *testing.T) {
 			},
 		},
 		{
+			name: "overlay single",
+			mount: mount.Mount{
+				Type:   "overlay",
+				Source: "overlay",
+				Options: []string{
+					"lowerdir={{ overlay 0 0 }}",
+				},
+			},
+			formatted: mount.Mount{
+				Type:   "overlay",
+				Source: "overlay",
+				Options: []string{
+					"lowerdir=/tmp/mp/0",
+				},
+			},
+		},
+		{
 			name: "copy",
 			mount: mount.Mount{
 				Type:   "bind",
