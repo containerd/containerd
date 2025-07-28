@@ -19,11 +19,9 @@ package erofs
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"github.com/containerd/continuity/fs"
@@ -93,19 +91,6 @@ func findErofs() bool {
 		return false
 	}
 	return bytes.Contains(fs, []byte("\terofs\n"))
-}
-
-// we have to claim it as uint32, otherwise s390x CI will complain.. :(
-const erofsSuperMagic = uint32(0xE0F5E1E2)
-
-// Check if a directory is actually an EROFS mount, which is used to setup or
-// recover EROFS mounts for lowerdirs.
-func isErofs(dir string) bool {
-	var st unix.Statfs_t
-	if err := unix.Statfs(dir, &st); err != nil {
-		return false
-	}
-	return uint32(st.Type) == erofsSuperMagic
 }
 
 // NewSnapshotter returns a Snapshotter which uses EROFS+OverlayFS. The layers
@@ -178,17 +163,13 @@ func (s *snapshotter) layerBlobPath(id string) string {
 	return filepath.Join(s.root, "snapshots", id, "layer.erofs")
 }
 
-func (s *snapshotter) lowerPath(id string) (mount.Mount, string, error) {
+func (s *snapshotter) lowerPath(id string) (string, error) {
 	layerBlob := s.layerBlobPath(id)
 	if _, err := os.Stat(layerBlob); err != nil {
-		return mount.Mount{}, "", fmt.Errorf("failed to find valid erofs layer blob: %w", err)
+		return "", fmt.Errorf("failed to find valid erofs layer blob: %w", err)
 	}
 
-	return mount.Mount{
-		Source:  layerBlob,
-		Type:    "erofs",
-		Options: []string{"ro"},
-	}, s.upperPath(id), nil
+	return layerBlob, nil
 }
 
 func (s *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, kind snapshots.Kind) (string, error) {
@@ -214,23 +195,26 @@ func (s *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, 
 	return td, nil
 }
 
-func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]mount.Mount, error) {
+func (s *snapshotter) mounts(snap storage.Snapshot, _ snapshots.Info) ([]mount.Mount, error) {
 	var options []string
 
 	if len(snap.ParentIDs) == 0 {
-		m, _, err := s.lowerPath(snap.ID)
-		if err == nil {
+		if layerBlob, err := s.lowerPath(snap.ID); err == nil {
 			if snap.Kind != snapshots.KindView {
 				return nil, fmt.Errorf("only works for snapshots.KindView on a committed snapshot: %w", err)
 			}
 			if s.enableFsverity {
-				if err := s.verifyFsverity(m.Source); err != nil {
+				if err := s.verifyFsverity(layerBlob); err != nil {
 					return nil, err
 				}
 			}
-			// We have to force a loop device here since mount[] is static.
-			m.Options = append(m.Options, "loop")
-			return []mount.Mount{m}, nil
+			return []mount.Mount{
+				{
+					Source:  layerBlob,
+					Type:    "erofs",
+					Options: []string{"ro", "loop"},
+				},
+			}, nil
 		}
 		// if we only have one layer/no parents then just return a bind mount as overlay
 		// will not work
@@ -256,45 +240,42 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 			fmt.Sprintf("upperdir=%s", s.upperPath(snap.ID)),
 		)
 	} else if len(snap.ParentIDs) == 1 {
-		m, _, err := s.lowerPath(snap.ParentIDs[0])
+		layerBlob, err := s.lowerPath(snap.ParentIDs[0])
 		if err != nil {
 			return nil, err
 		}
-		// We have to force a loop device here too since mount[] is static.
-		m.Options = append(m.Options, "loop")
-		return []mount.Mount{m}, nil
+		return []mount.Mount{
+			{
+				Source:  layerBlob,
+				Type:    "erofs",
+				Options: []string{"ro", "loop"},
+			},
+		}, nil
 	}
 
-	var lowerdirs []string
+	var mounts []mount.Mount
 	for i := range snap.ParentIDs {
-		m, mntpoint, err := s.lowerPath(snap.ParentIDs[i])
+		layerBlob, err := s.lowerPath(snap.ParentIDs[i])
 		if err != nil {
 			return nil, err
 		}
 
-		// If the lowerdir is actually an EROFS committed layer but
-		// doesn't have an EROFS mount.  Let's recover now.
-		if mntpoint != m.Source && !isErofs(mntpoint) {
-			err := m.Mount(mntpoint)
-			// Use loop if the current kernel (6.12+) doesn't support file-backed mount
-			if errors.Is(err, unix.ENOTBLK) {
-				m.Options = append(m.Options, "loop")
-				err = m.Mount(mntpoint)
-			}
-			if err != nil {
-				return nil, err
-			}
+		m := mount.Mount{
+			Source:  layerBlob,
+			Type:    "erofs",
+			Options: []string{"ro", "loop"},
 		}
-		lowerdirs = append(lowerdirs, mntpoint)
+
+		mounts = append(mounts, m)
 	}
-	options = append(options, fmt.Sprintf("lowerdir=%s", strings.Join(lowerdirs, ":")))
+	options = append(options, fmt.Sprintf("lowerdir={{ overlay 0 %d }}", len(mounts)-1))
 	options = append(options, s.ovlOptions...)
 
-	return []mount.Mount{{
-		Type:    "overlay",
+	return append(mounts, mount.Mount{
+		Type:    "format/overlay",
 		Source:  "overlay",
 		Options: options,
-	}}, nil
+	}), nil
 }
 
 func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
