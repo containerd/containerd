@@ -511,21 +511,21 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 	if err := mm.db.Update(func(tx *bolt.Tx) error {
 		v1bkt := tx.Bucket([]byte("v1"))
 		if v1bkt == nil {
-			return fmt.Errorf("missing v1 bucket: %w", errdefs.ErrUnknown)
+			return fmt.Errorf("missing v1 bucket: %w", errdefs.ErrNotFound)
 		}
 
 		nsbkt := v1bkt.Bucket([]byte(namespace))
 		if nsbkt == nil {
-			return fmt.Errorf("missing namespace %q bucket: %w", namespace, errdefs.ErrUnknown)
+			return fmt.Errorf("missing namespace %q bucket: %w", namespace, errdefs.ErrNotFound)
 		}
 
 		mbkt := nsbkt.Bucket(bucketKeyMounts)
 		if mbkt == nil {
-			return fmt.Errorf("missing mounts bucket: %w", errdefs.ErrUnknown)
+			return fmt.Errorf("missing mounts bucket: %w", errdefs.ErrNotFound)
 		}
 		bkt := mbkt.Bucket([]byte(name))
 		if bkt == nil {
-			return fmt.Errorf("missing mount %q bucket: %w", name, errdefs.ErrUnknown)
+			return fmt.Errorf("missing mount %q bucket: %w", name, errdefs.ErrNotFound)
 		}
 
 		mid = readID(bkt)
