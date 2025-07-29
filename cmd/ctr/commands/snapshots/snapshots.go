@@ -80,7 +80,7 @@ var listCommand = &cli.Command{
 			tw          = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		)
 		fmt.Fprintln(tw, "KEY\tPARENT\tKIND\t")
-		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+		if err := snapshotter.Walk(ctx, func(_ context.Context, info snapshots.Info) error {
 			fmt.Fprintf(tw, "%v\t%v\t%v\t\n",
 				info.Name,
 				info.Parent,
@@ -444,7 +444,7 @@ var treeCommand = &cli.Command{
 			tree        = newSnapshotTree()
 		)
 
-		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+		if err := snapshotter.Walk(ctx, func(_ context.Context, info snapshots.Info) error {
 			// Get or create node and add node details
 			tree.add(info)
 			return nil

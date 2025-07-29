@@ -40,7 +40,7 @@ const DefaultSandboxCPUshares = 2
 
 // WithRelativeRoot sets the root for the container
 func WithRelativeRoot(root string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		if s.Root == nil {
 			s.Root = &runtimespec.Root{}
 		}
@@ -50,7 +50,7 @@ func WithRelativeRoot(root string) oci.SpecOpts {
 }
 
 // WithoutRoot sets the root to nil for the container.
-func WithoutRoot(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+func WithoutRoot(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 	s.Root = nil
 	return nil
 }
@@ -109,7 +109,7 @@ func (m orderedMounts) parts(i int) int {
 
 // WithAnnotation sets the provided annotation
 func WithAnnotation(k, v string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if s.Annotations == nil {
 			s.Annotations = make(map[string]string)
 		}
@@ -120,7 +120,7 @@ func WithAnnotation(k, v string) oci.SpecOpts {
 
 // WithWindowsAffinityCPUs sets the CPU affinity values in runtime spec for windows.
 func WithWindowsAffinityCPUs(config *runtime.WindowsContainerConfig) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if s.Windows == nil || config.Resources == nil || config.Resources.AffinityCpus == nil {
 			return nil
 		}
@@ -179,7 +179,7 @@ func mergeGids(gids1, gids2 []uint32) []uint32 {
 }
 
 // WithoutDefaultSecuritySettings removes the default security settings generated on a spec
-func WithoutDefaultSecuritySettings(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+func WithoutDefaultSecuritySettings(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 	if s.Process == nil {
 		s.Process = &runtimespec.Process{}
 	}
@@ -233,12 +233,12 @@ func WithCapabilities(sc *runtime.LinuxContainerSecurityContext, allCaps []strin
 	return oci.Compose(opts...)
 }
 
-func nullOpt(_ context.Context, _ oci.Client, _ *containers.Container, _ *runtimespec.Spec) error {
+func nullOpt(context.Context, oci.Client, *containers.Container, *runtimespec.Spec) error {
 	return nil
 }
 
 // WithoutAmbientCaps removes the ambient caps from the spec
-func WithoutAmbientCaps(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+func WithoutAmbientCaps(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 	if s.Process == nil {
 		s.Process = &runtimespec.Process{}
 	}
@@ -251,7 +251,7 @@ func WithoutAmbientCaps(_ context.Context, _ oci.Client, c *containers.Container
 
 // WithSelinuxLabels sets the mount and process labels
 func WithSelinuxLabels(process, mount string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		if s.Linux == nil {
 			s.Linux = &runtimespec.Linux{}
 		}
@@ -266,7 +266,7 @@ func WithSelinuxLabels(process, mount string) oci.SpecOpts {
 
 // WithSysctls sets the provided sysctls onto the spec
 func WithSysctls(sysctls map[string]string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if s.Linux == nil {
 			s.Linux = &runtimespec.Linux{}
 		}
@@ -282,7 +282,7 @@ func WithSysctls(sysctls map[string]string) oci.SpecOpts {
 
 // WithSupplementalGroups sets the supplemental groups for the process
 func WithSupplementalGroups(groups []int64) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if s.Process == nil {
 			s.Process = &runtimespec.Process{}
 		}
@@ -296,7 +296,7 @@ func WithSupplementalGroups(groups []int64) oci.SpecOpts {
 }
 
 // WithDefaultSandboxShares sets the default sandbox CPU shares
-func WithDefaultSandboxShares(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+func WithDefaultSandboxShares(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 	if s.Linux == nil {
 		s.Linux = &runtimespec.Linux{}
 	}
@@ -313,7 +313,7 @@ func WithDefaultSandboxShares(ctx context.Context, client oci.Client, c *contain
 
 // WithoutNamespace removes the provided namespace
 func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -330,7 +330,7 @@ func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
 
 // WithNamespacePath updates namespace with existing path.
 func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if s.Linux == nil {
 			return fmt.Errorf("linux spec is required")
 		}

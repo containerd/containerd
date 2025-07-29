@@ -20,7 +20,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) error {
+func (c *criService) GetContainerEvents(_ *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) error {
 	eventC, closer := c.containerEventsQ.Subscribe()
 	defer closer.Close()
 

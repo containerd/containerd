@@ -261,7 +261,7 @@ func (ah *authHandler) authorize(ctx context.Context) (string, string, error) {
 	}
 }
 
-func (ah *authHandler) doBasicAuth(ctx context.Context) (string, string, error) {
+func (ah *authHandler) doBasicAuth(context.Context) (string, string, error) {
 	username, secret := ah.common.Username, ah.common.Secret
 
 	if username == "" || secret == "" {

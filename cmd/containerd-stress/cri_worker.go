@@ -90,7 +90,7 @@ func (w *criWorker) run(ctx, tctx context.Context) {
 	}
 }
 
-func (w *criWorker) runSandbox(tctx, ctx context.Context, id string) (err error) {
+func (w *criWorker) runSandbox(tctx, _ context.Context, id string) (err error) {
 
 	sbConfig := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
@@ -142,7 +142,7 @@ func (w *criWorker) getID() string {
 }
 
 // cleanup cleans up any containers in the "stress" namespace before the test run
-func criCleanup(ctx context.Context, client internalapi.RuntimeService) error {
+func criCleanup(_ context.Context, client internalapi.RuntimeService) error {
 	filter := &runtime.PodSandboxFilter{
 		LabelSelector: map[string]string{podNamespaceLabel: stressNs},
 	}

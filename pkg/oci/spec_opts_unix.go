@@ -39,7 +39,7 @@ func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Sp
 // WithDevices recursively adds devices from the passed in path.
 // If devicePath is a dir it traverses the dir to add all devices in that dir.
 // If devicePath is not a dir, it attempts to add the single device.
-func WithDevices(devicePath, containerPath, permissions string) SpecOpts {
+func WithDevices(devicePath, containerPath, _ string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		devs, err := getDevices(devicePath, containerPath)
 		if err != nil {
@@ -50,6 +50,6 @@ func WithDevices(devicePath, containerPath, permissions string) SpecOpts {
 	}
 }
 
-func escapeAndCombineArgs(args []string) string {
+func escapeAndCombineArgs([]string) string {
 	panic("not supported")
 }

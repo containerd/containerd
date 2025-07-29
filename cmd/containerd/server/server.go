@@ -355,7 +355,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 }
 
 // recordConfigDeprecations attempts to record use of any deprecated config field.  Failures are logged and ignored.
-func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set *plugin.Set) {
+func recordConfigDeprecations(ctx context.Context, _ *srvconfig.Config, set *plugin.Set) {
 	// record any detected deprecations without blocking server startup
 	p := set.Get(plugins.WarningPlugin, plugins.DeprecationsPlugin)
 	if p == nil {

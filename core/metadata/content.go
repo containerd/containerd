@@ -167,7 +167,7 @@ func (cs *contentStore) Walk(ctx context.Context, fn content.WalkFunc, fs ...str
 			return nil
 		}
 
-		return bkt.ForEach(func(k, v []byte) error {
+		return bkt.ForEach(func(k, _ []byte) error {
 			dgst, err := digest.Parse(string(k))
 			if err != nil {
 				// Not a digest, skip

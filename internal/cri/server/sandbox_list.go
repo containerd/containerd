@@ -26,7 +26,7 @@ import (
 )
 
 // ListPodSandbox returns a list of Sandbox.
-func (c *criService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (*runtime.ListPodSandboxResponse, error) {
+func (c *criService) ListPodSandbox(_ context.Context, r *runtime.ListPodSandboxRequest) (*runtime.ListPodSandboxResponse, error) {
 	start := time.Now()
 	// List all sandboxes from store.
 	sandboxesInStore := c.sandboxStore.List()

@@ -390,7 +390,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		if target != "" {
 			var tinfo *snapshots.Info
 			filter := fmt.Sprintf(`labels."containerd.io/snapshot.ref"==%s,parent==%q`, target, bparent)
-			if err := s.Snapshotter.Walk(ctx, func(ctx context.Context, i snapshots.Info) error {
+			if err := s.Snapshotter.Walk(ctx, func(_ context.Context, i snapshots.Info) error {
 				if tinfo == nil && i.Kind == snapshots.KindCommitted {
 					if i.Labels["containerd.io/snapshot.ref"] != target {
 						// Walk did not respect filter
@@ -936,7 +936,7 @@ func (s *snapshotter) walkTree(ctx context.Context, seen map[string]struct{}) ([
 	roots := []*treeNode{}
 	nodes := map[string]*treeNode{}
 
-	if err := s.Snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+	if err := s.Snapshotter.Walk(ctx, func(_ context.Context, info snapshots.Info) error {
 		_, isSeen := seen[info.Name]
 		node, ok := nodes[info.Name]
 		if !ok {
