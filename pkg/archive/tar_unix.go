@@ -111,7 +111,7 @@ func skipFile(hdr *tar.Header) bool {
 // This function must not be called for Block and Char when running in userns.
 // (skipFile() should return true for them.)
 func handleTarTypeBlockCharFifo(hdr *tar.Header, path string) error {
-	mode := uint32(hdr.Mode & 07777)
+	mode := uint32(hdr.Mode & 0o7777)
 	switch hdr.Typeflag {
 	case tar.TypeBlock:
 		mode |= unix.S_IFBLK

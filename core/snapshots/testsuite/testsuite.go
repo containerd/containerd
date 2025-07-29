@@ -98,7 +98,7 @@ func makeTest(
 		defer os.RemoveAll(tmpDir)
 
 		root := filepath.Join(tmpDir, "root")
-		if err := os.MkdirAll(root, 0777); err != nil {
+		if err := os.MkdirAll(root, 0o777); err != nil {
 			t.Fatal(err)
 		}
 
@@ -115,7 +115,7 @@ func makeTest(
 		}()
 
 		work := filepath.Join(tmpDir, "work")
-		if err := os.MkdirAll(work, 0777); err != nil {
+		if err := os.MkdirAll(work, 0o777); err != nil {
 			t.Fatal(err)
 		}
 
@@ -131,21 +131,21 @@ var opt = snapshots.WithLabels(map[string]string{
 // checkSnapshotterBasic tests the basic workflow of a snapshot snapshotter.
 func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	initialApplier := fstest.Apply(
-		fstest.CreateFile("/foo", []byte("foo\n"), 0777),
-		fstest.CreateDir("/a", 0755),
-		fstest.CreateDir("/a/b", 0755),
-		fstest.CreateDir("/a/b/c", 0755),
+		fstest.CreateFile("/foo", []byte("foo\n"), 0o777),
+		fstest.CreateDir("/a", 0o755),
+		fstest.CreateDir("/a/b", 0o755),
+		fstest.CreateDir("/a/b/c", 0o755),
 	)
 
 	diffApplier := fstest.Apply(
-		fstest.CreateFile("/bar", []byte("bar\n"), 0777),
+		fstest.CreateFile("/bar", []byte("bar\n"), 0o777),
 		// also, change content of foo to bar
-		fstest.CreateFile("/foo", []byte("bar\n"), 0777),
+		fstest.CreateFile("/foo", []byte("bar\n"), 0o777),
 		fstest.RemoveAll("/a/b"),
 	)
 
 	preparing := filepath.Join(work, "preparing")
-	if err := os.MkdirAll(preparing, 0777); err != nil {
+	if err := os.MkdirAll(preparing, 0o777); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
 
@@ -188,7 +188,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	next := filepath.Join(work, "nextlayer")
-	if err := os.MkdirAll(next, 0777); err != nil {
+	if err := os.MkdirAll(next, 0o777); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
 
@@ -258,7 +258,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	nextnext := filepath.Join(work, "nextnextlayer")
-	if err := os.MkdirAll(nextnext, 0777); err != nil {
+	if err := os.MkdirAll(nextnext, 0o777); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
 
@@ -292,7 +292,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 // Create a New Layer on top of base layer with Prepare, Stat on new layer, should return Active layer.
 func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
-	if err := os.MkdirAll(preparing, 0777); err != nil {
+	if err := os.MkdirAll(preparing, 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -310,7 +310,7 @@ func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter s
 	}
 	defer testutil.Unmount(t, preparing)
 
-	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -326,7 +326,7 @@ func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter s
 // Commit a New Layer on top of base layer with Prepare & Commit , Stat on new layer, should return Committed layer.
 func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	preparing := filepath.Join(work, "preparing")
-	if err := os.MkdirAll(preparing, 0777); err != nil {
+	if err := os.MkdirAll(preparing, 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -344,7 +344,7 @@ func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotte
 	}
 	defer testutil.Unmount(t, preparing)
 
-	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -365,7 +365,7 @@ func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotte
 
 func snapshotterPrepareMount(ctx context.Context, snapshotter snapshots.Snapshotter, diffPathName string, parent string, work string) (string, error) {
 	preparing := filepath.Join(work, diffPathName)
-	if err := os.MkdirAll(preparing, 0777); err != nil {
+	if err := os.MkdirAll(preparing, 0o777); err != nil {
 		return "", err
 	}
 
@@ -391,7 +391,7 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 		t.Fatal(err)
 	}
 
-	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0o777); err != nil {
 		testutil.Unmount(t, preparing)
 		t.Fatal(err)
 	}
@@ -407,7 +407,7 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 		t.Fatal(err)
 	}
 
-	if err = os.WriteFile(filepath.Join(next, "foo"), []byte("foo bar\n"), 0777); err != nil {
+	if err = os.WriteFile(filepath.Join(next, "foo"), []byte("foo bar\n"), 0o777); err != nil {
 		testutil.Unmount(t, next)
 		t.Fatal(err)
 	}
@@ -455,7 +455,7 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 
 	// Prepare & View with same key
 	newLayer := filepath.Join(work, "newlayer")
-	if err = os.MkdirAll(preparing, 0777); err != nil {
+	if err = os.MkdirAll(preparing, 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -470,7 +470,7 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 
 	// Two Prepare with same key
 	prepLayer := filepath.Join(work, "prepLayer")
-	if err = os.MkdirAll(preparing, 0777); err != nil {
+	if err = os.MkdirAll(preparing, 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -484,7 +484,7 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 
 	// Two View with same key
 	viewLayer := filepath.Join(work, "viewLayer")
-	if err = os.MkdirAll(preparing, 0777); err != nil {
+	if err = os.MkdirAll(preparing, 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -502,8 +502,8 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 func checkDeletedFilesInChildSnapshot(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 
 	l1Init := fstest.Apply(
-		fstest.CreateFile("/foo", []byte("foo\n"), 0777),
-		fstest.CreateFile("/foobar", []byte("foobar\n"), 0777),
+		fstest.CreateFile("/foo", []byte("foo\n"), 0o777),
+		fstest.CreateFile("/foobar", []byte("foobar\n"), 0o777),
 	)
 	l2Init := fstest.Apply(
 		fstest.RemoveAll("/foobar"),
@@ -810,7 +810,7 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 		t.Fatal(err)
 	}
 	viewMountPoint := filepath.Join(work, "view-mount")
-	if err := os.MkdirAll(viewMountPoint, 0777); err != nil {
+	if err := os.MkdirAll(viewMountPoint, 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -820,7 +820,7 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 	}
 
 	testfile := filepath.Join(viewMountPoint, "testfile")
-	err = os.WriteFile(testfile, []byte("testcontent"), 0777)
+	err = os.WriteFile(testfile, []byte("testcontent"), 0o777)
 	testutil.Unmount(t, viewMountPoint)
 	if err != nil {
 		t.Logf("write to %q failed with %v (EROFS is expected but can be other error code)", testfile, err)
@@ -835,14 +835,14 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 // Verify if the file at source is deleted and copied to new location.
 func checkFileFromLowerLayer(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	l1Init := fstest.Apply(
-		fstest.CreateDir("/dir1", 0700),
-		fstest.CreateFile("/dir1/f1", []byte("Hello"), 0644),
-		fstest.CreateDir("dir2", 0700),
-		fstest.CreateFile("dir2/f2", []byte("..."), 0644),
+		fstest.CreateDir("/dir1", 0o700),
+		fstest.CreateFile("/dir1/f1", []byte("Hello"), 0o644),
+		fstest.CreateDir("dir2", 0o700),
+		fstest.CreateFile("dir2/f2", []byte("..."), 0o644),
 	)
 	l2Init := fstest.Apply(
-		fstest.CreateDir("/dir3", 0700),
-		fstest.CreateFile("/dir3/f1", []byte("Hello"), 0644),
+		fstest.CreateDir("/dir3", 0o700),
+		fstest.CreateFile("/dir3/f1", []byte("Hello"), 0o644),
 		fstest.RemoveAll("/dir1"),
 		fstest.Link("dir2/f2", "dir3/f2"),
 		fstest.RemoveAll("dir2/f2"),
@@ -897,26 +897,26 @@ func checkRootPermission(ctx context.Context, t *testing.T, snapshotter snapshot
 func check128LayersMount(name string) func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	return func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 		lowestApply := fstest.Apply(
-			fstest.CreateFile("/bottom", []byte("way at the bottom\n"), 0777),
-			fstest.CreateFile("/overwriteme", []byte("FIRST!\n"), 0777),
-			fstest.CreateDir("/addhere", 0755),
-			fstest.CreateDir("/onlyme", 0755),
-			fstest.CreateFile("/onlyme/bottom", []byte("bye!\n"), 0777),
+			fstest.CreateFile("/bottom", []byte("way at the bottom\n"), 0o777),
+			fstest.CreateFile("/overwriteme", []byte("FIRST!\n"), 0o777),
+			fstest.CreateDir("/addhere", 0o755),
+			fstest.CreateDir("/onlyme", 0o755),
+			fstest.CreateFile("/onlyme/bottom", []byte("bye!\n"), 0o777),
 		)
 
 		appliers := []fstest.Applier{lowestApply}
 		for i := 1; i <= 127; i++ {
 			appliers = append(appliers, fstest.Apply(
-				fstest.CreateFile("/overwriteme", []byte(fmt.Sprintf("%d WAS HERE!\n", i)), 0777),
-				fstest.CreateFile(fmt.Sprintf("/addhere/file-%d", i), []byte("same\n"), 0755),
+				fstest.CreateFile("/overwriteme", []byte(fmt.Sprintf("%d WAS HERE!\n", i)), 0o777),
+				fstest.CreateFile(fmt.Sprintf("/addhere/file-%d", i), []byte("same\n"), 0o755),
 				fstest.RemoveAll("/onlyme"),
-				fstest.CreateDir("/onlyme", 0755),
-				fstest.CreateFile(fmt.Sprintf("/onlyme/file-%d", i), []byte("only me!\n"), 0777),
+				fstest.CreateDir("/onlyme", 0o755),
+				fstest.CreateFile(fmt.Sprintf("/onlyme/file-%d", i), []byte("only me!\n"), 0o777),
 			))
 		}
 
 		flat := filepath.Join(work, "flat")
-		if err := os.MkdirAll(flat, 0777); err != nil {
+		if err := os.MkdirAll(flat, 0o777); err != nil {
 			t.Fatalf("failed to create flat dir(%s): %+v", flat, err)
 		}
 
@@ -924,7 +924,7 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 		parent := ""
 		for i, applier := range appliers {
 			preparing := filepath.Join(work, fmt.Sprintf("prepare-layer-%d", i))
-			if err := os.MkdirAll(preparing, 0777); err != nil {
+			if err := os.MkdirAll(preparing, 0o777); err != nil {
 				t.Fatalf("[layer %d] failed to create preparing dir(%s): %+v", i, preparing, err)
 			}
 
@@ -969,7 +969,7 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 		}
 
 		view := filepath.Join(work, "fullview")
-		if err := os.MkdirAll(view, 0777); err != nil {
+		if err := os.MkdirAll(view, 0o777); err != nil {
 			t.Fatalf("failed to create fullview dir(%s): %+v", view, err)
 		}
 

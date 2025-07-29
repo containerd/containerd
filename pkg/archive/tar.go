@@ -457,7 +457,7 @@ func mkparent(ctx context.Context, path, root string, parents []string) error {
 		}
 	}
 
-	if err := mkdir(path, 0755); err != nil {
+	if err := mkdir(path, 0o755); err != nil {
 		// Check that still doesn't exist
 		dir, err1 := os.Lstat(path)
 		if err1 == nil && dir.IsDir() {

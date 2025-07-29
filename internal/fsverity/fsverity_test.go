@@ -42,7 +42,7 @@ func TestEnable(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	rootDir := filepath.Join(t.TempDir(), "content")
-	err := os.Mkdir(rootDir, 0755)
+	err := os.Mkdir(rootDir, 0o755)
 	if err != nil {
 		t.Errorf("could not create temporary directory: %s", err.Error())
 	}
@@ -92,7 +92,7 @@ func TestEnable(t *testing.T) {
 func TestIsEnabled(t *testing.T) {
 
 	testDir := filepath.Join(t.TempDir(), "content")
-	err := os.Mkdir(testDir, 0755)
+	err := os.Mkdir(testDir, 0o755)
 	if err != nil {
 		t.Errorf("could not create temporary directory: %s", err.Error())
 	}

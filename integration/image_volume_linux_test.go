@@ -286,7 +286,7 @@ func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {
 				_, err := snSrv.Prepare(ctx, target, alpineImageChainID)
 				require.NoError(t, err)
 
-				require.NoError(t, os.MkdirAll(target, 0755))
+				require.NoError(t, os.MkdirAll(target, 0o755))
 			},
 		},
 	} {

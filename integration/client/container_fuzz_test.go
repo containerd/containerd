@@ -98,7 +98,7 @@ func initInSteps(t *testing.T) bool {
 	// Extract binaries
 	if !haveExtractedBinaries {
 
-		if err := os.MkdirAll(downloadBinDir, 0777); err != nil {
+		if err := os.MkdirAll(downloadBinDir, 0o777); err != nil {
 			return true
 		}
 		cmd := exec.Command("tar", "xvf", downloadPath, "-C", downloadBinDir)
@@ -213,7 +213,7 @@ func deleteSocket() error {
 // to $PATH, since the binaries are available there.
 func updatePathEnv() error {
 	// Create test dir for socket
-	err := os.MkdirAll(defaultState, 0777)
+	err := os.MkdirAll(defaultState, 0o777)
 	if err != nil {
 		return err
 	}

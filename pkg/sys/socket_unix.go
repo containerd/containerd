@@ -33,7 +33,7 @@ func CreateUnixSocket(path string) (net.Listener, error) {
 	if len(path) > 104 {
 		return nil, fmt.Errorf("%q: unix socket path too long (> 104)", path)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0660); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o660); err != nil {
 		return nil, err
 	}
 	if err := unix.Unlink(path); err != nil && !os.IsNotExist(err) {
@@ -54,7 +54,7 @@ func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
 		return l, fmt.Errorf("failed to create unix socket on %s: %w", path, err)
 	}
 
-	if err := os.Chmod(path, 0660); err != nil {
+	if err := os.Chmod(path, 0o660); err != nil {
 		l.Close()
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func mkdirAs(path string, uid, gid int) error {
 		return err
 	}
 
-	if err := os.MkdirAll(path, 0770); err != nil {
+	if err := os.MkdirAll(path, 0o770); err != nil {
 		return err
 	}
 

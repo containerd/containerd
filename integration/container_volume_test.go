@@ -31,13 +31,13 @@ import (
 
 func createRegularFile(basePath, content string) (string, error) {
 	newFolder := filepath.Join(basePath, "regular")
-	err := os.Mkdir(newFolder, 0755)
+	err := os.Mkdir(newFolder, 0o755)
 	if err != nil {
 		return "", err
 	}
 
 	newFile := filepath.Join(newFolder, "foo.txt")
-	err = os.WriteFile(newFile, []byte(content), 0644)
+	err = os.WriteFile(newFile, []byte(content), 0o644)
 	return filepath.Join("regular", "foo.txt"), err
 }
 

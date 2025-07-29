@@ -55,7 +55,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 	tempDir := t.TempDir()
 
 	configTOMLFile := filepath.Join(tempDir, "config.toml")
-	if err := os.WriteFile(configTOMLFile, []byte(configTOML), 0600); err != nil {
+	if err := os.WriteFile(configTOMLFile, []byte(configTOML), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

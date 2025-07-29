@@ -106,7 +106,7 @@ func TestPoolDevice(t *testing.T) {
 	err = mount.WithTempMount(ctx, getMounts(thinDevice1), func(thin1MountPath string) error {
 		// Write v1 test file on 'thin-1' device
 		thin1TestFilePath := filepath.Join(thin1MountPath, "TEST")
-		err := os.WriteFile(thin1TestFilePath, []byte("test file (v1)"), 0700)
+		err := os.WriteFile(thin1TestFilePath, []byte("test file (v1)"), 0o700)
 		assert.Nil(t, err, "failed to write test file v1 on '%s' volume", thinDevice1)
 
 		return nil
@@ -120,7 +120,7 @@ func TestPoolDevice(t *testing.T) {
 	// Update TEST file on 'thin-1' to v2
 	err = mount.WithTempMount(ctx, getMounts(thinDevice1), func(thin1MountPath string) error {
 		thin1TestFilePath := filepath.Join(thin1MountPath, "TEST")
-		err = os.WriteFile(thin1TestFilePath, []byte("test file (v2)"), 0700)
+		err = os.WriteFile(thin1TestFilePath, []byte("test file (v2)"), 0o700)
 		assert.Nil(t, err, "failed to write test file v2 on 'thin-1' volume after taking snapshot")
 
 		return nil

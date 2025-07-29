@@ -469,7 +469,7 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 }
 
 func writeToFile(t *testing.T, filePath, message string) {
-	writer, err := os.OpenFile(filePath, os.O_WRONLY, 0600)
+	writer, err := os.OpenFile(filePath, os.O_WRONLY, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1704,9 +1704,9 @@ func TestIssue10589(t *testing.T) {
 
 	// 2. Create an exec
 	t.Log("2. Create exec1")
-	exec1ReadyFifo, err := fifosync.NewWaiter(filepath.Join(t.TempDir(), "exec1-ready.fifo"), 0600)
+	exec1ReadyFifo, err := fifosync.NewWaiter(filepath.Join(t.TempDir(), "exec1-ready.fifo"), 0o600)
 	require.NoError(t, err, "create exec1 ready fifo")
-	exec1DelayFifo, err := fifosync.NewTrigger(filepath.Join(t.TempDir(), "exec1-delay.fifo"), 0600)
+	exec1DelayFifo, err := fifosync.NewTrigger(filepath.Join(t.TempDir(), "exec1-delay.fifo"), 0o600)
 	require.NoError(t, err, "create exec1 delay fifo")
 	exec1, err := task.Exec(ctx, "exec1", &specs.Process{
 		Args: []string{"/bin/sleep", "301"},
@@ -1743,9 +1743,9 @@ func TestIssue10589(t *testing.T) {
 
 	// 5. Make an exec (2) using this failpoint
 	t.Log("5. Create exec2")
-	exec2ReadyFifo, err := fifosync.NewWaiter(filepath.Join(t.TempDir(), "exec2-ready.fifo"), 0600)
+	exec2ReadyFifo, err := fifosync.NewWaiter(filepath.Join(t.TempDir(), "exec2-ready.fifo"), 0o600)
 	require.NoError(t, err, "create exec2 ready fifo: %q", exec2ReadyFifo)
-	exec2DelayFifo, err := fifosync.NewTrigger(filepath.Join(t.TempDir(), "exec2-delay.fifo"), 0600)
+	exec2DelayFifo, err := fifosync.NewTrigger(filepath.Join(t.TempDir(), "exec2-delay.fifo"), 0o600)
 	require.NoError(t, err, "create exec2 delay fifo: %q", exec2DelayFifo)
 	exec2, err := task.Exec(ctx, "exec2", &specs.Process{
 		Args: []string{"/bin/sleep", "302"},

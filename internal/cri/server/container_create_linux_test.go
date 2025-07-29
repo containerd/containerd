@@ -1019,13 +1019,13 @@ additional-group-for-root:x:22222:root
 `
 	tempRootDir := t.TempDir()
 	require.NoError(t,
-		os.MkdirAll(filepath.Join(tempRootDir, "etc"), 0755),
+		os.MkdirAll(filepath.Join(tempRootDir, "etc"), 0o755),
 	)
 	require.NoError(t,
-		os.WriteFile(filepath.Join(tempRootDir, "etc", "passwd"), []byte(etcPasswd), 0644),
+		os.WriteFile(filepath.Join(tempRootDir, "etc", "passwd"), []byte(etcPasswd), 0o644),
 	)
 	require.NoError(t,
-		os.WriteFile(filepath.Join(tempRootDir, "etc", "group"), []byte(etcGroup), 0644),
+		os.WriteFile(filepath.Join(tempRootDir, "etc", "group"), []byte(etcGroup), 0o644),
 	)
 
 	for _, test := range []struct {
@@ -1327,7 +1327,7 @@ func writeFilesToTempDir(tmpDirPattern string, content []string) (string, error)
 
 	for idx, data := range content {
 		file := filepath.Join(dir, fmt.Sprintf("spec-%d.yaml", idx))
-		err := os.WriteFile(file, []byte(data), 0644)
+		err := os.WriteFile(file, []byte(data), 0o644)
 		if err != nil {
 			return "", err
 		}

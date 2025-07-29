@@ -89,7 +89,7 @@ func testUsage(t *testing.T, snapshotter snapshots.Snapshotter) {
 
 	var (
 		sizeBytes   int64 = 1048576 // 1MB
-		baseApplier       = fstest.Apply(fstest.CreateRandomFile("/a", 12345679, sizeBytes, 0777))
+		baseApplier       = fstest.Apply(fstest.CreateRandomFile("/a", 12345679, sizeBytes, 0o777))
 	)
 
 	mounts, err := snapshotter.Prepare(ctx, "prepare-2", "layer-1")
@@ -157,7 +157,7 @@ func TestMultipleXfsMounts(t *testing.T) {
 
 	var (
 		sizeBytes   int64 = 1048576 // 1MB
-		baseApplier       = fstest.Apply(fstest.CreateRandomFile("/a", 12345679, sizeBytes, 0777))
+		baseApplier       = fstest.Apply(fstest.CreateRandomFile("/a", 12345679, sizeBytes, 0o777))
 	)
 
 	// Create base layer

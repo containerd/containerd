@@ -283,9 +283,9 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 `, mirrorURL.String())
 
 	hostCfgDir := filepath.Join(tmpDir, "registrycfg", mirrorURL.Host)
-	assert.NoError(t, os.MkdirAll(hostCfgDir, 0600))
+	assert.NoError(t, os.MkdirAll(hostCfgDir, 0o600))
 
-	err = os.WriteFile(filepath.Join(hostCfgDir, "hosts.toml"), []byte(hostTomlContent), 0600)
+	err = os.WriteFile(filepath.Join(hostCfgDir, "hosts.toml"), []byte(hostTomlContent), 0o600)
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)

@@ -38,7 +38,7 @@ func prepareBundleDirectoryPermissions(path string, spec []byte) error {
 	if err := os.Chown(path, -1, int(gid)); err != nil {
 		return err
 	}
-	return os.Chmod(path, 0710)
+	return os.Chmod(path, 0o710)
 }
 
 // ociSpecUserNS is a subset of specs.Spec used to reduce garbage during

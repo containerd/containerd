@@ -51,11 +51,11 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-		if err := os.Mkdir(root, 0700); err != nil {
+		if err := os.Mkdir(root, 0o700); err != nil {
 			return nil, err
 		}
-	} else if st.Mode()&os.ModePerm != 0700 {
-		if err := os.Chmod(root, 0700); err != nil {
+	} else if st.Mode()&os.ModePerm != 0o700 {
+		if err := os.Chmod(root, 0o700); err != nil {
 			return nil, err
 		}
 	}
@@ -78,7 +78,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		view,
 		snapshots,
 	} {
-		if err := os.Mkdir(path, 0755); err != nil && !os.IsExist(err) {
+		if err := os.Mkdir(path, 0o755); err != nil && !os.IsExist(err) {
 			return nil, err
 		}
 	}

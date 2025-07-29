@@ -68,7 +68,7 @@ func init() {
 			state := ic.Properties[plugins.PropertyStateDir]
 			root := ic.Properties[plugins.PropertyRootDir]
 			for _, d := range []string{root, state} {
-				if err := os.MkdirAll(d, 0711); err != nil {
+				if err := os.MkdirAll(d, 0o711); err != nil {
 					return nil, err
 				}
 			}

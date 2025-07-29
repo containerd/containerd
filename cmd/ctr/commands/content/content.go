@@ -611,7 +611,7 @@ func edit(cliContext *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error)
 		return nil, err
 	}
 	// The editor might recreate new file and override the original one. We should reopen the file
-	edited, err := os.OpenFile(tmp.Name(), os.O_RDONLY, 0600)
+	edited, err := os.OpenFile(tmp.Name(), os.O_RDONLY, 0o600)
 	if err != nil {
 		return nil, err
 	}

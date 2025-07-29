@@ -874,11 +874,12 @@ func (c *gcContext) sendLabelRefs(ns string, bkt *bolt.Bucket, fn func(gc.Node),
 				continue
 			}
 			for k, v := lc.Seek(c.labelHandlers[i].key); k != nil && bytes.HasPrefix(k, c.labelHandlers[i].key); k, v = lc.Next() {
-				if c.labelHandlers[i].fn != nil {
+				switch {
+				case c.labelHandlers[i].fn != nil:
 					c.labelHandlers[i].fn(ns, k, v, fn)
-				} else if c.labelHandlers[i].bref != nil {
+				case c.labelHandlers[i].bref != nil:
 					c.labelHandlers[i].bref(ns, k, v, bref)
-				} else if root != nil {
+				case root != nil:
 					root()
 				}
 			}

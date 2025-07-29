@@ -226,7 +226,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 
 	if !shouldInvokeShimBinary {
 		// Write sandbox ID this task belongs to.
-		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0o600); err != nil {
 			return nil, err
 		}
 

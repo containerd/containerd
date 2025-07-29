@@ -424,7 +424,7 @@ func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlug
 	for i, data := range inputs {
 		filename := fmt.Sprintf("data%d.toml", i+1)
 		filepath := filepath.Join(tempDir, filename)
-		err := os.WriteFile(filepath, []byte(data), 0600)
+		err := os.WriteFile(filepath, []byte(data), 0o600)
 		assert.NoError(t, err)
 
 		var tempOut Config

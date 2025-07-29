@@ -43,7 +43,7 @@ version = 3
 `,
 		cgroupWritable)
 
-	err := os.WriteFile(configPath, []byte(config), 0600)
+	err := os.WriteFile(configPath, []byte(config), 0o600)
 	require.NoError(t, err)
 
 	currentProc := newCtrdProc(t, "containerd", configDir, nil)

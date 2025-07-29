@@ -74,7 +74,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	rootfs := ""
 	if len(pmounts) > 0 {
 		rootfs = filepath.Join(r.Bundle, "rootfs")
-		if err := os.Mkdir(rootfs, 0711); err != nil && !os.IsExist(err) {
+		if err := os.Mkdir(rootfs, 0o711); err != nil && !os.IsExist(err) {
 			return nil, err
 		}
 	}
@@ -183,7 +183,7 @@ func WriteOptions(path string, opts *options.Options) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(path, optionsFilename), data, 0600)
+	return os.WriteFile(filepath.Join(path, optionsFilename), data, 0o600)
 }
 
 // ReadRuntime reads the runtime information from the path
@@ -197,7 +197,7 @@ func ReadRuntime(path string) (string, error) {
 
 // WriteRuntime writes the runtime information into the path
 func WriteRuntime(path, runtime string) error {
-	return os.WriteFile(filepath.Join(path, "runtime"), []byte(runtime), 0600)
+	return os.WriteFile(filepath.Join(path, "runtime"), []byte(runtime), 0o600)
 }
 
 func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,

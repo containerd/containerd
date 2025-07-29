@@ -47,12 +47,12 @@ func createDirectory(name string, uid, gid int) initializerFunc {
 				if err := os.Remove(dname); err != nil {
 					return err
 				}
-				if err := os.Mkdir(dname, 0755); err != nil {
+				if err := os.Mkdir(dname, 0o755); err != nil {
 					return err
 				}
 			}
 		default:
-			if err := os.Mkdir(dname, 0755); err != nil {
+			if err := os.Mkdir(dname, 0o755); err != nil {
 				return err
 			}
 		}
@@ -76,7 +76,7 @@ func touchFile(name string, uid, gid int) initializerFunc {
 			return os.Chown(fname, uid, gid)
 		}
 
-		f, err := os.OpenFile(fname, os.O_CREATE, 0644)
+		f, err := os.OpenFile(fname, os.O_CREATE, 0o644)
 		if err != nil {
 			return err
 		}

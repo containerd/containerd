@@ -48,14 +48,14 @@ const tarCmd = "tar"
 // baseApplier creates a basic filesystem layout
 // with multiple types of files for basic tests.
 var baseApplier = fstest.Apply(
-	fstest.CreateDir("/etc/", 0755),
-	fstest.CreateFile("/etc/hosts", []byte("127.0.0.1 localhost"), 0644),
+	fstest.CreateDir("/etc/", 0o755),
+	fstest.CreateFile("/etc/hosts", []byte("127.0.0.1 localhost"), 0o644),
 	fstest.Link("/etc/hosts", "/etc/hosts.allow"),
-	fstest.CreateDir("/usr/local/lib", 0755),
-	fstest.CreateFile("/usr/local/lib/libnothing.so", []byte{0x00, 0x00}, 0755),
+	fstest.CreateDir("/usr/local/lib", 0o755),
+	fstest.CreateFile("/usr/local/lib/libnothing.so", []byte{0x00, 0x00}, 0o755),
 	fstest.Symlink("libnothing.so", "/usr/local/lib/libnothing.so.2"),
-	fstest.CreateDir("/home", 0755),
-	fstest.CreateDir("/home/derek", 0700),
+	fstest.CreateDir("/home", 0o755),
+	fstest.CreateDir("/home/derek", 0o700),
 )
 
 func TestUnpack(t *testing.T) {
@@ -115,8 +115,8 @@ func TestSymlinks(t *testing.T) {
 	links := [][2]fstest.Applier{
 		{
 			fstest.Apply(
-				fstest.CreateDir("/bin/", 0755),
-				fstest.CreateFile("/bin/superbinary", []byte{0x00, 0x00}, 0755),
+				fstest.CreateDir("/bin/", 0o755),
+				fstest.CreateFile("/bin/superbinary", []byte{0x00, 0x00}, 0o755),
 				fstest.Symlink("../bin/superbinary", "/bin/other1"),
 			),
 			fstest.Apply(
@@ -128,9 +128,9 @@ func TestSymlinks(t *testing.T) {
 		},
 		{
 			fstest.Apply(
-				fstest.CreateDir("/bin/", 0755),
-				fstest.CreateDir("/sbin/", 0755),
-				fstest.CreateFile("/sbin/superbinary", []byte{0x00, 0x00}, 0755),
+				fstest.CreateDir("/bin/", 0o755),
+				fstest.CreateDir("/sbin/", 0o755),
+				fstest.CreateFile("/sbin/superbinary", []byte{0x00, 0x00}, 0o755),
 				fstest.Symlink("/sbin/superbinary", "/bin/superbinary"),
 				fstest.Symlink("../bin/superbinary", "/bin/other1"),
 			),
@@ -142,9 +142,9 @@ func TestSymlinks(t *testing.T) {
 		},
 		{
 			fstest.Apply(
-				fstest.CreateDir("/bin/", 0755),
-				fstest.CreateDir("/sbin/", 0755),
-				fstest.CreateFile("/sbin/superbinary", []byte{0x00, 0x00}, 0755),
+				fstest.CreateDir("/bin/", 0o755),
+				fstest.CreateDir("/sbin/", 0o755),
+				fstest.CreateFile("/sbin/superbinary", []byte{0x00, 0x00}, 0o755),
 				fstest.Symlink("../sbin/superbinary", "/bin/superbinary"),
 				fstest.Symlink("../bin/superbinary", "/bin/other1"),
 			),
@@ -155,8 +155,8 @@ func TestSymlinks(t *testing.T) {
 		},
 		{
 			fstest.Apply(
-				fstest.CreateDir("/bin/", 0755),
-				fstest.CreateFile("/bin/actualbinary", []byte{0x00, 0x00}, 0755),
+				fstest.CreateDir("/bin/", 0o755),
+				fstest.CreateFile("/bin/actualbinary", []byte{0x00, 0x00}, 0o755),
 				fstest.Symlink("actualbinary", "/bin/superbinary"),
 				fstest.Symlink("../bin/superbinary", "/bin/other1"),
 				fstest.Symlink("superbinary", "/bin/other2"),
@@ -170,13 +170,13 @@ func TestSymlinks(t *testing.T) {
 		},
 		{
 			fstest.Apply(
-				fstest.CreateDir("/bin/", 0755),
-				fstest.CreateFile("/bin/actualbinary", []byte{0x00, 0x00}, 0755),
+				fstest.CreateDir("/bin/", 0o755),
+				fstest.CreateFile("/bin/actualbinary", []byte{0x00, 0x00}, 0o755),
 				fstest.Symlink("actualbinary", "/bin/myapp"),
 			),
 			fstest.Apply(
 				fstest.Remove("/bin/myapp"),
-				fstest.CreateDir("/bin/myapp", 0755),
+				fstest.CreateDir("/bin/myapp", 0o755),
 			),
 		},
 	}
@@ -226,7 +226,7 @@ func TestTarWithXattr(t *testing.T) {
 		tc := tartest.TarContext{}.WithUIDGID(os.Getuid(), os.Getgid()).WithModTime(time.Now().UTC()).WithXattrs(map[string]string{
 			at.key: at.value,
 		})
-		w := tartest.TarAll(tc.File("/file", []byte{}, 0755))
+		w := tartest.TarAll(tc.File("/file", []byte{}, 0o755))
 		validator := fileXattrExist("file", at.key, at.value)
 		t.Run(at.name, makeWriterToTarTest(w, nil, validator, at.err))
 	}
@@ -374,51 +374,51 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "SymlinkAbsolute",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0755),
+				tc.Dir("etc", 0o755),
 				tc.Symlink("/etc", "localetc"),
-				tc.File("/localetc/unbroken", []byte(expected), 0644),
+				tc.File("/localetc/unbroken", []byte(expected), 0o644),
 			),
 			validator: unbrokenCheck,
 		},
 		{
 			name: "SymlinkUpAndOut",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0755),
-				tc.Dir("dummy", 0755),
+				tc.Dir("etc", 0o755),
+				tc.Dir("dummy", 0o755),
 				tc.Symlink("/dummy/../etc", "localetc"),
-				tc.File("/localetc/unbroken", []byte(expected), 0644),
+				tc.File("/localetc/unbroken", []byte(expected), 0o644),
 			),
 			validator: unbrokenCheck,
 		},
 		{
 			name: "SymlinkMultipleAbsolute",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0755),
-				tc.Dir("dummy", 0755),
+				tc.Dir("etc", 0o755),
+				tc.Dir("dummy", 0o755),
 				tc.Symlink("/etc", "/dummy/etc"),
 				tc.Symlink("/dummy/etc", "localetc"),
-				tc.File("/dummy/etc/unbroken", []byte(expected), 0644),
+				tc.File("/dummy/etc/unbroken", []byte(expected), 0o644),
 			),
 			validator: unbrokenCheck,
 		},
 		{
 			name: "SymlinkMultipleRelative",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0755),
-				tc.Dir("dummy", 0755),
+				tc.Dir("etc", 0o755),
+				tc.Dir("dummy", 0o755),
 				tc.Symlink("/etc", "/dummy/etc"),
 				tc.Symlink("./dummy/etc", "localetc"),
-				tc.File("/dummy/etc/unbroken", []byte(expected), 0644),
+				tc.File("/dummy/etc/unbroken", []byte(expected), 0o644),
 			),
 			validator: unbrokenCheck,
 		},
 		{
 			name: "SymlinkEmptyFile",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0755),
-				tc.File("etc/emptied", []byte("notempty"), 0644),
+				tc.Dir("etc", 0o755),
+				tc.File("etc/emptied", []byte("notempty"), 0o644),
 				tc.Symlink("/etc", "localetc"),
-				tc.File("/localetc/emptied", []byte{}, 0644),
+				tc.File("/localetc/emptied", []byte{}, 0o644),
 			),
 			validator: func(root string) error {
 				b, err := os.ReadFile(filepath.Join(root, "etc", "emptied"))
@@ -434,9 +434,9 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "HardlinkRelative",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
-				tc.Dir("breakouts", 0755),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
+				tc.Dir("breakouts", 0o755),
 				tc.Symlink("../../etc", "breakouts/d1"),
 				tc.Link("/breakouts/d1/passwd", "breakouts/mypasswd"),
 			),
@@ -445,10 +445,10 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "HardlinkDownAndOut",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
-				tc.Dir("breakouts", 0755),
-				tc.Dir("downandout", 0755),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
+				tc.Dir("breakouts", 0o755),
+				tc.Dir("downandout", 0o755),
 				tc.Symlink("../downandout/../../etc", "breakouts/d1"),
 				tc.Link("/breakouts/d1/passwd", "breakouts/mypasswd"),
 			),
@@ -457,8 +457,8 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "HardlinkAbsolute",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
 				tc.Symlink("/etc", "localetc"),
 				tc.Link("/localetc/passwd", "localpasswd"),
 			),
@@ -467,8 +467,8 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "HardlinkRelativeLong",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
 				tc.Symlink("../../../../../../../etc", "localetc"),
 				tc.Link("/localetc/passwd", "localpasswd"),
 			),
@@ -477,8 +477,8 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "HardlinkRelativeUpAndOut",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
 				tc.Symlink("upandout/../../../etc", "localetc"),
 				tc.Link("/localetc/passwd", "localpasswd"),
 			),
@@ -487,8 +487,8 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "HardlinkDirectRelative",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
 				tc.Link("../../../../../etc/passwd", "localpasswd"),
 			),
 			validator: sameFile("localpasswd", "/etc/passwd"),
@@ -496,8 +496,8 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "HardlinkDirectAbsolute",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
 				tc.Link("/etc/passwd", "localpasswd"),
 			),
 			validator: sameFile("localpasswd", "/etc/passwd"),
@@ -506,8 +506,8 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "SymlinkParentDirectory",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
 				tc.Symlink("/etc/", ".."),
 				tc.Link("/etc/passwd", "localpasswd"),
 			),
@@ -516,8 +516,8 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "SymlinkEmptyFilename",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
 				tc.Symlink("/etc/", ""),
 				tc.Link("/etc/passwd", "localpasswd"),
 			),
@@ -526,8 +526,8 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "SymlinkParentRelative",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
 				tc.Symlink("/etc/", "localetc/sub/.."),
 				tc.Link("/etc/passwd", "/localetc/localpasswd"),
 			),
@@ -536,9 +536,9 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "SymlinkSlashEnded",
 			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
-				tc.Dir("localetc/", 0770),
+				tc.Dir("etc", 0o770),
+				tc.File("/etc/passwd", []byte("inside"), 0o644),
+				tc.Dir("localetc/", 0o770),
 				tc.Link("/etc/passwd", "/localetc/localpasswd"),
 			),
 			validator: sameFile("/localetc/localpasswd", "/etc/passwd"),
@@ -546,9 +546,9 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "SymlinkOverrideDirectory",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
-				fstest.CreateDir("/localetc/", 0755),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("inside"), 0o644),
+				fstest.CreateDir("/localetc/", 0o755),
 			),
 			w: tartest.TarAll(
 				tc.Symlink("/etc", "localetc"),
@@ -559,9 +559,9 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "SymlinkOverrideDirectoryRelative",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
-				fstest.CreateDir("/localetc/", 0755),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("inside"), 0o644),
+				fstest.CreateDir("/localetc/", 0o755),
 			),
 			w: tartest.TarAll(
 				tc.Symlink("../../etc", "localetc"),
@@ -572,12 +572,12 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "DirectoryOverrideSymlink",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("inside"), 0o644),
 				fstest.Symlink("/etc", "localetc"),
 			),
 			w: tartest.TarAll(
-				tc.Dir("/localetc/", 0755),
+				tc.Dir("/localetc/", 0o755),
 				tc.Link("/etc/passwd", "/localetc/localpasswd"),
 			),
 			validator: sameFile("/localetc/localpasswd", "/etc/passwd"),
@@ -585,70 +585,70 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "DirectoryOverrideSymlinkAndHardlink",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("inside"), 0o644),
 				fstest.Symlink("etc", "localetc"),
 				fstest.Link("/etc/passwd", "/localetc/localpasswd"),
 			),
 			w: tartest.TarAll(
-				tc.Dir("/localetc/", 0755),
-				tc.File("/localetc/localpasswd", []byte("different"), 0644),
+				tc.Dir("/localetc/", 0o755),
+				tc.File("/localetc/localpasswd", []byte("different"), 0o644),
 			),
 			validator: notSameFile("/localetc/localpasswd", "/etc/passwd"),
 		},
 		{
 			name: "WhiteoutRootParent",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("inside"), 0o644),
 			),
 			w: tartest.TarAll(
-				tc.File(".wh...", []byte{}, 0644), // Should wipe out whole directory
+				tc.File(".wh...", []byte{}, 0o644), // Should wipe out whole directory
 			),
 			err: errInvalidArchive,
 		},
 		{
 			name: "WhiteoutParent",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("inside"), 0o644),
 			),
 			w: tartest.TarAll(
-				tc.File("etc/.wh...", []byte{}, 0644),
+				tc.File("etc/.wh...", []byte{}, 0o644),
 			),
 			err: errInvalidArchive,
 		},
 		{
 			name: "WhiteoutRoot",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("inside"), 0o644),
 			),
 			w: tartest.TarAll(
-				tc.File(".wh..", []byte{}, 0644),
+				tc.File(".wh..", []byte{}, 0o644),
 			),
 			err: errInvalidArchive,
 		},
 		{
 			name: "WhiteoutCurrentDirectory",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("inside"), 0o644),
 			),
 			w: tartest.TarAll(
-				tc.File("etc/.wh..", []byte{}, 0644), // Should wipe out whole directory
+				tc.File("etc/.wh..", []byte{}, 0o644), // Should wipe out whole directory
 			),
 			err: errInvalidArchive,
 		},
 		{
 			name: "WhiteoutSymlink",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("all users"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("all users"), 0o644),
 				fstest.Symlink("/etc", "localetc"),
 			),
 			w: tartest.TarAll(
-				tc.File(".wh.localetc", []byte{}, 0644), // Should wipe out whole directory
+				tc.File(".wh.localetc", []byte{}, 0o644), // Should wipe out whole directory
 			),
 			validator: all(
 				fileValue("etc/passwd", []byte("all users")),
@@ -660,13 +660,13 @@ func TestBreakouts(t *testing.T) {
 			// symlinks as parents in the name
 			name: "WhiteoutSymlinkPath",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("all users"), 0644),
-				fstest.CreateFile("/etc/whitedout", []byte("ahhhh whiteout"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("all users"), 0o644),
+				fstest.CreateFile("/etc/whitedout", []byte("ahhhh whiteout"), 0o644),
 				fstest.Symlink("/etc", "localetc"),
 			),
 			w: tartest.TarAll(
-				tc.File("localetc/.wh.whitedout", []byte{}, 0644),
+				tc.File("localetc/.wh.whitedout", []byte{}, 0o644),
 			),
 			validator: all(
 				fileValue("etc/passwd", []byte("all users")),
@@ -676,13 +676,13 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "WhiteoutDirectoryName",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("all users"), 0644),
-				fstest.CreateFile("/etc/whitedout", []byte("ahhhh whiteout"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("all users"), 0o644),
+				fstest.CreateFile("/etc/whitedout", []byte("ahhhh whiteout"), 0o644),
 				fstest.Symlink("/etc", "localetc"),
 			),
 			w: tartest.TarAll(
-				tc.File(".wh.etc/somefile", []byte("non-empty"), 0644),
+				tc.File(".wh.etc/somefile", []byte("non-empty"), 0o644),
 			),
 			validator: all(
 				fileValue("etc/passwd", []byte("all users")),
@@ -692,12 +692,12 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "WhiteoutDeadSymlinkParent",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("all users"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("all users"), 0o644),
 				fstest.Symlink("/dne", "localetc"),
 			),
 			w: tartest.TarAll(
-				tc.File("localetc/.wh.etc", []byte{}, 0644),
+				tc.File("localetc/.wh.etc", []byte{}, 0o644),
 			),
 			// no-op, remove does not
 			validator: fileValue("etc/passwd", []byte("all users")),
@@ -705,12 +705,12 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "WhiteoutRelativePath",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("all users"), 0644),
+				fstest.CreateDir("/etc/", 0o755),
+				fstest.CreateFile("/etc/passwd", []byte("all users"), 0o644),
 				fstest.Symlink("/dne", "localetc"),
 			),
 			w: tartest.TarAll(
-				tc.File("dne/../.wh.etc", []byte{}, 0644),
+				tc.File("dne/../.wh.etc", []byte{}, 0o644),
 			),
 			// resolution ends up just removing etc
 			validator: fileNotExists("etc/passwd"),
@@ -718,14 +718,14 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "SymlinkOverridePath",
 			w: tartest.TarAll(
-				tc.Dir("foo", 0755),
-				tc.Dir("foo/tmp", 0755),
-				tc.File("foo/tmp/breakout-"+tname, []byte{0, 1, 2}, 0644),
+				tc.Dir("foo", 0o755),
+				tc.Dir("foo/tmp", 0o755),
+				tc.File("foo/tmp/breakout-"+tname, []byte{0, 1, 2}, 0o644),
 				tc.Symlink("/", "foo"),
-				tc.File("foo/tmp/breakout-"+tname, []byte{3, 4, 5}, 0644),
-				tc.Dir("foo", 0755),
-				tc.Dir("foo/tmp", 0755),
-				tc.File("foo/tmp/breakout-"+tname, []byte{6, 7, 8}, 0644),
+				tc.File("foo/tmp/breakout-"+tname, []byte{3, 4, 5}, 0o644),
+				tc.Dir("foo", 0o755),
+				tc.Dir("foo/tmp", 0o755),
+				tc.File("foo/tmp/breakout-"+tname, []byte{6, 7, 8}, 0o644),
 			),
 			validator: all(
 				func(string) error {
@@ -750,18 +750,18 @@ func TestBreakouts(t *testing.T) {
 			{
 				name: "HardlinkSymlinkBeforeCreateTarget",
 				w: tartest.TarAll(
-					tc.Dir("etc", 0770),
+					tc.Dir("etc", 0o770),
 					tc.Symlink("/etc/passwd", "localpasswd"),
 					tc.Link("localpasswd", "localpasswd-dup"),
-					tc.File("/etc/passwd", []byte("after"), 0644),
+					tc.File("/etc/passwd", []byte("after"), 0o644),
 				),
 				validator: sameFile("localpasswd-dup", "/etc/passwd"),
 			},
 			{
 				name: "HardlinkSymlinkRelative",
 				w: tartest.TarAll(
-					tc.Dir("etc", 0770),
-					tc.File("/etc/passwd", []byte("inside"), 0644),
+					tc.Dir("etc", 0o770),
+					tc.File("/etc/passwd", []byte("inside"), 0o644),
 					tc.Symlink("../../../../../etc/passwd", "passwdlink"),
 					tc.Link("/passwdlink", "localpasswd"),
 				),
@@ -773,8 +773,8 @@ func TestBreakouts(t *testing.T) {
 			{
 				name: "HardlinkSymlinkAbsolute",
 				w: tartest.TarAll(
-					tc.Dir("etc", 0770),
-					tc.File("/etc/passwd", []byte("inside"), 0644),
+					tc.Dir("etc", 0o770),
+					tc.File("/etc/passwd", []byte("inside"), 0o644),
 					tc.Symlink("/etc/passwd", "passwdlink"),
 					tc.Link("/passwdlink", "localpasswd"),
 				),
@@ -787,11 +787,11 @@ func TestBreakouts(t *testing.T) {
 				name: "HardlinkSymlinkChmod",
 				w: func() tartest.WriterToTar {
 					p := filepath.Join(td, "perm400")
-					if err := os.WriteFile(p, []byte("..."), 0400); err != nil {
+					if err := os.WriteFile(p, []byte("..."), 0o400); err != nil {
 						t.Fatal(err)
 					}
 					ep := filepath.Join(td, "also-exists-outside-root")
-					if err := os.WriteFile(ep, []byte("..."), 0640); err != nil {
+					if err := os.WriteFile(ep, []byte("..."), 0o640); err != nil {
 						t.Fatal(err)
 					}
 
@@ -851,14 +851,14 @@ func TestApplyTar(t *testing.T) {
 		{
 			name: "DirectoryCreation",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
+				fstest.CreateDir("/etc/", 0o755),
 			),
 			w: tartest.TarAll(
-				tc.Dir("/etc/subdir", 0755),
-				tc.Dir("/etc/subdir2/", 0755),
-				tc.Dir("/etc/subdir2/more", 0755),
-				tc.Dir("/other/noparent-1/1", 0755),
-				tc.Dir("/other/noparent-2/2/", 0755),
+				tc.Dir("/etc/subdir", 0o755),
+				tc.Dir("/etc/subdir2/", 0o755),
+				tc.Dir("/etc/subdir2/more", 0o755),
+				tc.Dir("/other/noparent-1/1", 0o755),
+				tc.Dir("/other/noparent-2/2/", 0o755),
 			),
 			validator: directoriesExist(
 				"etc/subdir",
@@ -1005,56 +1005,56 @@ func TestDiffTar(t *testing.T) {
 			name:       "EmptyDiff",
 			validators: []tarEntryValidator{},
 			a: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
+				fstest.CreateDir("/etc/", 0o755),
 			),
 			b: fstest.Apply(),
 		},
 		{
 			name: "ParentInclusion",
 			validators: []tarEntryValidator{
-				dirEntry("d1/", 0755),
-				dirEntry("d1/d/", 0700),
-				dirEntry("d2/", 0770),
-				fileEntry("d2/f", []byte("ok"), 0644),
+				dirEntry("d1/", 0o755),
+				dirEntry("d1/d/", 0o700),
+				dirEntry("d2/", 0o770),
+				fileEntry("d2/f", []byte("ok"), 0o644),
 			},
 			a: fstest.Apply(
-				fstest.CreateDir("/d1/", 0755),
-				fstest.CreateDir("/d2/", 0770),
+				fstest.CreateDir("/d1/", 0o755),
+				fstest.CreateDir("/d2/", 0o770),
 			),
 			b: fstest.Apply(
-				fstest.CreateDir("/d1/d", 0700),
-				fstest.CreateFile("/d2/f", []byte("ok"), 0644),
+				fstest.CreateDir("/d1/d", 0o700),
+				fstest.CreateFile("/d2/f", []byte("ok"), 0o644),
 			),
 		},
 		{
 			name: "HardlinkParentInclusion",
 			validators: []tarEntryValidator{
-				dirEntry("d2/", 0755),
-				fileEntry("d2/l1", []byte("link me"), 0644),
+				dirEntry("d2/", 0o755),
+				fileEntry("d2/l1", []byte("link me"), 0o644),
 				// d1/f1 and its parent is included after the new link,
 				// before the new link was included, these files would
 				// not have been needed
-				dirEntry("d1/", 0755),
+				dirEntry("d1/", 0o755),
 				linkEntry("d1/f1", "d2/l1"),
-				dirEntry("d3/", 0755),
-				fileEntry("d3/l1", []byte("link me"), 0644),
-				dirEntry("d4/", 0755),
+				dirEntry("d3/", 0o755),
+				fileEntry("d3/l1", []byte("link me"), 0o644),
+				dirEntry("d4/", 0o755),
 				linkEntry("d4/f1", "d3/l1"),
-				dirEntry("d6/", 0755),
+				dirEntry("d6/", 0o755),
 				whiteoutEntry("d6/l1"),
 				whiteoutEntry("d6/l2"),
 			},
 			a: fstest.Apply(
-				fstest.CreateDir("/d1/", 0755),
-				fstest.CreateFile("/d1/f1", []byte("link me"), 0644),
-				fstest.CreateDir("/d2/", 0755),
-				fstest.CreateFile("/d2/f1", []byte("link me"), 0644),
-				fstest.CreateDir("/d3/", 0755),
-				fstest.CreateDir("/d4/", 0755),
-				fstest.CreateFile("/d4/f1", []byte("link me"), 0644),
-				fstest.CreateDir("/d5/", 0755),
-				fstest.CreateFile("/d5/f1", []byte("link me"), 0644),
-				fstest.CreateDir("/d6/", 0755),
+				fstest.CreateDir("/d1/", 0o755),
+				fstest.CreateFile("/d1/f1", []byte("link me"), 0o644),
+				fstest.CreateDir("/d2/", 0o755),
+				fstest.CreateFile("/d2/f1", []byte("link me"), 0o644),
+				fstest.CreateDir("/d3/", 0o755),
+				fstest.CreateDir("/d4/", 0o755),
+				fstest.CreateFile("/d4/f1", []byte("link me"), 0o644),
+				fstest.CreateDir("/d5/", 0o755),
+				fstest.CreateFile("/d5/f1", []byte("link me"), 0o644),
+				fstest.CreateDir("/d6/", 0o755),
 				fstest.Link("/d1/f1", "/d6/l1"),
 				fstest.Link("/d5/f1", "/d6/l2"),
 			),
@@ -1068,89 +1068,89 @@ func TestDiffTar(t *testing.T) {
 		{
 			name: "UpdateDirectoryPermission",
 			validators: []tarEntryValidator{
-				dirEntry("d1/", 0777),
-				dirEntry("d1/d/", 0700),
-				dirEntry("d2/", 0770),
-				fileEntry("d2/f", []byte("ok"), 0644),
+				dirEntry("d1/", 0o777),
+				dirEntry("d1/d/", 0o700),
+				dirEntry("d2/", 0o770),
+				fileEntry("d2/f", []byte("ok"), 0o644),
 			},
 			a: fstest.Apply(
-				fstest.CreateDir("/d1/", 0755),
-				fstest.CreateDir("/d2/", 0770),
+				fstest.CreateDir("/d1/", 0o755),
+				fstest.CreateDir("/d2/", 0o770),
 			),
 			b: fstest.Apply(
-				fstest.Chmod("/d1", 0777),
-				fstest.CreateDir("/d1/d", 0700),
-				fstest.CreateFile("/d2/f", []byte("ok"), 0644),
+				fstest.Chmod("/d1", 0o777),
+				fstest.CreateDir("/d1/d", 0o700),
+				fstest.CreateFile("/d2/f", []byte("ok"), 0o644),
 			),
 		},
 		{
 			name: "HardlinkUpdatedParent",
 			validators: []tarEntryValidator{
-				dirEntry("d1/", 0777),
-				dirEntry("d2/", 0755),
-				fileEntry("d2/l1", []byte("link me"), 0644),
+				dirEntry("d1/", 0o777),
+				dirEntry("d2/", 0o755),
+				fileEntry("d2/l1", []byte("link me"), 0o644),
 				// d1/f1 is included after the new link, its
 				// parent has already changed and therefore
 				// only the linked file is included
 				linkEntry("d1/f1", "d2/l1"),
-				dirEntry("d4/", 0777),
-				fileEntry("d4/l1", []byte("link me"), 0644),
-				dirEntry("d3/", 0755),
+				dirEntry("d4/", 0o777),
+				fileEntry("d4/l1", []byte("link me"), 0o644),
+				dirEntry("d3/", 0o755),
 				linkEntry("d3/f1", "d4/l1"),
 			},
 			a: fstest.Apply(
-				fstest.CreateDir("/d1/", 0755),
-				fstest.CreateFile("/d1/f1", []byte("link me"), 0644),
-				fstest.CreateDir("/d2/", 0755),
-				fstest.CreateFile("/d2/f1", []byte("link me"), 0644),
-				fstest.CreateDir("/d3/", 0755),
-				fstest.CreateFile("/d3/f1", []byte("link me"), 0644),
-				fstest.CreateDir("/d4/", 0755),
+				fstest.CreateDir("/d1/", 0o755),
+				fstest.CreateFile("/d1/f1", []byte("link me"), 0o644),
+				fstest.CreateDir("/d2/", 0o755),
+				fstest.CreateFile("/d2/f1", []byte("link me"), 0o644),
+				fstest.CreateDir("/d3/", 0o755),
+				fstest.CreateFile("/d3/f1", []byte("link me"), 0o644),
+				fstest.CreateDir("/d4/", 0o755),
 			),
 			b: fstest.Apply(
-				fstest.Chmod("/d1", 0777),
+				fstest.Chmod("/d1", 0o777),
 				fstest.Link("/d1/f1", "/d2/l1"),
-				fstest.Chmod("/d4", 0777),
+				fstest.Chmod("/d4", 0o777),
 				fstest.Link("/d3/f1", "/d4/l1"),
 			),
 		},
 		{
 			name: "WhiteoutIncludesParents",
 			validators: []tarEntryValidator{
-				dirEntry("d1/", 0755),
+				dirEntry("d1/", 0o755),
 				whiteoutEntry("d1/f1"),
-				dirEntry("d2/", 0755),
+				dirEntry("d2/", 0o755),
 				whiteoutEntry("d2/f1"),
-				fileEntry("d2/f2", []byte("content"), 0777),
-				dirEntry("d3/", 0755),
+				fileEntry("d2/f2", []byte("content"), 0o777),
+				dirEntry("d3/", 0o755),
 				whiteoutEntry("d3/f1"),
-				fileEntry("d3/f2", []byte("content"), 0644),
-				dirEntry("d4/", 0755),
-				fileEntry("d4/f0", []byte("content"), 0644),
+				fileEntry("d3/f2", []byte("content"), 0o644),
+				dirEntry("d4/", 0o755),
+				fileEntry("d4/f0", []byte("content"), 0o644),
 				whiteoutEntry("d4/f1"),
 				whiteoutEntry("d5"),
 			},
 			a: fstest.Apply(
-				fstest.CreateDir("/d1/", 0755),
-				fstest.CreateFile("/d1/f1", []byte("content"), 0644),
-				fstest.CreateDir("/d2/", 0755),
-				fstest.CreateFile("/d2/f1", []byte("content"), 0644),
-				fstest.CreateFile("/d2/f2", []byte("content"), 0644),
-				fstest.CreateDir("/d3/", 0755),
-				fstest.CreateFile("/d3/f1", []byte("content"), 0644),
-				fstest.CreateDir("/d4/", 0755),
-				fstest.CreateFile("/d4/f1", []byte("content"), 0644),
-				fstest.CreateDir("/d5/", 0755),
-				fstest.CreateFile("/d5/f1", []byte("content"), 0644),
+				fstest.CreateDir("/d1/", 0o755),
+				fstest.CreateFile("/d1/f1", []byte("content"), 0o644),
+				fstest.CreateDir("/d2/", 0o755),
+				fstest.CreateFile("/d2/f1", []byte("content"), 0o644),
+				fstest.CreateFile("/d2/f2", []byte("content"), 0o644),
+				fstest.CreateDir("/d3/", 0o755),
+				fstest.CreateFile("/d3/f1", []byte("content"), 0o644),
+				fstest.CreateDir("/d4/", 0o755),
+				fstest.CreateFile("/d4/f1", []byte("content"), 0o644),
+				fstest.CreateDir("/d5/", 0o755),
+				fstest.CreateFile("/d5/f1", []byte("content"), 0o644),
 			),
 			b: fstest.Apply(
 				fstest.Remove("/d1/f1"),
 				fstest.Remove("/d2/f1"),
-				fstest.Chmod("/d2/f2", 0777),
+				fstest.Chmod("/d2/f2", 0o777),
 				fstest.Remove("/d3/f1"),
-				fstest.CreateFile("/d3/f2", []byte("content"), 0644),
+				fstest.CreateFile("/d3/f2", []byte("content"), 0o644),
 				fstest.Remove("/d4/f1"),
-				fstest.CreateFile("/d4/f0", []byte("content"), 0644),
+				fstest.CreateFile("/d4/f0", []byte("content"), 0o644),
 				fstest.RemoveAll("/d5"),
 			),
 		},
@@ -1159,33 +1159,33 @@ func TestDiffTar(t *testing.T) {
 			validators: []tarEntryValidator{
 				whiteoutEntry("d1"),
 				whiteoutEntry("d2"),
-				dirEntry("d3/", 0755),
+				dirEntry("d3/", 0o755),
 			},
 			a: fstest.Apply(
-				fstest.CreateDir("/d1/", 0755),
-				fstest.CreateDir("/d2/", 0755),
-				fstest.CreateFile("/d2/f1", []byte("content"), 0644),
+				fstest.CreateDir("/d1/", 0o755),
+				fstest.CreateDir("/d2/", 0o755),
+				fstest.CreateFile("/d2/f1", []byte("content"), 0o644),
 			),
 			b: fstest.Apply(
 				fstest.RemoveAll("/d1"),
 				fstest.RemoveAll("/d2"),
-				fstest.CreateDir("/d3/", 0755),
+				fstest.CreateDir("/d3/", 0o755),
 			),
 		},
 		{
 			name: "IgnoreSockets",
 			validators: []tarEntryValidator{
-				fileEntry("f2", []byte("content"), 0644),
+				fileEntry("f2", []byte("content"), 0o644),
 				// There should be _no_ socket here, despite the fstest.CreateSocket below
-				fileEntry("f3", []byte("content"), 0644),
+				fileEntry("f3", []byte("content"), 0o644),
 			},
 			a: fstest.Apply(
-				fstest.CreateFile("/f1", []byte("content"), 0644),
+				fstest.CreateFile("/f1", []byte("content"), 0o644),
 			),
 			b: fstest.Apply(
-				fstest.CreateFile("/f2", []byte("content"), 0644),
-				fstest.CreateSocket("/s0", 0644),
-				fstest.CreateFile("/f3", []byte("content"), 0644),
+				fstest.CreateFile("/f2", []byte("content"), 0o644),
+				fstest.CreateSocket("/s0", 0o644),
+				fstest.CreateFile("/f3", []byte("content"), 0o644),
 			),
 		},
 	}
@@ -1207,20 +1207,20 @@ func TestSourceDateEpoch(t *testing.T) {
 	opts := []WriteDiffOpt{WithSourceDateEpoch(&sourceDateEpoch)}
 	validators := []tarEntryValidator{
 		composeValidators(whiteoutEntry("f1"), requireModTime(time.Unix(0, 0).UTC())), // not sourceDateEpoch
-		composeValidators(fileEntry("f2", []byte("content2"), 0644), requireModTime(past)),
-		composeValidators(fileEntry("f3", []byte("content3"), 0644), requireModTime(sourceDateEpoch)),
+		composeValidators(fileEntry("f2", []byte("content2"), 0o644), requireModTime(past)),
+		composeValidators(fileEntry("f3", []byte("content3"), 0o644), requireModTime(sourceDateEpoch)),
 	}
 	a := fstest.Apply(
-		fstest.CreateFile("/f1", []byte("content"), 0644),
+		fstest.CreateFile("/f1", []byte("content"), 0o644),
 	)
 	b := fstest.Apply(
 		// Remove f1; the timestamp of the tar entry will be sourceDateEpoch
 		fstest.RemoveAll("/f1"),
 		// Create f2 with the past timestamp; the timestamp of the tar entry will be past (< sourceDateEpoch)
-		fstest.CreateFile("/f2", []byte("content2"), 0644),
+		fstest.CreateFile("/f2", []byte("content2"), 0o644),
 		fstest.Chtimes("/f2", past, past),
 		// Create f3 with the veryRecent timestamp; the timestamp of the tar entry will be sourceDateEpoch
-		fstest.CreateFile("/f3", []byte("content3"), 0644),
+		fstest.CreateFile("/f3", []byte("content3"), 0o644),
 		fstest.Chtimes("/f3", veryRecent, veryRecent),
 	)
 	makeDiffTarTest(validators, a, b, opts...)(t)

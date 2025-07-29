@@ -40,7 +40,7 @@ func setupSnapshotter(t *testing.T) ([]Opt, error) {
 	}
 
 	scratch := filepath.Join(t.TempDir(), "scratch")
-	scratchDevFile, err := os.OpenFile(scratch, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
+	scratchDevFile, err := os.OpenFile(scratch, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create %s: %w", scratch, err)
 	}

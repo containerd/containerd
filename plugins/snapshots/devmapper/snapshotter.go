@@ -76,7 +76,7 @@ func NewSnapshotter(ctx context.Context, config *Config) (*Snapshotter, error) {
 
 	var cleanupFn []closeFunc
 
-	if err := os.MkdirAll(config.RootPath, 0750); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(config.RootPath, 0o750); err != nil && !os.IsExist(err) {
 		return nil, fmt.Errorf("failed to create root directory: %s: %w", config.RootPath, err)
 	}
 

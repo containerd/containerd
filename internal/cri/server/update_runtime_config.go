@@ -129,7 +129,7 @@ func writeCNIConfigFile(ctx context.Context, confDir string, confTemplate string
 	if err != nil {
 		return fmt.Errorf("failed to parse cni config template %q: %w", confTemplate, err)
 	}
-	if err := os.MkdirAll(confDir, 0755); err != nil {
+	if err := os.MkdirAll(confDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create cni config directory: %q: %w", confDir, err)
 	}
 	confFile := filepath.Join(confDir, cniConfigFileName)

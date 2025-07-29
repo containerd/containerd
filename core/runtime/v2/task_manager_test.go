@@ -36,7 +36,7 @@ func setupAbsoluteShimPath(t *testing.T) (string, error) {
 	t.Setenv("PATH", tempShimDir+":"+os.Getenv("PATH"))
 	absoluteShimPath := tempShimDir + "/containerd-shim-runc-v2"
 
-	err = os.Chmod(absoluteShimPath, 0777)
+	err = os.Chmod(absoluteShimPath, 0o777)
 	if err != nil {
 		return "", err
 	}

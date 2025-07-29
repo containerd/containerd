@@ -75,7 +75,7 @@ func testLookup(t *testing.T, fsType string) {
 	checkLookup(t, fsType, newMnt, newMnt)
 
 	subDir := filepath.Join(newMnt, "subDir")
-	err = os.MkdirAll(subDir, 0700)
+	err = os.MkdirAll(subDir, 0o700)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestLookupWithOverlay(t *testing.T) {
 	defer testutil.Unmount(t, overlay)
 
 	testdir := filepath.Join(overlay, "testdir")
-	err := os.Mkdir(testdir, 0777)
+	err := os.Mkdir(testdir, 0o777)
 	assert.NoError(t, err)
 
 	testfile := filepath.Join(overlay, "testfile")

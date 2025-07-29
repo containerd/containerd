@@ -38,7 +38,7 @@ type snapshotter struct {
 // NewSnapshotter returns a Snapshotter which copies layers on the underlying
 // file system. A metadata file is stored under the root.
 func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
 	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
@@ -46,7 +46,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 
-	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0o700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
@@ -222,7 +222,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		if err != nil {
 			return nil, fmt.Errorf("failed to create temp dir: %w", err)
 		}
-		if err := os.Chmod(td, 0755); err != nil {
+		if err := os.Chmod(td, 0o755); err != nil {
 			return nil, fmt.Errorf("failed to chmod %s to 0755: %w", td, err)
 		}
 		defer func() {

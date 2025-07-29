@@ -44,7 +44,6 @@ linters:
         - importShadow
         - initClause
         - nestingReduce
-        - octalLiteral
         - paramTypeCombine
         - rangeValCopy
         - redundantSprint

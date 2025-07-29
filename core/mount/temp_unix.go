@@ -27,7 +27,7 @@ import (
 
 // SetTempMountLocation sets the temporary mount location
 func SetTempMountLocation(root string) error {
-	err := os.MkdirAll(root, 0700)
+	err := os.MkdirAll(root, 0o700)
 	if err != nil {
 		return err
 	}

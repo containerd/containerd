@@ -56,10 +56,10 @@ func (c *criService) seccompEnabled() bool {
 
 // openLogFile opens/creates a container log file.
 func openLogFile(path string) (*os.File, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
-	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
+	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o640)
 }
 
 // unmountRecursive unmounts the target and all mounts underneath, starting with

@@ -84,7 +84,7 @@ func TestErofsFsverity(t *testing.T) {
 	}
 
 	target := filepath.Join(root, key)
-	if err := os.MkdirAll(target, 0755); err != nil {
+	if err := os.MkdirAll(target, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := mount.All(mounts, target); err != nil {
@@ -93,7 +93,7 @@ func TestErofsFsverity(t *testing.T) {
 	defer testutil.Unmount(t, target)
 
 	// Write test data
-	if err := os.WriteFile(filepath.Join(target, "foo"), []byte("test data"), 0777); err != nil {
+	if err := os.WriteFile(filepath.Join(target, "foo"), []byte("test data"), 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,7 +127,7 @@ func TestErofsFsverity(t *testing.T) {
 	}
 
 	// Try to modify the layer file directly (should fail)
-	if err := os.WriteFile(layerPath, []byte("tampered data"), 0666); err == nil {
+	if err := os.WriteFile(layerPath, []byte("tampered data"), 0o666); err == nil {
 		t.Fatal("Expected direct write to fsverity-enabled layer to fail")
 	}
 }
