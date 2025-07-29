@@ -30,9 +30,10 @@ func ParseImageReferences(refs []string) ([]string, []string) {
 		if err != nil {
 			continue
 		}
-		if _, ok := parsed.(reference.Canonical); ok {
+		switch parsed.(type) {
+		case reference.Canonical:
 			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(reference.Tagged); ok {
+		case reference.Tagged:
 			tags = append(tags, parsed.String())
 		}
 	}

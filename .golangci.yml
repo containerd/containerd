@@ -55,7 +55,6 @@ linters:
         - sprintfQuotedString
         - stringConcatSimplify
         - tooManyResultsChecker
-        - typeAssertChain
         - typeDefFirst
         - typeUnparen
         - unlambda
