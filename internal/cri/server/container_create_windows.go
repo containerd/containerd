@@ -27,7 +27,7 @@ import (
 )
 
 // No extra spec options needed for windows.
-func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+func (c *criService) containerSpecOpts(*runtime.ContainerConfig, *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
 	return nil, nil
 }
 

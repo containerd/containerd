@@ -61,7 +61,7 @@ func HandleConsoleResize(ctx context.Context, task resizer, con console.Console)
 }
 
 // NewTask creates a new task
-func NewTask(ctx context.Context, client *containerd.Client, container containerd.Container, _ string, con console.Console, nullIO bool, logURI string, ioOpts []cio.Opt, opts ...containerd.NewTaskOpts) (containerd.Task, error) {
+func NewTask(ctx context.Context, _ *containerd.Client, container containerd.Container, _ string, con console.Console, nullIO bool, logURI string, ioOpts []cio.Opt, _ ...containerd.NewTaskOpts) (containerd.Task, error) {
 	var ioCreator cio.Creator
 	if con != nil {
 		if nullIO {
@@ -83,6 +83,6 @@ func NewTask(ctx context.Context, client *containerd.Client, container container
 }
 
 // GetNewTaskOpts resolves containerd.NewTaskOpts from cli.Context
-func GetNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
+func GetNewTaskOpts(*cli.Context) []containerd.NewTaskOpts {
 	return nil
 }

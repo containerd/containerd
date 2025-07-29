@@ -20,4 +20,4 @@ package v2
 
 // prepareBundleDirectoryPermissions prepares the permissions of the bundle
 // directory according to the needs of the current platform.
-func prepareBundleDirectoryPermissions(path string, spec []byte) error { return nil }
+func prepareBundleDirectoryPermissions(string, []byte) error { return nil }

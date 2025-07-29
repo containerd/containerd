@@ -20,7 +20,7 @@ package pprof
 
 import "net"
 
-func (d *pprofDialer) pprofDial(proto, addr string) (conn net.Conn, err error) {
+func (d *pprofDialer) pprofDial(string, string) (conn net.Conn, err error) {
 	return net.Dial(d.proto, d.addr)
 }
 

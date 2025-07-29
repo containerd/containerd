@@ -225,7 +225,7 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 			return nil
 		}
 
-		if err := bucket.ForEach(func(k, v []byte) error {
+		if err := bucket.ForEach(func(k, _ []byte) error {
 			info, err := s.read(bucket, k)
 			if err != nil {
 				return fmt.Errorf("failed to read bucket %q: %w", string(k), err)

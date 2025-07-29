@@ -148,7 +148,7 @@ func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *r
 	if err != nil {
 		return fmt.Errorf("failed to marshal spec %+v: %w", spec, err)
 	}
-	if err := cntr.Update(ctx, func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+	if err := cntr.Update(ctx, func(_ context.Context, _ *containerd.Client, c *containers.Container) error {
 		c.Spec = s
 		return nil
 	}); err != nil {

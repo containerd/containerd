@@ -24,16 +24,16 @@ import runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 func IsEnabled() bool { return false }
 
 // SetConfig always is no-op in non-linux platforms.
-func SetConfig(configFilePath string) error {
+func SetConfig(string) error {
 	return nil
 }
 
 // ClassNameToLinuxOCI always is no-op in non-linux platforms.
-func ClassNameToLinuxOCI(className string) (*runtimespec.LinuxBlockIO, error) {
+func ClassNameToLinuxOCI(string) (*runtimespec.LinuxBlockIO, error) {
 	return nil, nil
 }
 
 // ContainerClassFromAnnotations always is no-op in non-linux platforms.
-func ContainerClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
+func ContainerClassFromAnnotations(string, map[string]string, map[string]string) (string, error) {
 	return "", nil
 }

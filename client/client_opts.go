@@ -214,7 +214,7 @@ func WithChildLabelMap(fn func(ocispec.Descriptor) []string) RemoteOpt {
 
 // WithResolver specifies the resolver to use.
 func WithResolver(resolver remotes.Resolver) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
+	return func(_ *Client, c *RemoteContext) error {
 		c.Resolver = resolver
 		return nil
 	}
@@ -222,7 +222,7 @@ func WithResolver(resolver remotes.Resolver) RemoteOpt {
 
 // WithImageHandler adds a base handler to be called on dispatch.
 func WithImageHandler(h images.Handler) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
+	return func(_ *Client, c *RemoteContext) error {
 		c.BaseHandlers = append(c.BaseHandlers, h)
 		return nil
 	}
@@ -230,7 +230,7 @@ func WithImageHandler(h images.Handler) RemoteOpt {
 
 // WithImageHandlerWrapper wraps the handlers to be called on dispatch.
 func WithImageHandlerWrapper(w func(images.Handler) images.Handler) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
+	return func(_ *Client, c *RemoteContext) error {
 		c.HandlerWrapper = w
 		return nil
 	}
@@ -238,7 +238,7 @@ func WithImageHandlerWrapper(w func(images.Handler) images.Handler) RemoteOpt {
 
 // WithDownloadLimiter sets the limiter for concurrent download operations.
 func WithDownloadLimiter(limiter *semaphore.Weighted) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
+	return func(_ *Client, c *RemoteContext) error {
 		c.DownloadLimiter = limiter
 		return nil
 	}
@@ -246,7 +246,7 @@ func WithDownloadLimiter(limiter *semaphore.Weighted) RemoteOpt {
 
 // WithMaxConcurrentDownloads sets max concurrent download limit.
 func WithMaxConcurrentDownloads(max int) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
+	return func(_ *Client, c *RemoteContext) error {
 		c.MaxConcurrentDownloads = max
 		return nil
 	}
@@ -254,7 +254,7 @@ func WithMaxConcurrentDownloads(max int) RemoteOpt {
 
 // WithConcurrentLayerFetchBuffer sets the buffer size for concurrent layer fetches.
 func WithConcurrentLayerFetchBuffer(buffer int) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
+	return func(_ *Client, c *RemoteContext) error {
 		c.ConcurrentLayerFetchBuffer = buffer
 		return nil
 	}
@@ -262,7 +262,7 @@ func WithConcurrentLayerFetchBuffer(buffer int) RemoteOpt {
 
 // WithMaxConcurrentUploadedLayers sets max concurrent uploaded layer limit.
 func WithMaxConcurrentUploadedLayers(max int) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
+	return func(_ *Client, c *RemoteContext) error {
 		c.MaxConcurrentUploadedLayers = max
 		return nil
 	}

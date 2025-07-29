@@ -26,6 +26,6 @@ import (
 )
 
 // updateContainerIOOwner updates I/O files' owner to align with initial processe's UID/GID.
-func updateContainerIOOwner(ctx context.Context, cntr containerd.Container, config *runtime.ContainerConfig) ([]containerd.NewTaskOpts, error) {
+func updateContainerIOOwner(context.Context, containerd.Container, *runtime.ContainerConfig) ([]containerd.NewTaskOpts, error) {
 	return nil, nil
 }

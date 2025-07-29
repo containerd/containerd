@@ -27,7 +27,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func getRunPodSandboxTestData(_ criconfig.Config) (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
+func getRunPodSandboxTestData(criconfig.Config) (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
 	config := &runtime.PodSandboxConfig{}
 	imageConfig := &imagespec.ImageConfig{}
 	specCheck := func(t *testing.T, id string, spec *runtimespec.Spec) {

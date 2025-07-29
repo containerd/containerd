@@ -256,7 +256,7 @@ func (s *wcowSnapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mou
 
 // This is essentially a recreation of what HCS' CreateSandboxLayer does with some extra bells and
 // whistles like expanding the volume if a size is specified.
-func (s *wcowSnapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeInBytes uint64) error {
+func (s *wcowSnapshotter) createScratchLayer(_ context.Context, snDir string, parentLayers []string, sizeInBytes uint64) error {
 	parentLen := len(parentLayers)
 	if parentLen == 0 {
 		return fmt.Errorf("no parent layers present")
@@ -320,7 +320,7 @@ func (s *wcowSnapshotter) convertScratchToReadOnlyLayer(ctx context.Context, sna
 	return nil
 }
 
-func (s *wcowSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
+func (s *wcowSnapshotter) mounts(sn storage.Snapshot, _ string) []mount.Mount {
 	var (
 		roFlag string
 	)

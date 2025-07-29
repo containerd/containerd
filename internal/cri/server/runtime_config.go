@@ -23,7 +23,7 @@ import (
 )
 
 // RuntimeConfig returns configuration information of the runtime.
-func (c *criService) RuntimeConfig(ctx context.Context, r *runtime.RuntimeConfigRequest) (*runtime.RuntimeConfigResponse, error) {
+func (c *criService) RuntimeConfig(ctx context.Context, _ *runtime.RuntimeConfigRequest) (*runtime.RuntimeConfigResponse, error) {
 	resp := &runtime.RuntimeConfigResponse{
 		Linux: c.getLinuxRuntimeConfig(ctx),
 	}

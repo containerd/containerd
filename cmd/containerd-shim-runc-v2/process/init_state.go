@@ -59,11 +59,11 @@ func (s *createdState) transition(name string) error {
 	return nil
 }
 
-func (s *createdState) Pause(ctx context.Context) error {
+func (s *createdState) Pause(context.Context) error {
 	return errors.New("cannot pause task in created state")
 }
 
-func (s *createdState) Resume(ctx context.Context) error {
+func (s *createdState) Resume(context.Context) error {
 	return errors.New("cannot resume task in created state")
 }
 
@@ -71,7 +71,7 @@ func (s *createdState) Update(ctx context.Context, r *google_protobuf.Any) error
 	return s.p.update(ctx, r)
 }
 
-func (s *createdState) Checkpoint(ctx context.Context, r *CheckpointConfig) error {
+func (s *createdState) Checkpoint(context.Context, *CheckpointConfig) error {
 	return errors.New("cannot checkpoint a task in created state")
 }
 
@@ -105,7 +105,7 @@ func (s *createdState) Exec(ctx context.Context, path string, r *ExecConfig) (Pr
 	return s.p.exec(ctx, path, r)
 }
 
-func (s *createdState) Status(ctx context.Context) (string, error) {
+func (s *createdState) Status(context.Context) (string, error) {
 	return "created", nil
 }
 
@@ -128,11 +128,11 @@ func (s *createdCheckpointState) transition(name string) error {
 	return nil
 }
 
-func (s *createdCheckpointState) Pause(ctx context.Context) error {
+func (s *createdCheckpointState) Pause(context.Context) error {
 	return errors.New("cannot pause task in created state")
 }
 
-func (s *createdCheckpointState) Resume(ctx context.Context) error {
+func (s *createdCheckpointState) Resume(context.Context) error {
 	return errors.New("cannot resume task in created state")
 }
 
@@ -140,7 +140,7 @@ func (s *createdCheckpointState) Update(ctx context.Context, r *google_protobuf.
 	return s.p.update(ctx, r)
 }
 
-func (s *createdCheckpointState) Checkpoint(ctx context.Context, r *CheckpointConfig) error {
+func (s *createdCheckpointState) Checkpoint(context.Context, *CheckpointConfig) error {
 	return errors.New("cannot checkpoint a task in created state")
 }
 
@@ -210,11 +210,11 @@ func (s *createdCheckpointState) SetExited(status int) {
 	}
 }
 
-func (s *createdCheckpointState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
+func (s *createdCheckpointState) Exec(context.Context, string, *ExecConfig) (Process, error) {
 	return nil, errors.New("cannot exec in a created state")
 }
 
-func (s *createdCheckpointState) Status(ctx context.Context) (string, error) {
+func (s *createdCheckpointState) Status(context.Context) (string, error) {
 	return "created", nil
 }
 
@@ -249,7 +249,7 @@ func (s *runningState) Pause(ctx context.Context) error {
 	return s.transition("paused")
 }
 
-func (s *runningState) Resume(ctx context.Context) error {
+func (s *runningState) Resume(context.Context) error {
 	return errors.New("cannot resume a running process")
 }
 
@@ -261,11 +261,11 @@ func (s *runningState) Checkpoint(ctx context.Context, r *CheckpointConfig) erro
 	return s.p.checkpoint(ctx, r)
 }
 
-func (s *runningState) Start(ctx context.Context) error {
+func (s *runningState) Start(context.Context) error {
 	return errors.New("cannot start a running process")
 }
 
-func (s *runningState) Delete(ctx context.Context) error {
+func (s *runningState) Delete(context.Context) error {
 	return errors.New("cannot delete a running process")
 }
 
@@ -285,7 +285,7 @@ func (s *runningState) Exec(ctx context.Context, path string, r *ExecConfig) (Pr
 	return s.p.exec(ctx, path, r)
 }
 
-func (s *runningState) Status(ctx context.Context) (string, error) {
+func (s *runningState) Status(context.Context) (string, error) {
 	return "running", nil
 }
 
@@ -305,7 +305,7 @@ func (s *pausedState) transition(name string) error {
 	return nil
 }
 
-func (s *pausedState) Pause(ctx context.Context) error {
+func (s *pausedState) Pause(context.Context) error {
 	return errors.New("cannot pause a paused container")
 }
 
@@ -325,11 +325,11 @@ func (s *pausedState) Checkpoint(ctx context.Context, r *CheckpointConfig) error
 	return s.p.checkpoint(ctx, r)
 }
 
-func (s *pausedState) Start(ctx context.Context) error {
+func (s *pausedState) Start(context.Context) error {
 	return errors.New("cannot start a paused process")
 }
 
-func (s *pausedState) Delete(ctx context.Context) error {
+func (s *pausedState) Delete(context.Context) error {
 	return errors.New("cannot delete a paused process")
 }
 
@@ -349,11 +349,11 @@ func (s *pausedState) SetExited(status int) {
 	}
 }
 
-func (s *pausedState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
+func (s *pausedState) Exec(context.Context, string, *ExecConfig) (Process, error) {
 	return nil, errors.New("cannot exec in a paused state")
 }
 
-func (s *pausedState) Status(ctx context.Context) (string, error) {
+func (s *pausedState) Status(context.Context) (string, error) {
 	return "paused", nil
 }
 
@@ -371,23 +371,23 @@ func (s *stoppedState) transition(name string) error {
 	return nil
 }
 
-func (s *stoppedState) Pause(ctx context.Context) error {
+func (s *stoppedState) Pause(context.Context) error {
 	return errors.New("cannot pause a stopped container")
 }
 
-func (s *stoppedState) Resume(ctx context.Context) error {
+func (s *stoppedState) Resume(context.Context) error {
 	return errors.New("cannot resume a stopped container")
 }
 
-func (s *stoppedState) Update(ctx context.Context, r *google_protobuf.Any) error {
+func (s *stoppedState) Update(context.Context, *google_protobuf.Any) error {
 	return errors.New("cannot update a stopped container")
 }
 
-func (s *stoppedState) Checkpoint(ctx context.Context, r *CheckpointConfig) error {
+func (s *stoppedState) Checkpoint(context.Context, *CheckpointConfig) error {
 	return errors.New("cannot checkpoint a stopped container")
 }
 
-func (s *stoppedState) Start(ctx context.Context) error {
+func (s *stoppedState) Start(context.Context) error {
 	return errors.New("cannot start a stopped process")
 }
 
@@ -402,14 +402,14 @@ func (s *stoppedState) Kill(ctx context.Context, sig uint32, all bool) error {
 	return s.p.kill(ctx, sig, all)
 }
 
-func (s *stoppedState) SetExited(status int) {
+func (s *stoppedState) SetExited(int) {
 	// no op
 }
 
-func (s *stoppedState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
+func (s *stoppedState) Exec(context.Context, string, *ExecConfig) (Process, error) {
 	return nil, errors.New("cannot exec in a stopped state")
 }
 
-func (s *stoppedState) Status(ctx context.Context) (string, error) {
+func (s *stoppedState) Status(context.Context) (string, error) {
 	return "stopped", nil
 }

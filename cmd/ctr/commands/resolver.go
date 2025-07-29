@@ -82,7 +82,7 @@ func GetResolver(ctx context.Context, cliContext *cli.Context) (remotes.Resolver
 	}
 
 	hostOptions := config.HostOptions{}
-	hostOptions.Credentials = func(host string) (string, string, error) {
+	hostOptions.Credentials = func(string) (string, string, error) {
 		// If host doesn't match...
 		// Only one host
 		return username, secret, nil
@@ -158,7 +158,7 @@ type staticCredentials struct {
 }
 
 // NewStaticCredentials gets credentials from passing in cli context
-func NewStaticCredentials(ctx context.Context, cliContext *cli.Context, ref string) (registry.CredentialHelper, error) {
+func NewStaticCredentials(_ context.Context, cliContext *cli.Context, ref string) (registry.CredentialHelper, error) {
 	username := cliContext.String("user")
 	var secret string
 	if i := strings.IndexByte(username, ':'); i > 0 {
@@ -188,7 +188,7 @@ func NewStaticCredentials(ctx context.Context, cliContext *cli.Context, ref stri
 	}, nil
 }
 
-func (sc *staticCredentials) GetCredentials(ctx context.Context, ref, host string) (registry.Credentials, error) {
+func (sc *staticCredentials) GetCredentials(_ context.Context, ref, _ string) (registry.Credentials, error) {
 	if ref == sc.ref {
 		return registry.Credentials{
 			Username: sc.username,

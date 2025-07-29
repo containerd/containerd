@@ -48,7 +48,7 @@ func WithAttribute(k string, v interface{}) SpanOpt {
 func UpdateHTTPClient(client *http.Client, name string) {
 	client.Transport = otelhttp.NewTransport(
 		client.Transport,
-		otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+		otelhttp.WithSpanNameFormatter(func(string, *http.Request) string {
 			return name
 		}),
 	)

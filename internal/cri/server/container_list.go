@@ -26,7 +26,7 @@ import (
 )
 
 // ListContainers lists all containers matching the filter.
-func (c *criService) ListContainers(ctx context.Context, r *runtime.ListContainersRequest) (*runtime.ListContainersResponse, error) {
+func (c *criService) ListContainers(_ context.Context, r *runtime.ListContainersRequest) (*runtime.ListContainersResponse, error) {
 	start := time.Now()
 	// List all containers from store.
 	containersInStore := c.containerStore.List()

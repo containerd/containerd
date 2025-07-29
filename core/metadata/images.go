@@ -97,7 +97,7 @@ func (s *imageStore) List(ctx context.Context, fs ...string) ([]images.Image, er
 			return nil // empty store
 		}
 
-		return bkt.ForEach(func(k, v []byte) error {
+		return bkt.ForEach(func(k, _ []byte) error {
 			var (
 				image = images.Image{
 					Name: string(k),

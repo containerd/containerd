@@ -45,7 +45,7 @@ func WithLayerConvertFunc(fn ConvertFunc) Opt {
 }
 
 // WithDockerToOCI converts Docker media types into OCI ones.
-func WithDockerToOCI(v bool) Opt {
+func WithDockerToOCI(bool) Opt {
 	return func(copts *convertOpts) error {
 		copts.docker2oci = true
 		return nil

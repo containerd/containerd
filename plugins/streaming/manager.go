@@ -121,7 +121,7 @@ func (sm *streamManager) Get(ctx context.Context, name string) (streaming.Stream
 	return stream, nil
 }
 
-func (sm *streamManager) StartCollection(ctx context.Context) (metadata.CollectionContext, error) {
+func (sm *streamManager) StartCollection(context.Context) (metadata.CollectionContext, error) {
 	// lock now and collection will unlock on cancel or finish
 	sm.rwlock.Lock()
 

@@ -396,7 +396,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 func (s *snapshotter) handleSharing(ctx context.Context, id, snDir string) error {
 	var key string
-	if err := s.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+	if err := s.Walk(ctx, func(_ context.Context, info snapshots.Info) error {
 		if strings.Contains(info.Name, id) {
 			key = info.Name
 		}

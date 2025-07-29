@@ -331,10 +331,10 @@ func (c *controllerLocal) Metrics(ctx context.Context, sandboxID string) (*types
 }
 
 func (c *controllerLocal) Update(
-	ctx context.Context,
-	sandboxID string,
-	sandbox sandbox.Sandbox,
-	fields ...string) error {
+	context.Context,
+	string,
+	sandbox.Sandbox,
+	...string) error {
 	return nil
 }
 

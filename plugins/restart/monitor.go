@@ -63,7 +63,7 @@ func init() {
 			go m.run(tomlext.ToStdTime(ic.Config.(*Config).Interval))
 			return m, nil
 		},
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+		ConfigMigration: func(_ context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
 			if configVersion >= version.ConfigVersion {
 				return nil
 			}

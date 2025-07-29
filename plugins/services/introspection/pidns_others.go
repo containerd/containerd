@@ -18,6 +18,6 @@
 
 package introspection
 
-func statPIDNS(pid int) (uint64, error) {
+func statPIDNS(int) (uint64, error) {
 	return 0, nil
 }

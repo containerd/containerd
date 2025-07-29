@@ -51,7 +51,7 @@ func cleanupWCOWLayers(root string) error {
 	// See snapshots/windows/windows.go getSnapshotDir()
 	var layerNums []int
 	var rmLayerNums []int
-	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	if err := filepath.Walk(root, func(path string, info os.FileInfo, _ error) error {
 		if path != root && info.IsDir() {
 			name := filepath.Base(path)
 			if strings.HasPrefix(name, "rm-") {

@@ -29,10 +29,10 @@ import (
 // often be remedied.
 // Only use `ensureRemoveAll` if you really want to make every effort to remove
 // a directory.
-func ensureRemoveAll(ctx context.Context, dir string) error {
+func ensureRemoveAll(_ context.Context, dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+func modifyProcessLabel(string, *specs.Spec) error {
 	return nil
 }

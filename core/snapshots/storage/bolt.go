@@ -83,7 +83,7 @@ func GetInfo(ctx context.Context, key string) (string, snapshots.Info, snapshots
 			Name: key,
 		}
 	)
-	err := withSnapshotBucket(ctx, key, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	err := withSnapshotBucket(ctx, key, func(_ context.Context, bkt, _ *bolt.Bucket) error {
 		getUsage(bkt, &su)
 		return readSnapshot(bkt, &id, &si)
 	})
@@ -99,7 +99,7 @@ func UpdateInfo(ctx context.Context, info snapshots.Info, fieldpaths ...string) 
 	updated := snapshots.Info{
 		Name: info.Name,
 	}
-	err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	err := withBucket(ctx, func(_ context.Context, bkt, _ *bolt.Bucket) error {
 		sbkt := bkt.Bucket([]byte(info.Name))
 		if sbkt == nil {
 			return fmt.Errorf("snapshot does not exist: %w", errdefs.ErrNotFound)
@@ -153,7 +153,7 @@ func WalkInfo(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 		return err
 	}
 	// TODO: allow indexes (name, parent, specific labels)
-	return withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	return withBucket(ctx, func(ctx context.Context, bkt, _ *bolt.Bucket) error {
 		return bkt.ForEach(func(k, v []byte) error {
 			// skip non buckets
 			if v != nil {
@@ -180,7 +180,7 @@ func WalkInfo(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 // GetSnapshot returns the metadata for the active or view snapshot transaction
 // referenced by the given key. Requires a context with a storage transaction.
 func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
-	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	err = withBucket(ctx, func(_ context.Context, bkt, _ *bolt.Bucket) error {
 		sbkt := bkt.Bucket([]byte(key))
 		if sbkt == nil {
 			return fmt.Errorf("snapshot does not exist: %w", errdefs.ErrNotFound)
@@ -227,7 +227,7 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 		}
 	}
 
-	err = createBucketIfNotExists(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	err = createBucketIfNotExists(ctx, func(_ context.Context, bkt, pbkt *bolt.Bucket) error {
 		var (
 			spbkt *bolt.Bucket
 		)
@@ -301,7 +301,7 @@ func Remove(ctx context.Context, key string) (string, snapshots.Kind, error) {
 		si snapshots.Info
 	)
 
-	if err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	if err := withBucket(ctx, func(_ context.Context, bkt, pbkt *bolt.Bucket) error {
 		sbkt := bkt.Bucket([]byte(key))
 		if sbkt == nil {
 			return fmt.Errorf("snapshot %v: %w", key, errdefs.ErrNotFound)
@@ -358,7 +358,7 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 		}
 	}
 
-	if err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	if err := withBucket(ctx, func(_ context.Context, bkt, pbkt *bolt.Bucket) error {
 		dbkt, err := bkt.CreateBucket([]byte(name))
 		if err != nil {
 			if err == errbolt.ErrBucketExists {
@@ -419,7 +419,7 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 // IDMap returns all the IDs mapped to their key
 func IDMap(ctx context.Context) (map[string]string, error) {
 	m := map[string]string{}
-	if err := withBucket(ctx, func(ctx context.Context, bkt, _ *bolt.Bucket) error {
+	if err := withBucket(ctx, func(_ context.Context, bkt, _ *bolt.Bucket) error {
 		return bkt.ForEach(func(k, v []byte) error {
 			// skip non buckets
 			if v != nil {

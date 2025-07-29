@@ -38,7 +38,7 @@ func init() {
 	})
 }
 
-func initFunc(ic *plugin.InitContext) (interface{}, error) {
+func initFunc(*plugin.InitContext) (interface{}, error) {
 	return &service{}, nil
 }
 
@@ -51,7 +51,7 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
-func (s *service) Version(ctx context.Context, _ *ptypes.Empty) (*api.VersionResponse, error) {
+func (s *service) Version(context.Context, *ptypes.Empty) (*api.VersionResponse, error) {
 	return &api.VersionResponse{
 		Version:  ctrdversion.Version,
 		Revision: ctrdversion.Revision,

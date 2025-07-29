@@ -22,9 +22,9 @@ package rdt
 func IsEnabled() bool { return false }
 
 // SetConfig always is no-op in non-linux platforms.
-func SetConfig(configFilePath string) error { return nil }
+func SetConfig(string) error { return nil }
 
 // ContainerClassFromAnnotations always is no-op in non-linux platforms.
-func ContainerClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
+func ContainerClassFromAnnotations(string, map[string]string, map[string]string) (string, error) {
 	return "", nil
 }

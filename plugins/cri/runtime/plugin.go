@@ -187,7 +187,7 @@ func setGLogLevel() error {
 	return nil
 }
 
-func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+func configMigration(_ context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
 	if configVersion >= version.ConfigVersion {
 		return nil
 	}

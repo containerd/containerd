@@ -50,14 +50,14 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 		netNSPath = s.NetNS.GetPath()
 	} else {
 		// Run the function directly for host network.
-		netNSDo = func(do func(_ ns.NetNS) error) error {
+		netNSDo = func(do func(ns.NetNS) error) error {
 			return do(nil)
 		}
 		netNSPath = "host"
 	}
 
 	log.G(ctx).Infof("Executing port forwarding in network namespace %q", netNSPath)
-	err = netNSDo(func(_ ns.NetNS) error {
+	err = netNSDo(func(ns.NetNS) error {
 		defer stream.Close()
 		// localhost can resolve to both IPv4 and IPv6 addresses in dual-stack systems
 		// but the application can be listening in one of the IP families only.

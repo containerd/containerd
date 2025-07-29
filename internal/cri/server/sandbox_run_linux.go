@@ -29,7 +29,7 @@ import (
 )
 
 func (c *criService) bringUpLoopback(netns string) error {
-	if err := ns.WithNetNSPath(netns, func(_ ns.NetNS) error {
+	if err := ns.WithNetNSPath(netns, func(ns.NetNS) error {
 		link, err := netlink.LinkByName("lo")
 		if err != nil {
 			return err

@@ -60,7 +60,7 @@ type linuxPlatform struct {
 	epoller *console.Epoller
 }
 
-func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console, id, stdin, stdout, stderr string, wg *sync.WaitGroup) (cons console.Console, retErr error) {
+func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console, id, stdin, stdout, _ string, wg *sync.WaitGroup) (cons console.Console, retErr error) {
 	if p.epoller == nil {
 		return nil, errors.New("uninitialized epoller")
 	}
@@ -186,7 +186,7 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 	return epollConsole, nil
 }
 
-func (p *linuxPlatform) ShutdownConsole(ctx context.Context, cons console.Console) error {
+func (p *linuxPlatform) ShutdownConsole(_ context.Context, cons console.Console) error {
 	if p.epoller == nil {
 		return errors.New("uninitialized epoller")
 	}

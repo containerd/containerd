@@ -254,6 +254,6 @@ func migrateSandboxes(tx *bolt.Tx) error {
 // noOpMigration was for a database change from boltdb/bolt which is no
 // longer being supported, to go.etcd.io/bbolt which is the currently
 // maintained repo for boltdb.
-func noOpMigration(tx *bolt.Tx) error {
+func noOpMigration(*bolt.Tx) error {
 	return nil
 }

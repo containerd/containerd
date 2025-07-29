@@ -37,6 +37,6 @@ func init() {
 		})
 }
 
-func RuntimeOptions(cliContext *cli.Context) (interface{}, error) {
+func RuntimeOptions(*cli.Context) (interface{}, error) {
 	return nil, nil
 }

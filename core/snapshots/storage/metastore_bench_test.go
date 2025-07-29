@@ -38,7 +38,7 @@ func Benchmarks(b *testing.B, name string, metaFn metaFactory) {
 }
 
 // makeBench creates a benchmark with a writable transaction
-func makeBench(b *testing.B, name string, metaFn metaFactory, fn func(context.Context, *testing.B, *MetaStore)) func(b *testing.B) {
+func makeBench(_ *testing.B, _ string, metaFn metaFactory, fn func(context.Context, *testing.B, *MetaStore)) func(b *testing.B) {
 	return func(b *testing.B) {
 		ctx := context.Background()
 
@@ -62,7 +62,7 @@ func makeBench(b *testing.B, name string, metaFn metaFactory, fn func(context.Co
 	}
 }
 
-func openCloseWritable(b *testing.B, name string, metaFn metaFactory) func(b *testing.B) {
+func openCloseWritable(_ *testing.B, _ string, metaFn metaFactory) func(b *testing.B) {
 	return func(b *testing.B) {
 		ctx := context.Background()
 
@@ -85,7 +85,7 @@ func openCloseWritable(b *testing.B, name string, metaFn metaFactory) func(b *te
 	}
 }
 
-func openCloseReadonly(b *testing.B, name string, metaFn metaFactory) func(b *testing.B) {
+func openCloseReadonly(_ *testing.B, _ string, metaFn metaFactory) func(b *testing.B) {
 	return func(b *testing.B) {
 		ctx := context.Background()
 
@@ -108,7 +108,7 @@ func openCloseReadonly(b *testing.B, name string, metaFn metaFactory) func(b *te
 	}
 }
 
-func createActiveFromBase(ctx context.Context, ms *MetaStore, active, base string) error {
+func createActiveFromBase(ctx context.Context, _ *MetaStore, active, base string) error {
 	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "bottom", ""); err != nil {
 		return err
 	}

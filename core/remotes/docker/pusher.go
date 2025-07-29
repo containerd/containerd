@@ -479,7 +479,7 @@ func (pw *pushWriter) Digest() digest.Digest {
 	return pw.expected
 }
 
-func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
+func (pw *pushWriter) Commit(_ context.Context, size int64, expected digest.Digest, _ ...content.Opt) error {
 	// Check whether read has already thrown an error
 	if pw.pipe != nil {
 		if _, err := pw.pipe.Write([]byte{}); err != nil && !errors.Is(err, io.ErrClosedPipe) {
@@ -544,7 +544,7 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 	return nil
 }
 
-func (pw *pushWriter) Truncate(size int64) error {
+func (pw *pushWriter) Truncate(int64) error {
 	// TODO: if blob close request and start new request at offset
 	// TODO: always error on manifest
 	return errors.New("cannot truncate remote upload")

@@ -26,7 +26,7 @@ import (
 )
 
 // WithNamespaceCgroupDeletion removes the cgroup directory that was created for the namespace
-func WithNamespaceCgroupDeletion(ctx context.Context, i *namespaces.DeleteInfo) error {
+func WithNamespaceCgroupDeletion(_ context.Context, i *namespaces.DeleteInfo) error {
 	if cgroups.Mode() == cgroups.Unified {
 		cg, err := cgroup2.Load(i.Name)
 		if err != nil {

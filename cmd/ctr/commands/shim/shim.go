@@ -132,7 +132,7 @@ var stateCommand = &cli.Command{
 			Name:  "api-version",
 			Usage: "shim API version {2,3}",
 			Value: 3,
-			Action: func(c *cli.Context, v int) error {
+			Action: func(_ *cli.Context, v int) error {
 				if v != 2 && v != 3 {
 					return fmt.Errorf("api-version must be 2 or 3")
 				}

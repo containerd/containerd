@@ -213,7 +213,7 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 	manifests := []ocispec.Descriptor{}
 	indexStack := []ocispec.Descriptor{}
 
-	filterHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	filterHandler := images.HandlerFunc(func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if images.IsManifestType(desc.MediaType) {
 			m.Lock()
 			manifests = append(manifests, desc)

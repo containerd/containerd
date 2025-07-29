@@ -183,7 +183,7 @@ func NewAttach(opts ...Opt) Attach {
 }
 
 // NullIO redirects the container's IO into /dev/null
-func NullIO(_ string) (IO, error) {
+func NullIO(string) (IO, error) {
 	return &cio{}, nil
 }
 
@@ -243,7 +243,7 @@ var (
 
 // LogURI provides the raw logging URI
 func LogURI(uri *url.URL) Creator {
-	return func(_ string) (IO, error) {
+	return func(string) (IO, error) {
 		return &logURI{
 			config: Config{
 				Stdout: uri.String(),
@@ -255,7 +255,7 @@ func LogURI(uri *url.URL) Creator {
 
 // BinaryIO forwards container STDOUT|STDERR directly to a logging binary
 func BinaryIO(binary string, args map[string]string) Creator {
-	return func(_ string) (IO, error) {
+	return func(string) (IO, error) {
 		uri, err := LogURIGenerator("binary", binary, args)
 		if err != nil {
 			return nil, err
@@ -274,7 +274,7 @@ func BinaryIO(binary string, args map[string]string) Creator {
 // LogFile creates a file on disk that logs the task's STDOUT,STDERR.
 // If the log file already exists, the logs will be appended to the file.
 func LogFile(path string) Creator {
-	return func(_ string) (IO, error) {
+	return func(string) (IO, error) {
 		uri, err := LogURIGenerator("file", path, nil)
 		if err != nil {
 			return nil, err

@@ -374,7 +374,7 @@ func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.A
 	return typeurl.MarshalAny(s)
 }
 
-func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a typeurl.Any) error {
+func (is *Store) UnmarshalAny(_ context.Context, _ streaming.StreamGetter, a typeurl.Any) error {
 	var s transfertypes.ImageStore
 	if err := typeurl.UnmarshalTo(a, &s); err != nil {
 		return err

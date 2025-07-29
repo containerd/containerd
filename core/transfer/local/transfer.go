@@ -107,7 +107,7 @@ func name(t interface{}) string {
 
 // echo is mostly used for testing, it implements an import->export which is
 // a no-op which only roundtrips the bytes.
-func (ts *localTransferService) echo(ctx context.Context, i transfer.ImageImporter, e transfer.ImageExportStreamer, tops *transfer.Config) error {
+func (ts *localTransferService) echo(ctx context.Context, i transfer.ImageImporter, e transfer.ImageExportStreamer, _ *transfer.Config) error {
 	iis, ok := i.(transfer.ImageImportStreamer)
 	if !ok {
 		return fmt.Errorf("echo requires access to raw stream: %w", errdefs.ErrNotImplemented)

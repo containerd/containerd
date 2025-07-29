@@ -30,7 +30,7 @@ func init() {
 	registry.Register(&plugin.Registration{
 		ID:   pluginName,
 		Type: plugins.TTRPCPlugin,
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(*plugin.InitContext) (interface{}, error) {
 			return otelttrpcopts{}, nil
 		},
 	})

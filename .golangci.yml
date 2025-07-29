@@ -50,9 +50,8 @@ linters:
     revive:
       rules:
         - name: package-comments
-          severity: warning
           disabled: true
-          exclude: [ "" ]
+        - name: unused-parameter
     nolintlint:
       allow-unused: true
   exclusions:
@@ -76,9 +75,6 @@ linters:
       - linters:
           - revive
         text: superfluous-else
-      - linters:
-          - revive
-        text: unused-parameter
       - linters:
           - revive
         text: unreachable-code

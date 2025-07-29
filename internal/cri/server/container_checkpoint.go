@@ -30,20 +30,20 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string) (string, error) {
+func (c *criService) checkIfCheckpointOCIImage(context.Context, string) (string, error) {
 	return "", nil
 }
 
 func (c *criService) CRImportCheckpoint(
-	ctx context.Context,
-	meta *containerstore.Metadata,
-	sandbox *sandbox.Sandbox,
-	sandboxConfig *runtime.PodSandboxConfig,
+	context.Context,
+	*containerstore.Metadata,
+	*sandbox.Sandbox,
+	*runtime.PodSandboxConfig,
 ) (ctrID string, retErr error) {
 	return "", errdefs.ErrNotImplemented
 }
 
-func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (res *runtime.CheckpointContainerResponse, err error) {
+func (c *criService) CheckpointContainer(context.Context, *runtime.CheckpointContainerRequest) (res *runtime.CheckpointContainerResponse, err error) {
 	// The next line is just needed to make the linter happy.
 	containerCheckpointTimer.WithValues("no-runtime").UpdateSince(time.Now())
 	return nil, status.Errorf(codes.Unimplemented, "method CheckpointContainer not implemented")

@@ -45,7 +45,7 @@ type FakeShaper struct {
 }
 
 // Limit is not implemented
-func (f *FakeShaper) Limit(cidr string, egress, ingress *resource.Quantity) error {
+func (f *FakeShaper) Limit(string, *resource.Quantity, *resource.Quantity) error {
 	return errdefs.ErrNotImplemented
 }
 
@@ -61,7 +61,7 @@ func (f *FakeShaper) ReconcileInterface() error {
 }
 
 // ReconcileCIDR is not implemented
-func (f *FakeShaper) ReconcileCIDR(cidr string, egress, ingress *resource.Quantity) error {
+func (f *FakeShaper) ReconcileCIDR(string, *resource.Quantity, *resource.Quantity) error {
 	return errdefs.ErrNotImplemented
 }
 

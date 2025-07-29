@@ -29,7 +29,7 @@ import (
 
 // WithCDIDevices injects the requested CDI devices into the OCI specification.
 func WithCDIDevices(devices ...string) oci.SpecOpts {
-	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
+	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
 		if len(devices) == 0 {
 			return nil
 		}

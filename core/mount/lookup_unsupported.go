@@ -24,6 +24,6 @@ import (
 )
 
 // Lookup returns the mount info corresponds to the path.
-func Lookup(dir string) (Info, error) {
+func Lookup(string) (Info, error) {
 	return Info{}, fmt.Errorf("mount.Lookup is not implemented on %s/%s", runtime.GOOS, runtime.GOARCH)
 }

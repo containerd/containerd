@@ -86,7 +86,7 @@ func openShimLog(ctx context.Context, bundle *Bundle, dialer func(string, time.D
 	return dpc, nil
 }
 
-func checkCopyShimLogError(ctx context.Context, err error) error {
+func checkCopyShimLogError(_ context.Context, err error) error {
 	// When using a multi-container shim the 2nd to Nth container in the
 	// shim will not have a separate log pipe. Ignore the failure log
 	// message here when the shim connect times out.

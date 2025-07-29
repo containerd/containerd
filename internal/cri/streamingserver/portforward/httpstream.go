@@ -88,7 +88,7 @@ func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 // rejecting any streams that with missing or invalid values. Each valid
 // stream is sent to the streams channel.
 func httpStreamReceived(streams chan httpstream.Stream) func(httpstream.Stream, <-chan struct{}) error {
-	return func(stream httpstream.Stream, replySent <-chan struct{}) error {
+	return func(stream httpstream.Stream, _ <-chan struct{}) error {
 		// make sure it has a valid port header
 		portString := stream.Headers().Get(api.PortHeader)
 		if len(portString) == 0 {

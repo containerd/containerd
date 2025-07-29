@@ -53,7 +53,7 @@ type ExportOpt func(context.Context, *exportOptions) error
 // Additionally, platform is used to resolve image configs for
 // Docker v1.1, v1.2 format compatibility.
 func WithPlatform(p platforms.MatchComparer) ExportOpt {
-	return func(ctx context.Context, o *exportOptions) error {
+	return func(_ context.Context, o *exportOptions) error {
 		o.platform = p
 		return nil
 	}
@@ -62,7 +62,7 @@ func WithPlatform(p platforms.MatchComparer) ExportOpt {
 // WithAllPlatforms exports all manifests from a manifest list.
 // Missing content will fail the export.
 func WithAllPlatforms() ExportOpt {
-	return func(ctx context.Context, o *exportOptions) error {
+	return func(_ context.Context, o *exportOptions) error {
 		o.allPlatforms = true
 		return nil
 	}
@@ -71,7 +71,7 @@ func WithAllPlatforms() ExportOpt {
 // WithSkipDockerManifest skips creation of the Docker compatible
 // manifest.json file.
 func WithSkipDockerManifest() ExportOpt {
-	return func(ctx context.Context, o *exportOptions) error {
+	return func(_ context.Context, o *exportOptions) error {
 		o.skipDockerManifest = true
 		return nil
 	}
@@ -94,7 +94,7 @@ func WithImage(is images.Store, name string) ExportOpt {
 
 // WithImages adds multiples images to the exported archive.
 func WithImages(imgs []images.Image) ExportOpt {
-	return func(ctx context.Context, o *exportOptions) error {
+	return func(_ context.Context, o *exportOptions) error {
 		for _, img := range imgs {
 			img.Target.Annotations = addNameAnnotation(img.Name, img.Target.Annotations)
 			o.manifests = append(o.manifests, img.Target)
@@ -110,7 +110,7 @@ func WithImages(imgs []images.Image) ExportOpt {
 // When no names are provided, it is up to caller to put name annotation to
 // on the manifest descriptor if needed.
 func WithManifest(manifest ocispec.Descriptor, names ...string) ExportOpt {
-	return func(ctx context.Context, o *exportOptions) error {
+	return func(_ context.Context, o *exportOptions) error {
 		if len(names) == 0 {
 			o.manifests = append(o.manifests, manifest)
 		}
@@ -129,7 +129,7 @@ type BlobFilter func(ocispec.Descriptor) bool
 
 // WithBlobFilter specifies BlobFilter.
 func WithBlobFilter(f BlobFilter) ExportOpt {
-	return func(ctx context.Context, o *exportOptions) error {
+	return func(_ context.Context, o *exportOptions) error {
 		o.blobRecordOptions.blobFilter = f
 		return nil
 	}
@@ -149,7 +149,7 @@ func WithSkipNonDistributableBlobs() ExportOpt {
 // This allows to export multi-platform images if not all platforms are present
 // while still persisting the multi-platform index.
 func WithSkipMissing(store content.InfoReaderProvider) ExportOpt {
-	return func(ctx context.Context, o *exportOptions) error {
+	return func(_ context.Context, o *exportOptions) error {
 		o.blobRecordOptions.childrenHandler = images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
 			children, err := images.Children(ctx, store, desc)
 			if !images.IsManifestType(desc.MediaType) {
@@ -352,7 +352,7 @@ func Export(ctx context.Context, store content.InfoReaderProvider, writer io.Wri
 
 func getRecords(ctx context.Context, store content.Provider, desc ocispec.Descriptor, algorithms map[string]struct{}, brOpts *blobRecordOptions) ([]tarRecord, error) {
 	var records []tarRecord
-	exportHandler := func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	exportHandler := func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if err := desc.Digest.Validate(); err != nil {
 			return nil, err
 		}
@@ -453,7 +453,7 @@ func ociLayoutFile(version string) tarRecord {
 			Size:     int64(len(b)),
 			Typeflag: tar.TypeReg,
 		},
-		CopyTo: func(ctx context.Context, w io.Writer) (int64, error) {
+		CopyTo: func(_ context.Context, w io.Writer) (int64, error) {
 			n, err := w.Write(b)
 			return int64(n), err
 		},
@@ -482,7 +482,7 @@ func ociIndexRecord(manifests []ocispec.Descriptor) tarRecord {
 			Size:     int64(len(b)),
 			Typeflag: tar.TypeReg,
 		},
-		CopyTo: func(ctx context.Context, w io.Writer) (int64, error) {
+		CopyTo: func(_ context.Context, w io.Writer) (int64, error) {
 			n, err := w.Write(b)
 			return int64(n), err
 		},
@@ -546,7 +546,7 @@ func manifestsRecord(ctx context.Context, store content.Provider, manifests map[
 			Size:     int64(len(b)),
 			Typeflag: tar.TypeReg,
 		},
-		CopyTo: func(ctx context.Context, w io.Writer) (int64, error) {
+		CopyTo: func(_ context.Context, w io.Writer) (int64, error) {
 			n, err := w.Write(b)
 			return int64(n), err
 		},

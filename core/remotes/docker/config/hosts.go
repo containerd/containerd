@@ -616,7 +616,7 @@ func makeAbsPath(p string, base string) string {
 //     NOTE: If a ".key" file is missing, this function will just return
 //     the ".cert", which may contain the private key. If the ".cert" file
 //     does not contain the private key, the caller should detect and error.
-func loadCertFiles(ctx context.Context, certsDir string) ([]hostConfig, error) {
+func loadCertFiles(_ context.Context, certsDir string) ([]hostConfig, error) {
 	fs, err := os.ReadDir(certsDir)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err

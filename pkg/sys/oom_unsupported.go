@@ -29,20 +29,20 @@ const (
 // is out of range (-1000 - 1000), it is clipped to the min/max value.
 //
 // Not implemented on Windows
-func AdjustOOMScore(pid, score int) error {
+func AdjustOOMScore(int, int) error {
 	return nil
 }
 
 // SetOOMScore sets the oom score for the process
 //
 // Not implemented on Windows
-func SetOOMScore(pid, score int) error {
+func SetOOMScore(int, int) error {
 	return nil
 }
 
 // GetOOMScoreAdj gets the oom score for a process
 //
 // Not implemented on Windows
-func GetOOMScoreAdj(pid int) (int, error) {
+func GetOOMScoreAdj(int) (int, error) {
 	return 0, nil
 }

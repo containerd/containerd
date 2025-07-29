@@ -200,7 +200,7 @@ func WriteRuntime(path, runtime string) error {
 	return os.WriteFile(filepath.Join(path, "runtime"), []byte(runtime), 0600)
 }
 
-func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,
+func newInit(_ context.Context, path, workDir, namespace string, platform stdio.Platform,
 	r *process.CreateConfig, options *options.Options, rootfs string) (*process.Init, error) {
 	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.SystemdCgroup)
 	p := process.New(r.ID, runtime, stdio.Stdio{
@@ -402,7 +402,7 @@ func (c *Container) Resume(ctx context.Context) error {
 }
 
 // ResizePty of a process
-func (c *Container) ResizePty(ctx context.Context, r *task.ResizePtyRequest) error {
+func (c *Container) ResizePty(_ context.Context, r *task.ResizePtyRequest) error {
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return err
@@ -424,7 +424,7 @@ func (c *Container) Kill(ctx context.Context, r *task.KillRequest) error {
 }
 
 // CloseIO of a process
-func (c *Container) CloseIO(ctx context.Context, r *task.CloseIORequest) error {
+func (c *Container) CloseIO(_ context.Context, r *task.CloseIORequest) error {
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return err

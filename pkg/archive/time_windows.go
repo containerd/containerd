@@ -24,7 +24,7 @@ import (
 
 // chtimes will set the create time on a file using the given modtime.
 // This requires calling SetFileTime and explicitly including the create time.
-func chtimes(path string, atime, mtime time.Time) error {
+func chtimes(path string, _, mtime time.Time) error {
 	pathp, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return err

@@ -432,7 +432,7 @@ func (r *dockerResolver) SetOptions(options ...transfer.ImageResolverOption) {
 	}
 }
 
-func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetcher, error) {
+func (r *dockerResolver) Fetcher(_ context.Context, ref string) (remotes.Fetcher, error) {
 	base, err := r.resolveDockerBase(ref)
 	if err != nil {
 		return nil, err
@@ -443,7 +443,7 @@ func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetch
 	}, nil
 }
 
-func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher, error) {
+func (r *dockerResolver) Pusher(_ context.Context, ref string) (remotes.Pusher, error) {
 	base, err := r.resolveDockerBase(ref)
 	if err != nil {
 		return nil, err
@@ -660,7 +660,7 @@ func withErrorCheck(r *request, resp *http.Response) error {
 var errContentRangeIgnored = errors.New("content range requests ignored")
 
 func withOffsetCheck(offset int64) doChecks {
-	return func(r *request, resp *http.Response) error {
+	return func(_ *request, resp *http.Response) error {
 		if offset == 0 {
 			return nil
 		}

@@ -79,7 +79,7 @@ type manager struct {
 	name string
 }
 
-func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddress string, debug bool) (*exec.Cmd, error) {
+func newCommand(ctx context.Context, id, containerdAddress, _ string, debug bool) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -371,7 +371,7 @@ func (m manager) Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeIn
 	return info, nil
 }
 
-func (m manager) features(ctx context.Context, absBinary string, opts *options.Options) (*features.Features, error) {
+func (m manager) features(ctx context.Context, absBinary string, _ *options.Options) (*features.Features, error) {
 	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, absBinary, "features")
 	cmd.Stderr = &stderr

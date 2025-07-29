@@ -242,7 +242,7 @@ func adapt(ev interface{}) filters.Adaptor {
 		return adaptor
 	}
 
-	return filters.AdapterFunc(func(fieldpath []string) (string, bool) {
+	return filters.AdapterFunc(func([]string) (string, bool) {
 		return "", false
 	})
 }

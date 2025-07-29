@@ -163,7 +163,7 @@ func NewDirectIO(ctx context.Context, fifos *FIFOSet) (*DirectIO, error) {
 // TerminalLogURI provides the raw logging URI
 // as well as sets the terminal option to true.
 func TerminalLogURI(uri *url.URL) Creator {
-	return func(_ string) (IO, error) {
+	return func(string) (IO, error) {
 		return &logURI{
 			config: Config{
 				Stdout:   uri.String(),
@@ -177,7 +177,7 @@ func TerminalLogURI(uri *url.URL) Creator {
 // TerminalBinaryIO forwards container STDOUT|STDERR directly to a logging binary
 // It also sets the terminal option to true
 func TerminalBinaryIO(binary string, args map[string]string) Creator {
-	return func(_ string) (IO, error) {
+	return func(string) (IO, error) {
 		uri, err := LogURIGenerator("binary", binary, args)
 		if err != nil {
 			return nil, err

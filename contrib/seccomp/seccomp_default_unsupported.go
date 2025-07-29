@@ -21,6 +21,6 @@ package seccomp
 import specs "github.com/opencontainers/runtime-spec/specs-go"
 
 // DefaultProfile defines the allowed syscalls for the default seccomp profile.
-func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
+func DefaultProfile(*specs.Spec) *specs.LinuxSeccomp {
 	return &specs.LinuxSeccomp{}
 }

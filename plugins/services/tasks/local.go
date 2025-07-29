@@ -402,7 +402,7 @@ func (l *local) Get(ctx context.Context, r *api.GetRequest, _ ...grpc.CallOption
 	}, nil
 }
 
-func (l *local) List(ctx context.Context, r *api.ListTasksRequest, _ ...grpc.CallOption) (*api.ListTasksResponse, error) {
+func (l *local) List(ctx context.Context, _ *api.ListTasksRequest, _ ...grpc.CallOption) (*api.ListTasksResponse, error) {
 	resp := &api.ListTasksResponse{}
 	tasks, err := l.v2Runtime.Tasks(ctx, false)
 	if err != nil {

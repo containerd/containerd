@@ -67,7 +67,7 @@ type DeleteOpt func(context.Context, *DeleteOptions) error
 // SynchronousDelete is used to indicate that an image deletion and removal of
 // the image resources should occur synchronously before returning a result.
 func SynchronousDelete() DeleteOpt {
-	return func(ctx context.Context, o *DeleteOptions) error {
+	return func(_ context.Context, o *DeleteOptions) error {
 		o.Synchronous = true
 		return nil
 	}
@@ -77,7 +77,7 @@ func SynchronousDelete() DeleteOpt {
 // to have when deleting. If the image has a different target, then
 // NotFound is returned.
 func DeleteTarget(target *ocispec.Descriptor) DeleteOpt {
-	return func(ctx context.Context, o *DeleteOptions) error {
+	return func(_ context.Context, o *DeleteOptions) error {
 		o.Target = target
 		return nil
 	}
@@ -123,7 +123,7 @@ func (image *Image) RootFS(ctx context.Context, provider content.Provider, platf
 // Size returns the total size of an image's packed resources.
 func (image *Image) Size(ctx context.Context, provider content.Provider, platform platforms.MatchComparer) (int64, error) {
 	var size int64
-	return size, Walk(ctx, Handlers(HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return size, Walk(ctx, Handlers(HandlerFunc(func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if desc.Size < 0 {
 			return nil, fmt.Errorf("invalid size %v in %v (%v)", desc.Size, desc.Digest, desc.MediaType)
 		}

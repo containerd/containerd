@@ -103,7 +103,7 @@ func (*API) WithContainerAdjustment() containerd.NewContainerOpts {
 }
 
 func (*API) WithContainerExit(*cstore.Container) containerd.ProcessDeleteOpts {
-	return func(_ context.Context, _ containerd.Process) error {
+	return func(context.Context, containerd.Process) error {
 		return nil
 	}
 }

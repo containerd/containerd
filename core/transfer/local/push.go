@@ -219,14 +219,14 @@ func (ps *pushStatus) Status(name string) (content.Status, bool) {
 	return status, ok
 }
 
-func (ps *pushStatus) Check(ctx context.Context, dgst digest.Digest) (bool, error) {
+func (ps *pushStatus) Check(_ context.Context, dgst digest.Digest) (bool, error) {
 	ps.l.Lock()
 	_, ok := ps.complete[dgst]
 	ps.l.Unlock()
 	return ok, nil
 }
 
-func (p *progressPusher) Active(ctx context.Context, _ ...string) (ActiveJobs, error) {
+func (p *progressPusher) Active(context.Context, ...string) (ActiveJobs, error) {
 	return p.status, nil
 }
 

@@ -38,7 +38,7 @@ func chmodTarEntry(perm os.FileMode) os.FileMode {
 	return perm
 }
 
-func setHeaderForSpecialDevice(hdr *tar.Header, name string, fi os.FileInfo) error {
+func setHeaderForSpecialDevice(hdr *tar.Header, _ string, fi os.FileInfo) error {
 	// Devmajor and Devminor are only needed for special devices.
 
 	// In FreeBSD, RDev for regular files is -1 (unless overridden by FS):

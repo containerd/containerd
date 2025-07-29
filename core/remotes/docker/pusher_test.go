@@ -307,7 +307,7 @@ func (a *mockAuthorizer) AddResponses(ctx context.Context, resp []*http.Response
 	return a.addResponses(ctx, resp)
 }
 
-func tryUpload(ctx context.Context, t *testing.T, p dockerPusher, layerContent []byte) error {
+func tryUpload(ctx context.Context, _ *testing.T, p dockerPusher, layerContent []byte) error {
 	desc := ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageLayerGzip,
 		Digest:    digest.FromBytes(layerContent),

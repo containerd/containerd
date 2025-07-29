@@ -19,6 +19,6 @@ package mount
 import "github.com/containerd/errdefs"
 
 // Mount to the provided target.
-func (m *Mount) mount(target string) error {
+func (m *Mount) mount(string) error {
 	return errdefs.ErrNotImplemented
 }

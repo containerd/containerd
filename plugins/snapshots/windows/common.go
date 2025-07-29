@@ -200,7 +200,7 @@ func (w *windowsBaseSnapshotter) Close() error {
 }
 
 // This handles creating the UVMs scratch layer.
-func (w *windowsBaseSnapshotter) createUVMScratchLayer(ctx context.Context, snDir string, parentLayers []string) error {
+func (w *windowsBaseSnapshotter) createUVMScratchLayer(_ context.Context, snDir string, parentLayers []string) error {
 	parentLen := len(parentLayers)
 	if parentLen == 0 {
 		return errors.New("no parent layers present")

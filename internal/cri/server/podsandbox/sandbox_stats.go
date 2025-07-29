@@ -24,6 +24,6 @@ import (
 )
 
 // TODO(dcantah): Implement metrics to be used for SandboxStats rpc.
-func (c *Controller) Metrics(ctx context.Context, sandboxID string) (*types.Metric, error) {
+func (c *Controller) Metrics(context.Context, string) (*types.Metric, error) {
 	return nil, errdefs.ErrNotImplemented
 }

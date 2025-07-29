@@ -357,12 +357,12 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 
 func (a *API) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDeleteOpts {
 	if a.IsDisabled() {
-		return func(_ context.Context, _ containerd.Process) error {
+		return func(context.Context, containerd.Process) error {
 			return nil
 		}
 	}
 
-	return func(_ context.Context, _ containerd.Process) error {
+	return func(context.Context, containerd.Process) error {
 		a.NotifyContainerExit(context.Background(), criCtr)
 		return nil
 	}

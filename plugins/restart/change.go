@@ -32,7 +32,7 @@ type stopChange struct {
 	container containerd.Container
 }
 
-func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error {
+func (s *stopChange) apply(ctx context.Context, _ *containerd.Client) error {
 	return killTask(ctx, s.container)
 }
 
@@ -42,7 +42,7 @@ type startChange struct {
 	count     int
 }
 
-func (s *startChange) apply(ctx context.Context, client *containerd.Client) error {
+func (s *startChange) apply(ctx context.Context, _ *containerd.Client) error {
 	log := cio.NullIO
 	spec, err := s.container.Spec(ctx)
 	if err != nil {

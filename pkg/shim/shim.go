@@ -314,7 +314,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	registry.Register(&plugin.Registration{
 		Type: plugins.InternalPlugin,
 		ID:   "shutdown",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(*plugin.InitContext) (interface{}, error) {
 			return sd, nil
 		},
 	})

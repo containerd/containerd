@@ -105,7 +105,7 @@ func (c *criService) podSandboxStats(
 
 // https://github.com/cri-o/cri-o/blob/74a5cf8dffd305b311eb1c7f43a4781738c388c1/internal/oci/stats.go#L32
 func getContainerNetIO(ctx context.Context, netNsPath string) (rxBytes, rxErrors, txBytes, txErrors uint64) {
-	ns.WithNetNSPath(netNsPath, func(_ ns.NetNS) error {
+	ns.WithNetNSPath(netNsPath, func(ns.NetNS) error {
 		link, err := netlink.LinkByName(defaultIfName)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("unable to retrieve network namespace stats for netNsPath: %v, interface: %v", netNsPath, defaultIfName)

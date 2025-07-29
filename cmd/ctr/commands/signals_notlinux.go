@@ -20,6 +20,6 @@ package commands
 
 import "os"
 
-func canIgnoreSignal(_ os.Signal) bool {
+func canIgnoreSignal(os.Signal) bool {
 	return false
 }

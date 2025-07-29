@@ -405,7 +405,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 
 				cbkt := libkt.Bucket(bucketKeyObjectContent)
 				if cbkt != nil {
-					if err := cbkt.ForEach(func(k, v []byte) error {
+					if err := cbkt.ForEach(func(k, _ []byte) error {
 						fn(gcnode(ctype, ns, string(k)))
 						return nil
 					}); err != nil {
@@ -426,7 +426,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 						}
 						snbkt := sbkt.Bucket(sk)
 
-						return snbkt.ForEach(func(k, v []byte) error {
+						return snbkt.ForEach(func(k, _ []byte) error {
 							fn(gcnode(stype, ns, fmt.Sprintf("%s/%s", sk, k)))
 							return nil
 						})
@@ -437,7 +437,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 
 				ibkt := libkt.Bucket(bucketKeyObjectIngests)
 				if ibkt != nil {
-					if err := ibkt.ForEach(func(k, v []byte) error {
+					if err := ibkt.ForEach(func(k, _ []byte) error {
 						fn(gcnode(ResourceIngest, ns, string(k)))
 						return nil
 					}); err != nil {
@@ -452,7 +452,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 
 				ibkt = libkt.Bucket(bucketKeyObjectImages)
 				if ibkt != nil {
-					if err := ibkt.ForEach(func(k, v []byte) error {
+					if err := ibkt.ForEach(func(k, _ []byte) error {
 						fn(gcnode(itype, ns, string(k)))
 						return nil
 					}); err != nil {
@@ -596,7 +596,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 }
 
 // references finds the resources that are reachable from the given node.
-func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)) error {
+func (c *gcContext) references(_ context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)) error {
 	if refs, ok := c.backRefs[node]; ok {
 		// If we have back references, send them first
 		for _, ref := range refs {

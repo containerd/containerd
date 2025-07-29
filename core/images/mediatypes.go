@@ -67,7 +67,7 @@ const (
 // type. For Docker media types without compression, "unknown" is returned to
 // indicate that the media type may be compressed. If the media type is not
 // recognized as a layer diff, then it returns errdefs.ErrNotImplemented
-func DiffCompression(ctx context.Context, mediaType string) (string, error) {
+func DiffCompression(_ context.Context, mediaType string) (string, error) {
 	base, ext := parseMediaTypes(mediaType)
 	switch base {
 	case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerForeign:

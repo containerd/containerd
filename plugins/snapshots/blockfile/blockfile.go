@@ -68,7 +68,7 @@ type Opt func(string, *SnapshotterConfig)
 // WithScratchFile provides a scratch file which will get copied on startup
 // if the scratch file needs to be generated.
 func WithScratchFile(src string) Opt {
-	return func(root string, config *SnapshotterConfig) {
+	return func(_ string, config *SnapshotterConfig) {
 		config.scratchGenerator = func(dst string) error {
 			// Copy src to dst
 			if err := copyFileWithSync(dst, src); err != nil {
@@ -81,14 +81,14 @@ func WithScratchFile(src string) Opt {
 
 // WithFSType defines the filesystem type to apply to mounts of the blockfile
 func WithFSType(fsType string) Opt {
-	return func(root string, config *SnapshotterConfig) {
+	return func(_ string, config *SnapshotterConfig) {
 		config.fsType = fsType
 	}
 }
 
 // WithMountOptions defines the mount options used for the mount
 func WithMountOptions(options []string) Opt {
-	return func(root string, config *SnapshotterConfig) {
+	return func(_ string, config *SnapshotterConfig) {
 		config.mountOptions = options
 	}
 
@@ -97,7 +97,7 @@ func WithMountOptions(options []string) Opt {
 // WithRecreateScratch is used to determine that scratch should be recreated
 // even if already exists.
 func WithRecreateScratch(recreate bool) Opt {
-	return func(root string, config *SnapshotterConfig) {
+	return func(_ string, config *SnapshotterConfig) {
 		config.recreateScratch = recreate
 	}
 }

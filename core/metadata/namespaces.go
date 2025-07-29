@@ -38,7 +38,7 @@ func NewNamespaceStore(tx *bolt.Tx) namespaces.Store {
 	return &namespaceStore{tx: tx}
 }
 
-func (s *namespaceStore) Create(ctx context.Context, namespace string, labels map[string]string) error {
+func (s *namespaceStore) Create(_ context.Context, namespace string, labels map[string]string) error {
 	topbkt, err := createBucketIfNotExists(s.tx, bucketKeyVersion)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func (s *namespaceStore) Create(ctx context.Context, namespace string, labels ma
 	return nil
 }
 
-func (s *namespaceStore) Labels(ctx context.Context, namespace string) (map[string]string, error) {
+func (s *namespaceStore) Labels(_ context.Context, namespace string) (map[string]string, error) {
 	labels := map[string]string{}
 
 	bkt := getNamespaceLabelsBucket(s.tx, namespace)
@@ -96,7 +96,7 @@ func (s *namespaceStore) Labels(ctx context.Context, namespace string) (map[stri
 	return labels, nil
 }
 
-func (s *namespaceStore) SetLabel(ctx context.Context, namespace, key, value string) error {
+func (s *namespaceStore) SetLabel(_ context.Context, namespace, key, value string) error {
 	if err := l.Validate(key, value); err != nil {
 		return fmt.Errorf("namespace.Labels: %w", err)
 	}
@@ -111,7 +111,7 @@ func (s *namespaceStore) SetLabel(ctx context.Context, namespace, key, value str
 
 }
 
-func (s *namespaceStore) List(ctx context.Context) ([]string, error) {
+func (s *namespaceStore) List(context.Context) ([]string, error) {
 	bkt := getBucket(s.tx, bucketKeyVersion)
 	if bkt == nil {
 		return nil, nil // no namespaces!
