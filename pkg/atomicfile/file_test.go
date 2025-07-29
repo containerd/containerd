@@ -34,13 +34,13 @@ func TestFile(t *testing.T) {
 	f, err := New(path, 0o644)
 	require.NoError(t, err, "failed to create file")
 	n, err := fmt.Fprint(f, content)
-	assert.NoError(t, err, "failed to write content")
+	require.NoError(t, err, "failed to write content")
 	assert.Equal(t, len(content), n, "written bytes should be equal")
 	err = f.Close()
 	require.NoError(t, err, "failed to close file")
 
 	actual, err := os.ReadFile(path)
-	assert.NoError(t, err, "failed to read file")
+	require.NoError(t, err, "failed to read file")
 	assert.Equal(t, content, string(actual))
 }
 
@@ -56,22 +56,22 @@ func TestConcurrentWrites(t *testing.T) {
 	require.NoError(t, err, "failed to create file2")
 
 	n, err := fmt.Fprint(file1, content1)
-	assert.NoError(t, err, "failed to write content1")
+	require.NoError(t, err, "failed to write content1")
 	assert.Equal(t, len(content1), n, "written bytes should be equal")
 
 	n, err = fmt.Fprint(file2, content2)
-	assert.NoError(t, err, "failed to write content2")
+	require.NoError(t, err, "failed to write content2")
 	assert.Equal(t, len(content2), n, "written bytes should be equal")
 
 	err = file1.Close()
 	require.NoError(t, err, "failed to close file1")
 	actual, err := os.ReadFile(path)
-	assert.NoError(t, err, "failed to read file")
+	require.NoError(t, err, "failed to read file")
 	assert.Equal(t, content1, string(actual))
 
 	err = file2.Close()
 	require.NoError(t, err, "failed to close file2")
 	actual, err = os.ReadFile(path)
-	assert.NoError(t, err, "failed to read file")
+	require.NoError(t, err, "failed to read file")
 	assert.Equal(t, content2, string(actual))
 }

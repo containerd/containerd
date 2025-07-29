@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDo(t *testing.T) {
@@ -32,17 +33,17 @@ func TestDo(t *testing.T) {
 	v := "incontext"
 	ctx = context.WithValue(ctx, k, v) //nolint:staticcheck
 
-	assert.Nil(t, contextError(ctx))
+	require.NoError(t, contextError(ctx))
 	assert.Equal(t, ctx.Value(k), v)
 
 	cancel()
-	assert.Error(t, contextError(ctx))
+	require.Error(t, contextError(ctx))
 	assert.Equal(t, ctx.Value(k), v)
 
 	t.Run("with canceled context", func(t *testing.T) {
 		t.Parallel()
 		Do(ctx, func(ctx context.Context) {
-			assert.NoError(t, contextError(ctx))
+			require.NoError(t, contextError(ctx))
 			assert.Equal(t, ctx.Value(k), v)
 		})
 	})
@@ -52,7 +53,7 @@ func TestDo(t *testing.T) {
 		Do(ctx, func(ctx context.Context) {
 			ctx, cancelFn := context.WithCancel(ctx)
 			cancelFn()
-			assert.ErrorIs(t, contextError(ctx), context.Canceled)
+			require.ErrorIs(t, contextError(ctx), context.Canceled)
 			assert.Equal(t, ctx.Value(k), v)
 		})
 	})

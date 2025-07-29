@@ -30,6 +30,7 @@ import (
 
 	"github.com/containerd/fifo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOpenFifos(t *testing.T) {
@@ -58,7 +59,7 @@ func TestOpenFifos(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		_, err := openFifos(context.Background(), scenario)
-		assert.Error(t, err, scenario)
+		require.Error(t, err, "%+v", scenario)
 	}
 }
 
@@ -112,7 +113,7 @@ func TestNewFIFOSetInDir(t *testing.T) {
 	root := t.TempDir()
 
 	fifos, err := NewFIFOSetInDir(root, "theid", true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	dir := filepath.Dir(fifos.Stdin)
 	assertHasPrefix(t, dir, root)
@@ -125,16 +126,16 @@ func TestNewFIFOSetInDir(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, fifos.Config, expected.Config)
+	assert.Equal(t, expected.Config, fifos.Config)
 
 	files, err := os.ReadDir(root)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, files, 1)
 
-	assert.Nil(t, fifos.Close())
+	require.NoError(t, fifos.Close())
 	files, err = os.ReadDir(root)
-	assert.NoError(t, err)
-	assert.Len(t, files, 0)
+	require.NoError(t, err)
+	assert.Empty(t, files)
 }
 
 func TestNewAttach(t *testing.T) {
@@ -196,10 +197,10 @@ func TestNewAttach(t *testing.T) {
 			attacher := NewAttach(WithStreams(stdinArg, stdoutArg, stderrArg))
 
 			fifos, err := NewFIFOSetInDir("", "theid", false)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			attachedFifos, err := attacher(fifos)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			defer attachedFifos.Close()
 
 			producers := setupFIFOProducers(t, attachedFifos.Config())
@@ -208,12 +209,12 @@ func TestNewAttach(t *testing.T) {
 			var actualStdin []byte
 			if producers.Stdin != nil {
 				actualStdin, err = io.ReadAll(producers.Stdin)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			attachedFifos.Wait()
 			attachedFifos.Cancel()
-			assert.Nil(t, attachedFifos.Close())
+			require.NoError(t, attachedFifos.Close())
 
 			assert.Equal(t, tc.expectedStdout, stdout.String())
 			assert.Equal(t, tc.expectedStderr, stderr.String())
@@ -237,17 +238,17 @@ func setupFIFOProducers(t *testing.T, fifos Config) producers {
 
 	if fifos.Stdin != "" {
 		pipes.Stdin, err = fifo.OpenFifo(ctx, fifos.Stdin, syscall.O_RDONLY, 0)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	if fifos.Stdout != "" {
 		pipes.Stdout, err = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_WRONLY, 0)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	if fifos.Stderr != "" {
 		pipes.Stderr, err = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_WRONLY, 0)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	return pipes
@@ -256,14 +257,14 @@ func setupFIFOProducers(t *testing.T, fifos Config) producers {
 func initProducers(t *testing.T, producers producers, stdout, stderr string) {
 	if producers.Stdout != nil {
 		_, err := producers.Stdout.Write([]byte(stdout))
-		assert.NoError(t, err)
-		assert.Nil(t, producers.Stdout.Close())
+		require.NoError(t, err)
+		require.NoError(t, producers.Stdout.Close())
 	}
 
 	if producers.Stderr != nil {
 		_, err := producers.Stderr.Write([]byte(stderr))
-		assert.NoError(t, err)
-		assert.Nil(t, producers.Stderr.Close())
+		require.NoError(t, err)
+		require.NoError(t, producers.Stderr.Close())
 	}
 }
 

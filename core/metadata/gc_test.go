@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/opencontainers/go-digest"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 )
@@ -594,7 +593,7 @@ func newDatabase(t testing.TB) (*bolt.DB, error) {
 	}
 
 	t.Cleanup(func() {
-		assert.NoError(t, db.Close())
+		require.NoError(t, db.Close())
 	})
 
 	return db, nil

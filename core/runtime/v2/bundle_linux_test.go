@@ -67,7 +67,7 @@ func TestNewBundle(t *testing.T) {
 			require.NotNil(t, b, "bundle should not be nil")
 
 			fi, err := os.Stat(b.Path)
-			assert.NoError(t, err, "should be able to stat bundle path")
+			require.NoError(t, err, "should be able to stat bundle path")
 			if tc.userns {
 				assert.Equal(t, os.ModeDir|0710, fi.Mode(), "bundle path should be a directory with perm 0710")
 			} else {
@@ -136,7 +136,7 @@ func TestRemappedGID(t *testing.T) {
 			s, err := json.Marshal(tc.spec)
 			require.NoError(t, err, "failed to marshal spec")
 			gid, err := remappedGID(s)
-			assert.NoError(t, err, "should unmarshal successfully")
+			require.NoError(t, err, "should unmarshal successfully")
 			assert.Equal(t, tc.gid, gid, "expected GID to match")
 		})
 	}

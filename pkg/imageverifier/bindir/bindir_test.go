@@ -146,7 +146,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			Size:        2048,
 			Annotations: map[string]string{"a": "b"},
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.Equal(t, fmt.Sprintf("verifier-0%[1]v => Reason A line 1\nReason A line 2", exeIfWindows()), j.Reason)
 
@@ -156,7 +156,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 
 		b, err = os.ReadFile(data.StdinFile)
 		require.NoError(t, err)
-		assert.Equal(t, `{"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","digest":"sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4","size":2048,"annotations":{"a":"b"}}`, strings.TrimSpace(string(b)))
+		assert.JSONEq(t, `{"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","digest":"sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4","size":2048,"annotations":{"a":"b"}}`, string(b))
 	})
 
 	t.Run("large output is truncated", func(t *testing.T) {
@@ -188,7 +188,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
 	})
@@ -201,7 +201,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
 	})
@@ -218,7 +218,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.Empty(t, j.Reason)
 	})
@@ -236,7 +236,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
 	})
@@ -255,7 +255,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
 	})
@@ -273,7 +273,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.Equal(t, fmt.Sprintf("verifier-0%[1]v => Reason A, verifier-1%[1]v => Reason B, verifier-2%[1]v => Reason C", exeIfWindows()), j.Reason)
 	})
@@ -292,7 +292,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, j.OK)
 		assert.Equal(t, fmt.Sprintf("verifier verifier-2%[1]v rejected image (exit code 1): Reason D", exeIfWindows()), j.Reason)
 	})
@@ -311,7 +311,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.Equal(t, fmt.Sprintf("verifier-0%[1]v => Reason A, verifier-1%[1]v => Reason B, verifier-2%[1]v => Reason C", exeIfWindows()), j.Reason)
 	})
@@ -330,7 +330,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, j.OK)
 		assert.Equal(t, fmt.Sprintf("verifier verifier-2%[1]v rejected image (exit code 1): Reason D", exeIfWindows()), j.Reason)
 	})
@@ -350,11 +350,11 @@ func TestBinDirVerifyImage(t *testing.T) {
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
 		if runtime.GOOS == "windows" {
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.False(t, j.OK)
 			assert.Equal(t, "verifier verifier-2.exe rejected image (exit code 1): ", j.Reason)
 		} else {
-			assert.ErrorContains(t, err, "signal: killed")
+			require.ErrorContains(t, err, "signal: killed")
 			assert.Nil(t, j)
 		}
 
@@ -389,7 +389,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, j)
 	})
 
@@ -417,7 +417,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		// Should see a log like the following, but verification still succeeds:
 		// time="2023-09-05T11:15:50-04:00" level=warning msg="failed to completely write descriptor to stdin" error="write |1: broken pipe"
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
 	})
