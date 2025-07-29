@@ -35,7 +35,6 @@ linters:
         - commentedOutCode
         - commentFormatting
         - deferInLoop
-        - deprecatedComment
         - emptyStringTest
         - equalFold
         - exitAfterDefer
