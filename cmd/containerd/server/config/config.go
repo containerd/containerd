@@ -167,15 +167,17 @@ func v1MigratePluginName(ctx context.Context, plugin string) string {
 	}
 	if !strings.ContainsAny(plugin, ".") {
 		var ambiguous string
-		if full, ok := corePlugins[plugin]; ok {
+		full, ok := corePlugins[plugin]
+		switch {
+		case ok:
 			plugin = full
-		} else if strings.HasSuffix(plugin, "-service") {
+		case strings.HasSuffix(plugin, "-service"):
 			plugin = "io.containerd.service.v1." + plugin
-		} else if plugin == "windows" || plugin == "windows-lcow" {
+		case plugin == "windows" || plugin == "windows-lcow":
 			// runtime, differ, and snapshotter plugins do not have configs for v1
 			ambiguous = plugin
 			plugin = "io.containerd.snapshotter.v1." + plugin
-		} else {
+		default:
 			ambiguous = plugin
 			plugin = "io.containerd.grpc.v1." + plugin
 		}

@@ -238,7 +238,8 @@ func Export(ctx context.Context, store content.InfoReaderProvider, writer io.Wri
 	dManifests := map[digest.Digest]*exportManifest{}
 	resolvedIndex := map[digest.Digest]digest.Digest{}
 	for _, desc := range manifests {
-		if images.IsManifestType(desc.MediaType) {
+		switch {
+		case images.IsManifestType(desc.MediaType):
 			mt, ok := dManifests[desc.Digest]
 			if !ok {
 				// TODO(containerd): Skip if already added
@@ -258,7 +259,7 @@ func Export(ctx context.Context, store content.InfoReaderProvider, writer io.Wri
 			if name != "" {
 				mt.names = append(mt.names, name)
 			}
-		} else if images.IsIndexType(desc.MediaType) {
+		case images.IsIndexType(desc.MediaType):
 			d, ok := resolvedIndex[desc.Digest]
 			if !ok {
 				if err := desc.Digest.Validate(); err != nil {
@@ -322,7 +323,7 @@ func Export(ctx context.Context, store content.InfoReaderProvider, writer io.Wri
 				}
 
 			}
-		} else {
+		default:
 			return fmt.Errorf("only manifests may be exported: %w", errdefs.ErrInvalidArgument)
 		}
 	}
