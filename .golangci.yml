@@ -46,7 +46,6 @@ linters:
         - hugeParam
         - importShadow
         - initClause
-        - ifElseChain
         - nestingReduce
         - octalLiteral
         - paramTypeCombine

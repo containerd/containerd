@@ -335,7 +335,8 @@ func Check(ctx context.Context, provider content.Provider, image ocispec.Descrip
 
 // Children returns the immediate children of content described by the descriptor.
 func Children(ctx context.Context, provider content.Provider, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-	if IsManifestType(desc.MediaType) {
+	switch {
+	case IsManifestType(desc.MediaType):
 		p, err := content.ReadBlob(ctx, provider, desc)
 		if err != nil {
 			return nil, err
@@ -353,7 +354,7 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 		}
 
 		return append([]ocispec.Descriptor{manifest.Config}, manifest.Layers...), nil
-	} else if IsIndexType(desc.MediaType) {
+	case IsIndexType(desc.MediaType):
 		p, err := content.ReadBlob(ctx, provider, desc)
 		if err != nil {
 			return nil, err
@@ -369,7 +370,7 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 		}
 
 		return append([]ocispec.Descriptor{}, index.Manifests...), nil
-	} else if !IsLayerType(desc.MediaType) && !IsKnownConfig(desc.MediaType) && !IsAttestationType(desc.MediaType) {
+	case !IsLayerType(desc.MediaType) && !IsKnownConfig(desc.MediaType) && !IsAttestationType(desc.MediaType):
 		// Layers, configs, and attestations are childless data types and should not be logged.
 		log.G(ctx).Debugf("encountered unknown type %v; children may not be fetched", desc.MediaType)
 	}

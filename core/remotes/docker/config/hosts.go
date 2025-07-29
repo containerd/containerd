@@ -98,10 +98,11 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			hosts = make([]hostConfig, 1)
 		}
 		if len(hosts) > 0 && hosts[len(hosts)-1].host == "" {
-			if host == "docker.io" {
+			switch {
+			case host == "docker.io":
 				hosts[len(hosts)-1].scheme = "https"
 				hosts[len(hosts)-1].host = "registry-1.docker.io"
-			} else if docker.IsLocalhost(host) {
+			case docker.IsLocalhost(host):
 				hosts[len(hosts)-1].host = host
 				if options.DefaultScheme == "" {
 					_, port, _ := net.SplitHostPort(host)
@@ -122,7 +123,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				} else {
 					hosts[len(hosts)-1].scheme = options.DefaultScheme
 				}
-			} else {
+			default:
 				hosts[len(hosts)-1].host = host
 				if options.DefaultScheme != "" {
 					hosts[len(hosts)-1].scheme = options.DefaultScheme

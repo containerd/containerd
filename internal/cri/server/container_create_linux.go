@@ -38,11 +38,12 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	)
 	securityContext := config.GetLinux().GetSecurityContext()
 	userstr := "0" // runtime default
-	if securityContext.GetRunAsUsername() != "" {
+	switch {
+	case securityContext.GetRunAsUsername() != "":
 		userstr = securityContext.GetRunAsUsername()
-	} else if securityContext.GetRunAsUser() != nil {
+	case securityContext.GetRunAsUser() != nil:
 		userstr = strconv.FormatInt(securityContext.GetRunAsUser().GetValue(), 10)
-	} else if imageConfig.User != "" {
+	case imageConfig.User != "":
 		userstr, _, _ = strings.Cut(imageConfig.User, ":")
 	}
 

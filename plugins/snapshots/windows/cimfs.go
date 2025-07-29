@@ -130,7 +130,7 @@ func NewCimFSSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, fmt.Errorf("failed to init base scratch VHD: %w", err)
 	}
 
-	if err = os.MkdirAll(filepath.Join(baseSn.info.HomeDir, "cim-layers"), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Join(baseSn.info.HomeDir, "cim-layers"), 0o755); err != nil {
 		return nil, err
 	}
 
@@ -270,7 +270,7 @@ func (s *cimFSSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Ki
 		log.G(ctx).Debug("createSnapshot")
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
-		if err = os.MkdirAll(snDir, 0700); err != nil {
+		if err = os.MkdirAll(snDir, 0o700); err != nil {
 			return fmt.Errorf("failed to create snapshot dir %s: %w", snDir, err)
 		}
 		defer func() {
@@ -404,11 +404,12 @@ func createDifferencingScratchVHDs(ctx context.Context, path string) (err error)
 	}
 
 	_, err = os.Stat(diffVHDPath)
-	if err != nil && !os.IsNotExist(err) {
+	switch {
+	case err != nil && !os.IsNotExist(err):
 		return fmt.Errorf("failed to stat diff VHD: %w", err)
-	} else if baseVHDExists && err == nil {
+	case baseVHDExists && err == nil:
 		diffVHDExists = true
-	} else {
+	default:
 		// remove this diff VHD, it must be recreated with the new base VHD.
 		os.RemoveAll(diffVHDPath)
 	}

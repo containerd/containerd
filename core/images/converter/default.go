@@ -87,13 +87,14 @@ func (c *defaultConverter) convert(ctx context.Context, cs content.Store, desc o
 		newDesc *ocispec.Descriptor
 		err     error
 	)
-	if images.IsLayerType(desc.MediaType) {
+	switch {
+	case images.IsLayerType(desc.MediaType):
 		newDesc, err = c.convertLayer(ctx, cs, desc)
-	} else if images.IsManifestType(desc.MediaType) {
+	case images.IsManifestType(desc.MediaType):
 		newDesc, err = c.convertManifest(ctx, cs, desc)
-	} else if images.IsIndexType(desc.MediaType) {
+	case images.IsIndexType(desc.MediaType):
 		newDesc, err = c.convertIndex(ctx, cs, desc)
-	} else if images.IsConfigType(desc.MediaType) {
+	case images.IsConfigType(desc.MediaType):
 		newDesc, err = c.convertConfig(ctx, cs, desc)
 	}
 	if err != nil {

@@ -386,7 +386,8 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 
 	// An already exists error should indicate the backend found a snapshot
 	// matching a provided target reference.
-	if errdefs.IsAlreadyExists(err) {
+	switch {
+	case errdefs.IsAlreadyExists(err):
 		if target != "" {
 			var tinfo *snapshots.Info
 			filter := fmt.Sprintf(`labels."containerd.io/snapshot.ref"==%s,parent==%q`, target, bparent)
@@ -435,9 +436,9 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 			// to avoid confusing callers handling already exists.
 			return nil, fmt.Errorf("unexpected error from snapshotter: %v: %w", err, errdefs.ErrUnknown)
 		}
-	} else if err != nil {
+	case err != nil:
 		return nil, err
-	} else {
+	default:
 		ts := time.Now().UTC()
 		base.Created = ts
 		base.Updated = ts

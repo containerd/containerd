@@ -957,11 +957,12 @@ func (c *criService) buildWindowsSpec(
 		return nil, errors.New("pod spec and all containers inside must have the HostProcess field set to be valid")
 	}
 
-	if config.GetWorkingDir() != "" {
+	switch {
+	case config.GetWorkingDir() != "":
 		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
-	} else if imageConfig.WorkingDir != "" {
+	case imageConfig.WorkingDir != "":
 		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
-	} else if cntrHpc {
+	case cntrHpc:
 		specOpts = append(specOpts, oci.WithProcessCwd(`C:\hpc`))
 	}
 
