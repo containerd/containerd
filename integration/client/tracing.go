@@ -52,7 +52,7 @@ func validateRootSpan(t *testing.T, spanNameExpected string, spans []tracetest.S
 		//A span is root span if its parent SpanContext is invalid
 		if !span.Parent.IsValid() {
 			if span.Name == spanNameExpected {
-				assert.NotEqual(t, span.Status.Code, codes.Error)
+				assert.NotEqual(t, codes.Error, span.Status.Code)
 				return
 			}
 		}

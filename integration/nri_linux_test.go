@@ -24,7 +24,6 @@ import (
 
 	"github.com/containerd/nri/pkg/api"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/vishvananda/netlink"
@@ -189,7 +188,7 @@ func TestNriPluginNetworkingLifecycle(t *testing.T) {
 		t.Fatalf("test timed out waiting for the RunPodSandbox hook to be executed")
 	}
 
-	assert.NoError(t, runtimeService.StopPodSandbox(podID))
+	require.NoError(t, runtimeService.StopPodSandbox(podID))
 	err = plugin.Wait(&Event{Pod: podID, Type: EventType(StopPodSandbox)}, time.After(pluginSyncTimeout))
 	require.NoError(t, err, "plugin sync wait")
 	select {
@@ -198,7 +197,7 @@ func TestNriPluginNetworkingLifecycle(t *testing.T) {
 		t.Fatalf("test timed out waiting for the StopPodSandbox hook to be executed")
 	}
 
-	assert.NoError(t, runtimeService.RemovePodSandbox(podID))
+	require.NoError(t, runtimeService.RemovePodSandbox(podID))
 	err = plugin.Wait(&Event{Pod: podID, Type: EventType(RemovePodSandbox)}, time.After(pluginSyncTimeout))
 	require.NoError(t, err, "plugin sync wait")
 	select {

@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/log/logtest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
@@ -89,12 +90,12 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T, useLocal bool) {
 	cli := buildLocalContainerdClient(t, tmpDir, tweakContentInitFnWithDelayer(delayDuration))
 
 	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{}, useLocal)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
 
 	_, err = criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func testCRIImagePullTimeoutBySlowCommitWriterWithLocal(t *testing.T) {
@@ -120,7 +121,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 	cli := buildLocalContainerdClient(t, tmpDir, nil)
 
 	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{}, useLocal)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
 	contentStore := cli.ContentStore()
@@ -192,7 +193,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 	}
 	`
 	var index ocispec.Index
-	assert.NoError(t, json.Unmarshal([]byte(imageIndexJSON), &index))
+	require.NoError(t, json.Unmarshal([]byte(imageIndexJSON), &index))
 
 	var manifestWriters = []io.Closer{}
 
@@ -210,7 +211,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 			content.WithDescriptor(desc),
 			content.WithRef(fmt.Sprintf("manifest-%v", desc.Digest)),
 		)
-		assert.NoError(t, err, "failed to locked manifest")
+		require.NoError(t, err, "failed to locked manifest")
 
 		t.Logf("locked the manifest %+v", desc)
 		manifestWriters = append(manifestWriters, writer)
@@ -231,7 +232,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 	case err := <-errCh:
 		t.Fatalf("PullImage should not return because the manifest has been locked, but got error=%v", err)
 	}
-	assert.NoError(t, <-errCh)
+	require.NoError(t, <-errCh)
 }
 
 func testCRIImagePullTimeoutByHoldingContentOpenWriterWithLocal(t *testing.T) {
@@ -274,7 +275,7 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 	defer ts.Close()
 
 	mirrorURL, err := url.Parse(ts.URL)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var hostTomlContent = fmt.Sprintf(`
 [host."%s"]
@@ -283,10 +284,10 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 `, mirrorURL.String())
 
 	hostCfgDir := filepath.Join(tmpDir, "registrycfg", mirrorURL.Host)
-	assert.NoError(t, os.MkdirAll(hostCfgDir, 0600))
+	require.NoError(t, os.MkdirAll(hostCfgDir, 0600))
 
 	err = os.WriteFile(filepath.Join(hostCfgDir, "hosts.toml"), []byte(hostTomlContent), 0600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
 	for idx, registryCfg := range []criconfig.Registry{
@@ -311,10 +312,10 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 			continue
 		}
 		criService, err := initLocalCRIImageService(cli, tmpDir, registryCfg, useLocal)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		dctx, _, err := cli.WithLease(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		_, err = criService.PullImage(dctx, fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"), nil, nil, "")
 
@@ -325,7 +326,7 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 		lid, ok := leases.FromContext(dctx)
 		assert.True(t, ok)
 		err = cli.LeasesService().Delete(ctx, leases.Lease{ID: lid}, leases.SynchronousDelete)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 }
 

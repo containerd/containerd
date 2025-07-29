@@ -137,7 +137,7 @@ func TestImageVolumeBasic(t *testing.T) {
 			podCtx, cnID, err := setupRunningContainerWithImageVolume(t, tc.selinuxLevel, tc.containerImage, tc.imageVolumeImage, tc.imageSubPath, tc.containerPath)
 			if err != nil {
 				require.NotEmpty(t, tc.createContainerError)
-				require.Contains(t, err.Error(), tc.createContainerError)
+				require.ErrorContains(t, err, tc.createContainerError)
 				return
 			}
 			require.Empty(t, tc.createContainerError)
@@ -174,13 +174,12 @@ func TestImageVolumeBasic(t *testing.T) {
 
 			stdout, stderr, err := runtimeService.ExecSync(cnID, tc.execSyncCommands, 0)
 			if tc.execSyncError != "" {
-				require.Error(t, err)
 				require.ErrorContains(t, err, tc.execSyncError)
 				return
 			}
 
 			require.NoError(t, err)
-			require.Len(t, stderr, 0)
+			require.Empty(t, stderr)
 			require.Contains(t, string(stdout), tc.execSyncOutput)
 		})
 	}

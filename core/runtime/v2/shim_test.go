@@ -115,10 +115,10 @@ func TestRestoreBootstrapParams(t *testing.T) {
 		Protocol: "ttrpc",
 	}
 
-	require.EqualValues(t, expected, restored)
+	require.Equal(t, expected, restored)
 
 	loaded, err := readBootstrapParams(filepath.Join(bundlePath, "bootstrap.json"))
 
 	require.NoError(t, err)
-	require.EqualValues(t, expected, loaded)
+	require.Equal(t, expected, loaded)
 }
