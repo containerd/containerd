@@ -69,8 +69,7 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 	// Figure out matrix of whether source destination combination is supported
 	switch s := src.(type) {
 	case transfer.ImageFetcher:
-		switch d := dest.(type) {
-		case transfer.ImageStorer:
+		if d, ok := dest.(transfer.ImageStorer); ok {
 			return ts.pull(ctx, s, d, topts)
 		}
 	case transfer.ImageGetter:

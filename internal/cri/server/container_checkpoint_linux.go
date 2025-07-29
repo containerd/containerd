@@ -657,8 +657,7 @@ func withCheckpointOpts(rt, rootDir string) client.CheckpointTaskOpts {
 		// This implies that the container is never stopped
 		leaveRunning := true
 
-		switch rt {
-		case plugins.RuntimeRuncV2:
+		if rt == plugins.RuntimeRuncV2 {
 			if r.Options == nil {
 				r.Options = &options.CheckpointOptions{}
 			}
