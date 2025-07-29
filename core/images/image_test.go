@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,9 +45,9 @@ func TestValidateMediaType(t *testing.T) {
 
 			err = validateMediaType(b, tc.mt)
 			if tc.index {
-				assert.Error(t, err, "manifest should not be a valid index")
+				require.Error(t, err, "manifest should not be a valid index")
 			} else {
-				assert.NoError(t, err, "manifest should be valid")
+				require.NoError(t, err, "manifest should be valid")
 			}
 		})
 		t.Run("index-"+tc.mt, func(t *testing.T) {
@@ -60,9 +59,9 @@ func TestValidateMediaType(t *testing.T) {
 
 			err = validateMediaType(b, tc.mt)
 			if tc.index {
-				assert.NoError(t, err, "index should be valid")
+				require.NoError(t, err, "index should be valid")
 			} else {
-				assert.Error(t, err, "index should not be a valid manifest")
+				require.Error(t, err, "index should not be a valid manifest")
 			}
 		})
 	}
@@ -98,7 +97,7 @@ func TestValidateMediaType(t *testing.T) {
 				require.NoError(t, err, "failed to marshal document")
 
 				err = validateMediaType(b, tc.mt)
-				assert.NoError(t, err, "document should be valid")
+				require.NoError(t, err, "document should be valid")
 			})
 		}
 		for _, iv := range tc.invalid {
@@ -110,7 +109,7 @@ func TestValidateMediaType(t *testing.T) {
 				require.NoError(t, err, "failed to marshal document")
 
 				err = validateMediaType(b, tc.mt)
-				assert.Error(t, err, "document should not be valid")
+				require.Error(t, err, "document should not be valid")
 			})
 		}
 	}
@@ -122,6 +121,6 @@ func TestValidateMediaType(t *testing.T) {
 		require.NoError(t, err, "failed to marshal document")
 
 		err = validateMediaType(b, "")
-		assert.Error(t, err, "document should not be valid")
+		require.Error(t, err, "document should not be valid")
 	})
 }

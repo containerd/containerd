@@ -32,8 +32,8 @@ import (
 func TestSetPositiveOomScoreAdjustment(t *testing.T) {
 	// Setting a *positive* OOM score adjust does not require privileged
 	_, adjustment, err := adjustOom(123)
-	assert.NoError(t, err)
-	assert.EqualValues(t, adjustment, 123)
+	require.NoError(t, err)
+	assert.Equal(t, 123, adjustment)
 }
 
 func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
@@ -43,8 +43,8 @@ func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
 	}
 
 	_, adjustment, err := adjustOom(-123)
-	assert.NoError(t, err)
-	assert.EqualValues(t, adjustment, -123)
+	require.NoError(t, err)
+	assert.Equal(t, adjustment, -123)
 }
 
 func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) {
@@ -57,33 +57,31 @@ func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) 
 	}
 
 	initial, adjustment, err := adjustOom(-123)
-	assert.NoError(t, err)
-	assert.EqualValues(t, adjustment, initial)
+	require.NoError(t, err)
+	assert.Equal(t, adjustment, initial)
 }
 
 func TestSetOOMScoreBoundaries(t *testing.T) {
 	err := SetOOMScore(0, OOMScoreAdjMax+1)
-	require.NotNil(t, err)
-	assert.Contains(t, err.Error(), fmt.Sprintf("value out of range (%d): OOM score must be between", OOMScoreAdjMax+1))
+	require.ErrorContains(t, err, fmt.Sprintf("value out of range (%d): OOM score must be between", OOMScoreAdjMax+1))
 
 	err = SetOOMScore(0, OOMScoreAdjMin-1)
-	require.NotNil(t, err)
-	assert.Contains(t, err.Error(), fmt.Sprintf("value out of range (%d): OOM score must be between", OOMScoreAdjMin-1))
+	require.ErrorContains(t, err, fmt.Sprintf("value out of range (%d): OOM score must be between", OOMScoreAdjMin-1))
 
 	_, adjustment, err := adjustOom(OOMScoreAdjMax)
-	assert.NoError(t, err)
-	assert.EqualValues(t, adjustment, OOMScoreAdjMax)
+	require.NoError(t, err)
+	assert.Equal(t, OOMScoreAdjMax, adjustment)
 
 	score, err := GetOOMScoreAdj(os.Getpid())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if score == OOMScoreAdjMin {
 		// We won't be able to set the score lower than the parent process. This
 		// could also be tested if the parent process does not have a oom-score-adj
 		// set, but GetOOMScoreAdj does not distinguish between "not set" and
 		// "score is set, but zero".
 		_, adjustment, err = adjustOom(OOMScoreAdjMin)
-		assert.NoError(t, err)
-		assert.EqualValues(t, adjustment, OOMScoreAdjMin)
+		require.NoError(t, err)
+		assert.Equal(t, OOMScoreAdjMin, adjustment)
 	}
 }
 

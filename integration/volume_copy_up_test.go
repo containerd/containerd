@@ -127,7 +127,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	t.Logf("Check host path of the volume")
 	for _, vol := range expectedVolumes {
 		_, ok := volumeMappings[vol.containerPath]
-		assert.Equalf(t, true, ok, "expected to find volume %s", vol.containerPath)
+		assert.Truef(t, ok, "expected to find volume %s", vol.containerPath)
 	}
 
 	// ghcr.io/containerd/volume-copy-up:2.2 contains 3 volumes on Linux and 2 volumes on Windows.
@@ -136,7 +136,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	for _, vol := range expectedVolumes {
 		files, err := os.ReadDir(volumeMappings[vol.containerPath])
 		require.NoError(t, err)
-		assert.Equal(t, len(vol.files), len(files))
+		assert.Len(t, files, len(vol.files))
 
 		for _, file := range vol.files {
 			t.Logf("Check whether volume %s contains the test file %s", vol.containerPath, file.fileName)

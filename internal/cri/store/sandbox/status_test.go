@@ -22,6 +22,7 @@ import (
 	"time"
 
 	assertlib "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStatus(t *testing.T) {
@@ -37,6 +38,7 @@ func TestStatus(t *testing.T) {
 	}
 	updateErr := errors.New("update error")
 	assert := assertlib.New(t)
+	require := require.New(t)
 
 	t.Logf("simple store and get")
 	s := StoreStatus(testStatus)
@@ -54,7 +56,7 @@ func TestStatus(t *testing.T) {
 	err = s.Update(func(o Status) (Status, error) {
 		return updateStatus, nil
 	})
-	assert.NoError(err)
+	require.NoError(err)
 	assert.Equal(updateStatus, s.Get())
 }
 

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	assertlib "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -40,35 +41,36 @@ func TestMetadataMarshalUnmarshal(t *testing.T) {
 	}
 
 	assert := assertlib.New(t)
+	require := require.New(t)
 	newMeta := &Metadata{}
 	newVerMeta := &versionedMetadata{}
 
 	t.Logf("should be able to do json.marshal")
 	data, err := json.Marshal(meta)
-	assert.NoError(err)
+	require.NoError(err)
 	data1, err := json.Marshal(&versionedMetadata{
 		Version:  metadataVersion,
 		Metadata: metadataInternal(*meta),
 	})
-	assert.NoError(err)
+	require.NoError(err)
 	assert.Equal(data, data1)
 
 	t.Logf("should be able to do MarshalJSON")
 	data, err = meta.MarshalJSON()
-	assert.NoError(err)
-	assert.NoError(newMeta.UnmarshalJSON(data))
+	require.NoError(err)
+	require.NoError(newMeta.UnmarshalJSON(data))
 	assert.Equal(meta, newMeta)
 
 	t.Logf("should be able to do MarshalJSON and json.Unmarshal")
 	data, err = meta.MarshalJSON()
-	assert.NoError(err)
-	assert.NoError(json.Unmarshal(data, newVerMeta))
-	assert.Equal(meta, (*Metadata)(&newVerMeta.Metadata))
+	require.NoError(err)
+	require.NoError(json.Unmarshal(data, newVerMeta))
+	assert.Equal((*Metadata)(&newVerMeta.Metadata), meta)
 
 	t.Logf("should be able to do json.Marshal and UnmarshalJSON")
 	data, err = json.Marshal(meta)
-	assert.NoError(err)
-	assert.NoError(newMeta.UnmarshalJSON(data))
+	require.NoError(err)
+	require.NoError(newMeta.UnmarshalJSON(data))
 	assert.Equal(meta, newMeta)
 
 	t.Logf("should json.Unmarshal fail for unsupported version")
@@ -76,6 +78,6 @@ func TestMetadataMarshalUnmarshal(t *testing.T) {
 		Version:  "random-test-version",
 		Metadata: metadataInternal(*meta),
 	})
-	assert.NoError(err)
-	assert.Error(json.Unmarshal(unsupported, &newMeta))
+	require.NoError(err)
+	require.Error(json.Unmarshal(unsupported, &newMeta))
 }

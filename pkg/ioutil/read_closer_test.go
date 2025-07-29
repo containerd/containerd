@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWrapReadCloser(t *testing.T) {
@@ -31,12 +32,12 @@ func TestWrapReadCloser(t *testing.T) {
 	dst := make([]byte, 1)
 	n, err := rc.Read(dst)
 	assert.Equal(t, 1, n)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []byte("a"), dst)
 
 	n, err = rc.Read(dst)
 	assert.Equal(t, 1, n)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []byte("b"), dst)
 
 	rc.Close()

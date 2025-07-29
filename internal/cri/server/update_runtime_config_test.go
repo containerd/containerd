@@ -128,14 +128,14 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 				c.netPlugin[defaultNetworkPlugin].(*servertesting.FakeCNIPlugin).LoadErr = errors.New("random error")
 			}
 			_, err = c.UpdateRuntimeConfig(context.Background(), req)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if !test.expectCNIConfig {
 				_, err := os.Stat(confName)
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				got, err := os.ReadFile(confName)
-				assert.NoError(t, err)
-				assert.Equal(t, expected, string(got))
+				require.NoError(t, err)
+				assert.Equal(t, expected, string(got)) //nolint:testifylint //Can not use JSONEq
 			}
 		})
 	}

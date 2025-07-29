@@ -28,6 +28,7 @@ import (
 
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -41,7 +42,7 @@ import (
 func TestSnapshotterSuite(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	assert.NoError(t, log.SetLevel("debug"))
+	require.NoError(t, log.SetLevel("debug"))
 
 	snapshotterFn := func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 		poolName := fmt.Sprintf("containerd-snapshotter-suite-pool-%d", time.Now().Nanosecond())
@@ -60,7 +61,7 @@ func TestSnapshotterSuite(t *testing.T) {
 
 	t.Run("DevMapperUsage", func(t *testing.T) {
 		snapshotter, closer, err := snapshotterFn(ctx, t.TempDir())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		defer closer()
 
 		testUsage(t, snapshotter)
@@ -74,16 +75,16 @@ func testUsage(t *testing.T, snapshotter snapshots.Snapshotter) {
 
 	// Create empty base layer
 	_, err := snapshotter.Prepare(ctx, "prepare-1", "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	emptyLayerUsage, err := snapshotter.Usage(ctx, "prepare-1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Should be > 0 as just written file system also consumes blocks
-	assert.Greater(t, emptyLayerUsage.Size, int64(0))
+	assert.Positive(t, emptyLayerUsage.Size)
 
 	err = snapshotter.Commit(ctx, "layer-1", "prepare-1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create child layer with 1MB file
 
@@ -93,16 +94,16 @@ func testUsage(t *testing.T, snapshotter snapshots.Snapshotter) {
 	)
 
 	mounts, err := snapshotter.Prepare(ctx, "prepare-2", "layer-1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = mount.WithTempMount(ctx, mounts, baseApplier.Apply)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = snapshotter.Commit(ctx, "layer-2", "prepare-2")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	layer2Usage, err := snapshotter.Usage(ctx, "layer-2")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Should be at least 1 MB + fs metadata
 	assert.GreaterOrEqual(t, layer2Usage.Size, sizeBytes,
@@ -113,32 +114,32 @@ func TestMkfsExt4(t *testing.T) {
 	ctx := context.Background()
 	// We test the default setting which is lazy init is disabled
 	err := mkfs(ctx, "ext4", "nodiscard,lazy_itable_init=0,lazy_journal_init=0", "")
-	assert.Contains(t, err.Error(), `mkfs.ext4 couldn't initialize ""`)
+	require.ErrorContains(t, err, `mkfs.ext4 couldn't initialize ""`)
 }
 
 func TestMkfsExt4NonDefault(t *testing.T) {
 	ctx := context.Background()
 	// We test a non default setting where we enable lazy init for ext4
 	err := mkfs(ctx, "ext4", "nodiscard", "")
-	assert.Contains(t, err.Error(), `mkfs.ext4 couldn't initialize ""`)
+	require.ErrorContains(t, err, `mkfs.ext4 couldn't initialize ""`)
 }
 
 func TestMkfsXfs(t *testing.T) {
 	ctx := context.Background()
 	err := mkfs(ctx, "xfs", "", "")
-	assert.Contains(t, err.Error(), `mkfs.xfs couldn't initialize ""`)
+	require.ErrorContains(t, err, `mkfs.xfs couldn't initialize ""`)
 }
 
 func TestMkfsXfsNonDefault(t *testing.T) {
 	ctx := context.Background()
 	err := mkfs(ctx, "xfs", "noquota", "")
-	assert.Contains(t, err.Error(), `mkfs.xfs couldn't initialize ""`)
+	require.ErrorContains(t, err, `mkfs.xfs couldn't initialize ""`)
 }
 
 func TestMultipleXfsMounts(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	assert.NoError(t, log.SetLevel("debug"))
+	require.NoError(t, log.SetLevel("debug"))
 
 	ctx := context.Background()
 	ctx = namespaces.WithNamespace(ctx, "testsuite")
@@ -152,7 +153,7 @@ func TestMultipleXfsMounts(t *testing.T) {
 		FileSystemType: "xfs",
 	}
 	snapshotter, closer, err := createSnapshotter(ctx, t, config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer closer()
 
 	var (
@@ -162,27 +163,27 @@ func TestMultipleXfsMounts(t *testing.T) {
 
 	// Create base layer
 	mounts, err := snapshotter.Prepare(ctx, "prepare-1", "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	root1 := t.TempDir()
 	defer func() {
 		mount.UnmountAll(root1, 0)
 	}()
 	err = mount.All(mounts, root1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	baseApplier.Apply(root1)
 	snapshotter.Commit(ctx, "layer-1", "prepare-1")
 
 	// Create one child layer
 	mounts, err = snapshotter.Prepare(ctx, "prepare-2", "layer-1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	root2 := t.TempDir()
 	defer func() {
 		mount.UnmountAll(root2, 0)
 	}()
 	err = mount.All(mounts, root2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func createSnapshotter(ctx context.Context, t *testing.T, config *Config) (snapshots.Snapshotter, func() error, error) {
@@ -191,7 +192,7 @@ func createSnapshotter(ctx context.Context, t *testing.T, config *Config) (snaps
 	_, loopMetaDevice := createLoopbackDevice(t, config.RootPath)
 
 	err := dmsetup.CreatePool(config.PoolName, loopDataDevice, loopMetaDevice, 64*1024/dmsetup.SectorSize)
-	assert.Nil(t, err, "failed to create pool %q", config.PoolName)
+	require.NoError(t, err, "failed to create pool %q", config.PoolName)
 
 	snap, err := NewSnapshotter(ctx, config)
 	if err != nil {

@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/api/types"
 	containerd "github.com/containerd/containerd/v2/client"
@@ -403,7 +404,7 @@ func TestRecoverContainer(t *testing.T) {
 	for _, c := range containers {
 		cont := c.container
 		sb, err := controller.RecoverContainer(context.Background(), &cont)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		pSb := controller.store.Get(cont.ID())
 		assert.NotNil(t, pSb)

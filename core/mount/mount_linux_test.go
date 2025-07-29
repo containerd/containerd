@@ -381,7 +381,7 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 
 			if tc.injectUmountFault {
 				// We should have failed to remove the remounts location if the unmount failed.
-				assert.Error(t, err, "expected remove to fail (dir not empty), expected remount child locations to still exist after unmount failure")
+				require.Error(t, err, "expected remove to fail (dir not empty), expected remount child locations to still exist after unmount failure")
 			} else {
 				assert.NoError(t, err, "expected remove to work (dir empty), the child directory should be unmounted and removed")
 			}

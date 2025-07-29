@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -158,7 +159,7 @@ func TestFilterSandboxes(t *testing.T) {
 
 	// Inject test sandbox metadata
 	for _, sb := range sandboxes {
-		assert.NoError(t, c.sandboxStore.Add(sb))
+		require.NoError(t, c.sandboxStore.Add(sb))
 	}
 
 	for _, test := range []struct {

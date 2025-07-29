@@ -20,12 +20,12 @@ package devmapper
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )
 
@@ -45,16 +45,16 @@ func TestPoolMetadata_AddDevice(t *testing.T) {
 	}
 
 	err := store.AddDevice(testCtx, expected)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	result, err := store.GetDevice(testCtx, "test2")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, expected.Name, result.Name)
 	assert.Equal(t, expected.ParentName, result.ParentName)
 	assert.Equal(t, expected.Size, result.Size)
 	assert.Equal(t, expected.State, result.State)
-	assert.NotZero(t, result.DeviceID, 0)
+	assert.NotZero(t, result.DeviceID, "%+v", 0)
 	assert.Equal(t, expected.DeviceID, result.DeviceID)
 }
 
@@ -63,7 +63,7 @@ func TestPoolMetadata_AddDeviceRollback(t *testing.T) {
 	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: ""})
-	assert.True(t, err != nil)
+	require.Error(t, err)
 
 	_, err = store.GetDevice(testCtx, "")
 	assert.Equal(t, ErrNotFound, err)
@@ -74,10 +74,10 @@ func TestPoolMetadata_AddDeviceDuplicate(t *testing.T) {
 	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "test"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = store.AddDevice(testCtx, &DeviceInfo{Name: "test"})
-	assert.True(t, errors.Is(err, ErrAlreadyExists))
+	assert.ErrorIs(t, err, ErrAlreadyExists)
 }
 
 func TestPoolMetadata_ReuseDeviceID(t *testing.T) {
@@ -86,21 +86,21 @@ func TestPoolMetadata_ReuseDeviceID(t *testing.T) {
 
 	info1 := &DeviceInfo{Name: "test1"}
 	err := store.AddDevice(testCtx, info1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	info2 := &DeviceInfo{Name: "test2"}
 	err = store.AddDevice(testCtx, info2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.NotEqual(t, info1.DeviceID, info2.DeviceID)
 	assert.NotZero(t, info1.DeviceID)
 
 	err = store.RemoveDevice(testCtx, info2.Name)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	info3 := &DeviceInfo{Name: "test3"}
 	err = store.AddDevice(testCtx, info3)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, info2.DeviceID, info3.DeviceID)
 }
@@ -110,10 +110,10 @@ func TestPoolMetadata_RemoveDevice(t *testing.T) {
 	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "test"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = store.RemoveDevice(testCtx, "test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = store.GetDevice(testCtx, "test")
 	assert.Equal(t, ErrNotFound, err)
@@ -131,7 +131,7 @@ func TestPoolMetadata_UpdateDevice(t *testing.T) {
 	}
 
 	err := store.AddDevice(testCtx, oldInfo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = store.UpdateDevice(testCtx, oldInfo.Name, func(info *DeviceInfo) error {
 		info.ParentName = "test5"
@@ -140,14 +140,14 @@ func TestPoolMetadata_UpdateDevice(t *testing.T) {
 		return nil
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	newInfo, err := store.GetDevice(testCtx, "test1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, "test1", newInfo.Name)
 	assert.Equal(t, "test5", newInfo.ParentName)
-	assert.EqualValues(t, newInfo.Size, 6)
+	assert.EqualValues(t, 6, newInfo.Size)
 	assert.Equal(t, Created, newInfo.State)
 }
 
@@ -157,15 +157,15 @@ func TestPoolMetadata_MarkFaulty(t *testing.T) {
 
 	info := &DeviceInfo{Name: "test"}
 	err := store.AddDevice(testCtx, info)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = store.MarkFaulty(testCtx, "test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	saved, err := store.GetDevice(testCtx, info.Name)
-	assert.NoError(t, err)
-	assert.Equal(t, saved.State, Faulty)
-	assert.True(t, saved.DeviceID > 0)
+	require.NoError(t, err)
+	assert.Equal(t, Faulty, saved.State)
+	assert.Positive(t, saved.DeviceID)
 
 	// Make sure a device ID marked as faulty as well
 	err = store.db.View(func(tx *bbolt.Tx) error {
@@ -175,7 +175,7 @@ func TestPoolMetadata_MarkFaulty(t *testing.T) {
 		assert.Equal(t, value[0], byte(deviceFaulty))
 		return nil
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestPoolMetadata_WalkDevices(t *testing.T) {
@@ -183,10 +183,10 @@ func TestPoolMetadata_WalkDevices(t *testing.T) {
 	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "device1", DeviceID: 1, State: Created})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = store.AddDevice(testCtx, &DeviceInfo{Name: "device2", DeviceID: 2, State: Faulty})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	called := 0
 	err = store.WalkDevices(testCtx, func(info *DeviceInfo) error {
@@ -206,8 +206,8 @@ func TestPoolMetadata_WalkDevices(t *testing.T) {
 
 		return nil
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, called, 2)
+	require.NoError(t, err)
+	assert.Equal(t, 2, called)
 }
 
 func TestPoolMetadata_GetDeviceNames(t *testing.T) {
@@ -215,13 +215,13 @@ func TestPoolMetadata_GetDeviceNames(t *testing.T) {
 	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "test1"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = store.AddDevice(testCtx, &DeviceInfo{Name: "test2"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	names, err := store.GetDeviceNames(testCtx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, names, 2)
 
 	assert.Equal(t, "test1", names[0])
@@ -231,12 +231,12 @@ func TestPoolMetadata_GetDeviceNames(t *testing.T) {
 func createStore(t *testing.T) (store *PoolMetadata) {
 	path := filepath.Join(t.TempDir(), "test.db")
 	metadata, err := NewPoolMetadata(path)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return metadata
 }
 
 func cleanupStore(t *testing.T, store *PoolMetadata) {
 	err := store.Close()
-	assert.Nil(t, err, "failed to close metadata store")
+	require.NoError(t, err, "failed to close metadata store")
 }

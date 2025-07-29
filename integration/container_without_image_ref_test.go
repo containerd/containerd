@@ -48,7 +48,7 @@ func TestContainerLifecycleWithoutImageRef(t *testing.T) {
 	require.NoError(t, runtimeService.StartContainer(cn))
 
 	t.Log("Remove test image")
-	assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
+	require.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
 
 	t.Log("Container status should be running")
 	status, err := runtimeService.ContainerStatus(cn)
@@ -57,7 +57,7 @@ func TestContainerLifecycleWithoutImageRef(t *testing.T) {
 
 	t.Logf("Stop container")
 	err = runtimeService.StopContainer(cn, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Log("Container status should be exited")
 	status, err = runtimeService.ContainerStatus(cn)

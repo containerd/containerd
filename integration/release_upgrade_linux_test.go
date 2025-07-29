@@ -299,7 +299,7 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, taskVersion int,
 					PodSandboxId: pod.Id,
 				})
 				require.NoError(t, err)
-				require.Equal(t, 3, len(cntrs))
+				require.Len(t, cntrs, 3)
 
 				for _, cntr := range cntrs {
 					switch cntr.Id {
@@ -324,7 +324,7 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, taskVersion int,
 					PodSandboxId: pod.Id,
 				})
 				require.NoError(t, err)
-				require.Equal(t, 1, len(cntrs))
+				require.Len(t, cntrs, 1)
 				assert.Equal(t, criruntime.ContainerState_CONTAINER_EXITED, cntrs[0].State)
 
 			default:
@@ -364,7 +364,7 @@ func execToExistingContainer(t *testing.T, _ int,
 			PodSandboxId: pods[0].Id,
 		})
 		require.NoError(t, err)
-		require.Equal(t, 1, len(cntrs))
+		require.Len(t, cntrs, 1)
 		assert.Equal(t, criruntime.ContainerState_CONTAINER_RUNNING, cntrs[0].State)
 		assert.Equal(t, cnID, cntrs[0].Id)
 
@@ -388,7 +388,7 @@ func execToExistingContainer(t *testing.T, _ int,
 		t.Log("Run ExecSync")
 		stdout, stderr, err := rSvc.ExecSync(cntrs[0].Id, []string{"echo", "-n", "true"}, 0)
 		require.NoError(t, err)
-		require.Len(t, stderr, 0)
+		require.Empty(t, stderr)
 		require.Equal(t, "true", string(stdout))
 	}
 	return []upgradeVerifyCaseFunc{verifyFunc}, nil
@@ -501,7 +501,7 @@ func shouldManipulateContainersInPodAfterUpgrade(runtimeHandler string) setupUpg
 			t.Logf("Containers data dir %s should be empty", cntrDataDir)
 			ents, err := os.ReadDir(cntrDataDir)
 			require.NoError(t, err)
-			require.Len(t, ents, 0, cntrDataDir)
+			require.Empty(t, ents, cntrDataDir)
 
 			t.Log("Creating new running container in new pod")
 			pod2Ctx := newPodTCtxWithRuntimeHandler(t, rSvc, "running-pod-2", "sandbox", runtimeHandler)
@@ -518,7 +518,7 @@ func shouldManipulateContainersInPodAfterUpgrade(runtimeHandler string) setupUpg
 			for _, shimCli := range shimConns {
 				t.Logf("Checking container %s's shim client", shimCli.cntrID)
 				_, err = shimCli.cli.Connect(context.Background(), &apitask.ConnectRequest{})
-				assert.ErrorContains(t, err, "ttrpc: closed", "should be closed after deleting pod")
+				require.ErrorContains(t, err, "ttrpc: closed", "should be closed after deleting pod")
 			}
 		}
 		return []upgradeVerifyCaseFunc{verifyFunc}, nil
@@ -618,7 +618,7 @@ done
 
 		// NOTE: Just in case that part of inactive cache has been reclaimed.
 		expectedBytes := uint64(fileSize * 2 / 3)
-		require.True(t, stats.GetMemory().GetUsageBytes().GetValue() > expectedBytes)
+		require.Greater(t, stats.GetMemory().GetUsageBytes().GetValue(), expectedBytes)
 	}
 	return []upgradeVerifyCaseFunc{verifyFunc}, nil
 }
@@ -834,8 +834,8 @@ func cleanupPods(t *testing.T, criRuntimeService cri.RuntimeService) {
 	require.NoError(t, err)
 
 	for _, pod := range pods {
-		assert.NoError(t, criRuntimeService.StopPodSandbox(pod.Id))
-		assert.NoError(t, criRuntimeService.RemovePodSandbox(pod.Id))
+		require.NoError(t, criRuntimeService.StopPodSandbox(pod.Id))
+		require.NoError(t, criRuntimeService.RemovePodSandbox(pod.Id))
 	}
 }
 
@@ -940,7 +940,7 @@ func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string, envs []string
 		defer close(p.waitBlock)
 
 		require.NoError(t, p.cmd.Start(), "start containerd(%s)", ctrdBin)
-		assert.NoError(t, p.cmd.Wait())
+		require.NoError(t, p.cmd.Wait())
 	}()
 	return p
 }

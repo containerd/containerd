@@ -216,6 +216,6 @@ func TestRestartPolicyReconcile(t *testing.T) {
 	}
 	for _, testCase := range tests {
 		result := Reconcile(testCase.status, testCase.labels)
-		assert.Equal(t, testCase.want, result, testCase)
+		assert.Equal(t, testCase.want, result, "%+v", testCase)
 	}
 }

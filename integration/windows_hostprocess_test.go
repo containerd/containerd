@@ -27,7 +27,6 @@ import (
 
 	"github.com/Microsoft/hcsshim/osversion"
 	"github.com/containerd/containerd/v2/integration/images"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows/registry"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -111,7 +110,7 @@ func runHostProcess(t *testing.T, expectErr bool, image string, action hpcAction
 	cn, err := runtimeService.CreateContainer(sb, containerConfig, sbConfig)
 	require.NoError(t, err)
 	defer func() {
-		assert.NoError(t, runtimeService.RemoveContainer(cn))
+		require.NoError(t, runtimeService.RemoveContainer(cn))
 	}()
 	_, err = t, runtimeService.StartContainer(cn)
 	if err != nil {
@@ -121,7 +120,7 @@ func runHostProcess(t *testing.T, expectErr bool, image string, action hpcAction
 		return
 	}
 	defer func() {
-		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+		require.NoError(t, runtimeService.StopContainer(cn, 10))
 	}()
 
 	action(t, cn, containerConfig)
@@ -175,8 +174,8 @@ func TestArgsEscapedImagesOnWindows(t *testing.T) {
 	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+		require.NoError(t, runtimeService.StopPodSandbox(sb))
+		require.NoError(t, runtimeService.RemovePodSandbox(sb))
 	})
 
 	EnsureImageExists(t, testImage)

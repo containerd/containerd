@@ -29,6 +29,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log/logtest"
@@ -63,7 +64,7 @@ func TestMergeConfigs(t *testing.T) {
 	}
 
 	err := mergeConfig(a, b)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, 2, a.Version)
 	assert.Equal(t, "new_root", a.Root)
@@ -79,13 +80,13 @@ func TestMergeConfigs(t *testing.T) {
 	a = &Config{Version: 2, OOMScore: 1}
 	b = &Config{Version: 2, OOMScore: 0} // OOMScore "not set / default"
 	err = mergeConfig(a, b)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 1, a.OOMScore)
 
 	a = &Config{Version: 2, OOMScore: 1}
 	b = &Config{Version: 2, OOMScore: 0} // OOMScore "not set / default"
 	err = mergeConfig(a, b)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 1, a.OOMScore)
 }
 
@@ -94,7 +95,7 @@ func TestResolveImports(t *testing.T) {
 
 	for _, filename := range []string{"config_1.toml", "config_2.toml", "test.toml"} {
 		err := os.WriteFile(filepath.Join(tempDir, filename), []byte(""), 0o600)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	imports, err := resolveImports(filepath.Join(tempDir, "root.toml"), []string{
@@ -102,24 +103,24 @@ func TestResolveImports(t *testing.T) {
 		filepath.Join(tempDir, "./test.toml"),   // Path clean up
 		"current.toml",                          // Resolve current working dir
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, imports, []string{
+	assert.Equal(t, []string{
 		filepath.Join(tempDir, "config_1.toml"),
 		filepath.Join(tempDir, "config_2.toml"),
 		filepath.Join(tempDir, "test.toml"),
 		filepath.Join(tempDir, "current.toml"),
-	})
+	}, imports)
 
 	t.Run("GlobRelativePath", func(t *testing.T) {
 		imports, err := resolveImports(filepath.Join(tempDir, "root.toml"), []string{
 			"config_*.toml", // Glob files from working dir
 		})
-		assert.NoError(t, err)
-		assert.Equal(t, imports, []string{
+		require.NoError(t, err)
+		assert.Equal(t, []string{
 			filepath.Join(tempDir, "config_1.toml"),
 			filepath.Join(tempDir, "config_2.toml"),
-		})
+		}, imports)
 	})
 }
 
@@ -137,11 +138,11 @@ root = "/var/lib/containerd"
 
 	path := filepath.Join(tempDir, "config.toml")
 	err := os.WriteFile(path, []byte(data), 0o600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(context.Background(), path, &out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 2, out.Version)
 	assert.Equal(t, "/var/lib/containerd", out.Root)
 	assert.Equal(t, map[string]StreamProcessor{
@@ -166,14 +167,14 @@ disabled_plugins = ["io.containerd.v1.xyz"]
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0o600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0o600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, 2, out.Version)
 	assert.Equal(t, "/var/lib/containerd", out.Root)
@@ -194,14 +195,14 @@ imports = ["data1.toml", "data2.toml"]
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0o600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0o600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, 2, out.Version)
 	assert.Equal(t, "/var/lib/containerd", out.Root)
@@ -222,12 +223,12 @@ disabled_plugins=["cri"]
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0o600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var out Config
 	out.Version = version.ConfigVersion
 	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, version.ConfigVersion, out.Version)
 	assert.Equal(t, []string{"io.containerd.grpc.v1.cri"}, out.DisabledPlugins)
@@ -245,15 +246,15 @@ version = 2
 
 	path := filepath.Join(tempDir, "config.toml")
 	err := os.WriteFile(path, []byte(data), 0o600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(context.Background(), path, &out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	pluginConfig := map[string]interface{}{}
 	_, err = out.Decode(ctx, "io.containerd.runtime.v2.task", &pluginConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }
 
@@ -268,20 +269,20 @@ func TestDecodePluginInV1Config(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "config.toml")
 	err := os.WriteFile(path, []byte(data), 0o600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(context.Background(), path, &out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 0, out.Version)
 
 	err = out.MigrateConfig(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 3, out.Version)
 
 	pluginConfig := map[string]interface{}{}
 	_, err = out.Decode(ctx, "io.containerd.runtime.v2.task", &pluginConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }
 
@@ -425,17 +426,17 @@ func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlug
 		filename := fmt.Sprintf("data%d.toml", i+1)
 		filepath := filepath.Join(tempDir, filename)
 		err := os.WriteFile(filepath, []byte(data), 0600)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		var tempOut Config
 		err = LoadConfig(context.Background(), filepath, &tempOut)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		if i == 0 {
 			result = tempOut
 		} else {
 			err = mergeConfig(&result, &tempOut)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}
 

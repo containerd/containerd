@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/integration/images"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -82,7 +81,7 @@ func TestWindowsRootfsSize(t *testing.T) {
 
 	t.Log("Check container log")
 	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Format of output for dir /-C:
 	//

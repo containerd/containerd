@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/integration/images"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,11 +41,11 @@ func TestContainerRestart(t *testing.T) {
 	cn, err := runtimeService.CreateContainer(sb, containerConfig, sbConfig)
 	require.NoError(t, err)
 	defer func() {
-		assert.NoError(t, runtimeService.RemoveContainer(cn))
+		require.NoError(t, runtimeService.RemoveContainer(cn))
 	}()
 	require.NoError(t, runtimeService.StartContainer(cn))
 	defer func() {
-		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+		require.NoError(t, runtimeService.StopContainer(cn, 10))
 	}()
 
 	t.Logf("Restart the container with same config")
@@ -78,11 +77,11 @@ func TestFailedContainerRestart(t *testing.T) {
 	cn, err := runtimeService.CreateContainer(sb, containerConfig, sbConfig)
 	require.NoError(t, err)
 	defer func() {
-		assert.NoError(t, runtimeService.RemoveContainer(cn))
+		require.NoError(t, runtimeService.RemoveContainer(cn))
 	}()
 	require.Error(t, runtimeService.StartContainer(cn))
 	defer func() {
-		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+		require.NoError(t, runtimeService.StopContainer(cn, 10))
 	}()
 
 	t.Logf("Create the container with a proper command")

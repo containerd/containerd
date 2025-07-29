@@ -22,6 +22,7 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/reference"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRepositoryScope(t *testing.T) {
@@ -50,7 +51,7 @@ func TestRepositoryScope(t *testing.T) {
 	for _, x := range testCases {
 		t.Run(x.refspec.String(), func(t *testing.T) {
 			actual, err := RepositoryScope(x.refspec, x.push)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, x.expected, actual)
 		})
 	}

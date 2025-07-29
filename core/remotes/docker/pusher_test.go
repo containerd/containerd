@@ -162,19 +162,19 @@ func TestPusherErrReset(t *testing.T) {
 	}
 
 	w, err := p.push(context.Background(), desc, remotes.MakeRefKey(context.Background(), desc), false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// first push should fail with ErrReset
 	_, err = w.Write(ct)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = w.Commit(context.Background(), desc.Size, desc.Digest)
 	assert.Equal(t, content.ErrReset, err)
 
 	// second push should succeed
 	_, err = w.Write(ct)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = w.Commit(context.Background(), desc.Size, desc.Digest)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestPusherInvalidAuthorizationOnMount(t *testing.T) {
@@ -279,9 +279,9 @@ func TestPusherInvalidAuthorizationOnMount(t *testing.T) {
 			require.NoError(t, err)
 
 			_, err = w.Write(ct)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			err = w.Commit(context.Background(), desc.Size, desc.Digest)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.True(t, triggered.Load(), "error return was not triggered")
 		})
@@ -684,7 +684,7 @@ func Test_dockerPusher_push(t *testing.T) {
 
 			if test.wantStatus != nil {
 				status, err := tracker.GetStatus(test.args.ref)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, *test.wantStatus, status.PushStatus)
 			}
 
@@ -698,7 +698,7 @@ func Test_dockerPusher_push(t *testing.T) {
 
 			pw, ok := got.(*pushWriter)
 			if !ok {
-				assert.Errorf(t, errors.New("unable to cast content.Writer to pushWriter"), "got %v instead of pushwriter", got)
+				require.Errorf(t, errors.New("unable to cast content.Writer to pushWriter"), "got %v instead of pushwriter", got)
 			}
 
 			// test whether a proper response has been received after the push operation

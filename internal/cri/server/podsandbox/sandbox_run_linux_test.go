@@ -68,35 +68,35 @@ func getRunPodSandboxTestData(criCfg criconfig.Config) (*runtime.PodSandboxConfi
 		assert.Equal(t, "test-hostname", spec.Hostname)
 		assert.Equal(t, getCgroupsPath("/test/cgroup/parent", id), spec.Linux.CgroupsPath)
 		assert.Equal(t, relativeRootfsPath, spec.Root.Path)
-		assert.Equal(t, true, spec.Root.Readonly)
+		assert.True(t, spec.Root.Readonly)
 		assert.Contains(t, spec.Process.Env, "a=b", "c=d")
 		assert.Equal(t, []string{"/pause", "forever"}, spec.Process.Args)
 		assert.Equal(t, "/workspace", spec.Process.Cwd)
-		assert.EqualValues(t, *spec.Linux.Resources.CPU.Shares, opts.DefaultSandboxCPUshares)
-		assert.EqualValues(t, *spec.Process.OOMScoreAdj, defaultSandboxOOMAdj)
+		assert.EqualValues(t, opts.DefaultSandboxCPUshares, *spec.Linux.Resources.CPU.Shares)
+		assert.Equal(t, defaultSandboxOOMAdj, *spec.Process.OOMScoreAdj)
 
 		t.Logf("Check PodSandbox annotations")
 		assert.Contains(t, spec.Annotations, annotations.SandboxID)
-		assert.EqualValues(t, spec.Annotations[annotations.SandboxID], id)
+		assert.Equal(t, spec.Annotations[annotations.SandboxID], id)
 
 		assert.Contains(t, spec.Annotations, annotations.ContainerType)
-		assert.EqualValues(t, spec.Annotations[annotations.ContainerType], annotations.ContainerTypeSandbox)
+		assert.Equal(t, annotations.ContainerTypeSandbox, spec.Annotations[annotations.ContainerType])
 
 		assert.Contains(t, spec.Annotations, annotations.SandboxNamespace)
-		assert.EqualValues(t, spec.Annotations[annotations.SandboxNamespace], "test-ns")
+		assert.Equal(t, "test-ns", spec.Annotations[annotations.SandboxNamespace])
 
 		assert.Contains(t, spec.Annotations, annotations.SandboxUID)
-		assert.EqualValues(t, spec.Annotations[annotations.SandboxUID], "test-uid")
+		assert.Equal(t, "test-uid", spec.Annotations[annotations.SandboxUID])
 
 		assert.Contains(t, spec.Annotations, annotations.SandboxName)
-		assert.EqualValues(t, spec.Annotations[annotations.SandboxName], "test-name")
+		assert.Equal(t, "test-name", spec.Annotations[annotations.SandboxName])
 
 		assert.Contains(t, spec.Annotations, annotations.SandboxLogDir)
-		assert.EqualValues(t, spec.Annotations[annotations.SandboxLogDir], "test-log-directory")
+		assert.Equal(t, "test-log-directory", spec.Annotations[annotations.SandboxLogDir])
 
 		if selinux.GetEnabled() {
-			assert.NotEqual(t, "", spec.Process.SelinuxLabel)
-			assert.NotEqual(t, "", spec.Linux.MountLabel)
+			assert.NotEmpty(t, spec.Process.SelinuxLabel)
+			assert.NotEmpty(t, spec.Linux.MountLabel)
 		}
 
 		assert.Contains(t, spec.Mounts, runtimespec.Mount{
@@ -128,7 +128,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 
 	netnsBasedir := t.TempDir()
 	t.Cleanup(func() {
-		assert.NoError(t, unmountRecursive(context.Background(), netnsBasedir))
+		require.NoError(t, unmountRecursive(context.Background(), netnsBasedir))
 	})
 
 	var netNs *netns.NetNS
@@ -243,8 +243,8 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 					Type: runtimespec.UserNamespace,
 					Path: filepath.Join(c.config.StateDir, "sandboxes", testID, "pinned-namespaces", "user"),
 				})
-				require.Equal(t, spec.Linux.UIDMappings, []runtimespec.LinuxIDMapping{expIDMap})
-				require.Equal(t, spec.Linux.GIDMappings, []runtimespec.LinuxIDMapping{expIDMap})
+				require.Equal(t, []runtimespec.LinuxIDMapping{expIDMap}, spec.Linux.UIDMappings)
+				require.Equal(t, []runtimespec.LinuxIDMapping{expIDMap}, spec.Linux.GIDMappings)
 
 			},
 		},
@@ -372,20 +372,20 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
 				value, ok := spec.Annotations[annotations.SandboxCPUPeriod]
 				assert.True(t, ok)
-				assert.EqualValues(t, strconv.FormatInt(100, 10), value)
-				assert.EqualValues(t, "100", value)
+				assert.Equal(t, strconv.FormatInt(100, 10), value)
+				assert.Equal(t, "100", value)
 
 				value, ok = spec.Annotations[annotations.SandboxCPUQuota]
 				assert.True(t, ok)
-				assert.EqualValues(t, "200", value)
+				assert.Equal(t, "200", value)
 
 				value, ok = spec.Annotations[annotations.SandboxCPUShares]
 				assert.True(t, ok)
-				assert.EqualValues(t, "5000", value)
+				assert.Equal(t, "5000", value)
 
 				value, ok = spec.Annotations[annotations.SandboxMem]
 				assert.True(t, ok)
-				assert.EqualValues(t, "1024", value)
+				assert.Equal(t, "1024", value)
 			},
 		},
 		{
@@ -409,16 +409,16 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
 				value, ok := spec.Annotations[annotations.SandboxCPUPeriod]
 				assert.True(t, ok)
-				assert.EqualValues(t, "0", value)
+				assert.Equal(t, "0", value)
 				value, ok = spec.Annotations[annotations.SandboxCPUQuota]
 				assert.True(t, ok)
-				assert.EqualValues(t, "0", value)
+				assert.Equal(t, "0", value)
 				value, ok = spec.Annotations[annotations.SandboxCPUShares]
 				assert.True(t, ok)
-				assert.EqualValues(t, "0", value)
+				assert.Equal(t, "0", value)
 				value, ok = spec.Annotations[annotations.SandboxMem]
 				assert.True(t, ok)
-				assert.EqualValues(t, "0", value)
+				assert.Equal(t, "0", value)
 			},
 		},
 	} {
@@ -428,7 +428,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			c.config.StateDir = t.TempDir()
 
 			defer func() {
-				assert.NoError(t, unmountRecursive(context.Background(), c.config.StateDir))
+				require.NoError(t, unmountRecursive(context.Background(), c.config.StateDir))
 			}()
 
 			c.config.EnableUnprivilegedICMP = true
@@ -440,11 +440,11 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			}
 			spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)
 			if test.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, spec)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, spec)
 			if test.specCheck != nil {
@@ -779,11 +779,11 @@ options timeout:1
 		t.Run(test.desc, func(t *testing.T) {
 			resolvContent, err := parseDNSOptions(test.servers, test.searches, test.options)
 			if test.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, resolvContent, test.expectedContent)
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedContent, resolvContent)
 		})
 	}
 }

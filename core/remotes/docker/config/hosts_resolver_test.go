@@ -36,6 +36,7 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 )
@@ -162,9 +163,9 @@ server = "%s"
 		hostFilePath = filepath.Join(hostDir, "hosts.toml")
 
 		err := os.MkdirAll(hostDir, 0755)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		err = os.WriteFile(hostFilePath, []byte(hostTOML), 0644)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		hostOptions := HostOptions{
 			HostDir: HostDirFromRoot(dir),

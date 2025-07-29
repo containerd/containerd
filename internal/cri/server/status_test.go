@@ -27,6 +27,7 @@ import (
 	coreintrospection "github.com/containerd/containerd/v2/core/introspection"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -39,7 +40,7 @@ func TestRuntimeConditionContainerdHasNoDeprecationWarnings(t *testing.T) {
 	}
 
 	cond, err := runtimeConditionContainerdHasNoDeprecationWarnings(deprecations, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, &runtime.RuntimeCondition{
 		Type:    ContainerdHasNoDeprecationWarnings,
 		Status:  false,
@@ -48,7 +49,7 @@ func TestRuntimeConditionContainerdHasNoDeprecationWarnings(t *testing.T) {
 	}, cond)
 
 	cond, err = runtimeConditionContainerdHasNoDeprecationWarnings(deprecations, []string{"io.containerd.deprecation/foo"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, &runtime.RuntimeCondition{
 		Type:   ContainerdHasNoDeprecationWarnings,
 		Status: true,
@@ -118,11 +119,11 @@ func TestStatusRuntimeHandlersOrdering(t *testing.T) {
 
 	// Call Status() twice
 	resp1, err := c.Status(context.Background(), &runtime.StatusRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, resp1.RuntimeHandlers, len(handlers), "Unexpected number of runtime handlers")
 
 	resp2, err := c.Status(context.Background(), &runtime.StatusRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, resp2.RuntimeHandlers, len(handlers), "Unexpected number of runtime handlers")
 
 	// Check runtime handlers are in the same order

@@ -162,7 +162,7 @@ func TestContainerdRestart(t *testing.T) {
 		EnsureImageExists(t, image)
 	}
 	imagesBeforeRestart, err := imageService.ListImages(nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Logf("Restart containerd")
 	RestartContainerd(t, syscall.SIGTERM)
@@ -210,14 +210,14 @@ func TestContainerdRestart(t *testing.T) {
 
 	t.Logf("Should be able to stop and remove sandbox after restart")
 	for _, s := range sandboxes {
-		assert.NoError(t, runtimeService.StopPodSandbox(s.id))
-		assert.NoError(t, runtimeService.RemovePodSandbox(s.id))
+		require.NoError(t, runtimeService.StopPodSandbox(s.id))
+		require.NoError(t, runtimeService.RemovePodSandbox(s.id))
 	}
 
 	t.Logf("Should recover all images")
 	imagesAfterRestart, err := imageService.ListImages(nil)
-	assert.NoError(t, err)
-	assert.Equal(t, len(imagesBeforeRestart), len(imagesAfterRestart))
+	require.NoError(t, err)
+	assert.Len(t, imagesAfterRestart, len(imagesBeforeRestart))
 	for _, i1 := range imagesBeforeRestart {
 		found := false
 		for _, i2 := range imagesAfterRestart {

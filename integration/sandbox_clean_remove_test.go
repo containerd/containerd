@@ -105,7 +105,7 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 	assert.True(t, info.NetNSClosed)
 
 	t.Logf("Sandbox state should be NOTREADY")
-	assert.NoError(t, Eventually(func() (bool, error) {
+	require.NoError(t, Eventually(func() (bool, error) {
 		status, err := runtimeService.PodSandboxStatus(sb)
 		if err != nil {
 			return false, err
@@ -117,8 +117,8 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 	assert.True(t, checkIP(ip))
 
 	t.Logf("Should be able to stop and remove the sandbox")
-	assert.NoError(t, runtimeService.StopPodSandbox(sb))
-	assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+	require.NoError(t, runtimeService.StopPodSandbox(sb))
+	require.NoError(t, runtimeService.RemovePodSandbox(sb))
 
 	t.Logf("Should not be able to find the pod ip in host-local checkpoint")
 	assert.False(t, checkIP(ip))

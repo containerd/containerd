@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testFunc func(context.Context, *testing.T, *MetaStore)
@@ -234,7 +235,7 @@ func assertExist(t *testing.T, err error) {
 func testGetInfo(ctx context.Context, t *testing.T, _ *MetaStore) {
 	for key, expected := range baseInfo {
 		_, info, _, err := GetInfo(ctx, key)
-		assert.Nil(t, err, "on key %v", key)
+		require.NoError(t, err, "on key %v", key)
 		assert.Truef(t, cmp.Equal(expected, info, cmpSnapshotInfo), "on key %v", key)
 	}
 }
@@ -275,7 +276,7 @@ func testWalk(ctx context.Context, t *testing.T, _ *MetaStore) {
 		found[info.Name] = info
 		return nil
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, cmp.Equal(baseInfo, found, cmpSnapshotInfo))
 }
 
@@ -325,7 +326,7 @@ func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
 	test := func(ctx context.Context, t *testing.T, ms *MetaStore) {
 		for key, expected := range snapshotMap {
 			s, err := GetSnapshot(ctx, key)
-			assert.Nil(t, err, "failed to get snapshot %s", key)
+			require.NoError(t, err, "failed to get snapshot %s", key)
 			assert.Equalf(t, expected, s, "on key %s", key)
 		}
 	}

@@ -111,7 +111,7 @@ func TestHostDevicesDeviceFromPathFailure(t *testing.T) {
 		t.Fatalf("Unexpected error %v, expected %v", err, testError)
 	}
 
-	assert.Equal(t, 0, len(d))
+	assert.Empty(t, d)
 }
 
 // Based on test from runc:
@@ -138,8 +138,8 @@ func TestHostDevicesDeviceFromPathFailureInUserNS(t *testing.T) {
 	if !errors.Is(err, nil) {
 		t.Fatalf("Unexpected error %v, expected %v", err, nil)
 	}
-	assert.Equal(t, 1, len(d))
-	assert.Equal(t, d[0].Path, "/dev/null")
+	assert.Len(t, d, 1)
+	assert.Equal(t, "/dev/null", d[0].Path)
 }
 
 func TestHostDevicesAllValid(t *testing.T) {

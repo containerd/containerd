@@ -138,7 +138,7 @@ func TestContainerSymlinkVolumes(t *testing.T) {
 			}, time.Second, 30*time.Second))
 
 			output, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Contains(t, string(output), content)
 		})

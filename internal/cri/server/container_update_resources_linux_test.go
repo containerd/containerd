@@ -22,6 +22,7 @@ import (
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -245,9 +246,9 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 			}
 			got, err := updateOCIResource(context.Background(), test.spec, test.request, config)
 			if test.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equal(t, test.expected, got)
 		})

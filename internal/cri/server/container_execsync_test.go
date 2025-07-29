@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCWWrite(t *testing.T) {
@@ -35,17 +36,17 @@ func TestCWWrite(t *testing.T) {
 	cw := &cappedWriter{w: cioutil.NewNopWriteCloser(&buf), remain: 10}
 
 	n, err := cw.Write([]byte("hello"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 5, n)
 
 	n, err = cw.Write([]byte("helloworld"))
-	assert.NoError(t, err, "no errors even it hits the cap")
+	require.NoError(t, err, "no errors even it hits the cap")
 	assert.Equal(t, 10, n, "no indication of partial write")
 	assert.True(t, cw.isFull())
 	assert.Equal(t, []byte("hellohello"), buf.Bytes(), "the underlying writer is capped")
 
 	_, err = cw.Write([]byte("world"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, cw.isFull())
 	assert.Equal(t, []byte("hellohello"), buf.Bytes(), "the underlying writer is capped")
 }
@@ -54,7 +55,7 @@ func TestCWClose(t *testing.T) {
 	var buf bytes.Buffer
 	cw := &cappedWriter{w: cioutil.NewNopWriteCloser(&buf), remain: 5}
 	err := cw.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestDrainExecSyncIO(t *testing.T) {
@@ -68,8 +69,8 @@ func TestDrainExecSyncIO(t *testing.T) {
 
 		attachDoneCh := make(chan struct{})
 		time.AfterFunc(2*time.Second, func() { close(attachDoneCh) })
-		assert.NoError(t, drainExecSyncIO(ctx, ep, 0, attachDoneCh))
-		assert.Equal(t, 0, len(ep.actionEvents))
+		require.NoError(t, drainExecSyncIO(ctx, ep, 0, attachDoneCh))
+		assert.Empty(t, ep.actionEvents)
 	})
 
 	t.Run("With3Seconds", func(t *testing.T) {
@@ -80,7 +81,7 @@ func TestDrainExecSyncIO(t *testing.T) {
 
 		attachDoneCh := make(chan struct{})
 		time.AfterFunc(100*time.Second, func() { close(attachDoneCh) })
-		assert.Error(t, drainExecSyncIO(ctx, ep, 3*time.Second, attachDoneCh))
+		require.Error(t, drainExecSyncIO(ctx, ep, 3*time.Second, attachDoneCh))
 		assert.Equal(t, []string{"Delete"}, ep.actionEvents)
 	})
 }

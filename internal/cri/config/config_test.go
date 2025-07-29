@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	criruntime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/opts"
@@ -303,10 +304,9 @@ func TestValidateConfig(t *testing.T) {
 			if test.runtimeConfig != nil {
 				w, err := ValidateRuntimeConfig(context.Background(), test.runtimeConfig)
 				if test.runtimeExpectedErr != "" {
-					assert.Error(t, err)
-					assert.Contains(t, err.Error(), test.runtimeExpectedErr)
+					require.ErrorContains(t, err, test.runtimeExpectedErr)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, test.runtimeExpected, test.runtimeConfig)
 				}
 				warnings = append(warnings, w...)
@@ -314,9 +314,9 @@ func TestValidateConfig(t *testing.T) {
 			if test.imageConfig != nil {
 				w, err := ValidateImageConfig(context.Background(), test.imageConfig)
 				if test.imageExpectedErr != "" {
-					assert.Contains(t, err.Error(), test.imageExpectedErr)
+					require.ErrorContains(t, err, test.imageExpectedErr)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, test.imageExpected, test.imageConfig)
 				}
 				warnings = append(warnings, w...)
@@ -324,9 +324,9 @@ func TestValidateConfig(t *testing.T) {
 			if test.serverConfig != nil {
 				w, err := ValidateServerConfig(context.Background(), test.serverConfig)
 				if test.serverExpectedErr != "" {
-					assert.Contains(t, err.Error(), test.serverExpectedErr)
+					require.ErrorContains(t, err, test.serverExpectedErr)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, test.serverExpected, test.serverConfig)
 				}
 				warnings = append(warnings, w...)
@@ -335,7 +335,7 @@ func TestValidateConfig(t *testing.T) {
 			if len(test.warnings) > 0 {
 				assert.ElementsMatch(t, test.warnings, warnings)
 			} else {
-				assert.Len(t, warnings, 0)
+				assert.Empty(t, warnings)
 			}
 		})
 	}

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/platforms"
@@ -278,7 +279,7 @@ func TestRegistryEndpoints(t *testing.T) {
 			c, _ := newTestCRIService()
 			c.config.Registry.Mirrors = test.mirrors
 			got, err := c.registryEndpoints(test.host)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.expected, got)
 		})
 	}
@@ -431,7 +432,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
 			assert.Equal(t, tt.expectedSnapshotter, snapshotter)
 			if tt.expectedErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			}
 		})
 	}

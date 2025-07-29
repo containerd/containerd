@@ -23,7 +23,6 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )
@@ -67,8 +66,7 @@ func TestCreateDelete(t *testing.T) {
 				})
 			},
 			validate: func(t *testing.T, err error) {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), `still has containers, snapshots on "testss" snapshotter`)
+				require.ErrorContains(t, err, `still has containers, snapshots on "testss" snapshotter`)
 			},
 		},
 	}

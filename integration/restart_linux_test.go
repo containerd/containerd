@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -35,13 +36,13 @@ func TestContainerdRestartSandboxRecover(t *testing.T) {
 
 	sbReadyConfig := PodSandboxConfig("sandbox_ready", "sandbox_ready")
 	_, err := runtimeService.RunPodSandbox(sbReadyConfig, *runtimeHandler)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	sbNotReadyConfig := PodSandboxConfig("sandbox_not_ready", "sandbox_not_ready")
 	notReadyID, err := runtimeService.RunPodSandbox(sbNotReadyConfig, *runtimeHandler)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = runtimeService.StopPodSandbox(notReadyID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Logf("Create a pod config with shim create delay")
 	sbUnknownConfig := PodSandboxConfig("sandbox_unknown", "sandbox_unknown_status")
@@ -57,10 +58,10 @@ func TestContainerdRestartSandboxRecover(t *testing.T) {
 	}()
 	t.Logf("Create a sandbox with shim create delay")
 	_, err = runtimeService.RunPodSandbox(sbUnknownConfig, failpointRuntimeHandler)
-	assert.Error(t, err)
+	require.Error(t, err)
 	<-waitCh
 	sbs, err := runtimeService.ListPodSandbox(nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	foundUnkownSb := false
 	for _, sb := range sbs {
 		if sb.Metadata.Name == "sandbox_unknown" {
@@ -69,9 +70,9 @@ func TestContainerdRestartSandboxRecover(t *testing.T) {
 		if status, ok := sbStatuses[sb.Metadata.Name]; ok {
 			assert.Equal(t, status, sb.State)
 			err = runtimeService.StopPodSandbox(sb.Id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			err = runtimeService.RemovePodSandbox(sb.Id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}
 	assert.True(t, foundUnkownSb)

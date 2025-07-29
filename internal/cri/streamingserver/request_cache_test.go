@@ -83,7 +83,7 @@ func TestInsert(t *testing.T) {
 
 	// Insert again (should evict)
 	_, err = c.Insert(nextRequest())
-	assert.Error(t, err, "should reject further requests")
+	require.Error(t, err, "should reject further requests")
 	recorder := httptest.NewRecorder()
 	require.NoError(t, WriteError(err, recorder))
 	errResponse := recorder.Result()

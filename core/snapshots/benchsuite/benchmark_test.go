@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -65,14 +65,14 @@ func BenchmarkNative(b *testing.B) {
 	}
 
 	snapshotter, err := native.NewSnapshotter(nativeRootPath)
-	assert.Nil(b, err)
+	require.NoError(b, err)
 
 	defer func() {
 		err = snapshotter.Close()
-		assert.Nil(b, err)
+		require.NoError(b, err)
 
 		err = os.RemoveAll(nativeRootPath)
-		assert.Nil(b, err)
+		require.NoError(b, err)
 	}()
 
 	benchmarkSnapshotter(b, snapshotter)
@@ -84,14 +84,14 @@ func BenchmarkOverlay(b *testing.B) {
 	}
 
 	snapshotter, err := overlay.NewSnapshotter(overlayRootPath)
-	assert.Nil(b, err, "failed to create overlay snapshotter")
+	require.NoError(b, err, "failed to create overlay snapshotter")
 
 	defer func() {
 		err = snapshotter.Close()
-		assert.Nil(b, err)
+		require.NoError(b, err)
 
 		err = os.RemoveAll(overlayRootPath)
-		assert.Nil(b, err)
+		require.NoError(b, err)
 	}()
 
 	benchmarkSnapshotter(b, snapshotter)
@@ -115,17 +115,17 @@ func BenchmarkDeviceMapper(b *testing.B) {
 	ctx := context.Background()
 
 	snapshotter, err := devmapper.NewSnapshotter(ctx, config)
-	assert.Nil(b, err)
+	require.NoError(b, err)
 
 	defer func() {
 		err := snapshotter.ResetPool(ctx)
-		assert.Nil(b, err)
+		require.NoError(b, err)
 
 		err = snapshotter.Close()
-		assert.Nil(b, err)
+		require.NoError(b, err)
 
 		err = os.RemoveAll(dmRootPath)
-		assert.Nil(b, err)
+		require.NoError(b, err)
 	}()
 
 	benchmarkSnapshotter(b, snapshotter)
@@ -185,19 +185,19 @@ func benchmarkSnapshotter(b *testing.B, snapshotter snapshots.Snapshotter) {
 
 				timer = time.Now()
 				mounts, err := snapshotter.Prepare(ctx, current, parent)
-				assert.Nil(b, err)
+				require.NoError(b, err)
 				prepareDuration += time.Since(timer)
 
 				timer = time.Now()
 				err = mount.WithTempMount(ctx, mounts, layers[l].Apply)
-				assert.Nil(b, err)
+				require.NoError(b, err)
 				writeDuration += time.Since(timer)
 
 				parent = fmt.Sprintf("committed-%d", layerIndex.Add(1))
 
 				timer = time.Now()
 				err = snapshotter.Commit(ctx, parent, current)
-				assert.Nil(b, err)
+				require.NoError(b, err)
 				commitDuration += time.Since(timer)
 			}
 		}

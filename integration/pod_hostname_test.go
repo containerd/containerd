@@ -79,8 +79,8 @@ func TestPodHostname(t *testing.T) {
 			}
 			// Make sure the sandbox is cleaned up.
 			defer func() {
-				assert.NoError(t, runtimeService.StopPodSandbox(sb))
-				assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+				require.NoError(t, runtimeService.StopPodSandbox(sb))
+				require.NoError(t, runtimeService.RemovePodSandbox(sb))
 			}()
 			if test.expectErr {
 				t.Fatalf("Expected RunPodSandbox to return error")
@@ -120,7 +120,7 @@ func TestPodHostname(t *testing.T) {
 			}, time.Second, 30*time.Second))
 
 			content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			t.Log("Search hostname env in container log")
 			if goruntime.GOOS == "windows" {

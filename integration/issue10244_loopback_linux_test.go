@@ -95,7 +95,7 @@ func checkLoopbackResult(t *testing.T, useInternalLoopback bool) bool {
 
 	t.Logf("Check loopback status - should be UP (not DOWN) when 'use_internal_loopback' is '%t'", useInternalLoopback)
 	stdout, _, err := podCtx.rSvc.ExecSync(cnID, []string{"/loopback-v2"}, 5*time.Second)
-	require.NoError(t, err, "")
+	require.NoError(t, err)
 	t.Logf("%s", stdout)
 
 	return assert.Contains(t, string(stdout), "UP")

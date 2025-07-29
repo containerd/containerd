@@ -38,9 +38,9 @@ func TestContainerEvents(t *testing.T) {
 
 	t.Log("Set up container events streaming clients")
 	containerEventsStreamingClient1, err := runtimeService.GetContainerEvents(ctx, &runtime.GetEventsRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	containerEventsStreamingClient2, err := runtimeService.GetContainerEvents(ctx, &runtime.GetEventsRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	containerEventsChan1 := make(chan *runtime.ContainerEventResponse)
 	containerEventsChan2 := make(chan *runtime.ContainerEventResponse)
 
@@ -62,10 +62,10 @@ func TestContainerEvents(t *testing.T) {
 		expectedContainerStates := []runtime.ContainerState{}
 		expectedPodSandboxStatus := &runtime.PodSandboxStatus{State: runtime.PodSandboxState_SANDBOX_NOTREADY}
 		t.Logf("Step 6: StopPodSandbox and check events")
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		require.NoError(t, runtimeService.StopPodSandbox(sb))
 		checkContainerEventResponse(t, containerEventsChannels, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT, expectedPodSandboxStatus, expectedContainerStates)
 		t.Logf("Step 7: RemovePodSandbox and check events")
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+		require.NoError(t, runtimeService.RemovePodSandbox(sb))
 		checkContainerEventResponse(t, containerEventsChannels, runtime.ContainerEventType_CONTAINER_DELETED_EVENT, nil, expectedContainerStates)
 	})
 
@@ -93,7 +93,7 @@ func TestContainerEvents(t *testing.T) {
 
 	t.Cleanup(func() {
 		t.Logf("Step 5: RemoveContainer and check events")
-		assert.NoError(t, runtimeService.RemoveContainer(cn))
+		require.NoError(t, runtimeService.RemoveContainer(cn))
 		// No container status after the container is removed
 		expectedContainerStates := []runtime.ContainerState{}
 		checkContainerEventResponse(t, containerEventsChannels, runtime.ContainerEventType_CONTAINER_DELETED_EVENT, expectedPodSandboxStatus, expectedContainerStates)
@@ -106,7 +106,7 @@ func TestContainerEvents(t *testing.T) {
 
 	t.Cleanup(func() {
 		t.Logf("Step 4: StopContainer and check events")
-		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+		require.NoError(t, runtimeService.StopContainer(cn, 10))
 		expectedContainerStates := []runtime.ContainerState{runtime.ContainerState_CONTAINER_EXITED}
 		checkContainerEventResponse(t, containerEventsChannels, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT, expectedPodSandboxStatus, expectedContainerStates)
 	})
@@ -123,7 +123,7 @@ func listenToEventChannel(ctx context.Context, t *testing.T, containerEventsChan
 			return
 		default:
 		}
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if resp != nil {
 			containerEventsChan <- resp
 		}

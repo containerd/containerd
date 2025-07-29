@@ -76,7 +76,7 @@ func TestPodDualStack(t *testing.T) {
 	}, time.Second, 30*time.Second))
 
 	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	status, err := runtimeService.PodSandboxStatus(sb)
 	require.NoError(t, err)
 	ip := status.GetNetwork().GetIp()
@@ -92,9 +92,9 @@ func TestPodDualStack(t *testing.T) {
 	}
 
 	ipv4Enabled, err := regexp.MatchString(ipv4Regex, string(content))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	ipv6Enabled, err := regexp.MatchString(ipv6Regex, string(content))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	if ipv4Enabled && ipv6Enabled {
 		t.Log("Dualstack should be enabled")
@@ -103,7 +103,7 @@ func TestPodDualStack(t *testing.T) {
 		assert.Nil(t, net.ParseIP(additionalIps[0].GetIp()).To4())
 	} else {
 		t.Log("Dualstack should not be enabled")
-		assert.Len(t, additionalIps, 0)
+		assert.Empty(t, additionalIps)
 		assert.NotEmpty(t, ip)
 	}
 }

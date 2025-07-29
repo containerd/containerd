@@ -25,12 +25,13 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestImageLayersLabel(t *testing.T) {
 	sampleKey := "sampleKey"
 	sampleDigest, err := digest.Parse("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	sampleMaxSize := 300
 	sampleValidate := func(k, v string) error {
 		if (len(k) + len(v)) > sampleMaxSize {

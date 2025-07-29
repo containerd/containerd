@@ -113,17 +113,17 @@ func TestContainerCgroupWritable(t *testing.T) {
 			cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 			require.NoError(t, err)
 			defer func() {
-				assert.NoError(t, runtimeService.RemoveContainer(cn))
+				require.NoError(t, runtimeService.RemoveContainer(cn))
 			}()
 
 			require.NoError(t, runtimeService.StartContainer(cn))
 			defer func() {
-				assert.NoError(t, runtimeService.StopContainer(cn, 30))
+				require.NoError(t, runtimeService.StopContainer(cn, 30))
 			}()
 
 			status, err := runtimeService.ContainerStatus(cn)
 			require.NoError(t, err)
-			assert.Equal(t, status.GetState(), runtime.ContainerState_CONTAINER_RUNNING)
+			assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, status.GetState())
 
 			// Execute a command to verify if cgroup is writable
 			_, stderr, err := runtimeService.ExecSync(cn, []string{"mkdir", "sys/fs/cgroup/dummy-group"}, 2)

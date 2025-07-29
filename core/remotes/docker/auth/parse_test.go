@@ -79,7 +79,7 @@ func TestParseAuthHeader(t *testing.T) {
 
 	actual, ok := challenge[0].Parameters["empty"]
 	assert.True(t, ok)
-	assert.Equal(t, "", actual)
+	assert.Empty(t, actual)
 
 	actual, ok = challenge[0].Parameters["service"]
 	assert.True(t, ok)

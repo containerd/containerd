@@ -63,7 +63,6 @@ func TestRunPodSandboxWithSetupCNIFailure(t *testing.T) {
 
 	t.Logf("Create a sandbox")
 	_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
-	require.Error(t, err)
 	require.ErrorContains(t, err, "you-shall-not-pass!")
 
 	t.Logf("Retry to create sandbox with same config")
@@ -91,7 +90,6 @@ func TestRunPodSandboxWithShimStartFailure(t *testing.T) {
 
 	t.Logf("Create a sandbox")
 	_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
-	require.Error(t, err)
 	require.ErrorContains(t, err, "no hard feelings")
 }
 
@@ -118,7 +116,6 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 
 			t.Log("Create a sandbox")
 			_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
-			require.Error(t, err)
 			require.ErrorContains(t, err, "failed to start shim")
 
 			t.Log("ListPodSandbox with the specific label")
@@ -137,7 +134,7 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 			sbStatus, err := runtimeService.PodSandboxStatus(sb.Id)
 			require.NoError(t, err)
 			require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sbStatus.State)
-			require.Greater(t, len(sbStatus.Network.Ip), 0)
+			require.NotEmpty(t, sbStatus.Network.Ip)
 
 			if restart {
 				t.Log("Restart containerd")
@@ -194,7 +191,6 @@ func TestRunPodSandboxWithShimStartAndTeardownCNIFailure(t *testing.T) {
 
 			t.Log("Create a sandbox")
 			_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
-			require.Error(t, err)
 			require.ErrorContains(t, err, "failed to start shim")
 
 			t.Log("ListPodSandbox with the specific label")
@@ -257,11 +253,10 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 		defer wg.Done()
 		t.Log("Create a sandbox")
 		_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
-		require.Error(t, err)
 		require.ErrorContains(t, err, "error reading from server: EOF")
 	}()
 
-	assert.NoError(t, ensureCNIAddRunning(t, sbName), "check that failpoint CNI.Add is running")
+	require.NoError(t, ensureCNIAddRunning(t, sbName), "check that failpoint CNI.Add is running")
 
 	// Use SIGKILL to prevent containerd server gracefulshutdown which may cause indeterministic invocation of defer functions
 	t.Log("Restart containerd")
@@ -279,7 +274,7 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 	defer func() {
 		t.Log("Cleanup leaky sandbox")
 		err := runtimeService.StopPodSandbox(sb.Id)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		err = runtimeService.RemovePodSandbox(sb.Id)
 		require.NoError(t, err)
 	}()

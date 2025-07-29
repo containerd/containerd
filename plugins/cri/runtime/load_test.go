@@ -39,7 +39,7 @@ func TestLoadBaseOCISpec(t *testing.T) {
 	})
 
 	err = json.NewEncoder(file).Encode(&spec)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	config := criconfig.Config{}
 	config.Runtimes = map[string]criconfig.Runtime{
@@ -47,7 +47,7 @@ func TestLoadBaseOCISpec(t *testing.T) {
 	}
 
 	specs, err := loadBaseOCISpecs(&config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Len(t, specs, 1)
 

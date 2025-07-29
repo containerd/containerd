@@ -22,6 +22,7 @@ import (
 
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateEnableUnprivileged(t *testing.T) {
@@ -95,9 +96,9 @@ func TestValidateEnableUnprivileged(t *testing.T) {
 			}
 			err := ValidateEnableUnprivileged(context.Background(), test.config)
 			if test.expectedErr != "" {
-				assert.Equal(t, err.Error(), test.expectedErr)
+				assert.Equal(t, test.expectedErr, err.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

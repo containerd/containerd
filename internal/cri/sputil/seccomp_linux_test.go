@@ -22,6 +22,7 @@ import (
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/contrib/seccomp"
@@ -167,9 +168,9 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 				test.defaultProfile)
 			if err != nil {
 				if test.expectErr {
-					assert.Error(t, err)
+					require.Error(t, err)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 				}
 			} else {
 				if ssp == nil {
@@ -177,9 +178,9 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 				}
 				specOpts, err := GenerateSeccompSpecOpts(ssp, test.privileged, !test.disable)
 				if test.expectErr {
-					assert.Error(t, err)
+					require.Error(t, err)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					if test.specOpts == nil && specOpts == nil {
 						return
 					}
@@ -216,7 +217,7 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 					}
 					var actual runtimespec.Spec
 					err := util.DeepCopy(&actual, &expected)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
 					test.specOpts(context.TODO(), nil, nil, &expected)
 					specOpts(context.TODO(), nil, nil, &actual)

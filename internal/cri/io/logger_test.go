@@ -249,7 +249,7 @@ func TestRedirectLogs(t *testing.T) {
 				fields := strings.SplitN(lines[i], string([]byte{delimiter}), 4)
 				require.Len(t, fields, 4)
 				_, err := time.Parse(timestampFormat, fields[0])
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.EqualValues(t, test.stream, fields[1])
 				assert.Equal(t, string(test.tag[i]), fields[2])
 				assert.Equal(t, test.content[i], fields[3])

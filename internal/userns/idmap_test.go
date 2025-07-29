@@ -21,6 +21,7 @@ import (
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRootPair(t *testing.T) {
@@ -172,9 +173,9 @@ func TestToHost(t *testing.T) {
 		r, err := idmap.ToHost(test.container)
 		assert.Equal(t, test.host, r)
 		if r == invalidUser {
-			assert.Error(t, err)
+			require.Error(t, err)
 		} else {
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}
 }
@@ -296,7 +297,7 @@ func TestToHostOverflow(t *testing.T) {
 		},
 	} {
 		r, err := test.idmap.ToHost(test.user)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Equal(t, r, invalidUser)
 	}
 }

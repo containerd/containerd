@@ -59,7 +59,7 @@ func TestBinaryIOAbsolutePath(t *testing.T) {
 
 func TestBinaryIOFailOnRelativePath(t *testing.T) {
 	_, err := BinaryIO("./bin", nil)("!")
-	assert.Error(t, err, "absolute path needed")
+	require.Error(t, err, "absolute path needed")
 }
 
 func TestLogFileAbsolutePath(t *testing.T) {
@@ -71,14 +71,14 @@ func TestLogFileAbsolutePath(t *testing.T) {
 
 	// Test parse back
 	parsed, err := url.Parse(res.Config().Stdout)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "file", parsed.Scheme)
 	assert.Equal(t, urlPrefix+"/full/path/file.txt", parsed.Path)
 }
 
 func TestLogFileFailOnRelativePath(t *testing.T) {
 	_, err := LogFile("./file.txt")("!")
-	assert.Error(t, err, "absolute path needed")
+	require.Error(t, err, "absolute path needed")
 }
 
 type LogURIGeneratorTestCase struct {
@@ -98,10 +98,10 @@ func baseTestLogURIGenerator(t *testing.T, testCases []LogURIGeneratorTestCase) 
 	for _, tc := range testCases {
 		uri, err := LogURIGenerator(tc.scheme, tc.path, tc.args)
 		if tc.err != "" {
-			assert.ErrorContains(t, err, tc.err)
+			require.ErrorContains(t, err, tc.err)
 			continue
 		}
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, tc.expected, uri.String())
 	}
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/ttrpcutil"
 	"github.com/containerd/ttrpc"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClientTTRPC_New(t *testing.T) {
@@ -36,10 +37,10 @@ func TestClientTTRPC_New(t *testing.T) {
 		t.Skip()
 	}
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = client.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestClientTTRPC_Reconnect(t *testing.T) {
@@ -47,13 +48,13 @@ func TestClientTTRPC_Reconnect(t *testing.T) {
 		t.Skip()
 	}
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = client.Reconnect()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	service, err := client.EventsService()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Send test request to make sure its alive after reconnect
 	_, err = service.Forward(context.Background(), &v1.ForwardRequest{
@@ -64,10 +65,10 @@ func TestClientTTRPC_Reconnect(t *testing.T) {
 			Event:     &types.Any{},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = client.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestClientTTRPC_Close(t *testing.T) {
@@ -75,17 +76,17 @@ func TestClientTTRPC_Close(t *testing.T) {
 		t.Skip()
 	}
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	service, err := client.EventsService()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = client.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = service.Forward(context.Background(), &v1.ForwardRequest{Envelope: &apitypes.Envelope{}})
 	assert.Equal(t, err, ttrpc.ErrClosed)
 
 	err = client.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

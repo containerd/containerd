@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 )
@@ -75,15 +76,15 @@ func TestSetContainerRemoving(t *testing.T) {
 				containerstore.Metadata{ID: testID},
 				containerstore.WithFakeStatus(test.status),
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			err = setContainerRemoving(container)
 			if test.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, test.status, container.Status.Get(), "metadata should not be updated")
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.True(t, container.Status.Get().Removing, "removing should be set")
-				assert.NoError(t, resetContainerRemoving(container))
+				require.NoError(t, resetContainerRemoving(container))
 				assert.False(t, container.Status.Get().Removing, "removing should be reset")
 			}
 		})

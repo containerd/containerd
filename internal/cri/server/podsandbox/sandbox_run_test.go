@@ -24,6 +24,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -64,7 +65,7 @@ func TestSandboxContainerSpec(t *testing.T) {
 			desc:           "a passthrough annotation should be passed as an OCI annotation",
 			podAnnotations: []string{"c"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["c"], "d")
+				assert.Equal(t, "d", spec.Annotations["c"])
 			},
 		},
 		{
@@ -74,7 +75,7 @@ func TestSandboxContainerSpec(t *testing.T) {
 			},
 			podAnnotations: []string{"c"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["c"], "d")
+				assert.Equal(t, "d", spec.Annotations["c"])
 				_, ok := spec.Annotations["d"]
 				assert.False(t, ok)
 			},
@@ -90,9 +91,9 @@ func TestSandboxContainerSpec(t *testing.T) {
 			},
 			podAnnotations: []string{"t*", "z.*", "y.c*"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["t.f"], "j")
-				assert.Equal(t, spec.Annotations["z.g"], "o")
-				assert.Equal(t, spec.Annotations["y.ca"], "b")
+				assert.Equal(t, "j", spec.Annotations["t.f"])
+				assert.Equal(t, "o", spec.Annotations["z.g"])
+				assert.Equal(t, "b", spec.Annotations["y.ca"])
 				_, ok := spec.Annotations["y"]
 				assert.False(t, ok)
 				_, ok = spec.Annotations["z"]
@@ -113,11 +114,11 @@ func TestSandboxContainerSpec(t *testing.T) {
 			spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath,
 				test.podAnnotations)
 			if test.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, spec)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, spec)
 			if test.specCheck != nil {
@@ -166,9 +167,9 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 			}
 
 			md, err := typeurl.MarshalAny(meta)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			data, err := typeurl.UnmarshalAny(md)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.IsType(t, &sandboxstore.Metadata{}, data)
 			curMeta, ok := data.(*sandboxstore.Metadata)
 			assert.True(t, ok)

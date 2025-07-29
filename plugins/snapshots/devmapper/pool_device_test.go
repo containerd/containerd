@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -57,7 +58,7 @@ const (
 func TestPoolDevice(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	assert.NoError(t, log.SetLevel("debug"))
+	require.NoError(t, log.SetLevel("debug"))
 	ctx := context.Background()
 
 	tempDir := t.TempDir()
@@ -67,12 +68,12 @@ func TestPoolDevice(t *testing.T) {
 
 	poolName := fmt.Sprintf("test-pool-device-%d", time.Now().Nanosecond())
 	err := dmsetup.CreatePool(poolName, loopDataDevice, loopMetaDevice, 64*1024/dmsetup.SectorSize)
-	assert.Nil(t, err, "failed to create pool %q", poolName)
+	require.NoError(t, err, "failed to create pool %q", poolName)
 
 	defer func() {
 		// Detach loop devices and remove images
 		err := mount.DetachLoopDevice(loopDataDevice, loopMetaDevice)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}()
 
 	config := &Config{
@@ -84,12 +85,12 @@ func TestPoolDevice(t *testing.T) {
 	}
 
 	pool, err := NewPoolDevice(ctx, config)
-	assert.Nil(t, err, "can't create device pool")
-	assert.True(t, pool != nil)
+	require.NoError(t, err, "can't create device pool")
+	assert.NotNil(t, pool)
 
 	defer func() {
 		err := pool.RemovePool(ctx)
-		assert.Nil(t, err, "can't close device pool")
+		require.NoError(t, err, "can't close device pool")
 	}()
 
 	// Create thin devices
@@ -107,7 +108,7 @@ func TestPoolDevice(t *testing.T) {
 		// Write v1 test file on 'thin-1' device
 		thin1TestFilePath := filepath.Join(thin1MountPath, "TEST")
 		err := os.WriteFile(thin1TestFilePath, []byte("test file (v1)"), 0700)
-		assert.Nil(t, err, "failed to write test file v1 on '%s' volume", thinDevice1)
+		require.NoError(t, err, "failed to write test file v1 on '%s' volume", thinDevice1)
 
 		return nil
 	})
@@ -121,24 +122,24 @@ func TestPoolDevice(t *testing.T) {
 	err = mount.WithTempMount(ctx, getMounts(thinDevice1), func(thin1MountPath string) error {
 		thin1TestFilePath := filepath.Join(thin1MountPath, "TEST")
 		err = os.WriteFile(thin1TestFilePath, []byte("test file (v2)"), 0700)
-		assert.Nil(t, err, "failed to write test file v2 on 'thin-1' volume after taking snapshot")
+		require.NoError(t, err, "failed to write test file v2 on 'thin-1' volume after taking snapshot")
 
 		return nil
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Mount 'snap-1' and make sure TEST file is v1
 	err = mount.WithTempMount(ctx, getMounts(snapDevice1), func(snap1MountPath string) error {
 		// Read test file from snapshot device and make sure it's v1
 		fileData, err := os.ReadFile(filepath.Join(snap1MountPath, "TEST"))
-		assert.Nil(t, err, "couldn't read test file from '%s' device", snapDevice1)
+		require.NoError(t, err, "couldn't read test file from '%s' device", snapDevice1)
 		assert.Equal(t, "test file (v1)", string(fileData), "test file content is invalid on snapshot")
 
 		return nil
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Run("DeactivateDevice", func(t *testing.T) {
 		testDeactivateThinDevice(t, pool)
@@ -156,17 +157,17 @@ func TestPoolDevice(t *testing.T) {
 		snapDevice := "snap2"
 
 		err := pool.CreateSnapshotDevice(ctx, thinDevice1, snapDevice, device1Size)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		info, err := pool.metadata.GetDevice(ctx, snapDevice)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Simulate a case that the device cannot be activated.
 		err = pool.DeactivateDevice(ctx, info.Name, false, false)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = pool.rollbackActivate(ctx, info, err)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -175,16 +176,16 @@ func TestPoolDeviceMarkFaulty(t *testing.T) {
 	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "1", State: Unknown})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Note: do not use 'Activated' here because pool.ensureDeviceStates() will
 	// try to activate the real dm device, which will fail on a faked device.
 	err = store.AddDevice(testCtx, &DeviceInfo{Name: "2", State: Deactivated})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	pool := &PoolDevice{metadata: store}
 	err = pool.ensureDeviceStates(testCtx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	called := 0
 	err = pool.metadata.WalkDevices(testCtx, func(info *DeviceInfo) error {
@@ -203,7 +204,7 @@ func TestPoolDeviceMarkFaulty(t *testing.T) {
 
 		return nil
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 2, called)
 }
 
@@ -211,25 +212,25 @@ func testCreateThinDevice(t *testing.T, pool *PoolDevice) {
 	ctx := context.Background()
 
 	err := pool.CreateThinDevice(ctx, thinDevice1, device1Size)
-	assert.Nil(t, err, "can't create first thin device")
+	require.NoError(t, err, "can't create first thin device")
 
 	err = pool.CreateThinDevice(ctx, thinDevice1, device1Size)
-	assert.True(t, err != nil, "device pool allows duplicated device names")
+	require.Error(t, err, "device pool allows duplicated device names")
 
 	err = pool.CreateThinDevice(ctx, thinDevice2, device2Size)
-	assert.Nil(t, err, "can't create second thin device")
+	require.NoError(t, err, "can't create second thin device")
 
 	deviceInfo1, err := pool.metadata.GetDevice(ctx, thinDevice1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	deviceInfo2, err := pool.metadata.GetDevice(ctx, thinDevice2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	assert.True(t, deviceInfo1.DeviceID != deviceInfo2.DeviceID, "assigned device ids should be different")
+	assert.NotEqual(t, deviceInfo1.DeviceID, deviceInfo2.DeviceID, "assigned device ids should be different")
 
 	usage, err := pool.GetUsage(thinDevice1)
-	assert.NoError(t, err)
-	assert.Equal(t, usage, int64(0))
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), usage)
 }
 
 func testMakeFileSystem(t *testing.T, pool *PoolDevice) {
@@ -241,16 +242,16 @@ func testMakeFileSystem(t *testing.T, pool *PoolDevice) {
 	}
 
 	output, err := exec.Command("mkfs.ext4", args...).CombinedOutput()
-	assert.Nil(t, err, "failed to make filesystem on '%s': %s", thinDevice1, string(output))
+	require.NoError(t, err, "failed to make filesystem on '%s': %s", thinDevice1, string(output))
 
 	usage, err := pool.GetUsage(thinDevice1)
-	assert.NoError(t, err)
-	assert.True(t, usage > 0)
+	require.NoError(t, err)
+	assert.Positive(t, usage)
 }
 
 func testCreateSnapshot(t *testing.T, pool *PoolDevice) {
 	err := pool.CreateSnapshotDevice(context.Background(), thinDevice1, snapDevice1, device1Size)
-	assert.Nil(t, err, "failed to create snapshot from '%s' volume", thinDevice1)
+	require.NoError(t, err, "failed to create snapshot from '%s' volume", thinDevice1)
 }
 
 func testDeactivateThinDevice(t *testing.T, pool *PoolDevice) {
@@ -263,7 +264,7 @@ func testDeactivateThinDevice(t *testing.T, pool *PoolDevice) {
 		assert.True(t, pool.IsActivated(deviceName))
 
 		err := pool.DeactivateDevice(context.Background(), deviceName, false, true)
-		assert.Nil(t, err, "failed to remove '%s'", deviceName)
+		require.NoError(t, err, "failed to remove '%s'", deviceName)
 
 		assert.False(t, pool.IsActivated(deviceName))
 	}
@@ -271,10 +272,10 @@ func testDeactivateThinDevice(t *testing.T, pool *PoolDevice) {
 
 func testRemoveThinDevice(t *testing.T, pool *PoolDevice) {
 	err := pool.RemoveDevice(testCtx, thinDevice1)
-	assert.Nil(t, err, "should delete thin device from pool")
+	require.NoError(t, err, "should delete thin device from pool")
 
 	err = pool.RemoveDevice(testCtx, thinDevice2)
-	assert.Nil(t, err, "should delete thin device from pool")
+	require.NoError(t, err, "should delete thin device from pool")
 }
 
 func getMounts(thinDeviceName string) []mount.Mount {
@@ -288,21 +289,21 @@ func getMounts(thinDeviceName string) []mount.Mount {
 
 func createLoopbackDevice(t *testing.T, dir string) (string, string) {
 	file, err := os.CreateTemp(dir, testsPrefix)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	size, err := units.RAMInBytes("128Mb")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = file.Truncate(size)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = file.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	imagePath := file.Name()
 
 	loopDevice, err := mount.AttachLoopDevice(imagePath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return imagePath, loopDevice
 }

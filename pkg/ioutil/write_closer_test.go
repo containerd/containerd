@@ -37,7 +37,7 @@ func TestWriteCloseInformer(t *testing.T) {
 	n, err := wci.Write([]byte(data))
 	assert.Equal(t, len(data), n)
 	assert.Equal(t, data, original.buf.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	select {
 	case <-close:
@@ -83,7 +83,7 @@ func TestSerialWriteCloser(t *testing.T) {
 		for i := 0; i < goroutine; i++ {
 			go func(id int) {
 				n, err := wc.Write(testData[id])
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, dataLen+1, n)
 				wg.Done()
 			}(i)

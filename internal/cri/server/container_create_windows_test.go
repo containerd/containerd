@@ -166,7 +166,7 @@ func TestContainerWindowsNetworkNamespace(t *testing.T) {
 
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 	assert.NotNil(t, spec.Windows)
@@ -188,7 +188,7 @@ func TestMountCleanPath(t *testing.T) {
 		HostPath:      "c:/test/host-path",
 	})
 	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 	checkMount(t, spec.Mounts, "c:\\test\\host-path", "c:\\test\\container-path", "", []string{"rw"}, nil)
@@ -208,7 +208,7 @@ func TestMountNamedPipe(t *testing.T) {
 		HostPath:      `\\.\pipe\foo`,
 	})
 	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 	checkMount(t, spec.Mounts, `\\.\pipe\foo`, `\\.\pipe\foo`, "", []string{"rw"}, nil)
@@ -260,9 +260,9 @@ func TestHostProcessRequirements(t *testing.T) {
 			}
 			_, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			if test.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -356,7 +356,7 @@ func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
 				Windows: &runtime.WindowsContainerConfig{},
 			}
 			runtimeSpec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{}, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, runtimeSpec)
 
 			// check the runtime spec for expected commandline and args

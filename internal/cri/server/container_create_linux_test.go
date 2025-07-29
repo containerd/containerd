@@ -131,21 +131,21 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		checkMount(t, spec.Mounts, "host-path-2", "container-path-2", "bind", []string{"rbind", "rprivate", "ro"}, nil)
 
 		t.Logf("Check resource limits")
-		assert.EqualValues(t, *spec.Linux.Resources.CPU.Period, 100)
-		assert.EqualValues(t, *spec.Linux.Resources.CPU.Quota, 200)
-		assert.EqualValues(t, *spec.Linux.Resources.CPU.Shares, 300)
-		assert.EqualValues(t, spec.Linux.Resources.CPU.Cpus, "0-1")
-		assert.EqualValues(t, spec.Linux.Resources.CPU.Mems, "2-3")
-		assert.EqualValues(t, spec.Linux.Resources.Unified, map[string]string{"memory.min": "65536", "memory.swap.max": "1024"})
-		assert.EqualValues(t, *spec.Linux.Resources.Memory.Limit, 400)
-		assert.EqualValues(t, *spec.Process.OOMScoreAdj, 500)
+		assert.EqualValues(t, 100, *spec.Linux.Resources.CPU.Period)
+		assert.EqualValues(t, 200, *spec.Linux.Resources.CPU.Quota)
+		assert.EqualValues(t, 300, *spec.Linux.Resources.CPU.Shares)
+		assert.Equal(t, "0-1", spec.Linux.Resources.CPU.Cpus)
+		assert.Equal(t, "2-3", spec.Linux.Resources.CPU.Mems)
+		assert.Equal(t, map[string]string{"memory.min": "65536", "memory.swap.max": "1024"}, spec.Linux.Resources.Unified)
+		assert.EqualValues(t, 400, *spec.Linux.Resources.Memory.Limit)
+		assert.Equal(t, 500, *spec.Process.OOMScoreAdj)
 
 		t.Logf("Check supplemental groups")
 		assert.Contains(t, spec.Process.User.AdditionalGids, uint32(1111))
 		assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
 
 		t.Logf("Check no_new_privs")
-		assert.Equal(t, spec.Process.NoNewPrivileges, true)
+		assert.True(t, spec.Process.NoNewPrivileges)
 
 		t.Logf("Check cgroup path")
 		assert.Equal(t, getCgroupsPath("/test/cgroup/parent", id), spec.Linux.CgroupsPath)
@@ -170,22 +170,22 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 
 		t.Logf("Check PodSandbox annotations")
 		assert.Contains(t, spec.Annotations, annotations.SandboxID)
-		assert.EqualValues(t, spec.Annotations[annotations.SandboxID], sandboxID)
+		assert.Equal(t, spec.Annotations[annotations.SandboxID], sandboxID)
 
 		assert.Contains(t, spec.Annotations, annotations.ContainerType)
-		assert.EqualValues(t, spec.Annotations[annotations.ContainerType], annotations.ContainerTypeContainer)
+		assert.Equal(t, annotations.ContainerTypeContainer, spec.Annotations[annotations.ContainerType])
 
 		assert.Contains(t, spec.Annotations, annotations.SandboxNamespace)
-		assert.EqualValues(t, spec.Annotations[annotations.SandboxNamespace], "test-sandbox-ns")
+		assert.Equal(t, "test-sandbox-ns", spec.Annotations[annotations.SandboxNamespace])
 
 		assert.Contains(t, spec.Annotations, annotations.SandboxUID)
-		assert.EqualValues(t, spec.Annotations[annotations.SandboxUID], "test-sandbox-uid")
+		assert.Equal(t, "test-sandbox-uid", spec.Annotations[annotations.SandboxUID])
 
 		assert.Contains(t, spec.Annotations, annotations.SandboxName)
-		assert.EqualValues(t, spec.Annotations[annotations.SandboxName], "test-sandbox-name")
+		assert.Equal(t, "test-sandbox-name", spec.Annotations[annotations.SandboxName])
 
 		assert.Contains(t, spec.Annotations, annotations.ImageName)
-		assert.EqualValues(t, spec.Annotations[annotations.ImageName], testImageName)
+		assert.Equal(t, testImageName, spec.Annotations[annotations.ImageName])
 	}
 	return config, sandboxConfig, imageConfig, specCheck
 }
@@ -255,8 +255,8 @@ func TestContainerCapabilities(t *testing.T) {
 			require.NoError(t, err)
 
 			if selinux.GetEnabled() {
-				assert.NotEqual(t, "", spec.Process.SelinuxLabel)
-				assert.NotEqual(t, "", spec.Linux.MountLabel)
+				assert.NotEmpty(t, spec.Process.SelinuxLabel)
+				assert.NotEmpty(t, spec.Linux.MountLabel)
 			}
 
 			specCheck(t, testID, testSandboxID, testPid, spec)
@@ -432,9 +432,9 @@ func TestContainerAndSandboxPrivileged(t *testing.T) {
 			}
 			_, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			if test.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -472,7 +472,7 @@ func TestPrivilegedBindMount(t *testing.T) {
 
 			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if test.expectedSysFSRO {
 				checkMount(t, spec.Mounts, "sysfs", "/sys", "sysfs", []string{"ro"}, []string{"rw"})
 			} else {
@@ -822,8 +822,8 @@ func TestUserNamespace(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, spec.Linux.UIDMappings, test.expUIDMapping)
-			assert.Equal(t, spec.Linux.GIDMappings, test.expGIDMapping)
+			assert.Equal(t, test.expUIDMapping, spec.Linux.UIDMappings)
+			assert.Equal(t, test.expGIDMapping, spec.Linux.GIDMappings)
 
 			if test.expNS != nil {
 				assert.Contains(t, spec.Linux.Namespaces, *test.expNS)
@@ -845,7 +845,7 @@ func TestNoDefaultRunMount(t *testing.T) {
 	c := newTestCRIService()
 
 	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	for _, mount := range spec.Mounts {
 		assert.NotEqual(t, "/run", mount.Destination)
 	}
@@ -1119,7 +1119,7 @@ func TestNonRootUserAndDevices(t *testing.T) {
 	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 
 	hostDevicesRaw, err := oci.HostDevices()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testDevice := hostDevicesRaw[0]
 
@@ -1174,7 +1174,7 @@ func TestNonRootUserAndDevices(t *testing.T) {
 			}
 
 			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{}, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, test.expectedDeviceUID, *spec.Linux.Devices[0].UID)
 			assert.Equal(t, test.expectedDeviceGID, *spec.Linux.Devices[0].GID)
@@ -1247,10 +1247,10 @@ func TestPrivilegedDevices(t *testing.T) {
 				PrivilegedWithoutHostDevicesAllDevicesAllowed: test.privilegedWithoutHostDevicesAllDevicesAllowed,
 			}
 			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			hostDevicesRaw, err := oci.HostDevices()
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			var hostDevices = make([]string, 0)
 			for _, dev := range hostDevicesRaw {
 				// https://github.com/containerd/cri/pull/1521#issuecomment-652807951
@@ -1267,7 +1267,7 @@ func TestPrivilegedDevices(t *testing.T) {
 
 			assert.Len(t, spec.Linux.Resources.Devices, 1)
 			assert.Equal(t, spec.Linux.Resources.Devices[0].Allow, test.expectAllDevicesAllowed)
-			assert.Equal(t, spec.Linux.Resources.Devices[0].Access, "rwm")
+			assert.Equal(t, "rwm", spec.Linux.Resources.Devices[0].Access)
 		})
 	}
 }
@@ -1302,7 +1302,7 @@ func TestBaseOCISpec(t *testing.T) {
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 
 	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	specCheck(t, testID, testSandboxID, testPid, spec)
 

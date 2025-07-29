@@ -100,10 +100,10 @@ func TestListImages(t *testing.T) {
 
 	var err error
 	c.imageStore, err = imagestore.NewFakeStore(imagesInStore)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := c.ListImages(context.Background(), &runtime.ListImagesRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, resp)
 	images := resp.GetImages()
 	assert.Len(t, images, len(expect))

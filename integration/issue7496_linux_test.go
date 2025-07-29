@@ -35,7 +35,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/ttrpc"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -96,7 +95,7 @@ func TestIssue7496(t *testing.T) {
 	select {
 	case <-time.After(15 * time.Second):
 		resp, err := shimCli.Connect(ctx, &apitask.ConnectRequest{})
-		assert.Error(t, err, "should failed to call shim connect API")
+		require.Error(t, err, "should failed to call shim connect API")
 
 		t.Errorf("Strace doesn't exit in time")
 
@@ -140,7 +139,7 @@ func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTR
 
 		bufReader := bufio.NewReader(pipeR)
 		_, err := bufReader.Peek(1)
-		assert.NoError(t, err, "failed to ensure that strace has attached to shim")
+		require.NoError(t, err, "failed to ensure that strace has attached to shim")
 
 		close(readyCh)
 		io.Copy(os.Stdout, bufReader)
@@ -149,7 +148,7 @@ func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTR
 
 	go func() {
 		defer pipeW.Close()
-		assert.NoError(t, cmd.Wait(), "strace should exit with zero code")
+		require.NoError(t, cmd.Wait(), "strace should exit with zero code")
 	}()
 
 	<-readyCh

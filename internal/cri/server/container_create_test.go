@@ -98,7 +98,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			desc:           "a passthrough annotation should be passed as an OCI annotation",
 			podAnnotations: []string{"c"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["c"], "d")
+				assert.Equal(t, "d", spec.Annotations["c"])
 			},
 		},
 		{
@@ -108,7 +108,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			},
 			podAnnotations: []string{"c"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["c"], "d")
+				assert.Equal(t, "d", spec.Annotations["c"])
 				_, ok := spec.Annotations["d"]
 				assert.False(t, ok)
 			},
@@ -125,9 +125,9 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			podAnnotations: []string{"t*", "z.*", "y.c*"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
 				t.Logf("%+v", spec.Annotations)
-				assert.Equal(t, spec.Annotations["t.f"], "j")
-				assert.Equal(t, spec.Annotations["z.g"], "o")
-				assert.Equal(t, spec.Annotations["y.ca"], "b")
+				assert.Equal(t, "j", spec.Annotations["t.f"])
+				assert.Equal(t, "o", spec.Annotations["z.g"])
+				assert.Equal(t, "b", spec.Annotations["y.ca"])
 				_, ok := spec.Annotations["y"]
 				assert.False(t, ok)
 				_, ok = spec.Annotations["z"]
@@ -147,7 +147,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			}
 			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, testSandboxID, testPid, spec)
 			if test.specCheck != nil {
@@ -218,10 +218,10 @@ func TestContainerSpecCommand(t *testing.T) {
 			var spec runtimespec.Spec
 			err := opts.WithProcessArgs(config, imageConfig)(context.Background(), nil, nil, &spec)
 			if test.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.expected, spec.Process.Args, test.desc)
 		})
 	}
@@ -509,7 +509,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 			}
 			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, testSandboxID, testPid, spec)
 			if test.specCheck != nil {
@@ -536,7 +536,7 @@ func TestBaseRuntimeSpec(t *testing.T) {
 		oci.WithHostname("new-host"),
 		oci.WithDomainname("new-domain"),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, "1.0.2", out.Version)
 	assert.Equal(t, "new-host", out.Hostname)
@@ -544,9 +544,9 @@ func TestBaseRuntimeSpec(t *testing.T) {
 
 	// Make sure original base spec not changed
 	spec, err := c.LoadOCISpec("/etc/containerd/cri-base.json")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEqual(t, out, spec)
-	assert.Equal(t, spec.Hostname, "old")
+	assert.Equal(t, "old", spec.Hostname)
 
 	assert.Equal(t, filepath.Join("/", constants.K8sContainerdNamespace, "id1"), out.Linux.CgroupsPath)
 }

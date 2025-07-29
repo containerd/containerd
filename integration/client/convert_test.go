@@ -71,7 +71,7 @@ func TestConvert(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Assert that the image does not have any extra arch.
-	assert.Equal(t, 1, len(plats))
+	assert.Len(t, plats, 1)
 	assert.True(t, defPlat.Match(plats[0]))
 
 	// Assert that the media type is converted to OCI and also uncompressed

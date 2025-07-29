@@ -714,7 +714,7 @@ func testEnv(t *testing.T) (context.Context, *bolt.DB) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		assert.NoError(t, db.Close())
+		require.NoError(t, db.Close())
 		cancel()
 	})
 

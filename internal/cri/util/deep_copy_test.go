@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type A struct {
@@ -58,6 +59,6 @@ func TestCopy(t *testing.T) {
 	}
 	assert.NotEqual(t, expected, dst)
 	err := DeepCopy(dst, src)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, dst)
 }
