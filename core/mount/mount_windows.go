@@ -100,7 +100,7 @@ func (m *Mount) mount(target string) (retErr error) {
 	// Add an Alternate Data Stream to record the layer source.
 	// See https://docs.microsoft.com/en-au/archive/blogs/askcore/alternate-data-streams-in-ntfs
 	// for details on Alternate Data Streams.
-	if err := os.WriteFile(filepath.Clean(target)+":"+sourceStreamName, []byte(m.Source), 0666); err != nil {
+	if err := os.WriteFile(filepath.Clean(target)+":"+sourceStreamName, []byte(m.Source), 0o666); err != nil {
 		return fmt.Errorf("failed to record source for layer %s: %w", m.Source, err)
 	}
 

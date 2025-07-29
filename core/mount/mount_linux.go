@@ -274,7 +274,7 @@ func doPrepareIDMappedOverlay(tempRemountsLocation string, lowerDirs []string, u
 		tmpLowerDir := filepath.Join(tempRemountsLocation, strconv.Itoa(i))
 		tmpLowerDirs = append(tmpLowerDirs, tmpLowerDir)
 
-		if err := os.MkdirAll(tmpLowerDir, 0700); err != nil {
+		if err := os.MkdirAll(tmpLowerDir, 0o700); err != nil {
 			return nil, cleanUp, fmt.Errorf("failed to create temporary dir: %w", err)
 		}
 		if err := IDMapMountWithAttrs(lowerDir, tmpLowerDir, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
