@@ -202,7 +202,7 @@ func WithWindowsResources(resources *runtime.WindowsContainerResources) oci.Spec
 }
 
 // WithWindowsDefaultSandboxShares sets the default sandbox CPU shares
-func WithWindowsDefaultSandboxShares(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+func WithWindowsDefaultSandboxShares(_ context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
 	if s.Windows == nil {
 		s.Windows = &runtimespec.Windows{}
 	}
@@ -220,7 +220,7 @@ func WithWindowsDefaultSandboxShares(ctx context.Context, client oci.Client, c *
 // WithWindowsCredentialSpec assigns `credentialSpec` to the
 // `runtime.Spec.Windows.CredentialSpec` field.
 func WithWindowsCredentialSpec(credentialSpec string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	return func(_ context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
 		if s.Windows == nil {
 			s.Windows = &runtimespec.Windows{}
 		}
