@@ -96,8 +96,7 @@ func adaptContentStatus(status content.Status) filters.Adaptor {
 		if len(fieldpath) == 0 {
 			return "", false
 		}
-		switch fieldpath[0] {
-		case "ref":
+		if fieldpath[0] == "ref" {
 			return status.Ref, true
 		}
 

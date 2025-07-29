@@ -79,8 +79,7 @@ func (c *Metadata) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	// Handle old version after upgrade.
-	switch versioned.Version {
-	case metadataVersion:
+	if versioned.Version == metadataVersion {
 		*c = Metadata(versioned.Metadata)
 		return nil
 	}

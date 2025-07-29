@@ -155,8 +155,7 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst in
 	return errgrpc.ToNative(err)
 }
 func (p *proxyTransferrer) marshalAny(ctx context.Context, i interface{}) (typeurl.Any, error) {
-	switch m := i.(type) {
-	case streamMarshaler:
+	if m, ok := i.(streamMarshaler); ok {
 		return m.MarshalAny(ctx, p.streamCreator)
 	}
 	return typeurl.MarshalAny(i)

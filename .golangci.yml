@@ -51,7 +51,6 @@ linters:
         - paramTypeCombine
         - rangeValCopy
         - redundantSprint
-        - singleCaseSwitch
         - sloppyReassign
         - sprintfQuotedString
         - stringConcatSimplify

@@ -135,8 +135,7 @@ func (s *Status) decode(data []byte) error {
 		return err
 	}
 	// Handle old version after upgrade.
-	switch versioned.Version {
-	case statusVersion:
+	if versioned.Version == statusVersion {
 		*s = versioned.Status
 		return nil
 	}
