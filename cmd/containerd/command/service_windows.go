@@ -242,7 +242,7 @@ func registerUnregisterService(root string) (bool, error) {
 		// to the panic.log file as the underlying handle itself has been redirected.
 		var f *os.File
 		if logFileFlag != "" {
-			f, err = os.OpenFile(logFileFlag, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err = os.OpenFile(logFileFlag, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 			if err != nil {
 				return true, fmt.Errorf("open log file %q: %w", logFileFlag, err)
 			}
@@ -330,7 +330,7 @@ Loop:
 
 func initPanicFile(path string) error {
 	var err error
-	panicFile, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	panicFile, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return err
 	}

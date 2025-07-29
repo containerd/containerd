@@ -546,7 +546,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 	}
 
 	// ensure that the ingest path has been created.
-	if err := os.Mkdir(path, 0755); err != nil {
+	if err := os.Mkdir(path, 0o755); err != nil {
 		if !os.IsExist(err) {
 			return nil, err
 		}
@@ -568,7 +568,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 
 		// the ingest is new, we need to setup the target location.
 		// write the ref to a file for later use
-		if err := os.WriteFile(refp, []byte(ref), 0666); err != nil {
+		if err := os.WriteFile(refp, []byte(ref), 0o666); err != nil {
 			return nil, err
 		}
 
@@ -581,13 +581,13 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 		}
 
 		if total > 0 {
-			if err := os.WriteFile(filepath.Join(path, "total"), []byte(fmt.Sprint(total)), 0666); err != nil {
+			if err := os.WriteFile(filepath.Join(path, "total"), []byte(fmt.Sprint(total)), 0o666); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	fp, err := os.OpenFile(data, os.O_WRONLY|os.O_CREATE, 0666)
+	fp, err := os.OpenFile(data, os.O_WRONLY|os.O_CREATE, 0o666)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open data file: %w", err)
 	}
@@ -656,7 +656,7 @@ func (s *store) ingestPaths(ref string) (string, string, string) {
 }
 
 func (s *store) ensureIngestRoot() error {
-	return os.MkdirAll(filepath.Join(s.root, "ingest"), 0777)
+	return os.MkdirAll(filepath.Join(s.root, "ingest"), 0o777)
 }
 
 func readFileString(path string) (string, error) {
@@ -687,7 +687,7 @@ func writeTimestampFile(p string, t time.Time) error {
 	if err != nil {
 		return err
 	}
-	return writeToCompletion(p, b, 0666)
+	return writeToCompletion(p, b, 0o666)
 }
 
 func writeToCompletion(path string, data []byte, mode os.FileMode) error {
