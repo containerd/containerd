@@ -4,6 +4,7 @@ linters:
     - copyloopvar # Checks for loop variable copies in Go 1.22+
     - depguard # Checks for dependencies that should not be (re)introduced. See "settings" for further details.
     - dupword # Checks for duplicate words in the source code
+    - gocritic
     - gosec
     - misspell
     - nolintlint
@@ -23,6 +24,47 @@ linters:
       forbid:
         - pkg: ^regexp$
           msg: Use internal/lazyregexp.New instead.
+    gocritic:
+      disabled-checks:
+        - appendAssign
+        - appendCombine
+        - assignOp
+        - builtinShadow
+        - builtinShadowDecl
+        - captLocal
+        - commentedOutCode
+        - commentFormatting
+        - deferInLoop
+        - deprecatedComment
+        - elseif
+        - emptyStringTest
+        - equalFold
+        - exitAfterDefer
+        - exposedSyncMutex
+        - filepathJoin
+        - httpNoBody
+        - hugeParam
+        - importShadow
+        - initClause
+        - ifElseChain
+        - nestingReduce
+        - octalLiteral
+        - paramTypeCombine
+        - rangeValCopy
+        - redundantSprint
+        - singleCaseSwitch
+        - sloppyLen
+        - sloppyReassign
+        - sprintfQuotedString
+        - stringConcatSimplify
+        - tooManyResultsChecker
+        - typeAssertChain
+        - typeDefFirst
+        - typeUnparen
+        - unlambda
+        - unnamedResult
+        - whyNoLint
+      enable-all: true
     gosec:
       # The following issues surfaced when `gosec` linter
       # was enabled. They are temporarily excluded to unblock
