@@ -34,9 +34,10 @@ func createDirectory(name string, uid, gid int) initializerFunc {
 	return func(root string) error {
 		dname := filepath.Join(root, name)
 		st, err := os.Stat(dname)
-		if err != nil && !os.IsNotExist(err) {
+		switch {
+		case err != nil && !os.IsNotExist(err):
 			return err
-		} else if err == nil {
+		case err == nil:
 			if st.IsDir() {
 				stat := st.Sys().(*syscall.Stat_t)
 				if int(stat.Gid) == gid && int(stat.Uid) == uid {
@@ -50,7 +51,7 @@ func createDirectory(name string, uid, gid int) initializerFunc {
 					return err
 				}
 			}
-		} else {
+		default:
 			if err := os.Mkdir(dname, 0755); err != nil {
 				return err
 			}
