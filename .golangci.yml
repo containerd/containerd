@@ -52,7 +52,6 @@ linters:
         - rangeValCopy
         - redundantSprint
         - singleCaseSwitch
-        - sloppyLen
         - sloppyReassign
         - sprintfQuotedString
         - stringConcatSimplify
