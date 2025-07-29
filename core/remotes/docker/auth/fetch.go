@@ -170,7 +170,7 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 	client = &c
 	tracing.UpdateHTTPClient(client, tracing.Name("remotes.docker.resolver", "FetchToken"))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, to.Realm, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, to.Realm, http.NoBody)
 	if err != nil {
 		return nil, err
 	}

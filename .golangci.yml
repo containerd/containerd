@@ -42,7 +42,6 @@ linters:
         - exitAfterDefer
         - exposedSyncMutex
         - filepathJoin
-        - httpNoBody
         - hugeParam
         - importShadow
         - initClause
