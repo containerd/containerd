@@ -24,6 +24,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (c *criService) getLinuxRuntimeConfig(ctx context.Context) *runtime.LinuxRuntimeConfiguration {
+func (c *criService) getLinuxRuntimeConfig(context.Context) *runtime.LinuxRuntimeConfiguration {
 	return nil
 }

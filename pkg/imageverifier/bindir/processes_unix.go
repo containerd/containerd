@@ -32,7 +32,7 @@ type process struct {
 
 // Configure the verifier command so that killing it kills all child
 // processes of the verifier process.
-func startProcess(ctx context.Context, cmd *exec.Cmd) (*process, error) {
+func startProcess(_ context.Context, cmd *exec.Cmd) (*process, error) {
 	// Assign the verifier a new process group so that killing its process group
 	// in Cancel() doesn't kill the parent process (containerd).
 	cmd.SysProcAttr = &unix.SysProcAttr{Setpgid: true}
@@ -52,4 +52,4 @@ func startProcess(ctx context.Context, cmd *exec.Cmd) (*process, error) {
 	}, nil
 }
 
-func (p *process) cleanup(ctx context.Context) {}
+func (p *process) cleanup(context.Context) {}

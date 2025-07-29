@@ -250,10 +250,10 @@ func (s *localStream) Trailer() grpcm.MD {
 	return nil
 }
 
-func (s *localStream) SendMsg(m interface{}) error {
+func (s *localStream) SendMsg(interface{}) error {
 	return nil
 }
 
-func (s *localStream) RecvMsg(m interface{}) error {
+func (s *localStream) RecvMsg(interface{}) error {
 	return nil
 }

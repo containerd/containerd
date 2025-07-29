@@ -77,7 +77,7 @@ func (s *snapshotsSyncer) sync() error {
 		// `Usage` takes time, we don't want `Walk` to hold read lock
 		// of snapshot metadata store for too long time.
 		// TODO(random-liu): Set timeout for the following 2 contexts.
-		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
+		if err := snapshotter.Walk(ctx, func(_ context.Context, info snapshot.Info) error {
 			snapshots = append(snapshots, info)
 			return nil
 		}); err != nil {

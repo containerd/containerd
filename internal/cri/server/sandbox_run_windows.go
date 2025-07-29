@@ -27,6 +27,6 @@ func (c *criService) bringUpLoopback(string) error {
 	return nil
 }
 
-func (c *criService) setupNetnsWithinUserns(basedir string, cfg *runtime.UserNamespace) (*netns.NetNS, error) {
+func (c *criService) setupNetnsWithinUserns(string, *runtime.UserNamespace) (*netns.NetNS, error) {
 	return nil, fmt.Errorf("unsupported to setup netns within userns on windows platform")
 }

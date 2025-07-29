@@ -96,7 +96,7 @@ func NewLabeledStore(root string, ls LabelStore) (content.Store, error) {
 	return s, nil
 }
 
-func (s *store) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
+func (s *store) Info(_ context.Context, dgst digest.Digest) (content.Info, error) {
 	p, err := s.blobPath(dgst)
 	if err != nil {
 		return content.Info{}, fmt.Errorf("calculating blob info path: %w", err)
@@ -131,7 +131,7 @@ func (s *store) info(dgst digest.Digest, fi os.FileInfo, labels map[string]strin
 }
 
 // ReaderAt returns an io.ReaderAt for the blob.
-func (s *store) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
+func (s *store) ReaderAt(_ context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
 	p, err := s.blobPath(desc.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("calculating blob path for ReaderAt: %w", err)
@@ -149,7 +149,7 @@ func (s *store) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.
 //
 // While this is safe to do concurrently, safe exist-removal logic must hold
 // some global lock on the store.
-func (s *store) Delete(ctx context.Context, dgst digest.Digest) error {
+func (s *store) Delete(_ context.Context, dgst digest.Digest) error {
 	bp, err := s.blobPath(dgst)
 	if err != nil {
 		return fmt.Errorf("calculating blob path for delete: %w", err)
@@ -233,7 +233,7 @@ func (s *store) Update(ctx context.Context, info content.Info, fieldpaths ...str
 	return info, nil
 }
 
-func (s *store) Walk(ctx context.Context, fn content.WalkFunc, fs ...string) error {
+func (s *store) Walk(_ context.Context, fn content.WalkFunc, fs ...string) error {
 	root := filepath.Join(s.root, "blobs")
 
 	filter, err := filters.ParseAll(fs...)
@@ -293,11 +293,11 @@ func (s *store) Walk(ctx context.Context, fn content.WalkFunc, fs ...string) err
 	})
 }
 
-func (s *store) Status(ctx context.Context, ref string) (content.Status, error) {
+func (s *store) Status(_ context.Context, ref string) (content.Status, error) {
 	return s.status(s.ingestRoot(ref))
 }
 
-func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]content.Status, error) {
+func (s *store) ListStatuses(_ context.Context, fs ...string) ([]content.Status, error) {
 	fp, err := os.Open(filepath.Join(s.root, "ingest"))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -613,7 +613,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 
 // Abort an active transaction keyed by ref. If the ingest is active, it will
 // be cancelled. Any resources associated with the ingest will be cleaned.
-func (s *store) Abort(ctx context.Context, ref string) error {
+func (s *store) Abort(_ context.Context, ref string) error {
 	root := s.ingestRoot(ref)
 	if err := os.RemoveAll(root); err != nil {
 		if os.IsNotExist(err) {

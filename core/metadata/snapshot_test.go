@@ -369,7 +369,7 @@ func (s *tmpSnapshotter) View(ctx context.Context, key, parent string, opts ...s
 	return s.create(ctx, key, parent, snapshots.KindView, opts...)
 }
 
-func (s *tmpSnapshotter) create(ctx context.Context, key, parent string, kind snapshots.Kind, opts ...snapshots.Opt) ([]mount.Mount, error) {
+func (s *tmpSnapshotter) create(_ context.Context, key, parent string, kind snapshots.Kind, opts ...snapshots.Opt) ([]mount.Mount, error) {
 	s.l.Lock()
 	defer s.l.Unlock()
 

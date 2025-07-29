@@ -25,6 +25,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func toCRIContainerUser(ctx context.Context, container containerstore.Container) (*runtime.ContainerUser, error) {
+func toCRIContainerUser(context.Context, containerstore.Container) (*runtime.ContainerUser, error) {
 	return &runtime.ContainerUser{}, nil
 }

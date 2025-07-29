@@ -210,7 +210,7 @@ func (s *service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Sn
 			})
 		}
 	)
-	err = sn.Walk(ss.Context(), func(ctx context.Context, info snapshots.Info) error {
+	err = sn.Walk(ss.Context(), func(_ context.Context, info snapshots.Info) error {
 		buffer = append(buffer, proxy.InfoToProto(info))
 
 		if len(buffer) >= 100 {

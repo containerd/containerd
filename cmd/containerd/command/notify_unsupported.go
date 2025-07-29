@@ -22,10 +22,10 @@ import (
 	"context"
 )
 
-func notifyReady(ctx context.Context) error {
+func notifyReady(context.Context) error {
 	return nil
 }
 
-func notifyStopping(ctx context.Context) error {
+func notifyStopping(context.Context) error {
 	return nil
 }

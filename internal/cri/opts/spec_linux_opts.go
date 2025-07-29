@@ -40,7 +40,7 @@ import (
 )
 
 func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler, cgroupWritable bool) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
+	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
 		// be kept.
@@ -332,7 +332,7 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig, enableDevi
 
 // WithResources sets the provided resource restrictions
 func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHugetlbController, disableHugetlbController bool) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		if resources == nil {
 			return nil
 		}
@@ -414,7 +414,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 
 // WithOOMScoreAdj sets the oom score
 func WithOOMScoreAdj(config *runtime.ContainerConfig, restrict bool) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if s.Process == nil {
 			s.Process = &runtimespec.Process{}
 		}
@@ -438,7 +438,7 @@ func WithOOMScoreAdj(config *runtime.ContainerConfig, restrict bool) oci.SpecOpt
 
 // WithPodOOMScoreAdj sets the oom score for the pod sandbox
 func WithPodOOMScoreAdj(adj int, restrict bool) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if s.Process == nil {
 			s.Process = &runtimespec.Process{}
 		}
