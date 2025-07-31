@@ -64,7 +64,7 @@ type PoolMetadata struct {
 
 // NewPoolMetadata creates new or opens existing pool metadata database
 func NewPoolMetadata(dbfile string) (*PoolMetadata, error) {
-	db, err := bolt.Open(dbfile, 0600, nil)
+	db, err := bolt.Open(dbfile, 0o600, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,6 @@ func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
 
 		return putObject(devicesBucket, info.Name, info, true)
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to save metadata for device %q (parent: %q): %w", info.Name, info.ParentName, err)
 	}
@@ -320,7 +319,6 @@ func (m *PoolMetadata) GetDeviceNames(ctx context.Context) ([]string, error) {
 			return nil
 		})
 	})
-
 	if err != nil {
 		return nil, err
 	}

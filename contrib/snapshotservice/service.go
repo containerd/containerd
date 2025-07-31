@@ -151,7 +151,6 @@ func (s service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Sna
 	}
 
 	return nil
-
 }
 
 func (s service) Usage(ctx context.Context, ur *snapshotsapi.UsageRequest) (*snapshotsapi.UsageResponse, error) {

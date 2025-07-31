@@ -157,9 +157,7 @@ func serializeLinuxIDMapping(m specs.LinuxIDMapping) string {
 
 // deserializeLinuxIDMapping unmarshals a string to a LinuxIDMapping object
 func deserializeLinuxIDMapping(str string) (specs.LinuxIDMapping, error) {
-	var (
-		hostID, ctrID, length int64
-	)
+	var hostID, ctrID, length int64
 	_, err := fmt.Sscanf(str, "%d:%d:%d", &ctrID, &hostID, &length)
 	if err != nil {
 		return specs.LinuxIDMapping{}, fmt.Errorf("input value %s unparsable: %w", str, err)

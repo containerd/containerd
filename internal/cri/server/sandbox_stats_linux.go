@@ -24,17 +24,19 @@ import (
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
 func (c *criService) podSandboxStats(
 	ctx context.Context,
-	sandbox sandboxstore.Sandbox) (*runtime.PodSandboxStats, error) {
+	sandbox sandboxstore.Sandbox,
+) (*runtime.PodSandboxStats, error) {
 	meta := sandbox.Metadata
 
 	if sandbox.Status.Get().State != sandboxstore.StateReady {

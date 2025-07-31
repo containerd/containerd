@@ -23,16 +23,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/typeurl/v2"
+	"go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
+
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	api "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
-	"go.etcd.io/bbolt"
-	errbolt "go.etcd.io/bbolt/errors"
 )
 
 const (
@@ -214,9 +215,7 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 		return nil, fmt.Errorf("%s: %w", err.Error(), errdefs.ErrInvalidArgument)
 	}
 
-	var (
-		list []api.Sandbox
-	)
+	var list []api.Sandbox
 
 	if err := view(ctx, s.db, func(tx *bbolt.Tx) error {
 		bucket := getSandboxBucket(tx, ns)

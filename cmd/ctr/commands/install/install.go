@@ -17,9 +17,10 @@
 package install
 
 import (
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/urfave/cli/v2"
 )
 
 // Command to install binary packages

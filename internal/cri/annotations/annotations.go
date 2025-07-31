@@ -17,9 +17,10 @@
 package annotations
 
 import (
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // ContainerType values

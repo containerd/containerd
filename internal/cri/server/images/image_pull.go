@@ -99,7 +99,6 @@ import (
 
 // PullImage pulls an image with authentication config.
 func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
-
 	imageRef := r.GetImage().GetImage()
 
 	credentials := func(host string) (string, string, error) {
@@ -143,7 +142,6 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 			config := c.config.Registry.Configs[host]
 			if config.Auth != nil {
 				hostauth = toRuntimeAuthConfig(*config.Auth)
-
 			}
 
 			return ParseAuth(hostauth, host)
@@ -264,7 +262,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	}
 
 	// Temporarily removed for v2 upgrade
-	//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+	// pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
 	if !c.config.DisableSnapshotAnnotations {
 		pullOpts = append(pullOpts,
 			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
@@ -697,7 +695,7 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 			reportInterval = reporter.timeout / 2
 		}
 
-		var ticker = time.NewTicker(reportInterval)
+		ticker := time.NewTicker(reportInterval)
 		defer ticker.Stop()
 
 		for {
@@ -828,7 +826,8 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 // Once we know the runtime, try to override default snapshotter if it is set for this runtime.
 // See https://github.com/containerd/containerd/issues/6657
 func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig) (string, error) {
+	s *runtime.PodSandboxConfig,
+) (string, error) {
 	snapshotter := c.config.Snapshotter
 	if s == nil || s.Annotations == nil {
 		return snapshotter, nil
@@ -865,7 +864,7 @@ func newCRICredentials(ref string, credentials func(string) (string, string, err
 }
 
 // GetCredentials gets credential from criCredentials makes criCredentials a registry.CredentialHelper
-func (cc *criCredentials) GetCredentials(ctx context.Context, ref string, host string) (registry.Credentials, error) {
+func (cc *criCredentials) GetCredentials(ctx context.Context, ref, host string) (registry.Credentials, error) {
 	if cc.credentials == nil {
 		return registry.Credentials{}, fmt.Errorf("credential handler not initialized for ref %q", ref)
 	}
@@ -968,9 +967,7 @@ func (reporter *transferProgressReporter) start(ctx context.Context) {
 	}
 
 	go func() {
-		var (
-			reportInterval = defaultPullProgressReportInterval
-		)
+		reportInterval := defaultPullProgressReportInterval
 
 		reporter.lastSeenBytesRead = uint64(0)
 		reporter.lastSeenTimestamp = time.Now()
@@ -980,7 +977,7 @@ func (reporter *transferProgressReporter) start(ctx context.Context) {
 			reportInterval = reporter.timeout / 2
 		}
 
-		var ticker = time.NewTicker(reportInterval)
+		ticker := time.NewTicker(reportInterval)
 		defer ticker.Stop()
 
 		for {

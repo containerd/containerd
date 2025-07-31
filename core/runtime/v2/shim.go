@@ -28,11 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials/insecure"
-
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
 	eventstypes "github.com/containerd/containerd/api/events"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
@@ -43,6 +38,10 @@ import (
 	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/runtime"
@@ -396,8 +395,10 @@ type shim struct {
 	version int
 }
 
-var _ ShimInstance = (*shim)(nil)
-var _ clientVersionDowngrader = (*shim)(nil)
+var (
+	_ ShimInstance            = (*shim)(nil)
+	_ clientVersionDowngrader = (*shim)(nil)
+)
 
 // ID of the shim/task
 func (s *shim) ID() string {
@@ -649,7 +650,6 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 				rootfs,
 				decompressed,
 			)
-
 			if err != nil {
 				return nil, fmt.Errorf("unpacking of rootfs-diff archive %s into %s failed: %w", rootfsDiffTar.Name(), rootfs, err)
 			}

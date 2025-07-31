@@ -101,6 +101,7 @@ issues:
 formatters:
   enable:
     - gofmt
+    - gofumpt
     - goimports
   exclusions:
     generated: strict
@@ -111,3 +112,9 @@ formatters:
       - docs/man
       - releases
       - test
+  settings:
+    gofumpt:
+      extra-rules: true
+    goimports:
+      local-prefixes:
+        - github.com/containerd/containerd/v2

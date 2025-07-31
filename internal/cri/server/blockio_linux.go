@@ -21,8 +21,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/pkg/blockio"
 )
 
 // blockIOClassFromAnnotations examines container and pod annotations of a

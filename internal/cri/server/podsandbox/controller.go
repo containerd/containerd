@@ -21,13 +21,15 @@ import (
 	"fmt"
 	"time"
 
+	eventtypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	eventtypes "github.com/containerd/containerd/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -40,8 +42,6 @@ import (
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/platforms"
 )
 
 func init() {
@@ -143,7 +143,6 @@ func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitSt
 	podSandbox := c.store.Get(sandboxID)
 	if podSandbox == nil {
 		return sandbox.ExitStatus{}, fmt.Errorf("failed to get exit channel. %q", sandboxID)
-
 	}
 	exit, err := podSandbox.Wait(ctx)
 	if err != nil {
@@ -153,14 +152,14 @@ func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitSt
 		ExitStatus: exit.ExitCode(),
 		ExitedAt:   exit.ExitTime(),
 	}, err
-
 }
 
 func (c *Controller) Update(
 	ctx context.Context,
 	sandboxID string,
 	sandbox sandbox.Sandbox,
-	fields ...string) error {
+	fields ...string,
+) error {
 	return nil
 }
 

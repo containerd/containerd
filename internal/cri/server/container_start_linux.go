@@ -20,9 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/internal/userns"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // updateContainerIOOwner updates I/O files' owner to align with initial processe's UID/GID.

@@ -25,6 +25,13 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
@@ -36,12 +43,6 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/pkg/httpdbg"
 	"github.com/containerd/containerd/v2/pkg/progress"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
-	"golang.org/x/sync/errgroup"
 )
 
 var pushCommand = &cli.Command{

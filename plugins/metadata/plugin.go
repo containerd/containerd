@@ -22,18 +22,18 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 const (
@@ -106,7 +106,7 @@ func init() {
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			root := ic.Properties[plugins.PropertyRootDir]
-			if err := os.MkdirAll(root, 0711); err != nil {
+			if err := os.MkdirAll(root, 0o711); err != nil {
 				return nil, err
 			}
 			cs, err := ic.GetSingle(plugins.ContentPlugin)
@@ -176,7 +176,7 @@ func init() {
 				}
 			}()
 
-			db, err := bolt.Open(path, 0644, &options)
+			db, err := bolt.Open(path, 0o644, &options)
 			close(doneCh)
 			if err != nil {
 				return nil, err

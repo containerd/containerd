@@ -722,7 +722,7 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 	return nil
 }
 
-func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName string, id string) error {
+func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName, id string) error {
 	opts := []diff.Opt{
 		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", id)),
 	}

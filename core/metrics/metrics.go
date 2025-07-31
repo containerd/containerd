@@ -19,9 +19,10 @@ package metrics
 import (
 	"time"
 
+	goMetrics "github.com/docker/go-metrics"
+
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/version"
-	goMetrics "github.com/docker/go-metrics"
 )
 
 const (

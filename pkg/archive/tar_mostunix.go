@@ -31,7 +31,7 @@ func mknod(path string, mode uint32, dev uint64) error {
 
 // lsetxattrCreate wraps unix.Lsetxattr, passes the unix.XATTR_CREATE flag on
 // supported operating systems,and ignores appropriate errors
-func lsetxattrCreate(link string, attr string, data []byte) error {
+func lsetxattrCreate(link, attr string, data []byte) error {
 	err := unix.Lsetxattr(link, attr, data, unix.XATTR_CREATE)
 	if err == unix.ENOTSUP || err == unix.ENODATA || err == unix.EEXIST {
 		return nil

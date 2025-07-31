@@ -26,20 +26,22 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) podSandboxStats(
 	ctx context.Context,
-	sandbox sandboxstore.Sandbox) (*runtime.PodSandboxStats, error) {
+	sandbox sandboxstore.Sandbox,
+) (*runtime.PodSandboxStats, error) {
 	meta := sandbox.Metadata
 
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
@@ -198,7 +200,7 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 	return podRuntimeStats, windowsContainerStats, nil
 }
 
-func appendCPUPodStats(podRuntimeStats *runtime.WindowsContainerStats, containerRunTimeStats *runtime.WindowsContainerStats, timestamp time.Time) {
+func appendCPUPodStats(podRuntimeStats, containerRunTimeStats *runtime.WindowsContainerStats, timestamp time.Time) {
 	// protect against missing stats in case container hasn't started yet
 	if containerRunTimeStats.Cpu == nil || containerRunTimeStats.Cpu.UsageCoreNanoSeconds == nil {
 		return
@@ -220,7 +222,7 @@ func appendCPUPodStats(podRuntimeStats *runtime.WindowsContainerStats, container
 	podRuntimeStats.Cpu.UsageCoreNanoSeconds.Value += containerRunTimeStats.Cpu.UsageCoreNanoSeconds.Value
 }
 
-func appendMemoryPodStats(podRuntimeStats *runtime.WindowsContainerStats, containerRunTimeStats *runtime.WindowsContainerStats, timestamp time.Time) {
+func appendMemoryPodStats(podRuntimeStats, containerRunTimeStats *runtime.WindowsContainerStats, timestamp time.Time) {
 	// protect against missing stats in case container hasn't started yet
 	if containerRunTimeStats.Memory == nil {
 		return
@@ -258,7 +260,7 @@ func (c *criService) listWindowsMetricsForSandbox(ctx context.Context, sandbox s
 		req.Filters = append(req.Filters, "id=="+cntr.ID)
 	}
 
-	//add sandbox container as well
+	// add sandbox container as well
 	req.Filters = append(req.Filters, "id=="+sandbox.ID)
 
 	resp, err := c.client.TaskService().Metrics(ctx, req)

@@ -29,12 +29,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/continuity/fs"
+	"github.com/containerd/log"
 	"github.com/moby/sys/userns"
 
 	"github.com/containerd/containerd/v2/pkg/archive/tarheader"
 	"github.com/containerd/containerd/v2/pkg/epoch"
-	"github.com/containerd/continuity/fs"
-	"github.com/containerd/log"
 )
 
 var bufPool = &sync.Pool{
@@ -457,7 +457,7 @@ func mkparent(ctx context.Context, path, root string, parents []string) error {
 		}
 	}
 
-	if err := mkdir(path, 0755); err != nil {
+	if err := mkdir(path, 0o755); err != nil {
 		// Check that still doesn't exist
 		dir, err1 := os.Lstat(path)
 		if err1 == nil && dir.IsDir() {
@@ -766,7 +766,6 @@ func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written in
 		}
 	}
 	return written, err
-
 }
 
 // hardlinkRootPath returns target linkname, evaluating and bounding any

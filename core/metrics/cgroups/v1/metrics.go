@@ -24,15 +24,16 @@ import (
 	"sync"
 
 	cgroups "github.com/containerd/cgroups/v3/cgroup1"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	"github.com/docker/go-metrics"
+	"github.com/prometheus/client_golang/prometheus"
+
 	cmetrics "github.com/containerd/containerd/v2/core/metrics"
 	"github.com/containerd/containerd/v2/core/metrics/cgroups/common"
 	v1 "github.com/containerd/containerd/v2/core/metrics/types/v1"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
-	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
-	"github.com/docker/go-metrics"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Trigger will be called when an event happens and provides the cgroup

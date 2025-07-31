@@ -43,12 +43,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/internal/cri/streamingserver/responsewriter"
-	api "github.com/containerd/containerd/v2/internal/cri/streamingserver/v1"
 	"github.com/containerd/log"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+
+	"github.com/containerd/containerd/v2/internal/cri/streamingserver/responsewriter"
+	api "github.com/containerd/containerd/v2/internal/cri/streamingserver/v1"
 )
 
 const (

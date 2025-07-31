@@ -34,12 +34,12 @@ import (
 	"strings"
 
 	"dario.cat/mergo"
-	"github.com/pelletier/go-toml/v2"
-
-	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
+	"github.com/pelletier/go-toml/v2"
+
+	"github.com/containerd/containerd/v2/version"
 )
 
 // migrations hold the migration functions for every prior containerd config version

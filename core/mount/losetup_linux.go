@@ -23,9 +23,10 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/containerd/v2/internal/randutil"
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
-	"golang.org/x/sys/unix"
 )
 
 const (

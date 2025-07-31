@@ -20,11 +20,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/urfave/cli/v2"
+
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/errdefs"
-	"github.com/urfave/cli/v2"
 )
 
 var unmountCommand = &cli.Command{
@@ -39,9 +40,7 @@ var unmountCommand = &cli.Command{
 		},
 	),
 	Action: func(cliContext *cli.Context) error {
-		var (
-			target = cliContext.Args().First()
-		)
+		target := cliContext.Args().First()
 		if target == "" {
 			return errors.New("please provide a target path to unmount from")
 		}

@@ -19,15 +19,14 @@ package images
 import (
 	"context"
 
+	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	imagesapi "github.com/containerd/containerd/api/services/images/v1"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/metadata"

@@ -23,7 +23,7 @@ import (
 )
 
 // Mount is an empty stub on Windows.
-func (RealOS) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+func (RealOS) Mount(source, target, fstype string, flags uintptr, data string) error {
 	return errors.New("mount is not supported on Windows")
 }
 

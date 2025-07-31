@@ -22,13 +22,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/remotes"
-	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/transfer"
 )
 
 type ProgressTracker struct {
@@ -60,7 +61,7 @@ type jobStatus struct {
 type jobUpdate struct {
 	desc   ocispec.Descriptor
 	exists bool
-	//children []ocispec.Descriptor
+	// children []ocispec.Descriptor
 }
 
 type ActiveJobs interface {
@@ -164,7 +165,7 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 					Event:   "waiting",
 					Name:    name,
 					Parents: parents,
-					//Digest:   desc.Digest.String(),
+					// Digest:   desc.Digest.String(),
 					Progress: 0,
 					Total:    update.desc.Size,
 					Desc:     &job.desc,
@@ -210,7 +211,6 @@ func (j *ProgressTracker) MarkExists(desc ocispec.Descriptor) {
 		desc:   desc,
 		exists: true,
 	}
-
 }
 
 // AddChildren adds hierarchy information
@@ -223,7 +223,6 @@ func (j *ProgressTracker) AddChildren(desc ocispec.Descriptor, children []ocispe
 	for _, child := range children {
 		j.parents[child.Digest] = append(j.parents[child.Digest], desc)
 	}
-
 }
 
 func (j *ProgressTracker) Wait() {

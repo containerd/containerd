@@ -20,13 +20,13 @@ import (
 	"context"
 	"io"
 
+	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/labels"
-	"github.com/containerd/log"
 )
 
 // GetDiffID gets the diff ID of the layer blob descriptor.

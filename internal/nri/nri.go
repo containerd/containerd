@@ -22,9 +22,9 @@ import (
 	"sync"
 
 	"github.com/containerd/log"
+	nri "github.com/containerd/nri/pkg/adaptation"
 
 	"github.com/containerd/containerd/v2/version"
-	nri "github.com/containerd/nri/pkg/adaptation"
 )
 
 // API implements a common API for interfacing NRI from containerd. It is

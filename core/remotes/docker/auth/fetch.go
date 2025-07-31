@@ -26,17 +26,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/log"
+
 	remoteserrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/log"
 )
 
-var (
-	// ErrNoToken is returned if a request is successful but the body does not
-	// contain an authorization token.
-	ErrNoToken = errors.New("authorization server did not include a token in the response")
-)
+// ErrNoToken is returned if a request is successful but the body does not
+// contain an authorization token.
+var ErrNoToken = errors.New("authorization server did not include a token in the response")
 
 // GenerateTokenOptions generates options for fetching a token based on a challenge
 func GenerateTokenOptions(ctx context.Context, host, username, secret string, c Challenge) (TokenOptions, error) {

@@ -25,13 +25,13 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/internal/userns"
-
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/runtime-spec/specs-go"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/userns"
 )
 
 // WithRemappedSnapshot creates a new snapshot and remaps the uid/gid for the

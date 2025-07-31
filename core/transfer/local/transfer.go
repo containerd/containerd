@@ -22,10 +22,9 @@ import (
 	"io"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/semaphore"
-
-	"github.com/containerd/errdefs"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -60,7 +59,7 @@ func NewTransferService(cs content.Store, is images.Store, tc TransferConfig) tr
 	return ts
 }
 
-func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, dest interface{}, opts ...transfer.Opt) error {
+func (ts *localTransferService) Transfer(ctx context.Context, src, dest interface{}, opts ...transfer.Opt) error {
 	topts := &transfer.Config{}
 	for _, opt := range opts {
 		opt(topts)

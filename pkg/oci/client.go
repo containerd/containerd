@@ -19,9 +19,10 @@ package oci
 import (
 	"context"
 
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Client interface used by SpecOpt

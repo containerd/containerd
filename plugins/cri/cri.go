@@ -22,6 +22,7 @@ import (
 	"io"
 
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"google.golang.org/grpc"
@@ -37,7 +38,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/platforms"
 )
 
 // Register CRI service plugin

@@ -21,9 +21,10 @@ package v1
 import (
 	"strconv"
 
-	v1 "github.com/containerd/containerd/v2/core/metrics/types/v1"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
+
+	v1 "github.com/containerd/containerd/v2/core/metrics/types/v1"
 )
 
 var cpuMetrics = []*metric{

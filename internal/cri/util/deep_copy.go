@@ -23,7 +23,7 @@ import (
 )
 
 // DeepCopy makes a deep copy from src into dst.
-func DeepCopy(dst interface{}, src interface{}) error {
+func DeepCopy(dst, src interface{}) error {
 	if dst == nil {
 		return errors.New("dst cannot be nil")
 	}

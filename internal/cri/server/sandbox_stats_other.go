@@ -22,13 +22,15 @@ import (
 	"context"
 	"fmt"
 
-	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/errdefs"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
 func (c *criService) podSandboxStats(
 	ctx context.Context,
-	sandbox sandboxstore.Sandbox) (*runtime.PodSandboxStats, error) {
+	sandbox sandboxstore.Sandbox,
+) (*runtime.PodSandboxStats, error) {
 	return nil, fmt.Errorf("pod sandbox stats not implemented: %w", errdefs.ErrNotImplemented)
 }

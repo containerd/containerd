@@ -20,13 +20,14 @@ import (
 	"errors"
 
 	"github.com/containerd/console"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
 )
 
 var restoreCommand = &cli.Command{

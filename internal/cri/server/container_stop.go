@@ -24,15 +24,15 @@ import (
 	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/moby/sys/signal"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-
-	"github.com/moby/sys/signal"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // StopContainer stops a running container with a grace period (i.e., timeout).

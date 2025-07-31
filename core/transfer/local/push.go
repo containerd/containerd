@@ -22,14 +22,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/core/remotes"
-	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/transfer"
 )
 
 func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGetter, p transfer.ImagePusher, tops *transfer.Config) error {
@@ -52,7 +53,7 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 		tops.Progress(transfer.Progress{
 			Event: "pushing content",
 			Name:  img.Name,
-			//Digest: img.Target.Digest.String(),
+			// Digest: img.Target.Digest.String(),
 			Desc: &img.Target,
 		})
 	}
@@ -67,7 +68,7 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 
 	ctx, cancel := context.WithCancel(ctx)
 	if tops.Progress != nil {
-		progressTracker := NewProgressTracker(img.Name, "uploading") //Pass in first name as root
+		progressTracker := NewProgressTracker(img.Name, "uploading") // Pass in first name as root
 
 		p := newProgressPusher(pusher, progressTracker)
 		go progressTracker.HandleProgress(ctx, tops.Progress, p)
@@ -99,7 +100,7 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 		tops.Progress(transfer.Progress{
 			Event: "pushed content",
 			Name:  img.Name,
-			//Digest: img.Target.Digest.String(),
+			// Digest: img.Target.Digest.String(),
 			Desc: &img.Target,
 		})
 		tops.Progress(transfer.Progress{
@@ -133,7 +134,6 @@ func newProgressPusher(pusher remotes.Pusher, progress *ProgressTracker) *progre
 			complete: map[digest.Digest]struct{}{},
 		},
 	}
-
 }
 
 func (p *progressPusher) WrapHandler(h images.Handler) images.Handler {
@@ -201,6 +201,7 @@ func (ps *pushStatus) add(ref string, d ocispec.Descriptor) {
 	}
 	ps.l.Unlock()
 }
+
 func (ps *pushStatus) markComplete(ref string, d ocispec.Descriptor) {
 	ps.l.Lock()
 	_, ok := ps.statuses[ref]
@@ -209,7 +210,6 @@ func (ps *pushStatus) markComplete(ref string, d ocispec.Descriptor) {
 	}
 	ps.complete[d.Digest] = struct{}{}
 	ps.l.Unlock()
-
 }
 
 func (ps *pushStatus) Status(name string) (content.Status, bool) {
@@ -251,6 +251,7 @@ func (pw *progressWriter) Write(p []byte) (n int, err error) {
 	pw.status.update(pw.ref, n)
 	return
 }
+
 func (pw *progressWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	err := pw.Writer.Commit(ctx, size, expected, opts...)
 	if err != nil {

@@ -25,16 +25,17 @@ import (
 	"runtime"
 	"slices"
 
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
+
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
 )
 
 // viewHookHelper is only used in test for recover the filesystem.
-type viewHookHelper func(backingFile string, fsType string, defaultOpts []string) error
+type viewHookHelper func(backingFile, fsType string, defaultOpts []string) error
 
 // SnapshotterConfig holds the configurable properties for the blockfile snapshotter
 type SnapshotterConfig struct {
@@ -91,7 +92,6 @@ func WithMountOptions(options []string) Opt {
 	return func(root string, config *SnapshotterConfig) {
 		config.mountOptions = options
 	}
-
 }
 
 // WithRecreateScratch is used to determine that scratch should be recreated
@@ -126,7 +126,7 @@ type snapshotter struct {
 // file system. A metadata file is stored under the root.
 func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	var config SnapshotterConfig
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
 
@@ -170,7 +170,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 
-	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0o700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
@@ -349,7 +349,6 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		restore = true
 		return nil
 	})
-
 	if err != nil {
 		if renamed != "" && restore {
 			if err1 := os.Rename(renamed, path); err1 != nil {

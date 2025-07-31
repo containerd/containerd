@@ -67,7 +67,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 		return nil, fmt.Errorf("failed to unlink socket file %q: %v", addr, err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(addr), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(addr), 0o750); err != nil {
 		return nil, fmt.Errorf("error creating socket directory %q: %v", filepath.Dir(addr), err)
 	}
 
@@ -116,7 +116,7 @@ func dial(ctx context.Context, addr string) (net.Conn, error) {
 	return (&net.Dialer{}).DialContext(ctx, unixProtocol, addr)
 }
 
-func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string) (protocol string, addr string, err error) {
+func parseEndpointWithFallbackProtocol(endpoint, fallbackProtocol string) (protocol, addr string, err error) {
 	if protocol, addr, err = parseEndpoint(endpoint); err != nil && protocol == "" {
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)

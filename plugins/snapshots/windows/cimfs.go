@@ -33,10 +33,6 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/computestorage"
 	"github.com/Microsoft/hcsshim/pkg/cimfs"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/core/snapshots/storage"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -44,6 +40,11 @@ import (
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sys/windows"
+
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 const (
@@ -130,7 +131,7 @@ func NewCimFSSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, fmt.Errorf("failed to init base scratch VHD: %w", err)
 	}
 
-	if err = os.MkdirAll(filepath.Join(baseSn.info.HomeDir, "cim-layers"), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Join(baseSn.info.HomeDir, "cim-layers"), 0o755); err != nil {
 		return nil, err
 	}
 
@@ -270,7 +271,7 @@ func (s *cimFSSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Ki
 		log.G(ctx).Debug("createSnapshot")
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
-		if err = os.MkdirAll(snDir, 0700); err != nil {
+		if err = os.MkdirAll(snDir, 0o700); err != nil {
 			return fmt.Errorf("failed to create snapshot dir %s: %w", snDir, err)
 		}
 		defer func() {
@@ -343,9 +344,7 @@ func (s *cimFSSnapshotter) createScratchLayer(ctx context.Context, snDir string,
 }
 
 func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
-	var (
-		roFlag string
-	)
+	var roFlag string
 
 	if sn.Kind == snapshots.KindView {
 		roFlag = "ro"

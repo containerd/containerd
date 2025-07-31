@@ -29,8 +29,9 @@ import (
 	"strconv"
 	"strings"
 
-	blkdiscard "github.com/containerd/containerd/v2/plugins/snapshots/devmapper/blkdiscard"
 	"golang.org/x/sys/unix"
+
+	blkdiscard "github.com/containerd/containerd/v2/plugins/snapshots/devmapper/blkdiscard"
 )
 
 const (
@@ -131,7 +132,7 @@ func CreateDevice(poolName string, deviceID uint32) error {
 }
 
 // ActivateDevice activates the given thin-device using the 'thin' target
-func ActivateDevice(poolName string, deviceName string, deviceID uint32, size uint64, external string) error {
+func ActivateDevice(poolName, deviceName string, deviceID uint32, size uint64, external string) error {
 	mapping := makeThinMapping(poolName, deviceID, size, external)
 	_, err := dmsetup("create", deviceName, "--table", mapping)
 	return err
@@ -170,7 +171,7 @@ func Table(deviceName string) (string, error) {
 
 // CreateSnapshot sends "create_snap" message to the given thin-pool.
 // Caller needs to suspend and resume device if it is active.
-func CreateSnapshot(poolName string, deviceID uint32, baseDeviceID uint32) error {
+func CreateSnapshot(poolName string, deviceID, baseDeviceID uint32) error {
 	_, err := dmsetup("message", poolName, "0", fmt.Sprintf("create_snap %d %d", deviceID, baseDeviceID))
 	return err
 }
@@ -231,7 +232,6 @@ func Info(deviceName string) ([]*DeviceInfo, error) {
 		"--separator",
 		" ",
 		deviceName)
-
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,6 @@ func Info(deviceName string) ([]*DeviceInfo, error) {
 			&info.OpenCount,
 			&info.TargetCount,
 			&info.EventNumber)
-
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse line %q: %w", line, err)
 		}

@@ -41,12 +41,13 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/containerd/containerd/v2/internal/cri/streamingserver/v1"
 	"github.com/containerd/log"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
+	api "github.com/containerd/containerd/v2/internal/cri/streamingserver/v1"
 )
 
 func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {

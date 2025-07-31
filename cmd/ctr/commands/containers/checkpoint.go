@@ -20,10 +20,11 @@ import (
 	"errors"
 	"fmt"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/errdefs"
 	"github.com/urfave/cli/v2"
+
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 )
 
 var checkpointCommand = &cli.Command{

@@ -28,8 +28,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/plugin"
+
+	"github.com/containerd/containerd/v2/client"
 )
 
 type daemon struct {

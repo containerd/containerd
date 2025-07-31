@@ -21,6 +21,11 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -31,10 +36,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -182,6 +183,7 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	pluginConfigs[string(plugins.CRIServicePlugin)+".images"] = dst
 	return nil
 }
+
 func migrateConfig(dst, src map[string]interface{}) {
 	var pinnedImages map[string]interface{}
 	if v, ok := dst["pinned_images"]; ok {

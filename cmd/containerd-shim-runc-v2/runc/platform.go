@@ -29,10 +29,11 @@ import (
 	"syscall"
 
 	"github.com/containerd/console"
+	"github.com/containerd/fifo"
+
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
-	"github.com/containerd/fifo"
 )
 
 var bufPool = sync.Pool{

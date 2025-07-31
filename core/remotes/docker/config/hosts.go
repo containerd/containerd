@@ -116,7 +116,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 					// When port is 80, protocol is not ambiguous
 					if port != "80" {
 						// Skipping TLS verification for localhost
-						var skipVerify = true
+						skipVerify := true
 						hosts[len(hosts)-1].skipVerify = &skipVerify
 					}
 				} else {
@@ -235,7 +235,6 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 
 		return rhosts, nil
 	}
-
 }
 
 func updateTLSConfigFromHost(tlsConfig *tls.Config, host *hostConfig) error {
@@ -391,9 +390,7 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 		HostConfigs map[string]hostFileConfig `toml:"host"`
 	}{}
 
-	var (
-		hosts []hostConfig
-	)
+	var hosts []hostConfig
 
 	if err := toml.Unmarshal(b, &c); err != nil {
 		return nil, err
@@ -420,7 +417,7 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	return hosts, nil
 }
 
-func parseHostConfig(server string, baseDir string, config hostFileConfig) (hostConfig, error) {
+func parseHostConfig(server, baseDir string, config hostFileConfig) (hostConfig, error) {
 	var (
 		result = hostConfig{}
 		err    error
@@ -600,7 +597,7 @@ func makeStringSlice(slice []interface{}, cb func(string) string) ([]string, err
 	return out, nil
 }
 
-func makeAbsPath(p string, base string) string {
+func makeAbsPath(p, base string) string {
 	if filepath.IsAbs(p) {
 		return p
 	}

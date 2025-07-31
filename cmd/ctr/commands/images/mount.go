@@ -21,16 +21,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
+	"github.com/opencontainers/image-spec/identity"
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/platforms"
-	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli/v2"
 )
 
 var mountCommand = &cli.Command{

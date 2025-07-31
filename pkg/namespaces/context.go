@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/errdefs"
+
+	"github.com/containerd/containerd/v2/pkg/identifiers"
 )
 
 const (

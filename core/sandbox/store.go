@@ -85,7 +85,7 @@ func (s *Sandbox) AddExtension(name string, obj interface{}) error {
 }
 
 // AddLabel adds a label to sandbox's labels.
-func (s *Sandbox) AddLabel(name string, value string) {
+func (s *Sandbox) AddLabel(name, value string) {
 	if s.Labels == nil {
 		s.Labels = map[string]string{}
 	}

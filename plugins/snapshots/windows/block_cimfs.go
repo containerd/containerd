@@ -30,11 +30,6 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/pkg/cimfs"
 	cimlayer "github.com/Microsoft/hcsshim/pkg/ociwclayer/cim"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/core/snapshots/storage"
-	"github.com/containerd/containerd/v2/internal/kmutex"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -43,6 +38,12 @@ import (
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 const (
@@ -120,7 +121,6 @@ func NewBlockCIMSnapshotter(root string, config *BlockCIMSnapshotterConfig) (sna
 		// copy the differing VHD for every new scratch snapshot. If a different size is
 		// specified, we use ExpandVHD to change the size.
 		err = createDifferencingScratchVHDs(context.Background(), root)
-
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare scratch VHDs: %w", err)
@@ -173,7 +173,6 @@ func (s *blockCIMSnapshotter) getSnapshotBlockCIM(ctx context.Context, snID stri
 		Type:      cimfs.BlockCIMTypeSingleFile,
 		BlockPath: s.getSingleFileCIMBlockPath(snID),
 	}, nil
-
 }
 
 func (s *blockCIMSnapshotter) Usage(ctx context.Context, key string) (usage snapshots.Usage, err error) {
@@ -279,7 +278,7 @@ func (s *blockCIMSnapshotter) createSnapshot(ctx context.Context, kind snapshots
 
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
-		if err = os.MkdirAll(snDir, 0700); err != nil {
+		if err = os.MkdirAll(snDir, 0o700); err != nil {
 			return fmt.Errorf("failed to create snapshot dir %s: %w", snDir, err)
 		}
 		defer func() {

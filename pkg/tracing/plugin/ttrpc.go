@@ -17,11 +17,12 @@
 package plugin
 
 import (
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/otelttrpc"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
+
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 func init() {

@@ -21,9 +21,10 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/urfave/cli/v2"
 )
 
 var checkpointCommand = &cli.Command{

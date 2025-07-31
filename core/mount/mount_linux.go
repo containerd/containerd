@@ -110,9 +110,7 @@ func (m *Mount) mount(target string) (err error) {
 
 		// overlay expects lowerdir's to be remapped instead
 		if m.Type == "overlay" {
-			var (
-				userNsCleanUp func()
-			)
+			var userNsCleanUp func()
 			options, userNsCleanUp, err = prepareIDMappedOverlay(int(usernsFd.Fd()), options)
 			defer userNsCleanUp()
 
@@ -480,7 +478,7 @@ func optionsSize(opts []string) int {
 	return size
 }
 
-func mountAt(chdir string, source, target, fstype string, flags uintptr, data string) error {
+func mountAt(chdir, source, target, fstype string, flags uintptr, data string) error {
 	if chdir == "" {
 		err := unix.Mount(source, target, fstype, flags, data)
 		if err != nil {

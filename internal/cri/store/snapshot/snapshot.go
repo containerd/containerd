@@ -19,8 +19,9 @@ package snapshot
 import (
 	"sync"
 
-	snapshot "github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/errdefs"
+
+	snapshot "github.com/containerd/containerd/v2/core/snapshots"
 )
 
 type Key struct {

@@ -25,11 +25,6 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/google/uuid"
-	"google.golang.org/genproto/googleapis/rpc/code"
-	rpc "google.golang.org/genproto/googleapis/rpc/status"
-	"google.golang.org/grpc/status"
-
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
@@ -37,6 +32,10 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
+	"github.com/google/uuid"
+	"google.golang.org/genproto/googleapis/rpc/code"
+	rpc "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/grpc/status"
 
 	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/pkg/filters"
@@ -170,11 +169,11 @@ func (l *Local) generateUUID() (string, error) {
 		return "", err
 	}
 	path := l.uuidPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return "", err
 	}
 	uu := u.String()
-	if err := os.WriteFile(path, []byte(uu), 0666); err != nil {
+	if err := os.WriteFile(path, []byte(uu), 0o666); err != nil {
 		return "", err
 	}
 	return uu, nil

@@ -100,7 +100,6 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 
 		return errFwd
 	}()
-
 	if err != nil {
 		return fmt.Errorf("failed to execute portforward for podId %v, podIp %v, err: %w", id, podIP, err)
 	}

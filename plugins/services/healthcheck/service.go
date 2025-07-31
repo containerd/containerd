@@ -17,13 +17,13 @@
 package healthcheck
 
 import (
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
+
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 type service struct {

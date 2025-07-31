@@ -21,9 +21,10 @@ import (
 	"io"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 // Config is used to hold parameters needed for a diff operation

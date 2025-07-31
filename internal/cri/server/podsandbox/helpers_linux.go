@@ -101,15 +101,15 @@ func (c *Controller) getSandboxPinnedUserNamespace(id string) string {
 }
 
 // pinUserNamespace persists user namespace in namespace filesystem.
-func (c *Controller) pinUserNamespace(sandboxID string, netnsPath string) error {
+func (c *Controller) pinUserNamespace(sandboxID, netnsPath string) error {
 	nsPath := c.getSandboxPinnedUserNamespace(sandboxID)
 
 	baseDir := filepath.Dir(nsPath)
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return fmt.Errorf("failed to init pinned-namespaces directory %s: %w", baseDir, err)
 	}
 
-	emptyFd, err := os.OpenFile(nsPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+	emptyFd, err := os.OpenFile(nsPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 	if err != nil {
 		return fmt.Errorf("failed to create empty file %s: %w", nsPath, err)
 	}

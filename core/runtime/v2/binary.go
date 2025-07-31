@@ -26,13 +26,14 @@ import (
 	gruntime "runtime"
 
 	"github.com/containerd/containerd/api/runtime/task/v2"
+	"github.com/containerd/log"
+
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
-	"github.com/containerd/log"
 )
 
 type shimBinaryConfig struct {
@@ -125,7 +126,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		f.Close()
 	}
 	// Save runtime binary path for restore.
-	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0o600); err != nil {
 		return nil, err
 	}
 
@@ -184,7 +185,6 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 			Opts:         nil,
 			Args:         args,
 		})
-
 	if err != nil {
 		return nil, err
 	}

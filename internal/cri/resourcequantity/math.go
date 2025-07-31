@@ -65,8 +65,10 @@ var (
 	MaxMilliValue = int64(((1 << 63) - 1) / 1000)
 )
 
-const mostNegative = -(mostPositive + 1)
-const mostPositive = 1<<63 - 1
+const (
+	mostNegative = -(mostPositive + 1)
+	mostPositive = 1<<63 - 1
+)
 
 // int64Add returns a+b, or false if that would overflow int64.
 func int64Add(a, b int64) (int64, bool) {
@@ -101,7 +103,7 @@ func int64Multiply(a, b int64) (int64, bool) {
 
 // int64MultiplyScale returns a*b, assuming b is greater than one, or false if that would overflow or underflow int64.
 // Use when b is known to be greater than one.
-func int64MultiplyScale(a int64, b int64) (int64, bool) {
+func int64MultiplyScale(a, b int64) (int64, bool) {
 	if a == 0 || a == 1 {
 		return a * b, true
 	}
@@ -275,7 +277,7 @@ func divideByScaleInt64(base int64, scale Scale) (result, remainder int64, exact
 
 // removeInt64Factors divides in a loop; the return values have the property that
 // value == result * base ^ scale
-func removeInt64Factors(value int64, base int64) (result int64, times int32) {
+func removeInt64Factors(value, base int64) (result int64, times int32) {
 	times = 0
 	result = value
 	negative := result < 0

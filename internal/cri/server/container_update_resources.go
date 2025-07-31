@@ -22,15 +22,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
@@ -78,8 +77,8 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 func (c *criService) updateContainerResources(ctx context.Context,
 	cntr containerstore.Container,
 	r *runtime.UpdateContainerResourcesRequest,
-	status containerstore.Status) (newStatus containerstore.Status, retErr error) {
-
+	status containerstore.Status,
+) (newStatus containerstore.Status, retErr error) {
 	newStatus = status
 	id := cntr.ID
 	// Do not update the container when there is a removal in progress.

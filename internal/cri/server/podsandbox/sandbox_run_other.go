@@ -19,16 +19,18 @@
 package podsandbox
 
 import (
-	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/internal/cri/annotations"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/internal/cri/annotations"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (_ *runtimespec.Spec, retErr error) {
+	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string,
+) (_ *runtimespec.Spec, retErr error) {
 	return c.runtimeSpec(id, "", annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...)
 }
 

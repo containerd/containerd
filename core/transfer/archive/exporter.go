@@ -20,19 +20,19 @@ import (
 	"context"
 	"io"
 
+	"github.com/containerd/containerd/api/types"
+	transfertypes "github.com/containerd/containerd/api/types/transfer"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/containerd/containerd/api/types"
-	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 )
 
 func init() {

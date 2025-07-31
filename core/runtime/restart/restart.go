@@ -36,9 +36,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/containerd/log"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/log"
 )
 
 const (

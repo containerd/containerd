@@ -23,14 +23,15 @@ import (
 
 	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
 	apitypes "github.com/containerd/containerd/api/types"
-	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/containerd/v2/pkg/shim"
-	"github.com/containerd/containerd/v2/pkg/shutdown"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
+
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/shim"
+	"github.com/containerd/containerd/v2/pkg/shutdown"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 func init() {
@@ -91,12 +92,9 @@ func newTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	return &exampleTaskService{}, nil
 }
 
-var (
-	_ = shim.TTRPCService(&exampleTaskService{})
-)
+var _ = shim.TTRPCService(&exampleTaskService{})
 
-type exampleTaskService struct {
-}
+type exampleTaskService struct{}
 
 // RegisterTTRPC allows TTRPC services to be registered with the underlying server
 func (s *exampleTaskService) RegisterTTRPC(server *ttrpc.Server) error {

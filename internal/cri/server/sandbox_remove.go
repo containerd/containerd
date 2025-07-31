@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/leases"
-	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the

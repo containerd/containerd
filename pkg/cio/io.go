@@ -290,7 +290,7 @@ func LogFile(path string) Creator {
 }
 
 // LogURIGenerator is the helper to generate log uri with specific scheme.
-func LogURIGenerator(scheme string, path string, args map[string]string) (*url.URL, error) {
+func LogURIGenerator(scheme, path string, args map[string]string) (*url.URL, error) {
 	path = filepath.Clean(path)
 	if !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("%q must be absolute", path)
@@ -329,11 +329,9 @@ func (l *logURI) Config() Config {
 }
 
 func (l *logURI) Cancel() {
-
 }
 
 func (l *logURI) Wait() {
-
 }
 
 func (l *logURI) Close() error {

@@ -22,13 +22,13 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/opencontainers/image-spec/identity"
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/progress"
-
-	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli/v2"
 )
 
 var usageCommand = &cli.Command{
@@ -37,7 +37,7 @@ var usageCommand = &cli.Command{
 	ArgsUsage: "[flags] <ref>",
 	Flags:     commands.SnapshotterFlags,
 	Action: func(cliContext *cli.Context) error {
-		var ref = cliContext.Args().First()
+		ref := cliContext.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to mount")
 		}

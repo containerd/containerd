@@ -123,7 +123,7 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	)
 
 	// make sure parent directories of blob exist
-	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
 	}
 
@@ -175,7 +175,7 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	//
 	// NOTE: Windows does not support this operation
 	if runtime.GOOS != "windows" {
-		if err := os.Chmod(target, (fi.Mode()&os.ModePerm)&^0333); err != nil {
+		if err := os.Chmod(target, (fi.Mode()&os.ModePerm)&^0o333); err != nil {
 			log.G(ctx).WithField("ref", w.ref).Error("failed to make readonly")
 		}
 	}

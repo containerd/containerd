@@ -25,6 +25,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/containerd/typeurl/v2"
+	"github.com/davecgh/go-spew/spew"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux/label"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
@@ -38,15 +48,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/containerd/typeurl/v2"
-	"github.com/davecgh/go-spew/spew"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/opencontainers/selinux/go-selinux/label"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func init() {
@@ -225,7 +226,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	span := tracing.SpanFromContext(r.ctx)
 	// Create container root directory.
 	containerRootDir := c.getContainerRootDir(r.containerID)
-	if err := c.os.MkdirAll(containerRootDir, 0755); err != nil {
+	if err := c.os.MkdirAll(containerRootDir, 0o755); err != nil {
 		return "", fmt.Errorf(
 			"failed to create container root directory %q: %w",
 			containerRootDir,
@@ -244,7 +245,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 	volatileContainerRootDir := c.getVolatileContainerRootDir(r.containerID)
-	if err := c.os.MkdirAll(volatileContainerRootDir, 0755); err != nil {
+	if err := c.os.MkdirAll(volatileContainerRootDir, 0o755); err != nil {
 		return "", fmt.Errorf(
 			"failed to create volatile container root directory %q: %w",
 			volatileContainerRootDir,

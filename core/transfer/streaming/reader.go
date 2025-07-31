@@ -23,8 +23,9 @@ import (
 	"io"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
-	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/typeurl/v2"
+
+	"github.com/containerd/containerd/v2/core/streaming"
 )
 
 type readByteStream struct {
@@ -68,7 +69,6 @@ func ReadByteStream(ctx context.Context, stream streaming.Stream) io.ReadCloser 
 				rbs.errCh <- err
 			}
 		}
-
 	}()
 	return rbs
 }
@@ -113,7 +113,6 @@ func (r *readByteStream) Read(p []byte) (n int, err error) {
 	default:
 		return 0, fmt.Errorf("stream received error type %v", v)
 	}
-
 }
 
 func (r *readByteStream) Close() error {

@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/errdefs"
 	"github.com/moby/locker"
+
+	"github.com/containerd/containerd/v2/core/content"
 )
 
 // Status of a content operation

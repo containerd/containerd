@@ -27,11 +27,10 @@ import (
 	"syscall"
 
 	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"tags.cncf.io/container-device-interface/pkg/cdi"
-
-	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	cdispec "github.com/containerd/containerd/v2/pkg/cdi"

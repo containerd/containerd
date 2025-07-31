@@ -19,12 +19,12 @@ package oci
 import (
 	"fmt"
 
+	"github.com/containerd/platforms"
 	"github.com/urfave/cli/v2"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/platforms"
 )
 
 // Command is the parent for all OCI related tools under 'oci'

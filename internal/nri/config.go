@@ -17,10 +17,11 @@
 package nri
 
 import (
-	"github.com/containerd/containerd/v2/internal/tomlext"
 	nri "github.com/containerd/nri/pkg/adaptation"
 	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
+
+	"github.com/containerd/containerd/v2/internal/tomlext"
 )
 
 // Config data for NRI.

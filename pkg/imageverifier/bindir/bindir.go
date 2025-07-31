@@ -29,10 +29,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/v2/internal/tomlext"
-	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/internal/tomlext"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
 )
 
 const outputLimitBytes = 1 << 15 // 32 KiB
@@ -110,7 +111,7 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 	}, nil
 }
 
-func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc ocispec.Descriptor) (exitCode int, reason string, err error) {
+func (v *ImageVerifier) runVerifier(ctx context.Context, bin, imageName string, desc ocispec.Descriptor) (exitCode int, reason string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, tomlext.ToStdTime(v.config.PerVerifierTimeout))
 	defer cancel()
 

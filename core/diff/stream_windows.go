@@ -28,10 +28,10 @@ import (
 	"sync"
 
 	"github.com/Microsoft/go-winio"
-
-	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 )
 
 const processorPipe = "STREAM_PROCESSOR_PIPE"

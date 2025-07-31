@@ -19,15 +19,15 @@ package container
 import (
 	"sync"
 
+	"github.com/containerd/errdefs"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	"github.com/containerd/containerd/v2/internal/cri/store"
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	"github.com/containerd/containerd/v2/internal/truncindex"
-	"github.com/containerd/errdefs"
-
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // Container contains all resources associated with the container. All methods to

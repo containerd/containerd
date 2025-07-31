@@ -27,8 +27,9 @@ package identifiers
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/v2/internal/lazyregexp"
 	"github.com/containerd/errdefs"
+
+	"github.com/containerd/containerd/v2/internal/lazyregexp"
 )
 
 const (
@@ -37,10 +38,8 @@ const (
 	separators = `[._-]`
 )
 
-var (
-	// identifierRe defines the pattern for valid identifiers.
-	identifierRe = lazyregexp.New(reAnchor(alphanum + reGroup(separators+reGroup(alphanum)) + "*"))
-)
+// identifierRe defines the pattern for valid identifiers.
+var identifierRe = lazyregexp.New(reAnchor(alphanum + reGroup(separators+reGroup(alphanum)) + "*"))
 
 // Validate returns nil if the string s is a valid identifier.
 //

@@ -25,12 +25,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/metadata/boltutil"
-	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
 	errbolt "go.etcd.io/bbolt/errors"
+
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/pkg/filters"
 )
 
 var (
@@ -228,9 +229,7 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 	}
 
 	err = createBucketIfNotExists(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
-		var (
-			spbkt *bolt.Bucket
-		)
+		var spbkt *bolt.Bucket
 		if parent != "" {
 			spbkt = bkt.Bucket([]byte(parent))
 			if spbkt == nil {

@@ -26,6 +26,10 @@ import (
 	"sync"
 
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
@@ -34,9 +38,6 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
 	"github.com/containerd/containerd/v2/pkg/httpdbg"
-	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {
@@ -226,7 +227,7 @@ func (r *OCIRegistry) Fetcher(ctx context.Context, ref string) (transfer.Fetcher
 }
 
 func (r *OCIRegistry) Pusher(ctx context.Context, desc ocispec.Descriptor) (transfer.Pusher, error) {
-	var ref = r.reference
+	ref := r.reference
 	// Annotate ref with digest to push only push tag for single digest
 	if !strings.Contains(ref, "@") {
 		ref = ref + "@" + desc.Digest.String()
@@ -299,7 +300,6 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 					return
 				}
 			}
-
 		}()
 		res.AuthStream = sid
 	}

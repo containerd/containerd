@@ -59,11 +59,9 @@ var (
 	gzipPath string
 )
 
-var (
-	bufioReader32KPool = &sync.Pool{
-		New: func() interface{} { return bufio.NewReaderSize(nil, 32*1024) },
-	}
-)
+var bufioReader32KPool = &sync.Pool{
+	New: func() interface{} { return bufio.NewReaderSize(nil, 32*1024) },
+}
 
 // DecompressReadCloser include the stream after decompress and the compress method detected.
 type DecompressReadCloser interface {

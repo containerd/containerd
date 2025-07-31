@@ -23,9 +23,10 @@ import (
 	"errors"
 	"fmt"
 
-	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
+
+	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 )
 
 type initState interface {

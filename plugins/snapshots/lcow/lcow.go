@@ -34,16 +34,17 @@ import (
 
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/hcsshim/pkg/go-runhcs"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/core/snapshots/storage"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 func init() {
@@ -84,7 +85,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, fmt.Errorf("%s is not on an NTFS volume - only NTFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
 	}
 
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
 	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
@@ -92,7 +93,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 
-	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0o700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
@@ -315,7 +316,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		log.G(ctx).Debug("createSnapshot active")
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
-		if err = os.MkdirAll(snDir, 0700); err != nil {
+		if err = os.MkdirAll(snDir, 0o700); err != nil {
 			return err
 		}
 
@@ -372,7 +373,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 				// Create the sandbox.vhdx for this snapshot from the cache
 				destPath := filepath.Join(snDir, "sandbox.vhdx")
-				dest, err := os.OpenFile(destPath, os.O_RDWR|os.O_CREATE, 0700)
+				dest, err := os.OpenFile(destPath, os.O_RDWR|os.O_CREATE, 0o700)
 				if err != nil {
 					return fmt.Errorf("failed to create sandbox.vhdx in snapshot: %w", err)
 				}
@@ -439,7 +440,7 @@ func (s *snapshotter) openOrCreateScratch(ctx context.Context, sizeGB int, scrat
 		scratchFinalPath = filepath.Join(scratchLoc, vhdFileName)
 	}
 
-	scratchSource, err := os.OpenFile(scratchFinalPath, os.O_RDONLY, 0700)
+	scratchSource, err := os.OpenFile(scratchFinalPath, os.O_RDONLY, 0o700)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, fmt.Errorf("failed to open vhd %s for read: %w", vhdFileName, err)
@@ -474,7 +475,7 @@ func (s *snapshotter) openOrCreateScratch(ctx context.Context, sizeGB int, scrat
 			os.Remove(scratchTempPath)
 			return nil, fmt.Errorf("failed to rename '%s' temp file to 'scratch.vhdx': %w", scratchTempName, err)
 		}
-		scratchSource, err = os.OpenFile(scratchFinalPath, os.O_RDONLY, 0700)
+		scratchSource, err = os.OpenFile(scratchFinalPath, os.O_RDONLY, 0o700)
 		if err != nil {
 			os.Remove(scratchFinalPath)
 			return nil, fmt.Errorf("failed to open scratch.vhdx for read after creation: %w", err)

@@ -324,7 +324,6 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 		}
 
 		return nil, firstErr
-
 	})
 }
 

@@ -33,8 +33,9 @@ limitations under the License.
 package bandwidth
 
 import (
-	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 	"github.com/containerd/errdefs"
+
+	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 )
 
 // FakeShaper provides an implementation of the bandwidth.Shaper.

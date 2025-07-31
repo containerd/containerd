@@ -24,15 +24,16 @@ import (
 	"strings"
 
 	taskapi "github.com/containerd/containerd/api/runtime/task/v3"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/ttrpc"
+
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/task"
 	"github.com/containerd/containerd/v2/internal/failpoint"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/containerd/ttrpc"
 )
 
 const (
@@ -73,9 +74,7 @@ func init() {
 	})
 }
 
-var (
-	_ = shim.TTRPCServerUnaryOptioner(&taskServiceWithFp{})
-)
+var _ = shim.TTRPCServerUnaryOptioner(&taskServiceWithFp{})
 
 type taskServiceWithFp struct {
 	fps   map[string]*failpoint.Failpoint

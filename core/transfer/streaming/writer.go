@@ -23,9 +23,10 @@ import (
 	"sync/atomic"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
-	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+
+	"github.com/containerd/containerd/v2/core/streaming"
 )
 
 func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteCloser {

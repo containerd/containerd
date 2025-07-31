@@ -25,13 +25,13 @@ import (
 	"slices"
 	"time"
 
+	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
+	runcoptions "github.com/containerd/containerd/api/types/runc/options"
+	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	"github.com/containerd/log"
 	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
-	runcoptions "github.com/containerd/containerd/api/types/runc/options"
-	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
@@ -714,7 +714,6 @@ func (config *Config) GetSandboxRuntime(podSandboxConfig *runtime.PodSandboxConf
 		return Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
 	}
 	return r, nil
-
 }
 
 // untrustedWorkload returns true if the sandbox contains untrusted workload.

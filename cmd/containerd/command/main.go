@@ -27,6 +27,11 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/urfave/cli/v2"
+	"google.golang.org/grpc/grpclog"
+
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	_ "github.com/containerd/containerd/v2/core/metrics" // import containerd build info
@@ -34,10 +39,6 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
-	"google.golang.org/grpc/grpclog"
 )
 
 const usage = `

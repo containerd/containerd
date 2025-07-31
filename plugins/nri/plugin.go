@@ -17,10 +17,11 @@
 package nri
 
 import (
-	"github.com/containerd/containerd/v2/internal/nri"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+
+	"github.com/containerd/containerd/v2/internal/nri"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 func init() {

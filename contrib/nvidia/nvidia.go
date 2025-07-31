@@ -24,9 +24,10 @@ import (
 	"strconv"
 	"strings"
 
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // NvidiaCLI is the path to the Nvidia helper binary

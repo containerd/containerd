@@ -48,6 +48,7 @@ func (dpc *deferredPipeConnection) Read(p []byte) (n int, err error) {
 	}
 	return dpc.c.Read(p)
 }
+
 func (dpc *deferredPipeConnection) Close() error {
 	var err error
 	dpc.once.Do(func() {

@@ -23,12 +23,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/containerd/errdefs"
 	"github.com/moby/sys/userns"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/archive"
-	"github.com/containerd/errdefs"
 )
 
 func apply(ctx context.Context, mounts []mount.Mount, r io.Reader, sync bool) (retErr error) {

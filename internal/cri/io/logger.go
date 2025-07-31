@@ -23,10 +23,10 @@ import (
 	"io"
 	"time"
 
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
-	"github.com/containerd/log"
 )
 
 const (

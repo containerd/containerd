@@ -22,11 +22,12 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/containerd/log"
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
 )
 
 // AppContext returns the context for a command. Should only be called once per

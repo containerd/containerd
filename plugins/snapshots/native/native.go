@@ -22,12 +22,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/continuity/fs"
+	"github.com/containerd/log"
+
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
-	"github.com/containerd/log"
-
-	"github.com/containerd/continuity/fs"
 )
 
 type snapshotter struct {
@@ -38,7 +38,7 @@ type snapshotter struct {
 // NewSnapshotter returns a Snapshotter which copies layers on the underlying
 // file system. A metadata file is stored under the root.
 func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
 	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
@@ -46,7 +46,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 
-	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0o700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
@@ -184,7 +184,6 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		restore = true
 		return nil
 	})
-
 	if err != nil {
 		if renamed != "" && restore {
 			if err1 := os.Rename(renamed, path); err1 != nil {
@@ -222,7 +221,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		if err != nil {
 			return nil, fmt.Errorf("failed to create temp dir: %w", err)
 		}
-		if err := os.Chmod(td, 0755); err != nil {
+		if err := os.Chmod(td, 0o755); err != nil {
 			return nil, fmt.Errorf("failed to chmod %s to 0755: %w", td, err)
 		}
 		defer func() {

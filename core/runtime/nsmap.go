@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
+
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 type object interface {

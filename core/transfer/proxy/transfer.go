@@ -22,10 +22,6 @@ import (
 	"fmt"
 	"io"
 
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/errdefs"
@@ -34,6 +30,9 @@ import (
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
@@ -85,7 +84,7 @@ func (c convertClient) Transfer(ctx context.Context, r *transferapi.TransferRequ
 	return c.TransferClient.Transfer(ctx, r)
 }
 
-func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst interface{}, opts ...transfer.Opt) error {
+func (p *proxyTransferrer) Transfer(ctx context.Context, src, dst interface{}, opts ...transfer.Opt) error {
 	o := &transfer.Config{}
 	for _, opt := range opts {
 		opt(o)
@@ -154,6 +153,7 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst in
 	_, err = p.client.Transfer(ctx, req)
 	return errgrpc.ToNative(err)
 }
+
 func (p *proxyTransferrer) marshalAny(ctx context.Context, i interface{}) (typeurl.Any, error) {
 	switch m := i.(type) {
 	case streamMarshaler:

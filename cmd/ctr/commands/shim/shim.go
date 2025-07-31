@@ -284,6 +284,7 @@ func getTaskService(cliContext *cli.Context) (task.TTRPCTaskService, error) {
 	}
 	return task.NewTTRPCTaskClient(client), nil
 }
+
 func getTaskServiceV2(cliContext *cli.Context) (taskv2.TaskService, error) {
 	client, err := getTTRPCClient(cliContext)
 	if err != nil {

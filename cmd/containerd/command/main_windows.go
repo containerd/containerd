@@ -26,18 +26,17 @@ import (
 	"github.com/Microsoft/go-winio/pkg/etw"
 	"github.com/Microsoft/go-winio/pkg/etwlogrus"
 	"github.com/Microsoft/go-winio/pkg/guid"
-	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
+
+	"github.com/containerd/containerd/v2/cmd/containerd/server"
 )
 
-var (
-	handledSignals = []os.Signal{
-		windows.SIGTERM,
-		windows.SIGINT,
-	}
-)
+var handledSignals = []os.Signal{
+	windows.SIGTERM,
+	windows.SIGINT,
+}
 
 func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server, cancel func()) chan struct{} {
 	done := make(chan struct{})
@@ -96,7 +95,7 @@ func setupDumpStacks() {
 	}()
 }
 
-func etwCallback(sourceID guid.GUID, state etw.ProviderState, level etw.Level, matchAnyKeyword uint64, matchAllKeyword uint64, filterData uintptr) {
+func etwCallback(sourceID guid.GUID, state etw.ProviderState, level etw.Level, matchAnyKeyword, matchAllKeyword uint64, filterData uintptr) {
 	if state == etw.ProviderStateCaptureState {
 		dumpStacks(false)
 	}

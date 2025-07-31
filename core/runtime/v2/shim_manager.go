@@ -26,6 +26,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -36,11 +42,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/containerd/typeurl/v2"
 )
 
 // ShimConfig for the shim
@@ -226,7 +227,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 
 	if !shouldInvokeShimBinary {
 		// Write sandbox ID this task belongs to.
-		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0o600); err != nil {
 			return nil, err
 		}
 

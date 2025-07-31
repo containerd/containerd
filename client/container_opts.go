@@ -22,16 +22,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/image-spec/identity"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/image-spec/identity"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // DeleteOpts allows the caller to set options for the deletion of a container

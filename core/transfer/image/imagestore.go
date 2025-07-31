@@ -20,11 +20,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/containerd/api/types"
+	transfertypes "github.com/containerd/containerd/api/types/transfer"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/containerd/containerd/api/types"
-	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/archive"
@@ -32,8 +34,6 @@ import (
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/platforms"
 )
 
 func init() {
@@ -139,7 +139,7 @@ func WithNamedPrefix(name string, allowOverwrite bool) StoreOpt {
 // the image which does not have name as the prefix
 // - skipNamed: is set if no digest reference should be created if a named reference
 // is successfully resolved from the annotations.
-func WithDigestRef(name string, allowOverwrite bool, skipNamed bool) StoreOpt {
+func WithDigestRef(name string, allowOverwrite, skipNamed bool) StoreOpt {
 	ref := Reference{
 		Name:            name,
 		IsPrefix:        true,
@@ -418,6 +418,7 @@ func referencesFromProto(references []*transfertypes.ImageReference) []Reference
 	}
 	return or
 }
+
 func unpackToProto(uc []transfer.UnpackConfiguration) []*transfertypes.UnpackConfiguration {
 	auc := make([]*transfertypes.UnpackConfiguration, len(uc))
 	for i := range uc {

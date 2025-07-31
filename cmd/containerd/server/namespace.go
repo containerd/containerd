@@ -19,8 +19,9 @@ package server
 import (
 	"context"
 
-	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"google.golang.org/grpc"
+
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 func unaryNamespaceInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {

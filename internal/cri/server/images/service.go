@@ -20,6 +20,14 @@ import (
 	"context"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	docker "github.com/distribution/reference"
+	imagedigest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -29,14 +37,6 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/internal/kmutex"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"golang.org/x/sync/semaphore"
-
-	docker "github.com/distribution/reference"
-	imagedigest "github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 type imageClient interface {

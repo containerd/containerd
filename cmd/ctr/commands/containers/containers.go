@@ -23,15 +23,16 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
-	"github.com/urfave/cli/v2"
 )
 
 // Command is the cli command for managing containers
@@ -203,7 +204,6 @@ func deleteContainer(ctx context.Context, client *containerd.Client, id string, 
 		return container.Delete(ctx, opts...)
 	}
 	return fmt.Errorf("cannot delete a non stopped container: %v", status)
-
 }
 
 var setLabelsCommand = &cli.Command{

@@ -32,10 +32,6 @@ import (
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/core/snapshots/storage"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -43,6 +39,11 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 func init() {
@@ -152,7 +153,7 @@ func (s *wcowSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Kin
 		log.G(ctx).Debug("createSnapshot")
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
-		if err = os.MkdirAll(snDir, 0700); err != nil {
+		if err = os.MkdirAll(snDir, 0o700); err != nil {
 			return fmt.Errorf("failed to create snapshot dir %s: %w", snDir, err)
 		}
 		defer func() {
@@ -176,7 +177,7 @@ func (s *wcowSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Kin
 			// When committed, there'll be some post-processing to fill in the rest
 			// of the metadata.
 			filesDir := filepath.Join(snDir, "Files")
-			if err := os.MkdirAll(filesDir, 0700); err != nil {
+			if err := os.MkdirAll(filesDir, 0o700); err != nil {
 				return fmt.Errorf("creating Files dir: %w", err)
 			}
 			return nil
@@ -279,7 +280,6 @@ func (s *wcowSnapshotter) createScratchLayer(ctx context.Context, snDir string, 
 
 // convertScratchToReadOnlyLayer reimports the layer over itself, to transfer the files from the sandbox.vhdx to the on-disk storage.
 func (s *wcowSnapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapshot storage.Snapshot, path string) (retErr error) {
-
 	// TODO darrenstahlmsft: When this is done isolated, we should disable these.
 	// it currently cannot be disabled, unless we add ref counting. Since this is
 	// temporary, leaving it enabled is OK for now.
@@ -321,9 +321,7 @@ func (s *wcowSnapshotter) convertScratchToReadOnlyLayer(ctx context.Context, sna
 }
 
 func (s *wcowSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
-	var (
-		roFlag string
-	)
+	var roFlag string
 
 	if sn.Kind == snapshots.KindView {
 		roFlag = "ro"

@@ -20,16 +20,15 @@ import (
 	"context"
 	"io"
 
-	"golang.org/x/sync/semaphore"
-
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 )
 
 type Transferrer interface {
-	Transfer(ctx context.Context, source interface{}, destination interface{}, opts ...Opt) error
+	Transfer(ctx context.Context, source, destination interface{}, opts ...Opt) error
 }
 
 type ImageResolver interface {

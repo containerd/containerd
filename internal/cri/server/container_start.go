@@ -25,13 +25,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/tracing"
+	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
+	"github.com/checkpoint-restore/go-criu/v7/stats"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
-	"github.com/checkpoint-restore/go-criu/v7/stats"
 	containerd "github.com/containerd/containerd/v2/client"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -39,6 +38,7 @@ import (
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
 // StartContainer starts the container.
@@ -114,7 +114,6 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			ioCreation,
 			filepath.Join(c.getContainerRootDir(r.GetContainerId()), crmetadata.CheckpointDirectory),
 		)
-
 		if err != nil {
 			return nil, fmt.Errorf("failed to restore containerd task: %w", err)
 		}
@@ -317,7 +316,7 @@ func resetContainerStarting(container containerstore.Container) error {
 }
 
 // createContainerLoggers creates container loggers and return write closer for stdout and stderr.
-func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io.WriteCloser, stderr io.WriteCloser, err error) {
+func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout, stderr io.WriteCloser, err error) {
 	if logPath != "" {
 		// Only generate container log when log path is specified.
 		f, err := openLogFile(logPath)

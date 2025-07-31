@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+
 	snapshot "github.com/containerd/containerd/v2/core/snapshots"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 // snapshotsSyncer syncs snapshot stats periodically. imagefs info and container stats
@@ -40,7 +41,8 @@ type snapshotsSyncer struct {
 
 // newSnapshotsSyncer creates a snapshot syncer.
 func newSnapshotsSyncer(store *snapshotstore.Store, snapshotters map[string]snapshot.Snapshotter,
-	period time.Duration) *snapshotsSyncer {
+	period time.Duration,
+) *snapshotsSyncer {
 	return &snapshotsSyncer{
 		store:        store,
 		snapshotters: snapshotters,

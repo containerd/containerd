@@ -22,9 +22,10 @@ import (
 	"context"
 	"errors"
 
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // WithProfile sets the provided apparmor profile to the spec

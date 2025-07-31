@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/log"
 
-	eventtypes "github.com/containerd/containerd/api/events"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
 

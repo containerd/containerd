@@ -25,12 +25,13 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/platforms"
 	pluginutils "github.com/containerd/plugin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc/codes"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 )
 
 // Command is a cli command that outputs plugin information
@@ -133,7 +134,7 @@ var listCommand = &cli.Command{
 				}
 			}
 
-			var platformColumn = "-"
+			platformColumn := "-"
 			if len(plugin.Platforms) > 0 {
 				platformColumn = prettyPlatforms(plugin.Platforms)
 			}

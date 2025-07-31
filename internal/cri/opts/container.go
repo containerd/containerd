@@ -24,14 +24,14 @@ import (
 	"strings"
 
 	"github.com/containerd/continuity/fs"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the

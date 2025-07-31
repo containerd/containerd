@@ -22,11 +22,11 @@ import (
 	"time"
 
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 
 	deprecation "github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 type Service interface {
@@ -66,6 +66,7 @@ func (s *service) Emit(ctx context.Context, warning deprecation.Warning) {
 	defer s.m.Unlock()
 	s.warnings[warning] = time.Now()
 }
+
 func (s *service) Warnings() []Warning {
 	s.m.RLock()
 	defer s.m.RUnlock()

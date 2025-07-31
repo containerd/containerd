@@ -37,13 +37,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
-	"github.com/containerd/log"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	"github.com/containerd/containerd/v2/integration/remote/util"
 )
 

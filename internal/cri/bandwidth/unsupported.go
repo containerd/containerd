@@ -35,12 +35,12 @@ limitations under the License.
 package bandwidth
 
 import (
-	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 	"github.com/containerd/errdefs"
+
+	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 )
 
-type unsupportedShaper struct {
-}
+type unsupportedShaper struct{}
 
 // NewTCShaper makes a new unsupportedShapper for the given interface
 func NewTCShaper(iface string) Shaper {

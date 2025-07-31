@@ -25,6 +25,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/opencontainers/image-spec/identity"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
@@ -34,11 +40,6 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer/image"
 	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/pkg/progress"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/opencontainers/image-spec/identity"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
 )
 
 var pullCommand = &cli.Command{
@@ -91,9 +92,7 @@ command. As part of this process, we do the following:
 		},
 	),
 	Action: func(cliContext *cli.Context) error {
-		var (
-			ref = cliContext.Args().First()
-		)
+		ref := cliContext.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to pull")
 		}
@@ -105,7 +104,8 @@ command. As part of this process, we do the following:
 		defer cancel()
 
 		if !cliContext.Bool("local") {
-			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid",
+			unsupportedFlags := []string{
+				"max-concurrent-downloads", "print-chainid",
 				"skip-verify", "tlscacert", "tlscert", "tlskey", // RegistryFlags
 			}
 			for _, s := range unsupportedFlags {
@@ -324,7 +324,6 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 								parents = append(parents, parent)
 								var found bool
 								for _, child := range pStatus.children {
-
 									if child.Progress.Name == p.Name {
 										found = true
 										break
@@ -332,7 +331,6 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 								}
 								if !found {
 									pStatus.children = append(pStatus.children, node)
-
 								}
 								if node.root {
 									removeRoot = true
@@ -441,7 +439,7 @@ func displayNode(w io.Writer, prefix string, nodes []*progressNode) int64 {
 	return total
 }
 
-func prefixes(index, length int) (prefix string, childPrefix string) {
+func prefixes(index, length int) (prefix, childPrefix string) {
 	if index+1 == length {
 		prefix = "└──"
 		childPrefix = "   "

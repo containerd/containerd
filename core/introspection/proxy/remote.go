@@ -60,7 +60,6 @@ func (i *introspectionRemote) Plugins(ctx context.Context, filters ...string) (*
 	resp, err := i.client.Plugins(ctx, &api.PluginsRequest{
 		Filters: filters,
 	})
-
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
 	}
@@ -70,7 +69,6 @@ func (i *introspectionRemote) Plugins(ctx context.Context, filters ...string) (*
 
 func (i *introspectionRemote) Server(ctx context.Context) (*api.ServerResponse, error) {
 	resp, err := i.client.Server(ctx, &emptypb.Empty{})
-
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
 	}
@@ -102,9 +100,11 @@ type convertIntrospection struct {
 func (c convertIntrospection) Plugins(ctx context.Context, req *api.PluginsRequest) (*api.PluginsResponse, error) {
 	return c.client.Plugins(ctx, req)
 }
+
 func (c convertIntrospection) Server(ctx context.Context, in *emptypb.Empty) (*api.ServerResponse, error) {
 	return c.client.Server(ctx, in)
 }
+
 func (c convertIntrospection) PluginInfo(ctx context.Context, req *api.PluginInfoRequest) (*api.PluginInfoResponse, error) {
 	return c.client.PluginInfo(ctx, req)
 }

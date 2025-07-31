@@ -24,11 +24,12 @@ import (
 	"sort"
 	"strings"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // namedPipePath returns true if the given path is to a named pipe.
@@ -62,7 +63,7 @@ func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, e
 			if !os.IsNotExist(err) {
 				return nil, fmt.Errorf("failed to stat %q: %w", src, err)
 			}
-			if err := osi.MkdirAll(src, 0755); err != nil {
+			if err := osi.MkdirAll(src, 0o755); err != nil {
 				return nil, fmt.Errorf("failed to mkdir %q: %w", src, err)
 			}
 		}

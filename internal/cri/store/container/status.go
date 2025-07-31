@@ -173,7 +173,7 @@ func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 		return nil, fmt.Errorf("failed to encode status: %w", err)
 	}
 	path := filepath.Join(root, "status")
-	if err := continuity.AtomicWriteFile(path, data, 0600); err != nil {
+	if err := continuity.AtomicWriteFile(path, data, 0o600); err != nil {
 		return nil, fmt.Errorf("failed to checkpoint status to %q: %w", path, err)
 	}
 	return &statusStorage{
@@ -273,7 +273,7 @@ func (s *statusStorage) UpdateSync(u UpdateFunc) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode status: %w", err)
 	}
-	if err := continuity.AtomicWriteFile(s.path, data, 0600); err != nil {
+	if err := continuity.AtomicWriteFile(s.path, data, 0o600); err != nil {
 		return fmt.Errorf("failed to checkpoint status to %q: %w", s.path, err)
 	}
 	s.status = newStatus

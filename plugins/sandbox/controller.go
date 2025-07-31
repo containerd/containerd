@@ -22,6 +22,8 @@ import (
 	"os"
 	"time"
 
+	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
@@ -29,9 +31,6 @@ import (
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-
-	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
-	"github.com/containerd/containerd/api/types"
 
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/events/exchange"
@@ -68,7 +67,7 @@ func init() {
 			state := ic.Properties[plugins.PropertyStateDir]
 			root := ic.Properties[plugins.PropertyRootDir]
 			for _, d := range []string{root, state} {
-				if err := os.MkdirAll(d, 0711); err != nil {
+				if err := os.MkdirAll(d, 0o711); err != nil {
 					return nil, err
 				}
 			}
@@ -267,7 +266,6 @@ func (c *controllerLocal) Wait(ctx context.Context, sandboxID string) (sandbox.E
 	resp, err := svc.WaitSandbox(ctx, &runtimeAPI.WaitSandboxRequest{
 		SandboxID: sandboxID,
 	})
-
 	if err != nil {
 		return sandbox.ExitStatus{}, fmt.Errorf("failed to wait sandbox %s: %w", sandboxID, errgrpc.ToNative(err))
 	}
@@ -334,7 +332,8 @@ func (c *controllerLocal) Update(
 	ctx context.Context,
 	sandboxID string,
 	sandbox sandbox.Sandbox,
-	fields ...string) error {
+	fields ...string,
+) error {
 	return nil
 }
 

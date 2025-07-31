@@ -23,10 +23,10 @@ import (
 	"sync"
 	"time"
 
+	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 
-	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/internal/cri/clock"
 	"github.com/containerd/containerd/v2/internal/cri/constants"

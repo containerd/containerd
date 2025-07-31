@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -28,7 +29,6 @@ import (
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	critypes "github.com/containerd/containerd/v2/internal/cri/types"
-	"github.com/containerd/errdefs"
 )
 
 func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {

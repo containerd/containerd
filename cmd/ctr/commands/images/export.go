@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/containerd/platforms"
 	"github.com/urfave/cli/v2"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -29,7 +30,6 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	tarchive "github.com/containerd/containerd/v2/core/transfer/archive"
 	"github.com/containerd/containerd/v2/core/transfer/image"
-	"github.com/containerd/platforms"
 )
 
 var exportCommand = &cli.Command{

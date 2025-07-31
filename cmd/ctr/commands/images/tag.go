@@ -20,12 +20,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/distribution/reference"
 	"github.com/urfave/cli/v2"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/transfer/image"
-	"github.com/containerd/errdefs"
-	"github.com/distribution/reference"
 )
 
 var tagCommand = &cli.Command{
@@ -48,9 +48,7 @@ var tagCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		var (
-			ref = cliContext.Args().First()
-		)
+		ref := cliContext.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to tag from")
 		}

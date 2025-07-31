@@ -21,10 +21,10 @@ package seccomp
 import (
 	"runtime"
 
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/pkg/kernelversion"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func arches() []specs.Arch {

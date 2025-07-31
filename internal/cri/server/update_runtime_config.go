@@ -26,10 +26,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
-	"github.com/containerd/log"
 )
 
 // cniConfigTemplate contains the values containerd will overwrite
@@ -122,14 +122,14 @@ func getRoutes(cidrs []string) ([]string, error) {
 	return routes, nil
 }
 
-func writeCNIConfigFile(ctx context.Context, confDir string, confTemplate string, podCIDR string, podCIDRRanges []string, routes []string) error {
+func writeCNIConfigFile(ctx context.Context, confDir, confTemplate, podCIDR string, podCIDRRanges, routes []string) error {
 	log.G(ctx).Infof("Generating cni config from template %q", confTemplate)
 	// generate cni config file from the template with updated pod cidr.
 	t, err := template.ParseFiles(confTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse cni config template %q: %w", confTemplate, err)
 	}
-	if err := os.MkdirAll(confDir, 0755); err != nil {
+	if err := os.MkdirAll(confDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create cni config directory: %q: %w", confDir, err)
 	}
 	confFile := filepath.Join(confDir, cniConfigFileName)

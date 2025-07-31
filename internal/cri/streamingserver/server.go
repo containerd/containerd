@@ -43,17 +43,16 @@ import (
 	"path"
 	"time"
 
+	restful "github.com/emicklei/go-restful/v3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	restful "github.com/emicklei/go-restful/v3"
-
-	"github.com/containerd/containerd/v2/internal/cri/streamingserver/portforward"
-	remotecommandserver "github.com/containerd/containerd/v2/internal/cri/streamingserver/remotecommand"
 	"k8s.io/apimachinery/pkg/types"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/internal/cri/streamingserver/portforward"
+	remotecommandserver "github.com/containerd/containerd/v2/internal/cri/streamingserver/remotecommand"
 )
 
 // Server is the library interface to serve the stream requests.
@@ -383,9 +382,11 @@ type criAdapter struct {
 	Runtime
 }
 
-var _ remotecommandserver.Executor = &criAdapter{}
-var _ remotecommandserver.Attacher = &criAdapter{}
-var _ portforward.PortForwarder = &criAdapter{}
+var (
+	_ remotecommandserver.Executor = &criAdapter{}
+	_ remotecommandserver.Attacher = &criAdapter{}
+	_ portforward.PortForwarder    = &criAdapter{}
+)
 
 func (a *criAdapter) ExecInContainer(ctx context.Context, podName string, podUID types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	return a.Runtime.Exec(ctx, container, cmd, in, out, err, tty, resize)

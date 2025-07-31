@@ -23,13 +23,14 @@ import (
 
 	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/ttrpcutil"
-	"github.com/containerd/log"
-	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl/v2"
 )
 
 const (

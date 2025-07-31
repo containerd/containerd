@@ -60,6 +60,7 @@ func adaptImage(o interface{}) filters.Adaptor {
 		return "", false
 	})
 }
+
 func adaptContainer(o interface{}) filters.Adaptor {
 	obj := o.(containers.Container)
 	return filters.AdapterFunc(func(fieldpath []string) (string, bool) {

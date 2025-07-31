@@ -21,13 +21,14 @@ import (
 	"errors"
 	"fmt"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	gocni "github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/moby/sys/signal"
 	"github.com/urfave/cli/v2"
+
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 )
 
 const defaultSignal = "SIGTERM"

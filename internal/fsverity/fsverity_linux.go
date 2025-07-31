@@ -23,8 +23,9 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/containerd/containerd/v2/pkg/kernelversion"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/v2/pkg/kernelversion"
 )
 
 type fsverityEnableArg struct {
@@ -100,7 +101,7 @@ func Enable(path string) error {
 		return err
 	}
 
-	var args = &fsverityEnableArg{}
+	args := &fsverityEnableArg{}
 	args.version = 1
 	args.hashAlgorithm = 1
 

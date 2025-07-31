@@ -21,8 +21,9 @@ package server
 import (
 	"context"
 
-	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 )
 
 func toCRIContainerUser(ctx context.Context, container containerstore.Container) (*runtime.ContainerUser, error) {

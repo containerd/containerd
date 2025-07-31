@@ -22,20 +22,20 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
+	docker "github.com/distribution/reference"
+	imagedigest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest/digestset"
+	imageidentity "github.com/opencontainers/image-spec/identity"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/usage"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
 	"github.com/containerd/containerd/v2/internal/cri/setutils"
 	"github.com/containerd/containerd/v2/internal/cri/util"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/platforms"
-	docker "github.com/distribution/reference"
-
-	imagedigest "github.com/opencontainers/go-digest"
-	"github.com/opencontainers/go-digest/digestset"
-	imageidentity "github.com/opencontainers/image-spec/identity"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Image contains all resources associated with the image. All fields
@@ -185,7 +185,6 @@ func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
 		ImageSpec:  spec,
 		Pinned:     pinned,
 	}, nil
-
 }
 
 // Resolve resolves a image reference to image id.

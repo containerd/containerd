@@ -21,13 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	eventtypes "github.com/containerd/containerd/api/events"
+	apitasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	eventtypes "github.com/containerd/containerd/api/events"
-	apitasks "github.com/containerd/containerd/api/services/tasks/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"

@@ -23,8 +23,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/containerd/containerd/v2/defaults"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/defaults"
 )
 
 type pprofDialer struct {
