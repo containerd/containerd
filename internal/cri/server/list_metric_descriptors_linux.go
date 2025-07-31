@@ -36,7 +36,7 @@ func (c *criService) ListMetricDescriptors(context.Context, *runtime.ListMetricD
 
 func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescriptor {
 	descriptors := map[string][]*runtime.MetricDescriptor{
-		CpuUsageMetrics: {
+		CPUUsageMetrics: {
 			{
 				Name:      "container_cpu_user_seconds_total",
 				Help:      "Cumulative user CPU time consumed in seconds.",
