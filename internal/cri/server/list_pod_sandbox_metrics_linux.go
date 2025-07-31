@@ -19,8 +19,12 @@ package server
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
+	"time"
 
+	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
+	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -146,6 +150,7 @@ func (c *criService) collectPodSandboxMetrics(ctx context.Context, sandbox sandb
 // collectContainerMetrics collects metrics for a specific container
 func (c *criService) collectContainerMetrics(ctx context.Context, container containerstore.Container, podName, namespace string) (*runtime.ContainerMetrics, error) {
 	meta := container.Metadata
+	config := container.Config
 
 	// Get container stats
 	task, err := container.Container.Task(ctx, nil)
@@ -158,17 +163,146 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 		return nil, fmt.Errorf("failed to get metrics for container %s: %w", container.ID, err)
 	}
 
-	_, err = typeurl.UnmarshalAny(taskMetrics.Data)
+	stats, err := typeurl.UnmarshalAny(taskMetrics.Data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal metrics for container %s: %w", container.ID, err)
 	}
+
+	containerName := config.GetMetadata().GetName()
+	containerLabels := []string{containerName, podName, namespace, meta.ID}
+	timestamp := time.Now().UnixNano()
 
 	containerMetrics := &runtime.ContainerMetrics{
 		ContainerId: meta.ID,
 		Metrics:     []*runtime.Metric{},
 	}
 
-	// TODO Collect all metrics
+	// Collect CPU metrics
+	cpuMetrics, err := c.extractCPUMetrics(stats, containerLabels, timestamp)
+	if err != nil {
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract CPU metrics")
+	} else {
+		containerMetrics.Metrics = append(containerMetrics.Metrics, cpuMetrics...)
+	}
 
 	return containerMetrics, nil
+}
+
+// extractCPUMetrics extracts CPU-related metrics from container stats
+func (c *criService) extractCPUMetrics(stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+	var metrics []*runtime.Metric
+
+	switch s := stats.(type) {
+	case *cg1.Metrics:
+		if s.CPU != nil && s.CPU.Usage != nil {
+			metrics = append(metrics, &runtime.Metric{
+				Name:        "container_cpu_usage_seconds_total",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: s.CPU.Usage.Total / 1e9}, // Convert to seconds
+			})
+
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_cpu_user_seconds_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.CPU.Usage.User / 1e9},
+				},
+				{
+					Name:        "container_cpu_system_seconds_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.CPU.Usage.Kernel / 1e9},
+				},
+			}...)
+
+			if s.CPU.Throttling != nil {
+				metrics = append(metrics, []*runtime.Metric{
+					{
+						Name:        "container_cpu_cfs_periods_total",
+						Timestamp:   timestamp,
+						MetricType:  runtime.MetricType_COUNTER,
+						LabelValues: labels,
+						Value:       &runtime.UInt64Value{Value: s.CPU.Throttling.Periods},
+					},
+					{
+						Name:        "container_cpu_cfs_throttled_periods_total",
+						Timestamp:   timestamp,
+						MetricType:  runtime.MetricType_COUNTER,
+						LabelValues: labels,
+						Value:       &runtime.UInt64Value{Value: s.CPU.Throttling.ThrottledPeriods},
+					},
+					{
+						Name:        "container_cpu_cfs_throttled_seconds_total",
+						Timestamp:   timestamp,
+						MetricType:  runtime.MetricType_COUNTER,
+						LabelValues: labels,
+						Value:       &runtime.UInt64Value{Value: s.CPU.Throttling.ThrottledTime / 1e9},
+					},
+				}...)
+			}
+		}
+
+	case *cg2.Metrics:
+		if s.CPU != nil {
+			metrics = append(metrics, &runtime.Metric{
+				Name:        "container_cpu_usage_seconds_total",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: s.CPU.UsageUsec / 1e6}, // Convert microseconds to seconds
+			})
+
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_cpu_user_seconds_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.CPU.UserUsec / 1e6}, // Convert microseconds to seconds
+				},
+				{
+					Name:        "container_cpu_system_seconds_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.CPU.SystemUsec / 1e6}, // Convert microseconds to seconds
+				},
+			}...)
+
+			// Always include CFS throttling metrics, even if zero
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_cpu_cfs_periods_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.CPU.NrPeriods},
+				},
+				{
+					Name:        "container_cpu_cfs_throttled_periods_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.CPU.NrThrottled},
+				},
+				{
+					Name:        "container_cpu_cfs_throttled_seconds_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.CPU.ThrottledUsec / 1e6}, // Convert microseconds to seconds
+				},
+			}...)
+		}
+
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
+	}
+
+	return metrics, nil
 }
