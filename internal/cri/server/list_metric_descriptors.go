@@ -20,6 +20,8 @@ const (
 	CpuUsageMetrics     = "cpu"
 	MemoryUsageMetrics  = "memory"
 	NetworkUsageMetrics = "network"
+	DiskIOMetrics       = "diskIO"
+	DiskUsageMetrics    = "disk"
 )
 
 var baseLabelKeys = []string{"id", "name"}

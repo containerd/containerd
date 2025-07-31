@@ -32,3 +32,31 @@ type MetricsServer struct {
 type SandboxMetrics struct {
 	metric *runtime.PodSandboxMetrics
 }
+
+type containerFilesystemMetrics struct {
+	Device          string
+	Type            string
+	Limit           uint64
+	Usage           uint64
+	BaseUsage       uint64
+	Available       uint64
+	Inodes          uint64
+	InodesFree      uint64
+	InodesUsed      uint64
+	ReadsCompleted  uint64
+	ReadsMerged     uint64
+	SectorsRead     uint64
+	ReadTime        uint64
+	WritesCompleted uint64
+	WritesMerged    uint64
+	SectorsWritten  uint64
+	WriteTime       uint64
+	IoInProgress    uint64
+	IoTime          uint64
+	WeightedIoTime  uint64
+}
+
+type containerFilesystemUsage struct {
+	Bytes  uint64
+	Inodes uint64
+}
