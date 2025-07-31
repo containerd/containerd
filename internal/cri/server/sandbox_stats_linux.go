@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/internal/cri/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -41,7 +43,12 @@ func (c *criService) podSandboxStats(
 		return nil, fmt.Errorf("failed to get pod sandbox stats since sandbox container %q is not in ready state: %w", meta.ID, errdefs.ErrUnavailable)
 	}
 
-	stats, err := metricsForSandbox(sandbox)
+	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed getting status for sandbox %s: %w", sandbox.ID, err)
+	}
+
+	stats, err := metricsForSandbox(sandbox, cstatus.Info)
 	if err != nil {
 		return nil, fmt.Errorf("failed getting metrics for sandbox %s: %w", sandbox.ID, err)
 	}
@@ -124,9 +131,13 @@ func getContainerNetIO(ctx context.Context, netNsPath string) (rxBytes, rxErrors
 	return rxBytes, rxErrors, txBytes, txErrors
 }
 
-func metricsForSandbox(sandbox sandboxstore.Sandbox) (interface{}, error) {
-	cgroupPath := sandbox.Config.GetLinux().GetCgroupParent()
-
+func metricsForSandbox(sandbox sandboxstore.Sandbox, info map[string]string) (interface{}, error) {
+	var sandboxInfo types.SandboxInfo
+	err := json.Unmarshal([]byte(info["info"]), &sandboxInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal sandbox info: %v: %w", info["info"], err)
+	}
+	cgroupPath := sandboxInfo.RuntimeSpec.Linux.CgroupsPath
 	if cgroupPath == "" {
 		return nil, fmt.Errorf("failed to get cgroup metrics for sandbox %v because cgroupPath is empty", sandbox.ID)
 	}
