@@ -65,6 +65,70 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				LabelKeys: baseLabelKeys,
 			},
 		},
+		MemoryUsageMetrics: {
+			{
+				Name:      "container_memory_cache",
+				Help:      "Number of bytes of page cache memory.",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_memory_rss",
+				Help:      "Size of RSS in bytes.",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_memory_kernel_usage",
+				Help:      "Size of kernel memory allocated in bytes.",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_memory_mapped_file",
+				Help:      "Size of memory mapped files in bytes.",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_memory_swap",
+				Help:      "Container swap usage in bytes.",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_memory_failcnt",
+				Help:      "Number of times container memory usage has hit its cgroup v1 upper memory limit, for cg2 this value is not currently supported",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_memory_usage_bytes",
+				Help:      "Current memory usage in bytes, including all memory regardless of when it was accessed",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_memory_max_usage_bytes",
+				Help:      "Maximum memory usage recorded in bytes",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_memory_working_set_bytes",
+				Help:      "Current working set in bytes.",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				// additional added from cadvisor
+				Name:      "container_memory_total_active_file_bytes",
+				Help:      "Current total active cache memory in file on disk, in bytes.",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				// additional added from cadvisor
+				Name:      "container_memory_total_inactive_file_bytes",
+				Help:      "Current total inactive cache memory in file, in bytes.",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_memory_failures_total",
+				Help:      "Cumulative count of memory allocation failures.",
+				LabelKeys: append(baseLabelKeys, "failure_type", "scope"),
+			},
+		},
 	}
 	return descriptors
 }

@@ -17,5 +17,6 @@
 package server
 
 const (
-	CPUUsageMetrics = "cpu"
+	CPUUsageMetrics    = "cpu"
+	MemoryUsageMetrics = "memory"
 )

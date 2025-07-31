@@ -185,6 +185,14 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 		containerMetrics.Metrics = append(containerMetrics.Metrics, cpuMetrics...)
 	}
 
+	// Collect memory metrics
+	memoryMetrics, err := c.extractMemoryMetrics(stats, containerLabels, timestamp)
+	if err != nil {
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract memory metrics")
+	} else {
+		containerMetrics.Metrics = append(containerMetrics.Metrics, memoryMetrics...)
+	}
+
 	return containerMetrics, nil
 }
 
@@ -298,6 +306,232 @@ func (c *criService) extractCPUMetrics(stats interface{}, labels []string, times
 					Value:       &runtime.UInt64Value{Value: s.CPU.ThrottledUsec / 1e6}, // Convert microseconds to seconds
 				},
 			}...)
+		}
+
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
+	}
+
+	return metrics, nil
+}
+
+// extractMemoryMetrics extracts memory-related metrics from container stats
+func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+	var metrics []*runtime.Metric
+
+	switch s := stats.(type) {
+	case *cg1.Metrics:
+		if s.Memory != nil {
+			if s.Memory.Usage != nil {
+				metrics = append(metrics, []*runtime.Metric{
+					{
+						Name:        "container_memory_usage_bytes",
+						Timestamp:   timestamp,
+						MetricType:  runtime.MetricType_GAUGE,
+						LabelValues: labels,
+						Value:       &runtime.UInt64Value{Value: s.Memory.Usage.Usage},
+					},
+					{
+						Name:        "container_memory_working_set_bytes",
+						Timestamp:   timestamp,
+						MetricType:  runtime.MetricType_GAUGE,
+						LabelValues: labels,
+						Value:       &runtime.UInt64Value{Value: getWorkingSet(s.Memory)},
+					},
+					{
+						Name:        "container_memory_max_usage_bytes",
+						Timestamp:   timestamp,
+						MetricType:  runtime.MetricType_GAUGE,
+						LabelValues: labels,
+						Value:       &runtime.UInt64Value{Value: s.Memory.Usage.Max},
+					},
+				}...)
+			}
+
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_memory_rss",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.TotalRSS},
+				},
+				{
+					Name:        "container_memory_cache",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.TotalCache},
+				},
+				{
+					Name:        "container_memory_mapped_file",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.TotalMappedFile},
+				},
+				{
+					Name:        "container_memory_total_active_file_bytes",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.TotalActiveFile},
+				},
+				{
+					Name:        "container_memory_total_inactive_file_bytes",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.TotalInactiveFile},
+				},
+				{
+					Name:        "container_memory_failures_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(labels, "pgfault", "container"),
+					Value:       &runtime.UInt64Value{Value: s.Memory.PgFault},
+				},
+				{
+					Name:        "container_memory_failures_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(labels, "pgmajfault", "container"),
+					Value:       &runtime.UInt64Value{Value: s.Memory.PgMajFault},
+				},
+			}...)
+
+			// Add kernel memory metrics if available
+			if s.Memory.Kernel != nil {
+				metrics = append(metrics, &runtime.Metric{
+					Name:        "container_memory_kernel_usage",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.Kernel.Usage},
+				})
+			}
+
+			// Add swap metrics if available
+			if s.Memory.Swap != nil {
+				metrics = append(metrics, &runtime.Metric{
+					Name:        "container_memory_swap",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.Swap.Usage},
+				})
+			}
+
+			// Add usage failcnt if available
+			if s.Memory.Usage != nil {
+				metrics = append(metrics, &runtime.Metric{
+					Name:        "container_memory_failcnt",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.Usage.Failcnt},
+				})
+			}
+
+		}
+
+	case *cg2.Metrics:
+		if s.Memory != nil {
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_memory_usage_bytes",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.Usage},
+				},
+				{
+					Name:        "container_memory_max_usage_bytes",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.UsageLimit},
+				},
+				{
+					Name:        "container_memory_working_set_bytes",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: getWorkingSetV2(s.Memory)},
+				},
+				{
+					Name:        "container_memory_rss",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.Anon},
+				},
+				{
+					Name:        "container_memory_cache",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.File},
+				},
+				{
+					Name:        "container_memory_kernel_usage",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.KernelStack},
+				},
+				{
+					Name:        "container_memory_mapped_file",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.FileMapped},
+				},
+				{
+					Name:        "container_memory_swap",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.SwapUsage},
+				},
+				{
+					Name:        "container_memory_failcnt",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: 0}, // cgroups v2 doesn't expose failcnt, provide 0
+				},
+				{
+					Name:        "container_memory_total_active_file_bytes",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.ActiveFile},
+				},
+				{
+					Name:        "container_memory_total_inactive_file_bytes",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Memory.InactiveFile},
+				},
+				// TODO how to get hierarchical ?
+				{
+					Name:        "container_memory_failures_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(labels, "pgfault", "container"),
+					Value:       &runtime.UInt64Value{Value: s.Memory.Pgfault},
+				},
+				{
+					Name:        "container_memory_failures_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(labels, "pgmajfault", "container"),
+					Value:       &runtime.UInt64Value{Value: s.Memory.Pgmajfault},
+				},
+			}...)
+
 		}
 
 	default:
