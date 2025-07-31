@@ -171,6 +171,100 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				LabelKeys: append(baseLabelKeys, "interface"),
 			},
 		},
+		DiskUsageMetrics: {
+			{
+				Name:      "container_fs_inodes_free",
+				Help:      "Number of available Inodes",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_inodes_total",
+				Help:      "Number of Inodes",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_limit_bytes",
+				Help:      "Number of bytes that can be consumed by the container on this filesystem.",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_usage_bytes",
+				Help:      "Number of bytes that are consumed by the container on this filesystem.",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+		},
+		DiskIOMetrics: {
+			{
+				Name:      "container_fs_reads_bytes_total",
+				Help:      "Cumulative count of bytes read",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_reads_total",
+				Help:      "Cumulative count of reads completed",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_sector_reads_total",
+				Help:      "Cumulative count of sector reads completed",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_reads_merged_total",
+				Help:      "Cumulative count of reads merged",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_read_seconds_total",
+				Help:      "Cumulative count of seconds spent reading",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_writes_bytes_total",
+				Help:      "Cumulative count of bytes written",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_writes_total",
+				Help:      "Cumulative count of writes completed",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_sector_writes_total",
+				Help:      "Cumulative count of sector writes completed",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_writes_merged_total",
+				Help:      "Cumulative count of writes merged",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_write_seconds_total",
+				Help:      "Cumulative count of seconds spent writing",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_io_current",
+				Help:      "Number of I/Os currently in progress",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_io_time_seconds_total",
+				Help:      "Cumulative count of seconds spent doing I/Os",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_fs_io_time_weighted_seconds_total",
+				Help:      "Cumulative weighted I/O time in seconds",
+				LabelKeys: append(baseLabelKeys, "device"),
+			},
+			{
+				Name:      "container_blkio_device_usage_total",
+				Help:      "Blkio device bytes usage",
+				LabelKeys: append(baseLabelKeys, "device", "major", "minor", "operation"),
+			},
+		},
 	}
 	return descriptors
 }

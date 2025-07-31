@@ -20,4 +20,6 @@ const (
 	CPUUsageMetrics     = "cpu"
 	MemoryUsageMetrics  = "memory"
 	NetworkUsageMetrics = "network"
+	DiskIOMetrics       = "diskIO"
+	DiskUsageMetrics    = "disk"
 )
