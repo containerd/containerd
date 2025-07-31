@@ -22,4 +22,5 @@ const (
 	NetworkUsageMetrics = "network"
 	DiskIOMetrics       = "diskIO"
 	DiskUsageMetrics    = "disk"
+	ProcessMetrics      = "process"
 )

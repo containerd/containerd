@@ -265,6 +265,38 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				LabelKeys: append(baseLabelKeys, "device", "major", "minor", "operation"),
 			},
 		},
+		ProcessMetrics: {
+			{
+				Name:      "container_processes",
+				Help:      "Number of processes running inside the container.",
+				LabelKeys: baseLabelKeys,
+			},
+			/*{
+				Name:      "container_file_descriptors",
+				Help:      "Number of open file descriptors for the container.",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_sockets",
+				Help:      "Number of open sockets for the container.",
+				LabelKeys: baseLabelKeys,
+			},*/
+			{
+				Name:      "container_threads_max",
+				Help:      "Maximum number of threads allowed inside the container, infinity if value is zero",
+				LabelKeys: baseLabelKeys,
+			},
+			/*{
+				Name:      "container_threads",
+				Help:      "Number of threads running inside the container",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_ulimits_soft",
+				Help:      "Soft ulimit values for the container root process. Unlimited if -1, except priority and nice",
+				LabelKeys: append(baseLabelKeys, "ulimit"),
+			},*/
+		},
 	}
 	return descriptors
 }
