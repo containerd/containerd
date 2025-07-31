@@ -17,8 +17,9 @@
 package server
 
 const (
-	CpuUsageMetrics    = "cpu"
-	MemoryUsageMetrics = "memory"
+	CpuUsageMetrics     = "cpu"
+	MemoryUsageMetrics  = "memory"
+	NetworkUsageMetrics = "network"
 )
 
 var baseLabelKeys = []string{"id", "name"}
