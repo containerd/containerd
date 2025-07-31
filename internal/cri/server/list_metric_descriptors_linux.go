@@ -129,6 +129,48 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				LabelKeys: append(baseLabelKeys, "failure_type", "scope"),
 			},
 		},
+		NetworkUsageMetrics: {
+			{
+				Name:      "container_network_receive_bytes_total",
+				Help:      "Cumulative count of bytes received",
+				LabelKeys: append(baseLabelKeys, "interface"),
+			},
+			{
+				Name:      "container_network_receive_packets_total",
+				Help:      "Cumulative count of packets received",
+				LabelKeys: append(baseLabelKeys, "interface"),
+			},
+			{
+				Name:      "container_network_receive_packets_dropped_total",
+				Help:      "Cumulative count of packets dropped while receiving",
+				LabelKeys: append(baseLabelKeys, "interface"),
+			},
+			{
+				Name:      "container_network_receive_errors_total",
+				Help:      "Cumulative count of errors encountered while receiving",
+				LabelKeys: append(baseLabelKeys, "interface"),
+			},
+			{
+				Name:      "container_network_transmit_bytes_total",
+				Help:      "Cumulative count of bytes transmitted",
+				LabelKeys: append(baseLabelKeys, "interface"),
+			},
+			{
+				Name:      "container_network_transmit_packets_total",
+				Help:      "Cumulative count of packets transmitted",
+				LabelKeys: append(baseLabelKeys, "interface"),
+			},
+			{
+				Name:      "container_network_transmit_packets_dropped_total",
+				Help:      "Cumulative count of packets dropped while transmitting",
+				LabelKeys: append(baseLabelKeys, "interface"),
+			},
+			{
+				Name:      "container_network_transmit_errors_total",
+				Help:      "Cumulative count of errors encountered while transmitting",
+				LabelKeys: append(baseLabelKeys, "interface"),
+			},
+		},
 	}
 	return descriptors
 }

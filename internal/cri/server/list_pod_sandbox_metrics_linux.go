@@ -117,14 +117,76 @@ func (c *criService) collectPodSandboxMetrics(ctx context.Context, sandbox sandb
 		Metrics:      []*runtime.Metric{},
 	}
 
+	timestamp := time.Now().UnixNano()
+
 	// Extract pod-level labels
 	podName := config.GetMetadata().GetName()
 	namespace := config.GetMetadata().GetNamespace()
+	podLabels := []string{podName, namespace, meta.ID}
 
 	if stats != nil {
 		// Collect pod-level network metrics
 		if sandbox.NetNSPath != "" {
-			//TODO
+			rxBytes, rxErrors, txBytes, txErrors, rxPackets, rxDropped, txPackets, txDropped := getContainerNetIO(ctx, sandbox.NetNSPath)
+
+			podMetrics.Metrics = append(podMetrics.Metrics, []*runtime.Metric{
+				{
+					Name:        "container_network_receive_bytes_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: rxBytes},
+				},
+				{
+					Name:        "container_network_receive_packets_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: rxPackets},
+				},
+				{
+					Name:        "container_network_receive_packets_dropped_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: rxDropped},
+				},
+				{
+					Name:        "container_network_receive_errors_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: rxErrors},
+				},
+				{
+					Name:        "container_network_transmit_bytes_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: txBytes},
+				},
+				{
+					Name:        "container_network_transmit_packets_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: txPackets},
+				},
+				{
+					Name:        "container_network_transmit_packets_dropped_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: txDropped},
+				},
+				{
+					Name:        "container_network_transmit_errors_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: append(podLabels, "eth0"),
+					Value:       &runtime.UInt64Value{Value: txErrors},
+				},
+			}...)
 		}
 	}
 
