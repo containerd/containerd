@@ -18,10 +18,11 @@ package tasks
 
 import (
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/log"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/pkg/cio"
 )
 
 var attachCommand = &cli.Command{

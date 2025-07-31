@@ -34,7 +34,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	diffapi "github.com/containerd/containerd/api/services/diff/v1"
+	sbapi "github.com/containerd/containerd/api/services/sandbox/v1"
+	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
 	"github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -45,13 +51,6 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-
-	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	sbapi "github.com/containerd/containerd/api/services/sandbox/v1"
-	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	csproxy "github.com/containerd/containerd/v2/core/content/proxy"

@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"io"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/log"
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	containerd "github.com/containerd/containerd/v2/client"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
@@ -46,7 +46,8 @@ func (c *criService) Attach(ctx context.Context, r *runtime.AttachRequest) (*run
 }
 
 func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Reader, stdout, stderr io.WriteCloser,
-	tty bool, resize <-chan remotecommand.TerminalSize) error {
+	tty bool, resize <-chan remotecommand.TerminalSize,
+) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// Get container from our container store.

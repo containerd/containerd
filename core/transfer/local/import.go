@@ -21,10 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"

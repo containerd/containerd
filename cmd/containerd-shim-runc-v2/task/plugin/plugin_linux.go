@@ -17,12 +17,13 @@
 package plugin
 
 import (
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/task"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -45,5 +46,4 @@ func init() {
 			return task.NewTaskService(ic.Context, pp.(shim.Publisher), ss.(shutdown.Service))
 		},
 	})
-
 }

@@ -37,9 +37,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/containerd/containerd/v2/internal/cri/streamingserver/responsewriter"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+
+	"github.com/containerd/containerd/v2/internal/cri/streamingserver/responsewriter"
 )
 
 const (

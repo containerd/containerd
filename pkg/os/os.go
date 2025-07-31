@@ -36,7 +36,7 @@ type OS interface {
 	CopyFile(src, dest string, perm os.FileMode) error
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	Hostname() (string, error)
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
+	Mount(source, target, fstype string, flags uintptr, data string) error
 	Unmount(target string) error
 	LookupMount(path string) (mount.Info, error)
 }

@@ -18,6 +18,7 @@ package images
 
 import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
+
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf"

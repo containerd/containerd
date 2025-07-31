@@ -23,12 +23,13 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/windows"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 func escapeAndCombineArgsWindows(args []string) string {
@@ -81,7 +82,7 @@ func WithProcessCommandLineOrArgsForWindows(config *runtime.ContainerConfig, ima
 
 // getArgs is used to evaluate the overall args for the container by taking into account the image command and entrypoints
 // along with the container command and entrypoints specified through the podspec if any
-func getArgs(imgEntrypoint []string, imgCmd []string, ctrEntrypoint []string, ctrCmd []string) ([]string, bool, error) {
+func getArgs(imgEntrypoint, imgCmd, ctrEntrypoint, ctrCmd []string) ([]string, bool, error) {
 	//nolint:dupword
 	// firstArgFromImg is a flag that is returned to indicate that the first arg in the slice comes from either the image
 	// Entrypoint or Cmd. If the first arg instead comes from the container config (e.g. overriding the image values),

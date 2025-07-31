@@ -19,8 +19,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/v2/pkg/netns"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/pkg/netns"
 )
 
 func (c *criService) bringUpLoopback(string) error {

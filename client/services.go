@@ -24,6 +24,8 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/plugin"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -35,7 +37,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	srv "github.com/containerd/containerd/v2/plugins/services"
-	"github.com/containerd/plugin"
 )
 
 type services struct {

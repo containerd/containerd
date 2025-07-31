@@ -20,12 +20,13 @@ import (
 	"context"
 
 	api "github.com/containerd/containerd/api/services/version/v1"
-	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/containerd/v2/plugins"
-	ctrdversion "github.com/containerd/containerd/v2/version"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"google.golang.org/grpc"
+
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/plugins"
+	ctrdversion "github.com/containerd/containerd/v2/version"
 )
 
 var _ api.VersionServer = &service{}

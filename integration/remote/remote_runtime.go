@@ -39,6 +39,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -47,7 +48,6 @@ import (
 	"github.com/containerd/containerd/v2/integration/remote/logreduction"
 	"github.com/containerd/containerd/v2/integration/remote/util"
 	executil "github.com/containerd/containerd/v2/internal/cri/executil"
-	"github.com/containerd/log"
 )
 
 // RuntimeService is a gRPC implementation of internalapi.RuntimeService.
@@ -384,7 +384,7 @@ func (r *RuntimeService) UpdateContainerResources(containerID string, resources 
 
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
-func (r *RuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration, opts ...grpc.CallOption) (stdout []byte, stderr []byte, err error) {
+func (r *RuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration, opts ...grpc.CallOption) (stdout, stderr []byte, err error) {
 	log.L.Infof("[RuntimeService] ExecSync (containerID=%v, timeout=%v)", containerID, timeout)
 	// Do not set timeout when timeout is 0.
 	var ctx context.Context
@@ -501,7 +501,6 @@ func (r *RuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeCo
 	_, err := r.runtimeClient.UpdateRuntimeConfig(ctx, &runtimeapi.UpdateRuntimeConfigRequest{
 		RuntimeConfig: runtimeConfig,
 	}, opts...)
-
 	if err != nil {
 		return err
 	}

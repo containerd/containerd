@@ -21,8 +21,9 @@ package server
 import (
 	"context"
 
-	containerd "github.com/containerd/containerd/v2/client"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	containerd "github.com/containerd/containerd/v2/client"
 )
 
 // updateContainerIOOwner updates I/O files' owner to align with initial processe's UID/GID.

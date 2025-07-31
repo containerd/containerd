@@ -19,14 +19,14 @@ package server
 import (
 	"fmt"
 
+	"github.com/containerd/go-cni"
+	"github.com/containerd/log"
 	"github.com/moby/sys/userns"
 	"github.com/opencontainers/selinux/go-selinux"
 	"tags.cncf.io/container-device-interface/pkg/cdi"
 
 	"github.com/containerd/containerd/v2/pkg/cap"
 	"github.com/containerd/containerd/v2/pkg/kernelversion"
-	"github.com/containerd/go-cni"
-	"github.com/containerd/log"
 )
 
 func init() {

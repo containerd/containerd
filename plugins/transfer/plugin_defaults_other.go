@@ -19,8 +19,9 @@
 package transfer
 
 import (
-	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/platforms"
+
+	"github.com/containerd/containerd/v2/defaults"
 )
 
 func defaultUnpackConfig() []unpackConfiguration {

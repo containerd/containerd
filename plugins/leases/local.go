@@ -19,12 +19,13 @@ package plugin
 import (
 	"context"
 
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -80,5 +81,4 @@ func (l *local) Delete(ctx context.Context, lease leases.Lease, opts ...leases.D
 	}
 
 	return nil
-
 }

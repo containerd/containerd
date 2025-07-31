@@ -41,7 +41,6 @@ import (
 	"net/http"
 	"time"
 
-	api "github.com/containerd/containerd/v2/internal/cri/streamingserver/v1"
 	"github.com/containerd/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +50,8 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
+
+	api "github.com/containerd/containerd/v2/internal/cri/streamingserver/v1"
 )
 
 // Options contains details about which streams are required for

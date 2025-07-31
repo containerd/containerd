@@ -318,7 +318,6 @@ func getManifestPath(object string, dgst digest.Digest) []string {
 			// strip @<digest> for registry path to make tag
 			object = object[:i]
 		}
-
 	}
 
 	if object == "" {
@@ -471,7 +470,6 @@ func (pw *pushWriter) Status() (content.Status, error) {
 		return content.Status{}, err
 	}
 	return status.Status, nil
-
 }
 
 func (pw *pushWriter) Digest() digest.Digest {

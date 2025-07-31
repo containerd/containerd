@@ -42,6 +42,7 @@ func FromApplierAndComparer(a diff.Applier, c diff.Comparer) diffapi.DiffServer 
 		comparer: c,
 	}
 }
+
 func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi.ApplyResponse, error) {
 	if s.applier == nil {
 		return nil, errgrpc.ToGRPC(errdefs.ErrNotImplemented)

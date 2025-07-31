@@ -23,10 +23,11 @@ import (
 	"sync"
 	"time"
 
-	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
-	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 type criWorker struct {
@@ -91,7 +92,6 @@ func (w *criWorker) run(ctx, tctx context.Context) {
 }
 
 func (w *criWorker) runSandbox(tctx, ctx context.Context, id string) (err error) {
-
 	sbConfig := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
 			Name: id,

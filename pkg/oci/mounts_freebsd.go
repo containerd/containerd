@@ -46,7 +46,7 @@ func appendOSMounts(s *Spec, os string) {
 	/* The nosuid noexec options are for consistency with Linux mounts: on FreeBSD it is
 	   by default impossible to execute anything from these filesystems.
 	*/
-	var mounts = []specs.Mount{
+	mounts := []specs.Mount{
 		{
 			Destination: "/proc",
 			Type:        "linprocfs",

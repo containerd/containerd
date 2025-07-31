@@ -119,12 +119,12 @@ func NewSocket(address string) (*net.UnixListener, error) {
 		sock       = socket(address)
 		path       = sock.path()
 		isAbstract = sock.isAbstract()
-		perm       = os.FileMode(0600)
+		perm       = os.FileMode(0o600)
 	)
 
 	// Darwin needs +x to access socket, otherwise it'll fail with "bind: permission denied" when running as non-root.
 	if runtime.GOOS == "darwin" {
-		perm = 0700
+		perm = 0o700
 	}
 
 	if !isAbstract {
@@ -244,7 +244,6 @@ func hybridVsockDialer(addr string, port uint64, timeout time.Duration) (net.Con
 			return nil, fmt.Errorf("timeout waiting for hybrid vsocket handshake of %s:%d", addr, port)
 		}
 	}
-
 }
 
 func dialVsock(address string) (net.Conn, error) {

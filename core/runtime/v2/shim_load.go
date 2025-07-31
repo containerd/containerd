@@ -33,7 +33,7 @@ import (
 
 // LoadExistingShims loads existing shims from the path specified by stateDir
 // rootDir is for cleaning up the unused paths of removed shims.
-func (m *ShimManager) LoadExistingShims(ctx context.Context, stateDir string, rootDir string) error {
+func (m *ShimManager) LoadExistingShims(ctx context.Context, stateDir, rootDir string) error {
 	nsDirs, err := os.ReadDir(stateDir)
 	if err != nil {
 		return err

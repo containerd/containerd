@@ -27,6 +27,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/containerd/log"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -36,7 +37,6 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
-	"github.com/containerd/log"
 )
 
 func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler, cgroupWritable bool) oci.SpecOpts {
@@ -112,7 +112,7 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				if !os.IsNotExist(err) {
 					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}
-				if err := osi.MkdirAll(src, 0755); err != nil {
+				if err := osi.MkdirAll(src, 0o755); err != nil {
 					return fmt.Errorf("failed to mkdir %q: %w", src, err)
 				}
 			}
@@ -219,7 +219,6 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 // WithMounts sorts and adds runtime and CRI mounts to the spec
 func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
 	return withMounts(osi, config, extra, mountLabel, handler, false)
-
 }
 
 // WithMountsCgroupWritable sorts and adds runtime and CRI mounts to the spec if cgroup_writable is enabled.
