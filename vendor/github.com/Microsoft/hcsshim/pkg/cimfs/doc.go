@@ -24,6 +24,16 @@ newFSName string) (_ *CimFsWriter, err error)` function defined in this package,
 block CIMs can be created with the `func CreateBlockCIM(blockPath, oldName, newName
 string, blockType BlockCIMType) (_ *CimFsWriter, err error)` function.
 
+Verified CIMs:
+A block CIM can also provide integrity checking (via a hash/Merkel tree,
+similar to dm-verity on Linux). If a CIM is written and sealed, it generates a
+root hash of all of its contents and shares it back with the client. Any
+verified CIM can be mounted by passing a hash that we expect to be its root
+hash. All read operations on such a mounted CIM will then validate that the
+generated root hash matches with the one that was provided at mount time. If it
+doesn't match the read fails. This allows us to guarantee that the CIM based
+layered aren't being modified underneath us.
+
 Forking & Merging CIMs:
 In container world, CIMs are used for storing container image layers. Usually, one layer
 is stored in one CIM. This means we need a way to combine multiple CIMs to create the
