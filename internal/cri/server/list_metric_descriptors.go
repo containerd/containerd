@@ -22,6 +22,7 @@ const (
 	NetworkUsageMetrics = "network"
 	DiskIOMetrics       = "diskIO"
 	DiskUsageMetrics    = "disk"
+	ProcessMetrics      = "process"
 )
 
 var baseLabelKeys = []string{"id", "name"}
