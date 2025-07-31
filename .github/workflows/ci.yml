@@ -650,7 +650,7 @@ jobs:
           if [ "$CGROUP_DRIVER" = "systemd" ];then
               set +e
               touch ./critest_exit_code.txt
-              podman run --rm --privileged --group-add keep-groups -v ./critest_exit_code.txt:/tmp/critest_exit_code.txt cri-in-userns-systemd
+              podman run --rm --security-opt apparmor=unconfined --cap-add SYS_ADMIN --privileged --group-add keep-groups -v ./critest_exit_code.txt:/tmp/critest_exit_code.txt cri-in-userns-systemd
               exit_code=`cat ./critest_exit_code.txt`
               echo "exit_code:"$exit_code
               if [ "$exit_code" -gt 0 ]; then
@@ -659,7 +659,7 @@ jobs:
                 exit 0
               fi
           else
-            podman run --rm --privileged cri-in-userns
+            podman run --rm --security-opt apparmor=unconfined --cap-add SYS_ADMIN --privileged cri-in-userns
           fi
 
   tests-mac-os:

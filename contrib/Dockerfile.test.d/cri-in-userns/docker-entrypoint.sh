@@ -48,6 +48,10 @@ if [ ! -z "$IS_SYSTEMD_CGROUP" ] && [ "$IS_SYSTEMD_CGROUP" = true ];then
 EOF
 fi
 
+# echo >&2 "Enabling apparmor"
+# /etc/init.d/apparmor start
+
+
 set -x
 echo >&2 "Running containerd in background"
 containerd &
