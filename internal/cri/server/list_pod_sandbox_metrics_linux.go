@@ -275,6 +275,14 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 		containerMetrics.Metrics = append(containerMetrics.Metrics, fsMetrics...)
 	}
 
+	// Collect process metrics
+	processMetrics, err := c.extractProcessMetrics(stats, containerLabels, timestamp)
+	if err != nil {
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract process metrics")
+	} else {
+		containerMetrics.Metrics = append(containerMetrics.Metrics, processMetrics...)
+	}
+
 	return containerMetrics, nil
 }
 
@@ -796,6 +804,58 @@ func (c *criService) extractDiskMetrics(stats interface{}, labels []string, time
 					},
 				}...)
 			}
+		}
+
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
+	}
+
+	return metrics, nil
+}
+
+// extractProcessMetrics extracts process-related metrics from container stats
+func (c *criService) extractProcessMetrics(stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+	var metrics []*runtime.Metric
+
+	switch s := stats.(type) {
+	case *cg1.Metrics:
+		if s.Pids != nil {
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_processes",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Pids.Current},
+				},
+				{
+					Name:        "container_threads_max",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Pids.Limit},
+				},
+			}...)
+		}
+
+	case *cg2.Metrics:
+		if s.Pids != nil {
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_processes",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Pids.Current},
+				},
+				{
+					Name:        "container_threads_max",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Pids.Limit},
+				},
+			}...)
 		}
 
 	default:
