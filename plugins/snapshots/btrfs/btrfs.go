@@ -296,7 +296,7 @@ func (b *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 	var s storage.Snapshot
 
 	err = b.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
-		s, err = storage.GetSnapshot(ctx, key)
+		s, err = storage.GetSnapshotWithKind(ctx, key, []snapshots.Kind{})
 		return err
 	})
 
