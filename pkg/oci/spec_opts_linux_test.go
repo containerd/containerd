@@ -116,7 +116,7 @@ guest:x:100:guest
 			}
 			err := WithUser(testCase.user)(context.Background(), nil, &c, &s)
 			if err != nil {
-				assert.EqualError(t, err, testCase.err)
+				require.EqualError(t, err, testCase.err)
 			}
 			assert.Equal(t, testCase.expectedUID, s.Process.User.UID)
 			assert.Equal(t, testCase.expectedGID, s.Process.User.GID)
@@ -172,7 +172,7 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 				Linux: &specs.Linux{},
 			}
 			err := WithUserID(testCase.userID)(context.Background(), nil, &c, &s)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, testCase.expectedUID, s.Process.User.UID)
 			assert.Equal(t, testCase.expectedGID, s.Process.User.GID)
 		})
@@ -232,7 +232,7 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 			}
 			err := WithUsername(testCase.user)(context.Background(), nil, &c, &s)
 			if err != nil {
-				assert.EqualError(t, err, testCase.err)
+				require.EqualError(t, err, testCase.err)
 			}
 			assert.Equal(t, testCase.expectedUID, s.Process.User.UID)
 			assert.Equal(t, testCase.expectedGID, s.Process.User.GID)
@@ -299,7 +299,7 @@ sys:x:3:root,bin,adm
 				},
 			}
 			err := WithAdditionalGIDs(testCase.user)(context.Background(), nil, &c, &s)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, testCase.expected, s.Process.User.AdditionalGids)
 		})
 	}
@@ -708,7 +708,7 @@ daemon:x:2:root,bin,daemon
 			}
 			err := WithAppendAdditionalGroups(testCase.groups...)(context.Background(), nil, &c, &s)
 			if err != nil {
-				assert.EqualError(t, err, testCase.err)
+				require.EqualError(t, err, testCase.err)
 			}
 			assert.Equal(t, testCase.expected, s.Process.User.AdditionalGids)
 		})
@@ -765,7 +765,7 @@ func TestWithAppendAdditionalGroupsNoEtcGroup(t *testing.T) {
 			}
 			err := WithAppendAdditionalGroups(testCase.groups...)(context.Background(), nil, &c, &s)
 			if err != nil {
-				assert.EqualError(t, err, testCase.err)
+				require.EqualError(t, err, testCase.err)
 			}
 			assert.Equal(t, testCase.expected, s.Process.User.AdditionalGids)
 		})
@@ -833,9 +833,9 @@ func TestWithLinuxDeviceFollowSymlinks(t *testing.T) {
 			for _, opt := range opts {
 				if err := opt(nil, nil, nil, &spec); err != nil {
 					if tc.expectError {
-						assert.Error(t, err)
+						require.Error(t, err)
 					} else {
-						assert.NoError(t, err)
+						require.NoError(t, err)
 					}
 				}
 			}

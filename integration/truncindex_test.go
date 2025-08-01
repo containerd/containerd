@@ -62,9 +62,9 @@ func TestTruncIndex(t *testing.T) {
 	defer func() {
 		// The 2th StopPodSandbox will fail, the 2th RemovePodSandbox will success.
 		if !hasStoppedSandbox {
-			assert.NoError(t, runtimeService.StopPodSandbox(sbTruncIndex))
+			require.NoError(t, runtimeService.StopPodSandbox(sbTruncIndex))
 		}
-		assert.NoError(t, runtimeService.RemovePodSandbox(sbTruncIndex))
+		require.NoError(t, runtimeService.RemovePodSandbox(sbTruncIndex))
 	}()
 
 	t.Logf("Get sandbox status by truncindex")
@@ -74,7 +74,7 @@ func TestTruncIndex(t *testing.T) {
 
 	t.Logf("Forward port for sandbox by truncindex")
 	_, err = runtimeService.PortForward(&runtimeapi.PortForwardRequest{PodSandboxId: sbTruncIndex, Port: []int32{80}})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// TODO(yanxuean): add test case for ListPodSandbox
 
@@ -89,7 +89,7 @@ func TestTruncIndex(t *testing.T) {
 	cnTruncIndex := genTruncIndex(cn)
 	defer func() {
 		// the 2th RemovePodSandbox will success.
-		assert.NoError(t, runtimeService.RemoveContainer(cnTruncIndex))
+		require.NoError(t, runtimeService.RemoveContainer(cnTruncIndex))
 	}()
 
 	t.Logf("Get container status by truncindex")
@@ -103,7 +103,7 @@ func TestTruncIndex(t *testing.T) {
 	defer func() {
 		// The 2th StopPodSandbox will fail
 		if !hasStoppedContainer {
-			assert.NoError(t, runtimeService.StopContainer(cnTruncIndex, 10))
+			require.NoError(t, runtimeService.StopContainer(cnTruncIndex, 10))
 		}
 	}()
 
@@ -117,12 +117,12 @@ func TestTruncIndex(t *testing.T) {
 		err = runtimeService.UpdateContainerResources(cnTruncIndex, &runtimeapi.LinuxContainerResources{
 			MemoryLimitInBytes: 50 * 1024 * 1024,
 		}, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	} else {
 		err = runtimeService.UpdateContainerResources(cnTruncIndex, nil, &runtimeapi.WindowsContainerResources{
 			MemoryLimitInBytes: 50 * 1024 * 1024,
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	t.Logf("Execute cmd in container")
@@ -132,33 +132,33 @@ func TestTruncIndex(t *testing.T) {
 		Stdout:      true,
 	}
 	_, err = runtimeService.Exec(execReq)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Logf("Execute cmd in container by sync")
 	_, _, err = runtimeService.ExecSync(cnTruncIndex, []string{"pwd"}, 10)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// TODO(yanxuean): add test case for ListContainers
 
 	t.Logf("Get a non exist container status by truncindex")
 	err = runtimeService.StopContainer(cnTruncIndex, 10)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if err == nil {
 		hasStoppedContainer = true
 	}
 	_, err = runtimeService.ContainerStats(cnTruncIndex)
-	assert.Error(t, err)
-	assert.NoError(t, runtimeService.RemoveContainer(cnTruncIndex))
+	require.Error(t, err)
+	require.NoError(t, runtimeService.RemoveContainer(cnTruncIndex))
 	_, err = runtimeService.ContainerStatus(cnTruncIndex)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	t.Logf("Get a non exist sandbox status by truncindex")
 	err = runtimeService.StopPodSandbox(sbTruncIndex)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if err == nil {
 		hasStoppedSandbox = true
 	}
-	assert.NoError(t, runtimeService.RemovePodSandbox(sbTruncIndex))
+	require.NoError(t, runtimeService.RemovePodSandbox(sbTruncIndex))
 	_, err = runtimeService.PodSandboxStatus(sbTruncIndex)
-	assert.Error(t, err)
+	require.Error(t, err)
 }

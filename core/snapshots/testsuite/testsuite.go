@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // SnapshotterFunc is used in SnapshotterSuite
@@ -243,7 +244,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		si2.Name: si2,
 	}
 	walked := map[string]snapshots.Info{} // walk is not ordered
-	assert.Nil(t, snapshotter.Walk(ctx, func(ctx context.Context, si snapshots.Info) error {
+	require.NoError(t, snapshotter.Walk(ctx, func(ctx context.Context, si snapshots.Info) error {
 		walked[si.Name] = si
 		return nil
 	}))
@@ -277,16 +278,16 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	testutil.Unmount(t, nextnext)
-	assert.Nil(t, snapshotter.Remove(ctx, nextnext))
+	require.NoError(t, snapshotter.Remove(ctx, nextnext))
 
 	err = snapshotter.Remove(ctx, committed)
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	if err != nil {
-		assert.Contains(t, err.Error(), "remove")
+		require.ErrorContains(t, err, "remove")
 	}
 
-	assert.Nil(t, snapshotter.Remove(ctx, nextCommitted))
-	assert.Nil(t, snapshotter.Remove(ctx, committed))
+	require.NoError(t, snapshotter.Remove(ctx, nextCommitted))
+	require.NoError(t, snapshotter.Remove(ctx, committed))
 }
 
 // Create a New Layer on top of base layer with Prepare, Stat on new layer, should return Active layer.
@@ -320,7 +321,7 @@ func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter s
 	}
 	assert.Equal(t, si.Name, preparing)
 	assert.Equal(t, snapshots.KindActive, si.Kind)
-	assert.Equal(t, "", si.Parent)
+	assert.Empty(t, si.Parent)
 }
 
 // Commit a New Layer on top of base layer with Prepare & Commit , Stat on new layer, should return Committed layer.
@@ -359,7 +360,7 @@ func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotte
 	}
 	assert.Equal(t, si.Name, committed)
 	assert.Equal(t, snapshots.KindCommitted, si.Kind)
-	assert.Equal(t, "", si.Parent)
+	assert.Empty(t, si.Parent)
 
 }
 
@@ -434,9 +435,9 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 	}
 
 	// Test the transivity
-	assert.Equal(t, "", siA.Parent)
+	assert.Empty(t, siA.Parent)
 	assert.Equal(t, snapA, siB.Parent)
-	assert.Equal(t, "", siParentB.Parent)
+	assert.Empty(t, siParentB.Parent)
 
 }
 
@@ -466,7 +467,7 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	}
 
 	_, err = snapshotter.View(ctx, newLayer, snapA, opt)
-	assert.True(t, err != nil)
+	require.Error(t, err)
 
 	// Two Prepare with same key
 	prepLayer := filepath.Join(work, "prepLayer")
@@ -480,7 +481,7 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	}
 
 	_, err = snapshotter.Prepare(ctx, prepLayer, snapA, opt)
-	assert.True(t, err != nil)
+	require.Error(t, err)
 
 	// Two View with same key
 	viewLayer := filepath.Join(work, "viewLayer")
@@ -494,7 +495,7 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	}
 
 	_, err = snapshotter.View(ctx, viewLayer, snapA, opt)
-	assert.True(t, err != nil)
+	require.Error(t, err)
 
 }
 
@@ -827,8 +828,8 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 	} else {
 		t.Fatalf("write to %q should fail (EROFS) but did not fail", testfile)
 	}
-	assert.Nil(t, snapshotter.Remove(ctx, view))
-	assert.Nil(t, snapshotter.Remove(ctx, committed))
+	require.NoError(t, snapshotter.Remove(ctx, view))
+	require.NoError(t, snapshotter.Remove(ctx, committed))
 }
 
 // Move files from base layer to new location in intermediate layer.
