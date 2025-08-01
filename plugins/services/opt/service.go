@@ -43,7 +43,7 @@ func init() {
 			path := ic.Config.(*Config).Path
 			ic.Meta.Exports["path"] = path
 			bin := filepath.Join(path, "bin")
-			if err := os.MkdirAll(bin, 0711); err != nil {
+			if err := os.MkdirAll(bin, 0o711); err != nil {
 				return nil, err
 			}
 			if err := os.Setenv("PATH", fmt.Sprintf("%s%c%s", bin, os.PathListSeparator, os.Getenv("PATH"))); err != nil {
@@ -51,7 +51,7 @@ func init() {
 			}
 
 			lib := filepath.Join(path, "lib")
-			if err := os.MkdirAll(lib, 0711); err != nil {
+			if err := os.MkdirAll(lib, 0o711); err != nil {
 				return nil, err
 			}
 			if err := os.Setenv("LD_LIBRARY_PATH", fmt.Sprintf("%s%c%s", lib, os.PathListSeparator, os.Getenv("LD_LIBRARY_PATH"))); err != nil {

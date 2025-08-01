@@ -94,20 +94,21 @@ func NewTask(ctx context.Context, client *containerd.Client, container container
 	}
 
 	var ioCreator cio.Creator
-	if con != nil {
+	switch {
+	case con != nil:
 		if nullIO {
 			return nil, errors.New("tty and null-io cannot be used together")
 		}
 		ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStreams(con, con, nil), cio.WithTerminal}, ioOpts...)...)
-	} else if nullIO {
+	case nullIO:
 		ioCreator = cio.NullIO
-	} else if logURI != "" {
+	case logURI != "":
 		u, err := url.Parse(logURI)
 		if err != nil {
 			return nil, err
 		}
 		ioCreator = cio.LogURI(u)
-	} else {
+	default:
 		ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStreams(stdinC, os.Stdout, os.Stderr)}, ioOpts...)...)
 	}
 	t, err := container.NewTask(ctx, ioCreator, opts...)

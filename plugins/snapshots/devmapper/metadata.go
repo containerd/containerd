@@ -64,7 +64,7 @@ type PoolMetadata struct {
 
 // NewPoolMetadata creates new or opens existing pool metadata database
 func NewPoolMetadata(dbfile string) (*PoolMetadata, error) {
-	db, err := bolt.Open(dbfile, 0600, nil)
+	db, err := bolt.Open(dbfile, 0o600, nil)
 	if err != nil {
 		return nil, err
 	}

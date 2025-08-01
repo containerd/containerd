@@ -121,7 +121,7 @@ func TestFUSEHelper(t *testing.T) {
 	td := t.TempDir()
 
 	for _, dir := range []string{"lower1", "lower2", "upper", "work", "merged"} {
-		if err := os.Mkdir(filepath.Join(td, dir), 0755); err != nil {
+		if err := os.Mkdir(filepath.Join(td, dir), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -149,11 +149,11 @@ func TestMountAt(t *testing.T) {
 
 	defer unix.Unmount(filepath.Join(dir2, "bar"), unix.MNT_DETACH)
 
-	if err := os.WriteFile(filepath.Join(dir1, "foo"), []byte("foo"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir1, "foo"), []byte("foo"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(dir2, "bar"), []byte{}, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir2, "bar"), []byte{}, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -243,8 +243,8 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 
 			lowerDirs := []string{filepath.Join(fakeLowerDirsDir, "lower1"), filepath.Join(fakeLowerDirsDir, "lower2")}
 			for _, dir := range lowerDirs {
-				require.NoError(t, os.Mkdir(dir, 0755))
-				require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.Base(dir)), []byte("foo"), 0644))
+				require.NoError(t, os.Mkdir(dir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.Base(dir)), []byte("foo"), 0o644))
 			}
 
 			remountsLocation := t.TempDir()
@@ -311,7 +311,7 @@ func setupMounts(t *testing.T) (target string, mounts []Mount) {
 	dir1 := t.TempDir()
 	dir2 := t.TempDir()
 
-	if err := os.Mkdir(filepath.Join(dir1, "foo"), 0755); err != nil {
+	if err := os.Mkdir(filepath.Join(dir1, "foo"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	mounts = append(mounts, Mount{
@@ -323,7 +323,7 @@ func setupMounts(t *testing.T) (target string, mounts []Mount) {
 		},
 	})
 
-	if err := os.WriteFile(filepath.Join(dir2, "bar"), []byte("bar"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir2, "bar"), []byte("bar"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	mounts = append(mounts, Mount{

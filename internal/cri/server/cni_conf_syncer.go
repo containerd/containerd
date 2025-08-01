@@ -50,11 +50,11 @@ func newCNINetConfSyncer(confDir string, netPlugin cni.CNI, loadOpts []cni.Opt) 
 	// /etc/cni has to be readable for non-root users (0755), because /etc/cni/tuning/allowlist.conf is used for rootless mode too.
 	// This file was introduced in CNI plugins 1.2.0 (https://github.com/containernetworking/plugins/pull/693), and its path is hard-coded.
 	confDirParent := filepath.Dir(confDir)
-	if err := os.MkdirAll(confDirParent, 0755); err != nil {
+	if err := os.MkdirAll(confDirParent, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create the parent of the cni conf dir=%s: %w", confDirParent, err)
 	}
 
-	if err := os.MkdirAll(confDir, 0700); err != nil {
+	if err := os.MkdirAll(confDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create cni conf dir=%s for watch: %w", confDir, err)
 	}
 

@@ -779,8 +779,7 @@ func isCheckpointPathExist(runtime string, v interface{}) bool {
 		return false
 	}
 
-	switch runtime {
-	case plugins.RuntimeRuncV2:
+	if runtime == plugins.RuntimeRuncV2 {
 		if opts, ok := v.(*options.CheckpointOptions); ok && opts.ImagePath != "" {
 			return true
 		}

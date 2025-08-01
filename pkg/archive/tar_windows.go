@@ -29,9 +29,9 @@ import (
 // chmodTarEntry is used to adjust the file permissions used in tar header based
 // on the platform the archival is done.
 func chmodTarEntry(perm os.FileMode) os.FileMode {
-	perm &= 0755
+	perm &= 0o755
 	// Add the x bit: make everything +x from windows
-	perm |= 0111
+	perm |= 0o111
 
 	return perm
 }
