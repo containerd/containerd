@@ -953,11 +953,11 @@ func (c *criService) getContainerFilesystemUsage(ctx context.Context, containerI
 		var stat syscall.Statfs_t
 		if err := syscall.Statfs(rootPath, &stat); err == nil {
 			// Calculate filesystem total size as limit
-			limit = uint64(stat.Blocks) * uint64(stat.Bsize)
+			limit = stat.Blocks * uint64(stat.Bsize)
 
 			// Inode information
-			inodes = uint64(stat.Files)
-			inodesFree = uint64(stat.Ffree)
+			inodes = stat.Files
+			inodesFree = stat.Ffree
 		}
 	}
 
@@ -1036,16 +1036,16 @@ func (c *criService) getFilesystemUsageFromPath(ctx context.Context, containerID
 	}
 
 	// Calculate usage (used = total - available)
-	totalBytes := uint64(stat.Blocks) * uint64(stat.Bsize)
-	availableBytes := uint64(stat.Bavail) * uint64(stat.Bsize)
+	totalBytes := stat.Blocks * uint64(stat.Bsize)
+	availableBytes := stat.Bavail * uint64(stat.Bsize)
 	usage = totalBytes - availableBytes
 
 	// Filesystem limit is the total size
 	limit = totalBytes
 
 	// Inode information
-	inodes = uint64(stat.Files)
-	inodesFree = uint64(stat.Ffree)
+	inodes = stat.Files
+	inodesFree = stat.Ffree
 
 	return usage, limit, inodes, inodesFree, nil
 }
