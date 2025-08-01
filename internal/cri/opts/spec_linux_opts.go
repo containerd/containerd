@@ -39,7 +39,7 @@ import (
 	"github.com/containerd/log"
 )
 
-func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler, cgroupWritable bool) oci.SpecOpts {
+func withMounts(osi osinterface.OS, statManager *osinterface.StatManager, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler, cgroupWritable bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
@@ -106,9 +106,10 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				dst = mount.GetContainerPath()
 				src = mount.GetHostPath()
 			)
+
 			// Create the host path if it doesn't exist.
 			// TODO(random-liu): Add CRI validation test for this case.
-			if _, err := osi.Stat(src); err != nil {
+			if err := statManager.Stat(ctx, src); err != nil {
 				if !os.IsNotExist(err) {
 					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}
@@ -217,14 +218,14 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 }
 
 // WithMounts sorts and adds runtime and CRI mounts to the spec
-func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
-	return withMounts(osi, config, extra, mountLabel, handler, false)
+func WithMounts(osi osinterface.OS, statManager *osinterface.StatManager, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
+	return withMounts(osi, statManager, config, extra, mountLabel, handler, false)
 
 }
 
 // WithMountsCgroupWritable sorts and adds runtime and CRI mounts to the spec if cgroup_writable is enabled.
-func WithMountsCgroupWritable(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
-	return withMounts(osi, config, extra, mountLabel, handler, true)
+func WithMountsCgroupWritable(osi osinterface.OS, statManager *osinterface.StatManager, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
+	return withMounts(osi, statManager, config, extra, mountLabel, handler, true)
 }
 
 // Ensure mount point on which path is mounted, is shared.
