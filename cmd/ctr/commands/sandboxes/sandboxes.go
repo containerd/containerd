@@ -22,13 +22,14 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
 )
 
 // Command is a set of subcommands to manage runtimes with sandbox support

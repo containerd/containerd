@@ -167,7 +167,6 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		Size:      rc.c,
 		Digest:    digester.Digest(),
 	}, nil
-
 }
 
 // Compare creates a diff between the given mounts and uploads the result
@@ -214,7 +213,6 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 	cw, err := s.store.Writer(ctx, content.WithRef(config.Reference), content.WithDescriptor(ocispec.Descriptor{
 		MediaType: config.MediaType,
 	}))
-
 	if err != nil {
 		return emptyDesc, fmt.Errorf("failed to open writer: %w", err)
 	}
@@ -357,7 +355,6 @@ func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 // parent-and-child, or orphan-and-empty-list, and return the full list of layers, starting
 // with the upper-most (most childish?)
 func mountPairToLayerStack(lower, upper []mount.Mount) ([]string, error) {
-
 	// May return an ErrNotImplemented, which will fall back to LCOW
 	upperLayer, upperParentLayerPaths, err := mountsToLayerAndParents(upper)
 	if err != nil {

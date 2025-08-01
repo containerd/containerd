@@ -24,7 +24,9 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
+	"github.com/containerd/errdefs"
 	gocni "github.com/containerd/go-cni"
+	"github.com/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli/v2"
 
@@ -35,8 +37,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 func withMounts(cliContext *cli.Context) oci.SpecOpts {

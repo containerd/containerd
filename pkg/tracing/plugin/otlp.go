@@ -24,10 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/deprecation"
-	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -38,6 +34,11 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/containerd/containerd/v2/pkg/deprecation"
+	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 )
 
 const exporterPlugin = "otlp"
@@ -199,7 +200,6 @@ func newTracer(ctx context.Context, procs []trace.SpanProcessor) (io.Closer, err
 	return closerFunc(func() error {
 		return provider.Shutdown(ctx)
 	}), nil
-
 }
 
 func warnTraceConfig(ic *plugin.InitContext) error {

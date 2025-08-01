@@ -28,12 +28,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/containerd/v2/plugins/snapshots/devmapper/dmsetup"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 type fsType string
@@ -76,7 +77,7 @@ func NewSnapshotter(ctx context.Context, config *Config) (*Snapshotter, error) {
 
 	var cleanupFn []closeFunc
 
-	if err := os.MkdirAll(config.RootPath, 0750); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(config.RootPath, 0o750); err != nil && !os.IsExist(err) {
 		return nil, fmt.Errorf("failed to create root directory: %s: %w", config.RootPath, err)
 	}
 
@@ -457,7 +458,7 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 // mkfs creates filesystem on the given devmapper device based on type
 // specified in config.
-func mkfs(ctx context.Context, fs fsType, fsOptions string, path string) error {
+func mkfs(ctx context.Context, fs fsType, fsOptions, path string) error {
 	mkfsCommand := ""
 	var args []string
 

@@ -27,12 +27,12 @@ import (
 
 	"github.com/containerd/btrfs/v2"
 	"github.com/containerd/continuity/fs"
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
 )
 
 type snapshotter struct {
@@ -51,11 +51,11 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-		if err := os.Mkdir(root, 0700); err != nil {
+		if err := os.Mkdir(root, 0o700); err != nil {
 			return nil, err
 		}
-	} else if st.Mode()&os.ModePerm != 0700 {
-		if err := os.Chmod(root, 0700); err != nil {
+	} else if st.Mode()&os.ModePerm != 0o700 {
+		if err := os.Chmod(root, 0o700); err != nil {
 			return nil, err
 		}
 	}
@@ -78,7 +78,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		view,
 		snapshots,
 	} {
-		if err := os.Mkdir(path, 0755); err != nil && !os.IsExist(err) {
+		if err := os.Mkdir(path, 0o755); err != nil && !os.IsExist(err) {
 			return nil, err
 		}
 	}
@@ -104,7 +104,6 @@ func (b *snapshotter) Stat(ctx context.Context, key string) (info snapshots.Info
 		_, info, _, err = storage.GetInfo(ctx, key)
 		return err
 	})
-
 	if err != nil {
 		return snapshots.Info{}, err
 	}
@@ -117,7 +116,6 @@ func (b *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 		info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
 		return err
 	})
-
 	if err != nil {
 		return snapshots.Info{}, err
 	}
@@ -144,7 +142,6 @@ func (b *snapshotter) usage(ctx context.Context, key string) (usage snapshots.Us
 		}
 		return err
 	})
-
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
@@ -208,7 +205,6 @@ func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshots.Kind, key
 		readOnly := kind == snapshots.KindView
 		return btrfs.SubvolSnapshot(target, parentp, readOnly)
 	})
-
 	if err != nil {
 		if target != "" {
 			if derr := btrfs.SubvolDelete(target); derr != nil {
@@ -267,7 +263,6 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 
 		return btrfs.SubvolSnapshot(target, source, true)
 	})
-
 	if err != nil {
 		if target != "" {
 			if derr := btrfs.SubvolDelete(target); derr != nil {
@@ -299,7 +294,6 @@ func (b *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 		s, err = storage.GetSnapshot(ctx, key)
 		return err
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active snapshot: %w", err)
 	}
@@ -356,7 +350,6 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		restore = true
 		return nil
 	})
-
 	if err != nil {
 		if restore { // means failed to commit transaction
 			// Attempt to restore source

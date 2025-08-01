@@ -22,9 +22,9 @@ import (
 	"text/tabwriter"
 	"time"
 
+	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/urfave/cli/v2"
 
-	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 )
@@ -36,6 +36,7 @@ var Command = &cli.Command{
 		listCommand,
 	},
 }
+
 var listCommand = &cli.Command{
 	Name:  "list",
 	Usage: "Print warnings for deprecations",
@@ -79,7 +80,6 @@ var listCommand = &cli.Command{
 				}
 				return w.Flush()
 			}
-
 		}
 		return nil
 	},
@@ -102,6 +102,7 @@ func warnings(in *api.ServerResponse) []deprecationWarning {
 	}
 	return warnings
 }
+
 func deprecationWarningFromPB(in *api.DeprecationWarning) *deprecationWarning {
 	if in == nil {
 		return nil

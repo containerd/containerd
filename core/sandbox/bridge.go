@@ -20,10 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	"github.com/containerd/ttrpc"
 	"google.golang.org/grpc"
-
-	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
 )
 
 // NewClient returns a new sandbox client that handles both GRPC and TTRPC clients.

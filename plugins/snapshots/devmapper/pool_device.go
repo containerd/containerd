@@ -26,11 +26,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 
 	blkdiscard "github.com/containerd/containerd/v2/plugins/snapshots/devmapper/blkdiscard"
 	"github.com/containerd/containerd/v2/plugins/snapshots/devmapper/dmsetup"
-	"github.com/containerd/log"
 )
 
 // PoolDevice ties together data and metadata volumes, represents thin-pool and manages volumes, snapshots and device ids.
@@ -173,7 +173,7 @@ func (p *PoolDevice) ensureDeviceStates(ctx context.Context) error {
 // transition invokes 'updateStateFn' callback to perform devmapper operation and reflects device state changes/errors in meta store.
 // 'tryingState' will be set before invoking callback. If callback succeeded 'successState' will be set, otherwise
 // error details will be recorded in meta store.
-func (p *PoolDevice) transition(ctx context.Context, deviceName string, tryingState DeviceState, successState DeviceState, updateStateFn func() error) error {
+func (p *PoolDevice) transition(ctx context.Context, deviceName string, tryingState, successState DeviceState, updateStateFn func() error) error {
 	// Set device to trying state
 	uerr := p.metadata.UpdateDevice(ctx, deviceName, func(deviceInfo *DeviceInfo) error {
 		deviceInfo.State = tryingState
@@ -188,7 +188,6 @@ func (p *PoolDevice) transition(ctx context.Context, deviceName string, tryingSt
 
 	// Invoke devmapper operation
 	err := updateStateFn()
-
 	if err != nil {
 		result = append(result, err)
 	}
@@ -302,7 +301,7 @@ func (p *PoolDevice) activateDevice(ctx context.Context, info *DeviceInfo) error
 }
 
 // CreateSnapshotDevice creates and activates new thin-device from parent thin-device (makes snapshot)
-func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string, snapshotName string, virtualSizeBytes uint64) (retErr error) {
+func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName, snapshotName string, virtualSizeBytes uint64) (retErr error) {
 	baseInfo, err := p.metadata.GetDevice(ctx, deviceName)
 	if err != nil {
 		return fmt.Errorf("failed to query device metadata for %q: %w", deviceName, err)

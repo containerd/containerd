@@ -164,7 +164,7 @@ func expectToken(s string) (token, rest string) {
 	return s[:i], s[i:]
 }
 
-func expectTokenOrQuoted(s string) (value string, rest string) {
+func expectTokenOrQuoted(s string) (value, rest string) {
 	if !strings.HasPrefix(s, "\"") {
 		return expectToken(s)
 	}

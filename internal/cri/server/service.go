@@ -26,14 +26,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	apitypes "github.com/containerd/containerd/api/types"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/introspection"
@@ -74,12 +73,12 @@ type CRIService interface {
 
 type sandboxService interface {
 	CreateSandbox(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error
-	StartSandbox(ctx context.Context, sandboxer string, sandboxID string) (sandbox.ControllerInstance, error)
-	WaitSandbox(ctx context.Context, sandboxer string, sandboxID string) (<-chan containerd.ExitStatus, error)
+	StartSandbox(ctx context.Context, sandboxer, sandboxID string) (sandbox.ControllerInstance, error)
+	WaitSandbox(ctx context.Context, sandboxer, sandboxID string) (<-chan containerd.ExitStatus, error)
 	StopSandbox(ctx context.Context, sandboxer, sandboxID string, opts ...sandbox.StopOpt) error
-	ShutdownSandbox(ctx context.Context, sandboxer string, sandboxID string) error
-	SandboxStatus(ctx context.Context, sandboxer string, sandboxID string, verbose bool) (sandbox.ControllerStatus, error)
-	SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (imagespec.Platform, error)
+	ShutdownSandbox(ctx context.Context, sandboxer, sandboxID string) error
+	SandboxStatus(ctx context.Context, sandboxer, sandboxID string, verbose bool) (sandbox.ControllerStatus, error)
+	SandboxPlatform(ctx context.Context, sandboxer, sandboxID string) (imagespec.Platform, error)
 	SandboxController(sandboxer string) (sandbox.Controller, error)
 }
 

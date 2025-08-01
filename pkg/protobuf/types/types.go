@@ -23,6 +23,8 @@ import (
 	field_mask "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
-type Empty = emptypb.Empty
-type Any = anypb.Any
-type FieldMask = field_mask.FieldMask
+type (
+	Empty     = emptypb.Empty
+	Any       = anypb.Any
+	FieldMask = field_mask.FieldMask
+)

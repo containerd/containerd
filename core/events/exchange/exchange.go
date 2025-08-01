@@ -22,14 +22,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/pkg/filters"
-	"github.com/containerd/containerd/v2/pkg/identifiers"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	goevents "github.com/docker/go-events"
+
+	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/v2/pkg/identifiers"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 // Exchange broadcasts events
@@ -44,9 +45,11 @@ func NewExchange() *Exchange {
 	}
 }
 
-var _ events.Publisher = &Exchange{}
-var _ events.Forwarder = &Exchange{}
-var _ events.Subscriber = &Exchange{}
+var (
+	_ events.Publisher  = &Exchange{}
+	_ events.Forwarder  = &Exchange{}
+	_ events.Subscriber = &Exchange{}
+)
 
 // Forward accepts an envelope to be directly distributed on the exchange.
 //

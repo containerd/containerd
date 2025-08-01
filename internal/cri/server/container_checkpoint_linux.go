@@ -34,6 +34,16 @@ import (
 	"github.com/checkpoint-restore/go-criu/v7/stats"
 	"github.com/checkpoint-restore/go-criu/v7/utils"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/continuity/fs"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/distribution/reference"
+	"github.com/opencontainers/image-spec/identity"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	spec "github.com/opencontainers/runtime-spec/specs-go"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -47,16 +57,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/continuity/fs"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-
-	"github.com/distribution/reference"
-	"github.com/opencontainers/image-spec/identity"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	spec "github.com/opencontainers/runtime-spec/specs-go"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // checkIfCheckpointOCIImage returns checks if the input refers to a checkpoint image.
@@ -214,7 +214,6 @@ func (c *criService) CRImportCheckpoint(
 			archiveFile,
 			[]archive.ApplyOpt{filter}...,
 		)
-
 		if err != nil {
 			return "", fmt.Errorf("unpacking of checkpoint archive %s failed: %w", mountPoint, err)
 		}
@@ -438,7 +437,6 @@ func (c *criService) CRImportCheckpoint(
 		// Start from the beginning of the checkpoint archive
 		archiveFile.Seek(0, 0)
 		_, err = archive.Apply(ctx, containerRootDir, archiveFile, []archive.ApplyOpt{filter}...)
-
 		if err != nil {
 			return "", fmt.Errorf("unpacking of checkpoint archive %s failed: %w", containerRootDir, err)
 		}
@@ -449,7 +447,7 @@ func (c *criService) CRImportCheckpoint(
 	containerLog := filepath.Join(containerRootDir, "container.log")
 	_, err = c.os.Stat(containerLog)
 	if err == nil {
-		if err := c.os.CopyFile(containerLog, meta.LogPath, 0600); err != nil {
+		if err := c.os.CopyFile(containerLog, meta.LogPath, 0o600); err != nil {
 			return "", fmt.Errorf("restoring container log file %s failed: %w", containerLog, err)
 		}
 	}

@@ -118,7 +118,6 @@ func (r *remoteContainers) Create(ctx context.Context, container containers.Cont
 	}
 
 	return containerFromProto(created.Container), nil
-
 }
 
 func (r *remoteContainers) Update(ctx context.Context, container containers.Container, fieldpaths ...string) (containers.Container, error) {
@@ -138,7 +137,6 @@ func (r *remoteContainers) Update(ctx context.Context, container containers.Cont
 	}
 
 	return containerFromProto(updated.Container), nil
-
 }
 
 func (r *remoteContainers) Delete(ctx context.Context, id string) error {
@@ -147,7 +145,6 @@ func (r *remoteContainers) Delete(ctx context.Context, id string) error {
 	})
 
 	return errgrpc.ToNative(err)
-
 }
 
 func containerToProto(container *containers.Container) *containersapi.Container {

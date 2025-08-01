@@ -21,12 +21,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/containerd/containerd/v2/pkg/identifiers"
-	l "github.com/containerd/containerd/v2/pkg/labels"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
 	errbolt "go.etcd.io/bbolt/errors"
+
+	"github.com/containerd/containerd/v2/pkg/identifiers"
+	l "github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 type namespaceStore struct {
@@ -108,7 +109,6 @@ func (s *namespaceStore) SetLabel(ctx context.Context, namespace, key, value str
 
 		return bkt.Put([]byte(key), []byte(value))
 	})
-
 }
 
 func (s *namespaceStore) List(ctx context.Context) ([]string, error) {

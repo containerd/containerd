@@ -128,7 +128,6 @@ func New[T any](discardAfter time.Duration, discardFn func(T)) EventQueue[T] {
 					discardTime = time.After(time.Until(discardQueue[0].discardAt).Abs() + 10*time.Millisecond)
 				}
 			}
-
 		}
 	}()
 

@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/semaphore"
 
@@ -30,8 +32,6 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/platforms"
 )
 
 const (

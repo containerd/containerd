@@ -37,8 +37,7 @@ func NewNoopMonitor() TaskMonitor {
 	return &noopTaskMonitor{}
 }
 
-type noopTaskMonitor struct {
-}
+type noopTaskMonitor struct{}
 
 func (mm *noopTaskMonitor) Monitor(c Task, labels map[string]string) error {
 	return nil

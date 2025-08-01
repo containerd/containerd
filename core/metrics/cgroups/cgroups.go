@@ -22,16 +22,17 @@ import (
 	"context"
 
 	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	metrics "github.com/docker/go-metrics"
+
 	"github.com/containerd/containerd/v2/core/events"
 	v1 "github.com/containerd/containerd/v2/core/metrics/cgroups/v1"
 	v2 "github.com/containerd/containerd/v2/core/metrics/cgroups/v2"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	metrics "github.com/docker/go-metrics"
 )
 
 // Config for the cgroups monitor

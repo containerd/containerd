@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"slices"
 
+	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -33,8 +34,6 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
-
-	apitypes "github.com/containerd/containerd/api/types"
 
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
@@ -74,7 +73,7 @@ func init() {
 			shimManager := shimManagerI.(*ShimManager)
 			root, state := ic.Properties[plugins.PropertyRootDir], ic.Properties[plugins.PropertyStateDir]
 			for _, d := range []string{root, state} {
-				if err := os.MkdirAll(d, 0711); err != nil {
+				if err := os.MkdirAll(d, 0o711); err != nil {
 					return nil, err
 				}
 			}
@@ -235,7 +234,6 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 	exit, err := shimTask.delete(ctx, sandboxed, func(ctx context.Context, id string) {
 		m.manager.shims.Delete(ctx, id)
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete task: %w", err)
 	}

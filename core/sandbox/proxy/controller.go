@@ -208,7 +208,8 @@ func (s *remoteSandboxController) Update(
 	ctx context.Context,
 	sandboxID string,
 	sb sandbox.Sandbox,
-	fields ...string) error {
+	fields ...string,
+) error {
 	apiSandbox := sandbox.ToProto(&sb)
 	_, err := s.client.Update(ctx, &api.ControllerUpdateRequest{
 		SandboxID: sandboxID,

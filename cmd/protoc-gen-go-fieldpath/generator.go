@@ -50,7 +50,6 @@ func (gen *generator) genFieldMethod(m *protogen.Message) {
 		} else {
 			unhandled = append(unhandled, f)
 		}
-
 	}
 
 	if len(fields) > 0 {

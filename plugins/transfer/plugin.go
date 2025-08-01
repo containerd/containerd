@@ -28,17 +28,17 @@ import (
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata"
+
+	// Load packages with type registrations
+	_ "github.com/containerd/containerd/v2/core/transfer/archive"
+	_ "github.com/containerd/containerd/v2/core/transfer/image"
 	"github.com/containerd/containerd/v2/core/transfer/local"
+	_ "github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
-
-	// Load packages with type registrations
-	_ "github.com/containerd/containerd/v2/core/transfer/archive"
-	_ "github.com/containerd/containerd/v2/core/transfer/image"
-	_ "github.com/containerd/containerd/v2/core/transfer/registry"
 )
 
 // Register local transfer service plugin

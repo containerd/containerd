@@ -27,9 +27,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/log"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/v2/core/snapshots"
 )
 
 // Transactor is used to finalize an active transaction.
@@ -100,7 +101,7 @@ type transactionKey struct{}
 func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error) {
 	ms.dbL.Lock()
 	if ms.db == nil {
-		db, err := bolt.Open(ms.dbfile, 0600, &ms.opts)
+		db, err := bolt.Open(ms.dbfile, 0o600, &ms.opts)
 		if err != nil {
 			ms.dbL.Unlock()
 			return ctx, nil, fmt.Errorf("failed to open database file: %w", err)

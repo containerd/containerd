@@ -42,11 +42,12 @@ import (
 	"net"
 	"strings"
 
+	"github.com/containerd/log"
+
 	executil "github.com/containerd/containerd/v2/internal/cri/executil"
 	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 	"github.com/containerd/containerd/v2/internal/cri/setutils"
 	"github.com/containerd/containerd/v2/internal/lazyregexp"
-	"github.com/containerd/log"
 )
 
 var (
