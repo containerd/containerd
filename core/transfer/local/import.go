@@ -137,14 +137,15 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 			return err
 		}
 
-		if tops.Progress != nil {
-			for _, img := range imgs {
-				tops.Progress(transfer.Progress{
-					Event: "saved",
-					Name:  img.Name,
-					Desc:  &desc,
-				})
-			}
+		if tops.Progress == nil {
+			continue
+		}
+		for _, img := range imgs {
+			tops.Progress(transfer.Progress{
+				Event: "saved",
+				Name:  img.Name,
+				Desc:  &desc,
+			})
 		}
 	}
 

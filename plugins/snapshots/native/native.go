@@ -226,17 +226,19 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			return nil, fmt.Errorf("failed to chmod %s to 0755: %w", td, err)
 		}
 		defer func() {
-			if err != nil {
-				if td != "" {
-					if err1 := os.RemoveAll(td); err1 != nil {
-						err = fmt.Errorf("remove failed: %v: %w", err1, err)
-					}
+			if err == nil {
+				return
+			}
+			if td != "" {
+				if err1 := os.RemoveAll(td); err1 != nil {
+					err = fmt.Errorf("remove failed: %v: %w", err1, err)
 				}
-				if path != "" {
-					if err1 := os.RemoveAll(path); err1 != nil {
-						err = fmt.Errorf("failed to remove path: %v: %w", err1, err)
-					}
-				}
+			}
+			if path == "" {
+				return
+			}
+			if err1 := os.RemoveAll(path); err1 != nil {
+				err = fmt.Errorf("failed to remove path: %v: %w", err1, err)
 			}
 		}()
 	}

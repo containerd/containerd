@@ -76,15 +76,16 @@ func WithTaskCheckpoint(im Image) NewTaskOpts {
 			return err
 		}
 		for _, m := range index.Manifests {
-			if m.MediaType == images.MediaTypeContainerd1Checkpoint {
-				info.Checkpoint = &types.Descriptor{
-					MediaType:   m.MediaType,
-					Size:        m.Size,
-					Digest:      m.Digest.String(),
-					Annotations: m.Annotations,
-				}
-				return nil
+			if m.MediaType != images.MediaTypeContainerd1Checkpoint {
+				continue
 			}
+			info.Checkpoint = &types.Descriptor{
+				MediaType:   m.MediaType,
+				Size:        m.Size,
+				Digest:      m.Digest.String(),
+				Annotations: m.Annotations,
+			}
+			return nil
 		}
 		return fmt.Errorf("checkpoint not found in index %s", id)
 	}

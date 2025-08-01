@@ -52,10 +52,12 @@ func (m *ShimManager) LoadExistingShims(ctx context.Context, stateDir string, ro
 			log.G(ctx).WithField("namespace", ns).WithError(err).Error("loading tasks in namespace")
 			continue
 		}
-		if err := m.cleanupWorkDirs(namespaces.WithNamespace(ctx, ns), rootDir); err != nil {
-			log.G(ctx).WithField("namespace", ns).WithError(err).Error("cleanup working directory in namespace")
+		err := m.cleanupWorkDirs(namespaces.WithNamespace(ctx, ns), rootDir)
+		if err == nil {
 			continue
 		}
+		log.G(ctx).WithField("namespace", ns).WithError(err).Error("cleanup working directory in namespace")
+		continue
 	}
 	return nil
 }
@@ -105,11 +107,13 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 			bundle.Delete()
 			continue
 		}
-		if err := m.loadShim(ctx, bundle); err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
-			bundle.Delete()
+		err = m.loadShim(ctx, bundle)
+		if err == nil {
 			continue
 		}
+		log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
+		bundle.Delete()
+		continue
 
 	}
 	return nil
@@ -253,11 +257,13 @@ func (m *ShimManager) cleanupWorkDirs(ctx context.Context, rootDir string) error
 		// if the task was not loaded, cleanup and empty working directory
 		// this can happen on a reboot where /run for the bundle state is cleaned up
 		// but that persistent working dir is left
-		if _, err := m.shims.Get(ctx, dir); err != nil {
-			path := filepath.Join(rootDir, ns, dir)
-			if err := os.RemoveAll(path); err != nil {
-				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
-			}
+		_, err := m.shims.Get(ctx, dir)
+		if err == nil {
+			continue
+		}
+		path := filepath.Join(rootDir, ns, dir)
+		if err := os.RemoveAll(path); err != nil {
+			log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
 		}
 	}
 	return nil

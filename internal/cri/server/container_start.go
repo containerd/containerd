@@ -143,13 +143,14 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		}
 
 		defer func() {
-			if retErr != nil {
-				deferCtx, deferCancel := ctrdutil.DeferContext()
-				defer deferCancel()
-				err = c.nri.StopContainer(deferCtx, &sandbox, &cntr)
-				if err != nil {
-					log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
-				}
+			if retErr == nil {
+				return
+			}
+			deferCtx, deferCancel := ctrdutil.DeferContext()
+			defer deferCancel()
+			err = c.nri.StopContainer(deferCtx, &sandbox, &cntr)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
 			}
 		}()
 		// It handles the TaskExit event and update container state after this.
@@ -219,13 +220,14 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, fmt.Errorf("failed to create containerd task: %w", err)
 	}
 	defer func() {
-		if retErr != nil {
-			deferCtx, deferCancel := ctrdutil.DeferContext()
-			defer deferCancel()
-			// It's possible that task is deleted by event monitor.
-			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
-				log.G(ctx).WithError(err).Errorf("Failed to delete containerd task %q", id)
-			}
+		if retErr == nil {
+			return
+		}
+		deferCtx, deferCancel := ctrdutil.DeferContext()
+		defer deferCancel()
+		// It's possible that task is deleted by event monitor.
+		if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+			log.G(ctx).WithError(err).Errorf("Failed to delete containerd task %q", id)
 		}
 	}()
 
@@ -238,13 +240,14 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	defer c.nri.BlockPluginSync().Unblock()
 
 	defer func() {
-		if retErr != nil {
-			deferCtx, deferCancel := ctrdutil.DeferContext()
-			defer deferCancel()
-			err = c.nri.StopContainer(deferCtx, &sandbox, &cntr)
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
-			}
+		if retErr == nil {
+			return
+		}
+		deferCtx, deferCancel := ctrdutil.DeferContext()
+		defer deferCancel()
+		err = c.nri.StopContainer(deferCtx, &sandbox, &cntr)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
 		}
 	}()
 
