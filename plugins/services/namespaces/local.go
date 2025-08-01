@@ -93,7 +93,7 @@ func (l *local) Get(ctx context.Context, req *api.GetNamespaceRequest, _ ...grpc
 	})
 }
 
-func (l *local) List(ctx context.Context, req *api.ListNamespacesRequest, _ ...grpc.CallOption) (*api.ListNamespacesResponse, error) {
+func (l *local) List(ctx context.Context, _ *api.ListNamespacesRequest, _ ...grpc.CallOption) (*api.ListNamespacesResponse, error) {
 	var resp api.ListNamespacesResponse
 
 	return &resp, l.withStoreView(ctx, func(ctx context.Context, store namespaces.Store) error {

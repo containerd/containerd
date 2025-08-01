@@ -122,7 +122,7 @@ func (idx *TruncIndex) Get(s string) (string, error) {
 	var (
 		id string
 	)
-	subTreeVisitFunc := func(prefix patricia.Prefix, item patricia.Item) error {
+	subTreeVisitFunc := func(prefix patricia.Prefix, _ patricia.Item) error {
 		if id != "" {
 			// we haven't found the ID if there are two or more IDs
 			id = ""
@@ -150,7 +150,7 @@ func (idx *TruncIndex) Get(s string) (string, error) {
 func (idx *TruncIndex) Iterate(handler func(id string)) {
 	idx.Lock()
 	defer idx.Unlock()
-	idx.trie.Visit(func(prefix patricia.Prefix, item patricia.Item) error {
+	idx.trie.Visit(func(prefix patricia.Prefix, _ patricia.Item) error {
 		handler(string(prefix))
 		return nil
 	})
