@@ -17,6 +17,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -57,7 +58,7 @@ func handle(wr bool, tags, p string) (retErr error) {
 	if wr {
 		f, err := os.Create(p + ".tmp")
 		if err != nil {
-			return fmt.Errorf("error creatign temp file")
+			return errors.New("error creating temp file")
 		}
 		defer func() {
 			if retErr != nil {
@@ -76,7 +77,7 @@ func handle(wr bool, tags, p string) (retErr error) {
 
 	_, err = io.Copy(out, rdr)
 	if err != nil {
-		return fmt.Errorf("error copying original content to temp file")
+		return errors.New("error copying original content to temp file")
 	}
 
 	rdr.Close()

@@ -17,6 +17,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -99,7 +100,7 @@ func (syncer *cniNetConfSyncer) syncLoop() error {
 
 			// If the confDir is removed, stop watching.
 			if event.Name == syncer.confDir && (event.Has(fsnotify.Rename) || event.Has(fsnotify.Remove)) {
-				return fmt.Errorf("cni conf dir is removed, stop watching")
+				return errors.New("cni conf dir is removed, stop watching")
 			}
 
 			lerr := syncer.netPlugin.Load(syncer.loadOpts...)

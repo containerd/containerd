@@ -58,7 +58,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 		return nil, err
 	}
 	if protocol != unixProtocol {
-		return nil, fmt.Errorf("only support unix socket endpoint")
+		return nil, errors.New("only support unix socket endpoint")
 	}
 
 	// Unlink to cleanup the previous socket file.

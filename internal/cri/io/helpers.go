@@ -18,6 +18,7 @@ package io
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -219,13 +220,13 @@ func openStream(ctx context.Context, urlStr string) (streamingapi.Stream, error)
 	// or grpc+vsock://<cid>:<port>, we should get the protocol from the url first.
 	protocol, scheme, ok := strings.Cut(u.Scheme, "+")
 	if !ok {
-		return nil, fmt.Errorf("the scheme of sandbox address should be in " +
+		return nil, errors.New("the scheme of sandbox address should be in " +
 			" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
 	}
 
 	id := u.Query().Get("streaming_id")
 	if id == "" {
-		return nil, fmt.Errorf("no stream id in url queries")
+		return nil, errors.New("no stream id in url queries")
 	}
 	realAddress := fmt.Sprintf("%s://%s/%s", scheme, u.Host, u.Path)
 	conn, err := shim.AnonReconnectDialer(realAddress, 100*time.Second)
@@ -257,6 +258,6 @@ func openStream(ctx context.Context, urlStr string) (streamingapi.Stream, error)
 		}
 		return stream, nil
 	default:
-		return nil, fmt.Errorf("protocol not supported")
+		return nil, errors.New("protocol not supported")
 	}
 }

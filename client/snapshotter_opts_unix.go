@@ -21,6 +21,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -110,7 +111,7 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	}
 
 	if _, err := rsn.IDMap.RootPair(); err != nil {
-		return "", fmt.Errorf("container UID/GID mapping entries of 0 are required but not found")
+		return "", errors.New("container UID/GID mapping entries of 0 are required but not found")
 	}
 
 	usernsID, err := rsn.ID()

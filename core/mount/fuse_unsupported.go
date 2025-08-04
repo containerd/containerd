@@ -18,7 +18,7 @@
 
 package mount
 
-import "fmt"
+import "errors"
 
 func isFUSE(dir string) bool {
 	return false
@@ -26,5 +26,5 @@ func isFUSE(dir string) bool {
 
 // unmountFUSE is not implemented on this platform
 func unmountFUSE(target string) error {
-	return fmt.Errorf("FUSE is not supported on this platform")
+	return errors.New("FUSE is not supported on this platform")
 }

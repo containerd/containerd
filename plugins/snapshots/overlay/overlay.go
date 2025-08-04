@@ -20,6 +20,7 @@ package overlay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -504,7 +505,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				}
 				stat, ok := st.Sys().(*syscall.Stat_t)
 				if !ok {
-					return fmt.Errorf("incompatible types after stat call: *syscall.Stat_t expected")
+					return errors.New("incompatible types after stat call: *syscall.Stat_t expected")
 				}
 				mappedUID = int(stat.Uid)
 				mappedGID = int(stat.Gid)
