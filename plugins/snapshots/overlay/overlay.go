@@ -295,11 +295,21 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 }
 
 func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+	var base snapshots.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return err
+		}
+	}
 	return o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
 		// grab the existing id
-		id, _, _, err := storage.GetInfo(ctx, key)
+		id, info, _, err := storage.GetInfo(ctx, key)
 		if err != nil {
 			return err
+		}
+
+		if info.Parent != "" && base.Parent != "" && base.Parent != info.Parent {
+			return fmt.Errorf("unabled to change parent of snapshot %q from %q to %q", key, info.Parent, base.Parent)
 		}
 
 		usage, err := fs.DiskUsage(ctx, o.upperPath(id))
