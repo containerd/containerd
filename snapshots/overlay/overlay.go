@@ -543,6 +543,7 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 	if s.Kind == snapshots.KindActive {
 		options = append(options,
 			fmt.Sprintf("workdir=%s", o.workPath(s.ID)),
+			//here to modify upperdir path
 			fmt.Sprintf("upperdir=%s", o.upperPath(s.ID)),
 		)
 	} else if len(s.ParentIDs) == 1 {

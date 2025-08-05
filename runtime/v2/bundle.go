@@ -80,6 +80,7 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 	if err := os.MkdirAll(filepath.Dir(work), 0711); err != nil {
 		return nil, err
 	}
+	//to mount
 	rootfs := filepath.Join(b.Path, "rootfs")
 	if err := os.MkdirAll(rootfs, 0711); err != nil {
 		return nil, err
@@ -117,6 +118,7 @@ type Bundle struct {
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
 	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
+	//to umount
 	rootfs := filepath.Join(b.Path, "rootfs")
 	if err := mount.UnmountAll(rootfs, 0); err != nil {
 		return fmt.Errorf("unmount rootfs %s: %w", rootfs, err)
