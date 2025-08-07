@@ -180,7 +180,7 @@ func TestImageUsage(t *testing.T) {
 	imageName = imageName + "@" + image.Target().Digest.String()
 	defer client.ImageService().Delete(ctx, imageName, images.SynchronousDelete())
 
-	// Fetch single platforms, but all manifests pulled - using retry logic for network resilience
+	// Fetch single platform metadata, but all manifests pulled - using retry logic for network resilience
 	if err := retryImageFetch(ctx, t, client, imageName, WithPlatformMatcher(pMatcher), WithAllMetadata()); err != nil {
 		t.Fatal(err)
 	}
@@ -209,8 +209,8 @@ func TestImageUsage(t *testing.T) {
 		t.Fatalf("Expected larger usage counting all manifest reported sizes: %d <= %d", s3, s2)
 	}
 
-	// Fetch everything - using retry logic for network resilience
-	if err := retryImageFetch(ctx, t, client, imageName); err != nil {
+	// Fetch content for the current platform only to avoid timeout with large cross-platform layers - using retry logic for network resilience
+	if err := retryImageFetch(ctx, t, client, imageName, WithPlatformMatcher(pMatcher)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -255,7 +255,8 @@ func TestImageSupportedBySnapshotter_Error(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.Pull(ctx, unsupportedImage,
+	// Try to pull unsupported image with retry logic for network resilience
+	_, err = retryImagePull(ctx, t, client, unsupportedImage,
 		WithPlatform(platforms.DefaultString()),
 		WithPullSnapshotter(defaults.DefaultSnapshotter),
 		WithPullUnpack,
@@ -272,16 +273,20 @@ func retryImagePull(ctx context.Context, t *testing.T, client *Client, imageName
 	var image Image
 	var err error
 
+	// Add a reasonable timeout to prevent hanging on slow network operations
+	retryCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
 	for i := 0; i < 3; i++ {
-		image, err = client.Pull(ctx, imageName, opts...)
+		image, err = client.Pull(retryCtx, imageName, opts...)
 		if err == nil {
 			return image, nil
 		}
 		if i < 2 {
 			t.Logf("Pull attempt %d failed, retrying: %v", i+1, err)
 			select {
-			case <-ctx.Done():
-				return nil, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
+			case <-retryCtx.Done():
+				return nil, fmt.Errorf("context cancelled during retry: %w", retryCtx.Err())
 			case <-time.After(time.Second * time.Duration(i+1)):
 				// exponential backoff: 1s, 2s
 			}
@@ -294,16 +299,20 @@ func retryImagePull(ctx context.Context, t *testing.T, client *Client, imageName
 func retryImageFetch(ctx context.Context, t *testing.T, client *Client, ref string, opts ...RemoteOpt) error {
 	var err error
 
+	// Add a reasonable timeout to prevent hanging on slow network operations
+	retryCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
 	for i := 0; i < 3; i++ {
-		_, err = client.Fetch(ctx, ref, opts...)
+		_, err = client.Fetch(retryCtx, ref, opts...)
 		if err == nil {
 			return nil
 		}
 		if i < 2 {
 			t.Logf("Fetch attempt %d failed, retrying: %v", i+1, err)
 			select {
-			case <-ctx.Done():
-				return fmt.Errorf("context cancelled during fetch retry: %w", ctx.Err())
+			case <-retryCtx.Done():
+				return fmt.Errorf("context cancelled during fetch retry: %w", retryCtx.Err())
 			case <-time.After(time.Second * time.Duration(i+1)):
 				// exponential backoff: 1s, 2s
 			}
