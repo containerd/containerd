@@ -209,8 +209,8 @@ func TestImageUsage(t *testing.T) {
 		t.Fatalf("Expected larger usage counting all manifest reported sizes: %d <= %d", s3, s2)
 	}
 
-	// Fetch content for the current platform only to avoid timeout with large cross-platform layers - using retry logic for network resilience
-	if err := retryImageFetch(ctx, t, client, imageName, WithPlatformMatcher(pMatcher)); err != nil {
+	// Fetch everything - using retry logic for network resilience
+	if err := retryImageFetch(ctx, t, client, imageName); err != nil {
 		t.Fatal(err)
 	}
 
@@ -255,8 +255,7 @@ func TestImageSupportedBySnapshotter_Error(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Try to pull unsupported image with retry logic for network resilience
-	_, err = retryImagePull(ctx, t, client, unsupportedImage,
+	_, err = client.Pull(ctx, unsupportedImage,
 		WithPlatform(platforms.DefaultString()),
 		WithPullSnapshotter(defaults.DefaultSnapshotter),
 		WithPullUnpack,
@@ -274,7 +273,7 @@ func retryImagePull(ctx context.Context, t *testing.T, client *Client, imageName
 	var err error
 
 	// Add a reasonable timeout to prevent hanging on slow network operations
-	retryCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	retryCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	for i := 0; i < 3; i++ {
@@ -300,7 +299,7 @@ func retryImageFetch(ctx context.Context, t *testing.T, client *Client, ref stri
 	var err error
 
 	// Add a reasonable timeout to prevent hanging on slow network operations
-	retryCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	retryCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	for i := 0; i < 3; i++ {
