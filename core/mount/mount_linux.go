@@ -266,8 +266,12 @@ func doPrepareIDMappedOverlay(tmpDir string, lowerDirs []string, usernsFd int) (
 		return nil, nil, err
 	}
 	cleanMount := func() {
-		if err := unix.Unmount(tempRemountsLocation, 0); err != nil {
-			log.L.WithError(err).Warnf("failed to unmount idmapped directory %s", tempRemountsLocation)
+		// Use the Unmount helper that does retries because there can be easily an open fd
+		// to the idmapped directory and when containerd forks to create a userns fd (maybe
+		// for another container), it will make the mount busy for a few ms.
+		err := Unmount(tempRemountsLocation, 0)
+		if err != nil {
+			log.L.WithError(err).Warnf("failed to unmount idmapped directory %s: %v", tempRemountsLocation, err)
 		}
 	}
 	defer func() {
