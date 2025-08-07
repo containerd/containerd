@@ -272,8 +272,8 @@ func retryImagePull(ctx context.Context, t *testing.T, client *Client, imageName
 	var image Image
 	var err error
 
-	// Add a reasonable timeout to prevent hanging on slow network operations
-	retryCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	// Use a shorter timeout to allow multiple retry attempts within the overall test timeout
+	retryCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 
 	for i := 0; i < 3; i++ {
@@ -298,8 +298,8 @@ func retryImagePull(ctx context.Context, t *testing.T, client *Client, imageName
 func retryImageFetch(ctx context.Context, t *testing.T, client *Client, ref string, opts ...RemoteOpt) error {
 	var err error
 
-	// Add a reasonable timeout to prevent hanging on slow network operations
-	retryCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	// Use a shorter timeout to allow multiple retry attempts within the overall test timeout
+	retryCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 
 	for i := 0; i < 3; i++ {
