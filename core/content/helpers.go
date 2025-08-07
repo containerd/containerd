@@ -130,11 +130,11 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 // is locked until the reference is available or returns an error.
 func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, error) {
 	var (
-		cw    Writer
-		err   error
-		retry = 64
+		cw         Writer
+		err        error
+		retry      = 64
 		maxRetries = 10
-		attempt = 0
+		attempt    = 0
 	)
 	for attempt < maxRetries {
 		cw, err = cs.Writer(ctx, opts...)
@@ -151,13 +151,13 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 
 			// Exponential backoff with jitter and cap
 			baseDelay := time.Millisecond * time.Duration(retry)
-			jitter := time.Millisecond * time.Duration(randutil.Intn(int(retry/2)))
+			jitter := time.Millisecond * time.Duration(randutil.Intn(retry/2))
 			delay := baseDelay + jitter
-			
+
 			log.G(ctx).WithFields(log.Fields{
 				"attempt": attempt,
-				"delay": delay,
-				"error": err.Error(),
+				"delay":   delay,
+				"error":   err.Error(),
 			}).Debug("content writer locked, retrying")
 
 			select {
