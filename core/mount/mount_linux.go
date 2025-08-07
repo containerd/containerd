@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/containerd/log"
 	"github.com/moby/sys/userns"
@@ -266,9 +267,15 @@ func doPrepareIDMappedOverlay(tmpDir string, lowerDirs []string, usernsFd int) (
 		return nil, nil, err
 	}
 	cleanMount := func() {
-		if err := unix.Unmount(tempRemountsLocation, 0); err != nil {
-			log.L.WithError(err).Warnf("failed to unmount idmapped directory %s", tempRemountsLocation)
+		for retry := 0; retry < 5; retry++ {
+			err := unix.Unmount(tempRemountsLocation, 0)
+			if err != nil {
+				time.Sleep(time.Millisecond * 100)
+				continue
+			}
+			return
 		}
+		log.L.WithError(err).Warnf("failed to unmount idmapped directory %s", tempRemountsLocation)
 	}
 	defer func() {
 		if retErr != nil {
