@@ -132,28 +132,43 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 	var (
 		cw    Writer
 		err   error
-		retry = 16
+		retry = 64
+		maxRetries = 10
+		attempt = 0
 	)
-	for {
+	for attempt < maxRetries {
 		cw, err = cs.Writer(ctx, opts...)
 		if err != nil {
 			if !errdefs.IsUnavailable(err) {
 				return nil, err
 			}
 
-			// TODO: Check status to determine if the writer is active,
-			// continue waiting while active, otherwise return lock
-			// error or abort. Requires asserting for an ingest manager
+			attempt++
+			if attempt >= maxRetries {
+				log.G(ctx).WithField("attempt", attempt).WithError(err).Error("content writer max retries exceeded")
+				return nil, err
+			}
+
+			// Exponential backoff with jitter and cap
+			baseDelay := time.Millisecond * time.Duration(retry)
+			jitter := time.Millisecond * time.Duration(randutil.Intn(int(retry/2)))
+			delay := baseDelay + jitter
+			
+			log.G(ctx).WithFields(log.Fields{
+				"attempt": attempt,
+				"delay": delay,
+				"error": err.Error(),
+			}).Debug("content writer locked, retrying")
 
 			select {
-			case <-time.After(time.Millisecond * time.Duration(randutil.Intn(retry))):
+			case <-time.After(delay):
 				if retry < 2048 {
 					retry = retry << 1
 				}
 				continue
 			case <-ctx.Done():
-				// Propagate lock error
-				return nil, err
+				// Propagate context cancellation
+				return nil, ctx.Err()
 			}
 
 		}
