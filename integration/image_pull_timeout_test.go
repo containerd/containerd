@@ -88,7 +88,11 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T, useLocal bool) {
 	delayDuration := 2 * defaultImagePullProgressTimeout
 	cli := buildLocalContainerdClient(t, tmpDir, tweakContentInitFnWithDelayer(delayDuration))
 
-	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{}, useLocal)
+	// Use a longer timeout for slow commit writer tests to accommodate both
+	// the intentional delay and our improved retry logic
+	registryCfg := criconfig.Registry{}
+	extendedTimeout := 3 * delayDuration // 30 seconds to handle delays + retries
+	criService, err := initLocalCRIImageServiceWithTimeout(cli, tmpDir, registryCfg, useLocal, extendedTimeout)
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
@@ -501,17 +505,14 @@ func (l *ioCopyLimiter) limitedCopy(ctx context.Context, dst io.Writer, src io.R
 	return nil
 }
 
-// initLocalCRIImageService uses containerd.Client to init CRI plugin.
-//
-// NOTE: We don't need to start the CRI plugin here because we just need the
-// ImageService API.
-func initLocalCRIImageService(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry, useLocalPull bool) (criserver.ImageService, error) {
+// initLocalCRIImageServiceWithTimeout uses containerd.Client to init CRI plugin with custom timeout.
+func initLocalCRIImageServiceWithTimeout(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry, useLocalPull bool, timeout time.Duration) (criserver.ImageService, error) {
 	containerdRootDir := filepath.Join(tmpDir, "root")
 
 	cfg := criconfig.ImageConfig{
 		Snapshotter:              defaults.DefaultSnapshotter,
 		Registry:                 registryCfg,
-		ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
+		ImagePullProgressTimeout: timeout.String(),
 		StatsCollectPeriod:       10,
 		UseLocalImagePull:        useLocalPull,
 	}
@@ -526,4 +527,12 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 		Client:           client,
 		Transferrer:      client.TransferService(),
 	})
+}
+
+// initLocalCRIImageService uses containerd.Client to init CRI plugin.
+//
+// NOTE: We don't need to start the CRI plugin here because we just need the
+// ImageService API.
+func initLocalCRIImageService(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry, useLocalPull bool) (criserver.ImageService, error) {
+	return initLocalCRIImageServiceWithTimeout(client, tmpDir, registryCfg, useLocalPull, defaultImagePullProgressTimeout)
 }
