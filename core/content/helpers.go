@@ -133,7 +133,7 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 		cw         Writer
 		err        error
 		retry      = 64
-		maxRetries = 10
+		maxRetries = 15 // Increased to allow for longer legitimate waits (~30 seconds total)
 		attempt    = 0
 	)
 	for attempt < maxRetries {
@@ -162,7 +162,7 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 
 			select {
 			case <-time.After(delay):
-				if retry < 2048 {
+				if retry < 4096 { // Increased cap from 2048 to 4096 for more patient retries
 					retry = retry << 1
 				}
 				continue
