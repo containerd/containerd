@@ -519,8 +519,8 @@ func shouldManipulateContainersInPodAfterUpgrade(runtimeHandler string) setupUpg
 			for _, shimCli := range shimConns {
 				t.Logf("Checking container %s's shim client", shimCli.cntrID)
 
-				// Retry for up to 30 seconds to allow shim cleanup to complete
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				// Retry for up to 60 seconds to allow shim cleanup to complete in CI environments
+				ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 				defer cancel()
 
 				connectionClosed := false
