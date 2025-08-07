@@ -32,6 +32,8 @@ type CimFsWriter struct {
 	activeStream winapi.StreamHandle
 	// amount of bytes that can be written to the activeStream.
 	activeLeft uint64
+	// if true the CIM will be sealed after the writer is closed.
+	sealOnClose bool
 }
 
 // Create creates a new cim image. The CimFsWriter returned can then be used to do
@@ -63,39 +65,110 @@ func Create(imagePath string, oldFSName string, newFSName string) (_ *CimFsWrite
 	return &CimFsWriter{handle: handle, name: filepath.Join(imagePath, fsName)}, nil
 }
 
-// Create creates a new block CIM and opens it for writing. The CimFsWriter
-// returned can then be used to add/remove files to/from this CIM.
-func CreateBlockCIM(blockPath, name string, blockType BlockCIMType) (_ *CimFsWriter, err error) {
-	if !IsBlockCimSupported() {
-		return nil, fmt.Errorf("block CIM not supported on this OS version")
+// blockCIMConfig represents options for creating or merging block CIMs
+type blockCIMConfig struct {
+	// ensures that the generted CIM is identical every time when created from the same source data.
+	// This is mostly required for image layers. Dissabled by default.
+	consistentCIM bool
+	// enables data integrity checking, which means the CIM will be verified and sealed on close.
+	// This is useful for ensuring that the CIM is tamper-proof. Disabled by default.
+	dataIntegrity bool
+}
+
+// BlockCIMOpt is a function type for configuring block CIM creation options
+type BlockCIMOpt func(*blockCIMConfig) error
+
+// enabled consistent CIM creation, this ensures that CIMs created from identical source data  will always be identical (i.e. SHA256 digest of the CIM will remain same)
+func WithConsistentCIM() BlockCIMOpt {
+	return func(opts *blockCIMConfig) error {
+		opts.consistentCIM = true
+		return nil
 	}
-	if blockPath == "" || name == "" {
+}
+
+// WithDataIntegrity enables data integrity checking (verified CIM with sealing on close)
+func WithDataIntegrity() BlockCIMOpt {
+	return func(opts *blockCIMConfig) error {
+		opts.dataIntegrity = true
+		return nil
+	}
+}
+
+// CreateBlockCIMWithOptions creates a new block CIM with the specified options and opens it for writing.
+// The CimFsWriter returned can then be used to add/remove files to/from this CIM.
+func CreateBlockCIMWithOptions(ctx context.Context, bCIM *BlockCIM, options ...BlockCIMOpt) (_ *CimFsWriter, err error) {
+	// Apply default options
+	config := &blockCIMConfig{}
+
+	// Apply provided options
+	for _, option := range options {
+		if err = option(config); err != nil {
+			return nil, err
+		}
+	}
+
+	// Validate options
+	if bCIM.BlockPath == "" || bCIM.CimName == "" {
 		return nil, fmt.Errorf("both blockPath & name must be non empty: %w", os.ErrInvalid)
 	}
 
-	// When creating block CIMs we always want them to be consistent CIMs i.e a CIMs
-	// created from the same layer tar will always be identical.
-	var createFlags uint32 = CimCreateFlagConsistentCim
-	switch blockType {
+	if bCIM.Type == BlockCIMTypeNone {
+		return nil, fmt.Errorf("invalid block CIM type `%d`: %w", bCIM.Type, os.ErrInvalid)
+	}
+
+	// Check OS support
+	if !IsBlockCimSupported() {
+		return nil, fmt.Errorf("block CIM not supported on this OS version")
+	}
+
+	if config.dataIntegrity && !IsVerifiedCimSupported() {
+		return nil, fmt.Errorf("verified CIMs are not supported on this OS version")
+	}
+
+	// Build create flags based on options
+	var createFlags uint32
+	if config.consistentCIM {
+		createFlags |= CimCreateFlagConsistentCim
+	}
+	if config.dataIntegrity {
+		createFlags |= CimCreateFlagVerifiedCim
+	}
+
+	switch bCIM.Type {
 	case BlockCIMTypeDevice:
 		createFlags |= CimCreateFlagBlockDeviceCim
 	case BlockCIMTypeSingleFile:
 		createFlags |= CimCreateFlagSingleFileCim
 	default:
-		return nil, fmt.Errorf("invalid block CIM type `%d`: %w", blockType, os.ErrInvalid)
+		return nil, fmt.Errorf("invalid block CIM type `%d`: %w", bCIM.Type, os.ErrInvalid)
 	}
 
 	var newNameUTF16 *uint16
-	newNameUTF16, err = windows.UTF16PtrFromString(name)
+	newNameUTF16, err = windows.UTF16PtrFromString(bCIM.CimName)
 	if err != nil {
 		return nil, err
 	}
 
 	var handle winapi.FsHandle
-	if err := winapi.CimCreateImage2(blockPath, createFlags, nil, newNameUTF16, &handle); err != nil {
-		return nil, fmt.Errorf("failed to create block CIM at path %s,%s: %w", blockPath, name, err)
+	if err := winapi.CimCreateImage2(bCIM.BlockPath, createFlags, nil, newNameUTF16, &handle); err != nil {
+		return nil, fmt.Errorf("failed to create block CIM at path %s,%s: %w", bCIM.BlockPath, bCIM.CimName, err)
 	}
-	return &CimFsWriter{handle: handle, name: name}, nil
+
+	return &CimFsWriter{
+		handle:      handle,
+		name:        filepath.Join(bCIM.BlockPath, bCIM.CimName),
+		sealOnClose: config.dataIntegrity, // Seal on close if data integrity is enabled
+	}, nil
+}
+
+// Create creates a new block CIM and opens it for writing. The CimFsWriter
+// returned can then be used to add/remove files to/from this CIM.
+func CreateBlockCIM(blockPath, name string, blockType BlockCIMType) (_ *CimFsWriter, err error) {
+	return CreateBlockCIMWithOptions(context.Background(), &BlockCIM{
+		Type:      blockType,
+		BlockPath: blockPath,
+		CimName:   name,
+	}, WithConsistentCIM())
 }
 
 // CreateAlternateStream creates alternate stream of given size at the given path inside the cim. This will
@@ -268,7 +341,15 @@ func (c *CimFsWriter) Close() (err error) {
 	}
 	err = winapi.CimCloseImage(c.handle)
 	c.handle = 0
-	return err
+	if err != nil {
+		return &OpError{Cim: c.name, Op: "close", Err: err}
+	}
+	if c.sealOnClose {
+		if err = sealBlockCIM(filepath.Dir(c.name)); err != nil {
+			return &OpError{Cim: c.name, Op: "seal", Err: err}
+		}
+	}
+	return nil
 }
 
 // DestroyCim finds out the region files, object files of this cim and then delete the
@@ -351,30 +432,44 @@ func GetCimUsage(ctx context.Context, cimPath string) (uint64, error) {
 // considered the base CIM. (i.e file with the same path in CIM at index 0 will shadow
 // files with the same path at all other CIMs) When mounting this merged CIM the source
 // CIMs MUST be provided in the exact same order.
-func MergeBlockCIMs(mergedCIM *BlockCIM, sourceCIMs []*BlockCIM) (err error) {
+func MergeBlockCIMsWithOpts(ctx context.Context, mergedCIM *BlockCIM, sourceCIMs []*BlockCIM, opts ...BlockCIMOpt) (err error) {
 	if !IsMergedCimSupported() {
 		return fmt.Errorf("merged CIMs aren't supported on this OS version")
 	} else if len(sourceCIMs) < 2 {
 		return fmt.Errorf("need at least 2 source CIMs, got %d: %w", len(sourceCIMs), os.ErrInvalid)
 	}
 
-	var mergeFlag uint32
-	switch mergedCIM.Type {
-	case BlockCIMTypeDevice:
-		mergeFlag = CimMergeFlagBlockDevice
-	case BlockCIMTypeSingleFile:
-		mergeFlag = CimMergeFlagSingleFile
-	default:
-		return fmt.Errorf("invalid block CIM type `%d`: %w", mergedCIM.Type, os.ErrInvalid)
+	// Apply default options
+	config := &blockCIMConfig{}
+
+	// Apply provided options
+	for _, opt := range opts {
+		if err = opt(config); err != nil {
+			return err
+		}
 	}
 
 	for _, sCIM := range sourceCIMs {
 		if sCIM.Type != mergedCIM.Type {
-			return fmt.Errorf("source CIM (%s) type doesn't match with merged CIM type: %w", sCIM.String(), os.ErrInvalid)
+			return fmt.Errorf("source CIM (%s) type MUST match with merged CIM type: %w", sCIM.String(), os.ErrInvalid)
 		}
 	}
 
-	cim, err := CreateBlockCIM(mergedCIM.BlockPath, mergedCIM.CimName, mergedCIM.Type)
+	var mergeFlags uint32
+	switch mergedCIM.Type {
+	case BlockCIMTypeDevice:
+		mergeFlags = CimMergeFlagBlockDevice
+	case BlockCIMTypeSingleFile:
+		mergeFlags = CimMergeFlagSingleFile
+	default:
+		return fmt.Errorf("invalid block CIM type `%d`: %w", mergedCIM.Type, os.ErrInvalid)
+	}
+
+	if config.dataIntegrity {
+		mergeFlags |= CimMergeFlagVerifiedCim
+	}
+
+	cim, err := CreateBlockCIMWithOptions(ctx, mergedCIM, opts...)
 	if err != nil {
 		return fmt.Errorf("create merged CIM: %w", err)
 	}
@@ -389,9 +484,52 @@ func MergeBlockCIMs(mergedCIM *BlockCIM, sourceCIMs []*BlockCIM) (err error) {
 	// most CIM is added last.
 	for _, sCIM := range sourceCIMs {
 		fullPath := filepath.Join(sCIM.BlockPath, sCIM.CimName)
-		if err := winapi.CimAddFsToMergedImage2(cim.handle, fullPath, mergeFlag); err != nil {
+		if err := winapi.CimAddFsToMergedImage2(cim.handle, fullPath, mergeFlags); err != nil {
 			return fmt.Errorf("add cim to merged image: %w", err)
 		}
 	}
 	return nil
+}
+
+// MergeBlockCIMs creates a new merged BlockCIM from the provided source BlockCIMs.  CIM
+// at index 0 is considered to be topmost CIM and the CIM at index `length-1` is
+// considered the base CIM. (i.e file with the same path in CIM at index 0 will shadow
+// files with the same path at all other CIMs) When mounting this merged CIM the source
+// CIMs MUST be provided in the exact same order.
+func MergeBlockCIMs(mergedCIM *BlockCIM, sourceCIMs []*BlockCIM) (err error) {
+	return MergeBlockCIMsWithOpts(context.Background(), mergedCIM, sourceCIMs, WithConsistentCIM())
+}
+
+// sealBlockCIM seals a blockCIM at the given path so that no further modifications are allowed on it. This also writes a
+// root hash in the block header so that in future any reads happening on the CIM can be easily verified against this root hash
+// to detect tampering.
+func sealBlockCIM(blockPath string) error {
+	var hashSize, fixedHeaderSize uint64
+	hashBuf := make([]byte, cimHashSize)
+	if err := winapi.CimSealImage(blockPath, &hashSize, &fixedHeaderSize, &hashBuf[0]); err != nil {
+		return fmt.Errorf("failed to seal block CIM: %w", err)
+	} else if hashSize != cimHashSize {
+		return fmt.Errorf("unexpected cim hash size %d", hashSize)
+	}
+	return nil
+}
+
+// GetVerificationInfo returns the root digest of the given block CIM. This is only
+// applicable for CIMs that are sealed after writing.
+func GetVerificationInfo(blockPath string) ([]byte, error) {
+	var (
+		isSealed        uint32
+		hashSize        uint64
+		signatureSize   uint64
+		fixedHeaderSize uint64
+		hash            = make([]byte, cimHashSize)
+	)
+	if err := winapi.CimGetVerificationInformation(blockPath, &isSealed, &hashSize, &signatureSize, &fixedHeaderSize, &hash[0], nil); err != nil {
+		return nil, fmt.Errorf("failed to get verification info from the CIM: %w", err)
+	} else if hashSize != cimHashSize {
+		return nil, fmt.Errorf("unexpected cim hash size %d", hashSize)
+	} else if isSealed == 0 {
+		return nil, fmt.Errorf("cim is not sealed")
+	}
+	return hash, nil
 }

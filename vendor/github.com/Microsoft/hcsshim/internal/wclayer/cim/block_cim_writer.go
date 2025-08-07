@@ -9,6 +9,7 @@ import (
 
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/internal/log"
+	"github.com/Microsoft/hcsshim/internal/wclayer"
 	"github.com/Microsoft/hcsshim/pkg/cimfs"
 )
 
@@ -26,11 +27,10 @@ type BlockCIMLayerWriter struct {
 
 var _ CIMLayerWriter = &BlockCIMLayerWriter{}
 
-// NewBlockCIMLayerWriter writes the layer files in the block CIM format.
-func NewBlockCIMLayerWriter(ctx context.Context, layer *cimfs.BlockCIM, parentLayers []*cimfs.BlockCIM) (_ *BlockCIMLayerWriter, err error) {
-	if !cimfs.IsBlockCimSupported() {
-		return nil, fmt.Errorf("BlockCIM not supported on this build")
-	} else if layer.Type != cimfs.BlockCIMTypeSingleFile {
+// NewBlockCIMLayerWriterWithOpts returns a writer for writing image layers in the block CIM format. The writer's behavior can be
+// controlled with the supports opts.
+func NewBlockCIMLayerWriterWithOpts(ctx context.Context, layer *cimfs.BlockCIM, parentLayers []*cimfs.BlockCIM, opts ...cimfs.BlockCIMOpt) (_ *BlockCIMLayerWriter, err error) {
+	if layer.Type != cimfs.BlockCIMTypeSingleFile {
 		// we only support writing single file CIMs for now because in layer
 		// writing process we still need to write some files (registry hives)
 		// outside the CIM. We currently use the parent directory of the CIM (i.e
@@ -50,7 +50,10 @@ func NewBlockCIMLayerWriter(ctx context.Context, layer *cimfs.BlockCIM, parentLa
 		parentLayerPaths = append(parentLayerPaths, filepath.Dir(pl.BlockPath))
 	}
 
-	cim, err := cimfs.CreateBlockCIM(layer.BlockPath, layer.CimName, layer.Type)
+	// We always want to write layers with consistent flag
+	bcimOpts := append([]cimfs.BlockCIMOpt{cimfs.WithConsistentCIM()}, opts...)
+
+	cim, err := cimfs.CreateBlockCIMWithOptions(ctx, layer, bcimOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("error in creating a new cim: %w", err)
 	}
@@ -86,9 +89,25 @@ func NewBlockCIMLayerWriter(ctx context.Context, layer *cimfs.BlockCIM, parentLa
 	}, nil
 }
 
+// NewBlockCIMLayerWriter writes the layer files in the block CIM format.
+func NewBlockCIMLayerWriter(ctx context.Context, layer *cimfs.BlockCIM, parentLayers []*cimfs.BlockCIM) (_ *BlockCIMLayerWriter, err error) {
+	return NewBlockCIMLayerWriterWithOpts(ctx, layer, parentLayers)
+}
+
 // Add adds a file to the layer with given metadata.
 func (cw *BlockCIMLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo, fileSize int64, securityDescriptor []byte, extendedAttributes []byte, reparseData []byte) error {
 	cw.addedFiles[name] = struct{}{}
+	if name == wclayer.UtilityVMPath && len(cw.parentLayers) > 0 {
+		// If there are UtilityVM files in non base layers, we will have to merge
+		// those files with the parent layer UtilityVM files - either during image
+		// pull or at runtime (i.e when starting the UVM). In order to merge at image pull time, we will have
+		// to read parent layer block CIMs and copy all the UtilityVM files from
+		// those CIMs into this block CIM one by one i.e effectively merge all
+		// parent layer UtilityVM files in this layer. Or we will need to be able
+		// to boot the UtilityVM with merged block CIMs. None of these options are
+		// implemented yet so error out if we see that.
+		return fmt.Errorf("UtilityVM files in non base layers is not supported for block CIMs")
+	}
 	return cw.cimLayerWriter.Add(name, fileInfo, fileSize, securityDescriptor, extendedAttributes, reparseData)
 }
 

@@ -64,6 +64,12 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 		return fmt.Errorf("failed to start noop process for unshare: %w", err)
 	}
 
+	defer func() {
+		if pidfd != -1 {
+			unix.Close(pidfd)
+		}
+	}()
+
 	if pidfd == -1 || !SupportsPidFD() {
 		proc.Kill()
 		proc.Wait()

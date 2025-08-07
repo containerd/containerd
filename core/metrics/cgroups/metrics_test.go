@@ -45,12 +45,12 @@ func TestRegressionIssue6772(t *testing.T) {
 	ns := metrics.NewNamespace("test-container", "", nil)
 	isV1 := true
 
-	var collecter Collecter
+	var collector Collector
 	if cgroups.Mode() == cgroups.Unified {
 		isV1 = false
-		collecter = v2.NewCollector(ns)
+		collector = v2.NewCollector(ns)
 	} else {
-		collecter = v1.NewCollector(ns)
+		collector = v1.NewCollector(ns)
 	}
 
 	doneCh := make(chan struct{})
@@ -99,7 +99,7 @@ func TestRegressionIssue6772(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			err := collecter.Add(
+			err := collector.Add(
 				&mockStatT{
 					id:        strconv.Itoa(id),
 					namespace: "issue6772",
@@ -129,7 +129,7 @@ func TestRegressionIssue6772(t *testing.T) {
 	}
 }
 
-type Collecter interface {
+type Collector interface {
 	Collect(ch chan<- prometheus.Metric)
 
 	Add(t common.Statable, labels map[string]string) error
