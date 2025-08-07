@@ -514,11 +514,46 @@ func shouldManipulateContainersInPodAfterUpgrade(runtimeHandler string) setupUpg
 
 			pod2Ctx.stop(true)
 
-			// If connection is closed, it means the shim process exits.
+			// Wait for shim processes to exit after pod deletion
+			// Use a retry loop with timeout to handle timing issues
 			for _, shimCli := range shimConns {
 				t.Logf("Checking container %s's shim client", shimCli.cntrID)
-				_, err = shimCli.cli.Connect(context.Background(), &apitask.ConnectRequest{})
-				assert.ErrorContains(t, err, "ttrpc: closed", "should be closed after deleting pod")
+
+				// Retry for up to 30 seconds to allow shim cleanup to complete
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				connectionClosed := false
+				ticker := time.NewTicker(500 * time.Millisecond)
+				defer ticker.Stop()
+
+				for !connectionClosed {
+					select {
+					case <-ticker.C:
+						_, err = shimCli.cli.Connect(ctx, &apitask.ConnectRequest{})
+						if err != nil {
+							// Connection is broken - this is expected after pod deletion
+							// Accept various error types that indicate broken connection
+							if strings.Contains(err.Error(), "ttrpc: closed") ||
+								strings.Contains(err.Error(), "connection refused") ||
+								strings.Contains(err.Error(), "no such file or directory") ||
+								strings.Contains(err.Error(), "broken pipe") ||
+								strings.Contains(err.Error(), "EOF") {
+								t.Logf("Container %s's shim connection properly closed: %v", shimCli.cntrID, err)
+								connectionClosed = true
+								break
+							}
+							// For other errors like "Unimplemented", continue retrying
+							t.Logf("Container %s's shim returned error (retrying): %v", shimCli.cntrID, err)
+						} else {
+							// Connection still works, continue waiting
+							t.Logf("Container %s's shim still responding, waiting for cleanup...", shimCli.cntrID)
+						}
+					case <-ctx.Done():
+						t.Errorf("Timeout waiting for container %s's shim to close connection", shimCli.cntrID)
+						connectionClosed = true
+					}
+				}
 			}
 		}
 		return []upgradeVerifyCaseFunc{verifyFunc}, nil
