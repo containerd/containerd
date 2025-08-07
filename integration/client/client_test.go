@@ -158,6 +158,13 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	// pre-download and cache test images to avoid network timeouts during tests
+	log.G(ctx).Info("pre-downloading test images to cache")
+	if err := predownloadTestImages(ctx, client); err != nil {
+		log.G(ctx).WithError(err).Warn("failed to pre-download test images, tests may be flaky")
+		// Don't exit here - let tests run even if pre-download fails
+	}
+
 	if err := client.Close(); err != nil {
 		fmt.Fprintln(os.Stderr, "failed to close client", err)
 	}
@@ -575,4 +582,43 @@ func TestRuntimeInfo(t *testing.T) {
 	if !rroRecognized {
 		t.Fatalf("expected feat.MountOptions to contain \"rro\", only got %v", feat.MountOptions)
 	}
+}
+
+// predownloadTestImages downloads and caches test images with all manifests to avoid network timeouts during tests
+func predownloadTestImages(ctx context.Context, client *Client) error {
+	imageName := imagelist.Get(imagelist.Pause)
+
+	// Pull with all manifests (no platform restriction) to cache everything locally
+	fmt.Printf("Pre-downloading test image %s with all manifests...\n", imageName)
+
+	// Use a generous timeout for the initial download
+	downloadCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+
+	// Pull all platforms to cache everything locally
+	_, err := client.Pull(downloadCtx, imageName)
+	if err != nil {
+		fmt.Printf("Warning: Failed to pre-download %s: %v\n", imageName, err)
+		// Try with just the default platform as fallback
+		_, err = client.Pull(downloadCtx, imageName, WithPlatformMatcher(platforms.Default()))
+		if err != nil {
+			return fmt.Errorf("failed to pre-download test image %s: %w", imageName, err)
+		}
+	}
+
+	// Also fetch all manifests and blobs to ensure everything is cached
+	// Pin to specific digest for consistency
+	img, err := client.ImageService().Get(ctx, imageName)
+	if err != nil {
+		return fmt.Errorf("failed to get image %s: %w", imageName, err)
+	}
+
+	digestName := imageName + "@" + img.Target.Digest.String()
+	_, err = client.Fetch(downloadCtx, digestName)
+	if err != nil {
+		fmt.Printf("Warning: Failed to fetch all manifests for %s: %v\n", digestName, err)
+	}
+
+	fmt.Printf("Successfully pre-downloaded test image %s\n", imageName)
+	return nil
 }
