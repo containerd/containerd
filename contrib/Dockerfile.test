@@ -34,7 +34,7 @@
 #   docker run --privileged --group-add keep-groups -v ./critest_exit_code.txt:/tmp/critest_exit_code.txt containerd-test
 # ------------------------------------------------------------------------------
 
-ARG GOLANG_VERSION=1.24.5
+ARG GOLANG_VERSION=1.25-rc
 ARG GOLANG_IMAGE=golang
 
 FROM ${GOLANG_IMAGE}:${GOLANG_VERSION} AS golang
@@ -56,6 +56,13 @@ FROM golang AS build-env
 RUN apt-get update && apt-get install -y --no-install-recommends \
     btrfs-progs \
     libseccomp-dev \
+    apt-utils \
+    apparmor \
+    apparmor-utils \
+    apparmor-profiles \
+    apparmor-profiles-extra \
+    apparmor-notify \
+    apparmor-easyprof \
     xfsprogs \
     && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /go/src/github.com/containerd/containerd
