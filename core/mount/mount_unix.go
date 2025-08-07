@@ -28,6 +28,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const (
+	unmountRetryDelay = 50 * time.Millisecond
+)
+
 // UnmountRecursive unmounts the target and all mounts underneath, starting
 // with the deepest mount first.
 func UnmountRecursive(target string, flags int) error {
@@ -85,7 +89,7 @@ func unmount(target string, flags int) error {
 		if err := unix.Unmount(target, flags); err != nil {
 			switch err {
 			case unix.EBUSY:
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(unmountRetryDelay)
 				continue
 			default:
 				return err

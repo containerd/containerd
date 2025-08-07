@@ -25,6 +25,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/stretchr/testify/assert"
@@ -211,11 +212,12 @@ func TestDoPrepareIDMappedOverlayCleanups(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		lowerDirs       []string
-		tmpDir          string
-		callbackFailure bool
-		success         bool
+		name                    string
+		lowerDirs               []string
+		tmpDir                  string
+		callbackFailure         bool
+		callbackFailureDuration time.Duration // Duration of 0 means to fail all the time (if callbackFailure is true).
+		success                 bool
 	}{
 		{
 			name:      "mount failure",
@@ -230,6 +232,12 @@ func TestDoPrepareIDMappedOverlayCleanups(t *testing.T) {
 			name:            "cleanup callback failure",
 			callbackFailure: true,
 			success:         true,
+		},
+		{
+			name:                    "cleanup callback short failure",
+			callbackFailure:         true,
+			callbackFailureDuration: unmountRetryDelay * 2, // Duration of 2x unmountRetryDelay means it will fail for about two retries.
+			success:                 true,
 		},
 		{
 			name:    "all fine",
@@ -274,7 +282,8 @@ func TestDoPrepareIDMappedOverlayCleanups(t *testing.T) {
 			}
 
 			// Let's make the cleanup callback fail and make sure nothing is deleted.
-			if tc.callbackFailure {
+			// Duration of 0 means it will fail all the time.
+			if tc.callbackFailure && tc.callbackFailureDuration == 0 {
 				// We won't be able to umount if there is an open fd to it.
 				busyDh, err := os.Open(retLowerDirs[0])
 				assert.NoError(t, err)
@@ -290,6 +299,28 @@ func TestDoPrepareIDMappedOverlayCleanups(t *testing.T) {
 				// clean up the tmp directories.
 				assert.NoError(t, busyDh.Close())
 				cleanup()
+			}
+
+			if tc.callbackFailure && tc.callbackFailureDuration > 0 {
+				// We won't be able to umount if there is an open fd to it.
+				busyDh, err := os.Open(retLowerDirs[0])
+				assert.NoError(t, err)
+				defer busyDh.Close() // close even if asserts fails before we close manually below.
+
+				// The cleanup callback will fail until we close the fd.
+				// Let's make it fail for at least the specified duration.
+				go func() {
+					t.Logf("Waiting for cleanup callback to fail for %v", tc.callbackFailureDuration)
+					time.Sleep(tc.callbackFailureDuration)
+					// Close the fd, so the unmount callback can succeed after a
+					// few tries.
+					busyDh.Close()
+				}()
+
+				cleanup()
+
+				// Verify that tmpDir IS empty (cleanup worked after a few tries).
+				assert.NoError(t, os.Remove(tmpDir), "can't remove directory: %v", tmpDir)
 			}
 
 			// Verify that the lowerDirs were not modified.
