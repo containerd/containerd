@@ -100,7 +100,7 @@ func FuzzCSWalk(f *testing.F) {
 		expected := map[digest.Digest]struct{}{}
 		found := map[digest.Digest]struct{}{}
 		tmpDir := t.TempDir()
-		cs, err := local.NewStore(tmpDir)
+		cs, err := local.NewStore(tmpDir, nil)
 		if err != nil {
 			return
 		}
@@ -140,7 +140,7 @@ func FuzzArchiveExport(f *testing.F) {
 		}
 		ctx := context.Background()
 		tmpDir := t.TempDir()
-		cs, err := local.NewStore(tmpDir)
+		cs, err := local.NewStore(tmpDir, nil)
 		if err != nil {
 			return
 		}
