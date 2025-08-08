@@ -588,17 +588,16 @@ func TestRuntimeInfo(t *testing.T) {
 func predownloadTestImages(ctx context.Context, client *Client) error {
 	imageName := imagelist.Get(imagelist.Pause)
 
-	// Pull with all manifests (no platform restriction) to cache everything locally
 	fmt.Printf("Pre-downloading test image %s with all manifests...\n", imageName)
 
 	// Use a generous timeout for the initial download
 	downloadCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
 
-	// Pull all platforms to cache everything locally
+	// Pull all platforms to cache everything locally - this is required for TestImageUsage
 	_, err := client.Pull(downloadCtx, imageName)
 	if err != nil {
-		fmt.Printf("Warning: Failed to pre-download %s: %v\n", imageName, err)
+		fmt.Printf("Warning: Failed to pre-download all platforms for %s: %v\n", imageName, err)
 		// Try with just the default platform as fallback
 		_, err = client.Pull(downloadCtx, imageName, WithPlatformMatcher(platforms.Default()))
 		if err != nil {
@@ -619,6 +618,6 @@ func predownloadTestImages(ctx context.Context, client *Client) error {
 		fmt.Printf("Warning: Failed to fetch all manifests for %s: %v\n", digestName, err)
 	}
 
-	fmt.Printf("Successfully pre-downloaded test image %s\n", imageName)
+	fmt.Printf("Successfully pre-downloaded test image %s with all platforms\n", imageName)
 	return nil
 }
