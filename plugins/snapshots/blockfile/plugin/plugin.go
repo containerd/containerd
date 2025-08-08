@@ -43,6 +43,10 @@ type Config struct {
 	// RecreateScratch always recreates the specified `ScratchFile`
 	// on initialization of the plugin instead of using an existing.
 	RecreateScratch bool `toml:"recreate_scratch"`
+
+	// CopySparse forces the creation of a sparse file when copying
+	// the 'ScratchFile'
+	CopySparse bool `toml:"copy_sparse"`
 }
 
 func init() {
@@ -73,6 +77,7 @@ func init() {
 				opts = append(opts, blockfile.WithMountOptions(config.MountOptions))
 			}
 			opts = append(opts, blockfile.WithRecreateScratch(config.RecreateScratch))
+			opts = append(opts, blockfile.WithCopySparse(config.CopySparse))
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
 			return blockfile.NewSnapshotter(root, opts...)
