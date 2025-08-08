@@ -38,7 +38,6 @@ func TestUnshareAfterEnterUserns(t *testing.T) {
 	}
 
 	err = UnshareAfterEnterUserns("0:1000:1", "0:1000:1", syscall.CLONE_NEWUSER|syscall.CLONE_NEWIPC, nil)
-	require.Error(t, err)
 	require.ErrorContains(t, err, "unshare flags should not include user namespace")
 
 	t.Run("should work", testUnshareAfterEnterUsernsShouldWork)
@@ -131,7 +130,6 @@ func testUnshareAfterEnterUsernsKillPid(t *testing.T) {
 
 		return nil
 	})
-	require.Error(t, uerr)
 	require.ErrorContains(t, uerr, "failed to ensure child process is alive: no such process")
 }
 
@@ -139,7 +137,6 @@ func testUnshareAfterEnterUsernsInvalidFlags(t *testing.T) {
 	t.Parallel()
 
 	uerr := UnshareAfterEnterUserns("0:1000:1", "0:1000:1", syscall.CLONE_IO, nil)
-	require.Error(t, uerr)
 	require.ErrorContains(t, uerr, "fork/exec /proc/self/exe: invalid argument")
 }
 

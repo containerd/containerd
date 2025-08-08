@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const umountflags int = 0
@@ -99,5 +99,5 @@ func DumpDirOnFailure(t *testing.T, root string) {
 func Unmount(t testing.TB, mountPoint string) {
 	t.Log("unmount", mountPoint)
 	err := mount.UnmountAll(mountPoint, umountflags)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

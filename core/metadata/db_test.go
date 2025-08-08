@@ -101,7 +101,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB) {
 	require.NoError(t, db.Init(ctx))
 
 	t.Cleanup(func() {
-		assert.NoError(t, bdb.Close())
+		require.NoError(t, bdb.Close())
 		cancel()
 	})
 
@@ -115,7 +115,7 @@ func TestInit(t *testing.T) {
 
 	version, err := readDBVersion(db, bucketKeyVersion)
 	require.NoError(t, err)
-	assert.EqualValues(t, version, dbVersion, "unexpected version %d, expected %d", version, dbVersion)
+	assert.Equal(t, dbVersion, version, "unexpected version %d, expected %d", version, dbVersion)
 }
 
 func TestMigrations(t *testing.T) {

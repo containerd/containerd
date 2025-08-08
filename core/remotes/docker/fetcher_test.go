@@ -37,6 +37,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/transfer"
@@ -161,7 +162,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 		if errors.Is(err, errNoOverlap) {
 			err = nil
 		}
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if ignoreContentRange {
 			rng = nil
 		}
@@ -234,7 +235,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 				return
 			}
 		}
-		assert.NoError(t, rc.Close())
+		require.NoError(t, rc.Close())
 	}
 
 	cfgConcurency(10, 1*1024*1024)
@@ -273,16 +274,16 @@ func TestFetcherOpenParallel(t *testing.T) {
 	failAfter = 1
 	forceRange = []httpRange{{start: 20}}
 	_, err = f.open(ctx, req, "", 20, true)
-	assert.ErrorContains(t, err, "unexpected status")
+	require.ErrorContains(t, err, "unexpected status")
 	forceRange = nil
 	failAfter = 0
 
 	// test a case when a subsequent request fails and shouldn't have
 	failAfter = 1 * 1024 * 1024
 	body, err := f.open(ctx, req, "", 0, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = io.ReadAll(body)
-	assert.Error(t, err, "this should have failed")
+	require.Error(t, err, "this should have failed")
 }
 
 func TestContentEncoding(t *testing.T) {
@@ -586,11 +587,11 @@ func TestDockerFetcherOpenLimiterDeadlock(t *testing.T) {
 
 	req := f.request(host, http.MethodGet)
 	_, err = f.open(context.Background(), req, "", 0, true)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// verify that the limiter Release has been successfully called when the last open error occurred
 	_, err = f.open(context.Background(), req, "", 0, true)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 // httpRange specifies the byte range to be sent to the client.

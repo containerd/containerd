@@ -73,7 +73,7 @@ func TestContainerLogWithoutTailingNewLine(t *testing.T) {
 
 	t.Log("Check container log")
 	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	checkContainerLog(t, string(content), []string{
 		fmt.Sprintf("%s %s %s", runtime.Stdout, runtime.LogTagPartial, "abcd"),
 	})
@@ -128,7 +128,7 @@ func TestLongContainerLog(t *testing.T) {
 
 	t.Log("Check container log")
 	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	checkContainerLog(t, string(content), []string{
 		fmt.Sprintf("%s %s %s", runtime.Stdout, runtime.LogTagFull, strings.Repeat("a", maxSize-1)),
 		fmt.Sprintf("%s %s %s", runtime.Stdout, runtime.LogTagFull, strings.Repeat("b", maxSize)),
@@ -144,7 +144,7 @@ func checkContainerLog(t *testing.T, log string, messages []string) {
 		ts, msg, ok := strings.Cut(line, " ")
 		require.True(t, ok)
 		_, err := time.Parse(time.RFC3339Nano, ts)
-		assert.NoError(t, err, "timestamp should be in RFC3339Nano format")
+		require.NoError(t, err, "timestamp should be in RFC3339Nano format")
 		assert.Equal(t, messages[i], msg, "log content should match")
 	}
 }
