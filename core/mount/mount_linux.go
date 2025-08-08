@@ -24,8 +24,8 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/containerd/log"
 	"github.com/moby/sys/userns"
@@ -55,10 +55,7 @@ func init() {
 //
 // It returns:
 //  1. New options that include new "lowedir=..." mount option.
-//  2. "Clean up" function -- it should be called as a defer one before
-//     checking for error, because if do the second and avoid calling "clean up",
-//     you're going to have "dirty" setup -- there's no guarantee that those
-//     temporary mount points for lowedirs will be cleaned properly.
+//  2. "Clean up" function -- it should be called only if no error is returned.
 //  3. Error -- nil if everything's fine, otherwise an error.
 func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), error) {
 	lowerIdx, lowerDirs := findOverlayLowerdirs(options)
@@ -66,12 +63,7 @@ func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), e
 		return options, nil, fmt.Errorf("failed to parse overlay lowerdir's from given options")
 	}
 
-	tempRemountsLocation, err := os.MkdirTemp(tempMountLocation, "ovl-idmapped")
-	if err != nil {
-		return options, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
-	}
-
-	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(tempRemountsLocation, lowerDirs, usernsFd)
+	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(tempMountLocation, lowerDirs, usernsFd)
 	if err != nil {
 		return options, idMapCleanUp, fmt.Errorf("failed to create idmapped mount: %w", err)
 	}
@@ -115,11 +107,11 @@ func (m *Mount) mount(target string) (err error) {
 				userNsCleanUp func()
 			)
 			options, userNsCleanUp, err = prepareIDMappedOverlay(int(usernsFd.Fd()), options)
-			defer userNsCleanUp()
-
 			if err != nil {
 				return fmt.Errorf("failed to prepare idmapped overlay: %w", err)
 			}
+			defer userNsCleanUp()
+
 			// To not meet concurrency issues while using the same lowedirs
 			// for different containers, replace them by temporary directories,
 			if optionsSize(options) >= pagesize-512 {
@@ -249,39 +241,90 @@ func getUnprivilegedMountFlags(path string) (int, error) {
 	return flags, nil
 }
 
-func doPrepareIDMappedOverlay(tempRemountsLocation string, lowerDirs []string, usernsFd int) ([]string, func(), error) {
-	tmpLowerDirs := make([]string, 0, len(lowerDirs))
+func doPrepareIDMappedOverlay(tmpDir string, lowerDirs []string, usernsFd int) (tmpLowerDirs []string, cleanup func(), retErr error) {
+	commonDir, err := getCommonDirectory(lowerDirs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to determine common parent: %w", err)
+	}
 
-	cleanUp := func() {
-		for _, lowerDir := range tmpLowerDirs {
-			if err := unix.Unmount(lowerDir, 0); err != nil {
-				log.L.WithError(err).Warnf("failed to unmount temp lowerdir %s", lowerDir)
+	tempRemountsLocation, err := os.MkdirTemp(tmpDir, "ovl-idmapped")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
+	}
+	cleanDir := func() {
+		if err := os.Remove(tempRemountsLocation); err != nil {
+			log.L.WithError(err).Infof("failed to remove idmapped directory")
+		}
+	}
+	defer func() {
+		if retErr != nil {
+			cleanDir()
+		}
+	}()
+
+	// IDMapMount the directory containing all the layers
+	if err := IDMapMountWithAttrs(commonDir, tempRemountsLocation, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
+		return nil, nil, err
+	}
+	cleanMount := func() {
+		for retry := 0; retry < 5; retry++ {
+			err := unix.Unmount(tempRemountsLocation, 0)
+			if err != nil {
+				time.Sleep(time.Millisecond * 100)
 				continue
 			}
-			// Using os.Remove() so if it's not empty, we don't delete files in the
-			// rootfs.
-			if err := os.Remove(lowerDir); err != nil {
-				log.L.WithError(err).Warnf("failed to remove temporary overlay lowerdir")
-			}
+			return
 		}
-
-		// This dir should be empty now. Otherwise, we don't do anything.
-		if err := os.Remove(tempRemountsLocation); err != nil {
-			log.L.WithError(err).Infof("failed to remove temporary overlay dir")
-		}
+		log.L.WithError(err).Warnf("failed to unmount idmapped directory %s", tempRemountsLocation)
 	}
-	for i, lowerDir := range lowerDirs {
-		tmpLowerDir := filepath.Join(tempRemountsLocation, strconv.Itoa(i))
-		tmpLowerDirs = append(tmpLowerDirs, tmpLowerDir)
+	defer func() {
+		if retErr != nil {
+			cleanMount()
+		}
+	}()
 
-		if err := os.MkdirAll(tmpLowerDir, 0700); err != nil {
-			return nil, cleanUp, fmt.Errorf("failed to create temporary dir: %w", err)
-		}
-		if err := IDMapMountWithAttrs(lowerDir, tmpLowerDir, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
-			return nil, cleanUp, err
-		}
+	// Build new lower dir paths through the idmapped directory
+	tmpLowerDirs = buildIDMappedPaths(lowerDirs, commonDir, tempRemountsLocation)
+
+	cleanup = func() {
+		cleanMount()
+		cleanDir()
 	}
-	return tmpLowerDirs, cleanUp, nil
+	return tmpLowerDirs, cleanup, nil
+}
+
+// getCommonDirectory finds the common directory among the lowerDirs passed in.
+// "/" and "." are considered invalid common directories and are treated as error
+func getCommonDirectory(lowerDirs []string) (string, error) {
+	commonPrefix := longestCommonPrefix(lowerDirs)
+	if commonPrefix == "" {
+		return "", fmt.Errorf("no common prefix found")
+	}
+
+	// Ensure the common prefix ends at a directory boundary
+	if !strings.HasSuffix(commonPrefix, "/") {
+		commonPrefix = path.Dir(commonPrefix)
+	}
+
+	if commonPrefix == "." || commonPrefix == "/" {
+		return "", fmt.Errorf("invalid common directory: %s", commonPrefix)
+	}
+
+	return commonPrefix, nil
+}
+
+// buildIDMappedPaths constructs new lower directory paths through an idmapped mount of the commonDir.
+// It takes the original lowerDirs, the commonDir of those dirs, and rewrites the paths
+// to go through the idMappedDir directory to achieve idmapped lowerdirs ready for overlayfs
+func buildIDMappedPaths(lowerDirs []string, commonDir, idMappedDir string) []string {
+	var tmpLowerDirs []string
+
+	for _, lowerDir := range lowerDirs {
+		relativePath := strings.TrimPrefix(lowerDir, commonDir)
+		tmpLowerDirs = append(tmpLowerDirs, filepath.Join(idMappedDir, relativePath))
+	}
+
+	return tmpLowerDirs
 }
 
 // parseMountOptions takes fstab style mount options and parses them for
