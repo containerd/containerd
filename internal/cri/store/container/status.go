@@ -172,6 +172,12 @@ func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode status: %w", err)
 	}
+	// if root not exist, create it
+	if _, err := os.Stat(root); err != nil {
+		if err := os.MkdirAll(root, 0600); err != nil {
+			return nil, err
+		}
+	}
 	path := filepath.Join(root, "status")
 	if err := continuity.AtomicWriteFile(path, data, 0600); err != nil {
 		return nil, fmt.Errorf("failed to checkpoint status to %q: %w", path, err)
