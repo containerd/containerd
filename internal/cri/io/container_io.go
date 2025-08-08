@@ -144,18 +144,19 @@ func (c *ContainerIO) Pipe() {
 		}()
 	}
 
-	if !c.fifos.Terminal && c.stderr != nil {
-		wg.Add(1)
-		go func() {
-			if _, err := io.Copy(c.stderrGroup, c.stderr); err != nil {
-				log.L.WithError(err).Errorf("Failed to pipe stderr of container %q", c.id)
-			}
-			c.stderr.Close()
-			c.stderrGroup.Close()
-			wg.Done()
-			log.L.Debugf("Finish piping stderr of container %q", c.id)
-		}()
+	if c.fifos.Terminal || c.stderr == nil {
+		return
 	}
+	wg.Add(1)
+	go func() {
+		if _, err := io.Copy(c.stderrGroup, c.stderr); err != nil {
+			log.L.WithError(err).Errorf("Failed to pipe stderr of container %q", c.id)
+		}
+		c.stderr.Close()
+		c.stderrGroup.Close()
+		wg.Done()
+		log.L.Debugf("Finish piping stderr of container %q", c.id)
+	}()
 }
 
 // Attach attaches container stdio.

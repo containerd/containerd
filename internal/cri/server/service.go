@@ -230,13 +230,14 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 				path = rc.NetworkPluginConfDir
 			}
 		}
-		if path != "" {
-			m, err := newCNINetConfSyncer(path, i, c.cniLoadOptions())
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create cni conf monitor for %s: %w", name, err)
-			}
-			c.cniNetConfMonitor[name] = m
+		if path == "" {
+			continue
 		}
+		m, err := newCNINetConfSyncer(path, i, c.cniLoadOptions())
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create cni conf monitor for %s: %w", name, err)
+		}
+		c.cniNetConfMonitor[name] = m
 	}
 
 	c.nri = nri.NewAPI(options.NRI, &criImplementation{c})
@@ -299,10 +300,12 @@ func (c *criService) Run(ready func()) error {
 	streamServerErrCh := make(chan error)
 	go func() {
 		defer close(streamServerErrCh)
-		if err := c.streamServer.Start(true); err != nil && err != http.ErrServerClosed {
-			log.L.WithError(err).Error("Failed to start streaming server")
-			streamServerErrCh <- err
+		err := c.streamServer.Start(true)
+		if err == nil || err == http.ErrServerClosed {
+			return
 		}
+		log.L.WithError(err).Error("Failed to start streaming server")
+		streamServerErrCh <- err
 	}()
 
 	// register CRI domain with NRI
