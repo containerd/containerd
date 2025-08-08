@@ -34,6 +34,10 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 		return fmt.Errorf("unshare flags should not include user namespace")
 	}
 
+	if !SupportsPidFD() {
+		return fmt.Errorf("kernel doesn't support pidfd")
+	}
+
 	uidMaps, err := parseIDMapping(uidMap)
 	if err != nil {
 		return err
@@ -64,17 +68,13 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 		return fmt.Errorf("failed to start noop process for unshare: %w", err)
 	}
 
-	defer func() {
-		if pidfd != -1 {
-			unix.Close(pidfd)
-		}
-	}()
-
-	if pidfd == -1 || !SupportsPidFD() {
+	if pidfd == -1 {
 		proc.Kill()
 		proc.Wait()
 		return fmt.Errorf("kernel doesn't support CLONE_PIDFD")
 	}
+
+	defer unix.Close(pidfd)
 
 	defer func() {
 		derr := unix.PidfdSendSignal(pidfd, unix.SIGKILL, nil, 0)
