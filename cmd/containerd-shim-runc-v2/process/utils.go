@@ -59,7 +59,7 @@ func getLastRuntimeError(r *runc.Runc) (string, error) {
 		return "", nil
 	}
 
-	f, err := os.OpenFile(r.Log, os.O_RDONLY, 0400)
+	f, err := os.OpenFile(r.Log, os.O_RDONLY, 0o400)
 	if err != nil {
 		return "", err
 	}

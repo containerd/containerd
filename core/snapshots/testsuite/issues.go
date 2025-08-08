@@ -42,15 +42,15 @@ import (
 // See https://github.com/docker/docker/issues/21555
 func checkLayerFileUpdate(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	l1Init := fstest.Apply(
-		fstest.CreateDir("/etc", 0700),
-		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.1"), 0644),
-		fstest.CreateFile("/etc/profile", []byte("PATH=/usr/bin"), 0644),
+		fstest.CreateDir("/etc", 0o700),
+		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.1"), 0o644),
+		fstest.CreateFile("/etc/profile", []byte("PATH=/usr/bin"), 0o644),
 	)
 	l2Init := fstest.Apply(
-		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.2"), 0644),
-		fstest.CreateFile("/etc/profile", []byte("PATH=/usr/bin"), 0666),
-		fstest.CreateDir("/root", 0700),
-		fstest.CreateFile("/root/.bashrc", []byte("PATH=/usr/sbin:/usr/bin"), 0644),
+		fstest.CreateFile("/etc/hosts", []byte("mydomain 10.0.0.2"), 0o644),
+		fstest.CreateFile("/etc/profile", []byte("PATH=/usr/bin"), 0o666),
+		fstest.CreateDir("/root", 0o700),
+		fstest.CreateFile("/root/.bashrc", []byte("PATH=/usr/sbin:/usr/bin"), 0o644),
 	)
 
 	var sleepTime time.Duration
@@ -73,16 +73,16 @@ func checkLayerFileUpdate(ctx context.Context, t *testing.T, sn snapshots.Snapsh
 // See https://github.com/docker/docker/issues/25244
 func checkRemoveDirectoryInLowerLayer(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	l1Init := fstest.Apply(
-		fstest.CreateDir("/lib", 0700),
-		fstest.CreateFile("/lib/hidden", []byte{}, 0644),
+		fstest.CreateDir("/lib", 0o700),
+		fstest.CreateFile("/lib/hidden", []byte{}, 0o644),
 	)
 	l2Init := fstest.Apply(
 		fstest.RemoveAll("/lib"),
-		fstest.CreateDir("/lib", 0700),
-		fstest.CreateFile("/lib/not-hidden", []byte{}, 0644),
+		fstest.CreateDir("/lib", 0o700),
+		fstest.CreateFile("/lib/not-hidden", []byte{}, 0o644),
 	)
 	l3Init := fstest.Apply(
-		fstest.CreateFile("/lib/newfile", []byte{}, 0644),
+		fstest.CreateFile("/lib/newfile", []byte{}, 0o644),
 	)
 
 	if err := checkSnapshots(ctx, sn, work, l1Init, l2Init, l3Init); err != nil {
@@ -99,10 +99,10 @@ func checkChown(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, wor
 		t.Skip("Chown is not supported on Windows")
 	}
 	l1Init := fstest.Apply(
-		fstest.CreateDir("/opt", 0700),
-		fstest.CreateDir("/opt/a", 0700),
-		fstest.CreateDir("/opt/a/b", 0700),
-		fstest.CreateFile("/opt/a/b/file.txt", []byte("hello"), 0644),
+		fstest.CreateDir("/opt", 0o700),
+		fstest.CreateDir("/opt/a", 0o700),
+		fstest.CreateDir("/opt/a/b", 0o700),
+		fstest.CreateFile("/opt/a/b/file.txt", []byte("hello"), 0o644),
 	)
 	l2Init := fstest.Apply(
 		fstest.Chown("/opt", 1, 1),
@@ -121,10 +121,10 @@ func checkChown(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, wor
 func checkRename(ss string) func(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	return func(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 		l1Init := fstest.Apply(
-			fstest.CreateDir("/dir1", 0700),
-			fstest.CreateDir("/somefiles", 0700),
-			fstest.CreateFile("/somefiles/f1", []byte("was here first!"), 0644),
-			fstest.CreateFile("/somefiles/f2", []byte("nothing interesting"), 0644),
+			fstest.CreateDir("/dir1", 0o700),
+			fstest.CreateDir("/somefiles", 0o700),
+			fstest.CreateFile("/somefiles/f1", []byte("was here first!"), 0o644),
+			fstest.CreateFile("/somefiles/f2", []byte("nothing interesting"), 0o644),
 		)
 
 		var applier []fstest.Applier
@@ -142,7 +142,7 @@ func checkRename(ss string) func(ctx context.Context, t *testing.T, sn snapshots
 		}
 		applier = append(
 			applier,
-			fstest.CreateFile("/somefiles/f1-overwrite", []byte("new content 1"), 0644),
+			fstest.CreateFile("/somefiles/f1-overwrite", []byte("new content 1"), 0o644),
 			fstest.Rename("/somefiles/f1-overwrite", "/somefiles/f1"),
 			fstest.Rename("/somefiles/f2", "/somefiles/f3"),
 		)
@@ -161,13 +161,13 @@ func checkDirectoryPermissionOnCommit(ctx context.Context, t *testing.T, sn snap
 		t.Skip("Chown is not supported on WCOW")
 	}
 	l1Init := fstest.Apply(
-		fstest.CreateDir("/dir1", 0700),
-		fstest.CreateDir("/dir2", 0700),
-		fstest.CreateDir("/dir3", 0700),
-		fstest.CreateDir("/dir4", 0700),
-		fstest.CreateFile("/dir4/f1", []byte("..."), 0644),
-		fstest.CreateDir("/dir5", 0700),
-		fstest.CreateFile("/dir5/f1", []byte("..."), 0644),
+		fstest.CreateDir("/dir1", 0o700),
+		fstest.CreateDir("/dir2", 0o700),
+		fstest.CreateDir("/dir3", 0o700),
+		fstest.CreateDir("/dir4", 0o700),
+		fstest.CreateFile("/dir4/f1", []byte("..."), 0o644),
+		fstest.CreateDir("/dir5", 0o700),
+		fstest.CreateFile("/dir5/f1", []byte("..."), 0o644),
 		fstest.Chown("/dir1", 1, 1),
 		fstest.Chown("/dir2", 1, 1),
 		fstest.Chown("/dir3", 1, 1),
@@ -181,10 +181,10 @@ func checkDirectoryPermissionOnCommit(ctx context.Context, t *testing.T, sn snap
 		fstest.Chown("/dir4/f1", 1, 1),
 	)
 	l3Init := fstest.Apply(
-		fstest.CreateDir("/dir3", 0700),
+		fstest.CreateDir("/dir3", 0o700),
 		fstest.Chown("/dir3", 1, 1),
 		fstest.RemoveAll("/dir5"),
-		fstest.CreateDir("/dir5", 0700),
+		fstest.CreateDir("/dir5", 0o700),
 		fstest.Chown("/dir5", 1, 1),
 	)
 

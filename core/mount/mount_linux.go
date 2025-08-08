@@ -274,7 +274,7 @@ func doPrepareIDMappedOverlay(tempRemountsLocation string, lowerDirs []string, u
 		tmpLowerDir := filepath.Join(tempRemountsLocation, strconv.Itoa(i))
 		tmpLowerDirs = append(tmpLowerDirs, tmpLowerDir)
 
-		if err := os.MkdirAll(tmpLowerDir, 0700); err != nil {
+		if err := os.MkdirAll(tmpLowerDir, 0o700); err != nil {
 			return nil, cleanUp, fmt.Errorf("failed to create temporary dir: %w", err)
 		}
 		if err := IDMapMountWithAttrs(lowerDir, tmpLowerDir, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
@@ -322,19 +322,21 @@ func parseMountOptions(options []string) (opt mountOpt) {
 		// If the option does not exist in the flags table or the flag
 		// is not supported on the platform,
 		// then it is a data value for a specific fs type
-		if f, exists := flagsMap[o]; exists && f.flag != 0 {
+		f, exists := flagsMap[o]
+		switch {
+		case exists && f.flag != 0:
 			if f.clear {
 				opt.flags &^= f.flag
 			} else {
 				opt.flags |= f.flag
 			}
-		} else if o == loopOpt {
+		case o == loopOpt:
 			opt.losetup = true
-		} else if strings.HasPrefix(o, "uidmap=") {
+		case strings.HasPrefix(o, "uidmap="):
 			opt.uidmap = strings.TrimPrefix(o, "uidmap=")
-		} else if strings.HasPrefix(o, "gidmap=") {
+		case strings.HasPrefix(o, "gidmap="):
 			opt.gidmap = strings.TrimPrefix(o, "gidmap=")
-		} else {
+		default:
 			opt.data = append(opt.data, o)
 		}
 	}

@@ -366,7 +366,7 @@ func injectCNIFailpoint(t *testing.T, sbConfig *criapiv1.PodSandboxConfig, conf 
 	data, err := json.Marshal(conf)
 	require.NoError(t, err)
 
-	err = os.WriteFile(fpFilename, data, 0666)
+	err = os.WriteFile(fpFilename, data, 0o666)
 	require.NoError(t, err)
 
 	sbConfig.Annotations[failpointCNIConfPathKey] = fpFilename
