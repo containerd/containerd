@@ -38,8 +38,10 @@ import (
 	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 )
 
-var minRsrc = resource.MustParse("1k")
-var maxRsrc = resource.MustParse("1P")
+var (
+	minRsrc = resource.MustParse("1k")
+	maxRsrc = resource.MustParse("1P")
+)
 
 func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
 	if rsrc.Value() < minRsrc.Value() {

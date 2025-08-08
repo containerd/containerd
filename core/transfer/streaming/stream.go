@@ -27,13 +27,16 @@ import (
 	"time"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
-	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+
+	"github.com/containerd/containerd/v2/core/streaming"
 )
 
-const maxRead = 32 * 1024
-const windowSize = 2 * maxRead
+const (
+	maxRead    = 32 * 1024
+	windowSize = 2 * maxRead
+)
 
 var bufPool = &sync.Pool{
 	New: func() interface{} {
@@ -196,7 +199,6 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 				continue
 			}
 		}
-
 	}()
 
 	return r

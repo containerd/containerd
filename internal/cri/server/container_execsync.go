@@ -24,8 +24,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"k8s.io/client-go/tools/remotecommand"
@@ -37,6 +35,8 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
 type cappedWriter struct {
@@ -272,7 +272,6 @@ func (c *criService) execInContainer(ctx context.Context, id string, opts execOp
 	span := tracing.SpanFromContext(ctx)
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(id)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container %q in store: %w", id, err)
 	}

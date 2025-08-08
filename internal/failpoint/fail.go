@@ -93,7 +93,7 @@ type Failpoint struct {
 }
 
 // NewFailpoint returns failpoint control.
-func NewFailpoint(fnName string, terms string) (*Failpoint, error) {
+func NewFailpoint(fnName, terms string) (*Failpoint, error) {
 	entries, err := parseTerms([]byte(terms))
 	if err != nil {
 		return nil, err
@@ -222,7 +222,7 @@ func parseTerms(term []byte) ([]*failpointEntry, error) {
 
 func parseTerm(term []byte) ([]byte, *failpointEntry, error) {
 	var err error
-	var entry = newFailpointEntry()
+	entry := newFailpointEntry()
 
 	// count*
 	term, err = parseInt64(term, '*', &entry.count)
@@ -236,7 +236,7 @@ func parseTerm(term []byte) ([]byte, *failpointEntry, error) {
 }
 
 func parseType(term []byte, entry *failpointEntry) ([]byte, error) {
-	var nameToTyp = map[string]Type{
+	nameToTyp := map[string]Type{
 		"off":    TypeOff,
 		"error(": TypeError,
 		"panic(": TypePanic,

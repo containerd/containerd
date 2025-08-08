@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
-func GenerateSeccompSecurityProfile(profilePath string, unsetProfilePath string) (*runtime.SecurityProfile, error) {
+func GenerateSeccompSecurityProfile(profilePath, unsetProfilePath string) (*runtime.SecurityProfile, error) {
 	if profilePath != "" {
 		return generateSecurityProfile(profilePath)
 	}

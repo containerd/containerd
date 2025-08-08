@@ -24,13 +24,14 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/pkg/progress"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/pkg/progress"
 )
 
 // Command is the cli command for managing images
@@ -225,7 +226,7 @@ var checkCommand = &cli.Command{
 		}
 		defer cancel()
 
-		var contentStore = client.ContentStore()
+		contentStore := client.ContentStore()
 
 		args := cliContext.Args().Slice()
 		imageList, err := client.ListImages(ctx, args...)
@@ -237,7 +238,7 @@ var checkCommand = &cli.Command{
 			return exitErr
 		}
 
-		var tw = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		if !quiet {
 			fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSTATUS\tSIZE\tUNPACKED\t")
 		}

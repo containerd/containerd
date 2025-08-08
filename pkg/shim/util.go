@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 
@@ -36,7 +37,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/errdefs"
 )
 
 type CommandConfig struct {

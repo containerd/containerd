@@ -37,7 +37,6 @@ func main() {
 	secInfo, err := windows.GetNamedSecurityInfo(
 		os.Args[1], windows.SE_FILE_OBJECT,
 		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
-
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -23,10 +23,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
-
-	"github.com/urfave/cli/v2"
 )
 
 var (

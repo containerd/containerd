@@ -28,8 +28,9 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/typeurl/v2"
+
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 )
 
 // NewBinaryProcessor returns a binary processor for use with processing content streams

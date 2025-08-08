@@ -22,8 +22,7 @@ func NewNoop() KeyedLocker {
 	return &noopMutex{}
 }
 
-type noopMutex struct {
-}
+type noopMutex struct{}
 
 func (*noopMutex) Lock(_ context.Context, _ string) error {
 	return nil

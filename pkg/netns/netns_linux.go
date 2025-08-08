@@ -39,10 +39,11 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/containerd/containerd/v2/core/mount"
 	cnins "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/moby/sys/symlink"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 // Some of the following functions are migrated from
@@ -63,14 +64,14 @@ func newNS(baseDir string, pid uint32) (nsPath string, err error) {
 	// Create the directory for mounting network namespaces
 	// This needs to be a shared mountpoint in case it is mounted in to
 	// other namespaces (containers)
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return "", err
 	}
 
 	// create an empty file at the mount point and fail if it already exists
 	nsName := fmt.Sprintf("cni-%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 	nsPath = path.Join(baseDir, nsName)
-	mountPointFd, err := os.OpenFile(nsPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+	mountPointFd, err := os.OpenFile(nsPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 	if err != nil {
 		return "", err
 	}

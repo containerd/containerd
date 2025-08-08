@@ -23,12 +23,13 @@ import (
 	"github.com/containerd/cgroups/v3"
 	cgroup1 "github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
-	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/log"
 	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"github.com/containerd/containerd/v2/pkg/sys"
 )
 
 // apply sets config settings on the server process

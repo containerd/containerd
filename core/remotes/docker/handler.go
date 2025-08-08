@@ -22,12 +22,13 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/containerd/log"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/reference"
-	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // AppendDistributionSourceLabel updates the label of blob with distribution source.

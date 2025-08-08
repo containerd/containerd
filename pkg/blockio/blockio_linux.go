@@ -22,10 +22,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/containerd/log"
 	"github.com/intel/goresctrl/pkg/blockio"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-
-	"github.com/containerd/log"
 )
 
 var (

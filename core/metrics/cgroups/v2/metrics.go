@@ -23,15 +23,16 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	"github.com/docker/go-metrics"
+	"github.com/prometheus/client_golang/prometheus"
+
 	cmetrics "github.com/containerd/containerd/v2/core/metrics"
 	"github.com/containerd/containerd/v2/core/metrics/cgroups/common"
 	v2 "github.com/containerd/containerd/v2/core/metrics/types/v2"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
-	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
-	"github.com/docker/go-metrics"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // NewCollector registers the collector with the provided namespace and returns it so

@@ -22,13 +22,13 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"golang.org/x/sys/unix"
-
 	cgroups "github.com/containerd/cgroups/v3/cgroup1"
-	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/log"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/v2/pkg/sys"
 )
 
 func newOOMCollector(ns *metrics.Namespace) (*oomCollector, error) {

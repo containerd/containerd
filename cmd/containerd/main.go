@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containerd/containerd/v2/cmd/containerd/command"
-
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
+	"github.com/containerd/containerd/v2/cmd/containerd/command"
 )
 
 func main() {

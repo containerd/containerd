@@ -20,8 +20,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 )
 
 // ImageFsInfo returns information of the filesystem that is used to store images.

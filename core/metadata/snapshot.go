@@ -24,16 +24,17 @@ import (
 	"time"
 
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
+
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	bolt "go.etcd.io/bbolt"
-	errbolt "go.etcd.io/bbolt/errors"
 )
 
 const (
@@ -403,7 +404,6 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 					tinfo = &i
 				}
 				return nil
-
 			}, filter); err != nil {
 				return nil, fmt.Errorf("failed walking backend snapshots: %w", err)
 			}
@@ -645,7 +645,6 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	}); err != nil {
 		if bname != "" {
 			log.G(ctx).WithField("snapshotter", s.name).WithField("key", key).WithField("bname", bname).WithError(err).Error("uncommittable snapshot: transaction failed after commit, snapshot should be removed")
-
 		}
 		return err
 	}
@@ -663,7 +662,6 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	}
 
 	return rerr
-
 }
 
 func (s *snapshotter) Remove(ctx context.Context, key string) error {

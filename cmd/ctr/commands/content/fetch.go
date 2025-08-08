@@ -25,6 +25,13 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/content"
@@ -32,12 +39,6 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/pkg/httpdbg"
 	"github.com/containerd/containerd/v2/pkg/progress"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
 )
 
 var fetchCommand = &cli.Command{
@@ -82,9 +83,7 @@ Most of this is experimental and there are few leaps to make this work.`,
 		},
 	),
 	Action: func(cliContext *cli.Context) error {
-		var (
-			ref = cliContext.Args().First()
-		)
+		ref := cliContext.Args().First()
 		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err

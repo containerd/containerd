@@ -22,6 +22,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/typeurl/v2"
+	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/pkg/filters"
@@ -31,10 +36,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
-	bolt "go.etcd.io/bbolt"
-	errbolt "go.etcd.io/bbolt/errors"
 )
 
 const (

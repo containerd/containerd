@@ -25,15 +25,16 @@ import (
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/platforms"
+	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/rootfs"
-	"github.com/containerd/platforms"
-	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // ErrMediaTypeNotFound returns an error when a media type in the manifest is unknown
@@ -128,7 +129,6 @@ func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Contain
 	)
 	if err != nil {
 		return err
-
 	}
 	rw.Platform = &imagespec.Platform{
 		OS:           runtime.GOOS,

@@ -36,6 +36,13 @@ import (
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/errdefs"
+	runcC "github.com/containerd/go-runc"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/runtime-spec/specs-go/features"
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/core/mount"
@@ -43,12 +50,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/schedcore"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/errdefs"
-	runcC "github.com/containerd/go-runc"
-	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/runtime-spec/specs-go/features"
-	"golang.org/x/sys/unix"
 )
 
 // NewShimManager returns an implementation of the shim manager

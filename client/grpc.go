@@ -19,8 +19,9 @@ package client
 import (
 	"context"
 
-	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"google.golang.org/grpc"
+
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 type namespaceInterceptor struct {

@@ -20,8 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/pkg/tracing"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
