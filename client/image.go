@@ -265,7 +265,7 @@ type UnpackOpt func(context.Context, *UnpackConfig) error
 
 // WithSnapshotterPlatformCheck sets `CheckPlatformSupported` on the UnpackConfig
 func WithSnapshotterPlatformCheck() UnpackOpt {
-	return func(ctx context.Context, uc *UnpackConfig) error {
+	return func(_ context.Context, uc *UnpackConfig) error {
 		uc.CheckPlatformSupported = true
 		return nil
 	}
@@ -273,7 +273,7 @@ func WithSnapshotterPlatformCheck() UnpackOpt {
 
 // WithUnpackDuplicationSuppressor sets `DuplicationSuppressor` on the UnpackConfig.
 func WithUnpackDuplicationSuppressor(suppressor kmutex.KeyedLocker) UnpackOpt {
-	return func(ctx context.Context, uc *UnpackConfig) error {
+	return func(_ context.Context, uc *UnpackConfig) error {
 		uc.DuplicationSuppressor = suppressor
 		return nil
 	}
@@ -281,7 +281,7 @@ func WithUnpackDuplicationSuppressor(suppressor kmutex.KeyedLocker) UnpackOpt {
 
 // WithUnpackApplyOpts appends new apply options on the UnpackConfig.
 func WithUnpackApplyOpts(opts ...diff.ApplyOpt) UnpackOpt {
-	return func(ctx context.Context, uc *UnpackConfig) error {
+	return func(_ context.Context, uc *UnpackConfig) error {
 		uc.ApplyOpts = append(uc.ApplyOpts, opts...)
 		return nil
 	}

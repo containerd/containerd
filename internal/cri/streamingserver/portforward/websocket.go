@@ -109,7 +109,7 @@ func BuildV4Options(ports []int32) (*V4Options, error) {
 // a PortForwarder. A pair of streams are created per port (DATA n,
 // ERROR n+1). The associated port is written to each stream as a unsigned 16
 // bit integer in little endian format.
-func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, opts *V4Options, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
+func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, opts *V4Options, _ []string, idleTimeout, _ time.Duration) error {
 	channels := make([]wsstream.ChannelType, 0, len(opts.Ports)*2)
 	for i := 0; i < len(opts.Ports); i++ {
 		channels = append(channels, wsstream.ReadWriteChannel, wsstream.WriteChannel)

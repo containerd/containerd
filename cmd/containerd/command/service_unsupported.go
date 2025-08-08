@@ -30,15 +30,15 @@ func serviceFlags() []cli.Flag {
 }
 
 // applyPlatformFlags applies platform-specific flags.
-func applyPlatformFlags(cliContext *cli.Context) {
+func applyPlatformFlags(*cli.Context) {
 }
 
 // registerUnregisterService is only relevant on Windows.
-func registerUnregisterService(root string) (bool, error) {
+func registerUnregisterService(string) (bool, error) {
 	return false, nil
 }
 
 // launchService is only relevant on Windows.
-func launchService(s *server.Server, done chan struct{}) error {
+func launchService(*server.Server, chan struct{}) error {
 	return nil
 }

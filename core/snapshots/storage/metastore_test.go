@@ -61,7 +61,7 @@ func MetaStoreSuite(t *testing.T, name string, meta func(root string) (*MetaStor
 }
 
 // makeTest creates a testsuite with a writable transaction
-func makeTest(t *testing.T, name string, metaFn metaFactory, fn testFunc) func(t *testing.T) {
+func makeTest(_ *testing.T, _ string, metaFn metaFactory, fn testFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		ctx := context.Background()
 

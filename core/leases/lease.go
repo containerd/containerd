@@ -60,7 +60,7 @@ type DeleteOptions struct {
 // SynchronousDelete is used to indicate that a lease deletion and removal of
 // any unreferenced resources should occur synchronously before returning the
 // result.
-func SynchronousDelete(ctx context.Context, o *DeleteOptions) error {
+func SynchronousDelete(_ context.Context, o *DeleteOptions) error {
 	o.Synchronous = true
 	return nil
 }

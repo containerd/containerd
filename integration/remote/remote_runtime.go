@@ -534,7 +534,7 @@ func (r *RuntimeService) Status(opts ...grpc.CallOption) (*runtimeapi.StatusResp
 }
 
 // RuntimeConfig returns the CgroupDriver of the runtime.
-func (r *RuntimeService) RuntimeConfig(in *runtimeapi.RuntimeConfigRequest, opts ...grpc.CallOption) (*runtimeapi.RuntimeConfigResponse, error) {
+func (r *RuntimeService) RuntimeConfig(in *runtimeapi.RuntimeConfigRequest, _ ...grpc.CallOption) (*runtimeapi.RuntimeConfigResponse, error) {
 	log.L.Infof("[RuntimeService] RuntimeConfig (timeout=%v)", r.timeout)
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()

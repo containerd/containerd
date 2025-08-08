@@ -127,7 +127,7 @@ func (s service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Sna
 			})
 		}
 	)
-	err := s.sn.Walk(ss.Context(), func(ctx context.Context, info snapshots.Info) error {
+	err := s.sn.Walk(ss.Context(), func(_ context.Context, info snapshots.Info) error {
 		buffer = append(buffer, proxy.InfoToProto(info))
 
 		if len(buffer) >= 100 {
@@ -166,7 +166,7 @@ func (s service) Usage(ctx context.Context, ur *snapshotsapi.UsageRequest) (*sna
 	}, nil
 }
 
-func (s service) Cleanup(ctx context.Context, cr *snapshotsapi.CleanupRequest) (*ptypes.Empty, error) {
+func (s service) Cleanup(ctx context.Context, _ *snapshotsapi.CleanupRequest) (*ptypes.Empty, error) {
 	c, ok := s.sn.(snapshots.Cleaner)
 	if !ok {
 		return nil, errgrpc.ToGRPCf(errdefs.ErrNotImplemented, "snapshotter does not implement Cleanup method")

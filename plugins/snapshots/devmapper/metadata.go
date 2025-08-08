@@ -94,7 +94,7 @@ func (m *PoolMetadata) ensureDatabaseInitialized() error {
 }
 
 // AddDevice saves device info to database.
-func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
+func (m *PoolMetadata) AddDevice(_ context.Context, info *DeviceInfo) error {
 	err := m.db.Update(func(tx *bolt.Tx) error {
 		devicesBucket := tx.Bucket(devicesBucketName)
 
@@ -136,7 +136,7 @@ func (m *PoolMetadata) ChangeDeviceState(ctx context.Context, name string, state
 // The snapshotter might attempt to recreate a device in 'Faulty' state with another devmapper ID in
 // subsequent calls, and in case of success its status will be changed to 'Created' or 'Activated'.
 // The devmapper dev ID will remain in 'deviceFaulty' state until manually handled by a user.
-func (m *PoolMetadata) MarkFaulty(ctx context.Context, name string) error {
+func (m *PoolMetadata) MarkFaulty(_ context.Context, name string) error {
 	return m.db.Update(func(tx *bolt.Tx) error {
 		var (
 			device    = DeviceInfo{}
@@ -224,7 +224,7 @@ func markDeviceID(tx *bolt.Tx, deviceID uint32, state deviceIDState) error {
 // The callback should be used to indicate whether device info update was successful or not.
 // An error returned from the callback will rollback the update transaction in the database.
 // Name and Device ID are not allowed to change.
-func (m *PoolMetadata) UpdateDevice(ctx context.Context, name string, fn DeviceInfoCallback) error {
+func (m *PoolMetadata) UpdateDevice(_ context.Context, name string, fn DeviceInfoCallback) error {
 	return m.db.Update(func(tx *bolt.Tx) error {
 		var (
 			device = &DeviceInfo{}
@@ -256,7 +256,7 @@ func (m *PoolMetadata) UpdateDevice(ctx context.Context, name string, fn DeviceI
 }
 
 // GetDevice retrieves device info by name from database
-func (m *PoolMetadata) GetDevice(ctx context.Context, name string) (*DeviceInfo, error) {
+func (m *PoolMetadata) GetDevice(_ context.Context, name string) (*DeviceInfo, error) {
 	var (
 		dev DeviceInfo
 		err error
@@ -271,7 +271,7 @@ func (m *PoolMetadata) GetDevice(ctx context.Context, name string) (*DeviceInfo,
 }
 
 // RemoveDevice removes device info from store.
-func (m *PoolMetadata) RemoveDevice(ctx context.Context, name string) error {
+func (m *PoolMetadata) RemoveDevice(_ context.Context, name string) error {
 	return m.db.Update(func(tx *bolt.Tx) error {
 		var (
 			device = &DeviceInfo{}
@@ -292,7 +292,7 @@ func (m *PoolMetadata) RemoveDevice(ctx context.Context, name string) error {
 
 // WalkDevices walks all devmapper devices in metadata store and invokes the callback with device info.
 // The provided callback function must not modify the bucket.
-func (m *PoolMetadata) WalkDevices(ctx context.Context, cb func(info *DeviceInfo) error) error {
+func (m *PoolMetadata) WalkDevices(_ context.Context, cb func(info *DeviceInfo) error) error {
 	return m.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(devicesBucketName)
 		return bucket.ForEach(func(key, value []byte) error {
@@ -307,7 +307,7 @@ func (m *PoolMetadata) WalkDevices(ctx context.Context, cb func(info *DeviceInfo
 }
 
 // GetDeviceNames retrieves the list of device names currently stored in database
-func (m *PoolMetadata) GetDeviceNames(ctx context.Context) ([]string, error) {
+func (m *PoolMetadata) GetDeviceNames(context.Context) ([]string, error) {
 	var (
 		names []string
 		err   error

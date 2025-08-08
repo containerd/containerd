@@ -644,6 +644,6 @@ func (in *instrumentedService) RuntimeConfig(ctx context.Context, r *runtime.Run
 	return res, errgrpc.ToGRPC(err)
 }
 
-func (in *instrumentedService) UpdatePodSandboxResources(ctx context.Context, r *runtime.UpdatePodSandboxResourcesRequest) (res *runtime.UpdatePodSandboxResourcesResponse, err error) {
+func (in *instrumentedService) UpdatePodSandboxResources(context.Context, *runtime.UpdatePodSandboxResourcesRequest) (res *runtime.UpdatePodSandboxResourcesResponse, err error) {
 	return nil, errors.New("not implemented yet")
 }

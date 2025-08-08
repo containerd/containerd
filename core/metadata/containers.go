@@ -97,7 +97,7 @@ func (s *containerStore) List(ctx context.Context, fs ...string) ([]containers.C
 			return nil // empty store
 		}
 
-		return bkt.ForEach(func(k, v []byte) error {
+		return bkt.ForEach(func(k, _ []byte) error {
 			cbkt := bkt.Bucket(k)
 			if cbkt == nil {
 				return nil

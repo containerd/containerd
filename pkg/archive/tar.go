@@ -175,7 +175,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 
 	if convertWhiteout == nil {
 		// handle whiteouts by removing the target files
-		convertWhiteout = func(hdr *tar.Header, path string) (bool, error) {
+		convertWhiteout = func(_ *tar.Header, path string) (bool, error) {
 			base := filepath.Base(path)
 			dir := filepath.Dir(path)
 			if base == whiteoutOpaqueDir {
@@ -183,7 +183,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 				if err != nil {
 					return false, err
 				}
-				err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+				err = filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
 					if err != nil {
 						if os.IsNotExist(err) {
 							err = nil // parent was deleted
