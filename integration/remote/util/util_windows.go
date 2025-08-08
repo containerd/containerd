@@ -65,7 +65,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 		return winio.ListenPipe(addr, nil)
 
 	default:
-		return nil, fmt.Errorf("only support tcp and npipe endpoint")
+		return nil, errors.New("only support tcp and npipe endpoint")
 	}
 }
 

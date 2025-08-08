@@ -17,6 +17,7 @@
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"syscall"
@@ -49,7 +50,7 @@ func getUsernsFD(uidMaps, gidMaps []syscall.SysProcIDMap) (_ *os.File, retErr er
 	if pidfd == -1 || !sys.SupportsPidFD() {
 		proc.Kill()
 		proc.Wait()
-		return nil, fmt.Errorf("failed to prevent pid reused issue because pidfd isn't supported")
+		return nil, errors.New("failed to prevent pid reused issue because pidfd isn't supported")
 	}
 
 	pidFD := os.NewFile(uintptr(pidfd), "pidfd")

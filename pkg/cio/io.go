@@ -18,6 +18,7 @@ package cio
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -166,7 +167,7 @@ func NewAttach(opts ...Opt) Attach {
 	}
 	return func(fifos *FIFOSet) (IO, error) {
 		if fifos == nil {
-			return nil, fmt.Errorf("cannot attach, missing fifos")
+			return nil, errors.New("cannot attach, missing fifos")
 		}
 		if streams.Stdin == nil {
 			fifos.Stdin = ""

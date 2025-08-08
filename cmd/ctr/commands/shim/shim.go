@@ -134,7 +134,7 @@ var stateCommand = &cli.Command{
 			Value: 3,
 			Action: func(c *cli.Context, v int) error {
 				if v != 2 && v != 3 {
-					return fmt.Errorf("api-version must be 2 or 3")
+					return errors.New("api-version must be 2 or 3")
 				}
 				return nil
 			},
@@ -296,7 +296,7 @@ func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
 	id := cliContext.String("id")
 	shimAddress := cliContext.String("shim-address")
 	if id == "" && shimAddress == "" {
-		return nil, fmt.Errorf("shim ID (--id) or address (--shim-address) must be specified")
+		return nil, errors.New("shim ID (--id) or address (--shim-address) must be specified")
 	}
 	ns := cliContext.String("namespace")
 
