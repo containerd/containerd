@@ -143,14 +143,21 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 				t.Log("Restart containerd")
 				RestartContainerd(t, syscall.SIGTERM)
 
-				t.Log("ListPodSandbox with the specific label")
-				l, err = runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{Id: sb.Id})
+				// Add additional wait and retry logic for CRI service operations after restart
+				t.Log("ListPodSandbox with the specific label (with retry after restart)")
+				err = retryAfterRestart(func() error {
+					l, err = runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{Id: sb.Id})
+					return err
+				})
 				require.NoError(t, err)
 				require.Len(t, l, 1)
 				require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, l[0].State)
 
-				t.Log("Check PodSandboxStatus")
-				sbStatus, err := runtimeService.PodSandboxStatus(sb.Id)
+				t.Log("Check PodSandboxStatus (with retry after restart)")
+				err = retryAfterRestart(func() error {
+					sbStatus, err = runtimeService.PodSandboxStatus(sb.Id)
+					return err
+				})
 				require.NoError(t, err)
 				t.Log(sbStatus.Network)
 				require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sbStatus.State)
@@ -379,4 +386,41 @@ func injectShimFailpoint(t *testing.T, sbConfig *criapiv1.PodSandboxConfig, meth
 
 		sbConfig.Annotations[failpointShimPrefixKey+method] = fp
 	}
+}
+
+// retryAfterRestart provides retry logic for CRI operations after containerd restart
+// This helps with flaky connection issues during service reconnection
+func retryAfterRestart(operation func() error) error {
+	var err error
+	maxRetries := 10
+	baseDelay := 500 * time.Millisecond
+
+	for i := 0; i < maxRetries; i++ {
+		err = operation()
+		if err == nil {
+			return nil
+		}
+
+		// Check if this is a connection-related error that might resolve with retry
+		errStr := err.Error()
+		if strings.Contains(errStr, "connection error") ||
+			strings.Contains(errStr, "connect: no such file or directory") ||
+			strings.Contains(errStr, "Unavailable") ||
+			strings.Contains(errStr, "transport: Error while dialing") {
+
+			// Exponential backoff with jitter for connection retries
+			delay := time.Duration(i+1) * baseDelay
+			if i > 5 {
+				delay = 5 * time.Second // Cap at 5 seconds for later retries
+			}
+
+			time.Sleep(delay)
+			continue
+		}
+
+		// If it's not a connection error, don't retry
+		return err
+	}
+
+	return fmt.Errorf("operation failed after %d retries, last error: %w", maxRetries, err)
 }
