@@ -55,8 +55,3 @@ type containerFilesystemMetrics struct {
 	IoTime          uint64
 	WeightedIoTime  uint64
 }
-
-type containerFilesystemUsage struct {
-	Bytes  uint64
-	Inodes uint64
-}
