@@ -651,6 +651,10 @@ func printNode(name string, tree *snapshotTree, level int) {
 func printMounts(target string, mounts []mount.Mount) {
 	// FIXME: This is specific to Unix
 	for _, m := range mounts {
-		fmt.Printf("mount -t %s %s %s -o %s\n", m.Type, m.Source, filepath.Join(target, m.Target), strings.Join(m.Options, ","))
+		var opt string
+		if len(m.Options) > 0 {
+			opt = fmt.Sprintf(" -o %s", strings.Join(m.Options, ","))
+		}
+		fmt.Printf("mount -t %s %s %s%s\n", m.Type, m.Source, filepath.Join(target, m.Target), opt)
 	}
 }
