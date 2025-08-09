@@ -88,11 +88,7 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T, useLocal bool) {
 	delayDuration := 2 * defaultImagePullProgressTimeout
 	cli := buildLocalContainerdClient(t, tmpDir, tweakContentInitFnWithDelayer(delayDuration))
 
-	// Use a longer timeout for slow commit writer tests to accommodate both
-	// the intentional delay and our improved retry logic
-	registryCfg := criconfig.Registry{}
-	extendedTimeout := 3 * delayDuration // 30 seconds to handle delays + retries
-	criService, err := initLocalCRIImageServiceWithTimeout(cli, tmpDir, registryCfg, useLocal, extendedTimeout)
+	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{}, useLocal)
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
@@ -122,11 +118,16 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 	tmpDir := t.TempDir()
 
 	cli := buildLocalContainerdClient(t, tmpDir, nil)
+	defer cli.Close()
 
 	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{}, useLocal)
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
+	defer func() {
+		// Give time for any background operations to complete
+		time.Sleep(100 * time.Millisecond)
+	}()
 	contentStore := cli.ContentStore()
 
 	// imageIndexJSON is the manifest of ghcr.io/containerd/volume-ownership:2.1.
@@ -202,7 +203,9 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 
 	cleanupWriters := func() {
 		for _, closer := range manifestWriters {
-			closer.Close()
+			if closer != nil {
+				closer.Close()
+			}
 		}
 		manifestWriters = manifestWriters[:0]
 	}
@@ -220,7 +223,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 		manifestWriters = append(manifestWriters, writer)
 	}
 
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
 	go func() {
 		defer close(errCh)
 
@@ -228,14 +231,25 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 		errCh <- err
 	}()
 
+	// Wait for the pull to be blocked by locked manifests
+	timeout := defaultImagePullProgressTimeout * 5
 	select {
-	case <-time.After(defaultImagePullProgressTimeout * 5):
+	case <-time.After(timeout):
+		// Expected: pull should be blocked by locked writers
+		t.Logf("Pull operation blocked for %v as expected, releasing manifest locks", timeout)
 		// release the lock
 		cleanupWriters()
 	case err := <-errCh:
 		t.Fatalf("PullImage should not return because the manifest has been locked, but got error=%v", err)
 	}
-	assert.NoError(t, <-errCh)
+
+	// Wait for the pull to complete after releasing locks
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err, "Pull should succeed after releasing manifest locks")
+	case <-time.After(defaultImagePullProgressTimeout * 3):
+		t.Fatal("Pull operation did not complete within timeout after releasing locks")
+	}
 }
 
 func testCRIImagePullTimeoutByHoldingContentOpenWriterWithLocal(t *testing.T) {
@@ -264,6 +278,7 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 	tmpDir := t.TempDir()
 
 	cli := buildLocalContainerdClient(t, tmpDir, nil)
+	defer cli.Close()
 
 	mirrorSrv := newMirrorRegistryServer(mirrorRegistryServerConfig{
 		limitedBytesPerConn: 1024 * 1024 * 3, // 3MB
@@ -505,14 +520,17 @@ func (l *ioCopyLimiter) limitedCopy(ctx context.Context, dst io.Writer, src io.R
 	return nil
 }
 
-// initLocalCRIImageServiceWithTimeout uses containerd.Client to init CRI plugin with custom timeout.
-func initLocalCRIImageServiceWithTimeout(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry, useLocalPull bool, timeout time.Duration) (criserver.ImageService, error) {
+// initLocalCRIImageService uses containerd.Client to init CRI plugin.
+//
+// NOTE: We don't need to start the CRI plugin here because we just need the
+// ImageService API.
+func initLocalCRIImageService(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry, useLocalPull bool) (criserver.ImageService, error) {
 	containerdRootDir := filepath.Join(tmpDir, "root")
 
 	cfg := criconfig.ImageConfig{
 		Snapshotter:              defaults.DefaultSnapshotter,
 		Registry:                 registryCfg,
-		ImagePullProgressTimeout: timeout.String(),
+		ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
 		StatsCollectPeriod:       10,
 		UseLocalImagePull:        useLocalPull,
 	}
@@ -527,12 +545,4 @@ func initLocalCRIImageServiceWithTimeout(client *containerd.Client, tmpDir strin
 		Client:           client,
 		Transferrer:      client.TransferService(),
 	})
-}
-
-// initLocalCRIImageService uses containerd.Client to init CRI plugin.
-//
-// NOTE: We don't need to start the CRI plugin here because we just need the
-// ImageService API.
-func initLocalCRIImageService(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry, useLocalPull bool) (criserver.ImageService, error) {
-	return initLocalCRIImageServiceWithTimeout(client, tmpDir, registryCfg, useLocalPull, defaultImagePullProgressTimeout)
 }
