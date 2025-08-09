@@ -122,7 +122,19 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 			require.ErrorContains(t, err, "failed to start shim")
 
 			t.Log("ListPodSandbox with the specific label")
-			l, err := runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{LabelSelector: labels})
+			// Add retry logic for the initial ListPodSandbox call to handle potential timing issues
+			var l []*criapiv1.PodSandbox
+			err = retryAfterRestart(func() error {
+				var listErr error
+				l, listErr = runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{LabelSelector: labels})
+				if listErr != nil {
+					return listErr
+				}
+				if len(l) == 0 {
+					return fmt.Errorf("expected sandbox record not found yet, retrying")
+				}
+				return nil
+			})
 			require.NoError(t, err)
 			require.Len(t, l, 1)
 
@@ -211,7 +223,19 @@ func TestRunPodSandboxWithShimStartAndTeardownCNIFailure(t *testing.T) {
 			require.ErrorContains(t, err, "failed to start shim")
 
 			t.Log("ListPodSandbox with the specific label")
-			l, err := runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{LabelSelector: labels})
+			// Add retry logic for the initial ListPodSandbox call to handle potential timing issues
+			var l []*criapiv1.PodSandbox
+			err = retryAfterRestart(func() error {
+				var listErr error
+				l, listErr = runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{LabelSelector: labels})
+				if listErr != nil {
+					return listErr
+				}
+				if len(l) == 0 {
+					return fmt.Errorf("expected sandbox record not found yet, retrying")
+				}
+				return nil
+			})
 			require.NoError(t, err)
 			require.Len(t, l, 1)
 
