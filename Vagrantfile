@@ -291,7 +291,7 @@ EOF
           # Find all mount points under containerd directories and unmount them
           mount | grep '/run/containerd\|/var/lib/containerd' | cut -d' ' -f3 | sort -r | while read mount_point; do
               umount -l "$mount_point" 2>/dev/null || true
-          done
+          done || true
           
           # Wait a moment for unmounts to take effect
           sleep 1
@@ -330,7 +330,7 @@ EOF
             # Find all mount points under containerd directories and unmount them
             mount | grep '/run/containerd\|/var/lib/containerd' | cut -d' ' -f3 | sort -r | while read mount_point; do
                 umount -l "$mount_point" 2>/dev/null || true
-            done
+            done || true
             
             # Wait for unmounts
             sleep 1
