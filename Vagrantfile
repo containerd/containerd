@@ -288,6 +288,14 @@ EOF
         source /etc/profile.d/sh.local
         set -eux -o pipefail
         cleanup() {
+          # Find all mount points under containerd directories and unmount them
+          mount | grep '/run/containerd\|/var/lib/containerd' | cut -d' ' -f3 | sort -r | while read mount_point; do
+              umount -l "$mount_point" 2>/dev/null || true
+          done
+          
+          # Wait a moment for unmounts to take effect
+          sleep 1
+          
           rm -rf /var/lib/containerd* /run/containerd* /tmp/containerd* /tmp/test* /tmp/failpoint* /tmp/nri*
         }
         cleanup
@@ -319,6 +327,14 @@ EOF
         rm -rf /var/lib/containerd /run/containerd
         function cleanup()
         {
+            # Find all mount points under containerd directories and unmount them
+            mount | grep '/run/containerd\|/var/lib/containerd' | cut -d' ' -f3 | sort -r | while read mount_point; do
+                umount -l "$mount_point" 2>/dev/null || true
+            done
+            
+            # Wait for unmounts
+            sleep 1
+            
             journalctl -u containerd > /tmp/containerd.log
             cat /tmp/containerd.log
             systemctl stop containerd
