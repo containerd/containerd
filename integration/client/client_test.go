@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -329,7 +330,34 @@ func TestImagePullAllPlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	img, err := client.Fetch(ctx, imagelist.Get(imagelist.Pause))
+
+	// Retry the fetch operation to handle network flakiness
+	var img images.Image
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		img, err = client.Fetch(ctx, imagelist.Get(imagelist.Pause))
+		if err == nil {
+			break
+		}
+
+		// Check if this is a network-related error that should be retried
+		errStr := err.Error()
+		if strings.Contains(errStr, "connection reset by peer") ||
+			strings.Contains(errStr, "connection refused") ||
+			strings.Contains(errStr, "timeout") ||
+			strings.Contains(errStr, "network is unreachable") ||
+			strings.Contains(errStr, "temporary failure") {
+
+			if i < maxRetries-1 {
+				t.Logf("Network error on fetch attempt %d/%d, retrying: %v", i+1, maxRetries, err)
+				time.Sleep(time.Duration(i+1) * 2 * time.Second) // exponential backoff
+				continue
+			}
+		}
+
+		// If it's not a retryable error or we've exhausted retries, fail
+		break
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +407,34 @@ func TestImagePullSomePlatforms(t *testing.T) {
 
 	// Note: Must be different to the image used in TestImagePullAllPlatforms
 	// or it will see the content pulled by that, and fail.
-	img, err := client.Fetch(ctx, "registry.k8s.io/e2e-test-images/busybox:1.29-2", opts...)
+
+	// Retry the fetch operation to handle network flakiness
+	var img images.Image
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		img, err = client.Fetch(ctx, "registry.k8s.io/e2e-test-images/busybox:1.29-2", opts...)
+		if err == nil {
+			break
+		}
+
+		// Check if this is a network-related error that should be retried
+		errStr := err.Error()
+		if strings.Contains(errStr, "connection reset by peer") ||
+			strings.Contains(errStr, "connection refused") ||
+			strings.Contains(errStr, "timeout") ||
+			strings.Contains(errStr, "network is unreachable") ||
+			strings.Contains(errStr, "temporary failure") {
+
+			if i < maxRetries-1 {
+				t.Logf("Network error on fetch attempt %d/%d, retrying: %v", i+1, maxRetries, err)
+				time.Sleep(time.Duration(i+1) * 2 * time.Second) // exponential backoff
+				continue
+			}
+		}
+
+		// If it's not a retryable error or we've exhausted retries, fail
+		break
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,6 +643,7 @@ func TestRuntimeInfo(t *testing.T) {
 func predownloadTestImages(ctx context.Context, client *Client) error {
 	imageName := imagelist.Get(imagelist.Pause)
 
+	// Pull with all manifests (no platform restriction) to cache everything locally
 	fmt.Printf("Pre-downloading test image %s with all manifests...\n", imageName)
 
 	// Use a generous timeout for the initial download
@@ -618,6 +674,6 @@ func predownloadTestImages(ctx context.Context, client *Client) error {
 		fmt.Printf("Warning: Failed to fetch all manifests for %s: %v\n", digestName, err)
 	}
 
-	fmt.Printf("Successfully pre-downloaded test image %s with all platforms\n", imageName)
+	fmt.Printf("Successfully pre-downloaded test image %s\n", imageName)
 	return nil
 }
