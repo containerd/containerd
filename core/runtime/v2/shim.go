@@ -248,7 +248,7 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 		return err
 	}
 
-	f, err := atomicfile.New(path, 0o666)
+	f, err := atomicfile.New(path, 0o644)
 	if err != nil {
 		return err
 	}
