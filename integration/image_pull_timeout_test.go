@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -93,16 +94,8 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T, useLocal bool) {
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
 
-	// Retry with exponential backoff to handle transient network/auth issues
-	err = retryWithExponentialBackoff(t, func() error {
-		_, pullErr := criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
-		return pullErr
-	}, 5, 1*time.Second, "PullImage with slow commit writer")
-
-	if err != nil {
-		// For all errors including authentication errors, fail the test
-		t.Fatalf("PullImage failed after retries: %v", err)
-	}
+	_, err = criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
+	assert.NoError(t, err)
 }
 
 func testCRIImagePullTimeoutBySlowCommitWriterWithLocal(t *testing.T) {
@@ -241,26 +234,6 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 		// release the lock
 		cleanupWriters()
 	case err := <-errCh:
-		// If we get an authentication error, it means the pull operation tried to reach the registry
-		// but failed due to auth issues. This is not the behavior we're testing (manifest locks).
-		// Try with exponential backoff to handle transient network issues.
-		if err != nil && (strings.Contains(err.Error(), "failed to authorize") ||
-			strings.Contains(err.Error(), "failed to fetch anonymous token")) {
-			t.Logf("Got authentication error: %v, retrying with exponential backoff", err)
-			cleanupWriters()
-
-			// Retry the pull operation with exponential backoff
-			retryErr := retryWithExponentialBackoff(t, func() error {
-				_, pullErr := criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
-				return pullErr
-			}, 5, 1*time.Second, "PullImage after auth error")
-
-			if retryErr != nil {
-				t.Fatalf("All retry attempts failed: %v", retryErr)
-			}
-			t.Logf("Retry succeeded, original auth error was transient")
-			return
-		}
 		t.Fatalf("PullImage should not return because the manifest has been locked, but got error=%v", err)
 	}
 
@@ -315,6 +288,15 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 	mirrorURL, err := url.Parse(ts.URL)
 	assert.NoError(t, err)
 
+	// Verify the mirror registry is healthy and responsive before proceeding
+	err = checkRegistryHealth(t, mirrorURL.String(), 5)
+	if err != nil {
+		t.Fatalf("Mirror registry health check failed: %v", err)
+	}
+
+	// Give the registry a moment to fully stabilize
+	time.Sleep(100 * time.Millisecond)
+
 	var hostTomlContent = fmt.Sprintf(`
 [host."%s"]
   capabilities = ["pull", "resolve", "push"]
@@ -356,22 +338,6 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 		assert.NoError(t, err)
 
 		_, err = criService.PullImage(dctx, fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"), nil, nil, "")
-
-		// Check for authentication errors first and retry
-		if err != nil && (strings.Contains(err.Error(), "failed to authorize") ||
-			strings.Contains(err.Error(), "failed to fetch anonymous token")) {
-			t.Logf("[%v] Got authentication error: %v, retrying with exponential backoff", idx, err)
-			
-			// Retry the pull operation with exponential backoff
-			err = retryWithExponentialBackoff(t, func() error {
-				_, retryErr := criService.PullImage(dctx, fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"), nil, nil, "")
-				return retryErr
-			}, 5, 1*time.Second, fmt.Sprintf("PullImage retry for config %d", idx))
-			
-			if err != nil {
-				t.Fatalf("[%v] PullImage failed after auth error retries: %v", idx, err)
-			}
-		}
 
 		// Check for the expected context.Canceled error (from circuit breaker)
 		unwrappedErr := errors.Unwrap(err)
@@ -593,44 +559,53 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 	})
 }
 
-// retryWithExponentialBackoff retries a function with exponential backoff
-func retryWithExponentialBackoff(t *testing.T, operation func() error, maxRetries int, initialDelay time.Duration, operationName string) error {
+// checkRegistryHealth verifies that the mirror registry is responsive and can proxy requests
+func checkRegistryHealth(t *testing.T, registryURL string, maxRetries int) error {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	// Try to access the registry's /v2/ endpoint which should return 200 or 401
+	healthURL := fmt.Sprintf("%s/v2/", registryURL)
+	
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
-			// Exponential backoff: 2^attempt * initialDelay
-			delay := time.Duration(1<<uint(attempt-1)) * initialDelay
-			if delay > 30*time.Second {
-				delay = 30 * time.Second // Cap at 30 seconds
-			}
-			t.Logf("%s: Attempt %d failed, retrying in %v", operationName, attempt, delay)
+			delay := time.Duration(attempt) * 500 * time.Millisecond
+			t.Logf("Registry health check attempt %d failed, retrying in %v", attempt, delay)
 			time.Sleep(delay)
 		}
 
-		lastErr = operation()
-		if lastErr == nil {
-			if attempt > 0 {
-				t.Logf("%s: Succeeded on attempt %d", operationName, attempt+1)
+		resp, err := client.Get(healthURL)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to connect to registry: %v", err)
+			continue
+		}
+		resp.Body.Close()
+
+		// Registry should respond with 200 (if no auth required) or 401 (if auth required)
+		// Both indicate the registry is working
+		if resp.StatusCode == 200 || resp.StatusCode == 401 {
+			t.Logf("Registry health check passed (status: %d)", resp.StatusCode)
+			
+			// Additional check: try to access a specific manifest endpoint to ensure proxying works
+			manifestURL := fmt.Sprintf("%s/v2/containerd/volume-ownership/manifests/2.1", registryURL)
+			manifestResp, manifestErr := client.Head(manifestURL)
+			if manifestErr != nil {
+				t.Logf("Manifest endpoint check failed (non-fatal): %v", manifestErr)
+			} else {
+				manifestResp.Body.Close()
+				t.Logf("Manifest endpoint responded with status: %d", manifestResp.StatusCode)
 			}
+			
 			return nil
 		}
 
-		// Check if this is a retryable error
-		errStr := lastErr.Error()
-		isRetryable := strings.Contains(errStr, "failed to authorize") ||
-			strings.Contains(errStr, "failed to fetch anonymous token") ||
-			strings.Contains(errStr, "connection refused") ||
-			strings.Contains(errStr, "timeout") ||
-			strings.Contains(errStr, "temporary failure") ||
-			strings.Contains(errStr, "no such host")
-
-		if !isRetryable {
-			t.Logf("%s: Non-retryable error: %v", operationName, lastErr)
-			break
-		}
-
-		t.Logf("%s: Attempt %d failed with retryable error: %v", operationName, attempt+1, lastErr)
+		lastErr = fmt.Errorf("registry returned unexpected status: %d", resp.StatusCode)
 	}
 
-	return lastErr
+	return fmt.Errorf("registry health check failed after %d attempts: %v", maxRetries, lastErr)
 }
