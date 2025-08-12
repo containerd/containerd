@@ -18,6 +18,7 @@ package os
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -163,7 +164,11 @@ func (sm *StatManager) Stat(ctx context.Context, path string) error {
 		case res := <-resultChan: // Stat completed
 			statError = res.Err
 		case <-statCtx.Done(): // timeout / mountpath could be stuck.
-			statError = fmt.Errorf("mountpath (%q) could be stuck", path)
+			if errors.Is(statCtx.Err(), context.DeadlineExceeded) {
+				statError = fmt.Errorf("stat call for mountpath %q timed out after %v", path, sm.statTimeout)
+			} else {
+				statError = fmt.Errorf("stat call for mountpath %q cancelled: %w", path, statCtx.Err())
+			}
 		}
 		statcancel()
 
