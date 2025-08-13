@@ -252,7 +252,6 @@ EOF
         'GOTEST': ENV['GOTEST'] || "go test",
         'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
         'GOTESTSUM_JSONFILE': ENV['GOTESTSUM_JSONFILE'],
-        'GOMAXPROCS': ENV['GOMAXPROCS'] || "2",
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
@@ -262,11 +261,9 @@ EOF
         rm -rf /var/lib/containerd-test /run/containerd-test
         cd ${GOPATH}/src/github.com/containerd/containerd
         
-        # Reduce test parallelism to avoid lock contention
-        export GOMAXPROCS=${GOMAXPROCS:-2}
         
-        go test -v -count=1 -race -parallel=2 ./core/metrics/cgroups
-        make integration EXTRA_TESTFLAGS="-timeout 30m -no-criu -test.v -test.parallel=2" TEST_RUNTIME=io.containerd.runc.v2 RUNC_FLAVOR=$RUNC_FLAVOR
+        go test -v -count=1 -race ./core/metrics/cgroups
+        make integration EXTRA_TESTFLAGS="-timeout 30m -no-criu -test.v " TEST_RUNTIME=io.containerd.runc.v2 RUNC_FLAVOR=$RUNC_FLAVOR
     SHELL
   end
 
