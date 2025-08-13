@@ -850,14 +850,28 @@ func checkContainerState(t *testing.T, svc cri.RuntimeService, name string, expe
 	assert.Equal(t, expected, status.State)
 }
 
-// pullImagesByCRI pulls images by CRI.
+// pullImagesByCRI pulls images by CRI with retry logic for network issues.
 func pullImagesByCRI(t *testing.T, svc cri.ImageManagerService, images ...string) []string {
 	expectedRefs := make([]string, 0, len(images))
 
 	for _, image := range images {
 		t.Logf("Pulling image %q", image)
-		imgRef, err := svc.PullImage(&criruntime.ImageSpec{Image: image}, nil, nil, "")
-		require.NoError(t, err)
+		var imgRef string
+		var err error
+		
+		// Retry logic for image pull to handle network flakiness
+		for attempt := 1; attempt <= 3; attempt++ {
+			imgRef, err = svc.PullImage(&criruntime.ImageSpec{Image: image}, nil, nil, "")
+			if err == nil {
+				break
+			}
+			
+			if attempt < 3 {
+				t.Logf("Failed to pull image %q on attempt %d: %v, retrying...", image, attempt, err)
+				time.Sleep(time.Duration(attempt) * 2 * time.Second)
+			}
+		}
+		require.NoError(t, err, "Failed to pull image %q after 3 attempts", image)
 		expectedRefs = append(expectedRefs, imgRef)
 	}
 	return expectedRefs

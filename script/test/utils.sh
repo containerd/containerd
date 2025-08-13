@@ -312,7 +312,7 @@ test_setup() {
   run_crictl
 }
 
-# test_teardown kills containerd.
+# test_teardown kills containerd and shim processes.
 test_teardown() {
   if [ -n "${pid}" ]; then
     if [ $IS_WINDOWS -eq 1 ]; then
@@ -326,6 +326,20 @@ test_teardown() {
         ${sudo} pkill -g ${pgid}
       else
         echo "pid(${pid}) not found, skipping pkill"
+      fi
+      
+      # Wait for processes to terminate
+      sleep 1
+      
+      # Clean up any remaining shm mounts that might cause "Device or resource busy" errors
+      if [ -d "${CONTAINERD_STATE}" ]; then
+        echo "Cleaning up shm mounts under ${CONTAINERD_STATE}..."
+        ${sudo} mount | grep "${CONTAINERD_STATE}.*shm" | awk '{print $3}' | while read -r shm_mount; do
+          if [ -n "${shm_mount}" ]; then
+            echo "Unmounting ${shm_mount}"
+            ${sudo} umount "${shm_mount}" 2>/dev/null || ${sudo} umount -l "${shm_mount}" 2>/dev/null || true
+          fi
+        done 2>/dev/null || true
       fi
     fi
   fi
