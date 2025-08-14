@@ -340,9 +340,26 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 		_, err = criService.PullImage(dctx, fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"), nil, nil, "")
 
 		// Check for the expected context.Canceled error (from circuit breaker)
-		unwrappedErr := errors.Unwrap(err)
+		// The error might be deeply wrapped, so we need to unwrap recursively
+		var unwrappedErr error = err
+		for unwrappedErr != nil {
+			if unwrappedErr == context.Canceled {
+				break
+			}
+			next := errors.Unwrap(unwrappedErr)
+			if next == nil {
+				// Can't unwrap further, check if the error message contains "context canceled"
+				errStr := unwrappedErr.Error()
+				if strings.Contains(errStr, "context canceled") || strings.Contains(errStr, "context cancelled") {
+					unwrappedErr = context.Canceled
+					break
+				}
+			}
+			unwrappedErr = next
+		}
+
 		if unwrappedErr == nil {
-			// Try to unwrap further if needed
+			// Final fallback: check the original error message
 			errStr := err.Error()
 			if strings.Contains(errStr, "context canceled") || strings.Contains(errStr, "context cancelled") {
 				unwrappedErr = context.Canceled
@@ -570,7 +587,7 @@ func checkRegistryHealth(t *testing.T, registryURL string, maxRetries int) error
 
 	// Try to access the registry's /v2/ endpoint which should return 200 or 401
 	healthURL := fmt.Sprintf("%s/v2/", registryURL)
-	
+
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
@@ -590,7 +607,7 @@ func checkRegistryHealth(t *testing.T, registryURL string, maxRetries int) error
 		// Both indicate the registry is working
 		if resp.StatusCode == 200 || resp.StatusCode == 401 {
 			t.Logf("Registry health check passed (status: %d)", resp.StatusCode)
-			
+
 			// Additional check: try to access a specific manifest endpoint to ensure proxying works
 			manifestURL := fmt.Sprintf("%s/v2/containerd/volume-ownership/manifests/2.1", registryURL)
 			manifestResp, manifestErr := client.Head(manifestURL)
@@ -600,7 +617,7 @@ func checkRegistryHealth(t *testing.T, registryURL string, maxRetries int) error
 				manifestResp.Body.Close()
 				t.Logf("Manifest endpoint responded with status: %d", manifestResp.StatusCode)
 			}
-			
+
 			return nil
 		}
 
