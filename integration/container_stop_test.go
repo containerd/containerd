@@ -98,6 +98,11 @@ func TestContainerStopCancellation(t *testing.T) {
 	t.Log("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
 
+	// Wait for the container to fully start and set up the signal trap
+	// This prevents a race condition where StopContainer is called before
+	// the shell has set up the SIGTERM trap
+	time.Sleep(100 * time.Millisecond)
+
 	t.Log("Stop the container with 3s timeout, but 1s context timeout")
 	// Note that with container pid namespace, the sleep process
 	// is pid 1, and SIGTERM sent by `StopContainer` will be ignored.
