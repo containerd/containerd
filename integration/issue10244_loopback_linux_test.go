@@ -78,10 +78,11 @@ func checkLoopbackResult(t *testing.T, useInternalLoopback bool) bool {
 
 	var (
 		testImage     = images.Get(images.BusyBox)
+		pauseImage    = images.Get(images.Pause)
 		containerName = "test-container-loopback-v2"
 	)
 
-	pullImagesByCRI(t, currentProc.criImageService(t), testImage)
+	pullImagesByCRI(t, currentProc.criImageService(t), testImage, pauseImage)
 
 	t.Log("Create a pod with a container that checks the loopback status")
 	podCtx := newPodTCtx(t, currentProc.criRuntimeService(t), "container-exec-lo-test", "sandbox")
