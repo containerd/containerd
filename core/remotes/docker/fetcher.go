@@ -61,6 +61,7 @@ func (p *bufferPool) Get() *bytes.Buffer {
 }
 
 func (p *bufferPool) Put(buffer *bytes.Buffer) {
+	buffer.Reset()
 	p.pool.Put(buffer)
 }
 
@@ -519,6 +520,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		// keep reference of the initial body value to ensure it is closed
 		ibody := body
 		go func() {
+			defer close(queue)
 			for i := range numChunks {
 				select {
 				case queue <- i:
@@ -526,10 +528,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 					if i == 0 {
 						ibody.Close()
 					}
-					return // avoid leaking a goroutine if we exit early.
+					return
 				}
 			}
-			close(queue)
 		}()
 		for range parallelism {
 			go func() {
@@ -540,6 +541,8 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 							body = ibody
 						} else {
 							if err := r.Acquire(ctx, 1); err != nil {
+								_ = writers[i].CloseWithError(err)
+								cancelCtx()
 								return err
 							}
 							defer r.Release(1)
@@ -548,12 +551,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 							nresp, err := reqClone.doWithRetries(ctx, lastHost, withErrorCheck)
 							if err != nil {
 								_ = writers[i].CloseWithError(err)
-								select {
-								case <-done:
-									return ctx.Err()
-								default:
-									cancelCtx()
-								}
+								cancelCtx()
 								return err
 							}
 							body = nresp.Body
