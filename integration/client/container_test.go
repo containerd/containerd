@@ -1983,6 +1983,11 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 				t.Logf("Process failed with exit code %d, stdout length: %d", code, len(stdout.String()))
 				t.Errorf("expected exec exit code 0 but received %d", code)
 			}
+
+			// Wait for TTY output to be fully flushed before checking
+			// TTY buffering can cause output to be incomplete immediately after process exit
+			time.Sleep(200 * time.Millisecond)
+
 		case <-time.After(30 * time.Second):
 			t.Fatal("Process execution timed out after 30 seconds")
 		}
