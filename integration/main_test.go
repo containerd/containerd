@@ -633,13 +633,17 @@ func KillProcess(name string, signal syscall.Signal) error {
 
 // KillPid kills the process by pid. kill is used.
 func KillPid(pid int) error {
-	command := "kill"
-	if goruntime.GOOS == "windows" {
-		command = "tskill"
-	}
-	output, err := exec.Command(command, strconv.Itoa(pid)).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+	switch goruntime.GOOS {
+	case "windows":
+		output, err := exec.Command("tskill", strconv.Itoa(pid)).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+		}
+	default:
+		output, err := exec.Command("kill", "-9", strconv.Itoa(pid)).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+		}
 	}
 	return nil
 }
