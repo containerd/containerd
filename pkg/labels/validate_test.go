@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/containerd/errdefs"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidLabels(t *testing.T) {
@@ -58,23 +58,23 @@ func TestLongKey(t *testing.T) {
 	value := strings.Repeat("v", maxSize-len(key))
 
 	err := Validate(key, value)
-	assert.Equal(t, err, nil)
+	require.NoError(t, err)
 
 	key = strings.Repeat("s", keyMaxLen+12)
 	value = strings.Repeat("v", maxSize-len(key)+1)
 
 	err = Validate(key, value)
-	assert.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+	require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
 
 	key = strings.Repeat("s", keyMaxLen-1)
 	value = strings.Repeat("v", maxSize-len(key))
 
 	err = Validate(key, value)
-	assert.Equal(t, err, nil)
+	require.NoError(t, err)
 
 	key = strings.Repeat("s", keyMaxLen-1)
 	value = strings.Repeat("v", maxSize-len(key)-1)
 
 	err = Validate(key, value)
-	assert.Equal(t, err, nil)
+	require.NoError(t, err)
 }

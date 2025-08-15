@@ -8,6 +8,7 @@ linters:
     - revive
     - misspell
     - nolintlint
+    - testifylint
     - unconvert
   disable:
     - errcheck
@@ -54,6 +55,8 @@ linters:
           exclude: [ "" ]
     nolintlint:
       allow-unused: true
+    testifylint:
+      enable-all: true
   exclusions:
     generated: lax
     rules:

@@ -193,7 +193,7 @@ func TestWithDevices(t *testing.T) {
 
 			spec, err := oci.GenerateSpecWithPlatform(ctx, nil, platform, c, specOpts...)
 			if tc.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}

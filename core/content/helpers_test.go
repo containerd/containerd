@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type copySource struct {
@@ -185,7 +186,7 @@ func TestCopy(t *testing.T) {
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, testcase.source.digest, testcase.writer.committedDigest)
 			assert.Equal(t, testcase.expected, testcase.writer.String())
 		})

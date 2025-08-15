@@ -202,17 +202,17 @@ func initIDMappedChecker(t *testing.T, uidMaps, gidMaps []syscall.SysProcIDMap, 
 
 	srcDir := t.TempDir()
 
-	require.Equal(t, len(uidMaps), len(gidMaps))
+	require.Len(t, gidMaps, len(uidMaps))
 	for idx := range uidMaps {
 		file := filepath.Join(srcDir, fmt.Sprintf("%v", idx))
 
 		f, err := os.Create(file)
-		require.NoError(t, err, fmt.Sprintf("create file %s", file))
+		require.NoError(t, err, "create file %s", file)
 		defer f.Close()
 
 		uid, gid := uidMaps[idx].ContainerID, gidMaps[idx].ContainerID
 		err = f.Chown(uid, gid)
-		require.NoError(t, err, fmt.Sprintf("chown %v:%v for file %s", uid, gid, file))
+		require.NoError(t, err, "chown %v:%v for file %s", uid, gid, file)
 	}
 
 	writableDir := filepath.Join(srcDir, "write-test")
@@ -225,17 +225,17 @@ func initIDMappedChecker(t *testing.T, uidMaps, gidMaps []syscall.SysProcIDMap, 
 			file := filepath.Join(destDir, fmt.Sprintf("%v", idx))
 
 			f, err := os.Open(file)
-			require.NoError(t, err, fmt.Sprintf("open file %s", file))
+			require.NoError(t, err, "open file %s", file)
 			defer f.Close()
 
 			stat, err := f.Stat()
-			require.NoError(t, err, fmt.Sprintf("stat file %s", file))
+			require.NoError(t, err, "stat file %s", file)
 
 			sysStat := stat.Sys().(*syscall.Stat_t)
 
 			uid, gid := uidMaps[idx].HostID, gidMaps[idx].HostID
-			require.Equal(t, uint32(uid), sysStat.Uid, fmt.Sprintf("check file %s uid", file))
-			require.Equal(t, uint32(gid), sysStat.Gid, fmt.Sprintf("check file %s gid", file))
+			require.Equal(t, uint32(uid), sysStat.Uid, "check file %s uid", file)
+			require.Equal(t, uint32(gid), sysStat.Gid, "check file %s gid", file)
 			t.Logf("IDMapped File %s uid=%v, gid=%v", file, uid, gid)
 		}
 
