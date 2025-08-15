@@ -436,7 +436,7 @@ type credCallback struct {
 	stream streaming.Stream
 }
 
-func (cc *credCallback) GetCredentials(ctx context.Context, ref, host string) (Credentials, error) {
+func (cc *credCallback) GetCredentials(_ context.Context, ref, host string) (Credentials, error) {
 	cc.Lock()
 	defer cc.Unlock()
 

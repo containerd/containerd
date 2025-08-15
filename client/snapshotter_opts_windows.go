@@ -22,6 +22,6 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 )
 
-func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName string, snapshotter snapshots.Snapshotter, parent string, opts ...snapshots.Opt) (string, error) {
+func resolveSnapshotOptions(_ context.Context, _ *Client, _ string, _ snapshots.Snapshotter, parent string, _ ...snapshots.Opt) (string, error) {
 	return parent, nil
 }

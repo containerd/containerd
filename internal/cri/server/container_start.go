@@ -95,7 +95,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 	span.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
 
-	ioCreation := func(id string) (_ containerdio.IO, err error) {
+	ioCreation := func(string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create container loggers: %w", err)

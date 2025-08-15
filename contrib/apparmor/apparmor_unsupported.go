@@ -28,16 +28,16 @@ import (
 )
 
 // WithProfile sets the provided apparmor profile to the spec
-func WithProfile(profile string) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+func WithProfile(string) oci.SpecOpts {
+	return func(context.Context, oci.Client, *containers.Container, *specs.Spec) error {
 		return errors.New("apparmor is not supported")
 	}
 }
 
 // WithDefaultProfile will generate a default apparmor profile under the provided name
 // for the container.  It is only generated if a profile under that name does not exist.
-func WithDefaultProfile(name string) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+func WithDefaultProfile(string) oci.SpecOpts {
+	return func(context.Context, oci.Client, *containers.Container, *specs.Spec) error {
 		return errors.New("apparmor is not supported")
 	}
 }

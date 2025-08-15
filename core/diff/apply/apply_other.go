@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/archive"
 )
 
-func apply(ctx context.Context, mounts []mount.Mount, r io.Reader, _sync bool) error {
+func apply(ctx context.Context, mounts []mount.Mount, r io.Reader, _ bool) error {
 	// TODO: for windows, how to sync?
 
 	if !mount.HasBindMounts && len(mounts) == 1 && mounts[0].Type == "bind" {

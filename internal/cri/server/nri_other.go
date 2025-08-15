@@ -26,10 +26,10 @@ import (
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (i *criImplementation) UpdateContainerResources(ctx context.Context, ctr cstore.Container, req *cri.UpdateContainerResourcesRequest, status cstore.Status) (cstore.Status, error) {
+func (i *criImplementation) UpdateContainerResources(context.Context, cstore.Container, *cri.UpdateContainerResourcesRequest, cstore.Status) (cstore.Status, error) {
 	return cstore.Status{}, nil
 }
 
-func (i *criImplementation) StopContainer(ctx context.Context, ctr cstore.Container, timeout time.Duration) error {
+func (i *criImplementation) StopContainer(context.Context, cstore.Container, time.Duration) error {
 	return nil
 }

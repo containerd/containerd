@@ -172,7 +172,7 @@ type NewSandboxOpts func(ctx context.Context, client *Client, sandbox *api.Sandb
 
 // WithSandboxRuntime allows a user to specify the runtime to be used to run a sandbox
 func WithSandboxRuntime(name string, options interface{}) NewSandboxOpts {
-	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
+	return func(_ context.Context, _ *Client, s *api.Sandbox) error {
 		if options == nil {
 			options = &types.Empty{}
 		}
@@ -212,7 +212,7 @@ func WithSandboxSpec(s *oci.Spec, opts ...oci.SpecOpts) NewSandboxOpts {
 
 // WithSandboxExtension attaches an extension to sandbox
 func WithSandboxExtension(name string, extension interface{}) NewSandboxOpts {
-	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
+	return func(_ context.Context, _ *Client, s *api.Sandbox) error {
 		if s.Extensions == nil {
 			s.Extensions = make(map[string]typeurl.Any)
 		}
@@ -229,7 +229,7 @@ func WithSandboxExtension(name string, extension interface{}) NewSandboxOpts {
 
 // WithSandboxLabels attaches map of labels to sandbox
 func WithSandboxLabels(labels map[string]string) NewSandboxOpts {
-	return func(ctx context.Context, client *Client, sandbox *api.Sandbox) error {
+	return func(_ context.Context, _ *Client, sandbox *api.Sandbox) error {
 		sandbox.Labels = labels
 		return nil
 	}

@@ -43,15 +43,15 @@ type unsupportedShaper struct {
 }
 
 // NewTCShaper makes a new unsupportedShapper for the given interface
-func NewTCShaper(iface string) Shaper {
+func NewTCShaper(string) Shaper {
 	return &unsupportedShaper{}
 }
 
-func (f *unsupportedShaper) Limit(cidr string, egress, ingress *resource.Quantity) error {
+func (f *unsupportedShaper) Limit(string, *resource.Quantity, *resource.Quantity) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (f *unsupportedShaper) Reset(cidr string) error {
+func (f *unsupportedShaper) Reset(string) error {
 	return nil
 }
 
@@ -59,7 +59,7 @@ func (f *unsupportedShaper) ReconcileInterface() error {
 	return errdefs.ErrNotImplemented
 }
 
-func (f *unsupportedShaper) ReconcileCIDR(cidr string, egress, ingress *resource.Quantity) error {
+func (f *unsupportedShaper) ReconcileCIDR(string, *resource.Quantity, *resource.Quantity) error {
 	return errdefs.ErrNotImplemented
 }
 

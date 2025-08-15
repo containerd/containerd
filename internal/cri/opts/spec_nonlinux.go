@@ -35,8 +35,8 @@ func SwapControllerAvailable() bool {
 }
 
 // WithCDI does nothing on non-Linux platforms.
-func WithCDI(_ map[string]string, _ []*runtime.CDIDevice) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, container *containers.Container, spec *oci.Spec) error {
+func WithCDI(map[string]string, []*runtime.CDIDevice) oci.SpecOpts {
+	return func(context.Context, oci.Client, *containers.Container, *oci.Spec) error {
 		return nil
 	}
 }

@@ -55,7 +55,7 @@ type InfoConfig struct {
 // WithRuntime allows a user to specify the runtime name and additional options that should
 // be used to create tasks for the container
 func WithRuntime(name string, options interface{}) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
+	return func(_ context.Context, _ *Client, c *containers.Container) error {
 		var (
 			opts typeurl.Any
 			err  error
@@ -77,7 +77,7 @@ func WithRuntime(name string, options interface{}) NewContainerOpts {
 // WithSandbox joins the container to a container group (aka sandbox) from the given ID
 // Note: shim runtime must support sandboxes environments.
 func WithSandbox(sandboxID string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
+	return func(_ context.Context, _ *Client, c *containers.Container) error {
 		c.SandboxID = sandboxID
 		return nil
 	}
@@ -85,7 +85,7 @@ func WithSandbox(sandboxID string) NewContainerOpts {
 
 // WithImage sets the provided image as the base for the container
 func WithImage(i Image) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
+	return func(_ context.Context, _ *Client, c *containers.Container) error {
 		c.Image = i.Name()
 		return nil
 	}
@@ -93,7 +93,7 @@ func WithImage(i Image) NewContainerOpts {
 
 // WithImageName allows setting the image name as the base for the container
 func WithImageName(n string) NewContainerOpts {
-	return func(ctx context.Context, _ *Client, c *containers.Container) error {
+	return func(_ context.Context, _ *Client, c *containers.Container) error {
 		c.Image = n
 		return nil
 	}
@@ -178,7 +178,7 @@ func WithImageStopSignal(image Image, defaultSignal string) NewContainerOpts {
 //
 // This option must appear before other snapshotter options to have an effect.
 func WithSnapshotter(name string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
+	return func(_ context.Context, _ *Client, c *containers.Container) error {
 		c.Snapshotter = name
 		return nil
 	}
@@ -276,7 +276,7 @@ func withNewSnapshot(id string, i Image, readonly bool, opts ...snapshots.Opt) N
 // Make sure to register the type of `extension` in the typeurl package via
 // `typeurl.Register` or container creation may fail.
 func WithContainerExtension(name string, extension interface{}) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
+	return func(_ context.Context, _ *Client, c *containers.Container) error {
 		if name == "" {
 			return fmt.Errorf("extension key must not be zero-length: %w", errdefs.ErrInvalidArgument)
 		}
