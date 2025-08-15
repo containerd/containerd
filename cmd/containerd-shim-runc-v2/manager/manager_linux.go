@@ -51,6 +51,47 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func init() {
+	if _, ok := os.LookupEnv("init"); !ok {
+		goruntime.LockOSThread()
+		// Step 1: create a new mount namespace
+		if err := unix.Unshare(unix.CLONE_NEWNS); err != nil {
+			fmt.Fprintf(os.Stderr, "containerd failed to create new mount namespace: %s\n", err)
+			// if we cannot create a new mount namespace, just skip unshare
+			goruntime.UnlockOSThread()
+			return
+		}
+
+		// Step 2: Set the rootfs: "/" to MS_SLAVE to allow host mount propagation
+		if err := unix.Mount("", "/", "", unix.MS_SLAVE|unix.MS_REC, ""); err != nil {
+			fmt.Fprintf(os.Stderr, "containerd failed to remount root as slave: %v\n", err)
+			os.Exit(1)
+		}
+		// Step 3: Set the rootfs: "/" as shared, so that all containers and namespaces
+		if err := unix.Mount("", "/", "", unix.MS_REC|unix.MS_SHARED, ""); err != nil {
+			fmt.Fprintf(os.Stderr, "containerd failed to mount with shared: %v\n", err)
+			os.Exit(1)
+		}
+		// Step 3: re-exec containerd self
+		// os.Args[0] must be containerd
+		args := os.Args
+		os.Setenv("init", "true")
+		env := os.Environ()
+		buf := make([]byte, 4096)
+		n, err := syscall.Readlink("/proc/self/exe", buf)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cannot get link of /proc/self/exe: %v\n", err)
+			os.Exit(1)
+		}
+		path := string(buf[:n])
+
+		if err := syscall.Exec(path, args, env); err != nil {
+			fmt.Fprintf(os.Stderr, "containerd failed to execute target program: %v\n", err)
+			os.Exit(1)
+		}
+	}
+}
+
 // NewShimManager returns an implementation of the shim manager
 // using runc
 func NewShimManager(name string) shim.Manager {
