@@ -186,7 +186,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 				// we should get the protocol from the url first.
 				protocol, address, ok := strings.Cut(opts.Address, "+")
 				if !ok {
-					return nil, fmt.Errorf("the scheme of sandbox address should be in " +
+					return nil, errors.New("the scheme of sandbox address should be in " +
 						" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
 				}
 				params = shimbinary.BootstrapParams{
@@ -338,7 +338,7 @@ func restoreBootstrapParams(bundlePath string) (shimbinary.BootstrapParams, erro
 
 func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 	if runtime == "" {
-		return "", fmt.Errorf("no runtime name")
+		return "", errors.New("no runtime name")
 	}
 
 	// Custom path to runtime binary
