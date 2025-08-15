@@ -299,10 +299,15 @@ func (s *gcScheduler) run(ctx context.Context) {
 		last := time.Now()
 		if err != nil {
 			log.G(ctx).WithError(err).Error("garbage collection failed")
-			collectionCounter.WithValues("fail").Inc()
-
-			// Reschedule garbage collection for same duration + 1 second
-			schedC, nextCollection = schedule(nextCollection.Sub(*lastCollection) + time.Second)
+			var retryDelay time.Duration
+			if lastCollection != nil {
+				// If we have a previous collection time, reschedule based on that interval.
+				retryDelay = nextCollection.Sub(*lastCollection) + time.Second
+			} else {
+				// If this is the first collection and it failed, use the default schedule delay.
+				retryDelay = s.scheduleDelay
+			}
+			schedC, nextCollection = schedule(retryDelay)
 
 			// Update last collection time even though failure occurred
 			lastCollection = &last
