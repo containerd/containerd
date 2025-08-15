@@ -257,10 +257,11 @@ Num:
 			suffix = str[suffixStart:end]
 			return
 		}
-		if !strings.ContainsAny(str[i:i+1], "eEinumkKMGTP") {
-			pos = i
-			break
+		if strings.ContainsAny(str[i:i+1], "eEinumkKMGTP") {
+			continue
 		}
+		pos = i
+		break
 	}
 	if pos < end {
 		switch str[pos] {

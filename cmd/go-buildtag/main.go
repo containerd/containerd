@@ -38,10 +38,12 @@ func main() {
 	tags := *tagsFl
 	for i := 0; i < flag.NArg(); i++ {
 		p := flag.Arg(i)
-		if err := handle(wr, tags, p); err != nil {
-			fmt.Fprintln(os.Stderr, p+":", err)
-			os.Exit(2)
+		err := handle(wr, tags, p)
+		if err == nil {
+			continue
 		}
+		fmt.Fprintln(os.Stderr, p+":", err)
+		os.Exit(2)
 	}
 }
 

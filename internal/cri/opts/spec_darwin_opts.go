@@ -46,10 +46,11 @@ func WithDarwinMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra
 		for _, e := range extra {
 			found := false
 			for _, c := range criMounts {
-				if cleanMount(e.ContainerPath) == cleanMount(c.ContainerPath) {
-					found = true
-					break
+				if cleanMount(e.ContainerPath) != cleanMount(c.ContainerPath) {
+					continue
 				}
+				found = true
+				break
 			}
 			if !found {
 				mounts = append(mounts, e)

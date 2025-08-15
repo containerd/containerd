@@ -302,17 +302,19 @@ func getSupportedPlatform(ctx context.Context, uc transfer.UnpackConfiguration, 
 			//nolint:staticcheck // QF1003: could use tagged switch on base (staticcheck)
 			if uc.Snapshotter == sp.SnapshotterKey {
 				return true, sp
-			} else if uc.Snapshotter == "" {
-				if sp.SnapshotterKey == defaults.DefaultSnapshotter {
-					// Return as best match immediately
-					return true, sp
-				} else if !matched {
-					// Match but prefer default if present to prevent configuration
-					// changes from altering default behavior
-					matched = true
-					u = sp
-				}
+			} else if uc.Snapshotter != "" {
+				continue
 			}
+			if sp.SnapshotterKey == defaults.DefaultSnapshotter {
+				// Return as best match immediately
+				return true, sp
+			} else if matched {
+				continue
+			}
+			// Match but prefer default if present to prevent configuration
+			// changes from altering default behavior
+			matched = true
+			u = sp
 		} else if uc.Snapshotter == sp.SnapshotterKey {
 			log.G(ctx).WithFields(log.Fields{
 				"platform":    platforms.FormatAll(uc.Platform),
