@@ -41,8 +41,7 @@ type podSandboxEventHandler struct {
 }
 
 func (p *podSandboxEventHandler) HandleEvent(any interface{}) error {
-	switch e := any.(type) {
-	case *eventtypes.TaskExit:
+	if e, ok := any.(*eventtypes.TaskExit); ok {
 		log.L.Debugf("TaskExit event in podsandbox handler %+v", e)
 		// Use ID instead of ContainerID to rule out TaskExit event for exec.
 		sb := p.controller.store.Get(e.ID)

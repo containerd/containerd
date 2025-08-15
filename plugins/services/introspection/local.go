@@ -170,11 +170,11 @@ func (l *Local) generateUUID() (string, error) {
 		return "", err
 	}
 	path := l.uuidPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return "", err
 	}
 	uu := u.String()
-	if err := os.WriteFile(path, []byte(uu), 0666); err != nil {
+	if err := os.WriteFile(path, []byte(uu), 0o666); err != nil {
 		return "", err
 	}
 	return uu, nil

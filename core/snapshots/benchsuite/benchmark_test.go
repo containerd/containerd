@@ -234,40 +234,40 @@ func makeApplier(layerIndex int, fileSizeBytes int64) []fstest.Applier {
 		return []fstest.Applier{
 			updateFile("/a"),
 			updateFile("/b"),
-			fstest.CreateRandomFile("/c", seed, fileSizeBytes, 0777),
+			fstest.CreateRandomFile("/c", seed, fileSizeBytes, 0o777),
 			updateFile("/d"),
-			fstest.CreateRandomFile("/f", seed, fileSizeBytes, 0777),
+			fstest.CreateRandomFile("/f", seed, fileSizeBytes, 0o777),
 			updateFile("/e"),
 			fstest.RemoveAll("/g"),
-			fstest.CreateRandomFile("/h", seed, fileSizeBytes, 0777),
+			fstest.CreateRandomFile("/h", seed, fileSizeBytes, 0o777),
 			updateFile("/i"),
-			fstest.CreateRandomFile("/j", seed, fileSizeBytes, 0777),
+			fstest.CreateRandomFile("/j", seed, fileSizeBytes, 0o777),
 		}
 	case layerIndex%2 == 0:
 		return []fstest.Applier{
 			updateFile("/a"),
-			fstest.CreateRandomFile("/b", seed, fileSizeBytes, 0777),
+			fstest.CreateRandomFile("/b", seed, fileSizeBytes, 0o777),
 			fstest.RemoveAll("/c"),
-			fstest.CreateRandomFile("/d", seed, fileSizeBytes, 0777),
+			fstest.CreateRandomFile("/d", seed, fileSizeBytes, 0o777),
 			updateFile("/e"),
 			fstest.RemoveAll("/f"),
-			fstest.CreateRandomFile("/g", seed, fileSizeBytes, 0777),
+			fstest.CreateRandomFile("/g", seed, fileSizeBytes, 0o777),
 			updateFile("/h"),
-			fstest.CreateRandomFile("/i", seed, fileSizeBytes, 0777),
+			fstest.CreateRandomFile("/i", seed, fileSizeBytes, 0o777),
 			updateFile("/j"),
 		}
 	default:
 		return []fstest.Applier{
-			fstest.CreateRandomFile("/a", seed, fileSizeBytes, 0777),
-			fstest.CreateRandomFile("/b", seed, fileSizeBytes, 0777),
-			fstest.CreateRandomFile("/c", seed, fileSizeBytes, 0777),
-			fstest.CreateRandomFile("/d", seed, fileSizeBytes, 0777),
-			fstest.CreateRandomFile("/e", seed, fileSizeBytes, 0777),
-			fstest.CreateRandomFile("/f", seed, fileSizeBytes, 0777),
-			fstest.CreateRandomFile("/g", seed, fileSizeBytes, 0777),
-			fstest.CreateRandomFile("/h", seed, fileSizeBytes, 0777),
-			fstest.CreateRandomFile("/i", seed, fileSizeBytes, 0777),
-			fstest.CreateRandomFile("/j", seed, fileSizeBytes, 0777),
+			fstest.CreateRandomFile("/a", seed, fileSizeBytes, 0o777),
+			fstest.CreateRandomFile("/b", seed, fileSizeBytes, 0o777),
+			fstest.CreateRandomFile("/c", seed, fileSizeBytes, 0o777),
+			fstest.CreateRandomFile("/d", seed, fileSizeBytes, 0o777),
+			fstest.CreateRandomFile("/e", seed, fileSizeBytes, 0o777),
+			fstest.CreateRandomFile("/f", seed, fileSizeBytes, 0o777),
+			fstest.CreateRandomFile("/g", seed, fileSizeBytes, 0o777),
+			fstest.CreateRandomFile("/h", seed, fileSizeBytes, 0o777),
+			fstest.CreateRandomFile("/i", seed, fileSizeBytes, 0o777),
+			fstest.CreateRandomFile("/j", seed, fileSizeBytes, 0o777),
 		}
 	}
 }
@@ -285,7 +285,7 @@ func (fn applierFn) Apply(root string) error {
 func updateFile(name string) applierFn {
 	return func(root string) error {
 		path := filepath.Join(root, name)
-		file, err := os.OpenFile(path, os.O_WRONLY, 0600)
+		file, err := os.OpenFile(path, os.O_WRONLY, 0o600)
 		if err != nil {
 			return fmt.Errorf("failed to open %q: %w", path, err)
 		}

@@ -390,7 +390,8 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 
 		appendOSMounts(s, ociimage.OS)
 		setProcess(s)
-		if s.Linux != nil {
+		switch {
+		case s.Linux != nil:
 			defaults := config.Env
 			if len(defaults) == 0 {
 				defaults = defaultUnixEnv
@@ -416,7 +417,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			// we should query the image's /etc/group for additional GIDs
 			// even if there is no specified user in the image config
 			return WithAdditionalGIDs("root")(ctx, client, c, s)
-		} else if s.Windows != nil {
+		case s.Windows != nil:
 			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
 
 			// To support Docker ArgsEscaped on Windows we need to combine the
@@ -473,7 +474,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			s.Process.User = specs.User{
 				Username: config.User,
 			}
-		} else {
+		default:
 			return errors.New("spec does not contain Linux or Windows section")
 		}
 		return nil
@@ -775,7 +776,8 @@ func WithUsername(username string) SpecOpts {
 		defer ensureAdditionalGids(s)
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
-		if s.Linux != nil {
+		switch {
+		case s.Linux != nil:
 			setUser := func(root string) error {
 				usr, err := UserFromPath(root, func(u user.User) bool {
 					return u.Name == username
@@ -809,9 +811,9 @@ func WithUsername(username string) SpecOpts {
 			// only, we append ReadOnly mount option to prevent the Linux kernel
 			// from syncing whole filesystem in umount syscall.
 			return mount.WithReadonlyTempMount(ctx, mounts, setUser)
-		} else if s.Windows != nil {
+		case s.Windows != nil:
 			s.Process.User.Username = username
-		} else {
+		default:
 			return errors.New("spec does not contain Linux or Windows section")
 		}
 		return nil

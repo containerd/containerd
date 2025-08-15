@@ -140,7 +140,7 @@ func (c *criService) mutateImageMount(
 			}
 		}()
 
-		err = os.MkdirAll(target, 0755)
+		err = os.MkdirAll(target, 0o755)
 		if err != nil {
 			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 		}

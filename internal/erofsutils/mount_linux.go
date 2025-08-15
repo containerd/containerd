@@ -81,7 +81,7 @@ func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath st
 		cmd.Path, strings.Join(cmd.Args, " "), string(out))
 
 	// Open layerPath for appending
-	f, err := os.OpenFile(layerPath, os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(layerPath, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open layer file for appending: %w", err)
 	}

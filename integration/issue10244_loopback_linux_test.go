@@ -60,7 +60,7 @@ func checkLoopbackResult(t *testing.T, useInternalLoopback bool) bool {
 		use_internal_loopback = %t`,
 		useInternalLoopback)
 
-	err := os.WriteFile(configPath, []byte(ctrdConfig), 0600)
+	err := os.WriteFile(configPath, []byte(ctrdConfig), 0o600)
 	require.NoError(t, err)
 
 	t.Logf("Start containerd")
