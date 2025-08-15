@@ -20,9 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/typeurl/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/typeurl/v2"
 )
 
 func init() {

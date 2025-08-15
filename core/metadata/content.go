@@ -288,7 +288,6 @@ func (cs *contentStore) ListStatuses(ctx context.Context, fs ...string) ([]conte
 	}
 
 	return statuses, nil
-
 }
 
 func getRef(tx *bolt.Tx, ns, ref string) string {
@@ -367,7 +366,6 @@ func (cs *contentStore) Abort(ctx context.Context, ref string) error {
 
 		return nil
 	})
-
 }
 
 func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (content.Writer, error) {

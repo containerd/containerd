@@ -83,10 +83,8 @@ func IDMapMount(source, target string, usernsFd int) (err error) {
 }
 
 // IDMapMountWithAttrs clones the mount at source to target with the provided mount options and idmapping of the user namespace.
-func IDMapMountWithAttrs(source, target string, usernsFd int, attrSet uint64, attrClr uint64) (err error) {
-	var (
-		attr unix.MountAttr
-	)
+func IDMapMountWithAttrs(source, target string, usernsFd int, attrSet, attrClr uint64) (err error) {
+	var attr unix.MountAttr
 
 	attr.Attr_set = unix.MOUNT_ATTR_IDMAP | attrSet
 	attr.Attr_clr = attrClr

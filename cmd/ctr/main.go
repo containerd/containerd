@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containerd/containerd/v2/cmd/ctr/app"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/app"
 )
 
 var pluginCmds = []*cli.Command{}

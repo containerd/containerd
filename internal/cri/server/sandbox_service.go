@@ -56,7 +56,7 @@ func (c *criSandboxService) CreateSandbox(ctx context.Context, info sandbox.Sand
 	return ctrl.Create(ctx, info, opts...)
 }
 
-func (c *criSandboxService) StartSandbox(ctx context.Context, sandboxer string, sandboxID string) (sandbox.ControllerInstance, error) {
+func (c *criSandboxService) StartSandbox(ctx context.Context, sandboxer, sandboxID string) (sandbox.ControllerInstance, error) {
 	ctrl, err := c.SandboxController(sandboxer)
 	if err != nil {
 		return sandbox.ControllerInstance{}, err
@@ -64,7 +64,7 @@ func (c *criSandboxService) StartSandbox(ctx context.Context, sandboxer string, 
 	return ctrl.Start(ctx, sandboxID)
 }
 
-func (c *criSandboxService) WaitSandbox(ctx context.Context, sandboxer string, sandboxID string) (<-chan client.ExitStatus, error) {
+func (c *criSandboxService) WaitSandbox(ctx context.Context, sandboxer, sandboxID string) (<-chan client.ExitStatus, error) {
 	ctrl, err := c.SandboxController(sandboxer)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (c *criSandboxService) WaitSandbox(ctx context.Context, sandboxer string, s
 	return ch, nil
 }
 
-func (c *criSandboxService) SandboxStatus(ctx context.Context, sandboxer string, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {
+func (c *criSandboxService) SandboxStatus(ctx context.Context, sandboxer, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {
 	ctrl, err := c.SandboxController(sandboxer)
 	if err != nil {
 		return sandbox.ControllerStatus{}, err
@@ -94,7 +94,7 @@ func (c *criSandboxService) SandboxStatus(ctx context.Context, sandboxer string,
 	return ctrl.Status(ctx, sandboxID, verbose)
 }
 
-func (c *criSandboxService) SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (imagespec.Platform, error) {
+func (c *criSandboxService) SandboxPlatform(ctx context.Context, sandboxer, sandboxID string) (imagespec.Platform, error) {
 	ctrl, err := c.SandboxController(sandboxer)
 	if err != nil {
 		return imagespec.Platform{}, err
@@ -102,7 +102,7 @@ func (c *criSandboxService) SandboxPlatform(ctx context.Context, sandboxer strin
 	return ctrl.Platform(ctx, sandboxID)
 }
 
-func (c *criSandboxService) ShutdownSandbox(ctx context.Context, sandboxer string, sandboxID string) error {
+func (c *criSandboxService) ShutdownSandbox(ctx context.Context, sandboxer, sandboxID string) error {
 	ctrl, err := c.SandboxController(sandboxer)
 	if err != nil {
 		return err

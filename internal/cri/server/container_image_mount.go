@@ -22,9 +22,6 @@ import (
 	"os"
 	"path/filepath"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/core/leases"
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -32,6 +29,10 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierrors "k8s.io/cri-api/pkg/errors"
+
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 func (c *criService) mutateMounts(
@@ -140,7 +141,7 @@ func (c *criService) mutateImageMount(
 			}
 		}()
 
-		err = os.MkdirAll(target, 0755)
+		err = os.MkdirAll(target, 0o755)
 		if err != nil {
 			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 		}

@@ -17,8 +17,9 @@
 package tasks
 
 import (
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 )
 
 var pauseCommand = &cli.Command{

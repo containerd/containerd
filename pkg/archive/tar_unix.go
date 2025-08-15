@@ -27,11 +27,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/moby/sys/userns"
-	"golang.org/x/sys/unix"
-
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/sysx"
+	"github.com/moby/sys/userns"
+	"golang.org/x/sys/unix"
 )
 
 func chmodTarEntry(perm os.FileMode) os.FileMode {
@@ -111,7 +110,7 @@ func skipFile(hdr *tar.Header) bool {
 // This function must not be called for Block and Char when running in userns.
 // (skipFile() should return true for them.)
 func handleTarTypeBlockCharFifo(hdr *tar.Header, path string) error {
-	mode := uint32(hdr.Mode & 07777)
+	mode := uint32(hdr.Mode & 0o7777)
 	switch hdr.Typeflag {
 	case tar.TypeBlock:
 		mode |= unix.S_IFBLK

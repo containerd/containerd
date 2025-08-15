@@ -26,15 +26,16 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispecs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/pkg/labels"
 )
 
 type exportOptions struct {
@@ -320,7 +321,6 @@ func Export(ctx context.Context, store content.InfoReaderProvider, writer io.Wri
 					mt := dManifests[d]
 					mt.names = append(mt.names, name)
 				}
-
 			}
 		} else {
 			return fmt.Errorf("only manifests may be exported: %w", errdefs.ErrInvalidArgument)
@@ -339,9 +339,9 @@ func Export(ctx context.Context, store content.InfoReaderProvider, writer io.Wri
 	}
 
 	if len(algorithms) > 0 {
-		records = append(records, directoryRecord("blobs/", 0755))
+		records = append(records, directoryRecord("blobs/", 0o755))
 		for alg := range algorithms {
-			records = append(records, directoryRecord("blobs/"+alg+"/", 0755))
+			records = append(records, directoryRecord("blobs/"+alg+"/", 0o755))
 		}
 	}
 
@@ -397,7 +397,7 @@ func blobRecord(cs content.Provider, desc ocispec.Descriptor, opts *blobRecordOp
 	return tarRecord{
 		Header: &tar.Header{
 			Name:     path.Join(ocispec.ImageBlobsDir, desc.Digest.Algorithm().String(), desc.Digest.Encoded()),
-			Mode:     0444,
+			Mode:     0o444,
 			Size:     desc.Size,
 			Typeflag: tar.TypeReg,
 		},
@@ -449,7 +449,7 @@ func ociLayoutFile(version string) tarRecord {
 	return tarRecord{
 		Header: &tar.Header{
 			Name:     ocispec.ImageLayoutFile,
-			Mode:     0444,
+			Mode:     0o444,
 			Size:     int64(len(b)),
 			Typeflag: tar.TypeReg,
 		},
@@ -458,7 +458,6 @@ func ociLayoutFile(version string) tarRecord {
 			return int64(n), err
 		},
 	}
-
 }
 
 func ociIndexRecord(manifests []ocispec.Descriptor) tarRecord {
@@ -478,7 +477,7 @@ func ociIndexRecord(manifests []ocispec.Descriptor) tarRecord {
 	return tarRecord{
 		Header: &tar.Header{
 			Name:     ocispec.ImageIndexFile,
-			Mode:     0644,
+			Mode:     0o644,
 			Size:     int64(len(b)),
 			Typeflag: tar.TypeReg,
 		},
@@ -542,7 +541,7 @@ func manifestsRecord(ctx context.Context, store content.Provider, manifests map[
 	return tarRecord{
 		Header: &tar.Header{
 			Name:     "manifest.json",
-			Mode:     0644,
+			Mode:     0o644,
 			Size:     int64(len(b)),
 			Typeflag: tar.TypeReg,
 		},

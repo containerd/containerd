@@ -23,14 +23,14 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/platforms"
 )
 
 const (
@@ -38,11 +38,9 @@ const (
 	defaultRootfsPath = "rootfs"
 )
 
-var (
-	defaultUnixEnv = []string{
-		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-	}
-)
+var defaultUnixEnv = []string{
+	"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+}
 
 // Spec is a type alias to the OCI runtime spec to allow third part SpecOpts
 // to be created without the "issues" with go vendoring and package imports

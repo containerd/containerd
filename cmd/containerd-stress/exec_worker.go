@@ -23,11 +23,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/log"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/log"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type execWorker struct {

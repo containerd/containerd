@@ -70,7 +70,7 @@ func (l *LogReduction) cleanupErrorTimeouts() {
 
 // ShouldMessageBePrinted determines whether a message should be printed based
 // on how long ago this particular message was last printed
-func (l *LogReduction) ShouldMessageBePrinted(message string, parentID string) bool {
+func (l *LogReduction) ShouldMessageBePrinted(message, parentID string) bool {
 	l.errorMapLock.Lock()
 	defer l.errorMapLock.Unlock()
 	l.cleanupErrorTimeouts()

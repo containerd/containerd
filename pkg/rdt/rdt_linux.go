@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/containerd/log"
-
 	"github.com/intel/goresctrl/pkg/rdt"
 )
 

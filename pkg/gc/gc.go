@@ -147,7 +147,6 @@ func ConcurrentMark(ctx context.Context, root <-chan Node, refs func(context.Con
 						cancel()
 					})
 				}
-
 			}(gray)
 		}
 	}()

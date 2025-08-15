@@ -21,8 +21,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/v2/pkg/rdt"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/pkg/rdt"
 )
 
 // rdtClassFromAnnotations examines container and pod annotations of a

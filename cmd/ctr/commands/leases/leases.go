@@ -24,9 +24,10 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/urfave/cli/v2"
+
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/leases"
-	"github.com/urfave/cli/v2"
 )
 
 // Command is the cli command for managing content
@@ -41,7 +42,6 @@ var Command = &cli.Command{
 }
 
 var listCommand = &cli.Command{
-
 	Name:        "list",
 	Aliases:     []string{"ls"},
 	Usage:       "List all active leases",
@@ -118,7 +118,7 @@ var createCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		var labelstr = cliContext.Args().Slice()
+		labelstr := cliContext.Args().Slice()
 		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
@@ -167,7 +167,7 @@ var deleteCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		var lids = cliContext.Args().Slice()
+		lids := cliContext.Args().Slice()
 		if len(lids) == 0 {
 			return cli.ShowSubcommandHelp(cliContext)
 		}

@@ -20,10 +20,11 @@ import (
 	"context"
 	"io"
 
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/transfer"
 )
 
 // Resolver provides remotes based on a locator.
@@ -102,7 +103,7 @@ func (fn PusherFunc) Push(ctx context.Context, desc ocispec.Descriptor) (content
 
 // FetchByDigestConfig provides configuration for fetching content by digest
 type FetchByDigestConfig struct {
-	//Mediatype specifies mediatype header to append for fetch request
+	// Mediatype specifies mediatype header to append for fetch request
 	Mediatype string
 }
 

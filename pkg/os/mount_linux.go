@@ -17,12 +17,13 @@
 package os
 
 import (
-	"github.com/containerd/containerd/v2/core/mount"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 // Mount will call unix.Mount to mount the file.
-func (RealOS) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+func (RealOS) Mount(source, target, fstype string, flags uintptr, data string) error {
 	return unix.Mount(source, target, fstype, flags, data)
 }
 

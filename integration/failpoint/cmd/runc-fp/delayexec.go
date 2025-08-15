@@ -82,11 +82,11 @@ func fifoFromProcessEnv() (fifosync.Trigger, fifosync.Waiter, error) {
 		return nil, nil, fmt.Errorf("fifo: failed to find %q env var in %v", failpoint.DelayExecDelayEnv, env)
 	}
 	logrus.WithField("ready", readyName).WithField("delay", delayName).Debug("Found FIFOs!")
-	readyFIFO, err := fifosync.NewTrigger(readyName, 0600)
+	readyFIFO, err := fifosync.NewTrigger(readyName, 0o600)
 	if err != nil {
 		return nil, nil, err
 	}
-	delayFIFO, err := fifosync.NewWaiter(delayName, 0600)
+	delayFIFO, err := fifosync.NewWaiter(delayName, 0o600)
 	if err != nil {
 		return nil, nil, err
 	}

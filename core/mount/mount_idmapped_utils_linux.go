@@ -21,9 +21,9 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/containerd/containerd/v2/pkg/sys"
-
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/v2/pkg/sys"
 )
 
 // getUsernsFD returns pinnable user namespace's file descriptor.

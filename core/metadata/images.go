@@ -25,17 +25,18 @@ import (
 	"time"
 
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/errdefs"
+	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
+
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/errdefs"
-	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	bolt "go.etcd.io/bbolt"
-	errbolt "go.etcd.io/bbolt/errors"
 )
 
 type imageStore struct {
@@ -276,7 +277,6 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 	}
 
 	return updated, nil
-
 }
 
 func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.DeleteOpt) error {

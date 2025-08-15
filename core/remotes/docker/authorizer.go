@@ -26,10 +26,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/remotes/docker/auth"
-	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/core/remotes/docker/auth"
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 )
 
 type dockerAuthorizer struct {

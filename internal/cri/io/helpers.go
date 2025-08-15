@@ -87,7 +87,7 @@ func (g *wgCloser) Cancel() {
 // newFifos creates fifos directory for a container.
 func newFifos(root, id string, tty, stdin bool) (*cio.FIFOSet, error) {
 	root = filepath.Join(root, "io")
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
 	fifos, err := cio.NewFIFOSetInDir(root, id, tty)
@@ -177,7 +177,7 @@ func newStdioStream(fifos *cio.FIFOSet) (_ *stdioStream, _ *wgCloser, err error)
 func openStdin(ctx context.Context, url string) (io.WriteCloser, error) {
 	ok := strings.Contains(url, "://")
 	if !ok {
-		return openPipe(ctx, url, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
+		return openPipe(ctx, url, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0o700)
 	}
 
 	return openStdinStream(ctx, url)
@@ -194,7 +194,7 @@ func openStdinStream(ctx context.Context, url string) (io.WriteCloser, error) {
 func openOutput(ctx context.Context, url string) (io.ReadCloser, error) {
 	ok := strings.Contains(url, "://")
 	if !ok {
-		return openPipe(ctx, url, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700)
+		return openPipe(ctx, url, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0o700)
 	}
 
 	return openOutputStream(ctx, url)

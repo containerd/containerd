@@ -24,10 +24,11 @@ import (
 
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/log"
+
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/oom"
-	"github.com/containerd/log"
 )
 
 // New returns an implementation that listens to OOM events

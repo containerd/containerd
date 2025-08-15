@@ -29,6 +29,11 @@ import (
 
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
+	"github.com/intel/goresctrl/pkg/blockio"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/urfave/cli/v2"
+	"tags.cncf.io/container-device-interface/pkg/cdi"
+	"tags.cncf.io/container-device-interface/pkg/parser"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -40,12 +45,6 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	cdispec "github.com/containerd/containerd/v2/pkg/cdi"
 	"github.com/containerd/containerd/v2/pkg/oci"
-
-	"github.com/intel/goresctrl/pkg/blockio"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli/v2"
-	"tags.cncf.io/container-device-interface/pkg/cdi"
-	"tags.cncf.io/container-device-interface/pkg/parser"
 )
 
 var platformRunFlags = []cli.Flag{
