@@ -779,6 +779,32 @@ func TestWithoutMounts(t *testing.T) {
 	}
 }
 
+func TestWithParentCgroupDevices(t *testing.T) {
+	t.Parallel()
+
+	// TODO(thaJeztah): WithParentCgroupDevices should probably be a no-op if the Spec is non-Linux.
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			err := WithParentCgroupDevices(context.Background(), nil, nil, &spec)
+			assert.NoError(t, err)
+			assert.Nil(t, spec.Linux.Resources.Devices)
+		})
+	}
+
+	t.Run("reset existing", func(t *testing.T) {
+		s := Spec{
+			Linux: &specs.Linux{
+				Resources: &specs.LinuxResources{
+					Devices: []specs.LinuxDeviceCgroup{{Allow: true, Access: rwm}},
+				},
+			},
+		}
+		err := WithParentCgroupDevices(context.Background(), nil, nil, &s)
+		assert.NoError(t, err)
+		assert.Nil(t, s.Linux.Resources.Devices)
+	})
+}
+
 func TestWithWindowsDevice(t *testing.T) {
 	testcases := []struct {
 		name   string
