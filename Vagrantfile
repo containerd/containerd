@@ -263,7 +263,7 @@ EOF
         
         
         go test -v -count=1 -race ./core/metrics/cgroups
-        make integration EXTRA_TESTFLAGS="-timeout 30m -no-criu -test.v " TEST_RUNTIME=io.containerd.runc.v2 RUNC_FLAVOR=$RUNC_FLAVOR
+        make integration EXTRA_TESTFLAGS="-timeout 30m -no-criu -test.v" TEST_RUNTIME=io.containerd.runc.v2 RUNC_FLAVOR=$RUNC_FLAVOR
     SHELL
   end
 

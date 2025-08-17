@@ -52,7 +52,7 @@ func TestImageIsUnpacked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// By default pull does not unpack an image - using retry logic for network resilience
+	// By default pull does not unpack an image
 	image, err := retryImagePull(ctx, t, client, imageName, WithPlatformMatcher(platforms.Default()))
 	if err != nil {
 		t.Fatal(err)

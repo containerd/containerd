@@ -858,14 +858,14 @@ func pullImagesByCRI(t *testing.T, svc cri.ImageManagerService, images ...string
 		t.Logf("Pulling image %q", image)
 		var imgRef string
 		var err error
-		
+
 		// Retry logic for image pull to handle network flakiness
 		for attempt := 1; attempt <= 3; attempt++ {
 			imgRef, err = svc.PullImage(&criruntime.ImageSpec{Image: image}, nil, nil, "")
 			if err == nil {
 				break
 			}
-			
+
 			if attempt < 3 {
 				t.Logf("Failed to pull image %q on attempt %d: %v, retrying...", image, attempt, err)
 				time.Sleep(time.Duration(attempt) * 2 * time.Second)
