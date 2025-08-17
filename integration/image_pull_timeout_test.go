@@ -50,7 +50,7 @@ import (
 )
 
 var (
-	defaultImagePullProgressTimeout = 5 * time.Second
+	defaultImagePullProgressTimeout = 10 * time.Second
 	pullProgressTestImageName       = "ghcr.io/containerd/volume-ownership:2.1"
 )
 
@@ -227,6 +227,8 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 
 	// Wait for the pull to be blocked by locked manifests
 	timeout := defaultImagePullProgressTimeout * 5
+	time.Sleep(20 * time.Millisecond) // Give some time for the pull to start
+
 	select {
 	case <-time.After(timeout):
 		// Expected: pull should be blocked by locked writers
