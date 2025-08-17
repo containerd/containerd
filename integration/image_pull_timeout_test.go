@@ -50,7 +50,7 @@ import (
 )
 
 var (
-	defaultImagePullProgressTimeout = 10 * time.Second
+	defaultImagePullProgressTimeout = 5 * time.Second
 	pullProgressTestImageName       = "ghcr.io/containerd/volume-ownership:2.1"
 )
 
