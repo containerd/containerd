@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"path"
 	"sort"
 	"strings"
@@ -183,9 +184,9 @@ func WithSkipMissing(store content.InfoReaderProvider) ExportOpt {
 }
 
 func addNameAnnotation(name string, base map[string]string) map[string]string {
-	annotations := map[string]string{}
-	for k, v := range base {
-		annotations[k] = v
+	annotations := maps.Clone(base)
+	if annotations == nil {
+		annotations = map[string]string{}
 	}
 
 	annotations[images.AnnotationImageName] = name
