@@ -18,12 +18,14 @@ package podsandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"syscall"
 	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/sandbox"
@@ -109,7 +111,7 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types
 	}
 
 	// Kill the pod sandbox container.
-	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
+	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) && !errors.Is(err, ttrpc.ErrClosed) {
 		return fmt.Errorf("failed to kill pod sandbox container: %w", err)
 	}
 

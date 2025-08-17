@@ -18,12 +18,14 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	eventtypes "github.com/containerd/containerd/api/events"
@@ -188,7 +190,7 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 	} else {
 		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
 		if _, err = task.Delete(ctx, c.nri.WithContainerExit(&cntr), containerd.WithProcessKill); err != nil {
-			if !errdefs.IsNotFound(err) {
+			if !errdefs.IsNotFound(err) && !errors.Is(err, ttrpc.ErrClosed) {
 				return fmt.Errorf("failed to stop container: %w", err)
 			}
 			// Move on to make sure container status is updated.

@@ -312,24 +312,57 @@ test_setup() {
   run_crictl
 }
 
-# test_teardown kills containerd.
+# test_teardown kills containerd and associated shim processes, unmounts shm, and cleans up state.
 test_teardown() {
   if [ -n "${pid}" ]; then
     if [ $IS_WINDOWS -eq 1 ]; then
-      # Mark service for deletion. It will be deleted as soon as the service stops.
+      # Windows cleanup
       sc.exe delete containerd-test
       # Stop the service
       sc.exe stop containerd-test || true
     else
+      echo "[teardown] Stopping containerd for PID ${pid}..."
+
+      # Kill containerd process group
       pgid=$(ps -o pgid= -p "${pid}" || true)
-      if [ ! -z "${pgid}" ]; then
-        ${sudo} pkill -g ${pgid}
+      if [ -n "${pgid}" ]; then
+        ${sudo} pkill -g "${pgid}" || true
       else
-        echo "pid(${pid}) not found, skipping pkill"
+        echo "[teardown] pid(${pid}) not found, skipping pkill"
+      fi
+
+      # Kill only shims for this containerd instance (safe for parallel tests)
+      if [ -n "${CONTAINERD_STATE}" ]; then
+        echo "[teardown] Killing shims under ${CONTAINERD_STATE}..."
+        ${sudo} pkill -9 -f "containerd-shim.*${CONTAINERD_STATE}" || true
+
+        # Wait until shims are gone
+        for i in $(seq 1 30); do
+          if ! pgrep -f "containerd-shim.*${CONTAINERD_STATE}" >/dev/null; then
+            echo "[teardown] All shims exited."
+            break
+          fi
+          echo "[teardown] Waiting for shims to exit..."
+          sleep 1
+        done
+
+        # Clean up shm mounts
+        if [ -d "${CONTAINERD_STATE}" ]; then
+          echo "[teardown] Cleaning up shm mounts under ${CONTAINERD_STATE}..."
+          ${sudo} mount | grep "${CONTAINERD_STATE}.*shm" | awk '{print $3}' | while read -r shm_mount; do
+            if [ -n "${shm_mount}" ]; then
+              echo "[teardown] Unmounting ${shm_mount}"
+              ${sudo} umount "${shm_mount}" 2>/dev/null \
+                || ${sudo} umount -l "${shm_mount}" 2>/dev/null \
+                || true
+            fi
+          done 2>/dev/null || true
+        fi
       fi
     fi
   fi
 }
+
 
 run_ctr() {
   ${sudo} ${PWD}/bin/ctr --address "${TRIMMED_CONTAINERD_SOCK}" version

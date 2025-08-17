@@ -91,9 +91,10 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 	status := container.Status.Get()
 	reason := status.Reason
 	if status.State() == runtime.ContainerState_CONTAINER_EXITED && reason == "" {
-		if status.ExitCode == 0 {
+		switch status.ExitCode { //nolint:QF1003
+		case 0:
 			reason = completeExitReason
-		} else {
+		default:
 			reason = errorExitReason
 		}
 	}
