@@ -41,8 +41,9 @@ func DupStringMap(in map[string]string) map[string]string {
 // IsMarkedForRemoval checks if a key is marked for removal.
 //
 // The key can be an annotation name, a mount container path, a device path,
-// or an environment variable name. These are all marked for removal in
-// adjustments by preceding their corresponding key with a '-'.
+// a namespace type, or an environment variable name.
+// These are all marked for removal in adjustments by preceding
+// their corresponding key with a '-'.
 func IsMarkedForRemoval(key string) (string, bool) {
 	if key == "" {
 		return "", false
