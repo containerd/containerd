@@ -28,6 +28,7 @@ import (
 
 	"github.com/opencontainers/selinux/go-selinux"
 	assertlib "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -153,13 +154,14 @@ func TestContainerStore(t *testing.T) {
 		},
 	}
 	assert := assertlib.New(t)
+	require := require.New(t)
 	containers := map[string]Container{}
 	for id := range metadatas {
 		container, err := NewContainer(
 			metadatas[id],
 			WithFakeStatus(statuses[id]),
 		)
-		assert.NoError(err)
+		require.NoError(err)
 		containers[id] = container
 	}
 
@@ -174,14 +176,14 @@ func TestContainerStore(t *testing.T) {
 
 	t.Logf("should be able to add container")
 	for _, c := range containers {
-		assert.NoError(s.Add(c))
+		require.NoError(s.Add(c))
 	}
 
 	t.Logf("should be able to get container")
 	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
 	for id, c := range containers {
 		got, err := s.Get(genTruncIndex(id))
-		assert.NoError(err)
+		require.NoError(err)
 		assert.Equal(c, got)
 		assert.Nil(c.Stats)
 	}
@@ -193,7 +195,7 @@ func TestContainerStore(t *testing.T) {
 	t.Logf("should be able to update stats on container")
 	for id := range containers {
 		err := s.UpdateContainerStats(id, stats[id])
-		assert.NoError(err)
+		require.NoError(err)
 	}
 
 	// Validate stats were updated
@@ -266,9 +268,10 @@ func TestWithContainerIO(t *testing.T) {
 		Message:    "TestMessage-1",
 	}
 	assert := assertlib.New(t)
+	require := require.New(t)
 
 	c, err := NewContainer(meta, WithFakeStatus(status))
-	assert.NoError(err)
+	require.NoError(err)
 	assert.Nil(c.IO)
 
 	c, err = NewContainer(
@@ -276,6 +279,6 @@ func TestWithContainerIO(t *testing.T) {
 		WithFakeStatus(status),
 		WithContainerIO(&cio.ContainerIO{}),
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	assert.NotNil(c.IO)
 }

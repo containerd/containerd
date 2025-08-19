@@ -23,25 +23,26 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
 func Test_PodSandbox(t *testing.T) {
 	p := NewPodSandbox("test", sandbox.Status{State: sandbox.StateUnknown})
-	assert.Equal(t, p.Status.Get().State, sandbox.StateUnknown)
-	assert.Equal(t, p.ID, "test")
+	assert.Equal(t, sandbox.StateUnknown, p.Status.Get().State)
+	assert.Equal(t, "test", p.ID)
 	p.Metadata = sandbox.Metadata{ID: "test", NetNSPath: "/test"}
 	createAt := time.Now()
-	assert.NoError(t, p.Status.Update(func(status sandbox.Status) (sandbox.Status, error) {
+	require.NoError(t, p.Status.Update(func(status sandbox.Status) (sandbox.Status, error) {
 		status.State = sandbox.StateReady
 		status.Pid = uint32(100)
 		status.CreatedAt = createAt
 		return status, nil
 	}))
 	status := p.Status.Get()
-	assert.Equal(t, status.State, sandbox.StateReady)
-	assert.Equal(t, status.Pid, uint32(100))
+	assert.Equal(t, sandbox.StateReady, status.State)
+	assert.Equal(t, uint32(100), status.Pid)
 	assert.Equal(t, status.CreatedAt, createAt)
 
 	exitAt := time.Now().Add(time.Second)
@@ -59,10 +60,10 @@ func Test_PodSandbox(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		exitStatus, err := p.Wait(context.Background())
-		assert.Equal(t, err, nil)
+		require.NoError(t, err)
 		code, exitTime, err := exitStatus.Result()
-		assert.Equal(t, err, nil)
-		assert.Equal(t, code, uint32(128))
+		require.NoError(t, err)
+		assert.Equal(t, uint32(128), code)
 		assert.Equal(t, exitTime, exitAt)
 	}()
 	time.Sleep(time.Second)

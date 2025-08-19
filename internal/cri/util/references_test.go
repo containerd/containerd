@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/distribution/reference"
 	"github.com/opencontainers/go-digest"
@@ -63,7 +64,7 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			named, err := reference.ParseDockerRef(test.ref)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			repoDigest, repoTag := GetRepoDigestAndTag(named, digest)
 			assert.Equal(t, test.expectedRepoDigest, repoDigest)
 			assert.Equal(t, test.expectedRepoTag, repoTag)

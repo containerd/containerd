@@ -36,7 +36,6 @@ import (
 
 	"github.com/containerd/log"
 	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -280,8 +279,8 @@ func PodSandboxConfigWithCleanup(t *testing.T, name, ns string, opts ...PodSandb
 	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+		require.NoError(t, runtimeService.StopPodSandbox(sb))
+		require.NoError(t, runtimeService.RemovePodSandbox(sb))
 	})
 
 	return sb, sbConfig
@@ -794,7 +793,7 @@ func RestartContainerd(t *testing.T, signal syscall.Signal) {
 
 	// Use assert so that the 3rd wait always runs, this makes sure
 	// containerd is running before this function returns.
-	assert.NoError(t, Eventually(func() (bool, error) {
+	require.NoError(t, Eventually(func() (bool, error) {
 		pid, err := PidOf(*containerdBin)
 		if err != nil {
 			return false, err

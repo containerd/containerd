@@ -283,7 +283,7 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 
 			if tc.injectUmountFault {
 				// We should have failed to remove the remounts location if the unmount failed.
-				assert.NoError(t, err, "expected remounts location to still exist after unmount failure")
+				require.NoError(t, err, "expected remounts location to still exist after unmount failure")
 			} else {
 				pathErr, isPathErr := err.(*fs.PathError)
 				require.True(t, isPathErr, "expected a PathError")
