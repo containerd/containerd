@@ -483,14 +483,11 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 // root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
 // specified with the same destination.
 func (c *criService) volumeMounts(platform imagespec.Platform, containerRootDir string, containerConfig *runtime.ContainerConfig, config *imagespec.ImageConfig) []*runtime.Mount {
-	var uidMappings, gidMappings []*runtime.IDMapping
-	if platform.OS == "linux" {
-		if usernsOpts := containerConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions(); usernsOpts != nil {
-			uidMappings = usernsOpts.GetUids()
-			gidMappings = usernsOpts.GetGids()
-		}
-	}
-
+	// GetLinux() returns nil on non-Linux platforms, and protobuf methods work fine on nil
+	// objects. They just return nil.
+	usernsOpts := containerConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions()
+	uidMappings := usernsOpts.GetUids()
+	gidMappings := usernsOpts.GetGids()
 	criMounts := containerConfig.GetMounts()
 
 	if len(config.Volumes) == 0 {
