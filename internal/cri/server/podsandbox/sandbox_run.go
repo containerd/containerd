@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/containerd/log"
 	"github.com/containerd/nri"
@@ -41,6 +42,7 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/errdefs"
 )
 
@@ -261,16 +263,22 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 	}
 
-	nric, err := nri.New()
+	nric, err := nri.New() //nolint:staticcheck
 	if err != nil {
 		return cin, fmt.Errorf("unable to create nri client: %w", err)
 	}
 	if nric != nil {
-		nriSB := &nri.Sandbox{
+		if plugins := nric.Plugins(); len(plugins) != 0 { //nolint:staticcheck
+			c.warningService.Emit(ctx, deprecation.NRIV010Plugin)
+			msg, _ := deprecation.Message(deprecation.NRIV010Plugin)
+			log.G(ctx).Warnf("Deprecated NRI plugin(s) %s: %s", strings.Join(plugins, ","), msg)
+		}
+
+		nriSB := &nri.Sandbox{ //nolint:staticcheck
 			ID:     id,
 			Labels: config.Labels,
 		}
-		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
+		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil { //nolint:staticcheck
 			return cin, fmt.Errorf("nri invoke: %w", err)
 		}
 	}

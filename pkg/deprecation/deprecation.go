@@ -33,6 +33,8 @@ const (
 	TracingOTLPConfig Warning = Prefix + "tracing-processor-config"
 	// TracingServiceConfig is a warning for the use of the `tracing` property
 	TracingServiceConfig Warning = Prefix + "tracing-service-config"
+	// NRIV010Plugin is a warning for the use of NRI 0.1.0-style plugins
+	NRIV010Plugin Warning = Prefix + "nri-v010-plugin"
 )
 
 const (
@@ -53,6 +55,7 @@ var messages = map[Warning]string{
 		"Use OTLP environment variables instead: https://opentelemetry.io/docs/specs/otel/protocol/exporter/",
 	TracingServiceConfig: "The `tracing` property of `[plugins.\"io.containerd.internal.v1\".tracing]` is deprecated since containerd v1.6 and will be removed in containerd v2.2." +
 		"Use OTEL environment variables instead: https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/",
+	NRIV010Plugin: "NRI 0.1.0-style plugins are deprecated since containerd 2.2 and should only be used through the v010-adapter plugin.",
 }
 
 // Valid checks whether a given Warning is valid
