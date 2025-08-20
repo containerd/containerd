@@ -54,10 +54,7 @@ func init() {
 //
 // It returns:
 //  1. New options that include new "lowedir=..." mount option.
-//  2. "Clean up" function -- it should be called as a defer one before
-//     checking for error, because if do the second and avoid calling "clean up",
-//     you're going to have "dirty" setup -- there's no guarantee that those
-//     temporary mount points for lowedirs will be cleaned properly.
+//  2. "Clean up" function -- it should be called only if no error is returned.
 //  3. Error -- nil if everything's fine, otherwise an error.
 func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), error) {
 	lowerIdx, lowerDirs := findOverlayLowerdirs(options)
@@ -65,12 +62,7 @@ func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), e
 		return options, nil, fmt.Errorf("failed to parse overlay lowerdir's from given options")
 	}
 
-	tempRemountsLocation, err := os.MkdirTemp(tempMountLocation, "ovl-idmapped")
-	if err != nil {
-		return options, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
-	}
-
-	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(tempRemountsLocation, lowerDirs, usernsFd)
+	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(tempMountLocation, lowerDirs, usernsFd)
 	if err != nil {
 		return options, idMapCleanUp, fmt.Errorf("failed to create idmapped mount: %w", err)
 	}
@@ -114,11 +106,11 @@ func (m *Mount) mount(target string) (err error) {
 				userNsCleanUp func()
 			)
 			options, userNsCleanUp, err = prepareIDMappedOverlay(int(usernsFd.Fd()), options)
-			defer userNsCleanUp()
-
 			if err != nil {
 				return fmt.Errorf("failed to prepare idmapped overlay: %w", err)
 			}
+			defer userNsCleanUp()
+
 			// To not meet concurrency issues while using the same lowedirs
 			// for different containers, replace them by temporary directories,
 			if optionsSize(options) >= pagesize-512 {
@@ -248,31 +240,54 @@ func getUnprivilegedMountFlags(path string) (int, error) {
 	return flags, nil
 }
 
-func doPrepareIDMappedOverlay(tempRemountsLocation string, lowerDirs []string, usernsFd int) ([]string, func(), error) {
+func doPrepareIDMappedOverlay(tmpDir string, lowerDirs []string, usernsFd int) (_ []string, _ func(), retErr error) {
 	commonDir, err := getCommonDirectory(lowerDirs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to determine common parent: %w", err)
 	}
 
-	cleanUp := func() {
-		if err := unix.Unmount(tempRemountsLocation, 0); err != nil {
-			log.L.WithError(err).Warnf("failed to unmount idmapped directory %s", tempRemountsLocation)
-		}
-		// Using os.Remove() so if it's not empty, we don't delete files in the rootfs.
+	tempRemountsLocation, err := os.MkdirTemp(tmpDir, "ovl-idmapped")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
+	}
+	cleanDir := func() {
 		if err := os.Remove(tempRemountsLocation); err != nil {
 			log.L.WithError(err).Infof("failed to remove idmapped directory")
 		}
 	}
+	defer func() {
+		if retErr != nil {
+			cleanDir()
+		}
+	}()
 
 	// IDMapMount the directory containing all the layers
 	if err := IDMapMountWithAttrs(commonDir, tempRemountsLocation, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
-		return nil, cleanUp, err
+		return nil, nil, err
 	}
+	cleanMount := func() {
+		// Use the Unmount helper that does retries because there can be easily an open fd
+		// to the idmapped directory and when containerd forks to create a userns fd (maybe
+		// for another container), it will make the mount busy for a few ms.
+		err := Unmount(tempRemountsLocation, 0)
+		if err != nil {
+			log.L.WithError(err).Warnf("failed to unmount idmapped directory %s: %v", tempRemountsLocation, err)
+		}
+	}
+	defer func() {
+		if retErr != nil {
+			cleanMount()
+		}
+	}()
 
 	// Build new lower dir paths through the idmapped directory
 	tmpLowerDirs := buildIDMappedPaths(lowerDirs, commonDir, tempRemountsLocation)
 
-	return tmpLowerDirs, cleanUp, nil
+	cleanup := func() {
+		cleanMount()
+		cleanDir()
+	}
+	return tmpLowerDirs, cleanup, nil
 }
 
 // getCommonDirectory finds the common directory among the lowerDirs passed in.
