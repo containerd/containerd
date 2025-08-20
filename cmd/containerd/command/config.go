@@ -132,6 +132,7 @@ func platformAgnosticDefaultConfig() *srvconfig.Config {
 		State:   defaults.DefaultStateDir,
 		GRPC: srvconfig.GRPCConfig{
 			Address:        defaults.DefaultAddress,
+			AddressSymlink: "",
 			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
 			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
 		},

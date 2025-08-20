@@ -205,6 +205,7 @@ func v1Migrate(ctx context.Context, c *Config) error {
 // GRPCConfig provides GRPC configuration for the socket
 type GRPCConfig struct {
 	Address        string `toml:"address"`
+	AddressSymlink string `toml:"address_symlink"`
 	TCPAddress     string `toml:"tcp_address"`
 	TCPTLSCA       string `toml:"tcp_tls_ca"`
 	TCPTLSCert     string `toml:"tcp_tls_cert"`
