@@ -25,14 +25,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/pkg/labels"
 )
 
 type refKeyPrefix struct{}
@@ -208,7 +209,6 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 // content.Manager) then this will also annotate the distribution sources using
 // labels prefixed with "containerd.io/distribution.source".
 func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, store content.Provider, limiter *semaphore.Weighted, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler) error {
-
 	var m sync.Mutex
 	manifests := []ocispec.Descriptor{}
 	indexStack := []ocispec.Descriptor{}

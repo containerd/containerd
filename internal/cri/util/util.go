@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/constants"
@@ -30,7 +31,6 @@ import (
 	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
-	"github.com/containerd/log"
 )
 
 // deferCleanupTimeoutKey is used to retrieve the configurable timeout for containerd cleanup operations in defer.
@@ -62,7 +62,8 @@ func WithNamespace(ctx context.Context) context.Context {
 // GetPassthroughAnnotations filters requested pod annotations by comparing
 // against permitted annotations for the given runtime.
 func GetPassthroughAnnotations(podAnnotations map[string]string,
-	runtimePodAnnotations []string) (passthroughAnnotations map[string]string) {
+	runtimePodAnnotations []string,
+) (passthroughAnnotations map[string]string) {
 	passthroughAnnotations = make(map[string]string)
 
 	for podAnnotationKey, podAnnotationValue := range podAnnotations {

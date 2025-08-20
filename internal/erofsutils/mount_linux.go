@@ -26,9 +26,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {
@@ -81,7 +82,7 @@ func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath st
 		cmd.Path, strings.Join(cmd.Args, " "), string(out))
 
 	// Open layerPath for appending
-	f, err := os.OpenFile(layerPath, os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(layerPath, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open layer file for appending: %w", err)
 	}
@@ -102,7 +103,7 @@ func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath st
 	return nil
 }
 
-func ConvertErofs(ctx context.Context, layerPath string, srcDir string, mkfsExtraOpts []string) error {
+func ConvertErofs(ctx context.Context, layerPath, srcDir string, mkfsExtraOpts []string) error {
 	args := append([]string{"--quiet", "-Enoinline_data"}, mkfsExtraOpts...)
 	args = append(args, layerPath, srcDir)
 	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)

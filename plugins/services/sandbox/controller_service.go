@@ -21,9 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	eventtypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/errdefs"
@@ -31,6 +28,8 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/sandbox"
@@ -244,7 +243,8 @@ func (s *controllerService) Metrics(ctx context.Context, req *api.ControllerMetr
 
 func (s *controllerService) Update(
 	ctx context.Context,
-	req *api.ControllerUpdateRequest) (*api.ControllerUpdateResponse, error) {
+	req *api.ControllerUpdateRequest,
+) (*api.ControllerUpdateResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("sandbox update resource")
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {

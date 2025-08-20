@@ -21,11 +21,12 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/containerd/log"
+	"github.com/urfave/cli/v2"
+
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/leases"
-	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
 )
 
 const (

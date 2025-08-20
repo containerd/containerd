@@ -23,6 +23,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/urfave/cli/v2"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -32,8 +34,6 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	tarchive "github.com/containerd/containerd/v2/core/transfer/archive"
 	"github.com/containerd/containerd/v2/core/transfer/image"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 )
 
 var importCommand = &cli.Command{

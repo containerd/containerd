@@ -125,7 +125,6 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 
 		return errFwd
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to execute portforward in network namespace %q: %w", netNSPath, err)
 	}

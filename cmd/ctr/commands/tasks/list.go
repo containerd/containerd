@@ -22,8 +22,9 @@ import (
 	"text/tabwriter"
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 )
 
 var listCommand = &cli.Command{

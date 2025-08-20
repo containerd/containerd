@@ -22,9 +22,10 @@ import (
 	"net/http/pprof"
 	"time"
 
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 const pluginName = "pprof"

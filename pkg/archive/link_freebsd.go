@@ -19,8 +19,9 @@ package archive
 import (
 	"os"
 
-	"github.com/containerd/containerd/v2/pkg/sys"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/v2/pkg/sys"
 )
 
 func link(oldname, newname string) error {

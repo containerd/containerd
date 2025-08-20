@@ -21,15 +21,16 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -184,7 +185,6 @@ func (cc *collectionContext) All(fn func(gc.Node)) {
 			})
 		}
 	}
-
 }
 
 func (cc *collectionContext) Active(ns string, fn func(gc.Node)) {

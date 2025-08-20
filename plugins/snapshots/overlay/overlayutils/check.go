@@ -24,13 +24,13 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/containerd/continuity/fs"
+	"github.com/containerd/log"
 	"github.com/moby/sys/userns"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
-	"github.com/containerd/continuity/fs"
-	"github.com/containerd/log"
 )
 
 const (
@@ -57,7 +57,7 @@ func SupportsMultipleLowerDir(d string) error {
 	}()
 
 	for _, dir := range []string{"lower1", "lower2", "upper", "work", "merged"} {
-		if err := os.Mkdir(filepath.Join(td, dir), 0755); err != nil {
+		if err := os.Mkdir(filepath.Join(td, dir), 0o755); err != nil {
 			return err
 		}
 	}
@@ -82,7 +82,7 @@ func SupportsMultipleLowerDir(d string) error {
 // Supported is not called during plugin initialization, but exposed for downstream projects which uses
 // this snapshotter as a library.
 func Supported(root string) error {
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return err
 	}
 	supportsDType, err := fs.SupportsDType(root)
@@ -155,7 +155,7 @@ func NeedsUserXAttr(d string) (bool, error) {
 		log.L.WithError(err).Warnf("Failed to remove check directory %v", tdRoot)
 	}
 
-	if err := os.MkdirAll(tdRoot, 0700); err != nil {
+	if err := os.MkdirAll(tdRoot, 0o700); err != nil {
 		return false, err
 	}
 
@@ -171,7 +171,7 @@ func NeedsUserXAttr(d string) (bool, error) {
 	}
 
 	for _, dir := range []string{"lower1", "lower2", "upper", "work", "merged"} {
-		if err := os.Mkdir(filepath.Join(td, dir), 0755); err != nil {
+		if err := os.Mkdir(filepath.Join(td, dir), 0o755); err != nil {
 			return false, err
 		}
 	}
@@ -237,7 +237,7 @@ func SupportsIDMappedMounts() (bool, error) {
 	}()
 
 	for _, dir := range []string{"lower", "upper", "work", "merged"} {
-		if err = os.Mkdir(filepath.Join(td, dir), 0755); err != nil {
+		if err = os.Mkdir(filepath.Join(td, dir), 0o755); err != nil {
 			return false, fmt.Errorf("failed to create %s directory: %w", dir, err)
 		}
 	}

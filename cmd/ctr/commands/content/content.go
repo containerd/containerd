@@ -27,15 +27,16 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	units "github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/remotes"
 )
 
 var (
@@ -413,9 +414,7 @@ var (
 		Description: `Fetch objects by identifier from a remote.`,
 		Flags:       commands.RegistryFlags,
 		Action: func(cliContext *cli.Context) error {
-			var (
-				ref = cliContext.Args().First()
-			)
+			ref := cliContext.Args().First()
 			ctx, cancel := commands.AppContext(cliContext)
 			defer cancel()
 
@@ -611,7 +610,7 @@ func edit(cliContext *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error)
 		return nil, err
 	}
 	// The editor might recreate new file and override the original one. We should reopen the file
-	edited, err := os.OpenFile(tmp.Name(), os.O_RDONLY, 0600)
+	edited, err := os.OpenFile(tmp.Name(), os.O_RDONLY, 0o600)
 	if err != nil {
 		return nil, err
 	}

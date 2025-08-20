@@ -22,11 +22,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/snapshots/devmapper"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/snapshots/devmapper"
 )
 
 func init() {

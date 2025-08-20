@@ -38,12 +38,10 @@ type invoker func(context.Context) error
 
 type invokerInterceptor func(context.Context, invoker) error
 
-var (
-	failpointProfiles = map[string]invokerInterceptor{
-		"issue9103": issue9103KillInitAfterCreate,
-		"delayExec": delayExec,
-	}
-)
+var failpointProfiles = map[string]invokerInterceptor{
+	"issue9103": issue9103KillInitAfterCreate,
+	"delayExec": delayExec,
+}
 
 // setupLog setups messages into log file.
 func setupLog() {

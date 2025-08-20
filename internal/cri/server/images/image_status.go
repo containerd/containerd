@@ -23,13 +23,13 @@ import (
 	"strconv"
 	"strings"
 
-	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
-	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 // ImageStatus returns the status of the image, returns nil if the image isn't present.

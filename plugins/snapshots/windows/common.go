@@ -29,10 +29,11 @@ import (
 	"strconv"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
 )
 
 // windowsBaseSnapshotter is a type that implements common functionality required by both windows & cimfs
@@ -48,7 +49,7 @@ type windowsBaseSnapshotter struct {
 }
 
 func newBaseSnapshotter(root string) (*windowsBaseSnapshotter, error) {
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
 
@@ -57,7 +58,7 @@ func newBaseSnapshotter(root string) (*windowsBaseSnapshotter, error) {
 		return nil, err
 	}
 
-	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0o700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
@@ -223,7 +224,7 @@ func (w *windowsBaseSnapshotter) createUVMScratchLayer(ctx context.Context, snDi
 
 	// Move the sandbox.vhdx into a nested vm folder to avoid clashing with a containers sandbox.vhdx.
 	vmScratchDir := filepath.Join(snDir, "vm")
-	if err := os.MkdirAll(vmScratchDir, 0777); err != nil {
+	if err := os.MkdirAll(vmScratchDir, 0o777); err != nil {
 		return fmt.Errorf("failed to make `vm` directory for vm's scratch space: %w", err)
 	}
 
@@ -231,13 +232,13 @@ func (w *windowsBaseSnapshotter) createUVMScratchLayer(ctx context.Context, snDi
 }
 
 func copyScratchDisk(source, dest string) error {
-	scratchSource, err := os.OpenFile(source, os.O_RDWR, 0700)
+	scratchSource, err := os.OpenFile(source, os.O_RDWR, 0o700)
 	if err != nil {
 		return fmt.Errorf("failed to open %s: %w", source, err)
 	}
 	defer scratchSource.Close()
 
-	f, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0700)
+	f, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0o700)
 	if err != nil {
 		return fmt.Errorf("failed to create sandbox.vhdx in snapshot: %w", err)
 	}

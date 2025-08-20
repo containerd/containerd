@@ -24,10 +24,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 )
 
 // Command is the cli command for managing namespaces
@@ -174,7 +175,6 @@ var removeCommand = &cli.Command{
 					log.G(ctx).WithError(err).Errorf("unable to delete %v", target)
 					continue
 				}
-
 			}
 
 			fmt.Println(target)

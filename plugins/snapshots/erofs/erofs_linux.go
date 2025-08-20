@@ -116,7 +116,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		opt(&config)
 	}
 
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
 	supportsDType, err := fs.SupportsDType(root)
@@ -147,7 +147,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 
-	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0o700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
@@ -197,18 +197,18 @@ func (s *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, 
 		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
-	if err := os.Mkdir(filepath.Join(td, "fs"), 0755); err != nil {
+	if err := os.Mkdir(filepath.Join(td, "fs"), 0o755); err != nil {
 		return td, err
 	}
 
 	if kind == snapshots.KindActive {
-		if err := os.Mkdir(filepath.Join(td, "work"), 0711); err != nil {
+		if err := os.Mkdir(filepath.Join(td, "work"), 0o711); err != nil {
 			return td, err
 		}
 	}
 	// Create a special file for the EROFS differ to indicate it will be
 	// prepared as an EROFS layer by the EROFS snapshotter.
-	if err := os.WriteFile(filepath.Join(td, ".erofslayer"), []byte{}, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(td, ".erofslayer"), []byte{}, 0o644); err != nil {
 		return td, err
 	}
 	return td, nil
@@ -452,7 +452,6 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 		return nil
 	})
-
 	if err != nil {
 		return err
 	}

@@ -20,12 +20,13 @@ import (
 	"context"
 	"io"
 
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/archive"
 )
 
 type importOpts struct {
@@ -171,7 +172,7 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 			Target: index,
 		})
 	}
-	var platformMatcher = c.platform
+	platformMatcher := c.platform
 	if iopts.allPlatforms {
 		platformMatcher = platforms.All
 	} else if iopts.platformMatcher != nil {

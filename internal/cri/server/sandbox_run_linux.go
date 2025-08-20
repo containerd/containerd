@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/containerd/containerd/v2/pkg/netns"
-	"github.com/containerd/containerd/v2/pkg/sys"
-
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/pkg/netns"
+	"github.com/containerd/containerd/v2/pkg/sys"
 )
 
 func (c *criService) bringUpLoopback(netns string) error {

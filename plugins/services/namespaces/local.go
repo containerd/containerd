@@ -149,7 +149,6 @@ func (l *local) Create(ctx context.Context, req *api.CreateNamespaceRequest, _ .
 	}
 
 	return &resp, nil
-
 }
 
 func (l *local) Update(ctx context.Context, req *api.UpdateNamespaceRequest, _ ...grpc.CallOption) (*api.UpdateNamespaceResponse, error) {
@@ -185,7 +184,6 @@ func (l *local) Update(ctx context.Context, req *api.UpdateNamespaceRequest, _ .
 				if err := store.SetLabel(ctx, req.Namespace.Name, k, v); err != nil {
 					return err
 				}
-
 			}
 		}
 

@@ -346,7 +346,7 @@ func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.Spec
 }
 
 // WithPodNamespaces sets the pod namespaces for the container
-func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid uint32, targetPid uint32, uids, gids []runtimespec.LinuxIDMapping) oci.SpecOpts {
+func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid, targetPid uint32, uids, gids []runtimespec.LinuxIDMapping) oci.SpecOpts {
 	namespaces := config.GetNamespaceOptions()
 
 	opts := []oci.SpecOpts{

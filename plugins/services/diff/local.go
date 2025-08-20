@@ -133,7 +133,6 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 	return &diffapi.ApplyResponse{
 		Applied: oci.DescriptorToProto(ocidesc),
 	}, nil
-
 }
 
 func (l *local) Diff(ctx context.Context, dr *diffapi.DiffRequest, _ ...grpc.CallOption) (*diffapi.DiffResponse, error) {
