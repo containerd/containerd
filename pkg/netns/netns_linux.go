@@ -76,12 +76,12 @@ func newNS(baseDir string, pid uint32) (nsPath string, err error) {
 	}
 	mountPointFd.Close()
 
-	defer func() {
+	defer func(targetPath string) {
 		// Ensure the mount point is cleaned up on errors
 		if err != nil {
-			os.RemoveAll(nsPath)
+			os.RemoveAll(targetPath)
 		}
-	}()
+	}(nsPath)
 
 	if pid != 0 {
 		procNsPath := getNetNSPathFromPID(pid)
