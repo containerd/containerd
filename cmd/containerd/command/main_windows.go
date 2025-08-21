@@ -33,10 +33,7 @@ import (
 )
 
 var (
-	handledSignals = []os.Signal{
-		windows.SIGTERM,
-		windows.SIGINT,
-	}
+	handledSignals = []os.Signal{os.Interrupt}
 )
 
 func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server, cancel func()) chan struct{} {
