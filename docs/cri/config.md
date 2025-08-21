@@ -286,6 +286,7 @@ version = 3
           container_annotations = []
           privileged_without_host_devices = false
           privileged_without_host_devices_all_devices_allowed = false
+          cgroup_writable = false
           base_runtime_spec = ''
           cni_conf_dir = ''
           cni_max_conf_num = 0
@@ -567,6 +568,9 @@ version = 2
       # option so that even when no host devices are implicitly added to the container, all devices allowlisting is still enabled.
       # Requires privileged_without_host_devices to be enabled. Defaults to false.
       privileged_without_host_devices_all_devices_allowed = false
+
+      # cgroup_writable field enables the support for writable cgroups in unprivileged containers with cgroup v2 enabled. When disabled, the cgroup interface (/sys/fs/cgroup) is mounted as read-only, preventing containers from managing their own cgroup hierarchies.
+      cgroup_writable = false
 
       # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
       # container's are created from.
