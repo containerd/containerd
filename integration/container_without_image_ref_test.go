@@ -17,12 +17,14 @@
 package integration
 
 import (
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtimev1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // Test container lifecycle can work without image references.
@@ -30,37 +32,53 @@ func TestContainerLifecycleWithoutImageRef(t *testing.T) {
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-lifecycle-without-image-ref")
 
-	var (
-		testImage     = images.Get(images.BusyBox)
-		containerName = "test-container"
-	)
+	testImage := images.Get(images.BusyBox)
+	containerName := "test-container"
 
 	img := EnsureImageExists(t, testImage)
 
 	t.Log("Create test container")
-	cnConfig := ContainerConfig(
-		containerName,
-		testImage,
-		WithCommand("sleep", "1000"),
-	)
+	cnConfig := ContainerConfig(containerName, testImage, WithCommand("sleep", "1000"))
 	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 	require.NoError(t, err)
 	require.NoError(t, runtimeService.StartContainer(cn))
 
 	t.Log("Remove test image")
-	assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
+	assert.NoError(t, imageService.RemoveImage(&runtimev1.ImageSpec{Image: img}))
 
 	t.Log("Container status should be running")
 	status, err := runtimeService.ContainerStatus(cn)
 	require.NoError(t, err)
-	assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, status.GetState())
+	assert.Equal(t, runtimev1.ContainerState_CONTAINER_RUNNING, status.GetState())
 
-	t.Logf("Stop container")
-	err = runtimeService.StopContainer(cn, 1)
-	assert.NoError(t, err)
+	t.Log("Stop container")
+	stopTimeout := int64(10)
+	if runtime.GOOS == "windows" {
+		stopTimeout = 30
+	}
+	assert.NoError(t, runtimeService.StopContainer(cn, stopTimeout))
 
-	t.Log("Container status should be exited")
+	// Wait until the shim reports EXITED to avoid “still running” on sandbox removal.
+	waitMax := 10 * time.Second
+	if runtime.GOOS == "windows" {
+		waitMax = 30 * time.Second
+	}
+	deadline := time.Now().Add(waitMax)
+
+	for {
+		status, err = runtimeService.ContainerStatus(cn)
+		require.NoError(t, err)
+		if status.GetState() == runtimev1.ContainerState_CONTAINER_EXITED {
+			break
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	// Re-check once more and assert exited.
 	status, err = runtimeService.ContainerStatus(cn)
 	require.NoError(t, err)
-	assert.Equal(t, runtime.ContainerState_CONTAINER_EXITED, status.GetState())
+	assert.Equal(t, runtimev1.ContainerState_CONTAINER_EXITED, status.GetState())
 }

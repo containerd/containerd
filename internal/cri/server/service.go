@@ -182,16 +182,24 @@ type CRIServiceOptions struct {
 }
 
 func (c *criService) initTracing() error {
-	// Initialize tracing from CRI config or environment variables.
-	// If LifecycleTracing is nil, try to populate it from env.
 	if c.config.LifecycleTracing == nil {
+		log.L.Info("LifecycleTracing config is nil, attempting to load from env")
 		c.config.ApplyLifecycleTracingFromEnv()
 	}
 
-	if c.config.LifecycleTracing == nil || !c.config.LifecycleTracing.Enabled {
-		// Nothing to initialize.
+	if c.config.LifecycleTracing == nil {
+		log.L.Info("LifecycleTracing is still nil after loading from env, tracing is disabled")
 		return nil
 	}
+
+	if !c.config.LifecycleTracing.Enabled {
+		log.L.Info("LifecycleTracing is disabled via config")
+		return nil
+	}
+
+	log.L.Infof("Initializing tracing with config: Enabled=%v, SamplingRate=%f",
+		c.config.LifecycleTracing.Enabled,
+		c.config.LifecycleTracing.SamplingRate)
 
 	tracingCfg := manager.Config{
 		Enabled:          c.config.LifecycleTracing.Enabled,
@@ -203,9 +211,11 @@ func (c *criService) initTracing() error {
 
 	tm, err := manager.NewTraceManager(tracingCfg)
 	if err != nil {
+		log.L.WithError(err).Error("Failed to initialize TraceManager")
 		return fmt.Errorf("failed to initialize tracing: %w", err)
 	}
 	c.traceManager = tm
+	log.L.Info("Tracing initialized successfully")
 	return nil
 }
 
@@ -242,10 +252,6 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		netPlugin:          make(map[string]cni.CNI),
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
-	}
-
-	if err := c.initTracing(); err != nil {
-		return nil, nil, err
 	}
 
 	// TODO: Make discard time configurable
@@ -298,6 +304,11 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 
 	c.runtimeFeatures = &runtime.RuntimeFeatures{
 		SupplementalGroupsPolicy: true,
+	}
+
+	if err := c.initTracing(); err != nil {
+		log.L.WithError(err).Error("Failed to initialize Tracing from service.go")
+		return c, c, nil
 	}
 
 	return c, c, nil

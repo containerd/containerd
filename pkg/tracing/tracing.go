@@ -35,19 +35,19 @@ import (
 
 // globalTraceManager holds the global trace manager instance
 var (
-	globalTraceManager *manager.TraceManager
+	globalTraceManager manager.Manager
 	globalTraceMutex   sync.RWMutex
 )
 
 // SetGlobalTraceManager sets the global trace manager for enhanced tracing
-func SetGlobalTraceManager(tm *manager.TraceManager) {
+func SetGlobalTraceManager(tm manager.Manager) {
 	globalTraceMutex.Lock()
 	defer globalTraceMutex.Unlock()
 	globalTraceManager = tm
 }
 
 // getGlobalTraceManager returns the global trace manager instance
-func getGlobalTraceManager() *manager.TraceManager {
+func getGlobalTraceManager() manager.Manager {
 	globalTraceMutex.RLock()
 	defer globalTraceMutex.RUnlock()
 	return globalTraceManager
@@ -56,7 +56,10 @@ func getGlobalTraceManager() *manager.TraceManager {
 // isEnhancedTracingEnabled checks if enhanced tracing is enabled and available
 func isEnhancedTracingEnabled() bool {
 	tm := getGlobalTraceManager()
-	return tm != nil && tm.IsEnabled()
+	if tm == nil {
+		return false
+	}
+	return tm.IsEnabled()
 }
 
 // StartConfig defines configuration for a new span object.
