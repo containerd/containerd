@@ -67,15 +67,15 @@ func (m manager) Name() string {
 	return m.name
 }
 
-func (m manager) Start(ctx context.Context, id string, opts shim.StartOpts) (shim.BootstrapParams, error) {
+func (m manager) Start(context.Context, string, shim.StartOpts) (shim.BootstrapParams, error) {
 	return shim.BootstrapParams{}, errdefs.ErrNotImplemented
 }
 
-func (m manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
+func (m manager) Stop(context.Context, string) (shim.StopStatus, error) {
 	return shim.StopStatus{}, errdefs.ErrNotImplemented
 }
 
-func (m manager) Info(ctx context.Context, optionsR io.Reader) (*apitypes.RuntimeInfo, error) {
+func (m manager) Info(context.Context, io.Reader) (*apitypes.RuntimeInfo, error) {
 	info := &apitypes.RuntimeInfo{
 		Name: "io.containerd.example.v1",
 		Version: &apitypes.RuntimeVersion{
@@ -85,7 +85,7 @@ func (m manager) Info(ctx context.Context, optionsR io.Reader) (*apitypes.Runtim
 	return info, nil
 }
 
-func newTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TaskService, error) {
+func newTaskService(context.Context, shim.Publisher, shutdown.Service) (taskAPI.TaskService, error) {
 	// The shim.Publisher and shutdown.Service are usually useful for your task service,
 	// but we don't need them in the exampleTaskService.
 	return &exampleTaskService{}, nil
@@ -105,87 +105,87 @@ func (s *exampleTaskService) RegisterTTRPC(server *ttrpc.Server) error {
 }
 
 // Create a new container
-func (s *exampleTaskService) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *taskAPI.CreateTaskResponse, err error) {
+func (s *exampleTaskService) Create(context.Context, *taskAPI.CreateTaskRequest) (_ *taskAPI.CreateTaskResponse, err error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Start the primary user process inside the container
-func (s *exampleTaskService) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.StartResponse, error) {
+func (s *exampleTaskService) Start(context.Context, *taskAPI.StartRequest) (*taskAPI.StartResponse, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Delete a process or container
-func (s *exampleTaskService) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAPI.DeleteResponse, error) {
+func (s *exampleTaskService) Delete(context.Context, *taskAPI.DeleteRequest) (*taskAPI.DeleteResponse, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Exec an additional process inside the container
-func (s *exampleTaskService) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*ptypes.Empty, error) {
+func (s *exampleTaskService) Exec(context.Context, *taskAPI.ExecProcessRequest) (*ptypes.Empty, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // ResizePty of a process
-func (s *exampleTaskService) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*ptypes.Empty, error) {
+func (s *exampleTaskService) ResizePty(context.Context, *taskAPI.ResizePtyRequest) (*ptypes.Empty, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // State returns runtime state of a process
-func (s *exampleTaskService) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.StateResponse, error) {
+func (s *exampleTaskService) State(context.Context, *taskAPI.StateRequest) (*taskAPI.StateResponse, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Pause the container
-func (s *exampleTaskService) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.Empty, error) {
+func (s *exampleTaskService) Pause(context.Context, *taskAPI.PauseRequest) (*ptypes.Empty, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Resume the container
-func (s *exampleTaskService) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes.Empty, error) {
+func (s *exampleTaskService) Resume(context.Context, *taskAPI.ResumeRequest) (*ptypes.Empty, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Kill a process
-func (s *exampleTaskService) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Empty, error) {
+func (s *exampleTaskService) Kill(context.Context, *taskAPI.KillRequest) (*ptypes.Empty, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Pids returns all pids inside the container
-func (s *exampleTaskService) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.PidsResponse, error) {
+func (s *exampleTaskService) Pids(context.Context, *taskAPI.PidsRequest) (*taskAPI.PidsResponse, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // CloseIO of a process
-func (s *exampleTaskService) CloseIO(ctx context.Context, r *taskAPI.CloseIORequest) (*ptypes.Empty, error) {
+func (s *exampleTaskService) CloseIO(context.Context, *taskAPI.CloseIORequest) (*ptypes.Empty, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Checkpoint the container
-func (s *exampleTaskService) Checkpoint(ctx context.Context, r *taskAPI.CheckpointTaskRequest) (*ptypes.Empty, error) {
+func (s *exampleTaskService) Checkpoint(context.Context, *taskAPI.CheckpointTaskRequest) (*ptypes.Empty, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Connect returns shim information of the underlying service
-func (s *exampleTaskService) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*taskAPI.ConnectResponse, error) {
+func (s *exampleTaskService) Connect(context.Context, *taskAPI.ConnectRequest) (*taskAPI.ConnectResponse, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Shutdown is called after the underlying resources of the shim are cleaned up and the service can be stopped
-func (s *exampleTaskService) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
+func (s *exampleTaskService) Shutdown(context.Context, *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
 	os.Exit(0)
 	return &ptypes.Empty{}, nil
 }
 
 // Stats returns container level system stats for a container and its processes
-func (s *exampleTaskService) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.StatsResponse, error) {
+func (s *exampleTaskService) Stats(context.Context, *taskAPI.StatsRequest) (*taskAPI.StatsResponse, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Update the live container
-func (s *exampleTaskService) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*ptypes.Empty, error) {
+func (s *exampleTaskService) Update(context.Context, *taskAPI.UpdateTaskRequest) (*ptypes.Empty, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Wait for a process to exit
-func (s *exampleTaskService) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.WaitResponse, error) {
+func (s *exampleTaskService) Wait(context.Context, *taskAPI.WaitRequest) (*taskAPI.WaitResponse, error) {
 	return nil, errdefs.ErrNotImplemented
 }

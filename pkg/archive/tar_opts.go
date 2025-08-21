@@ -43,7 +43,7 @@ type Filter func(*tar.Header) (bool, error)
 type ConvertWhiteout func(*tar.Header, string) (bool, error)
 
 // all allows all files
-func all(_ *tar.Header) (bool, error) {
+func all(*tar.Header) (bool, error) {
 	return true, nil
 }
 

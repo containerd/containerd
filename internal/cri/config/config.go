@@ -674,7 +674,7 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 }
 
 // ValidateServerConfig validates the given server configuration.
-func ValidateServerConfig(ctx context.Context, c *ServerConfig) ([]deprecation.Warning, error) {
+func ValidateServerConfig(_ context.Context, c *ServerConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
 	// Validation for stream_idle_timeout
 	if c.StreamIdleTimeout != "" {

@@ -18,6 +18,6 @@
 
 package server
 
-func (c *criService) blockIOClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
+func (c *criService) blockIOClassFromAnnotations(string, map[string]string, map[string]string) (string, error) {
 	return "", nil
 }

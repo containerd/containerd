@@ -85,7 +85,7 @@ func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 	return nil
 }
 
-func (m *cgroupsMonitor) trigger(id, namespace string, cg cgroups.Cgroup) {
+func (m *cgroupsMonitor) trigger(id, namespace string, _ cgroups.Cgroup) {
 	ctx := namespaces.WithNamespace(m.context, namespace)
 	if err := m.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 		ContainerID: id,

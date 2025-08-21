@@ -20,14 +20,14 @@ package fsverity
 
 import "fmt"
 
-func IsSupported(rootPath string) (bool, error) {
+func IsSupported(string) (bool, error) {
 	return false, fmt.Errorf("fsverity is only supported on Linux systems")
 }
 
-func IsEnabled(path string) (bool, error) {
+func IsEnabled(string) (bool, error) {
 	return false, fmt.Errorf("fsverity is only supported on Linux systems")
 }
 
-func Enable(_ string) error {
+func Enable(string) error {
 	return fmt.Errorf("fsverity is only supported on Linux systems")
 }

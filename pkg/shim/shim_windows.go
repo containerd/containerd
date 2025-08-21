@@ -27,11 +27,11 @@ import (
 	"github.com/containerd/ttrpc"
 )
 
-func setupSignals(config Config) (chan os.Signal, error) {
+func setupSignals(Config) (chan os.Signal, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-func newServer(opts ...ttrpc.ServerOpt) (*ttrpc.Server, error) {
+func newServer(...ttrpc.ServerOpt) (*ttrpc.Server, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
@@ -39,20 +39,20 @@ func subreaper() error {
 	return errdefs.ErrNotImplemented
 }
 
-func setupDumpStacks(dump chan<- os.Signal) {
+func setupDumpStacks(chan<- os.Signal) {
 }
 
-func serveListener(path string, fd uintptr) (net.Listener, error) {
+func serveListener(string, uintptr) (net.Listener, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-func reap(ctx context.Context, logger *log.Entry, signals chan os.Signal) error {
+func reap(context.Context, *log.Entry, chan os.Signal) error {
 	return errdefs.ErrNotImplemented
 }
 
-func handleExitSignals(ctx context.Context, logger *log.Entry, cancel context.CancelFunc) {
+func handleExitSignals(context.Context, *log.Entry, context.CancelFunc) {
 }
 
-func openLog(ctx context.Context, _ string) (io.Writer, error) {
+func openLog(context.Context, string) (io.Writer, error) {
 	return nil, errdefs.ErrNotImplemented
 }
