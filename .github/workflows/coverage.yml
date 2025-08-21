@@ -1,0 +1,226 @@
+name: Coverage
+on:
+  pull_request:
+    types: [labeled,synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # TODO: Add Windows coverage support in the future
+  # TODO: Add messaging to PR description
+  # TODO: Add Coverage for main branch periodically and link with Readme badge
+  linux-coverage:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'coverage') }}
+    name: Linux Coverage
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      GOTEST: gotestsum --
+      BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime:
+          - io.containerd.runc.v2
+        runc: [runc]  # crun can be added here to debug crun issues
+        os: [ubuntu-24.04]
+        cgroup_driver: [cgroupfs, systemd]
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Go
+        uses: ./.github/actions/install-go
+
+      - name: Install containerd dependencies
+        env:
+          RUNC_FLAVOR: ${{ matrix.runc }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gperf dmsetup strace xfsprogs
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
+
+      - name: Install criu
+        run: |
+          sudo add-apt-repository -y ppa:criu/ppa
+          sudo apt-get update
+          sudo apt-get install -y criu
+
+      - name: Install containerd
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make coverage-binaries
+          sudo -E PATH=$PATH make install-all
+      - run: script/setup/install-gotestsum
+      - run: script/setup/install-teststat
+      - name: Run unit tests with coverage
+        id: unit-test
+        env:
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
+        run: |
+          make coverage
+          sudo -E PATH=$PATH make root-coverage
+      - name: Combine and rename coverage reports
+        run: |
+          set -euo pipefail
+          # Initialize combined coverage file with proper header
+          COMBINED_FILE="coverage-unit-test-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${BRANCH_NAME}.txt"
+          echo "mode: atomic" > "$COMBINED_FILE"
+
+          # Combine coverage files if they exist
+          if [ -f coverage.txt ]; then
+            echo "Adding coverage.txt to combined file"
+            grep -v '^mode:' coverage.txt >> "$COMBINED_FILE"
+          fi
+          if [ -f coverage-root.txt ]; then
+            echo "Adding coverage-root.txt to combined file"
+            grep -v '^mode:' coverage-root.txt >> "$COMBINED_FILE"
+          fi
+
+          # Clean up individual files
+          rm -f coverage.txt coverage-root.txt profile.out
+
+          echo "Combined coverage report created: $COMBINED_FILE"
+        if: steps.unit-test.outcome == 'success'
+
+      - name: Integration test with coverage
+        id: integration-test
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+        run: |
+          extraflags=""
+          [ "${RUNC_FLAVOR}" == "crun" ] && {
+                  extraflags="EXTRA_TESTFLAGS=-no-criu";
+          }
+          sudo -E PATH=$PATH make integration-coverage ${extraflags} TESTFLAGS_RACE=-race
+      - name: Rename integration coverage report
+        run: |
+          set -euo pipefail
+          if [ -f integration/client/integration-coverage-raw.txt ]; then
+            OUTPUT_FILE="coverage-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${BRANCH_NAME}.txt"
+            echo "mode: atomic" > "$OUTPUT_FILE"
+            grep -v '^mode:' integration/client/integration-coverage-raw.txt >> "$OUTPUT_FILE"
+            echo "Integration coverage report created: $OUTPUT_FILE (raw format)"
+          elif [ -f integration/client/integration-coverage.txt ]; then
+            # Fallback to summarized format if raw not available
+            OUTPUT_FILE="coverage-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${BRANCH_NAME}.txt"
+            cp integration/client/integration-coverage.txt "$OUTPUT_FILE"
+            echo "Integration coverage report created: $OUTPUT_FILE (summarized format - fallback)"
+          fi
+        if: steps.integration-test.outcome == 'success'
+
+      - name: CRI Integration Test
+        id: cri-integration-test
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
+        run: |
+          cat /sys/fs/cgroup/cgroup.controllers
+          systemctl status
+          [ "${RUNC_FLAVOR}" == "crun" ] && {
+             export XDG_RUNTIME_DIR=/run/user/$(id -u)
+          }
+          runc --version
+          CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration-coverage
+
+          # Verify the coverage file was created
+          if [ -f cri-integration-coverage.txt ]; then
+            echo "CRI integration coverage file created successfully"
+          else
+            echo "Warning: cri-integration-coverage.txt was not created"
+            exit 1
+          fi
+
+      - name: Rename CRI integration coverage report
+        run: |
+          set -euo pipefail
+          if [ -f cri-integration-coverage.txt ]; then
+            OUTPUT_FILE="coverage-cri-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${BRANCH_NAME}.txt"
+            echo "mode: atomic" > "$OUTPUT_FILE"
+            grep -v '^mode:' cri-integration-coverage.txt >> "$OUTPUT_FILE"
+            echo "CRI integration coverage report created: $OUTPUT_FILE"
+          else
+            echo "Warning: cri-integration-coverage.txt not found"
+          fi
+        if: steps.cri-integration-test.outcome == 'success'
+      - name: cri-tools critest wih coverage
+        id: cri-tools-critest
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+          GOCOVERDIR: ${{github.workspace}}/report/cover
+        run: |
+          env
+          sudo -E PATH=$PATH GOCOVERDIR=$GOCOVERDIR ./script/critest.sh "${{github.workspace}}/report"
+
+          # Fix ownership of coverage directory so we can process the files
+          sudo chown -R $(id -u):$(id -g) "$GOCOVERDIR"
+
+          # Convert coverage to text format
+          go tool covdata textfmt -i="$GOCOVERDIR" -o=report/cover/containerd.txt
+
+      - name: Rename cri-tools critest coverage report
+        run: |
+          set -euo pipefail
+          if [ -f report/cover/containerd.txt ]; then
+            OUTPUT_FILE="coverage-cri-tools-critest-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${BRANCH_NAME}.txt"
+            echo "mode: atomic" > "$OUTPUT_FILE"
+            grep -v '^mode:' report/cover/containerd.txt >> "$OUTPUT_FILE"
+            echo "CRI tools critest coverage report created: $OUTPUT_FILE"
+          fi
+        if: steps.cri-tools-critest.outcome == 'success'
+      - name: Coverage summary (grouped by package)
+        run: |
+          ./script/coverage/process-all-coverage.sh "${{ matrix.os }}" "${{ matrix.cgroup_driver }}" "${BRANCH_NAME}"
+        if: always() && (steps.unit-test.outcome == 'success' || steps.integration-test.outcome == 'success' || steps.cri-integration-test.outcome == 'success' || steps.cri-tools-critest.outcome == 'success')
+      - name: Upload coverage files and summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-${{ matrix.cgroup_driver }}
+          path: |
+            coverage-*.txt
+            coverage-*.md
+            all-coverage-*.txt
+          retention-days: 7
+        if: always() && (steps.unit-test.outcome == 'success' || steps.integration-test.outcome == 'success' || steps.cri-integration-test.outcome == 'success')
+
+  overall-coverage:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'coverage') }}
+    name: Overall Coverage Summary
+    needs: [linux-coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: Set up Go
+        uses: ./.github/actions/install-go
+
+      - name: Calculate overall coverage
+        run: |
+          ./script/coverage/process-all-coverage.sh --overall
+        if: always()

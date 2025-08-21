@@ -155,7 +155,7 @@ OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
+.PHONY: clean all AUTHORS build binaries coverage-binaries test integration generate protos check-protos coverage ci check help install install-coverage uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test cri-integration-coverage integration-coverage coverage all-coverage remove-replace clean-vendor
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -276,7 +276,14 @@ bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and om
 	@echo "$(WHALE) $@"
 	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
 
+bin/containerd-coverage: cmd/containerd FORCE ## build coverage-enabled containerd binary
+	@echo "$(WHALE) $@"
+	CGO_ENABLED=1 $(GO) build -cover -covermode=atomic -o $@ ${GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd
+
 binaries: $(BINARIES) ## build binaries
+	@echo "$(WHALE) $@"
+
+coverage-binaries: $(BINARIES) bin/containerd-coverage ## build all binaries including coverage-enabled containerd
 	@echo "$(WHALE) $@"
 
 man: $(addprefix man/,$(MANPAGES))
@@ -433,6 +440,16 @@ install: ## install binaries
 	@$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	@$(INSTALL) $(BINARIES) $(DESTDIR)$(BINDIR)
 
+install-coverage: bin/containerd-coverage ## install coverage-enabled containerd binary
+	@echo "$(WHALE) $@"
+	@$(INSTALL) -d $(DESTDIR)$(BINDIR)
+	@$(INSTALL) bin/containerd-coverage $(DESTDIR)$(BINDIR)
+
+install-all: $(BINARIES) bin/containerd-coverage ## install all binaries including coverage-enabled containerd
+	@echo "$(WHALE) $@ $(BINARIES) bin/containerd-coverage"
+	@$(INSTALL) -d $(DESTDIR)$(BINDIR)
+	@$(INSTALL) $(BINARIES) bin/containerd-coverage $(DESTDIR)$(BINDIR)
+
 uninstall:
 	@echo "$(WHALE) $@"
 	@rm -f $(addprefix $(DESTDIR)$(BINDIR)/,$(notdir $(BINARIES)))
@@ -473,7 +490,7 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 			-coverprofile=profile.out \
 			-covermode=atomic $$pkg -test.root || exit; \
 		if [ -f profile.out ]; then \
-			cat profile.out >> coverage.txt; \
+			cat profile.out >> coverage-root.txt; \
 			rm profile.out; \
 		fi; \
 	done )
@@ -484,8 +501,10 @@ integration-coverage: ## generate coverage profile for integration tests
 		$(GO) mod download && \
 		$(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} \
 			-cover -covermode=atomic -coverprofile=coverage.out . && \
+		cp coverage.out integration-coverage-raw.txt && \
 		$(GO) tool cover -func=coverage.out > integration-coverage.txt && \
-		echo "Coverage report saved to integration/client/integration-coverage.txt"
+		echo "Coverage report saved to integration/client/integration-coverage.txt" && \
+		echo "Raw coverage saved to integration/client/integration-coverage-raw.txt"
 
 cri-integration-coverage: binaries  ## generate coverage profile for cri integration tests
 	@echo "$(WHALE) $@"
@@ -497,10 +516,10 @@ cri-integration-coverage: binaries  ## generate coverage profile for cri integra
 
 all-coverage: ## generate combined coverage profile from all tests
 	@echo "$(WHALE) $@"
+	-@$(MAKE) coverage
 	-@$(MAKE) root-coverage
 	-@$(MAKE) integration-coverage
 	-@$(MAKE) cri-integration-coverage
-
 	@echo "Combining coverage profiles into all-coverage.txt"
 	@rm -f all-coverage.txt
 	@touch all-coverage.txt
