@@ -473,7 +473,7 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 			-coverprofile=profile.out \
 			-covermode=atomic $$pkg -test.root || exit; \
 		if [ -f profile.out ]; then \
-			cat profile.out >> coverage.txt; \
+			cat profile.out >> coverage-root.txt; \
 			rm profile.out; \
 		fi; \
 	done )
@@ -497,6 +497,7 @@ cri-integration-coverage: binaries  ## generate coverage profile for cri integra
 
 all-coverage: ## generate combined coverage profile from all tests
 	@echo "$(WHALE) $@"
+	-@$(MAKE) coverage
 	-@$(MAKE) root-coverage
 	-@$(MAKE) integration-coverage
 	-@$(MAKE) cri-integration-coverage
