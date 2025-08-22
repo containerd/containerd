@@ -26,6 +26,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 )
 
@@ -48,6 +49,7 @@ func newControllerService() *Controller {
 		config: testConfig,
 		os:     ostesting.NewFakeOS(),
 		store:  NewStore(),
+		locker: kmutex.New(),
 	}
 }
 
