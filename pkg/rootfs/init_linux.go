@@ -34,9 +34,10 @@ func createDirectory(name string, uid, gid int) initializerFunc {
 	return func(root string) error {
 		dname := filepath.Join(root, name)
 		st, err := os.Stat(dname)
-		if err != nil && !os.IsNotExist(err) {
+		switch {
+		case err != nil && !os.IsNotExist(err):
 			return err
-		} else if err == nil {
+		case err == nil:
 			if st.IsDir() {
 				stat := st.Sys().(*syscall.Stat_t)
 				if int(stat.Gid) == gid && int(stat.Uid) == uid {
@@ -46,12 +47,12 @@ func createDirectory(name string, uid, gid int) initializerFunc {
 				if err := os.Remove(dname); err != nil {
 					return err
 				}
-				if err := os.Mkdir(dname, 0755); err != nil {
+				if err := os.Mkdir(dname, 0o755); err != nil {
 					return err
 				}
 			}
-		} else {
-			if err := os.Mkdir(dname, 0755); err != nil {
+		default:
+			if err := os.Mkdir(dname, 0o755); err != nil {
 				return err
 			}
 		}
@@ -75,7 +76,7 @@ func touchFile(name string, uid, gid int) initializerFunc {
 			return os.Chown(fname, uid, gid)
 		}
 
-		f, err := os.OpenFile(fname, os.O_CREATE, 0644)
+		f, err := os.OpenFile(fname, os.O_CREATE, 0o644)
 		if err != nil {
 			return err
 		}

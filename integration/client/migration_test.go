@@ -35,7 +35,7 @@ func TestMigration(t *testing.T) {
 	currentDefault := filepath.Join(t.TempDir(), "default.toml")
 	defaultContent, err := currentDefaultConfig()
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(currentDefault, []byte(defaultContent), 0644))
+	require.NoError(t, os.WriteFile(currentDefault, []byte(defaultContent), 0o644))
 
 	type migrationTest struct {
 		Name     string
