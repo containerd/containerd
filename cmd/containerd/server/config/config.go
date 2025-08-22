@@ -204,15 +204,16 @@ func v1Migrate(ctx context.Context, c *Config) error {
 
 // GRPCConfig provides GRPC configuration for the socket
 type GRPCConfig struct {
-	Address        string `toml:"address"`
-	TCPAddress     string `toml:"tcp_address"`
-	TCPTLSCA       string `toml:"tcp_tls_ca"`
-	TCPTLSCert     string `toml:"tcp_tls_cert"`
-	TCPTLSKey      string `toml:"tcp_tls_key"`
-	UID            int    `toml:"uid"`
-	GID            int    `toml:"gid"`
-	MaxRecvMsgSize int    `toml:"max_recv_message_size"`
-	MaxSendMsgSize int    `toml:"max_send_message_size"`
+	Address         string `toml:"address"`
+	AddressHardLink string `toml:"address_hard_link"`
+	TCPAddress      string `toml:"tcp_address"`
+	TCPTLSCA        string `toml:"tcp_tls_ca"`
+	TCPTLSCert      string `toml:"tcp_tls_cert"`
+	TCPTLSKey       string `toml:"tcp_tls_key"`
+	UID             int    `toml:"uid"`
+	GID             int    `toml:"gid"`
+	MaxRecvMsgSize  int    `toml:"max_recv_message_size"`
+	MaxSendMsgSize  int    `toml:"max_send_message_size"`
 }
 
 // TTRPCConfig provides TTRPC configuration for the socket

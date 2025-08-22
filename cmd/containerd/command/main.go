@@ -281,6 +281,18 @@ can be used and modified as necessary as a custom configuration.`
 		if err != nil {
 			return fmt.Errorf("failed to get listener for main endpoint: %w", err)
 		}
+		if config.GRPC.AddressHardLink != "" {
+			if _, err := os.Stat(config.GRPC.AddressHardLink); err == nil {
+				os.Remove(config.GRPC.AddressHardLink)
+			}
+			// Ensure parent directory is created
+			if err = os.MkdirAll(filepath.Dir(config.GRPC.AddressHardLink), 0770); err != nil {
+				return err
+			}
+			if err = os.Link(config.GRPC.Address, config.GRPC.AddressHardLink); err != nil {
+				return err
+			}
+		}
 		serve(ctx, l, server.ServeGRPC)
 
 		readyC := make(chan struct{})
