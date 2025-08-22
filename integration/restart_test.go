@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	goruntime "runtime"
 	"sort"
 	"syscall"
@@ -236,3 +237,32 @@ func TestContainerdRestart(t *testing.T) {
 }
 
 // TODO: Add back the unknown state test.
+
+func TestRestartContainerdTime(t *testing.T) {
+	for i := 0; i < 110; i++ {
+		sbConfig := PodSandboxConfig("sandbox", fmt.Sprintf("test-restart-%d", i))
+		sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+		require.NoError(t, err)
+		defer runtimeService.StopPodSandbox(sb)
+		defer runtimeService.RemovePodSandbox(sb)
+	}
+	require.NoError(t, KillProcess(*containerdBin, syscall.SIGTERM))
+
+	// Use assert so that the 3rd wait always runs, this makes sure
+	// containerd is running before this function returns.
+	assert.NoError(t, Eventually(func() (bool, error) {
+		pid, err := PidOf(*containerdBin)
+		if err != nil {
+			return false, err
+		}
+		return pid == 0, nil
+	}, time.Second, 30*time.Second), "wait for containerd to be killed")
+	start := time.Now()
+	require.NoError(t, Eventually(func() (bool, error) {
+		if ConnectDaemons() != nil {
+			return false, nil
+		}
+		t.Logf("containerd restart use %v", time.Since(start))
+		return true, nil
+	}, time.Second, 30*time.Second), "wait for containerd to be restarted in 10s")
+}
