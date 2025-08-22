@@ -55,6 +55,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
+
+	"github.com/containerd/containerd/v2/pkg/tracing/manager"
 )
 
 var kernelSupportsRRO bool
@@ -157,6 +159,8 @@ type criService struct {
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
+	// tracer.Tracer trace lifecycle events of CRI
+	traceManager *manager.TraceManager
 }
 
 type CRIServiceOptions struct {
@@ -175,6 +179,46 @@ type CRIServiceOptions struct {
 	//
 	// TODO: Replace this gradually with directly configured instances
 	Client *containerd.Client
+}
+
+func (c *criService) initTracing() error {
+	// Initialize tracing from CRI config or environment variables.
+	// If LifecycleTracing is nil, try to populate it from env.
+	if c.config.LifecycleTracing == nil {
+		c.config.ApplyLifecycleTracingFromEnv()
+	}
+
+	if c.config.LifecycleTracing == nil || !c.config.LifecycleTracing.Enabled {
+		// Nothing to initialize.
+		return nil
+	}
+
+	tracingCfg := manager.Config{
+		Enabled:          c.config.LifecycleTracing.Enabled,
+		SamplingRate:     c.config.LifecycleTracing.SamplingRate,
+		UseSandboxID:     c.config.LifecycleTracing.UseSandboxID,
+		MaxSpansPerTrace: c.config.LifecycleTracing.MaxSpansPerTrace,
+		Exporters:        convertExporterConfigs(c.config.LifecycleTracing.Exporters),
+	}
+
+	tm, err := manager.NewTraceManager(tracingCfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize tracing: %w", err)
+	}
+	c.traceManager = tm
+	return nil
+}
+
+func convertExporterConfigs(criExporters []criconfig.ExporterConfig) []manager.ExporterConfig {
+	var exporters []manager.ExporterConfig
+	for _, exp := range criExporters {
+		exporters = append(exporters, manager.ExporterConfig{
+			Type:     exp.Type,
+			Endpoint: exp.Endpoint,
+			Options:  exp.Options,
+		})
+	}
+	return exporters
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -198,6 +242,10 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		netPlugin:          make(map[string]cni.CNI),
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
+	}
+
+	if err := c.initTracing(); err != nil {
+		return nil, nil, err
 	}
 
 	// TODO: Make discard time configurable
@@ -358,6 +406,14 @@ func (c *criService) Close() error {
 	c.eventMonitor.Stop()
 	if err := c.streamServer.Stop(); err != nil {
 		return fmt.Errorf("failed to stop stream server: %w", err)
+	}
+
+	if c.traceManager != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := c.traceManager.Shutdown(ctx); err != nil {
+			log.L.Warnf("Failed to shutdown tracer: %v", err)
+		}
 	}
 	return nil
 }
