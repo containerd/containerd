@@ -18,12 +18,14 @@ package podsandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	apitasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
 
 	containerd "github.com/containerd/containerd/v2/client"
 )
@@ -74,7 +76,7 @@ func (c *Controller) cleanupSandboxTask(ctx context.Context, sbCntr containerd.C
 		}
 	} else {
 		if _, err = task.Delete(ctx, containerd.WithProcessKill); err != nil {
-			if !errdefs.IsNotFound(err) {
+			if !errdefs.IsNotFound(err) && !errors.Is(err, ttrpc.ErrClosed) {
 				return fmt.Errorf("failed to stop sandbox: %w", err)
 			}
 		}

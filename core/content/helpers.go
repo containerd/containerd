@@ -130,30 +130,38 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 // is locked until the reference is available or returns an error.
 func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, error) {
 	var (
-		cw    Writer
-		err   error
-		retry = 16
+		cw         Writer
+		err        error
+		retry      = 64
+		maxRetries = 15
+		attempt    = 0
 	)
-	for {
+	for attempt < maxRetries {
 		cw, err = cs.Writer(ctx, opts...)
 		if err != nil {
 			if !errdefs.IsUnavailable(err) {
 				return nil, err
 			}
 
-			// TODO: Check status to determine if the writer is active,
-			// continue waiting while active, otherwise return lock
-			// error or abort. Requires asserting for an ingest manager
+			attempt++
+			if attempt >= maxRetries {
+				return nil, err
+			}
+
+			// Exponential backoff with jitter and cap
+			baseDelay := time.Millisecond * time.Duration(retry)
+			jitter := time.Millisecond * time.Duration(randutil.Intn(retry/2))
+			delay := baseDelay + jitter
 
 			select {
-			case <-time.After(time.Millisecond * time.Duration(randutil.Intn(retry))):
-				if retry < 2048 {
+			case <-time.After(delay):
+				if retry < 4096 {
 					retry = retry << 1
 				}
 				continue
 			case <-ctx.Done():
-				// Propagate lock error
-				return nil, err
+				// Propagate context cancellation
+				return nil, ctx.Err()
 			}
 
 		}
