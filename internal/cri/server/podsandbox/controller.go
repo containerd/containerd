@@ -40,6 +40,7 @@ import (
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 )
@@ -54,6 +55,7 @@ func init() {
 			plugins.SandboxStorePlugin,
 			plugins.CRIServicePlugin,
 			plugins.ServicePlugin,
+			plugins.WarningPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			client, err := containerd.New(
@@ -79,12 +81,18 @@ func init() {
 				return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 			}
 
+			warningPlugin, err := ic.GetSingle(plugins.WarningPlugin)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load CRI warning service plugin dependency: %w", err)
+			}
+
 			c := Controller{
 				client:         client,
 				config:         runtimeService.Config(),
 				os:             osinterface.RealOS{},
 				runtimeService: runtimeService,
 				imageService:   criImagePlugin.(ImageService),
+				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
 			}
 
@@ -124,6 +132,8 @@ type Controller struct {
 	runtimeService RuntimeService
 	// imageService is a dependency to CRI image service.
 	imageService ImageService
+	// warningService is used to emit deprecation warnings.
+	warningService warning.Service
 	// os is an interface for all required os operations.
 	os osinterface.OS
 	// eventMonitor is the event monitor for podsandbox controller to handle sandbox task exit event

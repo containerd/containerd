@@ -42,6 +42,8 @@ const (
 var appendPathOnce sync.Once
 
 // New nri client
+//
+// Deprecated: NRI 0.1.0-style plugins should only be used through the v010-adapter plugin
 func New() (*Client, error) {
 	conf, err := loadConfig(DefaultConfPath)
 	if err != nil {
@@ -60,12 +62,28 @@ func New() (*Client, error) {
 	}, nil
 }
 
+// Plugins returns a slice of the configured plugin names. This can be used by
+// the runtime to detect which plugins are configured.
+//
+// Deprecated: NRI 0.1.0-style plugins should only be used through the v010-adapter plugin
+func (c *Client) Plugins() []string {
+	names := make([]string, 0)
+	for _, p := range c.conf.Plugins {
+		names = append(names, p.Type)
+	}
+	return names
+}
+
 // Client for calling nri plugins
+//
+// Deprecated: NRI 0.1.0-style plugins should only be used through the v010-adapter plugin
 type Client struct {
 	conf *types.ConfigList
 }
 
 // Sandbox information
+//
+// Deprecated: NRI 0.1.0-style plugins should only be used through the v010-adapter plugin
 type Sandbox struct {
 	// ID of the sandbox
 	ID string
@@ -82,6 +100,8 @@ type process interface {
 }
 
 // Task is a subset of containerd's Task interface.
+//
+// Deprecated: NRI 0.1.0-style plugins should only be used through the v010-adapter plugin
 type Task interface {
 	process
 
@@ -90,11 +110,15 @@ type Task interface {
 }
 
 // Invoke the ConfList of nri plugins
+//
+// Deprecated: NRI 0.1.0-style plugins should only be used through the v010-adapter plugin
 func (c *Client) Invoke(ctx context.Context, task Task, state types.State) ([]*types.Result, error) {
 	return c.InvokeWithSandbox(ctx, task, state, nil)
 }
 
 // InvokeWithSandbox invokes the ConfList of nri plugins
+//
+// Deprecated: NRI 0.1.0-style plugins should only be used through the v010-adapter plugin
 func (c *Client) InvokeWithSandbox(ctx context.Context, task Task, state types.State, sandbox *Sandbox) ([]*types.Result, error) {
 	if len(c.conf.Plugins) == 0 {
 		return nil, nil
@@ -129,7 +153,7 @@ func (c *Client) InvokeWithSandbox(ctx context.Context, task Task, state types.S
 	return r.Results, nil
 }
 
-func (c *Client) invokePlugin(ctx context.Context, name string, r *types.Request) (*types.Result, error) {
+func (c *Client) invokePlugin(ctx context.Context, name string, r *types.Request) (*types.Result, error) { //nolint:staticcheck
 	payload, err := json.Marshal(r)
 	if err != nil {
 		return nil, err
@@ -154,28 +178,28 @@ func (c *Client) invokePlugin(ctx context.Context, name string, r *types.Request
 			return nil, err
 		}
 	}
-	var result types.Result
+	var result types.Result //nolint:staticcheck
 	if err := json.Unmarshal(out, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal plugin output %s: %w", msg, err)
 	}
-	if result.Err() != nil {
-		return nil, result.Err()
+	if result.Err() != nil { //nolint:staticcheck
+		return nil, result.Err() //nolint:staticcheck
 	}
 	return &result, nil
 }
 
-func loadConfig(path string) (*types.ConfigList, error) {
+func loadConfig(path string) (*types.ConfigList, error) { //nolint:staticcheck
 	f, err := os.Open(path)
 	if err != nil {
 		// if we don't have a config list on disk, create a new one for use
 		if os.IsNotExist(err) {
-			return &types.ConfigList{
+			return &types.ConfigList{ //nolint:staticcheck
 				Version: Version,
 			}, nil
 		}
 		return nil, err
 	}
-	var c types.ConfigList
+	var c types.ConfigList //nolint:staticcheck
 	err = json.NewDecoder(f).Decode(&c)
 	f.Close()
 	if err != nil {
@@ -184,8 +208,8 @@ func loadConfig(path string) (*types.ConfigList, error) {
 	return &c, nil
 }
 
-func createSpec(spec *oci.Spec) (*types.Spec, error) {
-	s := types.Spec{
+func createSpec(spec *oci.Spec) (*types.Spec, error) { //nolint:staticcheck
+	s := types.Spec{ //nolint:staticcheck
 		Namespaces:  make(map[string]string),
 		Annotations: spec.Annotations,
 	}

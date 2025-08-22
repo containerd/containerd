@@ -1,3 +1,5 @@
+//go:build !tinygo.wasm
+
 /*
    Copyright The containerd Authors.
 
@@ -18,7 +20,6 @@ package api
 
 import (
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // FromOCILinuxResources returns resources from an OCI runtime Spec.
@@ -70,34 +71,13 @@ func FromOCILinuxResources(o *rspec.LinuxResources, _ map[string]string) *LinuxR
 			Limit: p.Limit,
 		}
 	}
+	if len(o.Unified) != 0 {
+		l.Unified = make(map[string]string)
+		for k, v := range o.Unified {
+			l.Unified[k] = v
+		}
+	}
 	return l
-}
-
-func FromCRILinuxResources(c *cri.LinuxContainerResources) *LinuxResources {
-	if c == nil {
-		return nil
-	}
-	shares, quota, period := uint64(c.CpuShares), c.CpuQuota, uint64(c.CpuPeriod)
-	r := &LinuxResources{
-		Cpu: &LinuxCPU{
-			Shares: UInt64(&shares),
-			Quota:  Int64(&quota),
-			Period: UInt64(&period),
-			Cpus:   c.CpusetCpus,
-			Mems:   c.CpusetMems,
-		},
-		Memory: &LinuxMemory{
-			Limit: Int64(&c.MemoryLimitInBytes),
-		},
-	}
-	for _, l := range c.HugepageLimits {
-		r.HugepageLimits = append(r.HugepageLimits,
-			&HugepageLimit{
-				PageSize: l.PageSize,
-				Limit:    l.Limit,
-			})
-	}
-	return r
 }
 
 // ToOCI returns resources for an OCI runtime Spec.
@@ -161,39 +141,6 @@ func (r *LinuxResources) ToOCI() *rspec.LinuxResources {
 	return o
 }
 
-// ToCRI returns resources for CRI.
-func (r *LinuxResources) ToCRI(oomScoreAdj int64) *cri.LinuxContainerResources {
-	if r == nil {
-		return nil
-	}
-	o := &cri.LinuxContainerResources{}
-	if r.Memory != nil {
-		o.MemoryLimitInBytes = r.Memory.GetLimit().GetValue()
-		o.OomScoreAdj = oomScoreAdj
-	}
-	if r.Cpu != nil {
-		o.CpuShares = int64(r.Cpu.GetShares().GetValue())
-		o.CpuPeriod = int64(r.Cpu.GetPeriod().GetValue())
-		o.CpuQuota = r.Cpu.GetQuota().GetValue()
-		o.CpusetCpus = r.Cpu.Cpus
-		o.CpusetMems = r.Cpu.Mems
-	}
-	for _, l := range r.HugepageLimits {
-		o.HugepageLimits = append(o.HugepageLimits, &cri.HugepageLimit{
-			PageSize: l.PageSize,
-			Limit:    l.Limit,
-		})
-	}
-	if len(r.Unified) != 0 {
-		o.Unified = make(map[string]string)
-		for k, v := range r.Unified {
-			o.Unified[k] = v
-		}
-	}
-
-	return o
-}
-
 // Copy creates a copy of the resources.
 func (r *LinuxResources) Copy() *LinuxResources {
 	if r == nil {
@@ -242,6 +189,15 @@ func (r *LinuxResources) Copy() *LinuxResources {
 	}
 	o.BlockioClass = String(r.BlockioClass)
 	o.RdtClass = String(r.RdtClass)
+	for _, d := range r.Devices {
+		o.Devices = append(o.Devices, &LinuxDeviceCgroup{
+			Allow:  d.Allow,
+			Type:   d.Type,
+			Access: d.Access,
+			Major:  Int64(d.Major),
+			Minor:  Int64(d.Minor),
+		})
+	}
 
 	return o
 }
