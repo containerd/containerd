@@ -18,11 +18,11 @@ package mount
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -204,6 +204,105 @@ func TestUnmountRecursive(t *testing.T) {
 	}
 }
 
+func TestDoPrepareIDMappedOverlayCleanups(t *testing.T) {
+	testutil.RequiresRoot(t)
+	if !supportsIDMap(t.TempDir()) {
+		t.Skip("IDmapped mounts not supported on filesystem selected by t.TempDir()")
+	}
+
+	testCases := []struct {
+		name            string
+		lowerDirs       []string
+		tmpDir          string
+		callbackFailure bool
+		success         bool
+	}{
+		{
+			name:      "mount failure",
+			lowerDirs: []string{"/non/existent/path"},
+		},
+		{
+			name:      "tmpdir creation failure",
+			lowerDirs: []string{"/non/existent/path"},
+			tmpDir:    "/non/existent/",
+		},
+		{
+			name:            "cleanup callback failure",
+			callbackFailure: true,
+			success:         true,
+		},
+		{
+			name:    "all fine",
+			success: true,
+		},
+	}
+
+	usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
+	require.NoError(t, err)
+	defer usernsFD.Close()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := tc.tmpDir
+			if tmpDir == "" {
+				tmpDir = t.TempDir()
+			}
+			lowerDirs := tc.lowerDirs
+			if len(lowerDirs) == 0 {
+				// Create a temporary directory with a file to simulate lowerDirs
+				dir := t.TempDir()
+				require.NoError(t, os.Mkdir(dir+"/l", 0755))
+				require.NoError(t, os.WriteFile(dir+"/l/bar", []byte("foo"), 0644))
+				lowerDirs = []string{dir + "/l"}
+			}
+
+			retLowerDirs, cleanup, err := doPrepareIDMappedOverlay(tmpDir, lowerDirs, int(usernsFD.Fd()))
+			if tc.success && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !tc.success && err == nil {
+				t.Fatal("expected error but got none")
+			}
+			if err != nil {
+				return
+			}
+
+			if !tc.callbackFailure {
+				cleanup()
+				// Verify that tmpDir is empty
+				assert.NoError(t, os.Remove(tmpDir), "expected temporary directory %s to be removed, but got error", tmpDir)
+			}
+
+			// Let's make the cleanup callback fail and make sure nothing is deleted.
+			if tc.callbackFailure {
+				// We won't be able to umount if there is an open fd to it.
+				busyDh, err := os.Open(retLowerDirs[0])
+				assert.NoError(t, err)
+				cleanup()
+				defer busyDh.Close() // close even if asserts fails before we close manually below.
+
+				// Verify that tmpDir is NOT empty (cleanup failed and child dirs
+				// were not removed).
+				assert.Error(t, os.Remove(tmpDir), "expected remove directory %v to fail, but worked fine", tmpDir)
+
+				// Let's not leak mounts, let's close the handle and do the unmount.
+				// If this fails, golang will mark the test as failed, as it can't
+				// clean up the tmp directories.
+				assert.NoError(t, busyDh.Close())
+				cleanup()
+			}
+
+			// Verify that the lowerDirs were not modified.
+			// So we don't regress on issue #10704.
+			for _, dir := range lowerDirs {
+				_, err := os.Stat(dir)
+				assert.NoError(t, err, "expected lower directory %s to exist, but it does not", dir)
+				assert.Error(t, os.Remove(dir), "expected remove directory %s to fail, but worked fine", dir)
+			}
+		})
+	}
+}
+
 func TestDoPrepareIDMappedOverlay(t *testing.T) {
 	testutil.RequiresRoot(t)
 
@@ -278,15 +377,13 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 
 			cleanup()
 
-			_, err = os.Stat(remountsLocation)
+			err = os.Remove(remountsLocation)
 
 			if tc.injectUmountFault {
 				// We should have failed to remove the remounts location if the unmount failed.
-				assert.NoError(t, err, "expected remounts location to still exist after unmount failure")
+				assert.Error(t, err, "expected remove to fail (dir not empty), expected remount child locations to still exist after unmount failure")
 			} else {
-				pathErr, isPathErr := err.(*fs.PathError)
-				require.True(t, isPathErr, "expected a PathError")
-				assert.Equal(t, unix.ENOENT, pathErr.Err, "temporary remounts should be cleaned up")
+				assert.NoError(t, err, "expected remove to work (dir empty), the child directory should be unmounted and removed")
 			}
 
 			// Original lowerdirs should be unaffected.
@@ -394,4 +491,165 @@ func supportsIDMap(path string) bool {
 	}
 
 	return true
+}
+
+func TestBuildIDMappedPaths(t *testing.T) {
+	testCases := []struct {
+		name        string
+		lowerDirs   []string
+		commonDir   string
+		idMappedDir string
+		expected    []string
+	}{
+		{
+			name: "basic path rewriting",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2/fs",
+			},
+			commonDir:   "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+			idMappedDir: "/tmp/idmapped123",
+			expected: []string{
+				"/tmp/idmapped123/1/fs",
+				"/tmp/idmapped123/2/fs",
+			},
+		},
+		{
+			name: "single layer",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs",
+			},
+			commonDir:   "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs",
+			idMappedDir: "/tmp/idmapped789",
+			expected: []string{
+				"/tmp/idmapped789",
+			},
+		},
+		{
+			name: "single layer with ending slash",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs/",
+			},
+			commonDir:   "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs/",
+			idMappedDir: "/tmp/idmapped789",
+			expected: []string{
+				"/tmp/idmapped789",
+			},
+		},
+		{
+			name: "snapshots with common prefix in snapshot id",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/79/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/78/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/77/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/76/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/75/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/73/fs",
+			},
+			commonDir:   "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+			idMappedDir: "/tmp/ovl-idmapped1095187461",
+			expected: []string{
+				"/tmp/ovl-idmapped1095187461/79/fs",
+				"/tmp/ovl-idmapped1095187461/78/fs",
+				"/tmp/ovl-idmapped1095187461/77/fs",
+				"/tmp/ovl-idmapped1095187461/76/fs",
+				"/tmp/ovl-idmapped1095187461/75/fs",
+				"/tmp/ovl-idmapped1095187461/73/fs",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := buildIDMappedPaths(tc.lowerDirs, tc.commonDir, tc.idMappedDir)
+
+			if len(result) != len(tc.expected) {
+				t.Fatalf("expected %d paths, got %d", len(tc.expected), len(result))
+			}
+
+			for i, expected := range tc.expected {
+				if result[i] != expected {
+					t.Errorf("path %d: expected %s, got %s", i, expected, result[i])
+				}
+			}
+		})
+	}
+}
+
+func TestGetCommonDirectory(t *testing.T) {
+	testCases := []struct {
+		name        string
+		lowerDirs   []string
+		expected    string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "no lowerdirs",
+			lowerDirs:   []string{},
+			expectError: true,
+			errorMsg:    "no common prefix found",
+		},
+		{
+			name: "normal snapshots",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/37712/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16590/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585/fs",
+			},
+			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+		},
+		{
+			name: "no common prefix at all",
+			lowerDirs: []string{
+				"/completely/different/path/1",
+				"/totally/unrelated/path/2",
+			},
+			expectError: true,
+			errorMsg:    "invalid common directory:",
+		},
+		{
+			name: "single dir",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585/fs",
+			},
+			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585",
+		},
+		{
+			name: "snapshots with common prefix in snapshot id",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/79/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/78/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/77/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/76/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/75/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/73/fs",
+			},
+			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := getCommonDirectory(tc.lowerDirs)
+
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tc.errorMsg)
+				}
+				if !strings.Contains(err.Error(), tc.errorMsg) {
+					t.Errorf("expected error containing %q, got %q", tc.errorMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if result != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, result)
+			}
+		})
+	}
 }
