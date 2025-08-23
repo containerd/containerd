@@ -48,10 +48,15 @@ linters:
         - -ST1021
     revive:
       rules:
+        - name: if-return
+        - name: indent-error-flow
+          arguments:
+            - "preserve-scope"
         - name: package-comments
-          severity: warning
           disabled: true
-          exclude: [ "" ]
+        - name: superfluous-else
+          arguments:
+            - "preserve-scope"
     nolintlint:
       allow-unused: true
   exclusions:
@@ -68,13 +73,7 @@ linters:
         text: 'dot-imports:'
       - linters:
           - revive
-        text: if-return
-      - linters:
-          - revive
         text: empty-block
-      - linters:
-          - revive
-        text: superfluous-else
       - linters:
           - revive
         text: unused-parameter
