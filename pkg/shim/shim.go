@@ -230,7 +230,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	}
 
 	if namespaceFlag == "" {
-		return fmt.Errorf("shim namespace cannot be empty")
+		return errors.New("shim namespace cannot be empty")
 	}
 
 	setRuntime()
@@ -404,7 +404,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	}
 
 	if len(ttrpcServices) == 0 {
-		return fmt.Errorf("required that ttrpc service")
+		return errors.New("required that ttrpc service")
 	}
 
 	unaryInterceptor := chainUnaryServerInterceptors(ttrpcUnaryInterceptors...)
