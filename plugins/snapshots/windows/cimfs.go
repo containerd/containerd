@@ -414,10 +414,11 @@ func createDifferencingScratchVHDs(ctx context.Context, path string) (err error)
 	}
 
 	defer func() {
-		if err != nil {
-			os.RemoveAll(baseVHDPath)
-			os.RemoveAll(diffVHDPath)
+		if err == nil {
+			return
 		}
+		os.RemoveAll(baseVHDPath)
+		os.RemoveAll(diffVHDPath)
 	}()
 
 	if !baseVHDExists {

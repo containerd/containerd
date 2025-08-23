@@ -80,40 +80,41 @@ func addChildLinks(tx *bolt.Tx) error {
 		nbkt := v1bkt.Bucket(k)
 
 		sbkt := nbkt.Bucket(bucketKeyObjectSnapshots)
-		if sbkt != nil {
-			// Iterate through each snapshotter
-			if err := sbkt.ForEach(func(sk, sv []byte) error {
-				if sv != nil {
+		if sbkt == nil {
+			continue
+		}
+		// Iterate through each snapshotter
+		if err := sbkt.ForEach(func(sk, sv []byte) error {
+			if sv != nil {
+				return nil
+			}
+			snbkt := sbkt.Bucket(sk)
+
+			// Iterate through each snapshot
+			return snbkt.ForEach(func(k, v []byte) error {
+				if v != nil {
 					return nil
 				}
-				snbkt := sbkt.Bucket(sk)
-
-				// Iterate through each snapshot
-				return snbkt.ForEach(func(k, v []byte) error {
-					if v != nil {
+				parent := snbkt.Bucket(k).Get(bucketKeyParent)
+				if len(parent) > 0 {
+					pbkt := snbkt.Bucket(parent)
+					if pbkt == nil {
+						// Not enforcing consistency during migration, skip
 						return nil
 					}
-					parent := snbkt.Bucket(k).Get(bucketKeyParent)
-					if len(parent) > 0 {
-						pbkt := snbkt.Bucket(parent)
-						if pbkt == nil {
-							// Not enforcing consistency during migration, skip
-							return nil
-						}
-						cbkt, err := pbkt.CreateBucketIfNotExists(bucketKeyChildren)
-						if err != nil {
-							return err
-						}
-						if err := cbkt.Put(k, nil); err != nil {
-							return err
-						}
+					cbkt, err := pbkt.CreateBucketIfNotExists(bucketKeyChildren)
+					if err != nil {
+						return err
 					}
+					if err := cbkt.Put(k, nil); err != nil {
+						return err
+					}
+				}
 
-					return nil
-				})
-			}); err != nil {
-				return err
-			}
+				return nil
+			})
+		}); err != nil {
+			return err
 		}
 	}
 
