@@ -423,6 +423,139 @@ func TestIssue10598(t *testing.T) {
 	}, time.Second, 30*time.Second))
 }
 
+// TestUsernsVolumeCopyUp tests the volume-copy-up feature in user namespaces. It's inspired in
+// TestVolumeCopyUp but adapted to run with user namespaces and check file owners.
+// For more info, see:
+//
+//	https://github.com/containerd/containerd/issues/11852
+func TestUsernsVolumeCopyUp(t *testing.T) {
+	if !supportsUserNS() {
+		t.Skip("User namespaces are not supported")
+	}
+	if !supportsIDMap(defaultRoot) {
+		t.Skipf("ID mappings are not supported on: %v", defaultRoot)
+	}
+	if err := supportsRuncIDMap(); err != nil {
+		t.Skipf("OCI runtime doesn't support idmap mounts: %v", err)
+	}
+
+	var (
+		testImage   = images.Get(images.VolumeCopyUp)
+		execTimeout = time.Minute
+		containerID = uint32(0)
+		hostID      = uint32(65536)
+		size        = uint32(65536)
+	)
+
+	t.Logf("Create a sandbox")
+	sbOpts := []PodSandboxOpts{
+		WithPodUserNs(containerID, hostID, size),
+	}
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "volume-ownership", sbOpts...)
+
+	EnsureImageExists(t, testImage)
+
+	t.Logf("Create a container with volume-copy-up test image")
+	cnConfig := ContainerConfig(
+		"container",
+		testImage,
+		WithCommand("sleep", "150"),
+		WithUserNamespace(containerID, hostID, size),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Logf("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	expectedVolumes := []containerVolume{
+		{
+			containerPath: "/test_dir",
+			files: []volumeFile{
+				{
+					fileName: "test_file",
+					contents: "test_content\n",
+				},
+			},
+		},
+		{
+			containerPath: "/:colon_prefixed",
+			files: []volumeFile{
+				{
+					fileName: "colon_prefixed_file",
+					contents: "test_content\n",
+				},
+			},
+		},
+		{
+			containerPath: "/C:/weird_test_dir",
+			files: []volumeFile{
+				{
+					fileName: "weird_test_file",
+					contents: "test_content\n",
+				},
+			},
+		},
+	}
+
+	volumeMappings, err := getContainerBindVolumes(t, cn)
+	require.NoError(t, err)
+
+	t.Logf("Check host path of the volume")
+	for _, vol := range expectedVolumes {
+		_, ok := volumeMappings[vol.containerPath]
+		assert.Equalf(t, true, ok, "expected to find volume %s", vol.containerPath)
+	}
+
+	// ghcr.io/containerd/volume-copy-up:2.2 contains 3 volumes on Linux and 2 volumes on Windows.
+	// On linux, each of the volumes contains a single file, all with the same content. On Windows,
+	// non C volumes defined in the image start out as empty.
+	for _, vol := range expectedVolumes {
+		files, err := os.ReadDir(volumeMappings[vol.containerPath])
+		require.NoError(t, err)
+		assert.Equal(t, len(vol.files), len(files))
+
+		for _, file := range vol.files {
+			t.Logf("Check whether volume %s contains the test file %s", vol.containerPath, file.fileName)
+			stdout, stderr, err := runtimeService.ExecSync(cn, []string{
+				"cat",
+				filepath.ToSlash(filepath.Join(vol.containerPath, file.fileName)),
+			}, execTimeout)
+			require.NoError(t, err)
+			assert.Empty(t, stderr)
+			assert.Equal(t, file.contents, string(stdout))
+
+			t.Logf("Check whether volume %s contains the test file %s with proper permissions", vol.containerPath, file.fileName)
+			stdout, stderr, err = runtimeService.ExecSync(cn, []string{
+				"stat", "-c", "=%u=%g=",
+				filepath.ToSlash(filepath.Join(vol.containerPath, file.fileName)),
+			}, execTimeout)
+			require.NoError(t, err)
+			assert.Empty(t, stderr)
+			assert.Equal(t, "=0=0=\n", string(stdout))
+		}
+	}
+
+	testFilePath := filepath.Join(volumeMappings[expectedVolumes[0].containerPath], expectedVolumes[0].files[0].fileName)
+	inContainerPath := filepath.Join(expectedVolumes[0].containerPath, expectedVolumes[0].files[0].fileName)
+	contents, err := os.ReadFile(testFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, "test_content\n", string(contents))
+
+	t.Logf("Update volume from inside the container")
+	_, _, err = runtimeService.ExecSync(cn, []string{
+		"sh",
+		"-c",
+		fmt.Sprintf("echo new_content > %s", filepath.ToSlash(inContainerPath)),
+	}, execTimeout)
+	require.NoError(t, err)
+
+	t.Logf("Check whether host path of the volume is updated")
+	contents, err = os.ReadFile(testFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, "new_content\n", string(contents))
+}
+
 func supportsRuncIDMap() error {
 	var r runc.Runc
 	features, err := r.Features(context.Background())
