@@ -10,7 +10,6 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	"github.com/containerd/containerd/log"
 	"github.com/google/certtostore"
 	"golang.org/x/sys/windows"
 )
@@ -51,7 +50,6 @@ func (w *WindowsCertResource) Close() error {
 
 // Returns tls.Config, certPool, CertResource for caller-managed cleanup
 func SetupTLSFromWindowsCertStore(ctx context.Context, commonName string) (*tls.Config, *x509.CertPool, CertResource, error) {
-	log.G(ctx).Infof("Setting up TLS with common name %v", commonName)
 	// Open the Windows Certificate Store (My store)
 	store, err := certtostore.OpenWinCertStore(certtostore.ProviderMSSoftware, "My", []string{}, nil, false)
 	if err != nil {
@@ -70,17 +68,6 @@ func SetupTLSFromWindowsCertStore(ctx context.Context, commonName string) (*tls.
 	if certContext == nil {
 		store.Close()
 		return nil, nil, nil, fmt.Errorf("certificate context is nil for common name: %v", commonName)
-	}
-
-	if len(leafCert.Raw) == 0 {
-		certtostore.FreeCertContext(certContext)
-		store.Close()
-		return nil, nil, nil, fmt.Errorf("leaf certificate Raw bytes are empty")
-	}
-	if leafCert.Raw[0] != 0x30 {
-		certtostore.FreeCertContext(certContext)
-		store.Close()
-		return nil, nil, nil, fmt.Errorf("leaf certificate is not in DER format")
 	}
 
 	// Retrieve the private key from certtostore
