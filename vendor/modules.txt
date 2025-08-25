@@ -61,6 +61,9 @@ github.com/Microsoft/hcsshim/pkg/cimfs/format
 github.com/Microsoft/hcsshim/pkg/go-runhcs
 github.com/Microsoft/hcsshim/pkg/ociwclayer
 github.com/Microsoft/hcsshim/pkg/ociwclayer/cim
+# github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
+## explicit
+github.com/StackExchange/wmi
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -285,6 +288,10 @@ github.com/go-logr/logr/funcr
 # github.com/go-logr/stdr v1.2.2
 ## explicit; go 1.16
 github.com/go-logr/stdr
+# github.com/go-ole/go-ole v1.2.6
+## explicit; go 1.12
+github.com/go-ole/go-ole
+github.com/go-ole/go-ole/oleutil
 # github.com/godbus/dbus/v5 v5.1.0
 ## explicit; go 1.12
 github.com/godbus/dbus/v5
@@ -298,6 +305,12 @@ github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.5.4
 ## explicit; go 1.17
 github.com/golang/protobuf/proto
+# github.com/google/certtostore v1.0.6
+## explicit; go 1.18
+github.com/google/certtostore
+# github.com/google/deck v0.0.0-20230104221208-105ad94aa8ae
+## explicit; go 1.19
+github.com/google/deck
 # github.com/google/go-cmp v0.7.0
 ## explicit; go 1.21
 github.com/google/go-cmp/cmp
@@ -322,6 +335,8 @@ github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
+# github.com/hashicorp/errwrap v1.1.0
+## explicit
 # github.com/intel/goresctrl v0.9.0
 ## explicit; go 1.23
 github.com/intel/goresctrl/pkg/blockio
