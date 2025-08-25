@@ -25,6 +25,7 @@ import (
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/pkg/sys"
+	"github.com/containerd/containerd/v2/pkg/wintls"
 	"github.com/containerd/log"
 	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
@@ -72,3 +73,7 @@ func newTTRPCServer() (*ttrpc.Server, error) {
 		ttrpc.WithUnaryServerInterceptor(otelttrpc.UnaryServerInterceptor()),
 	)
 }
+
+// TLS resource helpers are no-ops on Linux.
+func setTLSResource(r wintls.CertResource) {}
+func cleanupTLSResources()                 {}
