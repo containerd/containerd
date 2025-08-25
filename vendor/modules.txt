@@ -307,7 +307,7 @@ github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.5.4
 ## explicit; go 1.17
 github.com/golang/protobuf/proto
-# github.com/google/certtostore v1.0.5-0.20250819205540-b2a18cc3547d
+# github.com/google/certtostore v1.0.5
 ## explicit; go 1.18
 github.com/google/certtostore
 # github.com/google/deck v0.0.0-20230104221208-105ad94aa8ae

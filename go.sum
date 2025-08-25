@@ -150,8 +150,8 @@ github.com/golang/protobuf v1.4.1/go.mod h1:U8fpvMrcmy5pZrNK1lt4xCsGvpyWQ/VVv6QD
 github.com/golang/protobuf v1.4.3/go.mod h1:oDoupMAO8OvCJWAcko0GGGIgR6R6ocIYbsSw735rRwI=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
-github.com/google/certtostore v1.0.5-0.20250819205540-b2a18cc3547d h1:iytssyAQH6zlFfcboCYWQifk1oRJnvriGmBKqRkCw74=
-github.com/google/certtostore v1.0.5-0.20250819205540-b2a18cc3547d/go.mod h1:6el+08TkTPg5FB9g59oVNvv1yrBXtbHpIv9fBTYTBBA=
+github.com/google/certtostore v1.0.5 h1:PTHEpNLDZ05zzxf7W395a0+K7fDrn3fuIH9nNGISK9c=
+github.com/google/certtostore v1.0.5/go.mod h1:6el+08TkTPg5FB9g59oVNvv1yrBXtbHpIv9fBTYTBBA=
 github.com/google/deck v0.0.0-20230104221208-105ad94aa8ae h1:Iy1Ad7L9qPtNAFJad+Ch2kwDXrcwu7QUBR0bfChjnEM=
 github.com/google/deck v0.0.0-20230104221208-105ad94aa8ae/go.mod h1:DoDv8G58DuLNZF0KysYn0bA/6ZWhmRW3fZE2VnGEH0w=
 github.com/google/gnostic-models v0.6.9 h1:MU/8wDLif2qCXZmzncUQ/BOfxWfthHi63KqpoNbWqVw=
