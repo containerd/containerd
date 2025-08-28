@@ -19,6 +19,8 @@ package oci
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,8 +30,10 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/containerd/continuity/fs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/moby/sys/user"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -696,7 +700,7 @@ func WithUser(userstr string) SpecOpts {
 			// from the container's rootfs. Since the option does read operation
 			// only, we append ReadOnly mount option to prevent the Linux kernel
 			// from syncing whole filesystem in umount syscall.
-			return mount.WithReadonlyTempMount(ctx, mounts, f)
+			return withReadonlyFS(ctx, client, mounts, f)
 		default:
 			return fmt.Errorf("invalid USER value %s", userstr)
 		}
@@ -760,7 +764,7 @@ func WithUserID(uid uint32) SpecOpts {
 		// from the container's rootfs. Since the option does read operation
 		// only, we append ReadOnly mount option to prevent the Linux kernel
 		// from syncing whole filesystem in umount syscall.
-		return mount.WithReadonlyTempMount(ctx, mounts, setUser)
+		return withReadonlyFS(ctx, client, mounts, setUser)
 	}
 }
 
@@ -808,7 +812,7 @@ func WithUsername(username string) SpecOpts {
 			// from the container's rootfs. Since the option does read operation
 			// only, we append ReadOnly mount option to prevent the Linux kernel
 			// from syncing whole filesystem in umount syscall.
-			return mount.WithReadonlyTempMount(ctx, mounts, setUser)
+			return withReadonlyFS(ctx, client, mounts, setUser)
 		} else if s.Windows != nil {
 			s.Process.User.Username = username
 		} else {
@@ -890,8 +894,34 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 		// from the container's rootfs. Since the option does read operation
 		// only, we append ReadOnly mount option to prevent the Linux kernel
 		// from syncing whole filesystem in umount syscall.
-		return mount.WithReadonlyTempMount(ctx, mounts, setAdditionalGids)
+		return withReadonlyFS(ctx, client, mounts, setAdditionalGids)
 	}
+}
+
+func withReadonlyFS(ctx context.Context, client Client, mounts []mount.Mount, fn func(root string) error) error {
+	var mm mount.Manager
+	if cwm, ok := client.(interface{ MountManager() mount.Manager }); ok {
+		mm = cwm.MountManager()
+	}
+
+	if mm != nil {
+		t := time.Now()
+		var b [3]byte
+		// Ignore read failures, just decreases uniqueness
+		rand.Read(b[:])
+		id := fmt.Sprintf("readonly-fs-%d-%s", t.Nanosecond(), base64.URLEncoding.EncodeToString(b[:]))
+
+		// TODO: Use temporary once the read only can be optimized for single bind mounts
+		active, err := mm.Activate(ctx, id, mounts)
+		if err == nil {
+			defer mm.Deactivate(ctx, id)
+			mounts = active.System
+		} else if errors.Is(err, errdefs.ErrNotImplemented) {
+			return err
+
+		}
+	}
+	return mount.WithReadonlyTempMount(ctx, mounts, fn)
 }
 
 // WithAppendAdditionalGroups append additional groups within the container.
@@ -958,7 +988,7 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 		// from the container's rootfs. Since the option does read operation
 		// only, we append ReadOnly mount option to prevent the Linux kernel
 		// from syncing whole filesystem in umount syscall.
-		return mount.WithReadonlyTempMount(ctx, mounts, setAdditionalGids)
+		return withReadonlyFS(ctx, client, mounts, setAdditionalGids)
 	}
 }
 
