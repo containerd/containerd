@@ -25,14 +25,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 
 	"github.com/google/certtostore"
 	"golang.org/x/sys/windows"
 )
 
-type CertResource interface {
-	Close() error
-}
+type CertResource = io.Closer
 
 type WindowsCertResource struct {
 	store       *certtostore.WinCertStore
@@ -65,7 +64,7 @@ func (w *WindowsCertResource) Close() error {
 }
 
 // Returns tls.Config, certPool, CertResource for caller-managed cleanup
-func SetupTLSFromWindowsCertStore(ctx context.Context, commonName string) (*tls.Config, *x509.CertPool, CertResource, error) {
+func SetupTLSFromWindowsCertStore(ctx context.Context, commonName string) (*tls.Config, *x509.CertPool, io.Closer, error) {
 	// Open the Windows Certificate Store (My store)
 	store, err := certtostore.OpenWinCertStore(certtostore.ProviderMSSoftware, "My", []string{}, nil, false)
 	if err != nil {

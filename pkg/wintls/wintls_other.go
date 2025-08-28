@@ -23,12 +23,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"io"
 )
 
-// CertResource is a platform-agnostic interface for cleaning up TLS resources
-type CertResource interface {
-	Close() error
-}
+type CertResource = io.Closer
 
 // NoopCertResource implements CertResource for non-Windows platforms
 type NoopCertResource struct{}
@@ -38,6 +36,6 @@ func (n *NoopCertResource) Close() error {
 }
 
 // Stub for non-Windows platforms
-func SetupTLSFromWindowsCertStore(ctx context.Context, commonName string) (*tls.Config, *x509.CertPool, CertResource, error) {
+func SetupTLSFromWindowsCertStore(ctx context.Context, commonName string) (*tls.Config, *x509.CertPool, io.Closer, error) {
 	return nil, nil, &NoopCertResource{}, nil
 }
