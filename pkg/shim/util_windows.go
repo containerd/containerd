@@ -39,11 +39,12 @@ func AnonReconnectDialer(address string, timeout time.Duration) (net.Conn, error
 	defer cancel()
 
 	c, err := winio.DialPipeContext(ctx, address)
-	if os.IsNotExist(err) {
+	switch {
+	case os.IsNotExist(err):
 		return nil, fmt.Errorf("npipe not found on reconnect: %w", os.ErrNotExist)
-	} else if err == context.DeadlineExceeded {
+	case err == context.DeadlineExceeded:
 		return nil, fmt.Errorf("timed out waiting for npipe %s: %w", address, err)
-	} else if err != nil {
+	case err != nil:
 		return nil, err
 	}
 	return c, nil

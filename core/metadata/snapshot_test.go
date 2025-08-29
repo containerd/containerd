@@ -41,7 +41,7 @@ import (
 
 func newTestSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 	nativeRoot := filepath.Join(root, "native")
-	if err := os.Mkdir(nativeRoot, 0770); err != nil {
+	if err := os.Mkdir(nativeRoot, 0o770); err != nil {
 		return nil, nil, err
 	}
 	snapshotter, err := native.NewSnapshotter(nativeRoot)

@@ -76,7 +76,7 @@ func TestIssue10467(t *testing.T) {
 	require.NoError(t, previousProc.wait(5*time.Minute))
 
 	t.Logf("%s should have bucket k8s.io in root", boltdbPath)
-	db, err := bbolt.Open(boltdbPath, 0600, &bbolt.Options{ReadOnly: true})
+	db, err := bbolt.Open(boltdbPath, 0o600, &bbolt.Options{ReadOnly: true})
 	require.NoError(t, err)
 	require.NoError(t, db.View(func(tx *bbolt.Tx) error {
 		if tx.Bucket([]byte("k8s.io")) == nil {
@@ -106,7 +106,7 @@ func TestIssue10467(t *testing.T) {
 	copiedBoltdbPath := filepath.Join(t.TempDir(), "meta.db.new")
 	require.NoError(t, fs.CopyFile(copiedBoltdbPath, boltdbPath))
 
-	db, err = bbolt.Open(copiedBoltdbPath, 0600, &bbolt.Options{ReadOnly: true})
+	db, err = bbolt.Open(copiedBoltdbPath, 0o600, &bbolt.Options{ReadOnly: true})
 	require.NoError(t, err)
 	require.NoError(t, db.View(func(tx *bbolt.Tx) error {
 		if tx.Bucket([]byte("k8s.io")) != nil {

@@ -39,7 +39,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGrou
 	wg = &sync.WaitGroup{}
 	ctx := context.Background()
 
-	f, err := fifo.OpenFifo(ctx, stdin, unix.O_WRONLY|unix.O_CREAT|unix.O_NONBLOCK, 0700)
+	f, err := fifo.OpenFifo(ctx, stdin, unix.O_WRONLY|unix.O_CREAT|unix.O_NONBLOCK, 0o700)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGrou
 		w.Close()
 	}(f)
 
-	f, err = fifo.OpenFifo(ctx, stdout, unix.O_RDONLY|unix.O_CREAT|unix.O_NONBLOCK, 0700)
+	f, err = fifo.OpenFifo(ctx, stdout, unix.O_RDONLY|unix.O_CREAT|unix.O_NONBLOCK, 0o700)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func prepareStdio(stdin, stdout, stderr string, console bool) (wg *sync.WaitGrou
 		wg.Done()
 	}(f)
 
-	f, err = fifo.OpenFifo(ctx, stderr, unix.O_RDONLY|unix.O_CREAT|unix.O_NONBLOCK, 0700)
+	f, err = fifo.OpenFifo(ctx, stderr, unix.O_RDONLY|unix.O_CREAT|unix.O_NONBLOCK, 0o700)
 	if err != nil {
 		return nil, err
 	}

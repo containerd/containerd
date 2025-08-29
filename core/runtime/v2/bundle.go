@@ -68,10 +68,10 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		}
 	}()
 	// create state directory for the bundle
-	if err := os.MkdirAll(filepath.Dir(b.Path), 0711); err != nil {
+	if err := os.MkdirAll(filepath.Dir(b.Path), 0o711); err != nil {
 		return nil, err
 	}
-	if err := os.Mkdir(b.Path, 0700); err != nil {
+	if err := os.Mkdir(b.Path, 0o700); err != nil {
 		return nil, err
 	}
 	if typeurl.Is(spec, &specs.Spec{}) {
@@ -81,20 +81,20 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	}
 	paths = append(paths, b.Path)
 	// create working directory for the bundle
-	if err := os.MkdirAll(filepath.Dir(work), 0711); err != nil {
+	if err := os.MkdirAll(filepath.Dir(work), 0o711); err != nil {
 		return nil, err
 	}
 	rootfs := filepath.Join(b.Path, "rootfs")
-	if err := os.MkdirAll(rootfs, 0711); err != nil {
+	if err := os.MkdirAll(rootfs, 0o711); err != nil {
 		return nil, err
 	}
 	paths = append(paths, rootfs)
-	if err := os.Mkdir(work, 0711); err != nil {
+	if err := os.Mkdir(work, 0o711); err != nil {
 		if !os.IsExist(err) {
 			return nil, err
 		}
 		os.RemoveAll(work)
-		if err := os.Mkdir(work, 0711); err != nil {
+		if err := os.Mkdir(work, 0o711); err != nil {
 			return nil, err
 		}
 	}
@@ -106,7 +106,7 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	if spec := spec.GetValue(); spec != nil {
 		// write the spec to the bundle
 		specPath := filepath.Join(b.Path, oci.ConfigFilename)
-		err = os.WriteFile(specPath, spec, 0666)
+		err = os.WriteFile(specPath, spec, 0o666)
 		if err != nil {
 			return nil, fmt.Errorf("failed to write bundle spec: %w", err)
 		}

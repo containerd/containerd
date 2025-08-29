@@ -225,7 +225,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	span := tracing.SpanFromContext(r.ctx)
 	// Create container root directory.
 	containerRootDir := c.getContainerRootDir(r.containerID)
-	if err := c.os.MkdirAll(containerRootDir, 0755); err != nil {
+	if err := c.os.MkdirAll(containerRootDir, 0o755); err != nil {
 		return "", fmt.Errorf(
 			"failed to create container root directory %q: %w",
 			containerRootDir,
@@ -244,7 +244,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 	volatileContainerRootDir := c.getVolatileContainerRootDir(r.containerID)
-	if err := c.os.MkdirAll(volatileContainerRootDir, 0755); err != nil {
+	if err := c.os.MkdirAll(volatileContainerRootDir, 0o755); err != nil {
 		return "", fmt.Errorf(
 			"failed to create volatile container root directory %q: %w",
 			volatileContainerRootDir,
@@ -957,11 +957,12 @@ func (c *criService) buildWindowsSpec(
 		return nil, errors.New("pod spec and all containers inside must have the HostProcess field set to be valid")
 	}
 
-	if config.GetWorkingDir() != "" {
+	switch {
+	case config.GetWorkingDir() != "":
 		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
-	} else if imageConfig.WorkingDir != "" {
+	case imageConfig.WorkingDir != "":
 		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
-	} else if cntrHpc {
+	case cntrHpc:
 		specOpts = append(specOpts, oci.WithProcessCwd(`C:\hpc`))
 	}
 
