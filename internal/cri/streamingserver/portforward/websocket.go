@@ -206,9 +206,10 @@ func (h *websocketStreamHandler) portForward(p *websocketStreamPair) {
 	err := h.forwarder.PortForward(ctx, h.pod, h.uid, p.port, p.dataStream)
 	log.L.WithField("port", p.port).Info("Connection done invoking forwarder.PortForward for port connection")
 
-	if err != nil {
-		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", p.port, h.pod, h.uid, err)
-		runtime.HandleError(msg)
-		fmt.Fprint(p.errorStream, msg.Error())
+	if err == nil {
+		return
 	}
+	msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", p.port, h.pod, h.uid, err)
+	runtime.HandleError(msg)
+	fmt.Fprint(p.errorStream, msg.Error())
 }

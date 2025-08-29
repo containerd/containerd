@@ -336,10 +336,11 @@ func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.Spec
 		}
 
 		for i, ns := range s.Linux.Namespaces {
-			if ns.Type == t {
-				s.Linux.Namespaces[i].Path = nsPath
-				return nil
+			if ns.Type != t {
+				continue
 			}
+			s.Linux.Namespaces[i].Path = nsPath
+			return nil
 		}
 		return fmt.Errorf("no such namespace %s", t)
 	}
