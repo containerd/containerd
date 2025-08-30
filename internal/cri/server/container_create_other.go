@@ -26,11 +26,11 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
-func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+func (c *criService) containerSpecOpts(*runtime.ContainerConfig, *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
 	return []oci.SpecOpts{}, nil
 }
 
 // snapshotterOpts returns snapshotter options for the rootfs snapshot
-func snapshotterOpts(config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
+func snapshotterOpts(*runtime.ContainerConfig) ([]snapshots.Opt, error) {
 	return []snapshots.Opt{}, nil
 }

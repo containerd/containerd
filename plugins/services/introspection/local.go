@@ -92,7 +92,7 @@ func (l *Local) UpdateLocal(root string) {
 }
 
 // Plugins returns the locally defined plugins
-func (l *Local) Plugins(ctx context.Context, fs ...string) (*api.PluginsResponse, error) {
+func (l *Local) Plugins(_ context.Context, fs ...string) (*api.PluginsResponse, error) {
 	filter, err := filters.ParseAll(fs...)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errdefs.ErrInvalidArgument, err)
@@ -265,7 +265,7 @@ func pluginsToPB(plugins []*plugin.Plugin) []*api.Plugin {
 	return pluginsPB
 }
 
-func warningsPB(ctx context.Context, warnings []warning.Warning) []*api.DeprecationWarning {
+func warningsPB(_ context.Context, warnings []warning.Warning) []*api.DeprecationWarning {
 	var pb []*api.DeprecationWarning
 
 	for _, w := range warnings {

@@ -48,7 +48,7 @@ func init() {
 			plugins.EventPlugin,
 		},
 		Config: &Config{},
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+		ConfigMigration: func(_ context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
 			if configVersion >= version.ConfigVersion {
 				return nil
 			}

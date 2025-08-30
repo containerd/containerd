@@ -28,7 +28,7 @@ import (
 )
 
 func (c *criService) podSandboxStats(
-	ctx context.Context,
-	sandbox sandboxstore.Sandbox) (*runtime.PodSandboxStats, error) {
+	context.Context,
+	sandboxstore.Sandbox) (*runtime.PodSandboxStats, error) {
 	return nil, fmt.Errorf("pod sandbox stats not implemented: %w", errdefs.ErrNotImplemented)
 }

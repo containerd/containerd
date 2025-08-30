@@ -40,11 +40,11 @@ func NewNoopMonitor() TaskMonitor {
 type noopTaskMonitor struct {
 }
 
-func (mm *noopTaskMonitor) Monitor(c Task, labels map[string]string) error {
+func (mm *noopTaskMonitor) Monitor(Task, map[string]string) error {
 	return nil
 }
 
-func (mm *noopTaskMonitor) Stop(c Task) error {
+func (mm *noopTaskMonitor) Stop(Task) error {
 	return nil
 }
 

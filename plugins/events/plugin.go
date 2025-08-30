@@ -27,7 +27,7 @@ func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.EventPlugin,
 		ID:   "exchange",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(*plugin.InitContext) (interface{}, error) {
 			return exchange.NewExchange(), nil
 		},
 	})

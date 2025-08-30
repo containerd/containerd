@@ -166,7 +166,7 @@ func ensureRemoveAll(_ context.Context, dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+func modifyProcessLabel(string, *specs.Spec) error {
 	return nil
 }
 

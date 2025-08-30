@@ -48,22 +48,22 @@ func WithProcessCommandLine(cmdLine string) SpecOpts {
 // WithHostDevices adds all the hosts device nodes to the container's spec
 //
 // Not supported on windows
-func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+func WithHostDevices(context.Context, Client, *containers.Container, *Spec) error {
 	return nil
 }
 
-func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
+func DeviceFromPath(string) (*specs.LinuxDevice, error) {
 	return nil, errors.New("device from path not supported on Windows")
 }
 
 // WithDevices does nothing on Windows.
-func WithDevices(devicePath, containerPath, permissions string) SpecOpts {
-	return func(ctx context.Context, client Client, container *containers.Container, spec *Spec) error {
+func WithDevices(string, string, string) SpecOpts {
+	return func(context.Context, Client, *containers.Container, *Spec) error {
 		return nil
 	}
 }
 
 // Windows containers have default path configured at bootup
-func WithDefaultPathEnv(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+func WithDefaultPathEnv(context.Context, Client, *containers.Container, *Spec) error {
 	return nil
 }

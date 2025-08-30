@@ -87,7 +87,7 @@ func (fn FilterFunc) Match(adaptor Adaptor) bool {
 }
 
 // Always is a filter that always returns true for any type of object
-var Always FilterFunc = func(adaptor Adaptor) bool {
+var Always FilterFunc = func(Adaptor) bool {
 	return true
 }
 

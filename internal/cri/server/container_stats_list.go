@@ -474,7 +474,7 @@ func getAvailableBytesV2(memory *cg2.MemoryStat, workingSetBytes uint64) uint64 
 	return 0
 }
 
-func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interface{}, timestamp time.Time) (*runtime.CpuUsage, error) {
+func (c *criService) cpuContainerStats(_ string, _ bool, stats interface{}, timestamp time.Time) (*runtime.CpuUsage, error) {
 	switch metrics := stats.(type) {
 	case *cg1.Metrics:
 		metrics.GetCPU().GetUsage()
@@ -500,7 +500,7 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interfac
 	return nil, nil
 }
 
-func (c *criService) memoryContainerStats(ID string, stats interface{}, timestamp time.Time) (*runtime.MemoryUsage, error) {
+func (c *criService) memoryContainerStats(_ string, stats interface{}, timestamp time.Time) (*runtime.MemoryUsage, error) {
 	switch metrics := stats.(type) {
 	case *cg1.Metrics:
 		if metrics.Memory != nil && metrics.Memory.Usage != nil {

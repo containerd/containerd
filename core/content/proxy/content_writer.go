@@ -105,7 +105,7 @@ func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func (rw *remoteWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) (err error) {
+func (rw *remoteWriter) Commit(_ context.Context, size int64, expected digest.Digest, opts ...content.Opt) (err error) {
 	defer func() {
 		err1 := rw.Close()
 		if err == nil {
