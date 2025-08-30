@@ -73,6 +73,7 @@ message UpdateContainersResponse {
 // can be used by plugins to discover the full extent of changes applied to
 // the container, including any changes made by other active plugins.
 //
+// go:plugin type=plugin version=1
 service Plugin {
   // Configure the plugin and get its event subscription.
   rpc Configure(ConfigureRequest) returns (ConfigureResponse);
@@ -100,11 +101,37 @@ service Plugin {
   // can update any of the remaining containers in the runtime in response.
   rpc StopContainer(StopContainerRequest) returns (StopContainerResponse);
 
+  // UpdatePodSandbox relays the corresponding request to the plugin.
+  rpc UpdatePodSandbox(UpdatePodSandboxRequest) returns (UpdatePodSandboxResponse);
+
   // StateChange relays any remaining pod or container lifecycle/state change
   // events the plugin has subscribed for. These can be used to trigger any
   // plugin-specific processing which needs to occur in connection with any of
   // these events.
   rpc StateChange(StateChangeEvent) returns (Empty);
+
+  // ValidateContainerAdjustment relays a container adjustment validation request
+  // to the plugin. Container creation will fail the plugin rejects the adjustments.
+  rpc ValidateContainerAdjustment(ValidateContainerAdjustmentRequest) returns (ValidateContainerAdjustmentResponse);
+}
+
+// go:plugin type=host
+service HostFunctions {
+  // Log displays a log message
+  rpc Log(LogRequest) returns (Empty) {}
+}
+
+message LogRequest {
+  string msg = 1;
+
+  enum Level {
+    LEVEL_UNSPECIFIED = 0;
+    LEVEL_DEBUG = 1;
+    LEVEL_INFO = 2;
+    LEVEL_WARN = 3;
+    LEVEL_ERROR = 4;
+  }
+  Level level = 2;
 }
 
 message ConfigureRequest {
@@ -186,6 +213,17 @@ message StopContainerResponse {
   repeated ContainerUpdate update = 1;
 }
 
+message UpdatePodSandboxRequest {
+  // Pod being updated.
+  PodSandbox pod = 1;
+  // Overhead associated with this pod.
+  LinuxResources overhead_linux_resources = 2;
+  // Sum of container resources for this pod.
+  LinuxResources linux_resources = 3;
+}
+
+message UpdatePodSandboxResponse {}
+
 message StateChangeEvent {
   // Event type of notification.
   Event event = 1;
@@ -195,6 +233,31 @@ message StateChangeEvent {
   // Container this notification is sent for. If the event is related to a pod,
   // container is nil.
   Container container = 3;
+}
+
+message ValidateContainerAdjustmentRequest {
+    // Pod of container being adjusted.
+    PodSandbox pod = 1;
+    // Container being adjusted in its pristine state.
+    Container container = 2;
+    // Pending container adjustments.
+    ContainerAdjustment adjust = 3;
+    // Pending updates to other containers.
+    repeated ContainerUpdate update = 4;
+    // Plugins that made the adjustments and updates.
+    OwningPlugins owners = 5;
+    // Plugins consulted for adjustments and updates.
+    repeated PluginInstance plugins = 6;
+}
+
+message PluginInstance {
+    string name = 1;
+    string index = 2;
+}
+
+message ValidateContainerAdjustmentResponse {
+    bool reject = 1;
+    string reason = 2;
 }
 
 // Empty response for those *Requests that are semantically events.
@@ -214,7 +277,10 @@ enum Event {
   POST_UPDATE_CONTAINER = 9;
   STOP_CONTAINER = 10;
   REMOVE_CONTAINER = 11;
-  LAST = 12;
+  UPDATE_POD_SANDBOX = 12;
+  POST_UPDATE_POD_SANDBOX = 13;
+  VALIDATE_CONTAINER_ADJUSTMENT = 14;
+  LAST = 15;
 }
 
 // Pod metadata that is considered relevant for a plugin.
@@ -256,6 +322,13 @@ message Container {
   LinuxContainer linux = 11;
   uint32 pid = 12; // for NRI v1 emulation
   repeated POSIXRlimit rlimits = 13;
+  int64 created_at = 14;
+  int64 started_at = 15;
+  int64 finished_at = 16;
+  int32 exit_code = 17;
+  string status_reason = 18;
+  string status_message = 19;
+  repeated CDIDevice CDI_devices = 20;
 }
 
 // Possible container states.
@@ -300,6 +373,9 @@ message LinuxContainer {
   LinuxResources resources = 3;
   OptionalInt oom_score_adj = 4;
   string cgroups_path = 5;
+  LinuxIOPriority io_priority = 6;
+  SecurityProfile seccomp_profile = 7;
+  LinuxSeccomp seccomp_policy = 8;
 }
 
 // A linux namespace.
@@ -374,6 +450,17 @@ message HugepageLimit {
   uint64 limit = 2;
 }
 
+// SecurityProfile for container.
+message SecurityProfile {
+  enum ProfileType {
+    RUNTIME_DEFAULT = 0;
+    UNCONFINED = 1;
+    LOCALHOST = 2;
+  }
+  ProfileType profile_type = 1;
+  string localhost_ref = 2;
+}
+
 // Container rlimits
 message POSIXRlimit {
   string type = 1;
@@ -386,6 +473,20 @@ message LinuxPids {
   int64 limit = 1;
 }
 
+message LinuxIOPriority {
+  // Scheduling class of the IO priority.
+  IOPrioClass class = 1;
+  // The value of the IO priority.
+  int32 priority = 2;
+}
+
+enum IOPrioClass {
+  IOPRIO_CLASS_NONE = 0;
+  IOPRIO_CLASS_RT = 1;
+  IOPRIO_CLASS_BE = 2;
+  IOPRIO_CLASS_IDLE = 3;
+}
+
 // Requested adjustments to a container being created.
 message ContainerAdjustment {
   map<string, string> annotations = 2;
@@ -395,6 +496,7 @@ message ContainerAdjustment {
   LinuxContainerAdjustment linux = 6;
   repeated POSIXRlimit rlimits = 7;
   repeated CDIDevice CDI_devices = 8;
+  repeated string args = 9;
 }
 
 // Adjustments to (linux) resources.
@@ -403,6 +505,33 @@ message LinuxContainerAdjustment {
   LinuxResources resources = 2;
   string cgroups_path = 3;
   OptionalInt oom_score_adj = 4;
+  LinuxIOPriority io_priority = 5;
+  LinuxSeccomp seccomp_policy = 6;
+  repeated LinuxNamespace namespaces = 7;
+}
+
+message LinuxSeccomp {
+  string default_action = 1;
+  OptionalUInt32 default_errno = 2;
+  repeated string architectures = 3;
+  repeated string flags = 4;
+  string listener_path = 5;
+  string listener_metadata = 6;
+  repeated LinuxSyscall syscalls = 7;
+}
+
+message LinuxSyscall {
+  repeated string names = 1;
+  string action = 2;
+  OptionalUInt32 errno_ret = 3;
+  repeated LinuxSeccompArg args = 4;
+}
+
+message LinuxSeccompArg {
+  uint32 index = 1;
+  uint64 value = 2;
+  uint64 value_two = 3;
+  string op = 4;
 }
 
 // Requested update to an already created container.
@@ -469,4 +598,71 @@ message OptionalBool {
 // An optional value of file permissions.
 message OptionalFileMode {
   uint32 value = 1;
+}
+
+// CompoundFieldOwners tracks 'plugin ownership' of compound fields
+// which can be adjusted entry by entry, typically maps or slices.
+// It is used to track ownership for annotations, mounts, devices,
+// environment variables, hugepage limits, etc. The key identifies
+// the owned entry (annotation key, mount destination, device path,
+// environment variable name, etc.). The value is the owning plugin.
+message CompoundFieldOwners {
+    map<string, string> owners = 1;
+}
+
+// FieldOwners tracks field 'plugin ownership' for a single container.
+// Keys represent adjustable fields of a container. For simple fields,
+// the value is the plugin that last modified the field. For compound
+// fields, the value is a CompoundFieldOwners which provides tracking
+// 'plugin ownership' per field for compound data, typically maps and
+// slices. Field enum values are used to index both maps, using Key()
+// to get the int32 for the Field.
+message FieldOwners {
+    map<int32, string> simple = 1;
+    map<int32, CompoundFieldOwners> compound = 2;
+}
+
+// OwningPlugins tracks field 'plugin ownership' for multiple containers.
+// The string keys are container IDs. The values are FieldOwners which
+// track 'plugin ownership' per adjustable field for the container.
+message OwningPlugins {
+    map<string, FieldOwners> owners = 1;
+}
+
+// Field enumerates all fields that can be adjusted by plugins.
+enum Field {
+    None = 0;
+    Annotations = 1;
+    Mounts = 2;
+    OciHooks = 3;
+    Devices = 4;
+    CdiDevices = 5;
+    Env = 6;
+    Args = 7;
+    MemLimit = 8;
+    MemReservation = 9;
+    MemSwapLimit = 10;
+    MemKernelLimit = 11;
+    MemTCPLimit = 12;
+    MemSwappiness = 13;
+    MemDisableOomKiller = 14;
+    MemUseHierarchy = 15;
+    CPUShares = 16;
+    CPUQuota = 17;
+    CPUPeriod = 18;
+    CPURealtimeRuntime = 19;
+    CPURealtimePeriod = 20;
+    CPUSetCPUs = 21;
+    CPUSetMems = 22;
+    PidsLimit = 23;
+    HugepageLimits = 24;
+    BlockioClass = 25;
+    RdtClass = 26;
+    CgroupsUnified = 27;
+    CgroupsPath = 28;
+    OomScoreAdj = 29;
+    Rlimits = 30;
+    IoPriority = 31;
+    SeccompPolicy = 32;
+    Namespace = 33;
 }

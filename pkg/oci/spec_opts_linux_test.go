@@ -23,14 +23,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/cap"
-	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/cap"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
 //nolint:gosec
@@ -739,7 +740,7 @@ func TestWithAppendAdditionalGroupsNoEtcGroup(t *testing.T) {
 		{
 			name:     "no additional gids, append root group",
 			groups:   []string{"root"},
-			err:      fmt.Sprintf("unable to find group root: open %s: no such file or directory", filepath.Join(td, "etc", "group")),
+			err:      "unable to find group root: openat etc/group: no such file or directory",
 			expected: []uint32{0},
 		},
 		{

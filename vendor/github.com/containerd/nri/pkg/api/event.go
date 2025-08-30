@@ -30,23 +30,25 @@ const (
 type (
 	// Define *Request/*Response type aliases for *Event/Empty pairs.
 
-	StateChangeResponse         = Empty
-	RunPodSandboxRequest        = StateChangeEvent
-	RunPodSandboxResponse       = Empty
-	StopPodSandboxRequest       = StateChangeEvent
-	StopPodSandboxResponse      = Empty
-	RemovePodSandboxRequest     = StateChangeEvent
-	RemovePodSandboxResponse    = Empty
-	StartContainerRequest       = StateChangeEvent
-	StartContainerResponse      = Empty
-	RemoveContainerRequest      = StateChangeEvent
-	RemoveContainerResponse     = Empty
-	PostCreateContainerRequest  = StateChangeEvent
-	PostCreateContainerResponse = Empty
-	PostStartContainerRequest   = StateChangeEvent
-	PostStartContainerResponse  = Empty
-	PostUpdateContainerRequest  = StateChangeEvent
-	PostUpdateContainerResponse = Empty
+	StateChangeResponse          = Empty
+	RunPodSandboxRequest         = StateChangeEvent
+	RunPodSandboxResponse        = Empty
+	StopPodSandboxRequest        = StateChangeEvent
+	StopPodSandboxResponse       = Empty
+	RemovePodSandboxRequest      = StateChangeEvent
+	RemovePodSandboxResponse     = Empty
+	PostUpdatePodSandboxRequest  = StateChangeEvent
+	PostUpdatePodSandboxResponse = Empty
+	StartContainerRequest        = StateChangeEvent
+	StartContainerResponse       = Empty
+	RemoveContainerRequest       = StateChangeEvent
+	RemoveContainerResponse      = Empty
+	PostCreateContainerRequest   = StateChangeEvent
+	PostCreateContainerResponse  = Empty
+	PostStartContainerRequest    = StateChangeEvent
+	PostStartContainerResponse   = Empty
+	PostUpdateContainerRequest   = StateChangeEvent
+	PostUpdateContainerResponse  = Empty
 
 	ShutdownRequest  = Empty
 	ShutdownResponse = Empty
@@ -60,17 +62,20 @@ func ParseEventMask(events ...string) (EventMask, error) {
 	var mask EventMask
 
 	bits := map[string]Event{
-		"runpodsandbox":       Event_RUN_POD_SANDBOX,
-		"stoppodsandbox":      Event_STOP_POD_SANDBOX,
-		"removepodsandbox":    Event_REMOVE_POD_SANDBOX,
-		"createcontainer":     Event_CREATE_CONTAINER,
-		"postcreatecontainer": Event_POST_CREATE_CONTAINER,
-		"startcontainer":      Event_START_CONTAINER,
-		"poststartcontainer":  Event_POST_START_CONTAINER,
-		"updatecontainer":     Event_UPDATE_CONTAINER,
-		"postupdatecontainer": Event_POST_UPDATE_CONTAINER,
-		"stopcontainer":       Event_STOP_CONTAINER,
-		"removecontainer":     Event_REMOVE_CONTAINER,
+		"runpodsandbox":               Event_RUN_POD_SANDBOX,
+		"updatepodsandbox":            Event_UPDATE_POD_SANDBOX,
+		"postupdatepodsandbox":        Event_POST_UPDATE_POD_SANDBOX,
+		"stoppodsandbox":              Event_STOP_POD_SANDBOX,
+		"removepodsandbox":            Event_REMOVE_POD_SANDBOX,
+		"createcontainer":             Event_CREATE_CONTAINER,
+		"postcreatecontainer":         Event_POST_CREATE_CONTAINER,
+		"startcontainer":              Event_START_CONTAINER,
+		"poststartcontainer":          Event_POST_START_CONTAINER,
+		"updatecontainer":             Event_UPDATE_CONTAINER,
+		"postupdatecontainer":         Event_POST_UPDATE_CONTAINER,
+		"stopcontainer":               Event_STOP_CONTAINER,
+		"removecontainer":             Event_REMOVE_CONTAINER,
+		"validatecontaineradjustment": Event_VALIDATE_CONTAINER_ADJUSTMENT,
 	}
 
 	for _, event := range events {
@@ -119,17 +124,20 @@ func MustParseEventMask(events ...string) EventMask {
 // PrettyString returns a human-readable string representation of an EventMask.
 func (m *EventMask) PrettyString() string {
 	names := map[Event]string{
-		Event_RUN_POD_SANDBOX:       "RunPodSandbox",
-		Event_STOP_POD_SANDBOX:      "StopPodSandbox",
-		Event_REMOVE_POD_SANDBOX:    "RemovePodSandbox",
-		Event_CREATE_CONTAINER:      "CreateContainer",
-		Event_POST_CREATE_CONTAINER: "PostCreateContainer",
-		Event_START_CONTAINER:       "StartContainer",
-		Event_POST_START_CONTAINER:  "PostStartContainer",
-		Event_UPDATE_CONTAINER:      "UpdateContainer",
-		Event_POST_UPDATE_CONTAINER: "PostUpdateContainer",
-		Event_STOP_CONTAINER:        "StopContainer",
-		Event_REMOVE_CONTAINER:      "RemoveContainer",
+		Event_RUN_POD_SANDBOX:               "RunPodSandbox",
+		Event_UPDATE_POD_SANDBOX:            "UpdatePodSandbox",
+		Event_POST_UPDATE_POD_SANDBOX:       "PostUpdatePodSandbox",
+		Event_STOP_POD_SANDBOX:              "StopPodSandbox",
+		Event_REMOVE_POD_SANDBOX:            "RemovePodSandbox",
+		Event_CREATE_CONTAINER:              "CreateContainer",
+		Event_POST_CREATE_CONTAINER:         "PostCreateContainer",
+		Event_START_CONTAINER:               "StartContainer",
+		Event_POST_START_CONTAINER:          "PostStartContainer",
+		Event_UPDATE_CONTAINER:              "UpdateContainer",
+		Event_POST_UPDATE_CONTAINER:         "PostUpdateContainer",
+		Event_STOP_CONTAINER:                "StopContainer",
+		Event_REMOVE_CONTAINER:              "RemoveContainer",
+		Event_VALIDATE_CONTAINER_ADJUSTMENT: "ValidateContainerAdjustment",
 	}
 
 	mask := *m

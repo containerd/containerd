@@ -19,6 +19,7 @@ package nri
 import (
 	"github.com/containerd/containerd/v2/internal/tomlext"
 	nri "github.com/containerd/nri/pkg/adaptation"
+	validator "github.com/containerd/nri/plugins/default-validator"
 	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
 )
@@ -39,6 +40,8 @@ type Config struct {
 	PluginRequestTimeout tomlext.Duration `toml:"plugin_request_timeout" json:"pluginRequestTimeout"`
 	// DisableConnections disables connections from externally launched plugins.
 	DisableConnections bool `toml:"disable_connections" json:"disableConnections"`
+	// DefaultValidator is the configuration for the built-in default validator.
+	DefaultValidator *validator.DefaultValidatorConfig `toml:"default_validator" json:"defaultValidator"`
 }
 
 // DefaultConfig returns the default configuration.
@@ -51,6 +54,8 @@ func DefaultConfig() *Config {
 
 		PluginRegistrationTimeout: tomlext.FromStdTime(nri.DefaultPluginRegistrationTimeout),
 		PluginRequestTimeout:      tomlext.FromStdTime(nri.DefaultPluginRequestTimeout),
+
+		DefaultValidator: &validator.DefaultValidatorConfig{},
 	}
 }
 
@@ -68,6 +73,9 @@ func (c *Config) toOptions() []nri.Option {
 	}
 	if c.DisableConnections {
 		opts = append(opts, nri.WithDisabledExternalConnections())
+	}
+	if c.DefaultValidator != nil {
+		opts = append(opts, nri.WithDefaultValidator(c.DefaultValidator))
 	}
 	opts = append(opts,
 		nri.WithTTRPCOptions(

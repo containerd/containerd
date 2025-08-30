@@ -1,0 +1,13 @@
+# NRI project maintainers
+#
+# See https://github.com/containerd/project/blob/main/GOVERNANCE.md#maintainership for committer versus reviewer roles
+#
+# Core containerd maintainers are also maintainers of the NRI project,
+# see https://github.com/containerd/project/blob/main/MAINTAINERS
+#
+# COMMITTERS
+# GitHub ID, Name, Email address,GPG fingerprint
+"klihub","Krisztian Litkey","krisztian.litkey@intel.com",""
+#
+# REVIEWERS
+# GitHub ID, Name, Email address, GPG fingerprint
