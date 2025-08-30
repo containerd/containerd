@@ -37,9 +37,10 @@ then
     cd "$tmpdir"
     git init .
     git remote add origin "$RUNHCS_REPO"
-    git fetch --tags --depth=1 origin ${RUNHCS_VERSION}
+    git fetch --depth 1 origin ${RUNHCS_VERSION}
+    git checkout FETCH_HEAD
 else
     cd "${HCSSHIM_SRC}"
+    git checkout "refs/tags/${RUNHCS_VERSION}" || git checkout "refs/heads/${RUNHCS_VERSION}" || git checkout "${RUNHCS_VERSION}"
 fi
-git checkout "refs/tags/${RUNHCS_VERSION}" || git checkout "refs/heads/${RUNHCS_VERSION}" || git checkout "${RUNHCS_VERSION}"
 GO111MODULE=on go build -mod=vendor -o "${DESTDIR}/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
