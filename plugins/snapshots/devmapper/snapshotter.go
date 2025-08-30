@@ -22,11 +22,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -276,7 +280,7 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		// Afterward, we resume it again to prevent a race window which may cause
 		// a process IO hang. See the issue below for details:
 		//   (https://github.com/containerd/containerd/issues/4234)
-		err = s.pool.SuspendDevice(ctx, deviceName)
+		err = suspendWithRetry(ctx, s.pool.SuspendDevice, deviceName)
 		if err != nil {
 			return err
 		}
@@ -563,4 +567,52 @@ func (s *Snapshotter) Cleanup(ctx context.Context) error {
 	}
 
 	return errors.Join(result...)
+}
+
+func isErrno(err error, errno unix.Errno) bool {
+	if errors.Is(err, errno) {
+		return true
+	}
+	var errnoPtr *unix.Errno
+	if errors.As(err, &errnoPtr) && errnoPtr != nil && *errnoPtr == errno {
+		return true
+	}
+	return false
+}
+
+func suspendWithRetry(
+	ctx context.Context,
+	suspend func(context.Context, string) error,
+	name string,
+) error {
+	const (
+		maxTries    = 8
+		baseBackoff = 25 * time.Millisecond
+		maxBackoff  = 750 * time.Millisecond
+	)
+
+	var lastErr error
+	for i := 0; i < maxTries; i++ {
+		if err := suspend(ctx, name); err != nil {
+			lastErr = err
+			if !isErrno(err, unix.EINVAL) {
+
+				return err
+			}
+
+			sleep := baseBackoff << i
+			if sleep > maxBackoff {
+				sleep = maxBackoff
+			}
+			jitter := time.Duration(rand.Int63n(int64(sleep / 4)))
+			select {
+			case <-time.After(sleep + jitter):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			continue
+		}
+		return nil
+	}
+	return lastErr
 }

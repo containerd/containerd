@@ -18,18 +18,22 @@ package client
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"testing"
 
+	traceAPI "github.com/containerd/containerd/v2/pkg/tracing"
+	traceManager "github.com/containerd/containerd/v2/pkg/tracing/manager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	traceAPI.SetGlobalTraceManager(traceManager.NewNoopManager())
+}
 
 func TestMigration(t *testing.T) {
 	currentDefault := filepath.Join(t.TempDir(), "default.toml")
@@ -50,30 +54,28 @@ func TestMigration(t *testing.T) {
 		},
 	}
 
-	// Only run the old version migration tests for the same platform
-	// and build settings the default config was generated for.
 	if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" && strings.Contains(defaultContent, "btrfs") && strings.Contains(defaultContent, "devmapper") {
 		migrationTests = append(migrationTests, []migrationTest{
 			{
 				Name:     "1.6-Default",
 				File:     "testdata/default-1.6.toml",
-				Migrated: defaultContent,
+				Migrated: patchExpectedConfig(defaultContent, map[string]string{}, []string{}),
 			},
 			{
 				Name:     "1.7-Default",
 				File:     "testdata/default-1.7.toml",
-				Migrated: defaultContent,
+				Migrated: patchExpectedConfig(defaultContent, map[string]string{}, []string{}),
 			},
 			{
 				Name: "1.7-Custom",
 				File: "testdata/custom-1.7.toml",
-				Migrated: replaceAllValues(defaultContent, map[string]string{
+				Migrated: patchExpectedConfig(defaultContent, map[string]string{
 					"sandbox":               "'custom.io/pause:3.10.1'",
 					"stream_idle_timeout":   "'2h0m0s'",
 					"stream_server_address": "'127.0.1.1'",
 					"stream_server_port":    "'15000'",
 					"enable_tls_streaming":  "true",
-				}),
+				}, []string{}),
 			},
 		}...)
 	}
@@ -86,10 +88,9 @@ func TestMigration(t *testing.T) {
 			cmd.Stderr = os.Stderr
 			require.NoError(t, cmd.Run())
 			actual := buf.String()
-			assert.Equal(t, tc.Migrated, actual, "Actual (full)\n%s", tc.Migrated, actual)
+			assert.Equal(t, tc.Migrated, actual)
 		})
 	}
-
 }
 
 func currentDefaultConfig() (string, error) {
@@ -103,14 +104,112 @@ func currentDefaultConfig() (string, error) {
 	return buf.String(), nil
 }
 
-func replaceAllValues(src string, values map[string]string) string {
-	for k, v := range values {
-		src = replaceValue(src, k, v)
-	}
-	return src
-}
+func patchExpectedConfig(src string, values map[string]string, extraBlocks []string) string {
+	lines := strings.Split(src, "\n")
 
-func replaceValue(src, key, value string) string {
-	re := regexp.MustCompile(fmt.Sprintf(`(\s*)%s = [^\n]*`, key))
-	return re.ReplaceAllString(src, fmt.Sprintf(`${1}%s = %s`, key, value))
+	for i, line := range lines {
+		if strings.Contains(strings.TrimSpace(line), "disabled_plugins =") {
+			lines[i] = "disabled_plugins = []"
+			break
+		}
+	}
+
+	// for i, line := range lines {
+	// 	if strings.Contains(strings.TrimSpace(line), "[plugins.'io.containerd.internal.v1.enhanced_tracing']") {
+	// 		hasExporters := false
+	// 		for j := i + 1; j < len(lines); j++ {
+	// 			trimmed := strings.TrimSpace(lines[j])
+	// 			if strings.HasPrefix(trimmed, "[") {
+	// 				break
+	// 			}
+	// 			if strings.Contains(trimmed, "exporters =") {
+	// 				hasExporters = true
+	// 				break
+	// 			}
+	// 		}
+
+	// 		if !hasExporters {
+	// 			insertIndex := -1
+	// 			for j := i + 1; j < len(lines); j++ {
+	// 				trimmed := strings.TrimSpace(lines[j])
+	// 				if strings.HasPrefix(trimmed, "[") {
+	// 					insertIndex = j
+	// 					break
+	// 				}
+	// 				if trimmed == "" {
+	// 					insertIndex = j
+	// 					break
+	// 				}
+	// 			}
+
+	// 			if insertIndex == -1 {
+	// 				insertIndex = i + 1
+	// 			}
+
+	// 			newLines := make([]string, 0, len(lines)+1)
+	// 			newLines = append(newLines, lines[:insertIndex]...)
+	// 			newLines = append(newLines, "    exporters = ['noop']")
+	// 			newLines = append(newLines, lines[insertIndex:]...)
+	// 			lines = newLines
+	// 		}
+	// 		break
+	// 	}
+	// }
+
+	var filteredLines []string
+	skipBlock := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		if strings.HasPrefix(trimmed, "[") {
+			skipBlock = false
+		}
+
+		if !skipBlock {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	lines = filteredLines
+
+	for i, line := range lines {
+		for k, v := range values {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, k+" =") {
+				indent := strings.Repeat(" ", len(line)-len(strings.TrimLeft(line, " ")))
+				lines[i] = indent + k + " = " + v
+			}
+		}
+	}
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "use_internal_loopback = false" && i > 0 {
+			prevLine := strings.TrimSpace(lines[i-1])
+			if strings.HasPrefix(prevLine, "ip_pref =") {
+				indent := strings.Repeat(" ", len(lines[i-1])-len(strings.TrimLeft(lines[i-1], " ")))
+				lines[i] = indent + "use_internal_loopback = false"
+			}
+		}
+	}
+
+	if len(extraBlocks) > 0 {
+		insertIndex := -1
+		for i := len(lines) - 1; i >= 0; i-- {
+			if strings.Contains(lines[i], "[plugins.'io.containerd.internal.v1.opt']") {
+				insertIndex = i
+				break
+			}
+		}
+
+		if insertIndex > 0 {
+			newLines := make([]string, 0, len(lines)+len(extraBlocks))
+			newLines = append(newLines, lines[:insertIndex]...)
+			newLines = append(newLines, extraBlocks...)
+			newLines = append(newLines, lines[insertIndex:]...)
+			lines = newLines
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }

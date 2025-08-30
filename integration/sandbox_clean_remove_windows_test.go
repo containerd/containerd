@@ -193,12 +193,13 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 	assert.False(t, checkIP(ip), fmt.Sprintf("The IP: %s is still in use in azure-vnet-ipam.json", ip))
 }
 
-func removePodSandbox(ctx context.Context, t *testing.T, client runtime.RuntimeServiceClient, podID string) {
-	t.Helper()
-	_, err := client.RemovePodSandbox(ctx, &runtime.RemovePodSandboxRequest{
-		PodSandboxId: podID,
-	})
-	require.NoError(t, err, "failed RemovePodSandbox for sandbox: %s", podID)
+// isNotFoundErr normalizes "not found" variants across implementations.
+func isNotFoundErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "not found") || strings.Contains(s, "notfound")
 }
 
 func stopPodSandbox(ctx context.Context, t *testing.T, client runtime.RuntimeServiceClient, podID string) {
@@ -207,15 +208,70 @@ func stopPodSandbox(ctx context.Context, t *testing.T, client runtime.RuntimeSer
 		PodSandboxId: podID,
 	})
 	require.NoError(t, err, "failed StopPodSandbox for sandbox: %s", podID)
+
+	// Give it a moment to start the stopping process
+	time.Sleep(500 * time.Millisecond)
+
+	// Wait for sandbox to report NOTREADY and its containers to be exited.
+	// Windows can take longer to fully quiesce, use a 60s deadline.
+	dl := time.Now().Add(60 * time.Second)
+	for {
+		ps, err := client.PodSandboxStatus(ctx, &runtime.PodSandboxStatusRequest{PodSandboxId: podID})
+		if err == nil && ps.Status != nil && ps.Status.GetState() == runtime.PodSandboxState_SANDBOX_NOTREADY {
+			break
+		}
+		if time.Now().After(dl) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	lresp, err := client.ListContainers(ctx, &runtime.ListContainersRequest{
+		Filter: &runtime.ContainerFilter{PodSandboxId: podID},
+	})
+	if err == nil {
+		for _, c := range lresp.Containers {
+			cs, err := client.ContainerStatus(ctx, &runtime.ContainerStatusRequest{ContainerId: c.Id})
+			if err != nil {
+				continue
+			}
+			if cs.Status == nil || cs.Status.GetState() != runtime.ContainerState_CONTAINER_EXITED {
+				_, _ = client.StopContainer(ctx, &runtime.StopContainerRequest{ContainerId: c.Id, Timeout: 60})
+				dl2 := time.Now().Add(60 * time.Second)
+				for {
+					cs, err = client.ContainerStatus(ctx, &runtime.ContainerStatusRequest{ContainerId: c.Id})
+					if err == nil && cs.Status != nil && cs.Status.GetState() == runtime.ContainerState_CONTAINER_EXITED {
+						break
+					}
+					if time.Now().After(dl2) {
+						break
+					}
+					time.Sleep(200 * time.Millisecond)
+				}
+			}
+		}
+	}
 }
 
 func stopContainer(ctx context.Context, t *testing.T, client runtime.RuntimeServiceClient, containerID string) {
 	t.Helper()
 	_, err := client.StopContainer(ctx, &runtime.StopContainerRequest{
 		ContainerId: containerID,
-		Timeout:     0,
+		Timeout:     30,
 	})
 	require.NoError(t, err, "failed StopContainer request for container: %s", containerID)
+
+	// Wait until EXITED to avoid races on subsequent remove.
+	dl := time.Now().Add(30 * time.Second)
+	for {
+		cs, err := client.ContainerStatus(ctx, &runtime.ContainerStatusRequest{ContainerId: containerID})
+		if err == nil && cs.Status != nil && cs.Status.GetState() == runtime.ContainerState_CONTAINER_EXITED {
+			break
+		}
+		if time.Now().After(dl) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 func startContainer(ctx context.Context, t *testing.T, client runtime.RuntimeServiceClient, containerID string) {
@@ -226,12 +282,101 @@ func startContainer(ctx context.Context, t *testing.T, client runtime.RuntimeSer
 	require.NoError(t, err, "failed StartContainer request for container: %s", containerID)
 }
 
+// Enhanced removeContainer with detailed logging
 func removeContainer(ctx context.Context, t *testing.T, client runtime.RuntimeServiceClient, containerID string) {
 	t.Helper()
-	_, err := client.RemoveContainer(ctx, &runtime.RemoveContainerRequest{
-		ContainerId: containerID,
+	t.Logf("Attempting to remove container: %s", containerID)
+
+	// Try to fetch current status; if missing, consider it already removed.
+	cs, err := client.ContainerStatus(ctx, &runtime.ContainerStatusRequest{ContainerId: containerID})
+	if err != nil {
+		if isNotFoundErr(err) {
+			t.Logf("Container %s already removed", containerID)
+			return
+		}
+		t.Logf("Error getting container status: %v", err)
+		require.NoError(t, err, "failed to get container status: %s", containerID)
+	}
+
+	state := runtime.ContainerState_CONTAINER_UNKNOWN
+	if cs != nil && cs.Status != nil {
+		state = cs.Status.GetState()
+		t.Logf("Container %s current state: %v", containerID, state)
+	}
+
+	// If running, stop and wait for EXITED.
+	if state == runtime.ContainerState_CONTAINER_RUNNING {
+		t.Logf("Stopping container %s before removal", containerID)
+		_, err = client.StopContainer(ctx, &runtime.StopContainerRequest{
+			ContainerId: containerID,
+			Timeout:     120, // Increased timeout
+		})
+		// Ignore benign errors like already stopped / not found.
+		if err != nil && !isNotFoundErr(err) && !strings.Contains(strings.ToLower(err.Error()), "already") {
+			t.Logf("Error stopping container: %v", err)
+			require.NoError(t, err, "failed to stop container: %s", containerID)
+		}
+
+		dl := time.Now().Add(120 * time.Second) // Increased timeout
+		for {
+			cs, err = client.ContainerStatus(ctx, &runtime.ContainerStatusRequest{ContainerId: containerID})
+			if err != nil {
+				t.Logf("Container status error during wait: %v", err)
+				break // Possibly removed concurrently.
+			}
+			if cs.Status != nil && cs.Status.GetState() == runtime.ContainerState_CONTAINER_EXITED {
+				t.Logf("Container %s successfully exited", containerID)
+				break
+			}
+			if time.Now().After(dl) {
+				currentState := "nil"
+				if cs != nil && cs.Status != nil {
+					currentState = cs.Status.GetState().String()
+				}
+				t.Logf("Timeout waiting for container %s to exit (current state: %v)", containerID, currentState)
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+
+	// Attempt removal.
+	t.Logf("Attempting final removal of container: %s", containerID)
+	_, err = client.RemoveContainer(ctx, &runtime.RemoveContainerRequest{ContainerId: containerID})
+	if err != nil {
+		t.Logf("First removal attempt failed: %v", err)
+		// If still running due to a race, force a final stop and retry once.
+		if strings.Contains(strings.ToLower(err.Error()), "still running") {
+			t.Logf("Container %s still running, forcing stop and retrying removal", containerID)
+			_, _ = client.StopContainer(ctx, &runtime.StopContainerRequest{ContainerId: containerID, Timeout: 30})
+			time.Sleep(5 * time.Second) // Increased wait time
+			_, err = client.RemoveContainer(ctx, &runtime.RemoveContainerRequest{ContainerId: containerID})
+		}
+		// If already removed, treat as success.
+		if isNotFoundErr(err) {
+			t.Logf("Container %s already removed", containerID)
+			return
+		}
+	}
+	require.NoError(t, err, "failed to remove container: %s", containerID)
+	t.Logf("Successfully removed container: %s", containerID)
+}
+
+func removePodSandbox(ctx context.Context, t *testing.T, client runtime.RuntimeServiceClient, podID string) {
+	t.Helper()
+
+	// Stop first so its containers transition to EXITED before removal.
+	stopPodSandbox(ctx, t, client, podID)
+
+	// Then remove. NotFound is benign.
+	_, err := client.RemovePodSandbox(ctx, &runtime.RemovePodSandboxRequest{
+		PodSandboxId: podID,
 	})
-	require.NoError(t, err, "failed RemoveContainer request for container: %s", containerID)
+	if err != nil && isNotFoundErr(err) {
+		t.Logf("Pod sandbox %s already removed", podID)
+		return
+	}
+	require.NoError(t, err, "failed RemovePodSandbox for sandbox: %s", podID)
 }
 
 // This test checks if create/stop and remove pods and containers work as expected
@@ -259,7 +404,6 @@ func TestCreateContainer(t *testing.T) {
 	require.NoError(t, err, "failed RunPodSandbox request")
 	// Make sure the sandbox is cleaned up.
 	t.Cleanup(func() { removePodSandbox(ctx, t, client, sandBoxResponse.PodSandboxId) })
-	t.Cleanup(func() { stopPodSandbox(ctx, t, client, sandBoxResponse.PodSandboxId) })
 
 	EnsureImageExists(t, testImage)
 

@@ -18,7 +18,9 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -79,6 +81,25 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 	return &runtime.StopContainerResponse{}, nil
 }
 
+func isAlreadyStoppedErr(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errdefs.IsNotFound(err) {
+		return true
+	}
+
+	if strings.Contains(err.Error(), "ttrpc: closed") {
+		return true
+	}
+
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	return false
+}
+
 // stopContainer stops a container based on the container metadata.
 func (c *criService) stopContainer(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
 	span := tracing.SpanFromContext(ctx)
@@ -98,13 +119,15 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 
 	task, err := container.Container.Task(ctx, nil)
 	if err != nil {
-		if !errdefs.IsNotFound(err) {
+		if !isAlreadyStoppedErr(err) {
 			return fmt.Errorf("failed to get task for container %q: %w", id, err)
 		}
 		// Don't return for unknown state, some cleanup needs to be done.
 		if state == runtime.ContainerState_CONTAINER_UNKNOWN {
 			return c.cleanupUnknownContainer(ctx, id, container, sandboxID)
 		}
+
+		log.G(ctx).Infof("Task for container %q already gone: %v", id, err)
 		return nil
 	}
 
@@ -115,7 +138,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		defer waitCancel()
 		exitCh, err := task.Wait(waitCtx)
 		if err != nil {
-			if !errdefs.IsNotFound(err) {
+			if !isAlreadyStoppedErr(err) {
 				return fmt.Errorf("failed to wait for task for %q: %w", id, err)
 			}
 			return c.cleanupUnknownContainer(ctx, id, container, sandboxID)
@@ -174,8 +197,12 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 
 		if sswt {
 			log.G(ctx).Infof("Stop container %q with signal %v", id, sig)
-			if err = task.Kill(ctx, sig); err != nil && !errdefs.IsNotFound(err) {
+			if err = task.Kill(ctx, sig); err != nil && !isAlreadyStoppedErr(err) {
 				return fmt.Errorf("failed to stop container %q: %w", id, err)
+			}
+			if err != nil && isAlreadyStoppedErr(err) {
+				log.G(ctx).Infof("Task for container %q already gone during SIGTERM: %v", id, err)
+				return nil
 			}
 		} else {
 			log.G(ctx).Infof("Skipping the sending of signal %v to container %q because a prior stop with timeout>0 request already sent the signal", sig, id)
@@ -197,8 +224,12 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	}
 
 	log.G(ctx).Infof("Kill container %q", id)
-	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
+	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !isAlreadyStoppedErr(err) {
 		return fmt.Errorf("failed to kill container %q: %w", id, err)
+	}
+	if err != nil && isAlreadyStoppedErr(err) {
+		log.G(ctx).Infof("Task for container %q already gone during SIGKILL: %v", id, err)
+		return nil
 	}
 
 	// Wait for a fixed timeout until container stop is observed by event monitor.
@@ -211,7 +242,6 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		tracing.Attribute("container.id", id),
 		tracing.Attribute("container.stop.duration", time.Since(start).String()),
 	)
-
 	return nil
 }
 

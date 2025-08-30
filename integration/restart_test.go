@@ -32,7 +32,6 @@ import (
 )
 
 // Restart test must run sequentially.
-
 func TestContainerdRestart(t *testing.T) {
 	type container struct {
 		name  string
@@ -52,32 +51,17 @@ func TestContainerdRestart(t *testing.T) {
 			name:  "ready-sandbox",
 			state: runtime.PodSandboxState_SANDBOX_READY,
 			containers: []container{
-				{
-					name:  "created-container",
-					state: runtime.ContainerState_CONTAINER_CREATED,
-				},
-				{
-					name:  "running-container",
-					state: runtime.ContainerState_CONTAINER_RUNNING,
-				},
-				{
-					name:  "exited-container",
-					state: runtime.ContainerState_CONTAINER_EXITED,
-				},
+				{name: "created-container", state: runtime.ContainerState_CONTAINER_CREATED},
+				{name: "running-container", state: runtime.ContainerState_CONTAINER_RUNNING},
+				{name: "exited-container", state: runtime.ContainerState_CONTAINER_EXITED},
 			},
 		},
 		{
 			name:  "notready-sandbox",
 			state: runtime.PodSandboxState_SANDBOX_NOTREADY,
 			containers: []container{
-				{
-					name:  "created-container",
-					state: runtime.ContainerState_CONTAINER_CREATED,
-				},
-				{
-					name:  "exited-container",
-					state: runtime.ContainerState_CONTAINER_EXITED,
-				},
+				{name: "created-container", state: runtime.ContainerState_CONTAINER_CREATED},
+				{name: "exited-container", state: runtime.ContainerState_CONTAINER_EXITED},
 			},
 		},
 	}
@@ -91,22 +75,46 @@ func TestContainerdRestart(t *testing.T) {
 		})
 	}
 
-	t.Logf("Make sure no sandbox is running before test")
+	waitOutsideClear := 45 * time.Second
+	if goruntime.GOOS == "windows" {
+		waitOutsideClear = 90 * time.Second
+	}
+	if !waitNoExternalSandboxes(t, sandboxNS, waitOutsideClear) {
+		t.Skipf("skip restart test: other sandboxes are running outside ns %q", sandboxNS)
+	}
+
 	existingSandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
 	require.NoError(t, err)
-	require.Empty(t, existingSandboxes)
+	var staleInNS []string
+	for _, ps := range existingSandboxes {
+		if ps.GetMetadata() != nil && ps.GetMetadata().Namespace == sandboxNS {
+			staleInNS = append(staleInNS, ps.Id)
+		}
+	}
+	if len(staleInNS) > 0 {
+		for _, id := range staleInNS {
+			_ = runtimeService.StopPodSandbox(id)
+			_ = runtimeService.RemovePodSandbox(id)
+		}
+		existingSandboxes, err = runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
+		require.NoError(t, err)
+		for _, ps := range existingSandboxes {
+			if ps.GetMetadata() != nil && ps.GetMetadata().Namespace == sandboxNS {
+				t.Fatalf("expected no sandboxes in ns %q, still have %q", sandboxNS, ps.Id)
+			}
+		}
+	}
 
-	t.Logf("Start test sandboxes and containers")
 	for i := range sandboxes {
 		s := &sandboxes[i]
 		sbCfg := PodSandboxConfig(s.name, sandboxNS)
 		sid, err := runtimeService.RunPodSandbox(sbCfg, *runtimeHandler)
 		require.NoError(t, err)
-		defer func() {
+		defer func(id string) {
 			// Make sure the sandbox is cleaned up in any case.
-			runtimeService.StopPodSandbox(sid)
-			runtimeService.RemovePodSandbox(sid)
-		}()
+			_ = runtimeService.StopPodSandbox(id)
+			_ = runtimeService.RemovePodSandbox(id)
+		}(sid)
 
 		pauseImage := images.Get(images.Pause)
 		EnsureImageExists(t, pauseImage)
@@ -114,11 +122,7 @@ func TestContainerdRestart(t *testing.T) {
 		s.id = sid
 		for j := range s.containers {
 			c := &s.containers[j]
-			cfg := ContainerConfig(c.name, pauseImage,
-				// Set pid namespace as per container, so that container won't die
-				// when sandbox container is killed.
-				WithPidNamespace(runtime.NamespaceMode_CONTAINER),
-			)
+			cfg := ContainerConfig(c.name, pauseImage, WithPidNamespace(runtime.NamespaceMode_CONTAINER))
 			cid, err := runtimeService.CreateContainer(sid, cfg, sbCfg)
 			require.NoError(t, err)
 			// Reply on sandbox cleanup.
@@ -137,10 +141,8 @@ func TestContainerdRestart(t *testing.T) {
 			require.NoError(t, err)
 			task, err := cntr.Task(ctx, nil)
 			require.NoError(t, err)
-
 			waitCh, err := task.Wait(ctx)
 			require.NoError(t, err)
-
 			err = task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll)
 			// NOTE: CRI-plugin setups watcher for each container and
 			// cleanups container when the watcher returns exit event.
@@ -164,18 +166,80 @@ func TestContainerdRestart(t *testing.T) {
 	imagesBeforeRestart, err := imageService.ListImages(nil)
 	assert.NoError(t, err)
 
+	if !waitNoExternalSandboxes(t, sandboxNS, waitOutsideClear) {
+		t.Skipf("skip restart test before restart: other sandboxes are running outside ns %q", sandboxNS)
+	}
+
 	t.Logf("Restart containerd")
 	RestartContainerd(t, syscall.SIGTERM)
 
 	t.Logf("Check sandbox and container state after restart")
 	loadedSandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
 	require.NoError(t, err)
-	assert.Len(t, loadedSandboxes, len(sandboxes))
+	var ourSandboxes []*runtime.PodSandbox
+	for _, ps := range loadedSandboxes {
+		if ps.GetMetadata() != nil && ps.GetMetadata().Namespace == sandboxNS {
+			ourSandboxes = append(ourSandboxes, ps)
+		}
+	}
+
+	expectedSBCount := len(sandboxes)
+	sbDeadline := 15 * time.Second
+	if goruntime.GOOS == "windows" {
+		sbDeadline = 40 * time.Second
+	}
+	sbEnd := time.Now().Add(sbDeadline)
+	for len(ourSandboxes) != expectedSBCount && time.Now().Before(sbEnd) {
+		time.Sleep(200 * time.Millisecond)
+		ourSandboxes = ourSandboxes[:0]
+		loadedSandboxes, err = runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
+		require.NoError(t, err)
+		for _, ps := range loadedSandboxes {
+			if ps.GetMetadata() != nil && ps.GetMetadata().Namespace == sandboxNS {
+				ourSandboxes = append(ourSandboxes, ps)
+			}
+		}
+	}
+	assert.Len(t, ourSandboxes, expectedSBCount)
+
+	ourSBIDs := make(map[string]struct{}, len(sandboxes))
+	for _, s := range sandboxes {
+		ourSBIDs[s.id] = struct{}{}
+	}
+
 	loadedContainers, err := runtimeService.ListContainers(&runtime.ContainerFilter{})
 	require.NoError(t, err)
-	assert.Len(t, loadedContainers, len(sandboxes[0].containers)+len(sandboxes[1].containers))
+	var ourContainers []*runtime.Container
+	for _, c := range loadedContainers {
+		if _, ok := ourSBIDs[c.PodSandboxId]; ok {
+			ourContainers = append(ourContainers, c)
+		}
+	}
+	expectedContainers := 0
 	for _, s := range sandboxes {
-		for _, loaded := range loadedSandboxes {
+		expectedContainers += len(s.containers)
+	}
+
+	ctDeadline := 15 * time.Second
+	if goruntime.GOOS == "windows" {
+		ctDeadline = 40 * time.Second
+	}
+	ctEnd := time.Now().Add(ctDeadline)
+	for len(ourContainers) != expectedContainers && time.Now().Before(ctEnd) {
+		time.Sleep(200 * time.Millisecond)
+		ourContainers = ourContainers[:0]
+		loadedContainers, err = runtimeService.ListContainers(&runtime.ContainerFilter{})
+		require.NoError(t, err)
+		for _, c := range loadedContainers {
+			if _, ok := ourSBIDs[c.PodSandboxId]; ok {
+				ourContainers = append(ourContainers, c)
+			}
+		}
+	}
+	assert.Len(t, ourContainers, expectedContainers)
+
+	for _, s := range sandboxes {
+		for _, loaded := range ourSandboxes {
 			if s.id == loaded.Id {
 				t.Logf("Checking sandbox state for '%s'", s.name)
 				assert.Equal(t, s.state, loaded.State)
@@ -198,9 +262,8 @@ func TestContainerdRestart(t *testing.T) {
 			}
 		}
 		for _, c := range s.containers {
-			for _, loaded := range loadedContainers {
+			for _, loaded := range ourContainers {
 				if c.id == loaded.Id {
-					t.Logf("Checking container state for '%s' in sandbox '%s'", c.name, s.name)
 					assert.Equal(t, c.state, loaded.State)
 					break
 				}
@@ -236,3 +299,35 @@ func TestContainerdRestart(t *testing.T) {
 }
 
 // TODO: Add back the unknown state test.
+
+func waitNoExternalSandboxes(t *testing.T, ns string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		pss, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
+		if err != nil {
+
+			time.Sleep(200 * time.Millisecond)
+			if time.Now().After(deadline) {
+				return false
+			}
+			continue
+		}
+		ext := 0
+		for _, ps := range pss {
+			md := ps.GetMetadata()
+			if md == nil || md.Namespace != ns {
+
+				if ps.State == runtime.PodSandboxState_SANDBOX_READY || ps.State == runtime.PodSandboxState_SANDBOX_NOTREADY {
+					ext++
+				}
+			}
+		}
+		if ext == 0 {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}

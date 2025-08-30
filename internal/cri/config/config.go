@@ -448,6 +448,8 @@ type Config struct {
 	RootDir string `json:"rootDir"`
 	// StateDir is the root directory path for managing volatile pod/container data
 	StateDir string `json:"stateDir"`
+	// LifecycleTracing is used to turn on/off ehanced tracing
+	LifecycleTracing *LifecycleTracingConfig `toml:"lifecycle_tracing,omitempty" json:"lifecycle_tracing,omitempty"`
 }
 
 // ServerConfig contains all the configuration for the CRI API server.
