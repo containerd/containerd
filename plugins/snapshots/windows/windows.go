@@ -22,6 +22,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -259,7 +260,7 @@ func (s *wcowSnapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mou
 func (s *wcowSnapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeInBytes uint64) error {
 	parentLen := len(parentLayers)
 	if parentLen == 0 {
-		return fmt.Errorf("no parent layers present")
+		return errors.New("no parent layers present")
 	}
 
 	baseLayer := parentLayers[parentLen-1]
