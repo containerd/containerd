@@ -61,6 +61,9 @@ func DefaultRuntimeConfig() RuntimeConfig {
 	# Root is the runc root directory.
 	Root = ""
 
+	# SystemdCgroup enables systemd cgroups.
+	SystemdCgroup = false
+
 	# CriuImagePath is the criu image path
 	CriuImagePath = ""
 
