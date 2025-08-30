@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
@@ -223,7 +224,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
 			// It's possible that task is deleted by event monitor.
-			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) && !errors.Is(err, ttrpc.ErrClosed) {
 				log.G(ctx).WithError(err).Errorf("Failed to delete containerd task %q", id)
 			}
 		}

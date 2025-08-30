@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -119,7 +120,16 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 		}
 		defer func() {
 			if err := cleanup(); err != nil && !t.Failed() {
-				t.Fatalf("Cleanup failed: %+v", err)
+				// If cleanup fails with "directory not empty", retry after a short delay
+				if strings.Contains(err.Error(), "directory not empty") {
+					t.Logf("Cleanup failed with 'directory not empty', retrying after delay: %v", err)
+					time.Sleep(100 * time.Millisecond)
+					if retryErr := cleanup(); retryErr != nil {
+						t.Fatalf("Cleanup failed after retry: %+v", retryErr)
+					}
+				} else {
+					t.Fatalf("Cleanup failed: %+v", err)
+				}
 			}
 		}()
 

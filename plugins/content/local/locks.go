@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 )
 
 // Handles locking references
@@ -37,8 +38,16 @@ func (s *store) tryLock(ref string) error {
 		// Returning the duration may help developers distinguish dead locks (long duration) from
 		// lock contentions (short duration).
 		now := time.Now()
+		duration := now.Sub(v.since)
+
+		// Log long-held locks as potential issues
+		if duration > 30*time.Second {
+			log.L.WithField("ref", ref).WithField("duration", duration).
+				Warn("content reference locked for extended period")
+		}
+
 		return fmt.Errorf(
-			"ref %s locked for %s (since %s): %w", ref, now.Sub(v.since), v.since,
+			"ref %s locked for %s (since %s): %w", ref, duration, v.since,
 			errdefs.ErrUnavailable,
 		)
 	}

@@ -18,12 +18,14 @@ package podsandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/ttrpc"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -207,7 +209,7 @@ func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventty
 	} else {
 		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
 		if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
-			if !errdefs.IsNotFound(err) {
+			if !errdefs.IsNotFound(err) && !errors.Is(err, ttrpc.ErrClosed) {
 				return fmt.Errorf("failed to stop sandbox: %w", err)
 			}
 		}

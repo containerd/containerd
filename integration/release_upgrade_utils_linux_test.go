@@ -25,6 +25,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/mod/semver"
@@ -46,11 +47,33 @@ func downloadReleaseBinary(t *testing.T, targetDir string, ver string) {
 		ver, strings.TrimPrefix(ver, "v"), runtime.GOARCH,
 	)
 
-	resp, err := http.Get(targetURL) //nolint:gosec
-	require.NoError(t, err, "failed to http-get %s", targetURL)
+	// Create HTTP client with timeout to avoid indefinite hangs
+	client := &http.Client{
+		Timeout: 5 * time.Minute,
+	}
+
+	// Add retry logic for network issues
+	var resp *http.Response
+	var err error
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		t.Logf("Downloading %s (attempt %d/%d)", targetURL, i+1, maxRetries)
+		resp, err = client.Get(targetURL) //nolint:gosec
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		if i < maxRetries-1 {
+			t.Logf("Download failed, retrying in 10 seconds: %v", err)
+			time.Sleep(10 * time.Second)
+		}
+	}
+	require.NoError(t, err, "failed to http-get %s after %d attempts", targetURL, maxRetries)
 
 	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "unexpected status code from %s", targetURL)
 
 	tarReader, err := gzip.NewReader(resp.Body)
 	require.NoError(t, err, "%s should be gzip stream", targetURL)
@@ -72,7 +95,11 @@ func previousReleaseVersion(t *testing.T, version string) string {
 
 // gitLsRemoteTags lists containerd tags based on pattern.
 func gitLsRemoteCtrdTags(t *testing.T, pattern string) (_tags []string) {
-	cmd := exec.Command("git", "ls-remote", "--tags", "--exit-code",
+	// Create context with timeout to prevent hanging
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--tags", "--exit-code",
 		"https://github.com/containerd/containerd.git", pattern)
 
 	t.Logf("Running %s", cmd.String())

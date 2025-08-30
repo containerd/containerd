@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"syscall"
@@ -30,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
 
 	"github.com/moby/sys/signal"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -174,7 +176,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 
 		if sswt {
 			log.G(ctx).Infof("Stop container %q with signal %v", id, sig)
-			if err = task.Kill(ctx, sig); err != nil && !errdefs.IsNotFound(err) {
+			if err = task.Kill(ctx, sig); err != nil && !errdefs.IsNotFound(err) && !errors.Is(err, ttrpc.ErrClosed) {
 				return fmt.Errorf("failed to stop container %q: %w", id, err)
 			}
 		} else {
@@ -197,7 +199,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	}
 
 	log.G(ctx).Infof("Kill container %q", id)
-	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
+	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) && !errors.Is(err, ttrpc.ErrClosed) {
 		return fmt.Errorf("failed to kill container %q: %w", id, err)
 	}
 

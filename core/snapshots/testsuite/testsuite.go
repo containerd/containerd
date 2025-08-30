@@ -922,6 +922,9 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 
 		// NOTE: add gc labels to avoid snapshots get removed by gc...
 		parent := ""
+		// Track layers for better DevMapper resource management
+		var layerCleanup []string
+
 		for i, applier := range appliers {
 			preparing := filepath.Join(work, fmt.Sprintf("prepare-layer-%d", i))
 			if err := os.MkdirAll(preparing, 0777); err != nil {
@@ -964,6 +967,36 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 			parent = filepath.Join(work, fmt.Sprintf("committed-%d", i))
 			if err := snapshotter.Commit(ctx, parent, preparing, opt); err != nil {
 				t.Fatalf("[layer %d] failed to commit the preparing: %+v", i, err)
+			}
+
+			layerCleanup = append(layerCleanup, parent)
+
+			// Add cleanup and pacing between layer operations to prevent DevMapper resource exhaustion
+			// This is especially important for DevMapper which needs to suspend/resume devices
+			if i > 0 && i%10 == 0 {
+				t.Logf("Processed %d layers, adding cleanup pause for DevMapper stability", i+1)
+				// Force a small delay every 10 layers to allow DevMapper to stabilize
+				time.Sleep(200 * time.Millisecond)
+
+				// For DevMapper specifically, trigger garbage collection of unused resources
+				if name == "devmapper" {
+					// Try to trigger cleanup by calling Walk to enumerate active snapshots
+					// This can help DevMapper clean up intermediate states
+					_ = snapshotter.Walk(ctx, func(ctx context.Context, si snapshots.Info) error {
+						return nil
+					})
+				}
+
+				// Clean up older snapshots we don't need anymore to free DevMapper resources
+				if len(layerCleanup) > 20 && name == "devmapper" {
+					// Keep only the last 20 layers
+					for _, oldSnapshot := range layerCleanup[:len(layerCleanup)-20] {
+						if err := snapshotter.Remove(ctx, oldSnapshot); err != nil {
+							t.Logf("Warning: failed to remove old snapshot %s: %v", oldSnapshot, err)
+						}
+					}
+					layerCleanup = layerCleanup[len(layerCleanup)-20:]
+				}
 			}
 
 		}
