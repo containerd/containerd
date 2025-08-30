@@ -61,6 +61,10 @@ message CreateTaskRequest {
 	string checkpoint = 8;
 	string parent_checkpoint = 9;
 	google.protobuf.Any options = 10;
+	// Path to attachable FIFO for binary stdout
+	string attachable_out = 11;
+	// Path to attachable FIFO for binary stderr
+	string attachable_err = 12;
 }
 
 message CreateTaskResponse {
