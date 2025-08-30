@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/errdefs"
 
 	assertlib "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -130,25 +131,26 @@ func TestSandboxStore(t *testing.T) {
 		},
 	}
 	assert := assertlib.New(t)
+	require := require.New(t)
 	s := NewStore(label.NewStore())
 
 	t.Logf("should be able to add sandbox")
 	for _, sb := range sandboxes {
-		assert.NoError(s.Add(sb))
+		require.NoError(s.Add(sb))
 	}
-	assert.NoError(s.Add(unknown))
+	require.NoError(s.Add(unknown))
 
 	t.Logf("should be able to get sandbox")
 	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
 	for id, sb := range sandboxes {
 		got, err := s.Get(genTruncIndex(id))
-		assert.NoError(err)
+		require.NoError(err)
 		assert.Equal(sb, got)
 	}
 
 	t.Logf("should be able to get sandbox in unknown state with Get")
 	got, err := s.Get(unknown.ID)
-	assert.NoError(err)
+	require.NoError(err)
 	assert.Equal(unknown, got)
 
 	t.Logf("should be able to list sandboxes")
@@ -159,7 +161,7 @@ func TestSandboxStore(t *testing.T) {
 	t.Logf("should be able to update stats on container")
 	for id := range sandboxes {
 		err := s.UpdateContainerStats(id, stats[id])
-		assert.NoError(err)
+		require.NoError(err)
 	}
 
 	// Validate stats were updated

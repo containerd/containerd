@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -159,7 +160,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 				containerstore.WithFakeStatus(*status),
 				containerstore.WithContainer(ctnr),
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			// Set expectation based on test case.
 			expected.Reason = test.expectedReason
 			expected.StartedAt = test.startedAt
@@ -171,7 +172,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 				container,
 				expected.Image,
 				expected.ImageRef)
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, expected, containerStatus, test.desc)
 		})
 	}
@@ -184,12 +185,12 @@ func TestToCRIContainerInfo(t *testing.T) {
 		*metadata,
 		containerstore.WithFakeStatus(*status),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	info, err := toCRIContainerInfo(context.Background(),
 		container,
 		false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, info)
 }
 
@@ -251,18 +252,18 @@ func TestContainerStatus(t *testing.T) {
 				containerstore.WithFakeStatus(*status),
 				containerstore.WithContainer(ctnr),
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if test.exist {
-				assert.NoError(t, c.containerStore.Add(container))
+				require.NoError(t, c.containerStore.Add(container))
 			}
 			if test.imageExist {
 				imageStore, err := imagestore.NewFakeStore([]imagestore.Image{*image})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				c.ImageService = &fakeImageService{imageStore: imageStore}
 			}
 			resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})
 			if test.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, resp)
 				return
 			}

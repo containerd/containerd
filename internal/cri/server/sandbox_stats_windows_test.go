@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -53,13 +54,13 @@ func TestGetUsageNanoCores(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: ID},
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// calculate for first iteration
 			// first run so container stats will be nil
 			assert.Nil(t, container.Stats)
 			cpuUsage := getUsageNanoCores(test.firstCPUValue, container.Stats, timestamp.UnixNano())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.expectedNanoCoreUsageFirst, cpuUsage)
 
 			// fill in the stats as if they now exist
@@ -70,7 +71,7 @@ func TestGetUsageNanoCores(t *testing.T) {
 
 			// calculate for second iteration
 			cpuUsage = getUsageNanoCores(test.secondCPUValue, container.Stats, secondAfterTimeStamp.UnixNano())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.expectedNanoCoreUsageSecond, cpuUsage)
 		})
 	}

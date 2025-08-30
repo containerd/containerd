@@ -65,13 +65,13 @@ func TestGetExec(t *testing.T) {
 	serv, err := NewServer(Config{
 		Addr: testAddr,
 	}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	tlsServer, err := NewServer(Config{
 		Addr:      testAddr,
 		TLSConfig: &tls.Config{},
 	}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	const pathPrefix = "cri/shim"
 	prefixServer, err := NewServer(Config{
@@ -82,7 +82,7 @@ func TestGetExec(t *testing.T) {
 			Path:   "/" + pathPrefix + "/",
 		},
 	}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assertRequestToken := func(expectedReq *runtimeapi.ExecRequest, cache *requestCache, token string) {
 		req, ok := cache.Consume(token)
@@ -97,7 +97,7 @@ func TestGetExec(t *testing.T) {
 	}
 	{ // Non-TLS
 		resp, err := serv.GetExec(request)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		expectedURL := "http://" + testAddr + "/exec/"
 		assert.Contains(t, resp.Url, expectedURL)
 		token := strings.TrimPrefix(resp.Url, expectedURL)
@@ -106,7 +106,7 @@ func TestGetExec(t *testing.T) {
 
 	{ // TLS
 		resp, err := tlsServer.GetExec(request)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		expectedURL := "https://" + testAddr + "/exec/"
 		assert.Contains(t, resp.Url, expectedURL)
 		token := strings.TrimPrefix(resp.Url, expectedURL)
@@ -115,7 +115,7 @@ func TestGetExec(t *testing.T) {
 
 	{ // Path prefix
 		resp, err := prefixServer.GetExec(request)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		expectedURL := "http://" + testAddr + "/" + pathPrefix + "/exec/"
 		assert.Contains(t, resp.Url, expectedURL)
 		token := strings.TrimPrefix(resp.Url, expectedURL)
@@ -223,7 +223,7 @@ func TestGetAttach(t *testing.T) {
 	}
 	{ // Non-TLS
 		resp, err := serv.GetAttach(request)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		expectedURL := "http://" + testAddr + "/attach/"
 		assert.Contains(t, resp.Url, expectedURL)
 		token := strings.TrimPrefix(resp.Url, expectedURL)
@@ -232,7 +232,7 @@ func TestGetAttach(t *testing.T) {
 
 	{ // TLS
 		resp, err := tlsServer.GetAttach(request)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		expectedURL := "https://" + testAddr + "/attach/"
 		assert.Contains(t, resp.Url, expectedURL)
 		token := strings.TrimPrefix(resp.Url, expectedURL)
@@ -251,9 +251,9 @@ func TestGetPortForward(t *testing.T) {
 		serv, err := NewServer(Config{
 			Addr: testAddr,
 		}, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		resp, err := serv.GetPortForward(request)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		expectedURL := "http://" + testAddr + "/portforward/"
 		assert.True(t, strings.HasPrefix(resp.Url, expectedURL))
 		token := strings.TrimPrefix(resp.Url, expectedURL)
@@ -267,9 +267,9 @@ func TestGetPortForward(t *testing.T) {
 			Addr:      testAddr,
 			TLSConfig: &tls.Config{},
 		}, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		resp, err := tlsServer.GetPortForward(request)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		expectedURL := "https://" + testAddr + "/portforward/"
 		assert.True(t, strings.HasPrefix(resp.Url, expectedURL))
 		token := strings.TrimPrefix(resp.Url, expectedURL)
@@ -478,13 +478,13 @@ func doClientStreams(t *testing.T, prefix string, stdin io.Writer, stdout, stder
 func readExpected(t *testing.T, streamName string, r io.Reader, expected string) {
 	result := make([]byte, len(expected))
 	_, err := io.ReadAtLeast(r, result, len(expected))
-	assert.NoError(t, err, "stream %s", streamName)
+	require.NoError(t, err, "stream %s", streamName)
 	assert.Equal(t, expected, string(result), "stream %s", streamName)
 }
 
 // Write and verify success of the data over the stream.
 func writeExpected(t *testing.T, streamName string, w io.Writer, data string) {
 	n, err := io.WriteString(w, data)
-	assert.NoError(t, err, "stream %s", streamName)
+	require.NoError(t, err, "stream %s", streamName)
 	assert.Equal(t, len(data), n, "stream %s", streamName)
 }

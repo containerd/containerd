@@ -19,7 +19,6 @@ package local
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,10 +26,9 @@ func TestTryLock(t *testing.T) {
 	s := &store{locks: map[string]*lock{}}
 
 	err := s.tryLock("testref")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer s.unlock("testref")
 
 	err = s.tryLock("testref")
-	require.NotNil(t, err)
-	assert.Contains(t, err.Error(), "ref testref locked for ")
+	require.ErrorContains(t, err, "ref testref locked for ")
 }

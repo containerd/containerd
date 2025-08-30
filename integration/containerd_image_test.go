@@ -48,13 +48,13 @@ func TestContainerdImage(t *testing.T) {
 	t.Logf("pull the image into containerd")
 	lbs := map[string]string{"foo": "bar", labels.PinnedImageLabelKey: labels.PinnedImageLabelValue}
 	_, err = containerdClient.Pull(ctx, testImage, containerd.WithPullUnpack, containerd.WithPullLabels(lbs))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		// Make sure the image is cleaned up in any case.
 		if err := containerdClient.ImageService().Delete(ctx, testImage); err != nil {
-			assert.True(t, errdefs.IsNotFound(err), err)
+			assert.True(t, errdefs.IsNotFound(err), "%+v", err)
 		}
-		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
+		require.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
 	}()
 
 	t.Logf("the image should be seen by the cri plugin")
@@ -92,9 +92,9 @@ func TestContainerdImage(t *testing.T) {
 	defer func() {
 		t.Logf("image should still be seen by id if only tag get deleted")
 		if err := containerdClient.ImageService().Delete(ctx, testImage); err != nil {
-			assert.True(t, errdefs.IsNotFound(err), err)
+			assert.True(t, errdefs.IsNotFound(err), "%+v", err)
 		}
-		assert.NoError(t, Consistently(func() (bool, error) {
+		require.NoError(t, Consistently(func() (bool, error) {
 			img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: id})
 			if err != nil {
 				return false, err
@@ -103,9 +103,9 @@ func TestContainerdImage(t *testing.T) {
 		}, 100*time.Millisecond, time.Second))
 		t.Logf("image should be removed from the cri plugin if all references get deleted")
 		if err := containerdClient.ImageService().Delete(ctx, id); err != nil {
-			assert.True(t, errdefs.IsNotFound(err), err)
+			assert.True(t, errdefs.IsNotFound(err), "%+v", err)
 		}
-		assert.NoError(t, Eventually(func() (bool, error) {
+		require.NoError(t, Eventually(func() (bool, error) {
 			img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: id})
 			if err != nil {
 				return false, err
@@ -116,17 +116,17 @@ func TestContainerdImage(t *testing.T) {
 
 	t.Logf("the image should be marked as managed")
 	imgByRef, err := containerdClient.GetImage(ctx, testImage)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "managed", imgByRef.Labels()["io.cri-containerd.image"])
 
 	t.Logf("the image id should be created and managed")
 	imgByID, err := containerdClient.GetImage(ctx, id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "managed", imgByID.Labels()["io.cri-containerd.image"])
 
 	t.Logf("the image should be labeled")
 	img, err := containerdClient.GetImage(ctx, testImage)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "bar", img.Labels()["foo"])
 	assert.Equal(t, labels.ImageLabelValue, img.Labels()[labels.ImageLabelKey])
 
@@ -176,13 +176,13 @@ func TestContainerdImageInOtherNamespaces(t *testing.T) {
 	t.Logf("pull the image into test namespace")
 	namespacedCtx := namespaces.WithNamespace(ctx, "test")
 	_, err = containerdClient.Pull(namespacedCtx, testImage, containerd.WithPullUnpack)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		// Make sure the image is cleaned up in any case.
 		if err := containerdClient.ImageService().Delete(namespacedCtx, testImage); err != nil {
-			assert.True(t, errdefs.IsNotFound(err), err)
+			assert.True(t, errdefs.IsNotFound(err), "%+v", err)
 		}
-		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
+		require.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
 	}()
 
 	t.Logf("cri plugin should not see the image")
@@ -214,7 +214,7 @@ func TestContainerdImageInOtherNamespaces(t *testing.T) {
 		}
 		return img != nil, nil
 	}
-	assert.NoError(t, Consistently(checkImage, 100*time.Millisecond, time.Second))
+	require.NoError(t, Consistently(checkImage, 100*time.Millisecond, time.Second))
 }
 
 func TestContainerdSandboxImage(t *testing.T) {
@@ -244,7 +244,7 @@ func TestContainerdSandboxImagePulledOutsideCRI(t *testing.T) {
 
 	t.Log("pull pause image")
 	_, err := containerdClient.Pull(ctx, pauseImage)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Log("pause image should be seen by cri plugin")
 	var pimg *runtime.Image

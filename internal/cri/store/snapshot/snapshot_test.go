@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/errdefs"
 
 	assertlib "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSnapshotStore(t *testing.T) {
@@ -63,6 +64,7 @@ func TestSnapshotStore(t *testing.T) {
 		},
 	}
 	assert := assertlib.New(t)
+	require := require.New(t)
 
 	s := NewStore()
 
@@ -74,7 +76,7 @@ func TestSnapshotStore(t *testing.T) {
 	t.Logf("should be able to get snapshot")
 	for id, sn := range snapshots {
 		got, err := s.Get(id)
-		assert.NoError(err)
+		require.NoError(err)
 		assert.Equal(sn, got)
 	}
 
