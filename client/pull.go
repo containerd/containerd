@@ -76,7 +76,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	span.SetAttributes(
-		tracing.Attribute("image.ref", ref),
+		tracing.Attribute(tracing.AttrImageRef, ref),
 		tracing.Attribute("unpack", pullCtx.Unpack),
 		tracing.Attribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
 		tracing.Attribute("concurrent.layer.fetch.buffer", pullCtx.ConcurrentLayerFetchBuffer),
@@ -96,7 +96,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if err != nil {
 			return nil, fmt.Errorf("unable to resolve snapshotter: %w", err)
 		}
-		span.SetAttributes(tracing.Attribute("snapshotter.name", snapshotterName))
+		span.SetAttributes(tracing.Attribute(tracing.AttrSnapshotter, snapshotterName))
 		var uconfig UnpackConfig
 		for _, opt := range pullCtx.UnpackOpts {
 			if err := opt(ctx, &uconfig); err != nil {
@@ -121,10 +121,13 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if uconfig.DuplicationSuppressor != nil {
 			uopts = append(uopts, unpack.WithDuplicationSuppressor(uconfig.DuplicationSuppressor))
 		}
+		_, unpackSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "UnpackWait"))
 		unpacker, err = unpack.NewUnpacker(ctx, c.ContentStore(), uopts...)
 		if err != nil {
+			unpackSpan.End()
 			return nil, fmt.Errorf("unable to initialize unpacker: %w", err)
 		}
+		unpackSpan.End()
 		defer func() {
 			if _, err := unpacker.Wait(); err != nil {
 				if retErr == nil {
@@ -187,6 +190,12 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	if err != nil {
 		return images.Image{}, fmt.Errorf("failed to resolve reference %q: %w", ref, err)
 	}
+	span.SetAttributes(
+		tracing.Attribute(tracing.AttrImageRef, ref),
+		tracing.Attribute("image.name", name),
+		tracing.Attribute("target.mediaType", desc.MediaType),
+		tracing.Attribute(tracing.AttrImageDigest, desc.Digest.String()),
+	)
 
 	fetcher, err := rCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
@@ -255,14 +264,20 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		handler = rCtx.HandlerWrapper(handler)
 	}
 
+	_, dspan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "dispatch"))
 	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
+		dspan.End()
 		return images.Image{}, err
 	}
+	dspan.End()
 
 	if isConvertible {
+		_, cspan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "convert_manifest"))
 		if desc, err = converterFunc(ctx, desc); err != nil {
+			cspan.End()
 			return images.Image{}, err
 		}
+		cspan.End()
 	}
 
 	return images.Image{
