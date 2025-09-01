@@ -54,13 +54,16 @@ func NewSandboxStore(db *DB) api.Store {
 func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.Sandbox, error) {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanSandboxPrefix, "Create"),
-		tracing.WithAttribute("sandbox.id", sandbox.ID),
+		tracing.WithAttribute(tracing.AttrSandboxID, sandbox.ID),
 	)
 	defer span.End()
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return api.Sandbox{}, err
 	}
+
+	tracing.AddStandardAttributes(span, sandbox.ID, "", "", "")
+	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
 
 	sandbox.CreatedAt = time.Now().UTC()
 	sandbox.UpdatedAt = sandbox.CreatedAt
@@ -94,13 +97,16 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpaths ...string) (api.Sandbox, error) {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanSandboxPrefix, "Update"),
-		tracing.WithAttribute("sandbox.id", sandbox.ID),
+		tracing.WithAttribute(tracing.AttrSandboxID, sandbox.ID),
 	)
 	defer span.End()
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return api.Sandbox{}, err
 	}
+
+	tracing.AddStandardAttributes(span, sandbox.ID, "", "", "")
+	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
 
 	ret := api.Sandbox{}
 	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
@@ -252,13 +258,16 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanSandboxPrefix, "Delete"),
-		tracing.WithAttribute("sandbox.id", id),
+		tracing.WithAttribute(tracing.AttrSandboxID, id),
 	)
 	defer span.End()
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
 	}
+
+	tracing.AddStandardAttributes(span, id, "", "", "")
+	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
 
 	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
 		buckets := getSandboxBucket(tx, ns)
