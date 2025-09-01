@@ -123,13 +123,16 @@ func (s *containerStore) List(ctx context.Context, fs ...string) ([]containers.C
 func (s *containerStore) Create(ctx context.Context, container containers.Container) (containers.Container, error) {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanContainerPrefix, "Create"),
-		tracing.WithAttribute("container.id", container.ID),
+		tracing.WithAttribute(tracing.AttrContainerID, container.ID),
 	)
 	defer span.End()
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
 	}
+
+	tracing.AddStandardAttributes(span, container.SandboxID, container.ID, "", "")
+	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, namespace))
 
 	if err := validateContainer(&container); err != nil {
 		return containers.Container{}, fmt.Errorf("create container failed validation: %w", err)
@@ -157,6 +160,7 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 
 		span.SetAttributes(
 			tracing.Attribute("container.createdAt", container.CreatedAt.Format(time.RFC3339)),
+			tracing.Attribute("container.updatedAt", container.CreatedAt.Format(time.RFC3339)),
 		)
 		return nil
 	}); err != nil {
@@ -169,7 +173,7 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 func (s *containerStore) Update(ctx context.Context, container containers.Container, fieldpaths ...string) (containers.Container, error) {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanContainerPrefix, "Update"),
-		tracing.WithAttribute("container.id", container.ID),
+		tracing.WithAttribute(tracing.AttrContainerID, container.ID),
 	)
 	defer span.End()
 	namespace, err := namespaces.NamespaceRequired(ctx)
@@ -180,6 +184,9 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 	if container.ID == "" {
 		return containers.Container{}, fmt.Errorf("must specify a container id: %w", errdefs.ErrInvalidArgument)
 	}
+
+	tracing.AddStandardAttributes(span, container.SandboxID, container.ID, "", "")
+	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, namespace))
 
 	var updated containers.Container
 	if err := update(ctx, s.db, func(tx *bolt.Tx) error {
@@ -278,7 +285,7 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 func (s *containerStore) Delete(ctx context.Context, id string) error {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanContainerPrefix, "Delete"),
-		tracing.WithAttribute("container.id", id),
+		tracing.WithAttribute(tracing.AttrContainerID, id),
 	)
 	defer span.End()
 
@@ -286,6 +293,9 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
+
+	tracing.AddStandardAttributes(span, "", id, "", "")
+	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, namespace))
 
 	return update(ctx, s.db, func(tx *bolt.Tx) error {
 		bkt := getContainersBucket(tx, namespace)
