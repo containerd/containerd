@@ -1,4 +1,4 @@
-//go:build darwin || freebsd || solaris
+//go:build !linux
 
 /*
    Copyright The containerd Authors.
@@ -16,12 +16,20 @@
    limitations under the License.
 */
 
-package builtins
+package erofs
 
 import (
-	_ "github.com/containerd/containerd/v2/plugins/diff/erofs/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/snapshots/blockfile/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/snapshots/erofs/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/snapshots/native/plugin"
+	"context"
+
+	"github.com/containerd/errdefs"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/mount"
 )
+
+// Compare creates a diff between the given mounts and uploads the result
+// to the content store.
+func (s erofsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+	return emptyDesc, errdefs.ErrNotImplemented
+}

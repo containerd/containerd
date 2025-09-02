@@ -26,9 +26,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {

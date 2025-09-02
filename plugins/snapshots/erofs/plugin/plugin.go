@@ -19,11 +19,12 @@ package plugin
 import (
 	"errors"
 
-	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/snapshots/erofs"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/snapshots/erofs"
 )
 
 // Config represents configuration for the native plugin.
@@ -35,6 +36,7 @@ type Config struct {
 	OvlOptions []string `toml:"ovl_mount_options"`
 
 	// EnableFsverity enables fsverity for EROFS layers
+	// Linux only
 	EnableFsverity bool `toml:"enable_fsverity"`
 
 	// If `SetImmutable` is enabled, IMMUTABLE_FL will be set on layer blobs.
