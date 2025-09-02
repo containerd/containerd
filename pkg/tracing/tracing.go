@@ -44,6 +44,23 @@ var (
 // It should return (sandboxID, true) if resolved, otherwise ("", false).
 var sandboxIDResolver func(attrs map[string]interface{}) (string, bool)
 
+type sandboxIDKey struct{}
+
+func ContextWithSandboxID(ctx context.Context, id string) context.Context {
+	if id == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, sandboxIDKey{}, id)
+}
+
+func SandboxIDFrom(ctx context.Context) (string, bool) {
+	v := ctx.Value(sandboxIDKey{})
+	if s, ok := v.(string); ok && s != "" {
+		return s, true
+	}
+	return "", false
+}
+
 // SetGlobalTraceManager sets the global trace manager for enhanced tracing
 func SetGlobalTraceManager(tm manager.Manager) {
 	globalTraceMutex.Lock()
