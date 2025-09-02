@@ -79,13 +79,6 @@ func (t *EnhancedTracer) StartSpan(ctx context.Context, operationName string, tr
 		enhancedSpan.attributes[attr.Key] = attr.Value
 	}
 
-	if t.config.UseSandboxID {
-		if sandboxID := extractSandboxID(ctx); sandboxID != "" {
-			enhancedSpan.traceID = sandboxID
-			enhancedSpan.attributes["sandbox.id"] = sandboxID
-		}
-	}
-
 	newCtx := ContextWithSpan(ctx, enhancedSpan)
 	return enhancedSpan, newCtx
 }
@@ -113,8 +106,17 @@ func (t *EnhancedTracer) ExportSpan(spanData exporters.SpanData) {
 		}
 	}
 
+	if spanData.Attributes != nil {
+		copied := make(map[string]interface{}, len(spanData.Attributes))
+		for k, v := range spanData.Attributes {
+			copied[k] = v
+		}
+		spanData.Attributes = copied
+	}
+
 	for _, exporter := range t.exporters {
-		go exporter.ExportSpan(context.Background(), spanData)
+		sd := spanData
+		go exporter.ExportSpan(context.Background(), sd)
 	}
 }
 
@@ -133,16 +135,6 @@ func (t *EnhancedTracer) Shutdown(ctx context.Context) error {
 		return fmt.Errorf("multiple errors during shutdown: %v", errs)
 	}
 	return nil
-}
-
-// Helper function to extract sandbox ID from context
-func extractSandboxID(ctx context.Context) string {
-	if value := ctx.Value("sandbox.id"); value != nil {
-		if sandboxID, ok := value.(string); ok {
-			return sandboxID
-		}
-	}
-	return ""
 }
 
 func generateSpanID() string {

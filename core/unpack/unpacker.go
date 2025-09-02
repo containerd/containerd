@@ -563,7 +563,7 @@ func (u *Unpacker) unpack(
 func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec.Descriptor, done []chan struct{}) error {
 	eg, ctx2 := errgroup.WithContext(ctx)
 	for i, desc := range layers {
-		ctx2, layerSpan := tracing.StartSpan(ctx2, tracing.Name(unpackSpanPrefix, "fetchLayer"))
+		lctx, layerSpan := tracing.StartSpan(ctx2, tracing.Name(unpackSpanPrefix, "fetchLayer"))
 		layerSpan.SetAttributes(
 			tracing.Attribute("layer.media.type", desc.MediaType),
 			tracing.Attribute("layer.media.size", desc.Size),
@@ -574,7 +574,7 @@ func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 			ch = done[i]
 		}
 
-		if err := u.acquire(ctx2); err != nil {
+		if err := u.acquire(lctx); err != nil {
 			layerSpan.End()
 			return err
 		}
@@ -582,13 +582,13 @@ func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 		eg.Go(func() error {
 			defer layerSpan.End()
 
-			unlock, err := u.lockBlobDescriptor(ctx2, desc)
+			unlock, err := u.lockBlobDescriptor(lctx, desc)
 			if err != nil {
 				u.release()
 				return err
 			}
 
-			_, err = h.Handle(ctx2, desc)
+			_, err = h.Handle(lctx, desc)
 
 			unlock()
 			u.release()

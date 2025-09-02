@@ -44,7 +44,7 @@ const (
 func init() {
 	registry.Register(&plugin.Registration{
 		ID:     enhancedTracingPlugin,
-		Type:   plugins.TracingProcessorPlugin,
+		Type:   plugins.InternalPlugin,
 		Config: &EnhancedConfig{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			config, err := loadEnhancedConfig(ic)
@@ -69,33 +69,33 @@ func init() {
 		},
 	})
 
-	// Register enhanced tracing as an internal plugin that can be used alongside OTEL
-	registry.Register(&plugin.Registration{
-		ID:     "enhanced_tracing",
-		Type:   plugins.InternalPlugin,
-		Config: &EnhancedConfig{},
-		Requires: []plugin.Type{
-			plugins.TracingProcessorPlugin,
-		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			// Get the tracing processor plugins
-			tracingProcessors, err := ic.GetByType(plugins.TracingProcessorPlugin)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get tracing processors: %w", err)
-			}
+	// // Register enhanced tracing as an internal plugin that can be used alongside OTEL
+	// registry.Register(&plugin.Registration{
+	// 	ID:     "enhanced_tracing",
+	// 	Type:   plugins.InternalPlugin,
+	// 	Config: &EnhancedConfig{},
+	// 	Requires: []plugin.Type{
+	// 		plugins.TracingProcessorPlugin,
+	// 	},
+	// 	InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+	// 		// Get the tracing processor plugins
+	// 		tracingProcessors, err := ic.GetByType(plugins.TracingProcessorPlugin)
+	// 		if err != nil {
+	// 			return nil, fmt.Errorf("failed to get tracing processors: %w", err)
+	// 		}
 
-			// Try to find the enhanced trace manager
-			for _, p := range tracingProcessors {
-				if tm, ok := p.(*manager.TraceManager); ok {
-					return tm, nil
-				}
-			}
+	// 		// Try to find the enhanced trace manager
+	// 		for _, p := range tracingProcessors {
+	// 			if tm, ok := p.(*manager.TraceManager); ok {
+	// 				return tm, nil
+	// 			}
+	// 		}
 
-			// fallback: return noop manager to avoid breaking integration tests
-			fmt.Fprintf(os.Stderr, "enhanced tracing manager not found, falling back to noop manager\n")
-			return manager.NewNoopManager(), nil
-		},
-	})
+	// 		// fallback: return noop manager to avoid breaking integration tests
+	// 		fmt.Fprintf(os.Stderr, "enhanced tracing manager not found, falling back to noop manager\n")
+	// 		return manager.NewNoopManager(), nil
+	// 	},
+	// })
 }
 
 // EnhancedConfig holds the configurations for enhanced tracing
@@ -141,10 +141,8 @@ func loadEnhancedConfig(ic *plugin.InitContext) (manager.Config, error) {
 func mergeConfigs(envConfig manager.Config, pluginConfig *EnhancedConfig) manager.Config {
 	config := envConfig
 
-	// Only override if plugin config has explicit values
-	if pluginConfig.Enabled {
-		config.Enabled = pluginConfig.Enabled
-	}
+	config.Enabled = pluginConfig.Enabled
+
 	if pluginConfig.SamplingRate > 0 {
 		config.SamplingRate = pluginConfig.SamplingRate
 	}
