@@ -47,13 +47,13 @@ func init() {
 		Type:   plugins.TracingProcessorPlugin,
 		Config: &EnhancedConfig{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			if err := checkEnhancedDisabled(); err != nil {
-				return nil, err
-			}
-
 			config, err := loadEnhancedConfig(ic)
 			if err != nil {
 				return nil, err
+			}
+
+			if !config.Enabled || len(config.Exporters) == 0 {
+				return nil, plugin.ErrSkipPlugin
 			}
 
 			// Create trace manager
@@ -112,22 +112,6 @@ type EnhancedExporterConfig struct {
 	Type     string                 `toml:"type,omitempty"`
 	Endpoint string                 `toml:"endpoint,omitempty"`
 	Options  map[string]interface{} `toml:"options,omitempty"`
-}
-
-// checkEnhancedDisabled checks if enhanced tracing is disabled via environment variables
-func checkEnhancedDisabled() error {
-	if v := os.Getenv(envEnabled); v != "" {
-		if enabled, err := strconv.ParseBool(v); err == nil && !enabled {
-			return fmt.Errorf("%w: enhanced tracing disabled by env %s=%s", plugin.ErrSkipPlugin, envEnabled, v)
-		}
-	}
-
-	// Check if any exporters are configured
-	if os.Getenv(envExporters) == "" {
-		return fmt.Errorf("%w: enhanced tracing exporters not configured", plugin.ErrSkipPlugin)
-	}
-
-	return nil
 }
 
 // loadEnhancedConfig loads enhanced tracing configuration from environment variables and plugin config

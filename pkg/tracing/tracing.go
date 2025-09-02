@@ -277,6 +277,11 @@ func Attribute(k string, v any) attribute.KeyValue {
 	return attribute.String(k, "<unsupported>")
 }
 
+// HTTPStatusCodeAttributes returns the attributes list for the given status code.
+func HTTPStatusCodeAttributes(code int) []attribute.KeyValue {
+	return []attribute.KeyValue{semconv.HTTPStatusCodeKey.Int(code)}
+}
+
 // HTTPClient wraps the given RoundTripper and returns an http.Client with tracing instrumentation.
 // The given attributes will be part of the span attributes.
 func HTTPClient(rt http.RoundTripper, attrs ...attribute.KeyValue) *http.Client {
@@ -287,24 +292,25 @@ func HTTPClient(rt http.RoundTripper, attrs ...attribute.KeyValue) *http.Client 
 	}
 }
 
-// HTTPStatusCodeAttributes returns the attributes list for the given status code.
-func HTTPStatusCodeAttributes(code int) []attribute.KeyValue {
-	return []attribute.KeyValue{semconv.HTTPStatusCodeKey.Int(code)}
+// NewHTTPClient is a convenience helper that returns a client with otel transport.
+func NewHTTPClient(base *http.Client) *http.Client {
+	if base == nil {
+		base = &http.Client{}
+	}
+	UpdateHTTPClient(base)
+	return base
 }
 
 // UpdateHTTPClient wraps the client's Transport with otelhttp to enable HTTP instrumentation.
-// It accepts an optional operation name for backward compatibility but doesn't require it.
-// It returns the same client instance for convenience.
-func UpdateHTTPClient(client *http.Client, opName ...string) *http.Client {
+func UpdateHTTPClient(client *http.Client, _ ...string) {
 	if client == nil {
-		client = &http.Client{}
+		return
 	}
 	rt := client.Transport
 	if rt == nil {
 		rt = http.DefaultTransport
 	}
 	client.Transport = otelhttp.NewTransport(rt)
-	return client
 }
 
 // Helper function to convert OTEL attributes to enhanced attributes
