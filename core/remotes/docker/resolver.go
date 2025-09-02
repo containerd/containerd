@@ -374,6 +374,12 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					return "", ocispec.Descriptor{}, err
 				}
 
+				// Check for error status code
+				if resp.StatusCode >= http.StatusBadRequest {
+					defer resp.Body.Close()
+					return "", ocispec.Descriptor{}, unexpectedResponseErr(resp)
+				}
+
 				bodyReader := countingReader{reader: resp.Body}
 
 				contentType = getManifestMediaType(resp)
