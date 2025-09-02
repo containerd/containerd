@@ -302,7 +302,7 @@ jobs:
           echo 'GCP_WORKLOAD_IDENTITY_PROVIDER=${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}' >> $GITHUB_OUTPUT
 
       - name: AuthGcp
-        uses: google-github-actions/auth@b7593ed2efd1c1617e1b0254da33b86225adb2a5 # v2.1.12
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
