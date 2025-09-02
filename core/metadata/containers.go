@@ -160,7 +160,7 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 
 		span.SetAttributes(
 			tracing.Attribute("container.createdAt", container.CreatedAt.Format(time.RFC3339)),
-			tracing.Attribute("container.updatedAt", container.CreatedAt.Format(time.RFC3339)),
+			tracing.Attribute("container.updatedAt", container.UpdatedAt.Format(time.RFC3339)),
 		)
 		return nil
 	}); err != nil {
