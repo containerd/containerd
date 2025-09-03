@@ -104,7 +104,13 @@ const ctxKeySandboxID ctxKey = "cri.sandbox.id"
 
 // PullImage pulls an image with authentication config.
 func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
-
+	ctx, rpcSpan := tracing.StartSpan(ctx, tracing.Name("cri.image", "grpc_pull"))
+	defer func() {
+		if err != nil {
+			rpcSpan.SetStatus(err)
+		}
+		rpcSpan.End()
+	}()
 	imageRef := r.GetImage().GetImage()
 
 	// Extract sandbox id best-effort from annotations.
@@ -120,8 +126,11 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 	}
 	if sandboxID != "" {
 		ctx = context.WithValue(ctx, ctxKeySandboxID, sandboxID)
+		ctx = tracing.ContextWithSandboxID(ctx, sandboxID)
 		if sp := tracing.SpanFromContext(ctx); sp != nil {
-			sp.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
+			sp.SetAttributes(
+				tracing.Attribute("sandbox.id", sandboxID),
+			)
 		}
 	}
 
@@ -146,7 +155,13 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 }
 
 func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (_ string, err error) {
-	span := tracing.SpanFromContext(ctx)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("cri.image", "pull"))
+	defer func() {
+		if err != nil {
+			span.SetStatus(err)
+		}
+		span.End()
+	}()
 
 	// Best-effort extract sandbox id from annotations.
 	var sandboxID string
@@ -159,8 +174,15 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	}
 	if sandboxID != "" {
 		ctx = context.WithValue(ctx, ctxKeySandboxID, sandboxID)
+		ctx = tracing.ContextWithSandboxID(ctx, sandboxID)
 		if span != nil {
 			span.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
+		}
+	}
+
+	if v := ctx.Value(ctxKeySandboxID); v != nil {
+		if s, _ := v.(string); s != "" {
+			span.SetAttributes(tracing.Attribute("sandbox.id", s))
 		}
 	}
 
