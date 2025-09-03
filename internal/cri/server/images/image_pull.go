@@ -145,6 +145,16 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 		}
 	}
 
+	if sp := tracing.SpanFromContext(ctx); sp != nil {
+		sp.SetAttributes(
+			tracing.Attribute("pull.has.sandboxconfig", r.SandboxConfig != nil),
+			tracing.Attribute("pull.has.sandboxid", sandboxID != ""),
+		)
+		if r.SandboxConfig != nil {
+			sp.SetAttributes(tracing.Attribute("pull.ann.count", len(r.SandboxConfig.GetAnnotations())))
+		}
+	}
+
 	credentials := func(host string) (string, string, error) {
 		// Trace: credentials lookup path
 		hostauth := r.GetAuth()
@@ -191,9 +201,11 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		}
 	}
 
-	if v := ctx.Value(ctxKeySandboxID); v != nil {
-		if s, _ := v.(string); s != "" {
-			span.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+	if span != nil && !span.IsEnhancedTracingActive() {
+		if v := ctx.Value(ctxKeySandboxID); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				span.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+			}
 		}
 	}
 
@@ -363,21 +375,22 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, error) {
+	pctx, pcancel := context.WithCancel(ctx)
+	defer pcancel()
 	// Open a child span for local pull path.
-	ctx, lspan := tracing.StartSpan(ctx, tracing.Name("cri.image", "local_pull"),
+	pctx, lspan := tracing.StartSpan(pctx, tracing.Name("cri.image", "local_pull"),
 		tracing.WithAttribute("image.ref", ref),
 		tracing.WithAttribute("snapshotter.name", snapshotter),
 	)
 	// Propagate sandbox id attribute if present.
-	if v := ctx.Value(ctxKeySandboxID); v != nil {
-		if s, _ := v.(string); s != "" {
-			lspan.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+	if lspan != nil && !lspan.IsEnhancedTracingActive() {
+		if v := pctx.Value(ctxKeySandboxID); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				lspan.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+			}
 		}
 	}
 	defer lspan.End()
-
-	pctx, pcancel := context.WithCancel(ctx)
-	defer pcancel()
 	pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Headers: c.config.Registry.Headers,
@@ -437,10 +450,12 @@ func (c *CRIImageService) pullImageWithTransferService(
 		tracing.WithAttribute("image.ref", ref),
 		tracing.WithAttribute("snapshotter.name", snapshotter),
 	)
-	// Propagate sandbox id attribute if present.
-	if v := ctx.Value(ctxKeySandboxID); v != nil {
-		if s, _ := v.(string); s != "" {
-			tspan.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+
+	if tspan != nil && !tspan.IsEnhancedTracingActive() {
+		if v := ctx.Value(ctxKeySandboxID); v != nil {
+			if s, _ := v.(string); s != "" {
+				tspan.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+			}
 		}
 	}
 	defer tspan.End()
