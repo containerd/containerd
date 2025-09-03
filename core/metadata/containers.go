@@ -126,6 +126,9 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 		tracing.WithAttribute(tracing.AttrContainerID, container.ID),
 	)
 	defer span.End()
+	if container.SandboxID != "" {
+		ctx = tracing.ContextWithSandboxID(ctx, container.SandboxID)
+	}
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
@@ -176,6 +179,9 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 		tracing.WithAttribute(tracing.AttrContainerID, container.ID),
 	)
 	defer span.End()
+	if container.SandboxID != "" {
+		ctx = tracing.ContextWithSandboxID(ctx, container.SandboxID)
+	}
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
@@ -288,6 +294,11 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 		tracing.WithAttribute(tracing.AttrContainerID, id),
 	)
 	defer span.End()
+
+	if meta, err := s.Get(ctx, id); err == nil && meta.SandboxID != "" {
+		ctx = tracing.ContextWithSandboxID(ctx, meta.SandboxID)
+		tracing.AddStandardAttributes(span, meta.SandboxID, id, "", "")
+	}
 
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
