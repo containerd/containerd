@@ -129,13 +129,16 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			return nil, fmt.Errorf("unable to initialize unpacker: %w", err)
 		}
 
-		// defer func() {
-		// 	if _, err := unpacker.Wait(); err != nil {
-		// 		if retErr == nil {
-		// 			retErr = fmt.Errorf("unpack: %w", err)
-		// 		}
-		// 	}
-		// }()
+		defer func() {
+			if unpacker == nil {
+				return
+			}
+			if _, err := unpacker.Wait(); err != nil {
+				if retErr == nil {
+					retErr = fmt.Errorf("unpack: %w", err)
+				}
+			}
+		}()
 		initSpan.End()
 		wrapper := pullCtx.HandlerWrapper
 		pullCtx.HandlerWrapper = func(h images.Handler) images.Handler {
@@ -157,12 +160,18 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	var ur unpack.Result
 	if unpacker != nil {
 		_, unpackSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "UnpackWait"))
-		ur, err = unpacker.Wait()
+		u := unpacker
+		unpacker = nil
+
+		ur, err = u.Wait()
 		if err != nil {
 			unpackSpan.SetStatus(err)
 			unpackSpan.End()
 			return nil, err
 		}
+		unpackSpan.SetAttributes(
+			tracing.Attribute("unpack.count", ur.Unpacks),
+		)
 		unpackSpan.End()
 	}
 
