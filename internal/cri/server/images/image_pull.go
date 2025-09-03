@@ -134,6 +134,17 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 		}
 	}
 
+	if sc := r.SandboxConfig; sc != nil && sc.GetMetadata() != nil {
+		md := sc.GetMetadata()
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.SetAttributes(
+				tracing.Attribute("pod.name", md.GetName()),
+				tracing.Attribute("pod.namespace", md.GetNamespace()),
+				tracing.Attribute("pod.uid", md.GetUid()),
+			)
+		}
+	}
+
 	credentials := func(host string) (string, string, error) {
 		// Trace: credentials lookup path
 		hostauth := r.GetAuth()
