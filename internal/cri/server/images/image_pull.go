@@ -168,7 +168,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		// TODO: add domain label for imagePulls metrics, and we may need to provide a mechanism
 		// for the user to configure the set of registries that they are interested in.
 		if err != nil {
-			span.RecordError(err)
+			if span != nil {
+				span.RecordError(err)
+			}
 			imagePulls.WithValues("failure").Inc()
 		} else {
 			imagePulls.WithValues("success").Inc()
