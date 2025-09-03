@@ -57,6 +57,9 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 		tracing.WithAttribute(tracing.AttrSandboxID, sandbox.ID),
 	)
 	defer span.End()
+
+	ctx = tracing.ContextWithSandboxID(ctx, sandbox.ID)
+
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return api.Sandbox{}, err
@@ -100,6 +103,9 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 		tracing.WithAttribute(tracing.AttrSandboxID, sandbox.ID),
 	)
 	defer span.End()
+
+	ctx = tracing.ContextWithSandboxID(ctx, sandbox.ID)
+
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return api.Sandbox{}, err
@@ -261,6 +267,9 @@ func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 		tracing.WithAttribute(tracing.AttrSandboxID, id),
 	)
 	defer span.End()
+
+	ctx = tracing.ContextWithSandboxID(ctx, id)
+
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
