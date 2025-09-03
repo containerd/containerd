@@ -265,7 +265,7 @@ func (t *task) Start(ctx context.Context) error {
 }
 
 func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) error {
-	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Kill"),
+	_, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Kill"),
 		tracing.WithAttribute("task.id", t.ID()),
 		tracing.WithAttribute("task.pid", int(t.Pid())),
 	)
@@ -359,14 +359,16 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 			return
 		}
 
-		span.SetAttributes(
-			tracing.Attribute("task.exit_status", int64(r.ExitStatus)),
-			tracing.Attribute("task.exited_at", protobuf.FromTimestamp(r.ExitedAt).Format(time.RFC3339)),
-		)
-		c <- ExitStatus{
+		exitStatus := ExitStatus{
 			code:     r.ExitStatus,
 			exitedAt: protobuf.FromTimestamp(r.ExitedAt),
 		}
+		c <- exitStatus
+
+		span.SetAttributes(
+			tracing.Attribute("task.exit_status", int64(exitStatus.code)),
+			tracing.Attribute("task.exited_at", exitStatus.exitedAt.Format(time.RFC3339)),
+		)
 	}()
 	return c, nil
 }
@@ -433,15 +435,17 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
 	}
-	// Only cleanup the IO after a successful Delete
-	if t.io != nil {
-		t.io.Close()
-	}
+
 	es := &ExitStatus{code: r.ExitStatus, exitedAt: protobuf.FromTimestamp(r.ExitedAt)}
 	span.SetAttributes(
 		tracing.Attribute("task.exit_status", int64(es.code)),
 		tracing.Attribute("task.exited_at", es.exitedAt.Format(time.RFC3339)),
 	)
+
+	// Only cleanup the IO after a successful Delete
+	if t.io != nil {
+		t.io.Close()
+	}
 	return es, nil
 }
 

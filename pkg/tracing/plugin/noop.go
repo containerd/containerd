@@ -19,17 +19,28 @@ package plugin
 import (
 	"context"
 
-	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 // NoopProcessor is a dummy tracing processor to satisfy plugin dependency
 type NoopProcessor struct{}
 
-// Process implements tracing.Processor interface but does nothing
-func (n *NoopProcessor) Process(ctx context.Context, span *tracing.Span) error {
+// OnStart implements trace.SpanProcessor interface
+func (n *NoopProcessor) OnStart(parent context.Context, s trace.ReadWriteSpan) {}
+
+// OnEnd implements trace.SpanProcessor interface
+func (n *NoopProcessor) OnEnd(s trace.ReadOnlySpan) {}
+
+// ForceFlush implements trace.SpanProcessor interface
+func (n *NoopProcessor) ForceFlush(ctx context.Context) error {
+	return nil
+}
+
+// Shutdown implements trace.SpanProcessor interface
+func (n *NoopProcessor) Shutdown(ctx context.Context) error {
 	return nil
 }
 
