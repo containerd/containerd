@@ -375,7 +375,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				}
 
 				// Check for error status code
-				if resp.StatusCode >= http.StatusBadRequest && resp.StatusCode < http.StatusInternalServerError {
+				if resp.StatusCode >= http.StatusBadRequest && resp.StatusCode < http.StatusNetworkAuthenticationRequired {
 					defer resp.Body.Close()
 					return "", ocispec.Descriptor{}, unexpectedResponseErr(resp)
 				}
