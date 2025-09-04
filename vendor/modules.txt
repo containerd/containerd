@@ -70,8 +70,8 @@ github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/checkpoint-restore/checkpointctl v1.3.0
-## explicit; go 1.21
+# github.com/checkpoint-restore/checkpointctl v1.4.0
+## explicit; go 1.23.0
 github.com/checkpoint-restore/checkpointctl/lib
 # github.com/checkpoint-restore/go-criu/v7 v7.2.0
 ## explicit; go 1.20
@@ -294,8 +294,8 @@ github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 github.com/gogo/protobuf/sortkeys
-# github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
-## explicit
+# github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8
+## explicit; go 1.20
 github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.5.4
 ## explicit; go 1.17
