@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -53,7 +54,7 @@ func updateContainerIOOwner(ctx context.Context, cntr containerd.Container, conf
 	}
 
 	if spec.Linux == nil || spec.Process == nil {
-		return nil, fmt.Errorf("invalid linux platform oci runtime spec")
+		return nil, errors.New("invalid linux platform oci runtime spec")
 	}
 
 	idMap := userns.IDMap{
