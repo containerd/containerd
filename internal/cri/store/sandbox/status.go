@@ -105,6 +105,10 @@ type Status struct {
 	ExitStatus uint32
 	// State is the state of the sandbox.
 	State State
+	// Overhead has sandbox resource overhead.
+	Overhead *runtime.ContainerResources
+	// Resources has sandbox resource constraints.
+	Resources *runtime.ContainerResources
 }
 
 // UpdateFunc is function used to update the sandbox status. If there
