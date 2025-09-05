@@ -202,7 +202,7 @@ func setupRunningContainerWithImageVolume(t *testing.T, selinuxLevel string, con
 		}
 	}()
 
-	pullImagesByCRI(t, imageService, containerImage, imageVolumeName)
+	pullImagesByCRI(t, imageService, containerImage, imageVolumeName, images.Get(images.Pause))
 
 	containerName := "running"
 	cfg := ContainerConfig(containerName, containerImage,
@@ -253,7 +253,7 @@ func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
 
 	alpineImage := images.Get(images.Alpine)
-	pullImagesByCRI(t, imageService, alpineImage)
+	pullImagesByCRI(t, imageService, alpineImage, images.Get(images.Pause))
 
 	img, err := containerdClient.GetImage(ctx, alpineImage)
 	require.NoError(t, err)

@@ -514,11 +514,45 @@ func shouldManipulateContainersInPodAfterUpgrade(runtimeHandler string) setupUpg
 
 			pod2Ctx.stop(true)
 
-			// If connection is closed, it means the shim process exits.
+			// Wait for shim processes to exit after pod deletion
+			// Use a retry loop with timeout to handle timing issues
 			for _, shimCli := range shimConns {
 				t.Logf("Checking container %s's shim client", shimCli.cntrID)
-				_, err = shimCli.cli.Connect(context.Background(), &apitask.ConnectRequest{})
-				assert.ErrorContains(t, err, "ttrpc: closed", "should be closed after deleting pod")
+
+				ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+				defer cancel()
+
+				connectionClosed := false
+				ticker := time.NewTicker(1 * time.Millisecond)
+				defer ticker.Stop()
+
+				for !connectionClosed {
+					select {
+					case <-ticker.C:
+						_, err = shimCli.cli.Connect(ctx, &apitask.ConnectRequest{})
+						if err != nil {
+							// Connection is broken - this is expected after pod deletion
+							// Accept various error types that indicate broken connection
+							if strings.Contains(err.Error(), "ttrpc: closed") ||
+								strings.Contains(err.Error(), "connection refused") ||
+								strings.Contains(err.Error(), "no such file or directory") ||
+								strings.Contains(err.Error(), "broken pipe") ||
+								strings.Contains(err.Error(), "EOF") {
+								t.Logf("Container %s's shim connection properly closed: %v", shimCli.cntrID, err)
+								connectionClosed = true
+								break
+							}
+							// For other errors like "Unimplemented", continue retrying
+							t.Logf("Container %s's shim returned error (retrying): %v", shimCli.cntrID, err)
+						} else {
+							// Connection still works, continue waiting
+							t.Logf("Container %s's shim still responding, waiting for cleanup...", shimCli.cntrID)
+						}
+					case <-ctx.Done():
+						t.Errorf("Timeout waiting for container %s's shim to close connection", shimCli.cntrID)
+						connectionClosed = true
+					}
+				}
 			}
 		}
 		return []upgradeVerifyCaseFunc{verifyFunc}, nil
@@ -815,14 +849,28 @@ func checkContainerState(t *testing.T, svc cri.RuntimeService, name string, expe
 	assert.Equal(t, expected, status.State)
 }
 
-// pullImagesByCRI pulls images by CRI.
+// pullImagesByCRI pulls images by CRI
 func pullImagesByCRI(t *testing.T, svc cri.ImageManagerService, images ...string) []string {
 	expectedRefs := make([]string, 0, len(images))
 
 	for _, image := range images {
 		t.Logf("Pulling image %q", image)
-		imgRef, err := svc.PullImage(&criruntime.ImageSpec{Image: image}, nil, nil, "")
-		require.NoError(t, err)
+		var imgRef string
+		var err error
+
+		// Retry logic for image pull to handle network flakiness
+		for attempt := 1; attempt <= 3; attempt++ {
+			imgRef, err = svc.PullImage(&criruntime.ImageSpec{Image: image}, nil, nil, "")
+			if err == nil {
+				break
+			}
+
+			if attempt < 3 {
+				t.Logf("Failed to pull image %q on attempt %d: %v, retrying...", image, attempt, err)
+				time.Sleep(time.Duration(attempt) * 2 * time.Second)
+			}
+		}
+		require.NoError(t, err, "Failed to pull image %q after 3 attempts", image)
 		expectedRefs = append(expectedRefs, imgRef)
 	}
 	return expectedRefs

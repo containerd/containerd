@@ -94,8 +94,18 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
 	go s.forward(ctx, publisher)
+	// Register a shutdown callback to safely close the events channel.
+	// This prevents "close of closed channel" panics that can occur during
+	// race conditions in upgrade tests where multiple shutdown operations
+	// might happen concurrently (e.g., old containerd shutting down while
+	// new containerd starts and encounters stale shims to clean up).
 	sd.RegisterCallback(func(context.Context) error {
-		close(s.events)
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if !s.eventsClosed {
+			close(s.events)
+			s.eventsClosed = true
+		}
 		return nil
 	})
 
@@ -111,11 +121,12 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 type service struct {
 	mu sync.Mutex
 
-	context  context.Context
-	events   chan interface{}
-	platform stdio.Platform
-	ec       chan runcC.Exit
-	ep       oom.Watcher
+	context      context.Context
+	events       chan interface{}
+	eventsClosed bool // Tracks if events channel has been closed to prevent double-close panics
+	platform     stdio.Platform
+	ec           chan runcC.Exit
+	ep           oom.Watcher
 
 	containers map[string]*runc.Container
 
