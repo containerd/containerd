@@ -228,6 +228,8 @@ type Registry struct {
 	// ConfigPath is a path to the root directory containing registry-specific
 	// configurations.
 	// If ConfigPath is set, the rest of the registry specific options are ignored.
+	// If no registry-specific options are set, ConfigPath defaults to
+	// "/etc/containerd/certs.d:/etc/docker/certs.d" for compatibility with Docker.
 	ConfigPath string `toml:"config_path" json:"configPath"`
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	// This option will not be used when ConfigPath is provided.
