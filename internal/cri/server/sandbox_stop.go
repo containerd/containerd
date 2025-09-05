@@ -18,7 +18,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -114,10 +113,8 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		} else if closed {
 			sandbox.NetNSPath = ""
 		}
-		if sandbox.CNIResult != nil {
-			if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
-				return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
-			}
+		if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
+			return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
 		}
 		if err := sandbox.NetNS.Remove(); err != nil {
 			return fmt.Errorf("failed to remove network namespace for sandbox %q: %w", id, err)
@@ -153,7 +150,7 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
 	netPlugin := c.getNetworkPlugin(sandbox.RuntimeHandler)
 	if netPlugin == nil {
-		return errors.New("cni config not initialized")
+		return ErrCNIConfigNotInitialized
 	}
 
 	var (
