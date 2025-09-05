@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -68,7 +69,7 @@ func TestLocalResolve(t *testing.T) {
 	c, _ := newTestCRIService()
 	var err error
 	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for _, ref := range []string{
 		"sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
@@ -86,11 +87,11 @@ func TestLocalResolve(t *testing.T) {
 		"docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 	} {
 		img, err := c.LocalResolve(ref)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, image, img)
 	}
 	img, err := c.LocalResolve("randomid")
-	assert.Equal(t, errdefs.IsNotFound(err), true)
+	assert.True(t, errdefs.IsNotFound(err))
 	assert.Equal(t, imagestore.Image{}, img)
 }
 

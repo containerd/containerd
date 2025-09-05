@@ -63,7 +63,7 @@ func downloadReleaseBinary(t *testing.T, targetDir string, ver string) {
 // previousReleaseVersion returns the latest version of previous release.
 func previousReleaseVersion(t *testing.T, version string) string {
 	tags := gitLsRemoteCtrdTags(t, fmt.Sprintf("refs/tags/v%s.*", version))
-	require.True(t, len(tags) >= 1)
+	require.GreaterOrEqual(t, len(tags), 1)
 
 	// sort them and get the latest version
 	semver.Sort(tags)
@@ -87,7 +87,7 @@ func gitLsRemoteCtrdTags(t *testing.T, pattern string) (_tags []string) {
 	// cec2382030533cf5797d63a4cdb2b255a9c3c7b6        refs/tags/v1.6.9
 	// 1c90a442489720eec95342e1789ee8a5e1b9536f        refs/tags/v1.6.9^{}
 	refTags := strings.Fields(string(out))
-	require.True(t, len(refTags)%2 == 0)
+	require.Equal(t, 0, len(refTags)%2)
 
 	tags := make([]string, 0, len(refTags)/2)
 	for i := 1; i < len(refTags); i += 2 {

@@ -38,8 +38,8 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 			sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 			require.NoError(t, err)
 			defer func() {
-				assert.NoError(t, runtimeService.StopPodSandbox(sb))
-				assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+				require.NoError(t, runtimeService.StopPodSandbox(sb))
+				require.NoError(t, runtimeService.RemovePodSandbox(sb))
 			}()
 
 			var (
@@ -109,10 +109,10 @@ func TestContainerStopCancellation(t *testing.T) {
 		ContainerId: cn,
 		Timeout:     3,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	t.Log("The container should still be running even after 5 seconds")
-	assert.NoError(t, Consistently(func() (bool, error) {
+	require.NoError(t, Consistently(func() (bool, error) {
 		s, err := runtimeService.ContainerStatus(cn)
 		if err != nil {
 			return false, err
@@ -121,7 +121,7 @@ func TestContainerStopCancellation(t *testing.T) {
 	}, 100*time.Millisecond, 5*time.Second))
 
 	t.Log("Stop the container with 1s timeout, without shorter context timeout")
-	assert.NoError(t, runtimeService.StopContainer(cn, 1))
+	require.NoError(t, runtimeService.StopContainer(cn, 1))
 
 	t.Log("The container state should be exited")
 	s, err := runtimeService.ContainerStatus(cn)

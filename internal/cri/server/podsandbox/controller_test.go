@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
@@ -62,7 +63,7 @@ func Test_Status(t *testing.T) {
 		CreatedAt: createdAt,
 	})
 	sb.Metadata = sandboxstore.Metadata{ID: sandboxID}
-	assert.NoError(t, controller.store.Save(sb))
+	require.NoError(t, controller.store.Save(sb))
 	s, err := controller.Status(context.Background(), sandboxID, false)
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +72,7 @@ func Test_Status(t *testing.T) {
 	assert.Equal(t, s.CreatedAt, createdAt)
 	assert.Equal(t, s.State, sandboxstore.StateReady.String())
 
-	assert.NoError(t, sb.Exit(exitStatus, exitedAt))
+	require.NoError(t, sb.Exit(exitStatus, exitedAt))
 
 	exit, err := controller.Wait(context.Background(), sandboxID)
 	if err != nil {

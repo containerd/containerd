@@ -21,6 +21,7 @@ import (
 
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -89,7 +90,7 @@ func TestInitSelinuxOpts(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			processLabel, mountLabel, err := initLabelsFromOpt(test.selinuxOpt)
 			if test.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				assert.Regexp(t, test.processLabel, processLabel)
 				assert.Regexp(t, test.mountLabel, mountLabel)
@@ -169,9 +170,9 @@ func TestCheckSelinuxLevel(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			err := checkSelinuxLevel(test.level)
 			if test.expectNoMatch {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

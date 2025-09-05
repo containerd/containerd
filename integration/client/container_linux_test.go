@@ -1723,7 +1723,7 @@ func TestIssue10589(t *testing.T) {
 		defer close(exec1done)
 		t.Log("Starting exec1")
 		err := exec1.Start(ctx)
-		assert.Error(t, err, "start exec1")
+		require.Error(t, err, "start exec1")
 		t.Logf("error starting exec1: %s", err)
 	}()
 
@@ -1763,7 +1763,7 @@ func TestIssue10589(t *testing.T) {
 		defer close(exec2done)
 		t.Log("Starting exec2")
 		err := exec2.Start(ctx)
-		assert.Error(t, err, "start exec2")
+		require.Error(t, err, "start exec2")
 		t.Logf("error starting exec2: %s", err)
 	}()
 
@@ -1783,7 +1783,7 @@ func TestIssue10589(t *testing.T) {
 	// 7. Allow exec=1 to proceed
 	t.Log("7. Allow exec=1 to proceed")
 	err = exec1DelayFifo.Trigger()
-	assert.NoError(t, err, "trigger exec1 fifo")
+	require.NoError(t, err, "trigger exec1 fifo")
 	status, err = task.Status(ctx)
 	require.NoError(t, err, "container status")
 	t.Log("container status", status.Status)
@@ -1796,7 +1796,7 @@ func TestIssue10589(t *testing.T) {
 	if didExec2Run {
 		t.Log("8. Allow exec2 to proceed")
 		err = exec2DelayFifo.Trigger()
-		assert.NoError(t, err, "trigger exec2 fifo")
+		require.NoError(t, err, "trigger exec2 fifo")
 		status, err = task.Status(ctx)
 		require.NoError(t, err, "container status")
 		t.Log("container status", status.Status)

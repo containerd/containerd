@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -72,26 +73,26 @@ func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: test.id},
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Nil(t, container.Stats)
 			err = c.containerStore.Add(container)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			cpuUsage, err := c.getUsageNanoCores(test.id, false, test.firstCPUValue, timestamp)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			container, err = c.containerStore.Get(test.id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, container.Stats)
 
 			assert.Equal(t, test.expectedNanoCoreUsageFirst, cpuUsage)
 
 			cpuUsage, err = c.getUsageNanoCores(test.id, false, test.secondCPUValue, tenSecondAftertimeStamp)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.expectedNanoCoreUsageSecond, cpuUsage)
 
 			container, err = c.containerStore.Get(test.id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, container.Stats)
 		})
 	}
@@ -339,7 +340,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			got, err := c.memoryContainerStats("ID", test.metrics, timestamp)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.expected, got)
 		})
 	}
@@ -502,6 +503,6 @@ func platformBasedMetricsData(t *testing.T) *anypb.Any {
 	default:
 		t.Fail()
 	}
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return data
 }

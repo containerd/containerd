@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd/v2/internal/randutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBasic(t *testing.T) {
@@ -37,9 +38,9 @@ func TestBasic(t *testing.T) {
 	km.Lock(ctx, "c1")
 	km.Lock(ctx, "c2")
 
-	assert.Equal(t, len(km.locks), 2)
-	assert.Equal(t, km.locks["c1"].ref, 1)
-	assert.Equal(t, km.locks["c2"].ref, 1)
+	assert.Len(t, km.locks, 2)
+	assert.Equal(t, 1, km.locks["c1"].ref)
+	assert.Equal(t, 1, km.locks["c2"].ref)
 
 	checkWaitFn := func(key string, num int) {
 		retries := 100
@@ -57,7 +58,7 @@ func TestBasic(t *testing.T) {
 			}
 			time.Sleep(time.Duration(randutil.Int63n(100)) * time.Millisecond)
 		}
-		assert.Equal(t, waitLock, true)
+		assert.True(t, waitLock)
 	}
 
 	// should acquire successfully after release
@@ -73,7 +74,7 @@ func TestBasic(t *testing.T) {
 		km.Unlock("c1")
 
 		<-waitCh
-		assert.Equal(t, km.locks["c1"].ref, 1)
+		assert.Equal(t, 1, km.locks["c1"].ref)
 	}
 
 	// failed to acquire if context cancel
@@ -89,7 +90,7 @@ func TestBasic(t *testing.T) {
 
 		cancel()
 		assert.Equal(t, <-errCh, context.Canceled)
-		assert.Equal(t, km.locks["c1"].ref, 1)
+		assert.Equal(t, 1, km.locks["c1"].ref)
 	}
 }
 
@@ -141,7 +142,7 @@ func TestMultiAcquireOnSameKey(t *testing.T) {
 	key := "c1"
 	ctx := context.Background()
 
-	assert.Nil(t, km.Lock(ctx, key))
+	require.NoError(t, km.Lock(ctx, key))
 
 	nproc := runtime.GOMAXPROCS(0)
 	nloops := 10000
@@ -166,5 +167,5 @@ func TestMultiAcquireOnSameKey(t *testing.T) {
 	wg.Wait()
 
 	// c1 key has been released so the it should not have any klock.
-	assert.Equal(t, len(km.locks), 0)
+	assert.Empty(t, km.locks)
 }

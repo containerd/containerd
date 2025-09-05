@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateStreamServer(t *testing.T) {
@@ -119,10 +120,10 @@ func TestValidateStreamServer(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			tlsMode, err := getStreamListenerMode(&test.config)
 			if test.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.tlsMode, tlsMode)
 		})
 	}
