@@ -79,7 +79,7 @@ var checkpointCommand = &cli.Command{
 }
 
 // withCheckpointOpts only suitable for runc runtime now
-func withCheckpointOpts(rt string, cliContext *cli.Context) containerd.CheckpointTaskOpts {
+func withCheckpointOpts(_ string, cliContext *cli.Context) containerd.CheckpointTaskOpts {
 	return func(r *containerd.CheckpointTaskInfo) error {
 		imagePath := cliContext.String("image-path")
 		workPath := cliContext.String("work-path")

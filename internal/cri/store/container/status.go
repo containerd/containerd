@@ -167,7 +167,7 @@ type StatusStorage interface {
 // StoreStatus creates the storage containing the passed in container status with the
 // specified id.
 // The status MUST be created in one transaction.
-func StoreStatus(root, id string, status Status) (StatusStorage, error) {
+func StoreStatus(root, _ string, status Status) (StatusStorage, error) {
 	data, err := status.encode()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode status: %w", err)
@@ -184,7 +184,7 @@ func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 
 // LoadStatus loads container status from checkpoint. There shouldn't be threads
 // writing to the file during loading.
-func LoadStatus(root, id string) (Status, error) {
+func LoadStatus(root, _ string) (Status, error) {
 	path := filepath.Join(root, "status")
 	data, err := os.ReadFile(path)
 	if err != nil {

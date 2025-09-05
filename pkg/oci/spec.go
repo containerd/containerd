@@ -222,7 +222,7 @@ func populateDefaultUnixSpec(ctx context.Context, s *Spec, id string) error {
 	return nil
 }
 
-func populateDefaultWindowsSpec(ctx context.Context, s *Spec, id string) error {
+func populateDefaultWindowsSpec(_ context.Context, s *Spec, _ string) error {
 	*s = Spec{
 		Version: specs.Version,
 		Root:    &specs.Root{},

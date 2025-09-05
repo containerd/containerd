@@ -28,6 +28,6 @@ import (
 
 // portForward uses netns to enter the sandbox namespace, and forwards a stream inside the
 // namespace to a specific port. It keeps forwarding until it exits or client disconnect.
-func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
+func (c *criService) portForward(context.Context, string, int32, io.ReadWriteCloser) error {
 	return fmt.Errorf("port forward: %w", errdefs.ErrNotImplemented)
 }

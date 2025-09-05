@@ -118,7 +118,7 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types
 }
 
 // cleanupUnknownSandbox cleanup stopped sandbox in unknown state.
-func cleanupUnknownSandbox(ctx context.Context, id string, sandbox *types.PodSandbox) error {
+func cleanupUnknownSandbox(ctx context.Context, _ string, sandbox *types.PodSandbox) error {
 	// Reuse handleSandboxTaskExit to do the cleanup.
 	return handleSandboxTaskExit(ctx, sandbox, &eventtypes.TaskExit{ExitStatus: unknownExitCode, ExitedAt: protobuf.ToTimestamp(time.Now())})
 }

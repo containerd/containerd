@@ -27,7 +27,7 @@ import (
 // ImageFsInfo returns information of the filesystem that is used to store images.
 // TODO(windows): Usage for windows is always 0 right now. Support this for windows.
 // TODO(random-liu): Handle storage consumed by content store
-func (c *CRIImageService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (*runtime.ImageFsInfoResponse, error) {
+func (c *CRIImageService) ImageFsInfo(context.Context, *runtime.ImageFsInfoRequest) (*runtime.ImageFsInfoResponse, error) {
 	snapshots := c.snapshotStore.List()
 	snapshotterFSInfos := map[string]snapshot.Snapshot{}
 

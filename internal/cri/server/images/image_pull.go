@@ -120,7 +120,7 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 	return &runtime.PullImageResponse{ImageRef: ref}, nil
 }
 
-func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (_ string, err error) {
+func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, _ string) (_ string, err error) {
 	span := tracing.SpanFromContext(ctx)
 	defer func() {
 		// TODO: add domain label for imagePulls metrics, and we may need to provide a mechanism
@@ -412,7 +412,7 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 }
 
 // getLabels get image labels to be added on CRI image
-func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
+func (c *CRIImageService) getLabels(_ context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
 	for _, pinned := range c.config.PinnedImages {
 		if pinned == name {
@@ -865,7 +865,7 @@ func newCRICredentials(ref string, credentials func(string) (string, string, err
 }
 
 // GetCredentials gets credential from criCredentials makes criCredentials a registry.CredentialHelper
-func (cc *criCredentials) GetCredentials(ctx context.Context, ref string, host string) (registry.Credentials, error) {
+func (cc *criCredentials) GetCredentials(_ context.Context, ref string, host string) (registry.Credentials, error) {
 	if cc.credentials == nil {
 		return registry.Credentials{}, fmt.Errorf("credential handler not initialized for ref %q", ref)
 	}

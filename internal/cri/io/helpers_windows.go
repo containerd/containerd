@@ -34,7 +34,7 @@ type pipe struct {
 	conWg  sync.WaitGroup
 }
 
-func openPipe(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+func openPipe(ctx context.Context, fn string, _ int, _ os.FileMode) (io.ReadWriteCloser, error) {
 	l, err := winio.ListenPipe(fn, nil)
 	if err != nil {
 		return nil, err
