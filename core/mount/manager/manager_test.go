@@ -47,6 +47,7 @@ func TestManager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer db.Close()
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
 	sourcedir := filepath.Join(td, "source")
@@ -240,6 +241,7 @@ func TestGC(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer db.Close()
 			ctx := namespaces.WithNamespace(context.Background(), "test")
 
 			sourcedir := filepath.Join(td, "source")
