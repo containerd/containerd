@@ -936,7 +936,7 @@ func cleanupAll(ctx context.Context, roots []string, handlers map[string]mount.H
 	var errs []error
 	for _, root := range roots {
 		if err := unmountAll(ctx, root, handlers); err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("unmount all failed during cleanup up %s: %w", root, err))
 		} else {
 			log.G(ctx).WithField("root", root).Debugf("unmounted")
 		}
@@ -949,14 +949,14 @@ func unmountAll(ctx context.Context, root string, handlers map[string]mount.Hand
 	if err != nil {
 		return err
 	}
-	defer fd.Close()
 
 	dirs, err := fd.Readdirnames(0)
+	fd.Close()
 	if err != nil {
 		return err
 	}
 
-	var mountErrs error
+	var mountErrs []error
 	for i := len(dirs) - 1; i >= 0; {
 		var (
 			d  = dirs[i]
@@ -984,7 +984,7 @@ func unmountAll(ctx context.Context, root string, handlers map[string]mount.Hand
 			} else if !os.IsNotExist(serr) {
 				return serr
 			} else {
-				log.G(ctx).WithField("mount", d).Infof("missing type file, attemping unmount with no handler")
+				log.G(ctx).WithField("mount", d).Infof("missing type file, attempting unmount with no handler")
 			}
 		}
 
@@ -995,11 +995,12 @@ func unmountAll(ctx context.Context, root string, handlers map[string]mount.Hand
 		}
 		if err != nil {
 			// TODO: Ignore already unmounted
-			mountErrs = errors.Join(mountErrs, fmt.Errorf("failure unmounting %s: %w", d, err))
+			mountErrs = append(mountErrs, fmt.Errorf("failure unmounting %s: %w", d, err))
 		}
 	}
-	if mountErrs != nil {
-		return mountErrs
+	if len(mountErrs) > 0 {
+		return errors.Join(mountErrs...)
 	}
+
 	return os.RemoveAll(root)
 }
