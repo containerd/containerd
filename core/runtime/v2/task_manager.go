@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -43,10 +44,19 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 )
 
+const (
+	formattedMounts = "containerd.io/runtime-formatted-mounts"
+)
+
 // TaskConfig for the runtime task manager
 type TaskConfig struct {
 	// Supported platforms
 	Platforms []string `toml:"platforms"`
+
+	// Runtimes are the runtimes to fetch runtime info for.
+	// The runtime info can be used to configure the runtime
+	// behavior.
+	Runtimes []string `toml:"runtimes"`
 }
 
 func init() {
@@ -87,9 +97,33 @@ func init() {
 					return nil, err
 				}
 			}
-			return newTaskManager(ic.Context, root, state, shimManager, mounts)
+
+			infos := make(map[string]*runtimeInfo)
+			for _, runtime := range config.Runtimes {
+				info, err := loadRuntimeInfo(ic.Context, shimManager, runtime)
+				if err != nil {
+					log.G(ic.Context).WithError(err).WithField("runtime", runtime).Error("failed to get runtime info")
+					continue
+				}
+				infos[runtime] = info
+			}
+
+			if err := shimManager.LoadExistingShims(ic.Context, state, root); err != nil {
+				return nil, fmt.Errorf("failed to load existing shims for task manager")
+			}
+			return &TaskManager{
+				root:    root,
+				state:   state,
+				manager: shimManager,
+				mounts:  mounts,
+				infos:   infos,
+			}, nil
 		},
 	})
+}
+
+type runtimeInfo struct {
+	formattedMounts bool
 }
 
 // TaskManager wraps task service client on top of shim manager.
@@ -98,6 +132,7 @@ type TaskManager struct {
 	state   string
 	manager *ShimManager
 	mounts  mount.Manager
+	infos   map[string]*runtimeInfo
 }
 
 // NewTaskManager creates a new task manager instance.
@@ -105,10 +140,6 @@ type TaskManager struct {
 // state is the stateDir of TaskManager plugin to store transient data
 // shims is  ShimManager for TaskManager to create/delete shims
 func NewTaskManager(ctx context.Context, root, state string, shims *ShimManager) (*TaskManager, error) {
-	return newTaskManager(ctx, root, state, shims, nil)
-}
-
-func newTaskManager(ctx context.Context, root, state string, shims *ShimManager, mounts mount.Manager) (*TaskManager, error) {
 	if err := shims.LoadExistingShims(ctx, state, root); err != nil {
 		return nil, fmt.Errorf("failed to load existing shims for task manager")
 	}
@@ -116,7 +147,6 @@ func newTaskManager(ctx context.Context, root, state string, shims *ShimManager,
 		root:    root,
 		state:   state,
 		manager: shims,
-		mounts:  mounts,
 	}
 	return m, nil
 }
@@ -147,8 +177,11 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		mount.WithLabels(map[string]string{
 			"containerd.io/gc.bref.container": taskID,
 		}),
-		// TODO: Pass through runtime name
 	}
+	if info, ok := m.infos[opts.Runtime]; ok && info.formattedMounts {
+		activateOpts = append(activateOpts, mount.WithAllowFormattedMounts)
+	}
+
 	// Add options based on runtime
 	ai, err := m.mounts.Activate(ctx, taskID, opts.Rootfs, activateOpts...)
 	if err == nil {
@@ -290,13 +323,31 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 	return exit, nil
 }
 
-func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (interface{}, error) {
-	req, ok := request.(*apitypes.RuntimeRequest)
-	if !ok {
-		return nil, fmt.Errorf("unknown request type %T: %w", request, errdefs.ErrNotImplemented)
+func loadRuntimeInfo(ctx context.Context, shims *ShimManager, runtime string) (*runtimeInfo, error) {
+	info, err := getRuntimeInfo(ctx, shims, &apitypes.RuntimeRequest{RuntimePath: runtime})
+	if err != nil {
+		return nil, err
+	}
+	rinfo := &runtimeInfo{}
+
+	if info.Annotations != nil {
+		if v, ok := info.Annotations[formattedMounts]; ok {
+			rinfo.formattedMounts, _ = strconv.ParseBool(v)
+		}
+
 	}
 
-	runtimePath, err := m.manager.resolveRuntimePath(req.RuntimePath)
+	fields := log.Fields{}
+	for k, v := range info.Annotations {
+		fields[k] = v
+	}
+	log.G(ctx).WithFields(fields).WithField("runtime", runtime).Debug("loaded runtime info")
+
+	return rinfo, nil
+}
+
+func getRuntimeInfo(ctx context.Context, shims *ShimManager, req *apitypes.RuntimeRequest) (*apitypes.RuntimeInfo, error) {
+	runtimePath, err := shims.resolveRuntimePath(req.RuntimePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
 	}
@@ -320,6 +371,15 @@ func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (inte
 		return nil, fmt.Errorf("failed to unmarshal stdout from %v into %T: %w", cmd.Args, &info, err)
 	}
 	return &info, nil
+}
+
+func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (interface{}, error) {
+	req, ok := request.(*apitypes.RuntimeRequest)
+	if !ok {
+		return nil, fmt.Errorf("unknown request type %T: %w", request, errdefs.ErrNotImplemented)
+	}
+
+	return getRuntimeInfo(ctx, m.manager, req)
 }
 
 func (m *TaskManager) validateRuntimeFeatures(ctx context.Context, opts runtime.CreateOpts) error {
