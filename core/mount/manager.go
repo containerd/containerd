@@ -58,6 +58,11 @@ type ActivateOptions struct {
 	// and all mounts should be performed
 	Temporary bool
 
+	// AllowFormattedMounts specifies that formatted mounts are
+	// allowed by the caller and should not be handled by the mount
+	// manager.
+	AllowFormattedMounts bool
+
 	// Final target with option to perform all mounts, normally the runtime will perform the root filesystem mount
 	// Custom temp directory for temporary mounts (for example devices mounted and used as overlay lowers)
 }
@@ -72,6 +77,10 @@ func WithLabels(labels map[string]string) ActivateOpt {
 	return func(o *ActivateOptions) {
 		o.Labels = labels
 	}
+}
+
+func WithAllowFormattedMounts(o *ActivateOptions) {
+	o.AllowFormattedMounts = true
 }
 
 // ActiveMount represents a mount which has been mounted by a
