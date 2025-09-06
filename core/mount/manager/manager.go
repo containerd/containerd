@@ -91,21 +91,24 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 				return mount.ActivationInfo{}, fmt.Errorf("first mount cannot be formatted, no mount prior mount state: %w", errdefs.ErrInvalidArgument)
 			}
 
-			// At least everything before this must be mounted
-			// by the mount manager
-			firstSystemMount = i
+			if !config.AllowFormattedMounts {
+				// At least everything before this must be mounted
+				// by the mount manager
+				firstSystemMount = i
+			}
 			if handlers == nil {
 				handlers = make([]mount.Handler, len(mounts))
 			}
-
-			// Strip "format/" from beginning before looking for handler
-			mounts[i].Type = mounts[i].Type[7:]
 
 			if mountConv == nil {
 				mountConv = make([]mountConverter, len(mounts))
 			}
 
-			mv, err := formatMount(mounts[i])
+			m := mounts[i]
+
+			// Strip "format/" from beginning before looking for handler
+			m.Type = m.Type[7:]
+			mv, err := formatMount(m)
 			if err != nil {
 				return mount.ActivationInfo{}, err
 			}
