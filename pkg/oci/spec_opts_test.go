@@ -302,8 +302,7 @@ func TestWithSpecFromFile(t *testing.T) {
 	p, err := json.Marshal(expected)
 	assert.NoError(t, err)
 
-	tmpDir := t.TempDir()
-	specFile := filepath.Join(tmpDir, "testwithdefaultspec.json")
+	specFile := filepath.Join(t.TempDir(), "testwithdefaultspec.json")
 	err = os.WriteFile(specFile, p, 0o600)
 	assert.NoError(t, err)
 

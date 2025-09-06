@@ -8,6 +8,9 @@ linters:
     - revive
     - misspell
     - nolintlint
+    - revive
+    - staticcheck
+    - usetesting
     - unconvert
   disable:
     - errcheck

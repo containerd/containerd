@@ -18,10 +18,12 @@ package mount
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/containerd/continuity/testutil"
+	"github.com/stretchr/testify/require"
 )
 
 var randomData = []byte("randomdata")
@@ -29,15 +31,14 @@ var randomData = []byte("randomdata")
 func createTempFile(t *testing.T) string {
 	t.Helper()
 
-	f, err := os.CreateTemp("", "losetup")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
+	f, err := os.Create(filepath.Join(t.TempDir(), "losetup"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		f.Close()
+	})
 
-	if err = f.Truncate(512); err != nil {
-		t.Fatal(err)
-	}
+	err = f.Truncate(512)
+	require.NoError(t, err)
 
 	return f.Name()
 }
@@ -56,17 +57,12 @@ func TestRoLoop(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	backingFile := createTempFile(t)
-	defer func() {
-		if err := os.Remove(backingFile); err != nil {
-			t.Fatal(err)
-		}
-	}()
 
 	file, err := setupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		file.Close()
+	})
 
 	if _, err := file.Write(randomData); err == nil {
 		t.Fatalf("writing to readonly loop device should fail")
@@ -77,17 +73,12 @@ func TestRwLoop(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	backingFile := createTempFile(t)
-	defer func() {
-		if err := os.Remove(backingFile); err != nil {
-			t.Fatal(err)
-		}
-	}()
 
 	file, err := setupLoop(backingFile, LoopParams{Autoclear: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		file.Close()
+	})
 
 	if _, err := file.Write(randomData); err != nil {
 		t.Fatal(err)
@@ -98,20 +89,12 @@ func TestAttachDetachLoopDevice(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	path := createTempFile(t)
-	defer func() {
-		if err := os.Remove(path); err != nil {
-			t.Fatal(err)
-		}
-	}()
 
 	dev, err := AttachLoopDevice(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if err = DetachLoopDevice(dev); err != nil {
-		t.Fatal(err)
-	}
+	err = DetachLoopDevice(dev)
+	require.NoError(t, err)
 }
 
 func TestAutoclearTrueLoop(t *testing.T) {
@@ -119,16 +102,9 @@ func TestAutoclearTrueLoop(t *testing.T) {
 
 	dev := func() string {
 		backingFile := createTempFile(t)
-		defer func() {
-			if err := os.Remove(backingFile); err != nil {
-				t.Fatal(err)
-			}
-		}()
 
 		file, err := setupLoop(backingFile, LoopParams{Autoclear: true})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		dev := file.Name()
 		file.Close()
 		return dev
@@ -144,22 +120,14 @@ func TestAutoclearFalseLoop(t *testing.T) {
 
 	dev := func() string {
 		backingFile := createTempFile(t)
-		defer func() {
-			if err := os.Remove(backingFile); err != nil {
-				t.Fatal(err)
-			}
-		}()
 
 		file, err := setupLoop(backingFile, LoopParams{Autoclear: false})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		dev := file.Name()
 		file.Close()
 		return dev
 	}()
 	time.Sleep(100 * time.Millisecond)
-	if err := removeLoop(dev); err != nil {
-		t.Fatal(err)
-	}
+	err := removeLoop(dev)
+	require.NoError(t, err)
 }

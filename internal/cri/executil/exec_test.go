@@ -36,7 +36,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os"
 	osexec "os/exec"
 	goruntime "runtime"
 	"testing"
@@ -248,9 +247,6 @@ func TestExecutorGo119LookPath(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipped on Windows.")
 	}
-
-	orig := os.Getenv("PATH")
-	defer func() { os.Setenv("PATH", orig) }()
 
 	t.Setenv("PATH", "./testdata")
 
