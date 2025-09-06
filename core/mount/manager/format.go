@@ -31,6 +31,7 @@ const formatCheck = "{{"
 
 func formatMount(m mount.Mount) (mountConverter, error) {
 	var converters []mountConverter
+	t := m.Type
 
 	if sc := formatString(m.Source); sc != nil {
 		converters = append(converters, func(m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
@@ -39,6 +40,7 @@ func formatMount(m mount.Mount) (mountConverter, error) {
 				return m, err
 			}
 			m.Source = f
+			m.Type = t
 			return m, nil
 		})
 	}
@@ -50,6 +52,7 @@ func formatMount(m mount.Mount) (mountConverter, error) {
 				return m, err
 			}
 			m.Target = f
+			m.Type = t
 			return m, nil
 		})
 	}
@@ -66,6 +69,7 @@ func formatMount(m mount.Mount) (mountConverter, error) {
 				m.Options = make([]string, len(o))
 				copy(m.Options, o)
 				m.Options[i] = f
+				m.Type = t
 				return m, nil
 			})
 		}
@@ -73,7 +77,10 @@ func formatMount(m mount.Mount) (mountConverter, error) {
 
 	switch len(converters) {
 	case 0:
-		return nil, nil
+		return func(m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
+			m.Type = t
+			return m, nil
+		}, nil
 	case 1:
 		return converters[0], nil
 	default:
