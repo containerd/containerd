@@ -286,6 +286,13 @@ func (p *Init) setExited(status int) {
 	p.exited = time.Now()
 	p.status = status
 	p.Platform.ShutdownConsole(context.Background(), p.console)
+	waitTimeout(context.Background(), &p.wg, 2*time.Second)
+	if p.io != nil {
+		for _, c := range p.closers {
+			c.Close()
+		}
+		p.io.Close()
+	}
 	close(p.waitBlock)
 }
 
@@ -298,7 +305,6 @@ func (p *Init) Delete(ctx context.Context) error {
 }
 
 func (p *Init) delete(ctx context.Context) error {
-	waitTimeout(ctx, &p.wg, 2*time.Second)
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes
@@ -311,12 +317,6 @@ func (p *Init) delete(ctx context.Context) error {
 		} else {
 			err = p.runtimeError(err, "failed to delete task")
 		}
-	}
-	if p.io != nil {
-		for _, c := range p.closers {
-			c.Close()
-		}
-		p.io.Close()
 	}
 	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
 		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
