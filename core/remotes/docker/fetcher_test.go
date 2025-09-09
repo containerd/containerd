@@ -247,6 +247,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	sendContentLength = true
 
 	ignoreContentRange = true
+	checkReader(0)
 	checkReader(25)
 	ignoreContentRange = false
 
