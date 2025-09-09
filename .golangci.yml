@@ -5,10 +5,11 @@ linters:
     - depguard # Checks for dependencies that should not be (re)introduced. See "settings" for further details.
     - dupword # Checks for duplicate words in the source code
     - gosec
-    - revive
     - misspell
     - nolintlint
+    - revive
     - unconvert
+    - usetesting
   disable:
     - errcheck
   settings:
