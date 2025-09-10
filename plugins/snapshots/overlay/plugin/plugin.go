@@ -48,6 +48,9 @@ type Config struct {
 
 	// MountOptions are options used for the overlay mount (not used on bind mounts)
 	MountOptions []string `toml:"mount_options"`
+
+	// EnableQuota is define the quota on the snapshot writable layer
+	EnableQuota bool `toml:"enable_quota"`
 }
 
 func init() {
@@ -90,6 +93,9 @@ func init() {
 				// If slowChown is false, we use capaOnlyRemapIDs to signal we only
 				// allow idmap mounts.
 				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaOnlyRemapIDs)
+			}
+			if config.EnableQuota {
+				oOpts = append(oOpts, overlay.WithEnableQuota)
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
