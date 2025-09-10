@@ -76,7 +76,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	span.SetAttributes(
-		tracing.Attribute("image.ref", ref),
+		tracing.Attribute(tracing.AttrImageRef, ref),
 		tracing.Attribute("unpack", pullCtx.Unpack),
 		tracing.Attribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
 		tracing.Attribute("concurrent.layer.fetch.buffer", pullCtx.ConcurrentLayerFetchBuffer),
@@ -96,7 +96,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if err != nil {
 			return nil, fmt.Errorf("unable to resolve snapshotter: %w", err)
 		}
-		span.SetAttributes(tracing.Attribute("snapshotter.name", snapshotterName))
+		span.SetAttributes(tracing.Attribute(tracing.AttrSnapshotter, snapshotterName))
 		var uconfig UnpackConfig
 		for _, opt := range pullCtx.UnpackOpts {
 			if err := opt(ctx, &uconfig); err != nil {
@@ -121,17 +121,25 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if uconfig.DuplicationSuppressor != nil {
 			uopts = append(uopts, unpack.WithDuplicationSuppressor(uconfig.DuplicationSuppressor))
 		}
+		_, initSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "UnpackerInit"))
 		unpacker, err = unpack.NewUnpacker(ctx, c.ContentStore(), uopts...)
 		if err != nil {
+			initSpan.SetStatus(err)
+			initSpan.End()
 			return nil, fmt.Errorf("unable to initialize unpacker: %w", err)
 		}
+
 		defer func() {
+			if unpacker == nil {
+				return
+			}
 			if _, err := unpacker.Wait(); err != nil {
 				if retErr == nil {
 					retErr = fmt.Errorf("unpack: %w", err)
 				}
 			}
 		}()
+		initSpan.End()
 		wrapper := pullCtx.HandlerWrapper
 		pullCtx.HandlerWrapper = func(h images.Handler) images.Handler {
 			if wrapper == nil {
@@ -152,11 +160,18 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	var ur unpack.Result
 	if unpacker != nil {
 		_, unpackSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "UnpackWait"))
-		if ur, err = unpacker.Wait(); err != nil {
+		u := unpacker
+		unpacker = nil
+
+		ur, err = u.Wait()
+		if err != nil {
 			unpackSpan.SetStatus(err)
 			unpackSpan.End()
 			return nil, err
 		}
+		unpackSpan.SetAttributes(
+			tracing.Attribute("unpack.count", ur.Unpacks),
+		)
 		unpackSpan.End()
 	}
 
@@ -166,7 +181,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	i := NewImageWithPlatform(c, img, pullCtx.PlatformMatcher)
-	span.SetAttributes(tracing.Attribute("image.ref", i.Name()))
+	span.SetAttributes(tracing.Attribute(tracing.AttrImageRef, i.Name()))
 
 	if unpacker != nil && ur.Unpacks == 0 {
 		// Unpack was tried previously but nothing was unpacked
@@ -187,6 +202,12 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	if err != nil {
 		return images.Image{}, fmt.Errorf("failed to resolve reference %q: %w", ref, err)
 	}
+	span.SetAttributes(
+		tracing.Attribute(tracing.AttrImageRef, ref),
+		tracing.Attribute("image.name", name),
+		tracing.Attribute("target.mediaType", desc.MediaType),
+		tracing.Attribute(tracing.AttrImageDigest, desc.Digest.String()),
+	)
 
 	fetcher, err := rCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
@@ -255,14 +276,19 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		handler = rCtx.HandlerWrapper(handler)
 	}
 
+	_, dspan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "dispatch"))
+	defer dspan.End()
 	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
 		return images.Image{}, err
 	}
 
 	if isConvertible {
+		_, cspan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "convert_manifest"))
+		defer cspan.End()
 		if desc, err = converterFunc(ctx, desc); err != nil {
 			return images.Image{}, err
 		}
+
 	}
 
 	return images.Image{
