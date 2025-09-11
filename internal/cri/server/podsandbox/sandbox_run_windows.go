@@ -91,21 +91,21 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 }
 
 // No sandbox container spec options for windows yet.
-func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+func (c *Controller) sandboxContainerSpecOpts(*runtime.PodSandboxConfig, *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
 	return nil, nil
 }
 
 // No sandbox files needed for windows.
-func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+func (c *Controller) setupSandboxFiles(string, *runtime.PodSandboxConfig) error {
 	return nil
 }
 
 // No sandbox files needed for windows.
-func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+func (c *Controller) cleanupSandboxFiles(string, *runtime.PodSandboxConfig) error {
 	return nil
 }
 
 // No sandbox snapshotter options needed for windows.
-func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+func sandboxSnapshotterOpts(*runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
 	return []snapshots.Opt{}, nil
 }

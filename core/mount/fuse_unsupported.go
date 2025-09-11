@@ -20,11 +20,11 @@ package mount
 
 import "fmt"
 
-func isFUSE(dir string) bool {
+func isFUSE(string) bool {
 	return false
 }
 
 // unmountFUSE is not implemented on this platform
-func unmountFUSE(target string) error {
+func unmountFUSE(string) error {
 	return fmt.Errorf("FUSE is not supported on this platform")
 }

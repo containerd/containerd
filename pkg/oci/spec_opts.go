@@ -1544,7 +1544,7 @@ var ErrNoShmMount = errors.New("no /dev/shm mount specified")
 //
 // The size value is specified in kb, kilobytes.
 func WithDevShmSize(kb int64) SpecOpts {
-	return func(ctx context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		for i, m := range s.Mounts {
 			if filepath.Clean(m.Destination) == "/dev/shm" && m.Source == "shm" && m.Type == "tmpfs" {
 				for i := 0; i < len(m.Options); i++ {
@@ -1577,7 +1577,7 @@ func WithWindowsDevice(idType, id string) SpecOpts {
 
 // WithMemorySwap sets the container's swap in bytes. It is a no-op on non-Linux specs.
 func WithMemorySwap(swap int64) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -1592,7 +1592,7 @@ func WithMemorySwap(swap int64) SpecOpts {
 
 // WithPidsLimit sets the container's pid limit or maximum. It is a no-op on non-Linux specs.
 func WithPidsLimit(limit int64) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -1607,7 +1607,7 @@ func WithPidsLimit(limit int64) SpecOpts {
 
 // WithBlockIO sets the container's blkio parameters. It is a no-op on non-Linux specs.
 func WithBlockIO(blockio *specs.LinuxBlockIO) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -1619,7 +1619,7 @@ func WithBlockIO(blockio *specs.LinuxBlockIO) SpecOpts {
 
 // WithCPUShares sets the container's cpu shares. It is a no-op on non-Linux specs.
 func WithCPUShares(shares uint64) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -1631,7 +1631,7 @@ func WithCPUShares(shares uint64) SpecOpts {
 
 // WithCPUs sets the container's cpus/cores for use by the container. It is a no-op on non-Linux specs.
 func WithCPUs(cpus string) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -1643,7 +1643,7 @@ func WithCPUs(cpus string) SpecOpts {
 
 // WithCPUsMems sets the container's cpu mems for use by the container. It is a no-op on non-Linux specs.
 func WithCPUsMems(mems string) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -1656,7 +1656,7 @@ func WithCPUsMems(mems string) SpecOpts {
 // WithCPUCFS sets the container's Completely fair scheduling (CFS) quota and period.
 // It is a no-op on non-Linux specs.
 func WithCPUCFS(quota int64, period uint64) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -1669,7 +1669,7 @@ func WithCPUCFS(quota int64, period uint64) SpecOpts {
 
 // WithCPUBurst sets the container's cpu burst. It is a no-op on non-Linux specs.
 func WithCPUBurst(burst uint64) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -1682,7 +1682,7 @@ func WithCPUBurst(burst uint64) SpecOpts {
 // WithCPURT sets the container's realtime scheduling (RT) runtime and period.
 // It is a no-op on non-Linux specs.
 func WithCPURT(runtime int64, period uint64) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux == nil {
 			return nil
 		}
@@ -1700,7 +1700,7 @@ func WithoutRunMount(ctx context.Context, client Client, c *containers.Container
 
 // WithRdt sets the container's RDT parameters
 func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		s.Linux.IntelRdt = &specs.LinuxIntelRdt{
 			ClosID:        closID,
 			L3CacheSchema: l3CacheSchema,

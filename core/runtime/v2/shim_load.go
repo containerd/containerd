@@ -183,7 +183,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		// We are unable to get Pids from the shim and it's not a sandbox
 		// shim. We should clean it up her.
 		// No need to do anything for removeTask since we never added this shim.
-		shim.delete(ctx, false, func(ctx context.Context, id string) {})
+		shim.delete(ctx, false, func(context.Context, string) {})
 	} else {
 		m.shims.Add(ctx, shim.ShimInstance)
 	}

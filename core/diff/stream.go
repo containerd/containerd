@@ -62,7 +62,7 @@ type Handler func(ctx context.Context, mediaType string) (StreamProcessorInit, b
 
 // StaticHandler returns the processor init func for a static media-type
 func StaticHandler(expectedMediaType string, fn StreamProcessorInit) Handler {
-	return func(ctx context.Context, mediaType string) (StreamProcessorInit, bool) {
+	return func(_ context.Context, mediaType string) (StreamProcessorInit, bool) {
 		if mediaType == expectedMediaType {
 			return fn, true
 		}
@@ -93,7 +93,7 @@ func compressedHandler(ctx context.Context, mediaType string) (StreamProcessorIn
 		return nil, false
 	}
 	if compressed != "" {
-		return func(ctx context.Context, stream StreamProcessor, payloads map[string]typeurl.Any) (StreamProcessor, error) {
+		return func(_ context.Context, stream StreamProcessor, _ map[string]typeurl.Any) (StreamProcessor, error) {
 			ds, err := compression.DecompressStream(stream)
 			if err != nil {
 				return nil, err
@@ -104,7 +104,7 @@ func compressedHandler(ctx context.Context, mediaType string) (StreamProcessorIn
 			}, nil
 		}, true
 	}
-	return func(ctx context.Context, stream StreamProcessor, payloads map[string]typeurl.Any) (StreamProcessor, error) {
+	return func(_ context.Context, stream StreamProcessor, _ map[string]typeurl.Any) (StreamProcessor, error) {
 		return &stdProcessor{
 			rc: stream,
 		}, nil

@@ -43,7 +43,7 @@ var ErrMediaTypeNotFound = errors.New("media type not found")
 type CheckpointOpts func(context.Context, *Client, *containers.Container, *imagespec.Index, *options.CheckpointOptions) error
 
 // WithCheckpointImage includes the container image in the checkpoint
-func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, _ *options.CheckpointOptions) error {
 	ir, err := client.ImageService().Get(ctx, c.Image)
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 }
 
 // WithCheckpointRuntime includes the container runtime info
-func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, _ *options.CheckpointOptions) error {
 	if c.Runtime.Options != nil && c.Runtime.Options.GetValue() != nil {
 		opt := typeurl.MarshalProto(c.Runtime.Options)
 		data, err := proto.Marshal(opt)
@@ -116,7 +116,7 @@ func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Co
 }
 
 // WithCheckpointRW includes the rw in the checkpoint
-func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, _ *options.CheckpointOptions) error {
 	diffOpts := []diff.Opt{
 		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", c.SnapshotKey)),
 	}
@@ -139,7 +139,7 @@ func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Contain
 }
 
 // WithCheckpointTaskExit causes the task to exit after checkpoint
-func WithCheckpointTaskExit(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+func WithCheckpointTaskExit(_ context.Context, _ *Client, _ *containers.Container, _ *imagespec.Index, copts *options.CheckpointOptions) error {
 	copts.Exit = true
 	return nil
 }

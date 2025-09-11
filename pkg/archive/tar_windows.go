@@ -77,19 +77,19 @@ func skipFile(hdr *tar.Header) bool {
 
 // handleTarTypeBlockCharFifo is an OS-specific helper function used by
 // createTarFile to handle the following types of header: Block; Char; Fifo
-func handleTarTypeBlockCharFifo(hdr *tar.Header, path string) error {
+func handleTarTypeBlockCharFifo(*tar.Header, string) error {
 	return nil
 }
 
-func lchmod(path string, mode os.FileMode) error {
+func lchmod(string, os.FileMode) error {
 	return nil
 }
 
-func getxattr(path, attr string) ([]byte, error) {
+func getxattr(string, string) ([]byte, error) {
 	return nil, nil
 }
 
-func setxattr(path, key, value string) error {
+func setxattr(string, string, string) error {
 	// Return not support error, do not wrap underlying not supported
 	// since xattrs should not exist in windows diff archives
 	return errors.New("xattrs not supported on Windows")
@@ -102,6 +102,6 @@ func copyDirInfo(fi os.FileInfo, path string) error {
 	return nil
 }
 
-func copyUpXAttrs(dst, src string) error {
+func copyUpXAttrs(string, string) error {
 	return nil
 }

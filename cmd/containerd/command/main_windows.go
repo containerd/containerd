@@ -93,7 +93,7 @@ func setupDumpStacks() {
 	}()
 }
 
-func etwCallback(sourceID guid.GUID, state etw.ProviderState, level etw.Level, matchAnyKeyword uint64, matchAllKeyword uint64, filterData uintptr) {
+func etwCallback(_ guid.GUID, state etw.ProviderState, _ etw.Level, _ uint64, _ uint64, _ uintptr) {
 	if state == etw.ProviderStateCaptureState {
 		dumpStacks(false)
 	}

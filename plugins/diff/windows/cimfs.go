@@ -141,7 +141,7 @@ func (c cimDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mo
 
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
-func (c cimDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+func (c cimDiff) Compare(context.Context, []mount.Mount, []mount.Mount, ...diff.Opt) (d ocispec.Descriptor, err error) {
 	// support for generating layer diff of cimfs layers will be added later.
 	return emptyDesc, errdefs.ErrNotImplemented
 }
@@ -246,7 +246,7 @@ func (c blockCIMDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts
 
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
-func (c blockCIMDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+func (c blockCIMDiff) Compare(context.Context, []mount.Mount, []mount.Mount, ...diff.Opt) (d ocispec.Descriptor, err error) {
 	// support for generating layer diff of cimfs layers will be added later.
 	return emptyDesc, errdefs.ErrNotImplemented
 }

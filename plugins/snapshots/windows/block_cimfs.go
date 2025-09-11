@@ -163,7 +163,7 @@ func (s *blockCIMSnapshotter) snapshotInfoFromID(ctx context.Context, snIDs []st
 }
 
 // returns a BlockCIM representing the snapshot
-func (s *blockCIMSnapshotter) getSnapshotBlockCIM(ctx context.Context, snID string, snInfo snapshots.Info) (*cimfs.BlockCIM, error) {
+func (s *blockCIMSnapshotter) getSnapshotBlockCIM(_ context.Context, snID string, snInfo snapshots.Info) (*cimfs.BlockCIM, error) {
 	if snInfo.Kind != snapshots.KindCommitted {
 		return nil, fmt.Errorf("requested BlockCIM of uncommitted snapshot `%s` ", snInfo.Name)
 	}

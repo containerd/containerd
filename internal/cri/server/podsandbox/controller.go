@@ -145,7 +145,7 @@ type Controller struct {
 
 var _ sandbox.Controller = (*Controller)(nil)
 
-func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (imagespec.Platform, error) {
+func (c *Controller) Platform(context.Context, string) (imagespec.Platform, error) {
 	return platforms.DefaultSpec(), nil
 }
 
@@ -167,10 +167,10 @@ func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitSt
 }
 
 func (c *Controller) Update(
-	ctx context.Context,
-	sandboxID string,
-	sandbox sandbox.Sandbox,
-	fields ...string) error {
+	context.Context,
+	string,
+	sandbox.Sandbox,
+	...string) error {
 	return nil
 }
 
