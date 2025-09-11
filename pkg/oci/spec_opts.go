@@ -79,39 +79,43 @@ func setLinux(s *Spec) {
 }
 
 func setResources(s *Spec) {
-	if s.Linux != nil {
-		if s.Linux.Resources == nil {
-			s.Linux.Resources = &specs.LinuxResources{}
-		}
+	if s.Linux == nil {
+		return
+	}
+	if s.Linux.Resources == nil {
+		s.Linux.Resources = &specs.LinuxResources{}
 	}
 }
 
 //nolint:nolintlint,unused // not used on all platforms
 func setResourcesWindows(s *Spec) {
-	if s.Windows != nil {
-		if s.Windows.Resources == nil {
-			s.Windows.Resources = &specs.WindowsResources{}
-		}
+	if s.Windows == nil {
+		return
+	}
+	if s.Windows.Resources == nil {
+		s.Windows.Resources = &specs.WindowsResources{}
 	}
 }
 
 //nolint:nolintlint,unused // not used on all platforms
 func setCPU(s *Spec) {
 	setResources(s)
-	if s.Linux != nil {
-		if s.Linux.Resources.CPU == nil {
-			s.Linux.Resources.CPU = &specs.LinuxCPU{}
-		}
+	if s.Linux == nil {
+		return
+	}
+	if s.Linux.Resources.CPU == nil {
+		s.Linux.Resources.CPU = &specs.LinuxCPU{}
 	}
 }
 
 //nolint:nolintlint,unused // not used on all platforms
 func setCPUWindows(s *Spec) {
 	setResourcesWindows(s)
-	if s.Windows != nil {
-		if s.Windows.Resources.CPU == nil {
-			s.Windows.Resources.CPU = &specs.WindowsCPUResources{}
-		}
+	if s.Windows == nil {
+		return
+	}
+	if s.Windows.Resources.CPU == nil {
+		s.Windows.Resources.CPU = &specs.WindowsCPUResources{}
 	}
 }
 
@@ -218,10 +222,11 @@ func replaceOrAppendEnvValues(defaults, overrides []string) []string {
 
 	// Now remove all entries that we want to "unset"
 	for i := 0; i < len(results); i++ {
-		if results[i] == "" {
-			results = append(results[:i], results[i+1:]...)
-			i--
+		if results[i] != "" {
+			continue
 		}
+		results = append(results[:i], results[i+1:]...)
+		i--
 	}
 
 	return results
@@ -323,10 +328,11 @@ func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
-			if n.Type == ns {
-				s.Linux.Namespaces = append(s.Linux.Namespaces[:i], s.Linux.Namespaces[i+1:]...)
-				return nil
+			if n.Type != ns {
+				continue
 			}
+			s.Linux.Namespaces = append(s.Linux.Namespaces[:i], s.Linux.Namespaces[i+1:]...)
+			return nil
 		}
 		return nil
 	}
@@ -338,10 +344,11 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
-			if n.Type == ns.Type {
-				s.Linux.Namespaces[i] = ns
-				return nil
+			if n.Type != ns.Type {
+				continue
 			}
+			s.Linux.Namespaces[i] = ns
+			return nil
 		}
 		s.Linux.Namespaces = append(s.Linux.Namespaces, ns)
 		return nil
@@ -546,10 +553,11 @@ func WithUserNamespace(uidMap, gidMap []specs.LinuxIDMapping) SpecOpts {
 		var hasUserns bool
 		setLinux(s)
 		for _, ns := range s.Linux.Namespaces {
-			if ns.Type == specs.UserNamespace {
-				hasUserns = true
-				break
+			if ns.Type != specs.UserNamespace {
+				continue
 			}
+			hasUserns = true
+			break
 		}
 		if !hasUserns {
 			s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{
@@ -845,11 +853,10 @@ func WithUsername(username string) SpecOpts {
 				defer rootfs.Close()
 				return setUser(rootfs.FS())
 			})
-		} else if s.Windows != nil {
-			s.Process.User.Username = username
-		} else {
+		} else if s.Windows == nil {
 			return errors.New("spec does not contain Linux or Windows section")
 		}
+		s.Process.User.Username = username
 		return nil
 	}
 }
@@ -1235,11 +1242,12 @@ func WithReadonlyPaths(paths []string) SpecOpts {
 // WithWriteableSysfs makes any sysfs mounts writeable
 func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	for _, m := range s.Mounts {
-		if m.Type == "sysfs" {
-			for i, o := range m.Options {
-				if o == "ro" {
-					m.Options[i] = "rw"
-				}
+		if m.Type != "sysfs" {
+			continue
+		}
+		for i, o := range m.Options {
+			if o == "ro" {
+				m.Options[i] = "rw"
 			}
 		}
 	}
@@ -1249,11 +1257,12 @@ func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s 
 // WithWriteableCgroupfs makes any cgroup mounts writeable
 func WithWriteableCgroupfs(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	for _, m := range s.Mounts {
-		if m.Type == "cgroup" {
-			for i, o := range m.Options {
-				if o == "ro" {
-					m.Options[i] = "rw"
-				}
+		if m.Type != "cgroup" {
+			continue
+		}
+		for i, o := range m.Options {
+			if o == "ro" {
+				m.Options[i] = "rw"
 			}
 		}
 	}
@@ -1546,16 +1555,18 @@ var ErrNoShmMount = errors.New("no /dev/shm mount specified")
 func WithDevShmSize(kb int64) SpecOpts {
 	return func(ctx context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		for i, m := range s.Mounts {
-			if filepath.Clean(m.Destination) == "/dev/shm" && m.Source == "shm" && m.Type == "tmpfs" {
-				for i := 0; i < len(m.Options); i++ {
-					if strings.HasPrefix(m.Options[i], "size=") {
-						m.Options = append(m.Options[:i], m.Options[i+1:]...)
-						i--
-					}
-				}
-				s.Mounts[i].Options = append(m.Options, fmt.Sprintf("size=%dk", kb))
-				return nil
+			if filepath.Clean(m.Destination) != "/dev/shm" || m.Source != "shm" || m.Type != "tmpfs" {
+				continue
 			}
+			for i := 0; i < len(m.Options); i++ {
+				if !strings.HasPrefix(m.Options[i], "size=") {
+					continue
+				}
+				m.Options = append(m.Options[:i], m.Options[i+1:]...)
+				i--
+			}
+			s.Mounts[i].Options = append(m.Options, fmt.Sprintf("size=%dk", kb))
+			return nil
 		}
 		return ErrNoShmMount
 	}

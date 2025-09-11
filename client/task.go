@@ -435,10 +435,11 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 		return nil, err
 	}
 	defer func() {
-		if retErr != nil && i != nil {
-			i.Cancel()
-			i.Close()
+		if retErr == nil || i == nil {
+			return
 		}
+		i.Cancel()
+		i.Close()
 	}()
 	pSpec, err := typeurl.MarshalAnyToProto(spec)
 	if err != nil {

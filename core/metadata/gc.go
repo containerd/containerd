@@ -769,16 +769,17 @@ func (c *gcContext) scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx contex
 		}
 
 		ibkt := nbkt.Bucket(bucketKeyObjectImages)
-		if ibkt != nil {
-			if err := ibkt.ForEach(func(k, v []byte) error {
-				if v != nil {
-					return nil
-				}
-				node := gcnode(ResourceImage, ns, string(k))
-				return fn(ctx, node)
-			}); err != nil {
-				return err
+		if ibkt == nil {
+			continue
+		}
+		if err := ibkt.ForEach(func(k, v []byte) error {
+			if v != nil {
+				return nil
 			}
+			node := gcnode(ResourceImage, ns, string(k))
+			return fn(ctx, node)
+		}); err != nil {
+			return err
 		}
 	}
 
@@ -811,26 +812,29 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (inte
 		if cbkt != nil {
 			cbkt = cbkt.Bucket(bucketKeyObjectBlob)
 		}
-		if cbkt != nil {
-			log.G(ctx).WithField("key", node.Key).Debug("remove content")
-			return nil, cbkt.DeleteBucket([]byte(node.Key))
+		if cbkt == nil {
+			break
 		}
+		log.G(ctx).WithField("key", node.Key).Debug("remove content")
+		return nil, cbkt.DeleteBucket([]byte(node.Key))
 	case ResourceSnapshot:
 		sbkt := nsbkt.Bucket(bucketKeyObjectSnapshots)
-		if sbkt != nil {
-			ss, key, ok := strings.Cut(node.Key, "/")
-			if !ok {
-				return nil, fmt.Errorf("invalid snapshot gc key %s", node.Key)
-			}
-			ssbkt := sbkt.Bucket([]byte(ss))
-			if ssbkt != nil {
-				log.G(ctx).WithField("key", key).WithField("snapshotter", ss).Debug("remove snapshot")
-				return &eventstypes.SnapshotRemove{
-					Key:         key,
-					Snapshotter: ss,
-				}, ssbkt.DeleteBucket([]byte(key))
-			}
+		if sbkt == nil {
+			break
 		}
+		ss, key, ok := strings.Cut(node.Key, "/")
+		if !ok {
+			return nil, fmt.Errorf("invalid snapshot gc key %s", node.Key)
+		}
+		ssbkt := sbkt.Bucket([]byte(ss))
+		if ssbkt == nil {
+			break
+		}
+		log.G(ctx).WithField("key", key).WithField("snapshotter", ss).Debug("remove snapshot")
+		return &eventstypes.SnapshotRemove{
+			Key:         key,
+			Snapshotter: ss,
+		}, ssbkt.DeleteBucket([]byte(key))
 	case ResourceImage:
 		ibkt := nsbkt.Bucket(bucketKeyObjectImages)
 		if ibkt != nil {
@@ -848,10 +852,11 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (inte
 		if ibkt != nil {
 			ibkt = ibkt.Bucket(bucketKeyObjectIngests)
 		}
-		if ibkt != nil {
-			log.G(ctx).WithField("ref", node.Key).Debug("remove ingest")
-			return nil, ibkt.DeleteBucket([]byte(node.Key))
+		if ibkt == nil {
+			break
 		}
+		log.G(ctx).WithField("ref", node.Key).Debug("remove ingest")
+		return nil, ibkt.DeleteBucket([]byte(node.Key))
 	default:
 		cc, ok := c.contexts[node.Type]
 		if ok {

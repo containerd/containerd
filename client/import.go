@@ -207,14 +207,15 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 					continue
 				}
 			}
-			if iopts.dgstRefT != nil {
-				ref := iopts.dgstRefT(m.Digest)
-				if ref != "" {
-					imgs = append(imgs, images.Image{
-						Name:   ref,
-						Target: m,
-					})
-				}
+			if iopts.dgstRefT == nil {
+				continue
+			}
+			ref := iopts.dgstRefT(m.Digest)
+			if ref != "" {
+				imgs = append(imgs, images.Image{
+					Name:   ref,
+					Target: m,
+				})
 			}
 		}
 
