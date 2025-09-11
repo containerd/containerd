@@ -152,7 +152,7 @@ func (s *wcowSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Kin
 		log.G(ctx).Debug("createSnapshot")
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
-		if err = os.MkdirAll(snDir, 0700); err != nil {
+		if err = os.MkdirAll(snDir, 0o700); err != nil {
 			return fmt.Errorf("failed to create snapshot dir %s: %w", snDir, err)
 		}
 		defer func() {
@@ -176,7 +176,7 @@ func (s *wcowSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Kin
 			// When committed, there'll be some post-processing to fill in the rest
 			// of the metadata.
 			filesDir := filepath.Join(snDir, "Files")
-			if err := os.MkdirAll(filesDir, 0700); err != nil {
+			if err := os.MkdirAll(filesDir, 0o700); err != nil {
 				return fmt.Errorf("creating Files dir: %w", err)
 			}
 			return nil

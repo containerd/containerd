@@ -274,14 +274,15 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 					continue
 				}
 				var resp transfertypes.AuthResponse
-				if creds.Header != "" {
+				switch {
+				case creds.Header != "":
 					resp.AuthType = transfertypes.AuthType_HEADER
 					resp.Secret = creds.Header
-				} else if creds.Username != "" {
+				case creds.Username != "":
 					resp.AuthType = transfertypes.AuthType_CREDENTIALS
 					resp.Username = creds.Username
 					resp.Secret = creds.Secret
-				} else {
+				default:
 					resp.AuthType = transfertypes.AuthType_REFRESH
 					resp.Secret = creds.Secret
 				}

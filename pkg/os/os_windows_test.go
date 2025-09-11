@@ -161,14 +161,14 @@ func setupVHDVolume(t *testing.T, vhdPath string) string {
 }
 
 func writeFile(t *testing.T, path string, content []byte) {
-	if err := os.WriteFile(path, content, 0644); err != nil {
+	if err := os.WriteFile(path, content, 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func mountVolume(t *testing.T, volumePath string, mountPoint string) {
 	// Create the mount point directory.
-	if err := os.Mkdir(mountPoint, 0644); err != nil {
+	if err := os.Mkdir(mountPoint, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {

@@ -162,7 +162,7 @@ func (c *failpointControl) delegatedEvalFn(cmdKind string) (failpoint.EvalFn, er
 }
 
 func (c *failpointControl) updateTx(updateFn func(conf *failpointConf) error) error {
-	f, err := os.OpenFile(c.confPath, os.O_RDWR, 0666)
+	f, err := os.OpenFile(c.confPath, os.O_RDWR, 0o666)
 	if err != nil {
 		return fmt.Errorf("failed to open confPath %s: %w", c.confPath, err)
 	}
@@ -191,7 +191,7 @@ func (c *failpointControl) updateTx(updateFn func(conf *failpointConf) error) er
 	if err != nil {
 		return fmt.Errorf("failed to marshal failpoint conf: %w", err)
 	}
-	return continuity.AtomicWriteFile(c.confPath, data, 0666)
+	return continuity.AtomicWriteFile(c.confPath, data, 0o666)
 }
 
 func nopEvalFn() error {
