@@ -71,10 +71,16 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	if err != nil {
 		return emptyDesc, fmt.Errorf("failed to get reader from content store: %w", err)
 	}
-	defer ra.Close()
+	var r io.ReadCloser
+	if config.Progress != nil {
+		r = newProgressReader(ra, config.Progress)
+	} else {
+		r = newReadCloser(ra)
+	}
+	defer r.Close()
 
 	var processors []diff.StreamProcessor
-	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
+	processor := diff.NewProcessorChain(desc.MediaType, r)
 	processors = append(processors, processor)
 	for {
 		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
@@ -110,6 +116,7 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 			}
 		}
 	}
+
 	return ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageLayer,
 		Size:      rc.c,
@@ -128,4 +135,47 @@ func (rc *readCounter) Read(p []byte) (n int, err error) {
 		rc.c += int64(n)
 	}
 	return
+}
+
+type progressReader struct {
+	rc *readCounter
+	c  io.Closer
+	p  func(int64)
+}
+
+func newProgressReader(ra content.ReaderAt, p func(int64)) io.ReadCloser {
+	return &progressReader{
+		rc: &readCounter{
+			r: content.NewReader(ra),
+			c: 0,
+		},
+		c: ra,
+		p: p,
+	}
+}
+
+func (pr *progressReader) Read(p []byte) (n int, err error) {
+	// Call the progress function with the current count, indicating
+	// the previously read content has been processed. Initial
+	// progress of 0 indicates start of processing.
+	pr.p(pr.rc.c)
+	n, err = pr.rc.Read(p)
+	return
+}
+
+func (pr *progressReader) Close() error {
+	pr.p(pr.rc.c)
+	return pr.c.Close()
+}
+
+type readCloser struct {
+	io.Reader
+	io.Closer
+}
+
+func newReadCloser(ra content.ReaderAt) io.ReadCloser {
+	return &readCloser{
+		Reader: content.NewReader(ra),
+		Closer: ra,
+	}
 }
