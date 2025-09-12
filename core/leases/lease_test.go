@@ -61,7 +61,7 @@ func TestWithLabels(t *testing.T) {
 			lease := newLease(tc.initialLabels)
 			err := WithLabels(tc.labels)(lease)
 			require.NoError(t, err)
-			assert.Equal(t, lease.Labels, tc.expected)
+			assert.Equal(t, tc.expected, lease.Labels)
 		})
 	}
 	for _, tc := range testcases {
@@ -71,7 +71,7 @@ func TestWithLabels(t *testing.T) {
 				err := WithLabel(k, v)(lease)
 				require.NoError(t, err)
 			}
-			assert.Equal(t, lease.Labels, tc.expected)
+			assert.Equal(t, tc.expected, lease.Labels)
 		})
 	}
 }

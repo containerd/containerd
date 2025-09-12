@@ -25,6 +25,7 @@ import (
 	"time"
 
 	assertlib "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	requirelib "github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -85,10 +86,11 @@ func TestStatusEncodeDecode(t *testing.T) {
 		Unknown:    true,
 	}
 	assert := assertlib.New(t)
+	require := require.New(t)
 	data, err := s.encode()
-	assert.NoError(err)
+	require.NoError(err)
 	newS := &Status{}
-	assert.NoError(newS.decode(data))
+	require.NoError(newS.decode(data))
 	s.Removing = false // Removing should not be encoded.
 	s.Starting = false // Starting should not be encoded.
 	s.Unknown = false  // Unknown should not be encoded.
@@ -98,8 +100,8 @@ func TestStatusEncodeDecode(t *testing.T) {
 		Version: "random-test-version",
 		Status:  *s,
 	})
-	assert.NoError(err)
-	assert.Error(newS.decode(unsupported))
+	require.NoError(err)
+	require.Error(newS.decode(unsupported))
 }
 
 func TestStatus(t *testing.T) {
@@ -120,11 +122,11 @@ func TestStatus(t *testing.T) {
 
 	t.Logf("simple store and get")
 	s, err := StoreStatus(tempDir, testID, testStatus)
-	assert.NoError(err)
+	require.NoError(err)
 	old := s.Get()
 	assert.Equal(testStatus, old)
 	_, err = os.Stat(statusFile)
-	assert.NoError(err)
+	require.NoError(err)
 	loaded, err := LoadStatus(tempDir, testID)
 	require.NoError(err)
 	assert.Equal(testStatus, loaded)
@@ -143,13 +145,13 @@ func TestStatus(t *testing.T) {
 	err = s.Update(func(o Status) (Status, error) {
 		return updateStatus, nil
 	})
-	assert.NoError(err)
+	require.NoError(err)
 	assert.Equal(updateStatus, s.Get())
 	loaded, err = LoadStatus(tempDir, testID)
 	require.NoError(err)
 	assert.Equal(testStatus, loaded)
 	// Recover status.
-	assert.NoError(s.Update(func(o Status) (Status, error) {
+	require.NoError(s.Update(func(o Status) (Status, error) {
 		return testStatus, nil
 	}))
 
@@ -167,7 +169,7 @@ func TestStatus(t *testing.T) {
 	err = s.UpdateSync(func(o Status) (Status, error) {
 		return updateStatus, nil
 	})
-	assert.NoError(err)
+	require.NoError(err)
 	assert.Equal(updateStatus, s.Get())
 	loaded, err = LoadStatus(tempDir, testID)
 	require.NoError(err)
@@ -177,12 +179,12 @@ func TestStatus(t *testing.T) {
 	assert.Equal(testStatus, old)
 
 	t.Logf("delete status")
-	assert.NoError(s.Delete())
+	require.NoError(s.Delete())
 	_, err = LoadStatus(tempDir, testID)
-	assert.Error(err)
+	require.Error(err)
 	_, err = os.Stat(statusFile)
 	assert.True(os.IsNotExist(err))
 
 	t.Logf("delete status should be idempotent")
-	assert.NoError(s.Delete())
+	require.NoError(s.Delete())
 }

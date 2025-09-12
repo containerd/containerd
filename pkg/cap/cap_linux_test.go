@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const procPIDStatus = `Name:   cat
@@ -91,9 +92,9 @@ func TestFromNumber(t *testing.T) {
 	assert.Equal(t, "CAP_CHOWN", FromNumber(0))
 	assert.Equal(t, "CAP_SYS_ADMIN", FromNumber(21))
 	assert.Equal(t, "CAP_CHECKPOINT_RESTORE", FromNumber(40))
-	assert.Equal(t, "", FromNumber(-1))
-	assert.Equal(t, "", FromNumber(63))
-	assert.Equal(t, "", FromNumber(255))
+	assert.Empty(t, FromNumber(-1))
+	assert.Empty(t, FromNumber(63))
+	assert.Empty(t, FromNumber(255))
 }
 
 func TestFromBitmap(t *testing.T) {
@@ -148,7 +149,7 @@ func TestFromBitmap(t *testing.T) {
 
 func TestParseProcPIDStatus(t *testing.T) {
 	res, err := ParseProcPIDStatus(strings.NewReader(procPIDStatus))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	expected := map[Type]uint64{
 		Inheritable: 0,
 		Permitted:   0xffffffffff,
@@ -156,18 +157,18 @@ func TestParseProcPIDStatus(t *testing.T) {
 		Bounding:    0xffffffffff,
 		Ambient:     0,
 	}
-	assert.EqualValues(t, expected, res)
+	assert.Equal(t, expected, res)
 }
 
 func TestCurrent(t *testing.T) {
 	caps, err := Current()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Logf("verify the result manually: %+v", caps)
 }
 
 func TestKnown(t *testing.T) {
 	caps := Known()
-	assert.EqualValues(t, caps59, caps)
+	assert.Equal(t, caps59, caps)
 }
 
 func FuzzParseProcPIDStatus(f *testing.F) {

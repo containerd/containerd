@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/systemd"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -97,7 +98,7 @@ func TestRuntimeConfig(t *testing.T) {
 			c.config.RuntimeConfig.ContainerdConfig.Runtimes = test.runtimes
 
 			resp, err := c.RuntimeConfig(context.TODO(), &runtime.RuntimeConfigRequest{})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.expectedCgroupDriver, resp.Linux.CgroupDriver, "got unexpected cgroup driver")
 		})
 	}

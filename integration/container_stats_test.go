@@ -47,11 +47,11 @@ func TestContainerStats(t *testing.T) {
 	cn, err := runtimeService.CreateContainer(sb, containerConfig, sbConfig)
 	require.NoError(t, err)
 	defer func() {
-		assert.NoError(t, runtimeService.RemoveContainer(cn))
+		require.NoError(t, runtimeService.RemoveContainer(cn))
 	}()
 	require.NoError(t, runtimeService.StartContainer(cn))
 	defer func() {
-		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+		require.NoError(t, runtimeService.StopContainer(cn, 10))
 	}()
 
 	t.Logf("Fetch stats for container")
@@ -89,11 +89,11 @@ func TestContainerConsumedStats(t *testing.T) {
 	cn, err := runtimeService.CreateContainer(sb, containerConfig, sbConfig)
 	require.NoError(t, err)
 	defer func() {
-		assert.NoError(t, runtimeService.RemoveContainer(cn))
+		require.NoError(t, runtimeService.RemoveContainer(cn))
 	}()
 	require.NoError(t, runtimeService.StartContainer(cn))
 	defer func() {
-		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+		require.NoError(t, runtimeService.StopContainer(cn, 10))
 	}()
 
 	t.Logf("Fetch initial stats for container")
@@ -170,11 +170,11 @@ func TestContainerListStats(t *testing.T) {
 		require.NoError(t, err)
 		containerConfigMap[cn] = containerConfig
 		defer func() {
-			assert.NoError(t, runtimeService.RemoveContainer(cn))
+			require.NoError(t, runtimeService.RemoveContainer(cn))
 		}()
 		require.NoError(t, runtimeService.StartContainer(cn))
 		defer func() {
-			assert.NoError(t, runtimeService.StopContainer(cn, 10))
+			require.NoError(t, runtimeService.StopContainer(cn, 10))
 		}()
 	}
 
@@ -225,11 +225,11 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 		containerConfigMap[cn] = containerConfig
 		require.NoError(t, err)
 		defer func() {
-			assert.NoError(t, runtimeService.RemoveContainer(cn))
+			require.NoError(t, runtimeService.RemoveContainer(cn))
 		}()
 		require.NoError(t, runtimeService.StartContainer(cn))
 		defer func() {
-			assert.NoError(t, runtimeService.StopContainer(cn, 10))
+			require.NoError(t, runtimeService.StopContainer(cn, 10))
 		}()
 	}
 
@@ -285,11 +285,11 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 		containerConfigMap[cn] = containerConfig
 		require.NoError(t, err)
 		defer func() {
-			assert.NoError(t, runtimeService.RemoveContainer(cn))
+			require.NoError(t, runtimeService.RemoveContainer(cn))
 		}()
 		require.NoError(t, runtimeService.StartContainer(cn))
 		defer func() {
-			assert.NoError(t, runtimeService.StopContainer(cn, 10))
+			require.NoError(t, runtimeService.StopContainer(cn, 10))
 		}()
 	}
 
@@ -346,11 +346,11 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 		containerConfigMap[cn] = containerConfig
 		require.NoError(t, err)
 		defer func() {
-			assert.NoError(t, runtimeService.RemoveContainer(cn))
+			require.NoError(t, runtimeService.RemoveContainer(cn))
 		}()
 		require.NoError(t, runtimeService.StartContainer(cn))
 		defer func() {
-			assert.NoError(t, runtimeService.StopContainer(cn, 10))
+			require.NoError(t, runtimeService.StopContainer(cn, 10))
 		}()
 	}
 	t.Logf("Fetch container stats for sandbox ID and container ID filter")
@@ -481,20 +481,20 @@ func TestContainerSysfsStatsWithPrivilegedPod(t *testing.T) {
 			)
 			cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 			if test.expectedErr != "" && err != nil {
-				assert.Contains(t, err.Error(), test.expectedErr)
+				require.ErrorContains(t, err, test.expectedErr)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			defer func() {
 				if test.expectedErr == "" {
-					assert.NoError(t, runtimeService.RemoveContainer(cn))
+					require.NoError(t, runtimeService.RemoveContainer(cn))
 				}
 			}()
 
 			t.Log("Start the container")
 			require.NoError(t, runtimeService.StartContainer(cn))
 			defer func() {
-				assert.NoError(t, runtimeService.StopContainer(cn, 10))
+				require.NoError(t, runtimeService.StopContainer(cn, 10))
 			}()
 
 			t.Logf("Execute cmd in container by sync")
@@ -503,7 +503,7 @@ func TestContainerSysfsStatsWithPrivilegedPod(t *testing.T) {
 				"-c",
 				"mount |grep sysfs",
 			}, 10)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Contains(t, string(mountinfo), test.expectedSysfsOption)
 		})
 	}

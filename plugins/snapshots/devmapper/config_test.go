@@ -24,6 +24,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -34,22 +35,22 @@ func TestLoadConfig(t *testing.T) {
 	}
 
 	file, err := os.CreateTemp(t.TempDir(), "devmapper-config-")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		file.Close()
 	})
 
 	encoder := toml.NewEncoder(file)
 	err = encoder.Encode(&expected)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	loaded, err := LoadConfig(file.Name())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, loaded.RootPath, expected.RootPath)
-	assert.Equal(t, loaded.PoolName, expected.PoolName)
-	assert.Equal(t, loaded.BaseImageSize, expected.BaseImageSize)
-	assert.True(t, loaded.BaseImageSizeBytes == 128*1024*1024)
+	assert.Equal(t, expected.RootPath, loaded.RootPath)
+	assert.Equal(t, expected.PoolName, loaded.PoolName)
+	assert.Equal(t, expected.BaseImageSize, loaded.BaseImageSize)
+	assert.Equal(t, uint64(128*1024*1024), loaded.BaseImageSizeBytes)
 }
 
 func TestLoadConfigInvalidPath(t *testing.T) {
@@ -57,7 +58,7 @@ func TestLoadConfigInvalidPath(t *testing.T) {
 	assert.Equal(t, os.ErrNotExist, err)
 
 	_, err = LoadConfig("/dev/null")
-	assert.NotNil(t, err)
+	require.Error(t, err)
 }
 
 func TestParseInvalidData(t *testing.T) {
@@ -66,21 +67,21 @@ func TestParseInvalidData(t *testing.T) {
 	}
 
 	err := config.parse()
-	assert.Error(t, err, "failed to parse base image size: 'y': invalid size: 'y'")
+	require.Error(t, err, "failed to parse base image size: 'y': invalid size: 'y'")
 }
 
 func TestFieldValidation(t *testing.T) {
 	config := &Config{}
 	err := config.Validate()
-	assert.NotNil(t, err)
+	require.Error(t, err)
 
 	multErr := err.(interface{ Unwrap() []error }).Unwrap()
 	assert.Len(t, multErr, 4)
 
-	assert.NotNil(t, multErr[0], "pool_name is empty")
-	assert.NotNil(t, multErr[1], "root_path is empty")
-	assert.NotNil(t, multErr[2], "base_image_size is empty")
-	assert.NotNil(t, multErr[3], "filesystem type cannot be empty")
+	require.Error(t, multErr[0], "pool_name is empty")
+	require.Error(t, multErr[1], "root_path is empty")
+	require.Error(t, multErr[2], "base_image_size is empty")
+	require.Error(t, multErr[3], "filesystem type cannot be empty")
 }
 
 func TestExistingPoolFieldValidation(t *testing.T) {
@@ -92,5 +93,5 @@ func TestExistingPoolFieldValidation(t *testing.T) {
 	}
 
 	err := config.Validate()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
