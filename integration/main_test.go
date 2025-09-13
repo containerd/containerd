@@ -353,11 +353,11 @@ func WithIDMapVolumeMount(hostPath, containerPath string, uidMaps, gidMaps []*ru
 	}
 }
 
-func WithImageVolumeMount(image, containerPath string) ContainerOpts {
-	return WithIDMapImageVolumeMount(image, containerPath, nil, nil)
+func WithImageVolumeMount(image, imageSubPath, containerPath string) ContainerOpts {
+	return WithIDMapImageVolumeMount(image, imageSubPath, containerPath, nil, nil)
 }
 
-func WithIDMapImageVolumeMount(image string, containerPath string, uidMaps, gidMaps []*runtime.IDMapping) ContainerOpts {
+func WithIDMapImageVolumeMount(image, imageSubPath, containerPath string, uidMaps, gidMaps []*runtime.IDMapping) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		containerPath, _ = filepath.Abs(containerPath)
 		mount := &runtime.Mount{
@@ -367,6 +367,7 @@ func WithIDMapImageVolumeMount(image string, containerPath string, uidMaps, gidM
 			Image: &runtime.ImageSpec{
 				Image: image,
 			},
+			ImageSubPath:   imageSubPath,
 			Readonly:       true,
 			SelinuxRelabel: true,
 		}
