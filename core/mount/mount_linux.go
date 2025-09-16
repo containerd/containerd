@@ -435,10 +435,11 @@ func findOverlayLowerdirs(opts []string) (int, []string) {
 	)
 
 	for i, opt := range opts {
-		if strings.HasPrefix(opt, prefix) {
-			idx = i
-			break
+		if !strings.HasPrefix(opt, prefix) {
+			continue
 		}
+		idx = i
+		break
 	}
 
 	if idx == -1 {

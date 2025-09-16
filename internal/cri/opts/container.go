@@ -95,11 +95,13 @@ func WithVolumes(volumeMounts map[string]string, platform imagespec.Platform) co
 			return fmt.Errorf("failed to mount: %w", err)
 		}
 		defer func() {
-			if uerr := mount.Unmount(root, 0); uerr != nil {
-				log.G(ctx).WithError(uerr).Errorf("Failed to unmount snapshot %q", root)
-				if err == nil {
-					err = uerr
-				}
+			uerr := mount.Unmount(root, 0)
+			if uerr == nil {
+				return
+			}
+			log.G(ctx).WithError(uerr).Errorf("Failed to unmount snapshot %q", root)
+			if err == nil {
+				err = uerr
 			}
 		}()
 

@@ -50,28 +50,29 @@ var Command = &cli.Command{
 			case err = <-errCh:
 				return err
 			}
-			if e != nil {
-				var out []byte
-				if e.Event != nil {
-					v, err := typeurl.UnmarshalAny(e.Event)
-					if err != nil {
-						log.G(ctx).WithError(err).Warn("cannot unmarshal an event from Any")
-						continue
-					}
-					out, err = json.Marshal(v)
-					if err != nil {
-						log.G(ctx).WithError(err).Warn("cannot marshal Any into JSON")
-						continue
-					}
+			if e == nil {
+				continue
+			}
+			var out []byte
+			if e.Event != nil {
+				v, err := typeurl.UnmarshalAny(e.Event)
+				if err != nil {
+					log.G(ctx).WithError(err).Warn("cannot unmarshal an event from Any")
+					continue
 				}
-				if _, err := fmt.Println(
-					e.Timestamp,
-					e.Namespace,
-					e.Topic,
-					string(out),
-				); err != nil {
-					return err
+				out, err = json.Marshal(v)
+				if err != nil {
+					log.G(ctx).WithError(err).Warn("cannot marshal Any into JSON")
+					continue
 				}
+			}
+			if _, err := fmt.Println(
+				e.Timestamp,
+				e.Namespace,
+				e.Topic,
+				string(out),
+			); err != nil {
+				return err
 			}
 		}
 	},

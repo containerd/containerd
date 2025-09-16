@@ -301,13 +301,14 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 				return nil, err
 			}
 			defer func() {
-				if err != nil {
-					if stdoutWC != nil {
-						stdoutWC.Close()
-					}
-					if stderrWC != nil {
-						stderrWC.Close()
-					}
+				if err == nil {
+					return
+				}
+				if stdoutWC != nil {
+					stdoutWC.Close()
+				}
+				if stderrWC != nil {
+					stderrWC.Close()
 				}
 			}()
 			containerIO, err = cio.NewContainerIO(id,
@@ -390,17 +391,18 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 				// Wait for the task for exit monitor.
 				// wait is a long running background request, no timeout needed.
 				exitCh, err = t.Wait(ctrdutil.NamespacedContext())
-				if err != nil {
-					exitCh = nil
-					if !errdefs.IsNotFound(err) {
-						return fmt.Errorf("failed to wait for task: %w", err)
-					}
-					// Container was in running state, but its task has been deleted,
-					// set unknown exited state.
-					status.FinishedAt = time.Now().UnixNano()
-					status.ExitCode = unknownExitCode
-					status.Reason = unknownExitReason
+				if err == nil {
+					break
 				}
+				exitCh = nil
+				if !errdefs.IsNotFound(err) {
+					return fmt.Errorf("failed to wait for task: %w", err)
+				}
+				// Container was in running state, but its task has been deleted,
+				// set unknown exited state.
+				status.FinishedAt = time.Now().UnixNano()
+				status.ExitCode = unknownExitCode
+				status.Reason = unknownExitReason
 			case containerd.Stopped:
 				// Task is stopped. Update status and delete the task.
 				if _, err := t.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
