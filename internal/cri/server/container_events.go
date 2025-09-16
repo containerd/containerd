@@ -25,7 +25,7 @@ func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.R
 	defer closer.Close()
 
 	for event := range eventC {
-		if err := s.Send(&event); err != nil {
+		if err := s.Send(event); err != nil {
 			return err
 		}
 	}
