@@ -172,7 +172,7 @@ func ConfigureDefaultRegistries(ropts ...RegistryOpt) RegistryHosts {
 			Host:         host,
 			Scheme:       "https",
 			Path:         "/v2",
-			Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+			Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush | HostCapabilityReferrers,
 		}
 
 		if config.Client == nil {
