@@ -40,6 +40,6 @@ func upperDirectoryPermission(p, parent string) error {
 	return nil
 }
 
-func convertDirToErof(ctx context.Context, layerBlob, upperDir string) error {
+func convertDirToErofs(ctx context.Context, layerBlob, upperDir string) error {
 	return errdefs.ErrNotImplemented
 }

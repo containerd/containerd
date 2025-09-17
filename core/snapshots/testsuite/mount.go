@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/errdefs"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/mount/handlers"
 	"github.com/containerd/containerd/v2/core/mount/manager"
 )
 
@@ -54,7 +55,13 @@ func withMountManager(ctx context.Context, t testing.TB) context.Context {
 		}
 	})
 
-	mm := manager.NewManager(db, targets, nil)
+	mh, err := handlers.MkdirHandler(targets)
+	if err != nil {
+		t.Fatalf("failed to create mkdir handler: %v", err)
+	}
+	mm := manager.NewManager(db, targets, map[string]mount.Handler{
+		"mkdir": mh,
+	})
 
 	return context.WithValue(ctx, mountManagerKey{}, mm)
 }

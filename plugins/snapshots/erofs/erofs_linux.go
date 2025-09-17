@@ -90,7 +90,7 @@ func cleanupUpper(upper string) error {
 	return nil
 }
 
-func convertDirToErof(ctx context.Context, layerBlob, upperDir string) error {
+func convertDirToErofs(ctx context.Context, layerBlob, upperDir string) error {
 	err := erofsutils.ConvertErofs(ctx, layerBlob, upperDir, nil)
 	if err != nil {
 		return err
