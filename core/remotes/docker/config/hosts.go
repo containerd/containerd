@@ -131,7 +131,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				}
 			}
 			hosts[len(hosts)-1].path = "/v2"
-			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
+			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush | docker.HostCapabilityReferrers
 		}
 
 		// tlsConfigured indicates that TLS was configured and HTTP endpoints should
@@ -463,7 +463,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			}
 		}
 	} else {
-		result.capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
+		result.capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush | docker.HostCapabilityReferrers
 	}
 
 	if config.CACert != nil {
