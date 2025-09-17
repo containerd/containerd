@@ -458,6 +458,8 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 				result.capabilities |= docker.HostCapabilityResolve
 			case "push":
 				result.capabilities |= docker.HostCapabilityPush
+			case "referrers":
+				result.capabilities |= docker.HostCapabilityReferrers
 			default:
 				return hostConfig{}, fmt.Errorf("unknown capability %v", c)
 			}

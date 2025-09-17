@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 )
 
-const allCaps = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
+const allCaps = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush | docker.HostCapabilityReferrers
 
 func TestDefaultHosts(t *testing.T) {
 	ctx := logtest.WithT(context.Background(), t)
@@ -97,7 +97,7 @@ ca = "/etc/path/default"
   capabilities = ["pull"]
 
 [host."https://test-1.registry"]
-  capabilities = ["pull", "resolve", "push"]
+  capabilities = ["pull", "resolve", "push", "referrers"]
   ca = ["/etc/certs/test-1-ca.pem", "/etc/certs/special.pem"]
   client = [["/etc/certs/client.cert", "/etc/certs/client.key"],["/etc/certs/client.pem", ""]]
 
@@ -105,6 +105,10 @@ ca = "/etc/path/default"
   client = "/etc/certs/client.pem"
 
 [host."https://test-3.registry"]
+  client = ["/etc/certs/client-1.pem", "/etc/certs/client-2.pem"]
+
+[host."https://no-referrers.registry"]
+  capabilities = ["pull", "resolve", "push"]
   client = ["/etc/certs/client-1.pem", "/etc/certs/client-2.pem"]
 
 [host."https://noncompliantmirror.registry/v2/namespaceprefix"]
@@ -171,6 +175,16 @@ ca = "/etc/path/default"
 			host:         "test-3.registry",
 			path:         "/v2",
 			capabilities: allCaps,
+			clientPairs: [][2]string{
+				{filepath.FromSlash("/etc/certs/client-1.pem")},
+				{filepath.FromSlash("/etc/certs/client-2.pem")},
+			},
+		},
+		{
+			scheme:       "https",
+			host:         "no-referrers.registry",
+			path:         "/v2",
+			capabilities: docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush,
 			clientPairs: [][2]string{
 				{filepath.FromSlash("/etc/certs/client-1.pem")},
 				{filepath.FromSlash("/etc/certs/client-2.pem")},
