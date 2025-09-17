@@ -561,7 +561,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 				Host:         u.Host,
 				Scheme:       u.Scheme,
 				Path:         u.Path,
-				Capabilities: docker.HostCapabilityResolve | docker.HostCapabilityPull,
+				Capabilities: docker.HostCapabilityResolve | docker.HostCapabilityPull | docker.HostCapabilityReferrers,
 			})
 		}
 		return registries, nil
