@@ -147,11 +147,11 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 
 	if sp := tracing.SpanFromContext(ctx); sp != nil {
 		sp.SetAttributes(
-			tracing.Attribute("pull.has.sandboxconfig", r.SandboxConfig != nil),
+			tracing.Attribute("pull.has_sandbox_config", r.SandboxConfig != nil),
 			tracing.Attribute("pull.has.sandboxid", sandboxID != ""),
 		)
 		if r.SandboxConfig != nil {
-			sp.SetAttributes(tracing.Attribute("pull.ann.count", len(r.SandboxConfig.GetAnnotations())))
+			sp.SetAttributes(tracing.Attribute("pull.annotation_count", len(r.SandboxConfig.GetAnnotations())))
 		}
 	}
 
