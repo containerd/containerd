@@ -310,7 +310,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	return
 }
 
-func (c *Controller) Create(_ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
+func (c *Controller) Create(_ context.Context, info sandbox.Sandbox, _ ...sandbox.CreateOpt) error {
 	metadata := sandboxstore.Metadata{}
 	if err := info.GetExtension(MetadataKey, &metadata); err != nil {
 		return fmt.Errorf("failed to get sandbox %q metadata: %w", info.ID, err)

@@ -24,7 +24,7 @@ import (
 )
 
 // Mount will call unix.Mount to mount the file.
-func (RealOS) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+func (RealOS) Mount(string, string, string, uintptr, string) error {
 	return errdefs.ErrNotImplemented
 }
 

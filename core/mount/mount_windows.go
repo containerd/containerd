@@ -126,7 +126,7 @@ func (m *Mount) GetParentPaths() ([]string, error) {
 }
 
 // Unmount the mount at the provided path
-func Unmount(mount string, flags int) error {
+func Unmount(mount string, _ int) error {
 	mount = filepath.Clean(mount)
 	adsFile := mount + ":" + sourceStreamName
 	var layerPath string

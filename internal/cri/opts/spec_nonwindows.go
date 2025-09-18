@@ -29,8 +29,8 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func WithProcessCommandLineOrArgsForWindows(config *runtime.ContainerConfig, image *imagespec.ImageConfig) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
+func WithProcessCommandLineOrArgsForWindows(*runtime.ContainerConfig, *imagespec.ImageConfig) oci.SpecOpts {
+	return func(context.Context, oci.Client, *containers.Container, *runtimespec.Spec) (err error) {
 		return errdefs.ErrNotImplemented
 	}
 }

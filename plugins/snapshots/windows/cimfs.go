@@ -328,7 +328,7 @@ func (s *cimFSSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Ki
 }
 
 // In case of CimFS layers, the scratch VHDs are fully empty (WCIFS layers have reparse points in scratch VHDs, hence those VHDs are unique per image), so we create only one scratch VHD and then copy & expand it for every scratch layer creation.
-func (s *cimFSSnapshotter) createScratchLayer(ctx context.Context, snDir string, sizeInBytes uint64) error {
+func (s *cimFSSnapshotter) createScratchLayer(_ context.Context, snDir string, sizeInBytes uint64) error {
 	dest := filepath.Join(snDir, "sandbox.vhdx")
 	if err := copyScratchDisk(filepath.Join(s.root, templateVHDName), dest); err != nil {
 		return err
@@ -342,7 +342,7 @@ func (s *cimFSSnapshotter) createScratchLayer(ctx context.Context, snDir string,
 	return nil
 }
 
-func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
+func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, _ string) []mount.Mount {
 	var (
 		roFlag string
 	)

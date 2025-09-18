@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/ttrpc"
 )
 
-func apply(_ context.Context, _ *srvconfig.Config) error {
+func apply(context.Context, *srvconfig.Config) error {
 	return nil
 }
 

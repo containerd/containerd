@@ -35,7 +35,7 @@ type NewTaskOpts func(context.Context, *Client, *TaskInfo) error
 
 // WithRootFS allows a task to be created without a snapshot being allocated to its container
 func WithRootFS(mounts []mount.Mount) NewTaskOpts {
-	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
+	return func(_ context.Context, _ *Client, ti *TaskInfo) error {
 		ti.RootFS = mounts
 		return nil
 	}
@@ -44,7 +44,7 @@ func WithRootFS(mounts []mount.Mount) NewTaskOpts {
 // WithRuntimePath will force task service to use a custom path to the runtime binary
 // instead of resolving it from runtime name.
 func WithRuntimePath(absRuntimePath string) NewTaskOpts {
-	return func(ctx context.Context, client *Client, info *TaskInfo) error {
+	return func(_ context.Context, _ *Client, info *TaskInfo) error {
 		info.RuntimePath = absRuntimePath
 		return nil
 	}
@@ -53,7 +53,7 @@ func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 // WithTaskAPIEndpoint allow task service to manage a task through a given endpoint,
 // usually it is served inside a sandbox, and we can get it from sandbox status.
 func WithTaskAPIEndpoint(address string, version uint32) NewTaskOpts {
-	return func(ctx context.Context, client *Client, info *TaskInfo) error {
+	return func(_ context.Context, _ *Client, info *TaskInfo) error {
 		opts, err := info.getRuncOptions()
 		if err != nil {
 			return err
@@ -115,7 +115,7 @@ func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 
 // WithRestoreImagePath sets image path for create option
 func WithRestoreImagePath(path string) NewTaskOpts {
-	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
+	return func(_ context.Context, _ *Client, ti *TaskInfo) error {
 		opts, err := ti.getRuncOptions()
 		if err != nil {
 			return err
@@ -127,7 +127,7 @@ func WithRestoreImagePath(path string) NewTaskOpts {
 
 // WithRestoreWorkPath sets criu work path for create option
 func WithRestoreWorkPath(path string) NewTaskOpts {
-	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
+	return func(_ context.Context, _ *Client, ti *TaskInfo) error {
 		opts, err := ti.getRuncOptions()
 		if err != nil {
 			return err
@@ -190,14 +190,14 @@ type KillInfo struct {
 type KillOpts func(context.Context, *KillInfo) error
 
 // WithKillAll kills all processes for a task
-func WithKillAll(ctx context.Context, i *KillInfo) error {
+func WithKillAll(_ context.Context, i *KillInfo) error {
 	i.All = true
 	return nil
 }
 
 // WithKillExecID specifies the process ID
 func WithKillExecID(execID string) KillOpts {
-	return func(ctx context.Context, i *KillInfo) error {
+	return func(_ context.Context, i *KillInfo) error {
 		i.ExecID = execID
 		return nil
 	}
@@ -206,7 +206,7 @@ func WithKillExecID(execID string) KillOpts {
 // WithResources sets the provided resources for task updates. Resources must be
 // either a *specs.LinuxResources or a *specs.WindowsResources
 func WithResources(resources interface{}) UpdateTaskOpts {
-	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
+	return func(_ context.Context, _ *Client, r *UpdateTaskInfo) error {
 		switch resources.(type) {
 		case *specs.LinuxResources:
 		case *specs.WindowsResources:
@@ -221,7 +221,7 @@ func WithResources(resources interface{}) UpdateTaskOpts {
 
 // WithAnnotations sets the provided annotations for task updates.
 func WithAnnotations(annotations map[string]string) UpdateTaskOpts {
-	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
+	return func(_ context.Context, _ *Client, r *UpdateTaskInfo) error {
 		r.Annotations = annotations
 		return nil
 	}

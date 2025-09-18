@@ -111,7 +111,7 @@ type FetchByDigestOpts func(context.Context, *FetchByDigestConfig) error
 
 // WithMediaType sets the media type header for fetch request
 func WithMediaType(mediatype string) FetchByDigestOpts {
-	return func(ctx context.Context, cfg *FetchByDigestConfig) error {
+	return func(_ context.Context, cfg *FetchByDigestConfig) error {
 		cfg.Mediatype = mediatype
 		return nil
 	}
