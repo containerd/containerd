@@ -341,13 +341,6 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	c := make(chan ExitStatus, 1)
 	go func() {
 		defer close(c)
-		ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Wait"),
-			tracing.WithAttribute("task.id", t.ID()),
-		)
-		defer span.End()
-		if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
-			span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
-		}
 		r, err := t.client.TaskService().Wait(ctx, &tasks.WaitRequest{
 			ContainerID: t.id,
 		})
@@ -364,11 +357,6 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 			exitedAt: protobuf.FromTimestamp(r.ExitedAt),
 		}
 		c <- exitStatus
-
-		span.SetAttributes(
-			tracing.Attribute("task.exit_status", int64(exitStatus.code)),
-			tracing.Attribute("task.exited_at", exitStatus.exitedAt.Format(time.RFC3339)),
-		)
 	}()
 	return c, nil
 }
