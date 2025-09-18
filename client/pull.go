@@ -121,11 +121,8 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if uconfig.DuplicationSuppressor != nil {
 			uopts = append(uopts, unpack.WithDuplicationSuppressor(uconfig.DuplicationSuppressor))
 		}
-		_, initSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "UnpackerInit"))
 		unpacker, err = unpack.NewUnpacker(ctx, c.ContentStore(), uopts...)
 		if err != nil {
-			initSpan.SetStatus(err)
-			initSpan.End()
 			return nil, fmt.Errorf("unable to initialize unpacker: %w", err)
 		}
 
@@ -139,7 +136,6 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 				}
 			}
 		}()
-		initSpan.End()
 		wrapper := pullCtx.HandlerWrapper
 		pullCtx.HandlerWrapper = func(h images.Handler) images.Handler {
 			if wrapper == nil {
@@ -277,8 +273,9 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	}
 
 	_, dspan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "dispatch"))
-	defer dspan.End()
-	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
+	err = images.Dispatch(ctx, handler, limiter, desc)
+	dspan.End()
+	if err != nil {
 		return images.Image{}, err
 	}
 

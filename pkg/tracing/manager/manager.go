@@ -61,6 +61,7 @@ type ExporterConfig struct {
 
 // NewTraceManager constructs a manager, instantiates exporters via factory,
 // and initializes an enhanced tracer when enabled and exporters are present.
+// The enhanced tracer is created using pkg/tracing/plugin/enhanced.go.
 func NewTraceManager(config Config) (*TraceManager, error) {
 	m := &TraceManager{
 		config: config,
