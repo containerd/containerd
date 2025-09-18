@@ -107,6 +107,7 @@ type StartConfig struct {
 type SpanOpt func(*StartConfig)
 
 // WithAttributes adds provided k/v attributes to a new span that is created.
+// This is a convenience helper to avoid repeatedly using trace.WithAttributes(Attribute(k, v))
 func WithAttributes(kv ...attribute.KeyValue) SpanOpt {
 	return func(cfg *StartConfig) {
 		cfg.spanOpts = append(cfg.spanOpts, trace.WithAttributes(kv...))

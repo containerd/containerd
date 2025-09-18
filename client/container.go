@@ -289,7 +289,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	}
 
 	span.SetAttributes(
-		tracing.Attribute("task.container.id", request.ContainerID),
+		tracing.Attribute("container.id", request.ContainerID),
 		tracing.Attribute("task.request.options", request.Options.String()),
 		tracing.Attribute("task.runtime.name", info.runtime),
 	)
