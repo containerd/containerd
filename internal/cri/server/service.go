@@ -186,24 +186,19 @@ type CRIServiceOptions struct {
 }
 
 func (c *criService) initTracing() error {
-	if c.config.LifecycleTracing == nil {
-		log.L.Info("LifecycleTracing config is nil, attempting to load from env")
-		c.config.ApplyLifecycleTracingFromEnv()
-	}
-
-	if c.config.LifecycleTracing == nil {
-		log.L.Info("LifecycleTracing is still nil after loading from env, tracing is disabled")
+	if c.config.Tracing == nil {
+		log.L.Info("Tracing is still nil after loading from env, tracing is disabled")
 		return nil
 	}
 
-	if !c.config.LifecycleTracing.Enabled {
-		log.L.Info("LifecycleTracing is disabled via config")
+	if !c.config.Tracing.Enabled {
+		log.L.Info("Tracing is disabled via config")
 		return nil
 	}
 
 	log.L.Infof("Initializing tracing with config: Enabled=%v, SamplingRate=%f",
-		c.config.LifecycleTracing.Enabled,
-		c.config.LifecycleTracing.SamplingRate)
+		c.config.Tracing.Enabled,
+		c.config.Tracing.SamplingRate)
 
 	// Register sandbox id resolver
 	resolver := func(attrs map[string]interface{}) (string, bool) {
@@ -213,7 +208,7 @@ func (c *criService) initTracing() error {
 			}
 		}
 		var cid string
-		if v, ok := attrs["task.container.id"]; ok {
+		if v, ok := attrs["container.id"]; ok {
 			if s, ok2 := v.(string); ok2 && s != "" {
 				cid = s
 			}
@@ -238,11 +233,11 @@ func (c *criService) initTracing() error {
 	tracing.SetSandboxIDResolver(resolver)
 
 	tracingCfg := manager.Config{
-		Enabled:          c.config.LifecycleTracing.Enabled,
-		SamplingRate:     c.config.LifecycleTracing.SamplingRate,
-		UseSandboxID:     c.config.LifecycleTracing.UseSandboxID,
-		MaxSpansPerTrace: c.config.LifecycleTracing.MaxSpansPerTrace,
-		Exporters:        convertExporterConfigs(c.config.LifecycleTracing.Exporters),
+		Enabled:          c.config.Tracing.Enabled,
+		SamplingRate:     c.config.Tracing.SamplingRate,
+		UseSandboxID:     c.config.Tracing.UseSandboxID,
+		MaxSpansPerTrace: c.config.Tracing.MaxSpansPerTrace,
+		Exporters:        convertExporterConfigs(c.config.Tracing.Exporters),
 		Resolver:         resolver,
 	}
 
