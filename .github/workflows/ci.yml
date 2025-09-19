@@ -402,6 +402,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y criu
 
+      # "apt-get install erofs-utils" installs an older version (1.7.1 as of 2025-09-18)
+      # Build and install erofs-utils 1.8.8 from source to get a newer version
       - name: Build and install erofs-utils from source
         run: |
           # Install dependencies
