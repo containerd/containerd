@@ -287,6 +287,12 @@ func (p *Init) setExited(status int) {
 	p.status = status
 	p.Platform.ShutdownConsole(context.Background(), p.console)
 	close(p.waitBlock)
+	if p.io != nil {
+		for _, c := range p.closers {
+			c.Close()
+		}
+		p.io.Close()
+	}
 }
 
 // Delete the init process
@@ -311,12 +317,6 @@ func (p *Init) delete(ctx context.Context) error {
 		} else {
 			err = p.runtimeError(err, "failed to delete task")
 		}
-	}
-	if p.io != nil {
-		for _, c := range p.closers {
-			c.Close()
-		}
-		p.io.Close()
 	}
 	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
 		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
