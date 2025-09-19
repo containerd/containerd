@@ -47,4 +47,5 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/services/warning"
 	_ "github.com/containerd/containerd/v2/plugins/streaming"
 	_ "github.com/containerd/containerd/v2/plugins/transfer"
+	_ "github.com/containerd/containerd/v2/plugins/watchdog"
 )
