@@ -132,7 +132,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 		return newStatus, fmt.Errorf("failed to get task: %w", err)
 	}
 	// newSpec.Linux / newSpec.Windows won't be nil
-	if err := task.Update(ctx, containerd.WithResources(getResources(newSpec))); err != nil {
+	if err := task.Update(ctx, containerd.WithResources(getResources(newSpec)), containerd.WithAnnotations(r.Annotations)); err != nil {
 		if errdefs.IsNotFound(err) {
 			// Task exited already.
 			return newStatus, nil
