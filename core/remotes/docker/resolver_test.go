@@ -902,22 +902,36 @@ func testocimanifest(ctx context.Context, f remotes.Fetcher, desc ocispec.Descri
 }
 
 type testContent struct {
-	mediaType string
-	content   []byte
+	mediaType    string
+	artifactType string
+	content      []byte
 }
 
-func newContent(mediaType string, b []byte) testContent {
-	return testContent{
+type contentOpt func(*testContent)
+
+func withArtifactType(artifactType string) contentOpt {
+	return func(tc *testContent) {
+		tc.artifactType = artifactType
+	}
+}
+
+func newContent(mediaType string, b []byte, opts ...contentOpt) testContent {
+	tc := testContent{
 		mediaType: mediaType,
 		content:   b,
 	}
+	for _, opt := range opts {
+		opt(&tc)
+	}
+	return tc
 }
 
 func (tc testContent) Descriptor() ocispec.Descriptor {
 	return ocispec.Descriptor{
-		MediaType: tc.mediaType,
-		Digest:    digest.FromBytes(tc.content),
-		Size:      int64(len(tc.content)),
+		ArtifactType: tc.artifactType,
+		MediaType:    tc.mediaType,
+		Digest:       digest.FromBytes(tc.content),
+		Size:         int64(len(tc.content)),
 	}
 }
 
