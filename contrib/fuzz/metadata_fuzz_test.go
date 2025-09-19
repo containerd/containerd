@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins/content/local"
@@ -165,7 +166,7 @@ func FuzzLeaseManager(f *testing.F) {
 					return
 				}
 				db.Update(func(tx *bolt.Tx) error {
-					_ = lm.AddResource(metadata.WithTransactionContext(ctx, tx), l, r)
+					_ = lm.AddResource(boltutil.WithTransaction(ctx, tx), l, r)
 					return nil
 				})
 			case opDelete:
@@ -235,7 +236,7 @@ func FuzzContainerStore(f *testing.F) {
 					return
 				}
 				db.Update(func(tx *bolt.Tx) error {
-					_, _ = store.Create(metadata.WithTransactionContext(ctx, tx), c)
+					_, _ = store.Create(boltutil.WithTransaction(ctx, tx), c)
 					return nil
 				})
 			case opList:
