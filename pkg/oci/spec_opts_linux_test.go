@@ -49,9 +49,9 @@ guest:x:100:guest
 `
 	td := t.TempDir()
 	apply := fstest.Apply(
-		fstest.CreateDir("/etc", 0777),
-		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0777),
-		fstest.CreateFile("/etc/group", []byte(expectedGroup), 0777),
+		fstest.CreateDir("/etc", 0o777),
+		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0o777),
+		fstest.CreateFile("/etc/group", []byte(expectedGroup), 0o777),
 	)
 	if err := apply.Apply(td); err != nil {
 		t.Fatalf("failed to apply: %v", err)
@@ -134,8 +134,8 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 `
 	td := t.TempDir()
 	apply := fstest.Apply(
-		fstest.CreateDir("/etc", 0777),
-		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0777),
+		fstest.CreateDir("/etc", 0o777),
+		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0o777),
 	)
 	if err := apply.Apply(td); err != nil {
 		t.Fatalf("failed to apply: %v", err)
@@ -189,8 +189,8 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 `
 	td := t.TempDir()
 	apply := fstest.Apply(
-		fstest.CreateDir("/etc", 0777),
-		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0777),
+		fstest.CreateDir("/etc", 0o777),
+		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0o777),
 	)
 	if err := apply.Apply(td); err != nil {
 		t.Fatalf("failed to apply: %v", err)
@@ -256,9 +256,9 @@ sys:x:3:root,bin,adm
 `
 	td := t.TempDir()
 	apply := fstest.Apply(
-		fstest.CreateDir("/etc", 0777),
-		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0777),
-		fstest.CreateFile("/etc/group", []byte(expectedGroup), 0777),
+		fstest.CreateDir("/etc", 0o777),
+		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0o777),
+		fstest.CreateFile("/etc/group", []byte(expectedGroup), 0o777),
 	)
 	if err := apply.Apply(td); err != nil {
 		t.Fatalf("failed to apply: %v", err)
@@ -505,7 +505,7 @@ func TestGetDevices(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	zero := filepath.Join(dir, "zero")
-	if err := os.WriteFile(zero, nil, 0600); err != nil {
+	if err := os.WriteFile(zero, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -545,7 +545,7 @@ func TestGetDevices(t *testing.T) {
 	})
 	t.Run("two devices", func(t *testing.T) {
 		nullDev := filepath.Join(dir, "null")
-		if err := os.WriteFile(nullDev, nil, 0600); err != nil {
+		if err := os.WriteFile(nullDev, nil, 0o600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -591,7 +591,7 @@ func TestGetDevices(t *testing.T) {
 	})
 	t.Run("No devices", func(t *testing.T) {
 		dir := dir + "2"
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(dir)
@@ -620,7 +620,7 @@ func TestGetDevices(t *testing.T) {
 			}
 		})
 		t.Run("regular file in dir", func(t *testing.T) {
-			if err := os.WriteFile(filepath.Join(dir, "somefile"), []byte("hello"), 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, "somefile"), []byte("hello"), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			defer os.Remove(filepath.Join(dir, "somefile"))
@@ -644,8 +644,8 @@ daemon:x:2:root,bin,daemon
 `
 	td := t.TempDir()
 	apply := fstest.Apply(
-		fstest.CreateDir("/etc", 0777),
-		fstest.CreateFile("/etc/group", []byte(expectedContent), 0777),
+		fstest.CreateDir("/etc", 0o777),
+		fstest.CreateFile("/etc/group", []byte(expectedContent), 0o777),
 	)
 	if err := apply.Apply(td); err != nil {
 		t.Fatalf("failed to apply: %v", err)

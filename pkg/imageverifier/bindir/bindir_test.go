@@ -77,7 +77,7 @@ func newBinDir(t *testing.T, srcDir string, bins ...string) string {
 		require.NoError(t, err)
 		defer src.Close()
 
-		dst, err := os.OpenFile(filepath.Join(binDir, fmt.Sprintf("verifier-%v%v", i, exeIfWindows())), os.O_WRONLY|os.O_CREATE, 0755)
+		dst, err := os.OpenFile(filepath.Join(binDir, fmt.Sprintf("verifier-%v%v", i, exeIfWindows())), os.O_WRONLY|os.O_CREATE, 0o755)
 		require.NoError(t, err)
 		defer dst.Close()
 

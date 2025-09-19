@@ -161,9 +161,9 @@ server = "%s"
 		}
 		hostFilePath = filepath.Join(hostDir, "hosts.toml")
 
-		err := os.MkdirAll(hostDir, 0755)
+		err := os.MkdirAll(hostDir, 0o755)
 		assert.NoError(t, err)
-		err = os.WriteFile(hostFilePath, []byte(hostTOML), 0644)
+		err = os.WriteFile(hostFilePath, []byte(hostTOML), 0o644)
 		assert.NoError(t, err)
 
 		hostOptions := HostOptions{

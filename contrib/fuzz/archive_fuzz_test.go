@@ -120,7 +120,7 @@ func FuzzImportIndex(f *testing.F) {
 				}
 				tw.WriteHeader(&tar.Header{
 					Name:     "manifest.json",
-					Mode:     0644,
+					Mode:     0o644,
 					Size:     int64(len(manifestFileContents)),
 					Typeflag: tar.TypeReg,
 				})

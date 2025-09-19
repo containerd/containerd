@@ -577,7 +577,7 @@ while true; do
 done
 `, fileSize,
 	),
-	), 0600))
+	), 0o600))
 
 	podLogDir := t.TempDir()
 	podCtx := newPodTCtx(t, rSvc, "running", "sandbox", WithPodLogDirectory(podLogDir))
@@ -842,7 +842,7 @@ func cleanupPods(t *testing.T, criRuntimeService cri.RuntimeService) {
 // currentReleaseCtrdDefaultConfig generates empty(default) config for current release.
 func currentReleaseCtrdDefaultConfig(t *testing.T, targetDir string) {
 	fileName := filepath.Join(targetDir, "config.toml")
-	err := os.WriteFile(fileName, []byte(""), 0600)
+	err := os.WriteFile(fileName, []byte(""), 0o600)
 	require.NoError(t, err, "failed to create config for current release")
 }
 
@@ -863,7 +863,7 @@ version = 2
 		previousReleaseBinDir)
 
 	fileName := filepath.Join(targetDir, "config.toml")
-	err := os.WriteFile(fileName, []byte(rawCfg), 0600)
+	err := os.WriteFile(fileName, []byte(rawCfg), 0o600)
 	require.NoError(t, err, "failed to create config for previous release")
 }
 
@@ -888,7 +888,7 @@ version = 2
 `, previousReleaseBinDir, previousReleaseBinDir)
 
 	fileName := filepath.Join(targetDir, "config.toml")
-	err := os.WriteFile(fileName, []byte(rawCfg), 0600)
+	err := os.WriteFile(fileName, []byte(rawCfg), 0o600)
 	require.NoError(t, err, "failed to create config for previous release")
 }
 
@@ -917,7 +917,7 @@ func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string, envs []string
 	args = append(args, "--config", p.configPath())
 	args = append(args, "--log-level", "debug")
 
-	f, err := os.OpenFile(p.logPath(), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	f, err := os.OpenFile(p.logPath(), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o600)
 	require.NoError(t, err, "open log file %s", p.logPath())
 	t.Cleanup(func() { f.Close() })
 

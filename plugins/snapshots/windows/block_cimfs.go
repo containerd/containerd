@@ -279,7 +279,7 @@ func (s *blockCIMSnapshotter) createSnapshot(ctx context.Context, kind snapshots
 
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
-		if err = os.MkdirAll(snDir, 0700); err != nil {
+		if err = os.MkdirAll(snDir, 0o700); err != nil {
 			return fmt.Errorf("failed to create snapshot dir %s: %w", snDir, err)
 		}
 		defer func() {

@@ -591,7 +591,7 @@ func (r *request) clone() *request {
 
 func (r *request) do(ctx context.Context) (*http.Response, error) {
 	u := r.host.Scheme + "://" + r.host.Host + r.path
-	req, err := http.NewRequestWithContext(ctx, r.method, u, nil)
+	req, err := http.NewRequestWithContext(ctx, r.method, u, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
