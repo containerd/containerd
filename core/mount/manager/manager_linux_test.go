@@ -151,12 +151,12 @@ func TestLoopbackOverlay(t *testing.T) {
 					{
 						Type:    "xfs",
 						Source:  b1,
-						Options: []string{"loop"},
+						Options: []string{"loop", "ro"},
 					},
 					{
 						Type:    "xfs",
 						Source:  b2,
-						Options: []string{"loop"},
+						Options: []string{"loop", "ro"},
 					},
 					{
 						Type:   "format/overlay",
@@ -183,22 +183,22 @@ func TestLoopbackOverlay(t *testing.T) {
 					{
 						Type:    "loop",
 						Source:  b1,
-						Options: []string{},
+						Options: []string{"ro"},
 					},
 					{
 						Type:    "format/xfs",
 						Source:  "{{ mount 0 }}",
-						Options: []string{},
+						Options: []string{"ro"},
 					},
 					{
 						Type:    "loop",
 						Source:  b2,
-						Options: []string{},
+						Options: []string{"ro"},
 					},
 					{
 						Type:    "format/xfs",
 						Source:  "{{ mount 2 }}",
-						Options: []string{},
+						Options: []string{"ro"},
 					},
 					{
 						Type:   "format/overlay",
@@ -225,12 +225,12 @@ func TestLoopbackOverlay(t *testing.T) {
 					{
 						Type:    "xfs",
 						Source:  b1,
-						Options: []string{"loop"},
+						Options: []string{"loop", "ro"},
 					},
 					{
 						Type:    "xfs",
 						Source:  b2,
-						Options: []string{"loop"},
+						Options: []string{"loop", "ro"},
 					},
 					{
 						Type:   "format/overlay",
@@ -257,12 +257,12 @@ func TestLoopbackOverlay(t *testing.T) {
 					{
 						Type:    "xfs",
 						Source:  b2,
-						Options: []string{"loop"},
+						Options: []string{"loop", "ro"},
 					},
 					{
 						Type:    "xfs",
 						Source:  b1,
-						Options: []string{"loop"},
+						Options: []string{"loop", "ro"},
 					},
 					{
 						Type:   "format/overlay",

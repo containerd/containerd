@@ -39,8 +39,14 @@ func (loopbackHandler) Mount(ctx context.Context, m Mount, mp string, _ []Active
 	params := LoopParams{
 		Autoclear: true,
 	}
-	// TODO: Handle readonly
-	// TODO: Handle direct io
+	for _, o := range m.Options {
+		switch o {
+		case "ro":
+			params.Readonly = true
+		case "direct-io":
+			params.Direct = true
+		}
+	}
 
 	t := time.Now()
 	loop, err := setupLoop(m.Source, params)
