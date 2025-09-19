@@ -388,6 +388,7 @@ func (u *Unpacker) unpack(
 						// Try again, this should be rare, log it
 						log.G(ctx).WithField("key", key).WithField("chainid", chainID).Debug("extraction snapshot already exists, chain id not found")
 					} else {
+						log.G(ctx).Infof("snapshot with chainID %s already exists skip fetch blob %q ", chainID, desc.Digest)
 						// no need to handle, snapshot now found with chain id
 						return nil
 					}
