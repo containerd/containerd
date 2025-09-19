@@ -1,0 +1,925 @@
+name: Coverage
+on:
+  pull_request:
+    types: [labeled,synchronize]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write  # Needed for PR comments
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+env:
+  BRANCH_NAME: ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+
+jobs:
+  windows-coverage:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'coverage') }}
+    name: Windows Coverage
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      GOTEST: gotestsum --
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022]
+        cgroup_driver: [cgroupfs]
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: src/github.com/containerd/containerd
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Set up Go
+        uses: ./src/github.com/containerd/containerd/.github/actions/install-go
+
+      - name: Checkout CRI Tools repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: kubernetes-sigs/cri-tools
+          path: src/github.com/kubernetes-sigs/cri-tools
+          fetch-depth: 0
+
+      - name: Set env
+        working-directory: ${{ github.workspace }}  # Run from workspace root
+        run: |
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin/windows/amd64" >> $GITHUB_PATH
+      - name: Install dependencies
+        run: script/setup/install-dev-tools
+
+      - name: Coverage Binaries
+        shell: bash
+        env:
+          CGO_ENABLED: 1
+        run: |
+          set -o xtrace
+          mingw32-make.exe coverage-binaries
+          CRITEST_VERSION=$(cat script/setup/critools-version)
+          cd ../../kubernetes-sigs/cri-tools
+          git checkout "${CRITEST_VERSION}"
+          make critest
+
+      - run: script/setup/install-cni-windows
+
+      - name: Set up test images
+        env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+          CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+          BUSYBOX_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/busybox:1.29-2"
+          RESOURCE_CONSUMER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/resource-consumer:1.10"
+          WEBSERVER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/nginx:1.14-2"
+        run: |
+          cat > "${{ env.TEST_IMAGE_LIST }}" << EOF
+          busybox = "${{ env.BUSYBOX_TESTING_IMAGE_REF }}"
+          ResourceConsumer = "${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}"
+          EOF
+          cat > "${{ env.CRI_TEST_IMAGES }}" << EOF
+          defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+          webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
+          EOF
+
+      - name: Get crictl tool
+        shell: powershell
+        run: |
+          # Get critctl tool. Used for cri-integration tests
+          $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.26.0/crictl-v1.26.0-windows-amd64.tar.gz"
+          curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
+          tar -xvf c:\crictl.tar.gz
+          mv crictl.exe "${{ github.workspace }}/bin/crictl.exe" # Move crictl somewhere in path
+
+      - run: script/setup/install-gotestsum
+      - run: script/setup/install-teststat
+
+      - name: Run unit tests with coverage
+        id: unit-test
+        env:
+          CGO_ENABLED: 1
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
+        run: |
+          mingw32-make.exe coverage
+          mingw32-make.exe root-coverage
+
+      - name: Combine and rename coverage reports
+        run: |
+          # Initialize combined coverage file
+          BRANCH_NAME=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          COMBINED_FILE="coverage-unit-test-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt"
+          > "$COMBINED_FILE"
+
+          # Combine coverage files if they exist
+          if [ -f coverage.txt ]; then
+            cat coverage.txt >> "$COMBINED_FILE"
+          fi
+          if [ -f coverage-root.txt ]; then
+            cat coverage-root.txt >> "$COMBINED_FILE"
+          fi
+
+          # Clean up individual files
+          rm -f coverage.txt coverage-root.txt profile.out
+
+          echo "Combined coverage report created: $COMBINED_FILE"
+        if: steps.unit-test.outcome == 'success'
+
+      - name: Integration test with coverage
+        id: integration-test
+        env:
+          CGO_ENABLED: 1
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+          EXTRA_TESTFLAGS: "-timeout=20m"
+        run: mingw32-make.exe integration-coverage
+
+      - name: Rename integration coverage report
+        run: |
+          if [ -f integration/client/integration-coverage.txt ]; then
+            cp integration/client/integration-coverage.txt coverage-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt
+            echo "Integration coverage report renamed to: coverage-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt"
+          fi
+        if: steps.integration-test.outcome == 'success'
+
+      - run: script/test/test2annotation.sh "$TESTFILE"
+        env:
+          TESTFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+        if: success()
+
+      - name: CRI Integration Test with coverage
+        id: cri-integration-test
+        env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+        run: |
+          make cri-integration-coverage
+
+      - name: Rename CRI integration coverage report
+        run: |
+          if [ -f cri-integration-coverage.txt ]; then
+            cp cri-integration-coverage.txt coverage-cri-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt
+            echo "CRI integration coverage report renamed to: coverage-cri-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt"
+          fi
+        if: steps.cri-integration-test.outcome == 'success'
+
+      - name: cri-tools critest
+        env:
+          CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+        shell: powershell
+        run: |
+          Start-Process -FilePath containerd.exe -NoNewWindow -RedirectStandardError true -PassThru
+          get-process | sls containerd
+          start-sleep 5
+          # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
+          # Info: https://github.com/containerd/containerd/issues/6652
+          if( '${{ matrix.os }}' -eq 'windows-2022' )
+          {
+            $skip = "-ginkgo.skip=runtime should support exec with tty=true and stdin=true"
+          }
+          critest-coverage.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
+
+      - name: Rename cri-tools critest coverage report
+        run: |
+          if [ -f report/cover/containerd.txt ]; then
+            cp report/cover/containerd.txt coverage-cri-tools-critest-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt
+            echo "CRI tools critest coverage report renamed to: coverage-cri-tools-critest-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt"
+          fi
+        if: steps.cri-tools-critest.outcome == 'success'
+
+      - name: Coverage summary with overlaps (grouped by package)
+        run: |
+              echo "=== Available coverage files ==="
+              ls -la coverage-*.txt || echo "No coverage files found"
+
+              declare -A FILE_MAP=(
+                ["coverage-unit-test-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"]="unit"
+                ["coverage-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"]="integration"
+                ["coverage-cri-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"]="cri-integration"
+                ["coverage-cri-tools-critest-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"]="cri-tools-critest"
+              )
+
+              # Start both action summary AND PR comment content
+              echo "## Coverage Summary (${{ matrix.os }}-${{ matrix.cgroup_driver }})" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Test Type | Coverage % | Status |" >> $GITHUB_STEP_SUMMARY
+              echo "|-----------|------------|---------|" >> $GITHUB_STEP_SUMMARY
+
+              # Create PR comment content file
+              PR_COMMENT_FILE="pr-coverage-comment.md"
+              echo "## Coverage Summary (${{ matrix.os }}-${{ matrix.cgroup_driver }})" > "$PR_COMMENT_FILE"
+              echo "" >> "$PR_COMMENT_FILE"
+              echo "| Test Type | Coverage % | Status |" >> "$PR_COMMENT_FILE"
+              echo "|-----------|------------|---------|" >> "$PR_COMMENT_FILE"
+
+              COMBINED="all-coverage-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"
+              rm -f "$COMBINED"
+              echo "mode: atomic" > "$COMBINED"
+
+              TMPFILE="all-lines-tagged.txt"
+              rm -f "$TMPFILE"
+
+              FOUND_FILES=0
+
+              for f in "${!FILE_MAP[@]}"; do
+                TYPE="${FILE_MAP[$f]}"
+                if [ -f "$f" ]; then
+                  echo "Processing $f (type: $TYPE)"
+
+                  # Show coverage % for this test type
+                  COVERAGE_PCT=$(go tool cover -func="$f" 2>/dev/null | grep total: | awk '{print $3}' || echo "0.0%")
+
+                  # Add to both action summary AND PR comment
+                  echo "| $TYPE | $COVERAGE_PCT | ✅ Found |" >> $GITHUB_STEP_SUMMARY
+                  echo "| $TYPE | $COVERAGE_PCT | ✅ Found |" >> "$PR_COMMENT_FILE"
+
+                  # Add to combined file (skip empty files)
+                  if [ -s "$f" ]; then
+                    grep -h -v '^mode:' "$f" >> "$COMBINED"
+                    # Add to tagged lines
+                    grep -h -v '^mode:' "$f" | awk -v t="$TYPE" '{print $0, "[" t "]"}' >> "$TMPFILE"
+                  fi
+
+                  FOUND_FILES=$((FOUND_FILES + 1))
+                else
+                  echo "| $TYPE | N/A | ❌ Missing |" >> $GITHUB_STEP_SUMMARY
+                  echo "| $TYPE | N/A | ❌ Missing |" >> "$PR_COMMENT_FILE"
+                  echo "Missing file: $f"
+                fi
+              done
+
+              if [ $FOUND_FILES -eq 0 ]; then
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "⚠️ **No coverage files found!** Check if previous test steps completed successfully." >> $GITHUB_STEP_SUMMARY
+                echo "" >> "$PR_COMMENT_FILE"
+                echo "⚠️ **No coverage files found!** Check if previous test steps completed successfully." >> "$PR_COMMENT_FILE"
+                exit 0
+              fi
+
+              # Overall combined coverage
+              if [ -s "$COMBINED" ] && [ $FOUND_FILES -gt 0 ]; then
+                OVERALL_COVERAGE=$(go tool cover -func="$COMBINED" 2>/dev/null | grep total: | awk '{print $3}' || echo "Unable to calculate")
+                echo "| **Overall** | **$OVERALL_COVERAGE** | ✅ Combined |" >> $GITHUB_STEP_SUMMARY
+                echo "| **Overall** | **$OVERALL_COVERAGE** | ✅ Combined |" >> "$PR_COMMENT_FILE"
+              fi
+
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "" >> "$PR_COMMENT_FILE"
+
+              # --- Overlap analysis (ONLY goes to action summary, NOT PR comment) ---
+              if [ ! -f "$TMPFILE" ] || [ ! -s "$TMPFILE" ]; then
+                echo "## Coverage Overlap Report (${{ matrix.os }}-${{ matrix.cgroup_driver }})" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "No overlap data available." >> $GITHUB_STEP_SUMMARY
+                exit 0
+              fi
+
+              echo "=== Processing overlap analysis ==="
+              # Process overlap data with better error handling
+              awk '
+              {
+                # Build key from all fields except the last tag field
+                key = $1;
+                for (i = 2; i <= NF-2; i++) {
+                  key = key FS $i;
+                }
+                # Extract tag (last two fields should be [ type ])
+                if (NF >= 2) {
+                  tag = $(NF-1) " " $NF;
+                  data[key] = data[key] " " tag;
+                  count[key]++;
+                }
+              }
+              END {
+                found_overlaps = 0;
+                for (k in data) {
+                  if (count[k] > 1) {
+                    # Clean up extra spaces
+                    gsub(/  +/, " ", data[k]);
+                    gsub(/^ +| +$/, "", data[k]);
+                    # Extract package path from the key
+                    pkg = k;
+                    sub(/\/[^\/]*\.go:.*/, "", pkg);
+
+                    print pkg "||" count[k] "||" k "||" data[k];
+                    found_overlaps = 1;
+                  }
+                }
+                if (found_overlaps == 0) {
+                  print "NO_OVERLAPS";
+                }
+              }' "$TMPFILE" | sort > overlap-by-pkg.txt
+
+              # Check if we found any overlaps
+              if [ ! -s overlap-by-pkg.txt ] || grep -q "NO_OVERLAPS" overlap-by-pkg.txt; then
+                echo "## Coverage Overlap Report (${{ matrix.os }}-${{ matrix.cgroup_driver }})" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "✅ No overlapping coverage found - all lines are covered by only one test type." >> $GITHUB_STEP_SUMMARY
+                exit 0
+              fi
+
+              echo "## Coverage Overlap Report (${{ matrix.os }}-${{ matrix.cgroup_driver }})" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "_Lines covered by multiple test types:_" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+
+              current_pkg=""
+              overlap_count=0
+              while IFS="||" read -r pkg count line sources; do
+                if [ "$pkg" != "$current_pkg" ]; then
+                  if [ -n "$current_pkg" ]; then
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                  fi
+                  echo "### Package: \`$pkg\`" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "| Count | File:Line Range | Test Types |" >> $GITHUB_STEP_SUMMARY
+                  echo "|-------|-----------------|------------|" >> $GITHUB_STEP_SUMMARY
+                  current_pkg="$pkg"
+                fi
+                # Truncate long file paths for readability
+                short_line=$(echo "$line" | sed 's|.*/||')
+                echo "| $count | \`$short_line\` | $sources |" >> $GITHUB_STEP_SUMMARY
+                overlap_count=$((overlap_count + 1))
+              done < overlap-by-pkg.txt
+
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "_Found $overlap_count overlapping coverage lines across packages._" >> $GITHUB_STEP_SUMMARY
+
+              # Clean up temporary files
+              rm -f overlap-by-pkg.txt "$TMPFILE"
+        if: always() && (steps.unit-test.outcome == 'success' || steps.integration-test.outcome == 'success' || steps.cri-integration-test.outcome == 'success' || steps.cri-tools-critest.outcome == 'success')
+
+      - name: Comment PR with coverage summary
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request' && always() && (steps.unit-test.outcome == 'success' || steps.integration-test.outcome == 'success' || steps.cri-integration-test.outcome == 'success' || steps.cri-tools-critest.outcome == 'success')
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'pr-coverage-comment.md';
+
+            if (!fs.existsSync(path)) {
+              console.log('No PR comment file found');
+              return;
+            }
+
+            const coverageContent = fs.readFileSync(path, 'utf8');
+
+            // Find or create comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Coverage Summary (${{ matrix.os }}-${{ matrix.cgroup_driver }})')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: coverageContent
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: coverageContent
+              });
+            }
+
+      - name: Upload coverage files
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-files-${{ matrix.os }}-${{ matrix.cgroup_driver }}
+          path: |
+            coverage-*.txt
+            all-coverage-*.txt
+          retention-days: 7
+        if: always() && (steps.unit-test.outcome == 'success' || steps.integration-test.outcome == 'success' || steps.cri-integration-test.outcome == 'success')
+
+
+  linux-coverage:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'coverage') }}
+    name: Linux Coverage
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      GOTEST: gotestsum --
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime:
+          - io.containerd.runc.v2
+        runc: [runc]  # crun can be added here to debug crun issues
+        os: [ubuntu-24.04]
+        cgroup_driver: [cgroupfs, systemd]
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Go
+        uses: ./.github/actions/install-go
+
+      - name: Install containerd dependencies
+        env:
+          RUNC_FLAVOR: ${{ matrix.runc }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gperf dmsetup strace xfsprogs
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
+
+      - name: Install criu
+        run: |
+          sudo add-apt-repository -y ppa:criu/ppa
+          sudo apt-get update
+          sudo apt-get install -y criu
+
+      - name: Install containerd
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make coverage-binaries
+          sudo -E PATH=$PATH make install-all
+      - run: script/setup/install-gotestsum
+      - run: script/setup/install-teststat
+      - name: Run unit tests with coverage
+        id: unit-test
+        env:
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
+        run: |
+          make coverage
+          sudo -E PATH=$PATH make root-coverage
+      - name: Combine and rename coverage reports
+        run: |
+          # Initialize combined coverage file
+          BRANCH_NAME=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          COMBINED_FILE="coverage-unit-test-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt"
+          > "$COMBINED_FILE"
+
+          # Combine coverage files if they exist
+          if [ -f coverage.txt ]; then
+            cat coverage.txt >> "$COMBINED_FILE"
+          fi
+          if [ -f coverage-root.txt ]; then
+            cat coverage-root.txt >> "$COMBINED_FILE"
+          fi
+
+          # Clean up individual files
+          rm -f coverage.txt coverage-root.txt profile.out
+
+          echo "Combined coverage report created: $COMBINED_FILE"
+        if: steps.unit-test.outcome == 'success'
+
+      - name: Integration test with coverage
+        id: integration-test
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+        run: |
+          extraflags=""
+          [ "${RUNC_FLAVOR}" == "crun" ] && {
+                  extraflags="EXTRA_TESTFLAGS=-no-criu";
+          }
+          sudo -E PATH=$PATH make integration-coverage ${extraflags} TESTFLAGS_RACE=-race
+      - name: Rename integration coverage report
+        run: |
+          if [ -f integration/client/integration-coverage.txt ]; then
+            cp integration/client/integration-coverage.txt coverage-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt
+            echo "Integration coverage report renamed to: coverage-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt"
+          fi
+        if: steps.integration-test.outcome == 'success'
+
+      - name: CRI Integration Test
+        id: cri-integration-test
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
+        run: |
+          cat /sys/fs/cgroup/cgroup.controllers
+          systemctl status
+          [ "${RUNC_FLAVOR}" == "crun" ] && {
+             export XDG_RUNTIME_DIR=/run/user/$(id -u)
+          }
+          runc --version
+          CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
+
+      - name: Rename CRI integration coverage report
+        run: |
+          if [ -f cri-integration-coverage.txt ]; then
+            cp cri-integration-coverage.txt coverage-cri-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt
+            echo "CRI integration coverage report renamed to: coverage-cri-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt"
+          fi
+        if: steps.cri-integration-test.outcome == 'success'
+      - name: cri-tools critest wih coverage
+        id: cri-tools-critest
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+        run: |
+          env
+          sudo -E PATH=$PATH ./script/critest-coverage.sh "${{github.workspace}}/report"
+
+      - name: Rename cri-tools critest coverage report
+        run: |
+          if [ -f report/cover/containerd.txt ]; then
+            cp report/cover/containerd.txt coverage-cri-tools-critest-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt
+            echo "CRI tools critest coverage report renamed to: coverage-cri-tools-critest-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{env.BRANCH_NAME}}.txt"
+          fi
+        if: steps.cri-tools-critest.outcome == 'success'
+      - name: Coverage summary with overlaps (grouped by package)
+        run: |
+          echo "=== Available coverage files ==="
+          ls -la coverage-*.txt || echo "No coverage files found"
+
+          declare -A FILE_MAP=(
+            ["coverage-unit-test-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"]="unit"
+            ["coverage-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"]="integration"
+            ["coverage-cri-integration-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"]="cri-integration"
+            ["coverage-cri-tools-critest-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"]="cri-tools-critest"
+          )
+          # Start both action summary AND PR comment content
+          echo "## Coverage Summary (${{ matrix.os }}-${{ matrix.cgroup_driver }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Coverage % | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|------------|---------|" >> $GITHUB_STEP_SUMMARY
+
+          # Create PR comment content file
+          PR_COMMENT_FILE="pr-coverage-comment.md"
+          echo "## Coverage Summary (${{ matrix.os }}-${{ matrix.cgroup_driver }})" > "$PR_COMMENT_FILE"
+          echo "" >> "$PR_COMMENT_FILE"
+          echo "| Test Type | Coverage % | Status |" >> "$PR_COMMENT_FILE"
+          echo "|-----------|------------|---------|" >> "$PR_COMMENT_FILE"
+
+          COMBINED="all-coverage-${{ matrix.os }}-${{ matrix.cgroup_driver }}-${{ env.BRANCH_NAME }}.txt"
+          rm -f "$COMBINED"
+          echo "mode: atomic" > "$COMBINED"
+
+          TMPFILE="all-lines-tagged.txt"
+          rm -f "$TMPFILE"
+
+          FOUND_FILES=0
+
+          for f in "${!FILE_MAP[@]}"; do
+              TYPE="${FILE_MAP[$f]}"
+              if [ -f "$f" ]; then
+                  echo "Processing $f (type: $TYPE)"
+
+              # Show coverage % for this test type
+              COVERAGE_PCT=$(go tool cover -func="$f" 2>/dev/null | grep total: | awk '{print $3}' || echo "0.0%")
+
+              # Add to both action summary AND PR comment
+              echo "| $TYPE | $COVERAGE_PCT | ✅ Found |" >> $GITHUB_STEP_SUMMARY
+              echo "| $TYPE | $COVERAGE_PCT | ✅ Found |" >> "$PR_COMMENT_FILE"
+
+              # Add to combined file (skip empty files)
+              if [ -s "$f" ]; then
+                grep -h -v '^mode:' "$f" >> "$COMBINED"
+                # Add to tagged lines
+                grep -h -v '^mode:' "$f" | awk -v t="$TYPE" '{print $0, "[" t "]"}' >> "$TMPFILE"
+              fi
+
+              FOUND_FILES=$((FOUND_FILES + 1))
+            else
+              echo "| $TYPE | N/A | ❌ Missing |" >> $GITHUB_STEP_SUMMARY
+              echo "| $TYPE | N/A | ❌ Missing |" >> "$PR_COMMENT_FILE"
+              echo "Missing file: $f"
+            fi
+          done
+
+          if [ $FOUND_FILES -eq 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **No coverage files found!** Check if previous test steps completed successfully." >> $GITHUB_STEP_SUMMARY
+            echo "" >> "$PR_COMMENT_FILE"
+            echo "⚠️ **No coverage files found!** Check if previous test steps completed successfully." >> "$PR_COMMENT_FILE"
+            exit 0
+          fi
+
+          # Overall combined coverage
+          if [ -s "$COMBINED" ] && [ $FOUND_FILES -gt 0 ]; then
+            OVERALL_COVERAGE=$(go tool cover -func="$COMBINED" 2>/dev/null | grep total: | awk '{print $3}' || echo "Unable to calculate")
+            echo "| **Overall** | **$OVERALL_COVERAGE** | ✅ Combined |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Overall** | **$OVERALL_COVERAGE** | ✅ Combined |" >> "$PR_COMMENT_FILE"
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "" >> "$PR_COMMENT_FILE"
+
+          # --- Overlap analysis (ONLY goes to action summary, NOT PR comment) ---
+          if [ ! -f "$TMPFILE" ] || [ ! -s "$TMPFILE" ]; then
+            echo "## Coverage Overlap Report (${{ matrix.os }}-${{ matrix.cgroup_driver }})" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No overlap data available." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          echo "=== Processing overlap analysis ==="
+          # Process overlap data with better error handling
+          awk '
+          {
+            # Build key from all fields except the last tag field
+            key = $1;
+            for (i = 2; i <= NF-2; i++) {
+              key = key FS $i;
+            }
+            # Extract tag (last two fields should be [ type ])
+            if (NF >= 2) {
+              tag = $(NF-1) " " $NF;
+              data[key] = data[key] " " tag;
+              count[key]++;
+            }
+          }
+          END {
+            found_overlaps = 0;
+            for (k in data) {
+              if (count[k] > 1) {
+                # Clean up extra spaces
+                gsub(/  +/, " ", data[k]);
+                gsub(/^ +| +$/, "", data[k]);
+                # Extract package path from the key
+                pkg = k;
+                sub(/\/[^\/]*\.go:.*/, "", pkg);
+
+                print pkg "||" count[k] "||" k "||" data[k];
+                found_overlaps = 1;
+              }
+            }
+            if (found_overlaps == 0) {
+              print "NO_OVERLAPS";
+            }
+          }' "$TMPFILE" | sort > overlap-by-pkg.txt
+
+          # Check if we found any overlaps
+          if [ ! -s overlap-by-pkg.txt ] || grep -q "NO_OVERLAPS" overlap-by-pkg.txt; then
+            echo "## Coverage Overlap Report (${{ matrix.os }}-${{ matrix.cgroup_driver }})" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ No overlapping coverage found - all lines are covered by only one test type." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          echo "## Coverage Overlap Report (${{ matrix.os }}-${{ matrix.cgroup_driver }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Lines covered by multiple test types:_" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          current_pkg=""
+          overlap_count=0
+          while IFS="||" read -r pkg count line sources; do
+              if [ "$pkg" != "$current_pkg" ]; then
+                  if [ -n "$current_pkg" ]; then
+                      echo "" >> $GITHUB_STEP_SUMMARY
+                  fi
+                  echo "### Package: \`$pkg\`" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "| Count | File:Line Range | Test Types |" >> $GITHUB_STEP_SUMMARY
+                  echo "|-------|-----------------|------------|" >> $GITHUB_STEP_SUMMARY
+                  current_pkg="$pkg"
+              fi
+              # Truncate long file paths for readability
+              short_line=$(echo "$line" | sed 's|.*/||')
+              echo "| $count | \`$short_line\` | $sources |" >> $GITHUB_STEP_SUMMARY
+              overlap_count=$((overlap_count + 1))
+          done < overlap-by-pkg.txt
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Found $overlap_count overlapping coverage lines across packages._" >> $GITHUB_STEP_SUMMARY
+
+          # Clean up temporary files
+          rm -f overlap-by-pkg.txt "$TMPFILE"
+        if: always() && (steps.unit-test.outcome == 'success' || steps.integration-test.outcome == 'success' || steps.cri-integration-test.outcome == 'success' || steps.cri-tools-critest.outcome == 'success')
+      - name: Comment PR with coverage summary
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request' && always() && (steps.unit-test.outcome == 'success' || steps.integration-test.outcome == 'success' || steps.cri-integration-test.outcome == 'success' || steps.cri-tools-critest.outcome == 'success')
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'pr-coverage-comment.md';
+
+            if (!fs.existsSync(path)) {
+              console.log('No PR comment file found');
+              return;
+            }
+
+            const coverageContent = fs.readFileSync(path, 'utf8');
+
+            // Find or create comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Coverage Summary (${{ matrix.os }}-${{ matrix.cgroup_driver }})')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: coverageContent
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: coverageContent
+              });
+            }
+
+      - name: Upload coverage files
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-files-${{ matrix.os }}-${{ matrix.cgroup_driver }}
+          path: |
+            coverage-*.txt
+            all-coverage-*.txt
+          retention-days: 7
+        if: always() && (steps.unit-test.outcome == 'success' || steps.integration-test.outcome == 'success' || steps.cri-integration-test.outcome == 'success')
+
+  overall-coverage:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'coverage') }}
+    name: Overall Coverage Summary
+    needs: [windows-coverage, linux-coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-files-*
+          merge-multiple: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Calculate overall coverage
+        run: |
+          echo "## 🎯 Overall Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Configuration | Coverage |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|---------------|----------|" >> $GITHUB_STEP_SUMMARY
+
+          # Create PR comment content file for overall coverage
+          OVERALL_PR_COMMENT_FILE="pr-overall-coverage-comment.md"
+          echo "## 🎯 Overall Coverage Summary" > "$OVERALL_PR_COMMENT_FILE"
+          echo "" >> "$OVERALL_PR_COMMENT_FILE"
+          echo "| Platform | Configuration | Coverage |" >> "$OVERALL_PR_COMMENT_FILE"
+          echo "|----------|---------------|----------|" >> "$OVERALL_PR_COMMENT_FILE"
+
+          # Initialize grand total coverage file
+          GRAND_TOTAL="grand-total-coverage.txt"
+          echo "mode: atomic" > "$GRAND_TOTAL"
+
+          # Process each platform/config combination
+          TOTAL_CONFIGS=0
+          COVERAGE_SUM=0
+
+          for combined_file in all-coverage-*.txt; do
+            if [ -f "$combined_file" ]; then
+              # Extract platform and config from filename
+              basename_file=$(basename "$combined_file" .txt)
+              platform_config=$(echo "$basename_file" | sed 's/^all-coverage-//' | sed 's/-[^-]*$//')
+
+              # Get coverage percentage
+              if [ -s "$combined_file" ]; then
+                coverage_pct=$(go tool cover -func="$combined_file" | grep total: | awk '{print $3}' | sed 's/%//')
+                coverage_display=$(go tool cover -func="$combined_file" | grep total: | awk '{print $3}')
+
+                # Add to summary table (both action summary AND PR comment)
+                platform=$(echo "$platform_config" | cut -d'-' -f1,2)
+                config=$(echo "$platform_config" | cut -d'-' -f3-)
+                echo "| $platform | $config | **$coverage_display** |" >> $GITHUB_STEP_SUMMARY
+                echo "| $platform | $config | **$coverage_display** |" >> "$OVERALL_PR_COMMENT_FILE"
+
+                # Add to grand total (remove duplicates by merging)
+                grep -h -v '^mode:' "$combined_file" >> "$GRAND_TOTAL"
+
+                # Track for average calculation
+                TOTAL_CONFIGS=$((TOTAL_CONFIGS + 1))
+                COVERAGE_SUM=$(echo "$COVERAGE_SUM + $coverage_pct" | bc -l)
+              else
+                platform=$(echo "$platform_config" | cut -d'-' -f1,2)
+                config=$(echo "$platform_config" | cut -d'-' -f3-)
+                echo "| $platform | $config | ❌ No data |" >> $GITHUB_STEP_SUMMARY
+                echo "| $platform | $config | ❌ No data |" >> "$OVERALL_PR_COMMENT_FILE"
+              fi
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "" >> "$OVERALL_PR_COMMENT_FILE"
+
+          # Calculate and display grand total coverage (deduplicated across all platforms)
+          if [ -s "$GRAND_TOTAL" ] && [ $(wc -l < "$GRAND_TOTAL") -gt 1 ]; then
+            # Sort and deduplicate coverage lines (same file:line combinations)
+            temp_file="temp_coverage.txt"
+            echo "mode: atomic" > "$temp_file"
+            grep -h -v '^mode:' "$GRAND_TOTAL" | sort -u >> "$temp_file"
+
+            grand_total_pct=$(go tool cover -func="$temp_file" | grep total: | awk '{print $3}')
+
+            # Add to both action summary AND PR comment
+            echo "### 🏆 **Grand Total Coverage: $grand_total_pct**" >> $GITHUB_STEP_SUMMARY
+            echo "### 🏆 **Grand Total Coverage: $grand_total_pct**" >> "$OVERALL_PR_COMMENT_FILE"
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "" >> "$OVERALL_PR_COMMENT_FILE"
+            echo "_This represents deduplicated coverage across all platforms and configurations._" >> $GITHUB_STEP_SUMMARY
+            echo "_This represents deduplicated coverage across all platforms and configurations._" >> "$OVERALL_PR_COMMENT_FILE"
+
+            rm -f "$temp_file"
+          fi
+
+          # Calculate average coverage across platforms
+          if [ $TOTAL_CONFIGS -gt 0 ]; then
+            avg_coverage=$(echo "scale=1; $COVERAGE_SUM / $TOTAL_CONFIGS" | bc -l)
+
+            # Add to both action summary AND PR comment
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "" >> "$OVERALL_PR_COMMENT_FILE"
+            echo "📊 **Average Coverage Across Platforms: ${avg_coverage}%**" >> $GITHUB_STEP_SUMMARY
+            echo "📊 **Average Coverage Across Platforms: ${avg_coverage}%**" >> "$OVERALL_PR_COMMENT_FILE"
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "" >> "$OVERALL_PR_COMMENT_FILE"
+            echo "📈 **Configurations Tested: $TOTAL_CONFIGS**" >> $GITHUB_STEP_SUMMARY
+            echo "📈 **Configurations Tested: $TOTAL_CONFIGS**" >> "$OVERALL_PR_COMMENT_FILE"
+          fi
+
+          # Add a quick interpretation guide (ONLY to action summary)
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Coverage Report Guide" >> $GITHUB_STEP_SUMMARY
+          echo "- **Grand Total**: Deduplicated coverage across all platforms (most accurate overall coverage)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Average Coverage**: Mean coverage percentage across all platform/config combinations" >> $GITHUB_STEP_SUMMARY
+          echo "- **Per-Platform**: Individual coverage for each OS and cgroup configuration" >> $GITHUB_STEP_SUMMARY
+        if: always()
+
+      - name: Comment PR with overall coverage summary
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request' && always()
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'pr-overall-coverage-comment.md';
+
+            if (!fs.existsSync(path)) {
+              console.log('No overall coverage PR comment file found');
+              return;
+            }
+
+            const overallCoverageContent = fs.readFileSync(path, 'utf8');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('🎯 Overall Coverage Summary')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: overallCoverageContent
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: overallCoverageContent
+              });
+            }
