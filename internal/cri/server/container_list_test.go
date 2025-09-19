@@ -60,7 +60,7 @@ func TestToCRIContainer(t *testing.T) {
 			},
 		),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	expect := &runtime.Container{
 		Id:           "test-id",
 		PodSandboxId: "test-sandbox-id",
@@ -285,14 +285,14 @@ func TestListContainers(t *testing.T) {
 
 	// Inject test sandbox metadata
 	for _, sb := range sandboxesInStore {
-		assert.NoError(t, c.sandboxStore.Add(sb))
+		require.NoError(t, c.sandboxStore.Add(sb))
 	}
 
 	// Inject test container metadata
 	for _, cntr := range containersInStore {
 		container, err := cntr.toContainer()
-		assert.NoError(t, err)
-		assert.NoError(t, c.containerStore.Add(container))
+		require.NoError(t, err)
+		require.NoError(t, c.containerStore.Add(container))
 	}
 
 	for _, testdata := range []struct {
@@ -352,7 +352,7 @@ func TestListContainers(t *testing.T) {
 	} {
 		t.Run(testdata.desc, func(t *testing.T) {
 			resp, err := c.ListContainers(context.Background(), &runtime.ListContainersRequest{Filter: testdata.filter})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			require.NotNil(t, resp)
 			containers := resp.GetContainers()
 			assert.Len(t, containers, len(testdata.expect))

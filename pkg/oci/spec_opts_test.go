@@ -221,19 +221,19 @@ func TestWithEnv(t *testing.T) {
 	}
 
 	err := WithEnv([]string{"env=1"})(context.Background(), nil, nil, &s)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"DEFAULT=test", "env=1"}, s.Process.Env, "didn't append")
 
 	err = WithEnv([]string{"env2=1"})(context.Background(), nil, nil, &s)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"DEFAULT=test", "env=1", "env2=1"}, s.Process.Env, "didn't append")
 
 	err = WithEnv([]string{"env2=2"})(context.Background(), nil, nil, &s)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"DEFAULT=test", "env=1", "env2=2"}, s.Process.Env, "didn't update")
 
 	err = WithEnv([]string{"env2"})(context.Background(), nil, nil, &s)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"DEFAULT=test", "env=1"}, s.Process.Env, "didn't update")
 }
 
@@ -256,7 +256,7 @@ func TestWithMounts(t *testing.T) {
 			Destination: "new-dest",
 		},
 	})(nil, nil, nil, &s)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, s.Mounts, 2, "didn't append")
 	assert.Equal(t, "new-source", s.Mounts[1].Source, "invalid mount")
 	assert.Equal(t, "new-dest", s.Mounts[1].Destination, "invalid mount")
@@ -271,17 +271,17 @@ func TestWithDefaultSpec(t *testing.T) {
 	)
 
 	err := ApplyOpts(ctx, nil, &c, &s, WithDefaultSpec())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var expected Spec
 
 	switch runtime.GOOS {
 	case "windows":
-		assert.NoError(t, populateDefaultWindowsSpec(ctx, &expected, c.ID))
+		require.NoError(t, populateDefaultWindowsSpec(ctx, &expected, c.ID))
 	case "darwin":
-		assert.NoError(t, populateDefaultDarwinSpec(&expected))
+		require.NoError(t, populateDefaultDarwinSpec(&expected))
 	default:
-		assert.NoError(t, populateDefaultUnixSpec(ctx, &expected, c.ID))
+		require.NoError(t, populateDefaultUnixSpec(ctx, &expected, c.ID))
 	}
 
 	assert.NotEmpty(t, s)
@@ -297,17 +297,17 @@ func TestWithSpecFromFile(t *testing.T) {
 	)
 
 	expected, err := GenerateSpec(ctx, nil, &c)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := json.Marshal(expected)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	specFile := filepath.Join(t.TempDir(), "testwithdefaultspec.json")
 	err = os.WriteFile(specFile, p, 0o600)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = ApplyOpts(ctx, nil, &c, &s, WithSpecFromFile(specFile))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, s)
 	assert.Equal(t, expected, &s)
 }
@@ -375,7 +375,7 @@ func TestWithMemorySwap(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expected := int64(123)
 			err := WithMemorySwap(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "linux" {
 				assert.Equal(t, expected, *spec.Linux.Resources.Memory.Swap)
 			} else {
@@ -390,7 +390,7 @@ func TestWithPidsLimit(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expected := int64(123)
 			err := WithPidsLimit(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "linux" {
 				assert.Equal(t, expected, spec.Linux.Resources.Pids.Limit)
 			} else {
@@ -409,7 +409,7 @@ func TestWithBlockIO(t *testing.T) {
 				LeafWeight: &v,
 			}
 			err := WithBlockIO(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "linux" {
 				assert.Equal(t, expected, spec.Linux.Resources.BlockIO)
 			} else {
@@ -424,7 +424,7 @@ func TestWithCPUShares(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expected := uint64(123)
 			err := WithCPUShares(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "linux" {
 				assert.Equal(t, expected, *spec.Linux.Resources.CPU.Shares)
 			} else {
@@ -439,7 +439,7 @@ func TestWithCPUs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expected := "0,1"
 			err := WithCPUs(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "linux" {
 				assert.Equal(t, expected, spec.Linux.Resources.CPU.Cpus)
 			} else {
@@ -454,7 +454,7 @@ func TestWithCPUsMems(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expected := "0,1"
 			err := WithCPUsMems(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "linux" {
 				assert.Equal(t, expected, spec.Linux.Resources.CPU.Mems)
 			} else {
@@ -469,7 +469,7 @@ func TestWithCPUBurst(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expected := uint64(123)
 			err := WithCPUBurst(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "linux" {
 				assert.Equal(t, expected, *spec.Linux.Resources.CPU.Burst)
 			} else {
@@ -484,7 +484,7 @@ func TestWithCPURT(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expectedRT, expectedPeriod := int64(123), uint64(456)
 			err := WithCPURT(expectedRT, expectedPeriod)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "linux" {
 				assert.Equal(t, expectedRT, *spec.Linux.Resources.CPU.RealtimeRuntime)
 				assert.Equal(t, expectedPeriod, *spec.Linux.Resources.CPU.RealtimePeriod)
@@ -858,7 +858,7 @@ func TestWithWindowsDevice(t *testing.T) {
 			for _, opt := range opts {
 				if err := opt(nil, nil, nil, &spec); err != nil {
 					if tc.expectError {
-						assert.Error(t, err)
+						require.Error(t, err)
 					} else {
 						require.NoError(t, err)
 					}
@@ -881,7 +881,7 @@ func TestWithWindowsCPUCount(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expected := uint64(123)
 			err := WithWindowsCPUCount(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "windows" {
 				assert.Equal(t, expected, *spec.Windows.Resources.CPU.Count)
 			} else {
@@ -896,7 +896,7 @@ func TestWithWindowsCPUShares(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expected := uint16(123)
 			err := WithWindowsCPUShares(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "windows" {
 				assert.Equal(t, expected, *spec.Windows.Resources.CPU.Shares)
 			} else {
@@ -911,7 +911,7 @@ func TestWithWindowsCPUMaximum(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			expected := uint16(123)
 			err := WithWindowsCPUMaximum(expected)(nil, nil, nil, &spec)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if name == "windows" {
 				assert.Equal(t, expected, *spec.Windows.Resources.CPU.Maximum)
 			} else {

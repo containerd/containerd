@@ -19,25 +19,25 @@ package registrar
 import (
 	"testing"
 
-	assertlib "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRegistrar(t *testing.T) {
 	r := NewRegistrar()
-	assert := assertlib.New(t)
+	require := require.New(t)
 
 	t.Logf("should be able to reserve a name<->key mapping")
-	assert.NoError(r.Reserve("test-name-1", "test-id-1"))
+	require.NoError(r.Reserve("test-name-1", "test-id-1"))
 
 	t.Logf("should be able to reserve a new name<->key mapping")
-	assert.NoError(r.Reserve("test-name-2", "test-id-2"))
+	require.NoError(r.Reserve("test-name-2", "test-id-2"))
 
 	t.Logf("should be able to reserve the same name<->key mapping")
-	assert.NoError(r.Reserve("test-name-1", "test-id-1"))
+	require.NoError(r.Reserve("test-name-1", "test-id-1"))
 
 	t.Logf("should not be able to reserve conflict name<->key mapping")
-	assert.Error(r.Reserve("test-name-1", "test-id-conflict"))
-	assert.Error(r.Reserve("test-name-conflict", "test-id-2"))
+	require.Error(r.Reserve("test-name-1", "test-id-conflict"))
+	require.Error(r.Reserve("test-name-conflict", "test-id-2"))
 
 	t.Logf("should be able to release name<->key mapping by key")
 	r.ReleaseByKey("test-id-1")
@@ -46,9 +46,9 @@ func TestRegistrar(t *testing.T) {
 	r.ReleaseByName("test-name-2")
 
 	t.Logf("should be able to reserve new name<->key mapping after release")
-	assert.NoError(r.Reserve("test-name-1", "test-id-new"))
-	assert.NoError(r.Reserve("test-name-new", "test-id-2"))
+	require.NoError(r.Reserve("test-name-1", "test-id-new"))
+	require.NoError(r.Reserve("test-name-new", "test-id-2"))
 
 	t.Logf("should be able to reserve same name/key name<->key")
-	assert.NoError(r.Reserve("same-name-id", "same-name-id"))
+	require.NoError(r.Reserve("same-name-id", "same-name-id"))
 }

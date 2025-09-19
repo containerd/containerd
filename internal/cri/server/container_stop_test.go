@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 )
@@ -71,8 +72,8 @@ func TestWaitContainerStop(t *testing.T) {
 				containerstore.Metadata{ID: id},
 				containerstore.WithFakeStatus(*test.status),
 			)
-			assert.NoError(t, err)
-			assert.NoError(t, c.containerStore.Add(container))
+			require.NoError(t, err)
+			require.NoError(t, c.containerStore.Add(container))
 			ctx := context.Background()
 			if test.cancel {
 				cancelledCtx, cancel := context.WithCancel(ctx)

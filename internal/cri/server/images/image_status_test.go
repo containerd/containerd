@@ -57,18 +57,18 @@ func TestImageStatus(t *testing.T) {
 	resp, err := c.ImageStatus(context.Background(), &runtime.ImageStatusRequest{
 		Image: &runtime.ImageSpec{Image: testID},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Nil(t, resp.GetImage())
 
 	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Logf("should return correct image status for exist image")
 	resp, err = g.ImageStatus(context.Background(), &runtime.ImageStatusRequest{
 		Image: &runtime.ImageSpec{Image: testID},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, resp)
 	assert.Equal(t, expected, resp.GetImage())
 }

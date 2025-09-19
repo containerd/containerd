@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAddExtension(t *testing.T) {
@@ -31,10 +32,10 @@ func TestAddExtension(t *testing.T) {
 	typeurl.Register(&test{})
 
 	var in = test{Name: "test"}
-	assert.NoError(t, sb.AddExtension("test", &in))
+	require.NoError(t, sb.AddExtension("test", &in))
 
 	var out test
 	err := sb.GetExtension("test", &out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test", out.Name)
 }
