@@ -23,6 +23,60 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+const (
+	// Container attributes
+	AttrContainerID      = "container.id"
+	AttrContainerName    = "container.name"
+	AttrContainerAttempt = "container.attempt"
+	AttrContainerRuntime = "container.runtime"
+
+	// Pod attributes
+	AttrPodUID              = "pod.uid"
+	AttrPodName             = "pod.name"
+	AttrPodNamespace        = "pod.namespace"
+	AttrContainerdNamespace = "containerd.namespace"
+
+	// Image attributes
+	AttrImageRef    = "container.image.ref"
+	AttrImageDigest = "image.digest"
+
+	// Infrastructure attributes
+	AttrSnapshotter = "snapshotter.name"
+	AttrNodeName    = "node.name"
+
+	// Operation attributes
+	AttrOperationType  = "operation.type"
+	AttrOperationPhase = "operation.phase"
+	AttrErrorCode      = "error.code"
+	AttrExitCode       = "container.exit_code"
+
+	// Sandbox attributes
+	AttrSandboxID   = "sandbox.id"
+	AttrSandboxName = "sandbox.name"
+)
+
+func AddStandardAttributes(span *Span, sandboxID, containerID, podName, podNS string) {
+	if span == nil {
+		return
+	}
+	kv := make([]attribute.KeyValue, 0, 4)
+	if sandboxID != "" {
+		kv = append(kv, Attribute(AttrSandboxID, sandboxID))
+	}
+	if containerID != "" {
+		kv = append(kv, Attribute(AttrContainerID, containerID))
+	}
+	if podName != "" {
+		kv = append(kv, Attribute(AttrPodName, podName))
+	}
+	if podNS != "" {
+		kv = append(kv, Attribute(AttrPodNamespace, podNS))
+	}
+	if len(kv) > 0 {
+		span.SetAttributes(kv...)
+	}
+}
+
 func keyValue(k string, v any) attribute.KeyValue {
 	if v == nil {
 		return attribute.String(k, "<nil>")
@@ -82,4 +136,36 @@ func keyValue(k string, v any) attribute.KeyValue {
 		return attribute.String(k, string(b))
 	}
 	return attribute.String(k, fmt.Sprintf("%v", v))
+}
+
+func AddImageAttributes(span *Span, imageRef, digest string) {
+	if span == nil {
+		return
+	}
+	kv := make([]attribute.KeyValue, 0, 2)
+	if imageRef != "" {
+		kv = append(kv, Attribute(AttrImageRef, imageRef))
+	}
+	if digest != "" {
+		kv = append(kv, Attribute(AttrImageDigest, digest))
+	}
+	if len(kv) > 0 {
+		span.SetAttributes(kv...)
+	}
+}
+
+func AddRuntimeAttributes(span *Span, runtimeName, snapshotter string) {
+	if span == nil {
+		return
+	}
+	kv := make([]attribute.KeyValue, 0, 2)
+	if runtimeName != "" {
+		kv = append(kv, Attribute(AttrContainerRuntime, runtimeName))
+	}
+	if snapshotter != "" {
+		kv = append(kv, Attribute(AttrSnapshotter, snapshotter))
+	}
+	if len(kv) > 0 {
+		span.SetAttributes(kv...)
+	}
 }
