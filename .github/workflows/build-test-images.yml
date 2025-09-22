@@ -77,13 +77,13 @@ jobs:
           creds: ${{ secrets.AZURE_CREDS }}
 
       - name: Create Azure Resource Group
-        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
+        uses: azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
         with:
           inlinescript: |
             az group create -n ${{ env.AZURE_RESOURCE_GROUP }} -l ${{ github.event.inputs.azure_location }} --tags creationTimestamp=$(date +%Y-%m-%dT%T%z)
 
       - name: Create Windows Helper VM
-        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
+        uses: azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
         with:
           inlinescript: |
             PASSWORD="$(/usr/bin/tr -dc "a-zA-Z0-9@#$%^&*()_+?><~\`;" < /dev/urandom | /usr/bin/head -c 24; echo '')"
@@ -98,7 +98,7 @@ jobs:
             az vm open-port --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name WinDockerHelper --port 2376 --priority 102
 
       - name: Prepare Windows image helper
-        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
+        uses: azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
         with:
           inlinescript: |
             # Installs Windows features, opens SSH and Docker port
@@ -120,7 +120,7 @@ jobs:
               --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
 
       - name: Get Windows Helper IPs
-        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
+        uses: azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
         with:
           inlinescript: |
             VM_DETAILS=$(az vm show -d -g ${{ env.AZURE_RESOURCE_GROUP }} -n WinDockerHelper -o json)
@@ -161,7 +161,7 @@ jobs:
 
       - name: Cleanup resources
         if: always()
-        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
+        uses: azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
         with:
           inlinescript: |
             az group delete -g ${{ env.AZURE_RESOURCE_GROUP }} --yes
