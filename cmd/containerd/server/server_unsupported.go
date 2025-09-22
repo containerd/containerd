@@ -1,4 +1,5 @@
 //go:build !linux && !windows && !solaris
+// +build !linux,!windows,!solaris
 
 /*
    Copyright The containerd Authors.
@@ -22,6 +23,7 @@ import (
 	"context"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"github.com/containerd/containerd/v2/internal/wintls"
 	"github.com/containerd/ttrpc"
 )
 
@@ -32,3 +34,7 @@ func apply(_ context.Context, _ *srvconfig.Config) error {
 func newTTRPCServer() (*ttrpc.Server, error) {
 	return ttrpc.NewServer()
 }
+
+// TLS resource helpers are no-ops on other unsupported platforms.
+func setTLSResource(r wintls.CertResource) {}
+func cleanupTLSResources()                 {}

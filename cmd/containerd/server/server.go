@@ -60,6 +60,7 @@ import (
 	sbproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
 	ssproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
 	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/internal/wintls"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -200,7 +201,19 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			tlsConfig.ClientCAs = caCertPool
 			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 		}
-
+		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
+	} else if config.GRPC.TCPTLSCName != "" {
+		tlsConfig, CA, res, err :=
+			wintls.SetupTLSFromWindowsCertStore(ctx, config.GRPC.TCPTLSCName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup TLS from Windows cert store: %w", err)
+		}
+		// Cache resource for cleanup (Windows only)
+		setTLSResource(res)
+		if CA != nil {
+			tlsConfig.ClientCAs = CA
+			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		}
 		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
 
@@ -226,8 +239,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		grpcServices  []grpcService
 		tcpServices   []tcpService
 		ttrpcServices []ttrpcService
-
-		s = &Server{
+		s             = &Server{
 			prometheusServerMetrics: prometheusServerMetrics,
 			grpcServer:              grpcServer,
 			tcpServer:               tcpServer,
@@ -437,6 +449,8 @@ func (s *Server) ServeDebug(l net.Listener) error {
 // Stop the containerd server canceling any open connections
 func (s *Server) Stop() {
 	s.grpcServer.Stop()
+	// Clean up TLS resources (Windows only)
+	cleanupTLSResources()
 	for i := len(s.plugins) - 1; i >= 0; i-- {
 		p := s.plugins[i]
 		instance, err := p.Instance()

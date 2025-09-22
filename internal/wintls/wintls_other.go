@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,28 +17,25 @@
    limitations under the License.
 */
 
-package server
+package wintls
 
 import (
 	"context"
-
-	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
-	"github.com/containerd/containerd/v2/internal/wintls"
-	"github.com/containerd/otelttrpc"
-	"github.com/containerd/ttrpc"
+	"crypto/tls"
+	"crypto/x509"
+	"io"
 )
 
-func apply(_ context.Context, _ *srvconfig.Config) error {
+type CertResource = io.Closer
+
+// NoopCertResource implements CertResource for non-Windows platforms
+type NoopCertResource struct{}
+
+func (n *NoopCertResource) Close() error {
 	return nil
 }
 
-// TLS resource helpers are no-ops on Solaris.
-func setTLSResource(r wintls.CertResource) {}
-func cleanupTLSResources()                 {}
-
-// newTTRPCServer provides the ttrpc server for Solaris builds.
-func newTTRPCServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(
-		ttrpc.WithUnaryServerInterceptor(otelttrpc.UnaryServerInterceptor()),
-	)
+// Stub for non-Windows platforms
+func SetupTLSFromWindowsCertStore(ctx context.Context, commonName string) (*tls.Config, *x509.CertPool, io.Closer, error) {
+	return nil, nil, &NoopCertResource{}, nil
 }
