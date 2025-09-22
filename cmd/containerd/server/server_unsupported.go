@@ -23,7 +23,7 @@ import (
 	"context"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
-	"github.com/containerd/containerd/v2/pkg/wintls"
+	"github.com/containerd/containerd/v2/internal/wintls"
 	"github.com/containerd/ttrpc"
 )
 
