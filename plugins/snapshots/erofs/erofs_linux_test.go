@@ -17,9 +17,8 @@
 package erofs
 
 import (
-	"archive/tar"
-	"bytes"
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/internal/fsverity"
+	"github.com/containerd/containerd/v2/pkg/archive/tartest"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins/content/local"
 	erofsdiffer "github.com/containerd/containerd/v2/plugins/diff/erofs"
@@ -180,13 +180,20 @@ func TestErofsDifferWithTarIndexMode(t *testing.T) {
 	defer s.Close()
 
 	// Create test tar content
-	tarContent := createTestTarContent(t)
+	tarReader := createTestTarContent()
+	defer tarReader.Close()
+
+	// Read the tar content into a buffer for digest calculation and writing
+	tarContent, err := io.ReadAll(tarReader)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Write tar content to content store
 	desc := ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageLayerGzip,
-		Digest:    digest.FromBytes(tarContent.Bytes()),
-		Size:      int64(len(tarContent.Bytes())),
+		Digest:    digest.FromBytes(tarContent),
+		Size:      int64(len(tarContent)),
 	}
 
 	writer, err := contentStore.Writer(ctx,
@@ -196,7 +203,7 @@ func TestErofsDifferWithTarIndexMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := writer.Write(tarContent.Bytes()); err != nil {
+	if _, err := writer.Write(tarContent); err != nil {
 		writer.Close()
 		t.Fatal(err)
 	}
@@ -297,56 +304,18 @@ func TestErofsDifferWithTarIndexMode(t *testing.T) {
 	t.Logf("Successfully verified EROFS Snapshotter using the differ with tar index mode")
 }
 
-// Helper function to create test tar content
-func createTestTarContent(t *testing.T) *bytes.Buffer {
-	buf := &bytes.Buffer{}
-	tw := tar.NewWriter(buf)
-	defer tw.Close()
+// Helper function to create test tar content using tartest
+func createTestTarContent() io.ReadCloser {
+	// Create a tar context with current time for consistency
+	tc := tartest.TarContext{}.WithModTime(time.Now())
 
-	// Add a test file to the tar
-	testFileContentBytes := []byte(testFileContent)
-	hdr := &tar.Header{
-		Name:    "test-file.txt",
-		Mode:    0644,
-		Size:    int64(len(testFileContentBytes)),
-		ModTime: time.Now(),
-	}
+	// Create the tar with our test files and directories
+	tarWriter := tartest.TarAll(
+		tc.File("test-file.txt", []byte(testFileContent), 0644),
+		tc.Dir("testdir", 0755),
+		tc.File("testdir/nested.txt", []byte(testNestedFileContent), 0644),
+	)
 
-	if err := tw.WriteHeader(hdr); err != nil {
-		t.Fatalf("Failed to write tar header: %v", err)
-	}
-
-	if _, err := tw.Write(testFileContentBytes); err != nil {
-		t.Fatalf("Failed to write tar content: %v", err)
-	}
-
-	// Add a directory and nested file
-	dirHdr := &tar.Header{
-		Name:     "testdir/",
-		Mode:     0755,
-		Typeflag: tar.TypeDir,
-		ModTime:  time.Now(),
-	}
-
-	if err := tw.WriteHeader(dirHdr); err != nil {
-		t.Fatalf("Failed to write tar directory header: %v", err)
-	}
-
-	nestedFileContentBytes := []byte(testNestedFileContent)
-	nestedHdr := &tar.Header{
-		Name:    "testdir/nested.txt",
-		Mode:    0644,
-		Size:    int64(len(nestedFileContentBytes)),
-		ModTime: time.Now(),
-	}
-
-	if err := tw.WriteHeader(nestedHdr); err != nil {
-		t.Fatalf("Failed to write nested tar header: %v", err)
-	}
-
-	if _, err := tw.Write(nestedFileContentBytes); err != nil {
-		t.Fatalf("Failed to write nested tar content: %v", err)
-	}
-
-	return buf
+	// Return the tar as a ReadCloser
+	return tartest.TarFromWriterTo(tarWriter)
 }
