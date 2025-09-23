@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/mount/handlers"
 	"github.com/containerd/containerd/v2/core/mount/manager"
 	"github.com/containerd/containerd/v2/plugins"
 )
@@ -53,9 +54,9 @@ func init() {
 			if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
 				return nil, err
 			}
-			handlers := make(map[string]mount.Handler, len(hp))
+			mhandlers := make(map[string]mount.Handler, len(hp))
 			for k, v := range hp {
-				handlers[k] = v.(mount.Handler)
+				mhandlers[k] = v.(mount.Handler)
 			}
 
 			root := ic.Properties[plugins.PropertyStateDir]
@@ -67,6 +68,14 @@ func init() {
 				return nil, merr
 			}
 
+			if _, ok := mhandlers["mkdir"]; !ok {
+				mkdir, err := handlers.MkdirHandler(targets)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create mkdir handler: %w", err)
+				}
+				mhandlers["mkdir"] = mkdir
+			}
+
 			metadb := filepath.Join(root, "mounts.db")
 
 			db, err := bolt.Open(metadb, 0600, nil)
@@ -74,7 +83,7 @@ func init() {
 				return nil, fmt.Errorf("failed to open database file: %w", err)
 			}
 
-			mm := manager.NewManager(db, targets, handlers)
+			mm := manager.NewManager(db, targets, mhandlers)
 
 			//TODO: IF has sync
 			if sync, ok := mm.(interface{ Sync(context.Context) error }); ok {
