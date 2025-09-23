@@ -77,6 +77,11 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		opt(&config)
 	}
 
+	allowedHandlers := make(map[string]struct{}, len(config.AllowMountTypes))
+	for _, t := range config.AllowMountTypes {
+		allowedHandlers[t] = struct{}{}
+	}
+
 	start := time.Now()
 	// highest index of a mount
 	// first system mount is the first index which should be mounted by the system
@@ -84,6 +89,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	var mountConv []mountConverter
 	var handlers []mount.Handler
 	for i := range mounts {
+		var mountType string
 		// Check is the source needs formatting, any formatting requires
 		// mounting with the mount manager.
 		if strings.HasPrefix(mounts[i].Type, "format/") {
@@ -114,16 +120,23 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			}
 
 			mountConv[i] = mv
+
+			mountType = m.Type
 		} else {
-			var handler mount.Handler
-			if mm.handlers != nil {
-				handler = mm.handlers[mounts[i].Type]
+			mountType = mounts[i].Type
+		}
+
+		var handler mount.Handler
+		if mm.handlers != nil {
+			handler = mm.handlers[mountType]
+		}
+
+		if handler != nil || config.Temporary {
+			if handlers == nil {
+				handlers = make([]mount.Handler, len(mounts))
 			}
-			if handler != nil || config.Temporary {
-				if handlers == nil {
-					handlers = make([]mount.Handler, len(mounts))
-				}
-				handlers[i] = handler
+			handlers[i] = handler
+			if _, ok := allowedHandlers[mountType]; !ok || config.Temporary {
 				firstSystemMount = i + 1
 			}
 		}
@@ -303,7 +316,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		if h := handlers[i]; h != nil {
 			active, err = h.Mount(ctx, m, mp, mounted)
 			if err != nil {
-				return mount.ActivationInfo{}, err
+				return mount.ActivationInfo{}, fmt.Errorf("mount handler failed %v: %w", m, err)
 			}
 		} else {
 			if err := os.Mkdir(mp, 0700); err != nil {
