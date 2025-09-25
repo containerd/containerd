@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -45,8 +46,8 @@ func init() {
 }
 
 func testContext(t testing.TB) (context.Context, context.CancelFunc) {
-	// This needs work to convert from context.Background() to t.Context().
-	ctx, cancel := context.WithCancel(context.Background())  //nolint:all
+	// Use a longer timeout for network-intensive operations in CI environments
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute) //nolint:all
 	ctx = namespaces.WithNamespace(ctx, testNamespace)
 	if t != nil {
 		ctx = logtest.WithT(ctx, t)
