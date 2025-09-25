@@ -727,6 +727,10 @@ jobs:
             *-junit.xml
             *-gotest.json
 
+  node-e2e:
+    name: E2E
+    uses: ./.github/workflows/node-e2e.yml
+
   # Currently Github actions UI supports no masks to mark matrix jobs as required to pass status checks.
   # This means that every time version of Go, containerd, or OS is changed, a corresponding job should
   # be added to the list of required checks. Which is not very convenient.
@@ -738,7 +742,7 @@ jobs:
     name: Report required job statuses
     runs-on: ubuntu-latest
     # List job dependencies which are required to pass status checks in order to be merged via merge queue.
-    needs: [linters, project, protos, binaries, integration-linux, integration-windows, tests-cri-in-userns, tests-mac-os]
+    needs: [linters, project, protos, binaries, integration-linux, integration-windows, tests-cri-in-userns, tests-mac-os, node-e2e]
     if: ${{ always() }}
     steps:
       - run: exit 1

@@ -1,9 +1,6 @@
 name: E2E
 on:
-  pull_request:
-    branches: ['main', 'release/1.7', 'release/2.0', 'release/2.1']
-  merge_group:
-    branches: ['main', 'release/1.7', 'release/2.0', 'release/2.1']
+  workflow_call:
 
 permissions:
   contents: read
