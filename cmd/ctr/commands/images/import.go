@@ -76,6 +76,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "compress-blobs",
 			Usage: "compress uncompressed blobs when creating manifest (Docker format only)",
 		},
+		cli.BoolFlag{
+			Name:  "skip-missing",
+			Usage: "ignore missing layers, may be helpful with OCI multi-arch manifests",
+		},
 	}, commands.SnapshotterFlags...),
 
 	Action: func(context *cli.Context) error {
@@ -103,6 +107,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		if context.Bool("compress-blobs") {
 			opts = append(opts, containerd.WithImportCompression())
+		}
+
+		if context.Bool("skip-missing") {
+			opts = append(opts, containerd.WithSkipMissing())
 		}
 
 		opts = append(opts, containerd.WithAllPlatforms(context.Bool("all-platforms")))
