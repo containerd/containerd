@@ -21,6 +21,7 @@ import (
 
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAddThenRemove(t *testing.T) {
@@ -29,6 +30,7 @@ func TestAddThenRemove(t *testing.T) {
 	}
 
 	assert := assert.New(t)
+	require := require.New(t)
 	store := NewStore()
 	releaseCount := 0
 	reserveCount := 0
@@ -44,11 +46,11 @@ func TestAddThenRemove(t *testing.T) {
 	}
 
 	t.Log("should count to two level")
-	assert.NoError(store.Reserve("junk:junk:junk:c1,c2"))
-	assert.NoError(store.Reserve("junk2:junk2:junk2:c1,c2"))
+	require.NoError(store.Reserve("junk:junk:junk:c1,c2"))
+	require.NoError(store.Reserve("junk2:junk2:junk2:c1,c2"))
 
 	t.Log("should have one item")
-	assert.Equal(1, len(store.levels))
+	assert.Len(store.levels, 1)
 
 	t.Log("c1,c2 count should be 2")
 	assert.Equal(2, store.levels["c1,c2"])
@@ -57,7 +59,7 @@ func TestAddThenRemove(t *testing.T) {
 	store.Release("junk2:junk2:junk2:c1,c2")
 
 	t.Log("should have 0 items")
-	assert.Equal(0, len(store.levels))
+	assert.Empty(store.levels)
 
 	t.Log("should have reserved")
 	assert.Equal(1, reserveCount)
@@ -72,6 +74,7 @@ func TestJunkData(t *testing.T) {
 	}
 
 	assert := assert.New(t)
+	require := require.New(t)
 	store := NewStore()
 	releaseCount := 0
 	store.Releaser = func(label string) {
@@ -83,34 +86,34 @@ func TestJunkData(t *testing.T) {
 	}
 
 	t.Log("should ignore empty label")
-	assert.NoError(store.Reserve(""))
-	assert.Equal(0, len(store.levels))
+	require.NoError(store.Reserve(""))
+	assert.Empty(store.levels)
 	store.Release("")
-	assert.Equal(0, len(store.levels))
+	assert.Empty(store.levels)
 	assert.Equal(0, releaseCount)
 	assert.Equal(0, reserveCount)
 
 	t.Log("should fail on bad label")
-	assert.Error(store.Reserve("junkjunkjunkc1c2"))
-	assert.Equal(0, len(store.levels))
+	require.Error(store.Reserve("junkjunkjunkc1c2"))
+	assert.Empty(store.levels)
 	store.Release("junkjunkjunkc1c2")
-	assert.Equal(0, len(store.levels))
+	assert.Empty(store.levels)
 	assert.Equal(0, releaseCount)
 	assert.Equal(0, reserveCount)
 
 	t.Log("should not release unknown label")
 	store.Release("junk2:junk2:junk2:c1,c2")
-	assert.Equal(0, len(store.levels))
+	assert.Empty(store.levels)
 	assert.Equal(0, releaseCount)
 	assert.Equal(0, reserveCount)
 
 	t.Log("should release once even if too many deletes")
-	assert.NoError(store.Reserve("junk2:junk2:junk2:c1,c2"))
-	assert.Equal(1, len(store.levels))
+	require.NoError(store.Reserve("junk2:junk2:junk2:c1,c2"))
+	assert.Len(store.levels, 1)
 	assert.Equal(1, store.levels["c1,c2"])
 	store.Release("junk2:junk2:junk2:c1,c2")
 	store.Release("junk2:junk2:junk2:c1,c2")
-	assert.Equal(0, len(store.levels))
+	assert.Empty(store.levels)
 	assert.Equal(1, releaseCount)
 	assert.Equal(1, reserveCount)
 }

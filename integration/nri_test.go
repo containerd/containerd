@@ -36,7 +36,6 @@ import (
 
 	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/integration/images"
@@ -676,14 +675,14 @@ func (tc *nriTest) startContainer(podID, name string, opts ...ContainerOpts) str
 	}
 
 	ctrID, err := tc.runtime.CreateContainer(podID, ctrCfg, podCfg)
-	assert.NoError(tc.t, err, "create container")
-	assert.NoError(tc.t, tc.runtime.StartContainer(ctrID), "start container")
+	require.NoError(tc.t, err, "create container")
+	require.NoError(tc.t, tc.runtime.StartContainer(ctrID), "start container")
 
 	tc.ctrs = append(tc.ctrs, ctrID)
 
 	tc.t.Cleanup(func() {
-		assert.NoError(tc.t, tc.runtime.StopContainer(ctrID, containerStopTimeout))
-		assert.NoError(tc.t, tc.runtime.RemoveContainer(ctrID))
+		require.NoError(tc.t, tc.runtime.StopContainer(ctrID, containerStopTimeout))
+		require.NoError(tc.t, tc.runtime.RemoveContainer(ctrID))
 	})
 
 	tc.t.Logf("created/started container %s/%s/%s with ID %s",

@@ -23,7 +23,6 @@ import (
 
 	"github.com/containerd/containerd/v2/integration/images"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,13 +52,13 @@ func TestContainerDrainExecIOAfterExit(t *testing.T) {
 	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 	require.NoError(t, err)
 	defer func() {
-		assert.NoError(t, runtimeService.RemoveContainer(cn))
+		require.NoError(t, runtimeService.RemoveContainer(cn))
 	}()
 
 	t.Log("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
 	defer func() {
-		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+		require.NoError(t, runtimeService.StopContainer(cn, 10))
 	}()
 
 	t.Log("Exec in container")

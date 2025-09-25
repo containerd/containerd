@@ -29,12 +29,13 @@ import (
 	"github.com/containerd/continuity/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func checkLookup(t *testing.T, fsType, mntPoint, dir string) {
 	t.Helper()
 	info, err := Lookup(dir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, fsType, info.FSType)
 	assert.Equal(t, mntPoint, info.Mountpoint)
 }
@@ -105,11 +106,11 @@ func TestLookupWithOverlay(t *testing.T) {
 
 	testdir := filepath.Join(overlay, "testdir")
 	err := os.Mkdir(testdir, 0777)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testfile := filepath.Join(overlay, "testfile")
 	_, err = os.Create(testfile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	checkLookup(t, "overlay", overlay, testdir)
 	checkLookup(t, "overlay", overlay, testfile)

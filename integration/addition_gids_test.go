@@ -122,7 +122,7 @@ func TestAdditionalGids(t *testing.T) {
 
 			t.Log("Search additional groups in container log")
 			content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Contains(t, string(content), tc.expected+"\n")
 		})
 	}

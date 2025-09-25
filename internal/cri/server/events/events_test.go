@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBackOff tests the logic of backOff struct.
@@ -75,23 +76,23 @@ func TestBackOff(t *testing.T) {
 			actual.enBackOff(k, event)
 		}
 	}
-	assert.Equal(t, actual.queuePool, expectedQueues)
+	assert.Equal(t, expectedQueues, actual.queuePool)
 
 	t.Logf("Should be able to check if the container is in backOff state")
 	for k, queue := range inputQueues {
 		for _, e := range queue.events {
 			evt, err := typeurl.MarshalAny(e)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			key, _, err := convertEvent(evt)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, k, key)
-			assert.Equal(t, actual.isInBackOff(key), true)
+			assert.True(t, actual.isInBackOff(key))
 		}
 	}
 
 	t.Logf("Should be able to check that a container isn't in backOff state")
 	notExistKey := "containerNotExist"
-	assert.Equal(t, actual.isInBackOff(notExistKey), false)
+	assert.False(t, actual.isInBackOff(notExistKey))
 
 	t.Logf("No containers should be expired")
 	assert.Empty(t, actual.getExpiredIDs())
@@ -99,7 +100,7 @@ func TestBackOff(t *testing.T) {
 	t.Logf("Should be able to get all keys which are expired for backOff")
 	testClock.Sleep(backOffInitDuration)
 	actKeyList := actual.getExpiredIDs()
-	assert.Equal(t, len(inputQueues), len(actKeyList))
+	assert.Len(t, actKeyList, len(inputQueues))
 	for k := range inputQueues {
 		assert.Contains(t, actKeyList, k)
 	}
@@ -131,6 +132,6 @@ func TestBackOff(t *testing.T) {
 			duration:   2 * queue.duration,
 			clock:      testClock,
 		}
-		assert.Equal(t, actQueue, expQueue)
+		assert.Equal(t, expQueue, actQueue)
 	}
 }
