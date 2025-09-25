@@ -25,6 +25,6 @@ const (
 	// persistent data
 	DefaultRootDir = "/var/lib/containerd"
 
-	// DefaultConfigIncludePattern is the default location for drop-in confiugration files.
+	// DefaultConfigIncludePattern is the default location for drop-in configuration files.
 	DefaultConfigIncludePattern = "/etc/containerd/conf.d/*.toml"
 )
