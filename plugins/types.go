@@ -101,5 +101,6 @@ const (
 )
 
 const (
+	ContentRootDir     = "root"
 	SnapshotterRootDir = "root"
 )
