@@ -17,6 +17,8 @@
 package plugin
 
 import (
+	"errors"
+
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
@@ -24,13 +26,29 @@ import (
 	"github.com/containerd/containerd/v2/plugins/content/local"
 )
 
+// Config represents configuration for the content plugin.
+type Config struct {
+	// Root directory for the plugin
+	RootPath string `toml:"root_path"`
+}
+
 func init() {
 	registry.Register(&plugin.Registration{
-		Type: plugins.ContentPlugin,
-		ID:   "content",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		Type:   plugins.ContentPlugin,
+		ID:     "content",
+		Config: &Config{},
+		InitFn: func(ic *plugin.InitContext) (any, error) {
+			config, ok := ic.Config.(*Config)
+			if !ok {
+				return nil, errors.New("invalid content configuration")
+			}
+
 			root := ic.Properties[plugins.PropertyRootDir]
-			ic.Meta.Exports["root"] = root
+			if config.RootPath != "" {
+				root = config.RootPath
+			}
+
+			ic.Meta.Exports[plugins.ContentRootDir] = root
 			return local.NewStore(root)
 		},
 	})
