@@ -260,8 +260,12 @@ func (j *ProgressTracker) Add(desc ocispec.Descriptor) {
 	if j == nil {
 		return
 	}
-	j.added <- jobUpdate{
+	up := jobUpdate{
 		desc: desc,
+	}
+	select {
+	case j.added <- up:
+	case <-j.waitC:
 	}
 }
 
@@ -269,11 +273,14 @@ func (j *ProgressTracker) MarkExists(desc ocispec.Descriptor) {
 	if j == nil {
 		return
 	}
-	j.added <- jobUpdate{
+	up := jobUpdate{
 		desc:   desc,
 		exists: true,
 	}
-
+	select {
+	case j.added <- up:
+	case <-j.waitC:
+	}
 }
 
 // AddChildren adds hierarchy information
@@ -293,9 +300,13 @@ func (j *ProgressTracker) ExtractProgress(desc ocispec.Descriptor, progress int6
 	if j == nil {
 		return
 	}
-	j.extraction <- extractionUpdate{
+	up := extractionUpdate{
 		desc:     desc,
 		progress: progress,
+	}
+	select {
+	case j.extraction <- up:
+	case <-j.waitC:
 	}
 }
 
