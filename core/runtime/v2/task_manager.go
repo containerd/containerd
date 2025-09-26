@@ -74,7 +74,7 @@ func init() {
 			shimManager := shimManagerI.(*ShimManager)
 			root, state := ic.Properties[plugins.PropertyRootDir], ic.Properties[plugins.PropertyStateDir]
 			for _, d := range []string{root, state} {
-				if err := os.MkdirAll(d, 0711); err != nil {
+				if err := os.MkdirAll(d, 0o711); err != nil {
 					return nil, err
 				}
 			}

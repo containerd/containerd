@@ -109,7 +109,7 @@ func testUnshareAfterEnterUsernsKillPid(t *testing.T) {
 
 		proc.Wait()
 
-		_, err = os.OpenFile(fmt.Sprintf("/proc/%d/ns/net", pid), os.O_RDONLY, 0600)
+		_, err = os.OpenFile(fmt.Sprintf("/proc/%d/ns/net", pid), os.O_RDONLY, 0o600)
 		require.Error(t, err)
 		require.ErrorIs(t, err, os.ErrNotExist)
 		return err

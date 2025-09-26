@@ -275,7 +275,8 @@ outer:
 				status, ok := statuses[key]
 				if !done && (!ok || status.Status == StatusDownloading) {
 					info, err := cs.Info(ctx, j.Digest)
-					if err != nil {
+					switch {
+					case err != nil:
 						if !errdefs.IsNotFound(err) {
 							log.G(ctx).WithError(err).Error("failed to get content info")
 							continue outer
@@ -285,7 +286,7 @@ outer:
 								Status: StatusWaiting,
 							}
 						}
-					} else if info.CreatedAt.After(start) {
+					case info.CreatedAt.After(start):
 						statuses[key] = StatusInfo{
 							Ref:       key,
 							Status:    StatusDone,
@@ -293,7 +294,7 @@ outer:
 							Total:     info.Size,
 							UpdatedAt: info.CreatedAt,
 						}
-					} else {
+					default:
 						statuses[key] = StatusInfo{
 							Ref:    key,
 							Status: StatusExists,
