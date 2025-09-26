@@ -123,7 +123,7 @@ tar.exe xvf .\containerd-$Version-windows-$Arch.tar.gz
 Copy-Item -Path .\bin -Destination $Env:ProgramFiles\containerd -Recurse -Force
 
 # add the binaries (containerd.exe, ctr.exe) in $env:Path
-$Path = [Environment]::GetEnvironmentVariable("PATH", "Machine") + [IO.Path]::PathSeparator + "$Env:ProgramFiles\containerd"
+$Path = [Environment]::GetEnvironmentVariable("PATH", "Machine") + [IO.Path]::PathSeparator + "$Env:ProgramFiles\containerd\bin"
 [Environment]::SetEnvironmentVariable( "Path", $Path, "Machine")
 # reload path, so you don't have to open a new PS terminal later if needed
 $Env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
@@ -138,6 +138,10 @@ Get-Content $Env:ProgramFiles\containerd\config.toml
 # Register and start service
 containerd.exe --register-service
 Start-Service containerd
+
+# Stop and unregister service 
+# Stop-Service containerd
+# containerd.exe  --unregister-service
 ```
 
 > **Tip for Running `containerd` Service on Windows:**
