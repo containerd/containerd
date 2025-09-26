@@ -332,7 +332,7 @@ func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
 func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
 		if s.Linux == nil {
-			return fmt.Errorf("linux spec is required")
+			return errors.New("linux spec is required")
 		}
 
 		for i, ns := range s.Linux.Namespaces {
