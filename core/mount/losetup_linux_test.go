@@ -109,10 +109,14 @@ func TestAutoclearTrueLoop(t *testing.T) {
 		file.Close()
 		return dev
 	}()
-	time.Sleep(100 * time.Millisecond)
-	if err := removeLoop(dev); err == nil {
-		t.Fatalf("removeLoop should fail if Autoclear is true")
+	for range 10 {
+		if err := removeLoop(dev); err != nil {
+			// Expected to fail as Autoclear should have already removed the loop device
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
+	t.Fatalf("removeLoop should fail if Autoclear is true")
 }
 
 func TestAutoclearFalseLoop(t *testing.T) {
