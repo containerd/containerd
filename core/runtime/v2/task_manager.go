@@ -283,7 +283,7 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 		return nil, fmt.Errorf("failed to delete task: %w", err)
 	}
 
-	if err := m.mounts.Deactivate(ctx, taskID); err != nil && !errdefs.IsNotImplemented(err) {
+	if err := m.mounts.Deactivate(ctx, taskID); err != nil && !errdefs.IsNotFound(err) {
 		log.G(ctx).WithError(err).WithField("task", taskID).Errorf("failed to deactivate mounts")
 	}
 
