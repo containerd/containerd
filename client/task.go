@@ -341,6 +341,10 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	c := make(chan ExitStatus, 1)
 	go func() {
 		defer close(c)
+		ctx, span := tracing.StartSpan(ctx, "task.Wait",
+			tracing.WithAttribute("task.id", t.ID()),
+		)
+		defer span.End()
 		r, err := t.client.TaskService().Wait(ctx, &tasks.WaitRequest{
 			ContainerID: t.id,
 		})

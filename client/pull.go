@@ -156,11 +156,8 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	var ur unpack.Result
 	if unpacker != nil {
 		_, unpackSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "UnpackWait"))
-		u := unpacker
-		unpacker = nil
 
-		ur, err = u.Wait()
-		if err != nil {
+		if ur, err = unpacker.Wait(); err != nil {
 			unpackSpan.SetStatus(err)
 			unpackSpan.End()
 			return nil, err

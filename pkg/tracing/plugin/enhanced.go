@@ -18,9 +18,6 @@ package plugin
 
 import (
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/pkg/tracing/manager"
@@ -29,17 +26,7 @@ import (
 	"github.com/containerd/plugin/registry"
 )
 
-const (
-	enhancedTracingPlugin = "enhanced"
-	envPrefix             = "CONTAINERD_TRACING_"
-
-	// Enhanced tracing specific environment variables
-	envEnabled          = envPrefix + "ENABLED"
-	envSamplingRate     = envPrefix + "SAMPLING_RATE"
-	envUseSandboxID     = envPrefix + "USE_SANDBOX_ID"
-	envMaxSpansPerTrace = envPrefix + "MAX_SPANS_PER_TRACE"
-	envExporters        = envPrefix + "EXPORTERS"
-)
+const enhancedTracingPlugin = "enhanced"
 
 func init() {
 	registry.Register(&plugin.Registration{
@@ -56,46 +43,15 @@ func init() {
 				return nil, plugin.ErrSkipPlugin
 			}
 
-			// Create trace manager
 			traceManager, err := manager.NewTraceManager(config)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create enhanced trace manager: %w", err)
 			}
 
-			// Set global trace manager for enhanced tracing
 			tracing.SetGlobalTraceManager(traceManager)
-
 			return traceManager, nil
 		},
 	})
-
-	// // Register enhanced tracing as an internal plugin that can be used alongside OTEL
-	// registry.Register(&plugin.Registration{
-	// 	ID:     "enhanced_tracing",
-	// 	Type:   plugins.InternalPlugin,
-	// 	Config: &EnhancedConfig{},
-	// 	Requires: []plugin.Type{
-	// 		plugins.TracingProcessorPlugin,
-	// 	},
-	// 	InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-	// 		// Get the tracing processor plugins
-	// 		tracingProcessors, err := ic.GetByType(plugins.TracingProcessorPlugin)
-	// 		if err != nil {
-	// 			return nil, fmt.Errorf("failed to get tracing processors: %w", err)
-	// 		}
-
-	// 		// Try to find the enhanced trace manager
-	// 		for _, p := range tracingProcessors {
-	// 			if tm, ok := p.(*manager.TraceManager); ok {
-	// 				return tm, nil
-	// 			}
-	// 		}
-
-	// 		// fallback: return noop manager to avoid breaking integration tests
-	// 		fmt.Fprintf(os.Stderr, "enhanced tracing manager not found, falling back to noop manager\n")
-	// 		return manager.NewNoopManager(), nil
-	// 	},
-	// })
 }
 
 // EnhancedConfig holds the configurations for enhanced tracing
@@ -114,123 +70,20 @@ type EnhancedExporterConfig struct {
 	Options  map[string]interface{} `toml:"options,omitempty"`
 }
 
-// loadEnhancedConfig loads enhanced tracing configuration from environment variables and plugin config
+// loadEnhancedConfig loads configuration only from plugin config (no env support)
 func loadEnhancedConfig(ic *plugin.InitContext) (manager.Config, error) {
-	config := manager.Config{
-		Enabled:          getEnvBool(envEnabled, false),
-		SamplingRate:     getEnvFloat(envSamplingRate, 0.1),
-		UseSandboxID:     getEnvBool(envUseSandboxID, true),
-		MaxSpansPerTrace: getEnvInt(envMaxSpansPerTrace, 1000),
+	if ic.Config == nil {
+		return manager.Config{}, fmt.Errorf("enhanced tracing plugin requires configuration")
 	}
 
-	// Load exporters from environment
-	if envVal := os.Getenv(envExporters); envVal != "" {
-		config.Exporters = parseExportersFromEnv(envVal)
-	}
-
-	// Override with plugin config if provided
-	if ic.Config != nil {
-		enhancedConfig := ic.Config.(*EnhancedConfig)
-		config = mergeConfigs(config, enhancedConfig)
-	}
-
-	return config, nil
-}
-
-// mergeConfigs merges environment-based config with plugin config
-func mergeConfigs(envConfig manager.Config, pluginConfig *EnhancedConfig) manager.Config {
-	config := envConfig
-
-	config.Enabled = pluginConfig.Enabled
-
-	if pluginConfig.SamplingRate > 0 {
-		config.SamplingRate = pluginConfig.SamplingRate
-	}
-	if pluginConfig.UseSandboxID {
-		config.UseSandboxID = pluginConfig.UseSandboxID
-	}
-	if pluginConfig.MaxSpansPerTrace > 0 {
-		config.MaxSpansPerTrace = pluginConfig.MaxSpansPerTrace
-	}
-	if len(pluginConfig.Exporters) > 0 {
-		config.Exporters = convertExporterConfigs(pluginConfig.Exporters)
-	}
-
-	return config
-}
-
-// Helper functions for environment variable parsing
-func getEnvBool(key string, defaultValue bool) bool {
-	if envVal := os.Getenv(key); envVal != "" {
-		if val, err := strconv.ParseBool(envVal); err == nil {
-			return val
-		}
-	}
-	return defaultValue
-}
-
-func getEnvFloat(key string, defaultValue float64) float64 {
-	if envVal := os.Getenv(key); envVal != "" {
-		if val, err := strconv.ParseFloat(envVal, 64); err == nil {
-			return val
-		}
-	}
-	return defaultValue
-}
-
-func getEnvInt(key string, defaultValue int) int {
-	if envVal := os.Getenv(key); envVal != "" {
-		if val, err := strconv.Atoi(envVal); err == nil {
-			return val
-		}
-	}
-	return defaultValue
-}
-
-// parseExportersFromEnv parses exporter configuration from environment variable
-func parseExportersFromEnv(envValue string) []manager.ExporterConfig {
-	var exporterConfigs []manager.ExporterConfig
-
-	// Split by semicolon to get individual exporter configs
-	exporterStrings := strings.Split(envValue, ";")
-	for _, expStr := range exporterStrings {
-		if expStr == "" {
-			continue
-		}
-
-		// Split by colon to get type and rest
-		parts := strings.SplitN(expStr, ":", 2)
-		if len(parts) < 2 {
-			continue
-		}
-
-		exporterType := strings.TrimSpace(parts[0])
-		rest := strings.TrimSpace(parts[1])
-
-		// Split rest by comma to get endpoint and options
-		endpointParts := strings.SplitN(rest, ",", 2)
-		endpoint := strings.TrimSpace(endpointParts[0])
-
-		options := make(map[string]interface{})
-		if len(endpointParts) > 1 {
-			// Parse options (format: "key1=value1,key2=value2")
-			optionPairs := strings.Split(endpointParts[1], ",")
-			for _, pair := range optionPairs {
-				kv := strings.SplitN(pair, "=", 2)
-				if len(kv) == 2 {
-					options[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
-				}
-			}
-		}
-
-		exporterConfigs = append(exporterConfigs, manager.ExporterConfig{
-			Type:     exporterType,
-			Endpoint: endpoint,
-			Options:  options,
-		})
-	}
-
-	return exporterConfigs
+	enhancedConfig := ic.Config.(*EnhancedConfig)
+	return manager.Config{
+		Enabled:          enhancedConfig.Enabled,
+		SamplingRate:     enhancedConfig.SamplingRate,
+		UseSandboxID:     enhancedConfig.UseSandboxID,
+		MaxSpansPerTrace: enhancedConfig.MaxSpansPerTrace,
+		Exporters:        convertExporterConfigs(enhancedConfig.Exporters),
+	}, nil
 }
 
 // convertExporterConfigs converts plugin exporter configs to manager configs
