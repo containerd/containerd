@@ -17,9 +17,6 @@
 package tracing
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -75,67 +72,6 @@ func AddStandardAttributes(span *Span, sandboxID, containerID, podName, podNS st
 	if len(kv) > 0 {
 		span.SetAttributes(kv...)
 	}
-}
-
-func KeyValue(k string, v any) attribute.KeyValue {
-	if v == nil {
-		return attribute.String(k, "<nil>")
-	}
-
-	switch typed := v.(type) {
-	case bool:
-		return attribute.Bool(k, typed)
-	case []bool:
-		return attribute.BoolSlice(k, typed)
-	case int:
-		return attribute.Int(k, typed)
-	case []int:
-		return attribute.IntSlice(k, typed)
-	case int8:
-		return attribute.Int(k, int(typed))
-	case []int8:
-		ls := make([]int, 0, len(typed))
-		for _, i := range typed {
-			ls = append(ls, int(i))
-		}
-		return attribute.IntSlice(k, ls)
-	case int16:
-		return attribute.Int(k, int(typed))
-	case []int16:
-		ls := make([]int, 0, len(typed))
-		for _, i := range typed {
-			ls = append(ls, int(i))
-		}
-		return attribute.IntSlice(k, ls)
-	case int32:
-		return attribute.Int64(k, int64(typed))
-	case []int32:
-		ls := make([]int64, 0, len(typed))
-		for _, i := range typed {
-			ls = append(ls, int64(i))
-		}
-		return attribute.Int64Slice(k, ls)
-	case int64:
-		return attribute.Int64(k, typed)
-	case []int64:
-		return attribute.Int64Slice(k, typed)
-	case float64:
-		return attribute.Float64(k, typed)
-	case []float64:
-		return attribute.Float64Slice(k, typed)
-	case string:
-		return attribute.String(k, typed)
-	case []string:
-		return attribute.StringSlice(k, typed)
-	}
-
-	if stringer, ok := v.(fmt.Stringer); ok {
-		return attribute.String(k, stringer.String())
-	}
-	if b, err := json.Marshal(v); b != nil && err == nil {
-		return attribute.String(k, string(b))
-	}
-	return attribute.String(k, fmt.Sprintf("%v", v))
 }
 
 func AddImageAttributes(span *Span, imageRef, digest string) {
