@@ -24,7 +24,23 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/containerd/containerd/v2/pkg/tracing/common"
 )
+
+type FileExporterDefaults struct {
+	Directory   string
+	Format      string
+	ServiceName string
+	MaxFileSize int64
+}
+
+var DefaultFileExporterConfig = FileExporterDefaults{
+	Directory:   "/var/log/containerd/traces",
+	Format:      "json",
+	ServiceName: "containerd",
+	MaxFileSize: 100 * 1024 * 1024, // 100MB
+}
 
 type FileExporter struct {
 	file          *os.File
@@ -68,33 +84,25 @@ type ZipkinAnnotation struct {
 }
 
 func NewFileExporter(filePath string, options map[string]interface{}) (*FileExporter, error) {
-	// Ensure directory exists
-	dir := "/var/log/containerd/traces"
-	if customDir, ok := options["directory"].(string); ok && customDir != "" {
-		dir = customDir
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("failed to create trace directory: %w", err)
-	}
+	cfg := DefaultFileExporterConfig
 
-	// Determine file format
-	format := "json"
+	if dir, ok := options["directory"].(string); ok && dir != "" {
+		cfg.Directory = dir
+	}
 	if fmtVal, ok := options["format"].(string); ok && fmtVal != "" {
-		format = fmtVal
+		cfg.Format = fmtVal
 	}
-
-	// Get service name for Zipkin format
-	serviceName := "containerd"
-	if svcVal, ok := options["service_name"].(string); ok && svcVal != "" {
-		serviceName = svcVal
+	if svc, ok := options["service_name"].(string); ok && svc != "" {
+		cfg.ServiceName = svc
 	}
-
-	// Get max file size for rotation (default 100MB)
-	maxFileSize := int64(100 * 1024 * 1024)
-	if sizeVal, ok := options["max_file_size"].(string); ok {
-		if size, err := strconv.ParseInt(sizeVal, 10, 64); err == nil {
-			maxFileSize = size
+	if sizeStr, ok := options["max_file_size"].(string); ok && sizeStr != "" {
+		if size, err := strconv.ParseInt(sizeStr, 10, 64); err == nil {
+			cfg.MaxFileSize = size
 		}
+	}
+
+	if err := os.MkdirAll(cfg.Directory, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create trace directory: %w", err)
 	}
 
 	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -102,7 +110,6 @@ func NewFileExporter(filePath string, options map[string]interface{}) (*FileExpo
 		return nil, fmt.Errorf("failed to open trace file: %w", err)
 	}
 
-	// Get current file size
 	fileInfo, err := file.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file info: %w", err)
@@ -112,11 +119,12 @@ func NewFileExporter(filePath string, options map[string]interface{}) (*FileExpo
 		file:        file,
 		encoder:     json.NewEncoder(file),
 		filePath:    filePath,
-		format:      format,
-		serviceName: serviceName,
-		maxFileSize: maxFileSize,
+		format:      cfg.Format,
+		serviceName: cfg.ServiceName,
+		maxFileSize: cfg.MaxFileSize,
 		currentSize: fileInfo.Size(),
 	}
+
 	return exporter, nil
 }
 
@@ -160,7 +168,8 @@ func (e *FileExporter) convertToZipkinFormat(spanData SpanData) ZipkinSpan {
 	// Convert attributes to Zipkin tags
 	tags := make(map[string]string)
 	for key, value := range spanData.Attributes {
-		tags[key] = fmt.Sprintf("%v", value)
+		kv := common.KeyValue(key, value)
+		tags[string(kv.Key)] = kv.Value.Emit()
 	}
 
 	// Add standard containerd tags
