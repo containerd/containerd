@@ -48,9 +48,13 @@ type Handler interface {
 	Unmount(context.Context, string) error
 }
 
+// ActivateOptions are used to modify activation behavior. Activate may be
+// performed differently based on the different scenarios, such as mounting
+// to view a filesystem or preparing a filesystem for a container that may
+// have specific runtime requirements. The runtime for a container may also
+// have different capabilities that would allow it to handle mounts which
+// would not need to be handled by the mount manager.
 type ActivateOptions struct {
-	// Mount type: native, filesystem, block device
-
 	// Labels are the labels to use for the activation
 	Labels map[string]string
 
@@ -67,27 +71,38 @@ type ActivateOptions struct {
 	// mount types and should not be handled by the mount manager even if
 	// there is a configured handler for the type.
 	AllowMountTypes []string
-
-	// Final target with option to perform all mounts, normally the runtime will perform the root filesystem mount
-	// Custom temp directory for temporary mounts (for example devices mounted and used as overlay lowers)
 }
 
+// ActivateOpt is a function option for Activate
 type ActivateOpt func(*ActivateOptions)
 
+// WithTemporary indicates that the activation is for temporary access
+// of the mounts. All mounts should be performed and a single bind
+// mount is returned to access to the mounted filesystem.
 func WithTemporary(o *ActivateOptions) {
 	o.Temporary = true
 }
 
+// WithLabels specifies the labels to use for the stored activation info.
 func WithLabels(labels map[string]string) ActivateOpt {
 	return func(o *ActivateOptions) {
 		o.Labels = labels
 	}
 }
 
+// WithAllowFormattedMounts indicates that formatted mounts should be
+// allowed in system mounts outputted, to be handled later by the
+// process performing the mounts. With this option, formatted mounts
+// will not cause all previous mounts to be performed in order to
+// fill in the formatting.
 func WithAllowFormattedMounts(o *ActivateOptions) {
 	o.AllowFormattedMounts = true
 }
 
+// WithAllowedMountTypes indicates the mount types that the peformer
+// of the mounts will support. Even if there is a custom handler
+// registered for the mount type to the mount handler, these mounts
+// should not performed unless required to support subsequent mounts.
 func WithAllowedMountType(mountType string) ActivateOpt {
 	return func(o *ActivateOptions) {
 		o.AllowMountTypes = append(o.AllowMountTypes, mountType)
