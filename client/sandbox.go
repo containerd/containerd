@@ -153,6 +153,10 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 		return nil, err
 	}
 
+	if err := c.SandboxController(sandboxer).Create(ctx, newSandbox); err != nil {
+		return nil, fmt.Errorf("failed to create sandbox with %s sandboxer: %w", sandboxer, err)
+	}
+
 	return &sandboxClient{
 		client:   c,
 		metadata: metadata,
