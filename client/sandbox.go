@@ -131,10 +131,15 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 		return nil, errors.New("sandbox ID must be specified")
 	}
 
+	sandboxer, err := c.defaultSandboxer(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get default sandboxer: %w", err)
+	}
 	newSandbox := api.Sandbox{
 		ID:        sandboxID,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
+		Sandboxer: sandboxer,
 	}
 
 	for _, opt := range opts {
