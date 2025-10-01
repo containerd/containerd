@@ -114,7 +114,7 @@ func (s *sandboxClient) Stop(ctx context.Context) error {
 }
 
 func (s *sandboxClient) Shutdown(ctx context.Context) error {
-	if err := s.client.SandboxController(s.metadata.Sandboxer).Shutdown(ctx, s.ID()); err != nil && errdefs.IsNotFound(err) {
+	if err := s.client.SandboxController(s.metadata.Sandboxer).Shutdown(ctx, s.ID()); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("failed to shutdown sandbox: %w", err)
 	}
 
