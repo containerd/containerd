@@ -54,7 +54,7 @@ func NewSandboxStore(db *DB) api.Store {
 func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.Sandbox, error) {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanSandboxPrefix, "Create"),
-		tracing.WithAttribute(tracing.AttrSandboxID, sandbox.ID),
+		tracing.WithAttribute("sandbox.id", sandbox.ID),
 	)
 	defer span.End()
 
@@ -65,8 +65,8 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 		return api.Sandbox{}, err
 	}
 
-	tracing.AddStandardAttributes(span, sandbox.ID, "", "", "")
-	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
+	AddStandardAttributes(span, sandbox.ID, "", "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
 
 	sandbox.CreatedAt = time.Now().UTC()
 	sandbox.UpdatedAt = sandbox.CreatedAt
@@ -100,7 +100,7 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpaths ...string) (api.Sandbox, error) {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanSandboxPrefix, "Update"),
-		tracing.WithAttribute(tracing.AttrSandboxID, sandbox.ID),
+		tracing.WithAttribute("sandbox.id", sandbox.ID),
 	)
 	defer span.End()
 
@@ -111,8 +111,8 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 		return api.Sandbox{}, err
 	}
 
-	tracing.AddStandardAttributes(span, sandbox.ID, "", "", "")
-	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
+	AddStandardAttributes(span, sandbox.ID, "", "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
 
 	ret := api.Sandbox{}
 	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
@@ -264,7 +264,7 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanSandboxPrefix, "Delete"),
-		tracing.WithAttribute(tracing.AttrSandboxID, id),
+		tracing.WithAttribute("sandbox.id", id),
 	)
 	defer span.End()
 
@@ -275,8 +275,8 @@ func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
-	tracing.AddStandardAttributes(span, id, "", "", "")
-	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
+	AddStandardAttributes(span, id, "", "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
 
 	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
 		buckets := getSandboxBucket(tx, ns)

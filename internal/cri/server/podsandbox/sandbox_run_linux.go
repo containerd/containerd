@@ -43,7 +43,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (_ *runtimespec.Spec, retErr error) {
 	ctx := tracing.ContextWithSandboxID(context.Background(), id)
 	_, span := tracing.StartSpan(ctx, tracing.Name("cri.sandbox", "make_spec"),
-		tracing.WithAttribute(tracing.AttrSandboxID, id))
+		tracing.WithAttribute("sandbox.id", id))
 	defer func() { span.SetStatus(retErr); span.End() }()
 
 	// Creates a spec Generator with the default spec.
@@ -295,7 +295,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	ctx := tracing.ContextWithSandboxID(context.Background(), id)
 	_, span := tracing.StartSpan(ctx, tracing.Name("cri.sandbox", "setup_files"),
-		tracing.WithAttribute(tracing.AttrSandboxID, id))
+		tracing.WithAttribute("sandbox.id", id))
 	defer span.End()
 
 	sandboxEtcHostname := c.getSandboxHostname(id)
@@ -393,7 +393,7 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	ctx := tracing.ContextWithSandboxID(context.Background(), id)
 	_, span := tracing.StartSpan(ctx, tracing.Name("cri.sandbox", "cleanup_files"),
-		tracing.WithAttribute(tracing.AttrSandboxID, id))
+		tracing.WithAttribute("sandbox.id", id))
 	defer span.End()
 
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() != runtime.NamespaceMode_NODE {

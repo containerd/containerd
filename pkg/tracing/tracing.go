@@ -29,6 +29,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/containerd/containerd/v2/pkg/tracing/common"
 	"github.com/containerd/containerd/v2/pkg/tracing/enhanced"
 	"github.com/containerd/containerd/v2/pkg/tracing/manager"
 )
@@ -51,14 +52,6 @@ func ContextWithSandboxID(ctx context.Context, id string) context.Context {
 		return ctx
 	}
 	return context.WithValue(ctx, sandboxIDKey{}, id)
-}
-
-func SandboxIDFrom(ctx context.Context) (string, bool) {
-	v := ctx.Value(sandboxIDKey{})
-	if s, ok := v.(string); ok && s != "" {
-		return s, true
-	}
-	return "", false
 }
 
 // SetGlobalTraceManager sets the global trace manager for enhanced tracing
@@ -130,6 +123,10 @@ func WithSpanOptions(opts ...trace.SpanStartOption) SpanOpt {
 // If this function is called inside the context of a parent span, its return
 // context holds the newly created span. Otherwise, it creates a span with implicit
 // parent referencing and returns the context holding the new span.
+// StartSpan creates a new Span and adds it to the context.
+// If this function is called inside the context of a parent span, its return
+// context holds the newly created span. Otherwise, it creates a span with implicit
+// parent referencing and returns the context holding the new span.
 func StartSpan(ctx context.Context, opName string, opts ...SpanOpt) (context.Context, *Span) {
 	config := StartConfig{}
 	for _, fn := range opts {
@@ -157,6 +154,20 @@ func StartSpan(ctx context.Context, opName string, opts ...SpanOpt) (context.Con
 			wrapperSpan.enhancedSpan = enhancedSpan
 			ctx = enhancedCtx
 		}
+
+		// Apply sandbox ID resolver if span lacks sandbox.id
+		if resolver := getSandboxIDResolver(); resolver != nil && enhancedSpan != nil {
+			if esp, ok := enhancedSpan.(*enhanced.EnhancedSpan); ok {
+				if _, exists := esp.GetAttribute("sandbox.id"); !exists {
+					if sid, ok := resolver(map[string]interface{}{
+						"trace.name": opName,
+					}); ok && sid != "" {
+						esp.SetAttribute("sandbox.id", sid)
+					}
+				}
+			}
+		}
+
 	}
 
 	return ctx, wrapperSpan
@@ -263,7 +274,7 @@ func (s *Span) SetAttribute(key string, value interface{}) {
 
 const spanDelimiter = "."
 
-// Name composes a span operation name using the standard delimiter.
+// Name sets the span name by joining a list of strings in dot separated format.
 func Name(parts ...string) string {
 	return strings.Join(parts, spanDelimiter)
 }
@@ -278,21 +289,7 @@ func SpanOperation(parts ...string) string {
 
 // Attribute returns generic attribute.KeyValue type for any supported input types.
 func Attribute(k string, v any) attribute.KeyValue {
-	switch v := v.(type) {
-	case bool:
-		return attribute.Bool(k, v)
-	case string:
-		return attribute.String(k, v)
-	case int:
-		return attribute.Int(k, v)
-	case int64:
-		return attribute.Int64(k, v)
-	case float64:
-		return attribute.Float64(k, v)
-	case []string:
-		return attribute.StringSlice(k, v)
-	}
-	return attribute.String(k, "<unsupported>")
+	return common.KeyValue(k, v)
 }
 
 // HTTPStatusCodeAttributes returns the attributes list for the given status code.
@@ -300,35 +297,23 @@ func HTTPStatusCodeAttributes(code int) []attribute.KeyValue {
 	return []attribute.KeyValue{semconv.HTTPStatusCodeKey.Int(code)}
 }
 
-// HTTPClient wraps the given RoundTripper and returns an http.Client with tracing instrumentation.
-// The given attributes will be part of the span attributes.
-func HTTPClient(rt http.RoundTripper, attrs ...attribute.KeyValue) *http.Client {
-	return &http.Client{
-		Transport: otelhttp.NewTransport(rt,
-			otelhttp.WithSpanOptions(trace.WithAttributes(attrs...)),
-		),
-	}
-}
-
-// NewHTTPClient is a convenience helper that returns a client with otel transport.
-func NewHTTPClient(base *http.Client) *http.Client {
-	if base == nil {
-		base = &http.Client{}
-	}
-	UpdateHTTPClient(base)
-	return base
-}
-
-// UpdateHTTPClient wraps the client's Transport with otelhttp to enable HTTP instrumentation.
-func UpdateHTTPClient(client *http.Client, _ ...string) {
+// UpdateHTTPClient wraps the given http.Client's transport with otelhttp instrumentation
+// and returns a new client instance to avoid modifying the original.
+func UpdateHTTPClient(client *http.Client, _ ...string) *http.Client {
 	if client == nil {
-		return
+		return http.DefaultClient
 	}
-	rt := client.Transport
+
+	// Copy to avoid side-effects
+	newClient := *client
+
+	rt := newClient.Transport
 	if rt == nil {
 		rt = http.DefaultTransport
 	}
-	client.Transport = otelhttp.NewTransport(rt)
+
+	newClient.Transport = otelhttp.NewTransport(rt)
+	return &newClient
 }
 
 // Helper function to convert OTEL attributes to enhanced attributes
@@ -365,9 +350,4 @@ func (s *Span) IsRecording() bool {
 		return true
 	}
 	return false
-}
-
-// GetSandboxIDResolverForExport returns the resolver for use by exporters.
-func GetSandboxIDResolverForExport() func(map[string]interface{}) (string, bool) {
-	return getSandboxIDResolver()
 }

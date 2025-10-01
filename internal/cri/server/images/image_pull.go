@@ -129,7 +129,7 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 		ctx = tracing.ContextWithSandboxID(ctx, sandboxID)
 		if sp := tracing.SpanFromContext(ctx); sp != nil {
 			sp.SetAttributes(
-				tracing.Attribute(tracing.AttrSandboxID, sandboxID),
+				tracing.Attribute("sandbox.id", sandboxID),
 			)
 		}
 	}
@@ -197,14 +197,14 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		ctx = context.WithValue(ctx, ctxKeySandboxID, sandboxID)
 		ctx = tracing.ContextWithSandboxID(ctx, sandboxID)
 		if span != nil {
-			span.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, sandboxID))
+			span.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
 		}
 	}
 
 	if span != nil && !span.IsEnhancedTracingActive() {
 		if v := ctx.Value(ctxKeySandboxID); v != nil {
 			if s, ok := v.(string); ok && s != "" {
-				span.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+				span.SetAttributes(tracing.Attribute("sandbox.id", s))
 			}
 		}
 	}
@@ -275,7 +275,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		// Propagate sandbox id into the span if present in context.
 		if v := ctx.Value(ctxKeySandboxID); v != nil {
 			if s, _ := v.(string); s != "" {
-				span.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+				span.SetAttributes(tracing.Attribute("sandbox.id", s))
 			}
 		}
 		span.AddEvent("image.pull.start",
@@ -386,7 +386,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	if lspan != nil && !lspan.IsEnhancedTracingActive() {
 		if v := pctx.Value(ctxKeySandboxID); v != nil {
 			if s, ok := v.(string); ok && s != "" {
-				lspan.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+				lspan.SetAttributes(tracing.Attribute("sandbox.id", s))
 			}
 		}
 	}
@@ -454,7 +454,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	if tspan != nil && !tspan.IsEnhancedTracingActive() {
 		if v := ctx.Value(ctxKeySandboxID); v != nil {
 			if s, _ := v.(string); s != "" {
-				tspan.SetAttributes(tracing.Attribute(tracing.AttrSandboxID, s))
+				tspan.SetAttributes(tracing.Attribute("sandbox.id", s))
 			}
 		}
 	}

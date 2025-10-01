@@ -67,7 +67,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	// Add sandbox attributes to span
 	span.SetAttributes(
-		tracing.Attribute(tracing.AttrSandboxID, id),
+		tracing.Attribute("sandbox.id", id),
 		tracing.Attribute("sandbox.name", name),
 	)
 
@@ -413,7 +413,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 
 	// Add tracing attributes
 	span.SetAttributes(
-		tracing.Attribute(tracing.AttrSandboxID, id),
+		tracing.Attribute("sandbox.id", id),
 		tracing.Attribute("netns.path", path),
 		tracing.Attribute("runtime.handler", sandbox.RuntimeHandler),
 	)

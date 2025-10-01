@@ -19,6 +19,7 @@ package enhanced
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"time"
 
@@ -59,6 +60,15 @@ func generateTraceID() string {
 		return fmt.Sprintf("%x", b)
 	}
 	return fmt.Sprintf("%x", time.Now().UnixNano())
+}
+
+// GetAttribute returns the attribute value for the given key if it exists.
+func (s *EnhancedSpan) GetAttribute(key string) (interface{}, bool) {
+	if s == nil {
+		return nil, false
+	}
+	val, ok := s.attributes[key]
+	return val, ok
 }
 
 func (t *EnhancedTracer) StartSpan(ctx context.Context, operationName string, traceID string, attrs ...Attribute) (Span, context.Context) {
@@ -132,7 +142,7 @@ func (t *EnhancedTracer) Shutdown(ctx context.Context) error {
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("multiple errors during shutdown: %v", errs)
+		return fmt.Errorf("multiple errors during shutdown: %w", errors.Join(errs...))
 	}
 	return nil
 }

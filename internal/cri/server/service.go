@@ -187,7 +187,7 @@ type CRIServiceOptions struct {
 
 func (c *criService) initTracing() error {
 	if c.config.Tracing == nil {
-		log.L.Info("Tracing is still nil after loading from env, tracing is disabled")
+		log.L.Info("Tracing is still nil and tracing is disabled")
 		return nil
 	}
 
@@ -196,8 +196,7 @@ func (c *criService) initTracing() error {
 		return nil
 	}
 
-	log.L.Infof("Initializing tracing with config: Enabled=%v, SamplingRate=%f",
-		c.config.Tracing.Enabled,
+	log.L.Infof("Initializing tracing with config: SamplingRate=%f",
 		c.config.Tracing.SamplingRate)
 
 	// Register sandbox id resolver

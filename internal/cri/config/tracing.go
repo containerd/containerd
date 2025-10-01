@@ -31,21 +31,3 @@ type ExporterConfig struct {
 	Endpoint string                 `toml:"endpoint" json:"endpoint"`
 	Options  map[string]interface{} `toml:"options" json:"options"`
 }
-
-// ApplyTracingFromEnv populates c.Tracing from environment variables
-func (config *Config) ApplyTracingFromEnv() {
-	if config.Tracing != nil {
-		return
-	}
-	var anySet bool
-	cfg := &TracingConfig{
-		// Provide safe defaults; they will only matter when Enabled=true.
-		SamplingRate:     0.1,
-		UseSandboxID:     true,
-		MaxSpansPerTrace: 1000,
-	}
-
-	if anySet {
-		config.Tracing = cfg
-	}
-}

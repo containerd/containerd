@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	bolt "go.etcd.io/bbolt"
 	errbolt "go.etcd.io/bbolt/errors"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -123,7 +124,7 @@ func (s *containerStore) List(ctx context.Context, fs ...string) ([]containers.C
 func (s *containerStore) Create(ctx context.Context, container containers.Container) (containers.Container, error) {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanContainerPrefix, "Create"),
-		tracing.WithAttribute(tracing.AttrContainerID, container.ID),
+		tracing.WithAttribute("container.id", container.ID),
 	)
 	defer span.End()
 	if container.SandboxID != "" {
@@ -134,8 +135,8 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 		return containers.Container{}, err
 	}
 
-	tracing.AddStandardAttributes(span, container.SandboxID, container.ID, "", "")
-	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, namespace))
+	AddStandardAttributes(span, container.SandboxID, container.ID, "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", namespace))
 
 	if err := validateContainer(&container); err != nil {
 		return containers.Container{}, fmt.Errorf("create container failed validation: %w", err)
@@ -176,7 +177,7 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 func (s *containerStore) Update(ctx context.Context, container containers.Container, fieldpaths ...string) (containers.Container, error) {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanContainerPrefix, "Update"),
-		tracing.WithAttribute(tracing.AttrContainerID, container.ID),
+		tracing.WithAttribute("container.id", container.ID),
 	)
 	defer span.End()
 	if container.SandboxID != "" {
@@ -191,8 +192,8 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 		return containers.Container{}, fmt.Errorf("must specify a container id: %w", errdefs.ErrInvalidArgument)
 	}
 
-	tracing.AddStandardAttributes(span, container.SandboxID, container.ID, "", "")
-	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, namespace))
+	AddStandardAttributes(span, container.SandboxID, container.ID, "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", namespace))
 
 	var updated containers.Container
 	if err := update(ctx, s.db, func(tx *bolt.Tx) error {
@@ -291,13 +292,13 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 func (s *containerStore) Delete(ctx context.Context, id string) error {
 	ctx, span := tracing.StartSpan(ctx,
 		tracing.Name(spanContainerPrefix, "Delete"),
-		tracing.WithAttribute(tracing.AttrContainerID, id),
+		tracing.WithAttribute("container.id", id),
 	)
 	defer span.End()
 
 	if meta, err := s.Get(ctx, id); err == nil && meta.SandboxID != "" {
 		ctx = tracing.ContextWithSandboxID(ctx, meta.SandboxID)
-		tracing.AddStandardAttributes(span, meta.SandboxID, id, "", "")
+		AddStandardAttributes(span, meta.SandboxID, id, "", "")
 	}
 
 	namespace, err := namespaces.NamespaceRequired(ctx)
@@ -305,8 +306,8 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
-	tracing.AddStandardAttributes(span, "", id, "", "")
-	span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, namespace))
+	AddStandardAttributes(span, "", id, "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", namespace))
 
 	return update(ctx, s.db, func(tx *bolt.Tx) error {
 		bkt := getContainersBucket(tx, namespace)
@@ -463,4 +464,26 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 	}
 
 	return boltutil.WriteLabels(bkt, container.Labels)
+}
+
+func AddStandardAttributes(span *tracing.Span, sandboxID, containerID, podName, podNS string) {
+	if span == nil {
+		return
+	}
+	kv := make([]attribute.KeyValue, 0, 4)
+	if sandboxID != "" {
+		kv = append(kv, attribute.String("sandbox.id", sandboxID))
+	}
+	if containerID != "" {
+		kv = append(kv, attribute.String("container.id", containerID))
+	}
+	if podName != "" {
+		kv = append(kv, attribute.String("pod.name", podName))
+	}
+	if podNS != "" {
+		kv = append(kv, attribute.String("pod.namespace", podNS))
+	}
+	if len(kv) > 0 {
+		span.SetAttributes(kv...)
+	}
 }

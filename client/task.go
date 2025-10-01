@@ -245,9 +245,7 @@ func (t *task) Start(ctx context.Context) error {
 	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Start"),
 		tracing.WithAttribute("task.id", t.ID()))
 	defer span.End()
-	if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
-		span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
-	}
+	span.SetAttributes(tracing.Attribute("containerd.namespace", "k8s.io"))
 
 	r, err := t.client.TaskService().Start(ctx, &tasks.StartRequest{
 		ContainerID: t.id,
@@ -271,7 +269,7 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) err
 	)
 	defer span.End()
 	if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
-		span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
+		span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
 	}
 
 	var i KillInfo
@@ -356,11 +354,10 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 			return
 		}
 
-		exitStatus := ExitStatus{
+		c <- ExitStatus{
 			code:     r.ExitStatus,
 			exitedAt: protobuf.FromTimestamp(r.ExitedAt),
 		}
-		c <- exitStatus
 	}()
 	return c, nil
 }
@@ -374,7 +371,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	)
 	defer span.End()
 	if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
-		span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
+		span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
 	}
 	for _, o := range opts {
 		if err := o(ctx, t); err != nil {
@@ -447,7 +444,7 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 	)
 	defer span.End()
 	if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
-		span.SetAttributes(tracing.Attribute(tracing.AttrContainerdNamespace, ns))
+		span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
 	}
 
 	if id == "" {
