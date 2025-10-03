@@ -449,7 +449,7 @@ func (c *criService) CRImportCheckpoint(
 	containerLog := filepath.Join(containerRootDir, "container.log")
 	_, err = c.os.Stat(containerLog)
 	if err == nil {
-		if err := c.os.CopyFile(containerLog, meta.LogPath, 0600); err != nil {
+		if err := c.os.CopyFile(containerLog, meta.LogPath, 0o600); err != nil {
 			return "", fmt.Errorf("restoring container log file %s failed: %w", containerLog, err)
 		}
 	}
@@ -657,8 +657,7 @@ func withCheckpointOpts(rt, rootDir string) client.CheckpointTaskOpts {
 		// This implies that the container is never stopped
 		leaveRunning := true
 
-		switch rt {
-		case plugins.RuntimeRuncV2:
+		if rt == plugins.RuntimeRuncV2 {
 			if r.Options == nil {
 				r.Options = &options.CheckpointOptions{}
 			}

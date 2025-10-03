@@ -133,7 +133,7 @@ func testOverlayCommit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 		t.Fatal(err)
 	}
 	m := mounts[0]
-	if err := os.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
+	if err := os.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0o660); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
@@ -624,7 +624,7 @@ func testOverlayOverlayRead(t *testing.T, newSnapshotter testsuite.SnapshotterFu
 		t.Fatal(err)
 	}
 	m := mounts[0]
-	if err := os.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
+	if err := os.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0o660); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
@@ -634,7 +634,7 @@ func testOverlayOverlayRead(t *testing.T, newSnapshotter testsuite.SnapshotterFu
 		t.Fatal(err)
 	}
 	dest := filepath.Join(root, "dest")
-	if err := os.Mkdir(dest, 0700); err != nil {
+	if err := os.Mkdir(dest, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := mount.All(mounts, dest); err != nil {
@@ -663,7 +663,7 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 		t.Fatal(err)
 	}
 	m := mounts[0]
-	if err := os.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
+	if err := os.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0o660); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
@@ -675,7 +675,7 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(getParents(ctx, o, root, "/tmp/top")[0], "foo"), []byte("hi, again"), 0660); err != nil {
+	if err := os.WriteFile(filepath.Join(getParents(ctx, o, root, "/tmp/top")[0], "foo"), []byte("hi, again"), 0o660); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "top", key); err != nil {

@@ -112,7 +112,7 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				if !os.IsNotExist(err) {
 					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}
-				if err := osi.MkdirAll(src, 0755); err != nil {
+				if err := osi.MkdirAll(src, 0o755); err != nil {
 					return fmt.Errorf("failed to mkdir %q: %w", src, err)
 				}
 			}

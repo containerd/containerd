@@ -100,7 +100,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 	// Create sandbox container root directories.
 	sandboxRootDir := c.getSandboxRootDir(id)
-	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
+	if err := c.os.MkdirAll(sandboxRootDir, 0o755); err != nil {
 		return cin, fmt.Errorf("failed to create sandbox root directory %q: %w",
 			sandboxRootDir, err)
 	}
@@ -115,7 +115,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	}()
 
 	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
-	if err := c.os.MkdirAll(volatileSandboxRootDir, 0755); err != nil {
+	if err := c.os.MkdirAll(volatileSandboxRootDir, 0o755); err != nil {
 		return cin, fmt.Errorf("failed to create volatile sandbox root directory %q: %w",
 			volatileSandboxRootDir, err)
 	}

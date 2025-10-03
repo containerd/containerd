@@ -899,7 +899,7 @@ func (c *Client) GetSnapshotterSupportedPlatforms(ctx context.Context, snapshott
 		return nil, err
 	}
 
-	if len(resp.Plugins) <= 0 {
+	if len(resp.Plugins) == 0 {
 		return nil, fmt.Errorf("inspection service could not find snapshotter %s plugin", snapshotterName)
 	}
 
@@ -930,7 +930,7 @@ func (c *Client) GetSnapshotterCapabilities(ctx context.Context, snapshotterName
 		return nil, err
 	}
 
-	if len(resp.Plugins) <= 0 {
+	if len(resp.Plugins) == 0 {
 		return nil, fmt.Errorf("inspection service could not find snapshotter %s plugin", snapshotterName)
 	}
 
