@@ -26,9 +26,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {
@@ -125,7 +126,7 @@ func ConvertErofs(ctx context.Context, layerPath string, srcDir string, mkfsExtr
 func MountsToLayer(mounts []mount.Mount) (string, error) {
 	var layer string
 	switch mnt := mounts[0]; mnt.Type {
-	case "bind", "erofs":
+	case "bind", "erofs", "ext4":
 		layer = filepath.Dir(mnt.Source)
 	case "overlay":
 		var topLower string
@@ -147,7 +148,7 @@ func MountsToLayer(mounts []mount.Mount) (string, error) {
 			layer = topLower
 		}
 	default:
-		return "", fmt.Errorf("invalid filesystem type for erofs differ: %w", errdefs.ErrNotImplemented)
+		return "", fmt.Errorf("invalid filesystem type %q for erofs differ: %w", mnt.Type, errdefs.ErrNotImplemented)
 	}
 	// If the layer is not prepared by the EROFS snapshotter, fall back to the next differ
 	if _, err := os.Stat(filepath.Join(layer, ".erofslayer")); err != nil {

@@ -19,13 +19,14 @@ package plugin
 import (
 	"fmt"
 
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/diff/erofs"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 // Config represents configuration for the erofs plugin.
@@ -60,7 +61,9 @@ func init() {
 				return nil, err
 			}
 
-			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
+			p := platforms.DefaultSpec()
+			p.OS = "linux"
+			ic.Meta.Platforms = append(ic.Meta.Platforms, p)
 			cs := md.(*metadata.DB).ContentStore()
 			config := ic.Config.(*Config)
 
