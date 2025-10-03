@@ -18,6 +18,7 @@ package sandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -51,19 +52,25 @@ func init() {
 			sc := make(map[string]sandbox.Controller)
 
 			sandboxers, err := ic.GetByType(plugins.PodSandboxPlugin)
-			if err != nil {
+			if err == nil {
+				for name, p := range sandboxers {
+					sc[name] = p.(sandbox.Controller)
+				}
+			} else if !errors.Is(err, plugin.ErrPluginNotFound) {
 				return nil, err
-			}
-			for name, p := range sandboxers {
-				sc[name] = p.(sandbox.Controller)
 			}
 
 			sandboxersV2, err := ic.GetByType(plugins.SandboxControllerPlugin)
-			if err != nil {
+			if err == nil {
+				for name, p := range sandboxersV2 {
+					sc[name] = p.(sandbox.Controller)
+				}
+			} else if !errors.Is(err, plugin.ErrPluginNotFound) {
 				return nil, err
 			}
-			for name, p := range sandboxersV2 {
-				sc[name] = p.(sandbox.Controller)
+
+			if len(sc) == 0 {
+				return nil, fmt.Errorf("no sandbox controllers initialized: %w", plugin.ErrPluginNotFound)
 			}
 
 			ep, err := ic.GetSingle(plugins.EventPlugin)

@@ -53,6 +53,7 @@ func init() {
 			plugins.EventPlugin,
 			plugins.LeasePlugin,
 			plugins.SandboxStorePlugin,
+			plugins.TransferPlugin,
 			plugins.CRIServicePlugin,
 			plugins.ServicePlugin,
 			plugins.WarningPlugin,
