@@ -75,6 +75,9 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, ar
 		if len(fallbackHosts) == 0 {
 			return nil, 0, fmt.Errorf("no referrers hosts: %w", errdefs.ErrNotFound)
 		}
+	} else {
+		// If referrers are defined, use same hosts for fallback
+		fallbackHosts = hosts
 	}
 
 	ctx, err := ContextWithRepositoryScope(ctx, r.refspec, false)
