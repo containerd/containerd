@@ -17,6 +17,8 @@
 package healthcheck
 
 import (
+	"context"
+
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -26,7 +28,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
-type service struct {
+type Service struct {
 	serve *health.Server
 }
 
@@ -40,13 +42,21 @@ func init() {
 	})
 }
 
-func newService() (*service, error) {
-	return &service{
+func newService() (*Service, error) {
+	return &Service{
 		health.NewServer(),
 	}, nil
 }
 
-func (s *service) Register(server *grpc.Server) error {
+func (s *Service) Register(server *grpc.Server) error {
 	grpc_health_v1.RegisterHealthServer(server, s.serve)
 	return nil
+}
+
+func (s *Service) IsServing(ctx context.Context) (bool, error) {
+	r, err := s.serve.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+	if err != nil {
+		return false, err
+	}
+	return r.Status == grpc_health_v1.HealthCheckResponse_SERVING, nil
 }
