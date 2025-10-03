@@ -117,7 +117,11 @@ func New(address string, opts ...Opt) (*Client, error) {
 	}
 
 	if copts.defaultRuntime != "" {
-		c.runtime.value = copts.defaultRuntime
+		c.defaults.runtime = copts.defaultRuntime
+	}
+
+	if copts.defaultSandboxer != "" {
+		c.defaults.sandboxer = copts.defaultSandboxer
 	}
 
 	if copts.defaultPlatform != nil {
@@ -193,7 +197,11 @@ func NewWithConn(conn *grpc.ClientConn, opts ...Opt) (*Client, error) {
 	}
 
 	if copts.defaultRuntime != "" {
-		c.runtime.value = copts.defaultRuntime
+		c.defaults.runtime = copts.defaultRuntime
+	}
+
+	if copts.defaultSandboxer != "" {
+		c.defaults.sandboxer = copts.defaultSandboxer
 	}
 
 	if copts.defaultPlatform != nil {
@@ -218,10 +226,11 @@ type Client struct {
 	platform  platforms.MatchComparer
 	connector func() (*grpc.ClientConn, error)
 
-	// this should only be accessed via defaultRuntime()
-	runtime struct {
-		value string
-		mut   sync.Mutex
+	// this should only be accessed via default*() functions
+	defaults struct {
+		runtime   string
+		sandboxer string
+		mut       sync.Mutex
 	}
 }
 
@@ -248,11 +257,11 @@ func (c *Client) Runtime() string {
 }
 
 func (c *Client) defaultRuntime(ctx context.Context) (string, error) {
-	c.runtime.mut.Lock()
-	defer c.runtime.mut.Unlock()
+	c.defaults.mut.Lock()
+	defer c.defaults.mut.Unlock()
 
-	if c.runtime.value != "" {
-		return c.runtime.value, nil
+	if c.defaults.runtime != "" {
+		return c.defaults.runtime, nil
 	}
 
 	if c.defaultns != "" {
@@ -262,12 +271,35 @@ func (c *Client) defaultRuntime(ctx context.Context) (string, error) {
 			return defaults.DefaultRuntime, fmt.Errorf("failed to get default runtime label: %w", err)
 		}
 		if label != "" {
-			c.runtime.value = label
+			c.defaults.runtime = label
 			return label, nil
 		}
 	}
-	c.runtime.value = defaults.DefaultRuntime
-	return c.runtime.value, nil
+	c.defaults.runtime = defaults.DefaultRuntime
+	return c.defaults.runtime, nil
+}
+
+func (c *Client) defaultSandboxer(ctx context.Context) (string, error) {
+	c.defaults.mut.Lock()
+	defer c.defaults.mut.Unlock()
+
+	if c.defaults.sandboxer != "" {
+		return c.defaults.sandboxer, nil
+	}
+
+	if c.defaultns != "" {
+		label, err := c.GetLabel(ctx, defaults.DefaultSandboxerNSLabel)
+		if err != nil {
+			// Don't set the sandboxer value if there's an error
+			return defaults.DefaultSandboxer, fmt.Errorf("failed to get default sandboxer label: %w", err)
+		}
+		if label != "" {
+			c.defaults.sandboxer = label
+			return label, nil
+		}
+	}
+	c.defaults.sandboxer = defaults.DefaultSandboxer
+	return c.defaults.sandboxer, nil
 }
 
 // IsServing returns true if the client can successfully connect to the

@@ -103,7 +103,13 @@ func (s *controllerService) getController(name string) (sandbox.Controller, erro
 }
 
 func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreateRequest) (*api.ControllerCreateResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("create sandbox")
+	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+		"sandbox_id": req.GetSandboxID(),
+		"sandboxer":  req.GetSandboxer(),
+	}))
+
+	log.G(ctx).Debug("create sandbox")
+
 	// TODO: Rootfs
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
@@ -132,14 +138,19 @@ func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreat
 }
 
 func (s *controllerService) Start(ctx context.Context, req *api.ControllerStartRequest) (*api.ControllerStartResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("start sandbox")
+	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+		"sandbox_id": req.GetSandboxID(),
+		"sandboxer":  req.GetSandboxer(),
+	}))
+
+	log.G(ctx).Debug("start sandbox")
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
-		return nil, errgrpc.ToGRPC(err)
+		return nil, errgrpc.ToGRPCf(err, "failed to get sandbox controller for %q", req.Sandboxer)
 	}
 	inst, err := ctrl.Start(ctx, req.GetSandboxID())
 	if err != nil {
-		return &api.ControllerStartResponse{}, errgrpc.ToGRPC(err)
+		return &api.ControllerStartResponse{}, errgrpc.ToGRPCf(err, "failed to start sandbox %q", req.GetSandboxID())
 	}
 
 	if err := s.publisher.Publish(ctx, "sandboxes/start", &eventtypes.SandboxStart{
