@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -52,6 +53,8 @@ const (
 	resourceEnd
 	// ResourceStream specifies a stream
 	ResourceStream
+	// ResourceMount specifies a mount
+	ResourceMount
 )
 
 const (
@@ -309,18 +312,22 @@ func (c *gcContext) leased(namespace, lease string, fn func(gc.Node)) {
 }
 
 func (c *gcContext) cancel(ctx context.Context) {
-	for _, gctx := range c.contexts {
+	for t, gctx := range c.contexts {
 		if err := gctx.Cancel(); err != nil {
-			log.G(ctx).WithError(err).Error("failed to cancel collection context")
+			log.G(ctx).WithField("type", t).WithError(err).Error("failed to cancel collection context")
 		}
 	}
 }
 
-func (c *gcContext) finish(ctx context.Context) {
-	for _, gctx := range c.contexts {
-		if err := gctx.Finish(); err != nil {
-			log.G(ctx).WithError(err).Error("failed to finish collection context")
-		}
+func (c *gcContext) finish(ctx context.Context, wg *sync.WaitGroup) {
+	wg.Add(len(c.contexts))
+	for t, gctx := range c.contexts {
+		go func() {
+			if err := gctx.Finish(); err != nil {
+				log.G(ctx).WithField("type", t).WithError(err).Error("failed to finish collection context")
+			}
+			wg.Done()
+		}()
 	}
 }
 

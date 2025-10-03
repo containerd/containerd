@@ -24,6 +24,8 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -36,16 +38,32 @@ import (
 
 	apitypes "github.com/containerd/containerd/api/types"
 
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 )
 
+const (
+	// formattedMounts indicates that the runtimes supports formatted mounts and
+	// the mount manager can skip mounting those mounts which require formatting.
+	formattedMounts = "containerd.io/runtime-formatted-mounts"
+
+	// allowedMounts are the custom mount types allowed by the runtime. These
+	// types should not be handled by the mount manager.
+	allowedMounts = "containerd.io/runtime-allowed-mounts"
+)
+
 // TaskConfig for the runtime task manager
 type TaskConfig struct {
 	// Supported platforms
 	Platforms []string `toml:"platforms"`
+
+	// Runtimes are the runtimes to fetch runtime info for.
+	// The runtime info can be used to configure the runtime
+	// behavior.
+	Runtimes []string `toml:"runtimes"`
 }
 
 func init() {
@@ -54,6 +72,7 @@ func init() {
 		ID:   "task",
 		Requires: []plugin.Type{
 			plugins.ShimPlugin,
+			plugins.MountManagerPlugin,
 		},
 		Config: &TaskConfig{
 			Platforms: defaultPlatforms(),
@@ -72,15 +91,47 @@ func init() {
 				return nil, err
 			}
 			shimManager := shimManagerI.(*ShimManager)
+
+			var mounts mount.Manager
+			if mountsI, err := ic.GetSingle(plugins.MountManagerPlugin); err == nil {
+				mounts = mountsI.(mount.Manager)
+			} else if !errors.Is(err, plugin.ErrPluginNotFound) {
+				return nil, err
+			}
 			root, state := ic.Properties[plugins.PropertyRootDir], ic.Properties[plugins.PropertyStateDir]
 			for _, d := range []string{root, state} {
 				if err := os.MkdirAll(d, 0711); err != nil {
 					return nil, err
 				}
 			}
-			return NewTaskManager(ic.Context, root, state, shimManager)
+
+			infos := make(map[string]*runtimeInfo)
+			for _, runtime := range config.Runtimes {
+				info, err := loadRuntimeInfo(ic.Context, shimManager, runtime)
+				if err != nil {
+					log.G(ic.Context).WithError(err).WithField("runtime", runtime).Error("failed to get runtime info")
+					continue
+				}
+				infos[runtime] = info
+			}
+
+			if err := shimManager.LoadExistingShims(ic.Context, state, root); err != nil {
+				return nil, fmt.Errorf("failed to load existing shims for task manager")
+			}
+			return &TaskManager{
+				root:    root,
+				state:   state,
+				manager: shimManager,
+				mounts:  mounts,
+				infos:   infos,
+			}, nil
 		},
 	})
+}
+
+type runtimeInfo struct {
+	formattedMounts bool
+	handledMounts   []string
 }
 
 // TaskManager wraps task service client on top of shim manager.
@@ -88,6 +139,8 @@ type TaskManager struct {
 	root    string
 	state   string
 	manager *ShimManager
+	mounts  mount.Manager
+	infos   map[string]*runtimeInfo
 }
 
 // NewTaskManager creates a new task manager instance.
@@ -122,6 +175,42 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 			bundle.Delete()
 		}
 	}()
+
+	log.G(ctx).WithFields(log.Fields{
+		"id":      taskID,
+		"runtime": opts.Runtime,
+	}).Debug("creating task")
+
+	activateOpts := []mount.ActivateOpt{
+		mount.WithLabels(map[string]string{
+			"containerd.io/gc.bref.container": taskID,
+		}),
+	}
+	if info, ok := m.infos[opts.Runtime]; ok {
+		if info.formattedMounts {
+			activateOpts = append(activateOpts, mount.WithAllowFormattedMounts)
+		}
+		for _, t := range info.handledMounts {
+			activateOpts = append(activateOpts, mount.WithAllowedMountType(t))
+		}
+	}
+
+	// Add options based on runtime
+	ai, err := m.mounts.Activate(ctx, taskID, opts.Rootfs, activateOpts...)
+	if err == nil {
+		opts.Rootfs = ai.System
+		defer func() {
+			if retErr != nil {
+				dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+				defer cancel()
+				if err := m.mounts.Deactivate(dctx, taskID); err != nil {
+					log.G(ctx).WithError(err).WithField("task", taskID).Errorf("failed to deactivate mounts")
+				}
+			}
+		}()
+	} else if !errdefs.IsNotImplemented(err) {
+		return nil, err
+	}
 
 	shim, err := m.manager.Start(ctx, taskID, bundle, opts)
 	if err != nil {
@@ -240,16 +329,40 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 		return nil, fmt.Errorf("failed to delete task: %w", err)
 	}
 
+	if err := m.mounts.Deactivate(ctx, taskID); err != nil && !errdefs.IsNotFound(err) {
+		log.G(ctx).WithError(err).WithField("task", taskID).Errorf("failed to deactivate mounts")
+	}
+
 	return exit, nil
 }
 
-func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (interface{}, error) {
-	req, ok := request.(*apitypes.RuntimeRequest)
-	if !ok {
-		return nil, fmt.Errorf("unknown request type %T: %w", request, errdefs.ErrNotImplemented)
+func loadRuntimeInfo(ctx context.Context, shims *ShimManager, runtime string) (*runtimeInfo, error) {
+	info, err := getRuntimeInfo(ctx, shims, &apitypes.RuntimeRequest{RuntimePath: runtime})
+	if err != nil {
+		return nil, err
+	}
+	rinfo := &runtimeInfo{}
+
+	if info.Annotations != nil {
+		if v, ok := info.Annotations[formattedMounts]; ok {
+			rinfo.formattedMounts, _ = strconv.ParseBool(v)
+		}
+		if v, ok := info.Annotations[allowedMounts]; ok {
+			rinfo.handledMounts = strings.Split(v, ",")
+		}
 	}
 
-	runtimePath, err := m.manager.resolveRuntimePath(req.RuntimePath)
+	fields := log.Fields{}
+	for k, v := range info.Annotations {
+		fields[k] = v
+	}
+	log.G(ctx).WithFields(fields).WithField("runtime", runtime).Debug("loaded runtime info")
+
+	return rinfo, nil
+}
+
+func getRuntimeInfo(ctx context.Context, shims *ShimManager, req *apitypes.RuntimeRequest) (*apitypes.RuntimeInfo, error) {
+	runtimePath, err := shims.resolveRuntimePath(req.RuntimePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
 	}
@@ -273,6 +386,15 @@ func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (inte
 		return nil, fmt.Errorf("failed to unmarshal stdout from %v into %T: %w", cmd.Args, &info, err)
 	}
 	return &info, nil
+}
+
+func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (interface{}, error) {
+	req, ok := request.(*apitypes.RuntimeRequest)
+	if !ok {
+		return nil, fmt.Errorf("unknown request type %T: %w", request, errdefs.ErrNotImplemented)
+	}
+
+	return getRuntimeInfo(ctx, m.manager, req)
 }
 
 func (m *TaskManager) validateRuntimeFeatures(ctx context.Context, opts runtime.CreateOpts) error {
