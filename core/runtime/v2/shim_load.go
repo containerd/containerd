@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -29,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
+	"golang.org/x/sync/errgroup"
 )
 
 // LoadExistingShims loads existing shims from the path specified by stateDir
@@ -71,6 +73,9 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 	if err != nil {
 		return err
 	}
+	eg, ctx2 := errgroup.WithContext(ctx)
+	eg.SetLimit(runtime.GOMAXPROCS(0))
+	var errLoad error
 	for _, sd := range shimDirs {
 		if !sd.IsDir() {
 			continue
@@ -82,37 +87,41 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 		}
 		bundle, err := LoadBundle(ctx, stateDir, id)
 		if err != nil {
+			errLoad = err
 			// fine to return error here, it is a programmer error if the context
 			// does not have a namespace
-			return err
+			break
 		}
-		// fast path
-		f, err := os.Open(bundle.Path)
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
-			continue
-		}
+		eg.Go(func() error {
+			// fast path
+			f, err := os.Open(bundle.Path)
+			if err != nil {
+				bundle.Delete()
+				log.G(ctx2).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+				return nil
+			}
 
-		bf, err := f.Readdirnames(-1)
-		f.Close()
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
-			continue
-		}
-		if len(bf) == 0 {
-			bundle.Delete()
-			continue
-		}
-		if err := m.loadShim(ctx, bundle); err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
-			bundle.Delete()
-			continue
-		}
-
+			bf, err := f.Readdirnames(-1)
+			f.Close()
+			if err != nil {
+				bundle.Delete()
+				log.G(ctx2).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+				return nil
+			}
+			if len(bf) == 0 {
+				bundle.Delete()
+				return nil
+			}
+			if err := m.loadShim(ctx2, bundle); err != nil {
+				log.G(ctx2).WithError(err).Errorf("failed to load shim %s", bundle.Path)
+				bundle.Delete()
+				return nil
+			}
+			return nil
+		})
 	}
-	return nil
+	_ = eg.Wait()
+	return errLoad
 }
 
 func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
