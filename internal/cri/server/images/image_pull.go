@@ -426,6 +426,18 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
+	parsedRef, err := distribution.ParseAnyReference(r)
+	if err != nil {
+		return fmt.Errorf("failed to parse reference %q: %w", r, err)
+	}
+	// If the image is missing a registry, then we know it didn't come from the
+	// CRI service and we should not store it.
+	namedRef, ok := parsedRef.(distribution.Named)
+	registryMissing := ok && r != namedRef.String()
+	if registryMissing {
+		return nil
+	}
+
 	// TODO: Use image service
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil {
