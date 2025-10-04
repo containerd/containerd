@@ -708,7 +708,8 @@ version = 2
     #
     # *** registry.configs and registry.mirrors that were a part of containerd 1.4
     # are now DEPRECATED and will only be used if the config_path is not specified.
-    config_path = ""
+    # It is an error to specify both config_path and the deprecated configs or mirrors
+    config_path = "/etc/containerd/certs.d:/etc/docker/certs.d"
 ```
 
 </p>
