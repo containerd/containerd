@@ -17,6 +17,8 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/internal/cri/types"
 )
 
 func TestPodSandboxStatus(t *testing.T) {
@@ -129,6 +132,98 @@ func TestPodSandboxStatus(t *testing.T) {
 			expected.State = test.expectedState
 			got := toCRISandboxStatus(metadata, test.state, createdAt, ip, additionalIPs)
 			assert.Equal(t, expected, got)
+		})
+	}
+}
+
+func TestSetUpdatedResources(t *testing.T) {
+	overhead := &runtime.LinuxContainerResources{
+		CpuPeriod: 100,
+	}
+	resources := &runtime.LinuxContainerResources{
+		CpuPeriod: 200,
+	}
+
+	tests := []struct {
+		desc            string
+		status          sandboxstore.Status
+		info            map[string]string
+		expectOverhead  *runtime.LinuxContainerResources
+		expectResources *runtime.LinuxContainerResources
+		expectErr       bool
+	}{
+		{
+			desc: "should update info with resources",
+			status: sandboxstore.Status{
+				Overhead:  &runtime.ContainerResources{Linux: overhead},
+				Resources: &runtime.ContainerResources{Linux: resources},
+			},
+			info: map[string]string{
+				"info": `{"pid": 1234}`,
+			},
+			expectOverhead:  overhead,
+			expectResources: resources,
+		},
+		{
+			desc:   "should not update if resources are nil",
+			status: sandboxstore.Status{},
+			info: map[string]string{
+				"info": `{"pid": 1234}`,
+			},
+			expectOverhead:  nil,
+			expectResources: nil,
+		},
+		{
+			desc:   "should return error on invalid json",
+			status: sandboxstore.Status{},
+			info: map[string]string{
+				"info": `invalid-json`,
+			},
+			expectErr: true,
+		},
+		{
+			desc:            "should handle nil info map gracefully",
+			status:          sandboxstore.Status{},
+			info:            nil,
+			expectOverhead:  nil,
+			expectResources: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			sb := sandboxstore.NewSandbox(sandboxstore.Metadata{}, test.status)
+			err := setUpdatedResources(context.Background(), sb, test.info)
+			if test.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+
+			if test.info == nil {
+				return
+			}
+
+			var info types.SandboxInfo
+			err = json.Unmarshal([]byte(test.info["info"]), &info)
+			assert.NoError(t, err)
+
+			if test.expectOverhead != nil {
+				assert.Equal(t, test.expectOverhead, info.Overhead.Linux)
+			} else {
+				assert.Nil(t, info.Overhead)
+			}
+
+			if test.expectResources != nil {
+				assert.Equal(t, test.expectResources, info.Resources.Linux)
+			} else {
+				assert.Nil(t, info.Resources)
+			}
+
+			// Verify original fields are preserved
+			if test.desc == "should update info with resources" {
+				assert.Equal(t, uint32(1234), info.Pid)
+			}
 		})
 	}
 }
