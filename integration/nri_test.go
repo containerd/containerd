@@ -573,6 +573,46 @@ func TestNriUpdatePodSandbox(t *testing.T) {
 	assert.Equal(t, resMemLimit, res.MemoryLimitInBytes)
 }
 
+// Test pod sandbox resource updates persist across containerd restarts.
+func TestUpdatePodSandboxWithRestart(t *testing.T) {
+	skipNriTestIfNecessary(t)
+
+	t.Log("Test that pod sandbox resource updates persist across containerd restarts.")
+
+	tc := &nriTest{
+		t: t,
+	}
+	tc.setup()
+
+	podID := tc.runPod("pod0")
+	_ = tc.startContainer(podID, "ctr0")
+
+	overhead := &runtime.LinuxContainerResources{MemoryLimitInBytes: 10}
+	res := &runtime.LinuxContainerResources{MemoryLimitInBytes: 5}
+	err := tc.runtime.UpdatePodSandboxResources(podID, overhead, res)
+	assert.NoError(tc.t, err, "update pod sandbox")
+
+	t.Logf("Verify sandbox resources are updated before restart")
+	_, info, err := SandboxInfo(podID)
+	require.NoError(t, err)
+	require.NotNil(t, info.Resources)
+	require.NotNil(t, info.Overhead)
+	assert.Equal(t, res.MemoryLimitInBytes, info.Resources.GetLinux().GetMemoryLimitInBytes())
+	assert.Equal(t, overhead.MemoryLimitInBytes, info.Overhead.GetLinux().GetMemoryLimitInBytes())
+
+	t.Logf("Restart containerd")
+	RestartContainerd(t, syscall.SIGTERM)
+
+	t.Logf("Verify sandbox resources are still updated after restart")
+	_, info, err = SandboxInfo(podID)
+	require.NoError(t, err)
+	require.NotNil(t, info.Resources)
+	require.NotNil(t, info.Overhead)
+	assert.Equal(t, res.MemoryLimitInBytes, info.Resources.GetLinux().GetMemoryLimitInBytes())
+	assert.Equal(t, overhead.MemoryLimitInBytes, info.Overhead.GetLinux().GetMemoryLimitInBytes())
+}
+
+
 // Test NRI vs. containerd restart.
 func TestNriPluginContainerdRestart(t *testing.T) {
 	skipNriTestIfNecessary(t)

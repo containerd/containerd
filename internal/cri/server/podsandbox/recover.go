@@ -63,9 +63,33 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 		return sandbox, fmt.Errorf("failed to get sandbox container info: %w", err)
 	}
 
+	var updatedRes UpdatedResources
+	if c.client != nil {
+		sb, err := c.client.SandboxStore().Get(ctx, meta.ID)
+		if err != nil {
+			log.G(ctx).WithError(err).Warnf("failed to get sandbox %s from sandbox store", meta.ID)
+		} else {
+			if err := sb.GetExtension(UpdatedResourcesKey, &updatedRes); err != nil {
+				if !errdefs.IsNotFound(err) {
+					return sandbox, fmt.Errorf("failed to get updated sandbox resources extension: %w", err)
+				}
+			}
+		}
+	}
+
 	s, ch, err := func() (sandboxstore.Status, <-chan containerd.ExitStatus, error) {
 		status := sandboxstore.Status{
 			State: sandboxstore.StateUnknown,
+		}
+		if updatedRes.Resources != nil {
+			status.Resources = &runtime.ContainerResources{
+				Linux: updatedRes.Resources,
+			}
+		}
+		if updatedRes.Overhead != nil {
+			status.Overhead = &runtime.ContainerResources{
+				Linux: updatedRes.Overhead,
+			}
 		}
 		var channel <-chan containerd.ExitStatus
 
