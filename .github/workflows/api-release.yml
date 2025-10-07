@@ -77,4 +77,4 @@ jobs:
           draft: false
           make_latest: false
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-          body_path: ./builds/containerd-release-notes/release-notes.md
+          body_path: ./builds/release-notes.md
