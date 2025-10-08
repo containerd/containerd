@@ -12,7 +12,7 @@ require (
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.0.5
 	github.com/containerd/console v1.0.5
-	github.com/containerd/containerd/api v1.9.0
+	github.com/containerd/containerd/api v1.10.0-beta.1
 	github.com/containerd/continuity v0.4.5
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/errdefs/pkg v0.3.0
@@ -158,8 +158,6 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 	tags.cncf.io/container-device-interface/specs-go v1.0.0 // indirect
 )
-
-replace github.com/containerd/containerd/api => ./api
 
 exclude (
 	// These dependencies were updated to "master" in some modules we depend on,
