@@ -34,6 +34,9 @@ import (
 func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, artifactTypes ...string) ([]ocispec.Descriptor, error) {
 	rc, size, err := r.openReferrers(ctx, dgst, artifactTypes...)
 	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return []ocispec.Descriptor{}, nil
+		}
 		return nil, err
 	}
 	defer rc.Close()
@@ -75,6 +78,9 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, ar
 		if len(fallbackHosts) == 0 {
 			return nil, 0, fmt.Errorf("no referrers hosts: %w", errdefs.ErrNotFound)
 		}
+	} else {
+		// If referrers are defined, use same hosts for fallback
+		fallbackHosts = hosts
 	}
 
 	ctx, err := ContextWithRepositoryScope(ctx, r.refspec, false)
@@ -82,6 +88,7 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, ar
 		return nil, 0, err
 	}
 
+	var firstErr error
 	for i, host := range hosts {
 		req := r.request(host, http.MethodGet, "referrers", dgst.String())
 		for _, artifactType := range artifactTypes {
@@ -96,7 +103,10 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, ar
 		rc, cl, err := r.open(ctx, req, mediaType, 0, i == len(hosts)-1)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
-				return nil, 0, err
+				log.G(ctx).WithError(err).WithField("host", host.Host).Debug("error fetching referrers")
+				if firstErr == nil {
+					firstErr = err
+				}
 			}
 		} else {
 			return rc, cl, nil
@@ -110,13 +120,22 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, ar
 		}
 		rc, cl, err := r.open(ctx, req, mediaType, 0, i == len(fallbackHosts)-1)
 		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				return nil, 0, err
+			if errdefs.IsNotFound(err) {
+				// Equivalent to empty referrers list
+				firstErr = err
+				break
+			}
+			log.G(ctx).WithError(err).WithField("host", host.Host).Debug("error fetching referrers via fallback")
+			if firstErr == nil {
+				firstErr = err
 			}
 		} else {
 			return rc, cl, nil
 		}
 	}
+	if firstErr == nil {
+		firstErr = fmt.Errorf("could not be found at any host: %w", errdefs.ErrNotFound)
+	}
 
-	return nil, 0, fmt.Errorf("could not be found at any host: %w", errdefs.ErrNotFound)
+	return nil, 0, firstErr
 }
