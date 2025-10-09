@@ -581,6 +581,9 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 
 		parent := obkt.Get(bucketKeyParent)
+		if len(parent) == 0 && len(base.Parent) > 0 {
+			parent = []byte(base.Parent)
+		}
 		if len(parent) > 0 {
 			pbkt := bkt.Bucket(parent)
 			if pbkt == nil {
