@@ -321,9 +321,8 @@ func Check(ctx context.Context, provider content.Provider, image ocispec.Descrip
 			if errdefs.IsNotFound(err) {
 				missing = append(missing, desc)
 				continue
-			} else {
-				return false, nil, nil, nil, fmt.Errorf("failed to check image %v: %w", desc.Digest, err)
 			}
+			return false, nil, nil, nil, fmt.Errorf("failed to check image %v: %w", desc.Digest, err)
 		}
 		ra.Close()
 		present = append(present, desc)
