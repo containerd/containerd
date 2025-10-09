@@ -25,7 +25,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
+	"sync/atomic"
+
+	goruntime "runtime"
 
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/log"
@@ -67,11 +69,10 @@ type Opt func(*bolt.Options) error
 // driver but can be used to handle the persistence and transactional
 // complexities of a driver implementation.
 type MetaStore struct {
-	dbfile string
-
-	dbL  sync.Mutex
-	db   *bolt.DB
-	opts bolt.Options
+	dbfile      string
+	readerCount int64
+	db          *bolt.DB
+	opts        bolt.Options
 }
 
 // NewMetaStore returns a snapshot MetaStore for storage of metadata related to
@@ -95,19 +96,41 @@ func NewMetaStore(dbfile string, opts ...Opt) (*MetaStore, error) {
 
 type transactionKey struct{}
 
+func (ms *MetaStore) RLock() {
+	atomic.AddInt64(&ms.readerCount, 1)
+}
+
+func (ms *MetaStore) RUnlock() {
+	atomic.AddInt64(&ms.readerCount, -1)
+}
+
+func (ms *MetaStore) Lock() {
+	for !atomic.CompareAndSwapInt64(&ms.readerCount, 0, -1) {
+		goruntime.Gosched()
+	}
+}
+
+func (ms *MetaStore) Unlock() {
+	atomic.StoreInt64(&ms.readerCount, 0)
+}
+
 // TransactionContext creates a new transaction context. The writable value
 // should be set to true for transactions which are expected to mutate data.
 func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error) {
-	ms.dbL.Lock()
-	if ms.db == nil {
+	ms.RLock()
+	if ms.db != nil {
+		ms.RUnlock()
+	} else {
+		ms.RUnlock()
+		ms.Lock()
 		db, err := bolt.Open(ms.dbfile, 0600, &ms.opts)
 		if err != nil {
-			ms.dbL.Unlock()
+			ms.Unlock()
 			return ctx, nil, fmt.Errorf("failed to open database file: %w", err)
 		}
 		ms.db = db
+		ms.Unlock()
 	}
-	ms.dbL.Unlock()
 
 	tx, err := ms.db.Begin(writable)
 	if err != nil {
@@ -161,8 +184,8 @@ func (ms *MetaStore) WithTransaction(ctx context.Context, writable bool, fn Tran
 
 // Close closes the metastore and any underlying database connections
 func (ms *MetaStore) Close() error {
-	ms.dbL.Lock()
-	defer ms.dbL.Unlock()
+	ms.Lock()
+	defer ms.Unlock()
 	if ms.db == nil {
 		return nil
 	}
