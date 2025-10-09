@@ -159,7 +159,8 @@ type criService struct {
 	// runtimeHandlers contains runtime handler info
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
-	runtimeFeatures *runtime.RuntimeFeatures
+	runtimeFeatures  *runtime.RuntimeFeatures
+	updateContainers sync.Map
 }
 
 type CRIServiceOptions struct {
