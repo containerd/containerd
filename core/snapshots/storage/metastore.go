@@ -32,6 +32,12 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+var (
+	openOnce  sync.Once
+	openError error
+	db        *bolt.DB
+)
+
 // Transactor is used to finalize an active transaction.
 type Transactor interface {
 	// Commit commits any changes made during the transaction. On error a
@@ -99,16 +105,16 @@ type transactionKey struct{}
 // should be set to true for transactions which are expected to mutate data.
 func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error) {
 	ms.dbL.Lock()
-	if ms.db == nil {
-		db, err := bolt.Open(ms.dbfile, 0600, &ms.opts)
-		if err != nil {
-			ms.dbL.Unlock()
-			return ctx, nil, fmt.Errorf("failed to open database file: %w", err)
+	openOnce.Do(func() {
+		if ms.db == nil {
+			db, openError = bolt.Open(ms.dbfile, 0600, &ms.opts)
+			ms.db = db
 		}
-		ms.db = db
-	}
+	})
 	ms.dbL.Unlock()
-
+	if openError != nil {
+		return ctx, nil, fmt.Errorf("failed to open database file: %w", openError)
+	}
 	tx, err := ms.db.Begin(writable)
 	if err != nil {
 		return ctx, nil, fmt.Errorf("failed to start transaction: %w", err)
