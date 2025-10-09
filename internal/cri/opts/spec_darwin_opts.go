@@ -32,7 +32,7 @@ import (
 )
 
 // WithDarwinMounts adds mounts from CRI's container config + extra mounts.
-func WithDarwinMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount) oci.SpecOpts {
+func WithDarwinMounts(osi osinterface.OS, statManager *osinterface.StatManager, config *runtime.ContainerConfig, extra []*runtime.Mount) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, container *containers.Container, s *oci.Spec) error {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
@@ -86,7 +86,7 @@ func WithDarwinMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra
 			)
 
 			// Create the host path if it doesn't exist.
-			if _, err := osi.Stat(src); err != nil {
+			if err := statManager.Stat(ctx, src); err != nil {
 				if !os.IsNotExist(err) {
 					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}
