@@ -19,6 +19,7 @@
 package overlayutils
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -289,7 +290,7 @@ func SupportsIDMappedMounts() (bool, error) {
 		return false, fmt.Errorf("failed to stat %s: %w", filepath.Join(td, "merged"), err)
 	}
 	if stat, ok := st.Sys().(*syscall.Stat_t); !ok {
-		return false, fmt.Errorf("incompatible types after stat call: *syscall.Stat_t expected")
+		return false, errors.New("incompatible types after stat call: *syscall.Stat_t expected")
 	} else if int(stat.Uid) != uidMap.HostID || int(stat.Gid) != gidMap.HostID {
 		return false, fmt.Errorf("bad mapping: expected {uid: %d, gid: %d}; real {uid: %d, gid: %d}", uidMap.HostID, gidMap.HostID, int(stat.Uid), int(stat.Gid))
 	}
