@@ -98,6 +98,7 @@ func newStatusTestCRIService() *criService {
 	return &criService{
 		client:          newFakeContainerdClient(),
 		runtimeHandlers: make(map[string]*runtime.RuntimeHandler),
+		cniNetPlugin:    newCNINetPlugin(),
 	}
 }
 
