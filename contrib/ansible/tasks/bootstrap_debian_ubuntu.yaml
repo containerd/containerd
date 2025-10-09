@@ -1,5 +1,5 @@
 ---
-- name: "Install required packages on Ubuntu"
+- name: "Install required packages on {{ ansible_distribution }}"
   package:
     name: "{{ item }}"
     state: latest
@@ -7,6 +7,5 @@
       - unzip
       - tar
       - apt-transport-https
-      - btrfs-tools
       - libseccomp2
       - util-linux
