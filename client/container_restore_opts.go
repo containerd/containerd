@@ -24,10 +24,13 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 var (
@@ -125,8 +128,70 @@ func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint 
 			return err
 		}
 		c.Spec = &any
+
+		v, err := typeurl.UnmarshalAny(c.Spec)
+		if err != nil {
+			return err
+		}
+		spec, ok := v.(*oci.Spec)
+		if !ok {
+			return fmt.Errorf("Error type")
+		}
+		if err := setDevices(spec); err != nil {
+			return err
+		}
+		c.Spec, err = typeurl.MarshalAnyToProto(spec)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}
+}
+
+func setDevices(spec *oci.Spec) error {
+	var devs []specs.LinuxDevice
+	var perms []specs.LinuxDeviceCgroup
+	var access string
+	var allow bool
+
+	if spec.Linux != nil {
+		for _, device := range spec.Linux.Devices {
+			// Find and delete old LinuxDeviceCgroup element
+			for i, perm := range spec.Linux.Resources.Devices {
+				if perm.Major == nil || perm.Minor == nil {
+					continue
+				}
+				if device.Major == *perm.Major && device.Minor == *perm.Minor {
+					spec.Linux.Resources.Devices = append(
+						spec.Linux.Resources.Devices[:i],
+						spec.Linux.Resources.Devices[i+1:]...)
+					access = perm.Access
+					allow = perm.Allow
+					break
+				}
+			}
+
+			dev, err := oci.DeviceFromPath(device.Path)
+			if err != nil {
+				return err
+			}
+
+			devs = append(devs, *dev)
+			perms = append(perms, specs.LinuxDeviceCgroup{
+				Type:   dev.Type,
+				Allow:  allow,
+				Major:  &dev.Major,
+				Minor:  &dev.Minor,
+				Access: access,
+			})
+		}
+
+		spec.Linux.Devices = devs
+		spec.Linux.Resources.Devices = append(spec.Linux.Resources.Devices, perms...)
+	}
+
+	return nil
 }
 
 // WithRestoreRW restores the rw layer from the checkpoint for the container
