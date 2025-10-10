@@ -1,7 +1,7 @@
 linters:
   enable:
-    - depguard      # Checks for imports that shouldn't be used.
-    - exportloopref # Checks for pointers to enclosing loop variables
+    - depguard # Checks for dependencies that should not be (re)introduced. See "linter-settings" for further details.
+    # - copyloopvar # Checks for loop variable copies in Go 1.22+
     - gofmt
     - goimports
     - gosec
