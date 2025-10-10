@@ -111,6 +111,9 @@ type ImageService interface {
 
 // criService implements CRIService.
 type criService struct {
+	runtime.UnimplementedRuntimeServiceServer
+	runtime.UnimplementedImageServiceServer
+
 	RuntimeService
 	ImageService
 	// config contains all configurations.
@@ -148,7 +151,7 @@ type criService struct {
 	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
 	// containerEventsQ is used to capture container events and send them
 	// to the callers of GetContainerEvents.
-	containerEventsQ eventq.EventQueue[runtime.ContainerEventResponse]
+	containerEventsQ eventq.EventQueue[*runtime.ContainerEventResponse]
 	// nri is used to hook NRI into CRI request processing.
 	nri *nri.API
 	// sandboxService is the sandbox related service for CRI
@@ -201,7 +204,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	}
 
 	// TODO: Make discard time configurable
-	c.containerEventsQ = eventq.New[runtime.ContainerEventResponse](5*time.Minute, func(event runtime.ContainerEventResponse) {
+	c.containerEventsQ = eventq.New[*runtime.ContainerEventResponse](5*time.Minute, func(event *runtime.ContainerEventResponse) {
 		containerEventsDroppedCount.Inc()
 		log.L.WithFields(
 			log.Fields{
@@ -391,9 +394,13 @@ func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introsp
 
 	c.runtimeHandlers[name] = h
 	if name == c.config.DefaultRuntimeName {
-		defH := *h
-		defH.Name = "" // denotes default
-		c.runtimeHandlers[""] = &defH
+		// Copying runtime.RuntimeHandler isn't allowed so a new struct with the same
+		// contents as the variable "h" is created here for the default runtime.
+		defH := &runtime.RuntimeHandler{
+			Name:     "", // denotes default
+			Features: h.Features,
+		}
+		c.runtimeHandlers[""] = defH
 	}
 
 	return nil

@@ -135,3 +135,33 @@ sudo cp build/bin/v010-adapter /usr/local/bin
 sudo mkdir -p /opt/nri/plugins
 sudo ln -s /usr/local/bin/v010-adapter /opt/nri/plugins/00-v010-adapter
 ```
+
+## Default Validator
+
+The built-in default NRI validator plugin can be used to selectively lock
+down some of the container controls available in NRI. You can enable and
+configure the default validator using the following toml fragment in the
+containerd configuration file:
+
+```toml
+  [plugins.'io.containerd.nri.v1.nri'.default_validator]
+      enable = <true|false>
+      reject_oci_hook_adjustment = <true|false>
+      reject_runtime_default_seccomp_adjustment = <true|false>
+      reject_unconfined_seccomp_adjustment = <true|false>
+      reject_custom_seccomp_adjustment = <true|false>
+      reject_namespace_adjustment = <true|false>
+      required_plugins = [ <list of required NRI plugins> ]
+      tolerate_missing_plugins_annotation = <annotation key name for toleration>
+```
+
+Using this configuration you can selectively disable
+  - OCI hook injection
+  - adjustment of the default seccomp policy
+  - adjustment of an unconfined seccomp policy
+  - adjustment of a custom seccomp policy
+  - adjustment of linux namespace adjustment
+
+Additionally, you can require a set of NRI plugins to always be present for
+container creation to succeed, and an annotation key which can be used to
+annotate containers otherwise.

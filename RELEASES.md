@@ -127,12 +127,14 @@ to all committers.
 | [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life   | September 26, 2019             | March 4, 2021                  |                        |
 | [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life   | August 17, 2020                | March 3, 2022                  |                        |
 | [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life   | May 3, 2021                    | February 28, 2023              |                        |
-| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.0)  | LTS           | February 15, 2022              | July 23, 2025                  | @containerd/committers |
-| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS           | March 10, 2023                 | March 10, 2026                 | @containerd/committers |
+| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.0)  | End of Life   | February 15, 2022              | August 23, 2025                | @containerd/committers |
+| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS           | March 10, 2023                 | September 2026*                | @containerd/committers |
 | [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.0)  | Active        | November 5, 2024               | November 7, 2025               | @containerd/committers |
 | [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.0)  | Active        | May 7, 2025                    | May 5, 2026 (_tentative_)      | @containerd/committers |
-| [2.2](https://github.com/containerd/containerd/milestone/49)         | _Future_      | November 5, 2025 (_tentative_) | November 6, 2026 (_tentative_) | _TBD_                  |
+| [2.2](https://github.com/containerd/containerd/milestone/49)         | Beta          | November 5, 2025 (_tentative_) | November 6, 2026 (_tentative_) | @containerd/committers |
 | [2.3](https://github.com/containerd/containerd/milestone/50)         | _Future_      | May 6, 2026 (_tentative_)      | _TBD_                          | _TBD_                  |
+
+\* Support for the 1.7 release branch is provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by @chrishenzie and @samuelkarp.
 
 ### Kubernetes Support
 
@@ -147,10 +149,10 @@ of containerd for every supported version of Kubernetes.
 
 | Kubernetes Version | containerd Version               | CRI Version     |
 |--------------------|----------------------------------|-----------------|
-| 1.30               | 2.1.0+, 2.0.0+, 1.7.13+, 1.6.28+ | v1              |
 | 1.31               | 2.1.0+, 2.0.0+, 1.7.20+, 1.6.34+ | v1              |
 | 1.32               | 2.1.0+, 2.0.1+, 1.7.24+, 1.6.36+ | v1              |
 | 1.33               | 2.1.0+, 2.0.4+, 1.7.24+, 1.6.36+ | v1              |
+| 1.34               | 2.1.3+, 2.0.6+, 1.7.28+, 1.6.39+ | v1              |
 
 Deprecated containerd and kubernetes versions
 
@@ -472,6 +474,7 @@ The deprecated features are shown in the following table:
 | Legacy CRI implementation of podsandbox support                                  | containerd v2.0     | containerd v2.0 ✅                    |                                          |
 | Go-Plugin library (`*.so`) as containerd runtime plugin                          | containerd v2.0     | containerd v2.1 ✅                    | Use external plugins (proxy or binary)   |
 | CNI `bin_dir` in CRI runtime config (`plugins.'io.containerd.cri.v1.runtime'.cni.bin_dir`) | containerd v2.1     | containerd v2.2                       | Change `bin_dir` to `bin_dirs` in the same section which supports a list of directories  |
+| NRI v0.1.0 plugin support                                                        | containerd v2.2     | containerd v2.3                       | Use the v010-adapter NRI plugin, or update v0.1.0 plugins to use the current NRI API |
 
 - Pulling Schema 1 images has been disabled in containerd v2.0, but it still can be enabled by setting an environment variable `CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1`
   until containerd v2.1. `ctr` users have to specify `--local` too (e.g., `ctr images pull --local`). Users of CRI clients (such as Kubernetes and `crictl`) have to specify this environment variable on the containerd daemon (usually in the systemd unit).

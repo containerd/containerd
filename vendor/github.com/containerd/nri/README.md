@@ -83,6 +83,11 @@ provides functions for
   - hooking the plugin into pod/container lifecycle events
   - shutting down the plugin
 
+An additional interface is provided for validating the changes active plugins
+have requested to containers. This interface allows one to set up and enforce
+cluster- or node-wide boundary conditions for changes NRI plugins are allowed
+to make.
+
 ### Plugin Registration
 
 Before a plugin can start receiving and processing container events, it needs
@@ -176,6 +181,7 @@ The following pieces of container metadata are available to plugins in NRI:
   - mounts
   - OCI hooks
   - rlimits
+  - I/O priority
   - linux
     - namespace IDs
     - devices
@@ -200,9 +206,18 @@ The following pieces of container metadata are available to plugins in NRI:
         - cpuset memory
       - Block I/O class
       - RDT class
+      - Unified cgroup v2 parameter map
+    - Linux seccomp profile and policy
+  - container (init) process ID
+  - container (init process) exit status
+  - timestamp of container creation
+  - timestamp of starting the container
+  - timestamp of stopping the container/container exit
+  - container exit status reason (camelCase)
+  - container exit status message (human readable)
 
 Apart from data identifying the container, these pieces of information
-represent the corresponding data in the container's OCI Spec.
+represent the corresponding data in the container's [OCI Spec](https://github.com/opencontainers/runtime-spec/blob/main/spec.md).
 
 ### Container Adjustment
 
@@ -211,9 +226,11 @@ container parameters:
 
   - annotations
   - mounts
+  - command line arguments
   - environment variables
   - OCI hooks
   - rlimits
+  - I/O priority
   - linux
     - devices
     - resources
@@ -237,6 +254,9 @@ container parameters:
         - cpuset memory
       - Block I/O class
       - RDT class
+      - Unified cgroup v2 parameter map
+      - Linux seccomp policy
+    - Linux namespaces
 
 ### Container Updates
 
@@ -268,7 +288,92 @@ can be updated this way:
       - cpuset memory
     - Block I/O class
     - RDT class
+    - Unified cgroup v2 parameter map
 
+### Container Adjustment Validation
+
+NRI plugins operate as trusted extensions of the container runtime, granting
+them significant privileges to alter container specs. While this extensibility
+is powerful with valid use cases, some of the capabilities granted to plugins
+allow modifying security-sensitive settings of containers. As such they also
+come with the risk that a plugin could inadvertently or maliciously weaken a
+container's isolation or security posture, potentially overriding policies set
+by cluster orchestrators such as K8s.
+
+NRI offers cluster administrators a mechanism to exercise fine-grained control
+over what changes plugins are allowed to make to containers, allowing cluster
+administrators to lock down selected features in NRI or allowing them to only
+be used a subset of plugins. Changes in NRI are made in two phases: “Mutating”
+plugins propose changes, and “Validating” plugins approve or deny them.
+
+Validating plugins are invoked during container creation after all the changes
+requested to containers have been collected. Validating plugins receive the
+changes with extra information about which of the plugins requested what
+changes. They can then choose to reject the changes if they violate some of the
+conditions being validated.
+
+Validation has transactional semantics. If any validating plugin rejects an
+adjustment, creation of the adjusted container will fail and none of the other
+related changes will be made.
+
+#### Validation Use Cases
+
+Some key validation uses cases include
+
+1. Functional Validators: These plugins care about the final state and
+consistency. They check if the combined effect of all mutations result
+in a valid configuration (e.g. are the resource limits sane).
+
+2. Security Validators: These plugins are interested in which plugin is
+attempting to modify sensitive fields. They use the extra data passed to
+plugins in addition to adjustments to check if a potentially untrusted
+plugin tried to modify a restricted field, regardless of the value.
+Rejection might occur simply because a non-approved plugin touched a
+specific field. Plugins like this may need to be assured to run, and to
+have workloads fail-closed if the validator is not running.
+
+3. Mandatory Plugin Validators: These ensure that specific plugins, required
+for certain workloads have successfully run. They might use the extra metadata
+passed to validator in addition to adjustments to confirm the mandatory
+plugin owns certain critical fields and potentially use the list of plugins
+that processed the container to ensure all mandatory plugins were consulted.
+
+#### Default Validation
+
+The default built-in validator plugin provides configurable minimal validation.
+It may be enabled or disabled by configuring the container runtime. It can be
+selectively configured to
+
+1. Reject OCI Hook injection: Reject any adjustment which tries to inject
+OCI Hooks into a container.
+
+2. Reject Linux seccomp policy adjustment: Reject any adjustment which tries
+to set/override Linux seccomp policy of a container. There are separate controls
+for rejecting adjustment of the seccomp policy profile based on the type of policy
+profile set for the container. These types include the runtime default seccomp
+policy profile, a custom policy profile, and unconfined security profiles.
+
+3. Reject Linux Namespace adjustment: Reject any adjustment which tries to
+alter Linux namespaces of a container.
+
+4. Verify global mandatory plugins: Verify that all configured mandatory
+plugins are present and have processed a container. Otherwise reject the
+creation of the container.
+
+5. Verify annotated mandatory plugins: Verify that an annotated set of
+container-specific mandatory plugins are present and have processed a
+container. Otherwise reject the creation of the container.
+
+Containers can be annotated to tolerate missing required plugins. This
+allows one to deploy mandatory plugins as containers themselves.
+
+#### Default Validation Scope
+
+Currently only OCI hook injection, Linux seccomp policy and Linux namespace
+adjustment can be restricted using the default validator. However, this probably
+will change in the future. Especially when NRI is extended with control over more
+container parameters. If newly added controls will have security implications,
+expect corresponding configurable restrictions in the default validator.
 
 ## Runtime Adaptation
 
@@ -309,12 +414,40 @@ The following sample plugins exist for NRI:
   - [differ](plugins/differ)
   - [device injector](plugins/device-injector)
   - [network device injector](plugins/network-device-injector)
+  - [network logger](plugins/network-logger)
   - [OCI hook injector](plugins/hook-injector)
   - [ulimit adjuster](plugins/ulimit-adjuster)
   - [NRI v0.1.0 plugin adapter](plugins/v010-adapter)
+  - [WebAssembly plugin](plugins/wasm)
+  - [template](plugins/template)
 
 Please see the documentation of these plugins for further details
 about what and how each of these plugins can be used for.
+
+Ready-built container images for these plugins are available at
+ghcr.io/containerd/nri/plugins/<plugin>.
+
+Minimal [kustomize](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/)
+overlays for deploying the sample are available at
+[contrib/kustomize](contrib/kustomize). See plugin-specific documentation for
+detailed examples.
+
+> [!CAUTION]
+> Use at your own risk. The kustomize overlays provided in this repository is
+> offered as a convenience for testing and demonstration purposes.
+
+### WebAssembly support
+
+The NRI supports WebAssembly plugins through a SDK provided by
+[knqyf263/go-plugin](https://github.com/knqyf263/go-plugin). This method works
+natively from go version 1.24 and works like any other binary plugin by
+supporting the same [protocol definition](pkg/api/api.proto). An example plugin
+outlining the most basic functionality can be found in
+[plugins/wasm](./plugins/wasm/plugin.go). There is no middle layer (stub)
+implemented like for the ttRPC plugins for simplicity reasons. If logging from
+the WebAssembly plugin is required, then the NRI provides a host function helper
+[`Log`](https://github.com/containerd/nri/blob/8ebdb076ea6aa524094a7f1c2c9ca31c30852328/plugins/wasm/plugin.go#L31-L36)
+for that.
 
 ## Security Considerations
 
@@ -375,7 +508,7 @@ nri is a containerd sub-project, licensed under the [Apache 2.0 license](./LICEN
 As a containerd sub-project, you will find the:
 
  * [Project governance](https://github.com/containerd/project/blob/main/GOVERNANCE.md),
- * [Maintainers](https://github.com/containerd/project/blob/main/MAINTAINERS),
+ * [Maintainers](./MAINTAINERS),
  * and [Contributing guidelines](https://github.com/containerd/project/blob/main/CONTRIBUTING.md)
 
 information in our [`containerd/project`](https://github.com/containerd/project) repository.

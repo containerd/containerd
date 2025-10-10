@@ -309,11 +309,9 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 			scheme = "https"
 		}
 	}
-	dynamicWindow := true
 	icwz := int32(initialWindowSize)
 	if opts.InitialConnWindowSize >= defaultWindowSize {
 		icwz = opts.InitialConnWindowSize
-		dynamicWindow = false
 	}
 	writeBufSize := opts.WriteBufferSize
 	readBufSize := opts.ReadBufferSize
@@ -381,9 +379,8 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 	t.controlBuf = newControlBuffer(t.ctxDone)
 	if opts.InitialWindowSize >= defaultWindowSize {
 		t.initialWindowSize = opts.InitialWindowSize
-		dynamicWindow = false
 	}
-	if dynamicWindow {
+	if !opts.StaticWindowSize {
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
 			updateFlowControl: t.updateFlowControl,
@@ -559,6 +556,19 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 	// Make the slice of certain predictable size to reduce allocations made by append.
 	hfLen := 7 // :method, :scheme, :path, :authority, content-type, user-agent, te
 	hfLen += len(authData) + len(callAuthData)
+	registeredCompressors := t.registeredCompressors
+	if callHdr.PreviousAttempts > 0 {
+		hfLen++
+	}
+	if callHdr.SendCompress != "" {
+		hfLen++
+	}
+	if registeredCompressors != "" {
+		hfLen++
+	}
+	if _, ok := ctx.Deadline(); ok {
+		hfLen++
+	}
 	headerFields := make([]hpack.HeaderField, 0, hfLen)
 	headerFields = append(headerFields, hpack.HeaderField{Name: ":method", Value: "POST"})
 	headerFields = append(headerFields, hpack.HeaderField{Name: ":scheme", Value: t.scheme})
@@ -571,7 +581,6 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-previous-rpc-attempts", Value: strconv.Itoa(callHdr.PreviousAttempts)})
 	}
 
-	registeredCompressors := t.registeredCompressors
 	if callHdr.SendCompress != "" {
 		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-encoding", Value: callHdr.SendCompress})
 		// Include the outgoing compressor name when compressor is not registered
@@ -1091,32 +1100,29 @@ func (t *http2Client) GracefulClose() {
 // Write formats the data into HTTP2 data frame(s) and sends it out. The caller
 // should proceed only if Write returns nil.
 func (t *http2Client) write(s *ClientStream, hdr []byte, data mem.BufferSlice, opts *WriteOptions) error {
-	reader := data.Reader()
-
 	if opts.Last {
 		// If it's the last message, update stream state.
 		if !s.compareAndSwapState(streamActive, streamWriteDone) {
-			_ = reader.Close()
 			return errStreamDone
 		}
 	} else if s.getState() != streamActive {
-		_ = reader.Close()
 		return errStreamDone
 	}
 	df := &dataFrame{
 		streamID:  s.id,
 		endStream: opts.Last,
 		h:         hdr,
-		reader:    reader,
+		data:      data,
 	}
-	if hdr != nil || df.reader.Remaining() != 0 { // If it's not an empty data frame, check quota.
-		if err := s.wq.get(int32(len(hdr) + df.reader.Remaining())); err != nil {
-			_ = reader.Close()
+	dataLen := data.Len()
+	if hdr != nil || dataLen != 0 { // If it's not an empty data frame, check quota.
+		if err := s.wq.get(int32(len(hdr) + dataLen)); err != nil {
 			return err
 		}
 	}
+	data.Ref()
 	if err := t.controlBuf.put(df); err != nil {
-		_ = reader.Close()
+		data.Free()
 		return err
 	}
 	t.incrMsgSent()
@@ -1505,13 +1511,6 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 		case "grpc-message":
 			grpcMessage = decodeGrpcMessage(hf.Value)
 		case ":status":
-			if hf.Value == "200" {
-				httpStatusErr = ""
-				statusCode := 200
-				httpStatusCode = &statusCode
-				break
-			}
-
 			c, err := strconv.ParseInt(hf.Value, 10, 32)
 			if err != nil {
 				se := status.New(codes.Internal, fmt.Sprintf("transport: malformed http-status: %v", err))
@@ -1519,7 +1518,19 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 				return
 			}
 			statusCode := int(c)
+			if statusCode >= 100 && statusCode < 200 {
+				if endStream {
+					se := status.New(codes.Internal, fmt.Sprintf(
+						"protocol error: informational header with status code %d must not have END_STREAM set", statusCode))
+					t.closeStream(s, se.Err(), true, http2.ErrCodeProtocol, se, nil, endStream)
+				}
+				return
+			}
 			httpStatusCode = &statusCode
+			if statusCode == 200 {
+				httpStatusErr = ""
+				break
+			}
 
 			httpStatusErr = fmt.Sprintf(
 				"unexpected HTTP status code received from server: %d (%s)",

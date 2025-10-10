@@ -1,9 +1,6 @@
 name: E2E
 on:
-  pull_request:
-    branches: ['main', 'release/1.7', 'release/2.0', 'release/2.1']
-  merge_group:
-    branches: ['main', 'release/1.7', 'release/2.0', 'release/2.1']
+  workflow_call:
 
 permissions:
   contents: read
@@ -15,12 +12,12 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout containerd
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           path: src/github.com/containerd/containerd
 
       - name: Checkout Kubernetes
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: kubernetes/kubernetes
           path: src/k8s.io/kubernetes
@@ -95,7 +92,7 @@ jobs:
           # https://github.com/kubernetes/kubernetes/blob/v1.33.2/test/e2e_node/resource_metrics_test.go#L67-L71
           sudo make test-e2e-node \
             FOCUS='\[NodeConformance\]|\[Feature:.+\]|\[Feature\]' \
-            SKIP='\[Flaky\]|\[Slow\]|\[Serial\]|\[Feature:UserNamespacesSupport\]|\[Feature:PodLifecycleSleepActionAllowZero\]|\[Feature:UserNamespacesPodSecurityStandards\]|\[Feature:KubeletCredentialProviders\]|\[Feature:LockContention\]|\[Feature:SCTPConnectivity\]|\[Feature:ResourceMetrics\]' \
+            SKIP='\[Flaky\]|\[Slow\]|\[Serial\]|\[Feature:UserNamespacesSupport\]|\[Feature:PodLifecycleSleepActionAllowZero\]|\[Feature:UserNamespacesPodSecurityStandards\]|\[Feature:KubeletCredentialProviders\]|\[Feature:LockContention\]|\[Feature:SCTPConnectivity\]|\[Feature:ResourceMetrics\]|\[Alpha\]' \
             TEST_ARGS='--kubelet-flags="--cgroup-driver=systemd --cgroups-per-qos=true --cgroup-root=/ --runtime-cgroups=/system.slice/containerd.service"'
 
       - name: Collect Logs on Failure

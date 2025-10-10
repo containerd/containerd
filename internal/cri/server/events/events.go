@@ -252,10 +252,7 @@ func (b *backOff) reBackOff(key string, events []interface{}, oldDuration time.D
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
 
-	duration := 2 * oldDuration
-	if duration > b.maxDuration {
-		duration = b.maxDuration
-	}
+	duration := min(2*oldDuration, b.maxDuration)
 	b.queuePool[key] = newBackOffQueue(events, duration, b.clock)
 }
 

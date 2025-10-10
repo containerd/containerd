@@ -30,14 +30,15 @@ import (
 )
 
 type clientOpts struct {
-	defaultns       string
-	defaultRuntime  string
-	defaultPlatform platforms.MatchComparer
-	services        *services
-	dialOptions     []grpc.DialOption
-	extraDialOpts   []grpc.DialOption
-	callOptions     []grpc.CallOption
-	timeout         time.Duration
+	defaultns        string
+	defaultRuntime   string
+	defaultSandboxer string
+	defaultPlatform  platforms.MatchComparer
+	services         *services
+	dialOptions      []grpc.DialOption
+	extraDialOpts    []grpc.DialOption
+	callOptions      []grpc.CallOption
+	timeout          time.Duration
 }
 
 // Opt allows callers to set options on the containerd client
@@ -58,6 +59,14 @@ func WithDefaultNamespace(ns string) Opt {
 func WithDefaultRuntime(rt string) Opt {
 	return func(c *clientOpts) error {
 		c.defaultRuntime = rt
+		return nil
+	}
+}
+
+// WithDefaultSandboxer sets the default sandboxer on the client
+func WithDefaultSandboxer(sb string) Opt {
+	return func(c *clientOpts) error {
+		c.defaultSandboxer = sb
 		return nil
 	}
 }

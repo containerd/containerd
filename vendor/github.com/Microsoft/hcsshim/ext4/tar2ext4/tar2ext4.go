@@ -352,3 +352,18 @@ func ConvertToVhd(w io.WriteSeeker) error {
 	}
 	return binary.Write(w, binary.BigEndian, makeFixedVHDFooter(size))
 }
+
+// A convenience wrapper for ConverToVhd, instead of asking the caller to open the file and pass an io.WriteSeeker, this
+// takes in a file path and appends the VHD footer to that file.
+func ConvertFileToVhd(filePath string) error {
+	f, err := os.OpenFile(filePath, os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file `%s` : %w", filePath, err)
+	}
+	defer f.Close()
+
+	if err := ConvertToVhd(f); err != nil {
+		return fmt.Errorf("failed to append VHD footer: %w", err)
+	}
+	return nil
+}

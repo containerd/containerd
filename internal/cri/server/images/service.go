@@ -51,6 +51,8 @@ type ImagePlatform struct {
 }
 
 type CRIImageService struct {
+	runtime.UnimplementedImageServiceServer
+
 	// config contains all image configurations.
 	config criconfig.ImageConfig
 	// images is the lower level image store used for raw storage,

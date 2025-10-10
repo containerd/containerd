@@ -302,8 +302,7 @@ func TestWithSpecFromFile(t *testing.T) {
 	p, err := json.Marshal(expected)
 	assert.NoError(t, err)
 
-	tmpDir := t.TempDir()
-	specFile := filepath.Join(tmpDir, "testwithdefaultspec.json")
+	specFile := filepath.Join(t.TempDir(), "testwithdefaultspec.json")
 	err = os.WriteFile(specFile, p, 0o600)
 	assert.NoError(t, err)
 
@@ -777,6 +776,32 @@ func TestWithoutMounts(t *testing.T) {
 	if !reflect.DeepEqual(expected, s.Mounts) {
 		t.Fatalf("expected %+v, got %+v", expected, s.Mounts)
 	}
+}
+
+func TestWithParentCgroupDevices(t *testing.T) {
+	t.Parallel()
+
+	// TODO(thaJeztah): WithParentCgroupDevices should probably be a no-op if the Spec is non-Linux.
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			err := WithParentCgroupDevices(context.Background(), nil, nil, &spec)
+			assert.NoError(t, err)
+			assert.Nil(t, spec.Linux.Resources.Devices)
+		})
+	}
+
+	t.Run("reset existing", func(t *testing.T) {
+		s := Spec{
+			Linux: &specs.Linux{
+				Resources: &specs.LinuxResources{
+					Devices: []specs.LinuxDeviceCgroup{{Allow: true, Access: rwm}},
+				},
+			},
+		}
+		err := WithParentCgroupDevices(context.Background(), nil, nil, &s)
+		assert.NoError(t, err)
+		assert.Nil(t, s.Linux.Resources.Devices)
+	})
 }
 
 func TestWithWindowsDevice(t *testing.T) {

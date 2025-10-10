@@ -107,6 +107,10 @@ The supported garbage collection labels are:
 | `containerd.io/gc.ref.content.<user defined>` | _digest_ | Content, Snapshots, Images, Containers | Resource references the given content blob with a `<user defined>` label key |
 | `containerd.io/gc.expire` | _timestamp_ formatted as [rfc3339](https://tools.ietf.org/html/rfc3339) | Leases | When to expire the lease. The garbage collector will delete the lease after expiration. |
 | `containerd.io/gc.flat` | _nonempty_ | Leases | Ignore label references of leased resources. This only applies when the reference is originating from the lease, if the leased resources are referenced elsewhere, then their label references will be used. |
+| `containerd.io/gc.bref.container` | `<identifier>` | Content, Snapshots, Images | Resource is referenced by the given container `<identifier>` |
+| `containerd.io/gc.bref.content` | _digest_ | Content, Snapshots, Images | Resource is referenced by the given content blob |
+| `containerd.io/gc.bref.image` | _image name_ | Content, Snapshots, Images | Resource is referenced by the given image |
+| `containerd.io/gc.bref.snapshot.<snapshotter>` | `<identifier>` | Content, Snapshots, Images | Resource is referenced by the given snapshot `<identifier>` for the snapshotter `<snapshotter>` |
 
 ## Garbage Collection configuration
 

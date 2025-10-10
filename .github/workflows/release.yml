@@ -13,7 +13,7 @@ on:
 name: Release
 
 env:
-  GO_VERSION: "1.24.4"
+  GO_VERSION: "1.24.8"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
@@ -29,13 +29,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
 
       - name: Check signature
         run: |
+          # git tag -v requires an allowedSignersFile to be configured and exist for ssh signature verification
+          touch ${{ runner.temp }}/empty-allowedSignersFile
+          git config --global gpg.ssh.allowedSignersFile ${{ runner.temp }}/empty-allowedSignersFile
           releasever=${{ github.ref }}
           releasever="${releasever#refs/tags/}"
           TAGCHECK=$(git tag -v ${releasever} 2>&1 >/dev/null) ||
@@ -90,7 +93,7 @@ jobs:
           releasever="${releasever#refs/tags/}"
           echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
       - name: Checkout containerd
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           # Intentionally use github.repository instead of containerd/containerd to
           # make this action runnable on forks.
@@ -141,18 +144,18 @@ jobs:
     needs: [build, check]
     steps:
       - name: Download builds and release notes
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           path: builds
       - name: Attest Artifacts
         id: attest
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
           subject-path: ./builds/release-tars-**/*.tar.gz
       - name: Rename attestation artifact
         run: mv ${{ steps.attest.outputs.bundle-path }} containerd-${{ needs.check.outputs.stringver }}-attestation.intoto.jsonl
       - name: Create Release
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
+        uses: softprops/action-gh-release@62c96d0c4e8a889135c1f3a25910db8dbe0e85f7 # v2.3.4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: true

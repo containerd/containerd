@@ -563,6 +563,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/types/mount.proto"
   package: "containerd.types"
+  dependency: "google/protobuf/timestamp.proto"
   message_type {
     name: "Mount"
     field {
@@ -592,6 +593,114 @@ file {
       label: LABEL_REPEATED
       type: TYPE_STRING
       json_name: "options"
+    }
+  }
+  message_type {
+    name: "ActiveMount"
+    field {
+      name: "mount"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Mount"
+      json_name: "mount"
+    }
+    field {
+      name: "mounted_at"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "mountedAt"
+    }
+    field {
+      name: "mount_point"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "mountPoint"
+    }
+    field {
+      name: "data"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.ActiveMount.DataEntry"
+      json_name: "data"
+    }
+    nested_type {
+      name: "DataEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  message_type {
+    name: "ActivationInfo"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "active"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.ActiveMount"
+      json_name: "active"
+    }
+    field {
+      name: "system"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Mount"
+      json_name: "system"
+    }
+    field {
+      name: "labels"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.ActivationInfo.LabelsEntry"
+      json_name: "labels"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
     }
   }
   options {
@@ -4964,6 +5073,192 @@ file {
   }
   options {
     go_package: "github.com/containerd/containerd/api/services/leases/v1;leases"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/services/mounts/v1/mounts.proto"
+  package: "containerd.services.mounts.v1"
+  dependency: "google/protobuf/empty.proto"
+  dependency: "google/protobuf/field_mask.proto"
+  dependency: "github.com/containerd/containerd/api/types/mount.proto"
+  message_type {
+    name: "ActivateRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "mounts"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Mount"
+      json_name: "mounts"
+    }
+    field {
+      name: "labels"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.mounts.v1.ActivateRequest.LabelsEntry"
+      json_name: "labels"
+    }
+    field {
+      name: "temporary"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "temporary"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  message_type {
+    name: "ActivateResponse"
+    field {
+      name: "info"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.ActivationInfo"
+      json_name: "info"
+    }
+  }
+  message_type {
+    name: "DeactivateRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+  }
+  message_type {
+    name: "InfoRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+  }
+  message_type {
+    name: "InfoResponse"
+    field {
+      name: "info"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.ActivationInfo"
+      json_name: "info"
+    }
+  }
+  message_type {
+    name: "UpdateRequest"
+    field {
+      name: "info"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.ActivationInfo"
+      json_name: "info"
+    }
+    field {
+      name: "update_mask"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.FieldMask"
+      json_name: "updateMask"
+    }
+  }
+  message_type {
+    name: "UpdateResponse"
+    field {
+      name: "info"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.ActivationInfo"
+      json_name: "info"
+    }
+  }
+  message_type {
+    name: "ListRequest"
+    field {
+      name: "filters"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "filters"
+    }
+  }
+  message_type {
+    name: "ListMessage"
+    field {
+      name: "info"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.ActivationInfo"
+      json_name: "info"
+    }
+  }
+  service {
+    name: "Mounts"
+    method {
+      name: "Activate"
+      input_type: ".containerd.services.mounts.v1.ActivateRequest"
+      output_type: ".containerd.services.mounts.v1.ActivateResponse"
+    }
+    method {
+      name: "Deactivate"
+      input_type: ".containerd.services.mounts.v1.DeactivateRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Info"
+      input_type: ".containerd.services.mounts.v1.InfoRequest"
+      output_type: ".containerd.services.mounts.v1.InfoResponse"
+    }
+    method {
+      name: "Update"
+      input_type: ".containerd.services.mounts.v1.UpdateRequest"
+      output_type: ".containerd.services.mounts.v1.UpdateResponse"
+    }
+    method {
+      name: "List"
+      input_type: ".containerd.services.mounts.v1.ListRequest"
+      output_type: ".containerd.services.mounts.v1.ListMessage"
+      server_streaming: true
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/mounts/v1;mounts"
   }
   syntax: "proto3"
 }

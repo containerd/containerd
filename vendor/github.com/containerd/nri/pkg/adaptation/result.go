@@ -18,6 +18,8 @@ package adaptation
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/containerd/nri/pkg/api"
@@ -27,7 +29,7 @@ type result struct {
 	request resultRequest
 	reply   resultReply
 	updates map[string]*ContainerUpdate
-	owners  resultOwners
+	owners  *api.OwningPlugins
 }
 
 type resultRequest struct {
@@ -39,8 +41,6 @@ type resultReply struct {
 	adjust *ContainerAdjustment
 	update []*ContainerUpdate
 }
-
-type resultOwners map[string]*owners
 
 func collectCreateContainerResult(request *CreateContainerRequest) *result {
 	if request.Container.Labels == nil {
@@ -79,6 +79,9 @@ func collectCreateContainerResult(request *CreateContainerRequest) *result {
 	if request.Container.Linux.Resources.Unified == nil {
 		request.Container.Linux.Resources.Unified = map[string]string{}
 	}
+	if request.Container.Linux.Namespaces == nil {
+		request.Container.Linux.Namespaces = []*LinuxNamespace{}
+	}
 
 	return &result{
 		request: resultRequest{
@@ -100,11 +103,12 @@ func collectCreateContainerResult(request *CreateContainerRequest) *result {
 						HugepageLimits: []*HugepageLimit{},
 						Unified:        map[string]string{},
 					},
+					Namespaces: []*LinuxNamespace{},
 				},
 			},
 		},
 		updates: map[string]*ContainerUpdate{},
-		owners:  resultOwners{},
+		owners:  api.NewOwningPlugins(),
 	}
 }
 
@@ -129,7 +133,7 @@ func collectUpdateContainerResult(request *UpdateContainerRequest) *result {
 			update: []*ContainerUpdate{},
 		},
 		updates: map[string]*ContainerUpdate{},
-		owners:  resultOwners{},
+		owners:  api.NewOwningPlugins(),
 	}
 }
 
@@ -203,7 +207,10 @@ func (r *result) adjust(rpl *ContainerAdjustment, plugin string) error {
 	if err := r.adjustEnv(rpl.Env, plugin); err != nil {
 		return err
 	}
-	if err := r.adjustHooks(rpl.Hooks); err != nil {
+	if err := r.adjustArgs(rpl.Args, plugin); err != nil {
+		return err
+	}
+	if err := r.adjustHooks(rpl.Hooks, plugin); err != nil {
 		return err
 	}
 	if rpl.Linux != nil {
@@ -217,6 +224,15 @@ func (r *result) adjust(rpl *ContainerAdjustment, plugin string) error {
 			return err
 		}
 		if err := r.adjustOomScoreAdj(rpl.Linux.OomScoreAdj, plugin); err != nil {
+			return err
+		}
+		if err := r.adjustIOPriority(rpl.Linux.IoPriority, plugin); err != nil {
+			return err
+		}
+		if err := r.adjustSeccompPolicy(rpl.Linux.SeccompPolicy, plugin); err != nil {
+			return err
+		}
+		if err := r.adjustNamespaces(rpl.Linux.Namespaces, plugin); err != nil {
 			return err
 		}
 	}
@@ -260,11 +276,11 @@ func (r *result) adjustAnnotations(annotations map[string]string, plugin string)
 
 	for k, v := range annotations {
 		if _, ok := del[k]; ok {
-			r.owners.clearAnnotation(id, k)
+			r.owners.ClearAnnotation(id, k, plugin)
 			delete(create.Container.Annotations, k)
 			r.reply.adjust.Annotations[MarkForRemoval(k)] = ""
 		}
-		if err := r.owners.claimAnnotation(id, k, plugin); err != nil {
+		if err := r.owners.ClaimAnnotation(id, k, plugin); err != nil {
 			return err
 		}
 		create.Container.Annotations[k] = v
@@ -303,7 +319,7 @@ func (r *result) adjustMounts(mounts []*Mount, plugin string) error {
 	cleared := []*Mount{}
 	for _, m := range r.reply.adjust.Mounts {
 		if _, removed := del[m.Destination]; removed {
-			r.owners.clearMount(id, m.Destination)
+			r.owners.ClearMount(id, m.Destination, plugin)
 			continue
 		}
 		cleared = append(cleared, m)
@@ -325,7 +341,7 @@ func (r *result) adjustMounts(mounts []*Mount, plugin string) error {
 
 	// next, apply additions/modifications to collected adjustments
 	for _, m := range add {
-		if err := r.owners.claimMount(id, m.Destination, plugin); err != nil {
+		if err := r.owners.ClaimMount(id, m.Destination, plugin); err != nil {
 			return err
 		}
 		r.reply.adjust.Mounts = append(r.reply.adjust.Mounts, m)
@@ -368,7 +384,7 @@ func (r *result) adjustDevices(devices []*LinuxDevice, plugin string) error {
 	cleared := []*LinuxDevice{}
 	for _, d := range r.reply.adjust.Linux.Devices {
 		if _, removed := del[d.Path]; removed {
-			r.owners.clearDevice(id, d.Path)
+			r.owners.ClearDevice(id, d.Path, plugin)
 			continue
 		}
 		cleared = append(cleared, d)
@@ -390,7 +406,7 @@ func (r *result) adjustDevices(devices []*LinuxDevice, plugin string) error {
 
 	// next, apply additions/modifications to collected adjustments
 	for _, d := range add {
-		if err := r.owners.claimDevice(id, d.Path, plugin); err != nil {
+		if err := r.owners.ClaimDevice(id, d.Path, plugin); err != nil {
 			return err
 		}
 		r.reply.adjust.Linux.Devices = append(r.reply.adjust.Linux.Devices, d)
@@ -398,6 +414,39 @@ func (r *result) adjustDevices(devices []*LinuxDevice, plugin string) error {
 
 	// finally, apply additions/modifications to plugin container creation request
 	create.Container.Linux.Devices = append(create.Container.Linux.Devices, add...)
+
+	return nil
+}
+
+func (r *result) adjustNamespaces(namespaces []*LinuxNamespace, plugin string) error {
+	if len(namespaces) == 0 {
+		return nil
+	}
+
+	create, id := r.request.create, r.request.create.Container.Id
+
+	creatensmap := map[string]*LinuxNamespace{}
+	for _, n := range create.Container.Linux.Namespaces {
+		creatensmap[n.Type] = n
+	}
+
+	for _, n := range namespaces {
+		if n == nil {
+			continue
+		}
+		key, marked := n.IsMarkedForRemoval()
+		if err := r.owners.ClaimNamespace(id, key, plugin); err != nil {
+			return err
+		}
+		if marked {
+			delete(creatensmap, key)
+		} else {
+			creatensmap[key] = n
+		}
+		r.reply.adjust.Linux.Namespaces = append(r.reply.adjust.Linux.Namespaces, n)
+	}
+
+	create.Container.Linux.Namespaces = slices.Collect(maps.Values(creatensmap))
 
 	return nil
 }
@@ -423,7 +472,7 @@ func (r *result) adjustCDIDevices(devices []*CDIDevice, plugin string) error {
 
 	// apply additions to collected adjustments
 	for _, d := range devices {
-		if err := r.owners.claimCDIDevice(id, d.Name, plugin); err != nil {
+		if err := r.owners.ClaimCdiDevice(id, d.Name, plugin); err != nil {
 			return err
 		}
 		r.reply.adjust.CDIDevices = append(r.reply.adjust.CDIDevices, d)
@@ -456,7 +505,7 @@ func (r *result) adjustEnv(env []*KeyValue, plugin string) error {
 	cleared := []*KeyValue{}
 	for _, e := range r.reply.adjust.Env {
 		if _, removed := del[e.Key]; removed {
-			r.owners.clearEnv(id, e.Key)
+			r.owners.ClearEnv(id, e.Key, plugin)
 			continue
 		}
 		cleared = append(cleared, e)
@@ -479,7 +528,7 @@ func (r *result) adjustEnv(env []*KeyValue, plugin string) error {
 
 	// next, apply additions/modifications to collected adjustments
 	for _, e := range add {
-		if err := r.owners.claimEnv(id, e.Key, plugin); err != nil {
+		if err := r.owners.ClaimEnv(id, e.Key, plugin); err != nil {
 			return err
 		}
 		r.reply.adjust.Env = append(r.reply.adjust.Env, e)
@@ -504,37 +553,70 @@ func splitEnvVar(s string) (string, string) {
 	return split[0], split[1]
 }
 
-func (r *result) adjustHooks(hooks *Hooks) error {
+func (r *result) adjustArgs(args []string, plugin string) error {
+	if len(args) == 0 {
+		return nil
+	}
+
+	create, id := r.request.create, r.request.create.Container.Id
+
+	if args[0] == "" {
+		r.owners.ClearArgs(id, plugin)
+		args = args[1:]
+	}
+
+	if err := r.owners.ClaimArgs(id, plugin); err != nil {
+		return err
+	}
+
+	r.reply.adjust.Args = slices.Clone(args)
+	create.Container.Args = r.reply.adjust.Args
+
+	return nil
+}
+
+func (r *result) adjustHooks(hooks *Hooks, plugin string) error {
 	if hooks == nil {
 		return nil
 	}
 
 	reply := r.reply.adjust
 	container := r.request.create.Container
+	claim := false
 
 	if h := hooks.Prestart; len(h) > 0 {
 		reply.Hooks.Prestart = append(reply.Hooks.Prestart, h...)
 		container.Hooks.Prestart = append(container.Hooks.Prestart, h...)
+		claim = true
 	}
 	if h := hooks.Poststart; len(h) > 0 {
 		reply.Hooks.Poststart = append(reply.Hooks.Poststart, h...)
 		container.Hooks.Poststart = append(container.Hooks.Poststart, h...)
+		claim = true
 	}
 	if h := hooks.Poststop; len(h) > 0 {
 		reply.Hooks.Poststop = append(reply.Hooks.Poststop, h...)
 		container.Hooks.Poststop = append(container.Hooks.Poststop, h...)
+		claim = true
 	}
 	if h := hooks.CreateRuntime; len(h) > 0 {
 		reply.Hooks.CreateRuntime = append(reply.Hooks.CreateRuntime, h...)
 		container.Hooks.CreateRuntime = append(container.Hooks.CreateRuntime, h...)
+		claim = true
 	}
 	if h := hooks.CreateContainer; len(h) > 0 {
 		reply.Hooks.CreateContainer = append(reply.Hooks.CreateContainer, h...)
 		container.Hooks.CreateContainer = append(container.Hooks.CreateContainer, h...)
+		claim = true
 	}
 	if h := hooks.StartContainer; len(h) > 0 {
 		reply.Hooks.StartContainer = append(reply.Hooks.StartContainer, h...)
 		container.Hooks.StartContainer = append(container.Hooks.StartContainer, h...)
+		claim = true
+	}
+
+	if claim {
+		r.owners.ClaimHooks(container.Id, plugin)
 	}
 
 	return nil
@@ -551,56 +633,56 @@ func (r *result) adjustResources(resources *LinuxResources, plugin string) error
 
 	if mem := resources.Memory; mem != nil {
 		if v := mem.GetLimit(); v != nil {
-			if err := r.owners.claimMemLimit(id, plugin); err != nil {
+			if err := r.owners.ClaimMemLimit(id, plugin); err != nil {
 				return err
 			}
 			container.Memory.Limit = Int64(v.GetValue())
 			reply.Memory.Limit = Int64(v.GetValue())
 		}
 		if v := mem.GetReservation(); v != nil {
-			if err := r.owners.claimMemReservation(id, plugin); err != nil {
+			if err := r.owners.ClaimMemReservation(id, plugin); err != nil {
 				return err
 			}
 			container.Memory.Reservation = Int64(v.GetValue())
 			reply.Memory.Reservation = Int64(v.GetValue())
 		}
 		if v := mem.GetSwap(); v != nil {
-			if err := r.owners.claimMemSwapLimit(id, plugin); err != nil {
+			if err := r.owners.ClaimMemSwapLimit(id, plugin); err != nil {
 				return err
 			}
 			container.Memory.Swap = Int64(v.GetValue())
 			reply.Memory.Swap = Int64(v.GetValue())
 		}
 		if v := mem.GetKernel(); v != nil {
-			if err := r.owners.claimMemKernelLimit(id, plugin); err != nil {
+			if err := r.owners.ClaimMemKernelLimit(id, plugin); err != nil {
 				return err
 			}
 			container.Memory.Kernel = Int64(v.GetValue())
 			reply.Memory.Kernel = Int64(v.GetValue())
 		}
 		if v := mem.GetKernelTcp(); v != nil {
-			if err := r.owners.claimMemTCPLimit(id, plugin); err != nil {
+			if err := r.owners.ClaimMemTCPLimit(id, plugin); err != nil {
 				return err
 			}
 			container.Memory.KernelTcp = Int64(v.GetValue())
 			reply.Memory.KernelTcp = Int64(v.GetValue())
 		}
 		if v := mem.GetSwappiness(); v != nil {
-			if err := r.owners.claimMemSwappiness(id, plugin); err != nil {
+			if err := r.owners.ClaimMemSwappiness(id, plugin); err != nil {
 				return err
 			}
 			container.Memory.Swappiness = UInt64(v.GetValue())
 			reply.Memory.Swappiness = UInt64(v.GetValue())
 		}
 		if v := mem.GetDisableOomKiller(); v != nil {
-			if err := r.owners.claimMemDisableOomKiller(id, plugin); err != nil {
+			if err := r.owners.ClaimMemDisableOomKiller(id, plugin); err != nil {
 				return err
 			}
 			container.Memory.DisableOomKiller = Bool(v.GetValue())
 			reply.Memory.DisableOomKiller = Bool(v.GetValue())
 		}
 		if v := mem.GetUseHierarchy(); v != nil {
-			if err := r.owners.claimMemUseHierarchy(id, plugin); err != nil {
+			if err := r.owners.ClaimMemUseHierarchy(id, plugin); err != nil {
 				return err
 			}
 			container.Memory.UseHierarchy = Bool(v.GetValue())
@@ -609,49 +691,49 @@ func (r *result) adjustResources(resources *LinuxResources, plugin string) error
 	}
 	if cpu := resources.Cpu; cpu != nil {
 		if v := cpu.GetShares(); v != nil {
-			if err := r.owners.claimCpuShares(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUShares(id, plugin); err != nil {
 				return err
 			}
 			container.Cpu.Shares = UInt64(v.GetValue())
 			reply.Cpu.Shares = UInt64(v.GetValue())
 		}
 		if v := cpu.GetQuota(); v != nil {
-			if err := r.owners.claimCpuQuota(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUQuota(id, plugin); err != nil {
 				return err
 			}
 			container.Cpu.Quota = Int64(v.GetValue())
 			reply.Cpu.Quota = Int64(v.GetValue())
 		}
 		if v := cpu.GetPeriod(); v != nil {
-			if err := r.owners.claimCpuPeriod(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUPeriod(id, plugin); err != nil {
 				return err
 			}
 			container.Cpu.Period = UInt64(v.GetValue())
 			reply.Cpu.Period = UInt64(v.GetValue())
 		}
 		if v := cpu.GetRealtimeRuntime(); v != nil {
-			if err := r.owners.claimCpuRealtimeRuntime(id, plugin); err != nil {
+			if err := r.owners.ClaimCPURealtimeRuntime(id, plugin); err != nil {
 				return err
 			}
 			container.Cpu.RealtimeRuntime = Int64(v.GetValue())
 			reply.Cpu.RealtimeRuntime = Int64(v.GetValue())
 		}
 		if v := cpu.GetRealtimePeriod(); v != nil {
-			if err := r.owners.claimCpuRealtimePeriod(id, plugin); err != nil {
+			if err := r.owners.ClaimCPURealtimePeriod(id, plugin); err != nil {
 				return err
 			}
 			container.Cpu.RealtimePeriod = UInt64(v.GetValue())
 			reply.Cpu.RealtimePeriod = UInt64(v.GetValue())
 		}
 		if v := cpu.GetCpus(); v != "" {
-			if err := r.owners.claimCpusetCpus(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUSetCPUs(id, plugin); err != nil {
 				return err
 			}
 			container.Cpu.Cpus = v
 			reply.Cpu.Cpus = v
 		}
 		if v := cpu.GetMems(); v != "" {
-			if err := r.owners.claimCpusetMems(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUSetMems(id, plugin); err != nil {
 				return err
 			}
 			container.Cpu.Mems = v
@@ -660,16 +742,21 @@ func (r *result) adjustResources(resources *LinuxResources, plugin string) error
 	}
 
 	for _, l := range resources.HugepageLimits {
-		if err := r.owners.claimHugepageLimit(id, l.PageSize, plugin); err != nil {
+		if err := r.owners.ClaimHugepageLimit(id, l.PageSize, plugin); err != nil {
 			return err
 		}
 		container.HugepageLimits = append(container.HugepageLimits, l)
 		reply.HugepageLimits = append(reply.HugepageLimits, l)
 	}
 
+	for _, d := range resources.Devices {
+		container.Devices = append(container.Devices, d)
+		reply.Devices = append(reply.Devices, d)
+	}
+
 	if len(resources.Unified) != 0 {
 		for k, v := range resources.Unified {
-			if err := r.owners.claimUnified(id, k, plugin); err != nil {
+			if err := r.owners.ClaimCgroupsUnified(id, k, plugin); err != nil {
 				return err
 			}
 			container.Unified[k] = v
@@ -678,21 +765,21 @@ func (r *result) adjustResources(resources *LinuxResources, plugin string) error
 	}
 
 	if v := resources.GetBlockioClass(); v != nil {
-		if err := r.owners.claimBlockioClass(id, plugin); err != nil {
+		if err := r.owners.ClaimBlockioClass(id, plugin); err != nil {
 			return err
 		}
 		container.BlockioClass = String(v.GetValue())
 		reply.BlockioClass = String(v.GetValue())
 	}
 	if v := resources.GetRdtClass(); v != nil {
-		if err := r.owners.claimRdtClass(id, plugin); err != nil {
+		if err := r.owners.ClaimRdtClass(id, plugin); err != nil {
 			return err
 		}
 		container.RdtClass = String(v.GetValue())
 		reply.RdtClass = String(v.GetValue())
 	}
 	if v := resources.GetPids(); v != nil {
-		if err := r.owners.claimPidsLimit(id, plugin); err != nil {
+		if err := r.owners.ClaimPidsLimit(id, plugin); err != nil {
 			return err
 		}
 		pidv := &api.LinuxPids{
@@ -711,7 +798,7 @@ func (r *result) adjustCgroupsPath(path, plugin string) error {
 
 	create, id := r.request.create, r.request.create.Container.Id
 
-	if err := r.owners.claimCgroupsPath(id, plugin); err != nil {
+	if err := r.owners.ClaimCgroupsPath(id, plugin); err != nil {
 		return err
 	}
 
@@ -728,7 +815,7 @@ func (r *result) adjustOomScoreAdj(OomScoreAdj *OptionalInt, plugin string) erro
 
 	create, id := r.request.create, r.request.create.Container.Id
 
-	if err := r.owners.claimOomScoreAdj(id, plugin); err != nil {
+	if err := r.owners.ClaimOomScoreAdj(id, plugin); err != nil {
 		return err
 	}
 
@@ -738,10 +825,43 @@ func (r *result) adjustOomScoreAdj(OomScoreAdj *OptionalInt, plugin string) erro
 	return nil
 }
 
+func (r *result) adjustIOPriority(priority *LinuxIOPriority, plugin string) error {
+	if priority == nil {
+		return nil
+	}
+
+	create, id := r.request.create, r.request.create.Container.Id
+
+	if err := r.owners.ClaimIOPriority(id, plugin); err != nil {
+		return err
+	}
+
+	create.Container.Linux.IoPriority = priority
+	r.reply.adjust.Linux.IoPriority = priority
+
+	return nil
+}
+
+func (r *result) adjustSeccompPolicy(adjustment *LinuxSeccomp, plugin string) error {
+	if adjustment == nil {
+		return nil
+	}
+	create, id := r.request.create, r.request.create.Container.Id
+
+	if err := r.owners.ClaimSeccompPolicy(id, plugin); err != nil {
+		return err
+	}
+
+	create.Container.Linux.SeccompPolicy = adjustment
+	r.reply.adjust.Linux.SeccompPolicy = adjustment
+
+	return nil
+}
+
 func (r *result) adjustRlimits(rlimits []*POSIXRlimit, plugin string) error {
 	create, id, adjust := r.request.create, r.request.create.Container.Id, r.reply.adjust
 	for _, l := range rlimits {
-		if err := r.owners.claimRlimits(id, l.Type, plugin); err != nil {
+		if err := r.owners.ClaimRlimit(id, l.Type, plugin); err != nil {
 			return err
 		}
 
@@ -768,49 +888,49 @@ func (r *result) updateResources(reply, u *ContainerUpdate, plugin string) error
 
 	if mem := u.Linux.Resources.Memory; mem != nil {
 		if v := mem.GetLimit(); v != nil {
-			if err := r.owners.claimMemLimit(id, plugin); err != nil {
+			if err := r.owners.ClaimMemLimit(id, plugin); err != nil {
 				return err
 			}
 			resources.Memory.Limit = Int64(v.GetValue())
 		}
 		if v := mem.GetReservation(); v != nil {
-			if err := r.owners.claimMemReservation(id, plugin); err != nil {
+			if err := r.owners.ClaimMemReservation(id, plugin); err != nil {
 				return err
 			}
 			resources.Memory.Reservation = Int64(v.GetValue())
 		}
 		if v := mem.GetSwap(); v != nil {
-			if err := r.owners.claimMemSwapLimit(id, plugin); err != nil {
+			if err := r.owners.ClaimMemSwapLimit(id, plugin); err != nil {
 				return err
 			}
 			resources.Memory.Swap = Int64(v.GetValue())
 		}
 		if v := mem.GetKernel(); v != nil {
-			if err := r.owners.claimMemKernelLimit(id, plugin); err != nil {
+			if err := r.owners.ClaimMemKernelLimit(id, plugin); err != nil {
 				return err
 			}
 			resources.Memory.Kernel = Int64(v.GetValue())
 		}
 		if v := mem.GetKernelTcp(); v != nil {
-			if err := r.owners.claimMemTCPLimit(id, plugin); err != nil {
+			if err := r.owners.ClaimMemTCPLimit(id, plugin); err != nil {
 				return err
 			}
 			resources.Memory.KernelTcp = Int64(v.GetValue())
 		}
 		if v := mem.GetSwappiness(); v != nil {
-			if err := r.owners.claimMemSwappiness(id, plugin); err != nil {
+			if err := r.owners.ClaimMemSwappiness(id, plugin); err != nil {
 				return err
 			}
 			resources.Memory.Swappiness = UInt64(v.GetValue())
 		}
 		if v := mem.GetDisableOomKiller(); v != nil {
-			if err := r.owners.claimMemDisableOomKiller(id, plugin); err != nil {
+			if err := r.owners.ClaimMemDisableOomKiller(id, plugin); err != nil {
 				return err
 			}
 			resources.Memory.DisableOomKiller = Bool(v.GetValue())
 		}
 		if v := mem.GetUseHierarchy(); v != nil {
-			if err := r.owners.claimMemUseHierarchy(id, plugin); err != nil {
+			if err := r.owners.ClaimMemUseHierarchy(id, plugin); err != nil {
 				return err
 			}
 			resources.Memory.UseHierarchy = Bool(v.GetValue())
@@ -818,43 +938,43 @@ func (r *result) updateResources(reply, u *ContainerUpdate, plugin string) error
 	}
 	if cpu := u.Linux.Resources.Cpu; cpu != nil {
 		if v := cpu.GetShares(); v != nil {
-			if err := r.owners.claimCpuShares(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUShares(id, plugin); err != nil {
 				return err
 			}
 			resources.Cpu.Shares = UInt64(v.GetValue())
 		}
 		if v := cpu.GetQuota(); v != nil {
-			if err := r.owners.claimCpuQuota(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUQuota(id, plugin); err != nil {
 				return err
 			}
 			resources.Cpu.Quota = Int64(v.GetValue())
 		}
 		if v := cpu.GetPeriod(); v != nil {
-			if err := r.owners.claimCpuPeriod(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUPeriod(id, plugin); err != nil {
 				return err
 			}
 			resources.Cpu.Period = UInt64(v.GetValue())
 		}
 		if v := cpu.GetRealtimeRuntime(); v != nil {
-			if err := r.owners.claimCpuRealtimeRuntime(id, plugin); err != nil {
+			if err := r.owners.ClaimCPURealtimeRuntime(id, plugin); err != nil {
 				return err
 			}
 			resources.Cpu.RealtimeRuntime = Int64(v.GetValue())
 		}
 		if v := cpu.GetRealtimePeriod(); v != nil {
-			if err := r.owners.claimCpuRealtimePeriod(id, plugin); err != nil {
+			if err := r.owners.ClaimCPURealtimePeriod(id, plugin); err != nil {
 				return err
 			}
 			resources.Cpu.RealtimePeriod = UInt64(v.GetValue())
 		}
 		if v := cpu.GetCpus(); v != "" {
-			if err := r.owners.claimCpusetCpus(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUSetCPUs(id, plugin); err != nil {
 				return err
 			}
 			resources.Cpu.Cpus = v
 		}
 		if v := cpu.GetMems(); v != "" {
-			if err := r.owners.claimCpusetMems(id, plugin); err != nil {
+			if err := r.owners.ClaimCPUSetMems(id, plugin); err != nil {
 				return err
 			}
 			resources.Cpu.Mems = v
@@ -862,7 +982,7 @@ func (r *result) updateResources(reply, u *ContainerUpdate, plugin string) error
 	}
 
 	for _, l := range u.Linux.Resources.HugepageLimits {
-		if err := r.owners.claimHugepageLimit(id, l.PageSize, plugin); err != nil {
+		if err := r.owners.ClaimHugepageLimit(id, l.PageSize, plugin); err != nil {
 			return err
 		}
 		resources.HugepageLimits = append(resources.HugepageLimits, l)
@@ -873,7 +993,7 @@ func (r *result) updateResources(reply, u *ContainerUpdate, plugin string) error
 			resources.Unified = make(map[string]string)
 		}
 		for k, v := range u.Linux.Resources.Unified {
-			if err := r.owners.claimUnified(id, k, plugin); err != nil {
+			if err := r.owners.ClaimCgroupsUnified(id, k, plugin); err != nil {
 				return err
 			}
 			resources.Unified[k] = v
@@ -881,19 +1001,19 @@ func (r *result) updateResources(reply, u *ContainerUpdate, plugin string) error
 	}
 
 	if v := u.Linux.Resources.GetBlockioClass(); v != nil {
-		if err := r.owners.claimBlockioClass(id, plugin); err != nil {
+		if err := r.owners.ClaimBlockioClass(id, plugin); err != nil {
 			return err
 		}
 		resources.BlockioClass = String(v.GetValue())
 	}
 	if v := u.Linux.Resources.GetRdtClass(); v != nil {
-		if err := r.owners.claimRdtClass(id, plugin); err != nil {
+		if err := r.owners.ClaimRdtClass(id, plugin); err != nil {
 			return err
 		}
 		resources.RdtClass = String(v.GetValue())
 	}
 	if v := resources.GetPids(); v != nil {
-		if err := r.owners.claimPidsLimit(id, plugin); err != nil {
+		if err := r.owners.ClaimPidsLimit(id, plugin); err != nil {
 			return err
 		}
 		resources.Pids = &api.LinuxPids{
@@ -946,454 +1066,4 @@ func (r *result) getContainerUpdate(u *ContainerUpdate, plugin string) (*Contain
 	}
 
 	return update, nil
-}
-
-type owners struct {
-	annotations         map[string]string
-	mounts              map[string]string
-	devices             map[string]string
-	cdiDevices          map[string]string
-	env                 map[string]string
-	memLimit            string
-	memReservation      string
-	memSwapLimit        string
-	memKernelLimit      string
-	memTCPLimit         string
-	memSwappiness       string
-	memDisableOomKiller string
-	memUseHierarchy     string
-	cpuShares           string
-	cpuQuota            string
-	cpuPeriod           string
-	cpuRealtimeRuntime  string
-	cpuRealtimePeriod   string
-	cpusetCpus          string
-	cpusetMems          string
-	pidsLimit           string
-	hugepageLimits      map[string]string
-	blockioClass        string
-	rdtClass            string
-	unified             map[string]string
-	cgroupsPath         string
-	oomScoreAdj         string
-	rlimits             map[string]string
-}
-
-func (ro resultOwners) ownersFor(id string) *owners {
-	o, ok := ro[id]
-	if !ok {
-		o = &owners{}
-		ro[id] = o
-	}
-	return o
-}
-
-func (ro resultOwners) claimAnnotation(id, key, plugin string) error {
-	return ro.ownersFor(id).claimAnnotation(key, plugin)
-}
-
-func (ro resultOwners) claimMount(id, destination, plugin string) error {
-	return ro.ownersFor(id).claimMount(destination, plugin)
-}
-
-func (ro resultOwners) claimDevice(id, path, plugin string) error {
-	return ro.ownersFor(id).claimDevice(path, plugin)
-}
-
-func (ro resultOwners) claimCDIDevice(id, path, plugin string) error {
-	return ro.ownersFor(id).claimCDIDevice(path, plugin)
-}
-
-func (ro resultOwners) claimEnv(id, name, plugin string) error {
-	return ro.ownersFor(id).claimEnv(name, plugin)
-}
-
-func (ro resultOwners) claimMemLimit(id, plugin string) error {
-	return ro.ownersFor(id).claimMemLimit(plugin)
-}
-
-func (ro resultOwners) claimMemReservation(id, plugin string) error {
-	return ro.ownersFor(id).claimMemReservation(plugin)
-}
-
-func (ro resultOwners) claimMemSwapLimit(id, plugin string) error {
-	return ro.ownersFor(id).claimMemSwapLimit(plugin)
-}
-
-func (ro resultOwners) claimMemKernelLimit(id, plugin string) error {
-	return ro.ownersFor(id).claimMemKernelLimit(plugin)
-}
-
-func (ro resultOwners) claimMemTCPLimit(id, plugin string) error {
-	return ro.ownersFor(id).claimMemTCPLimit(plugin)
-}
-
-func (ro resultOwners) claimMemSwappiness(id, plugin string) error {
-	return ro.ownersFor(id).claimMemSwappiness(plugin)
-}
-
-func (ro resultOwners) claimMemDisableOomKiller(id, plugin string) error {
-	return ro.ownersFor(id).claimMemDisableOomKiller(plugin)
-}
-
-func (ro resultOwners) claimMemUseHierarchy(id, plugin string) error {
-	return ro.ownersFor(id).claimMemUseHierarchy(plugin)
-}
-
-func (ro resultOwners) claimCpuShares(id, plugin string) error {
-	return ro.ownersFor(id).claimCpuShares(plugin)
-}
-
-func (ro resultOwners) claimCpuQuota(id, plugin string) error {
-	return ro.ownersFor(id).claimCpuQuota(plugin)
-}
-
-func (ro resultOwners) claimCpuPeriod(id, plugin string) error {
-	return ro.ownersFor(id).claimCpuPeriod(plugin)
-}
-
-func (ro resultOwners) claimCpuRealtimeRuntime(id, plugin string) error {
-	return ro.ownersFor(id).claimCpuRealtimeRuntime(plugin)
-}
-
-func (ro resultOwners) claimCpuRealtimePeriod(id, plugin string) error {
-	return ro.ownersFor(id).claimCpuRealtimePeriod(plugin)
-}
-
-func (ro resultOwners) claimCpusetCpus(id, plugin string) error {
-	return ro.ownersFor(id).claimCpusetCpus(plugin)
-}
-
-func (ro resultOwners) claimCpusetMems(id, plugin string) error {
-	return ro.ownersFor(id).claimCpusetMems(plugin)
-}
-
-func (ro resultOwners) claimPidsLimit(id, plugin string) error {
-	return ro.ownersFor(id).claimPidsLimit(plugin)
-}
-
-func (ro resultOwners) claimHugepageLimit(id, size, plugin string) error {
-	return ro.ownersFor(id).claimHugepageLimit(size, plugin)
-}
-
-func (ro resultOwners) claimBlockioClass(id, plugin string) error {
-	return ro.ownersFor(id).claimBlockioClass(plugin)
-}
-
-func (ro resultOwners) claimRdtClass(id, plugin string) error {
-	return ro.ownersFor(id).claimRdtClass(plugin)
-}
-
-func (ro resultOwners) claimUnified(id, key, plugin string) error {
-	return ro.ownersFor(id).claimUnified(key, plugin)
-}
-
-func (ro resultOwners) claimCgroupsPath(id, plugin string) error {
-	return ro.ownersFor(id).claimCgroupsPath(plugin)
-}
-
-func (ro resultOwners) claimOomScoreAdj(id, plugin string) error {
-	return ro.ownersFor(id).claimOomScoreAdj(plugin)
-}
-
-func (ro resultOwners) claimRlimits(id, typ, plugin string) error {
-	return ro.ownersFor(id).claimRlimit(typ, plugin)
-}
-
-func (o *owners) claimAnnotation(key, plugin string) error {
-	if o.annotations == nil {
-		o.annotations = make(map[string]string)
-	}
-	if other, taken := o.annotations[key]; taken {
-		return conflict(plugin, other, "annotation", key)
-	}
-	o.annotations[key] = plugin
-	return nil
-}
-
-func (o *owners) claimMount(destination, plugin string) error {
-	if o.mounts == nil {
-		o.mounts = make(map[string]string)
-	}
-	if other, taken := o.mounts[destination]; taken {
-		return conflict(plugin, other, "mount", destination)
-	}
-	o.mounts[destination] = plugin
-	return nil
-}
-
-func (o *owners) claimDevice(path, plugin string) error {
-	if o.devices == nil {
-		o.devices = make(map[string]string)
-	}
-	if other, taken := o.devices[path]; taken {
-		return conflict(plugin, other, "device", path)
-	}
-	o.devices[path] = plugin
-	return nil
-}
-
-func (o *owners) claimCDIDevice(name, plugin string) error {
-	if o.cdiDevices == nil {
-		o.cdiDevices = make(map[string]string)
-	}
-	if other, taken := o.cdiDevices[name]; taken {
-		return conflict(plugin, other, "CDI device", name)
-	}
-	o.cdiDevices[name] = plugin
-	return nil
-}
-
-func (o *owners) claimEnv(name, plugin string) error {
-	if o.env == nil {
-		o.env = make(map[string]string)
-	}
-	if other, taken := o.env[name]; taken {
-		return conflict(plugin, other, "env", name)
-	}
-	o.env[name] = plugin
-	return nil
-}
-
-func (o *owners) claimMemLimit(plugin string) error {
-	if other := o.memLimit; other != "" {
-		return conflict(plugin, other, "memory limit")
-	}
-	o.memLimit = plugin
-	return nil
-}
-
-func (o *owners) claimMemReservation(plugin string) error {
-	if other := o.memReservation; other != "" {
-		return conflict(plugin, other, "memory reservation")
-	}
-	o.memReservation = plugin
-	return nil
-}
-
-func (o *owners) claimMemSwapLimit(plugin string) error {
-	if other := o.memSwapLimit; other != "" {
-		return conflict(plugin, other, "memory swap limit")
-	}
-	o.memSwapLimit = plugin
-	return nil
-}
-
-func (o *owners) claimMemKernelLimit(plugin string) error {
-	if other := o.memKernelLimit; other != "" {
-		return conflict(plugin, other, "memory kernel limit")
-	}
-	o.memKernelLimit = plugin
-	return nil
-}
-
-func (o *owners) claimMemTCPLimit(plugin string) error {
-	if other := o.memTCPLimit; other != "" {
-		return conflict(plugin, other, "memory TCP limit")
-	}
-	o.memTCPLimit = plugin
-	return nil
-}
-
-func (o *owners) claimMemSwappiness(plugin string) error {
-	if other := o.memSwappiness; other != "" {
-		return conflict(plugin, other, "memory swappiness")
-	}
-	o.memSwappiness = plugin
-	return nil
-}
-
-func (o *owners) claimMemDisableOomKiller(plugin string) error {
-	if other := o.memDisableOomKiller; other != "" {
-		return conflict(plugin, other, "memory disable OOM killer")
-	}
-	o.memDisableOomKiller = plugin
-	return nil
-}
-
-func (o *owners) claimMemUseHierarchy(plugin string) error {
-	if other := o.memUseHierarchy; other != "" {
-		return conflict(plugin, other, "memory 'UseHierarchy'")
-	}
-	o.memUseHierarchy = plugin
-	return nil
-}
-
-func (o *owners) claimCpuShares(plugin string) error {
-	if other := o.cpuShares; other != "" {
-		return conflict(plugin, other, "CPU shares")
-	}
-	o.cpuShares = plugin
-	return nil
-}
-
-func (o *owners) claimCpuQuota(plugin string) error {
-	if other := o.cpuQuota; other != "" {
-		return conflict(plugin, other, "CPU quota")
-	}
-	o.cpuQuota = plugin
-	return nil
-}
-
-func (o *owners) claimCpuPeriod(plugin string) error {
-	if other := o.cpuPeriod; other != "" {
-		return conflict(plugin, other, "CPU period")
-	}
-	o.cpuPeriod = plugin
-	return nil
-}
-
-func (o *owners) claimCpuRealtimeRuntime(plugin string) error {
-	if other := o.cpuRealtimeRuntime; other != "" {
-		return conflict(plugin, other, "CPU realtime runtime")
-	}
-	o.cpuRealtimeRuntime = plugin
-	return nil
-}
-
-func (o *owners) claimCpuRealtimePeriod(plugin string) error {
-	if other := o.cpuRealtimePeriod; other != "" {
-		return conflict(plugin, other, "CPU realtime period")
-	}
-	o.cpuRealtimePeriod = plugin
-	return nil
-}
-
-func (o *owners) claimCpusetCpus(plugin string) error {
-	if other := o.cpusetCpus; other != "" {
-		return conflict(plugin, other, "CPU pinning")
-	}
-	o.cpusetCpus = plugin
-	return nil
-}
-
-func (o *owners) claimCpusetMems(plugin string) error {
-	if other := o.cpusetMems; other != "" {
-		return conflict(plugin, other, "memory pinning")
-	}
-	o.cpusetMems = plugin
-	return nil
-}
-
-func (o *owners) claimPidsLimit(plugin string) error {
-	if other := o.pidsLimit; other != "" {
-		return conflict(plugin, other, "pids pinning")
-	}
-	o.pidsLimit = plugin
-	return nil
-}
-
-func (o *owners) claimHugepageLimit(size, plugin string) error {
-	if o.hugepageLimits == nil {
-		o.hugepageLimits = make(map[string]string)
-	}
-
-	if other, taken := o.hugepageLimits[size]; taken {
-		return conflict(plugin, other, "hugepage limit of size", size)
-	}
-	o.hugepageLimits[size] = plugin
-	return nil
-}
-
-func (o *owners) claimBlockioClass(plugin string) error {
-	if other := o.blockioClass; other != "" {
-		return conflict(plugin, other, "block I/O class")
-	}
-	o.blockioClass = plugin
-	return nil
-}
-
-func (o *owners) claimRdtClass(plugin string) error {
-	if other := o.rdtClass; other != "" {
-		return conflict(plugin, other, "RDT class")
-	}
-	o.rdtClass = plugin
-	return nil
-}
-
-func (o *owners) claimUnified(key, plugin string) error {
-	if o.unified == nil {
-		o.unified = make(map[string]string)
-	}
-	if other, taken := o.unified[key]; taken {
-		return conflict(plugin, other, "unified resource", key)
-	}
-	o.unified[key] = plugin
-	return nil
-}
-
-func (o *owners) claimRlimit(typ, plugin string) error {
-	if o.rlimits == nil {
-		o.rlimits = make(map[string]string)
-	}
-	if other, taken := o.rlimits[typ]; taken {
-		return conflict(plugin, other, "rlimit", typ)
-	}
-	o.rlimits[typ] = plugin
-	return nil
-}
-
-func (o *owners) claimCgroupsPath(plugin string) error {
-	if other := o.cgroupsPath; other != "" {
-		return conflict(plugin, other, "cgroups path")
-	}
-	o.cgroupsPath = plugin
-	return nil
-}
-
-func (o *owners) claimOomScoreAdj(plugin string) error {
-	if other := o.oomScoreAdj; other != "" {
-		return conflict(plugin, other, "oom score adj")
-	}
-	o.oomScoreAdj = plugin
-	return nil
-}
-
-func (ro resultOwners) clearAnnotation(id, key string) {
-	ro.ownersFor(id).clearAnnotation(key)
-}
-
-func (ro resultOwners) clearMount(id, destination string) {
-	ro.ownersFor(id).clearMount(destination)
-}
-
-func (ro resultOwners) clearDevice(id, path string) {
-	ro.ownersFor(id).clearDevice(path)
-}
-
-func (ro resultOwners) clearEnv(id, name string) {
-	ro.ownersFor(id).clearEnv(name)
-}
-
-func (o *owners) clearAnnotation(key string) {
-	if o.annotations == nil {
-		return
-	}
-	delete(o.annotations, key)
-}
-
-func (o *owners) clearMount(destination string) {
-	if o.mounts == nil {
-		return
-	}
-	delete(o.mounts, destination)
-}
-
-func (o *owners) clearDevice(path string) {
-	if o.devices == nil {
-		return
-	}
-	delete(o.devices, path)
-}
-
-func (o *owners) clearEnv(name string) {
-	if o.env == nil {
-		return
-	}
-	delete(o.env, name)
-}
-
-func conflict(plugin, other, subject string, qualif ...string) error {
-	return fmt.Errorf("plugins %q and %q both tried to set %s",
-		plugin, other, strings.Join(append([]string{subject}, qualif...), " "))
 }

@@ -19,6 +19,7 @@ package metadata
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -28,12 +29,14 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/metadata/boltutil"
-	"github.com/containerd/containerd/v2/pkg/gc"
+	"github.com/containerd/log/logtest"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
+	"github.com/containerd/containerd/v2/pkg/gc"
 )
 
 func TestResourceMax(t *testing.T) {
@@ -118,24 +121,19 @@ func TestGCRoots(t *testing.T) {
 	}
 
 	expected := []gc.Node{
-		gcnode(ResourceContent, "ns1", dgst(7).String()),
-		gcnode(ResourceContent, "ns1", dgst(8).String()),
-		gcnode(ResourceContent, "ns1", dgst(9).String()),
 		gcnode(ResourceContent, "ns2", dgst(2).String()),
 		gcnode(ResourceContent, "ns2", dgst(4).String()),
 		gcnode(ResourceContent, "ns2", dgst(5).String()),
 		gcnode(ResourceContent, "ns2", dgst(6).String()),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
-		gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
-		gcnode(ResourceSnapshot, "ns1", "overlay/sn5"),
-		gcnode(ResourceSnapshot, "ns1", "overlay/sn6"),
-		gcnode(ResourceSnapshot, "ns1", "overlay/sn7"),
-		gcnode(ResourceSnapshot, "ns1", "overlay/sn8"),
-		gcnode(ResourceSnapshot, "ns1", "overlay/sn9"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn5"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn6"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn7"),
 		gcnode(ResourceSnapshot, "ns4", "overlay/sn1"),
+		gcnode(ResourceContainer, "ns1", "container1"),
+		gcnode(ResourceContainer, "ns1", "container2"),
+		gcnode(ResourceContainer, "ns1", "container3"),
+		gcnode(ResourceContainer, "ns1", "container4"),
 		gcnode(ResourceImage, "ns1", "image1"),
 		gcnode(ResourceImage, "ns1", "image2"),
 		gcnode(ResourceImage, "ns2", "image3"),
@@ -277,11 +275,25 @@ func TestGCRefs(t *testing.T) {
 		addContent("ns1", dgst(2), nil),
 		addContent("ns1", dgst(3), nil),
 		addContent("ns1", dgst(4), labelmap(string(labelGCContentRef), dgst(1).String())),
-		addContent("ns1", dgst(5), labelmap(string(labelGCContentRef)+".anything-1", dgst(2).String(), string(labelGCContentRef)+".anything-2", dgst(3).String())),
+		addContent("ns1", dgst(5), labelmap(
+			string(labelGCContentRef)+".anything-1", dgst(2).String(),
+			string(labelGCContentRef)+".anything-2", dgst(3).String())),
 		addContent("ns1", dgst(6), labelmap(string(labelGCContentRef)+"bad", dgst(1).String())),
-		addContent("ns1", dgst(7), labelmap(string(labelGCContentRef)+"/anything-1", dgst(2).String(), string(labelGCContentRef)+"/anything-2", dgst(3).String())),
+		addContent("ns1", dgst(7), labelmap(
+			string(labelGCContentRef)+"/anything-1", dgst(2).String(),
+			string(labelGCContentRef)+"/anything-2", dgst(3).String(),
+			string(labelGCContainerBackRef), "container3")),
 		addContent("ns2", dgst(1), nil),
 		addContent("ns2", dgst(2), nil),
+		addContainer("ns1", "container1", "overlay", "sn4", nil),
+		addContainer("ns1", "container2", "overlay", "sn5", labelmap(string(labelGCSnapRef)+"overlay", "sn6")),
+		addContainer("ns1", "container3", "overlay", "sn7", labelmap(
+			string(labelGCSnapRef)+"overlay/anything-1", "sn8",
+			string(labelGCSnapRef)+"overlay/anything-2", "sn9",
+			string(labelGCContentRef), dgst(7).String())),
+		addContainer("ns1", "container4", "", "", labelmap(
+			string(labelGCContentRef)+".0", dgst(8).String(),
+			string(labelGCContentRef)+".1", dgst(9).String())),
 		addImage("ns1", "image1", dgst(3), nil),
 		addImage("ns1", "image2", dgst(4), labelmap(
 			string(labelGCImageRef)+".anything", "image1",
@@ -291,8 +303,12 @@ func TestGCRefs(t *testing.T) {
 		addSnapshot("ns1", "overlay", "sn1", "", nil),
 		addSnapshot("ns1", "overlay", "sn2", "sn1", nil),
 		addSnapshot("ns1", "overlay", "sn3", "sn2", nil),
-		addSnapshot("ns1", "overlay", "sn4", "", labelmap(string(labelGCSnapRef)+"btrfs", "sn1", string(labelGCSnapRef)+"overlay", "sn1")),
-		addSnapshot("ns1", "overlay", "sn5", "", labelmap(string(labelGCSnapRef)+"overlay/anything-1", "sn1", string(labelGCSnapRef)+"overlay/anything-2", "sn2")),
+		addSnapshot("ns1", "overlay", "sn4", "", labelmap(
+			string(labelGCSnapRef)+"btrfs", "sn1",
+			string(labelGCSnapRef)+"overlay", "sn1")),
+		addSnapshot("ns1", "overlay", "sn5", "", labelmap(
+			string(labelGCSnapRef)+"overlay/anything-1", "sn1",
+			string(labelGCSnapRef)+"overlay/anything-2", "sn2")),
 		addSnapshot("ns1", "btrfs", "sn1", "", nil),
 		addSnapshot("ns2", "overlay", "sn1", "", nil),
 		addSnapshot("ns2", "overlay", "sn2", "sn1", nil),
@@ -303,6 +319,20 @@ func TestGCRefs(t *testing.T) {
 		// Test flat references don't follow label references
 		addContent("ns3", dgst(1), nil),
 		addContent("ns3", dgst(2), labelmap(string(labelGCContentRef)+".0", dgst(1).String())),
+
+		// Back references
+		addContent("ns1", dgst(10), labelmap(
+			string(labelGCContainerBackRef), "container1",
+			string(labelGCContentBackRef), dgst(5).String(),
+			string(labelGCImageBackRef), "image2",
+			string(labelGCSnapBackRef)+"btrfs", "sn1")),
+		addContent("ns3", dgst(10), labelmap(string(labelGCContainerBackRef), "container1")),
+		addImage("ns1", "image3", dgst(10), labelmap(
+			string(labelGCImageBackRef), "image2",
+			string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))), // If not expired, reference is irrelevant as it is already a root
+		addImage("ns1", "image4", dgst(10), labelmap(
+			string(labelGCImageBackRef), "image2",
+			string(labelGCExpire), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
 
 		addSnapshot("ns3", "overlay", "sn1", "", nil),
 		addSnapshot("ns3", "overlay", "sn2", "sn1", nil),
@@ -317,6 +347,7 @@ func TestGCRefs(t *testing.T) {
 			gcnode(ResourceContent, "ns1", dgst(1).String()),
 		},
 		gcnode(ResourceContent, "ns1", dgst(5).String()): {
+			gcnode(ResourceContent, "ns1", dgst(10).String()),
 			gcnode(ResourceContent, "ns1", dgst(2).String()),
 			gcnode(ResourceContent, "ns1", dgst(3).String()),
 		},
@@ -342,7 +373,9 @@ func TestGCRefs(t *testing.T) {
 			gcnode(ResourceSnapshot, "ns1", "overlay/sn1"),
 			gcnode(ResourceSnapshot, "ns1", "overlay/sn2"),
 		},
-		gcnode(ResourceSnapshot, "ns1", "btrfs/sn1"):   nil,
+		gcnode(ResourceSnapshot, "ns1", "btrfs/sn1"): {
+			gcnode(ResourceContent, "ns1", dgst(10).String()),
+		},
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn1"): nil,
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn2"): {
 			gcnode(ResourceSnapshot, "ns2", "overlay/sn1"),
@@ -351,13 +384,34 @@ func TestGCRefs(t *testing.T) {
 			gcnode(ResourceContent, "ns2", dgst(1).String()),
 			gcnode(ResourceContent, "ns2", dgst(6).String()),
 		},
+		gcnode(ResourceContainer, "ns1", "container1"): {
+			gcnode(ResourceContent, "ns1", dgst(10).String()),
+			gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
+		},
+		gcnode(ResourceContainer, "ns1", "container2"): {
+			gcnode(ResourceSnapshot, "ns1", "overlay/sn5"),
+			gcnode(ResourceSnapshot, "ns1", "overlay/sn6"),
+		},
+		gcnode(ResourceContainer, "ns1", "container3"): {
+			gcnode(ResourceContent, "ns1", dgst(7).String()),
+			gcnode(ResourceContent, "ns1", dgst(7).String()), // Referenced by label and backreference
+			gcnode(ResourceSnapshot, "ns1", "overlay/sn7"),
+			gcnode(ResourceSnapshot, "ns1", "overlay/sn8"),
+			gcnode(ResourceSnapshot, "ns1", "overlay/sn9"),
+		},
+		gcnode(ResourceContainer, "ns1", "container4"): {
+			gcnode(ResourceContent, "ns1", dgst(8).String()),
+			gcnode(ResourceContent, "ns1", dgst(9).String()),
+		},
 		gcnode(ResourceImage, "ns1", "image1"): {
 			gcnode(ResourceContent, "ns1", dgst(3).String()),
 		},
 		gcnode(ResourceImage, "ns1", "image2"): {
+			gcnode(ResourceContent, "ns1", dgst(10).String()),
 			gcnode(ResourceContent, "ns1", dgst(4).String()),
 			gcnode(ResourceContent, "ns1", dgst(5).String()),
 			gcnode(ResourceImage, "ns1", "image1"),
+			gcnode(ResourceImage, "ns1", "image4"),
 		},
 		gcnode(ResourceIngest, "ns1", "ingest-1"): nil,
 		gcnode(ResourceIngest, "ns2", "ingest-2"): {
@@ -398,8 +452,19 @@ func TestGCRefs(t *testing.T) {
 		t.Fatalf("Update failed: %+v", err)
 	}
 
-	ctx := context.Background()
+	ctx := logtest.WithT(context.Background(), t)
 	c := startGCContext(ctx, nil)
+	if err := db.View(func(tx *bolt.Tx) error {
+		rctx, rcancel := context.WithCancel(ctx)
+		// Use canceled context to avoid blocking on nil chan
+		rcancel()
+		if err := c.scanRoots(rctx, tx, nil); err != nil && !errors.Is(err, context.Canceled) {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("Scan roots failed: %+v", err)
+	}
 
 	for n, nodes := range refs {
 		checkNodeC(ctx, t, db, nodes, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
@@ -410,9 +475,6 @@ func TestGCRefs(t *testing.T) {
 				}
 			})
 		})
-		if t.Failed() {
-			t.Fatalf("Failure scanning %v", n)
-		}
 	}
 }
 
@@ -431,11 +493,23 @@ func TestCollectibleResources(t *testing.T) {
 		addImage("ns1", "image2", dgst(2), nil),
 		addLease("ns1", "lease1", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
 		addLease("ns1", "lease2", labelmap(string(labelGCExpire), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
+		addContainer("ns1", "container1", "testsn", "sn1", nil),
 	}
 	refs := map[gc.Node][]gc.Node{
 		gcnode(ResourceContent, "ns1", dgst(1).String()): nil,
 		gcnode(ResourceContent, "ns1", dgst(2).String()): {
 			gcnode(testResource, "ns1", "test2"),
+		},
+		gcnode(ResourceImage, "ns1", "image1"): {
+			gcnode(ResourceContent, "ns1", dgst(1).String()),
+		},
+		gcnode(ResourceImage, "ns1", "image2"): {
+			gcnode(ResourceContent, "ns1", dgst(2).String()),
+			gcnode(testResource, "ns1", "test5"),
+		},
+		gcnode(ResourceContainer, "ns1", "container1"): {
+			gcnode(ResourceSnapshot, "ns1", "testsn/sn1"),
+			gcnode(testResource, "ns1", "test5"),
 		},
 	}
 	all := []gc.Node{
@@ -449,9 +523,11 @@ func TestCollectibleResources(t *testing.T) {
 		gcnode(testResource, "ns1", "test2"), // 7: Will be removed
 		gcnode(testResource, "ns1", "test3"),
 		gcnode(testResource, "ns1", "test4"),
+		gcnode(testResource, "ns1", "test5"),
 	}
 	removeIndex := 7
 	roots := []gc.Node{
+		gcnode(ResourceContainer, "ns1", "container1"),
 		gcnode(ResourceImage, "ns1", "image1"),
 		gcnode(ResourceImage, "ns1", "image2"),
 		gcnode(ResourceLease, "ns1", "lease1"),
@@ -464,9 +540,14 @@ func TestCollectibleResources(t *testing.T) {
 			gcnode(testResource, "ns1", "test2"),
 			gcnode(testResource, "ns1", "test3"),
 			gcnode(testResource, "ns1", "test4"),
+			gcnode(testResource, "ns1", "test5"),
 		},
 		active: []gc.Node{
 			gcnode(testResource, "ns1", "test1"),
+		},
+		brefs: map[gc.Node]gc.Node{
+			gcnode(ResourceImage, "ns1", "image2"):         gcnode(testResource, "ns1", "test5"),
+			gcnode(ResourceContainer, "ns1", "container1"): gcnode(testResource, "ns1", "test5"),
 		},
 		leased: map[string][]gc.Node{
 			"lease1": {
@@ -498,6 +579,9 @@ func TestCollectibleResources(t *testing.T) {
 		testResource: collector,
 	})
 
+	checkNodeC(ctx, t, db, roots, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+		return c.scanRoots(ctx, tx, nc)
+	})
 	for n, nodes := range refs {
 		checkNodeC(ctx, t, db, nodes, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 			return c.references(ctx, tx, n, func(n gc.Node) {
@@ -513,9 +597,6 @@ func TestCollectibleResources(t *testing.T) {
 	}
 	checkNodes(ctx, t, db, all, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
 		return c.scanAll(ctx, tx, fn)
-	})
-	checkNodeC(ctx, t, db, roots, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
-		return c.scanRoots(ctx, tx, nc)
 	})
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -535,6 +616,7 @@ func TestCollectibleResources(t *testing.T) {
 type testCollector struct {
 	all    []gc.Node
 	active []gc.Node
+	brefs  map[gc.Node]gc.Node
 	leased map[string][]gc.Node
 }
 
@@ -551,13 +633,21 @@ func (tc *testCollector) All(fn func(gc.Node)) {
 		fn(n)
 	}
 }
-
-func (tc *testCollector) Active(namespace string, fn func(gc.Node)) {
+func (tc *testCollector) ActiveWithBackRefs(namespace string, fn func(gc.Node), bref func(gc.Node, gc.Node)) {
 	for _, n := range tc.active {
 		if n.Namespace == namespace {
 			fn(n)
 		}
 	}
+	for b, r := range tc.brefs {
+		if b.Namespace == namespace {
+			bref(b, r)
+		}
+	}
+}
+
+func (tc *testCollector) Active(namespace string, fn func(gc.Node)) {
+	tc.ActiveWithBackRefs(namespace, fn, func(gc.Node, gc.Node) {})
 }
 
 func (tc *testCollector) Leased(namespace, lease string, fn func(gc.Node)) {
@@ -892,7 +982,8 @@ func dgst(i int64) digest.Digest {
 	if _, err := io.CopyN(dgstr.Hash(), r, 256); err != nil {
 		panic(err)
 	}
-	return dgstr.Digest()
+	d := dgstr.Digest()
+	return digest.NewDigestFromEncoded(d.Algorithm(), fmt.Sprintf("%03d00", i)+d.Encoded()[5:])
 }
 
 func timeIn(d time.Duration) *time.Time {
