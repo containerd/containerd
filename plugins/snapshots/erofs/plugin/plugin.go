@@ -46,6 +46,9 @@ type Config struct {
 
 	// DefaultSize is the default size of a writable layer in string
 	DefaultSize string `toml:"default_size"`
+
+	// MaxUnmergedLayers (>0) enables fsmerge when the number of image layers exceeds this value.
+	MaxUnmergedLayers uint `toml:"max_unmerged_layers"`
 }
 
 func init() {
@@ -85,6 +88,10 @@ func init() {
 					return nil, fmt.Errorf("failed to parse default_size '%v': %w", config.DefaultSize, err)
 				}
 				opts = append(opts, erofs.WithDefaultSize(size))
+			}
+
+			if config.MaxUnmergedLayers > 0 {
+				opts = append(opts, erofs.WithFsMergeThreshold(config.MaxUnmergedLayers))
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
