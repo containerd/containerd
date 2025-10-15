@@ -50,6 +50,13 @@ func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 	}
 }
 
+func WithOOMPath(OomPath string) NewTaskOpts {
+	return func(ctx context.Context, client *Client, info *TaskInfo) error {
+		info.OOMPath = OomPath
+		return nil
+	}
+}
+
 // WithTaskAPIEndpoint allow task service to manage a task through a given endpoint,
 // usually it is served inside a sandbox, and we can get it from sandbox status.
 func WithTaskAPIEndpoint(address string, version uint32) NewTaskOpts {

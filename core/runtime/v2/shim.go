@@ -391,6 +391,7 @@ func (gc *grpcConn) UserOnCloseWait(ctx context.Context) error {
 
 type shim struct {
 	bundle  *Bundle
+	OOMPath string
 	client  any
 	address string
 	version int
@@ -600,6 +601,7 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 	request := &task.CreateTaskRequest{
 		ID:         s.ID(),
 		Bundle:     s.Bundle(),
+		OomPath:    opts.OOMPath,
 		Stdin:      opts.IO.Stdin,
 		Stdout:     opts.IO.Stdout,
 		Stderr:     opts.IO.Stderr,

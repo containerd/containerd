@@ -212,6 +212,8 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if err != nil {
 		return nil, fmt.Errorf("failed to update container IO owner: %w", err)
 	}
+	oomPahOpts := containerd.WithOOMPath(filepath.Join(c.getContainerRootDir(id), "oom"))
+	taskOpts = append(taskOpts, oomPahOpts)
 	taskOpts = append(taskOpts, ioOwnerTaskOpts...)
 
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)

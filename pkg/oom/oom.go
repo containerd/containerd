@@ -27,4 +27,6 @@ type Watcher interface {
 	Close() error
 	Run(ctx context.Context)
 	Add(id string, cg interface{}) error
+	GetOOMContainers() map[string]struct{}
+	DeleteOOMContainer(id string)
 }
