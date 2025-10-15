@@ -57,6 +57,7 @@ func init() {
 			for k, v := range hp {
 				opts = append(opts, manager.WithMountHandler(k, v.(mount.Handler)))
 			}
+			opts = append(opts, manager.WithMountHandler("loop", mount.LoopbackHandler()))
 
 			root := ic.Properties[plugins.PropertyStateDir]
 
