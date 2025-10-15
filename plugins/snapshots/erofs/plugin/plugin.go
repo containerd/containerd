@@ -44,6 +44,9 @@ type Config struct {
 
 	// DefaultSizeMB is the default size of a writable layer in MB
 	DefaultSizeMB int64 `toml:"default_size_mb"`
+
+	// Indicate if fsmerge feature is enabled: tiny fsmeta will be used to avoid mounting individual layers
+	MergeFsMeta bool `toml:"enable_fsmerge"`
 }
 
 func init() {
@@ -79,6 +82,9 @@ func init() {
 
 			if config.DefaultSizeMB > 0 {
 				opts = append(opts, erofs.WithDefaultSize(config.DefaultSizeMB*1024*1024))
+			}
+			if config.MergeFsMeta {
+				opts = append(opts, erofs.WithMergeFSMeta())
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
