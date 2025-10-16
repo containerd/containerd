@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
@@ -129,6 +130,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		publisher:  ep.(events.Publisher),
 		monitor:    monitor.(runtime.TaskMonitor),
 		v2Runtime:  v2r.(runtime.PlatformRuntime),
+		locker:     kmutex.New(),
 	}
 
 	v2Tasks, err := l.v2Runtime.Tasks(ic.Context, true)
@@ -156,6 +158,7 @@ type local struct {
 
 	monitor   runtime.TaskMonitor
 	v2Runtime runtime.PlatformRuntime
+	locker    kmutex.KeyedLocker
 }
 
 func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
@@ -295,6 +298,8 @@ func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOp
 }
 
 func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.CallOption) (*api.DeleteResponse, error) {
+	l.locker.Lock(context.Background(), r.ContainerID)
+	defer l.locker.Unlock(r.ContainerID)
 	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -450,6 +455,8 @@ func (l *local) Resume(ctx context.Context, r *api.ResumeTaskRequest, _ ...grpc.
 }
 
 func (l *local) Kill(ctx context.Context, r *api.KillRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
+	l.locker.Lock(context.Background(), r.ContainerID)
+	defer l.locker.Unlock(r.ContainerID)
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
