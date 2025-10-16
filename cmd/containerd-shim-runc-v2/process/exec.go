@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -111,7 +112,9 @@ func (e *execProcess) Delete(ctx context.Context) error {
 }
 
 func (e *execProcess) delete(ctx context.Context) error {
-	waitTimeout(ctx, &e.wg, 2*time.Second)
+	if err := waitTimeout(ctx, &e.wg, 10*time.Second); err != nil {
+		log.G(ctx).WithError(err).Errorf("failed to drain exec process %s io", e.id)
+	}
 	if e.io != nil {
 		for _, c := range e.closers {
 			c.Close()
