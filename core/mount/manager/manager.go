@@ -115,6 +115,16 @@ type mountManager struct {
 	rwlock sync.RWMutex
 }
 
+func (mm *mountManager) Close() error {
+	var errs []error
+	for _, r := range mm.rootMap {
+		if err := r.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func (mm *mountManager) Activate(ctx context.Context, name string, mounts []mount.Mount, opts ...mount.ActivateOpt) (info mount.ActivationInfo, retErr error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {

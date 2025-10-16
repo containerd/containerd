@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -58,6 +59,7 @@ func withMountManager(ctx context.Context, t testing.TB, mopts ...manager.Opt) c
 	if err != nil {
 		t.Fatalf("failed to create mount manager: %v", err)
 	}
+	t.Cleanup(func() { mm.(io.Closer).Close() })
 
 	return context.WithValue(ctx, mountManagerKey{}, mm)
 }
