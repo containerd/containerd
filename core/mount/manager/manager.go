@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,20 +49,80 @@ type BoltManager interface {
 	Sync(context.Context) error
 }
 
-func NewManager(db *bolt.DB, targetDir string, handlers map[string]mount.Handler) mount.Manager {
+type managerOptions struct {
+	handlers map[string]mount.Handler
+	roots    []*os.Root
+}
+
+type Opt func(*managerOptions) error
+
+func WithMountHandler(name string, h mount.Handler) Opt {
+	return func(o *managerOptions) error {
+		if o.handlers == nil {
+			o.handlers = make(map[string]mount.Handler)
+		}
+		o.handlers[name] = h
+		return nil
+	}
+}
+
+func WithAllowedRoot(root string) Opt {
+	return func(o *managerOptions) error {
+		r, err := os.OpenRoot(root)
+		if err != nil {
+			return err
+		}
+		o.roots = append(o.roots, r)
+		return nil
+	}
+}
+
+func NewManager(db *bolt.DB, targetDir string, opts ...Opt) (mount.Manager, error) {
+	options := managerOptions{}
+	for _, o := range opts {
+		if err := o(&options); err != nil {
+			return nil, err
+		}
+	}
+	if err := os.MkdirAll(targetDir, 0700); err != nil {
+		return nil, err
+	}
+	tr, err := os.OpenRoot(targetDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open target root %q: %w", targetDir, err)
+	}
+	rootMap := map[string]*os.Root{
+		tr.Name(): tr,
+	}
+	for _, r := range options.roots {
+		rootMap[r.Name()] = r
+	}
+
 	return &mountManager{
 		db:       db,
-		targets:  targetDir,
-		handlers: handlers,
-	}
+		targets:  tr,
+		handlers: options.handlers,
+		rootMap:  rootMap,
+	}, nil
 }
 
 type mountManager struct {
 	db       *bolt.DB
-	targets  string
+	targets  *os.Root
 	handlers map[string]mount.Handler
+	rootMap  map[string]*os.Root
 
 	rwlock sync.RWMutex
+}
+
+func (mm *mountManager) Close() error {
+	var errs []error
+	for _, r := range mm.rootMap {
+		if err := r.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (mm *mountManager) Activate(ctx context.Context, name string, mounts []mount.Mount, opts ...mount.ActivateOpt) (info mount.ActivationInfo, retErr error) {
@@ -70,6 +131,8 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		return mount.ActivationInfo{}, err
 	}
 
+	log.G(ctx).WithField("name", name).WithField("mounts", mounts).Debugf("activating mount")
+
 	lid, leased := leases.FromContext(ctx)
 
 	var config mount.ActivateOptions
@@ -77,53 +140,67 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		opt(&config)
 	}
 
-	allowedHandlers := make(map[string]struct{}, len(config.AllowMountTypes))
-	for _, t := range config.AllowMountTypes {
-		allowedHandlers[t] = struct{}{}
+	shouldTransform := func(p string, t string) bool {
+		p = p + "/*"
+		for _, mt := range config.AllowMountTypes {
+			if mt == p || mt == t {
+				return false
+			}
+		}
+		return true
+	}
+
+	shouldHandle := func(t string) bool {
+		return !slices.Contains(config.AllowMountTypes, t)
+	}
+
+	transforms := map[string]mount.Transformer{
+		"format": mountFormatter{},
+		"mkfs": &mkfs{
+			rootMap: mm.rootMap,
+		},
+		"mkdir": &mkdir{
+			rootMap: mm.rootMap,
+		},
 	}
 
 	start := time.Now()
 	// highest index of a mount
 	// first system mount is the first index which should be mounted by the system
 	var firstSystemMount = -1
-	var mountConv []mountConverter
+	var mountConv [][]mount.Transformer
 	var handlers []mount.Handler
 	for i := range mounts {
-		var mountType string
-		// Check is the source needs formatting, any formatting requires
+		mountType := mounts[i].Type
+
+		// Check is the source needs transformation, any transform operation requires
 		// mounting with the mount manager.
-		if strings.HasPrefix(mounts[i].Type, "format/") {
-			if i == 0 {
-				return mount.ActivationInfo{}, fmt.Errorf("first mount cannot be formatted, no mount prior mount state: %w", errdefs.ErrInvalidArgument)
+		for transformType, mt, ok := strings.Cut(mountType, "/"); ok; transformType, mt, ok = strings.Cut(mountType, "/") {
+			if tr, ok := transforms[transformType]; ok {
+				if shouldTransform(transformType, mounts[i].Type) {
+					// At least everything before this must be mounted
+					// by the mount manager
+					firstSystemMount = i
+				}
+
+				if handlers == nil {
+					handlers = make([]mount.Handler, len(mounts))
+				}
+
+				if mountConv == nil {
+					mountConv = make([][]mount.Transformer, len(mounts))
+				}
+
+				mountConv[i] = append(mountConv[i], typeTransformer{
+					Transformer: tr,
+					mountType:   mt,
+				})
+
+				mountType = mt
+			} else {
+				log.G(ctx).Warnf("unknown transform %q for mount %v", transformType, mounts[i])
+				break
 			}
-
-			if !config.AllowFormattedMounts {
-				// At least everything before this must be mounted
-				// by the mount manager
-				firstSystemMount = i
-			}
-			if handlers == nil {
-				handlers = make([]mount.Handler, len(mounts))
-			}
-
-			if mountConv == nil {
-				mountConv = make([]mountConverter, len(mounts))
-			}
-
-			m := mounts[i]
-
-			// Strip "format/" from beginning before looking for handler
-			m.Type = m.Type[7:]
-			mv, err := formatMount(m)
-			if err != nil {
-				return mount.ActivationInfo{}, err
-			}
-
-			mountConv[i] = mv
-
-			mountType = m.Type
-		} else {
-			mountType = mounts[i].Type
 		}
 
 		var handler mount.Handler
@@ -136,7 +213,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 				handlers = make([]mount.Handler, len(mounts))
 			}
 			handlers[i] = handler
-			if _, ok := allowedHandlers[mountType]; !ok || config.Temporary {
+			if shouldHandle(mountType) || config.Temporary {
 				firstSystemMount = i + 1
 			}
 		}
@@ -260,8 +337,8 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		}
 	}()
 
-	targetBase := filepath.Join(mm.targets, fmt.Sprintf("%d", mid))
-	if err := os.MkdirAll(targetBase, 0700); err != nil {
+	targetName := strconv.FormatUint(mid, 10)
+	if err := mm.targets.Mkdir(targetName, 0700); err != nil {
 		return mount.ActivationInfo{}, err
 	}
 
@@ -297,31 +374,35 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 
 	for i, m := range mounts[:firstSystemMount] {
 		if mountConv != nil && mountConv[i] != nil {
-			newM, err := mountConv[i](m, mounted)
-			if err != nil {
-				return mount.ActivationInfo{}, err
+			for _, tr := range mountConv[i] {
+				newM, err := tr.Transform(ctx, m, mounted)
+				if err != nil {
+					return mount.ActivationInfo{}, err
+				}
+				m = newM
 			}
-			m = newM
+			mounts[i] = m
 		}
 
 		// Use cleanup order for directory names
 		ci := firstSystemMount - i
-		t := filepath.Join(targetBase, fmt.Sprintf(formatType, ci))
-		if err := os.WriteFile(t, []byte(m.Type), 0600); err != nil {
+		// TODO: Go 1.25 use targetbase.WriteFile
+		if err := os.WriteFile(filepath.Join(mm.targets.Name(), targetName, fmt.Sprintf(formatType, ci)), []byte(m.Type), 0600); err != nil {
 			return mount.ActivationInfo{}, err
 		}
-		mp := filepath.Join(targetBase, fmt.Sprintf(formatMP, ci))
 
+		mname := fmt.Sprintf(formatMP, ci)
 		var active mount.ActiveMount
 		if h := handlers[i]; h != nil {
-			active, err = h.Mount(ctx, m, mp, mounted)
+			active, err = h.Mount(ctx, m, filepath.Join(mm.targets.Name(), targetName, mname), mounted)
 			if err != nil {
 				return mount.ActivationInfo{}, fmt.Errorf("mount handler failed %v: %w", m, err)
 			}
 		} else {
-			if err := os.Mkdir(mp, 0700); err != nil {
+			if err := mm.targets.Mkdir(filepath.Join(targetName, mname), 0700); err != nil {
 				return mount.ActivationInfo{}, err
 			}
+			mp := filepath.Join(mm.targets.Name(), targetName, mname)
 			if err := m.Mount(mp); err != nil {
 				return mount.ActivationInfo{}, fmt.Errorf("mount failed %v: %w", m, err)
 			}
@@ -337,8 +418,8 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 
 	// If first system mount is converted, fill in the format
 	if mountConv != nil {
-		if t := mountConv[firstSystemMount]; t != nil {
-			newM, err := t(mounts[firstSystemMount], mounted)
+		for _, tr := range mountConv[firstSystemMount] {
+			newM, err := tr.Transform(ctx, mounts[firstSystemMount], mounted)
 			if err != nil {
 				return mount.ActivationInfo{}, err
 			}
@@ -602,7 +683,8 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 
 	// Run in background, GC would handle leftovers?
 	// Make configurable?
-	if err := os.RemoveAll(filepath.Join(mm.targets, fmt.Sprintf("%d", mid))); err != nil {
+	// TODO: In go 1.25, use mm.targets.RemoveAll()
+	if err := os.RemoveAll(filepath.Join(mm.targets.Name(), fmt.Sprintf("%d", mid))); err != nil {
 		// TODO: Only log here, cleanup would have to occur later
 		log.G(ctx).WithError(err).WithField("mountid", mid).Error("failed to cleanup mount target")
 	}
@@ -922,7 +1004,7 @@ func (cc *collectionContext) applyRemove() (map[uint64]struct{}, error) {
 }
 
 func (cc *collectionContext) getCleanupDirectories(remaining map[uint64]struct{}) ([]string, error) {
-	fd, err := os.Open(cc.manager.targets)
+	fd, err := cc.manager.targets.Open(".")
 	if err != nil {
 		return nil, err
 	}
@@ -942,7 +1024,7 @@ func (cc *collectionContext) getCleanupDirectories(remaining map[uint64]struct{}
 		if _, ok := remaining[id]; ok {
 			continue
 		}
-		cleanup = append(cleanup, filepath.Join(cc.manager.targets, d))
+		cleanup = append(cleanup, filepath.Join(cc.manager.targets.Name(), d))
 	}
 
 	return cleanup, nil

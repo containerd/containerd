@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -34,7 +35,7 @@ import (
 
 type mountManagerKey struct{}
 
-func withMountManager(ctx context.Context, t testing.TB) context.Context {
+func withMountManager(ctx context.Context, t testing.TB, mopts ...manager.Opt) context.Context {
 	root := t.TempDir()
 
 	targets := filepath.Join(root, "t")
@@ -54,7 +55,11 @@ func withMountManager(ctx context.Context, t testing.TB) context.Context {
 		}
 	})
 
-	mm := manager.NewManager(db, targets, nil)
+	mm, err := manager.NewManager(db, targets, mopts...)
+	if err != nil {
+		t.Fatalf("failed to create mount manager: %v", err)
+	}
+	t.Cleanup(func() { mm.(io.Closer).Close() })
 
 	return context.WithValue(ctx, mountManagerKey{}, mm)
 }

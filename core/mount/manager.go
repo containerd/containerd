@@ -48,6 +48,14 @@ type Handler interface {
 	Unmount(context.Context, string) error
 }
 
+// Transformer is an interface that can make changes to the mount based on
+// the previous mount state. This can be used to update the values of the
+// mount, such as with formatting, or for mount initialization that do not
+// require runtime state, such as device formatting.
+type Transformer interface {
+	Transform(context.Context, Mount, []ActiveMount) (Mount, error)
+}
+
 // ActivateOptions are used to modify activation behavior. Activate may be
 // performed differently based on the different scenarios, such as mounting
 // to view a filesystem or preparing a filesystem for a container that may
@@ -62,14 +70,10 @@ type ActivateOptions struct {
 	// and all mounts should be performed
 	Temporary bool
 
-	// AllowFormattedMounts specifies that formatted mounts are
-	// allowed by the caller and should not be handled by the mount
-	// manager.
-	AllowFormattedMounts bool
-
 	// AllowMountTypes indicates that the caller will handle the specified
 	// mount types and should not be handled by the mount manager even if
 	// there is a configured handler for the type.
+	// Use "/*" suffix to match prepare mount types, such as "format/*".
 	AllowMountTypes []string
 }
 
@@ -90,20 +94,13 @@ func WithLabels(labels map[string]string) ActivateOpt {
 	}
 }
 
-// WithAllowFormattedMounts indicates that formatted mounts should be
-// allowed in system mounts outputted, to be handled later by the
-// process performing the mounts. With this option, formatted mounts
-// will not cause all previous mounts to be performed in order to
-// fill in the formatting.
-func WithAllowFormattedMounts(o *ActivateOptions) {
-	o.AllowFormattedMounts = true
-}
-
-// WithAllowedMountTypes indicates the mount types that the peformer
+// WithAllowMountType indicates the mount types that the peformer
 // of the mounts will support. Even if there is a custom handler
 // registered for the mount type to the mount handler, these mounts
 // should not performed unless required to support subsequent mounts.
-func WithAllowedMountType(mountType string) ActivateOpt {
+// For prepare mount types, use "/*" suffix to match all prepare types,
+// such as "format/*".
+func WithAllowMountType(mountType string) ActivateOpt {
 	return func(o *ActivateOptions) {
 		o.AllowMountTypes = append(o.AllowMountTypes, mountType)
 	}

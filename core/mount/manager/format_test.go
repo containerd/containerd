@@ -139,18 +139,9 @@ func TestFormatMount(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			formatted, err := formatMount(tc.mount)
+			result, err := mountFormatter{}.Transform(t.Context(), tc.mount, activeMounts)
 			if err != nil {
-				t.Fatalf("formatMount failed: %v", err)
-			}
-			var result mount.Mount
-			if formatted == nil {
-				result = tc.mount
-			} else {
-				result, err = formatted(tc.mount, activeMounts)
-				if err != nil {
-					t.Fatalf("formatted failed: %v", err)
-				}
+				t.Fatalf("formatted failed: %v", err)
 			}
 
 			assert.Equal(t, tc.formatted, result, "Formatted mismatch")

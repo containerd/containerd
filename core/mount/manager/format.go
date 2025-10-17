@@ -18,6 +18,7 @@ package manager
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"text/template"
@@ -25,73 +26,45 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 )
 
-type mountConverter func(mount.Mount, []mount.ActiveMount) (mount.Mount, error)
-
 const formatCheck = "{{"
 
-func formatMount(m mount.Mount) (mountConverter, error) {
-	var converters []mountConverter
-	t := m.Type
+type mountFormatter struct{}
 
+func (mountFormatter) Transform(_ context.Context, m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
 	if sc := formatString(m.Source); sc != nil {
-		converters = append(converters, func(m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
-			f, err := sc(a)
-			if err != nil {
-				return m, err
-			}
-			m.Source = f
-			m.Type = t
-			return m, nil
-		})
+		f, err := sc(a)
+		if err != nil {
+			return m, err
+		}
+		m.Source = f
 	}
 
 	if tc := formatString(m.Target); tc != nil {
-		converters = append(converters, func(m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
-			f, err := tc(a)
+		f, err := tc(a)
+		if err != nil {
+			return m, err
+		}
+		m.Target = f
+	}
+
+	var o []string
+	for i := range m.Options {
+		if oc := formatString(m.Options[i]); oc != nil {
+			f, err := oc(a)
 			if err != nil {
 				return m, err
 			}
-			m.Target = f
-			m.Type = t
-			return m, nil
-		})
-	}
-
-	for i := range m.Options {
-		if oc := formatString(m.Options[i]); oc != nil {
-			i := i
-			converters = append(converters, func(m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
-				f, err := oc(a)
-				if err != nil {
-					return m, err
-				}
-				o := m.Options
-				m.Options = make([]string, len(o))
-				copy(m.Options, o)
-				m.Options[i] = f
-				m.Type = t
-				return m, nil
-			})
+			if o == nil {
+				o = make([]string, len(m.Options))
+				copy(o, m.Options)
+			}
+			o[i] = f
 		}
 	}
-
-	switch len(converters) {
-	case 0:
-		return func(m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
-			m.Type = t
-			return m, nil
-		}, nil
-	case 1:
-		return converters[0], nil
-	default:
-		return func(m mount.Mount, a []mount.ActiveMount) (r mount.Mount, err error) {
-			r = m
-			for _, mc := range converters {
-				r, err = mc(r, a)
-			}
-			return
-		}, nil
+	if o != nil {
+		m.Options = o
 	}
+	return m, nil
 }
 
 func formatString(s string) func([]mount.ActiveMount) (string, error) {
@@ -100,6 +73,7 @@ func formatString(s string) func([]mount.ActiveMount) (string, error) {
 	}
 
 	return func(a []mount.ActiveMount) (string, error) {
+		// TODO: The formatting is very easy, don't use template
 		fm := template.FuncMap{
 			"source": func(i int) (string, error) {
 				if i < 0 || i >= len(a) {
