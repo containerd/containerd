@@ -452,7 +452,6 @@ endif
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
 	@rm -f coverage.txt
-	@$(GO) test ${TESTFLAGS} ${PACKAGES}
 	@( for pkg in ${PACKAGES}; do \
 		$(GO) test ${TESTFLAGS} \
 			-cover \
@@ -466,7 +465,7 @@ coverage: ## generate coverprofiles from the unit tests, except tests that requi
 
 root-coverage: ## generate coverage profiles for unit tests that require root
 	@echo "$(WHALE) $@"
-	@$(GO) test ${TESTFLAGS} ${TEST_REQUIRES_ROOT_PACKAGES} 2> /dev/null
+	@rm -f coverage.txt
 	@( for pkg in ${TEST_REQUIRES_ROOT_PACKAGES}; do \
 		$(GO) test ${TESTFLAGS} \
 			-cover \
