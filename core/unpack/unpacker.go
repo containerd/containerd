@@ -238,6 +238,11 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 				}
 			}
 
+			span.AddEvent("manifest.children.split",
+				tracing.Attribute("layers.count", len(manifestLayers)),
+				tracing.Attribute("nonlayers.count", len(nonLayers)),
+			)
+
 			lock.Lock()
 			for _, nl := range nonLayers {
 				layers[nl.Digest] = manifestLayers
@@ -286,8 +291,8 @@ func (u *Unpacker) unpack(
 	layers []ocispec.Descriptor,
 ) error {
 	ctx := u.ctx
-	ctx, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpack"))
-	defer layerSpan.End()
+	ctx, unpackSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpack"))
+	defer unpackSpan.End()
 	unpackStart := time.Now()
 	p, err := content.ReadBlob(ctx, u.content, config)
 	if err != nil {
@@ -305,33 +310,39 @@ func (u *Unpacker) unpack(
 	}
 
 	// TODO: Support multiple unpacks rather than just first match
-	var unpack *Platform
-
 	imgPlatform := platforms.Normalize(i.Platform)
-	for _, up := range u.platforms {
-		if up.ConfigType != "" && up.ConfigType != config.MediaType {
+	unpackSpan.SetAttributes(
+		tracing.Attribute("config.digest", config.Digest.String()),
+		tracing.Attribute("platform.os", imgPlatform.OS),
+		tracing.Attribute("platform.arch", imgPlatform.Architecture),
+		tracing.Attribute("platform.variant", imgPlatform.Variant),
+	)
+
+	var up *Platform
+	for _, cand := range u.platforms {
+		if cand.ConfigType != "" && cand.ConfigType != config.MediaType {
 			continue
 		}
 		// "layers" is only supported rootfs value for OCI images
-		if (up.ConfigType == "" || images.IsConfigType(up.ConfigType)) && i.RootFS.Type != "" && i.RootFS.Type != "layers" {
+		if (cand.ConfigType == "" || images.IsConfigType(cand.ConfigType)) && i.RootFS.Type != "" && i.RootFS.Type != "layers" {
 			continue
 		}
-		if up.Platform.Match(imgPlatform) {
-			unpack = up
+		if cand.Platform.Match(imgPlatform) {
+			up = cand
 			break
 		}
 	}
 
-	if unpack == nil {
+	if up == nil {
 		log.G(ctx).WithField("image", config.Digest).WithField("platform", platforms.Format(imgPlatform)).Debugf("unpacker does not support platform, only fetching layers")
 		return u.fetch(ctx, h, layers, nil)
 	}
-
+	unpackSpan.SetAttributes(tracing.Attribute(tracing.AttrSnapshotter, up.SnapshotterKey))
 	u.unpacks.Add(1)
 
 	var (
-		sn = unpack.Snapshotter
-		a  = unpack.Applier
+		sn = up.Snapshotter
+		a  = up.Applier
 		cs = u.content
 
 		fetchOffset int
@@ -356,7 +367,7 @@ func (u *Unpacker) unpack(
 		}
 		chainID := chainIDs[i].String()
 
-		unlock, err := u.lockSnChainID(ctx, chainID, unpack.SnapshotterKey)
+		unlock, err := u.lockSnChainID(ctx, chainID, up.SnapshotterKey)
 		if err != nil {
 			return err
 		}
@@ -372,14 +383,24 @@ func (u *Unpacker) unpack(
 		var (
 			key    string
 			mounts []mount.Mount
-			opts   = append(unpack.SnapshotOpts, snapshots.WithLabels(snapshotLabels))
+			opts   = append(up.SnapshotOpts, snapshots.WithLabels(snapshotLabels))
 		)
 
 		for try := 1; try <= 3; try++ {
 			// Prepare snapshot with from parent, label as root
+			_, prepSpan := tracing.StartSpan(ctx, "snapshot.prepare")
+			prepSpan.SetAttributes(
+				tracing.Attribute("layer.index", i),
+				tracing.Attribute("retry.index", try),
+				tracing.Attribute("parent.chain.id", parent),
+				tracing.Attribute("chain.id", chainID),
+				tracing.Attribute(tracing.AttrSnapshotter, up.SnapshotterKey),
+			)
+
 			key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
 			mounts, err = sn.Prepare(ctx, key, parent, opts...)
 			if err != nil {
+				prepSpan.End()
 				if errdefs.IsAlreadyExists(err) {
 					if _, err := sn.Stat(ctx, chainID); err != nil {
 						if !errdefs.IsNotFound(err) {
@@ -395,6 +416,7 @@ func (u *Unpacker) unpack(
 					return fmt.Errorf("failed to prepare extraction snapshot %q: %w", key, err)
 				}
 			} else {
+				prepSpan.End()
 				break
 			}
 		}
@@ -438,23 +460,43 @@ func (u *Unpacker) unpack(
 		case <-fetchC[i-fetchOffset]:
 		}
 
-		diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
+		_, applySpan := tracing.StartSpan(ctx, "snapshot.apply")
+		applySpan.SetAttributes(
+			tracing.Attribute("layer.index", i),
+			tracing.Attribute(tracing.AttrSnapshotter, up.SnapshotterKey),
+			tracing.Attribute("chain.id", chainID),
+			tracing.Attribute("layer.media.type", desc.MediaType),
+			tracing.Attribute("layer.media.size", desc.Size),
+			tracing.Attribute("layer.media.digest", desc.Digest.String()),
+		)
+		diff, err := a.Apply(ctx, desc, mounts, up.ApplyOpts...)
 		if err != nil {
+			applySpan.End()
 			cleanup.Do(ctx, abort)
-			return fmt.Errorf("failed to extract layer (%s %s) to %s as %q: %w", desc.MediaType, desc.Digest, unpack.SnapshotterKey, key, err)
+			return fmt.Errorf("failed to extract layer (%s %s) to %s as %q: %w", desc.MediaType, desc.Digest, up.SnapshotterKey, key, err)
 		}
+		applySpan.End()
+
 		if diff.Digest != diffIDs[i] {
 			cleanup.Do(ctx, abort)
 			return fmt.Errorf("wrong diff id calculated on extraction %q", diffIDs[i])
 		}
 
+		_, commitSpan := tracing.StartSpan(ctx, "snapshot.commit")
+		commitSpan.SetAttributes(
+			tracing.Attribute("layer.index", i),
+			tracing.Attribute(tracing.AttrSnapshotter, up.SnapshotterKey),
+			tracing.Attribute("chain.id", chainID),
+		)
 		if err = sn.Commit(ctx, chainID, key, opts...); err != nil {
+			commitSpan.End()
 			cleanup.Do(ctx, abort)
 			if errdefs.IsAlreadyExists(err) {
 				return nil
 			}
 			return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
 		}
+		commitSpan.End()
 
 		// Set the uncompressed label after the uncompressed
 		// digest has been verified through apply.
@@ -474,6 +516,7 @@ func (u *Unpacker) unpack(
 		_, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpackLayer"))
 		unpackLayerStart := time.Now()
 		layerSpan.SetAttributes(
+			tracing.Attribute("layer.index", i),
 			tracing.Attribute("layer.media.type", desc.MediaType),
 			tracing.Attribute("layer.media.size", desc.Size),
 			tracing.Attribute("layer.media.digest", desc.Digest.String()),
@@ -494,13 +537,17 @@ func (u *Unpacker) unpack(
 	if len(chainIDs) > 0 {
 		chainID = chainIDs[len(chainIDs)-1].String()
 	}
+	unpackSpan.AddEvent("image.unpacked",
+		tracing.Attribute("chain.id", chainID),
+		tracing.Attribute("duration.ms", time.Since(unpackStart).Milliseconds()),
+	)
 	cinfo := content.Info{
 		Digest: config.Digest,
 		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", unpack.SnapshotterKey): chainID,
+			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", up.SnapshotterKey): chainID,
 		},
 	}
-	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", unpack.SnapshotterKey))
+	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", up.SnapshotterKey))
 	if err != nil {
 		return err
 	}
@@ -516,7 +563,7 @@ func (u *Unpacker) unpack(
 func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec.Descriptor, done []chan struct{}) error {
 	eg, ctx2 := errgroup.WithContext(ctx)
 	for i, desc := range layers {
-		ctx2, layerSpan := tracing.StartSpan(ctx2, tracing.Name(unpackSpanPrefix, "fetchLayer"))
+		lctx, layerSpan := tracing.StartSpan(ctx2, tracing.Name(unpackSpanPrefix, "fetchLayer"))
 		layerSpan.SetAttributes(
 			tracing.Attribute("layer.media.type", desc.MediaType),
 			tracing.Attribute("layer.media.size", desc.Size),
@@ -527,20 +574,21 @@ func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 			ch = done[i]
 		}
 
-		if err := u.acquire(ctx); err != nil {
+		if err := u.acquire(lctx); err != nil {
+			layerSpan.End()
 			return err
 		}
 
 		eg.Go(func() error {
 			defer layerSpan.End()
 
-			unlock, err := u.lockBlobDescriptor(ctx2, desc)
+			unlock, err := u.lockBlobDescriptor(lctx, desc)
 			if err != nil {
 				u.release()
 				return err
 			}
 
-			_, err = h.Handle(ctx2, desc)
+			_, err = h.Handle(lctx, desc)
 
 			unlock()
 			u.release()
