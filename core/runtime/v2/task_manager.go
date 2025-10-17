@@ -324,8 +324,11 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 	exit, err := shimTask.delete(ctx, sandboxed, func(ctx context.Context, id string) {
 		m.manager.shims.Delete(ctx, id)
 	})
-
 	if err != nil {
+		if _, err := os.Stat(shimTask.Bundle()); err != nil {
+			log.G(ctx).Warnf("task %s already deleted", taskID)
+			return nil, errdefs.ErrNotFound
+		}
 		return nil, fmt.Errorf("failed to delete task: %w", err)
 	}
 

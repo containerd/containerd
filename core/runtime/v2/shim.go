@@ -702,6 +702,10 @@ func (s *shimTask) Kill(ctx context.Context, signal uint32, all bool) error {
 		Signal: signal,
 		All:    all,
 	}); err != nil {
+		if _, err := os.Stat(s.Bundle()); err != nil {
+			log.G(ctx).Warnf("task %s already deleted", s.ID())
+			return errdefs.ErrNotFound
+		}
 		return errgrpc.ToNative(err)
 	}
 	return nil
