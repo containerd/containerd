@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/log/logtest"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/containerd/containerd/v2/core/mount/manager"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/randutil"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -85,7 +86,6 @@ func makeTest(
 
 		ctx := logtest.WithT(context.Background(), t)
 		ctx = namespaces.WithNamespace(ctx, "testsuite")
-		ctx = withMountManager(ctx, t)
 		// Make two directories: a snapshotter root and a play area for the tests:
 		//
 		// 	/tmp
@@ -97,6 +97,8 @@ func makeTest(
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(tmpDir)
+
+		ctx = withMountManager(ctx, t, manager.WithAllowedRoot(tmpDir))
 
 		root := filepath.Join(tmpDir, "root")
 		if err := os.MkdirAll(root, 0777); err != nil {

@@ -18,6 +18,7 @@ package erofs
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -45,7 +46,7 @@ const (
 	testNestedFileContent = "Nested file content"
 )
 
-func newSnapshotter(t *testing.T) func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
+func newSnapshotter(t *testing.T, opts ...Opt) func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 	_, err := exec.LookPath("mkfs.erofs")
 	if err != nil {
 		t.Skipf("could not find mkfs.erofs: %v", err)
@@ -55,8 +56,6 @@ func newSnapshotter(t *testing.T) func(ctx context.Context, root string) (snapsh
 		t.Skip("check for erofs kernel support failed, skipping test")
 	}
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-		var opts []Opt
-
 		snapshotter, err := NewSnapshotter(root, opts...)
 		if err != nil {
 			return nil, nil, err
@@ -66,9 +65,45 @@ func newSnapshotter(t *testing.T) func(ctx context.Context, root string) (snapsh
 	}
 }
 
+func testMount(t *testing.T, scratchFile string) error {
+	root, err := os.MkdirTemp(t.TempDir(), "")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(root)
+
+	m := []mount.Mount{
+		{
+			Type:    "ext4",
+			Source:  scratchFile,
+			Options: []string{"loop", "direct-io", "sync"},
+		},
+	}
+
+	if err := mount.All(m, root); err != nil {
+		return fmt.Errorf("failed to mount device %s: %w", scratchFile, err)
+	}
+
+	if err := os.Remove(filepath.Join(root, "lost+found")); err != nil {
+		return err
+	}
+	if err := os.Mkdir(filepath.Join(root, "work"), 0755); err != nil {
+		return err
+	}
+	if err := os.Mkdir(filepath.Join(root, "upper"), 0755); err != nil {
+		return err
+	}
+	return mount.UnmountAll(root, 0)
+}
+
 func TestErofs(t *testing.T) {
 	testutil.RequiresRoot(t)
 	testsuite.SnapshotterSuite(t, "erofs", newSnapshotter(t))
+}
+
+func TestErofsWithQuota(t *testing.T) {
+	testutil.RequiresRoot(t)
+	testsuite.SnapshotterSuite(t, "erofs", newSnapshotter(t, WithDefaultSize(16*1024*1024)))
 }
 
 func TestErofsFsverity(t *testing.T) {

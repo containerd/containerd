@@ -72,10 +72,8 @@ func TestLoopbackMount(t *testing.T) {
 		},
 	}
 
-	handlers := map[string]mount.Handler{
-		"loop": mount.LoopbackHandler(),
-	}
-	m := NewManager(db, targetdir, handlers)
+	m, err := NewManager(db, targetdir, WithMountHandler("loop", mount.LoopbackHandler()))
+	require.NoError(t, err)
 	ainfo, err := m.Activate(ctx, "id1", mounts)
 	require.NoError(t, err)
 	defer func() {
@@ -282,10 +280,8 @@ func TestLoopbackOverlay(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			handlers := map[string]mount.Handler{
-				"loop": mount.LoopbackHandler(),
-			}
-			m := NewManager(db, targetdir, handlers)
+			m, err := NewManager(db, targetdir, WithMountHandler("loop", mount.LoopbackHandler()))
+			require.NoError(t, err)
 			ainfo, err := m.Activate(ctx, "id1", mounts)
 			require.NoError(t, err)
 			defer func() {

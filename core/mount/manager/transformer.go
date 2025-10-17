@@ -1,5 +1,3 @@
-//go:build darwin || freebsd || solaris
-
 /*
    Copyright The containerd Authors.
 
@@ -16,12 +14,29 @@
    limitations under the License.
 */
 
-package builtins
+package manager
 
 import (
-	_ "github.com/containerd/containerd/v2/plugins/diff/erofs/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/snapshots/blockfile/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/snapshots/erofs/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/snapshots/native/plugin"
+	"context"
+
+	"github.com/containerd/containerd/v2/core/mount"
 )
+
+const (
+	// define mount options using X-containerd prefix as defined by
+	// https://man7.org/linux/man-pages/man8/mount.8.html
+
+	prefixMkdir = "X-containerd.mkdir."
+	prefixMkfs  = "X-containerd.mkfs."
+)
+
+type typeTransformer struct {
+	mount.Transformer
+
+	mountType string
+}
+
+func (t typeTransformer) Transform(ctx context.Context, m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
+	m.Type = t.mountType
+	return t.Transformer.Transform(ctx, m, a)
+}

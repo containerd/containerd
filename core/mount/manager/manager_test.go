@@ -63,22 +63,22 @@ func TestManager(t *testing.T) {
 	}
 
 	t.Run("ActivateNoMounts", func(t *testing.T) {
-		handlers := map[string]mount.Handler{}
-		_, err = NewManager(db, targetdir, handlers).Activate(ctx, "id1", []mount.Mount{})
+		m, err := NewManager(db, targetdir)
+		require.NoError(t, err)
+		_, err = m.Activate(ctx, "id1", []mount.Mount{})
 		assert.ErrorIs(t, err, errdefs.ErrNotImplemented)
 	})
 
 	t.Run("SystemOnly", func(t *testing.T) {
-		handlers := map[string]mount.Handler{}
-		_, err = NewManager(db, targetdir, handlers).Activate(ctx, "id1", mounts)
+		m, err := NewManager(db, targetdir)
+		require.NoError(t, err)
+		_, err = m.Activate(ctx, "id1", mounts)
 		assert.ErrorIs(t, err, errdefs.ErrNotImplemented)
 	})
 
 	t.Run("SystemOverride", func(t *testing.T) {
-		handlers := map[string]mount.Handler{
-			"bind": &noopHandler{mounts: &atomic.Int32{}},
-		}
-		m := NewManager(db, targetdir, handlers)
+		m, err := NewManager(db, targetdir, WithMountHandler("bind", &noopHandler{mounts: &atomic.Int32{}}))
+		require.NoError(t, err)
 		ainfo, err := m.Activate(ctx, "id1", mounts)
 		require.NoError(t, err)
 		defer assert.NoError(t, m.Deactivate(ctx, "id1"))
@@ -249,11 +249,8 @@ func TestGC(t *testing.T) {
 				t.Fatal(err)
 			}
 			mountC := new(atomic.Int32)
-			handlers := map[string]mount.Handler{
-				"noop":  &noopHandler{mounts: mountC},
-				"error": &errOnceHandler{mounts: mountC, mounted: make(map[string]struct{})},
-			}
-			m := NewManager(db, targetdir, handlers)
+			m, err := NewManager(db, targetdir, WithMountHandler("noop", &noopHandler{mounts: mountC}), WithMountHandler("error", &errOnceHandler{mounts: mountC, mounted: make(map[string]struct{})}))
+			require.NoError(t, err)
 
 			for i, run := range tc.gcruns {
 				for j, mnt := range run.a {
