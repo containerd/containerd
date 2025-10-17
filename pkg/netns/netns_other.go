@@ -34,7 +34,7 @@ func NewNetNS(baseDir string) (*NetNS, error) {
 	return nil, errNotImplementedOnUnix
 }
 
-// NewNetNS returns the netns from pid or a new netns if pid is 0.
+// NewNetNSFromPID returns the netns from pid or a new netns if pid is 0.
 func NewNetNSFromPID(baseDir string, pid uint32) (*NetNS, error) {
 	return nil, errNotImplementedOnUnix
 }
