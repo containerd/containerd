@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -76,7 +77,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
+func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) (rerr error) {
 	// Ensure even on error the writer is fully closed
 	defer w.s.unlock(w.ref)
 
@@ -86,6 +87,11 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 			return err
 		}
 	}
+	defer func() {
+		if err := w.removeAll(); err != nil {
+			log.G(ctx).WithField("ref", w.ref).WithField("path", w.path).Error("failed to remove ingest directory")
+		}
+	}()
 
 	fp := w.fp
 	w.fp = nil
@@ -93,19 +99,20 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	if fp == nil {
 		return fmt.Errorf("cannot commit on closed writer: %w", errdefs.ErrFailedPrecondition)
 	}
+	defer func() {
+		// always close the file but only return the error if there isn't one already.
+		if err := fp.Close(); rerr == nil && err != nil {
+			rerr = fmt.Errorf("failed to close ingest file: %w", err)
+		}
+	}()
 
 	if err := fp.Sync(); err != nil {
-		fp.Close()
 		return fmt.Errorf("sync failed: %w", err)
 	}
 
 	fi, err := fp.Stat()
-	closeErr := fp.Close()
 	if err != nil {
 		return fmt.Errorf("stat on ingest file failed: %w", err)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("failed to close ingest file: %w", closeErr)
 	}
 
 	if size > 0 && size != fi.Size() {
@@ -123,15 +130,12 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	)
 
 	// make sure parent directories of blob exist
-	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
 	}
 
 	if _, err := os.Stat(target); err == nil {
 		// collision with the target file!
-		if err := os.RemoveAll(w.path); err != nil {
-			log.G(ctx).WithField("ref", w.ref).WithField("path", w.path).Error("failed to remove ingest directory")
-		}
 		return fmt.Errorf("content %v: %w", dgst, errdefs.ErrAlreadyExists)
 	}
 
@@ -143,7 +147,6 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 		return err
 	}
 	// Enable content blob integrity verification if supported
-
 	if w.s.integritySupported {
 		if err := fsverity.Enable(target); err != nil {
 			log.G(ctx).Warnf("failed to enable integrity for blob %v: %s", target, err.Error())
@@ -157,11 +160,6 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	commitTime := time.Now()
 	if err := os.Chtimes(target, commitTime, commitTime); err != nil {
 		log.G(ctx).WithField("digest", dgst).Error("failed to change file time to commit time")
-	}
-
-	// clean up!!
-	if err := os.RemoveAll(w.path); err != nil {
-		log.G(ctx).WithField("ref", w.ref).WithField("path", w.path).Error("failed to remove ingest directory")
 	}
 
 	if w.s.ls != nil && base.Labels != nil {
@@ -178,7 +176,7 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	//
 	// NOTE: Windows does not support this operation
 	if runtime.GOOS != "windows" {
-		if err := os.Chmod(target, (fi.Mode()&os.ModePerm)&^0333); err != nil {
+		if err := os.Chmod(target, (fi.Mode()&os.ModePerm)&^0o333); err != nil {
 			log.G(ctx).WithField("ref", w.ref).Error("failed to make readonly")
 		}
 	}
@@ -199,7 +197,6 @@ func (w *writer) Close() (err error) {
 	if w.fp != nil {
 		w.fp.Sync()
 		err = w.fp.Close()
-		writeTimestampFile(filepath.Join(w.path, "updatedat"), w.updatedAt)
 		w.fp = nil
 		w.s.unlock(w.ref)
 		return
@@ -226,4 +223,65 @@ func (w *writer) Sync() error {
 	}
 
 	return nil
+}
+
+// removeAll does a more efficient removal of the ingest directory, since we
+// don't have to be as defensive as os.RemoveAll.
+//
+// For example, we don't need to check if something is a directory or a file,
+// since we already know.
+//
+// If the logic fails somewhere, we fallback to os.RemoveAll.
+func (w *writer) removeAll() (rerr error) {
+	defer func() {
+		// fallback to os.RemoveAll if we encounter an error
+		if rerr != nil {
+			if err := os.RemoveAll(w.path); err != nil {
+				if os.IsNotExist(err) {
+					return
+				}
+				rerr = fmt.Errorf("failed to remove ingest directory %v: %w", w.path, err)
+			}
+		}
+	}()
+
+	for _, child := range []string{"data", "ref", "total"} {
+		path := filepath.Join(w.path, child)
+		if err := unlink(path); err != nil {
+			if os.IsNotExist(err) {
+				continue // not clear that this works for errno.
+			}
+
+			return fmt.Errorf("failed to remove ingest directory child %v: %w", path, err)
+		}
+	}
+
+	// remove the directory itself.
+	if err := rmdir(w.path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove ingest directory %v: %w", w.path, err)
+	}
+
+	return nil
+}
+
+// TODO(sjd): Need to move these to os specific implementations.
+
+func unlink(path string) error {
+	return ignoringEINTR(func() error { return syscall.Unlink(path) })
+}
+
+func rmdir(path string) error {
+	return ignoringEINTR(func() error { return syscall.Rmdir(path) })
+}
+
+// ignoringEINTR is a helper function to ignore EINTR errors, wrapping syscalls that may return them.
+//
+// According to os package, these functions are not guaranteed to be restarted on EINTR.
+func ignoringEINTR(fn func() error) error {
+	for {
+		err := fn()
+		if err != syscall.EINTR {
+			return err
+		}
+	}
 }
