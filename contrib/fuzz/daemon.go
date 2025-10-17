@@ -71,7 +71,7 @@ func startDaemon() {
 			return
 		}
 
-		l, err := sys.GetLocalListener(srvconfig.GRPC.Address, srvconfig.GRPC.UID, srvconfig.GRPC.GID)
+		l, err := sys.GetLocalListener(srvconfig.GRPC.Address, srvconfig.GRPC.UID, srvconfig.GRPC.GID, srvconfig.GRPC.User, srvconfig.GRPC.Group)
 		if err != nil {
 			errC <- err
 			return
