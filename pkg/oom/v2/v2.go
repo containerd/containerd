@@ -21,6 +21,7 @@ package v2
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -34,15 +35,18 @@ import (
 // from a container's cgroups.
 func New(publisher events.Publisher) (oom.Watcher, error) {
 	return &watcher{
-		itemCh:    make(chan item),
-		publisher: publisher,
+		itemCh:     make(chan item),
+		publisher:  publisher,
+		containers: make(map[string]struct{}),
 	}, nil
 }
 
 // watcher implementation for handling OOM events from a container's cgroup
 type watcher struct {
-	itemCh    chan item
-	publisher events.Publisher
+	mu         sync.Mutex
+	itemCh     chan item
+	publisher  events.Publisher
+	containers map[string]struct{}
 }
 
 type item struct {
@@ -71,6 +75,7 @@ func (w *watcher) Run(ctx context.Context) {
 			}
 			lastOOM := lastOOMMap[i.id]
 			if i.ev.OOMKill > lastOOM {
+				w.addOOMContainer(i.id)
 				if err := w.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 					ContainerID: i.id,
 				}); err != nil {
@@ -82,6 +87,24 @@ func (w *watcher) Run(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (w *watcher) GetOOMContainers() map[string]struct{} {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.containers
+}
+
+func (w *watcher) addOOMContainer(id string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.containers[id] = struct{}{}
+}
+
+func (w *watcher) DeleteOOMContainer(id string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	delete(w.containers, id)
 }
 
 // Add cgroups.Cgroup to the epoll monitor
