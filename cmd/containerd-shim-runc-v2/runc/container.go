@@ -496,6 +496,8 @@ func (c *Container) OOMWatch(ctx context.Context, eventf func(string)) error {
 	// The routine shuts down when an error happens, mostly when the cgroup is deleted.
 	eventCh, errCh := cg.EventChan()
 	go func() {
+
+		log.G(ctx).WithField("container", c.ID).Info("watching OOM events")
 		var oomKills uint64
 		for {
 			select {

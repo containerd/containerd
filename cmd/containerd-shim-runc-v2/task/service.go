@@ -332,6 +332,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 				s.publish(ctx, &eventstypes.TaskOOM{
 					ContainerID: container.ID,
 				})
+				log.G(ctx).WithField("container", id).Info("published OOM event for container")
 			}); err != nil {
 				log.G(ctx).WithError(err).Error("failed to watch oom events")
 			}
