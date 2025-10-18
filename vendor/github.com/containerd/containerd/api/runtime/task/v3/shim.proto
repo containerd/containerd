@@ -115,6 +115,7 @@ message StateResponse {
 	uint32 exit_status = 9;
 	google.protobuf.Timestamp exited_at = 10;
 	string exec_id = 11;
+	containerd.v1.types.ExitReason exit_reason = 12;
 }
 
 message KillRequest {
