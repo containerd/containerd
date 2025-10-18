@@ -6438,6 +6438,13 @@ file {
       type_name: ".containerd.services.snapshots.v1.CommitSnapshotRequest.LabelsEntry"
       json_name: "labels"
     }
+    field {
+      name: "parent"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "parent"
+    }
     nested_type {
       name: "LabelsEntry"
       field {
