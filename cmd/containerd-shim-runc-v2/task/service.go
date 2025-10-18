@@ -330,7 +330,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 
 			if err := container.OOMWatch(ctx, func(id string) {
 				s.publish(ctx, &eventstypes.TaskOOM{
-					ContainerID: container.ID,
+					ContainerID: id,
 				})
 			}); err != nil {
 				log.G(ctx).WithError(err).Error("failed to watch oom events")
@@ -435,6 +435,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 	if err != nil {
 		return nil, err
 	}
+
 	status := task.Status_UNKNOWN
 	switch st {
 	case "created":
@@ -460,6 +461,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 		Terminal:   sio.Terminal,
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
+		ExitReason: container.ExitReason(p.ExitStatus()),
 	}, nil
 }
 
@@ -771,6 +773,7 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 		Pid:         uint32(e.Pid),
 		ExitStatus:  uint32(e.Status),
 		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+		ExitReason:  c.ExitReason(e.Status),
 	})
 	if _, init := p.(*process.Init); !init {
 		s.lifecycleMu.Lock()

@@ -68,6 +68,19 @@ func statusFromProto(from tasktypes.Status) runtime.Status {
 	return status
 }
 
+func exitReasonFromProto(from tasktypes.ExitReason) runtime.ExitReason {
+	var reason runtime.ExitReason
+	switch from {
+	case tasktypes.ExitReason_NONE:
+		reason = runtime.ExitReasonNone
+	case tasktypes.ExitReason_OOMKILLED:
+		reason = runtime.ExitReasonOOMKilled
+	case tasktypes.ExitReason_SIGNALED:
+		reason = runtime.ExitReasonSignaled
+	}
+	return reason
+}
+
 func (p *process) State(ctx context.Context) (runtime.State, error) {
 	response, err := p.shim.task.State(ctx, &task.StateRequest{
 		ID:     p.shim.ID(),
@@ -88,6 +101,7 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 		Terminal:   response.Terminal,
 		ExitStatus: response.ExitStatus,
 		ExitedAt:   protobuf.FromTimestamp(response.ExitedAt),
+		ExitReason: exitReasonFromProto(response.ExitReason),
 	}, nil
 }
 

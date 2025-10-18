@@ -28,6 +28,7 @@ import (
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	apitasks "github.com/containerd/containerd/api/services/tasks/v1"
+	taskt "github.com/containerd/containerd/api/types/task"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -244,6 +245,10 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 			status.Pid = 0
 			status.FinishedAt = protobuf.FromTimestamp(e.ExitedAt).UnixNano()
 			status.ExitCode = int32(e.ExitStatus)
+			switch e.ExitReason {
+			case taskt.ExitReason_OOMKILLED:
+				status.Reason = oomExitReason
+			}
 		}
 
 		// Unknown state can only transit to EXITED state, so we need

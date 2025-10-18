@@ -115,6 +115,17 @@ const (
 	PausingStatus
 )
 
+type ExitReason int
+
+const (
+	// ExitReasonNone indicates no exit reason
+	ExitReasonNone ExitReason = iota
+	// ExitReasonOOMKilled indicates the process was killed due to out of memory
+	ExitReasonOOMKilled
+	// ExitReasonSignaled indicates the process was killed via signal
+	ExitReasonSignaled
+)
+
 // State information for a process
 type State struct {
 	// Status is the current status of the container
@@ -127,10 +138,15 @@ type State struct {
 	// ExitedAt is the time at which the process exited
 	// Only valid if the Status is Stopped
 	ExitedAt time.Time
-	Stdin    string
-	Stdout   string
-	Stderr   string
-	Terminal bool
+	// ExitReason is the reason the process exited,
+	// whether it was signaled, OOM killed, or no
+	// reason, indicating the process has not exited
+	// or exited on its own.
+	ExitReason ExitReason
+	Stdin      string
+	Stdout     string
+	Stderr     string
+	Terminal   bool
 }
 
 // ProcessInfo holds platform specific process information

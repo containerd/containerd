@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	taskt "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 
@@ -273,8 +274,17 @@ func (p *process) Status(ctx context.Context) (Status, error) {
 	status := ProcessStatus(strings.ToLower(r.Process.Status.String()))
 	exitStatus := r.Process.ExitStatus
 
+	var reason ExitReason
+	switch r.Process.ExitReason {
+	case taskt.ExitReason_OOMKILLED:
+		reason = ExitReasonOOMKilled
+	case taskt.ExitReason_SIGNALED:
+		reason = ExitReasonSignaled
+	}
+
 	return Status{
 		Status:     status,
 		ExitStatus: exitStatus,
+		ExitReason: reason,
 	}, nil
 }

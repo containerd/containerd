@@ -850,5 +850,6 @@ func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
 		Terminal:   response.Terminal,
 		ExitStatus: response.ExitStatus,
 		ExitedAt:   protobuf.FromTimestamp(response.ExitedAt),
+		ExitReason: exitReasonFromProto(response.ExitReason),
 	}, nil
 }
