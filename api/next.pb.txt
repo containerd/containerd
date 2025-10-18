@@ -709,11 +709,165 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/task/task.proto"
+  package: "containerd.v1.types"
+  dependency: "google/protobuf/timestamp.proto"
+  dependency: "google/protobuf/any.proto"
+  message_type {
+    name: "Process"
+    field {
+      name: "container_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+    field {
+      name: "id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "pid"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "pid"
+    }
+    field {
+      name: "status"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.v1.types.Status"
+      json_name: "status"
+    }
+    field {
+      name: "stdin"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdin"
+    }
+    field {
+      name: "stdout"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdout"
+    }
+    field {
+      name: "stderr"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stderr"
+    }
+    field {
+      name: "terminal"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "terminal"
+    }
+    field {
+      name: "exit_status"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "exitStatus"
+    }
+    field {
+      name: "exited_at"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "exitedAt"
+    }
+    field {
+      name: "exit_reason"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.v1.types.ExitReason"
+      json_name: "exitReason"
+    }
+  }
+  message_type {
+    name: "ProcessInfo"
+    field {
+      name: "pid"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "pid"
+    }
+    field {
+      name: "info"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "info"
+    }
+  }
+  enum_type {
+    name: "Status"
+    value {
+      name: "UNKNOWN"
+      number: 0
+    }
+    value {
+      name: "CREATED"
+      number: 1
+    }
+    value {
+      name: "RUNNING"
+      number: 2
+    }
+    value {
+      name: "STOPPED"
+      number: 3
+    }
+    value {
+      name: "PAUSED"
+      number: 4
+    }
+    value {
+      name: "PAUSING"
+      number: 5
+    }
+  }
+  enum_type {
+    name: "ExitReason"
+    value {
+      name: "NONE"
+      number: 0
+    }
+    value {
+      name: "OOMKILLED"
+      number: 1
+    }
+    value {
+      name: "SIGNALED"
+      number: 2
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/task"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/events/task.proto"
   package: "containerd.events"
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/api/types/task/task.proto"
   message_type {
     name: "TaskCreate"
     field {
@@ -885,6 +1039,14 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       json_name: "exitedAt"
+    }
+    field {
+      name: "exit_reason"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.v1.types.ExitReason"
+      json_name: "exitReason"
     }
   }
   message_type {
@@ -1488,136 +1650,6 @@ file {
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
-  }
-  syntax: "proto3"
-}
-file {
-  name: "github.com/containerd/containerd/api/types/task/task.proto"
-  package: "containerd.v1.types"
-  dependency: "google/protobuf/timestamp.proto"
-  dependency: "google/protobuf/any.proto"
-  message_type {
-    name: "Process"
-    field {
-      name: "container_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "containerId"
-    }
-    field {
-      name: "id"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "id"
-    }
-    field {
-      name: "pid"
-      number: 3
-      label: LABEL_OPTIONAL
-      type: TYPE_UINT32
-      json_name: "pid"
-    }
-    field {
-      name: "status"
-      number: 4
-      label: LABEL_OPTIONAL
-      type: TYPE_ENUM
-      type_name: ".containerd.v1.types.Status"
-      json_name: "status"
-    }
-    field {
-      name: "stdin"
-      number: 5
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "stdin"
-    }
-    field {
-      name: "stdout"
-      number: 6
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "stdout"
-    }
-    field {
-      name: "stderr"
-      number: 7
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "stderr"
-    }
-    field {
-      name: "terminal"
-      number: 8
-      label: LABEL_OPTIONAL
-      type: TYPE_BOOL
-      json_name: "terminal"
-    }
-    field {
-      name: "exit_status"
-      number: 9
-      label: LABEL_OPTIONAL
-      type: TYPE_UINT32
-      json_name: "exitStatus"
-    }
-    field {
-      name: "exited_at"
-      number: 10
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Timestamp"
-      json_name: "exitedAt"
-    }
-  }
-  message_type {
-    name: "ProcessInfo"
-    field {
-      name: "pid"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_UINT32
-      json_name: "pid"
-    }
-    field {
-      name: "info"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Any"
-      json_name: "info"
-    }
-  }
-  enum_type {
-    name: "Status"
-    value {
-      name: "UNKNOWN"
-      number: 0
-    }
-    value {
-      name: "CREATED"
-      number: 1
-    }
-    value {
-      name: "RUNNING"
-      number: 2
-    }
-    value {
-      name: "STOPPED"
-      number: 3
-    }
-    value {
-      name: "PAUSED"
-      number: 4
-    }
-    value {
-      name: "PAUSING"
-      number: 5
-    }
-  }
-  options {
-    go_package: "github.com/containerd/containerd/api/types/task"
   }
   syntax: "proto3"
 }
@@ -2655,6 +2687,14 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "execId"
+    }
+    field {
+      name: "exit_reason"
+      number: 12
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.v1.types.ExitReason"
+      json_name: "exitReason"
     }
   }
   message_type {
@@ -6936,6 +6976,14 @@ file {
       type_name: ".google.protobuf.Timestamp"
       json_name: "exitedAt"
     }
+    field {
+      name: "exit_reason"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.v1.types.ExitReason"
+      json_name: "exitReason"
+    }
   }
   message_type {
     name: "DeleteProcessRequest"
@@ -7322,6 +7370,14 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       json_name: "exitedAt"
+    }
+    field {
+      name: "exit_reason"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.v1.types.ExitReason"
+      json_name: "exitReason"
     }
   }
   service {

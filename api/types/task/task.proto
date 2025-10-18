@@ -32,6 +32,12 @@ enum Status {
 	PAUSING = 5;
 }
 
+enum ExitReason {
+	NONE = 0;
+	OOMKILLED = 1;
+	SIGNALED = 2;
+}
+
 message Process {
 	string container_id = 1;
 	string id = 2;
@@ -43,6 +49,7 @@ message Process {
 	bool terminal = 8;
 	uint32 exit_status = 9;
 	google.protobuf.Timestamp exited_at = 10;
+	ExitReason exit_reason = 11;
 }
 
 message ProcessInfo {
