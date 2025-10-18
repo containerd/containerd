@@ -408,6 +408,9 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 				}
 				status.FinishedAt = s.ExitTime.UnixNano()
 				status.ExitCode = int32(s.ExitStatus)
+				if s.ExitReason == containerd.ExitReasonOOMKilled {
+					status.Reason = oomExitReason
+				}
 			default:
 				return fmt.Errorf("unexpected task status %q", s.Status)
 			}

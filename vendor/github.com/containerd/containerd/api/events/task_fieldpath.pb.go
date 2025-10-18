@@ -97,6 +97,7 @@ func (m *TaskExit) Field(fieldpath []string) (string, bool) {
 	// unhandled: pid
 	// unhandled: exit_status
 	// unhandled: exited_at
+	// unhandled: exit_reason
 	case "container_id":
 		return string(m.ContainerID), len(m.ContainerID) > 0
 	case "id":
