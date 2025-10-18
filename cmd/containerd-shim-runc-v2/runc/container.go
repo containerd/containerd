@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types/runc/options"
+	taskt "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
@@ -239,6 +240,9 @@ type Container struct {
 	process         process.Process
 	processes       map[string]process.Process
 	reservedProcess map[string]struct{}
+
+	checkOOM   func()
+	exitReason taskt.ExitReason
 }
 
 // All processes in the container
@@ -420,7 +424,16 @@ func (c *Container) Kill(ctx context.Context, r *task.KillRequest) error {
 	if err != nil {
 		return err
 	}
-	return p.Kill(ctx, r.Signal, r.All)
+	// Set signaled if Kill returns nil
+	err = p.Kill(ctx, r.Signal, r.All)
+	if err == nil {
+		c.mu.Lock()
+		if c.exitReason == taskt.ExitReason_NONE {
+			c.exitReason = taskt.ExitReason_SIGNALED
+		}
+		c.mu.Unlock()
+	}
+	return err
 }
 
 // CloseIO of a process
@@ -482,6 +495,87 @@ func (c *Container) HasPid(pid int) bool {
 		}
 	}
 	return false
+}
+
+func (c *Container) OOMWatch(ctx context.Context, eventf func()) error {
+	cg, ok := c.cgroup.(*cgroupsv2.Manager)
+	if !ok {
+		return fmt.Errorf("expected *cgroupsv2.Manager, got: %T", c.cgroup)
+	}
+
+	trigger := make(chan func())
+
+	// FIXME: cgroupsv2.Manager does not support closing eventCh routine currently.
+	// The routine shuts down when an error happens, mostly when the cgroup is deleted.
+	eventCh, errCh := cg.EventChan()
+	go func() {
+		var oomKills uint64
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case ev := <-eventCh:
+				if ev.OOMKill > oomKills {
+					oomKills = ev.OOMKill
+					c.mu.Lock()
+					if c.exitReason == taskt.ExitReason_NONE {
+						c.exitReason = taskt.ExitReason_OOMKILLED
+					}
+					c.mu.Unlock()
+					eventf()
+				}
+			case err := <-errCh:
+				// channel is closed when cgroup gets deleted
+				if err != nil {
+					// we no longer get any event/err when we got an err
+					log.L.WithError(err).Warn("error from *cgroupsv2.Manager.EventChan")
+				}
+				return
+			case f := <-trigger:
+				stats, err := cg.Stat()
+				if err != nil {
+					log.L.WithError(err).Warn("error getting stats from *cgroupsv2.Manager")
+				} else {
+					if stats.MemoryEvents != nil && stats.MemoryEvents.OomKill > oomKills {
+						oomKills = stats.MemoryEvents.OomKill
+						c.mu.Lock()
+						if c.exitReason == taskt.ExitReason_NONE {
+							c.exitReason = taskt.ExitReason_OOMKILLED
+						}
+						c.mu.Unlock()
+						eventf()
+					}
+				}
+				f()
+
+			}
+		}
+	}()
+
+	c.mu.Lock()
+	c.checkOOM = func() {
+		done := make(chan struct{})
+		trigger <- func() {
+			close(done)
+		}
+		<-done
+	}
+	c.mu.Unlock()
+
+	return nil
+}
+
+func (c *Container) ExitReason(status int) taskt.ExitReason {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// Get event from oom watcher if 137 is not signaled by kill
+	if c.exitReason == taskt.ExitReason_NONE && status != 137 && c.checkOOM != nil {
+		cm := c.checkOOM
+		c.mu.Unlock()
+		cm()
+		c.mu.Lock()
+	}
+	return c.exitReason
 }
 
 func loadProcessCgroup(ctx context.Context, pid int) (cg interface{}, err error) {

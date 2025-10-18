@@ -369,6 +369,13 @@ func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, err
 	default:
 		log.G(ctx).WithField("status", state.Status).Warn("unknown status")
 	}
+	reason := task.ExitReason_NONE
+	switch state.ExitReason {
+	case runtime.ExitReasonOOMKilled:
+		reason = task.ExitReason_OOMKILLED
+	case runtime.ExitReasonSignaled:
+		reason = task.ExitReason_SIGNALED
+	}
 	return &task.Process{
 		ID:         p.ID(),
 		Pid:        state.Pid,
@@ -379,6 +386,7 @@ func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, err
 		Terminal:   state.Terminal,
 		ExitStatus: state.ExitStatus,
 		ExitedAt:   protobuf.ToTimestamp(state.ExitedAt),
+		ExitReason: reason,
 	}, nil
 }
 

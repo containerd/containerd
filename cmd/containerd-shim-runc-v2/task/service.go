@@ -46,7 +46,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	oomv1 "github.com/containerd/containerd/v2/pkg/oom/v1"
-	oomv2 "github.com/containerd/containerd/v2/pkg/oom/v2"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/shim"
@@ -66,20 +65,18 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		ep  oom.Watcher
 		err error
 	)
-	if cgroups.Mode() == cgroups.Unified {
-		ep, err = oomv2.New(publisher)
-	} else {
+	if cgroups.Mode() != cgroups.Unified {
 		ep, err = oomv1.New(publisher)
+		if err != nil {
+			return nil, err
+		}
+		go ep.Run(ctx)
 	}
-	if err != nil {
-		return nil, err
-	}
-	go ep.Run(ctx)
 	s := &service{
 		context:              ctx,
 		events:               make(chan interface{}, 128),
 		ec:                   reaper.Default.Subscribe(),
-		ep:                   ep,
+		cg1oom:               ep,
 		shutdown:             sd,
 		containers:           make(map[string]*runc.Container),
 		running:              make(map[int][]containerProcess),
@@ -115,7 +112,7 @@ type service struct {
 	events   chan interface{}
 	platform stdio.Platform
 	ec       chan runcC.Exit
-	ep       oom.Watcher
+	cg1oom   oom.Watcher
 
 	containers map[string]*runc.Container
 
@@ -310,7 +307,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	case "":
 		switch cg := container.Cgroup().(type) {
 		case cgroup1.Cgroup:
-			if err := s.ep.Add(container.ID, cg); err != nil {
+			if err := s.cg1oom.Add(container.ID, cg); err != nil {
 				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
 			}
 		case *cgroupsv2.Manager:
@@ -326,9 +323,12 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 					}
 				}
 			}
-			if err := s.ep.Add(container.ID, cg); err != nil {
-				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
-			}
+
+			container.OOMWatch(ctx, func() {
+				s.send(&eventstypes.TaskOOM{
+					ContainerID: container.ID,
+				})
+			})
 		}
 
 		s.send(&eventstypes.TaskStart{
@@ -429,6 +429,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 	if err != nil {
 		return nil, err
 	}
+
 	status := task.Status_UNKNOWN
 	switch st {
 	case "created":
@@ -454,6 +455,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 		Terminal:   sio.Terminal,
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
+		ExitReason: container.ExitReason(p.ExitStatus()),
 	}, nil
 }
 
@@ -758,6 +760,7 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 		Pid:         uint32(e.Pid),
 		ExitStatus:  uint32(e.Status),
 		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+		ExitReason:  c.ExitReason(e.Status),
 	})
 	if _, init := p.(*process.Init); !init {
 		s.lifecycleMu.Lock()
