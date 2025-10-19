@@ -324,22 +324,26 @@ func initalizeBlockDevice(td string, a fstest.Applier) (string, error) {
 		file.Close()
 		return "", fmt.Errorf("failed to resize loopback file: %w", err)
 	}
+	dpath := file.Name()
 	file.Close()
 
-	loopdev, err := mount.AttachLoopDevice(file.Name())
+	loopdev, err := mount.AttachLoopDevice(dpath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to attach loop: %w", err)
 	}
-	defer mount.DetachLoopDevice(loopdev)
 
 	if out, err := exec.Command("mkfs.ext4", loopdev).CombinedOutput(); err != nil {
 		return "", fmt.Errorf("could not mkfs.ext4 %s: %w (out: %s)", loopdev, err, string(out))
 	}
 
+	if err := mount.DetachLoopDevice(loopdev); err != nil {
+		return "", fmt.Errorf("failed to detach loop: %w", err)
+	}
+
 	m := mount.Mount{
 		Type:    "ext4",
-		Source:  loopdev, // previous mount
-		Options: []string{},
+		Source:  dpath, // previous mount
+		Options: []string{"loop"},
 	}
 	target, err := os.MkdirTemp(td, "mount-")
 	if err != nil {
@@ -347,17 +351,21 @@ func initalizeBlockDevice(td string, a fstest.Applier) (string, error) {
 	}
 
 	if err := m.Mount(target); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to mount: %w", err)
 	}
-	defer mount.Unmount(target, 0)
 
 	rootDir := filepath.Join(target, "root")
 	if err := os.Mkdir(rootDir, 0755); err != nil {
 		return "", err
 	}
 	if err := a.Apply(rootDir); err != nil {
+		mount.Unmount(target, 0)
 		return "", err
 	}
 
-	return file.Name(), nil
+	if err := mount.Unmount(target, 0); err != nil {
+		return "", fmt.Errorf("failed to unmount: %w", err)
+	}
+
+	return dpath, nil
 }
