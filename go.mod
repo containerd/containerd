@@ -43,7 +43,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0
 	github.com/intel/goresctrl v0.9.0
-	github.com/klauspost/compress v1.18.0
+	github.com/klauspost/compress v1.18.1
 	github.com/mdlayher/vsock v1.2.1
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.7.2
