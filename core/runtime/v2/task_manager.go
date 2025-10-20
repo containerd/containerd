@@ -24,7 +24,6 @@ import (
 	"os"
 	"os/exec"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/containerd/errdefs"
@@ -46,13 +45,10 @@ import (
 )
 
 const (
-	// formattedMounts indicates that the runtimes supports formatted mounts and
-	// the mount manager can skip mounting those mounts which require formatting.
-	formattedMounts = "containerd.io/runtime-formatted-mounts"
-
 	// allowedMounts are the custom mount types allowed by the runtime. These
 	// types should not be handled by the mount manager.
-	allowedMounts = "containerd.io/runtime-allowed-mounts"
+	// To include prepare mount types, use "/*" suffix, such as "format/*"
+	allowedMounts = "containerd.io/runtime-allow-mounts"
 )
 
 // TaskConfig for the runtime task manager
@@ -130,8 +126,7 @@ func init() {
 }
 
 type runtimeInfo struct {
-	formattedMounts bool
-	handledMounts   []string
+	handledMounts []string
 }
 
 // TaskManager wraps task service client on top of shim manager.
@@ -187,11 +182,8 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		}),
 	}
 	if info, ok := m.infos[opts.Runtime]; ok {
-		if info.formattedMounts {
-			activateOpts = append(activateOpts, mount.WithAllowFormattedMounts)
-		}
 		for _, t := range info.handledMounts {
-			activateOpts = append(activateOpts, mount.WithAllowedMountType(t))
+			activateOpts = append(activateOpts, mount.WithAllowMountType(t))
 		}
 	}
 
@@ -344,9 +336,6 @@ func loadRuntimeInfo(ctx context.Context, shims *ShimManager, runtime string) (*
 	rinfo := &runtimeInfo{}
 
 	if info.Annotations != nil {
-		if v, ok := info.Annotations[formattedMounts]; ok {
-			rinfo.formattedMounts, _ = strconv.ParseBool(v)
-		}
 		if v, ok := info.Annotations[allowedMounts]; ok {
 			rinfo.handledMounts = strings.Split(v, ",")
 		}

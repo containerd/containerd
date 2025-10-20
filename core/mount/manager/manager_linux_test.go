@@ -66,16 +66,14 @@ func TestLoopbackMount(t *testing.T) {
 			Options: []string{},
 		},
 		{
-			Type:    "format/xfs",
+			Type:    "format/ext4",
 			Source:  "{{ mount 0 }}", // previous mount
 			Options: []string{},
 		},
 	}
 
-	handlers := map[string]mount.Handler{
-		"loop": mount.LoopbackHandler(),
-	}
-	m := NewManager(db, targetdir, handlers)
+	m, err := NewManager(db, targetdir, WithMountHandler("loop", mount.LoopbackHandler()))
+	require.NoError(t, err)
 	ainfo, err := m.Activate(ctx, "id1", mounts)
 	require.NoError(t, err)
 	defer func() {
@@ -101,7 +99,7 @@ func TestLoopbackMount(t *testing.T) {
 	}
 	defer testutil.Unmount(t, tm)
 
-	if err := fstest.CheckDirectoryEqual(tm, actual); err != nil {
+	if err := fstest.CheckDirectoryEqual(filepath.Join(tm, "root"), actual); err != nil {
 		t.Fatalf("check directory failed: %v", err)
 	}
 }
@@ -149,12 +147,12 @@ func TestLoopbackOverlay(t *testing.T) {
 				}
 				return []mount.Mount{
 					{
-						Type:    "xfs",
+						Type:    "ext4",
 						Source:  b1,
 						Options: []string{"loop"},
 					},
 					{
-						Type:    "xfs",
+						Type:    "ext4",
 						Source:  b2,
 						Options: []string{"loop"},
 					},
@@ -186,7 +184,7 @@ func TestLoopbackOverlay(t *testing.T) {
 						Options: []string{},
 					},
 					{
-						Type:    "format/xfs",
+						Type:    "format/ext4",
 						Source:  "{{ mount 0 }}",
 						Options: []string{},
 					},
@@ -196,7 +194,7 @@ func TestLoopbackOverlay(t *testing.T) {
 						Options: []string{},
 					},
 					{
-						Type:    "format/xfs",
+						Type:    "format/ext4",
 						Source:  "{{ mount 2 }}",
 						Options: []string{},
 					},
@@ -223,12 +221,12 @@ func TestLoopbackOverlay(t *testing.T) {
 				}
 				return []mount.Mount{
 					{
-						Type:    "xfs",
+						Type:    "ext4",
 						Source:  b1,
 						Options: []string{"loop"},
 					},
 					{
-						Type:    "xfs",
+						Type:    "ext4",
 						Source:  b2,
 						Options: []string{"loop"},
 					},
@@ -255,12 +253,12 @@ func TestLoopbackOverlay(t *testing.T) {
 				}
 				return []mount.Mount{
 					{
-						Type:    "xfs",
+						Type:    "ext4",
 						Source:  b2,
 						Options: []string{"loop"},
 					},
 					{
-						Type:    "xfs",
+						Type:    "ext4",
 						Source:  b1,
 						Options: []string{"loop"},
 					},
@@ -282,10 +280,8 @@ func TestLoopbackOverlay(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			handlers := map[string]mount.Handler{
-				"loop": mount.LoopbackHandler(),
-			}
-			m := NewManager(db, targetdir, handlers)
+			m, err := NewManager(db, targetdir, WithMountHandler("loop", mount.LoopbackHandler()))
+			require.NoError(t, err)
 			ainfo, err := m.Activate(ctx, "id1", mounts)
 			require.NoError(t, err)
 			defer func() {
@@ -311,7 +307,7 @@ func TestLoopbackOverlay(t *testing.T) {
 			}
 			defer testutil.Unmount(t, tm)
 
-			if err := fstest.CheckDirectoryEqual(tm, actual); err != nil {
+			if err := fstest.CheckDirectoryEqual(filepath.Join(tm, "root"), actual); err != nil {
 				t.Fatalf("check directory failed: %v", err)
 			}
 		})
@@ -324,26 +320,30 @@ func initalizeBlockDevice(td string, a fstest.Applier) (string, error) {
 		return "", err
 	}
 
-	if err := file.Truncate(300 << 20); err != nil {
+	if err := file.Truncate(16 << 20); err != nil {
 		file.Close()
 		return "", fmt.Errorf("failed to resize loopback file: %w", err)
 	}
+	dpath := file.Name()
 	file.Close()
 
-	loopdev, err := mount.AttachLoopDevice(file.Name())
+	loopdev, err := mount.AttachLoopDevice(dpath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to attach loop: %w", err)
 	}
-	defer mount.DetachLoopDevice(loopdev)
 
-	if out, err := exec.Command("mkfs.xfs", loopdev).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("could not mkfs.xfs %s: %w (out: %s)", loopdev, err, string(out))
+	if out, err := exec.Command("mkfs.ext4", loopdev).CombinedOutput(); err != nil {
+		return "", fmt.Errorf("could not mkfs.ext4 %s: %w (out: %s)", loopdev, err, string(out))
+	}
+
+	if err := mount.DetachLoopDevice(loopdev); err != nil {
+		return "", fmt.Errorf("failed to detach loop: %w", err)
 	}
 
 	m := mount.Mount{
-		Type:    "xfs",
-		Source:  loopdev, // previous mount
-		Options: []string{},
+		Type:    "ext4",
+		Source:  dpath, // previous mount
+		Options: []string{"loop"},
 	}
 	target, err := os.MkdirTemp(td, "mount-")
 	if err != nil {
@@ -351,13 +351,21 @@ func initalizeBlockDevice(td string, a fstest.Applier) (string, error) {
 	}
 
 	if err := m.Mount(target); err != nil {
-		return "", err
-	}
-	defer mount.Unmount(target, 0)
-
-	if err := a.Apply(target); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to mount: %w", err)
 	}
 
-	return file.Name(), nil
+	rootDir := filepath.Join(target, "root")
+	if err := os.Mkdir(rootDir, 0755); err != nil {
+		return "", err
+	}
+	if err := a.Apply(rootDir); err != nil {
+		mount.Unmount(target, 0)
+		return "", err
+	}
+
+	if err := mount.Unmount(target, 0); err != nil {
+		return "", fmt.Errorf("failed to unmount: %w", err)
+	}
+
+	return dpath, nil
 }

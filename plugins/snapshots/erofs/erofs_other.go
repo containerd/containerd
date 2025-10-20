@@ -1,4 +1,4 @@
-//go:build darwin || freebsd || solaris
+//go:build !linux
 
 /*
    Copyright The containerd Authors.
@@ -16,12 +16,30 @@
    limitations under the License.
 */
 
-package builtins
+package erofs
 
 import (
-	_ "github.com/containerd/containerd/v2/plugins/diff/erofs/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/snapshots/blockfile/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/snapshots/erofs/plugin"
-	_ "github.com/containerd/containerd/v2/plugins/snapshots/native/plugin"
+	"context"
+
+	"github.com/containerd/errdefs"
 )
+
+func checkCompatibility(root string) error {
+	return nil
+}
+
+func setImmutable(path string, enable bool) error {
+	return errdefs.ErrNotImplemented
+}
+
+func cleanupUpper(upper string) error {
+	return nil
+}
+
+func upperDirectoryPermission(p, parent string) error {
+	return nil
+}
+
+func convertDirToErofs(ctx context.Context, layerBlob, upperDir string) error {
+	return errdefs.ErrNotImplemented
+}
