@@ -36,7 +36,7 @@ func GenerateSeccompSecurityProfile(profilePath string, unsetProfilePath string)
 	return nil, nil
 }
 
-// generateSeccompSpecOpts generates containerd SpecOpts for seccomp.
+// GenerateSeccompSpecOpts generates containerd SpecOpts for seccomp.
 func GenerateSeccompSpecOpts(sp *runtime.SecurityProfile, privileged, seccompEnabled bool) (oci.SpecOpts, error) {
 	if privileged {
 		// Do not set seccomp profile when container is privileged
