@@ -314,14 +314,14 @@ func TestGC(t *testing.T) {
 func checkGCActive(t *testing.T, i int, cc metadata.CollectionContext, active []string, brefs map[string][]string) {
 	t.Helper()
 	ccb := cc.(interface {
-		ActiveWithBackReference(string, func(gc.Node), func(gc.Node, gc.Node))
+		ActiveWithBackRefs(string, func(gc.Node), func(gc.Node, gc.Node))
 	})
 
 	var (
 		activeKeys  []string
 		activeBrefs = map[string][]string{}
 	)
-	ccb.ActiveWithBackReference("test", func(n gc.Node) {
+	ccb.ActiveWithBackRefs("test", func(n gc.Node) {
 		activeKeys = append(activeKeys, n.Key)
 	}, func(n, ref gc.Node) {
 		activeBrefs[n.Key] = append(activeBrefs[n.Key], ref.Key)
