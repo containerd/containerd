@@ -47,7 +47,14 @@ func (c *Controller) Stop(ctx context.Context, sandboxID string, _ ...sandbox.St
 	}
 	state := podSandbox.Status.Get().State
 	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
-		if err := c.stopSandboxContainer(ctx, podSandbox); err != nil {
+		err = c.stopSandboxContainer(ctx, podSandbox)
+		if err != nil && isShimTTRPCClosed(err) {
+			log.G(ctx).WithError(err).
+				Warnf("Shim ttrpc connection closed when stopping sandbox container %q in %q state, retrying", sandboxID, state)
+
+			err = c.stopSandboxContainer(ctx, podSandbox)
+		}
+		if err != nil {
 			return fmt.Errorf("failed to stop sandbox container %q in %q state: %w", sandboxID, state, err)
 		}
 	}
