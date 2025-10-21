@@ -18,12 +18,17 @@ package podsandbox
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/ttrpc"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
 
@@ -102,5 +107,45 @@ func TestEnsureRemoveAllWithMount(t *testing.T) {
 
 	if _, err := os.Stat(dir1); !os.IsNotExist(err) {
 		t.Fatalf("expected %q to not exist", dir1)
+	}
+}
+
+func TestIsShimTTRPCClosed(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "ttrpc closed error text",
+			err:      fmt.Errorf("ttrpc: closed"),
+			expected: true,
+		},
+		{
+			name:     "ttrpc closed error",
+			err:      ttrpc.ErrClosed,
+			expected: true,
+		},
+		{
+			name:     "wrapped ttrpc closed error",
+			err:      fmt.Errorf("some context: %w", ttrpc.ErrClosed),
+			expected: true,
+		},
+		{
+			name:     "non-ttrpc error",
+			err:      fmt.Errorf("some other error"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, isShimTTRPCClosed(errgrpc.ToNative(tt.err)))
+		})
 	}
 }

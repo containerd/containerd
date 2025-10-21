@@ -20,7 +20,10 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
@@ -123,4 +126,13 @@ func getMetadata(ctx context.Context, container containerd.Container) (*sandboxs
 		return nil, fmt.Errorf("failed to convert the extension to sandbox metadata")
 	}
 	return meta, nil
+}
+
+// isShimTTRPCClosed returns true if the cause of error is ttrpc.ErrClosed from shim.
+func isShimTTRPCClosed(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errdefs.IsUnknown(err) && strings.HasSuffix(err.Error(), ttrpc.ErrClosed.Error())
 }
