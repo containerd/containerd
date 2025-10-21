@@ -22,13 +22,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/docker/go-units"
 )
 
 type mkfs struct {
@@ -69,12 +69,12 @@ func (t *mkfs) Transform(ctx context.Context, m mount.Mount, a []mount.ActiveMou
 				value = "true"
 			}
 			switch key {
-			case "size_mb":
-				sizemb, err := strconv.Atoi(value)
+			case "size":
+				var err error
+				size, err = units.RAMInBytes(value)
 				if err != nil {
 					return mount.Mount{}, fmt.Errorf("bad option %s: %w", key, err)
 				}
-				size = int64(sizemb) * 1024 * 1024
 			case "fs":
 				fs = value
 			case "uuid":
@@ -89,7 +89,7 @@ func (t *mkfs) Transform(ctx context.Context, m mount.Mount, a []mount.ActiveMou
 	}
 	m.Options = options
 	if size == 0 {
-		return mount.Mount{}, fmt.Errorf("mkfs requires mkfs.size_mb option: %w", errdefs.ErrInvalidArgument)
+		return mount.Mount{}, fmt.Errorf("mkfs requires mkfs.size option: %w", errdefs.ErrInvalidArgument)
 	}
 
 	if _, err := r.Stat(subpath); err == nil {

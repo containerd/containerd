@@ -235,7 +235,7 @@ func (s *snapshotter) mounts(snap storage.Snapshot, _ snapshots.Info) ([]mount.M
 					Options: []string{
 						"X-containerd.mkfs.fs=ext4",
 						// TODO: Get size from snapshot labels
-						fmt.Sprintf("X-containerd.mkfs.size_mb=%d", s.defaultWritable/(1024*1024)),
+						fmt.Sprintf("X-containerd.mkfs.size=%d", s.defaultWritable),
 						// TODO: Add UUID
 						roFlag,
 						"loop",
@@ -274,7 +274,7 @@ func (s *snapshotter) mounts(snap storage.Snapshot, _ snapshots.Info) ([]mount.M
 				Options: []string{
 					"X-containerd.mkfs.fs=ext4",
 					// TODO: Get size from snapshot labels
-					fmt.Sprintf("X-containerd.mkfs.size_mb=%d", s.defaultWritable/(1024*1024)),
+					fmt.Sprintf("X-containerd.mkfs.size=%d", s.defaultWritable),
 					// TODO: Add UUID
 					"rw",
 					"loop",

@@ -18,6 +18,7 @@ package plugin
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/snapshots/erofs"
+	"github.com/docker/go-units"
 )
 
 // Config represents configuration for the native plugin.
@@ -42,8 +44,8 @@ type Config struct {
 	// If `SetImmutable` is enabled, IMMUTABLE_FL will be set on layer blobs.
 	SetImmutable bool `toml:"set_immutable"`
 
-	// DefaultSizeMB is the default size of a writable layer in MB
-	DefaultSizeMB int64 `toml:"default_size_mb"`
+	// DefaultSize is the default size of a writable layer in string
+	DefaultSize string `toml:"default_size"`
 }
 
 func init() {
@@ -77,8 +79,12 @@ func init() {
 				opts = append(opts, erofs.WithImmutable())
 			}
 
-			if config.DefaultSizeMB > 0 {
-				opts = append(opts, erofs.WithDefaultSize(config.DefaultSizeMB*1024*1024))
+			if config.DefaultSize != "" {
+				size, err := units.RAMInBytes(config.DefaultSize)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse default_size '%v': %w", config.DefaultSize, err)
+				}
+				opts = append(opts, erofs.WithDefaultSize(size))
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
