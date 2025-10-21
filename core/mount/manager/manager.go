@@ -807,7 +807,7 @@ func gcnode(t gc.ResourceType, ns, key string) gc.Node {
 	}
 }
 
-func (cc *collectionContext) ActiveWithBackReference(ns string, fn func(gc.Node), bref func(gc.Node, gc.Node)) {
+func (cc *collectionContext) ActiveWithBackRefs(ns string, fn func(gc.Node), bref func(gc.Node, gc.Node)) {
 	nsbkt := getBucket(cc.tx, []byte("v1"), []byte(ns), bucketKeyMounts)
 	if nsbkt != nil {
 		mc := nsbkt.Cursor()
@@ -884,7 +884,7 @@ func (cc *collectionContext) ActiveWithBackReference(ns string, fn func(gc.Node)
 }
 
 func (cc *collectionContext) Active(ns string, fn func(gc.Node)) {
-	cc.ActiveWithBackReference(ns, fn, func(gc.Node, gc.Node) {})
+	cc.ActiveWithBackRefs(ns, fn, func(gc.Node, gc.Node) {})
 }
 
 func (cc *collectionContext) Leased(ns, lease string, fn func(gc.Node)) {
