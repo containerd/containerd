@@ -68,6 +68,8 @@ type Status struct {
 	ExitStatus uint32
 	// ExitedTime is the time at which the process died
 	ExitTime time.Time
+	// ExitReason is the reason for process exit
+	ExitReason ExitReason
 }
 
 // ProcessInfo provides platform specific process information
@@ -97,6 +99,15 @@ const (
 	Pausing ProcessStatus = "pausing"
 	// Unknown indicates that we could not determine the status from the runtime
 	Unknown ProcessStatus = "unknown"
+)
+
+type ExitReason string
+
+const (
+	// ExitReasonOOMKilled indicates the process was killed due to out of memory
+	ExitReasonOOMKilled ExitReason = "OOMKilled"
+	// ExitReasonSignaled indicates the process was killed via signal
+	ExitReasonSignaled ExitReason = "Signaled"
 )
 
 // IOCloseInfo allows specific io pipes to be closed on a process

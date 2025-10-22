@@ -21,6 +21,7 @@ package containerd.events;
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/fieldpath.proto";
+import "github.com/containerd/containerd/api/types/task/task.proto";
 
 option go_package = "github.com/containerd/containerd/api/events;events";
 option (containerd.types.fieldpath_all) = true;
@@ -62,6 +63,7 @@ message TaskExit {
 	uint32 pid = 3;
 	uint32 exit_status = 4;
 	google.protobuf.Timestamp exited_at = 5;
+	containerd.v1.types.ExitReason exit_reason = 6;
 }
 
 message TaskOOM {
