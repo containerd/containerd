@@ -47,7 +47,7 @@ func TestNonExistingLoop(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	backingFile := "setup-loop-test-no-such-file"
-	_, err := setupLoop(backingFile, LoopParams{})
+	_, err := SetupLoop(backingFile, LoopParams{})
 	if err == nil {
 		t.Fatalf("setupLoop with non-existing file should fail")
 	}
@@ -58,7 +58,7 @@ func TestRoLoop(t *testing.T) {
 
 	backingFile := createTempFile(t)
 
-	file, err := setupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
+	file, err := SetupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		file.Close()
@@ -74,7 +74,7 @@ func TestRwLoop(t *testing.T) {
 
 	backingFile := createTempFile(t)
 
-	file, err := setupLoop(backingFile, LoopParams{Autoclear: true})
+	file, err := SetupLoop(backingFile, LoopParams{Autoclear: true})
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		file.Close()
@@ -103,7 +103,7 @@ func TestAutoclearTrueLoop(t *testing.T) {
 	dev := func() string {
 		backingFile := createTempFile(t)
 
-		file, err := setupLoop(backingFile, LoopParams{Autoclear: true})
+		file, err := SetupLoop(backingFile, LoopParams{Autoclear: true})
 		require.NoError(t, err)
 		dev := file.Name()
 		file.Close()
@@ -125,7 +125,7 @@ func TestAutoclearFalseLoop(t *testing.T) {
 	dev := func() string {
 		backingFile := createTempFile(t)
 
-		file, err := setupLoop(backingFile, LoopParams{Autoclear: false})
+		file, err := SetupLoop(backingFile, LoopParams{Autoclear: false})
 		require.NoError(t, err)
 		dev := file.Name()
 		file.Close()
