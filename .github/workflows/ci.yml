@@ -643,6 +643,9 @@ jobs:
         run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
       - name: test-cri
         run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: dump-dmesg
+        if: always()
+        run: sudo BOX=$BOX vagrant ssh -c "sudo dmesg -T -f kern"
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
