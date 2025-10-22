@@ -43,7 +43,7 @@ func (loopbackHandler) Mount(ctx context.Context, m Mount, mp string, _ []Active
 	// TODO: Handle direct io
 
 	t := time.Now()
-	loop, err := setupLoop(m.Source, params)
+	loop, err := SetupLoop(m.Source, params)
 	if err != nil {
 		return ActiveMount{}, err
 	}

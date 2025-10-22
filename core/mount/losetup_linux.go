@@ -151,7 +151,7 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) (_ *os.File, re
 	return loop, nil
 }
 
-// setupLoop looks for (and possibly creates) a free loop device, and
+// SetupLoop looks for (and possibly creates) a free loop device, and
 // then attaches backingFile to it.
 //
 // When autoclear is true, caller should take care to close it when
@@ -165,7 +165,7 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) (_ *os.File, re
 // the loop device when done with it.
 //
 // Upon success, the file handle to the loop device is returned.
-func setupLoop(backingFile string, param LoopParams) (*os.File, error) {
+func SetupLoop(backingFile string, param LoopParams) (*os.File, error) {
 	for retry := 1; retry < 100; retry++ {
 		num, err := getFreeLoopDev()
 		if err != nil {
@@ -227,7 +227,7 @@ func removeLoop(loopdev string) error {
 
 // AttachLoopDevice attaches a specified backing file to a loop device
 func AttachLoopDevice(backingFile string) (string, error) {
-	file, err := setupLoop(backingFile, LoopParams{})
+	file, err := SetupLoop(backingFile, LoopParams{})
 	if err != nil {
 		return "", err
 	}
