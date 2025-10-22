@@ -31,6 +31,8 @@ import (
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	digest "github.com/opencontainers/go-digest"
 	is "github.com/opencontainers/image-spec/specs-go"
@@ -284,6 +286,18 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) err
 		All:         i.All,
 	})
 	if err != nil {
+		if isShimTTRPCClosed(err) {
+			log.G(ctx).WithError(err).Warnf("Shim ttrpc connection closed when killing container %q, retrying", t.id)
+			_, err = t.client.TaskService().Kill(ctx, &tasks.KillRequest{
+				Signal:      uint32(s),
+				ContainerID: t.id,
+				ExecID:      i.ExecID,
+				All:         i.All,
+			})
+			if err != nil {
+				return errgrpc.ToNative(err)
+			}
+		}
 		return errgrpc.ToNative(err)
 	}
 	return nil
@@ -408,17 +422,32 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 		t.io.Cancel()
 		t.io.Wait()
 	}
-	r, err := t.client.TaskService().Delete(ctx, &tasks.DeleteTaskRequest{
+	var r *tasks.DeleteResponse
+	var errDelete error
+	r, errDelete = t.client.TaskService().Delete(ctx, &tasks.DeleteTaskRequest{
 		ContainerID: t.id,
 	})
-	if err != nil {
-		return nil, errgrpc.ToNative(err)
+	if errDelete != nil && isShimTTRPCClosed(errDelete) {
+		log.G(ctx).WithError(err).Warnf("Shim ttrpc connection closed when deleting container %q, retrying", t.id)
+		r, errDelete = t.client.TaskService().Delete(ctx, &tasks.DeleteTaskRequest{
+			ContainerID: t.id,
+		})
+		if errDelete != nil {
+			return nil, errgrpc.ToNative(errDelete)
+		}
 	}
 	// Only cleanup the IO after a successful Delete
 	if t.io != nil {
 		t.io.Close()
 	}
 	return &ExitStatus{code: r.ExitStatus, exitedAt: protobuf.FromTimestamp(r.ExitedAt)}, nil
+}
+
+func isShimTTRPCClosed(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errdefs.IsUnknown(err) && strings.HasSuffix(err.Error(), ttrpc.ErrClosed.Error())
 }
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, retErr error) {
