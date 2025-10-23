@@ -17,11 +17,15 @@
 package integration
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -75,4 +79,48 @@ func TestContainerdRestartSandboxRecover(t *testing.T) {
 		}
 	}
 	assert.True(t, foundUnkownSb)
+}
+
+func TestReload100Pods(t *testing.T) {
+	workDir := t.TempDir()
+
+	currentReleaseCtrdDefaultConfig(t, workDir)
+
+	ctrd := newCtrdProc(t, *containerdBin, workDir, []string{})
+
+	logPath := ctrd.logPath()
+	t.Cleanup(func() {
+		if t.Failed() {
+			dumpFileContent(t, logPath)
+		}
+
+		t.Log("Ensure there is no leaky state dir after test")
+		assert.NoError(t, os.Remove(filepath.Join(workDir, "state", "io.containerd.runtime.v2.task", "k8s.io")))
+	})
+	require.NoError(t, ctrd.isReady())
+
+	podCtxs := []*podTCtx{}
+	defer func() {
+		for _, p := range podCtxs {
+			p.stop(true)
+		}
+		assert.NoError(t, ctrd.kill(syscall.SIGTERM))
+		assert.NoError(t, ctrd.wait(5*time.Minute))
+	}()
+
+	for i := 0; i < 100; i++ {
+		podCtx := newPodTCtx(t,
+			ctrd.criRuntimeService(t),
+			fmt.Sprintf("test-restart-%d", i),
+			"sandbox",
+			WithHostNetwork)
+
+		podCtxs = append(podCtxs, podCtx)
+	}
+
+	assert.NoError(t, ctrd.kill(syscall.SIGTERM))
+	assert.NoError(t, ctrd.wait(5*time.Minute))
+
+	ctrd = newCtrdProc(t, *containerdBin, workDir, []string{})
+	require.NoError(t, ctrd.isReady())
 }
