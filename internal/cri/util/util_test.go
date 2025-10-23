@@ -17,11 +17,15 @@
 package util
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/ttrpc"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -229,6 +233,46 @@ func TestGenerateUserString(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			assert.Equal(t, tc.result, r)
+		})
+	}
+}
+
+func TestIsShimTTRPCClosed(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "ttrpc closed error text",
+			err:      fmt.Errorf("ttrpc: closed"),
+			expected: true,
+		},
+		{
+			name:     "ttrpc closed error",
+			err:      ttrpc.ErrClosed,
+			expected: true,
+		},
+		{
+			name:     "wrapped ttrpc closed error",
+			err:      fmt.Errorf("some context: %w", ttrpc.ErrClosed),
+			expected: true,
+		},
+		{
+			name:     "non-ttrpc error",
+			err:      fmt.Errorf("some other error"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, IsShimTTRPCClosed(errgrpc.ToNative(tt.err)))
 		})
 	}
 }
