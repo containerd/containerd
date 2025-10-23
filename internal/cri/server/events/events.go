@@ -121,16 +121,13 @@ func convertEvent(e typeurl.Any) (string, interface{}, error) {
 // event monitor.
 //
 // NOTE:
-//  1. Start must be called after Subscribe.
-//  2. The task exit event has been handled in individual startSandboxExitMonitor
-//     or startContainerExitMonitor goroutine at the first. If the goroutine fails,
-//     it puts the event into backoff retry queue and event monitor will handle
-//     it later.
+//
+//	The task exit event has been handled in individual startSandboxExitMonitor
+//	or startContainerExitMonitor goroutine at the first. If the goroutine fails,
+//	it puts the event into backoff retry queue and event monitor will handle
+//	it later.
 func (em *EventMonitor) Start() <-chan error {
 	errCh := make(chan error)
-	if em.ch == nil || em.errCh == nil {
-		panic("event channel is nil")
-	}
 	backOffCheckCh := em.backOff.start()
 	go func() {
 		defer close(errCh)
@@ -175,6 +172,16 @@ func (em *EventMonitor) Start() <-chan error {
 						}
 					}
 				}
+			case <-em.ctx.Done():
+				if em.errCh == nil {
+					return
+				}
+
+				if err := <-em.errCh; err != nil {
+					log.L.WithError(err).Error("Failed to handle event stream")
+					errCh <- err
+				}
+				return
 			}
 		}
 	}()
