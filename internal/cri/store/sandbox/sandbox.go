@@ -166,13 +166,18 @@ func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.Contain
 func (s *Store) Delete(id string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	id, err := s.idIndex.Get(id)
-	if err != nil {
-		// Note: The idIndex.Delete and delete doesn't handle truncated index.
-		// So we need to return if there are error.
-		return
+
+	// Normalize id using idIndex if available, otherwise use as-is to prevent leaks (issue #12390)
+	if normalized, err := s.idIndex.Get(id); err == nil {
+		id = normalized
 	}
-	s.labels.Release(s.sandboxes[id].ProcessLabel)
+
+	// Always attempt to delete from map, even if not found in idIndex
+	if sb, ok := s.sandboxes[id]; ok {
+		s.labels.Release(sb.ProcessLabel)
+		delete(s.sandboxes, id)
+	}
+
+	// Delete from idIndex (ignore error if already missing)
 	s.idIndex.Delete(id)
-	delete(s.sandboxes, id)
 }
