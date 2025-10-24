@@ -148,6 +148,13 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) (_ *os.File, re
 		}
 	}
 
+	// 5. Verify that the loop device is usable
+	if vinfo, err := unix.IoctlLoopGetStatus64(int(loop.Fd())); err != nil {
+		return nil, fmt.Errorf("failed to get loop device status: %w", err)
+	} else if vinfo.Flags != info.Flags {
+		return nil, fmt.Errorf("failed to get loop device status: %w", err)
+	}
+
 	return loop, nil
 }
 
