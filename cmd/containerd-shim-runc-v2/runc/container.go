@@ -351,11 +351,6 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 	if err := p.Start(ctx); err != nil {
 		return p, err
 	}
-	if c.Cgroup() == nil && p.Pid() > 0 {
-		if cg, err := loadProcessCgroup(ctx, p.Pid()); err == nil {
-			c.cgroup = cg
-		}
-	}
 	return p, nil
 }
 
