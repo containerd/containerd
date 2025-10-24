@@ -204,6 +204,9 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 					if progressTracker != nil {
 						mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
 					}
+					if u.AllContent {
+						uopts = append(uopts, unpack.WithFetchAllContent())
+					}
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 				} else {
 					log.G(ctx).WithFields(log.Fields{
