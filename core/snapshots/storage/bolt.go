@@ -386,6 +386,16 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 		// Replace labels, do not inherit
 		si.Labels = base.Labels
 
+		// If the snapshot didn't have a parent when created, allow it
+		// to be rebased on a parent on commit.
+		if si.Parent != base.Parent {
+			if len(si.Parent) == 0 {
+				si.Parent = base.Parent
+			} else if len(base.Parent) > 0 {
+				return fmt.Errorf("cannot change parent of active snapshot %q on commit: %w", key, errdefs.ErrInvalidArgument)
+			}
+		}
+
 		if err := putSnapshot(dbkt, id, si); err != nil {
 			return err
 		}
