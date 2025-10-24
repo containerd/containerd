@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -207,6 +208,18 @@ func migrateConfig(dst, src map[string]interface{}) {
 	} {
 		if val, ok := src[key]; ok {
 			dst[key] = val
+		}
+	}
+	if runtime.GOOS == "linux" {
+		if value, ok := dst["registry"]; ok {
+			regMap := value.(map[string]any)
+			if configPath, ok := regMap["config_path"]; ok {
+				if configPath == "" {
+					// Fill in default from config_unix.go (DefaultImageConfig)
+					regMap["config_path"] = "/etc/containerd/certs.d:/etc/docker/certs.d"
+				}
+			}
+			dst["registry"] = regMap
 		}
 	}
 
