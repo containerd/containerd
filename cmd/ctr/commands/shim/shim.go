@@ -81,6 +81,7 @@ var Command = &cli.Command{
 		execCommand,
 		startCommand,
 		stateCommand,
+		shutdownCommand,
 		pprofCommand,
 	},
 }
@@ -115,6 +116,47 @@ var deleteCommand = &cli.Command{
 			return err
 		}
 		fmt.Printf("container deleted and returned exit status %d\n", r.ExitStatus)
+		return nil
+	},
+}
+
+var shutdownCommand = &cli.Command{
+	Name:  "shutdown",
+	Usage: "Shutdown shim if there is no active container",
+	Flags: []cli.Flag{
+		&cli.IntFlag{
+			Name:  "api-version",
+			Usage: "shim API version {2,3}",
+			Value: 3,
+			Action: func(c *cli.Context, v int) error {
+				if v != 2 && v != 3 {
+					return fmt.Errorf("api-version must be 2 or 3")
+				}
+				return nil
+			},
+		},
+	},
+	Action: func(cliContext *cli.Context) error {
+		switch cliContext.Int("api-version") {
+		case 2:
+			service, err := getTaskServiceV2(cliContext)
+			if err != nil {
+				return err
+			}
+			_, err = service.Shutdown(context.Background(), &taskv2.ShutdownRequest{})
+			if err != nil {
+				return err
+			}
+		default:
+			service, err := getTaskService(cliContext)
+			if err != nil {
+				return err
+			}
+			_, err = service.Shutdown(context.Background(), &task.ShutdownRequest{})
+			if err != nil {
+				return err
+			}
+		}
 		return nil
 	},
 }

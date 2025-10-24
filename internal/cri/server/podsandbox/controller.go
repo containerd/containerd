@@ -97,13 +97,15 @@ func init() {
 				store:          NewStore(),
 			}
 
-			eventMonitor := events.NewEventMonitor(&podSandboxEventHandler{
-				controller: &c,
-			})
-			eventMonitor.Subscribe(client, []string{`topic=="/tasks/exit"`})
-			eventMonitor.Start()
-			c.eventMonitor = eventMonitor
-
+			// There is no need to subscribe to the exit event for the pause container,
+			// as a dedicated goroutine already monitors the sandbox exit event.
+			// The eventMonitor handles the backoff mechanism in case the pause container cleanup fails.
+			c.eventMonitor = events.NewEventMonitor(
+				&podSandboxEventHandler{
+					controller: &c,
+				},
+			)
+			c.eventMonitor.Start()
 			return &c, nil
 		},
 	})
@@ -184,11 +186,23 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 			exitStatus = unknownExitCode
 			exitedAt = time.Now()
 		}
+
 		dctx := ctrdutil.NamespacedContext()
 		dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 		defer dcancel()
-		event := &eventtypes.TaskExit{ExitStatus: exitStatus, ExitedAt: protobuf.ToTimestamp(exitedAt)}
+
+		event := &eventtypes.TaskExit{
+			ID:          p.ID,
+			ContainerID: p.ID,
+			ExitStatus:  exitStatus,
+			ExitedAt:    protobuf.ToTimestamp(exitedAt),
+		}
+
+		log.G(ctx).WithField("monitor_name", "podsandbox").
+			Infof("received sandbox exit event %+v", event)
+
 		if err := handleSandboxTaskExit(dctx, p, event); err != nil {
+			log.G(ctx).WithError(err).Errorf("failed to handle sandbox exit event %+v", event)
 			c.eventMonitor.Backoff(p.ID, event)
 		}
 		return nil

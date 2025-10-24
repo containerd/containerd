@@ -18,6 +18,8 @@ package integration
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
@@ -91,6 +93,9 @@ func TestReload100Pods(t *testing.T) {
 		if t.Failed() {
 			dumpFileContent(t, logPath)
 		}
+
+		t.Log("Ensure there is no leaky state dir after test")
+		assert.NoError(t, os.Remove(filepath.Join(workDir, "state", "io.containerd.runtime.v2.task", "k8s.io")))
 	})
 	require.NoError(t, ctrd.isReady())
 
