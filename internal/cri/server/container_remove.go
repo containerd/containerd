@@ -130,7 +130,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	c.containerStore.Delete(id)
 
 	c.containerNameIndex.ReleaseByKey(id)
-
+	c.updateContainers.Delete(id)
 	c.generateAndSendContainerEvent(ctx, id, container.SandboxID, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
 
 	containerRemoveTimer.WithValues(i.Runtime.Name).UpdateSince(start)
