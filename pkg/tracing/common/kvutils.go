@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package tracing
+package common
 
 import (
 	"encoding/json"
@@ -23,7 +23,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-func keyValue(k string, v any) attribute.KeyValue {
+func KeyValue(k string, v any) attribute.KeyValue {
 	if v == nil {
 		return attribute.String(k, "<nil>")
 	}

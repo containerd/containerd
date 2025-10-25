@@ -17,6 +17,7 @@
 package tracing
 
 import (
+	"github.com/containerd/containerd/v2/pkg/tracing/common"
 	"github.com/containerd/log"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -76,7 +77,7 @@ func (h *LogrusHook) Fire(entry *log.Entry) error {
 func logrusDataToAttrs(data map[string]any) []attribute.KeyValue {
 	attrs := make([]attribute.KeyValue, 0, len(data))
 	for k, v := range data {
-		attrs = append(attrs, keyValue(k, v))
+		attrs = append(attrs, common.KeyValue(k, v))
 	}
 	return attrs
 }
