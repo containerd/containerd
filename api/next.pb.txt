@@ -1703,6 +1703,13 @@ file {
       type_name: ".google.protobuf.Any"
       json_name: "options"
     }
+    field {
+      name: "oom_path"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "oomPath"
+    }
   }
   message_type {
     name: "CreateTaskResponse"
@@ -2417,6 +2424,13 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "options"
+    }
+    field {
+      name: "oom_path"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "oomPath"
     }
   }
   message_type {
@@ -6856,6 +6870,13 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "runtimePath"
+    }
+    field {
+      name: "oom_path"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "oomPath"
     }
   }
   message_type {
