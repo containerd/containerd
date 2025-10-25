@@ -571,8 +571,11 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 			// to wait for it?
 			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
 		}
-	}
 
+		if _, err := s.State(ctx); err == nil {
+			log.G(ctx).WithField("id", s.ID()).Warnf("shim service still running the shim might be leaked")
+		}
+	}
 	if err := s.ShimInstance.Delete(ctx); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete shim")
 	}

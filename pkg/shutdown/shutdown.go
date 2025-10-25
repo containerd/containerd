@@ -76,7 +76,9 @@ func (s *shutdownService) Shutdown() {
 	}
 	s.isShutdown = true
 
+	done := make(chan struct{})
 	go func(callbacks []func(context.Context) error) {
+		defer close(done)
 		ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 		defer cancel()
 		grp, ctx := errgroup.WithContext(ctx)
@@ -93,6 +95,7 @@ func (s *shutdownService) Shutdown() {
 		close(s.doneC)
 		s.mu.Unlock()
 	}(s.callbacks)
+	<-done
 }
 
 func (s *shutdownService) Done() <-chan struct{} {
