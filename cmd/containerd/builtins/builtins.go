@@ -23,6 +23,7 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/events"
 	_ "github.com/containerd/containerd/v2/plugins/gc"
 	_ "github.com/containerd/containerd/v2/plugins/imageverifier"
+	_ "github.com/containerd/containerd/v2/plugins/integrityverifier"
 	_ "github.com/containerd/containerd/v2/plugins/leases"
 	_ "github.com/containerd/containerd/v2/plugins/metadata"
 	_ "github.com/containerd/containerd/v2/plugins/mount"
