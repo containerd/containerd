@@ -85,6 +85,8 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		Runtime:          opts.BinaryName,
 		Rootfs:           pmounts,
 		Terminal:         r.Terminal,
+		AttachableOut:    r.AttachableOut,
+		AttachableErr:    r.AttachableErr,
 		Stdin:            r.Stdin,
 		Stdout:           r.Stdout,
 		Stderr:           r.Stderr,
@@ -134,6 +136,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
+
 	if err := p.Create(ctx, config); err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
@@ -204,10 +207,12 @@ func newInit(ctx context.Context, path, workDir, namespace string, platform stdi
 	r *process.CreateConfig, options *options.Options, rootfs string) (*process.Init, error) {
 	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.SystemdCgroup)
 	p := process.New(r.ID, runtime, stdio.Stdio{
-		Stdin:    r.Stdin,
-		Stdout:   r.Stdout,
-		Stderr:   r.Stderr,
-		Terminal: r.Terminal,
+		Stdin:         r.Stdin,
+		Stdout:        r.Stdout,
+		Stderr:        r.Stderr,
+		AttachableOut: r.AttachableOut,
+		AttachableErr: r.AttachableErr,
+		Terminal:      r.Terminal,
 	})
 	p.Bundle = r.Bundle
 	p.Platform = platform
