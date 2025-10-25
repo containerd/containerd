@@ -19,9 +19,11 @@ package shutdown
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/containerd/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -92,6 +94,7 @@ func (s *shutdownService) Shutdown() {
 		s.err = err
 		close(s.doneC)
 		s.mu.Unlock()
+		log.G(ctx).Infof("shim shutdown successfully with pid %d", os.Getpid())
 	}(s.callbacks)
 }
 
