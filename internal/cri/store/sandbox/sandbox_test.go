@@ -187,3 +187,58 @@ func TestSandboxStore(t *testing.T) {
 		assert.Equal(errdefs.ErrNotFound, err)
 	}
 }
+
+// TestSandboxStoreDeleteWithCorruptedIndex tests that Delete removes sandbox
+// from the store even when the truncated index is out of sync (issue #12390).
+// This reproduces the production bug where pods leaked when idIndex lost track
+// of sandbox IDs, causing the old Delete implementation to silently fail.
+func TestSandboxStoreDeleteWithCorruptedIndex(t *testing.T) {
+	labels := label.NewStore()
+	s := NewStore(labels)
+
+	// Create a test sandbox
+	sandbox := NewSandbox(
+		Metadata{
+			ID:   "test-sandbox-12390",
+			Name: "leak-test",
+			Config: &runtime.PodSandboxConfig{
+				Metadata: &runtime.PodSandboxMetadata{
+					Name:      "TestPod",
+					Uid:       "TestUid",
+					Namespace: "TestNamespace",
+					Attempt:   1,
+				},
+			},
+		},
+		Status{State: StateReady},
+	)
+
+	// Add sandbox to store (adds to both map and idIndex)
+	assert := assertlib.New(t)
+	assert.NoError(s.Add(sandbox))
+
+	// Verify it's in the store
+	_, err := s.Get(sandbox.ID)
+	assert.NoError(err)
+	assert.Len(s.List(), 1)
+
+	// Simulate idIndex corruption by manually removing from index
+	// This simulates the condition that caused the leak in production
+	s.idIndex.Delete(sandbox.ID)
+
+	// Verify idIndex no longer has the ID
+	_, err = s.idIndex.Get(sandbox.ID)
+	assert.Error(err, "idIndex should not have the ID after manual deletion")
+
+	// But the sandbox should still be in the map
+	assert.Len(s.List(), 1, "sandbox should still be in map")
+
+	// Now call Delete - with the bug, this would silently fail
+	// With the fix, it should delete from map even though idIndex lookup fails
+	s.Delete(sandbox.ID)
+
+	// Verify the sandbox was actually removed from the store
+	assert.Len(s.List(), 0, "sandbox should be removed from map despite idIndex corruption")
+	_, err = s.Get(sandbox.ID)
+	assert.Equal(errdefs.ErrNotFound, err, "sandbox should not be found after deletion")
+}
