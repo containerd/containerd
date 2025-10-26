@@ -18,8 +18,10 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -84,8 +86,18 @@ func NewStore(root string) (content.Store, error) {
 // require labels and should use `NewStore`. `NewLabeledStore` is primarily
 // useful for tests or standalone implementations.
 func NewLabeledStore(root string, ls LabelStore) (content.Store, error) {
-	supported, _ := fsverity.IsSupported(root)
-
+	if _, err := os.Stat(root); err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("failed to stat %q: %w", root, err)
+		}
+		if err := os.MkdirAll(root, 0755); err != nil {
+			return nil, fmt.Errorf("failed to mkdir %q: %w", root, err)
+		}
+	}
+	supported, err := fsverity.IsSupported(root)
+	if err != nil {
+		log.L.WithError(err).WithField("path", root).Warnf("failed check for fsverity support")
+	}
 	s := &store{
 		root:               root,
 		ls:                 ls,
