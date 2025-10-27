@@ -74,7 +74,7 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		}
 		// Forcibly stop the container. Do not use `StopContainer`, because it introduces a race
 		// if a container is removed after list.
-		if err := c.stopContainer(ctx, container, 0); err != nil {
+		if err := c.stopContainerRetryOnConnectionClosed(ctx, container, 0); err != nil {
 			return fmt.Errorf("failed to stop container %q: %w", container.ID, err)
 		}
 	}

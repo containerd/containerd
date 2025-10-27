@@ -88,6 +88,7 @@ func init() {
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
+			ic.Meta.Capabilities = append(ic.Meta.Capabilities, "rebase")
 			return erofs.NewSnapshotter(root, opts...)
 		},
 	})

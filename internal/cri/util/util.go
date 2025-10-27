@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -30,7 +31,9 @@ import (
 	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
 )
 
 // deferCleanupTimeoutKey is used to retrieve the configurable timeout for containerd cleanup operations in defer.
@@ -135,4 +138,13 @@ func GenerateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 		userstr = userstr + ":" + groupstr
 	}
 	return userstr, nil
+}
+
+// IsShimTTRPCClosed returns true if the cause of error is ttrpc.ErrClosed from shim.
+func IsShimTTRPCClosed(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errdefs.IsUnknown(err) && strings.HasSuffix(err.Error(), ttrpc.ErrClosed.Error())
 }

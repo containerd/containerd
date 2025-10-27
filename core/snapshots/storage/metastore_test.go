@@ -58,6 +58,7 @@ func MetaStoreSuite(t *testing.T, name string, meta func(root string) (*MetaStor
 	t.Run("RemoveNotExist", makeTest(t, name, meta, inWriteTransaction(testRemoveNotExist)))
 	t.Run("RemoveWithChildren", makeTest(t, name, meta, inWriteTransaction(testRemoveWithChildren)))
 	t.Run("ParentIDs", makeTest(t, name, meta, inWriteTransaction(testParents)))
+	t.Run("Rebase", makeTest(t, name, meta, inWriteTransaction(testRebase)))
 }
 
 // makeTest creates a testsuite with a writable transaction
@@ -637,6 +638,66 @@ func testParents(ctx context.Context, t *testing.T, ms *MetaStore) {
 				expectedParents = parents[1:]
 			}
 
+		}
+	}
+}
+
+func testRebase(ctx context.Context, t *testing.T, ms *MetaStore) {
+	if err := basePopulate(ctx, ms); err != nil {
+		t.Fatalf("Populate failed: %+v", err)
+	}
+
+	testcases := []struct {
+		Key       string
+		Name      string
+		OldParent string
+		NewParent string
+		ExpectErr bool
+	}{
+		{"rebase-active-1", "rebase-committed-1", "", "committed-1", false},
+		{"rebase-active-2", "rebase-committed-2", "committed-1", "committed-1", false},
+		{"rebase-active-3", "rebase-committed-3", "", "nonexist", true},
+		{"rebase-active-4", "rebase-committed-4", "committed-1", "", false},
+	}
+
+	for _, tc := range testcases {
+		_, err := CreateSnapshot(ctx, snapshots.KindActive, tc.Key, tc.OldParent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, err := CommitActive(ctx, tc.Key, tc.Name, snapshots.Usage{}, snapshots.WithParent(tc.NewParent))
+		if tc.ExpectErr {
+			if err == nil {
+				t.Fatalf("Expected rebase of %s to fail", tc.Key)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		view := fmt.Sprintf("%s-view", tc.Name)
+		_, err = CreateSnapshot(ctx, snapshots.KindView, view, tc.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parent := tc.NewParent
+		if len(parent) == 0 {
+			parent = tc.OldParent
+		}
+		pid, _, _, err := GetInfo(ctx, parent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := GetSnapshot(ctx, view)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(s.ParentIDs) != 2 || s.ParentIDs[0] != id || s.ParentIDs[1] != pid {
+			t.Fatalf("Unexpected parent IDs for %s: %+v", tc.Name, s.ParentIDs)
+		}
+		_, _, err = Remove(ctx, tc.Name)
+		if err == nil {
+			t.Fatalf("Expected removal of parent %s to fail", tc.Name)
 		}
 	}
 }

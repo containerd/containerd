@@ -66,7 +66,7 @@ func (c *criService) startSandboxExitMonitor(ctx context.Context, id string, exi
 				ExitedAt:   protobuf.ToTimestamp(exitedAt),
 			}
 
-			log.L.Infof("received exit event %+v", e)
+			log.L.WithField("monitor_name", "criService").Infof("received sandbox container exit event %+v", e)
 
 			err = func() error {
 				dctx := ctrdutil.NamespacedContext()
@@ -135,7 +135,7 @@ func (c *criService) startContainerExitMonitor(ctx context.Context, id string, p
 				ExitedAt:    protobuf.ToTimestamp(exitedAt),
 			}
 
-			log.L.Infof("received exit event %+v", e)
+			log.L.Infof("received container exit event %+v", e)
 
 			err = func() error {
 				dctx := ctrdutil.NamespacedContext()
