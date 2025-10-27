@@ -68,7 +68,11 @@ func init() {
 			state := ic.Properties[plugins.PropertyStateDir]
 			root := ic.Properties[plugins.PropertyRootDir]
 			for _, d := range []string{root, state} {
-				if err := os.MkdirAll(d, 0711); err != nil {
+				if err := os.MkdirAll(d, 0700); err != nil {
+					return nil, err
+				}
+				// chmod is needed for upgrading from an older release that created the dir with 0o711
+				if err := os.Chmod(d, 0o700); err != nil {
 					return nil, err
 				}
 			}

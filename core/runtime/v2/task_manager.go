@@ -92,6 +92,8 @@ func init() {
 			}
 			root, state := ic.Properties[plugins.PropertyRootDir], ic.Properties[plugins.PropertyStateDir]
 			for _, d := range []string{root, state} {
+				// root:  the parent of this directory is created as 0o700, not 0o711.
+				// state: the parent of this directory is created as 0o711 too, so as to support userns-remapped containers.
 				if err := os.MkdirAll(d, 0711); err != nil {
 					return nil, err
 				}
