@@ -10,7 +10,7 @@ require (
 	github.com/checkpoint-restore/checkpointctl v1.4.0
 	github.com/checkpoint-restore/go-criu/v7 v7.2.0
 	github.com/containerd/btrfs/v2 v2.0.0
-	github.com/containerd/cgroups/v3 v3.0.5
+	github.com/containerd/cgroups/v3 v3.1.0
 	github.com/containerd/console v1.0.5
 	github.com/containerd/containerd/api v1.10.0-beta.1
 	github.com/containerd/continuity v0.4.5
