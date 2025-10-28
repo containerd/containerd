@@ -243,6 +243,14 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 		Metrics:     []*runtime.Metric{},
 	}
 
+	// miscellaneous metrics
+	containerMetrics.Metrics = append(containerMetrics.Metrics, &runtime.Metric{
+		Name:       "container_last_seen",
+		Timestamp:  timestamp,
+		MetricType: runtime.MetricType_GAUGE,
+		Value:      &runtime.UInt64Value{Value: uint64(time.Now().Unix())},
+	})
+
 	// Collect CPU metrics
 	cpuMetrics, err := c.extractCPUMetrics(stats, containerLabels, timestamp)
 	if err != nil {
