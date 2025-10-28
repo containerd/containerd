@@ -129,13 +129,15 @@ func readonlyMounts(mounts []Mount) []Mount {
 // readonlyOverlay takes mount options for overlay mounts and makes them readonly by
 // removing workdir and upperdir (and appending the upperdir layer to lowerdir) - see:
 // https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html#multiple-lower-layers
+// It also strips the uidmap/gidmap options to avoid needlessly doing an idmap of this
+// temporary mount
 func readonlyOverlay(opt []string) []string {
 	out := make([]string, 0, len(opt))
 	upper := ""
 	for _, o := range opt {
 		if strings.HasPrefix(o, "upperdir=") {
 			upper = strings.TrimPrefix(o, "upperdir=")
-		} else if !strings.HasPrefix(o, "workdir=") {
+		} else if !isSkippedReadonlyOption(o) {
 			out = append(out, o)
 		}
 	}
@@ -147,6 +149,15 @@ func readonlyOverlay(opt []string) []string {
 		}
 	}
 	return out
+}
+
+// isSkippedReadonlyOption takes an overlayfs option string and returns
+// true if such an option should be skipped when converting the mount
+// to a readonly mount
+func isSkippedReadonlyOption(o string) bool {
+	return strings.HasPrefix(o, "workdir=") ||
+		strings.HasPrefix(o, "uidmap=") ||
+		strings.HasPrefix(o, "gidmap=")
 }
 
 // ToProto converts from [Mount] to the containerd
