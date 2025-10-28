@@ -297,6 +297,13 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				LabelKeys: append(baseLabelKeys, "ulimit"),
 			},*/
 		},
+		MiscellaneousMetrics: {
+			{
+				Name:      "container_last_seen",
+				Help:      "Last time a container was seen by the exporter",
+				LabelKeys: baseLabelKeys,
+			},
+		},
 	}
 	return descriptors
 }
