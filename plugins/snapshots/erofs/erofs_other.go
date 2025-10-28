@@ -41,10 +41,10 @@ func cleanupUpper(upper string) error {
 	return nil
 }
 
-func upperDirectoryPermission(p, parent string) error {
-	return nil
-}
-
 func convertDirToErofs(ctx context.Context, layerBlob, upperDir string) error {
 	return errdefs.ErrNotImplemented
+}
+
+func getParentOwnership(parentPath string) (uid, gid int, err error) {
+	return -1, -1, nil
 }
