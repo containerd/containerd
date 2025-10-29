@@ -542,6 +542,18 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 
 		}
 
+		if s.MemoryOomControl != nil {
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_oom_events_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.MemoryOomControl.GetOomKill()},
+				},
+			}...)
+		}
+
 	case *cg2.Metrics:
 		if s.Memory != nil {
 			metrics = append(metrics, []*runtime.Metric{
@@ -639,6 +651,18 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 				},
 			}...)
 
+		}
+
+		if s.MemoryEvents != nil {
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_oom_events_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.MemoryEvents.GetOomKill()},
+				},
+			}...)
 		}
 
 	default:
