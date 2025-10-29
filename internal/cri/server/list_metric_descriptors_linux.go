@@ -128,6 +128,11 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				Help:      "Cumulative count of memory allocation failures.",
 				LabelKeys: append(baseLabelKeys, "failure_type", "scope"),
 			},
+			{
+				Name:      "container_oom_events_total",
+				Help:      "Count of out of memory events observed for the container",
+				LabelKeys: baseLabelKeys,
+			},
 		},
 		NetworkUsageMetrics: {
 			{
