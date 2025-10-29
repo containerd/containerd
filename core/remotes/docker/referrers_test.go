@@ -89,7 +89,7 @@ func runReferrersTest(t *testing.T, name string, sf func(h http.Handler) (string
 		}
 	}
 
-	refs, err = rf.FetchReferrers(ctx, d.Digest, "application/vnd.test.sig")
+	refs, err = rf.FetchReferrers(ctx, d.Digest, remotes.WithReferrerArtifactTypes("application/vnd.test.sig"))
 	if err != nil {
 		t.Fatal(err)
 	}
