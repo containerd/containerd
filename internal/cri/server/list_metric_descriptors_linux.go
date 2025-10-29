@@ -304,6 +304,33 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				LabelKeys: baseLabelKeys,
 			},
 		},
+		ContainerSpecMetrics: {
+			{
+				Name:      "container_spec_cpu_period",
+				Help:      "CPU period of the container",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_spec_cpu_shares",
+				Help:      "CPU share of the container",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_spec_memory_limit_bytes",
+				Help:      "Memory limit for the container",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_spec_memory_reservation_limit_bytes",
+				Help:      "Memory reservation limit for the container",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_spec_memory_swap_limit_bytes",
+				Help:      "Memory swap limit for the container",
+				LabelKeys: baseLabelKeys,
+			},
+		},
 	}
 	return descriptors
 }

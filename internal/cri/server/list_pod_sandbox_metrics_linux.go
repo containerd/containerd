@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -289,6 +290,14 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract process metrics")
 	} else {
 		containerMetrics.Metrics = append(containerMetrics.Metrics, processMetrics...)
+	}
+
+	// Collect container spec metrics
+	containerSpecMetrics, err := c.extractContainerSpecMetrics(ctx, container.ID, containerLabels, timestamp)
+	if err != nil {
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract container spec metrics")
+	} else {
+		containerMetrics.Metrics = append(containerMetrics.Metrics, containerSpecMetrics...)
 	}
 
 	return containerMetrics, nil
@@ -863,6 +872,13 @@ func (c *criService) extractProcessMetrics(stats interface{}, labels []string, t
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Pids.Limit},
 				},
+				{
+					Name:        "container_threads",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Pids.Current},
+				},
 			}...)
 		}
 
@@ -870,6 +886,63 @@ func (c *criService) extractProcessMetrics(stats interface{}, labels []string, t
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
 	}
 
+	return metrics, nil
+}
+
+// extractContainerSpecMetrics extracts container spec related metrics from the task/oci spec
+func (c *criService) extractContainerSpecMetrics(ctx context.Context, containerID string, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+
+	var metrics []*runtime.Metric
+
+	resource, err := c.getContainerLinuxResources(ctx, containerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if cpuResource := resource.CPU; cpuResource != nil {
+		metrics = append(metrics, []*runtime.Metric{
+			{
+				Name:        "container_spec_cpu_period",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: *cpuResource.Period},
+			},
+			{
+				Name:        "container_spec_cpu_shares",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: *cpuResource.Shares},
+			},
+		}...)
+	}
+
+	if memoryResource := resource.Memory; memoryResource != nil {
+		metrics = append(metrics, []*runtime.Metric{
+			{
+				Name:        "container_spec_memory_limit_bytes",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: uint64(*memoryResource.Limit)},
+			},
+			{
+				Name:        "container_spec_memory_reservation_limit_bytes",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: uint64(*memoryResource.Reservation)},
+			},
+			{
+				Name:        "container_spec_memory_swap_limit_bytes",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: uint64(*memoryResource.Swap)},
+			},
+		}...)
+	}
 	return metrics, nil
 }
 
@@ -1051,4 +1124,27 @@ func (c *criService) getFilesystemUsageFromPath(ctx context.Context, containerID
 	inodesFree = stat.Ffree
 
 	return usage, limit, inodes, inodesFree, nil
+}
+
+// getLinuxResources from the task spec
+func (c *criService) getContainerLinuxResources(ctx context.Context, containerID string) (*spec.LinuxResources, error) {
+	container, err := c.containerStore.Get(containerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container: %w", err)
+	}
+	task, err := container.Container.Task(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container task: %w", err)
+	}
+	taskSpec, err := task.Spec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task spec: %w", err)
+	}
+
+	if taskSpec.Linux != nil {
+		if taskSpec.Linux.Resources != nil {
+			return taskSpec.Linux.Resources, nil
+		}
+	}
+	return nil, fmt.Errorf("container spec resources is empty")
 }

@@ -24,4 +24,5 @@ const (
 	DiskUsageMetrics     = "disk"
 	ProcessMetrics       = "process"
 	MiscellaneousMetrics = "misc"
+	ContainerSpecMetrics = "container_spec"
 )
