@@ -645,6 +645,28 @@ func TestResolveProxyFallback(t *testing.T) {
 	}
 }
 
+func TestAddQuery(t *testing.T) {
+	req := &request{path: "/foo"}
+	if err := req.addQuery("bar", "123"); err != nil {
+		t.Fatal(err)
+	}
+	if exp := "/foo?bar=123"; req.path != exp {
+		t.Fatalf("unexpected path %q, expected %q", req.path, exp)
+	}
+	if err := req.addQuery("baz", "456"); err != nil {
+		t.Fatal(err)
+	}
+	if exp := "/foo?bar=123&baz=456"; req.path != exp {
+		t.Fatalf("unexpected path %q, expected %q", req.path, exp)
+	}
+	if err := req.addQuery("baz", "789"); err != nil {
+		t.Fatal(err)
+	}
+	if exp := "/foo?bar=123&baz=456&baz=789"; req.path != exp {
+		t.Fatalf("unexpected path %q, expected %q", req.path, exp)
+	}
+}
+
 func flipLocalhost(host string) string {
 	if strings.HasPrefix(host, "127.0.0.1") {
 		return "localhost" + host[9:]
