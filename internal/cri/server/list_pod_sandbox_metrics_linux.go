@@ -285,7 +285,7 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 	}
 
 	// Collect process metrics
-	processMetrics, err := c.extractProcessMetrics(stats, containerLabels, timestamp)
+	processMetrics, err := c.extractProcessMetrics(ctx, container.ID, stats, containerLabels, timestamp)
 	if err != nil {
 		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract process metrics")
 	} else {
@@ -855,7 +855,7 @@ func (c *criService) extractDiskMetrics(stats interface{}, labels []string, time
 }
 
 // extractProcessMetrics extracts process-related metrics from container stats
-func (c *criService) extractProcessMetrics(stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+func (c *criService) extractProcessMetrics(ctx context.Context, containerID string, stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
 	var metrics []*runtime.Metric
 
 	switch s := stats.(type) {
@@ -908,6 +908,33 @@ func (c *criService) extractProcessMetrics(stats interface{}, labels []string, t
 
 	default:
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
+	}
+
+	container, err := c.containerStore.Get(containerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container: %w", err)
+	}
+	task, err := container.Container.Task(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container task: %w", err)
+	}
+	taskSpec, err := task.Spec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task spec: %w", err)
+	}
+
+	if taskSpec != nil {
+		if taskSpec.Process != nil {
+			for _, rlimit := range taskSpec.Process.Rlimits {
+				metrics = append(metrics, &runtime.Metric{
+					Name:        "container_ulimits_soft",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: append(labels, rlimit.Type),
+					Value:       &runtime.UInt64Value{Value: rlimit.Soft},
+				})
+			}
+		}
 	}
 
 	return metrics, nil
