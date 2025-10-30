@@ -14,8 +14,6 @@ pre_release = true
 preface = """\
 The second minor release of containerd 2.x focuses on continued stability alongside
 new features and improvements. This is the second time-based released for containerd.
-
-This is a beta release and some functionality is still under development.
 """
 
 postface = """\
