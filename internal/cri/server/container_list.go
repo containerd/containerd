@@ -18,11 +18,13 @@ package server
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	"github.com/containerd/containerd/v2/internal/truncindex"
 )
 
 // ListContainers lists all containers matching the filter.
@@ -36,7 +38,10 @@ func (c *criService) ListContainers(ctx context.Context, r *runtime.ListContaine
 		containers = append(containers, toCRIContainer(container))
 	}
 
-	containers = c.filterCRIContainers(containers, r.GetFilter())
+	containers, err := c.filterCRIContainers(containers, r.GetFilter())
+	if err != nil {
+		return nil, err
+	}
 
 	containerListTimer.UpdateSince(start)
 	return &runtime.ListContainersResponse{Containers: containers}, nil
@@ -58,19 +63,32 @@ func toCRIContainer(container containerstore.Container) *runtime.Container {
 	}
 }
 
-func (c *criService) normalizeContainerFilter(filter *runtime.ContainerFilter) {
-	if cntr, err := c.containerStore.Get(filter.GetId()); err == nil {
+func (c *criService) normalizeContainerFilter(filter *runtime.ContainerFilter) error {
+	cntr, err := c.containerStore.Get(filter.GetId())
+	if err != nil {
+		var amc truncindex.ErrAmbiguousPrefix
+		if errors.As(err, &amc) {
+			return err
+		}
+	} else {
 		filter.Id = cntr.ID
 	}
-	if sb, err := c.sandboxStore.Get(filter.GetPodSandboxId()); err == nil {
+	sb, err := c.sandboxStore.Get(filter.GetPodSandboxId())
+	if err != nil {
+		var amp truncindex.ErrAmbiguousPrefix
+		if errors.As(err, &amp) {
+			return err
+		}
+	} else {
 		filter.PodSandboxId = sb.ID
 	}
+	return nil
 }
 
 // filterCRIContainers filters CRIContainers.
-func (c *criService) filterCRIContainers(containers []*runtime.Container, filter *runtime.ContainerFilter) []*runtime.Container {
+func (c *criService) filterCRIContainers(containers []*runtime.Container, filter *runtime.ContainerFilter) ([]*runtime.Container, error) {
 	if filter == nil {
-		return containers
+		return containers, nil
 	}
 
 	// The containerd cri plugin supports short ids so long as there is only one
@@ -84,7 +102,10 @@ func (c *criService) filterCRIContainers(containers []*runtime.Container, filter
 		}
 	}
 
-	c.normalizeContainerFilter(filter)
+	err := c.normalizeContainerFilter(filter)
+	if err != nil {
+		return nil, err
+	}
 	filtered := []*runtime.Container{}
 	for _, cntr := range containers {
 		if filter.GetId() != "" && filter.GetId() != cntr.Id {
@@ -112,5 +133,5 @@ func (c *criService) filterCRIContainers(containers []*runtime.Container, filter
 		filtered = append(filtered, cntr)
 	}
 
-	return filtered
+	return filtered, nil
 }
