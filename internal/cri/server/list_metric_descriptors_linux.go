@@ -308,6 +308,11 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				Help:      "Last time a container was seen by the exporter",
 				LabelKeys: baseLabelKeys,
 			},
+			{
+				Name:      "container_start_time_seconds",
+				Help:      "Start time of the container since unix epoch in seconds",
+				LabelKeys: baseLabelKeys,
+			},
 		},
 		ContainerSpecMetrics: {
 			{
