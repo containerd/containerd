@@ -245,12 +245,20 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 	}
 
 	// miscellaneous metrics
-	containerMetrics.Metrics = append(containerMetrics.Metrics, &runtime.Metric{
-		Name:       "container_last_seen",
-		Timestamp:  timestamp,
-		MetricType: runtime.MetricType_GAUGE,
-		Value:      &runtime.UInt64Value{Value: uint64(time.Now().Unix())},
-	})
+	containerMetrics.Metrics = append(containerMetrics.Metrics, []*runtime.Metric{
+		{
+			Name:       "container_last_seen",
+			Timestamp:  timestamp,
+			MetricType: runtime.MetricType_GAUGE,
+			Value:      &runtime.UInt64Value{Value: uint64(time.Now().Unix())},
+		},
+		{
+			Name:       "container_start_time_seconds",
+			Timestamp:  timestamp,
+			MetricType: runtime.MetricType_GAUGE,
+			Value:      &runtime.UInt64Value{Value: uint64(container.Status.Get().StartedAt)},
+		},
+	}...)
 
 	// Collect CPU metrics
 	cpuMetrics, err := c.extractCPUMetrics(stats, containerLabels, timestamp)
