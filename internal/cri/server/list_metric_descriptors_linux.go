@@ -291,11 +291,11 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				Help:      "Maximum number of threads allowed inside the container, infinity if value is zero",
 				LabelKeys: baseLabelKeys,
 			},
-			/*{
+			{
 				Name:      "container_threads",
 				Help:      "Number of threads running inside the container",
 				LabelKeys: baseLabelKeys,
-			},*/
+			},
 			{
 				Name:      "container_ulimits_soft",
 				Help:      "Soft ulimit values for the container root process. Unlimited if -1, except priority and nice",
