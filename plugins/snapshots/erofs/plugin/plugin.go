@@ -46,6 +46,9 @@ type Config struct {
 
 	// DefaultSize is the default size of a writable layer in string
 	DefaultSize string `toml:"default_size"`
+
+	// Indicate if fsmerge feature is enabled: tiny fsmeta will be used to avoid mounting individual layers
+	MergeFsMeta bool `toml:"enable_fsmerge"`
 }
 
 func init() {
@@ -53,6 +56,9 @@ func init() {
 		Type:   plugins.SnapshotPlugin,
 		ID:     "erofs",
 		Config: &Config{},
+		Requires: []plugin.Type{
+			plugins.MountHandlerPlugin,
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 
@@ -85,6 +91,9 @@ func init() {
 					return nil, fmt.Errorf("failed to parse default_size '%v': %w", config.DefaultSize, err)
 				}
 				opts = append(opts, erofs.WithDefaultSize(size))
+			}
+			if config.MergeFsMeta {
+				opts = append(opts, erofs.WithMergeFSMeta())
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
