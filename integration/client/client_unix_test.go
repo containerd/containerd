@@ -29,7 +29,7 @@ import (
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/prototestutil"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
@@ -143,7 +143,7 @@ func TestNewTaskWithRuntimeOption(t *testing.T) {
 
 			gotOptions := &options.Options{}
 			require.NoError(t, typeurl.UnmarshalTo(req.Options, gotOptions))
-			require.True(t, cmp.Equal(tc.expectedOptions, gotOptions, protobuf.Compare))
+			require.True(t, cmp.Equal(tc.expectedOptions, gotOptions, prototestutil.Compare))
 		})
 	}
 }
