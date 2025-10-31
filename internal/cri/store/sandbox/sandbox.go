@@ -167,17 +167,11 @@ func (s *Store) Delete(id string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// Normalize id using idIndex if available, otherwise use as-is to prevent leaks (issue #12390)
-	if normalized, err := s.idIndex.Get(id); err == nil {
-		id = normalized
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		return
 	}
-
-	// Always attempt to delete from map, even if not found in idIndex
-	if sb, ok := s.sandboxes[id]; ok {
-		s.labels.Release(sb.ProcessLabel)
-		delete(s.sandboxes, id)
-	}
-
-	// Delete from idIndex (ignore error if already missing)
+	s.labels.Release(s.sandboxes[id].ProcessLabel)
 	s.idIndex.Delete(id)
+	delete(s.sandboxes, id)
 }
