@@ -140,6 +140,11 @@ func testOverlayCommit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 		t.Fatal(err)
 	}
 
+	activeParent := "active-parent"
+	if _, err := o.Prepare(ctx, activeParent, ""); err != nil {
+		t.Fatal(err)
+	}
+
 	// test rebase
 	testCases := []struct {
 		oldParent string
@@ -171,6 +176,11 @@ func testOverlayCommit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 			newParent: "new",
 			expError:  true,
 		},
+		{
+			oldParent: "",
+			newParent: activeParent,
+			expError:  true,
+		},
 	}
 	for i, tc := range testCases {
 		key := fmt.Sprintf("/tmp/test-%d", i)
@@ -183,6 +193,7 @@ func testOverlayCommit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 			if !tc.expError {
 				t.Fatal(err)
 			}
+			t.Logf("expected error received: %v", err)
 		} else if tc.expError {
 			t.Fatal("expected error but commit succeeded")
 		}
