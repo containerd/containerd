@@ -658,6 +658,7 @@ func testRebase(ctx context.Context, t *testing.T, ms *MetaStore) {
 		{"rebase-active-2", "rebase-committed-2", "committed-1", "committed-1", false},
 		{"rebase-active-3", "rebase-committed-3", "", "nonexist", true},
 		{"rebase-active-4", "rebase-committed-4", "committed-1", "", false},
+		{"rebase-active-5", "rebase-committed-5", "", "active-1", true},
 	}
 
 	for _, tc := range testcases {
