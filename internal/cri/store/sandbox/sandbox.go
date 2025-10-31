@@ -166,10 +166,9 @@ func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.Contain
 func (s *Store) Delete(id string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
 	id, err := s.idIndex.Get(id)
 	if err != nil {
-		// Note: The idIndex.Delete and delete doesn't handle truncated index.
-		// So we need to return if there are error.
 		return
 	}
 	s.labels.Release(s.sandboxes[id].ProcessLabel)
