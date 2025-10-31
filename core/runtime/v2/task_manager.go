@@ -41,6 +41,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 )
 
 const (
@@ -63,6 +64,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.ShimPlugin,
 			plugins.MountManagerPlugin,
+			plugins.WarningPlugin,
 		},
 		Config: &TaskConfig{
 			Platforms: defaultPlatforms(),
@@ -98,6 +100,14 @@ func init() {
 			if err := shimManager.LoadExistingShims(ic.Context, state, root); err != nil {
 				return nil, fmt.Errorf("failed to load existing shims for task manager")
 			}
+
+			warningsI, err := ic.GetSingle(plugins.WarningPlugin)
+			if err != nil {
+				return nil, err
+			}
+			warnings := warningsI.(warning.Service)
+			emitPlatformWarnings(ic.Context, warnings)
+
 			return &TaskManager{
 				root:    root,
 				state:   state,
