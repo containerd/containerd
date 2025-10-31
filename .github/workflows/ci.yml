@@ -521,7 +521,7 @@ jobs:
       fail-fast: false
       matrix:
         box:
-          - fedora/39-cloud-base
+          - fedora/43-cloud-base
           # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
           # The image was changed from rockylinux/8 to almalinux/8,
           # as the former one no longer works:
@@ -535,11 +535,11 @@ jobs:
         exclude:
           - box: almalinux/9
             runtime: io.containerd.runc.v1
-          - box: fedora/39-cloud-base
+          - box: fedora/43-cloud-base
             runtime: io.containerd.runc.v1
           - box: almalinux/9
             runtime: io.containerd.runtime.v1.linux
-          - box: fedora/39-cloud-base
+          - box: fedora/43-cloud-base
             runtime: io.containerd.runtime.v1.linux
 
     env:
@@ -575,7 +575,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
           sudo env VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1 vagrant plugin install vagrant-libvirt
       - name: Boot VM
-        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --no-tty
+        run: |
+          if  [ "$BOX" = "fedora/43-cloud-base" ]; then
+            # fedora/41-cloud-base seems the last version available in https://portal.cloud.hashicorp.com/vagrant/discover/fedora
+            sudo vagrant box add fedora/43-cloud-base https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-libvirt-43-1.6.x86_64.vagrant.libvirt.box
+          fi
+          sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --no-tty
       - name: test-integration
         run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
       - name: test-cri-integration
