@@ -573,16 +573,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - box: fedora/41-cloud-base
+          - box: fedora/43-cloud-base
             cgroup_driver: cgroupfs
             runc: runc
-          - box: fedora/41-cloud-base
+          - box: fedora/43-cloud-base
             cgroup_driver: systemd
             runc: runc
-          - box: fedora/41-cloud-base
+          - box: fedora/43-cloud-base
             cgroup_driver: cgroupfs
             runc: crun
-          - box: fedora/41-cloud-base
+          - box: fedora/43-cloud-base
             cgroup_driver: systemd
             runc: crun
             # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
@@ -635,14 +635,11 @@ jobs:
           sudo env VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1 vagrant plugin install vagrant-libvirt
       - name: Boot VM
         run: |
-          sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --no-tty
-          if  [ "$BOX" = "fedora/41-cloud-base" ]; then
-            # Install the kernel update for Fedora 41 to fix an error "Extension MARK revision 0 not supported, missing kernel module"
-            # https://bugzilla.redhat.com/show_bug.cgi?id=2321325
-            sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=upgrade-packages
-            sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant halt
-            sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up
+          if  [ "$BOX" = "fedora/43-cloud-base" ]; then
+            # fedora/41-cloud-base seems the last version available in https://portal.cloud.hashicorp.com/vagrant/discover/fedora
+            sudo vagrant box add fedora/43-cloud-base https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-libvirt-43-1.6.x86_64.vagrant.libvirt.box
           fi
+          sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --no-tty
       - name: test-integration
         run: sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
       - name: test-cri-integration

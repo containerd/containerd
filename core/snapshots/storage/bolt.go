@@ -412,6 +412,10 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 			}
 			pid := readID(spbkt)
 
+			if pkind := readKind(spbkt); pkind != snapshots.KindCommitted {
+				return fmt.Errorf("parent %q is not committed: %w", si.Parent, errdefs.ErrFailedPrecondition)
+			}
+
 			// Updates parent back link to use new key
 			if err := pbkt.Put(parentKey(pid, id), []byte(name)); err != nil {
 				return fmt.Errorf("failed to update parent link %q from %q to %q: %w", pid, key, name, err)

@@ -17,7 +17,7 @@
 
 # Vagrantfile for Fedora and EL
 Vagrant.configure("2") do |config|
-  config.vm.box = ENV["BOX"] ? ENV["BOX"].split("@")[0] : "fedora/41-cloud-base"
+  config.vm.box = ENV["BOX"] ? ENV["BOX"].split("@")[0] : "fedora/43-cloud-base"
   # BOX_VERSION is deprecated. Use "BOX=<BOX>@<BOX_VERSION>".
   config.vm.box_version = ENV["BOX_VERSION"] || (ENV["BOX"].split("@")[1] if ENV["BOX"])
 
