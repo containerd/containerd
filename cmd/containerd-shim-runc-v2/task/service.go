@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
@@ -52,6 +53,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/containerd/v2/pkg/sys/reaper"
+
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -93,6 +96,16 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	}
 	go s.forward(ctx, publisher)
 	sd.RegisterCallback(func(context.Context) error {
+		if tp := otel.GetTracerProvider(); tp != nil {
+			if shutdowner, ok := tp.(interface{ Shutdown(context.Context) error }); ok {
+				ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+				defer cancel()
+				if err := shutdowner.Shutdown(ctx); err != nil {
+					log.G(ctx).WithError(err).Warn("Failed to shutdown tracer provider")
+				}
+			}
+		}
+
 		close(s.events)
 		return nil
 	})
