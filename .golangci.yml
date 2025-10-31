@@ -50,9 +50,8 @@ linters:
     revive:
       rules:
         - name: package-comments
-          severity: warning
           disabled: true
-          exclude: [ "" ]
+        - name: use-errors-new
     nolintlint:
       allow-unused: true
   exclusions:
