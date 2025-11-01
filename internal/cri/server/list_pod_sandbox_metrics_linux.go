@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -945,6 +947,36 @@ func (c *criService) extractProcessMetrics(ctx context.Context, containerID stri
 		}
 	}
 
+	// Collect file descriptor and socket metrics
+	pidsInfo, err := task.Pids(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container PIDs for FD/socket metrics: %w", err)
+	} else {
+		pids := make([]int, 0, len(pidsInfo))
+		for _, pidInfo := range pidsInfo {
+			pids = append(pids, int(pidInfo.Pid))
+		}
+		fdCount, socketCount, err := c.getContainerProcessDescriptorCount(ctx, pids)
+		if err != nil {
+			log.G(ctx).WithField("containerid", containerID).WithError(err).Debug("failed to count file descriptors and sockets")
+		} else {
+			metrics = append(metrics, &runtime.Metric{
+				Name:        "container_file_descriptors",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: fdCount},
+			})
+			metrics = append(metrics, &runtime.Metric{
+				Name:        "container_sockets",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: socketCount},
+			})
+		}
+	}
+
 	return metrics, nil
 }
 
@@ -1206,4 +1238,35 @@ func (c *criService) getContainerLinuxResources(ctx context.Context, containerID
 		}
 	}
 	return nil, fmt.Errorf("container spec resources is empty")
+}
+
+// getContainerProcessDescriptorCount gets the total no of fds and sockets in a pid
+// Referenced from https://github.com/google/cadvisor/blob/master/container/libcontainer/handler.go
+func (c *criService) getContainerProcessDescriptorCount(ctx context.Context, pids []int) (fdCount, socketCount uint64, err error) {
+
+	for _, pid := range pids {
+		fdDir := path.Join("/proc", strconv.Itoa(pid), "fd")
+		fds, err := os.ReadDir(fdDir)
+		if err != nil {
+			log.G(ctx).WithField("pid", pid).WithError(err).Debug("failed to read fd directory for PID")
+			continue
+		}
+		fdCount += uint64(len(fds))
+
+		for _, fd := range fds {
+			fdPath := filepath.Join(fdDir, fd.Name())
+			linkTarget, err := os.Readlink(fdPath)
+			if err != nil {
+				log.G(ctx).WithField("fd", fdPath).WithError(err).Debug("error while reading fd link")
+				continue
+			}
+
+			// check if the fd is a socket
+			if strings.HasPrefix(linkTarget, "socket") {
+				socketCount++
+			}
+		}
+	}
+
+	return fdCount, socketCount, nil
 }
