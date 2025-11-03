@@ -51,6 +51,7 @@ type catInfoAll struct {
 }
 
 type catInfo struct {
+	numClosids    uint64
 	cbmMask       bitmask
 	minCbmBits    uint64
 	shareableBits bitmask
@@ -63,6 +64,7 @@ type l3MonInfo struct {
 
 type mbInfo struct {
 	cacheIds      []uint64
+	numClosids    uint64
 	bandwidthGran uint64
 	delayLinear   uint64
 	minBandwidth  uint64
@@ -122,9 +124,13 @@ func getRdtInfo() (*resctrlInfo, error) {
 			dir := string(cl) + suffix
 			subpath := filepath.Join(infopath, dir)
 			if _, err = os.Stat(subpath); err == nil {
-				*i, info.numClosids, err = getCatInfo(subpath)
+				*i, err = getCatInfo(subpath)
 				if err != nil {
 					return info, fmt.Errorf("failed to get %s info from %q: %v", dir, subpath, err)
+				}
+				// Overall number of closids is the minimum across all cache levels/features
+				if info.numClosids == 0 || i.numClosids < info.numClosids {
+					info.numClosids = i.numClosids
 				}
 			}
 		}
@@ -149,7 +155,7 @@ func getRdtInfo() (*resctrlInfo, error) {
 	// Check MBA feature available
 	subpath = filepath.Join(infopath, "MB")
 	if _, err = os.Stat(subpath); err == nil {
-		info.mb, info.numClosids, err = getMBInfo(subpath)
+		info.mb, err = getMBInfo(subpath)
 		if err != nil {
 			return info, fmt.Errorf("failed to get MBA info from %q: %v", subpath, err)
 		}
@@ -158,34 +164,37 @@ func getRdtInfo() (*resctrlInfo, error) {
 		if err != nil {
 			return info, fmt.Errorf("failed to get MBA cache IDs: %v", err)
 		}
+		// Overall number of closids is the minimum across all cache levels/features
+		if info.numClosids == 0 || info.mb.numClosids < info.numClosids {
+			info.numClosids = info.mb.numClosids
+		}
 	}
 
 	return info, nil
 }
 
-func getCatInfo(basepath string) (catInfo, uint64, error) {
+func getCatInfo(basepath string) (catInfo, error) {
 	var err error
-	var numClosids uint64
 	info := catInfo{}
 
 	info.cbmMask, err = readFileBitmask(filepath.Join(basepath, "cbm_mask"))
 	if err != nil {
-		return info, numClosids, err
+		return info, err
 	}
 	info.minCbmBits, err = readFileUint64(filepath.Join(basepath, "min_cbm_bits"))
 	if err != nil {
-		return info, numClosids, err
+		return info, err
 	}
 	info.shareableBits, err = readFileBitmask(filepath.Join(basepath, "shareable_bits"))
 	if err != nil {
-		return info, numClosids, err
+		return info, err
 	}
-	numClosids, err = readFileUint64(filepath.Join(basepath, "num_closids"))
+	info.numClosids, err = readFileUint64(filepath.Join(basepath, "num_closids"))
 	if err != nil {
-		return info, numClosids, err
+		return info, err
 	}
 
-	return info, numClosids, nil
+	return info, nil
 }
 
 // Supported returns true if L3 cache allocation has is supported and enabled in the system
@@ -217,39 +226,38 @@ func (i l3MonInfo) Supported() bool {
 	return i.numRmids != 0 && len(i.monFeatures) > 0
 }
 
-func getMBInfo(basepath string) (mbInfo, uint64, error) {
+func getMBInfo(basepath string) (mbInfo, error) {
 	var err error
-	var numClosids uint64
 	info := mbInfo{}
 
 	info.bandwidthGran, err = readFileUint64(filepath.Join(basepath, "bandwidth_gran"))
 	if err != nil {
-		return info, numClosids, err
+		return info, err
 	}
 	info.delayLinear, err = readFileUint64(filepath.Join(basepath, "delay_linear"))
 	if err != nil {
-		return info, numClosids, err
+		return info, err
 	}
 	info.minBandwidth, err = readFileUint64(filepath.Join(basepath, "min_bandwidth"))
 	if err != nil {
-		return info, numClosids, err
+		return info, err
 	}
-	numClosids, err = readFileUint64(filepath.Join(basepath, "num_closids"))
+	info.numClosids, err = readFileUint64(filepath.Join(basepath, "num_closids"))
 	if err != nil {
-		return info, numClosids, err
+		return info, err
 	}
 
 	// Detect MBps mode directly from mount options as it's not visible in MB
 	// info directory
 	_, mountOpts, err := getResctrlMountInfo()
 	if err != nil {
-		return info, numClosids, fmt.Errorf("failed to get resctrl mount options: %v", err)
+		return info, fmt.Errorf("failed to get resctrl mount options: %v", err)
 	}
 	if _, ok := mountOpts["mba_MBps"]; ok {
 		info.mbpsEnabled = true
 	}
 
-	return info, numClosids, nil
+	return info, nil
 }
 
 // Supported returns true if memory bandwidth allocation has is supported and enabled in the system
@@ -307,7 +315,9 @@ func getResctrlMountInfo() (string, map[string]struct{}, error) {
 		if len(split) > 3 && split[2] == "resctrl" {
 			opts := strings.Split(split[3], ",")
 			for _, opt := range opts {
-				mountOptions[opt] = struct{}{}
+				if opt != "" {
+					mountOptions[opt] = struct{}{}
+				}
 			}
 			return split[1], mountOptions, nil
 		}

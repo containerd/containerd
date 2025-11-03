@@ -42,7 +42,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0
-	github.com/intel/goresctrl v0.9.0
+	github.com/intel/goresctrl v0.10.0
 	github.com/klauspost/compress v1.18.1
 	github.com/mdlayher/vsock v1.2.1
 	github.com/moby/locker v1.0.1

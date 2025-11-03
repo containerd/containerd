@@ -27,6 +27,9 @@ import (
 const (
 	// Unknown represents an unknown id.
 	Unknown ID = -1
+	// maxID sets an upper bound for the size of id sets
+	// generated from listset strings, e.g. "0-16777215".
+	maxID ID = (1 << 24) - 1
 )
 
 // ID is nn integer id, used to identify packages, CPUs, nodes, etc.
@@ -55,6 +58,54 @@ func NewIDSetFromIntSlice(ids ...int) IDSet {
 	}
 
 	return s
+}
+
+// NewIDSetFromString creates new unordered set from string in listset syntax "0,61-63,2".
+func NewIDSetFromString(listSet string) (IDSet, error) {
+	s := NewIDSet()
+	minValue := 0
+	maxValue := maxID
+
+	parts := strings.Split(listSet, ",")
+	for _, part := range parts {
+		switch {
+		case part == "":
+			continue
+		case strings.Contains(part, "-"):
+			rangeParts := strings.Split(part, "-")
+			if len(rangeParts) != 2 {
+				return nil, fmt.Errorf("invalid range: %s", part)
+			}
+			start, err := strconv.Atoi(rangeParts[0])
+			if err != nil {
+				return nil, err
+			}
+			end, err := strconv.Atoi(rangeParts[1])
+			if err != nil {
+				return nil, err
+			}
+			if start > end {
+				return nil, fmt.Errorf("invalid range %s: start > end", part)
+			}
+			if start < minValue || end > maxValue {
+				return nil, fmt.Errorf("invalid range %s: out of range %d-%d", part, minValue, maxValue)
+			}
+			for i := start; i <= end; i++ {
+				s.Add(ID(i))
+			}
+		default:
+			num, err := strconv.Atoi(part)
+			if err != nil {
+				return nil, err
+			}
+			if num < minValue || num > maxValue {
+				return nil, fmt.Errorf("invalid value %d: out of range %d-%d", num, minValue, maxValue)
+			}
+			s.Add(ID(num))
+		}
+	}
+
+	return s, nil
 }
 
 // Clone returns a copy of this IdSet.
