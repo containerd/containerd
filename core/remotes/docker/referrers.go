@@ -45,6 +45,11 @@ func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, o
 		return nil, err
 	}
 	defer rc.Close()
+	if size < 0 {
+		size = MaxManifestSize
+	} else if size > MaxManifestSize {
+		return nil, fmt.Errorf("referrers index size %d exceeds maximum allowed %d: %w", size, MaxManifestSize, errdefs.ErrNotFound)
+	}
 
 	var index ocispec.Index
 	dec := json.NewDecoder(io.LimitReader(rc, size))

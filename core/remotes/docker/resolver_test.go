@@ -927,6 +927,7 @@ type testContent struct {
 	mediaType    string
 	artifactType string
 	content      []byte
+	skipLength   bool
 }
 
 type contentOpt func(*testContent)
@@ -963,7 +964,11 @@ func (tc testContent) Digest() digest.Digest {
 
 func (tc testContent) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", tc.mediaType)
-	w.Header().Add("Content-Length", strconv.Itoa(len(tc.content)))
+	if !tc.skipLength {
+		w.Header().Add("Content-Length", strconv.Itoa(len(tc.content)))
+	} else {
+		w.Header().Set("Content-Length", "")
+	}
 	w.Header().Add("Docker-Content-Digest", tc.Digest().String())
 	w.WriteHeader(http.StatusOK)
 	w.Write(tc.content)
