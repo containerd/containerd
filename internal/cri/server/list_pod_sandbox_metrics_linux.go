@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -33,6 +35,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -243,6 +246,22 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 		Metrics:     []*runtime.Metric{},
 	}
 
+	// miscellaneous metrics
+	containerMetrics.Metrics = append(containerMetrics.Metrics, []*runtime.Metric{
+		{
+			Name:       "container_last_seen",
+			Timestamp:  timestamp,
+			MetricType: runtime.MetricType_GAUGE,
+			Value:      &runtime.UInt64Value{Value: uint64(time.Now().Unix())},
+		},
+		{
+			Name:       "container_start_time_seconds",
+			Timestamp:  timestamp,
+			MetricType: runtime.MetricType_GAUGE,
+			Value:      &runtime.UInt64Value{Value: uint64(container.Status.Get().StartedAt)},
+		},
+	}...)
+
 	// Collect CPU metrics
 	cpuMetrics, err := c.extractCPUMetrics(stats, containerLabels, timestamp)
 	if err != nil {
@@ -276,11 +295,19 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 	}
 
 	// Collect process metrics
-	processMetrics, err := c.extractProcessMetrics(stats, containerLabels, timestamp)
+	processMetrics, err := c.extractProcessMetrics(ctx, container.ID, stats, containerLabels, timestamp)
 	if err != nil {
 		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract process metrics")
 	} else {
 		containerMetrics.Metrics = append(containerMetrics.Metrics, processMetrics...)
+	}
+
+	// Collect container spec metrics
+	containerSpecMetrics, err := c.extractContainerSpecMetrics(ctx, container.ID, containerLabels, timestamp)
+	if err != nil {
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract container spec metrics")
+	} else {
+		containerMetrics.Metrics = append(containerMetrics.Metrics, containerSpecMetrics...)
 	}
 
 	return containerMetrics, nil
@@ -525,6 +552,18 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 
 		}
 
+		if s.MemoryOomControl != nil {
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_oom_events_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.MemoryOomControl.GetOomKill()},
+				},
+			}...)
+		}
+
 	case *cg2.Metrics:
 		if s.Memory != nil {
 			metrics = append(metrics, []*runtime.Metric{
@@ -622,6 +661,18 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 				},
 			}...)
 
+		}
+
+		if s.MemoryEvents != nil {
+			metrics = append(metrics, []*runtime.Metric{
+				{
+					Name:        "container_oom_events_total",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_COUNTER,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.MemoryEvents.GetOomKill()},
+				},
+			}...)
 		}
 
 	default:
@@ -814,7 +865,7 @@ func (c *criService) extractDiskMetrics(stats interface{}, labels []string, time
 }
 
 // extractProcessMetrics extracts process-related metrics from container stats
-func (c *criService) extractProcessMetrics(stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+func (c *criService) extractProcessMetrics(ctx context.Context, containerID string, stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
 	var metrics []*runtime.Metric
 
 	switch s := stats.(type) {
@@ -855,6 +906,13 @@ func (c *criService) extractProcessMetrics(stats interface{}, labels []string, t
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Pids.Limit},
 				},
+				{
+					Name:        "container_threads",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Pids.Current},
+				},
 			}...)
 		}
 
@@ -862,6 +920,120 @@ func (c *criService) extractProcessMetrics(stats interface{}, labels []string, t
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
 	}
 
+	container, err := c.containerStore.Get(containerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container: %w", err)
+	}
+	task, err := container.Container.Task(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container task: %w", err)
+	}
+	taskSpec, err := task.Spec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task spec: %w", err)
+	}
+
+	if taskSpec != nil {
+		if taskSpec.Process != nil {
+			for _, rlimit := range taskSpec.Process.Rlimits {
+				metrics = append(metrics, &runtime.Metric{
+					Name:        "container_ulimits_soft",
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: append(labels, rlimit.Type),
+					Value:       &runtime.UInt64Value{Value: rlimit.Soft},
+				})
+			}
+		}
+	}
+
+	// Collect file descriptor and socket metrics
+	pidsInfo, err := task.Pids(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container PIDs for FD/socket metrics: %w", err)
+	} else {
+		pids := make([]int, 0, len(pidsInfo))
+		for _, pidInfo := range pidsInfo {
+			pids = append(pids, int(pidInfo.Pid))
+		}
+		fdCount, socketCount, err := c.getContainerProcessDescriptorCount(ctx, pids)
+		if err != nil {
+			log.G(ctx).WithField("containerid", containerID).WithError(err).Debug("failed to count file descriptors and sockets")
+		} else {
+			metrics = append(metrics, &runtime.Metric{
+				Name:        "container_file_descriptors",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: fdCount},
+			})
+			metrics = append(metrics, &runtime.Metric{
+				Name:        "container_sockets",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: socketCount},
+			})
+		}
+	}
+
+	return metrics, nil
+}
+
+// extractContainerSpecMetrics extracts container spec related metrics from the task/oci spec
+func (c *criService) extractContainerSpecMetrics(ctx context.Context, containerID string, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+
+	var metrics []*runtime.Metric
+
+	resource, err := c.getContainerLinuxResources(ctx, containerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if cpuResource := resource.CPU; cpuResource != nil {
+		metrics = append(metrics, []*runtime.Metric{
+			{
+				Name:        "container_spec_cpu_period",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: *cpuResource.Period},
+			},
+			{
+				Name:        "container_spec_cpu_shares",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: *cpuResource.Shares},
+			},
+		}...)
+	}
+
+	if memoryResource := resource.Memory; memoryResource != nil {
+		metrics = append(metrics, []*runtime.Metric{
+			{
+				Name:        "container_spec_memory_limit_bytes",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: uint64(*memoryResource.Limit)},
+			},
+			{
+				Name:        "container_spec_memory_reservation_limit_bytes",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: uint64(*memoryResource.Reservation)},
+			},
+			{
+				Name:        "container_spec_memory_swap_limit_bytes",
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: labels,
+				Value:       &runtime.UInt64Value{Value: uint64(*memoryResource.Swap)},
+			},
+		}...)
+	}
 	return metrics, nil
 }
 
@@ -1043,4 +1215,58 @@ func (c *criService) getFilesystemUsageFromPath(ctx context.Context, containerID
 	inodesFree = stat.Ffree
 
 	return usage, limit, inodes, inodesFree, nil
+}
+
+// getLinuxResources from the task spec
+func (c *criService) getContainerLinuxResources(ctx context.Context, containerID string) (*spec.LinuxResources, error) {
+	container, err := c.containerStore.Get(containerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container: %w", err)
+	}
+	task, err := container.Container.Task(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container task: %w", err)
+	}
+	taskSpec, err := task.Spec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task spec: %w", err)
+	}
+
+	if taskSpec.Linux != nil {
+		if taskSpec.Linux.Resources != nil {
+			return taskSpec.Linux.Resources, nil
+		}
+	}
+	return nil, fmt.Errorf("container spec resources is empty")
+}
+
+// getContainerProcessDescriptorCount gets the total no of fds and sockets in a pid
+// Referenced from https://github.com/google/cadvisor/blob/master/container/libcontainer/handler.go
+func (c *criService) getContainerProcessDescriptorCount(ctx context.Context, pids []int) (fdCount, socketCount uint64, err error) {
+
+	for _, pid := range pids {
+		fdDir := path.Join("/proc", strconv.Itoa(pid), "fd")
+		fds, err := os.ReadDir(fdDir)
+		if err != nil {
+			log.G(ctx).WithField("pid", pid).WithError(err).Debug("failed to read fd directory for PID")
+			continue
+		}
+		fdCount += uint64(len(fds))
+
+		for _, fd := range fds {
+			fdPath := filepath.Join(fdDir, fd.Name())
+			linkTarget, err := os.Readlink(fdPath)
+			if err != nil {
+				log.G(ctx).WithField("fd", fdPath).WithError(err).Debug("error while reading fd link")
+				continue
+			}
+
+			// check if the fd is a socket
+			if strings.HasPrefix(linkTarget, "socket") {
+				socketCount++
+			}
+		}
+	}
+
+	return fdCount, socketCount, nil
 }
