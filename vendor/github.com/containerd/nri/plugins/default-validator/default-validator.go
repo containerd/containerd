@@ -30,6 +30,7 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+// DefaultValidatorConfig is the configuration for the default validator plugin.
 type DefaultValidatorConfig struct {
 	// Enable the default validator plugin.
 	Enable bool `yaml:"enable" toml:"enable"`

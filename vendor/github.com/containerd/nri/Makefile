@@ -12,15 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-PROTO_SOURCES = $(shell find . -name '*.proto' | grep -v /vendor/)
-PROTO_GOFILES = $(patsubst %.proto,%.pb.go,$(PROTO_SOURCES))
-PROTO_INCLUDE = -I$(PWD):/usr/local/include:/usr/include
-PROTO_OPTIONS = --proto_path=. $(PROTO_INCLUDE) \
-    --go_opt=paths=source_relative --go_out=. \
-    --go-ttrpc_opt=paths=source_relative --go-ttrpc_out=. \
-    --go-plugin_opt=paths=source_relative,disable_pb_gen=true --go-plugin_out=.
-PROTO_COMPILE = PATH=$(PATH):$(shell go env GOPATH)/bin; protoc $(PROTO_OPTIONS)
-
 GO_CMD     := go
 GO_BUILD   := $(GO_CMD) build
 GO_INSTALL := $(GO_CMD) install
@@ -39,7 +30,18 @@ GINKGO        := ginkgo
 RESOLVED_PWD  := $(shell realpath $(shell pwd))
 BUILD_PATH    := $(RESOLVED_PWD)/build
 BIN_PATH      := $(BUILD_PATH)/bin
+TOOLS_PATH    := $(BUILD_PATH)/tools
+PROTOC_PATH   := $(TOOLS_PATH)/protoc
 COVERAGE_PATH := $(BUILD_PATH)/coverage
+
+PROTOBUF_VERSION = 3.20.1
+PROTO_SOURCES = $(shell find pkg -name '*.proto' | grep -v /vendor/)
+PROTO_INCLUDE = -I $(PWD) -I$(PROTOC_PATH)/include
+PROTO_OPTIONS = --proto_path=. $(PROTO_INCLUDE) \
+    --go_opt=paths=source_relative --go_out=. \
+    --go-ttrpc_opt=paths=source_relative --go-ttrpc_out=. \
+    --go-plugin_opt=paths=source_relative,disable_pb_gen=true --go-plugin_out=.
+PROTO_COMPILE = PATH=$(PROTOC_PATH)/bin protoc $(PROTO_OPTIONS)
 
 PLUGINS := \
 	$(BIN_PATH)/logger \
@@ -77,7 +79,18 @@ FORCE:
 # build targets
 #
 
-build-proto: $(PROTO_GOFILES)
+build-proto: check-protoc install-ttrpc-plugin install-wasm-plugin install-protoc-dependencies
+	for src in $(PROTO_SOURCES); do \
+		$(PROTO_COMPILE) $$src; \
+	done
+	sed -i '1s;^;//go:build !wasip1\n\n;' pkg/api/api_ttrpc.pb.go
+
+.PHONY: build-proto-dockerized
+build-proto-dockerized:
+	$(Q)docker build --build-arg ARTIFACTS="$(dir $(PROTO_SOURCES))" --target final \
+		--output type=local,dest=$(RESOLVED_PWD) \
+		-f hack/Dockerfile.buildproto .
+	$(Q)tar xf artifacts.tgz && rm -f artifacts.tgz
 
 build-plugins: $(PLUGINS)
 
@@ -167,29 +180,32 @@ validate-repo-no-changes:
 	}
 
 #
-# proto generation targets
-#
-
-%.pb.go: %.proto
-	$(Q)echo "Generating $@..."; \
-	$(PROTO_COMPILE) $<
-	sed -i '1s;^;//go:build !wasip1\n\n;' pkg/api/api_ttrpc.pb.go
-
-#
 # targets for installing dependencies
 #
+check-protoc:
+	$(Q)found_proto=$(shell $(PROTO_COMPILE) --version 2> /dev/null | awk '{print $$2}'); \
+	if [ "$$found_proto" != "$(PROTOBUF_VERSION)" ]; then \
+	echo "installing protoc version $(PROTOBUF_VERSION) (found: $$found_proto)"; \
+		make clean-protoc; \
+		make install-protoc; \
+	else \
+		echo "protoc version $$found_proto found."; \
+	fi
 
 install-protoc install-protobuf:
-	$(Q)./scripts/install-protobuf
+	$(Q)PROTOBUF_VERSION=$(PROTOBUF_VERSION) INSTALL_DIR=$(PROTOC_PATH) ./scripts/install-protobuf
+
+clean-protoc:
+	$(Q)rm -rf $(PROTOC_PATH)
 
 install-ttrpc-plugin:
-	$(Q)$(GO_INSTALL) -mod=mod github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@74421d10189e8c118870d294c9f7f62db2d33ec1
+	$(Q)GOBIN="$(PROTOC_PATH)/bin" $(GO_INSTALL) github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc
 
 install-wasm-plugin:
-	$(Q)$(GO_INSTALL) -mod=mod github.com/knqyf263/go-plugin/cmd/protoc-gen-go-plugin@$(shell go list -m -f {{.Version}} github.com/knqyf263/go-plugin)
+	$(Q)GOBIN="$(PROTOC_PATH)/bin" $(GO_INSTALL) github.com/knqyf263/go-plugin/cmd/protoc-gen-go-plugin
 
 install-protoc-dependencies:
-	$(Q)$(GO_INSTALL) -mod=mod google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+	$(Q)GOBIN="$(PROTOC_PATH)/bin" $(GO_INSTALL) google.golang.org/protobuf/cmd/protoc-gen-go
 
 install-ginkgo:
 	$(Q)$(GO_INSTALL) -mod=mod github.com/onsi/ginkgo/v2/ginkgo

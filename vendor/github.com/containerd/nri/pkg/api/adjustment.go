@@ -116,6 +116,7 @@ func (a *ContainerAdjustment) AddHooks(h *Hooks) {
 	}
 }
 
+// AddRlimit records the addition of rlimit (POSIX resource limits) to a container.
 func (a *ContainerAdjustment) AddRlimit(typ string, hard, soft uint64) {
 	a.initRlimits()
 	a.Rlimits = append(a.Rlimits, &POSIXRlimit{
