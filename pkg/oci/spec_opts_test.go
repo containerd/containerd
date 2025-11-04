@@ -392,7 +392,7 @@ func TestWithPidsLimit(t *testing.T) {
 			err := WithPidsLimit(expected)(nil, nil, nil, &spec)
 			assert.NoError(t, err)
 			if name == "linux" {
-				assert.Equal(t, expected, spec.Linux.Resources.Pids.Limit)
+				assert.Equal(t, expected, *spec.Linux.Resources.Pids.Limit)
 			} else {
 				assert.Empty(t, spec.Linux, "should not have modified spec")
 			}
