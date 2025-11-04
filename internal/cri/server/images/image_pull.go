@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -113,6 +114,11 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 		return ParseAuth(hostauth, host)
 	}
 
+	tracing.SpanFromContext(ctx).SetAttributes(
+		tracing.Attribute("image.runtime.handler", r.GetImage().GetRuntimeHandler()),
+		tracing.Attribute("runtime.platforms", maps.Keys(c.runtimePlatforms)),
+	)
+
 	ref, err := c.CRIImageService.PullImage(ctx, imageRef, credentials, r.SandboxConfig, r.GetImage().GetRuntimeHandler())
 	if err != nil {
 		return nil, err
@@ -165,7 +171,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
-	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig)
+	snapshotter, err := c.determineSnapshotter(ctx, ref, runtimeHandler, sandboxConfig)
 	if err != nil {
 		return "", err
 	}
@@ -173,6 +179,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
+		tracing.Attribute("runtime.handler", runtimeHandler),
 	)
 	labels := c.getLabels(ctx, ref)
 
@@ -823,33 +830,31 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 	return resp, err
 }
 
-// Given that runtime information is not passed from PullImageRequest, we depend on an experimental annotation
-// passed from pod sandbox config to get the runtimeHandler. The annotation key is specified in configuration.
-// Once we know the runtime, try to override default snapshotter if it is set for this runtime.
-// See https://github.com/containerd/containerd/issues/6657
-func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig) (string, error) {
-	snapshotter := c.config.Snapshotter
-	if s == nil || s.Annotations == nil {
-		return snapshotter, nil
+// determineSnapshotter will select the appropriate snapshotter based on the passed runtimeHandler
+// or PodSandboxConfig annotations. In order to maintain backward compatibility, if runtimeHandler
+// is empty, it will attempt to get it from PodSandboxConfig annotations.
+// If a specific snapshotter is configured from the runtimePlatforms, it will be used. Otherwise,
+// the default snapshotter from the configuration will be returned.
+func (c *CRIImageService) determineSnapshotter(ctx context.Context, imageRef string,
+	runtimeHandler string, s *runtime.PodSandboxConfig) (string, error) {
+
+	// Attempt to get runtimeHandler from pod sandbox config annotations if not passed in
+	// to maintain backward compatibility.
+	if runtimeHandler == "" && s != nil && s.Annotations != nil {
+		runtimeHandler = s.Annotations[annotations.RuntimeHandler]
 	}
 
-	// TODO(kiashok): honor the new CRI runtime handler field added to v0.29.0
-	// for image pull per runtime class support.
-	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
-	if !ok {
-		return snapshotter, nil
+	switch p, ok := c.runtimePlatforms[runtimeHandler]; {
+	case ok && p.Snapshotter != c.config.Snapshotter:
+		log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, p.Snapshotter)
+		return p.Snapshotter, nil
+	case runtimeHandler != "":
+		// TODO: Ensure error is returned if runtime not found?
+		log.G(ctx).Warnf("experimental: no specific snapshotter configured for runtime %s, using default snapshotter %s", runtimeHandler, c.config.Snapshotter)
+		return c.config.Snapshotter, nil
+	default:
+		return c.config.Snapshotter, nil
 	}
-
-	// TODO: Ensure error is returned if runtime not found?
-	if c.runtimePlatforms != nil {
-		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
-			snapshotter = p.Snapshotter
-			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
-		}
-	}
-
-	return snapshotter, nil
 }
 
 type criCredentials struct {
