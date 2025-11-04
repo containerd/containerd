@@ -85,6 +85,24 @@ version = 2
 
 See [here](https://github.com/containerd/containerd/blob/main/docs/snapshotters) for other supported snapshotters.
 
+### Multiple snapshotters via runtime handlers
+
+Since v2.3, containerd supports configuring different snapshotters for different runtime handlers,
+enabling mixed workloads to use the most appropriate snapshotter for their use case.
+This is particularly useful in Kubernetes clusters using RuntimeClass to select different
+container runtimes.
+
+To configure runtime-specific snapshotters, add a `runtime_platforms` section to the
+containerd configuration:
+
+```toml
+[plugins.'io.containerd.cri.v1.images'.runtime_platforms.runc]
+  snapshotter = 'overlayfs'
+
+[plugins.'io.containerd.cri.v1.images'.runtime_platforms.kata]
+  snapshotter = 'devmapper'
+```
+
 ### Runtime classes
 
 The following example registers custom runtimes into containerd:
