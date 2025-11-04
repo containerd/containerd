@@ -31,6 +31,15 @@ func IsBlockCimSupported() bool {
 	return build >= 27766
 }
 
+// IsVerifiedCimSupported returns true if block CIM format supports also writing verification information in the CIM.
+func IsVerifiedCimSupported() bool {
+	build := osversion.Build()
+	// TODO(ambarve): Currently we are checking against a higher build number since there is no
+	// official build with block CIM support yet. Once we have that build, we should
+	// update the build number here.
+	return build >= 27800
+}
+
 func IsMergedCimSupported() bool {
 	// The merged CIM support was originally added before block CIM support.  However,
 	// some of the merged CIM features that we use (e.g. merged hard links) were added
@@ -49,6 +58,7 @@ const (
 	CimMountFlagEnableDax  uint32 = 0x2
 	CimMountBlockDeviceCim uint32 = 0x10
 	CimMountSingleFileCim  uint32 = 0x20
+	CimMountVerifiedCim    uint32 = 0x80
 
 	CimCreateFlagNone                uint32 = 0x0
 	CimCreateFlagDoNotExpandPEImages uint32 = 0x1
@@ -56,10 +66,12 @@ const (
 	CimCreateFlagBlockDeviceCim      uint32 = 0x4
 	CimCreateFlagSingleFileCim       uint32 = 0x8
 	CimCreateFlagConsistentCim       uint32 = 0x10
+	CimCreateFlagVerifiedCim         uint32 = 0x40
 
 	CimMergeFlagNone        uint32 = 0x0
 	CimMergeFlagSingleFile  uint32 = 0x1
 	CimMergeFlagBlockDevice uint32 = 0x2
+	CimMergeFlagVerifiedCim uint32 = 0x4
 )
 
 // BlockCIM represents a CIM stored in a block formatted way.

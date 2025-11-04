@@ -23,11 +23,13 @@ import (
 	"testing"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sync/semaphore"
 )
 
 func TestIDMappedOverlay(t *testing.T) {
@@ -36,10 +38,11 @@ func TestIDMappedOverlay(t *testing.T) {
 	}
 
 	for name, test := range map[string]struct {
-		idMap   userns.IDMap
-		snapOpt func(idMap userns.IDMap) snapshots.Opt
-		expUID  uint32
-		expGID  uint32
+		idMap     userns.IDMap
+		snapOpt   func(idMap userns.IDMap) snapshots.Opt
+		unpackOpt []containerd.UnpackOpt
+		expUID    uint32
+		expGID    uint32
 	}{
 		"TestIDMappedOverlay-SingleMapping": {
 			idMap: userns.IDMap{
@@ -100,6 +103,35 @@ func TestIDMappedOverlay(t *testing.T) {
 			expUID: 33,
 			expGID: 66,
 		},
+		"TestIDMappedOverlay-SingleMapping-ParallelUnpack": {
+			idMap: userns.IDMap{
+				UidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      33,
+						Size:        65535,
+					},
+				},
+				GidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      33,
+						Size:        65535,
+					},
+				},
+			},
+			snapOpt: func(idMap userns.IDMap) snapshots.Opt {
+				return containerd.WithRemapperLabels(
+					idMap.UidMap[0].ContainerID, idMap.UidMap[0].HostID,
+					idMap.GidMap[0].ContainerID, idMap.GidMap[0].HostID,
+					idMap.UidMap[0].Size)
+			},
+			unpackOpt: []containerd.UnpackOpt{
+				containerd.WithUnpackLimiter(semaphore.NewWeighted(3)),
+			},
+			expUID: 33,
+			expGID: 33,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var (
@@ -117,7 +149,7 @@ func TestIDMappedOverlay(t *testing.T) {
 			}
 			defer client.Close()
 
-			image, err := client.Pull(ctx, testMultiLayeredImage, containerd.WithPullUnpack)
+			image, err := client.Pull(ctx, testMultiLayeredImage, containerd.WithPullUnpack, containerd.WithUnpackOpts(test.unpackOpt))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -134,7 +166,10 @@ func TestIDMappedOverlay(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer container.Delete(ctx, containerd.WithSnapshotCleanup)
+			defer func() {
+				container.Delete(ctx, containerd.WithSnapshotCleanup)
+				client.ImageService().Delete(ctx, testMultiLayeredImage, images.SynchronousDelete())
+			}()
 
 			t.Logf("container %s created!", id)
 			o := client.SnapshotService(snapshotter)

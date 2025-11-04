@@ -26,6 +26,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
@@ -200,6 +201,9 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 					if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
 						enableRemoteSnapshotAnnotations = true
 					}
+					if progressTracker != nil {
+						mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
+					}
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 				} else {
 					log.G(ctx).WithFields(log.Fields{
@@ -211,6 +215,10 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 
 			if ts.config.DuplicationSuppressor != nil {
 				uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
+			}
+
+			if ts.limiterP != nil {
+				uopts = append(uopts, unpack.WithUnpackLimiter(ts.limiterP))
 			}
 
 			if enableRemoteSnapshotAnnotations {
@@ -299,6 +307,7 @@ func getSupportedPlatform(ctx context.Context, uc transfer.UnpackConfiguration, 
 		// use default Snapshotter
 		if sp.Platform.Match(uc.Platform) {
 			// Assume sp.SnapshotterKey is not empty
+			//nolint:staticcheck // QF1003: could use tagged switch on base (staticcheck)
 			if uc.Snapshotter == sp.SnapshotterKey {
 				return true, sp
 			} else if uc.Snapshotter == "" {

@@ -106,6 +106,7 @@ func convertMetricsToWindowsStats(metrics []*types.Metric, sandbox sandboxstore.
 		// In the case of HostProcess sandbox container we will use the nil value for the statsmap which is used later
 		// otherwise return an error since we should have gotten stats
 		containerStats, ok := containerStatsData.(*wstats.Statistics)
+		//nolint:staticcheck // QF1001: could apply De Morgan's law (staticcheck)
 		if !ok && !(isHostProcess && sandbox.ID == stat.ID) {
 			return nil, fmt.Errorf("failed to extract metrics for container with id %s: %w", stat.ID, err)
 		}
@@ -228,13 +229,7 @@ func appendMemoryPodStats(podRuntimeStats *runtime.WindowsContainerStats, contai
 	// It is possible the pod sandbox might not be populated with values if it doesn't exist
 	// HostProcess pods are an example where there is no actual pod sandbox running and therefor no stats
 	if podRuntimeStats.Memory == nil {
-		podRuntimeStats.Memory = &runtime.WindowsMemoryUsage{
-			Timestamp:         timestamp.UnixNano(),
-			WorkingSetBytes:   &runtime.UInt64Value{Value: 0},
-			AvailableBytes:    &runtime.UInt64Value{Value: 0},
-			PageFaults:        &runtime.UInt64Value{Value: 0},
-			CommitMemoryBytes: &runtime.UInt64Value{Value: 0},
-		}
+		podRuntimeStats.Memory = &runtime.WindowsMemoryUsage{Timestamp: timestamp.UnixNano()}
 	}
 
 	if containerRunTimeStats.Memory.WorkingSetBytes != nil {
@@ -244,18 +239,11 @@ func appendMemoryPodStats(podRuntimeStats *runtime.WindowsContainerStats, contai
 		podRuntimeStats.Memory.WorkingSetBytes.Value += containerRunTimeStats.Memory.WorkingSetBytes.Value
 	}
 
-	if containerRunTimeStats.Memory.AvailableBytes != nil {
-		if podRuntimeStats.Memory.AvailableBytes == nil {
-			podRuntimeStats.Memory.AvailableBytes = &runtime.UInt64Value{Value: 0}
+	if containerRunTimeStats.Memory.CommitMemoryBytes != nil {
+		if podRuntimeStats.Memory.CommitMemoryBytes == nil {
+			podRuntimeStats.Memory.CommitMemoryBytes = &runtime.UInt64Value{Value: 0}
 		}
-		podRuntimeStats.Memory.AvailableBytes.Value += containerRunTimeStats.Memory.AvailableBytes.Value
-	}
-
-	if containerRunTimeStats.Memory.PageFaults != nil {
-		if podRuntimeStats.Memory.PageFaults == nil {
-			podRuntimeStats.Memory.PageFaults = &runtime.UInt64Value{Value: 0}
-		}
-		podRuntimeStats.Memory.PageFaults.Value += containerRunTimeStats.Memory.PageFaults.Value
+		podRuntimeStats.Memory.CommitMemoryBytes.Value += containerRunTimeStats.Memory.CommitMemoryBytes.Value
 	}
 }
 

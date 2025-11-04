@@ -1986,6 +1986,9 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 
 		const expectedSuffix = "999999 1000000"
 		stdoutString := stdout.String()
+		if len(stdoutString) == 0 {
+			t.Fatal(fmt.Errorf("len (stdoutString) is 0"))
+		}
 		if !strings.Contains(stdoutString, expectedSuffix) {
 			t.Fatalf("process output does not end with %q at iteration %d, here are the last 20 characters of the output:\n\n %q", expectedSuffix, i, stdoutString[len(stdoutString)-20:])
 		}
@@ -2400,8 +2403,8 @@ func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) 
 		t.Fatal(err)
 	}
 
-	// The container is using longCommand, which contains sleep 1 on Linux, and ping -t localhost on Windows.
-	if strings.Contains(string(b), "sleep 1") || strings.Contains(string(b), "ping -t localhost") {
+	// The container is using longCommand, which contains sleep inf on Linux, and ping -t localhost on Windows.
+	if strings.Contains(string(b), "sleep inf") || strings.Contains(string(b), "ping -t localhost") {
 		t.Fatalf("killing init didn't kill all its children:\n%v", string(b))
 	}
 

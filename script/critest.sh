@@ -75,6 +75,11 @@ if [ -n "${SKIP_TEST:-}" ]; then
   GINKGO_SKIP_TEST+=("--ginkgo.skip" "$SKIP_TEST")
 fi
 
+GINKGO_FOCUS_TEST=()
+if [ -n "${FOCUS_TEST:-}" ]; then
+  GINKGO_FOCUS_TEST+=("--ginkgo.focus" "$FOCUS_TEST")
+fi
+
 ls /etc/cni/net.d
 
 /usr/local/bin/containerd \
@@ -90,4 +95,4 @@ do
     crictl --runtime-endpoint ${BDIR}/c.sock info && break || sleep 1
 done
 
-critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8 "${GINKGO_SKIP_TEST[@]}" "${EXTRA_CRITEST_OPTIONS:-""}"
+critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8 "${GINKGO_SKIP_TEST[@]}" "${GINKGO_FOCUS_TEST[@]}" "${EXTRA_CRITEST_OPTIONS:-""}"

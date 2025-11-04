@@ -25,6 +25,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -46,6 +47,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/platforms"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
@@ -84,19 +86,14 @@ func testExportImport(t *testing.T, imageName string) {
 		t.Fatal(err)
 	}
 
-	dstFile, err := os.CreateTemp("", "export-import-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
+	dstFile, err := os.Create(filepath.Join(t.TempDir(), "export-import-test"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
 		dstFile.Close()
-		os.Remove(dstFile.Name())
-	}()
+	})
 
 	err = client.Export(ctx, dstFile, archive.WithPlatform(platforms.Default()), archive.WithImage(client.ImageService(), imageName))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	client.ImageService().Delete(ctx, imageName)
 
@@ -108,9 +105,7 @@ func testExportImport(t *testing.T, imageName string) {
 	}
 
 	imgrecs, err := client.Import(ctx, dstFile, opts...)
-	if err != nil {
-		t.Fatalf("Import failed: %+v", err)
-	}
+	require.NoError(t, err, "Import failed: %+v", err)
 
 	// We need to unpack the image, especially if it's multilayered.
 	for _, img := range imgrecs {
@@ -119,32 +114,25 @@ func testExportImport(t *testing.T, imageName string) {
 		// TODO: Show unpack status
 		t.Logf("unpacking %s (%s)...", img.Name, img.Target.Digest)
 		err = image.Unpack(ctx, "")
-		if err != nil {
-			t.Fatalf("Error while unpacking image: %+v", err)
-		}
+		require.NoError(t, err, "Error while unpacking image: %+v", err)
 		t.Log("done")
 	}
 
 	// we're triggering the Garbage Collector to do its job.
 	ls := client.LeasesService()
 	l, err := ls.Create(ctx, leases.WithRandomID(), leases.WithExpiration(time.Hour))
-	if err != nil {
-		t.Fatalf("Error while creating lease: %+v", err)
-	}
-	if err = ls.Delete(ctx, l, leases.SynchronousDelete); err != nil {
+	require.NoError(t, err, "Error while creating lease: %+v", err)
+
+	if err := ls.Delete(ctx, l, leases.SynchronousDelete); err != nil {
 		t.Fatalf("Error while deleting lease: %+v", err)
 	}
 
 	image, err := client.GetImage(ctx, imageName)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	id := t.Name()
 	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image)))
-	if err != nil {
-		t.Fatalf("Error while creating container: %+v", err)
-	}
+	require.NoError(t, err, "Error while creating container: %+v", err)
 	container.Delete(ctx, WithSnapshotCleanup)
 
 	for _, imgrec := range imgrecs {
@@ -152,9 +140,7 @@ func testExportImport(t *testing.T, imageName string) {
 			continue
 		}
 		err = client.ImageService().Delete(ctx, imgrec.Name)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}
 }
 

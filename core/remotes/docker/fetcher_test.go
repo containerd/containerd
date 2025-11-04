@@ -50,6 +50,10 @@ func TestFetcherOpen(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if start > 0 {
 			rw.Header().Set("content-range", fmt.Sprintf("bytes %d-127/128", start))
+		} else if r.Header.Get("Range") == "bytes=0-" {
+			// Simulate registries which do not support range requests
+			rw.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		rw.Header().Set("content-length", strconv.Itoa(len(content[start:])))
 		_, _ = rw.Write(content[start:])
@@ -79,7 +83,7 @@ func TestFetcherOpen(t *testing.T) {
 	checkReader := func(o int64) {
 		t.Helper()
 
-		rc, err := f.open(ctx, req, "", o, true)
+		rc, _, err := f.open(ctx, req, "", o, true)
 		if err != nil {
 			t.Fatalf("failed to open: %+v", err)
 		}
@@ -119,7 +123,7 @@ func TestFetcherOpen(t *testing.T) {
 	// Check that server returning a different content range
 	// then requested errors
 	start = 30
-	_, err = f.open(ctx, req, "", 20, true)
+	_, _, err = f.open(ctx, req, "", 20, true)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
 	}
@@ -129,6 +133,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	size := int64(3 * 1024 * 1024)
 	content := make([]byte, size)
 	rand.New(rand.NewSource(1)).Read(content)
+	sendContentLength := true
 
 	f := dockerFetcher{
 		&dockerBase{
@@ -175,12 +180,16 @@ func TestFetcherOpenParallel(t *testing.T) {
 		}
 
 		if len(rng) == 0 {
-			rw.Header().Set("content-length", strconv.Itoa(len(content)))
+			if sendContentLength {
+				rw.Header().Set("content-length", strconv.Itoa(len(content)))
+			}
 			_, _ = rw.Write(content)
 		} else {
 			b := content[rng[0].start : rng[0].start+rng[0].length]
 			rw.Header().Set("content-range", rng[0].contentRange(size))
-			rw.Header().Set("content-length", strconv.Itoa(len(b)))
+			if sendContentLength {
+				rw.Header().Set("content-length", strconv.Itoa(len(b)))
+			}
 			_, _ = rw.Write(b)
 		}
 
@@ -206,7 +215,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	checkReader := func(offset int64) {
 		t.Helper()
 
-		rc, err := f.open(ctx, req, "", offset, true)
+		rc, _, err := f.open(ctx, req, "", offset, true)
 		if err != nil {
 			t.Fatalf("failed to open: %+v", err)
 		}
@@ -233,7 +242,12 @@ func TestFetcherOpenParallel(t *testing.T) {
 
 	checkReader(25)
 
+	sendContentLength = false
+	checkReader(25)
+	sendContentLength = true
+
 	ignoreContentRange = true
+	checkReader(0)
 	checkReader(25)
 	ignoreContentRange = false
 
@@ -247,7 +261,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	// Check that server returning a different content range
 	// than requested errors
 	forceRange = []httpRange{{start: 10, length: size - 20}}
-	_, err = f.open(ctx, req, "", 20, true)
+	_, _, err = f.open(ctx, req, "", 20, true)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
 	}
@@ -259,14 +273,14 @@ func TestFetcherOpenParallel(t *testing.T) {
 
 	failAfter = 1
 	forceRange = []httpRange{{start: 20}}
-	_, err = f.open(ctx, req, "", 20, true)
+	_, _, err = f.open(ctx, req, "", 20, true)
 	assert.ErrorContains(t, err, "unexpected status")
 	forceRange = nil
 	failAfter = 0
 
 	// test a case when a subsequent request fails and shouldn't have
 	failAfter = 1 * 1024 * 1024
-	body, err := f.open(ctx, req, "", 0, true)
+	body, _, err := f.open(ctx, req, "", 0, true)
 	assert.NoError(t, err)
 	_, err = io.ReadAll(body)
 	assert.Error(t, err, "this should have failed")
@@ -394,7 +408,7 @@ func TestContentEncoding(t *testing.T) {
 
 			req := f.request(host, http.MethodGet)
 
-			rc, err := f.open(context.Background(), req, "", 0, true)
+			rc, _, err := f.open(context.Background(), req, "", 0, true)
 			if err != nil {
 				t.Fatalf("failed to open for encoding %s: %+v", tc.encodingHeader, err)
 			}
@@ -529,7 +543,7 @@ func TestDockerFetcherOpen(t *testing.T) {
 
 			req := f.request(host, http.MethodGet)
 
-			got, err := f.open(context.TODO(), req, "", 0, tt.lastHost)
+			got, _, err := f.open(context.TODO(), req, "", 0, tt.lastHost)
 			assert.Equal(t, tt.wantErr, err != nil)
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, 0, tt.retries)
@@ -544,6 +558,40 @@ func TestDockerFetcherOpen(t *testing.T) {
 
 		})
 	}
+}
+
+func TestDockerFetcherOpenLimiterDeadlock(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Encoding", "gzip")
+		rw.Write([]byte("bad gzip data"))
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f := dockerFetcher{&dockerBase{
+		repository: "ns",
+		limiter:    semaphore.NewWeighted(int64(1)),
+	}}
+
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
+	req := f.request(host, http.MethodGet)
+	_, _, err = f.open(context.Background(), req, "", 0, true)
+	assert.Error(t, err)
+
+	// verify that the limiter Release has been successfully called when the last open error occurred
+	_, _, err = f.open(context.Background(), req, "", 0, true)
+	assert.Error(t, err)
 }
 
 // httpRange specifies the byte range to be sent to the client.

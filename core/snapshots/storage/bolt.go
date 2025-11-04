@@ -386,6 +386,16 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 		// Replace labels, do not inherit
 		si.Labels = base.Labels
 
+		// If the snapshot didn't have a parent when created, allow it
+		// to be rebased on a parent on commit.
+		if si.Parent != base.Parent {
+			if len(si.Parent) == 0 {
+				si.Parent = base.Parent
+			} else if len(base.Parent) > 0 {
+				return fmt.Errorf("cannot change parent of active snapshot %q on commit: %w", key, errdefs.ErrInvalidArgument)
+			}
+		}
+
 		if err := putSnapshot(dbkt, id, si); err != nil {
 			return err
 		}
@@ -401,6 +411,10 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 				return fmt.Errorf("missing parent %q of snapshot %q: %w", si.Parent, key, errdefs.ErrNotFound)
 			}
 			pid := readID(spbkt)
+
+			if pkind := readKind(spbkt); pkind != snapshots.KindCommitted {
+				return fmt.Errorf("parent %q is not committed: %w", si.Parent, errdefs.ErrFailedPrecondition)
+			}
 
 			// Updates parent back link to use new key
 			if err := pbkt.Put(parentKey(pid, id), []byte(name)); err != nil {

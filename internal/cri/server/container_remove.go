@@ -68,7 +68,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	if state == runtime.ContainerState_CONTAINER_RUNNING ||
 		state == runtime.ContainerState_CONTAINER_UNKNOWN {
 		log.L.Infof("Forcibly stopping container %q", id)
-		if err := c.stopContainer(ctx, container, 0); err != nil {
+		if err := c.stopContainerRetryOnConnectionClosed(ctx, container, 0); err != nil {
 			return nil, fmt.Errorf("failed to forcibly stop container %q: %w", id, err)
 		}
 

@@ -308,17 +308,26 @@ func (c *criService) CRImportCheckpoint(
 		}
 	}
 
-	// Pulling the image the checkpoint is based on. This is a bit different
-	// than automatic image pulling. The checkpoint image is not automatically
-	// pulled, but the image the checkpoint is based on.
-	// During checkpointing the base image of the checkpoint is stored in the
-	// checkpoint archive as NAME@DIGEST. The checkpoint archive also contains
-	// the tag with which it was initially pulled.
-	// First step is to pull NAME@DIGEST
-	containerdImage, err := c.client.Pull(ctx, config.RootfsImageRef)
+	var containerdImage client.Image
+
+	containerdImage, err = c.client.GetImage(ctx, config.RootfsImageRef)
 	if err != nil {
-		return "", fmt.Errorf("failed to pull checkpoint base image %s: %w", config.RootfsImageRef, err)
+		if !errdefs.IsNotFound(err) {
+			return "", fmt.Errorf("failed to get checkpoint base image %s: %w", config.RootfsImageRef, err)
+		}
+		// Pulling the image the checkpoint is based on. This is a bit different
+		// than automatic image pulling. The checkpoint image is not automatically
+		// pulled, but the image the checkpoint is based on.
+		// During checkpointing the base image of the checkpoint is stored in the
+		// checkpoint archive as NAME@DIGEST. The checkpoint archive also contains
+		// the tag with which it was initially pulled.
+		// First step is to pull NAME@DIGEST
+		containerdImage, err = c.client.Pull(ctx, config.RootfsImageRef)
+		if err != nil {
+			return "", fmt.Errorf("failed to pull checkpoint base image %s: %w", config.RootfsImageRef, err)
+		}
 	}
+
 	if _, err := reference.ParseAnyReference(config.RootfsImageName); err != nil {
 		return "", fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", config.RootfsImageName, err)
 	}

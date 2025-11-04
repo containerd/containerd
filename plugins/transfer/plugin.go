@@ -86,6 +86,7 @@ func init() {
 			lc.ConcurrentLayerFetchBuffer = config.ConcurrentLayerFetchBuffer
 
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
+			lc.MaxConcurrentUnpacks = config.MaxConcurrentUnpacks
 
 			// If UnpackConfiguration is not defined, set the default.
 			// If UnpackConfiguration is defined and empty, ignore.
@@ -102,9 +103,13 @@ func init() {
 				if sn == nil {
 					return nil, fmt.Errorf("snapshotter %q not found: %w", uc.Snapshotter, errdefs.ErrNotFound)
 				}
-				var snExports map[string]string
+				var (
+					snExports      map[string]string
+					snCapabilities []string
+				)
 				if p := ic.Plugins().Get(plugins.SnapshotPlugin, uc.Snapshotter); p != nil {
 					snExports = p.Meta.Exports
+					snCapabilities = p.Meta.Capabilities
 				}
 
 				var applier diff.Applier
@@ -162,13 +167,14 @@ func init() {
 				}
 
 				up := unpack.Platform{
-					Platform:           target,
-					SnapshotterKey:     uc.Snapshotter,
-					Snapshotter:        sn,
-					SnapshotterExports: snExports,
-					Applier:            applier,
-					ConfigType:         uc.ConfigType,
-					LayerTypes:         uc.LayerTypes,
+					Platform:                target,
+					SnapshotterKey:          uc.Snapshotter,
+					Snapshotter:             sn,
+					SnapshotterExports:      snExports,
+					SnapshotterCapabilities: snCapabilities,
+					Applier:                 applier,
+					ConfigType:              uc.ConfigType,
+					LayerTypes:              uc.LayerTypes,
 				}
 				lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
 			}
@@ -202,6 +208,9 @@ type transferConfig struct {
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
 	RegistryConfigPath string `toml:"config_path"`
+
+	// MaxConcurrentUnpacks controls the number of concurrent layer unpack operations.
+	MaxConcurrentUnpacks int `toml:"max_concurrent_unpacks"`
 }
 
 type unpackConfiguration struct {
@@ -225,6 +234,7 @@ func defaultConfig() *transferConfig {
 	return &transferConfig{
 		MaxConcurrentDownloads:      3,
 		MaxConcurrentUploadedLayers: 3,
+		MaxConcurrentUnpacks:        1,
 		CheckPlatformSupported:      false,
 	}
 }

@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -210,7 +209,7 @@ type createContainerRequest struct {
 	sandboxID             string
 	imageID               string
 	containerConfig       *runtime.ContainerConfig
-	imageConfig           *v1.ImageConfig
+	imageConfig           *imagespec.ImageConfig
 	podSandboxConfig      *runtime.PodSandboxConfig
 	sandboxRuntimeHandler string
 	sandboxPid            uint32
@@ -1027,6 +1026,10 @@ func (c *criService) buildWindowsSpec(
 	specOpts = append(specOpts,
 		annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)...,
 	)
+
+	if config.Windows != nil {
+		specOpts = append(specOpts, customopts.WithWindowsAffinityCPUs(config.Windows))
+	}
 
 	return specOpts, nil
 }

@@ -112,8 +112,13 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 
 			t.Log("Inject Shim failpoint")
 			injectShimFailpoint(t, sbConfig, map[string]string{
-				"Start":  "1*error(failed to start shim)",
-				"Delete": "1*error(please retry)", // inject failpoint during rollback shim
+				"Start": "1*error(failed to start shim)",
+				// Kill invoked by Delete during rollback, we should block it instead of Delete
+				//
+				// NOTE: If we allow to Kill, there could be a race condition. The event handler
+				// will cleanup the sandbox record after Kill asynchronously. It could cause that
+				// ListPodSandbox returns empty.
+				"Kill": "1*error(please retry)",
 			})
 
 			t.Log("Create a sandbox")

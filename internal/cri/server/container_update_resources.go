@@ -55,7 +55,7 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 		return nil, fmt.Errorf("NRI container update failed: %w", err)
 	}
 	if updated != nil {
-		*resources = *updated
+		r.Linux = updated
 	}
 
 	// Update resources in status update transaction, so that:

@@ -107,7 +107,7 @@ func (r *ImageService) ImageStatus(image *runtimeapi.ImageSpec, opts ...grpc.Cal
 	}
 
 	if resp.Image != nil {
-		if resp.Image.Id == "" || resp.Image.Size() == 0 {
+		if resp.Image.Id == "" || resp.Image.Size == 0 {
 			errorMessage := fmt.Sprintf("Id or size of image %q is not set", image.Image)
 			log.L.Errorf("ImageStatus failed: %s", errorMessage)
 			return nil, errors.New(errorMessage)

@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
@@ -205,7 +206,7 @@ func (l *local) Delete(ctx context.Context, req *api.DeleteContainerRequest, _ .
 
 func (l *local) withStore(ctx context.Context, fn func(ctx context.Context) error) func(tx *bolt.Tx) error {
 	return func(tx *bolt.Tx) error {
-		return fn(metadata.WithTransactionContext(ctx, tx))
+		return fn(boltutil.WithTransaction(ctx, tx))
 	}
 }
 

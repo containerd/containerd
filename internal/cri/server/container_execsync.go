@@ -49,10 +49,7 @@ func (cw *cappedWriter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
-	end := cw.remain
-	if end > len(p) {
-		end = len(p)
-	}
+	end := min(cw.remain, len(p))
 	written, err := cw.w.Write(p[0:end])
 	cw.remain -= written
 

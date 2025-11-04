@@ -102,7 +102,7 @@ func getRdtInfo() (*resctrlInfo, error) {
 	if err != nil {
 		return info, fmt.Errorf("failed to detect resctrl mount point: %v", err)
 	}
-	log.Infof("detected resctrl filesystem at %q", info.resctrlPath)
+	log.Info("detected resctrl filesystem", "path", info.resctrlPath)
 
 	// Check that RDT is available
 	infopath := filepath.Join(info.resctrlPath, "info")
@@ -299,7 +299,7 @@ func getResctrlMountInfo() (string, map[string]struct{}, error) {
 	if err != nil {
 		return "", mountOptions, err
 	}
-	defer f.Close()
+	defer f.Close() // nolint:errcheck
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {

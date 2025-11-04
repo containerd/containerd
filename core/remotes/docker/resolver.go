@@ -551,27 +551,31 @@ func (r *request) authorize(ctx context.Context, req *http.Request) error {
 	return nil
 }
 
-func (r *request) addNamespace(ns string) (err error) {
-	if !r.host.isProxy(ns) {
-		return nil
-	}
+func (r *request) addQuery(key, value string) (err error) {
 	var q url.Values
 	// Parse query
-	if i := strings.IndexByte(r.path, '?'); i > 0 {
-		r.path = r.path[:i+1]
-		q, err = url.ParseQuery(r.path[i+1:])
+	if p, query, ok := strings.Cut(r.path, "?"); ok {
+		q, err = url.ParseQuery(query)
 		if err != nil {
 			return
 		}
+		r.path = p + "?"
 	} else {
 		r.path = r.path + "?"
 		q = url.Values{}
 	}
-	q.Add("ns", ns)
+	q.Add(key, value)
 
 	r.path = r.path + q.Encode()
 
 	return
+}
+
+func (r *request) addNamespace(ns string) error {
+	if !r.host.isProxy(ns) {
+		return nil
+	}
+	return r.addQuery("ns", ns)
 }
 
 type request struct {
@@ -659,9 +663,9 @@ func withErrorCheck(r *request, resp *http.Response) error {
 
 var errContentRangeIgnored = errors.New("content range requests ignored")
 
-func withOffsetCheck(offset int64) doChecks {
+func withOffsetCheck(offset, parallelism int64) doChecks {
 	return func(r *request, resp *http.Response) error {
-		if offset == 0 {
+		if parallelism <= 1 && offset == 0 {
 			return nil
 		}
 		if resp.StatusCode == http.StatusPartialContent {

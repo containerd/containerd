@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/containerd/v2/core/introspection"
 	_ "github.com/containerd/containerd/v2/core/runtime" // for typeurl init
 	"github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/internal/cri/config"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/nri"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
@@ -112,6 +111,9 @@ type ImageService interface {
 
 // criService implements CRIService.
 type criService struct {
+	runtime.UnimplementedRuntimeServiceServer
+	runtime.UnimplementedImageServiceServer
+
 	RuntimeService
 	ImageService
 	// config contains all configurations.
@@ -149,7 +151,7 @@ type criService struct {
 	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
 	// containerEventsQ is used to capture container events and send them
 	// to the callers of GetContainerEvents.
-	containerEventsQ eventq.EventQueue[runtime.ContainerEventResponse]
+	containerEventsQ eventq.EventQueue[*runtime.ContainerEventResponse]
 	// nri is used to hook NRI into CRI request processing.
 	nri *nri.API
 	// sandboxService is the sandbox related service for CRI
@@ -202,7 +204,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	}
 
 	// TODO: Make discard time configurable
-	c.containerEventsQ = eventq.New[runtime.ContainerEventResponse](5*time.Minute, func(event runtime.ContainerEventResponse) {
+	c.containerEventsQ = eventq.New[*runtime.ContainerEventResponse](5*time.Minute, func(event *runtime.ContainerEventResponse) {
 		containerEventsDroppedCount.Inc()
 		log.L.WithFields(
 			log.Fields{
@@ -368,7 +370,7 @@ func (c *criService) IsInitialized() bool {
 	return c.initialized.Load()
 }
 
-func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introspection.Service, name string, r config.Runtime) error {
+func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introspection.Service, name string, r criconfig.Runtime) error {
 	h := &runtime.RuntimeHandler{
 		Name: name,
 	}
@@ -392,15 +394,19 @@ func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introsp
 
 	c.runtimeHandlers[name] = h
 	if name == c.config.DefaultRuntimeName {
-		defH := *h
-		defH.Name = "" // denotes default
-		c.runtimeHandlers[""] = &defH
+		// Copying runtime.RuntimeHandler isn't allowed so a new struct with the same
+		// contents as the variable "h" is created here for the default runtime.
+		defH := &runtime.RuntimeHandler{
+			Name:     "", // denotes default
+			Features: h.Features,
+		}
+		c.runtimeHandlers[""] = defH
 	}
 
 	return nil
 }
 
-func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r config.Runtime) (*features.Features, error) {
+func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r criconfig.Runtime) (*features.Features, error) {
 	if r.Type != plugins.RuntimeRuncV2 {
 		return nil, fmt.Errorf("introspecting OCI runtime features needs the runtime type to be %q, got %q",
 			plugins.RuntimeRuncV2, r.Type)
@@ -413,7 +419,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if r.Path != "" {
 		rr.RuntimePath = r.Path // "/usr/local/bin/crun"
 	}
-	options, err := config.GenerateRuntimeOptions(r)
+	options, err := criconfig.GenerateRuntimeOptions(r)
 	if err != nil {
 		return nil, err
 	}

@@ -67,7 +67,7 @@ func WithProcessArgs(config *runtime.ContainerConfig, image *imagespec.ImageConf
 				args = append([]string{}, image.Cmd...)
 			}
 			if command == nil {
-				if !(len(image.Entrypoint) == 1 && image.Entrypoint[0] == "") {
+				if len(image.Entrypoint) != 1 || image.Entrypoint[0] != "" {
 					command = append([]string{}, image.Entrypoint...)
 				}
 			}
@@ -114,6 +114,33 @@ func WithAnnotation(k, v string) oci.SpecOpts {
 			s.Annotations = make(map[string]string)
 		}
 		s.Annotations[k] = v
+		return nil
+	}
+}
+
+// WithWindowsAffinityCPUs sets the CPU affinity values in runtime spec for windows.
+func WithWindowsAffinityCPUs(config *runtime.WindowsContainerConfig) oci.SpecOpts {
+	return func(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+		if s.Windows == nil || config.Resources == nil || config.Resources.AffinityCpus == nil {
+			return nil
+		}
+
+		if s.Windows.Resources == nil {
+			s.Windows.Resources = &runtimespec.WindowsResources{}
+		}
+
+		if s.Windows.Resources.CPU == nil {
+			s.Windows.Resources.CPU = &runtimespec.WindowsCPUResources{}
+		}
+
+		affinities := make([]runtimespec.WindowsCPUGroupAffinity, 0, len(config.Resources.AffinityCpus))
+		for _, affinity := range config.Resources.AffinityCpus {
+			affinities = append(affinities, runtimespec.WindowsCPUGroupAffinity{
+				Mask:  affinity.CpuMask,
+				Group: affinity.CpuGroup,
+			})
+		}
+		s.Windows.Resources.CPU.Affinity = affinities
 		return nil
 	}
 }
@@ -305,7 +332,7 @@ func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
 func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
 		if s.Linux == nil {
-			return fmt.Errorf("Linux spec is required")
+			return fmt.Errorf("linux spec is required")
 		}
 
 		for i, ns := range s.Linux.Namespaces {

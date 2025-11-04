@@ -33,6 +33,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
+	"golang.org/x/sync/semaphore"
 
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/images"
@@ -472,6 +473,27 @@ func TestImagePullWithTracing(t *testing.T) {
 	spans := exp.GetSpans()
 	validateRootSpan(t, spanNameExpected, spans)
 
+}
+
+func TestImagePullWithConcurrentUnpacks(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := testContext(t)
+	defer cancel()
+	_, err = client.Pull(ctx, testMultiLayeredImage,
+		WithPlatformMatcher(platforms.Default()),
+		WithPullUnpack,
+		WithUnpackOpts([]UnpackOpt{WithUnpackLimiter(semaphore.NewWeighted(3))}),
+	)
+	defer client.ImageService().Delete(ctx, testMultiLayeredImage, images.SynchronousDelete())
+
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestClientReconnect(t *testing.T) {

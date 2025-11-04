@@ -32,6 +32,9 @@ func DefaultImageConfig() ImageConfig {
 		Snapshotter:                defaults.DefaultSnapshotter,
 		DisableSnapshotAnnotations: true,
 		MaxConcurrentDownloads:     3,
+		Registry: Registry{
+			ConfigPath: "/etc/containerd/certs.d:/etc/docker/certs.d",
+		},
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
@@ -64,6 +67,9 @@ func DefaultRuntimeConfig() RuntimeConfig {
 
 	# Root is the runc root directory.
 	Root = ""
+
+	# SystemdCgroup enables systemd cgroups.
+	SystemdCgroup = false
 
 	# CriuImagePath is the criu image path
 	CriuImagePath = ""

@@ -80,17 +80,11 @@ runtime_type = "${CONTAINERD_RUNTIME}"
 EOF
   fi
   if [ $IS_WINDOWS -eq 0 ]; then
-    NRI_CONFIG_DIR="${CONTAINERD_CONFIG_DIR}/nri"
     cat >>${config_file} <<EOF
 [plugins."io.containerd.nri.v1.nri"]
   disable = false
-  config_file = "${NRI_CONFIG_DIR}/nri.conf"
   socket_path = "/var/run/nri-test.sock"
   plugin_path = "/no/pre-launched/nri/plugins"
-EOF
-    mkdir -p "${NRI_CONFIG_DIR}"
-    cat >"${NRI_CONFIG_DIR}/nri.conf" <<EOF
-disableConnections: false
 EOF
   fi
   CONTAINERD_CONFIG_FILE="${config_file}"
@@ -166,8 +160,10 @@ version = 2
           SandboxIsolation = 1
 EOF
 fi
-
-if [ $IS_WINDOWS -eq 0 ] && [ ! -z "$CGROUP_DRIVER" ] && [ "$CGROUP_DRIVER" = "systemd" ];then
+# To allow the cri-integration test to run via CLI without explicitly setting CGROUP_DRIVER
+if [ $IS_WINDOWS -eq 0 ] && [ ! -v CGROUP_DRIVER ]; then
+  echo "CGROUP_DRIVER is unset"
+elif [ "$CGROUP_DRIVER" = "systemd" ]; then
   cat >> ${CONTAINERD_CONFIG_FILE} << EOF
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
    SystemdCgroup = true

@@ -17,7 +17,8 @@ PROTO_GOFILES = $(patsubst %.proto,%.pb.go,$(PROTO_SOURCES))
 PROTO_INCLUDE = -I$(PWD):/usr/local/include:/usr/include
 PROTO_OPTIONS = --proto_path=. $(PROTO_INCLUDE) \
     --go_opt=paths=source_relative --go_out=. \
-    --go-ttrpc_opt=paths=source_relative --go-ttrpc_out=.
+    --go-ttrpc_opt=paths=source_relative --go-ttrpc_out=. \
+    --go-plugin_opt=paths=source_relative,disable_pb_gen=true --go-plugin_out=.
 PROTO_COMPILE = PATH=$(PATH):$(shell go env GOPATH)/bin; protoc $(PROTO_OPTIONS)
 
 GO_CMD     := go
@@ -28,12 +29,15 @@ GO_LINT    := golint -set_exit_status
 GO_FMT     := gofmt
 GO_VET     := $(GO_CMD) vet
 
+GO_BUILD_FLAGS ?=
+
 GO_MODULES := $(shell $(GO_CMD) list ./...)
 
 GOLANG_CILINT := golangci-lint
 GINKGO        := ginkgo
 
-BUILD_PATH    := $(shell pwd)/build
+RESOLVED_PWD  := $(shell realpath $(shell pwd))
+BUILD_PATH    := $(RESOLVED_PWD)/build
 BIN_PATH      := $(BUILD_PATH)/bin
 COVERAGE_PATH := $(BUILD_PATH)/coverage
 
@@ -44,8 +48,10 @@ PLUGINS := \
 	$(BIN_PATH)/differ \
 	$(BIN_PATH)/ulimit-adjuster \
 	$(BIN_PATH)/v010-adapter \
-	$(BIN_PATH)/template
-
+	$(BIN_PATH)/template \
+	$(BIN_PATH)/wasm \
+	$(BIN_PATH)/network-device-injector \
+	$(BIN_PATH)/network-logger
 
 ifneq ($(V),1)
   Q := @
@@ -65,6 +71,8 @@ allclean: clean clean-cache
 
 test: test-gopkgs
 
+FORCE:
+
 #
 # build targets
 #
@@ -75,6 +83,10 @@ build-plugins: $(PLUGINS)
 
 build-check:
 	$(Q)$(GO_BUILD) -v $(GO_MODULES)
+
+mod-tidy:
+	$(Q)$(GO_CMD) mod tidy
+	$(Q)./scripts/go-mod-tidy
 
 #
 # clean targets
@@ -90,33 +102,14 @@ clean-cache:
 # plugins build targets
 #
 
-$(BIN_PATH)/logger: $(wildcard plugins/logger/*.go)
+$(BIN_PATH)/% build/bin/%: FORCE
 	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
+	$(GO_BUILD) -C plugins/$* -o $(abspath $@) $(GO_BUILD_FLAGS) .
 
-$(BIN_PATH)/device-injector: $(wildcard plugins/device-injector/*.go)
+$(BIN_PATH)/wasm build/bin/wasm: FORCE
 	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
-
-$(BIN_PATH)/hook-injector: $(wildcard plugins/hook-injector/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
-
-$(BIN_PATH)/differ: $(wildcard plugins/differ/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
-
-$(BIN_PATH)/ulimit-adjuster: $(wildcard plugins/ulimit-adjuster/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
-
-$(BIN_PATH)/v010-adapter: $(wildcard plugins/v010-adapter/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
-
-$(BIN_PATH)/template: $(wildcard plugins/template/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
+	mkdir -p $(BIN_PATH) && \
+	GOOS=wasip1 GOARCH=wasm $(GO_BUILD) -C plugins/wasm -o $(abspath $@) $(GO_BUILD_FLAGS) -buildmode=c-shared .
 
 #
 # test targets
@@ -180,6 +173,7 @@ validate-repo-no-changes:
 %.pb.go: %.proto
 	$(Q)echo "Generating $@..."; \
 	$(PROTO_COMPILE) $<
+	sed -i '1s;^;//go:build !wasip1\n\n;' pkg/api/api_ttrpc.pb.go
 
 #
 # targets for installing dependencies
@@ -190,6 +184,9 @@ install-protoc install-protobuf:
 
 install-ttrpc-plugin:
 	$(Q)$(GO_INSTALL) -mod=mod github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@74421d10189e8c118870d294c9f7f62db2d33ec1
+
+install-wasm-plugin:
+	$(Q)$(GO_INSTALL) -mod=mod github.com/knqyf263/go-plugin/cmd/protoc-gen-go-plugin@$(shell go list -m -f {{.Version}} github.com/knqyf263/go-plugin)
 
 install-protoc-dependencies:
 	$(Q)$(GO_INSTALL) -mod=mod google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0

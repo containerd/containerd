@@ -24,8 +24,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/moby/sys/userns"
-
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
@@ -39,14 +37,15 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
+	"github.com/moby/sys/userns"
 
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
+	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	oomv1 "github.com/containerd/containerd/v2/pkg/oom/v1"
-	oomv2 "github.com/containerd/containerd/v2/pkg/oom/v2"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/shim"
@@ -66,20 +65,19 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		ep  oom.Watcher
 		err error
 	)
-	if cgroups.Mode() == cgroups.Unified {
-		ep, err = oomv2.New(publisher)
-	} else {
+	if cgroups.Mode() != cgroups.Unified {
 		ep, err = oomv1.New(publisher)
+		if err != nil {
+			return nil, err
+		}
+		go ep.Run(ctx)
 	}
-	if err != nil {
-		return nil, err
-	}
-	go ep.Run(ctx)
 	s := &service{
 		context:              ctx,
 		events:               make(chan interface{}, 128),
 		ec:                   reaper.Default.Subscribe(),
-		ep:                   ep,
+		cg1oom:               ep,
+		publisher:            publisher,
 		shutdown:             sd,
 		containers:           make(map[string]*runc.Container),
 		running:              make(map[int][]containerProcess),
@@ -115,7 +113,9 @@ type service struct {
 	events   chan interface{}
 	platform stdio.Platform
 	ec       chan runcC.Exit
-	ep       oom.Watcher
+	cg1oom   oom.Watcher
+
+	publisher events.Publisher
 
 	containers map[string]*runc.Container
 
@@ -251,6 +251,33 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		Pid:        uint32(container.Pid()),
 	})
 
+	// After runc.Create(init), the container’s cgroup contains a paused init process.
+	// Therefore, we should start monitoring OOM events immediately after creation, in
+	// case the process goes OOM very quickly. Otherwise, we may encounter flaky cases
+	switch cg := container.Cgroup().(type) {
+	case cgroup1.Cgroup:
+		if err := s.cg1oom.Add(container.ID, cg); err != nil {
+			log.G(ctx).WithError(err).Error("add cg to OOM monitor")
+		}
+	case *cgroupsv2.Manager:
+		allControllers, err := cg.RootControllers()
+		if err != nil {
+			log.G(ctx).WithError(err).Error("failed to get root controllers")
+		} else {
+			if err := cg.ToggleControllers(allControllers, cgroupsv2.Enable); err != nil {
+				if userns.RunningInUserNS() {
+					log.G(ctx).WithError(err).Debugf("failed to enable controllers (%v)", allControllers)
+				} else {
+					log.G(ctx).WithError(err).Errorf("failed to enable controllers (%v)", allControllers)
+				}
+			}
+		}
+
+		if err := container.OOMWatch(ctx, s.oomEvent); err != nil {
+			log.G(ctx).WithError(err).WithField("container_id", container.ID).Error("failed to watch oom events")
+		}
+	}
+
 	// The following line cannot return an error as the only state in which that
 	// could happen would also cause the container.Pid() call above to
 	// nil-deference panic.
@@ -308,29 +335,6 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 
 	switch r.ExecID {
 	case "":
-		switch cg := container.Cgroup().(type) {
-		case cgroup1.Cgroup:
-			if err := s.ep.Add(container.ID, cg); err != nil {
-				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
-			}
-		case *cgroupsv2.Manager:
-			allControllers, err := cg.RootControllers()
-			if err != nil {
-				log.G(ctx).WithError(err).Error("failed to get root controllers")
-			} else {
-				if err := cg.ToggleControllers(allControllers, cgroupsv2.Enable); err != nil {
-					if userns.RunningInUserNS() {
-						log.G(ctx).WithError(err).Debugf("failed to enable controllers (%v)", allControllers)
-					} else {
-						log.G(ctx).WithError(err).Errorf("failed to enable controllers (%v)", allControllers)
-					}
-				}
-			}
-			if err := s.ep.Add(container.ID, cg); err != nil {
-				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
-			}
-		}
-
 		s.send(&eventstypes.TaskStart{
 			ContainerID: container.ID,
 			Pid:         uint32(p.Pid()),
@@ -690,6 +694,15 @@ func (s *service) processExits() {
 				s.handleProcessExit(e, cp.Container, cp.Process)
 			}
 		}
+	}
+}
+
+func (s *service) oomEvent(id string) {
+	err := s.publisher.Publish(s.context, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
+		ContainerID: id,
+	})
+	if err != nil {
+		log.G(s.context).WithError(err).Error("post event")
 	}
 }
 

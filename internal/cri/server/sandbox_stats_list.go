@@ -42,13 +42,14 @@ func (c *criService) ListPodSandboxStats(
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			sandboxStats, err := c.podSandboxStats(ctx, sandbox)
+			// issue 12279: this is tautologically true where interface is stubbed out.
+			sandboxStats, err := c.podSandboxStats(ctx, sandbox) //nolint: staticcheck
 			switch {
 			case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
 				log.G(ctx).WithField("podsandboxid", sandbox.ID).WithError(err).Debug("failed to get pod sandbox stats, this is likely a transient error")
 			case errors.Is(err, ttrpc.ErrClosed):
 				log.G(ctx).WithField("podsandboxid", sandbox.ID).WithError(err).Debug("failed to get pod sandbox stats, connection closed")
-			case err != nil:
+			case err != nil: //nolint: staticcheck
 				errs[i] = fmt.Errorf("failed to decode sandbox container metrics for sandbox %q: %w", sandbox.ID, err)
 			default:
 				stats[i] = sandboxStats

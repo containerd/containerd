@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -391,24 +392,68 @@ func (p *PoolDevice) createSnapshot(ctx context.Context, baseInfo, snapInfo *Dev
 
 // SuspendDevice flushes the outstanding IO and blocks the further IO
 func (p *PoolDevice) SuspendDevice(ctx context.Context, deviceName string) error {
-	if err := p.transition(ctx, deviceName, Suspending, Suspended, func() error {
-		return dmsetup.SuspendDevice(deviceName)
-	}); err != nil {
+	// Retry logic for suspend operations to handle resource contention
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			// Add exponential backoff between retry attempts
+			time.Sleep(time.Duration(100*attempt) * time.Millisecond)
+		}
+
+		err := p.transition(ctx, deviceName, Suspending, Suspended, func() error {
+			return dmsetup.SuspendDevice(deviceName)
+		})
+
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+
+		// Check if this is a recoverable error
+		if strings.Contains(err.Error(), "invalid argument") || strings.Contains(err.Error(), "device busy") {
+			log.G(ctx).WithError(err).Warnf("suspend device %q failed (attempt %d/3), retrying", deviceName, attempt+1)
+			continue
+		}
+
+		// Non-recoverable error, fail immediately
 		return fmt.Errorf("failed to suspend device %q: %w", deviceName, err)
 	}
 
-	return nil
+	return fmt.Errorf("failed to suspend device %q after 3 attempts: %w", deviceName, lastErr)
 }
 
 // ResumeDevice resumes IO for the given device
 func (p *PoolDevice) ResumeDevice(ctx context.Context, deviceName string) error {
-	if err := p.transition(ctx, deviceName, Resuming, Resumed, func() error {
-		return dmsetup.ResumeDevice(deviceName)
-	}); err != nil {
+	// Retry logic for resume operations to handle resource contention
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			// Add exponential backoff between retry attempts
+			time.Sleep(time.Duration(100*attempt) * time.Millisecond)
+		}
+
+		err := p.transition(ctx, deviceName, Resuming, Resumed, func() error {
+			return dmsetup.ResumeDevice(deviceName)
+		})
+
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+
+		// Check if this is a recoverable error
+		if strings.Contains(err.Error(), "invalid argument") || strings.Contains(err.Error(), "device busy") {
+			log.G(ctx).WithError(err).Warnf("resume device %q failed (attempt %d/3), retrying", deviceName, attempt+1)
+			continue
+		}
+
+		// Non-recoverable error, fail immediately
 		return fmt.Errorf("failed to resume device %q: %w", deviceName, err)
 	}
 
-	return nil
+	return fmt.Errorf("failed to resume device %q after 3 attempts: %w", deviceName, lastErr)
 }
 
 // DeactivateDevice deactivates thin device

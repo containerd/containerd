@@ -18,6 +18,7 @@ package ioutil
 
 import (
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -68,10 +69,11 @@ func TestSerialWriteCloser(t *testing.T) {
 			testData[i] = []byte(repeatNumber(i, dataLen) + "\n")
 		}
 
-		f, err := os.CreateTemp("", "serial-write-closer")
+		f, err := os.Create(filepath.Join(t.TempDir(), "serial-write-closer"))
 		require.NoError(t, err)
-		defer os.RemoveAll(f.Name())
-		defer f.Close()
+		t.Cleanup(func() {
+			f.Close()
+		})
 		wc := NewSerialWriteCloser(f)
 		defer wc.Close()
 

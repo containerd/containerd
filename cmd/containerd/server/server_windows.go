@@ -20,10 +20,29 @@ import (
 	"context"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"github.com/containerd/containerd/v2/internal/wintls"
+	"github.com/containerd/log"
 	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
 )
 
+// tlsResource holds Windows-specific TLS resources for cleanup on Stop.
+var tlsResource wintls.CertResource
+
+// setTLSResource caches the resource for later cleanup.
+func setTLSResource(r wintls.CertResource) { tlsResource = r }
+
+// cleanupTLSResources releases any cached TLS resources; safe to call multiple times.
+func cleanupTLSResources() {
+	if tlsResource != nil {
+		if err := tlsResource.Close(); err != nil {
+			log.L.WithError(err).Error("failed to cleanup TLS resources")
+		}
+		tlsResource = nil
+	}
+}
+
+// Windows-specific apply and TTRPC server constructor
 func apply(_ context.Context, _ *srvconfig.Config) error {
 	return nil
 }

@@ -97,6 +97,24 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		id = cliContext.Args().Get(1)
 	}
 
+	platform := cliContext.String("platform")
+	if platform == "" {
+		plat := platforms.DefaultSpec()
+		switch plat.OS {
+		case "linux":
+		case "freebsd":
+			// TODO: freebsd support is under development, allow platform to remain unchanged.
+			// A freebsd spec generator must be implemented to make use of it, until then,
+			// either a spec must be provided or the runtime can convert from the linux spec.
+		default:
+			// Other OSes do not have a supported container runtime, to use experimental runtimes,
+			// specs must be explicitly provided. Once there is a support spec generator, then
+			// the default platform can be added above to not default to linux.
+			plat.OS = "linux"
+		}
+		platform = platforms.FormatAll(plat)
+	}
+
 	var (
 		opts  []oci.SpecOpts
 		cOpts []containerd.NewContainerOpts
@@ -116,7 +134,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			// for container's id is Args[1]
 			args = cliContext.Args().Slice()[2:]
 		)
-		opts = append(opts, oci.WithDefaultSpec(), oci.WithDefaultUnixDevices)
+		opts = append(opts, oci.WithDefaultSpecForPlatform(platform), oci.WithDefaultUnixDevices)
 		if ef := cliContext.String("env-file"); ef != "" {
 			opts = append(opts, oci.WithEnvFile(ef))
 		}
@@ -243,8 +261,8 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		}
 
 		if caps := cliContext.StringSlice("cap-add"); len(caps) > 0 {
-			for _, cap := range caps {
-				if !strings.HasPrefix(cap, "CAP_") {
+			for _, c := range caps {
+				if !strings.HasPrefix(c, "CAP_") {
 					return nil, errors.New("capabilities must be specified with 'CAP_' prefix")
 				}
 			}
@@ -252,8 +270,8 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		}
 
 		if caps := cliContext.StringSlice("cap-drop"); len(caps) > 0 {
-			for _, cap := range caps {
-				if !strings.HasPrefix(cap, "CAP_") {
+			for _, c := range caps {
+				if !strings.HasPrefix(c, "CAP_") {
 					return nil, errors.New("capabilities must be specified with 'CAP_' prefix")
 				}
 			}

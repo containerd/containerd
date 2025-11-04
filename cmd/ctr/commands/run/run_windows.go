@@ -128,7 +128,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			opts = append(opts, oci.WithTTYSize(int(size.Width), int(size.Height)))
 		}
 		if cliContext.Bool("net-host") {
-			return nil, errors.New("Cannot use host mode networking with Windows containers")
+			return nil, errors.New("cannot use host mode networking with Windows containers")
 		}
 		if cliContext.Bool("cni") {
 			ns, err := netns.NewNetNS("")

@@ -323,7 +323,7 @@ func parseUsernsIDMap(runtimeIDMap []*runtime.IDMapping) ([]runtimespec.LinuxIDM
 	if runtimeIDMap[0] == nil {
 		return m, nil
 	}
-	uidMap := *runtimeIDMap[0]
+	uidMap := runtimeIDMap[0]
 
 	if uidMap.Length < 1 {
 		return m, fmt.Errorf("invalid mapping length: %v", uidMap.Length)

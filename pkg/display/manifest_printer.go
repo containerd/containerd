@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -121,8 +122,7 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 	fmt.Fprintf(p.w, "%s%s @%s (%d bytes)\n", prefix, desc.MediaType, desc.Digest, desc.Size)
 
 	if desc.Platform != nil && desc.Platform.Architecture != "" {
-		// TODO: Use containerd platform library to format
-		fmt.Fprintf(p.w, "%s Platform: %s/%s\n", subchild, desc.Platform.OS, desc.Platform.Architecture)
+		fmt.Fprintf(p.w, "%s Platform: %s\n", subchild, platforms.Format(*desc.Platform))
 	}
 	b, err := content.ReadBlob(ctx, store, desc)
 	if err != nil {
