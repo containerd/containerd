@@ -17,10 +17,12 @@
 package server
 
 const (
-	CPUUsageMetrics     = "cpu"
-	MemoryUsageMetrics  = "memory"
-	NetworkUsageMetrics = "network"
-	DiskIOMetrics       = "diskIO"
-	DiskUsageMetrics    = "disk"
-	ProcessMetrics      = "process"
+	CPUUsageMetrics      = "cpu"
+	MemoryUsageMetrics   = "memory"
+	NetworkUsageMetrics  = "network"
+	DiskIOMetrics        = "diskIO"
+	DiskUsageMetrics     = "disk"
+	ProcessMetrics       = "process"
+	MiscellaneousMetrics = "misc"
+	ContainerSpecMetrics = "container_spec"
 )

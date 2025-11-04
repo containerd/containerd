@@ -128,6 +128,11 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				Help:      "Cumulative count of memory allocation failures.",
 				LabelKeys: append(baseLabelKeys, "failure_type", "scope"),
 			},
+			{
+				Name:      "container_oom_events_total",
+				Help:      "Count of out of memory events observed for the container",
+				LabelKeys: baseLabelKeys,
+			},
 		},
 		NetworkUsageMetrics: {
 			{
@@ -271,7 +276,7 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				Help:      "Number of processes running inside the container.",
 				LabelKeys: baseLabelKeys,
 			},
-			/*{
+			{
 				Name:      "container_file_descriptors",
 				Help:      "Number of open file descriptors for the container.",
 				LabelKeys: baseLabelKeys,
@@ -280,13 +285,13 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				Name:      "container_sockets",
 				Help:      "Number of open sockets for the container.",
 				LabelKeys: baseLabelKeys,
-			},*/
+			},
 			{
 				Name:      "container_threads_max",
 				Help:      "Maximum number of threads allowed inside the container, infinity if value is zero",
 				LabelKeys: baseLabelKeys,
 			},
-			/*{
+			{
 				Name:      "container_threads",
 				Help:      "Number of threads running inside the container",
 				LabelKeys: baseLabelKeys,
@@ -295,7 +300,46 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 				Name:      "container_ulimits_soft",
 				Help:      "Soft ulimit values for the container root process. Unlimited if -1, except priority and nice",
 				LabelKeys: append(baseLabelKeys, "ulimit"),
-			},*/
+			},
+		},
+		MiscellaneousMetrics: {
+			{
+				Name:      "container_last_seen",
+				Help:      "Last time a container was seen by the exporter",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_start_time_seconds",
+				Help:      "Start time of the container since unix epoch in seconds",
+				LabelKeys: baseLabelKeys,
+			},
+		},
+		ContainerSpecMetrics: {
+			{
+				Name:      "container_spec_cpu_period",
+				Help:      "CPU period of the container",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_spec_cpu_shares",
+				Help:      "CPU share of the container",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_spec_memory_limit_bytes",
+				Help:      "Memory limit for the container",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_spec_memory_reservation_limit_bytes",
+				Help:      "Memory reservation limit for the container",
+				LabelKeys: baseLabelKeys,
+			},
+			{
+				Name:      "container_spec_memory_swap_limit_bytes",
+				Help:      "Memory swap limit for the container",
+				LabelKeys: baseLabelKeys,
+			},
 		},
 	}
 	return descriptors

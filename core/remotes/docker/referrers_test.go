@@ -25,15 +25,28 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/errdefs"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestFetchReferrers(t *testing.T) {
-	runReferrersTest(t, "testname", tlsServer)
+	t.Run("basic", func(t *testing.T) {
+		runReferrersTest(t, "testname", tlsServer)
+	})
+	t.Run("missing length", func(t *testing.T) {
+		runReferrersTest(t, "testname", tlsServer, func(tc *testContent) {
+			tc.skipLength = true
+		})
+	})
+	t.Run("too long", func(t *testing.T) {
+		runReferrersTest(t, "testname", tlsServer, func(tc *testContent) {
+			tc.content = make([]byte, MaxManifestSize+1)
+		})
+	})
 }
 
-func runReferrersTest(t *testing.T, name string, sf func(h http.Handler) (string, ResolverOptions, func())) {
+func runReferrersTest(t *testing.T, name string, sf func(h http.Handler) (string, ResolverOptions, func()), ropts ...contentOpt) {
 	var (
 		ctx = context.Background()
 		r   = http.NewServeMux()
@@ -49,7 +62,7 @@ func runReferrersTest(t *testing.T, name string, sf func(h http.Handler) (string
 		newContent(ocispec.MediaTypeImageManifest, []byte("some signature manifest"), withArtifactType("application/vnd.test.sig")),
 		newContent(ocispec.MediaTypeImageManifest, []byte("some sbom"), withArtifactType("application/vnd.test.sbom")),
 	)
-	ic := newContent(ocispec.MediaTypeImageIndex, i.OCIManifest())
+	ic := newContent(ocispec.MediaTypeImageIndex, i.OCIManifest(), ropts...)
 
 	m.RegisterHandler(r, name)
 	i.RegisterHandler(r, name)
@@ -75,6 +88,18 @@ func runReferrersTest(t *testing.T, name string, sf func(h http.Handler) (string
 	rf := f.(remotes.ReferrersFetcher)
 
 	refs, err := rf.FetchReferrers(ctx, d.Digest)
+	if len(ic.content) > int(MaxManifestSize) {
+		if err == nil {
+			t.Fatal("expected error for exceeding max size")
+		}
+		if !strings.Contains(err.Error(), "exceeds maximum allowed") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !errdefs.IsNotFound(err) {
+			t.Fatalf("unexpected error type: %v", err)
+		}
+		return
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

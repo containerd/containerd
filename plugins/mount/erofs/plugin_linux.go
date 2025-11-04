@@ -72,6 +72,7 @@ func (erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string, _ 
 		// Never try to mount with raw files anymore if tried
 		forceloop = true
 		params := mount.LoopParams{
+			Readonly:  true,
 			Autoclear: true,
 		}
 		// set up all loop devices
