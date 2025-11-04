@@ -13,7 +13,7 @@ on:
 name: Release
 
 env:
-  GO_VERSION: "1.24.8"
+  GO_VERSION: "1.24.9"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
