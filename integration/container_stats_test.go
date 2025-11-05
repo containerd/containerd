@@ -379,7 +379,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 	for id, config := range containerConfigMap {
 		require.NoError(t, Eventually(func() (bool, error) {
 			stats, err = runtimeService.ListContainerStats(
-				&runtime.ContainerStatsFilter{Id: id[:3], PodSandboxId: sb[:3]})
+				&runtime.ContainerStatsFilter{Id: id[:6], PodSandboxId: sb[:6]})
 			if err != nil {
 				return false, err
 			}
