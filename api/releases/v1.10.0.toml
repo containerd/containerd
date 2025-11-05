@@ -9,7 +9,7 @@ ignore_deps = [ "github.com/containerd/containerd" ]
 # previous release
 previous = "api/v1.9.0"
 
-pre_release = true
+pre_release = false
 
 preface = """\
 The 11th release for the containerd 1.x API aligns with the containerd 2.2 release.
