@@ -1,22 +1,17 @@
 # EROFS Snapshotter
 
-The [EROFS](https://erofs.docs.kernel.org) snapshotter is an experimental
-feature, which is able to leverage EROFS-formatted blobs for each committed
-snapshot and prepares an EROFS + OverlayFS mount for each active snapshot.
+The [EROFS](https://erofs.docs.kernel.org) snapshotter is a native containerd
+snapshotter to enable the EROFS filesystem, specifically to keep EROFS‑formatted
+blobs for each committed snapshot and to prepare an OverlayFS mount for each
+active snapshot.
 
-In order to leverage EROFS-formatted blobs, the EROFS differ is needed to be
-used together to apply image layers.  Otherwise, the EROFS snapshotter will
-just behave as the existing OverlayFS snapshotter: the default applier will
-unpack the image layer into the active EROFS snapshot, and commit it.
-
-Although it sounds somewhat similar to an enhanced OverlayFS snapshotter but
-I believe there are clear differences if looking into `s.mount()` and it highly
-tightens to the EROFS internals.  Currently, it's not quite clear to form an
-enhanced OverlayFS snapshotter directly, and (I think) it's not urgent since
-in the very beginning, it'd be better to be left as an independent snapshotter
-so that existing overlayfs users won't be impacted by the new behaviors and
-users could have a chance to try and develop the related ecosystems (such as
-ComposeFS, confidential containers, gVisor, Kata, gVisor, and more) together.
+Although the EROFS snapshotter sounds somewhat similar to an enhanced OverlayFS
+snapshotter, several kernel features are highly tied to the EROFS internals, so
+it would be better to leave it as an independent snapshotter. This way, existing
+OverlayFS users will not be impacted by the new EROFS‑specific behaviors, and
+interested users will also have a chance to use the EROFS filesystem and even
+develop the related ecosystems (such as ComposeFS, confidential containers,
+gVisor, Kata, nerdbox and more) together.
 
 ## Use Cases
 
@@ -28,15 +23,26 @@ on the backing filesystem, it applies OCI layers into EROFS blobs, therefore:
  - Improved image unpacking performance (~14% for WordPress image with the
    latest erofs-utils 1.8.2) due to reduced metadata overhead;
 
+ - Parallel unpacking is now supported natively, similar to the OverlayFS
+   snapshotter.  This capability is difficult to implement in
+   disk‑snapshot‑style snapshotters such as blockfile, devmapper and ZFS
+   snapshotters.  It also uses an efficient method to persist layer data (via
+   fsync) compared to the OverlayFS snapshotter, which can only use syncfs;
+
+ - Support given‑size block devices as the upper layer for OverlayFS to
+   limit the disk quota for writable layers (usually ephemeral storage);
+
+ - A dedicated EROFS default mount handler enables EROFS file‑backed mounts
+   to avoid loop devices on runC.  Note that specific runtime shims can
+   handle EROFS mounts without this built‑in handler; for more details, see
+   [containerd Mounts and Mount Management](../mounts.md);
+
  - Full data protection for each snapshot using the FS_IMMUTABLE_FL file
    attribute and fsverity.  EROFS uses FS_IMMUTABLE_FL and fsverity to protect
    each EROFS layer blob, ensuring the mounted tree remains immutable.  However,
    since FS_IMMUTABLE_FL and fsverity protect individual files rather than a
    sub-filesystem tree, other snapshotter implementations like the overlayfs
    snapshotter are not quite applicable due to less efficiency at least;
-
- - Parallel unpacking can be supported in a more reliable way (fsync) compared
-   to the overlayfs snapshotter (syncfs);
 
  - Native EROFS layers can be pulled from registries without conversion.
 
@@ -49,20 +55,6 @@ the popular application kernel [gVisor](https://gvisor.dev/) also supports
 pass-through.
 
 ## Usage
-
-### Checking if the EROFS snapshotter and differ are available
-
-To check if the EROFS snapshotter is available, run the following command:
-
-```bash
-$ ctr plugins ls | grep erofs
-```
-
-The following message will be shown like below:
-```
-io.containerd.snapshotter.v1           erofs                    linux/amd64    ok
-io.containerd.differ.v1                erofs                    linux/amd64    ok
-```
 
 ### Ensure that EROFS filesystem is available
 
@@ -78,8 +70,23 @@ $ dnf install erofs-utils
 
 Make sure that erofs-utils version is 1.7 or higher.
 
-Before using EROFS snapshotter, also make sure the _EROFS kernel module_ is
-loaded (Linux 5.4 or later is required): it can be loaded with `modprobe erofs`.
+When using the EROFS snapshotter, before starting containerd, also make sure
+the _EROFS kernel module_ is loaded (Linux 5.4 or later is required): it can be
+loaded with `modprobe erofs`.
+
+### Checking if the EROFS snapshotter and differ are available
+
+To check if the EROFS snapshotter is available, run the following command:
+
+```bash
+$ ctr plugins ls | grep erofs
+```
+
+The following message will be shown like below:
+```
+io.containerd.snapshotter.v1           erofs                    linux/amd64    ok
+io.containerd.differ.v1                erofs                    linux/amd64    ok
+```
 
 ### Configuration
 
@@ -126,6 +133,17 @@ $ # ensure that the image we are using exists; it is a regular OCI image
 $ ctr image pull docker.io/library/busybox:latest
 $ # run the container with the provides snapshotter
 $ ctr run -rm -t --snapshotter erofs docker.io/library/busybox:latest hello sh
+```
+
+## Quota Support
+
+EROFS supports block mode to generate fixed‑size virtual blocks as the upper
+layers for overlayfs with a given filesystem formatted in order enable the disk
+quota.  The `default_size` option can be used in the containerd configuration:
+
+```toml
+  [plugins."io.containerd.snapshotter.v1.erofs"]
+    default_size = "20GiB"
 ```
 
 ## Data Integrity
@@ -221,6 +239,8 @@ For the EROFS differ:
 
 ## TODO
 
-The EROFS Fsmerge feature is NOT supported in the current implementation
-because it was somewhat unclean (relying on `containerd.io/snapshot.ref`).
-It needs to be reconsidered later.
+ - EROFS Flatten filesystem support (EROFS fsmerge feature);
+
+ - ID-mapped mount spport;
+
+ - DMVerity support.
