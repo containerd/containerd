@@ -79,6 +79,13 @@ func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
 	rootDir := filepath.Join(containerdRootDir, "io.containerd.grpc.v1.cri")
 	containerdStateDir := filepath.Dir(ic.Properties[plugins.PropertyStateDir])
 	stateDir := filepath.Join(containerdStateDir, "io.containerd.grpc.v1.cri")
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		return nil, err
+	}
+	// chmod is needed for upgrading from an older release that created the dir with 0o755
+	if err := os.Chmod(stateDir, 0o700); err != nil {
+		return nil, err
+	}
 	c := criconfig.Config{
 		RuntimeConfig:      *pluginConfig,
 		ContainerdRootDir:  containerdRootDir,
