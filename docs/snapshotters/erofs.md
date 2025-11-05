@@ -218,9 +218,3 @@ For the EROFS differ:
 [plugins."io.containerd.differ.v1.erofs"]
   enable_tar_index = true
 ```
-
-## TODO
-
-The EROFS Fsmerge feature is NOT supported in the current implementation
-because it was somewhat unclean (relying on `containerd.io/snapshot.ref`).
-It needs to be reconsidered later.
