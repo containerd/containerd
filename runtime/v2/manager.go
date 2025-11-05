@@ -134,6 +134,8 @@ type ManagerConfig struct {
 // NewShimManager creates a manager for v2 shims
 func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, error) {
 	for _, d := range []string{config.Root, config.State} {
+		// root:  the parent of this directory is created as 0700, not 0711.
+		// state: the parent of this directory is created as 0711 too, so as to support userns-remapped containers.
 		if err := os.MkdirAll(d, 0711); err != nil {
 			return nil, err
 		}

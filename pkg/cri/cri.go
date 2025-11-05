@@ -74,6 +74,13 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		}
 	}
 
+	if err := os.MkdirAll(ic.State, 0700); err != nil {
+		return nil, err
+	}
+	// chmod is needed for upgrading from an older release that created the dir with 0755
+	if err := os.Chmod(ic.State, 0700); err != nil {
+		return nil, err
+	}
 	c := criconfig.Config{
 		PluginConfig:       *pluginConfig,
 		ContainerdRootDir:  filepath.Dir(ic.Root),
