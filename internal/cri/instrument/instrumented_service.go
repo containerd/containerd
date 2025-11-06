@@ -355,7 +355,9 @@ func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullIma
 	log.G(ctx).Infof("PullImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("PullImage %q failed", r.GetImage().GetImage())
+			// Sanitize error to remove sensitive information
+			sanitizedErr := ctrdutil.SanitizeError(err)
+			log.G(ctx).WithError(sanitizedErr).Errorf("PullImage %q failed", r.GetImage().GetImage())
 		} else {
 			log.G(ctx).Infof("PullImage %q returns image reference %q",
 				r.GetImage().GetImage(), res.GetImageRef())
@@ -373,7 +375,9 @@ func (in *instrumentedService) ListImages(ctx context.Context, r *runtime.ListIm
 	log.G(ctx).Tracef("ListImages with filter %+v", r.GetFilter())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("ListImages with filter %+v failed", r.GetFilter())
+			// Sanitize error to remove sensitive information
+			sanitizedErr := ctrdutil.SanitizeError(err)
+			log.G(ctx).WithError(sanitizedErr).Errorf("ListImages with filter %+v failed", r.GetFilter())
 		} else {
 			log.G(ctx).Tracef("ListImages with filter %+v returns image list %+v",
 				r.GetFilter(), res.GetImages())
@@ -390,7 +394,9 @@ func (in *instrumentedService) ImageStatus(ctx context.Context, r *runtime.Image
 	log.G(ctx).Tracef("ImageStatus for %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("ImageStatus for %q failed", r.GetImage().GetImage())
+			// Sanitize error to remove sensitive information
+			sanitizedErr := ctrdutil.SanitizeError(err)
+			log.G(ctx).WithError(sanitizedErr).Errorf("ImageStatus for %q failed", r.GetImage().GetImage())
 		} else {
 			log.G(ctx).Tracef("ImageStatus for %q returns image status %+v",
 				r.GetImage().GetImage(), res.GetImage())
@@ -408,7 +414,9 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 	log.G(ctx).Infof("RemoveImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("RemoveImage %q failed", r.GetImage().GetImage())
+			// Sanitize error to remove sensitive information
+			sanitizedErr := ctrdutil.SanitizeError(err)
+			log.G(ctx).WithError(sanitizedErr).Errorf("RemoveImage %q failed", r.GetImage().GetImage())
 		} else {
 			log.G(ctx).Infof("RemoveImage %q returns successfully", r.GetImage().GetImage())
 		}
