@@ -147,7 +147,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
 					if _, err := io.CopyBuffer(wc, rio.Stdout(), *p); err != nil {
-						log.G(ctx).Warn("error copying stdout")
+						log.G(ctx).WithError(err).Error("error copying stdout")
 					}
 					wg.Done()
 					wc.Close()
@@ -166,7 +166,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
 					if _, err := io.CopyBuffer(wc, rio.Stderr(), *p); err != nil {
-						log.G(ctx).Warn("error copying stderr")
+						log.G(ctx).WithError(err).Error("error copying stderr")
 					}
 					wg.Done()
 					wc.Close()
@@ -205,7 +205,8 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				sameFile = newCountingWriteCloser(fw, 1)
 			}
 		}
-		i.dest(fw, fr)
+		discardWriter := newDiscardWriteCloser(fw)
+		i.dest(discardWriter, fr)
 	}
 	if stdin == "" {
 		return nil
@@ -225,6 +226,25 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 		f.Close()
 	}()
 	return nil
+}
+
+type discardWriter struct {
+	io.WriteCloser
+}
+
+func newDiscardWriteCloser(w io.WriteCloser) *discardWriter {
+	wc := &discardWriter{
+		w,
+	}
+	return wc
+}
+
+func (w *discardWriter) Write(p []byte) (int, error) {
+	n, err := w.WriteCloser.Write(p)
+	if err != nil && errors.Is(err, syscall.ENOSPC) {
+		return len(p), nil
+	}
+	return n, err
 }
 
 // countingWriteCloser masks io.Closer() until close has been invoked a certain number of times.
