@@ -98,7 +98,7 @@ github.com/cilium/ebpf/link
 # github.com/containerd/btrfs/v2 v2.0.0
 ## explicit; go 1.19
 github.com/containerd/btrfs/v2
-# github.com/containerd/cgroups/v3 v3.1.0
+# github.com/containerd/cgroups/v3 v3.1.1
 ## explicit; go 1.22.0
 github.com/containerd/cgroups/v3
 github.com/containerd/cgroups/v3/cgroup1
@@ -422,7 +422,7 @@ github.com/opencontainers/go-digest/digestset
 github.com/opencontainers/image-spec/identity
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runtime-spec v1.2.1
+# github.com/opencontainers/runtime-spec v1.3.0
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/runtime-spec/specs-go/features
