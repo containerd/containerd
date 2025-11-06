@@ -166,4 +166,4 @@ jobs:
           files: |
             builds/release-tars-**/*
             containerd-*-attestation.intoto.jsonl
-          make_latest: false
+          make_latest: true

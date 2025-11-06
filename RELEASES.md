@@ -130,8 +130,8 @@ to all committers.
 | [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.0)  | End of Life   | February 15, 2022              | August 23, 2025                | @containerd/committers |
 | [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS           | March 10, 2023                 | September 2026*                | @containerd/committers |
 | [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.0)  | Active        | November 5, 2024               | November 7, 2025               | @containerd/committers |
-| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.0)  | Active        | May 7, 2025                    | May 5, 2026 (_tentative_)      | @containerd/committers |
-| [2.2](https://github.com/containerd/containerd/milestone/49)         | Beta          | November 5, 2025 (_tentative_) | November 6, 2026 (_tentative_) | @containerd/committers |
+| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.0)  | Active        | May 7, 2025                    | May 5, 2026                    | @containerd/committers |
+| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.0)  | Active        | November 5, 2025               | November 6, 2026               | @containerd/committers |
 | [2.3](https://github.com/containerd/containerd/milestone/50)         | _Future_      | May 6, 2026 (_tentative_)      | _TBD_                          | _TBD_                  |
 
 \* Support for the 1.7 release branch is provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by @chrishenzie and @samuelkarp.
@@ -333,7 +333,7 @@ releases for prior API versions should be avoided if possible.
 | v1.7               | 1.7                    |
 | v2.0               | 1.8                    |
 | v2.1               | 1.9                    |
-| _v2.2_             | _1.10_                 |
+| v2.2               | 1.10                   |
 | _v2.3_             | _1.11_                 |
 
 
