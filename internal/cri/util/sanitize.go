@@ -22,11 +22,6 @@ import (
 	"strings"
 )
 
-// sensitiveParams defines query parameters that should be redacted.
-var sensitiveParams = map[string]bool{
-	"sig": true, // Azure SAS signature
-}
-
 // SanitizeError sanitizes an error by redacting sensitive information in URLs.
 // If the error contains a *url.Error, it parses and sanitizes the URL.
 // Otherwise, it returns the error unchanged.
@@ -55,7 +50,7 @@ func SanitizeError(err error) error {
 	return err
 }
 
-// sanitizeURL properly parses a URL and redacts sensitive query parameters.
+// sanitizeURL properly parses a URL and redacts all query parameters.
 func sanitizeURL(rawURL string) string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
@@ -69,24 +64,9 @@ func sanitizeURL(rawURL string) string {
 		return rawURL
 	}
 
-	// Check if any sensitive parameters exist
-	hasSensitive := false
+	// Redact all query parameters
 	for param := range query {
-		if sensitiveParams[param] {
-			hasSensitive = true
-			break
-		}
-	}
-
-	if !hasSensitive {
-		return rawURL
-	}
-
-	// Redact sensitive parameters
-	for param := range sensitiveParams {
-		if query.Has(param) {
-			query.Set(param, "[REDACTED]")
-		}
+		query.Set(param, "[REDACTED]")
 	}
 
 	// Reconstruct URL with sanitized query

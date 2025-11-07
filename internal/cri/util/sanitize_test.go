@@ -44,10 +44,10 @@ func TestSanitizeError_SimpleURLError(t *testing.T) {
 	require.True(t, ok, "Should return *sanitizedError type")
 	assert.Equal(t, urlErr, sanitizedErr.original)
 	assert.Equal(t, urlErr, sanitizedErr.urlError)
-	assert.Equal(t, "https://storage.blob.core.windows.net/container/blob?sig=%5BREDACTED%5D&sv=2020", sanitizedErr.sanitizedURL)
+	assert.Equal(t, "https://storage.blob.core.windows.net/container/blob?sig=%5BREDACTED%5D&sv=%5BREDACTED%5D", sanitizedErr.sanitizedURL)
 
 	// Test Error() method - verifies ReplaceAll functionality
-	expected := "Get \"https://storage.blob.core.windows.net/container/blob?sig=%5BREDACTED%5D&sv=2020\": connection timeout"
+	expected := "Get \"https://storage.blob.core.windows.net/container/blob?sig=%5BREDACTED%5D&sv=%5BREDACTED%5D\": connection timeout"
 	assert.Equal(t, expected, sanitized.Error())
 }
 
@@ -96,8 +96,8 @@ func TestSanitizeError_NilError(t *testing.T) {
 	assert.Nil(t, sanitized, "nil error should return nil")
 }
 
-func TestSanitizeError_NoSensitiveParams(t *testing.T) {
-	// URL without sensitive params
+func TestSanitizeError_NoQueryParams(t *testing.T) {
+	// URL without any query parameters
 	urlErr := &url.Error{
 		Op:  "Get",
 		URL: "https://registry.example.com/v2/image/manifests/latest",
@@ -108,7 +108,7 @@ func TestSanitizeError_NoSensitiveParams(t *testing.T) {
 
 	// Should return the same error object (no sanitization needed)
 	assert.Equal(t, urlErr, sanitized,
-		"Errors without sensitive params should pass through unchanged")
+		"Errors without query params should pass through unchanged")
 }
 
 func TestSanitizedError_Unwrap(t *testing.T) {
