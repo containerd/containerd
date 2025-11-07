@@ -447,7 +447,7 @@ func (computeSystem *System) statisticsInProc(job *jobobject.JobObject) (*hcssch
 	// with the class SystemProcessInformation which returns an array containing system information for *every*
 	// process running on the machine. They then grab the pids that are running in the container and filter down
 	// the entries in the array to only what's running in that silo and start tallying up the total. This doesn't
-	// work well as performance should get worse if more processess are running on the machine in general and not
+	// work well as performance should get worse if more processes are running on the machine in general and not
 	// just in the container. All of the additional information besides the WorkingSetPrivateSize field is ignored
 	// as well which isn't great and is wasted work to fetch.
 	//

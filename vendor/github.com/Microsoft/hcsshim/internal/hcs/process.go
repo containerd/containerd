@@ -134,7 +134,7 @@ func (process *Process) Kill(ctx context.Context) (bool, error) {
 		// A kill signal has already been sent to this process. Sending a second
 		// one offers no real benefit, as processes cannot stop themselves from
 		// being terminated, once a TerminateProcess has been issued. Sending a
-		// second kill may result in a number of errors (two of which detailed bellow)
+		// second kill may result in a number of errors (two of which detailed below)
 		// and which we can avoid handling.
 		return true, nil
 	}

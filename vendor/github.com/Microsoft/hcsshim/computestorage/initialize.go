@@ -34,7 +34,7 @@ func InitializeWritableLayer(ctx context.Context, layerPath string, layerData La
 	// Options are not used in the platform as of RS5
 	err = hcsInitializeWritableLayer(layerPath, string(bytes), "")
 	if err != nil {
-		return errors.Wrap(err, "failed to intitialize container layer")
+		return errors.Wrap(err, "failed to initialize container layer")
 	}
 	return nil
 }

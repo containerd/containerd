@@ -42,12 +42,12 @@ func SetupContainerBaseLayer(ctx context.Context, layerPath, baseVhdPath, diffVh
 	// differencing disks if they exist in case we're asking for a different size.
 	if _, err := os.Stat(hivesPath); err == nil {
 		if err := os.RemoveAll(hivesPath); err != nil {
-			return errors.Wrap(err, "failed to remove prexisting hives directory")
+			return errors.Wrap(err, "failed to remove preexisting hives directory")
 		}
 	}
 	if _, err := os.Stat(layoutPath); err == nil {
 		if err := os.RemoveAll(layoutPath); err != nil {
-			return errors.Wrap(err, "failed to remove prexisting layout file")
+			return errors.Wrap(err, "failed to remove preexisting layout file")
 		}
 	}
 
