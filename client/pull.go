@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
@@ -51,6 +52,14 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		}
 	}
 
+	if resolver, ok := pullCtx.Resolver.(remotes.ResolverWithOptions); ok {
+		resolver.SetOptions(
+			transfer.WithConcurrentLayerFetchBuffer(pullCtx.ConcurrentLayerFetchBuffer),
+			transfer.WithMaxConcurrentDownloads(pullCtx.MaxConcurrentDownloads),
+			transfer.WithDownloadLimiter(pullCtx.DownloadLimiter),
+		)
+	}
+
 	if pullCtx.PlatformMatcher == nil {
 		if len(pullCtx.Platforms) > 1 {
 			return nil, errors.New("cannot pull multiplatform image locally, try Fetch")
@@ -70,6 +79,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("unpack", pullCtx.Unpack),
 		tracing.Attribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
+		tracing.Attribute("concurrent.layer.fetch.buffer", pullCtx.ConcurrentLayerFetchBuffer),
 		tracing.Attribute("platforms.count", len(pullCtx.Platforms)),
 	)
 
@@ -108,9 +118,6 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			ApplyOpts:      uconfig.ApplyOpts,
 		}
 		uopts := []unpack.UnpackerOpt{unpack.WithUnpackPlatform(platform)}
-		if pullCtx.MaxConcurrentDownloads > 0 {
-			uopts = append(uopts, unpack.WithLimiter(semaphore.NewWeighted(int64(pullCtx.MaxConcurrentDownloads))))
-		}
 		if uconfig.DuplicationSuppressor != nil {
 			uopts = append(uopts, unpack.WithDuplicationSuppressor(uconfig.DuplicationSuppressor))
 		}
@@ -145,11 +152,18 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	var ur unpack.Result
 	if unpacker != nil {
 		_, unpackSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "UnpackWait"))
-		if ur, err = unpacker.Wait(); err != nil {
+		u := unpacker
+		unpacker = nil
+
+		ur, err = u.Wait()
+		if err != nil {
 			unpackSpan.SetStatus(err)
 			unpackSpan.End()
 			return nil, err
 		}
+		unpackSpan.SetAttributes(
+			tracing.Attribute("unpack.count", ur.Unpacks),
+		)
 		unpackSpan.End()
 	}
 
@@ -159,7 +173,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	i := NewImageWithPlatform(c, img, pullCtx.PlatformMatcher)
-	span.SetAttributes(tracing.Attribute("image.ref", i.Name()))
+	span.SetAttributes(tracing.Attribute("container.image.ref", i.Name()))
 
 	if unpacker != nil && ur.Unpacks == 0 {
 		// Unpack was tried previously but nothing was unpacked
@@ -180,6 +194,12 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	if err != nil {
 		return images.Image{}, fmt.Errorf("failed to resolve reference %q: %w", ref, err)
 	}
+	span.SetAttributes(
+		tracing.Attribute("container.image.ref", ref),
+		tracing.Attribute("image.name", name),
+		tracing.Attribute("target.mediaType", desc.MediaType),
+		tracing.Attribute("image.digest", desc.Digest.String()),
+	)
 
 	fetcher, err := rCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
@@ -248,18 +268,20 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		handler = rCtx.HandlerWrapper(handler)
 	}
 
-	if rCtx.MaxConcurrentDownloads > 0 {
-		limiter = semaphore.NewWeighted(int64(rCtx.MaxConcurrentDownloads))
-	}
-
-	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
+	_, dspan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "dispatch"))
+	err = images.Dispatch(ctx, handler, limiter, desc)
+	dspan.End()
+	if err != nil {
 		return images.Image{}, err
 	}
 
 	if isConvertible {
+		_, cspan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "convert_manifest"))
+		defer cspan.End()
 		if desc, err = converterFunc(ctx, desc); err != nil {
 			return images.Image{}, err
 		}
+
 	}
 
 	return images.Image{

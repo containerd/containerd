@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/containers"
@@ -36,6 +35,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	bolt "go.etcd.io/bbolt"
 	errbolt "go.etcd.io/bbolt/errors"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -127,10 +127,16 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 		tracing.WithAttribute("container.id", container.ID),
 	)
 	defer span.End()
+	if container.SandboxID != "" {
+		ctx = tracing.ContextWithSandboxID(ctx, container.SandboxID)
+	}
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
 	}
+
+	AddStandardAttributes(span, container.SandboxID, container.ID, "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", namespace))
 
 	if err := validateContainer(&container); err != nil {
 		return containers.Container{}, fmt.Errorf("create container failed validation: %w", err)
@@ -158,6 +164,7 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 
 		span.SetAttributes(
 			tracing.Attribute("container.createdAt", container.CreatedAt.Format(time.RFC3339)),
+			tracing.Attribute("container.updatedAt", container.UpdatedAt.Format(time.RFC3339)),
 		)
 		return nil
 	}); err != nil {
@@ -173,6 +180,9 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 		tracing.WithAttribute("container.id", container.ID),
 	)
 	defer span.End()
+	if container.SandboxID != "" {
+		ctx = tracing.ContextWithSandboxID(ctx, container.SandboxID)
+	}
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
@@ -181,6 +191,9 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 	if container.ID == "" {
 		return containers.Container{}, fmt.Errorf("must specify a container id: %w", errdefs.ErrInvalidArgument)
 	}
+
+	AddStandardAttributes(span, container.SandboxID, container.ID, "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", namespace))
 
 	var updated containers.Container
 	if err := update(ctx, s.db, func(tx *bolt.Tx) error {
@@ -283,10 +296,18 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 	)
 	defer span.End()
 
+	if meta, err := s.Get(ctx, id); err == nil && meta.SandboxID != "" {
+		ctx = tracing.ContextWithSandboxID(ctx, meta.SandboxID)
+		AddStandardAttributes(span, meta.SandboxID, id, "", "")
+	}
+
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
 	}
+
+	AddStandardAttributes(span, "", id, "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", namespace))
 
 	return update(ctx, s.db, func(tx *bolt.Tx) error {
 		bkt := getContainersBucket(tx, namespace)
@@ -301,7 +322,7 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 			return err
 		}
 
-		atomic.AddUint32(&s.db.dirty, 1)
+		s.db.dirty.Add(1)
 
 		return nil
 	})
@@ -443,4 +464,26 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 	}
 
 	return boltutil.WriteLabels(bkt, container.Labels)
+}
+
+func AddStandardAttributes(span *tracing.Span, sandboxID, containerID, podName, podNS string) {
+	if span == nil {
+		return
+	}
+	kv := make([]attribute.KeyValue, 0, 4)
+	if sandboxID != "" {
+		kv = append(kv, attribute.String("sandbox.id", sandboxID))
+	}
+	if containerID != "" {
+		kv = append(kv, attribute.String("container.id", containerID))
+	}
+	if podName != "" {
+		kv = append(kv, attribute.String("pod.name", podName))
+	}
+	if podNS != "" {
+		kv = append(kv, attribute.String("pod.namespace", podNS))
+	}
+	if len(kv) > 0 {
+		span.SetAttributes(kv...)
+	}
 }

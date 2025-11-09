@@ -32,7 +32,6 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubelet/pkg/cri/streaming"
 
 	apitypes "github.com/containerd/containerd/api/types"
 
@@ -40,7 +39,6 @@ import (
 	"github.com/containerd/containerd/v2/core/introspection"
 	_ "github.com/containerd/containerd/v2/core/runtime" // for typeurl init
 	"github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/internal/cri/config"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/nri"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
@@ -49,6 +47,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
+	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/eventq"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
@@ -56,6 +55,9 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
+
+	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/containerd/v2/pkg/tracing/manager"
 )
 
 var kernelSupportsRRO bool
@@ -112,6 +114,9 @@ type ImageService interface {
 
 // criService implements CRIService.
 type criService struct {
+	runtime.UnimplementedRuntimeServiceServer
+	runtime.UnimplementedImageServiceServer
+
 	RuntimeService
 	ImageService
 	// config contains all configurations.
@@ -149,7 +154,7 @@ type criService struct {
 	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
 	// containerEventsQ is used to capture container events and send them
 	// to the callers of GetContainerEvents.
-	containerEventsQ eventq.EventQueue[runtime.ContainerEventResponse]
+	containerEventsQ eventq.EventQueue[*runtime.ContainerEventResponse]
 	// nri is used to hook NRI into CRI request processing.
 	nri *nri.API
 	// sandboxService is the sandbox related service for CRI
@@ -158,6 +163,8 @@ type criService struct {
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
+	// tracer.Tracer trace lifecycle events of CRI
+	traceManager *manager.TraceManager
 }
 
 type CRIServiceOptions struct {
@@ -176,6 +183,86 @@ type CRIServiceOptions struct {
 	//
 	// TODO: Replace this gradually with directly configured instances
 	Client *containerd.Client
+}
+
+func (c *criService) initTracing() error {
+	if c.config.Tracing == nil {
+		log.L.Info("Tracing is still nil and tracing is disabled")
+		return nil
+	}
+
+	if !c.config.Tracing.Enabled {
+		log.L.Info("Tracing is disabled via config")
+		return nil
+	}
+
+	log.L.Infof("Initializing tracing with config: SamplingRate=%f",
+		c.config.Tracing.SamplingRate)
+
+	// Register sandbox id resolver
+	resolver := func(attrs map[string]interface{}) (string, bool) {
+		if v, ok := attrs["sandbox.id"]; ok {
+			if s, ok2 := v.(string); ok2 && s != "" {
+				return s, true
+			}
+		}
+		var cid string
+		if v, ok := attrs["container.id"]; ok {
+			if s, ok2 := v.(string); ok2 && s != "" {
+				cid = s
+			}
+		}
+		if cid == "" {
+			if v, ok := attrs["container.id"]; ok {
+				if s, ok2 := v.(string); ok2 && s != "" {
+					cid = s
+				}
+			}
+		}
+		if cid == "" {
+			return "", false
+		}
+		if meta, err := c.containerStore.Get(cid); err == nil && meta.SandboxID != "" {
+			return meta.SandboxID, true
+		}
+
+		return "", false
+	}
+
+	tracing.SetSandboxIDResolver(resolver)
+
+	tracingCfg := manager.Config{
+		Enabled:          c.config.Tracing.Enabled,
+		SamplingRate:     c.config.Tracing.SamplingRate,
+		UseSandboxID:     c.config.Tracing.UseSandboxID,
+		MaxSpansPerTrace: c.config.Tracing.MaxSpansPerTrace,
+		Exporters:        convertExporterConfigs(c.config.Tracing.Exporters),
+		Resolver:         resolver,
+	}
+
+	tm, err := manager.NewTraceManager(tracingCfg)
+
+	if err != nil {
+		log.L.WithError(err).Error("Failed to initialize TraceManager")
+		return fmt.Errorf("failed to initialize tracing: %w", err)
+	}
+	c.traceManager = tm
+	tracing.SetGlobalTraceManager(tm)
+	log.L.Info("Tracing initialized successfully")
+
+	return nil
+}
+
+func convertExporterConfigs(criExporters []criconfig.ExporterConfig) []manager.ExporterConfig {
+	var exporters []manager.ExporterConfig
+	for _, exp := range criExporters {
+		exporters = append(exporters, manager.ExporterConfig{
+			Type:     exp.Type,
+			Endpoint: exp.Endpoint,
+			Options:  exp.Options,
+		})
+	}
+	return exporters
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -202,7 +289,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	}
 
 	// TODO: Make discard time configurable
-	c.containerEventsQ = eventq.New[runtime.ContainerEventResponse](5*time.Minute, func(event runtime.ContainerEventResponse) {
+	c.containerEventsQ = eventq.New[*runtime.ContainerEventResponse](5*time.Minute, func(event *runtime.ContainerEventResponse) {
 		containerEventsDroppedCount.Inc()
 		log.L.WithFields(
 			log.Fields{
@@ -251,6 +338,11 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 
 	c.runtimeFeatures = &runtime.RuntimeFeatures{
 		SupplementalGroupsPolicy: true,
+	}
+
+	if err := c.initTracing(); err != nil {
+		log.L.WithError(err).Error("Failed to initialize Tracing from service.go")
+		return c, c, nil
 	}
 
 	return c, c, nil
@@ -360,6 +452,14 @@ func (c *criService) Close() error {
 	if err := c.streamServer.Stop(); err != nil {
 		return fmt.Errorf("failed to stop stream server: %w", err)
 	}
+
+	if c.traceManager != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := c.traceManager.Shutdown(ctx); err != nil {
+			log.L.Warnf("Failed to shutdown tracer: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -368,7 +468,7 @@ func (c *criService) IsInitialized() bool {
 	return c.initialized.Load()
 }
 
-func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introspection.Service, name string, r config.Runtime) error {
+func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introspection.Service, name string, r criconfig.Runtime) error {
 	h := &runtime.RuntimeHandler{
 		Name: name,
 	}
@@ -392,15 +492,19 @@ func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introsp
 
 	c.runtimeHandlers[name] = h
 	if name == c.config.DefaultRuntimeName {
-		defH := *h
-		defH.Name = "" // denotes default
-		c.runtimeHandlers[""] = &defH
+		// Copying runtime.RuntimeHandler isn't allowed so a new struct with the same
+		// contents as the variable "h" is created here for the default runtime.
+		defH := &runtime.RuntimeHandler{
+			Name:     "", // denotes default
+			Features: h.Features,
+		}
+		c.runtimeHandlers[""] = defH
 	}
 
 	return nil
 }
 
-func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r config.Runtime) (*features.Features, error) {
+func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r criconfig.Runtime) (*features.Features, error) {
 	if r.Type != plugins.RuntimeRuncV2 {
 		return nil, fmt.Errorf("introspecting OCI runtime features needs the runtime type to be %q, got %q",
 			plugins.RuntimeRuncV2, r.Type)
@@ -413,7 +517,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if r.Path != "" {
 		rr.RuntimePath = r.Path // "/usr/local/bin/crun"
 	}
-	options, err := config.GenerateRuntimeOptions(r)
+	options, err := criconfig.GenerateRuntimeOptions(r)
 	if err != nil {
 		return nil, err
 	}

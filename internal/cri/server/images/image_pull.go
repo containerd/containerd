@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/imgcrypt/v2"
 	"github.com/containerd/imgcrypt/v2/images/encryption"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	distribution "github.com/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -44,6 +45,9 @@ import (
 	containerdimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
+	"github.com/containerd/containerd/v2/core/transfer"
+	transferimage "github.com/containerd/containerd/v2/core/transfer/image"
+	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
@@ -93,12 +97,66 @@ import (
 // after we pull the image? How to manage the disk usage of contents? If some
 // contents are missing but snapshots are ready, is the image still "READY"?
 
+// private context key for sandbox id propagation
+type ctxKey string
+
+const ctxKeySandboxID ctxKey = "cri.sandbox.id"
+
 // PullImage pulls an image with authentication config.
 func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
-
+	ctx, rpcSpan := tracing.StartSpan(ctx, tracing.Name("cri.image", "grpc_pull"))
+	defer func() {
+		if err != nil {
+			rpcSpan.SetStatus(err)
+		}
+		rpcSpan.End()
+	}()
 	imageRef := r.GetImage().GetImage()
 
+	// Extract sandbox id best-effort from annotations.
+	// There is no SandboxId field in PullImageRequest in CRI v1.
+	var sandboxID string
+	if r.SandboxConfig != nil && r.SandboxConfig.Annotations != nil {
+		// Common fallback keys that may carry sandbox id.
+		if v, ok := r.SandboxConfig.Annotations["io.kubernetes.cri.sandbox-id"]; ok && v != "" {
+			sandboxID = v
+		} else if v, ok := r.SandboxConfig.Annotations["k8s.v1.cni.cncf.io/sandbox-id"]; ok && v != "" {
+			sandboxID = v
+		}
+	}
+	if sandboxID != "" {
+		ctx = context.WithValue(ctx, ctxKeySandboxID, sandboxID)
+		ctx = tracing.ContextWithSandboxID(ctx, sandboxID)
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.SetAttributes(
+				tracing.Attribute("sandbox.id", sandboxID),
+			)
+		}
+	}
+
+	if sc := r.SandboxConfig; sc != nil && sc.GetMetadata() != nil {
+		md := sc.GetMetadata()
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.SetAttributes(
+				tracing.Attribute("pod.name", md.GetName()),
+				tracing.Attribute("pod.namespace", md.GetNamespace()),
+				tracing.Attribute("pod.uid", md.GetUid()),
+			)
+		}
+	}
+
+	if sp := tracing.SpanFromContext(ctx); sp != nil {
+		sp.SetAttributes(
+			tracing.Attribute("pull.has_sandbox_config", r.SandboxConfig != nil),
+			tracing.Attribute("pull.has.sandboxid", sandboxID != ""),
+		)
+		if r.SandboxConfig != nil {
+			sp.SetAttributes(tracing.Attribute("pull.annotation_count", len(r.SandboxConfig.GetAnnotations())))
+		}
+	}
+
 	credentials := func(host string) (string, string, error) {
+		// Trace: credentials lookup path
 		hostauth := r.GetAuth()
 		if hostauth == nil {
 			config := c.config.Registry.Configs[host]
@@ -113,15 +171,51 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 	if err != nil {
 		return nil, err
 	}
+	// Trace: returning normalized image ref to caller
 	return &runtime.PullImageResponse{ImageRef: ref}, nil
 }
 
 func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (_ string, err error) {
-	span := tracing.SpanFromContext(ctx)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("cri.image", "pull"))
+	defer func() {
+		if err != nil {
+			span.SetStatus(err)
+		}
+		span.End()
+	}()
+
+	// Best-effort extract sandbox id from annotations.
+	var sandboxID string
+	if sandboxConfig != nil && sandboxConfig.Annotations != nil {
+		if v, ok := sandboxConfig.Annotations["io.kubernetes.cri.sandbox-id"]; ok && v != "" {
+			sandboxID = v
+		} else if v, ok := sandboxConfig.Annotations["k8s.v1.cni.cncf.io/sandbox-id"]; ok && v != "" {
+			sandboxID = v
+		}
+	}
+	if sandboxID != "" {
+		ctx = context.WithValue(ctx, ctxKeySandboxID, sandboxID)
+		ctx = tracing.ContextWithSandboxID(ctx, sandboxID)
+		if span != nil {
+			span.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
+		}
+	}
+
+	if span != nil && !span.IsEnhancedTracingActive() {
+		if v := ctx.Value(ctxKeySandboxID); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				span.SetAttributes(tracing.Attribute("sandbox.id", s))
+			}
+		}
+	}
+
 	defer func() {
 		// TODO: add domain label for imagePulls metrics, and we may need to provide a mechanism
 		// for the user to configure the set of registries that they are interested in.
 		if err != nil {
+			if span != nil {
+				span.RecordError(err)
+			}
 			imagePulls.WithValues("failure").Inc()
 		} else {
 			imagePulls.WithValues("success").Inc()
@@ -150,6 +244,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	if err != nil {
 		return "", fmt.Errorf("failed to parse image reference %q: %w", name, err)
 	}
+
 	ref := namedRef.String()
 	if ref != name {
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
@@ -157,39 +252,160 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 
 	imagePullProgressTimeout, err := time.ParseDuration(c.config.ImagePullProgressTimeout)
 	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+		}
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
-	var (
-		pctx, pcancel = context.WithCancel(ctx)
-
-		pullReporter = newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
-
-		resolver = docker.NewResolver(docker.ResolverOptions{
-			Headers: c.config.Registry.Headers,
-			Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
-		})
-	)
-
-	defer pcancel()
 	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig)
 	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+		}
 		return "", err
 	}
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
-	span.SetAttributes(
-		tracing.Attribute("image.ref", ref),
-		tracing.Attribute("snapshotter.name", snapshotter),
-	)
+
+	// Attach commonly useful attributes to the current span.
+	if span != nil {
+		span.SetAttributes(
+			tracing.Attribute("image.ref", ref),
+			tracing.Attribute("snapshotter.name", snapshotter),
+		)
+		// Propagate sandbox id into the span if present in context.
+		if v := ctx.Value(ctxKeySandboxID); v != nil {
+			if s, _ := v.(string); s != "" {
+				span.SetAttributes(tracing.Attribute("sandbox.id", s))
+			}
+		}
+		span.AddEvent("image.pull.start",
+			tracing.Attribute("strategy.selectable", fmt.Sprintf("%t", !c.config.UseLocalImagePull)))
+	}
 
 	labels := c.getLabels(ctx, ref)
 
+	// If UseLocalImagePull is true, use client.Pull to pull the image, else use transfer service by default.
+	//
+	// Transfer service does not currently support all the CRI image config options.
+	// TODO: Add support for DisableSnapshotAnnotations, DiscardUnpackedLayers, ImagePullWithSyncFs and unpackDuplicationSuppressor
+	var image containerd.Image
+	if c.config.UseLocalImagePull {
+		if span != nil {
+			span.AddEvent("pull.strategy.select", tracing.Attribute("strategy", "client.Pull"))
+		}
+		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+	} else {
+		if span != nil {
+			span.AddEvent("pull.strategy.select", tracing.Attribute("strategy", "transfer.service"))
+		}
+		image, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+	}
+
+	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+		}
+		return "", err
+	}
+
+	if span != nil {
+		span.AddEvent("Pull and unpack image complete")
+	}
+
+	configDesc, err := image.Config(ctx)
+	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+		}
+		return "", fmt.Errorf("get image config descriptor: %w", err)
+	}
+	imageID := configDesc.Digest.String()
+
+	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest)
+	for _, r := range []string{imageID, repoTag, repoDigest} {
+		if r == "" {
+			continue
+		}
+		if err := c.createOrUpdateImageReference(ctx, r, image.Target(), labels); err != nil {
+			if span != nil {
+				span.RecordError(err)
+			}
+			return "", fmt.Errorf("failed to create image reference %q: %w", r, err)
+		}
+		// Update image store to reflect the newest state in containerd.
+		// No need to use `updateImage`, because the image reference must
+		// have been managed by the cri plugin.
+		// TODO: Use image service directly
+		if err := c.imageStore.Update(ctx, r); err != nil {
+			if span != nil {
+				span.RecordError(err)
+			}
+			return "", fmt.Errorf("failed to update image store %q: %w", r, err)
+		}
+	}
+
+	const mbToByte = 1024 * 1024
+	size, _ := image.Size(ctx)
+	imagePullingSpeed := float64(size) / mbToByte / time.Since(startTime).Seconds()
+	imagePullThroughput.Observe(imagePullingSpeed)
+
+	if span != nil {
+		span.SetAttributes(
+			tracing.Attribute("image.size.bytes", size),
+			tracing.Attribute("pull.seconds", time.Since(startTime).Seconds()),
+		)
+	}
+
+	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", name, imageID,
+		repoTag, repoDigest, strconv.FormatInt(size, 10), time.Since(startTime))
+	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
+	// in-memory image store, it's only for in-memory indexing. The image could be removed
+	// by someone else anytime, before/during/after we create the metadata. We should always
+	// check the actual state in containerd before using the image or returning status of the
+	// image.
+	return imageID, nil
+}
+
+// pullImageWithLocalPull handles image pulling using the local client.
+func (c *CRIImageService) pullImageWithLocalPull(
+	ctx context.Context,
+	ref string,
+	credentials func(string) (string, string, error),
+	snapshotter string,
+	labels map[string]string,
+	imagePullProgressTimeout time.Duration,
+) (containerd.Image, error) {
+	pctx, pcancel := context.WithCancel(ctx)
+	defer pcancel()
+	// Open a child span for local pull path.
+	pctx, lspan := tracing.StartSpan(pctx, tracing.Name("cri.image", "local_pull"),
+		tracing.WithAttribute("image.ref", ref),
+		tracing.WithAttribute("snapshotter.name", snapshotter),
+	)
+	// Propagate sandbox id attribute if present.
+	if lspan != nil && !lspan.IsEnhancedTracingActive() {
+		if v := pctx.Value(ctxKeySandboxID); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				lspan.SetAttributes(tracing.Attribute("sandbox.id", s))
+			}
+		}
+	}
+	defer lspan.End()
+	pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		Headers: c.config.Registry.Headers,
+		Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
+	})
+
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, snapshotter)
 	pullOpts := []containerd.RemoteOpt{
 		containerd.WithResolver(resolver),
 		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabels(labels),
+		containerd.WithDownloadLimiter(c.downloadLimiter),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+		containerd.WithConcurrentLayerFetchBuffer(c.config.ConcurrentLayerFetchBuffer),
 		containerd.WithUnpackOpts([]containerd.UnpackOpt{
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
 			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
@@ -213,46 +429,76 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	image, err := c.client.Pull(pctx, ref, pullOpts...)
 	pcancel()
 	if err != nil {
-		return "", fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		lspan.RecordError(err)
+		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
-	span.AddEvent("Pull and unpack image complete")
+	lspan.AddEvent("client.pull.done")
+	return image, nil
+}
 
-	configDesc, err := image.Config(ctx)
+// pullImageWithTransferService handles image pulling using the transfer service.
+func (c *CRIImageService) pullImageWithTransferService(
+	ctx context.Context,
+	ref string,
+	credentials func(string) (string, string, error),
+	snapshotter string,
+	labels map[string]string,
+	imagePullProgressTimeout time.Duration,
+) (containerd.Image, error) {
+	// Open a child span for transfer service path.
+	ctx, tspan := tracing.StartSpan(ctx, tracing.Name("cri.image", "transfer_pull"),
+		tracing.WithAttribute("image.ref", ref),
+		tracing.WithAttribute("snapshotter.name", snapshotter),
+	)
+
+	if tspan != nil && !tspan.IsEnhancedTracingActive() {
+		if v := ctx.Value(ctxKeySandboxID); v != nil {
+			if s, _ := v.(string); s != "" {
+				tspan.SetAttributes(tracing.Attribute("sandbox.id", s))
+			}
+		}
+	}
+	defer tspan.End()
+
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
+	rctx, rcancel := context.WithCancel(ctx)
+	defer rcancel()
+	transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
+
+	// Set image store opts
+	var sopts []transferimage.StoreOpt
+	sopts = append(sopts, transferimage.WithPlatforms(platforms.DefaultSpec()))
+	sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
+	sopts = append(sopts, transferimage.WithImageLabels(labels))
+	is := transferimage.NewStore(ref, sopts...)
+	log.G(ctx).Debugf("Getting new CRI credentials")
+	ch := newCRICredentials(ref, credentials)
+	opts := []registry.Opt{registry.WithCredentials(ch)}
+	opts = append(opts, registry.WithHeaders(c.config.Registry.Headers))
+	opts = append(opts, registry.WithHostDir(c.config.Registry.ConfigPath))
+	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 	if err != nil {
-		return "", fmt.Errorf("get image config descriptor: %w", err)
-	}
-	imageID := configDesc.Digest.String()
-
-	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest)
-	for _, r := range []string{imageID, repoTag, repoDigest} {
-		if r == "" {
-			continue
-		}
-		if err := c.createOrUpdateImageReference(ctx, r, image.Target(), labels); err != nil {
-			return "", fmt.Errorf("failed to create image reference %q: %w", r, err)
-		}
-		// Update image store to reflect the newest state in containerd.
-		// No need to use `updateImage`, because the image reference must
-		// have been managed by the cri plugin.
-		// TODO: Use image service directly
-		if err := c.imageStore.Update(ctx, r); err != nil {
-			return "", fmt.Errorf("failed to update image store %q: %w", r, err)
-		}
+		tspan.RecordError(err)
+		return nil, fmt.Errorf("failed to create OCI registry: %w", err)
 	}
 
-	const mbToByte = 1024 * 1024
-	size, _ := image.Size(ctx)
-	imagePullingSpeed := float64(size) / mbToByte / time.Since(startTime).Seconds()
-	imagePullThroughput.Observe(imagePullingSpeed)
+	transferProgressReporter.start(rctx)
+	log.G(ctx).Debugf("Calling cri transfer service")
+	err = c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx)))
+	rcancel()
+	if err != nil {
+		tspan.RecordError(err)
+		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+	}
 
-	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", name, imageID,
-		repoTag, repoDigest, strconv.FormatInt(size, 10), time.Since(startTime))
-	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
-	// in-memory image store, it's only for in-memory indexing. The image could be removed
-	// by someone else anytime, before/during/after we create the metadata. We should always
-	// check the actual state in containerd before using the image or returning status of the
-	// image.
-	return imageID, nil
+	// Image should be pulled, unpacked and present in containerd image store at this moment
+	image, err := c.client.GetImage(ctx, ref)
+	if err != nil {
+		tspan.RecordError(err)
+		return nil, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
+	}
+	tspan.AddEvent("transfer.pull.done")
+	return image, nil
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
@@ -305,6 +551,12 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 		// Add a label to indicate that the image is managed by the cri plugin.
 		Labels: labels,
 	}
+	// Trace: attempt to create or update image reference
+	if sp := tracing.SpanFromContext(ctx); sp != nil {
+		sp.AddEvent("image.reference.upsert",
+			tracing.Attribute("ref", name),
+			tracing.Attribute("target.digest", desc.Digest.String()))
+	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
 	// TODO: Call CRIImageService directly
@@ -312,12 +564,18 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 	if err == nil {
 		return nil
 	} else if !errdefs.IsAlreadyExists(err) {
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.RecordError(err)
+		}
 		return err
 	}
 	// Retrieve oldImg from image store here because Create routine returns an
 	// empty image on ErrAlreadyExists
 	oldImg, err := c.images.Get(ctx, name)
 	if err != nil {
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.RecordError(err)
+		}
 		return err
 	}
 	fieldpaths := []string{"target"}
@@ -332,6 +590,11 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 		return nil
 	}
 	_, err = c.images.Update(ctx, img, fieldpaths...)
+	if err != nil {
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.RecordError(err)
+		}
+	}
 	return err
 }
 
@@ -346,7 +609,7 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 	return labels
 }
 
-// updateImage updates image store to reflect the newest state of an image reference
+// UpdateImage updates image store to reflect the newest state of an image reference
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
@@ -354,11 +617,17 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
+			if sp := tracing.SpanFromContext(ctx); sp != nil {
+				sp.RecordError(err)
+			}
 			return fmt.Errorf("get image by reference: %w", err)
 		}
 		// If the image is not found, we should continue updating the cache,
 		// so that the image can be removed from the cache.
 		if err := c.imageStore.Update(ctx, r); err != nil {
+			if sp := tracing.SpanFromContext(ctx); sp != nil {
+				sp.RecordError(err)
+			}
 			return fmt.Errorf("update image store for %q: %w", r, err)
 		}
 		return nil
@@ -372,23 +641,38 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 			// identifier that references the image in its lifetime.
 			configDesc, err := img.Config(ctx)
 			if err != nil {
+				if sp := tracing.SpanFromContext(ctx); sp != nil {
+					sp.RecordError(err)
+				}
 				return fmt.Errorf("get image id: %w", err)
 			}
 			id := configDesc.Digest.String()
 			if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
+				if sp := tracing.SpanFromContext(ctx); sp != nil {
+					sp.RecordError(err)
+				}
 				return fmt.Errorf("create image id reference %q: %w", id, err)
 			}
 			if err := c.imageStore.Update(ctx, id); err != nil {
+				if sp := tracing.SpanFromContext(ctx); sp != nil {
+					sp.RecordError(err)
+				}
 				return fmt.Errorf("update image store for %q: %w", id, err)
 			}
 			// The image id is ready, add the label to mark the image as managed.
 			if err := c.createOrUpdateImageReference(ctx, r, img.Target(), criLabels); err != nil {
+				if sp := tracing.SpanFromContext(ctx); sp != nil {
+					sp.RecordError(err)
+				}
 				return fmt.Errorf("create managed label: %w", err)
 			}
 			break
 		}
 	}
 	if err := c.imageStore.Update(ctx, r); err != nil {
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.RecordError(err)
+		}
 		return fmt.Errorf("update image store for %q: %w", r, err)
 	}
 	return nil
@@ -429,6 +713,11 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 
 	return func(host string) ([]docker.RegistryHost, error) {
 		var registries []docker.RegistryHost
+
+		// Trace: registry endpoints discovery
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.AddEvent("registry.endpoints.resolve", tracing.Attribute("host", host))
+		}
 
 		endpoints, err := c.registryEndpoints(host)
 		if err != nil {
@@ -485,7 +774,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 				Host:         u.Host,
 				Scheme:       u.Scheme,
 				Path:         u.Path,
-				Capabilities: docker.HostCapabilityResolve | docker.HostCapabilityPull,
+				Capabilities: docker.HostCapabilityResolve | docker.HostCapabilityPull | docker.HostCapabilityReferrers,
 			})
 		}
 		return registries, nil
@@ -686,27 +975,27 @@ func (r *countingReadCloser) Close() error {
 type pullRequestReporter struct {
 	// activeReqs indicates that current number of active pulling requests,
 	// including auth requests.
-	activeReqs int32
+	activeReqs atomic.Int32
 	// totalBytesRead indicates that the total bytes has been read from
 	// remote registry.
-	totalBytesRead uint64
+	totalBytesRead atomic.Uint64
 }
 
 func (reporter *pullRequestReporter) incRequest() {
-	atomic.AddInt32(&reporter.activeReqs, 1)
+	reporter.activeReqs.Add(1)
 }
 
 func (reporter *pullRequestReporter) decRequest() {
-	atomic.AddInt32(&reporter.activeReqs, -1)
+	reporter.activeReqs.Add(-1)
 }
 
 func (reporter *pullRequestReporter) incByteRead(nr uint64) {
-	atomic.AddUint64(&reporter.totalBytesRead, nr)
+	reporter.totalBytesRead.Add(nr)
 }
 
 func (reporter *pullRequestReporter) status() (currentReqs int32, totalBytesRead uint64) {
-	currentReqs = atomic.LoadInt32(&reporter.activeReqs)
-	totalBytesRead = atomic.LoadUint64(&reporter.totalBytesRead)
+	currentReqs = reporter.activeReqs.Load()
+	totalBytesRead = reporter.totalBytesRead.Load()
 	return currentReqs, totalBytesRead
 }
 
@@ -774,4 +1063,187 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	}
 
 	return snapshotter, nil
+}
+
+type criCredentials struct {
+	ref         string
+	credentials func(string) (string, string, error)
+}
+
+func newCRICredentials(ref string, credentials func(string) (string, string, error)) registry.CredentialHelper {
+	return &criCredentials{
+		ref:         ref,
+		credentials: credentials,
+	}
+}
+
+// GetCredentials gets credential from criCredentials makes criCredentials a registry.CredentialHelper
+func (cc *criCredentials) GetCredentials(ctx context.Context, ref string, host string) (registry.Credentials, error) {
+	if cc.credentials == nil {
+		return registry.Credentials{}, fmt.Errorf("credential handler not initialized for ref %q", ref)
+	}
+
+	if ref != cc.ref {
+		return registry.Credentials{}, fmt.Errorf("invalid ref %q, expected %q", ref, cc.ref)
+	}
+
+	username, secret, err := cc.credentials(host)
+	if err != nil {
+		return registry.Credentials{}, fmt.Errorf("failed to get credentials for %q: %w", host, err)
+	}
+	return registry.Credentials{
+		Host:     host,
+		Username: username,
+		Secret:   secret,
+	}, nil
+}
+
+type transferProgressReporter struct {
+	ref               string
+	pc                chan transfer.Progress
+	cancel            context.CancelFunc
+	timeout           time.Duration
+	reqReporter       pullRequestReporter
+	statuses          map[string]*transfer.Progress
+	lastSeenBytesRead uint64
+	lastSeenTimestamp time.Time
+}
+
+func newTransferProgressReporter(ref string, cancel context.CancelFunc, timeout time.Duration) *transferProgressReporter {
+	return &transferProgressReporter{
+		ref:      ref,
+		cancel:   cancel,
+		timeout:  timeout,
+		pc:       make(chan transfer.Progress),
+		statuses: make(map[string]*transfer.Progress),
+	}
+}
+
+func (reporter *transferProgressReporter) handleProgress(p transfer.Progress) {
+	// We only need to handle Progress Nodes that represent
+	// valid requests to a remote registry, so Progress nodes
+	// without 'Name', 'Desc' or 'Total' can be ignored
+	if p.Name == "" || p.Desc == nil || p.Total == 0 {
+		return
+	}
+
+	switch p.Event {
+	case "waiting":
+		// 'Waiting' events can be either when the layer is waiting to be
+		// downloaded and no progress has been made. Or when we have made
+		// some progress but `waiting` for more content to be downloaded.
+		if p.Progress == 0 {
+			return
+		}
+		fallthrough // Handle non-zero waiting progress same as downloading
+	case "downloading":
+		var curProgress int64
+		if node, ok := reporter.statuses[p.Name]; !ok {
+			curProgress = p.Progress
+			reporter.reqReporter.incRequest()
+		} else {
+			curProgress = p.Progress - node.Progress
+		}
+		reporter.statuses[p.Name] = &p
+		if curProgress > 0 {
+			reporter.IncBytesRead(curProgress)
+		}
+
+		// Download may be complete, but waiting for content
+		// to be written. In this case, we no longer consider it
+		// as an active requests.
+		if p.Progress == p.Total {
+			reporter.reqReporter.decRequest()
+			delete(reporter.statuses, p.Name)
+		}
+
+	case "complete":
+		if node, exists := reporter.statuses[p.Name]; exists {
+			if curProgress := p.Progress - node.Progress; curProgress > 0 {
+				reporter.IncBytesRead(curProgress)
+			}
+			reporter.reqReporter.decRequest()
+			delete(reporter.statuses, p.Name)
+		}
+	default:
+		return
+	}
+}
+
+func (reporter *transferProgressReporter) IncBytesRead(bytes int64) {
+	reporter.reqReporter.incByteRead(uint64(bytes))
+}
+
+func (reporter *transferProgressReporter) start(ctx context.Context) {
+	if reporter.timeout == 0 {
+		log.G(ctx).Infof("no timeout and will not start pulling image %s reporter", reporter.ref)
+		return
+	}
+
+	go func() {
+		var (
+			reportInterval = defaultPullProgressReportInterval
+		)
+
+		reporter.lastSeenBytesRead = uint64(0)
+		reporter.lastSeenTimestamp = time.Now()
+
+		// check progress more frequently if timeout < default internal
+		if reporter.timeout < reportInterval {
+			reportInterval = reporter.timeout / 2
+		}
+
+		var ticker = time.NewTicker(reportInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case p := <-reporter.pc:
+				reporter.handleProgress(p)
+			case <-ticker.C:
+				reporter.checkProgress(ctx, reportInterval)
+				continue
+			case <-ctx.Done():
+				activeReqs, bytesRead := reporter.reqReporter.status()
+				log.G(ctx).Infof("stop pulling image %s: active requests=%v, bytes read=%v", reporter.ref, activeReqs, bytesRead)
+				return
+			}
+		}
+	}()
+}
+
+func (reporter *transferProgressReporter) checkProgress(ctx context.Context, reportInterval time.Duration) {
+	activeReqs, bytesRead := reporter.reqReporter.status()
+
+	lastSeenBytesRead := reporter.lastSeenBytesRead
+	lastSeenTimestamp := reporter.lastSeenTimestamp
+
+	log.G(ctx).WithField("ref", reporter.ref).
+		WithField("activeReqs", activeReqs).
+		WithField("totalBytesRead", bytesRead).
+		WithField("lastSeenBytesRead", lastSeenBytesRead).
+		WithField("lastSeenTimestamp", lastSeenTimestamp.Format(time.RFC3339)).
+		WithField("reportInterval", reportInterval).
+		Debugf("progress for image pull")
+
+	if activeReqs == 0 || bytesRead > lastSeenBytesRead {
+		reporter.lastSeenBytesRead = bytesRead
+		reporter.lastSeenTimestamp = time.Now()
+		return
+	}
+
+	if time.Since(lastSeenTimestamp) > reporter.timeout {
+		log.G(ctx).Errorf("cancel pulling image %s because of no progress in %v", reporter.ref, reporter.timeout)
+		reporter.cancel()
+	}
+}
+
+func (reporter *transferProgressReporter) createProgressFunc(ctx context.Context) transfer.ProgressFunc {
+	return func(p transfer.Progress) {
+		select {
+		case reporter.pc <- p:
+		case <-ctx.Done():
+			return
+		}
+	}
 }
