@@ -65,8 +65,7 @@ type unpackerConfig struct {
 
 	limiter               Limiter
 	duplicationSuppressor KeyedLocker
-
-	unpackLimiter Limiter
+	unpackLimiter         Limiter
 }
 
 // Platform represents a platform-specific unpack configuration which includes

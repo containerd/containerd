@@ -97,12 +97,66 @@ import (
 // after we pull the image? How to manage the disk usage of contents? If some
 // contents are missing but snapshots are ready, is the image still "READY"?
 
+// private context key for sandbox id propagation
+type ctxKey string
+
+const ctxKeySandboxID ctxKey = "cri.sandbox.id"
+
 // PullImage pulls an image with authentication config.
 func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
-
+	ctx, rpcSpan := tracing.StartSpan(ctx, tracing.Name("cri.image", "grpc_pull"))
+	defer func() {
+		if err != nil {
+			rpcSpan.SetStatus(err)
+		}
+		rpcSpan.End()
+	}()
 	imageRef := r.GetImage().GetImage()
 
+	// Extract sandbox id best-effort from annotations.
+	// There is no SandboxId field in PullImageRequest in CRI v1.
+	var sandboxID string
+	if r.SandboxConfig != nil && r.SandboxConfig.Annotations != nil {
+		// Common fallback keys that may carry sandbox id.
+		if v, ok := r.SandboxConfig.Annotations["io.kubernetes.cri.sandbox-id"]; ok && v != "" {
+			sandboxID = v
+		} else if v, ok := r.SandboxConfig.Annotations["k8s.v1.cni.cncf.io/sandbox-id"]; ok && v != "" {
+			sandboxID = v
+		}
+	}
+	if sandboxID != "" {
+		ctx = context.WithValue(ctx, ctxKeySandboxID, sandboxID)
+		ctx = tracing.ContextWithSandboxID(ctx, sandboxID)
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.SetAttributes(
+				tracing.Attribute("sandbox.id", sandboxID),
+			)
+		}
+	}
+
+	if sc := r.SandboxConfig; sc != nil && sc.GetMetadata() != nil {
+		md := sc.GetMetadata()
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.SetAttributes(
+				tracing.Attribute("pod.name", md.GetName()),
+				tracing.Attribute("pod.namespace", md.GetNamespace()),
+				tracing.Attribute("pod.uid", md.GetUid()),
+			)
+		}
+	}
+
+	if sp := tracing.SpanFromContext(ctx); sp != nil {
+		sp.SetAttributes(
+			tracing.Attribute("pull.has_sandbox_config", r.SandboxConfig != nil),
+			tracing.Attribute("pull.has.sandboxid", sandboxID != ""),
+		)
+		if r.SandboxConfig != nil {
+			sp.SetAttributes(tracing.Attribute("pull.annotation_count", len(r.SandboxConfig.GetAnnotations())))
+		}
+	}
+
 	credentials := func(host string) (string, string, error) {
+		// Trace: credentials lookup path
 		hostauth := r.GetAuth()
 		if hostauth == nil {
 			config := c.config.Registry.Configs[host]
@@ -117,15 +171,51 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 	if err != nil {
 		return nil, err
 	}
+	// Trace: returning normalized image ref to caller
 	return &runtime.PullImageResponse{ImageRef: ref}, nil
 }
 
 func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (_ string, err error) {
-	span := tracing.SpanFromContext(ctx)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("cri.image", "pull"))
+	defer func() {
+		if err != nil {
+			span.SetStatus(err)
+		}
+		span.End()
+	}()
+
+	// Best-effort extract sandbox id from annotations.
+	var sandboxID string
+	if sandboxConfig != nil && sandboxConfig.Annotations != nil {
+		if v, ok := sandboxConfig.Annotations["io.kubernetes.cri.sandbox-id"]; ok && v != "" {
+			sandboxID = v
+		} else if v, ok := sandboxConfig.Annotations["k8s.v1.cni.cncf.io/sandbox-id"]; ok && v != "" {
+			sandboxID = v
+		}
+	}
+	if sandboxID != "" {
+		ctx = context.WithValue(ctx, ctxKeySandboxID, sandboxID)
+		ctx = tracing.ContextWithSandboxID(ctx, sandboxID)
+		if span != nil {
+			span.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
+		}
+	}
+
+	if span != nil && !span.IsEnhancedTracingActive() {
+		if v := ctx.Value(ctxKeySandboxID); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				span.SetAttributes(tracing.Attribute("sandbox.id", s))
+			}
+		}
+	}
+
 	defer func() {
 		// TODO: add domain label for imagePulls metrics, and we may need to provide a mechanism
 		// for the user to configure the set of registries that they are interested in.
 		if err != nil {
+			if span != nil {
+				span.RecordError(err)
+			}
 			imagePulls.WithValues("failure").Inc()
 		} else {
 			imagePulls.WithValues("success").Inc()
@@ -162,18 +252,36 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 
 	imagePullProgressTimeout, err := time.ParseDuration(c.config.ImagePullProgressTimeout)
 	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+		}
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
 	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig)
 	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+		}
 		return "", err
 	}
 
-	span.SetAttributes(
-		tracing.Attribute("image.ref", ref),
-		tracing.Attribute("snapshotter.name", snapshotter),
-	)
+	// Attach commonly useful attributes to the current span.
+	if span != nil {
+		span.SetAttributes(
+			tracing.Attribute("image.ref", ref),
+			tracing.Attribute("snapshotter.name", snapshotter),
+		)
+		// Propagate sandbox id into the span if present in context.
+		if v := ctx.Value(ctxKeySandboxID); v != nil {
+			if s, _ := v.(string); s != "" {
+				span.SetAttributes(tracing.Attribute("sandbox.id", s))
+			}
+		}
+		span.AddEvent("image.pull.start",
+			tracing.Attribute("strategy.selectable", fmt.Sprintf("%t", !c.config.UseLocalImagePull)))
+	}
+
 	labels := c.getLabels(ctx, ref)
 
 	// If UseLocalImagePull is true, use client.Pull to pull the image, else use transfer service by default.
@@ -182,19 +290,33 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	// TODO: Add support for DisableSnapshotAnnotations, DiscardUnpackedLayers, ImagePullWithSyncFs and unpackDuplicationSuppressor
 	var image containerd.Image
 	if c.config.UseLocalImagePull {
+		if span != nil {
+			span.AddEvent("pull.strategy.select", tracing.Attribute("strategy", "client.Pull"))
+		}
 		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
 	} else {
+		if span != nil {
+			span.AddEvent("pull.strategy.select", tracing.Attribute("strategy", "transfer.service"))
+		}
 		image, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
 	}
 
 	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+		}
 		return "", err
 	}
 
-	span.AddEvent("Pull and unpack image complete")
+	if span != nil {
+		span.AddEvent("Pull and unpack image complete")
+	}
 
 	configDesc, err := image.Config(ctx)
 	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+		}
 		return "", fmt.Errorf("get image config descriptor: %w", err)
 	}
 	imageID := configDesc.Digest.String()
@@ -205,6 +327,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 			continue
 		}
 		if err := c.createOrUpdateImageReference(ctx, r, image.Target(), labels); err != nil {
+			if span != nil {
+				span.RecordError(err)
+			}
 			return "", fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
 		// Update image store to reflect the newest state in containerd.
@@ -212,6 +337,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		// have been managed by the cri plugin.
 		// TODO: Use image service directly
 		if err := c.imageStore.Update(ctx, r); err != nil {
+			if span != nil {
+				span.RecordError(err)
+			}
 			return "", fmt.Errorf("failed to update image store %q: %w", r, err)
 		}
 	}
@@ -220,6 +348,13 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	size, _ := image.Size(ctx)
 	imagePullingSpeed := float64(size) / mbToByte / time.Since(startTime).Seconds()
 	imagePullThroughput.Observe(imagePullingSpeed)
+
+	if span != nil {
+		span.SetAttributes(
+			tracing.Attribute("image.size.bytes", size),
+			tracing.Attribute("pull.seconds", time.Since(startTime).Seconds()),
+		)
+	}
 
 	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", name, imageID,
 		repoTag, repoDigest, strconv.FormatInt(size, 10), time.Since(startTime))
@@ -242,6 +377,22 @@ func (c *CRIImageService) pullImageWithLocalPull(
 ) (containerd.Image, error) {
 	pctx, pcancel := context.WithCancel(ctx)
 	defer pcancel()
+
+	// Open a child span for local pull path.
+	pctx, lspan := tracing.StartSpan(pctx, tracing.Name("cri.image", "local_pull"),
+		tracing.WithAttribute("image.ref", ref),
+		tracing.WithAttribute("snapshotter.name", snapshotter),
+	)
+	// Propagate sandbox id attribute if present.
+	if lspan != nil && !lspan.IsEnhancedTracingActive() {
+		if v := pctx.Value(ctxKeySandboxID); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				lspan.SetAttributes(tracing.Attribute("sandbox.id", s))
+			}
+		}
+	}
+	defer lspan.End()
+
 	pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Headers: c.config.Registry.Headers,
@@ -264,7 +415,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	}
 
 	// Temporarily removed for v2 upgrade
-	//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+	// pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
 	if !c.config.DisableSnapshotAnnotations {
 		pullOpts = append(pullOpts,
 			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
@@ -280,7 +431,13 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	image, err := c.client.Pull(pctx, ref, pullOpts...)
 	pcancel()
 	if err != nil {
+		if lspan != nil {
+			lspan.RecordError(err)
+		}
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+	}
+	if lspan != nil {
+		lspan.AddEvent("client.pull.done")
 	}
 	return image, nil
 }
@@ -294,6 +451,21 @@ func (c *CRIImageService) pullImageWithTransferService(
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, error) {
+	// Open a child span for transfer service path.
+	ctx, tspan := tracing.StartSpan(ctx, tracing.Name("cri.image", "transfer_pull"),
+		tracing.WithAttribute("image.ref", ref),
+		tracing.WithAttribute("snapshotter.name", snapshotter),
+	)
+
+	if tspan != nil && !tspan.IsEnhancedTracingActive() {
+		if v := ctx.Value(ctxKeySandboxID); v != nil {
+			if s, _ := v.(string); s != "" {
+				tspan.SetAttributes(tracing.Attribute("sandbox.id", s))
+			}
+		}
+	}
+	defer tspan.End()
+
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
 	rctx, rcancel := context.WithCancel(ctx)
 	defer rcancel()
@@ -305,6 +477,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
 	sopts = append(sopts, transferimage.WithImageLabels(labels))
 	is := transferimage.NewStore(ref, sopts...)
+
 	log.G(ctx).Debugf("Getting new CRI credentials")
 	ch := newCRICredentials(ref, credentials)
 	opts := []registry.Opt{registry.WithCredentials(ch)}
@@ -312,6 +485,9 @@ func (c *CRIImageService) pullImageWithTransferService(
 	opts = append(opts, registry.WithHostDir(c.config.Registry.ConfigPath))
 	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 	if err != nil {
+		if tspan != nil {
+			tspan.RecordError(err)
+		}
 		return nil, fmt.Errorf("failed to create OCI registry: %w", err)
 	}
 
@@ -320,13 +496,22 @@ func (c *CRIImageService) pullImageWithTransferService(
 	err = c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx)))
 	rcancel()
 	if err != nil {
+		if tspan != nil {
+			tspan.RecordError(err)
+		}
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
 
 	// Image should be pulled, unpacked and present in containerd image store at this moment
 	image, err := c.client.GetImage(ctx, ref)
 	if err != nil {
+		if tspan != nil {
+			tspan.RecordError(err)
+		}
 		return nil, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
+	}
+	if tspan != nil {
+		tspan.AddEvent("transfer.pull.done")
 	}
 	return image, nil
 }
@@ -381,6 +566,12 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 		// Add a label to indicate that the image is managed by the cri plugin.
 		Labels: labels,
 	}
+	// Trace: attempt to create or update image reference
+	if sp := tracing.SpanFromContext(ctx); sp != nil {
+		sp.AddEvent("image.reference.upsert",
+			tracing.Attribute("ref", name),
+			tracing.Attribute("target.digest", desc.Digest.String()))
+	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
 	// TODO: Call CRIImageService directly
@@ -388,12 +579,18 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 	if err == nil {
 		return nil
 	} else if !errdefs.IsAlreadyExists(err) {
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.RecordError(err)
+		}
 		return err
 	}
 	// Retrieve oldImg from image store here because Create routine returns an
 	// empty image on ErrAlreadyExists
 	oldImg, err := c.images.Get(ctx, name)
 	if err != nil {
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.RecordError(err)
+		}
 		return err
 	}
 	fieldpaths := []string{"target"}
@@ -408,6 +605,11 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 		return nil
 	}
 	_, err = c.images.Update(ctx, img, fieldpaths...)
+	if err != nil {
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.RecordError(err)
+		}
+	}
 	return err
 }
 
@@ -430,11 +632,17 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
+			if sp := tracing.SpanFromContext(ctx); sp != nil {
+				sp.RecordError(err)
+			}
 			return fmt.Errorf("get image by reference: %w", err)
 		}
 		// If the image is not found, we should continue updating the cache,
 		// so that the image can be removed from the cache.
 		if err := c.imageStore.Update(ctx, r); err != nil {
+			if sp := tracing.SpanFromContext(ctx); sp != nil {
+				sp.RecordError(err)
+			}
 			return fmt.Errorf("update image store for %q: %w", r, err)
 		}
 		return nil
@@ -448,23 +656,38 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 			// identifier that references the image in its lifetime.
 			configDesc, err := img.Config(ctx)
 			if err != nil {
+				if sp := tracing.SpanFromContext(ctx); sp != nil {
+					sp.RecordError(err)
+				}
 				return fmt.Errorf("get image id: %w", err)
 			}
 			id := configDesc.Digest.String()
 			if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
+				if sp := tracing.SpanFromContext(ctx); sp != nil {
+					sp.RecordError(err)
+				}
 				return fmt.Errorf("create image id reference %q: %w", id, err)
 			}
 			if err := c.imageStore.Update(ctx, id); err != nil {
+				if sp := tracing.SpanFromContext(ctx); sp != nil {
+					sp.RecordError(err)
+				}
 				return fmt.Errorf("update image store for %q: %w", id, err)
 			}
 			// The image id is ready, add the label to mark the image as managed.
 			if err := c.createOrUpdateImageReference(ctx, r, img.Target(), criLabels); err != nil {
+				if sp := tracing.SpanFromContext(ctx); sp != nil {
+					sp.RecordError(err)
+				}
 				return fmt.Errorf("create managed label: %w", err)
 			}
 			break
 		}
 	}
 	if err := c.imageStore.Update(ctx, r); err != nil {
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.RecordError(err)
+		}
 		return fmt.Errorf("update image store for %q: %w", r, err)
 	}
 	return nil
@@ -505,6 +728,11 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 
 	return func(host string) ([]docker.RegistryHost, error) {
 		var registries []docker.RegistryHost
+
+		// Trace: registry endpoints discovery
+		if sp := tracing.SpanFromContext(ctx); sp != nil {
+			sp.AddEvent("registry.endpoints.resolve", tracing.Attribute("host", host))
+		}
 
 		endpoints, err := c.registryEndpoints(host)
 		if err != nil {

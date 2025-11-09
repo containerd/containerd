@@ -57,10 +57,16 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 		tracing.WithAttribute("sandbox.id", sandbox.ID),
 	)
 	defer span.End()
+
+	ctx = tracing.ContextWithSandboxID(ctx, sandbox.ID)
+
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return api.Sandbox{}, err
 	}
+
+	AddStandardAttributes(span, sandbox.ID, "", "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
 
 	sandbox.CreatedAt = time.Now().UTC()
 	sandbox.UpdatedAt = sandbox.CreatedAt
@@ -97,10 +103,16 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 		tracing.WithAttribute("sandbox.id", sandbox.ID),
 	)
 	defer span.End()
+
+	ctx = tracing.ContextWithSandboxID(ctx, sandbox.ID)
+
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return api.Sandbox{}, err
 	}
+
+	AddStandardAttributes(span, sandbox.ID, "", "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
 
 	ret := api.Sandbox{}
 	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
@@ -255,10 +267,16 @@ func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 		tracing.WithAttribute("sandbox.id", id),
 	)
 	defer span.End()
+
+	ctx = tracing.ContextWithSandboxID(ctx, id)
+
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
 	}
+
+	AddStandardAttributes(span, id, "", "", "")
+	span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
 
 	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
 		buckets := getSandboxBucket(tx, ns)
