@@ -40,19 +40,18 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"regexp"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/exec"
-
-	"k8s.io/klog/v2"
+	executil "github.com/containerd/containerd/v2/internal/cri/executil"
+	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
+	"github.com/containerd/containerd/v2/internal/cri/setutils"
+	"github.com/containerd/containerd/v2/internal/lazyregexp"
+	"github.com/containerd/log"
 )
 
 var (
-	classShowMatcher      = regexp.MustCompile(`class htb (1:\d+)`)
-	classAndHandleMatcher = regexp.MustCompile(`filter parent 1:.*fh (\d+::\d+).*flowid (\d+:\d+)`)
+	classShowMatcher      = lazyregexp.New(`class htb (1:\d+)`)
+	classAndHandleMatcher = lazyregexp.New(`filter parent 1:.*fh (\d+::\d+).*flowid (\d+:\d+)`)
 )
 
 // tcShaper provides an implementation of the Shaper interface on Linux using the 'tc' tool.
@@ -62,24 +61,24 @@ var (
 // Uses the hierarchical token bucket queuing discipline (htb), this requires Linux 2.4.20 or newer
 // or a custom kernel with that queuing discipline backported.
 type tcShaper struct {
-	e     exec.Interface
+	e     executil.Interface
 	iface string
 }
 
 // NewTCShaper makes a new tcShaper for the given interface
 func NewTCShaper(iface string) Shaper {
 	shaper := &tcShaper{
-		e:     exec.New(),
+		e:     executil.New(),
 		iface: iface,
 	}
 	return shaper
 }
 
 func (t *tcShaper) execAndLog(cmdStr string, args ...string) error {
-	klog.V(6).Infof("Running: %s %s", cmdStr, strings.Join(args, " "))
+	log.L.Infof("Running: %s %s", cmdStr, strings.Join(args, " "))
 	cmd := t.e.Command(cmdStr, args...)
 	out, err := cmd.CombinedOutput()
-	klog.V(6).Infof("Output from tc: %s", string(out))
+	log.L.Infof("Output from tc: %s", string(out))
 	return err
 }
 
@@ -90,7 +89,7 @@ func (t *tcShaper) nextClassID() (int, error) {
 	}
 
 	scanner := bufio.NewScanner(bytes.NewBuffer(data))
-	classes := sets.Set[string]{}
+	classes := setutils.Set[string]{}
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		// skip empty lines
@@ -282,7 +281,7 @@ func (t *tcShaper) ReconcileInterface() error {
 		return err
 	}
 	if !exists {
-		klog.V(4).Info("Didn't find bandwidth interface, creating")
+		log.L.Info("Didn't find bandwidth interface, creating")
 		return t.initializeInterface()
 	}
 	fields := strings.Split(output, " ")
@@ -305,7 +304,7 @@ func (t *tcShaper) Reset(cidr string) error {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("Failed to find cidr: %s on interface: %s", cidr, t.iface)
+		return fmt.Errorf("failed to find cidr: %s on interface: %s", cidr, t.iface)
 	}
 	for i := 0; i < len(classAndHandle); i++ {
 		if err := t.execAndLog("tc", "filter", "del",

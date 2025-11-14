@@ -379,7 +379,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 	for id, config := range containerConfigMap {
 		require.NoError(t, Eventually(func() (bool, error) {
 			stats, err = runtimeService.ListContainerStats(
-				&runtime.ContainerStatsFilter{Id: id[:3], PodSandboxId: sb[:3]})
+				&runtime.ContainerStatsFilter{Id: id[:6], PodSandboxId: sb[:6]})
 			if err != nil {
 				return false, err
 			}
@@ -426,5 +426,85 @@ func testStats(t *testing.T,
 	// Windows does not collect inodes stats.
 	if goruntime.GOOS != "windows" {
 		require.NotEmpty(t, s.GetWritableLayer().GetInodesUsed().GetValue())
+	}
+}
+
+func TestContainerSysfsStatsWithPrivilegedPod(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Doesn't care about filesystem properties on windows")
+	}
+	testImage := images.Get(images.BusyBox)
+	testcases := []struct {
+		name                               string
+		privilegedPod, privilegedContainer bool
+		expectedSysfsOption, expectedErr   string
+	}{
+		{
+			name:                "sandbox and container with privileged=true, sysfs is rw",
+			privilegedPod:       true,
+			privilegedContainer: true,
+			expectedSysfsOption: "rw",
+		},
+		{
+			name:                "sandbox with privileged=true, and container with privileged=false, sysfs is ro",
+			privilegedPod:       true,
+			privilegedContainer: false,
+			expectedSysfsOption: "ro",
+		},
+		{
+			name:                "sandbox and container with privileged=false, sysfs is ro",
+			privilegedPod:       false,
+			privilegedContainer: false,
+			expectedSysfsOption: "ro",
+		},
+		{
+			name:                "sandbox with privileged=false, and container with privileged=true, create container failed",
+			privilegedPod:       false,
+			privilegedContainer: true,
+			expectedErr:         "failed to generate spec opts: no privileged container allowed in sandbox",
+		},
+	}
+	for _, test := range testcases {
+		t.Run(test.name, func(t *testing.T) {
+			EnsureImageExists(t, testImage)
+			sb, sbConfig := PodSandboxConfigWithCleanup(
+				t,
+				"sandbox",
+				"sysfs-stats-with-privileged",
+				WithPodSecurityContext(test.privilegedPod),
+			)
+			cnConfig := ContainerConfig(
+				"container",
+				testImage,
+				WithCommand("sh", "-c", "top"),
+				WithSecurityContext(test.privilegedContainer),
+			)
+			cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+			if test.expectedErr != "" && err != nil {
+				assert.Contains(t, err.Error(), test.expectedErr)
+				return
+			}
+			assert.NoError(t, err)
+			defer func() {
+				if test.expectedErr == "" {
+					assert.NoError(t, runtimeService.RemoveContainer(cn))
+				}
+			}()
+
+			t.Log("Start the container")
+			require.NoError(t, runtimeService.StartContainer(cn))
+			defer func() {
+				assert.NoError(t, runtimeService.StopContainer(cn, 10))
+			}()
+
+			t.Logf("Execute cmd in container by sync")
+			mountinfo, _, err := runtimeService.ExecSync(cn, []string{
+				"sh",
+				"-c",
+				"mount |grep sysfs",
+			}, 10)
+			assert.NoError(t, err)
+			assert.Contains(t, string(mountinfo), test.expectedSysfsOption)
+		})
 	}
 }

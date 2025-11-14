@@ -67,11 +67,13 @@ type IpsetCreateOptions struct {
 	Comments bool
 	Skbinfo  bool
 
-	Revision uint8
-	IPFrom   net.IP
-	IPTo     net.IP
-	PortFrom uint16
-	PortTo   uint16
+	Family      uint8
+	Revision    uint8
+	IPFrom      net.IP
+	IPTo        net.IP
+	PortFrom    uint16
+	PortTo      uint16
+	MaxElements uint32
 }
 
 // IpsetProtocol returns the ipset protocol version from the kernel
@@ -94,6 +96,11 @@ func IpsetFlush(setname string) error {
 	return pkgHandle.IpsetFlush(setname)
 }
 
+// IpsetSwap swaps two ipsets.
+func IpsetSwap(setname, othersetname string) error {
+	return pkgHandle.IpsetSwap(setname, othersetname)
+}
+
 // IpsetList dumps an specific ipset.
 func IpsetList(setname string) (*IPSetResult, error) {
 	return pkgHandle.IpsetList(setname)
@@ -112,6 +119,11 @@ func IpsetAdd(setname string, entry *IPSetEntry) error {
 // IpsetDel deletes an entry from an existing ipset.
 func IpsetDel(setname string, entry *IPSetEntry) error {
 	return pkgHandle.IpsetDel(setname, entry)
+}
+
+// IpsetTest tests whether an entry is in a set or not.
+func IpsetTest(setname string, entry *IPSetEntry) (bool, error) {
+	return pkgHandle.IpsetTest(setname, entry)
 }
 
 func (h *Handle) IpsetProtocol() (protocol uint8, minVersion uint8, err error) {
@@ -135,9 +147,11 @@ func (h *Handle) IpsetCreate(setname, typename string, options IpsetCreateOption
 	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_SETNAME, nl.ZeroTerminated(setname)))
 	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_TYPENAME, nl.ZeroTerminated(typename)))
 
+	cadtFlags := optionsToBitflag(options)
+
 	revision := options.Revision
 	if revision == 0 {
-		revision = getIpsetDefaultWithTypeName(typename)
+		revision = getIpsetDefaultRevision(typename, cadtFlags)
 	}
 	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_REVISION, nl.Uint8Attr(revision)))
 
@@ -153,25 +167,20 @@ func (h *Handle) IpsetCreate(setname, typename string, options IpsetCreateOption
 		data.AddChild(nl.NewRtAttr(nl.IPSET_ATTR_PORT_FROM|int(nl.NLA_F_NET_BYTEORDER), buf[:2]))
 		data.AddChild(nl.NewRtAttr(nl.IPSET_ATTR_PORT_TO|int(nl.NLA_F_NET_BYTEORDER), buf[2:]))
 	default:
-		family = unix.AF_INET
+		family = options.Family
+		if family == 0 {
+			family = unix.AF_INET
+		}
 	}
 
 	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_FAMILY, nl.Uint8Attr(family)))
 
+	if options.MaxElements != 0 {
+		data.AddChild(&nl.Uint32Attribute{Type: nl.IPSET_ATTR_MAXELEM | nl.NLA_F_NET_BYTEORDER, Value: options.MaxElements})
+	}
+
 	if timeout := options.Timeout; timeout != nil {
 		data.AddChild(&nl.Uint32Attribute{Type: nl.IPSET_ATTR_TIMEOUT | nl.NLA_F_NET_BYTEORDER, Value: *timeout})
-	}
-
-	var cadtFlags uint32
-
-	if options.Comments {
-		cadtFlags |= nl.IPSET_FLAG_WITH_COMMENT
-	}
-	if options.Counters {
-		cadtFlags |= nl.IPSET_FLAG_WITH_COUNTERS
-	}
-	if options.Skbinfo {
-		cadtFlags |= nl.IPSET_FLAG_WITH_SKBINFO
 	}
 
 	if cadtFlags != 0 {
@@ -193,6 +202,14 @@ func (h *Handle) IpsetDestroy(setname string) error {
 func (h *Handle) IpsetFlush(setname string) error {
 	req := h.newIpsetRequest(nl.IPSET_CMD_FLUSH)
 	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_SETNAME, nl.ZeroTerminated(setname)))
+	_, err := ipsetExecute(req)
+	return err
+}
+
+func (h *Handle) IpsetSwap(setname, othersetname string) error {
+	req := h.newIpsetRequest(nl.IPSET_CMD_SWAP)
+	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_SETNAME, nl.ZeroTerminated(setname)))
+	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_TYPENAME, nl.ZeroTerminated(othersetname)))
 	_, err := ipsetExecute(req)
 	return err
 }
@@ -236,18 +253,23 @@ func (h *Handle) IpsetDel(setname string, entry *IPSetEntry) error {
 	return h.ipsetAddDel(nl.IPSET_CMD_DEL, setname, entry)
 }
 
-func (h *Handle) ipsetAddDel(nlCmd int, setname string, entry *IPSetEntry) error {
-	req := h.newIpsetRequest(nlCmd)
-	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_SETNAME, nl.ZeroTerminated(setname)))
-
-	if entry.Comment != "" {
-		req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_COMMENT, nl.ZeroTerminated(entry.Comment)))
+func encodeIP(ip net.IP) (*nl.RtAttr, error) {
+	typ := int(nl.NLA_F_NET_BYTEORDER)
+	if ip4 := ip.To4(); ip4 != nil {
+		typ |= nl.IPSET_ATTR_IPADDR_IPV4
+		ip = ip4
+	} else {
+		typ |= nl.IPSET_ATTR_IPADDR_IPV6
 	}
 
+	return nl.NewRtAttr(typ, ip), nil
+}
+
+func buildEntryData(entry *IPSetEntry) (*nl.RtAttr, error) {
 	data := nl.NewRtAttr(nl.IPSET_ATTR_DATA|int(nl.NLA_F_NESTED), nil)
 
-	if !entry.Replace {
-		req.Flags |= unix.NLM_F_EXCL
+	if entry.Comment != "" {
+		data.AddChild(nl.NewRtAttr(nl.IPSET_ATTR_COMMENT, nl.ZeroTerminated(entry.Comment)))
 	}
 
 	if entry.Timeout != nil {
@@ -255,7 +277,10 @@ func (h *Handle) ipsetAddDel(nlCmd int, setname string, entry *IPSetEntry) error
 	}
 
 	if entry.IP != nil {
-		nestedData := nl.NewRtAttr(nl.IPSET_ATTR_IP|int(nl.NLA_F_NET_BYTEORDER), entry.IP)
+		nestedData, err := encodeIP(entry.IP)
+		if err != nil {
+			return nil, err
+		}
 		data.AddChild(nl.NewRtAttr(nl.IPSET_ATTR_IP|int(nl.NLA_F_NESTED), nestedData.Serialize()))
 	}
 
@@ -268,7 +293,10 @@ func (h *Handle) ipsetAddDel(nlCmd int, setname string, entry *IPSetEntry) error
 	}
 
 	if entry.IP2 != nil {
-		nestedData := nl.NewRtAttr(nl.IPSET_ATTR_IP|int(nl.NLA_F_NET_BYTEORDER), entry.IP2)
+		nestedData, err := encodeIP(entry.IP2)
+		if err != nil {
+			return nil, err
+		}
 		data.AddChild(nl.NewRtAttr(nl.IPSET_ATTR_IP2|int(nl.NLA_F_NESTED), nestedData.Serialize()))
 	}
 
@@ -295,12 +323,51 @@ func (h *Handle) ipsetAddDel(nlCmd int, setname string, entry *IPSetEntry) error
 	if entry.Mark != nil {
 		data.AddChild(&nl.Uint32Attribute{Type: nl.IPSET_ATTR_MARK | nl.NLA_F_NET_BYTEORDER, Value: *entry.Mark})
 	}
+	return data, nil
+}
 
+func (h *Handle) ipsetAddDel(nlCmd int, setname string, entry *IPSetEntry) error {
+	req := h.newIpsetRequest(nlCmd)
+	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_SETNAME, nl.ZeroTerminated(setname)))
+
+	if !entry.Replace {
+		req.Flags |= unix.NLM_F_EXCL
+	}
+
+	data, err := buildEntryData(entry)
+	if err != nil {
+		return err
+	}
 	data.AddChild(&nl.Uint32Attribute{Type: nl.IPSET_ATTR_LINENO | nl.NLA_F_NET_BYTEORDER, Value: 0})
 	req.AddData(data)
 
-	_, err := ipsetExecute(req)
+	_, err = ipsetExecute(req)
 	return err
+}
+
+func (h *Handle) IpsetTest(setname string, entry *IPSetEntry) (bool, error) {
+	req := h.newIpsetRequest(nl.IPSET_CMD_TEST)
+	req.AddData(nl.NewRtAttr(nl.IPSET_ATTR_SETNAME, nl.ZeroTerminated(setname)))
+
+	if !entry.Replace {
+		req.Flags |= unix.NLM_F_EXCL
+	}
+
+	data, err := buildEntryData(entry)
+	if err != nil {
+		return false, err
+	}
+	req.AddData(data)
+
+	_, err = ipsetExecute(req)
+	if err != nil {
+		if err == nl.IPSetError(nl.IPSET_ERR_EXIST) {
+			// not exist
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (h *Handle) newIpsetRequest(cmd int) *nl.NetlinkRequest {
@@ -318,14 +385,89 @@ func (h *Handle) newIpsetRequest(cmd int) *nl.NetlinkRequest {
 	return req
 }
 
-func getIpsetDefaultWithTypeName(typename string) uint8 {
+// NOTE: This can't just take typename into account, it also has to take desired
+// feature support into account, on a per-set-type basis, to return the correct revision, see e.g.
+// https://github.com/Olipro/ipset/blob/9f145b49100104d6570fe5c31a5236816ebb4f8f/kernel/net/netfilter/ipset/ip_set_hash_ipport.c#L30
+//
+// This means that whenever a new "type" of ipset is added, returning the "correct" default revision
+// requires adding a new case here for that type, and consulting the ipset C code to figure out the correct
+// combination of type name, feature bit flags, and revision ranges.
+//
+// Care should be taken as some types share the same revision ranges for the same features, and others do not.
+// When in doubt, mimic the C code.
+func getIpsetDefaultRevision(typename string, featureFlags uint32) uint8 {
 	switch typename {
 	case "hash:ip,port",
-		"hash:ip,port,ip",
-		"hash:ip,port,net",
+		"hash:ip,port,ip":
+		// Taken from
+		// - ipset/kernel/net/netfilter/ipset/ip_set_hash_ipport.c
+		// - ipset/kernel/net/netfilter/ipset/ip_set_hash_ipportip.c
+		if (featureFlags & nl.IPSET_FLAG_WITH_SKBINFO) != 0 {
+			return 5
+		}
+
+		if (featureFlags & nl.IPSET_FLAG_WITH_FORCEADD) != 0 {
+			return 4
+		}
+
+		if (featureFlags & nl.IPSET_FLAG_WITH_COMMENT) != 0 {
+			return 3
+		}
+
+		if (featureFlags & nl.IPSET_FLAG_WITH_COUNTERS) != 0 {
+			return 2
+		}
+
+		// the min revision this library supports for this type
+		return 1
+
+	case "hash:ip,port,net",
 		"hash:net,port":
+		// Taken from
+		// - ipset/kernel/net/netfilter/ipset/ip_set_hash_ipportnet.c
+		// - ipset/kernel/net/netfilter/ipset/ip_set_hash_netport.c
+		if (featureFlags & nl.IPSET_FLAG_WITH_SKBINFO) != 0 {
+			return 7
+		}
+
+		if (featureFlags & nl.IPSET_FLAG_WITH_FORCEADD) != 0 {
+			return 6
+		}
+
+		if (featureFlags & nl.IPSET_FLAG_WITH_COMMENT) != 0 {
+			return 5
+		}
+
+		if (featureFlags & nl.IPSET_FLAG_WITH_COUNTERS) != 0 {
+			return 4
+		}
+
+		if (featureFlags & nl.IPSET_FLAG_NOMATCH) != 0 {
+			return 3
+		}
+		// the min revision this library supports for this type
+		return 2
+
+	case "hash:ip":
+		// Taken from
+		// - ipset/kernel/net/netfilter/ipset/ip_set_hash_ip.c
+		if (featureFlags & nl.IPSET_FLAG_WITH_SKBINFO) != 0 {
+			return 4
+		}
+
+		if (featureFlags & nl.IPSET_FLAG_WITH_FORCEADD) != 0 {
+			return 3
+		}
+
+		if (featureFlags & nl.IPSET_FLAG_WITH_COMMENT) != 0 {
+			return 2
+		}
+
+		// the min revision this library supports for this type
 		return 1
 	}
+
+	// can't map the correct revision for this type.
 	return 0
 }
 
@@ -466,7 +608,7 @@ func parseIPSetEntry(data []byte) (entry IPSetEntry) {
 		case nl.IPSET_ATTR_IP | nl.NLA_F_NESTED:
 			for attr := range nl.ParseAttributes(attr.Value) {
 				switch attr.Type {
-				case nl.IPSET_ATTR_IP:
+				case nl.IPSET_ATTR_IPADDR_IPV4, nl.IPSET_ATTR_IPADDR_IPV6:
 					entry.IP = net.IP(attr.Value)
 				default:
 					log.Printf("unknown nested ADT attribute from kernel: %+v", attr)
@@ -475,7 +617,7 @@ func parseIPSetEntry(data []byte) (entry IPSetEntry) {
 		case nl.IPSET_ATTR_IP2 | nl.NLA_F_NESTED:
 			for attr := range nl.ParseAttributes(attr.Value) {
 				switch attr.Type {
-				case nl.IPSET_ATTR_IP:
+				case nl.IPSET_ATTR_IPADDR_IPV4, nl.IPSET_ATTR_IPADDR_IPV6:
 					entry.IP2 = net.IP(attr.Value)
 				default:
 					log.Printf("unknown nested ADT attribute from kernel: %+v", attr)
@@ -501,4 +643,20 @@ func parseIPSetEntry(data []byte) (entry IPSetEntry) {
 		}
 	}
 	return
+}
+
+func optionsToBitflag(options IpsetCreateOptions) uint32 {
+	var cadtFlags uint32
+
+	if options.Comments {
+		cadtFlags |= nl.IPSET_FLAG_WITH_COMMENT
+	}
+	if options.Counters {
+		cadtFlags |= nl.IPSET_FLAG_WITH_COUNTERS
+	}
+	if options.Skbinfo {
+		cadtFlags |= nl.IPSET_FLAG_WITH_SKBINFO
+	}
+
+	return cadtFlags
 }

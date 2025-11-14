@@ -57,7 +57,6 @@ func TestWithLabels(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			lease := newLease(tc.initialLabels)
 			err := WithLabels(tc.labels)(lease)
@@ -66,7 +65,6 @@ func TestWithLabels(t *testing.T) {
 		})
 	}
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name+"-WithLabel", func(t *testing.T) {
 			lease := newLease(tc.initialLabels)
 			for k, v := range tc.labels {

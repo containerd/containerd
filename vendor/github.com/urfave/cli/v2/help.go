@@ -54,7 +54,7 @@ var helpCommand = &Command{
 			cCtx = cCtx.parentContext
 		}
 
-		// Case 4. $ app hello foo
+		// Case 4. $ app help foo
 		// foo is the command for which help needs to be shown
 		if argsPresent {
 			return ShowCommandHelp(cCtx, firstArg)
@@ -150,7 +150,7 @@ func printCommandSuggestions(commands []*Command, writer io.Writer) {
 		if command.Hidden {
 			continue
 		}
-		if strings.HasSuffix(os.Getenv("SHELL"), "zsh") {
+		if strings.HasSuffix(os.Getenv("0"), "zsh") {
 			for _, name := range command.Names() {
 				_, _ = fmt.Fprintf(writer, "%s:%s\n", name, command.Usage)
 			}

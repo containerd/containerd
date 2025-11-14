@@ -96,7 +96,11 @@ GO_BUILDTAGS += ${DEBUG_TAGS}
 ifneq ($(STATIC),)
 	GO_BUILDTAGS += osusergo netgo static_build
 endif
+
+SHIM_GO_BUILDTAGS := $(GO_BUILDTAGS) no_grpc
+
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
+SHIM_GO_TAGS=$(if $(SHIM_GO_BUILDTAGS),-tags "$(strip $(SHIM_GO_BUILDTAGS))",)
 
 GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
 ifneq ($(STATIC),)
@@ -150,7 +154,8 @@ GOTEST ?= $(GO) test
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test remove-replace clean-vendor
+
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -162,7 +167,7 @@ check: proto-fmt ## run all linters
 	@echo "$(WHALE) $@"
 	GOGC=75 golangci-lint run
 
-ci: check binaries check-protos coverage coverage-integration ## to be used by the CI
+ci: check binaries check-protos coverage ## to be used by the CI
 
 AUTHORS: .mailmap .git/HEAD
 	git log --format='%aN <%aE>' | sort -fu > $@
@@ -171,7 +176,7 @@ generate: protos
 	@echo "$(WHALE) $@"
 	@PATH="${ROOTDIR}/bin:${PATH}" $(GO) generate -x ${PACKAGES}
 
-protos: bin/protoc-gen-go-fieldpath
+protos: bin/protoc-gen-go-fieldpath bin/go-buildtag
 	@echo "$(WHALE) $@"
 	@find . -path ./vendor -prune -false -o -name '*.pb.go' | xargs rm
 	$(eval TMPDIR := $(shell mktemp -d))
@@ -181,6 +186,7 @@ protos: bin/protoc-gen-go-fieldpath
 	@rm -rf ${TMPDIR} v2
 	go-fix-acronym -w -a '^Os' $(shell find api/ -name '*.pb.go')
 	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ -name '*.pb.go')
+	bin/go-buildtag -w --tags '!no_grpc' $(shell find api/ -name '*_grpc.pb.go')
 	@test -z "$$(git status --short | grep "api/next.pb.txt" | tee /dev/stderr)" || \
 		$(GO) mod edit -replace=github.com/containerd/containerd/api=./api
 
@@ -217,7 +223,6 @@ integration: ## run integration tests
 	@echo "$(WHALE) $@"
 	@cd "${ROOTDIR}/integration/client" && $(GO) mod download && $(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
-# TODO integrate cri integration bucket with coverage
 bin/cri-integration.test:
 	@echo "$(WHALE) $@"
 	@$(GO) test -c ./integration -o bin/cri-integration.test
@@ -230,7 +235,7 @@ cri-integration: binaries bin/cri-integration.test ## run cri integration tests 
 # build runc shimv2 with failpoint control, only used by integration test
 bin/containerd-shim-runc-fp-v1: integration/failpoint/cmd/containerd-shim-runc-fp-v1 FORCE
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./integration/failpoint/cmd/containerd-shim-runc-fp-v1
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ${SHIM_GO_TAGS} ./integration/failpoint/cmd/containerd-shim-runc-fp-v1
 
 # build CNI bridge plugin wrapper with failpoint support, only used by integration test
 bin/cni-bridge-fp: integration/failpoint/cmd/cni-bridge-fp FORCE
@@ -241,6 +246,11 @@ bin/cni-bridge-fp: integration/failpoint/cmd/cni-bridge-fp FORCE
 bin/runc-fp: integration/failpoint/cmd/runc-fp FORCE
 	@echo "$(WHALE) $@"
 	@$(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/runc-fp
+
+# build loopback-v2 with failpoint support, only used by integration test
+bin/loopback-v2: integration/failpoint/cmd/loopback-v2 FORCE
+	@echo "$(WHALE) $@"
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/loopback-v2
 
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"
@@ -264,12 +274,12 @@ bin/gen-manpages: cmd/gen-manpages FORCE
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v2
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
 
-man: mandir $(addprefix man/,$(MANPAGES))
+man: $(addprefix man/,$(MANPAGES))
 	@echo "$(WHALE) $@"
 
 mandir:
@@ -278,15 +288,15 @@ mandir:
 # Kept for backwards compatibility
 genman: man/containerd.8 man/ctr.8
 
-man/containerd.8: bin/gen-manpages FORCE
+man/containerd.8: bin/gen-manpages FORCE | mandir
 	@echo "$(WHALE) $@"
 	$< $(@F) $(@D)
 
-man/ctr.8: bin/gen-manpages FORCE
+man/ctr.8: bin/gen-manpages FORCE | mandir
 	@echo "$(WHALE) $@"
 	$< $(@F) $(@D)
 
-man/%: docs/man/%.md FORCE
+man/%: docs/man/%.md FORCE | mandir
 	@echo "$(WHALE) $@"
 	go-md2man -in "$<" -out "$@"
 
@@ -442,7 +452,7 @@ endif
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
 	@rm -f coverage.txt
-	@$(GO) test -i ${TESTFLAGS} ${PACKAGES} 2> /dev/null
+	@$(GO) test ${TESTFLAGS} ${PACKAGES}
 	@( for pkg in ${PACKAGES}; do \
 		$(GO) test ${TESTFLAGS} \
 			-cover \
@@ -456,7 +466,7 @@ coverage: ## generate coverprofiles from the unit tests, except tests that requi
 
 root-coverage: ## generate coverage profiles for unit tests that require root
 	@echo "$(WHALE) $@"
-	@$(GO) test -i ${TESTFLAGS} ${TEST_REQUIRES_ROOT_PACKAGES} 2> /dev/null
+	@$(GO) test ${TESTFLAGS} ${TEST_REQUIRES_ROOT_PACKAGES} 2> /dev/null
 	@( for pkg in ${TEST_REQUIRES_ROOT_PACKAGES}; do \
 		$(GO) test ${TESTFLAGS} \
 			-cover \
@@ -467,6 +477,14 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 			rm profile.out; \
 		fi; \
 	done )
+
+cri-integration-coverage: binaries  ## generate coverage profile for cri integration tests
+	@echo "$(WHALE) $@"
+	@rm -f cri-integration-coverage.txt
+	@$(GO) test -c -coverpkg=./... -covermode=atomic ./integration -o bin/cri-integration.test
+	@bash ./script/test/cri-integration.sh -test.coverprofile=cri-integration-coverage.txt
+	@echo "Coverage profile generated at cri-integration-coverage.txt"
+	@rm -rf bin/cri-integration.test
 
 remove-replace:
 	@echo "$(WHALE) $@"

@@ -140,15 +140,9 @@ func (c *criService) toContainerStats(
 		if !ok {
 			handler, err = c.getMetricsHandler(ctx, cntr.SandboxID)
 			if err != nil {
-				// If the sandbox is not found, it may have been removed. we need to check container whether it is still exist
-				if errdefs.IsNotFound(err) {
-					_, err = c.containerStore.Get(cntr.ID)
-					if err != nil && errdefs.IsNotFound(err) {
-						log.G(ctx).Warnf("container %q is not found, skip it", cntr.ID)
-						continue
-					}
-				}
-				return nil, fmt.Errorf("failed to get metrics handler for container %q: %w", cntr.ID, err)
+				// If an error occurred while determining metrics handler for the sandbox, skip this container
+				log.G(ctx).Warnf("skipping container %q, failed to get metrics handler: %v", cntr.ID, err.Error())
+				continue
 			}
 			sandboxToMetricsHandler[cntr.SandboxID] = handler
 		} else {
@@ -164,7 +158,9 @@ func (c *criService) toContainerStats(
 			// this is a calculated value and should be computed for all OSes
 			nanoUsage, err := c.getUsageNanoCores(cntr.Metadata.ID, false, cs.stats.Cpu.UsageCoreNanoSeconds.Value, time.Unix(0, cs.stats.Cpu.Timestamp))
 			if err != nil {
-				return nil, fmt.Errorf("failed to get usage nano cores, containerID: %s: %w", cntr.Metadata.ID, err)
+				// If an error occurred when getting nano cores usage, skip the container
+				log.G(ctx).Warnf("skipping container %q, failed to get metrics handler: %v", cntr.ID, err.Error())
+				continue
 			}
 			cs.stats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoUsage}
 		}
@@ -221,6 +217,11 @@ func (c *criService) getUsageNanoCores(containerID string, isSandbox bool, curre
 
 	// zero or negative interval
 	if nanoSeconds <= 0 {
+		return 0, nil
+	}
+
+	// can't go backwards, this value might come in as 0 if the container was just removed
+	if currentUsageCoreNanoSeconds < oldStats.UsageCoreNanoSeconds {
 		return 0, nil
 	}
 
@@ -345,6 +346,9 @@ func (c *criService) windowsContainerMetrics(
 				Timestamp: (protobuf.FromTimestamp(wstats.Timestamp)).UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{
 					Value: wstats.Memory.MemoryUsagePrivateWorkingSetBytes,
+				},
+				UsageBytes: &runtime.UInt64Value{
+					Value: wstats.Memory.MemoryUsageCommitBytes,
 				},
 			}
 		}

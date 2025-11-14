@@ -1,4 +1,4 @@
-//go:build !darwin && !freebsd
+//go:build windows || linux
 
 /*
    Copyright The containerd Authors.
@@ -47,13 +47,15 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 		return nil, err
 	}
 
+	defer c.nri.BlockPluginSync().Unblock()
+
 	resources := r.GetLinux()
 	updated, err := c.nri.UpdateContainerResources(ctx, &sandbox, &container, resources)
 	if err != nil {
 		return nil, fmt.Errorf("NRI container update failed: %w", err)
 	}
 	if updated != nil {
-		*resources = *updated
+		r.Linux = updated
 	}
 
 	// Update resources in status update transaction, so that:

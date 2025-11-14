@@ -28,7 +28,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/log"
 )
 
 // New creates a loopback device
@@ -57,18 +57,18 @@ func New(size int64) (*Loopback, error) {
 	}
 
 	deviceName := strings.TrimSpace(stdout.String())
-	logrus.Debugf("Created loop device %s (using %s)", deviceName, file.Name())
+	log.L.Debugf("Created loop device %s (using %s)", deviceName, file.Name())
 
 	cleanup := func() error {
 		// detach device
-		logrus.Debugf("Removing loop device %s", deviceName)
+		log.L.Debugf("Removing loop device %s", deviceName)
 		losetup := exec.Command("losetup", "--detach", deviceName)
 		if out, err := losetup.CombinedOutput(); err != nil {
 			return fmt.Errorf("Could not remove loop device %s (%v): %q: %w", deviceName, losetup.Args, string(out), err)
 		}
 
 		// remove file
-		logrus.Debugf("Removing temporary file %s", file.Name())
+		log.L.Debugf("Removing temporary file %s", file.Name())
 		return os.Remove(file.Name())
 	}
 

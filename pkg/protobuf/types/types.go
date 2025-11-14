@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-// Package types provides convinient aliases that make google.golang.org/protobuf migration easier.
+// Package types provides convenient aliases that make google.golang.org/protobuf migration easier.
 package types
 
 import (

@@ -21,26 +21,25 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/containerd/continuity/fs/fstest"
+
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/randutil"
-	"github.com/containerd/continuity/fs/fstest"
 )
 
-const umountflags int = 0
-
-func applyToMounts(m []mount.Mount, work string, a fstest.Applier) (err error) {
+func applyToMounts(ctx context.Context, m []mount.Mount, work string, a fstest.Applier) (err error) {
 	td, err := os.MkdirTemp(work, "prepare")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(td)
 
-	if err := mount.All(m, td); err != nil {
+	if err := mountAll(ctx, m, td); err != nil {
 		return fmt.Errorf("failed to mount: %w", err)
 	}
 	defer func() {
-		if err1 := mount.UnmountAll(td, umountflags); err1 != nil && err == nil {
+		if err1 := unmountCtx(ctx, td); err1 != nil && err == nil {
 			err = fmt.Errorf("failed to unmount: %w", err1)
 		}
 	}()
@@ -59,7 +58,7 @@ func createSnapshot(ctx context.Context, sn snapshots.Snapshotter, parent, work 
 		return "", fmt.Errorf("failed to prepare snapshot: %w", err)
 	}
 
-	if err := applyToMounts(m, work, a); err != nil {
+	if err := applyToMounts(ctx, m, work, a); err != nil {
 		return "", fmt.Errorf("failed to apply: %w", err)
 	}
 
@@ -92,11 +91,11 @@ func checkSnapshot(ctx context.Context, sn snapshots.Snapshotter, work, name, ch
 		}
 	}()
 
-	if err := mount.All(m, td); err != nil {
+	if err := mountAll(ctx, m, td); err != nil {
 		return fmt.Errorf("failed to mount: %w", err)
 	}
 	defer func() {
-		if err1 := mount.UnmountAll(td, umountflags); err1 != nil && err == nil {
+		if err1 := unmountCtx(ctx, td); err1 != nil && err == nil {
 			err = fmt.Errorf("failed to unmount view: %w", err1)
 		}
 	}()

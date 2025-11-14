@@ -76,6 +76,11 @@ func WithVolumes(volumeMounts map[string]string, platform imagespec.Platform) co
 		}
 		mounts = mount.RemoveVolatileOption(mounts)
 
+		// Always copy files without UID/GID transformations.
+		// The ID transformations are only needed when running inside a userns, that is not
+		// the case here.
+		mounts = mount.RemoveIDMapOption(mounts)
+
 		root, err := os.MkdirTemp("", "ctd-volume")
 		if err != nil {
 			return err

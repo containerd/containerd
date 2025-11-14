@@ -19,13 +19,9 @@ package podsandbox
 import (
 	"context"
 	"fmt"
-	"path"
 	"path/filepath"
 
-	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	docker "github.com/distribution/reference"
-	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -34,7 +30,6 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
@@ -65,21 +60,6 @@ func (c *Controller) getVolatileSandboxRootDir(id string) string {
 	return filepath.Join(c.config.StateDir, sandboxesDir, id)
 }
 
-// getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
-func getRepoDigestAndTag(namedRef docker.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
-	var repoTag, repoDigest string
-	if _, ok := namedRef.(docker.NamedTagged); ok {
-		repoTag = namedRef.String()
-	}
-	if _, ok := namedRef.(docker.Canonical); ok {
-		repoDigest = namedRef.String()
-	} else if !schema1 {
-		// digest is not actual repo digest for schema1 image.
-		repoDigest = namedRef.Name() + "@" + digest.String()
-	}
-	return repoDigest, repoTag
-}
-
 // toContainerdImage converts an image object in image store to containerd image handler.
 func (c *Controller) toContainerdImage(ctx context.Context, image imagestore.Image) (containerd.Image, error) {
 	// image should always have at least one reference.
@@ -87,64 +67,6 @@ func (c *Controller) toContainerdImage(ctx context.Context, image imagestore.Ima
 		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
 	}
 	return c.client.GetImage(ctx, image.References[0])
-}
-
-// buildLabel builds the labels from config to be passed to containerd
-func buildLabels(configLabels, imageConfigLabels map[string]string, containerType string) map[string]string {
-	labels := make(map[string]string)
-
-	for k, v := range imageConfigLabels {
-		if err := clabels.Validate(k, v); err == nil {
-			labels[k] = v
-		} else {
-			// In case the image label is invalid, we output a warning and skip adding it to the
-			// container.
-			log.L.WithError(err).Warnf("unable to add image label with key %s to the container", k)
-		}
-	}
-	// labels from the CRI request (config) will override labels in the image config
-	for k, v := range configLabels {
-		labels[k] = v
-	}
-	labels[crilabels.ContainerKindLabel] = containerType
-	return labels
-}
-
-// parseImageReferences parses a list of arbitrary image references and returns
-// the repotags and repodigests
-func parseImageReferences(refs []string) ([]string, []string) {
-	var tags, digests []string
-	for _, ref := range refs {
-		parsed, err := docker.ParseAnyReference(ref)
-		if err != nil {
-			continue
-		}
-		if _, ok := parsed.(docker.Canonical); ok {
-			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(docker.Tagged); ok {
-			tags = append(tags, parsed.String())
-		}
-	}
-	return tags, digests
-}
-
-// getPassthroughAnnotations filters requested pod annotations by comparing
-// against permitted annotations for the given runtime.
-func getPassthroughAnnotations(podAnnotations map[string]string,
-	runtimePodAnnotations []string) (passthroughAnnotations map[string]string) {
-	passthroughAnnotations = make(map[string]string)
-
-	for podAnnotationKey, podAnnotationValue := range podAnnotations {
-		for _, pattern := range runtimePodAnnotations {
-			// Use path.Match instead of filepath.Match here.
-			// filepath.Match treated `\\` as path separator
-			// on windows, which is not what we want.
-			if ok, _ := path.Match(pattern, podAnnotationKey); ok {
-				passthroughAnnotations[podAnnotationKey] = podAnnotationValue
-			}
-		}
-	}
-	return passthroughAnnotations
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.

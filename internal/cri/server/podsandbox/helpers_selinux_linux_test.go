@@ -86,7 +86,6 @@ func TestInitSelinuxOpts(t *testing.T) {
 			expectErr: true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			processLabel, mountLabel, err := initLabelsFromOpt(test.selinuxOpt)
 			if test.expectErr {
@@ -167,7 +166,6 @@ func TestCheckSelinuxLevel(t *testing.T) {
 			expectNoMatch: true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			err := checkSelinuxLevel(test.level)
 			if test.expectNoMatch {

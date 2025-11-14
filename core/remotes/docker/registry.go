@@ -17,9 +17,11 @@
 package docker
 
 import (
+	"crypto/tls"
 	"errors"
 	"net"
 	"net/http"
+	"time"
 )
 
 // HostCapabilities represent the capabilities of the registry
@@ -54,6 +56,10 @@ const (
 	// HostCapabilityPush represents the capability to push blobs and
 	// manifests
 	HostCapabilityPush
+
+	// HostCapabilityReferrers represents the capability to generate a
+	// list of referrers using the OCI Distribution referrers endpoint.
+	HostCapabilityReferrers
 
 	// Reserved for future capabilities (i.e. search, catalog, remove)
 )
@@ -166,11 +172,13 @@ func ConfigureDefaultRegistries(ropts ...RegistryOpt) RegistryHosts {
 			Host:         host,
 			Scheme:       "https",
 			Path:         "/v2",
-			Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+			Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush | HostCapabilityReferrers,
 		}
 
 		if config.Client == nil {
-			config.Client = http.DefaultClient
+			config.Client = &http.Client{
+				Transport: DefaultHTTPTransport(nil),
+			}
 		}
 
 		if opts.plainHTTP != nil {
@@ -208,10 +216,10 @@ func MatchAllHosts(string) (bool, error) {
 // Note: this does not handle matching of ip addresses in octal,
 // decimal or hex form.
 func MatchLocalhost(host string) (bool, error) {
-	switch {
-	case host == "::1":
+	switch host {
+	case "::1":
 		return true, nil
-	case host == "[::1]":
+	case "[::1]":
 		return true, nil
 	}
 	h, p, err := net.SplitHostPort(host)
@@ -241,4 +249,20 @@ func MatchLocalhost(host string) (bool, error) {
 	ip := net.ParseIP(h)
 
 	return ip.IsLoopback(), nil
+}
+
+func DefaultHTTPTransport(defaultTLSConfig *tls.Config) *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:       30 * time.Second,
+			KeepAlive:     30 * time.Second,
+			FallbackDelay: 300 * time.Millisecond,
+		}).DialContext,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       30 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		TLSClientConfig:       defaultTLSConfig,
+		ExpectContinueTimeout: 5 * time.Second,
+	}
 }

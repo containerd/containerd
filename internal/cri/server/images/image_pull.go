@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -33,11 +32,11 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
-	"github.com/containerd/imgcrypt"
-	"github.com/containerd/imgcrypt/images/encryption"
+	"github.com/containerd/imgcrypt/v2"
+	"github.com/containerd/imgcrypt/v2/images/encryption"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	distribution "github.com/distribution/reference"
-	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -46,9 +45,13 @@ import (
 	containerdimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
+	"github.com/containerd/containerd/v2/core/transfer"
+	transferimage "github.com/containerd/containerd/v2/core/transfer/image"
+	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 )
@@ -133,10 +136,25 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	defer inProgressImagePulls.Dec()
 	startTime := time.Now()
 
+	if credentials == nil {
+		credentials = func(host string) (string, string, error) {
+			var hostauth *runtime.AuthConfig
+
+			config := c.config.Registry.Configs[host]
+			if config.Auth != nil {
+				hostauth = toRuntimeAuthConfig(*config.Auth)
+
+			}
+
+			return ParseAuth(hostauth, host)
+		}
+	}
+
 	namedRef, err := distribution.ParseDockerRef(name)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse image reference %q: %w", name, err)
 	}
+
 	ref := namedRef.String()
 	if ref != name {
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
@@ -147,71 +165,32 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
-	var (
-		pctx, pcancel = context.WithCancel(ctx)
-
-		pullReporter = newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
-
-		resolver = docker.NewResolver(docker.ResolverOptions{
-			Headers: c.config.Registry.Headers,
-			Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
-		})
-		isSchema1    bool
-		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
-			desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
-			if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
-				isSchema1 = true
-			}
-			return nil, nil
-		}
-	)
-
-	defer pcancel()
 	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig)
 	if err != nil {
 		return "", err
 	}
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
+
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
 	)
-
 	labels := c.getLabels(ctx, ref)
 
-	pullOpts := []containerd.RemoteOpt{
-		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(snapshotter),
-		containerd.WithPullUnpack,
-		containerd.WithPullLabels(labels),
-		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
-		containerd.WithImageHandler(imageHandler),
-		containerd.WithUnpackOpts([]containerd.UnpackOpt{
-			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
-			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
-		}),
+	// If UseLocalImagePull is true, use client.Pull to pull the image, else use transfer service by default.
+	//
+	// Transfer service does not currently support all the CRI image config options.
+	// TODO: Add support for DisableSnapshotAnnotations, DiscardUnpackedLayers, ImagePullWithSyncFs and unpackDuplicationSuppressor
+	var image containerd.Image
+	if c.config.UseLocalImagePull {
+		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+	} else {
+		image, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
 	}
 
-	// Temporarily removed for v2 upgrade
-	//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
-	if !c.config.DisableSnapshotAnnotations {
-		pullOpts = append(pullOpts,
-			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
-	}
-
-	if c.config.DiscardUnpackedLayers {
-		// Allows GC to clean layers up from the content store after unpacking
-		pullOpts = append(pullOpts,
-			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
-	}
-
-	pullReporter.start(pctx)
-	image, err := c.client.Pull(pctx, ref, pullOpts...)
-	pcancel()
 	if err != nil {
-		return "", fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		return "", err
 	}
+
 	span.AddEvent("Pull and unpack image complete")
 
 	configDesc, err := image.Config(ctx)
@@ -220,7 +199,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	}
 	imageID := configDesc.Digest.String()
 
-	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
+	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue
@@ -252,19 +231,104 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	return imageID, nil
 }
 
-// getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
-func getRepoDigestAndTag(namedRef distribution.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
-	var repoTag, repoDigest string
-	if _, ok := namedRef.(distribution.NamedTagged); ok {
-		repoTag = namedRef.String()
+// pullImageWithLocalPull handles image pulling using the local client.
+func (c *CRIImageService) pullImageWithLocalPull(
+	ctx context.Context,
+	ref string,
+	credentials func(string) (string, string, error),
+	snapshotter string,
+	labels map[string]string,
+	imagePullProgressTimeout time.Duration,
+) (containerd.Image, error) {
+	pctx, pcancel := context.WithCancel(ctx)
+	defer pcancel()
+	pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		Headers: c.config.Registry.Headers,
+		Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
+	})
+
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, snapshotter)
+	pullOpts := []containerd.RemoteOpt{
+		containerd.WithResolver(resolver),
+		containerd.WithPullSnapshotter(snapshotter),
+		containerd.WithPullUnpack,
+		containerd.WithPullLabels(labels),
+		containerd.WithDownloadLimiter(c.downloadLimiter),
+		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+		containerd.WithConcurrentLayerFetchBuffer(c.config.ConcurrentLayerFetchBuffer),
+		containerd.WithUnpackOpts([]containerd.UnpackOpt{
+			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
+			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
+		}),
 	}
-	if _, ok := namedRef.(distribution.Canonical); ok {
-		repoDigest = namedRef.String()
-	} else if !schema1 {
-		// digest is not actual repo digest for schema1 image.
-		repoDigest = namedRef.Name() + "@" + digest.String()
+
+	// Temporarily removed for v2 upgrade
+	//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+	if !c.config.DisableSnapshotAnnotations {
+		pullOpts = append(pullOpts,
+			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
 	}
-	return repoDigest, repoTag
+
+	if c.config.DiscardUnpackedLayers {
+		// Allows GC to clean layers up from the content store after unpacking
+		pullOpts = append(pullOpts,
+			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
+	}
+
+	pullReporter.start(pctx)
+	image, err := c.client.Pull(pctx, ref, pullOpts...)
+	pcancel()
+	if err != nil {
+		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+	}
+	return image, nil
+}
+
+// pullImageWithTransferService handles image pulling using the transfer service.
+func (c *CRIImageService) pullImageWithTransferService(
+	ctx context.Context,
+	ref string,
+	credentials func(string) (string, string, error),
+	snapshotter string,
+	labels map[string]string,
+	imagePullProgressTimeout time.Duration,
+) (containerd.Image, error) {
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
+	rctx, rcancel := context.WithCancel(ctx)
+	defer rcancel()
+	transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
+
+	// Set image store opts
+	var sopts []transferimage.StoreOpt
+	sopts = append(sopts, transferimage.WithPlatforms(platforms.DefaultSpec()))
+	sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
+	sopts = append(sopts, transferimage.WithImageLabels(labels))
+	is := transferimage.NewStore(ref, sopts...)
+	log.G(ctx).Debugf("Getting new CRI credentials")
+	ch := newCRICredentials(ref, credentials)
+	opts := []registry.Opt{registry.WithCredentials(ch)}
+	opts = append(opts, registry.WithHeaders(c.config.Registry.Headers))
+	opts = append(opts, registry.WithHostDir(c.config.Registry.ConfigPath))
+	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI registry: %w", err)
+	}
+
+	transferProgressReporter.start(rctx)
+	log.G(ctx).Debugf("Calling cri transfer service")
+	err = c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx)))
+	rcancel()
+	if err != nil {
+		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+	}
+
+	// Image should be pulled, unpacked and present in containerd image store at this moment
+	image, err := c.client.GetImage(ctx, ref)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
+	}
+	return image, nil
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
@@ -358,7 +422,7 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 	return labels
 }
 
-// updateImage updates image store to reflect the newest state of an image reference
+// UpdateImage updates image store to reflect the newest state of an image reference
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
@@ -431,6 +495,10 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 		}
 		hostOptions.Credentials = credentials
 		hostOptions.HostDir = hostDirFromRoots(paths)
+		// need to pass cri global headers to per-host authorizers
+		hostOptions.AuthorizerOpts = []docker.AuthorizerOpt{
+			docker.WithAuthHeader(c.config.Registry.Headers),
+		}
 
 		return config.ConfigureHosts(ctx, hostOptions)
 	}
@@ -449,7 +517,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 			}
 
 			var (
-				transport = newTransport()
+				transport = docker.DefaultHTTPTransport(nil) // no tls config
 				client    = &http.Client{Transport: transport}
 				config    = c.config.Registry.Configs[u.Host]
 			)
@@ -469,7 +537,6 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 				credentials = func(host string) (string, string, error) {
 					return ParseAuth(auth, host)
 				}
-
 			}
 
 			if updateClientFn != nil {
@@ -480,7 +547,9 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 
 			authorizer := docker.NewDockerAuthorizer(
 				docker.WithAuthClient(client),
-				docker.WithAuthCreds(credentials))
+				docker.WithAuthCreds(credentials),
+				docker.WithAuthHeader(c.config.Registry.Headers),
+			)
 
 			if u.Path == "" {
 				u.Path = "/v2"
@@ -492,7 +561,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 				Host:         u.Host,
 				Scheme:       u.Scheme,
 				Path:         u.Path,
-				Capabilities: docker.HostCapabilityResolve | docker.HostCapabilityPull,
+				Capabilities: docker.HostCapabilityResolve | docker.HostCapabilityPull | docker.HostCapabilityReferrers,
 			})
 		}
 		return registries, nil
@@ -563,23 +632,6 @@ func (c *CRIImageService) registryEndpoints(host string) ([]string, error) {
 		}
 	}
 	return append(endpoints, defaultScheme(defaultHost)+"://"+defaultHost), nil
-}
-
-// newTransport returns a new HTTP transport used to pull image.
-// TODO(random-liu): Create a library and share this code with `ctr`.
-func newTransport() *http.Transport {
-	return &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:       30 * time.Second,
-			KeepAlive:     30 * time.Second,
-			FallbackDelay: 300 * time.Millisecond,
-		}).DialContext,
-		MaxIdleConns:          10,
-		IdleConnTimeout:       30 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 5 * time.Second,
-	}
 }
 
 // encryptedImagesPullOpts returns the necessary list of pull options required
@@ -710,27 +762,27 @@ func (r *countingReadCloser) Close() error {
 type pullRequestReporter struct {
 	// activeReqs indicates that current number of active pulling requests,
 	// including auth requests.
-	activeReqs int32
+	activeReqs atomic.Int32
 	// totalBytesRead indicates that the total bytes has been read from
 	// remote registry.
-	totalBytesRead uint64
+	totalBytesRead atomic.Uint64
 }
 
 func (reporter *pullRequestReporter) incRequest() {
-	atomic.AddInt32(&reporter.activeReqs, 1)
+	reporter.activeReqs.Add(1)
 }
 
 func (reporter *pullRequestReporter) decRequest() {
-	atomic.AddInt32(&reporter.activeReqs, -1)
+	reporter.activeReqs.Add(-1)
 }
 
 func (reporter *pullRequestReporter) incByteRead(nr uint64) {
-	atomic.AddUint64(&reporter.totalBytesRead, nr)
+	reporter.totalBytesRead.Add(nr)
 }
 
 func (reporter *pullRequestReporter) status() (currentReqs int32, totalBytesRead uint64) {
-	currentReqs = atomic.LoadInt32(&reporter.activeReqs)
-	totalBytesRead = atomic.LoadUint64(&reporter.totalBytesRead)
+	currentReqs = reporter.activeReqs.Load()
+	totalBytesRead = reporter.totalBytesRead.Load()
 	return currentReqs, totalBytesRead
 }
 
@@ -798,4 +850,187 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	}
 
 	return snapshotter, nil
+}
+
+type criCredentials struct {
+	ref         string
+	credentials func(string) (string, string, error)
+}
+
+func newCRICredentials(ref string, credentials func(string) (string, string, error)) registry.CredentialHelper {
+	return &criCredentials{
+		ref:         ref,
+		credentials: credentials,
+	}
+}
+
+// GetCredentials gets credential from criCredentials makes criCredentials a registry.CredentialHelper
+func (cc *criCredentials) GetCredentials(ctx context.Context, ref string, host string) (registry.Credentials, error) {
+	if cc.credentials == nil {
+		return registry.Credentials{}, fmt.Errorf("credential handler not initialized for ref %q", ref)
+	}
+
+	if ref != cc.ref {
+		return registry.Credentials{}, fmt.Errorf("invalid ref %q, expected %q", ref, cc.ref)
+	}
+
+	username, secret, err := cc.credentials(host)
+	if err != nil {
+		return registry.Credentials{}, fmt.Errorf("failed to get credentials for %q: %w", host, err)
+	}
+	return registry.Credentials{
+		Host:     host,
+		Username: username,
+		Secret:   secret,
+	}, nil
+}
+
+type transferProgressReporter struct {
+	ref               string
+	pc                chan transfer.Progress
+	cancel            context.CancelFunc
+	timeout           time.Duration
+	reqReporter       pullRequestReporter
+	statuses          map[string]*transfer.Progress
+	lastSeenBytesRead uint64
+	lastSeenTimestamp time.Time
+}
+
+func newTransferProgressReporter(ref string, cancel context.CancelFunc, timeout time.Duration) *transferProgressReporter {
+	return &transferProgressReporter{
+		ref:      ref,
+		cancel:   cancel,
+		timeout:  timeout,
+		pc:       make(chan transfer.Progress),
+		statuses: make(map[string]*transfer.Progress),
+	}
+}
+
+func (reporter *transferProgressReporter) handleProgress(p transfer.Progress) {
+	// We only need to handle Progress Nodes that represent
+	// valid requests to a remote registry, so Progress nodes
+	// without 'Name', 'Desc' or 'Total' can be ignored
+	if p.Name == "" || p.Desc == nil || p.Total == 0 {
+		return
+	}
+
+	switch p.Event {
+	case "waiting":
+		// 'Waiting' events can be either when the layer is waiting to be
+		// downloaded and no progress has been made. Or when we have made
+		// some progress but `waiting` for more content to be downloaded.
+		if p.Progress == 0 {
+			return
+		}
+		fallthrough // Handle non-zero waiting progress same as downloading
+	case "downloading":
+		var curProgress int64
+		if node, ok := reporter.statuses[p.Name]; !ok {
+			curProgress = p.Progress
+			reporter.reqReporter.incRequest()
+		} else {
+			curProgress = p.Progress - node.Progress
+		}
+		reporter.statuses[p.Name] = &p
+		if curProgress > 0 {
+			reporter.IncBytesRead(curProgress)
+		}
+
+		// Download may be complete, but waiting for content
+		// to be written. In this case, we no longer consider it
+		// as an active requests.
+		if p.Progress == p.Total {
+			reporter.reqReporter.decRequest()
+			delete(reporter.statuses, p.Name)
+		}
+
+	case "complete":
+		if node, exists := reporter.statuses[p.Name]; exists {
+			if curProgress := p.Progress - node.Progress; curProgress > 0 {
+				reporter.IncBytesRead(curProgress)
+			}
+			reporter.reqReporter.decRequest()
+			delete(reporter.statuses, p.Name)
+		}
+	default:
+		return
+	}
+}
+
+func (reporter *transferProgressReporter) IncBytesRead(bytes int64) {
+	reporter.reqReporter.incByteRead(uint64(bytes))
+}
+
+func (reporter *transferProgressReporter) start(ctx context.Context) {
+	if reporter.timeout == 0 {
+		log.G(ctx).Infof("no timeout and will not start pulling image %s reporter", reporter.ref)
+		return
+	}
+
+	go func() {
+		var (
+			reportInterval = defaultPullProgressReportInterval
+		)
+
+		reporter.lastSeenBytesRead = uint64(0)
+		reporter.lastSeenTimestamp = time.Now()
+
+		// check progress more frequently if timeout < default internal
+		if reporter.timeout < reportInterval {
+			reportInterval = reporter.timeout / 2
+		}
+
+		var ticker = time.NewTicker(reportInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case p := <-reporter.pc:
+				reporter.handleProgress(p)
+			case <-ticker.C:
+				reporter.checkProgress(ctx, reportInterval)
+				continue
+			case <-ctx.Done():
+				activeReqs, bytesRead := reporter.reqReporter.status()
+				log.G(ctx).Infof("stop pulling image %s: active requests=%v, bytes read=%v", reporter.ref, activeReqs, bytesRead)
+				return
+			}
+		}
+	}()
+}
+
+func (reporter *transferProgressReporter) checkProgress(ctx context.Context, reportInterval time.Duration) {
+	activeReqs, bytesRead := reporter.reqReporter.status()
+
+	lastSeenBytesRead := reporter.lastSeenBytesRead
+	lastSeenTimestamp := reporter.lastSeenTimestamp
+
+	log.G(ctx).WithField("ref", reporter.ref).
+		WithField("activeReqs", activeReqs).
+		WithField("totalBytesRead", bytesRead).
+		WithField("lastSeenBytesRead", lastSeenBytesRead).
+		WithField("lastSeenTimestamp", lastSeenTimestamp.Format(time.RFC3339)).
+		WithField("reportInterval", reportInterval).
+		Debugf("progress for image pull")
+
+	if activeReqs == 0 || bytesRead > lastSeenBytesRead {
+		reporter.lastSeenBytesRead = bytesRead
+		reporter.lastSeenTimestamp = time.Now()
+		return
+	}
+
+	if time.Since(lastSeenTimestamp) > reporter.timeout {
+		log.G(ctx).Errorf("cancel pulling image %s because of no progress in %v", reporter.ref, reporter.timeout)
+		reporter.cancel()
+	}
+}
+
+func (reporter *transferProgressReporter) createProgressFunc(ctx context.Context) transfer.ProgressFunc {
+	return func(p transfer.Progress) {
+		select {
+		case reporter.pc <- p:
+		case <-ctx.Done():
+			return
+		}
+	}
 }

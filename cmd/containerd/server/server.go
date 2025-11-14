@@ -49,6 +49,10 @@ import (
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	sbapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	csproxy "github.com/containerd/containerd/v2/core/content/proxy"
 	"github.com/containerd/containerd/v2/core/diff"
@@ -56,18 +60,13 @@ import (
 	sbproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
 	ssproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/deprecation"
+	"github.com/containerd/containerd/v2/internal/wintls"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/dynamic"
-	"github.com/containerd/plugin/registry"
 )
 
 // CreateTopLevelDirectories creates the top-level root and state directories.
@@ -81,10 +80,16 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 		return errors.New("root and state must be different paths")
 	}
 
-	if err := sys.MkdirAllWithACL(config.Root, 0o711); err != nil {
+	if err := sys.MkdirAllWithACL(config.Root, 0o700); err != nil {
+		return err
+	}
+	// chmod is needed for upgrading from an older release that created the dir with 0o711
+	if err := os.Chmod(config.Root, 0o700); err != nil {
 		return err
 	}
 
+	// For supporting userns-remapped containers, the state dir cannot be just mkdired with 0o700.
+	// Each of plugins creates a dedicated directory beneath the state dir with appropriate permission bits.
 	if err := sys.MkdirAllWithACL(config.State, 0o711); err != nil {
 		return err
 	}
@@ -99,7 +104,11 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 	}
 
 	if config.TempDir != "" {
-		if err := sys.MkdirAllWithACL(config.TempDir, 0o711); err != nil {
+		if err := sys.MkdirAllWithACL(config.TempDir, 0o700); err != nil {
+			return err
+		}
+		// chmod is needed for upgrading from an older release that created the dir with 0o711
+		if err := os.Chmod(config.Root, 0o700); err != nil {
 			return err
 		}
 		if runtime.GOOS == "windows" {
@@ -202,7 +211,19 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			tlsConfig.ClientCAs = caCertPool
 			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 		}
-
+		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
+	} else if config.GRPC.TCPTLSCName != "" {
+		tlsConfig, CA, res, err :=
+			wintls.SetupTLSFromWindowsCertStore(ctx, config.GRPC.TCPTLSCName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup TLS from Windows cert store: %w", err)
+		}
+		// Cache resource for cleanup (Windows only)
+		setTLSResource(res)
+		if CA != nil {
+			tlsConfig.ClientCAs = CA
+			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		}
 		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
 
@@ -228,8 +249,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		grpcServices  []grpcService
 		tcpServices   []tcpService
 		ttrpcServices []ttrpcService
-
-		s = &Server{
+		s             = &Server{
 			prometheusServerMetrics: prometheusServerMetrics,
 			grpcServer:              grpcServer,
 			tcpServer:               tcpServer,
@@ -266,7 +286,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	for _, p := range loaded {
 		id := p.URI()
 		log.G(ctx).WithFields(log.Fields{"id": id, "type": p.Type}).Info("loading plugin")
-		var mustSucceed int32
+		var mustSucceed atomic.Int32
 
 		initContext := plugin.NewContext(
 			ctx,
@@ -279,7 +299,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			},
 		)
 		initContext.RegisterReadiness = func() func() {
-			atomic.StoreInt32(&mustSucceed, 1)
+			mustSucceed.Store(1)
 			return s.RegisterReadiness()
 		}
 
@@ -307,7 +327,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 				return nil, fmt.Errorf("load required plugin %s: %w", id, err)
 			}
 			// If readiness was registered during initialization, the plugin cannot fail
-			if atomic.LoadInt32(&mustSucceed) != 0 {
+			if mustSucceed.Load() != 0 {
 				return nil, fmt.Errorf("plugin failed after registering readiness %s: %w", id, err)
 			}
 			continue
@@ -375,9 +395,8 @@ func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set
 		return
 	}
 
-	if config.PluginDir != "" { //nolint:staticcheck
-		warn.Emit(ctx, deprecation.GoPluginLibrary)
-	}
+	// warn.Emit(ctx, deprecation...) will be used for future deprecations
+	_ = warn
 }
 
 // Server is the containerd main daemon
@@ -440,6 +459,8 @@ func (s *Server) ServeDebug(l net.Listener) error {
 // Stop the containerd server canceling any open connections
 func (s *Server) Stop() {
 	s.grpcServer.Stop()
+	// Clean up TLS resources (Windows only)
+	cleanupTLSResources()
 	for i := len(s.plugins) - 1; i >= 0; i-- {
 		p := s.plugins[i]
 		instance, err := p.Instance()
@@ -472,27 +493,6 @@ func (s *Server) Wait() {
 // of all plugins.
 func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Registration, error) {
 	// load all plugins into containerd
-	path := config.PluginDir //nolint:staticcheck
-	if path == "" {
-		path = filepath.Join(config.Root, "plugins")
-	}
-	if count, err := dynamic.Load(path); err != nil {
-		return nil, err
-	} else if count > 0 || config.PluginDir != "" { //nolint:staticcheck
-		config.PluginDir = path //nolint:staticcheck
-		log.G(ctx).Warningf("loaded %d dynamic plugins. `go_plugin` is deprecated, please use `external plugins` instead", count)
-	}
-	// load additional plugins that don't automatically register themselves
-	registry.Register(&plugin.Registration{
-		Type: plugins.ContentPlugin,
-		ID:   "content",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			root := ic.Properties[plugins.PropertyRootDir]
-			ic.Meta.Exports["root"] = root
-			return local.NewStore(root)
-		},
-	})
-
 	clients := &proxyClients{}
 	for name, pp := range config.ProxyPlugins {
 		var (
@@ -520,7 +520,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		case string(plugins.SandboxControllerPlugin), "sandbox":
 			t = plugins.SandboxControllerPlugin
 			f = func(conn *grpc.ClientConn) interface{} {
-				return sbproxy.NewSandboxController(sbapi.NewControllerClient(conn))
+				return sbproxy.NewSandboxController(sbapi.NewControllerClient(conn), name)
 			}
 		case string(plugins.DiffPlugin), "diff":
 			t = plugins.DiffPlugin

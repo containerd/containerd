@@ -70,7 +70,6 @@ func TestSetContainerRemoving(t *testing.T) {
 			expectErr: false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: testID},

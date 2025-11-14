@@ -19,18 +19,21 @@ package transfer
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/v2/core/diff"
-	"github.com/containerd/containerd/v2/core/leases"
-	"github.com/containerd/containerd/v2/core/metadata"
-	"github.com/containerd/containerd/v2/core/transfer/local"
-	"github.com/containerd/containerd/v2/core/unpack"
-	"github.com/containerd/containerd/v2/pkg/imageverifier"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+
+	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/transfer/local"
+	"github.com/containerd/containerd/v2/core/unpack"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
+	"github.com/containerd/containerd/v2/plugins"
 
 	// Load packages with type registrations
 	_ "github.com/containerd/containerd/v2/core/transfer/archive"
@@ -48,6 +51,7 @@ func init() {
 			plugins.MetadataPlugin,
 			plugins.DiffPlugin,
 			plugins.ImageVerifierPlugin,
+			plugins.SnapshotPlugin,
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -79,7 +83,10 @@ func init() {
 
 			// Set configuration based on default or user input
 			lc.MaxConcurrentDownloads = config.MaxConcurrentDownloads
+			lc.ConcurrentLayerFetchBuffer = config.ConcurrentLayerFetchBuffer
+
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
+			lc.MaxConcurrentUnpacks = config.MaxConcurrentUnpacks
 
 			// If UnpackConfiguration is not defined, set the default.
 			// If UnpackConfiguration is defined and empty, ignore.
@@ -96,6 +103,14 @@ func init() {
 				if sn == nil {
 					return nil, fmt.Errorf("snapshotter %q not found: %w", uc.Snapshotter, errdefs.ErrNotFound)
 				}
+				var (
+					snExports      map[string]string
+					snCapabilities []string
+				)
+				if p := ic.Plugins().Get(plugins.SnapshotPlugin, uc.Snapshotter); p != nil {
+					snExports = p.Meta.Exports
+					snCapabilities = p.Meta.Capabilities
+				}
 
 				var applier diff.Applier
 				target := platforms.Only(p)
@@ -106,6 +121,7 @@ func init() {
 					}
 					applier = inst.(diff.Applier)
 				} else {
+					var applierID string
 					for name, plugin := range ic.GetAll() {
 						if plugin.Registration.Type != plugins.DiffPlugin {
 							continue
@@ -120,29 +136,50 @@ func init() {
 							continue
 						}
 						if applier != nil {
-							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", plugin.Registration.ID)
-							continue
+							skippedApplier := plugin.Registration.ID
+
+							// Prefer the default when multiple plugins match
+							if skippedApplier == defaults.DefaultDiffer {
+								skippedApplier = applierID
+							}
+
+							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", skippedApplier)
+
+							if plugin.Registration.ID == skippedApplier {
+								continue
+							}
 						}
 						inst, err := plugin.Instance()
 						if err != nil {
 							return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", name, err)
 						}
 						applier = inst.(diff.Applier)
+						applierID = plugin.Registration.ID
 					}
 				}
 				if applier == nil {
 					return nil, fmt.Errorf("no matching diff plugins: %w", errdefs.ErrNotFound)
 				}
 
+				// If CheckPlatformSupported is false, we will match all platforms
+				if !config.CheckPlatformSupported {
+					target = platforms.All
+				}
+
 				up := unpack.Platform{
-					Platform:       target,
-					SnapshotterKey: uc.Snapshotter,
-					Snapshotter:    sn,
-					Applier:        applier,
+					Platform:                target,
+					SnapshotterKey:          uc.Snapshotter,
+					Snapshotter:             sn,
+					SnapshotterExports:      snExports,
+					SnapshotterCapabilities: snCapabilities,
+					Applier:                 applier,
+					ConfigType:              uc.ConfigType,
+					LayerTypes:              uc.LayerTypes,
 				}
 				lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
+			lc.DuplicationSuppressor = kmutex.New()
 
 			return local.NewTransferService(ms.ContentStore(), metadata.NewImageStore(ms), lc), nil
 		},
@@ -153,14 +190,27 @@ type transferConfig struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads"`
 
+	// ConcurrentLayerFetchBuffer sets the maximum size in bytes for each chunk
+	// when downloading layers in parallel. Larger chunks reduce coordination
+	// overhead but use more memory. When ConcurrentLayerFetchBuffer is above
+	// 512 bytes, parallel layer fetch is enabled. It can accelerate pulls for
+	// big images.
+	ConcurrentLayerFetchBuffer int `toml:"concurrent_layer_fetch_buffer"`
+
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
+
+	// CheckPlatformSupported enables platform check specified in UnpackConfiguration
+	CheckPlatformSupported bool `toml:"check_platform_supported"`
 
 	// UnpackConfiguration is used to read config from toml
 	UnpackConfiguration []unpackConfiguration `toml:"unpack_config,omitempty"`
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
 	RegistryConfigPath string `toml:"config_path"`
+
+	// MaxConcurrentUnpacks controls the number of concurrent layer unpack operations.
+	MaxConcurrentUnpacks int `toml:"max_concurrent_unpacks"`
 }
 
 type unpackConfiguration struct {
@@ -172,11 +222,19 @@ type unpackConfiguration struct {
 
 	// Differ is the diff plugin to be used for apply
 	Differ string `toml:"differ"`
+
+	// ConfigType is the config types for this unpack configuration
+	ConfigType string `toml:"config_type"`
+
+	// LayerTypes are the allowed layer types for this unpack configuration
+	LayerTypes []string `toml:"layer_types"`
 }
 
 func defaultConfig() *transferConfig {
 	return &transferConfig{
 		MaxConcurrentDownloads:      3,
 		MaxConcurrentUploadedLayers: 3,
+		MaxConcurrentUnpacks:        1,
+		CheckPlatformSupported:      false,
 	}
 }

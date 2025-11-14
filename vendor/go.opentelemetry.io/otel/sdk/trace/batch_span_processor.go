@@ -5,6 +5,7 @@ package trace // import "go.opentelemetry.io/otel/sdk/trace"
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -201,10 +202,9 @@ func (bsp *batchSpanProcessor) ForceFlush(ctx context.Context) error {
 			}
 		}
 
-		wait := make(chan error)
+		wait := make(chan error, 1)
 		go func() {
 			wait <- bsp.exportSpans(ctx)
-			close(wait)
 		}()
 		// Wait until the export is finished or the context is cancelled/timed out
 		select {
@@ -268,7 +268,7 @@ func (bsp *batchSpanProcessor) exportSpans(ctx context.Context) error {
 
 	if bsp.o.ExportTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, bsp.o.ExportTimeout)
+		ctx, cancel = context.WithTimeoutCause(ctx, bsp.o.ExportTimeout, errors.New("processor export timeout"))
 		defer cancel()
 	}
 
@@ -280,6 +280,7 @@ func (bsp *batchSpanProcessor) exportSpans(ctx context.Context) error {
 		//
 		// It is up to the exporter to implement any type of retry logic if a batch is failing
 		// to be exported, since it is specific to the protocol and backend being sent to.
+		clear(bsp.batch) // Erase elements to let GC collect objects
 		bsp.batch = bsp.batch[:0]
 
 		if err != nil {
@@ -316,7 +317,11 @@ func (bsp *batchSpanProcessor) processQueue() {
 			bsp.batchMutex.Unlock()
 			if shouldExport {
 				if !bsp.timer.Stop() {
-					<-bsp.timer.C
+					// Handle both GODEBUG=asynctimerchan=[0|1] properly.
+					select {
+					case <-bsp.timer.C:
+					default:
+					}
 				}
 				if err := bsp.exportSpans(ctx); err != nil {
 					otel.Handle(err)

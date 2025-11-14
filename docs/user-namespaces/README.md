@@ -157,19 +157,37 @@ overlay on / type overlay (rw,relatime,lowerdir=/tmp/ovl-idmapped823885363/0,upp
 
 You can also create a container with user namespaces using `ctr`. This is more low-level, be warned.
 
-Create an OCI bundle as explained [here][runc-bundle]. Then, change the UID/GID to 65536:
+Create a directory where we will work:
 
+```sh
+mkdir -p /tmp/userns-test
+cd /tmp/userns-test
 ```
+
+Please note that we will need +x permissions to all components in the path to the rootfs (like
+`/tmp` and `/tmp/rootfs`). So, it's recommended to do this inside `/tmp`, as that will have the
+right permissions.
+
+Create an OCI bundle:
+```sh
+# create the rootfs directory
+mkdir rootfs
+
+# export busybox via Docker into the rootfs directory
+docker export $(docker create busybox) | tar -C rootfs -xvf -
+
+# adjust the permissions
 sudo chown -R 65536:65536 rootfs/
 ```
 
-Copy [this config.json](./config.json) and replace `XXX-path-to-rootfs` with the
-absolute path to the rootfs you just chowned.
+Copy [this config.json](./config.json) to `/tmp/userns-test`. Please note the process.root.path
+field in the config.json it's pointing to the rootfs we just created. This **needs to be an
+absolute path**.
 
 Then create and start the container with:
 
 ```
-sudo ctr create --config <path>/config.json userns-test
+sudo ctr c create --config config.json userns-test
 sudo ctr t start userns-test
 ```
 
@@ -182,5 +200,3 @@ root@runc:/# cat /proc/self/uid_map
 ```
 
 The output should be exactly the same.
-
-[runc-bundle]: https://github.com/opencontainers/runc#creating-an-oci-bundle

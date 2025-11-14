@@ -1,5 +1,5 @@
 The "cri-containerd-(cni-)-VERSION-OS-ARCH.tar.gz" release bundle has been deprecated since containerd 1.6,
-does not work on some Linux distributions, and will be removed in containerd 2.0.
+does not work on some Linux distributions, and has been removed in containerd 2.0.
 
 Instead of this, install the following components separately, either from the binary or from the source:
 * containerd:  https://github.com/containerd/containerd/releases

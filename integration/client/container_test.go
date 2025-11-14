@@ -33,6 +33,15 @@ import (
 
 	apievents "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/continuity/fs"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/go-runc"
+	"github.com/containerd/log/logtest"
+	"github.com/containerd/platforms"
+	"github.com/containerd/typeurl/v2"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/require"
+
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/images"
@@ -42,14 +51,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	gogotypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/continuity/fs"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/go-runc"
-	"github.com/containerd/log/logtest"
-	"github.com/containerd/platforms"
-	"github.com/containerd/typeurl/v2"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/stretchr/testify/require"
 )
 
 func empty() cio.Creator {
@@ -363,6 +364,67 @@ func withStdout(stdout io.Writer) cio.Opt {
 	}
 }
 
+func TestContainerWait(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	ctx2, cancle2 := context.WithCancel(ctx)
+	cancle2()
+	statusErrC, _ := task.Wait(ctx2)
+	s := <-statusErrC
+	require.Error(t, s.Error(), "expected wait error, but got nil")
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
+
+	err = task.Kill(ctx, syscall.SIGTERM)
+	if err == nil {
+		t.Fatal("second call to kill should return an error")
+	}
+	if !errdefs.IsNotFound(err) {
+		t.Errorf("expected error %q but received %q", errdefs.ErrNotFound, err)
+	}
+}
+
 func TestContainerExec(t *testing.T) {
 	t.Parallel()
 
@@ -571,44 +633,61 @@ func TestContainerPids(t *testing.T) {
 		t.Errorf("invalid task pid %d", taskPid)
 	}
 
-	processes, err := task.Pids(ctx)
-	if err != nil {
-		t.Fatal(err)
+	tryUntil := time.Now().Add(time.Second)
+	checkPids := func() bool {
+		processes, err := task.Pids(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		l := len(processes)
+		// The point of this test is to see that we successfully can get all of
+		// the pids running in the container and they match the number expected,
+		// but for Windows this concept is a bit different. Windows containers
+		// essentially go through the usermode boot phase of the operating system,
+		// and have quite a few processes and system services running outside of
+		// the "init" process you specify. Because of this, there's not a great
+		// way to say "there should only be N processes running" like we can ensure
+		// for Linux based off the process we asked to run.
+		//
+		// With all that said, on Windows lets check that we're greater than one
+		// ("init" + system services/procs)
+		if runtime.GOOS == "windows" {
+			if l <= 1 {
+				t.Errorf("expected more than one process but received %d", l)
+			}
+		} else {
+			// 2 processes, 1 for sh and one for sleep
+			if l != 2 {
+				if l == 1 && time.Now().Before(tryUntil) {
+					// The subcommand may not have been started when the
+					// pids are requested. Retrying is a simple way to
+					// handle the race under normal conditions. A better
+					// but more complex solution would be first waiting
+					// for output from the subprocess to be seen.
+					return true
+				}
+				t.Errorf("expected 2 process but received %d", l)
+			}
+		}
+
+		var found bool
+		for _, p := range processes {
+			if p.Pid == taskPid {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("pid %d must be in %+v", taskPid, processes)
+		}
+		return false
 	}
 
-	l := len(processes)
-	// The point of this test is to see that we successfully can get all of
-	// the pids running in the container and they match the number expected,
-	// but for Windows this concept is a bit different. Windows containers
-	// essentially go through the usermode boot phase of the operating system,
-	// and have quite a few processes and system services running outside of
-	// the "init" process you specify. Because of this, there's not a great
-	// way to say "there should only be N processes running" like we can ensure
-	// for Linux based off the process we asked to run.
-	//
-	// With all that said, on Windows lets check that we're greater than one
-	// ("init" + system services/procs)
-	if runtime.GOOS == "windows" {
-		if l <= 1 {
-			t.Errorf("expected more than one process but received %d", l)
-		}
-	} else {
-		// 2 processes, 1 for sh and one for sleep
-		if l != 2 {
-			t.Errorf("expected 2 process but received %d", l)
-		}
+	for checkPids() {
+		time.Sleep(5 * time.Millisecond)
 	}
 
-	var found bool
-	for _, p := range processes {
-		if p.Pid == taskPid {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("pid %d must be in %+v", taskPid, processes)
-	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		select {
 		case s := <-statusC:
@@ -1907,6 +1986,9 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 
 		const expectedSuffix = "999999 1000000"
 		stdoutString := stdout.String()
+		if len(stdoutString) == 0 {
+			t.Fatal(fmt.Errorf("len (stdoutString) is 0"))
+		}
 		if !strings.Contains(stdoutString, expectedSuffix) {
 			t.Fatalf("process output does not end with %q at iteration %d, here are the last 20 characters of the output:\n\n %q", expectedSuffix, i, stdoutString[len(stdoutString)-20:])
 		}
@@ -2321,8 +2403,8 @@ func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) 
 		t.Fatal(err)
 	}
 
-	// The container is using longCommand, which contains sleep 1 on Linux, and ping -t localhost on Windows.
-	if strings.Contains(string(b), "sleep 1") || strings.Contains(string(b), "ping -t localhost") {
+	// The container is using longCommand, which contains sleep inf on Linux, and ping -t localhost on Windows.
+	if strings.Contains(string(b), "sleep inf") || strings.Contains(string(b), "ping -t localhost") {
 		t.Fatalf("killing init didn't kill all its children:\n%v", string(b))
 	}
 
@@ -2704,8 +2786,23 @@ func TestContainerPTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := buf.String()
-	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
-		t.Fatal(`expected \x00 in output`)
+	tries := 1
+	if runtime.GOOS == "windows" {
+		// TODO: Fix flakiness on Window by checking for race in writing to buffer
+		tries += 2
+	}
+
+	for {
+		out := buf.String()
+		if strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
+			break
+
+		}
+		tries--
+		if tries == 0 {
+			t.Fatal(`expected \x00 in output`)
+		}
+		t.Logf("output %#q does not contain \\x00, trying again", out)
+		time.Sleep(time.Millisecond)
 	}
 }

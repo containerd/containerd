@@ -5,15 +5,9 @@ Tracing currently targets only gRPC calls.
 
 ## Sending traces from containerd daemon
 
-By configuring `io.containerd.tracing.processor.v1.otlp` plugin.
-containerd daemon can send traces to the specified OpenTelemetry endpoint.
-
-```toml
-version = 2
-
-[plugins."io.containerd.tracing.processor.v1.otlp"]
-    endpoint = "http://localhost:4318"
-```
+containerd daemon can send traces to collection endpoints by configuring
+[OpenTelemetry exporter environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/)
+within the daemon's process space.
 
 The following options are supported.
 
@@ -24,15 +18,28 @@ The following options are supported.
   "http/protobuf" always uses the schema provided by the endpoint and
   the value of this setting being ignored.
 
-The sampling ratio and the service name on the traces could be configured by
-`io.containerd.internal.v1.tracing` plugin.
+The sampling ratio and the service name on the traces can be configured by setting
+[OpenTelemetry environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/).
 
-```toml
-version = 2
+For example, if running containerd as a systemd service, add the environment variables to the service:
 
-[plugins."io.containerd.internal.v1.tracing"]
-    sampling_ratio = 1.0
-    service_name = "containerd"
+```text
+[Service]
+Environment="OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318"
+Environment="OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf"
+Environment="OTEL_SERVICE_NAME=containerd"
+Environment="OTEL_TRACES_SAMPLER=traceidratio"
+Environment="OTEL_TRACES_SAMPLER_ARG=1.0"
+```
+
+Or if running containerd from the command-line, set the environment variables before starting the daemon:
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
+export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+export OTEL_SERVICE_NAME="containerd"
+export OTEL_TRACES_SAMPLER="traceidratio"
+export OTEL_TRACES_SAMPLER_ARG=1.0
 ```
 
 ## Sending traces from containerd client

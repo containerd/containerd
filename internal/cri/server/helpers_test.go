@@ -20,7 +20,6 @@ import (
 	"context"
 	"os"
 	goruntime "runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -29,7 +28,6 @@ import (
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/core/containers"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
-	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -81,36 +79,12 @@ func TestGetUserFromImage(t *testing.T) {
 			name: "test",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			actualUID, actualName := getUserFromImage(test.user)
 			assert.Equal(t, test.uid, actualUID)
 			assert.Equal(t, test.name, actualName)
 		})
 	}
-}
-
-func TestBuildLabels(t *testing.T) {
-	imageConfigLabels := map[string]string{
-		"a":          "z",
-		"d":          "y",
-		"long-label": strings.Repeat("example", 10000),
-	}
-	configLabels := map[string]string{
-		"a": "b",
-		"c": "d",
-	}
-	newLabels := buildLabels(configLabels, imageConfigLabels, crilabels.ContainerKindSandbox)
-	assert.Len(t, newLabels, 4)
-	assert.Equal(t, "b", newLabels["a"])
-	assert.Equal(t, "d", newLabels["c"])
-	assert.Equal(t, "y", newLabels["d"])
-	assert.Equal(t, crilabels.ContainerKindSandbox, newLabels[crilabels.ContainerKindLabel])
-	assert.NotContains(t, newLabels, "long-label")
-
-	newLabels["a"] = "e"
-	assert.Empty(t, configLabels[crilabels.ContainerKindLabel], "should not add new labels into original label")
-	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
 }
 
 func TestGenerateRuntimeOptions(t *testing.T) {
@@ -173,7 +147,6 @@ systemd_cgroup = true
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			opts, err := criconfig.GenerateRuntimeOptions(test.r)
 			assert.NoError(t, err)
@@ -246,7 +219,6 @@ func TestEnvDeduplication(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			var spec runtimespec.Spec
 			if len(test.existing) > 0 {
@@ -258,121 +230,6 @@ func TestEnvDeduplication(t *testing.T) {
 				oci.WithEnv([]string{kv[0] + "=" + kv[1]})(context.Background(), nil, nil, &spec)
 			}
 			assert.Equal(t, test.expected, spec.Process.Env)
-		})
-	}
-}
-
-func TestPassThroughAnnotationsFilter(t *testing.T) {
-	for _, test := range []struct {
-		desc                   string
-		podAnnotations         map[string]string
-		runtimePodAnnotations  []string
-		passthroughAnnotations map[string]string
-	}{
-		{
-			desc:                   "should support direct match",
-			podAnnotations:         map[string]string{"c": "d", "d": "e"},
-			runtimePodAnnotations:  []string{"c"},
-			passthroughAnnotations: map[string]string{"c": "d"},
-		},
-		{
-			desc: "should support wildcard match",
-			podAnnotations: map[string]string{
-				"t.f":  "j",
-				"z.g":  "o",
-				"z":    "o",
-				"y.ca": "b",
-				"y":    "b",
-			},
-			runtimePodAnnotations: []string{"*.f", "z*g", "y.c*"},
-			passthroughAnnotations: map[string]string{
-				"t.f":  "j",
-				"z.g":  "o",
-				"y.ca": "b",
-			},
-		},
-		{
-			desc: "should support wildcard match all",
-			podAnnotations: map[string]string{
-				"t.f":  "j",
-				"z.g":  "o",
-				"z":    "o",
-				"y.ca": "b",
-				"y":    "b",
-			},
-			runtimePodAnnotations: []string{"*"},
-			passthroughAnnotations: map[string]string{
-				"t.f":  "j",
-				"z.g":  "o",
-				"z":    "o",
-				"y.ca": "b",
-				"y":    "b",
-			},
-		},
-		{
-			desc: "should support match including path separator",
-			podAnnotations: map[string]string{
-				"matchend.com/end":    "1",
-				"matchend.com/end1":   "2",
-				"matchend.com/1end":   "3",
-				"matchmid.com/mid":    "4",
-				"matchmid.com/mi1d":   "5",
-				"matchmid.com/mid1":   "6",
-				"matchhead.com/head":  "7",
-				"matchhead.com/1head": "8",
-				"matchhead.com/head1": "9",
-				"matchall.com/abc":    "10",
-				"matchall.com/def":    "11",
-				"end/matchend":        "12",
-				"end1/matchend":       "13",
-				"1end/matchend":       "14",
-				"mid/matchmid":        "15",
-				"mi1d/matchmid":       "16",
-				"mid1/matchmid":       "17",
-				"head/matchhead":      "18",
-				"1head/matchhead":     "19",
-				"head1/matchhead":     "20",
-				"abc/matchall":        "21",
-				"def/matchall":        "22",
-				"match1/match2":       "23",
-				"nomatch/nomatch":     "24",
-			},
-			runtimePodAnnotations: []string{
-				"matchend.com/end*",
-				"matchmid.com/mi*d",
-				"matchhead.com/*head",
-				"matchall.com/*",
-				"end*/matchend",
-				"mi*d/matchmid",
-				"*head/matchhead",
-				"*/matchall",
-				"match*/match*",
-			},
-			passthroughAnnotations: map[string]string{
-				"matchend.com/end":    "1",
-				"matchend.com/end1":   "2",
-				"matchmid.com/mid":    "4",
-				"matchmid.com/mi1d":   "5",
-				"matchhead.com/head":  "7",
-				"matchhead.com/1head": "8",
-				"matchall.com/abc":    "10",
-				"matchall.com/def":    "11",
-				"end/matchend":        "12",
-				"end1/matchend":       "13",
-				"mid/matchmid":        "15",
-				"mi1d/matchmid":       "16",
-				"head/matchhead":      "18",
-				"1head/matchhead":     "19",
-				"abc/matchall":        "21",
-				"def/matchall":        "22",
-				"match1/match2":       "23",
-			},
-		},
-	} {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			passthroughAnnotations := getPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
-			assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)
 		})
 	}
 }
@@ -392,14 +249,12 @@ func TestEnsureRemoveAllWithDir(t *testing.T) {
 }
 
 func TestEnsureRemoveAllWithFile(t *testing.T) {
-	tmp, err := os.CreateTemp("", "test-ensure-removeall-with-dir")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmp, err := os.CreateTemp(t.TempDir(), "test-ensure-removeall-with-dir")
+	require.NoError(t, err)
 	tmp.Close()
-	if err := ensureRemoveAll(context.Background(), tmp.Name()); err != nil {
-		t.Fatal(err)
-	}
+
+	err = ensureRemoveAll(context.Background(), tmp.Name())
+	require.NoError(t, err)
 }
 
 // Helper function for setting up an environment to test PID namespace targeting.
@@ -484,7 +339,6 @@ func TestValidateTargetContainer(t *testing.T) {
 			expectError:       true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			targetContainer, err := c.validateTargetContainer(testSandboxID, test.targetContainerID)
 			if test.expectError {
@@ -548,7 +402,6 @@ func TestHostNetwork(t *testing.T) {
 			t.Skip()
 		}
 
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if hostNetwork(tt.c) != tt.expected {
 				t.Errorf("failed hostNetwork got %t expected %t", hostNetwork(tt.c), tt.expected)

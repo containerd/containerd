@@ -24,17 +24,20 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/plugin"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	srv "github.com/containerd/containerd/v2/plugins/services"
-	"github.com/containerd/plugin"
 )
 
 type services struct {
@@ -50,6 +53,8 @@ type services struct {
 	introspectionService introspection.Service
 	sandboxStore         sandbox.Store
 	sandboxers           map[string]sandbox.Controller
+	transferService      transfer.Transferrer
+	mountManager         mount.Manager
 }
 
 // ServicesOpt allows callers to set options on the services
@@ -163,6 +168,20 @@ func WithSandboxStore(client sandbox.Store) ServicesOpt {
 	}
 }
 
+// WithTransferService sets the transfer service.
+func WithTransferService(tr transfer.Transferrer) ServicesOpt {
+	return func(s *services) {
+		s.transferService = tr
+	}
+}
+
+// WithMountManager sets the mount manager.
+func WithMountManager(mm mount.Manager) ServicesOpt {
+	return func(s *services) {
+		s.mountManager = mm
+	}
+}
+
 // WithInMemoryServices is suitable for cases when there is need to use containerd's client from
 // another (in-memory) containerd plugin (such as CRI).
 func WithInMemoryServices(ic *plugin.InitContext) Opt {
@@ -177,6 +196,12 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 			},
 			plugins.SandboxStorePlugin: func(i interface{}) ServicesOpt {
 				return WithSandboxStore(i.(sandbox.Store))
+			},
+			plugins.TransferPlugin: func(i interface{}) ServicesOpt {
+				return WithTransferService(i.(transfer.Transferrer))
+			},
+			plugins.MountManagerPlugin: func(i interface{}) ServicesOpt {
+				return WithMountManager(i.(mount.Manager))
 			},
 		} {
 			i, err := ic.GetSingle(t)
@@ -227,21 +252,6 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 		for _, o := range opts {
 			o(c.services)
 		}
-		return nil
-	}
-}
-
-func WithInMemorySandboxControllers(ic *plugin.InitContext) Opt {
-	return func(c *clientOpts) error {
-		sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
-		if err != nil {
-			return err
-		}
-		sc := make(map[string]sandbox.Controller)
-		for name, p := range sandboxers {
-			sc[name] = p.(sandbox.Controller)
-		}
-		c.services.sandboxers = sc
 		return nil
 	}
 }

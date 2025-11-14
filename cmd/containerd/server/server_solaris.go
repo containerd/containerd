@@ -20,8 +20,22 @@ import (
 	"context"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"github.com/containerd/containerd/v2/internal/wintls"
+	"github.com/containerd/otelttrpc"
+	"github.com/containerd/ttrpc"
 )
 
 func apply(_ context.Context, _ *srvconfig.Config) error {
 	return nil
+}
+
+// TLS resource helpers are no-ops on Solaris.
+func setTLSResource(r wintls.CertResource) {}
+func cleanupTLSResources()                 {}
+
+// newTTRPCServer provides the ttrpc server for Solaris builds.
+func newTTRPCServer() (*ttrpc.Server, error) {
+	return ttrpc.NewServer(
+		ttrpc.WithUnaryServerInterceptor(otelttrpc.UnaryServerInterceptor()),
+	)
 }

@@ -72,7 +72,7 @@ func (c *criService) podSandboxStats(
 		podSandboxStats.Linux.Memory = memoryStats
 
 		if sandbox.NetNSPath != "" {
-			rxBytes, rxErrors, txBytes, txErrors := getContainerNetIO(ctx, sandbox.NetNSPath)
+			rxBytes, rxErrors, txBytes, txErrors, rxPackets, rxDropped, txPackets, txDropped := getContainerNetIO(ctx, sandbox.NetNSPath)
 			podSandboxStats.Linux.Network = &runtime.NetworkUsage{
 				DefaultInterface: &runtime.NetworkInterfaceUsage{
 					Name:     defaultIfName,
@@ -82,6 +82,12 @@ func (c *criService) podSandboxStats(
 					TxErrors: &runtime.UInt64Value{Value: txErrors},
 				},
 			}
+			// Suppress unused variable warnings for packet stats
+			// (these are used only in the metrics API and not in the stats API)
+			_ = rxPackets
+			_ = rxDropped
+			_ = txPackets
+			_ = txDropped
 		}
 
 		listContainerStatsRequest := &runtime.ListContainerStatsRequest{Filter: &runtime.ContainerStatsFilter{PodSandboxId: meta.ID}}
@@ -104,7 +110,7 @@ func (c *criService) podSandboxStats(
 }
 
 // https://github.com/cri-o/cri-o/blob/74a5cf8dffd305b311eb1c7f43a4781738c388c1/internal/oci/stats.go#L32
-func getContainerNetIO(ctx context.Context, netNsPath string) (rxBytes, rxErrors, txBytes, txErrors uint64) {
+func getContainerNetIO(ctx context.Context, netNsPath string) (rxBytes, rxErrors, txBytes, txErrors, rxPackets, rxDropped, txPackets, txDropped uint64) {
 	ns.WithNetNSPath(netNsPath, func(_ ns.NetNS) error {
 		link, err := netlink.LinkByName(defaultIfName)
 		if err != nil {
@@ -117,11 +123,15 @@ func getContainerNetIO(ctx context.Context, netNsPath string) (rxBytes, rxErrors
 			rxErrors = attrs.Statistics.RxErrors
 			txBytes = attrs.Statistics.TxBytes
 			txErrors = attrs.Statistics.TxErrors
+			rxPackets = attrs.Statistics.RxPackets
+			rxDropped = attrs.Statistics.RxDropped
+			txPackets = attrs.Statistics.TxPackets
+			txDropped = attrs.Statistics.TxDropped
 		}
 		return nil
 	})
 
-	return rxBytes, rxErrors, txBytes, txErrors
+	return rxBytes, rxErrors, txBytes, txErrors, rxPackets, rxDropped, txPackets, txDropped
 }
 
 func metricsForSandbox(sandbox sandboxstore.Sandbox) (interface{}, error) {

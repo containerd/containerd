@@ -20,17 +20,18 @@ import (
 	"context"
 	"encoding/base64"
 	"testing"
+	"time"
 
-	docker "github.com/distribution/reference"
-	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/platforms"
 
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestParseAuth(t *testing.T) {
@@ -115,7 +116,6 @@ func TestParseAuth(t *testing.T) {
 			expectedSecret: testPasswd,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			u, s, err := ParseAuth(test.auth, test.host)
 			assert.Equal(t, test.expectErr, err != nil)
@@ -274,7 +274,6 @@ func TestRegistryEndpoints(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c, _ := newTestCRIService()
 			c.config.Registry.Mirrors = test.mirrors
@@ -342,7 +341,6 @@ func TestDefaultScheme(t *testing.T) {
 			expected: "https",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := defaultScheme(test.host)
 			assert.Equal(t, test.expected, got)
@@ -368,7 +366,6 @@ func TestEncryptedImagePullOpts(t *testing.T) {
 			expectedOpts: 0,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c, _ := newTestCRIService()
 			c.config.ImageDecryption.KeyModel = test.keyModel
@@ -440,52 +437,6 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 	}
 }
 
-func TestGetRepoDigestAndTag(t *testing.T) {
-	digest := digest.Digest("sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582")
-	for _, test := range []struct {
-		desc               string
-		ref                string
-		schema1            bool
-		expectedRepoDigest string
-		expectedRepoTag    string
-	}{
-		{
-			desc:               "repo tag should be empty if original ref has no tag",
-			ref:                "gcr.io/library/busybox@" + digest.String(),
-			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
-		},
-		{
-			desc:               "repo tag should not be empty if original ref has tag",
-			ref:                "gcr.io/library/busybox:latest",
-			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
-			expectedRepoTag:    "gcr.io/library/busybox:latest",
-		},
-		{
-			desc:               "repo digest should be empty if original ref is schema1 and has no digest",
-			ref:                "gcr.io/library/busybox:latest",
-			schema1:            true,
-			expectedRepoDigest: "",
-			expectedRepoTag:    "gcr.io/library/busybox:latest",
-		},
-		{
-			desc:               "repo digest should not be empty if original ref is schema1 but has digest",
-			ref:                "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
-			schema1:            true,
-			expectedRepoDigest: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
-			expectedRepoTag:    "",
-		},
-	} {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			named, err := docker.ParseDockerRef(test.ref)
-			assert.NoError(t, err)
-			repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
-			assert.Equal(t, test.expectedRepoDigest, repoDigest)
-			assert.Equal(t, test.expectedRepoTag, repoTag)
-		})
-	}
-}
-
 func TestImageGetLabels(t *testing.T) {
 
 	criService, _ := newTestCRIService()
@@ -499,8 +450,8 @@ func TestImageGetLabels(t *testing.T) {
 		{
 			name:          "pinned image labels should get added on sandbox image",
 			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			pinnedImages:  map[string]string{"sandbox": "k8s.gcr.io/pause:3.10"},
-			pullImageName: "k8s.gcr.io/pause:3.10",
+			pinnedImages:  map[string]string{"sandbox": "registry.k8s.io/pause:3.10.1"},
+			pullImageName: "registry.k8s.io/pause:3.10.1",
 		},
 		{
 			name:          "pinned image labels should get added on sandbox image without tag",
@@ -539,6 +490,250 @@ func TestImageGetLabels(t *testing.T) {
 			labels := criService.getLabels(context.Background(), tt.pullImageName)
 			assert.Equal(t, tt.expectedLabel, labels)
 
+		})
+	}
+}
+
+func TestTransferProgressReporter(t *testing.T) {
+
+	tests := []struct {
+		name     string
+		setup    func(*transferProgressReporter) chan struct{}
+		progress []transfer.Progress
+		check    func(*testing.T, *transferProgressReporter, <-chan struct{})
+	}{
+		{
+			name: "PullImageWithCompleteEvent",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 1000,
+					Event:    "complete",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(0), activeReqs, "Expected 0 active requests")
+				assert.Equal(t, uint64(1000), totalBytesRead, "Expected 1000 bytes read")
+			},
+		},
+		{
+			name: "FinishedDownloadingWithNoCompleteEvent",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 1000,
+					Event:    "downloading",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(0), activeReqs, "Expected 0 active requests")
+				assert.Equal(t, uint64(1000), totalBytesRead, "Expected 1000 bytes read")
+			},
+		},
+		{
+			name: "NilDescriptorInProgressNode",
+			progress: []transfer.Progress{
+				{
+					Name:     "layer1",
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				assert.Equal(t, int32(0), r.reqReporter.activeReqs.Load(), "Expected zero active request")
+				assert.Equal(t, uint64(0), r.reqReporter.totalBytesRead.Load(), "Expected zero bytes read")
+			},
+		},
+		{
+			name: "EmptyTotalInProgressNode",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    0,
+					Progress: 500,
+					Event:    "downloading",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(0), activeReqs, "Expected zero active request")
+				assert.Equal(t, uint64(0), totalBytesRead, "Expected zero bytes read")
+			},
+		},
+		{
+			name: "TimeoutDuringPull",
+			setup: func(r *transferProgressReporter) chan struct{} {
+				r.timeout = 100 * time.Millisecond
+
+				cancelCalled := make(chan struct{})
+				originalCancel := r.cancel
+				r.cancel = func() {
+					originalCancel()
+					close(cancelCalled)
+				}
+
+				return cancelCalled
+			},
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				select {
+				case <-cancelCalled:
+					// Expected behavior: cancel was called
+				case <-time.After(150 * time.Millisecond):
+					t.Error("Cancel function was not called within the expected timeframe")
+				}
+			},
+		},
+		{
+			name: "MultipleRequests",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef1",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer2",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef2",
+						Size:      2000,
+					},
+					Total:    2000,
+					Progress: 1000,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef1",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 1000,
+					Event:    "complete",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(1), activeReqs, "Expected one active request")
+				assert.Equal(t, uint64(2000), totalBytesRead, "Expected 2000 bytes read")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			reporter := &transferProgressReporter{
+				reqReporter: pullRequestReporter{},
+				pc:          make(chan transfer.Progress),
+				statuses:    make(map[string]*transfer.Progress),
+				ref:         "test-image:latest",
+				timeout:     30 * time.Second,
+				cancel:      cancel,
+			}
+
+			var cancelCalled chan struct{}
+			if tt.setup != nil {
+				cancelCalled = tt.setup(reporter)
+			}
+
+			go reporter.start(ctx)
+
+			for _, progress := range tt.progress {
+				reporter.pc <- progress
+				time.Sleep(50 * time.Millisecond) // Allow some time for processing
+			}
+
+			if tt.check != nil {
+				tt.check(t, reporter, cancelCalled)
+			}
 		})
 	}
 }

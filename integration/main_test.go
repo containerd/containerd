@@ -41,7 +41,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -56,7 +55,7 @@ import (
 )
 
 const (
-	timeout                    = 1 * time.Minute
+	timeout                    = 3 * time.Minute
 	k8sNamespace               = constants.K8sContainerdNamespace
 	defaultCgroupSystemdParent = "/containerd-test.slice"
 )
@@ -136,6 +135,22 @@ func WithHostNetwork(p *runtime.PodSandboxConfig) {
 		p.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{}
 	}
 	p.Linux.SecurityContext.NamespaceOptions.Network = runtime.NamespaceMode_NODE
+}
+
+// Set selinux level
+func WithSelinuxLevel(level string) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		if p.Linux == nil {
+			p.Linux = &runtime.LinuxPodSandboxConfig{}
+		}
+		if p.Linux.SecurityContext == nil {
+			p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
+		}
+		if p.Linux.SecurityContext.SelinuxOptions == nil {
+			p.Linux.SecurityContext.SelinuxOptions = &runtime.SELinuxOption{}
+		}
+		p.Linux.SecurityContext.SelinuxOptions.Level = level
+	}
 }
 
 // Set pod userns.
@@ -218,12 +233,25 @@ func WithPodLabels(kvs map[string]string) PodSandboxOpts {
 	}
 }
 
+// WithSecurityContext set container privileged.
+func WithPodSecurityContext(privileged bool) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		if p.Linux == nil {
+			p.Linux = &runtime.LinuxPodSandboxConfig{}
+		}
+		if p.Linux.SecurityContext == nil {
+			p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
+		}
+		p.Linux.SecurityContext.Privileged = privileged
+	}
+}
+
 // PodSandboxConfig generates a pod sandbox config for test.
 func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandboxConfig {
 	var cgroupParent string
 	runtimeConfig, err := runtimeService.RuntimeConfig(&runtime.RuntimeConfigRequest{})
 	if err != nil {
-		klog.Errorf("runtime service call RuntimeConfig error %s", err.Error())
+		log.L.WithError(err).Errorf("runtime service call RuntimeConfig error")
 	} else if runtimeConfig.GetLinux().GetCgroupDriver() == runtime.CgroupDriver_SYSTEMD {
 		cgroupParent = defaultCgroupSystemdParent
 	}
@@ -320,6 +348,28 @@ func WithIDMapVolumeMount(hostPath, containerPath string, uidMaps, gidMaps []*ru
 			SelinuxRelabel: selinux.GetEnabled(),
 			UidMappings:    uidMaps,
 			GidMappings:    gidMaps,
+		}
+		c.Mounts = append(c.Mounts, mount)
+	}
+}
+
+func WithImageVolumeMount(image, imageSubPath, containerPath string) ContainerOpts {
+	return WithIDMapImageVolumeMount(image, imageSubPath, containerPath, nil, nil)
+}
+
+func WithIDMapImageVolumeMount(image, imageSubPath, containerPath string, uidMaps, gidMaps []*runtime.IDMapping) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		containerPath, _ = filepath.Abs(containerPath)
+		mount := &runtime.Mount{
+			ContainerPath: containerPath,
+			UidMappings:   uidMaps,
+			GidMappings:   gidMaps,
+			Image: &runtime.ImageSpec{
+				Image: image,
+			},
+			ImageSubPath:   imageSubPath,
+			Readonly:       true,
+			SelinuxRelabel: true,
 		}
 		c.Mounts = append(c.Mounts, mount)
 	}
@@ -462,12 +512,43 @@ func WithSupplementalGroups(gids []int64) ContainerOpts {
 	}
 }
 
+// WithSecurityContext set container privileged.
+func WithSecurityContext(privileged bool) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.Privileged = privileged
+	}
+}
+
 // WithDevice adds a device mount.
 func WithDevice(containerPath, hostPath, permissions string) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		c.Devices = append(c.Devices, &runtime.Device{
 			ContainerPath: containerPath, HostPath: hostPath, Permissions: permissions,
 		})
+	}
+}
+
+// WithSELinuxOptions allows to set SELinux option for container.
+func WithSELinuxOptions(user, role, typ, level string) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.SelinuxOptions = &runtime.SELinuxOption{
+			User:  user,
+			Role:  role,
+			Type:  typ,
+			Level: level,
+		}
 	}
 }
 
@@ -552,13 +633,17 @@ func KillProcess(name string, signal syscall.Signal) error {
 
 // KillPid kills the process by pid. kill is used.
 func KillPid(pid int) error {
-	command := "kill"
-	if goruntime.GOOS == "windows" {
-		command = "tskill"
-	}
-	output, err := exec.Command(command, strconv.Itoa(pid)).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+	switch goruntime.GOOS {
+	case "windows":
+		output, err := exec.Command("tskill", strconv.Itoa(pid)).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+		}
+	default:
+		output, err := exec.Command("kill", "-9", strconv.Itoa(pid)).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+		}
 	}
 	return nil
 }

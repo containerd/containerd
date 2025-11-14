@@ -28,6 +28,13 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli/v2"
+
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
@@ -35,10 +42,6 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/progress"
 	"github.com/containerd/containerd/v2/pkg/rootfs"
-	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
 )
 
 // Command is the cli command for managing snapshots
@@ -378,6 +381,12 @@ var mountCommand = &cli.Command{
 	Aliases:   []string{"m", "mount"},
 	Usage:     "Mount gets mount commands for the snapshots",
 	ArgsUsage: "<target> <key>",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "temp",
+			Usage: "Mounts the snapshot mounts as a temp mount and returns a bind mount",
+		},
+	},
 	Action: func(cliContext *cli.Context) error {
 		if cliContext.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cliContext)
@@ -395,6 +404,19 @@ var mountCommand = &cli.Command{
 		mounts, err := snapshotter.Mounts(ctx, key)
 		if err != nil {
 			return err
+		}
+
+		mm := client.MountManager()
+
+		var opts []mount.ActivateOpt
+		if cliContext.Bool("temp") {
+			opts = append(opts, mount.WithTemporary)
+		}
+		info, err := mm.Activate(ctx, "ctr"+key, mounts, opts...)
+		if err == nil {
+			mounts = info.System
+		} else if !errdefs.IsNotImplemented(err) {
+			return fmt.Errorf("activate error: %w", err)
 		}
 
 		printMounts(target, mounts)
@@ -536,7 +558,12 @@ var unpackCommand = &cli.Command{
 	Name:      "unpack",
 	Usage:     "Unpack applies layers from a manifest to a snapshot",
 	ArgsUsage: "[flags] <digest>",
-	Flags:     commands.SnapshotterFlags,
+	Flags: append([]cli.Flag{
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
+		},
+	}, commands.SnapshotterFlags...),
 	Action: func(cliContext *cli.Context) error {
 		dgst, err := digest.Parse(cliContext.Args().First())
 		if err != nil {
@@ -557,7 +584,7 @@ var unpackCommand = &cli.Command{
 		for _, image := range images {
 			if image.Target().Digest == dgst {
 				fmt.Printf("unpacking %s (%s)...", dgst, image.Target().MediaType)
-				if err := image.Unpack(ctx, cliContext.String("snapshotter")); err != nil {
+				if err := image.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs")))); err != nil {
 					fmt.Println()
 					return err
 				}
@@ -644,6 +671,10 @@ func printNode(name string, tree *snapshotTree, level int) {
 func printMounts(target string, mounts []mount.Mount) {
 	// FIXME: This is specific to Unix
 	for _, m := range mounts {
-		fmt.Printf("mount -t %s %s %s -o %s\n", m.Type, m.Source, filepath.Join(target, m.Target), strings.Join(m.Options, ","))
+		var opt string
+		if len(m.Options) > 0 {
+			opt = fmt.Sprintf(" -o %s", strings.Join(m.Options, ","))
+		}
+		fmt.Printf("mount -t %s %s %s%s\n", m.Type, m.Source, filepath.Join(target, m.Target), opt)
 	}
 }

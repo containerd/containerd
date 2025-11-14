@@ -7,7 +7,7 @@
 			"gid": 0
 		},
 		"args": [
-			"bash"
+			"sh"
 		],
 		"env": [
 			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
@@ -51,7 +51,7 @@
 		"noNewPrivileges": true
 	},
 	"root": {
-		"path": "XXX-path-to-rootfs"
+		"path": "/tmp/userns-test/rootfs"
 	},
 	"hostname": "runc",
 	"mounts": [

@@ -175,6 +175,8 @@ func (k JSONWebKey) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON reads a key from its JSON representation.
+//
+// Returns ErrUnsupportedKeyType for unrecognized or unsupported "kty" header values.
 func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 	var raw rawJSONWebKey
 	err = json.Unmarshal(data, &raw)
@@ -228,7 +230,7 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 		}
 		key, err = raw.symmetricKey()
 	case "OKP":
-		if raw.Crv == "Ed25519" && raw.X != nil {
+		if raw.Crv == "Ed25519" {
 			if raw.D != nil {
 				key, err = raw.edPrivateKey()
 				if err == nil {
@@ -238,15 +240,25 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 				key, err = raw.edPublicKey()
 				keyPub = key
 			}
-		} else {
-			err = fmt.Errorf("go-jose/go-jose: unknown curve %s'", raw.Crv)
 		}
-	default:
-		err = fmt.Errorf("go-jose/go-jose: unknown json web key type '%s'", raw.Kty)
+	case "":
+		// kty MUST be present
+		err = fmt.Errorf("go-jose/go-jose: missing json web key type")
 	}
 
 	if err != nil {
 		return
+	}
+
+	if key == nil {
+		// RFC 7517:
+		// 5.  JWK Set Format
+		// ...
+		//     Implementations SHOULD ignore JWKs within a JWK Set that use "kty"
+		//     (key type) values that are not understood by them, that are missing
+		//     required members, or for which values are out of the supported
+		//     ranges.
+		return ErrUnsupportedKeyType
 	}
 
 	if certPub != nil && keyPub != nil {
@@ -581,10 +593,10 @@ func fromEcPublicKey(pub *ecdsa.PublicKey) (*rawJSONWebKey, error) {
 
 func (key rawJSONWebKey) edPrivateKey() (ed25519.PrivateKey, error) {
 	var missing []string
-	switch {
-	case key.D == nil:
+	if key.D == nil {
 		missing = append(missing, "D")
-	case key.X == nil:
+	}
+	if key.X == nil {
 		missing = append(missing, "X")
 	}
 
@@ -611,19 +623,21 @@ func (key rawJSONWebKey) edPublicKey() (ed25519.PublicKey, error) {
 
 func (key rawJSONWebKey) rsaPrivateKey() (*rsa.PrivateKey, error) {
 	var missing []string
-	switch {
-	case key.N == nil:
+	if key.N == nil {
 		missing = append(missing, "N")
-	case key.E == nil:
+	}
+	if key.E == nil {
 		missing = append(missing, "E")
-	case key.D == nil:
+	}
+	if key.D == nil {
 		missing = append(missing, "D")
-	case key.P == nil:
+	}
+	if key.P == nil {
 		missing = append(missing, "P")
-	case key.Q == nil:
+	}
+	if key.Q == nil {
 		missing = append(missing, "Q")
 	}
-
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("go-jose/go-jose: invalid RSA private key, missing %s value(s)", strings.Join(missing, ", "))
 	}
@@ -698,8 +712,19 @@ func (key rawJSONWebKey) ecPrivateKey() (*ecdsa.PrivateKey, error) {
 		return nil, fmt.Errorf("go-jose/go-jose: unsupported elliptic curve '%s'", key.Crv)
 	}
 
-	if key.X == nil || key.Y == nil || key.D == nil {
-		return nil, fmt.Errorf("go-jose/go-jose: invalid EC private key, missing x/y/d values")
+	var missing []string
+	if key.X == nil {
+		missing = append(missing, "X")
+	}
+	if key.Y == nil {
+		missing = append(missing, "Y")
+	}
+	if key.D == nil {
+		missing = append(missing, "D")
+	}
+
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC private key, missing %s value(s)", strings.Join(missing, ", "))
 	}
 
 	// The length of this octet string MUST be the full size of a coordinate for
@@ -779,7 +804,13 @@ func (key rawJSONWebKey) symmetricKey() ([]byte, error) {
 	return key.K.bytes(), nil
 }
 
-func tryJWKS(key interface{}, headers ...Header) interface{} {
+var (
+	// ErrJWKSKidNotFound is returned when a JWKS does not contain a JWK with a
+	// key ID which matches one in the provided tokens headers.
+	ErrJWKSKidNotFound = errors.New("go-jose/go-jose: JWK with matching kid not found in JWK Set")
+)
+
+func tryJWKS(key interface{}, headers ...Header) (interface{}, error) {
 	var jwks JSONWebKeySet
 
 	switch jwksType := key.(type) {
@@ -788,9 +819,11 @@ func tryJWKS(key interface{}, headers ...Header) interface{} {
 	case JSONWebKeySet:
 		jwks = jwksType
 	default:
-		return key
+		// If the specified key is not a JWKS, return as is.
+		return key, nil
 	}
 
+	// Determine the KID to search for from the headers.
 	var kid string
 	for _, header := range headers {
 		if header.KeyID != "" {
@@ -799,14 +832,17 @@ func tryJWKS(key interface{}, headers ...Header) interface{} {
 		}
 	}
 
+	// If no KID is specified in the headers, reject.
 	if kid == "" {
-		return key
+		return nil, ErrJWKSKidNotFound
 	}
 
+	// Find the JWK with the matching KID. If no JWK with the specified KID is
+	// found, reject.
 	keys := jwks.Key(kid)
 	if len(keys) == 0 {
-		return key
+		return nil, ErrJWKSKidNotFound
 	}
 
-	return keys[0].Key
+	return keys[0].Key, nil
 }

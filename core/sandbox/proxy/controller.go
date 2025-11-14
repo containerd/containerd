@@ -22,25 +22,26 @@ import (
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/sandbox"
 )
 
 // remoteSandboxController is a low level GRPC client for containerd's sandbox controller service
 type remoteSandboxController struct {
-	client api.ControllerClient
+	client        api.ControllerClient
+	sandboxerName string
 }
 
 var _ sandbox.Controller = (*remoteSandboxController)(nil)
 
 // NewSandboxController creates a client for a sandbox controller
-func NewSandboxController(client api.ControllerClient) sandbox.Controller {
-	return &remoteSandboxController{client: client}
+func NewSandboxController(client api.ControllerClient, name string) sandbox.Controller {
+	return &remoteSandboxController{client: client, sandboxerName: name}
 }
 
 func (s *remoteSandboxController) Create(ctx context.Context, sandboxInfo sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
@@ -48,32 +49,30 @@ func (s *remoteSandboxController) Create(ctx context.Context, sandboxInfo sandbo
 	for _, opt := range opts {
 		opt(&options)
 	}
-	apiSandbox, err := toAPISandbox(sandboxInfo)
-	if err != nil {
-		return err
-	}
-	_, err = s.client.Create(ctx, &api.ControllerCreateRequest{
-		SandboxID: sandboxInfo.ID,
-		Rootfs:    mount.ToProto(options.Rootfs),
-		Options: &anypb.Any{
-			TypeUrl: options.Options.GetTypeUrl(),
-			Value:   options.Options.GetValue(),
-		},
+	apiSandbox := sandbox.ToProto(&sandboxInfo)
+	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{
+		SandboxID:   sandboxInfo.ID,
+		Rootfs:      mount.ToProto(options.Rootfs),
+		Options:     typeurl.MarshalProto(options.Options),
 		NetnsPath:   options.NetNSPath,
 		Annotations: options.Annotations,
-		Sandbox:     &apiSandbox,
+		Sandbox:     apiSandbox,
+		Sandboxer:   s.sandboxerName,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 
 	return nil
 }
 
 func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (sandbox.ControllerInstance, error) {
-	resp, err := s.client.Start(ctx, &api.ControllerStartRequest{SandboxID: sandboxID})
+	resp, err := s.client.Start(ctx, &api.ControllerStartRequest{
+		SandboxID: sandboxID,
+		Sandboxer: s.sandboxerName,
+	})
 	if err != nil {
-		return sandbox.ControllerInstance{}, errdefs.FromGRPC(err)
+		return sandbox.ControllerInstance{}, errgrpc.ToNative(err)
 	}
 
 	return sandbox.ControllerInstance{
@@ -87,9 +86,12 @@ func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (
 }
 
 func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string) (imagespec.Platform, error) {
-	resp, err := s.client.Platform(ctx, &api.ControllerPlatformRequest{SandboxID: sandboxID})
+	resp, err := s.client.Platform(ctx, &api.ControllerPlatformRequest{
+		SandboxID: sandboxID,
+		Sandboxer: s.sandboxerName,
+	})
 	if err != nil {
-		return imagespec.Platform{}, errdefs.FromGRPC(err)
+		return imagespec.Platform{}, errgrpc.ToNative(err)
 	}
 
 	platform := resp.GetPlatform()
@@ -105,22 +107,28 @@ func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string, op
 	for _, opt := range opts {
 		opt(&soptions)
 	}
-	req := &api.ControllerStopRequest{SandboxID: sandboxID}
+	req := &api.ControllerStopRequest{
+		SandboxID: sandboxID,
+		Sandboxer: s.sandboxerName,
+	}
 	if soptions.Timeout != nil {
 		req.TimeoutSecs = uint32(soptions.Timeout.Seconds())
 	}
 	_, err := s.client.Stop(ctx, req)
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 
 	return nil
 }
 
 func (s *remoteSandboxController) Shutdown(ctx context.Context, sandboxID string) error {
-	_, err := s.client.Shutdown(ctx, &api.ControllerShutdownRequest{SandboxID: sandboxID})
+	_, err := s.client.Shutdown(ctx, &api.ControllerShutdownRequest{
+		SandboxID: sandboxID,
+		Sandboxer: s.sandboxerName,
+	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 
 	return nil
@@ -135,9 +143,12 @@ func (s *remoteSandboxController) Wait(ctx context.Context, sandboxID string) (s
 		retryInterval time.Duration = 128
 	)
 	for {
-		resp, err = s.client.Wait(ctx, &api.ControllerWaitRequest{SandboxID: sandboxID})
+		resp, err = s.client.Wait(ctx, &api.ControllerWaitRequest{
+			SandboxID: sandboxID,
+			Sandboxer: s.sandboxerName,
+		})
 		if err != nil {
-			grpcErr := errdefs.FromGRPC(err)
+			grpcErr := errgrpc.ToNative(err)
 			if !errdefs.IsUnavailable(grpcErr) {
 				return sandbox.ExitStatus{}, grpcErr
 			}
@@ -161,9 +172,13 @@ func (s *remoteSandboxController) Wait(ctx context.Context, sandboxID string) (s
 }
 
 func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {
-	resp, err := s.client.Status(ctx, &api.ControllerStatusRequest{SandboxID: sandboxID, Verbose: verbose})
+	resp, err := s.client.Status(ctx, &api.ControllerStatusRequest{
+		SandboxID: sandboxID,
+		Verbose:   verbose,
+		Sandboxer: s.sandboxerName,
+	})
 	if err != nil {
-		return sandbox.ControllerStatus{}, errdefs.FromGRPC(err)
+		return sandbox.ControllerStatus{}, errgrpc.ToNative(err)
 	}
 	return sandbox.ControllerStatus{
 		SandboxID: sandboxID,
@@ -179,9 +194,12 @@ func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, 
 }
 
 func (s *remoteSandboxController) Metrics(ctx context.Context, sandboxID string) (*types.Metric, error) {
-	resp, err := s.client.Metrics(ctx, &api.ControllerMetricsRequest{SandboxID: sandboxID})
+	resp, err := s.client.Metrics(ctx, &api.ControllerMetricsRequest{
+		SandboxID: sandboxID,
+		Sandboxer: s.sandboxerName,
+	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return resp.Metrics, nil
 }
@@ -189,51 +207,16 @@ func (s *remoteSandboxController) Metrics(ctx context.Context, sandboxID string)
 func (s *remoteSandboxController) Update(
 	ctx context.Context,
 	sandboxID string,
-	sandbox sandbox.Sandbox,
+	sb sandbox.Sandbox,
 	fields ...string) error {
-	apiSandbox, err := toAPISandbox(sandbox)
-	if err != nil {
-		return err
-	}
-	_, err = s.client.Update(ctx, &api.ControllerUpdateRequest{
+	apiSandbox := sandbox.ToProto(&sb)
+	_, err := s.client.Update(ctx, &api.ControllerUpdateRequest{
 		SandboxID: sandboxID,
-		Sandbox:   &apiSandbox,
+		Sandbox:   apiSandbox,
 		Fields:    fields,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
-}
-
-func toAPISandbox(sb sandbox.Sandbox) (types.Sandbox, error) {
-	options, err := typeurl.MarshalAnyToProto(sb.Runtime.Options)
-	if err != nil {
-		return types.Sandbox{}, err
-	}
-	spec, err := typeurl.MarshalAnyToProto(sb.Spec)
-	if err != nil {
-		return types.Sandbox{}, err
-	}
-	extensions := make(map[string]*anypb.Any)
-	for k, v := range sb.Extensions {
-		pb, err := typeurl.MarshalAnyToProto(v)
-		if err != nil {
-			return types.Sandbox{}, err
-		}
-		extensions[k] = pb
-	}
-	return types.Sandbox{
-		SandboxID: sb.ID,
-		Runtime: &types.Sandbox_Runtime{
-			Name:    sb.Runtime.Name,
-			Options: options,
-		},
-		Spec:       spec,
-		Labels:     sb.Labels,
-		CreatedAt:  protobuf.ToTimestamp(sb.CreatedAt),
-		UpdatedAt:  protobuf.ToTimestamp(sb.UpdatedAt),
-		Extensions: extensions,
-		Sandboxer:  sb.Sandboxer,
-	}, nil
 }

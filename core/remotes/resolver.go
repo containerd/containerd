@@ -19,8 +19,10 @@ package remotes
 import (
 	"context"
 	"io"
+	"net/url"
 
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -51,6 +53,12 @@ type Resolver interface {
 	Pusher(ctx context.Context, ref string) (Pusher, error)
 }
 
+// ResolverWithOptions is a Resolver that also supports setting options.
+type ResolverWithOptions interface {
+	Resolver
+	SetOptions(options ...transfer.ImageResolverOption)
+}
+
 // Fetcher fetches content.
 // A fetcher implementation may implement the FetcherByDigest interface too.
 type Fetcher interface {
@@ -66,6 +74,10 @@ type FetcherByDigest interface {
 	// Typically, the media type is always set to "application/octet-stream",
 	// and the annotations are unset.
 	FetchByDigest(ctx context.Context, dgst digest.Digest, opts ...FetchByDigestOpts) (io.ReadCloser, ocispec.Descriptor, error)
+}
+
+type ReferrersFetcher interface {
+	FetchReferrers(ctx context.Context, dgst digest.Digest, opts ...FetchReferrersOpt) ([]ocispec.Descriptor, error)
 }
 
 // Pusher pushes content
@@ -106,6 +118,35 @@ type FetchByDigestOpts func(context.Context, *FetchByDigestConfig) error
 func WithMediaType(mediatype string) FetchByDigestOpts {
 	return func(ctx context.Context, cfg *FetchByDigestConfig) error {
 		cfg.Mediatype = mediatype
+		return nil
+	}
+}
+
+type FetchReferrersConfig struct {
+	// ArtifactTypes specifies the artifact types to filter referrers, this can be
+	// applied to registry queries or filtering the results after fetching.
+	ArtifactTypes []string
+	// QueryFilters specifies additional filters which may get sent as query parameters
+	QueryFilters url.Values
+}
+
+type FetchReferrersOpt func(context.Context, *FetchReferrersConfig) error
+
+// WithReferrerArtifactTypes sets the artifact types to filter referrers
+func WithReferrerArtifactTypes(artifactTypes ...string) FetchReferrersOpt {
+	return func(ctx context.Context, cfg *FetchReferrersConfig) error {
+		cfg.ArtifactTypes = artifactTypes
+		return nil
+	}
+}
+
+// WithReferrerQueryFilter sets additional query filters for referrer fetching
+func WithReferrerQueryFilter(param, value string) FetchReferrersOpt {
+	return func(ctx context.Context, cfg *FetchReferrersConfig) error {
+		if cfg.QueryFilters == nil {
+			cfg.QueryFilters = url.Values{}
+		}
+		cfg.QueryFilters.Add(param, value)
 		return nil
 	}
 }

@@ -45,6 +45,8 @@ const (
 	Gzip
 	// Zstd is zstd compression algorithm.
 	Zstd
+	// Unknown is used when a plugin handles the algorithm.
+	Unknown
 )
 
 const (
@@ -218,7 +220,9 @@ func DecompressStream(archive io.Reader) (DecompressReadCloser, error) {
 			},
 		}, nil
 	case Zstd:
-		zstdReader, err := zstd.NewReader(buf)
+		zstdReader, err := zstd.NewReader(buf,
+			zstd.WithDecoderLowmem(false),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -257,6 +261,8 @@ func (compression *Compression) Extension() string {
 		return "gz"
 	case Zstd:
 		return "zst"
+	case Unknown:
+		return "unknown"
 	}
 	return ""
 }

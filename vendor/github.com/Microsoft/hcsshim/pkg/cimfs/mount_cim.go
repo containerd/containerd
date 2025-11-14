@@ -5,12 +5,14 @@ package cimfs
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/internal/winapi"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/windows"
 )
 
 type MountError struct {
@@ -45,7 +47,7 @@ func Unmount(volumePath string) error {
 		volumePath += "\\"
 	}
 
-	if !(strings.HasPrefix(volumePath, "\\\\?\\Volume{") && strings.HasSuffix(volumePath, "}\\")) {
+	if !strings.HasPrefix(volumePath, "\\\\?\\Volume{") || !strings.HasSuffix(volumePath, "}\\") {
 		return errors.Errorf("volume path %s is not in the expected format", volumePath)
 	}
 
@@ -62,4 +64,86 @@ func Unmount(volumePath string) error {
 	}
 
 	return nil
+}
+
+// MountMergedBlockCIMs mounts the given merged BlockCIM (usually created with
+// `MergeBlockCIMs`) at a volume with given GUID. The `sourceCIMs` MUST be identical
+// to the `sourceCIMs` passed to `MergeBlockCIMs` when creating this merged CIM.
+func MountMergedBlockCIMs(mergedCIM *BlockCIM, sourceCIMs []*BlockCIM, mountFlags uint32, volumeGUID guid.GUID) (string, error) {
+	if !IsMergedCimSupported() {
+		return "", fmt.Errorf("merged CIMs aren't supported on this OS version")
+	} else if len(sourceCIMs) < 2 {
+		return "", fmt.Errorf("need at least 2 source CIMs, got %d: %w", len(sourceCIMs), os.ErrInvalid)
+	}
+
+	switch mergedCIM.Type {
+	case BlockCIMTypeDevice:
+		mountFlags |= CimMountBlockDeviceCim
+	case BlockCIMTypeSingleFile:
+		mountFlags |= CimMountSingleFileCim
+	default:
+		return "", fmt.Errorf("invalid block CIM type `%d`", mergedCIM.Type)
+	}
+
+	for _, sCIM := range sourceCIMs {
+		if sCIM.Type != mergedCIM.Type {
+			return "", fmt.Errorf("source CIM (%s) type doesn't match with merged CIM type: %w", sCIM.String(), os.ErrInvalid)
+		}
+	}
+
+	// win32 mount merged CIM API expects an array of all CIMs. 0th entry in the array
+	// should be the merged CIM. All remaining entries should be the source CIM paths
+	// in the same order that was used while creating the merged CIM.
+	allcims := append([]*BlockCIM{mergedCIM}, sourceCIMs...)
+	cimsToMerge := []winapi.CimFsImagePath{}
+	for _, bcim := range allcims {
+		// Trailing backslashes cause problems-remove those
+		imageDir, err := windows.UTF16PtrFromString(strings.TrimRight(bcim.BlockPath, `\`))
+		if err != nil {
+			return "", fmt.Errorf("convert string to utf16: %w", err)
+		}
+		cimName, err := windows.UTF16PtrFromString(bcim.CimName)
+		if err != nil {
+			return "", fmt.Errorf("convert string to utf16: %w", err)
+		}
+
+		cimsToMerge = append(cimsToMerge, winapi.CimFsImagePath{
+			ImageDir:  imageDir,
+			ImageName: cimName,
+		})
+	}
+
+	if err := winapi.CimMergeMountImage(uint32(len(cimsToMerge)), &cimsToMerge[0], mountFlags, &volumeGUID); err != nil {
+		return "", &MountError{Cim: filepath.Join(mergedCIM.BlockPath, mergedCIM.CimName), Op: "MountMerged", Err: err}
+	}
+	return fmt.Sprintf("\\\\?\\Volume{%s}\\", volumeGUID.String()), nil
+}
+
+// Mounts a verified block CIM with the provided root hash. The root hash is usually
+// returned when the CIM is sealed or the root hash can be queried from a block CIM.
+// Every read on the mounted volume will be verified to match against the provided root
+// hash if it doesn't, the read will fail.  The CIM MUST have been created with the
+// verified creation flag.
+func MountVerifiedBlockCIM(bCIM *BlockCIM, mountFlags uint32, volumeGUID guid.GUID, rootHash []byte) (string, error) {
+	if len(rootHash) != cimHashSize {
+		return "", fmt.Errorf("unexpected root hash size %d, expected size is %d", len(rootHash), cimHashSize)
+	}
+
+	// The CimMountVerifiedCim flag should only be used when using the regular mount
+	// CIM API. That flag is required to tell that API that this is a verified
+	// CIM. This API doesn't need that flag as it is already assumed that the CIM is
+	// verified.
+	switch bCIM.Type {
+	case BlockCIMTypeDevice:
+		mountFlags |= CimMountBlockDeviceCim
+	case BlockCIMTypeSingleFile:
+		mountFlags |= CimMountSingleFileCim
+	default:
+		return "", fmt.Errorf("invalid block CIM type `%d`: %w", bCIM.Type, os.ErrInvalid)
+	}
+
+	if err := winapi.CimMountVerifiedImage(bCIM.BlockPath, bCIM.CimName, mountFlags, &volumeGUID, cimHashSize, &rootHash[0]); err != nil {
+		return "", &MountError{Cim: bCIM.String(), Op: "MountVerifiedCIM", Err: err}
+	}
+	return fmt.Sprintf("\\\\?\\Volume{%s}\\", volumeGUID.String()), nil
 }

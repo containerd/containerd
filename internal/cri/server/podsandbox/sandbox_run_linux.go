@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -33,6 +33,8 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
+	"github.com/containerd/containerd/v2/internal/cri/sputil"
+	criutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
@@ -58,13 +60,9 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	specOpts = append(specOpts, oci.WithProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...)...))
 
 	// Set cgroups parent.
-	if c.config.DisableCgroup {
-		specOpts = append(specOpts, customopts.WithDisabledCgroups)
-	} else {
-		if config.GetLinux().GetCgroupParent() != "" {
-			cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id)
-			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
-		}
+	if config.GetLinux().GetCgroupParent() != "" {
+		cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id)
+		specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 	}
 
 	// When cgroup parent is not set, containerd-shim will create container in a child cgroup
@@ -107,6 +105,11 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		case runtime.NamespaceMode_POD:
 			specOpts = append(specOpts, oci.WithUserNamespace(uids, gids))
 			usernsEnabled = true
+
+			if err := c.pinUserNamespace(id, nsPath); err != nil {
+				return nil, fmt.Errorf("failed to pin user namespace: %w", err)
+			}
+			specOpts = append(specOpts, customopts.WithNamespacePath(runtimespec.UserNamespace, c.getSandboxPinnedUserNamespace(id)))
 		default:
 			return nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
 		}
@@ -174,9 +177,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	// Note: LinuxSandboxSecurityContext does not currently provide an apparmor profile
 
-	if !c.config.DisableCgroup {
-		specOpts = append(specOpts, customopts.WithDefaultSandboxShares)
-	}
+	specOpts = append(specOpts, customopts.WithDefaultSandboxShares)
 
 	if res := config.GetLinux().GetResources(); res != nil {
 		specOpts = append(specOpts,
@@ -188,7 +189,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.config.RestrictOOMScoreAdj))
 
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+	for pKey, pValue := range criutil.GetPassthroughAnnotations(config.Annotations,
 		runtimePodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
@@ -208,14 +209,14 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 	)
 	ssp := securityContext.GetSeccomp()
 	if ssp == nil {
-		ssp, err = generateSeccompSecurityProfile(
+		ssp, err = sputil.GenerateSeccompSecurityProfile(
 			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
 			c.config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 		}
 	}
-	seccompSpecOpts, err := c.generateSeccompSpecOpts(
+	seccompSpecOpts, err := sputil.GenerateSeccompSpecOpts(
 		ssp,
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
@@ -226,7 +227,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
 
-	userstr, err := generateUserString(
+	userstr, err := criutil.GenerateUserString(
 		"",
 		securityContext.GetRunAsUser(),
 		securityContext.GetRunAsGroup(),

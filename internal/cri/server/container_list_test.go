@@ -157,7 +157,6 @@ func TestFilterContainers(t *testing.T) {
 			expect: []*runtime.Container{testContainers[2]},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			filtered := c.filterCRIContainers(testContainers, test.filter)
 			assert.Equal(t, test.expect, filtered, test.desc)
@@ -351,7 +350,6 @@ func TestListContainers(t *testing.T) {
 			expect: expectedContainers[:1],
 		},
 	} {
-		testdata := testdata
 		t.Run(testdata.desc, func(t *testing.T) {
 			resp, err := c.ListContainers(context.Background(), &runtime.ListContainersRequest{Filter: testdata.filter})
 			assert.NoError(t, err)

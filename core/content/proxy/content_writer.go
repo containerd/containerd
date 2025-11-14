@@ -20,12 +20,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
-	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	digest "github.com/opencontainers/go-digest"
+
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 )
 
 type remoteWriter struct {
@@ -58,7 +61,7 @@ func (rw *remoteWriter) Status() (content.Status, error) {
 		Action: contentapi.WriteAction_STAT,
 	})
 	if err != nil {
-		return content.Status{}, fmt.Errorf("error getting writer status: %w", errdefs.FromGRPC(err))
+		return content.Status{}, fmt.Errorf("error getting writer status: %w", errgrpc.ToNative(err))
 	}
 
 	return content.Status{
@@ -75,27 +78,31 @@ func (rw *remoteWriter) Digest() digest.Digest {
 }
 
 func (rw *remoteWriter) Write(p []byte) (n int, err error) {
-	offset := rw.offset
+	const maxBufferSize = defaults.DefaultMaxSendMsgSize >> 1
+	for data := range slices.Chunk(p, maxBufferSize) {
+		offset := rw.offset
 
-	resp, err := rw.send(&contentapi.WriteContentRequest{
-		Action: contentapi.WriteAction_WRITE,
-		Offset: offset,
-		Data:   p,
-	})
-	if err != nil {
-		return 0, fmt.Errorf("failed to send write: %w", errdefs.FromGRPC(err))
-	}
+		resp, err := rw.send(&contentapi.WriteContentRequest{
+			Action: contentapi.WriteAction_WRITE,
+			Offset: offset,
+			Data:   data,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("failed to send write: %w", errgrpc.ToNative(err))
+		}
 
-	n = int(resp.Offset - offset)
-	if n < len(p) {
-		err = io.ErrShortWrite
-	}
+		written := int(resp.Offset - offset)
+		rw.offset += int64(written)
+		if resp.Digest != "" {
+			rw.digest = digest.Digest(resp.Digest)
+		}
+		n += written
 
-	rw.offset += int64(n)
-	if resp.Digest != "" {
-		rw.digest = digest.Digest(resp.Digest)
+		if written < len(data) {
+			return n, io.ErrShortWrite
+		}
 	}
-	return
+	return n, nil
 }
 
 func (rw *remoteWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) (err error) {
@@ -120,7 +127,7 @@ func (rw *remoteWriter) Commit(ctx context.Context, size int64, expected digest.
 		Labels:   base.Labels,
 	})
 	if err != nil {
-		return fmt.Errorf("commit failed: %w", errdefs.FromGRPC(err))
+		return fmt.Errorf("commit failed: %w", errgrpc.ToNative(err))
 	}
 
 	if size != 0 && resp.Offset != size {

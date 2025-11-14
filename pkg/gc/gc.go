@@ -69,12 +69,14 @@ func Tricolor(roots []Node, refs func(ref Node) ([]Node, error)) (map[Node]struc
 	)
 
 	grays = append(grays, roots...)
+	for _, root := range roots {
+		seen[root] = struct{}{} // pre-mark this as not-white
+	}
 
 	for len(grays) > 0 {
 		// Pick any gray object
 		id := grays[len(grays)-1] // effectively "depth first" because first element
 		grays = grays[:len(grays)-1]
-		seen[id] = struct{}{} // post-mark this as not-white
 		rs, err := refs(id)
 		if err != nil {
 			return nil, err
@@ -84,6 +86,7 @@ func Tricolor(roots []Node, refs func(ref Node) ([]Node, error)) (map[Node]struc
 		for _, target := range rs {
 			if _, ok := seen[target]; !ok {
 				grays = append(grays, target)
+				seen[target] = struct{}{}
 			}
 		}
 

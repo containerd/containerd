@@ -20,7 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	goruntime "runtime"
+	"slices"
+	"sort"
 
 	"github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/log"
@@ -57,9 +60,15 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			runtimeCondition,
 			networkCondition,
 		}},
-		RuntimeHandlers: c.runtimeHandlers,
-		Features:        c.runtimeFeatures,
+		Features: c.runtimeFeatures,
 	}
+
+	// Ensure stable ordering of runtime handlers in response
+	resp.RuntimeHandlers = slices.Collect(maps.Values(c.runtimeHandlers))
+	sort.SliceStable(resp.RuntimeHandlers, func(i, j int) bool {
+		return resp.RuntimeHandlers[i].Name < resp.RuntimeHandlers[j].Name
+	})
+
 	if r.Verbose {
 		configByt, err := json.Marshal(c.config)
 		if err != nil {

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http/httptrace"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -31,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/pkg/httpdbg"
 	"github.com/containerd/containerd/v2/pkg/progress"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -150,11 +150,6 @@ func NewFetchConfig(ctx context.Context, cliContext *cli.Context) (*FetchConfig,
 		config.AllMetadata = true
 	}
 
-	if cliContext.IsSet("max-concurrent-downloads") {
-		mcd := cliContext.Int("max-concurrent-downloads")
-		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentDownloads(mcd))
-	}
-
 	if cliContext.IsSet("max-concurrent-uploaded-layers") {
 		mcu := cliContext.Int("max-concurrent-uploaded-layers")
 		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentUploadedLayers(mcu))
@@ -168,7 +163,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 	ongoing := NewJobs(ref)
 
 	if config.TraceHTTP {
-		ctx = httptrace.WithClientTrace(ctx, commands.NewDebugClientTrace(ctx))
+		ctx = httpdbg.WithClientTrace(ctx)
 	}
 
 	pctx, stopProgress := context.WithCancel(ctx)
@@ -183,9 +178,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 	}()
 
 	h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
-			ongoing.Add(desc)
-		}
+		ongoing.Add(desc)
 		return nil, nil
 	})
 
@@ -195,7 +188,6 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		containerd.WithPullLabels(labels),
 		containerd.WithResolver(config.Resolver),
 		containerd.WithImageHandler(h),
-		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	}
 	opts = append(opts, config.RemoteOpts...)
 

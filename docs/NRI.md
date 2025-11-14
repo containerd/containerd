@@ -23,8 +23,8 @@ look at the [NRI repository](https://github.com/containerd/nri).
 </details>
 
 NRI support in containerd is split into two parts both logically and
-physically. These parts are a common plugin (/nri/*) to integrate to
-NRI and CRI-specific bits (/pkg/cri/server/nri-api) which convert
+physically. These parts are a common plugin (`/internal/nri/*`) to integrate to
+NRI and CRI-specific bits (`/internal/cri/nri`) which convert
 data between the runtime-agnostic NRI representation and the internal
 representation of the CRI plugin.
 
@@ -42,10 +42,7 @@ an external NRI plugin needs to be applied to a container within containerd. `Do
 
 The containerd CRI plugin registers itself as an above mentioned NRI
 Domain for the "k8s.io" namespace, to allow container configuration to be customized by external
-NRI plugins. Currently this Domain interface is only implemented for
-the original CRI `pkg/cri/server` implementation. Implementing it for
-the more recent experimental `pkg/cri/sbserver` implementation is on
-the TODO list.
+NRI plugins.
 
 ### NRI Support for Other Container 'Domains'
 
@@ -75,7 +72,7 @@ look something like this:
     plugin_path = "/opt/nri/plugins"
     # plugin_registration_timeout is the timeout for a plugin to register after connection.
     plugin_registration_timeout = "5s"
-    # plugin_requst_timeout is the timeout for a plugin to handle an event/request.
+    # plugin_request_timeout is the timeout for a plugin to handle an event/request.
     plugin_request_timeout = "2s"
     # socket_path is the path of the NRI socket to create for plugins to connect to.
     socket_path = "/var/run/nri/nri.sock"
@@ -138,3 +135,33 @@ sudo cp build/bin/v010-adapter /usr/local/bin
 sudo mkdir -p /opt/nri/plugins
 sudo ln -s /usr/local/bin/v010-adapter /opt/nri/plugins/00-v010-adapter
 ```
+
+## Default Validator
+
+The built-in default NRI validator plugin can be used to selectively lock
+down some of the container controls available in NRI. You can enable and
+configure the default validator using the following toml fragment in the
+containerd configuration file:
+
+```toml
+  [plugins.'io.containerd.nri.v1.nri'.default_validator]
+      enable = <true|false>
+      reject_oci_hook_adjustment = <true|false>
+      reject_runtime_default_seccomp_adjustment = <true|false>
+      reject_unconfined_seccomp_adjustment = <true|false>
+      reject_custom_seccomp_adjustment = <true|false>
+      reject_namespace_adjustment = <true|false>
+      required_plugins = [ <list of required NRI plugins> ]
+      tolerate_missing_plugins_annotation = <annotation key name for toleration>
+```
+
+Using this configuration you can selectively disable
+  - OCI hook injection
+  - adjustment of the default seccomp policy
+  - adjustment of an unconfined seccomp policy
+  - adjustment of a custom seccomp policy
+  - adjustment of linux namespace adjustment
+
+Additionally, you can require a set of NRI plugins to always be present for
+container creation to succeed, and an annotation key which can be used to
+annotate containers otherwise.

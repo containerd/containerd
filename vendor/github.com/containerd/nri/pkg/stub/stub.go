@@ -35,7 +35,7 @@ import (
 )
 
 // Plugin can implement a number of interfaces related to Pod and Container
-// lifecycle events. No any single such inteface is mandatory, therefore the
+// lifecycle events. No any single such interface is mandatory, therefore the
 // Plugin interface itself is empty. Plugins are required to implement at
 // least one of these interfaces and this is verified during stub creation.
 // Trying to create a stub for a plugin violating this requirement will fail
@@ -69,6 +69,12 @@ type RunPodInterface interface {
 	RunPodSandbox(context.Context, *api.PodSandbox) error
 }
 
+// UpdatePodInterface handles UpdatePodSandbox API requests.
+type UpdatePodInterface interface {
+	// UpdatePodSandbox relays an UpdatePodSandbox request to the plugin.
+	UpdatePodSandbox(context.Context, *api.PodSandbox, *api.LinuxResources, *api.LinuxResources) error
+}
+
 // StopPodInterface handles StopPodSandbox API events.
 type StopPodInterface interface {
 	// StopPodSandbox relays a StopPodSandbox event to the plugin.
@@ -79,6 +85,12 @@ type StopPodInterface interface {
 type RemovePodInterface interface {
 	// RemovePodSandbox relays a RemovePodSandbox event to the plugin.
 	RemovePodSandbox(context.Context, *api.PodSandbox) error
+}
+
+// PostUpdatePodInterface handles PostUpdatePodSandbox API events.
+type PostUpdatePodInterface interface {
+	// PostUpdatePodSandbox relays a PostUpdatePodSandbox event to the plugin.
+	PostUpdatePodSandbox(context.Context, *api.PodSandbox) error
 }
 
 // CreateContainerInterface handles CreateContainer API requests.
@@ -135,9 +147,17 @@ type PostUpdateContainerInterface interface {
 	PostUpdateContainer(context.Context, *api.PodSandbox, *api.Container) error
 }
 
+// ValidateContainerAdjustmentInterface handles container adjustment validation.
+type ValidateContainerAdjustmentInterface interface {
+	// ValidateContainerAdjustment validates the container adjustment.
+	ValidateContainerAdjustment(context.Context, *api.ValidateContainerAdjustmentRequest) error
+}
+
 // Stub is the interface the stub provides for the plugin implementation.
 type Stub interface {
-	// Run the plugin. Starts the plugin then waits for an error or the plugin to stop
+	// Run starts the plugin then waits for the plugin service to exit, either due to a
+	// critical error or an explicit call to Stop(). Once Run() returns, the plugin can be
+	// restarted by calling Run() or Start() again.
 	Run(context.Context) error
 	// Start the plugin.
 	Start(context.Context) error
@@ -148,11 +168,23 @@ type Stub interface {
 
 	// UpdateContainer requests unsolicited updates to containers.
 	UpdateContainers([]*api.ContainerUpdate) ([]*api.ContainerUpdate, error)
+
+	// RegistrationTimeout returns the registration timeout for the stub.
+	// This is the default timeout if the plugin has not been started or
+	// the timeout received in the Configure request otherwise.
+	RegistrationTimeout() time.Duration
+
+	// RequestTimeout returns the request timeout for the stub.
+	// This is the default timeout if the plugin has not been started or
+	// the timeout received in the Configure request otherwise.
+	RequestTimeout() time.Duration
 }
 
 const (
-	// Plugin registration timeout.
-	registrationTimeout = 2 * time.Second
+	// DefaultRegistrationTimeout is the default plugin registration timeout.
+	DefaultRegistrationTimeout = api.DefaultPluginRegistrationTimeout
+	// DefaultRequestTimeout is the default plugin request processing timeout.
+	DefaultRequestTimeout = api.DefaultPluginRequestTimeout
 )
 
 var (
@@ -255,29 +287,35 @@ type stub struct {
 	rpcs       *ttrpc.Server
 	rpcc       *ttrpc.Client
 	runtime    api.RuntimeService
-	closeOnce  sync.Once
 	started    bool
 	doneC      chan struct{}
 	srvErrC    chan error
 	cfgErrC    chan error
+	syncReq    *api.SynchronizeRequest
+
+	registrationTimeout time.Duration
+	requestTimeout      time.Duration
 }
 
 // Handlers for NRI plugin event and request.
 type handlers struct {
-	Configure           func(context.Context, string, string, string) (api.EventMask, error)
-	Synchronize         func(context.Context, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
-	Shutdown            func(context.Context)
-	RunPodSandbox       func(context.Context, *api.PodSandbox) error
-	StopPodSandbox      func(context.Context, *api.PodSandbox) error
-	RemovePodSandbox    func(context.Context, *api.PodSandbox) error
-	CreateContainer     func(context.Context, *api.PodSandbox, *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error)
-	StartContainer      func(context.Context, *api.PodSandbox, *api.Container) error
-	UpdateContainer     func(context.Context, *api.PodSandbox, *api.Container, *api.LinuxResources) ([]*api.ContainerUpdate, error)
-	StopContainer       func(context.Context, *api.PodSandbox, *api.Container) ([]*api.ContainerUpdate, error)
-	RemoveContainer     func(context.Context, *api.PodSandbox, *api.Container) error
-	PostCreateContainer func(context.Context, *api.PodSandbox, *api.Container) error
-	PostStartContainer  func(context.Context, *api.PodSandbox, *api.Container) error
-	PostUpdateContainer func(context.Context, *api.PodSandbox, *api.Container) error
+	Configure                   func(context.Context, string, string, string) (api.EventMask, error)
+	Synchronize                 func(context.Context, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
+	Shutdown                    func(context.Context)
+	RunPodSandbox               func(context.Context, *api.PodSandbox) error
+	UpdatePodSandbox            func(context.Context, *api.PodSandbox, *api.LinuxResources, *api.LinuxResources) error
+	StopPodSandbox              func(context.Context, *api.PodSandbox) error
+	RemovePodSandbox            func(context.Context, *api.PodSandbox) error
+	PostUpdatePodSandbox        func(context.Context, *api.PodSandbox) error
+	CreateContainer             func(context.Context, *api.PodSandbox, *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error)
+	StartContainer              func(context.Context, *api.PodSandbox, *api.Container) error
+	UpdateContainer             func(context.Context, *api.PodSandbox, *api.Container, *api.LinuxResources) ([]*api.ContainerUpdate, error)
+	StopContainer               func(context.Context, *api.PodSandbox, *api.Container) ([]*api.ContainerUpdate, error)
+	RemoveContainer             func(context.Context, *api.PodSandbox, *api.Container) error
+	PostCreateContainer         func(context.Context, *api.PodSandbox, *api.Container) error
+	PostStartContainer          func(context.Context, *api.PodSandbox, *api.Container) error
+	PostUpdateContainer         func(context.Context, *api.PodSandbox, *api.Container) error
+	ValidateContainerAdjustment func(context.Context, *api.ValidateContainerAdjustmentRequest) error
 }
 
 // New creates a stub with the given plugin and options.
@@ -288,7 +326,9 @@ func New(p interface{}, opts ...Option) (Stub, error) {
 		idx:        os.Getenv(api.PluginIdxEnvVar),
 		socketPath: api.DefaultSocketPath,
 		dialer:     func(p string) (stdnet.Conn, error) { return stdnet.Dial("unix", p) },
-		doneC:      make(chan struct{}),
+
+		registrationTimeout: DefaultRegistrationTimeout,
+		requestTimeout:      DefaultRequestTimeout,
 	}
 
 	for _, o := range opts {
@@ -316,10 +356,10 @@ func (stub *stub) Start(ctx context.Context) (retErr error) {
 	stub.Lock()
 	defer stub.Unlock()
 
-	if stub.started {
+	if stub.isStarted() {
 		return fmt.Errorf("stub already started")
 	}
-	stub.started = true
+	stub.doneC = make(chan struct{})
 
 	err := stub.connect()
 	if err != nil {
@@ -378,10 +418,11 @@ func (stub *stub) Start(ctx context.Context) (retErr error) {
 
 	stub.srvErrC = make(chan error, 1)
 	stub.cfgErrC = make(chan error, 1)
-	go func() {
-		stub.srvErrC <- rpcs.Serve(ctx, rpcl)
-		close(stub.doneC)
-	}()
+
+	go func(l stdnet.Listener, doneC chan struct{}, srvErrC chan error) {
+		srvErrC <- rpcs.Serve(ctx, l)
+		close(doneC)
+	}(rpcl, stub.doneC, stub.srvErrC)
 
 	stub.rpcm = rpcm
 	stub.rpcl = rpcl
@@ -401,6 +442,7 @@ func (stub *stub) Start(ctx context.Context) (retErr error) {
 
 	log.Infof(ctx, "Started plugin %s...", stub.Name())
 
+	stub.started = true
 	return nil
 }
 
@@ -413,24 +455,43 @@ func (stub *stub) Stop() {
 	stub.close()
 }
 
+// IsStarted returns true if the plugin has been started either by Start() or by Run().
+func (stub *stub) IsStarted() bool {
+	stub.Lock()
+	defer stub.Unlock()
+	return stub.isStarted()
+}
+
+func (stub *stub) isStarted() bool {
+	return stub.started
+}
+
+// reset stub to the status that can initiate a new
+// NRI connection, the caller must hold lock.
 func (stub *stub) close() {
-	stub.closeOnce.Do(func() {
-		if stub.rpcl != nil {
-			stub.rpcl.Close()
-		}
-		if stub.rpcs != nil {
-			stub.rpcs.Close()
-		}
-		if stub.rpcc != nil {
-			stub.rpcc.Close()
-		}
-		if stub.rpcm != nil {
-			stub.rpcm.Close()
-		}
-		if stub.srvErrC != nil {
-			<-stub.doneC
-		}
-	})
+	if !stub.isStarted() {
+		return
+	}
+
+	if stub.rpcl != nil {
+		stub.rpcl.Close()
+	}
+	if stub.rpcs != nil {
+		stub.rpcs.Close()
+	}
+	if stub.rpcc != nil {
+		stub.rpcc.Close()
+	}
+	if stub.rpcm != nil {
+		stub.rpcm.Close()
+	}
+	if stub.srvErrC != nil {
+		<-stub.doneC
+	}
+
+	stub.started = false
+	stub.conn = nil
+	stub.syncReq = nil
 }
 
 // Run the plugin. Start event processing then wait for an error or getting stopped.
@@ -443,25 +504,30 @@ func (stub *stub) Run(ctx context.Context) error {
 
 	err = <-stub.srvErrC
 	if err == ttrpc.ErrServerClosed {
-		return nil
+		log.Infof(noCtx, "ttrpc server closed %s : %v", stub.Name(), err)
 	}
 
 	return err
 }
 
-// Wait for the plugin to stop.
+// Wait for the plugin to stop, should be called after Start() or Run().
 func (stub *stub) Wait() {
-	stub.Lock()
-	if stub.srvErrC == nil {
-		return
+	if stub.IsStarted() {
+		<-stub.doneC
 	}
-	stub.Unlock()
-	<-stub.doneC
 }
 
 // Name returns the full indexed name of the plugin.
 func (stub *stub) Name() string {
 	return stub.idx + "-" + stub.name
+}
+
+func (stub *stub) RegistrationTimeout() time.Duration {
+	return stub.registrationTimeout
+}
+
+func (stub *stub) RequestTimeout() time.Duration {
+	return stub.requestTimeout
 }
 
 // Connect the plugin to NRI.
@@ -502,7 +568,7 @@ func (stub *stub) connect() error {
 func (stub *stub) register(ctx context.Context) error {
 	log.Infof(ctx, "Registering plugin %s...", stub.Name())
 
-	ctx, cancel := context.WithTimeout(ctx, registrationTimeout)
+	ctx, cancel := context.WithTimeout(ctx, stub.registrationTimeout)
 	defer cancel()
 
 	req := &api.RegisterPluginRequest{
@@ -518,13 +584,13 @@ func (stub *stub) register(ctx context.Context) error {
 
 // Handle a lost connection.
 func (stub *stub) connClosed() {
+	stub.Lock()
 	stub.close()
+	stub.Unlock()
 	if stub.onClose != nil {
 		stub.onClose()
 		return
 	}
-
-	os.Exit(0)
 }
 
 //
@@ -557,6 +623,9 @@ func (stub *stub) Configure(ctx context.Context, req *api.ConfigureRequest) (rpl
 
 	log.Infof(ctx, "Configuring plugin %s for runtime %s/%s...", stub.Name(),
 		req.RuntimeName, req.RuntimeVersion)
+
+	stub.registrationTimeout = time.Duration(req.RegistrationTimeout * int64(time.Millisecond))
+	stub.requestTimeout = time.Duration(req.RequestTimeout * int64(time.Millisecond))
 
 	defer func() {
 		stub.cfgErrC <- retErr
@@ -596,16 +665,55 @@ func (stub *stub) Configure(ctx context.Context, req *api.ConfigureRequest) (rpl
 func (stub *stub) Synchronize(ctx context.Context, req *api.SynchronizeRequest) (*api.SynchronizeResponse, error) {
 	handler := stub.handlers.Synchronize
 	if handler == nil {
-		return &api.SynchronizeResponse{}, nil
+		return &api.SynchronizeResponse{More: req.More}, nil
 	}
-	update, err := handler(ctx, req.Pods, req.Containers)
+
+	if req.More {
+		return stub.collectSync(req)
+	}
+
+	return stub.deliverSync(ctx, req)
+}
+
+func (stub *stub) collectSync(req *api.SynchronizeRequest) (*api.SynchronizeResponse, error) {
+	stub.Lock()
+	defer stub.Unlock()
+
+	log.Debugf(noCtx, "collecting sync req with %d pods, %d containers...",
+		len(req.Pods), len(req.Containers))
+
+	if stub.syncReq == nil {
+		stub.syncReq = req
+	} else {
+		stub.syncReq.Pods = append(stub.syncReq.Pods, req.Pods...)
+		stub.syncReq.Containers = append(stub.syncReq.Containers, req.Containers...)
+	}
+
+	return &api.SynchronizeResponse{More: req.More}, nil
+}
+
+func (stub *stub) deliverSync(ctx context.Context, req *api.SynchronizeRequest) (*api.SynchronizeResponse, error) {
+	stub.Lock()
+	syncReq := stub.syncReq
+	stub.syncReq = nil
+	stub.Unlock()
+
+	if syncReq == nil {
+		syncReq = req
+	} else {
+		syncReq.Pods = append(syncReq.Pods, req.Pods...)
+		syncReq.Containers = append(syncReq.Containers, req.Containers...)
+	}
+
+	update, err := stub.handlers.Synchronize(ctx, syncReq.Pods, syncReq.Containers)
 	return &api.SynchronizeResponse{
 		Update: update,
+		More:   false,
 	}, err
 }
 
 // Shutdown the plugin.
-func (stub *stub) Shutdown(ctx context.Context, req *api.ShutdownRequest) (*api.ShutdownResponse, error) {
+func (stub *stub) Shutdown(ctx context.Context, _ *api.ShutdownRequest) (*api.ShutdownResponse, error) {
 	handler := stub.handlers.Shutdown
 	if handler != nil {
 		handler(ctx)
@@ -617,7 +725,7 @@ func (stub *stub) Shutdown(ctx context.Context, req *api.ShutdownRequest) (*api.
 func (stub *stub) CreateContainer(ctx context.Context, req *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
 	handler := stub.handlers.CreateContainer
 	if handler == nil {
-		return nil, nil
+		return &api.CreateContainerResponse{}, nil
 	}
 	adjust, update, err := handler(ctx, req.Pod, req.Container)
 	return &api.CreateContainerResponse{
@@ -630,7 +738,7 @@ func (stub *stub) CreateContainer(ctx context.Context, req *api.CreateContainerR
 func (stub *stub) UpdateContainer(ctx context.Context, req *api.UpdateContainerRequest) (*api.UpdateContainerResponse, error) {
 	handler := stub.handlers.UpdateContainer
 	if handler == nil {
-		return nil, nil
+		return &api.UpdateContainerResponse{}, nil
 	}
 	update, err := handler(ctx, req.Pod, req.Container, req.LinuxResources)
 	return &api.UpdateContainerResponse{
@@ -642,12 +750,22 @@ func (stub *stub) UpdateContainer(ctx context.Context, req *api.UpdateContainerR
 func (stub *stub) StopContainer(ctx context.Context, req *api.StopContainerRequest) (*api.StopContainerResponse, error) {
 	handler := stub.handlers.StopContainer
 	if handler == nil {
-		return nil, nil
+		return &api.StopContainerResponse{}, nil
 	}
 	update, err := handler(ctx, req.Pod, req.Container)
 	return &api.StopContainerResponse{
 		Update: update,
 	}, err
+}
+
+// UpdatePodSandbox request handler.
+func (stub *stub) UpdatePodSandbox(ctx context.Context, req *api.UpdatePodSandboxRequest) (*api.UpdatePodSandboxResponse, error) {
+	handler := stub.handlers.UpdatePodSandbox
+	if handler == nil {
+		return &api.UpdatePodSandboxResponse{}, nil
+	}
+	err := handler(ctx, req.Pod, req.OverheadLinuxResources, req.LinuxResources)
+	return &api.UpdatePodSandboxResponse{}, err
 }
 
 // StateChange event handler.
@@ -656,6 +774,10 @@ func (stub *stub) StateChange(ctx context.Context, evt *api.StateChangeEvent) (*
 	switch evt.Event {
 	case api.Event_RUN_POD_SANDBOX:
 		if handler := stub.handlers.RunPodSandbox; handler != nil {
+			err = handler(ctx, evt.Pod)
+		}
+	case api.Event_POST_UPDATE_POD_SANDBOX:
+		if handler := stub.handlers.PostUpdatePodSandbox; handler != nil {
 			err = handler(ctx, evt.Pod)
 		}
 	case api.Event_STOP_POD_SANDBOX:
@@ -689,6 +811,22 @@ func (stub *stub) StateChange(ctx context.Context, evt *api.StateChangeEvent) (*
 	}
 
 	return &api.StateChangeResponse{}, err
+}
+
+func (stub *stub) ValidateContainerAdjustment(ctx context.Context, req *api.ValidateContainerAdjustmentRequest) (*api.ValidateContainerAdjustmentResponse, error) {
+	handler := stub.handlers.ValidateContainerAdjustment
+	if handler == nil {
+		return &api.ValidateContainerAdjustmentResponse{}, nil
+	}
+
+	if err := handler(ctx, req); err != nil {
+		return &api.ValidateContainerAdjustmentResponse{
+			Reject: true,
+			Reason: err.Error(),
+		}, nil
+	}
+
+	return &api.ValidateContainerAdjustmentResponse{}, nil
 }
 
 // ensureIdentity sets plugin index and name from the binary if those are unset.
@@ -729,6 +867,10 @@ func (stub *stub) setupHandlers() error {
 		stub.handlers.RunPodSandbox = plugin.RunPodSandbox
 		stub.events.Set(api.Event_RUN_POD_SANDBOX)
 	}
+	if plugin, ok := stub.plugin.(UpdatePodInterface); ok {
+		stub.handlers.UpdatePodSandbox = plugin.UpdatePodSandbox
+		stub.events.Set(api.Event_UPDATE_POD_SANDBOX)
+	}
 	if plugin, ok := stub.plugin.(StopPodInterface); ok {
 		stub.handlers.StopPodSandbox = plugin.StopPodSandbox
 		stub.events.Set(api.Event_STOP_POD_SANDBOX)
@@ -736,6 +878,10 @@ func (stub *stub) setupHandlers() error {
 	if plugin, ok := stub.plugin.(RemovePodInterface); ok {
 		stub.handlers.RemovePodSandbox = plugin.RemovePodSandbox
 		stub.events.Set(api.Event_REMOVE_POD_SANDBOX)
+	}
+	if plugin, ok := stub.plugin.(PostUpdatePodInterface); ok {
+		stub.handlers.PostUpdatePodSandbox = plugin.PostUpdatePodSandbox
+		stub.events.Set(api.Event_POST_UPDATE_POD_SANDBOX)
 	}
 	if plugin, ok := stub.plugin.(CreateContainerInterface); ok {
 		stub.handlers.CreateContainer = plugin.CreateContainer
@@ -768,6 +914,10 @@ func (stub *stub) setupHandlers() error {
 	if plugin, ok := stub.plugin.(PostUpdateContainerInterface); ok {
 		stub.handlers.PostUpdateContainer = plugin.PostUpdateContainer
 		stub.events.Set(api.Event_POST_UPDATE_CONTAINER)
+	}
+	if plugin, ok := stub.plugin.(ValidateContainerAdjustmentInterface); ok {
+		stub.handlers.ValidateContainerAdjustment = plugin.ValidateContainerAdjustment
+		stub.events.Set(api.Event_VALIDATE_CONTAINER_ADJUSTMENT)
 	}
 
 	if stub.events == 0 {

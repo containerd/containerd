@@ -43,19 +43,15 @@ jobs:
       # (e.g. hitting resource limits in the `AZTestVMCreate` task)
       fail-fast: false
       matrix:
-        win_ver: [ltsc2019, ltsc2022]
+        win_ver: [ltsc2022]
         include:
-        - win_ver: ltsc2019
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest"
-          AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2019-${{ github.run_id }}
-          GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2019-hyperv/"
         - win_ver: ltsc2022
           AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:latest"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2022-${{ github.run_id }}
           GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022-hyperv/"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Install required packages
         run: |
@@ -81,18 +77,18 @@ jobs:
           echo "SSH_PUB_KEY=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
 
       - name: AZLogin
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           creds: ${{ secrets.AZURE_CREDS }}
 
       - name: AZResourceGroupCreate
-        uses: azure/CLI@v1
+        uses: azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
         with:
           inlinescript: |
             az group create -n ${{ matrix.AZURE_RESOURCE_GROUP }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
       - name: AZTestVMCreate
-        uses: azure/CLI@v1
+        uses: azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
         with:
           inlinescript: |
             DETAILS=$(az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }} --public-ip-sku Standard -o json)
@@ -116,7 +112,7 @@ jobs:
             echo "VM_PUB_IP=$PUB_IP" >> $GITHUB_ENV
 
       - name: EnableAZVMSSH
-        uses: azure/CLI@v1
+        uses: azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
         with:
           inlinescript: |
             az vm run-command invoke  --command-id RunPowerShellScript -n winTestVM -g ${{ matrix.AZURE_RESOURCE_GROUP }} --scripts @$GITHUB_WORKSPACE/script/setup/enable_ssh_windows.ps1 --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
@@ -306,14 +302,14 @@ jobs:
           echo 'GCP_WORKLOAD_IDENTITY_PROVIDER=${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}' >> $GITHUB_OUTPUT
 
       - name: AuthGcp
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: UploadJobReport
-        uses: google-github-actions/upload-cloud-storage@v2.1.0
+        uses: google-github-actions/upload-cloud-storage@6397bd7208e18d13ba2619ee21b9873edc94427a # v3.0.0
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ github.workspace }}/latest-build.txt
@@ -321,7 +317,7 @@ jobs:
           parent: false
 
       - name: UploadLogsDir
-        uses: google-github-actions/upload-cloud-storage@v2.1.0
+        uses: google-github-actions/upload-cloud-storage@6397bd7208e18d13ba2619ee21b9873edc94427a # v3.0.0
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ env.LOGS_DIR }}
@@ -329,7 +325,7 @@ jobs:
           parent: false
 
       - name: Check all CI stages succeeded
-        uses: actions/github-script@v7
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           script: |
             const stepResults = {
@@ -349,7 +345,7 @@ jobs:
 
       - name: ResourceCleanup
         if: always()
-        uses: azure/CLI@v1
+        uses: azure/CLI@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2.2.0
         with:
           inlinescript: |
             az group delete -g ${{ matrix.AZURE_RESOURCE_GROUP }} --yes

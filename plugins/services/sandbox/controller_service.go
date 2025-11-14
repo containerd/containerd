@@ -18,6 +18,7 @@ package sandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -26,16 +27,16 @@ import (
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
-	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/containerd/typeurl/v2"
 )
 
 func init() {
@@ -43,18 +44,33 @@ func init() {
 		Type: plugins.GRPCPlugin,
 		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
+			plugins.PodSandboxPlugin,
 			plugins.SandboxControllerPlugin,
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
-			if err != nil {
+			sc := make(map[string]sandbox.Controller)
+
+			sandboxers, err := ic.GetByType(plugins.PodSandboxPlugin)
+			if err == nil {
+				for name, p := range sandboxers {
+					sc[name] = p.(sandbox.Controller)
+				}
+			} else if !errors.Is(err, plugin.ErrPluginNotFound) {
 				return nil, err
 			}
 
-			sc := make(map[string]sandbox.Controller)
-			for name, p := range sandboxers {
-				sc[name] = p.(sandbox.Controller)
+			sandboxersV2, err := ic.GetByType(plugins.SandboxControllerPlugin)
+			if err == nil {
+				for name, p := range sandboxersV2 {
+					sc[name] = p.(sandbox.Controller)
+				}
+			} else if !errors.Is(err, plugin.ErrPluginNotFound) {
+				return nil, err
+			}
+
+			if len(sc) == 0 {
+				return nil, fmt.Errorf("no sandbox controllers initialized: %w", plugin.ErrPluginNotFound)
 			}
 
 			ep, err := ic.GetSingle(plugins.EventPlugin)
@@ -94,27 +110,33 @@ func (s *controllerService) getController(name string) (sandbox.Controller, erro
 }
 
 func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreateRequest) (*api.ControllerCreateResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("create sandbox")
+	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+		"sandbox_id": req.GetSandboxID(),
+		"sandboxer":  req.GetSandboxer(),
+	}))
+
+	log.G(ctx).Debug("create sandbox")
+
 	// TODO: Rootfs
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	var sb sandbox.Sandbox
 	if req.Sandbox != nil {
-		sb = fromAPISandbox(req.Sandbox)
+		sb = sandbox.FromProto(req.Sandbox)
 	} else {
 		sb = sandbox.Sandbox{ID: req.GetSandboxID()}
 	}
 	err = ctrl.Create(ctx, sb, sandbox.WithOptions(req.GetOptions()))
 	if err != nil {
-		return &api.ControllerCreateResponse{}, errdefs.ToGRPC(err)
+		return &api.ControllerCreateResponse{}, errgrpc.ToGRPC(err)
 	}
 
 	if err := s.publisher.Publish(ctx, "sandboxes/create", &eventtypes.SandboxCreate{
 		SandboxID: req.GetSandboxID(),
 	}); err != nil {
-		return &api.ControllerCreateResponse{}, errdefs.ToGRPC(err)
+		return &api.ControllerCreateResponse{}, errgrpc.ToGRPC(err)
 	}
 
 	return &api.ControllerCreateResponse{
@@ -123,20 +145,25 @@ func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreat
 }
 
 func (s *controllerService) Start(ctx context.Context, req *api.ControllerStartRequest) (*api.ControllerStartResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("start sandbox")
+	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+		"sandbox_id": req.GetSandboxID(),
+		"sandboxer":  req.GetSandboxer(),
+	}))
+
+	log.G(ctx).Debug("start sandbox")
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPCf(err, "failed to get sandbox controller for %q", req.Sandboxer)
 	}
 	inst, err := ctrl.Start(ctx, req.GetSandboxID())
 	if err != nil {
-		return &api.ControllerStartResponse{}, errdefs.ToGRPC(err)
+		return &api.ControllerStartResponse{}, errgrpc.ToGRPCf(err, "failed to start sandbox %q", req.GetSandboxID())
 	}
 
 	if err := s.publisher.Publish(ctx, "sandboxes/start", &eventtypes.SandboxStart{
 		SandboxID: req.GetSandboxID(),
 	}); err != nil {
-		return &api.ControllerStartResponse{}, errdefs.ToGRPC(err)
+		return &api.ControllerStartResponse{}, errgrpc.ToGRPC(err)
 	}
 
 	return &api.ControllerStartResponse{
@@ -151,20 +178,20 @@ func (s *controllerService) Stop(ctx context.Context, req *api.ControllerStopReq
 	log.G(ctx).WithField("req", req).Debug("delete sandbox")
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
-	return &api.ControllerStopResponse{}, errdefs.ToGRPC(ctrl.Stop(ctx, req.GetSandboxID(), sandbox.WithTimeout(time.Duration(req.TimeoutSecs)*time.Second)))
+	return &api.ControllerStopResponse{}, errgrpc.ToGRPC(ctrl.Stop(ctx, req.GetSandboxID(), sandbox.WithTimeout(time.Duration(req.TimeoutSecs)*time.Second)))
 }
 
 func (s *controllerService) Wait(ctx context.Context, req *api.ControllerWaitRequest) (*api.ControllerWaitResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("wait sandbox")
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	exitStatus, err := ctrl.Wait(ctx, req.GetSandboxID())
 	if err != nil {
-		return &api.ControllerWaitResponse{}, errdefs.ToGRPC(err)
+		return &api.ControllerWaitResponse{}, errgrpc.ToGRPC(err)
 	}
 
 	if err := s.publisher.Publish(ctx, "sandboxes/exit", &eventtypes.SandboxExit{
@@ -172,7 +199,7 @@ func (s *controllerService) Wait(ctx context.Context, req *api.ControllerWaitReq
 		ExitStatus: exitStatus.ExitStatus,
 		ExitedAt:   protobuf.ToTimestamp(exitStatus.ExitedAt),
 	}); err != nil {
-		return &api.ControllerWaitResponse{}, errdefs.ToGRPC(err)
+		return &api.ControllerWaitResponse{}, errgrpc.ToGRPC(err)
 	}
 
 	return &api.ControllerWaitResponse{
@@ -185,11 +212,11 @@ func (s *controllerService) Status(ctx context.Context, req *api.ControllerStatu
 	log.G(ctx).WithField("req", req).Debug("sandbox status")
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	cstatus, err := ctrl.Status(ctx, req.GetSandboxID(), req.GetVerbose())
 	if err != nil {
-		return &api.ControllerStatusResponse{}, errdefs.ToGRPC(err)
+		return &api.ControllerStatusResponse{}, errgrpc.ToGRPC(err)
 	}
 	extra := &anypb.Any{}
 	if cstatus.Extra != nil {
@@ -213,20 +240,20 @@ func (s *controllerService) Shutdown(ctx context.Context, req *api.ControllerShu
 	log.G(ctx).WithField("req", req).Debug("shutdown sandbox")
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
-	return &api.ControllerShutdownResponse{}, errdefs.ToGRPC(ctrl.Shutdown(ctx, req.GetSandboxID()))
+	return &api.ControllerShutdownResponse{}, errgrpc.ToGRPC(ctrl.Shutdown(ctx, req.GetSandboxID()))
 }
 
 func (s *controllerService) Metrics(ctx context.Context, req *api.ControllerMetricsRequest) (*api.ControllerMetricsResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("sandbox metrics")
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	metrics, err := ctrl.Metrics(ctx, req.GetSandboxID())
 	if err != nil {
-		return &api.ControllerMetricsResponse{}, errdefs.ToGRPC(err)
+		return &api.ControllerMetricsResponse{}, errgrpc.ToGRPC(err)
 	}
 	return &api.ControllerMetricsResponse{
 		Metrics: metrics,
@@ -239,38 +266,14 @@ func (s *controllerService) Update(
 	log.G(ctx).WithField("req", req).Debug("sandbox update resource")
 	ctrl, err := s.getController(req.Sandboxer)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	if req.Sandbox == nil {
 		return nil, fmt.Errorf("sandbox can not be nil")
 	}
-	err = ctrl.Update(ctx, req.SandboxID, fromAPISandbox(req.Sandbox), req.Fields...)
+	err = ctrl.Update(ctx, req.SandboxID, sandbox.FromProto(req.Sandbox), req.Fields...)
 	if err != nil {
-		return &api.ControllerUpdateResponse{}, errdefs.ToGRPC(err)
+		return &api.ControllerUpdateResponse{}, errgrpc.ToGRPC(err)
 	}
 	return &api.ControllerUpdateResponse{}, nil
-}
-
-func fromAPISandbox(sb *types.Sandbox) sandbox.Sandbox {
-	var runtime sandbox.RuntimeOpts
-	if sb.Runtime != nil {
-		runtime = sandbox.RuntimeOpts{
-			Name:    sb.Runtime.Name,
-			Options: sb.Runtime.Options,
-		}
-	}
-	extensions := make(map[string]typeurl.Any)
-	for k, v := range sb.Extensions {
-		extensions[k] = v
-	}
-	return sandbox.Sandbox{
-		ID:         sb.SandboxID,
-		Runtime:    runtime,
-		Spec:       sb.Spec,
-		Labels:     sb.Labels,
-		CreatedAt:  protobuf.FromTimestamp(sb.CreatedAt),
-		UpdatedAt:  protobuf.FromTimestamp(sb.UpdatedAt),
-		Extensions: extensions,
-		Sandboxer:  sb.Sandboxer,
-	}
 }

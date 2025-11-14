@@ -33,8 +33,9 @@ func (c *criService) PodSandboxStats(
 		return nil, fmt.Errorf("an error occurred when trying to find sandbox %s: %w", r.GetPodSandboxId(), err)
 	}
 
-	podSandboxStats, err := c.podSandboxStats(ctx, sandbox)
-	if err != nil {
+	// issue 12279: this is tautologically true where interface is stubbed out.
+	podSandboxStats, err := c.podSandboxStats(ctx, sandbox) //nolint: staticcheck
+	if err != nil {                                         //nolint: staticcheck
 		return nil, fmt.Errorf("failed to decode pod sandbox metrics %s: %w", r.GetPodSandboxId(), err)
 	}
 

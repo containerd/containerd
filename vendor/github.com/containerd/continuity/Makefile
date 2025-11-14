@@ -46,6 +46,7 @@ generate:
 lint:
 	@echo "+ $@"
 	@golangci-lint run
+	@(cd cmd/continuity && golangci-lint --config=../../.golangci.yml run)
 
 build:
 	@echo "+ $@"
@@ -57,7 +58,7 @@ test:
 
 root-test:
 	@echo "+ $@"
-	@go test -exec sudo ${TEST_REQUIRES_ROOT_PACKAGES} -test.root
+	@go test -exec sudo ${TEST_REQUIRES_ROOT_PACKAGES} -test.root -test.v
 
 test-compile:
 	@echo "+ $@"

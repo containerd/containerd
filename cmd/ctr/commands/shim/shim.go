@@ -28,16 +28,18 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/api/runtime/task/v3"
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/containerd/v2/pkg/shim"
+	taskv2 "github.com/containerd/containerd/api/runtime/task/v2"
+	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/shim"
 )
 
 var fifoFlags = []cli.Flag{
@@ -67,7 +69,11 @@ var Command = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "id",
-			Usage: "Container id",
+			Usage: "shim ID",
+		},
+		&cli.StringFlag{
+			Name:  "shim-address",
+			Usage: "shim address (default: computed from shim ID)",
 		},
 	},
 	Subcommands: []*cli.Command{
@@ -75,6 +81,7 @@ var Command = &cli.Command{
 		execCommand,
 		startCommand,
 		stateCommand,
+		shutdownCommand,
 		pprofCommand,
 	},
 }
@@ -113,19 +120,98 @@ var deleteCommand = &cli.Command{
 	},
 }
 
+var shutdownCommand = &cli.Command{
+	Name:  "shutdown",
+	Usage: "Shutdown shim if there is no active container",
+	Flags: []cli.Flag{
+		&cli.IntFlag{
+			Name:  "api-version",
+			Usage: "shim API version {2,3}",
+			Value: 3,
+			Action: func(c *cli.Context, v int) error {
+				if v != 2 && v != 3 {
+					return fmt.Errorf("api-version must be 2 or 3")
+				}
+				return nil
+			},
+		},
+	},
+	Action: func(cliContext *cli.Context) error {
+		switch cliContext.Int("api-version") {
+		case 2:
+			service, err := getTaskServiceV2(cliContext)
+			if err != nil {
+				return err
+			}
+			_, err = service.Shutdown(context.Background(), &taskv2.ShutdownRequest{})
+			if err != nil {
+				return err
+			}
+		default:
+			service, err := getTaskService(cliContext)
+			if err != nil {
+				return err
+			}
+			_, err = service.Shutdown(context.Background(), &task.ShutdownRequest{})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	},
+}
+
 var stateCommand = &cli.Command{
 	Name:  "state",
-	Usage: "Get the state of all the processes of the task",
+	Usage: "Get the state of all main process of the task",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "task-id",
+			Aliases: []string{"t"},
+			Usage:   "task ID",
+		},
+		&cli.IntFlag{
+			Name:  "api-version",
+			Usage: "shim API version {2,3}",
+			Value: 3,
+			Action: func(c *cli.Context, v int) error {
+				if v != 2 && v != 3 {
+					return fmt.Errorf("api-version must be 2 or 3")
+				}
+				return nil
+			},
+		},
+	},
 	Action: func(cliContext *cli.Context) error {
-		service, err := getTaskService(cliContext)
-		if err != nil {
-			return err
+		id := cliContext.String("task-id")
+		if id == "" {
+			id = cliContext.String("id")
 		}
-		r, err := service.State(context.Background(), &task.StateRequest{
-			ID: cliContext.String("id"),
-		})
-		if err != nil {
-			return err
+
+		var r any
+		switch cliContext.Int("api-version") {
+		case 2:
+			service, err := getTaskServiceV2(cliContext)
+			if err != nil {
+				return err
+			}
+			r, err = service.State(context.Background(), &taskv2.StateRequest{
+				ID: id,
+			})
+			if err != nil {
+				return err
+			}
+		default:
+			service, err := getTaskService(cliContext)
+			if err != nil {
+				return err
+			}
+			r, err = service.State(context.Background(), &task.StateRequest{
+				ID: id,
+			})
+			if err != nil {
+				return err
+			}
 		}
 		commands.PrintAsJSON(r)
 		return nil
@@ -234,21 +320,44 @@ var execCommand = &cli.Command{
 }
 
 func getTaskService(cliContext *cli.Context) (task.TTRPCTaskService, error) {
+	client, err := getTTRPCClient(cliContext)
+	if err != nil {
+		return nil, err
+	}
+	return task.NewTTRPCTaskClient(client), nil
+}
+func getTaskServiceV2(cliContext *cli.Context) (taskv2.TaskService, error) {
+	client, err := getTTRPCClient(cliContext)
+	if err != nil {
+		return nil, err
+	}
+	return taskv2.NewTaskClient(client), nil
+}
+
+func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
 	id := cliContext.String("id")
-	if id == "" {
-		return nil, fmt.Errorf("container id must be specified")
+	shimAddress := cliContext.String("shim-address")
+	if id == "" && shimAddress == "" {
+		return nil, fmt.Errorf("shim ID (--id) or address (--shim-address) must be specified")
 	}
 	ns := cliContext.String("namespace")
 
-	// /containerd-shim/ns/id/shim.sock is the old way to generate shim socket,
-	// compatible it
-	s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
-	// this should not error, ctr always get a default ns
-	ctx := namespaces.WithNamespace(context.Background(), ns)
-	s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, false)
-	s2 = strings.TrimPrefix(s2, "unix://")
-
-	for _, socket := range []string{s2, "\x00" + s1} {
+	sockets := make([]string, 0)
+	if shimAddress != "" {
+		trimmed := strings.TrimPrefix(shimAddress, "unix://")
+		sockets = append(sockets, trimmed)
+	}
+	if id != "" {
+		// /containerd-shim/ns/id/shim.sock is the old way to generate shim socket,
+		// compatible it
+		s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
+		// this should not error, ctr always get a default ns
+		ctx := namespaces.WithNamespace(context.Background(), ns)
+		s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, false)
+		s2 = strings.TrimPrefix(s2, "unix://")
+		sockets = append(sockets, s2, "\x00"+s1)
+	}
+	for _, socket := range sockets {
 		conn, err := net.Dial("unix", socket)
 		if err == nil {
 			client := ttrpc.NewClient(conn)
@@ -256,9 +365,9 @@ func getTaskService(cliContext *cli.Context) (task.TTRPCTaskService, error) {
 			// TODO(stevvooe): This actually leaks the connection. We were leaking it
 			// before, so may not be a huge deal.
 
-			return task.NewTTRPCTaskClient(client), nil
+			return client, nil
 		}
 	}
 
-	return nil, fmt.Errorf("fail to connect to container %s's shim", id)
+	return nil, fmt.Errorf("fail to connect to container shim with sockets: %v", sockets)
 }

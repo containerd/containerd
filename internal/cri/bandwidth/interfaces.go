@@ -32,7 +32,7 @@ limitations under the License.
 
 package bandwidth
 
-import "k8s.io/apimachinery/pkg/api/resource"
+import resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 
 // Shaper is designed so that the shaper structs created
 // satisfy the Shaper interface.

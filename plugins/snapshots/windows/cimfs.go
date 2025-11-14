@@ -33,7 +33,6 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/computestorage"
 	"github.com/Microsoft/hcsshim/pkg/cimfs"
-	cimlayer "github.com/Microsoft/hcsshim/pkg/ociwclayer/cim"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
@@ -48,11 +47,47 @@ import (
 )
 
 const (
-	baseVHDName                = "blank-base.vhdx"
-	templateVHDName            = "blank.vhdx"
-	vhdMaxSizeInBytes   uint64 = 10 * 1024 * 1024 * 1024 // 10 GB
-	vhdBlockSizeInBytes uint32 = 1 * 1024 * 1024         // 1 MB
+	baseVHDName                         = "blank-base.vhdx"
+	templateVHDName                     = "blank.vhdx"
+	defaultScratchVHDSizeInBytes uint64 = 10 * 1024 * 1024 * 1024 // 10 GB
+	vhdBlockSizeInBytes          uint32 = 1 * 1024 * 1024         // 1 MB
 )
+
+// scratchCreationOpt is a functional option for configuring scratch VHD creation
+type scratchCreationOpt func(*scratchCreationOptions) error
+
+// scratchCreationOptions holds configuration for scratch VHD creation
+type scratchCreationOptions struct {
+	ntfsFormat  bool
+	sizeInBytes uint64
+}
+
+// WithNTFSFormat specifies whether the scratch VHD should be formatted with NTFS
+func WithNTFSFormat() scratchCreationOpt {
+	return func(opts *scratchCreationOptions) error {
+		opts.ntfsFormat = true
+		return nil
+	}
+}
+
+// WithSize specifies the size of the scratch VHD in bytes
+func WithSize(size uint64) scratchCreationOpt {
+	return func(opts *scratchCreationOptions) error {
+		if size == 0 {
+			return fmt.Errorf("VHD size cannot be zero")
+		}
+		opts.sizeInBytes = size
+		return nil
+	}
+}
+
+// defaultScratchCreationOptions returns the default options for scratch VHD creation
+func defaultScratchCreationOptions() *scratchCreationOptions {
+	return &scratchCreationOptions{
+		ntfsFormat:  true,
+		sizeInBytes: defaultScratchVHDSizeInBytes,
+	}
+}
 
 // Composite image FileSystem (CimFS) is a new read-only filesystem (similar to overlayFS on Linux) created
 // specifically for storing container image layers on windows.  cimFSSnapshotter is a snapshotter that uses
@@ -91,8 +126,12 @@ func NewCimFSSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 
-	if err = createScratchVHDs(context.Background(), baseSn.root); err != nil {
+	if err = createDifferencingScratchVHDs(context.Background(), baseSn.root); err != nil {
 		return nil, fmt.Errorf("failed to init base scratch VHD: %w", err)
+	}
+
+	if err = os.MkdirAll(filepath.Join(baseSn.info.HomeDir, "cim-layers"), 0755); err != nil {
+		return nil, err
 	}
 
 	return &cimFSSnapshotter{
@@ -101,29 +140,19 @@ func NewCimFSSnapshotter(root string) (snapshots.Snapshotter, error) {
 	}, nil
 }
 
-// getCimLayerPath returns the path of the cim file for the given snapshot. Note that this function doesn't
+// getLayerCimPath returns the path of the cim file for the given snapshot. Note that this function doesn't
 // actually check if the cim layer exists it simply does string manipulation to generate the path isCimLayer
 // can be used to verify if it is actually a cim layer.
-func getCimLayerPath(cimDir, snID string) string {
-	return filepath.Join(cimDir, (snID + ".cim"))
+func (s *cimFSSnapshotter) getLayerCimPath(snID string) string {
+	return filepath.Join(s.cimDir, (snID + ".cim"))
 }
 
-// isCimLayer checks if the snapshot referred by the given key is actually a cim layer.  With CimFS
-// snapshotter all the read-only (i.e image) layers are stored in the cim format while we still use VHDs for
-// scratch layers.
-func (s *cimFSSnapshotter) isCimLayer(ctx context.Context, key string) (bool, error) {
-	id, _, _, err := storage.GetInfo(ctx, key)
-	if err != nil {
-		return false, fmt.Errorf("get snapshot info: %w", err)
+func (s *cimFSSnapshotter) parentIDsToCimPaths(parentIDs []string) []string {
+	cimPaths := make([]string, 0, len(parentIDs))
+	for _, id := range parentIDs {
+		cimPaths = append(cimPaths, s.getLayerCimPath(id))
 	}
-	snCimPath := getCimLayerPath(s.cimDir, id)
-	if _, err := os.Stat(snCimPath); err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
+	return cimPaths
 }
 
 func (s *cimFSSnapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
@@ -138,15 +167,14 @@ func (s *cimFSSnapshotter) Usage(ctx context.Context, key string) (snapshots.Usa
 	}
 	defer t.Rollback()
 
-	id, _, _, err := storage.GetInfo(ctx, key)
+	id, info, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
 		return snapshots.Usage{}, fmt.Errorf("failed to get snapshot info: %w", err)
 	}
 
-	if ok, err := s.isCimLayer(ctx, key); err != nil {
-		return snapshots.Usage{}, err
-	} else if ok {
-		cimUsage, err := cimfs.GetCimUsage(ctx, getCimLayerPath(s.cimDir, id))
+	if info.Kind == snapshots.KindCommitted {
+		// Committed MUST be a cimfs layer
+		cimUsage, err := cimfs.GetCimUsage(ctx, s.getLayerCimPath(id))
 		if err != nil {
 			return snapshots.Usage{}, err
 		}
@@ -219,7 +247,7 @@ func (s *cimFSSnapshotter) Remove(ctx context.Context, key string) error {
 		return fmt.Errorf("%w: %s", errdefs.ErrFailedPrecondition, err)
 	}
 
-	if err := cimlayer.DestroyCimLayer(s.getSnapshotDir(ID)); err != nil {
+	if err := cimfs.DestroyCim(ctx, s.getLayerCimPath(ID)); err != nil {
 		// Must be cleaned up, any "rm-*" could be removed if no active transactions
 		log.G(ctx).WithError(err).WithField("ID", ID).Warnf("failed to cleanup cim files")
 	}
@@ -325,25 +353,31 @@ func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount
 		roFlag = "rw"
 	}
 
-	source := s.getSnapshotDir(sn.ID)
-	parentLayerPaths := s.parentIDsToParentPaths(sn.ParentIDs)
-
-	mountType := "CimFS"
-
-	// error is not checked here, as a string array will never fail to Marshal
-	parentLayersJSON, _ := json.Marshal(parentLayerPaths)
-	parentLayersOption := mount.ParentLayerPathsFlag + string(parentLayersJSON)
-
 	options := []string{
 		roFlag,
 	}
+
+	// add the layer CIM path - this path will only be used if we are extracting an
+	// image layer, in case of scratch snapshots this path MUST be ignored.
+	layerCimPath := s.getLayerCimPath(sn.ID)
+	options = append(options, mount.LayerCimPathFlag+layerCimPath)
+
 	if len(sn.ParentIDs) != 0 {
+		parentLayerPaths := s.parentIDsToParentPaths(sn.ParentIDs)
+		parentLayerCimPaths := s.parentIDsToCimPaths(sn.ParentIDs)
+		// error is not checked here, as a string array will never fail to Marshal
+		parentLayersJSON, _ := json.Marshal(parentLayerPaths)
+		parentLayersOption := mount.ParentLayerPathsFlag + string(parentLayersJSON)
+		parentCimLayersJSON, _ := json.Marshal(parentLayerCimPaths)
+		parentCimLayersOption := mount.ParentLayerCimPathsFlag + string(parentCimLayersJSON)
 		options = append(options, parentLayersOption)
+		options = append(options, parentCimLayersOption)
 	}
+
 	mounts := []mount.Mount{
 		{
-			Source:  source,
-			Type:    mountType,
+			Source:  s.getSnapshotDir(sn.ID),
+			Type:    mount.CimFSMountType,
 			Options: options,
 		},
 	}
@@ -351,12 +385,13 @@ func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount
 	return mounts
 }
 
-// creates a base scratch VHD and a differencing VHD from that base VHD inside the given `path`
-// directory. Once these VHDs are created, every scratch snapshot will make a copy of the differencing VHD to
-// be used as the scratch for that snapshot. We could ideally just have a base VHD and no differencing VHD and
-// copy the base VHD for every scratch snapshot. However, base VHDs are slightly bigger in size and so take
-// longer to copy so we keep a differencing VHD and copy that.
-func createScratchVHDs(ctx context.Context, path string) (err error) {
+// creates a base scratch VHD and a differencing VHD from that base VHD inside the given
+// `path` directory. Once these VHDs are created, every scratch snapshot will make a copy
+// of the differencing VHD to be used as the scratch for that snapshot. We could ideally
+// just have a base VHD and no differencing VHD and copy the base VHD for every scratch
+// snapshot. However, base VHDs are slightly bigger in size and so take longer to copy so
+// we keep a differencing VHD and copy that.
+func createDifferencingScratchVHDs(ctx context.Context, path string) (err error) {
 	baseVHDPath := filepath.Join(path, baseVHDName)
 	diffVHDPath := filepath.Join(path, templateVHDName)
 	baseVHDExists := false
@@ -386,26 +421,8 @@ func createScratchVHDs(ctx context.Context, path string) (err error) {
 	}()
 
 	if !baseVHDExists {
-		var baseVHDHandle syscall.Handle
-		createParams := &vhd.CreateVirtualDiskParameters{
-			Version: 2,
-			Version2: vhd.CreateVersion2{
-				MaximumSize:      vhdMaxSizeInBytes,
-				BlockSizeInBytes: vhdBlockSizeInBytes,
-			},
-		}
-		baseVHDHandle, err = vhd.CreateVirtualDisk(baseVHDPath, vhd.VirtualDiskAccessNone, vhd.CreateVirtualDiskFlagNone, createParams)
-		if err != nil {
+		if err = createScratchVHD(ctx, baseVHDPath); err != nil {
 			return fmt.Errorf("failed to create base vhd: %w", err)
-		}
-
-		err = computestorage.FormatWritableLayerVhd(ctx, windows.Handle(baseVHDHandle))
-		// we always wanna close the handle whether format succeeds for not.
-		closeErr := syscall.CloseHandle(baseVHDHandle)
-		if err != nil {
-			return err
-		} else if closeErr != nil {
-			return fmt.Errorf("failed to close vhdx handle: %w", closeErr)
 		}
 	}
 
@@ -417,12 +434,69 @@ func createScratchVHDs(ctx context.Context, path string) (err error) {
 		}
 	}
 
-	// re assigning group access even if we didn't create the VHD shouldn't throw an error
-	if err = security.GrantVmGroupAccess(baseVHDPath); err != nil {
-		return fmt.Errorf("failed to grant vm group access to %s: %w", baseVHDPath, err)
-	}
+	// Grant VM group access to the differencing VHD (base VHD access is already granted by createSingleVHD)
 	if err = security.GrantVmGroupAccess(diffVHDPath); err != nil {
 		return fmt.Errorf("failed to grant vm group access to %s: %w", diffVHDPath, err)
+	}
+	return nil
+}
+
+// createScratchVHD creates a new scratch VHD at the specified path with the given options
+func createScratchVHD(ctx context.Context, vhdPath string, opts ...scratchCreationOpt) (retErr error) {
+	// Apply default options
+	options := defaultScratchCreationOptions()
+	for _, opt := range opts {
+		if err := opt(options); err != nil {
+			return fmt.Errorf("failed to apply scratch creation option: %w", err)
+		}
+	}
+
+	// Check if VHD already exists
+	if _, err := os.Stat(vhdPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to stat VHD path: %w", err)
+	}
+
+	createParams := &vhd.CreateVirtualDiskParameters{
+		Version: 2,
+		Version2: vhd.CreateVersion2{
+			MaximumSize:      options.sizeInBytes,
+			BlockSizeInBytes: vhdBlockSizeInBytes,
+		},
+	}
+
+	vhdHandle, err := vhd.CreateVirtualDisk(vhdPath, vhd.VirtualDiskAccessNone, vhd.CreateVirtualDiskFlagNone, createParams)
+	if err != nil {
+		return fmt.Errorf("failed to create VHD: %w", err)
+	}
+	defer func() {
+		if retErr != nil {
+			if rmErr := os.RemoveAll(vhdPath); rmErr != nil {
+				log.G(ctx).WithError(err).Warnf("on error cleanup failed: %s", rmErr)
+			}
+		}
+	}()
+
+	// Format the VHD if requested
+	if options.ntfsFormat {
+		err = computestorage.FormatWritableLayerVhd(ctx, windows.Handle(vhdHandle))
+	}
+
+	// Always close the handle
+	closeErr := syscall.CloseHandle(vhdHandle)
+
+	// Handle errors from formatting and closing
+	if err != nil {
+		return fmt.Errorf("failed to format VHD: %w", err)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("failed to close VHD handle: %w", closeErr)
+	}
+
+	// Grant VM group access to the VHD
+	if err = security.GrantVmGroupAccess(vhdPath); err != nil {
+		return fmt.Errorf("failed to grant vm group access to %s: %w", vhdPath, err)
 	}
 	return nil
 }

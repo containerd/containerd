@@ -16,6 +16,8 @@
 
 package api
 
+import "slices"
+
 //
 // Notes:
 //   Adjustment of metadata that is stored in maps (labels and annotations)
@@ -80,6 +82,17 @@ func (a *ContainerAdjustment) RemoveEnv(key string) {
 	})
 }
 
+// SetArgs overrides the container command with the given arguments.
+func (a *ContainerAdjustment) SetArgs(args []string) {
+	a.Args = slices.Clone(args)
+}
+
+// UpdateArgs overrides the container command with the given arguments.
+// It won't fail if another plugin has already set the command line.
+func (a *ContainerAdjustment) UpdateArgs(args []string) {
+	a.Args = append([]string{""}, args...)
+}
+
 // AddHooks records the addition of the given hooks to a container.
 func (a *ContainerAdjustment) AddHooks(h *Hooks) {
 	a.initHooks()
@@ -126,6 +139,25 @@ func (a *ContainerAdjustment) RemoveDevice(path string) {
 	a.initLinux()
 	a.Linux.Devices = append(a.Linux.Devices, &LinuxDevice{
 		Path: MarkForRemoval(path),
+	})
+}
+
+// AddCDIDevice records the addition of the given CDI device to a container.
+func (a *ContainerAdjustment) AddCDIDevice(d *CDIDevice) {
+	a.CDIDevices = append(a.CDIDevices, d) // TODO: should we dup d here ?
+}
+
+// AddOrReplaceNamespace records the addition or replacement of the given namespace to a container.
+func (a *ContainerAdjustment) AddOrReplaceNamespace(n *LinuxNamespace) {
+	a.initLinuxNamespaces()
+	a.Linux.Namespaces = append(a.Linux.Namespaces, n) // TODO: should we dup n here ?
+}
+
+// RemoveNamespace records the removal of the given namespace from a container.
+func (a *ContainerAdjustment) RemoveNamespace(n *LinuxNamespace) {
+	a.initLinuxNamespaces()
+	a.Linux.Namespaces = append(a.Linux.Namespaces, &LinuxNamespace{
+		Type: MarkForRemoval(n.Type),
 	})
 }
 
@@ -219,6 +251,12 @@ func (a *ContainerAdjustment) SetLinuxCPUSetMems(value string) {
 	a.Linux.Resources.Cpu.Mems = value
 }
 
+// SetLinuxPidLimits records setting the pid max number for a container.
+func (a *ContainerAdjustment) SetLinuxPidLimits(value int64) {
+	a.initLinuxResourcesPids()
+	a.Linux.Resources.Pids.Limit = value
+}
+
 // AddLinuxHugepageLimit records adding a hugepage limit for a container.
 func (a *ContainerAdjustment) AddLinuxHugepageLimit(pageSize string, value uint64) {
 	a.initLinuxResources()
@@ -253,6 +291,24 @@ func (a *ContainerAdjustment) SetLinuxCgroupsPath(value string) {
 	a.Linux.CgroupsPath = value
 }
 
+// SetLinuxOomScoreAdj records setting the kernel's Out-Of-Memory (OOM) killer score for a container.
+func (a *ContainerAdjustment) SetLinuxOomScoreAdj(value *int) {
+	a.initLinux()
+	a.Linux.OomScoreAdj = Int(value) // using Int(value) from ./options.go to optionally allocate a pointer to normalized copy of value
+}
+
+// SetLinuxIOPriority records setting the I/O priority for a container.
+func (a *ContainerAdjustment) SetLinuxIOPriority(ioprio *LinuxIOPriority) {
+	a.initLinux()
+	a.Linux.IoPriority = ioprio
+}
+
+// SetLinuxSeccompPolicy overrides the container seccomp policy with the given arguments.
+func (a *ContainerAdjustment) SetLinuxSeccompPolicy(seccomp *LinuxSeccomp) {
+	a.initLinux()
+	a.Linux.SeccompPolicy = seccomp
+}
+
 //
 // Initializing a container adjustment and container update.
 //
@@ -281,6 +337,13 @@ func (a *ContainerAdjustment) initLinux() {
 	}
 }
 
+func (a *ContainerAdjustment) initLinuxNamespaces() {
+	a.initLinux()
+	if a.Linux.Namespaces == nil {
+		a.Linux.Namespaces = []*LinuxNamespace{}
+	}
+}
+
 func (a *ContainerAdjustment) initLinuxResources() {
 	a.initLinux()
 	if a.Linux.Resources == nil {
@@ -299,6 +362,13 @@ func (a *ContainerAdjustment) initLinuxResourcesCPU() {
 	a.initLinuxResources()
 	if a.Linux.Resources.Cpu == nil {
 		a.Linux.Resources.Cpu = &LinuxCPU{}
+	}
+}
+
+func (a *ContainerAdjustment) initLinuxResourcesPids() {
+	a.initLinuxResources()
+	if a.Linux.Resources.Pids == nil {
+		a.Linux.Resources.Pids = &LinuxPids{}
 	}
 }
 

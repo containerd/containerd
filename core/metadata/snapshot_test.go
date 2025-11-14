@@ -19,10 +19,7 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -30,39 +27,10 @@ import (
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/testutil"
-	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 	"github.com/containerd/errdefs"
-	bolt "go.etcd.io/bbolt"
 )
-
-func newTestSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-	nativeRoot := filepath.Join(root, "native")
-	if err := os.Mkdir(nativeRoot, 0770); err != nil {
-		return nil, nil, err
-	}
-	snapshotter, err := native.NewSnapshotter(nativeRoot)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	db, err := bolt.Open(filepath.Join(root, "metadata.db"), 0660, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sn := NewDB(db, nil, map[string]snapshots.Snapshotter{"native": snapshotter}).Snapshotter("native")
-
-	return sn, func() error {
-		if err := sn.Close(); err != nil {
-			return err
-		}
-		return db.Close()
-	}, nil
-}
 
 func snapshotLease(ctx context.Context, t *testing.T, db *DB, sn string) (context.Context, func(string) bool) {
 	lm := NewLeaseManager(db)
@@ -88,15 +56,6 @@ func snapshotLease(ctx context.Context, t *testing.T, db *DB, sn string) (contex
 		}
 		return false
 	}
-}
-
-func TestMetadata(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("snapshotter not implemented on windows")
-	}
-	// Snapshot tests require mounting, still requires root
-	testutil.RequiresRoot(t)
-	testsuite.SnapshotterSuite(t, "Metadata", newTestSnapshotter)
 }
 
 func TestSnapshotterWithRef(t *testing.T) {

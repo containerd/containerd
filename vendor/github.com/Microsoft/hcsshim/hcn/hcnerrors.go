@@ -23,11 +23,7 @@ var (
 )
 
 func checkForErrors(methodName string, hr error, resultBuffer *uint16) error {
-	errorFound := false
-
-	if hr != nil {
-		errorFound = true
-	}
+	errorFound := hr != nil
 
 	result := ""
 	if resultBuffer != nil {
@@ -39,7 +35,7 @@ func checkForErrors(methodName string, hr error, resultBuffer *uint16) error {
 
 	if errorFound {
 		returnError := new(hr, methodName, result)
-		logrus.Debugf(returnError.Error()) // HCN errors logged for debugging.
+		logrus.Debug(returnError.Error()) // HCN errors logged for debugging.
 		return returnError
 	}
 

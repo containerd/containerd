@@ -28,6 +28,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/image"
@@ -84,6 +85,10 @@ command. As part of this process, we do the following:
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
 		},
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
+		},
 	),
 	Action: func(cliContext *cli.Context) error {
 		var (
@@ -101,7 +106,7 @@ command. As part of this process, we do the following:
 
 		if !cliContext.Bool("local") {
 			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid",
-				"skip-verify", "tlscacert", "tlscert", "tlskey", "http-dump", "http-trace", // RegistryFlags
+				"skip-verify", "tlscacert", "tlscert", "tlskey", // RegistryFlags
 			}
 			for _, s := range unsupportedFlags {
 				if cliContext.IsSet(s) {
@@ -119,19 +124,20 @@ command. As part of this process, we do the following:
 			if err != nil {
 				return err
 			}
-
-			// Set unpack configuration
+			allPlatforms := cliContext.Bool("all-platforms")
+			if len(p) > 0 && allPlatforms {
+				return errors.New("cannot specify both --platform and --all-platforms")
+			}
+			if len(p) == 0 && !allPlatforms {
+				p = append(p, platforms.DefaultSpec())
+			}
+			// we use an empty `Platform` slice to indicate that we want to pull all platforms
+			sopts = append(sopts, image.WithPlatforms(p...))
+			// TODO: Support unpack for all platforms..?
+			// Pass in a *?
 			for _, platform := range p {
 				sopts = append(sopts, image.WithUnpack(platform, cliContext.String("snapshotter")))
 			}
-			if !cliContext.Bool("all-platforms") {
-				if len(p) == 0 {
-					p = append(p, platforms.DefaultSpec())
-				}
-				sopts = append(sopts, image.WithPlatforms(p...))
-			}
-			// TODO: Support unpack for all platforms..?
-			// Pass in a *?
 
 			if cliContext.Bool("metadata-only") {
 				sopts = append(sopts, image.WithAllMetadata)
@@ -146,9 +152,19 @@ command. As part of this process, we do the following:
 				sopts = append(sopts, image.WithImageLabels(commands.LabelArgs(labels)))
 			}
 
-			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(cliContext.String("hosts-dir"))}
+			opts := []registry.Opt{
+				registry.WithCredentials(ch),
+				registry.WithHostDir(cliContext.String("hosts-dir")),
+			}
 			if cliContext.Bool("plain-http") {
 				opts = append(opts, registry.WithDefaultScheme("http"))
+			}
+			logStream := log.G(ctx).Writer()
+			if cliContext.Bool("http-dump") {
+				opts = append(opts, registry.WithHTTPDebug(), registry.WithClientStream(logStream))
+			}
+			if cliContext.Bool("http-trace") {
+				opts = append(opts, registry.WithHTTPTrace(), registry.WithClientStream(logStream))
 			}
 			reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 			if err != nil {
@@ -203,7 +219,7 @@ command. As part of this process, we do the following:
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, cliContext.String("snapshotter"))
+			err = i.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs"))))
 			if err != nil {
 				return err
 			}
@@ -249,9 +265,14 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 		statuses = map[string]*progressNode{}
 		roots    = []*progressNode{}
 		progress transfer.ProgressFunc
-		pc       = make(chan transfer.Progress, 1)
-		status   string
-		closeC   = make(chan struct{})
+		// Use a buffered channel for progress to allow multiple completed
+		// progress updates to be processed before shutting down the progress
+		// handler. Currently the progress stream does not have an explicit
+		// end, however, done indicates the server has already commpleted
+		// sending all progress.
+		pc     = make(chan transfer.Progress, 5)
+		status string
+		closeC = make(chan struct{})
 	)
 
 	progress = func(p transfer.Progress) {
@@ -393,7 +414,7 @@ func displayNode(w io.Writer, prefix string, nodes []*progressNode) int64 {
 		name := prefix + pf + displayName(status.Name)
 
 		switch status.Event {
-		case "downloading", "uploading":
+		case "downloading", "uploading", "extracting":
 			var bar progress.Bar
 			if status.Total > 0.0 {
 				bar = progress.Bar(float64(status.Progress) / float64(status.Total))
@@ -409,7 +430,7 @@ func displayNode(w io.Writer, prefix string, nodes []*progressNode) int64 {
 				name,
 				status.Event,
 				bar)
-		case "complete":
+		case "complete", "extracted":
 			bar := progress.Bar(1.0)
 			fmt.Fprintf(w, "%-40.40s\t%-11s\t%40r\t\n",
 				name,

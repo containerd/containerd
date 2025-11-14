@@ -19,7 +19,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 	"github.com/opencontainers/selinux/go-selinux"
 	"tags.cncf.io/container-device-interface/pkg/cdi"
 
@@ -87,7 +87,7 @@ func (c *criService) initPlatform() (err error) {
 		i, err := cni.New(cni.WithMinNetworkCount(networkAttachCount),
 			cni.WithPluginConfDir(dir),
 			cni.WithPluginMaxConfNum(max),
-			cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
+			cni.WithPluginDir(c.config.NetworkPluginBinDirs))
 		if err != nil {
 			return fmt.Errorf("failed to initialize cni: %w", err)
 		}

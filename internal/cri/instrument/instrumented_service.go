@@ -18,18 +18,16 @@ package instrument
 
 import (
 	"context"
+	"errors"
 
-	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-)
+	"github.com/containerd/containerd/v2/pkg/tracing"
 
-const (
-	// criSpanPrefix is a prefix for CRI server specific spans
-	criSpanPrefix = "pkg.cri.server"
+	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 // criService is an CRI server dependency to be wrapped with instrumentation.
@@ -47,6 +45,9 @@ type GRPCServices interface {
 
 // instrumentedService wraps service with containerd namespace and logs.
 type instrumentedService struct {
+	runtime.UnimplementedRuntimeServiceServer
+	runtime.UnimplementedImageServiceServer
+
 	c criService
 }
 
@@ -62,13 +63,14 @@ func (in *instrumentedService) checkInitialized() error {
 	if in.c.IsInitialized() {
 		return nil
 	}
-	return errdefs.ToGRPCf(errdefs.ErrUnavailable, "server is not initialized yet")
+	return errgrpc.ToGRPCf(errdefs.ErrUnavailable, "server is not initialized yet")
 }
 
 func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (res *runtime.RunPodSandboxResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("RunPodSandbox for %+v", r.GetConfig().GetMetadata())
 	defer func() {
 		if err != nil {
@@ -76,9 +78,10 @@ func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		} else {
 			log.G(ctx).Infof("RunPodSandbox for %+v returns sandbox id %q", r.GetConfig().GetMetadata(), res.GetPodSandboxId())
 		}
+		span.RecordError(err)
 	}()
 	res, err = in.c.RunPodSandbox(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (res *runtime.ListPodSandboxResponse, err error) {
@@ -94,7 +97,7 @@ func (in *instrumentedService) ListPodSandbox(ctx context.Context, r *runtime.Li
 		}
 	}()
 	res, err = in.c.ListPodSandbox(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandboxStatusRequest) (res *runtime.PodSandboxStatusResponse, err error) {
@@ -110,13 +113,14 @@ func (in *instrumentedService) PodSandboxStatus(ctx context.Context, r *runtime.
 		}
 	}()
 	res, err = in.c.PodSandboxStatus(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (_ *runtime.StopPodSandboxResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("StopPodSandbox for %q", r.GetPodSandboxId())
 	defer func() {
 		if err != nil {
@@ -124,15 +128,17 @@ func (in *instrumentedService) StopPodSandbox(ctx context.Context, r *runtime.St
 		} else {
 			log.G(ctx).Infof("StopPodSandbox for %q returns successfully", r.GetPodSandboxId())
 		}
+		span.RecordError(err)
 	}()
 	res, err := in.c.StopPodSandbox(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodSandboxRequest) (_ *runtime.RemovePodSandboxResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("RemovePodSandbox for %q", r.GetPodSandboxId())
 	defer func() {
 		if err != nil {
@@ -140,9 +146,10 @@ func (in *instrumentedService) RemovePodSandbox(ctx context.Context, r *runtime.
 		} else {
 			log.G(ctx).Infof("RemovePodSandbox %q returns successfully", r.GetPodSandboxId())
 		}
+		span.RecordError(err)
 	}()
 	res, err := in.c.RemovePodSandbox(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (res *runtime.PortForwardResponse, err error) {
@@ -158,13 +165,14 @@ func (in *instrumentedService) PortForward(ctx context.Context, r *runtime.PortF
 		}
 	}()
 	res, err = in.c.PortForward(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (res *runtime.CreateContainerResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("CreateContainer within sandbox %q for container %+v",
 		r.GetPodSandboxId(), r.GetConfig().GetMetadata())
 	defer func() {
@@ -175,15 +183,17 @@ func (in *instrumentedService) CreateContainer(ctx context.Context, r *runtime.C
 			log.G(ctx).Infof("CreateContainer within sandbox %q for %+v returns container id %q",
 				r.GetPodSandboxId(), r.GetConfig().GetMetadata(), res.GetContainerId())
 		}
+		span.RecordError(err)
 	}()
 	res, err = in.c.CreateContainer(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (_ *runtime.StartContainerResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("StartContainer for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
@@ -191,9 +201,10 @@ func (in *instrumentedService) StartContainer(ctx context.Context, r *runtime.St
 		} else {
 			log.G(ctx).Infof("StartContainer for %q returns successfully", r.GetContainerId())
 		}
+		span.RecordError(err)
 	}()
 	res, err := in.c.StartContainer(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ListContainers(ctx context.Context, r *runtime.ListContainersRequest) (res *runtime.ListContainersResponse, err error) {
@@ -210,7 +221,7 @@ func (in *instrumentedService) ListContainers(ctx context.Context, r *runtime.Li
 		}
 	}()
 	res, err = in.c.ListContainers(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ContainerStatus(ctx context.Context, r *runtime.ContainerStatusRequest) (res *runtime.ContainerStatusResponse, err error) {
@@ -226,13 +237,14 @@ func (in *instrumentedService) ContainerStatus(ctx context.Context, r *runtime.C
 		}
 	}()
 	res, err = in.c.ContainerStatus(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (res *runtime.StopContainerResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("StopContainer for %q with timeout %d (s)", r.GetContainerId(), r.GetTimeout())
 	defer func() {
 		if err != nil {
@@ -240,15 +252,17 @@ func (in *instrumentedService) StopContainer(ctx context.Context, r *runtime.Sto
 		} else {
 			log.G(ctx).Infof("StopContainer for %q returns successfully", r.GetContainerId())
 		}
+		span.RecordError(err)
 	}()
 	res, err = in.c.StopContainer(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (res *runtime.RemoveContainerResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("RemoveContainer for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
@@ -256,15 +270,17 @@ func (in *instrumentedService) RemoveContainer(ctx context.Context, r *runtime.R
 		} else {
 			log.G(ctx).Infof("RemoveContainer for %q returns successfully", r.GetContainerId())
 		}
+		span.RecordError(err)
 	}()
 	res, err = in.c.RemoveContainer(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (res *runtime.ExecSyncResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Debugf("ExecSync for %q with command %+v and timeout %d (s)", r.GetContainerId(), r.GetCmd(), r.GetTimeout())
 	defer func() {
 		if err != nil {
@@ -272,15 +288,17 @@ func (in *instrumentedService) ExecSync(ctx context.Context, r *runtime.ExecSync
 		} else {
 			log.G(ctx).Tracef("ExecSync for %q returns with exit code %d", r.GetContainerId(), res.GetExitCode())
 		}
+		span.RecordError(err)
 	}()
 	res, err = in.c.ExecSync(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) Exec(ctx context.Context, r *runtime.ExecRequest) (res *runtime.ExecResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Debugf("Exec for %q with command %+v, tty %v and stdin %v",
 		r.GetContainerId(), r.GetCmd(), r.GetTty(), r.GetStdin())
 	defer func() {
@@ -289,15 +307,17 @@ func (in *instrumentedService) Exec(ctx context.Context, r *runtime.ExecRequest)
 		} else {
 			log.G(ctx).Debugf("Exec for %q returns URL %q", r.GetContainerId(), res.GetUrl())
 		}
+		span.RecordError(err)
 	}()
 	res, err = in.c.Exec(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) Attach(ctx context.Context, r *runtime.AttachRequest) (res *runtime.AttachResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Debugf("Attach for %q with tty %v and stdin %v", r.GetContainerId(), r.GetTty(), r.GetStdin())
 	defer func() {
 		if err != nil {
@@ -305,9 +325,10 @@ func (in *instrumentedService) Attach(ctx context.Context, r *runtime.AttachRequ
 		} else {
 			log.G(ctx).Debugf("Attach for %q returns URL %q", r.GetContainerId(), res.Url)
 		}
+		span.RecordError(err)
 	}()
 	res, err = in.c.Attach(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) UpdateContainerResources(ctx context.Context, r *runtime.UpdateContainerResourcesRequest) (res *runtime.UpdateContainerResourcesResponse, err error) {
@@ -323,15 +344,14 @@ func (in *instrumentedService) UpdateContainerResources(ctx context.Context, r *
 		}
 	}()
 	res, err = in.c.UpdateContainerResources(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (res *runtime.PullImageResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "PullImage"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("PullImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -340,18 +360,16 @@ func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullIma
 			log.G(ctx).Infof("PullImage %q returns image reference %q",
 				r.GetImage().GetImage(), res.GetImageRef())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err = in.c.PullImage(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (res *runtime.ListImagesResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ListImages"))
-	defer span.End()
 	log.G(ctx).Tracef("ListImages with filter %+v", r.GetFilter())
 	defer func() {
 		if err != nil {
@@ -360,18 +378,15 @@ func (in *instrumentedService) ListImages(ctx context.Context, r *runtime.ListIm
 			log.G(ctx).Tracef("ListImages with filter %+v returns image list %+v",
 				r.GetFilter(), res.GetImages())
 		}
-		span.SetStatus(err)
 	}()
 	res, err = in.c.ListImages(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (res *runtime.ImageStatusResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageStatus"))
-	defer span.End()
 	log.G(ctx).Tracef("ImageStatus for %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -380,18 +395,16 @@ func (in *instrumentedService) ImageStatus(ctx context.Context, r *runtime.Image
 			log.G(ctx).Tracef("ImageStatus for %q returns image status %+v",
 				r.GetImage().GetImage(), res.GetImage())
 		}
-		span.SetStatus(err)
 	}()
 	res, err = in.c.ImageStatus(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (_ *runtime.RemoveImageResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "RemoveImage"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("RemoveImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -399,18 +412,16 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 		} else {
 			log.G(ctx).Infof("RemoveImage %q returns successfully", r.GetImage().GetImage())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err := in.c.RemoveImage(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (res *runtime.ImageFsInfoResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageFsInfo"))
-	defer span.End()
 	log.G(ctx).Tracef("ImageFsInfo")
 	defer func() {
 		if err != nil {
@@ -418,10 +429,9 @@ func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.Image
 		} else {
 			log.G(ctx).Tracef("ImageFsInfo returns filesystem info %+v", res.ImageFilesystems)
 		}
-		span.SetStatus(err)
 	}()
 	res, err = in.c.ImageFsInfo(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) PodSandboxStats(ctx context.Context, r *runtime.PodSandboxStatsRequest) (res *runtime.PodSandboxStatsResponse, err error) {
@@ -437,7 +447,7 @@ func (in *instrumentedService) PodSandboxStats(ctx context.Context, r *runtime.P
 		}
 	}()
 	res, err = in.c.PodSandboxStats(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ContainerStats(ctx context.Context, r *runtime.ContainerStatsRequest) (res *runtime.ContainerStatsResponse, err error) {
@@ -453,7 +463,7 @@ func (in *instrumentedService) ContainerStats(ctx context.Context, r *runtime.Co
 		}
 	}()
 	res, err = in.c.ContainerStats(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ListPodSandboxStats(ctx context.Context, r *runtime.ListPodSandboxStatsRequest) (res *runtime.ListPodSandboxStatsResponse, err error) {
@@ -469,7 +479,7 @@ func (in *instrumentedService) ListPodSandboxStats(ctx context.Context, r *runti
 		}
 	}()
 	res, err = in.c.ListPodSandboxStats(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ListContainerStats(ctx context.Context, r *runtime.ListContainerStatsRequest) (res *runtime.ListContainerStatsResponse, err error) {
@@ -485,7 +495,7 @@ func (in *instrumentedService) ListContainerStats(ctx context.Context, r *runtim
 		}
 	}()
 	res, err = in.c.ListContainerStats(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) Status(ctx context.Context, r *runtime.StatusRequest) (res *runtime.StatusResponse, err error) {
@@ -501,7 +511,7 @@ func (in *instrumentedService) Status(ctx context.Context, r *runtime.StatusRequ
 		}
 	}()
 	res, err = in.c.Status(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) Version(ctx context.Context, r *runtime.VersionRequest) (res *runtime.VersionResponse, err error) {
@@ -517,7 +527,7 @@ func (in *instrumentedService) Version(ctx context.Context, r *runtime.VersionRe
 		}
 	}()
 	res, err = in.c.Version(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateRuntimeConfigRequest) (res *runtime.UpdateRuntimeConfigResponse, err error) {
@@ -533,7 +543,7 @@ func (in *instrumentedService) UpdateRuntimeConfig(ctx context.Context, r *runti
 		}
 	}()
 	res, err = in.c.UpdateRuntimeConfig(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (res *runtime.ReopenContainerLogResponse, err error) {
@@ -549,7 +559,7 @@ func (in *instrumentedService) ReopenContainerLog(ctx context.Context, r *runtim
 		}
 	}()
 	res, err = in.c.ReopenContainerLog(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (res *runtime.CheckpointContainerResponse, err error) {
@@ -566,7 +576,7 @@ func (in *instrumentedService) CheckpointContainer(ctx context.Context, r *runti
 	}()
 
 	res, err = in.c.CheckpointContainer(ctrdutil.WithNamespace(ctx), r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) (err error) {
@@ -584,7 +594,7 @@ func (in *instrumentedService) GetContainerEvents(r *runtime.GetEventsRequest, s
 	}()
 
 	err = in.c.GetContainerEvents(r, s)
-	return errdefs.ToGRPC(err)
+	return errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ListMetricDescriptors(ctx context.Context, r *runtime.ListMetricDescriptorsRequest) (res *runtime.ListMetricDescriptorsResponse, err error) {
@@ -601,7 +611,7 @@ func (in *instrumentedService) ListMetricDescriptors(ctx context.Context, r *run
 	}()
 
 	res, err = in.c.ListMetricDescriptors(ctx, r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (res *runtime.ListPodSandboxMetricsResponse, err error) {
@@ -618,7 +628,7 @@ func (in *instrumentedService) ListPodSandboxMetrics(ctx context.Context, r *run
 	}()
 
 	res, err = in.c.ListPodSandboxMetrics(ctx, r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
 }
 
 func (in *instrumentedService) RuntimeConfig(ctx context.Context, r *runtime.RuntimeConfigRequest) (res *runtime.RuntimeConfigResponse, err error) {
@@ -634,5 +644,9 @@ func (in *instrumentedService) RuntimeConfig(ctx context.Context, r *runtime.Run
 		}
 	}()
 	res, err = in.c.RuntimeConfig(ctx, r)
-	return res, errdefs.ToGRPC(err)
+	return res, errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) UpdatePodSandboxResources(ctx context.Context, r *runtime.UpdatePodSandboxResourcesRequest) (res *runtime.UpdatePodSandboxResourcesResponse, err error) {
+	return nil, errors.New("not implemented yet")
 }

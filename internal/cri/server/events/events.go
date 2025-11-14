@@ -25,10 +25,10 @@ import (
 
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	"k8s.io/utils/clock"
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/containerd/v2/internal/cri/clock"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 )
 
@@ -121,16 +121,13 @@ func convertEvent(e typeurl.Any) (string, interface{}, error) {
 // event monitor.
 //
 // NOTE:
-//  1. Start must be called after Subscribe.
-//  2. The task exit event has been handled in individual startSandboxExitMonitor
-//     or startContainerExitMonitor goroutine at the first. If the goroutine fails,
-//     it puts the event into backoff retry queue and event monitor will handle
-//     it later.
+//
+//	The task exit event has been handled in individual startSandboxExitMonitor
+//	or startContainerExitMonitor goroutine at the first. If the goroutine fails,
+//	it puts the event into backoff retry queue and event monitor will handle
+//	it later.
 func (em *EventMonitor) Start() <-chan error {
 	errCh := make(chan error)
-	if em.ch == nil || em.errCh == nil {
-		panic("event channel is nil")
-	}
 	backOffCheckCh := em.backOff.start()
 	go func() {
 		defer close(errCh)
@@ -175,6 +172,16 @@ func (em *EventMonitor) Start() <-chan error {
 						}
 					}
 				}
+			case <-em.ctx.Done():
+				if em.errCh == nil {
+					return
+				}
+
+				if err := <-em.errCh; err != nil {
+					log.L.WithError(err).Error("Failed to handle event stream")
+					errCh <- err
+				}
+				return
 			}
 		}
 	}()
@@ -237,7 +244,7 @@ func (b *backOff) enBackOff(key string, evt interface{}) {
 	b.queuePool[key] = newBackOffQueue([]interface{}{evt}, b.minDuration, b.clock)
 }
 
-// enBackOff get out the whole queue
+// deBackOff get out the whole queue
 func (b *backOff) deBackOff(key string) *backOffQueue {
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
@@ -252,10 +259,7 @@ func (b *backOff) reBackOff(key string, events []interface{}, oldDuration time.D
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
 
-	duration := 2 * oldDuration
-	if duration > b.maxDuration {
-		duration = b.maxDuration
-	}
+	duration := min(2*oldDuration, b.maxDuration)
 	b.queuePool[key] = newBackOffQueue(events, duration, b.clock)
 }
 

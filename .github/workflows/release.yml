@@ -13,7 +13,7 @@ on:
 name: Release
 
 env:
-  GO_VERSION: "1.22.5"
+  GO_VERSION: "1.24.9"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
@@ -22,20 +22,23 @@ jobs:
   check:
     name: Check Signed Tag
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       stringver: ${{ steps.contentrel.outputs.stringver }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
 
       - name: Check signature
         run: |
+          # git tag -v requires an allowedSignersFile to be configured and exist for ssh signature verification
+          touch ${{ runner.temp }}/empty-allowedSignersFile
+          git config --global gpg.ssh.allowedSignersFile ${{ runner.temp }}/empty-allowedSignersFile
           releasever=${{ github.ref }}
           releasever="${releasever#refs/tags/}"
           TAGCHECK=$(git tag -v ${releasever} 2>&1 >/dev/null) ||
@@ -57,32 +60,29 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
       - name: Save release notes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: containerd-release-notes
           path: src/github.com/containerd/containerd/release-notes.md
 
   build:
     name: Build Release Binaries
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       matrix:
         include:
-          # Ubuntu 22.04 can't be used until we drop support for binary compatibility with dynamically-linked glibc 2.17 (CentOS 7).
-          # https://github.com/containerd/containerd/issues/7255
-          # https://github.com/containerd/containerd/issues/7961
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/amd64
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/arm64
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/ppc64le
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/s390x
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/riscv64
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: windows/amd64
     steps:
       - name: Set RELEASE_VER
@@ -93,7 +93,7 @@ jobs:
           releasever="${releasever#refs/tags/}"
           echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
       - name: Checkout containerd
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           # Intentionally use github.repository instead of containerd/containerd to
           # make this action runnable on forks.
@@ -103,10 +103,10 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - name: Setup buildx instance
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
           use: true
-      - uses: crazy-max/ghaction-github-runtime@v3 # sets up needed vars for caching to github
+      - uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124 # v3.1.0
       - name: Make
         shell: bash
         run: |
@@ -127,7 +127,7 @@ jobs:
         env:
           PLATFORM: ${{ matrix.dockerfile-platform }}
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: release-tars-${{env.PLATFORM_CLEAN}}
           path: src/github.com/containerd/containerd/releases/*.tar.gz*
@@ -137,16 +137,25 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    runs-on: ubuntu-24.04
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [build, check]
     steps:
       - name: Download builds and release notes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           path: builds
+      - name: Attest Artifacts
+        id: attest
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-path: ./builds/release-tars-**/*.tar.gz
+      - name: Rename attestation artifact
+        run: mv ${{ steps.attest.outputs.bundle-path }} containerd-${{ needs.check.outputs.stringver }}-attestation.intoto.jsonl
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2.4.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: true
@@ -156,4 +165,5 @@ jobs:
           body_path: ./builds/containerd-release-notes/release-notes.md
           files: |
             builds/release-tars-**/*
-          make_latest: false
+            containerd-*-attestation.intoto.jsonl
+          make_latest: true

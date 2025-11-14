@@ -194,7 +194,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			}
 		} else {
 			if sameFile != nil {
-				sameFile.count++
+				sameFile.bumpCount(1)
 				i.dest(sameFile, nil)
 				continue
 			}
@@ -202,10 +202,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				return fmt.Errorf("containerd-shim: opening file %q failed: %w", i.name, err)
 			}
 			if stdout == stderr {
-				sameFile = &countingWriteCloser{
-					WriteCloser: fw,
-					count:       1,
-				}
+				sameFile = newCountingWriteCloser(fw, 1)
 			}
 		}
 		i.dest(fw, fr)
@@ -233,11 +230,24 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 // countingWriteCloser masks io.Closer() until close has been invoked a certain number of times.
 type countingWriteCloser struct {
 	io.WriteCloser
-	count int64
+	count atomic.Int64
+}
+
+func newCountingWriteCloser(c io.WriteCloser, count int64) *countingWriteCloser {
+	cwc := &countingWriteCloser{
+		c,
+		atomic.Int64{},
+	}
+	cwc.bumpCount(count)
+	return cwc
+}
+
+func (c *countingWriteCloser) bumpCount(delta int64) int64 {
+	return c.count.Add(delta)
 }
 
 func (c *countingWriteCloser) Close() error {
-	if atomic.AddInt64(&c.count, -1) > 0 {
+	if c.bumpCount(-1) > 0 {
 		return nil
 	}
 	return c.WriteCloser.Close()
