@@ -26,17 +26,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/mount"
+	mountmanager "github.com/containerd/containerd/v2/core/mount/manager"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
+	"github.com/containerd/containerd/v2/internal/dmverity"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/pkg/archive/tartest"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins/content/local"
 	erofsdiffer "github.com/containerd/containerd/v2/plugins/diff/erofs"
+	erofsmount "github.com/containerd/containerd/v2/plugins/mount/erofs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -353,4 +361,240 @@ func createTestTarContent() io.ReadCloser {
 
 	// Return the tar as a ReadCloser
 	return tartest.TarFromWriterTo(tarWriter)
+}
+
+// TestCreateErofsMount tests mount creation without dm-verity
+func TestCreateErofsMount(t *testing.T) {
+	tmpDir := t.TempDir()
+	layerBlob := filepath.Join(tmpDir, "layer.erofs")
+	require.NoError(t, os.WriteFile(layerBlob, []byte{}, 0644))
+
+	s := &snapshotter{
+		root:         tmpDir,
+		dmverityMode: "off",
+	}
+
+	t.Run("creates regular erofs mount", func(t *testing.T) {
+		m, err := s.createErofsMount(layerBlob)
+		require.NoError(t, err)
+
+		assert.Equal(t, "erofs", m.Type)
+		assert.Equal(t, layerBlob, m.Source)
+		// No X-containerd.dmverity option needed since no .dmverity metadata exists
+		assert.Equal(t, []string{"ro", "loop"}, m.Options)
+	})
+
+	t.Run("always returns erofs mount type", func(t *testing.T) {
+		s.dmverityMode = "on"
+		metadataFile := layerBlob + ".dmverity"
+		metadataContent := `{
+  "roothash": "fedcba098765432109876543210987654321098765432109876543210987",
+  "hashoffset": 4096
+}`
+		require.NoError(t, os.WriteFile(metadataFile, []byte(metadataContent), 0644))
+
+		m, err := s.createErofsMount(layerBlob)
+		require.NoError(t, err)
+		// Mount type is always "erofs" - dm-verity detection happens in mount handler
+		assert.Equal(t, "erofs", m.Type)
+		assert.Equal(t, layerBlob, m.Source)
+		assert.Contains(t, m.Options, "ro")
+		assert.Contains(t, m.Options, "loop")
+	})
+
+	t.Run("mode off skips dm-verity even when metadata exists", func(t *testing.T) {
+		// Create a layer with .dmverity metadata
+		metadataFile := layerBlob + ".dmverity"
+		metadataContent := `{
+  "roothash": "fedcba098765432109876543210987654321098765432109876543210987",
+  "hashoffset": 4096
+}`
+		require.NoError(t, os.WriteFile(metadataFile, []byte(metadataContent), 0644))
+
+		// Set mode to "off"
+		s.dmverityMode = "off"
+
+		m, err := s.createErofsMount(layerBlob)
+		require.NoError(t, err)
+
+		assert.Equal(t, "erofs", m.Type)
+		assert.Equal(t, layerBlob, m.Source)
+		// The mount options should include X-containerd.dmverity=off to tell
+		// the mount handler to skip dm-verity even though metadata exists
+		assert.Contains(t, m.Options, "X-containerd.dmverity=off")
+	})
+}
+
+// TestDmverityEndToEnd tests the full workflow: differ creates dm-verity layer,
+// snapshotter mounts it via mount manager, and cleanup on removal
+func TestDmverityEndToEnd(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	// Check if dm-verity is supported
+	supported, err := dmverity.IsSupported()
+	if err != nil || !supported {
+		t.Skip("dm-verity is not supported on this system")
+	}
+
+	t.Run("with regular mode", func(t *testing.T) {
+		testDmverityEndToEndWithMode(t, false)
+	})
+
+	// Check if tar index mode is supported
+	tarSupported, err := erofsutils.SupportGenerateFromTar()
+	if err == nil && tarSupported {
+		t.Run("with tar index mode", func(t *testing.T) {
+			testDmverityEndToEndWithMode(t, true)
+		})
+	} else {
+		t.Logf("Skipping tar index mode test: mkfs.erofs does not support tar mode")
+	}
+}
+
+func testDmverityEndToEndWithMode(t *testing.T, useTarIndex bool) {
+	ctx := context.Background()
+	ctx = namespaces.WithNamespace(ctx, "test")
+	tempDir := t.TempDir()
+
+	// Create mount manager database
+	metadb := filepath.Join(tempDir, "mounts.db")
+	db, err := bolt.Open(metadb, 0600, nil)
+	require.NoError(t, err)
+	defer db.Close()
+
+	// Create mount manager with dm-verity support
+	mountTargetDir := filepath.Join(tempDir, "mount-manager")
+	mgr, err := mountmanager.NewManager(db, mountTargetDir,
+		mountmanager.WithMountHandler("erofs", erofsmount.NewErofsMountHandler()))
+	require.NoError(t, err)
+
+	// Create content store for the differ
+	contentStore, err := local.NewStore(filepath.Join(tempDir, "content"))
+	require.NoError(t, err)
+
+	// Create EROFS differ with dm-verity enabled and optional tar index mode
+	var differOpts []erofsdiffer.DifferOpt
+	differOpts = append(differOpts, erofsdiffer.WithDmverity())
+	if useTarIndex {
+		differOpts = append(differOpts, erofsdiffer.WithTarIndexMode())
+	}
+	differ := erofsdiffer.NewErofsDiffer(contentStore, differOpts...)
+
+	// Create EROFS snapshotter with dm-verity enabled
+	snapshotRoot := filepath.Join(tempDir, "snapshots")
+	sn, err := NewSnapshotter(snapshotRoot, WithDmverityMode("on"))
+	require.NoError(t, err)
+	defer sn.Close()
+
+	s := sn.(*snapshotter)
+
+	// Create test tar content
+	tarReader := createTestTarContent()
+	defer tarReader.Close()
+
+	// Read the tar content into a buffer
+	tarContent, err := io.ReadAll(tarReader)
+	require.NoError(t, err)
+
+	// Write tar content to content store
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayerGzip,
+		Digest:    digest.FromBytes(tarContent),
+		Size:      int64(len(tarContent)),
+	}
+
+	writer, err := contentStore.Writer(ctx,
+		content.WithRef("test-layer"),
+		content.WithDescriptor(desc))
+	require.NoError(t, err)
+
+	_, err = writer.Write(tarContent)
+	require.NoError(t, err)
+
+	err = writer.Commit(ctx, desc.Size, desc.Digest)
+	require.NoError(t, err)
+	writer.Close()
+
+	// Prepare snapshot
+	snapshotKey := "test-snapshot"
+	mounts, err := sn.Prepare(ctx, snapshotKey, "")
+	require.NoError(t, err)
+
+	// Apply layer using differ (creates EROFS + dm-verity)
+	_, err = differ.Apply(ctx, desc, mounts)
+	require.NoError(t, err)
+
+	// Commit the snapshot
+	commitKey := "test-commit"
+	err = sn.Commit(ctx, commitKey, snapshotKey)
+	require.NoError(t, err)
+
+	// Get snapshot ID
+	var snapshotID string
+	err = s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		var err error
+		snapshotID, _, _, err = storage.GetInfo(ctx, commitKey)
+		return err
+	})
+	require.NoError(t, err)
+
+	// Verify dm-verity metadata was created by differ
+	layerPath := s.layerBlobPath(snapshotID)
+	metadataPath := layerPath + ".dmverity"
+
+	metadataData, err := os.ReadFile(metadataPath)
+	require.NoError(t, err, ".dmverity file should exist")
+	require.NotEmpty(t, metadataData, "metadata should not be empty")
+
+	// Create a view and mount it (uses mount manager with dm-verity)
+	viewKey := "test-view"
+	viewMounts, err := sn.View(ctx, viewKey, commitKey)
+	require.NoError(t, err)
+
+	// Verify the mount type is regular erofs (dm-verity is handled by mount handler)
+	require.Len(t, viewMounts, 1)
+	assert.Equal(t, "erofs", viewMounts[0].Type)
+	assert.Contains(t, viewMounts[0].Options, "ro")
+	assert.Contains(t, viewMounts[0].Options, "loop")
+
+	// Use mount manager to mount the view (EROFS mount handler will detect and activate dm-verity)
+	viewTarget := filepath.Join(tempDir, "view-mount")
+	require.NoError(t, os.MkdirAll(viewTarget, 0755))
+
+	mountID := "test-view-mount"
+	activateInfo, err := mgr.Activate(ctx, mountID, viewMounts)
+	require.NoError(t, err)
+
+	// EROFS handler mounts directly, check Active mounts for the actual mount point
+	require.Len(t, activateInfo.Active, 1, "should have one active mount from EROFS handler")
+	actualMountPoint := activateInfo.Active[0].MountPoint
+	require.NotEmpty(t, actualMountPoint, "mount point should be set by EROFS handler")
+
+	// Verify we can read test files from the dm-verity protected filesystem
+	testData, err := os.ReadFile(filepath.Join(actualMountPoint, "test-file.txt"))
+	require.NoError(t, err, "should be able to read test file from dm-verity mount")
+	assert.Equal(t, testFileContent, string(testData))
+
+	nestedData, err := os.ReadFile(filepath.Join(actualMountPoint, "testdir", "nested.txt"))
+	require.NoError(t, err, "should be able to read nested file from dm-verity mount")
+	assert.Equal(t, testNestedFileContent, string(nestedData))
+
+	// Cleanup: deactivate and remove snapshots
+	err = mgr.Deactivate(ctx, mountID)
+	require.NoError(t, err)
+
+	// Remove the view first (child must be removed before parent)
+	err = sn.Remove(ctx, viewKey)
+	require.NoError(t, err)
+
+	// Remove the committed snapshot
+	err = sn.Remove(ctx, commitKey)
+	require.NoError(t, err)
+
+	// Verify snapshot was removed
+	err = s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		_, err := storage.GetSnapshot(ctx, commitKey)
+		return err
+	})
+	assert.Error(t, err, "snapshot should be removed from metadata")
 }

@@ -4,6 +4,11 @@ dario.cat/mergo
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
 ## explicit; go 1.20
 github.com/AdaLogics/go-fuzz-headers
+# github.com/ChengyuZhu6/veritysetup-go v0.0.0-20251103052406-76d6bed62130
+## explicit; go 1.24.3
+github.com/ChengyuZhu6/veritysetup-go/pkg/dm
+github.com/ChengyuZhu6/veritysetup-go/pkg/utils
+github.com/ChengyuZhu6/veritysetup-go/pkg/verity
 # github.com/Microsoft/go-winio v0.6.2
 ## explicit; go 1.21
 github.com/Microsoft/go-winio

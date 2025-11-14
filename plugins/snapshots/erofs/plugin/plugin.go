@@ -46,6 +46,10 @@ type Config struct {
 
 	// DefaultSize is the default size of a writable layer in string
 	DefaultSize string `toml:"default_size"`
+
+	// DmverityMode controls dm-verity behavior: "auto" (use if available), "on" (require), "off" (disable)
+	// Linux only
+	DmverityMode string `toml:"dmverity_mode"`
 }
 
 func init() {
@@ -85,6 +89,11 @@ func init() {
 					return nil, fmt.Errorf("failed to parse default_size '%v': %w", config.DefaultSize, err)
 				}
 				opts = append(opts, erofs.WithDefaultSize(size))
+			}
+
+			// Handle dm-verity mode configuration
+			if config.DmverityMode != "" {
+				opts = append(opts, erofs.WithDmverityMode(config.DmverityMode))
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root

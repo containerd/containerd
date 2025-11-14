@@ -92,6 +92,18 @@ func (m *Mount) mount(target string) (err error) {
 		options   = m.Options
 	)
 
+	// Filter out X-containerd.* options which are meant for mount manager/handlers,
+	// not for the kernel mount syscall. Be specific about which options to filter.
+	filteredOptions := make([]string, 0, len(options))
+	for _, opt := range options {
+		// Skip known mount handler options
+		if strings.HasPrefix(opt, "X-containerd.dmverity=") {
+			continue
+		}
+		filteredOptions = append(filteredOptions, opt)
+	}
+	options = filteredOptions
+
 	opt := parseMountOptions(options)
 	// The only remapping of both GID and UID is supported
 	if opt.uidmap != "" && opt.gidmap != "" {

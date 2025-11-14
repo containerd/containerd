@@ -5,6 +5,7 @@ go 1.24.3
 require (
 	dario.cat/mergo v1.0.2
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
+	github.com/ChengyuZhu6/veritysetup-go v0.0.0-20251103052406-76d6bed62130
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/Microsoft/hcsshim v0.14.0-rc.1
 	github.com/checkpoint-restore/checkpointctl v1.4.0
