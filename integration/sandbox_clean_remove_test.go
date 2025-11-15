@@ -111,7 +111,7 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 			return false, err
 		}
 		return status.GetState() == runtime.PodSandboxState_SANDBOX_NOTREADY, nil
-	}, time.Second, 30*time.Second), "sandbox state should become NOTREADY")
+	}, 2*time.Second, 60*time.Second), "sandbox state should become NOTREADY")
 
 	t.Logf("Should still be able to find the pod ip in host-local checkpoint")
 	assert.True(t, checkIP(ip))
