@@ -164,7 +164,7 @@ github.com/containerd/go-cni
 # github.com/containerd/go-runc v1.1.0
 ## explicit; go 1.18
 github.com/containerd/go-runc
-# github.com/containerd/imgcrypt/v2 v2.0.1
+# github.com/containerd/imgcrypt/v2 v2.0.2
 ## explicit; go 1.23.0
 github.com/containerd/imgcrypt/v2
 github.com/containerd/imgcrypt/v2/images/encryption
