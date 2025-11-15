@@ -85,21 +85,12 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 	return d
 }
 
-// A valid EROFS native layer media type should end with ".erofs".
-//
-// Please avoid using any +suffix to list the algorithms used inside EROFS
-// blobs, since:
-//   - Each EROFS layer can use multiple compression algorithms;
-//   - The suffixes should only indicate the corresponding preprocessor for
-//     `images.DiffCompression`.
-//
-// Since `images.DiffCompression` doesn't support arbitrary media types,
-// disallow non-empty suffixes for now.
+// isErofsMediaType reports true if the base media type (without any +suffixes)
+// denotes an EROFS layer type. Optional +suffixes (e.g., +zstd, +gzip) are
+// structured syntax suffixes indicating blob stream compression and are handled
+// by the diff processor chain (see images.DiffCompression).
 func isErofsMediaType(mt string) bool {
-	mediaType, _, hasExt := strings.Cut(mt, "+")
-	if hasExt {
-		return false
-	}
+	mediaType, _, _ := strings.Cut(mt, "+")
 	return strings.HasSuffix(mediaType, ".erofs")
 }
 
@@ -118,7 +109,9 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 
 	native := false
 	if isErofsMediaType(desc.MediaType) {
-		native = true
+		if compressed, _ := images.DiffCompression(ctx, desc.MediaType); compressed == "" {
+			native = true
+		}
 	} else if _, err := images.DiffCompression(ctx, desc.MediaType); err != nil {
 		return emptyDesc, fmt.Errorf("currently unsupported media type: %s", desc.MediaType)
 	}
@@ -156,6 +149,47 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	}
 
 	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
+	mediaType, _, _ := strings.Cut(desc.MediaType, "+")
+	if strings.HasSuffix(mediaType, ".erofs") {
+		for {
+			if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
+				return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
+			}
+			if processor.MediaType() == ocispec.MediaTypeImageLayer {
+				break
+			}
+		}
+		defer processor.Close()
+
+		digester := digest.Canonical.Digester()
+		rc := &readCounter{
+			r: io.TeeReader(processor, digester.Hash()),
+		}
+
+		f, err := os.Create(layerBlobPath)
+		if err != nil {
+			return emptyDesc, err
+		}
+		if _, err := io.Copy(f, rc); err != nil {
+			f.Close()
+			return emptyDesc, err
+		}
+		if err := f.Close(); err != nil {
+			return emptyDesc, err
+		}
+		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer by decompressing EROFS blob")
+
+		if _, err := io.Copy(io.Discard, rc); err != nil {
+			return emptyDesc, err
+		}
+
+		return ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Size:      rc.c,
+			Digest:    digester.Digest(),
+		}, nil
+	}
+
 	for {
 		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
 			return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
