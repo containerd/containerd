@@ -290,12 +290,12 @@ func cleanupSockets(ctx context.Context) {
 	}
 	if len(socketFlag) > 0 {
 		_ = RemoveSocket("unix://" + socketFlag)
-	} else if address, err := SocketAddress(ctx, addressFlag, id, false); err == nil {
+	} else if address, err := SocketAddress(ctx, addressFlag, ID, false); err == nil {
 		_ = RemoveSocket(address)
 	}
 	if len(debugSocketFlag) > 0 {
 		_ = RemoveSocket("unix://" + debugSocketFlag)
-	} else if address, err := SocketAddress(ctx, addressFlag, id, true); err == nil {
+	} else if address, err := SocketAddress(ctx, addressFlag, ID, true); err == nil {
 		_ = RemoveSocket(address)
 	}
 }
