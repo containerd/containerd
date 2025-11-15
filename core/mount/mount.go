@@ -131,21 +131,42 @@ func readonlyMounts(mounts []Mount) []Mount {
 // https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html#multiple-lower-layers
 func readonlyOverlay(opt []string) []string {
 	out := make([]string, 0, len(opt))
-	upper := ""
+	//upper := ""
 	for _, o := range opt {
-		if strings.HasPrefix(o, "upperdir=") {
-			upper = strings.TrimPrefix(o, "upperdir=")
-		} else if !strings.HasPrefix(o, "workdir=") {
+		//if strings.HasPrefix(o, "upperdir=") {
+			//upper = strings.TrimPrefix(o, "upperdir=")
+		//} else 
+		if !strings.HasPrefix(o, "workdir=") {
 			out = append(out, o)
 		}
 	}
-	if upper != "" {
-		for i, o := range out {
-			if strings.HasPrefix(o, "lowerdir=") {
-				out[i] = "lowerdir=" + upper + ":" + strings.TrimPrefix(o, "lowerdir=")
-			}
-		}
-	}
+	//if upper != "" {
+		// HACK: Skip the upper dir, it should be empty anyways. With erofs + mount manager
+		// + idmap support this is needed, since currently idmap support will idmap bind mount
+		// the common dir of all lowerdirs, and mount manager can use a separate path
+		// for the lowerdirs than the snapshotter upper dir. i.e.
+		// workdir=/mnt/containerd/io.containerd.snapshotter.v1.erofs/snapshots/25795/work
+		// upperdir=/mnt/containerd/io.containerd.snapshotter.v1.erofs/snapshots/25795/fs
+		// lowerdir=/run/containerd/io.containerd.mount-manager.v1.bolt/t/8103/3:/run/containerd/io.containerd.mount-manager.v1.bolt/t/8103/2:/run/containerd/io.containerd.mount-manager.v1.bolt/t/8103/1 uidmap=0:1383202816:65536 gidmap=0:1383202816:65536 volatile]","time":"2025-10-28T21:49:48.859556788Z"}
+		// and by adding the upper dir to the lowerdir list, the idmap code claims the
+		// common parent directory is "/" and fails. Even if you remove the check, bind
+		// mounting "/" somewhere fails as well.
+		//
+		// This hack works ok in my tests, except when there's only one lowerdir. In that
+		// case a overlayfs mount of just one lowerdir and no upperdir fails with -EINVAL
+		// since a ro overlay mount with one lowerdir makes no sense to do. I guess
+		// we could bind mount the lowerdir instead and pass that back but this is all
+		// a hack so for now just leave this novel here for feedback. We could also do
+		// multiple idmaps (either as two different ones for the specific case I showed,
+		// or per layer) in the idmap code, but per layer scales poorly and finding the
+		// least number of non-root common directories sounds annoying and confusing (i.e.
+		// we'd do a idmap view of the /run/ stuff to get mount manager's lowerdirs, and
+		// a idmap view of the /mnt/ stuff to get the upperdir that was turned lowerdir.
+		//
+		// We could also just not do the tempmount with uidmap/gidmap, but I'd need to see
+		// if anything actually cares about the mapping at this point in the lifecycle. Probably
+		// not?
+	//}
 	return out
 }
 
