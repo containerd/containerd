@@ -243,6 +243,11 @@ version = 3
     stats_collect_period = 10
     use_local_image_pull = false
 
+    [plugins."io.containerd.cri.v1.images".runtime_platforms]
+      [plugins."io.containerd.cri.v1.images".runtime_platforms.runc]
+        platform = ''
+        snapshotter = ''
+
     [plugins.'io.containerd.cri.v1.images'.pinned_images]
       sandbox = 'registry.k8s.io/pause:3.10.1'
 
