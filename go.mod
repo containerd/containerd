@@ -10,7 +10,7 @@ require (
 	github.com/checkpoint-restore/checkpointctl v1.4.0
 	github.com/checkpoint-restore/go-criu/v7 v7.2.0
 	github.com/containerd/btrfs/v2 v2.0.0
-	github.com/containerd/cgroups/v3 v3.1.0
+	github.com/containerd/cgroups/v3 v3.1.1
 	github.com/containerd/console v1.0.5
 	github.com/containerd/containerd/api v1.10.0
 	github.com/containerd/continuity v0.4.5
@@ -54,7 +54,7 @@ require (
 	github.com/moby/sys/userns v0.1.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
-	github.com/opencontainers/runtime-spec v1.2.1
+	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/opencontainers/runtime-tools v0.9.1-0.20250523060157-0ea5ed0382a2
 	github.com/opencontainers/selinux v1.12.0
 	github.com/pelletier/go-toml/v2 v2.2.4
