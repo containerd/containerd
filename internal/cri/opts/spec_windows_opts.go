@@ -18,6 +18,7 @@ package opts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,7 +87,7 @@ func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, e
 				dst = "C:" + dst
 			}
 		} else if dst[0] == 'c' || dst[0] == 'C' {
-			return nil, fmt.Errorf("destination path can not be C drive")
+			return nil, errors.New("destination path can not be C drive")
 		}
 	}
 
