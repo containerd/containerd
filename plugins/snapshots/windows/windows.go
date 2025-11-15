@@ -289,6 +289,14 @@ func (s *wcowSnapshotter) convertScratchToReadOnlyLayer(ctx context.Context, sna
 	}
 
 	parentLayerPaths := s.parentIDsToParentPaths(snapshot.ParentIDs)
+
+	// Ensure the layer is deactivated
+	// This handles the case where the layer is still active from container execution
+	// Calling deactivate layer multiple times won't cause error
+	if err := hcsshim.DeactivateLayer(s.info, filepath.Base(path)); err != nil {
+		return fmt.Errorf("failed to deactivate layer: %w", err)
+	}
+
 	reader, writer := io.Pipe()
 
 	go func() {
