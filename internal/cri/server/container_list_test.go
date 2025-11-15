@@ -158,7 +158,8 @@ func TestFilterContainers(t *testing.T) {
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
-			filtered := c.filterCRIContainers(testContainers, test.filter)
+			filtered, err := c.filterCRIContainers(testContainers, test.filter)
+			assert.NoError(t, err)
 			assert.Equal(t, test.expect, filtered, test.desc)
 		})
 	}
