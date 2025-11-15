@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/v2/internal/nlwrap"
 	"github.com/containerd/nri/pkg/api"
 
 	"github.com/stretchr/testify/assert"
@@ -231,7 +232,7 @@ func getNetworkNamespaceIPs(nsPath string) []string {
 	}
 	// to avoid golang problem with goroutines we create the socket in the
 	// namespace and use it directly
-	nhNs, err := netlink.NewHandleAt(sandboxNs)
+	nhNs, err := nlwrap.NewHandleAt(sandboxNs)
 	if err != nil {
 		return ips
 	}
