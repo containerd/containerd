@@ -920,6 +920,28 @@ func (c *criService) buildLinuxSpec(
 		return nil, fmt.Errorf("user namespace config for sandbox is different from container. Sandbox userns config: %v - Container userns config: %v", sandboxUsernsOpts, nsOpts.GetUsernsOptions())
 	}
 
+	// Determine if user namespace is enabled
+	var usernsEnabled bool
+	if nsOpts.GetUsernsOptions() != nil && nsOpts.GetUsernsOptions().GetMode() == runtime.NamespaceMode_POD {
+		usernsEnabled = true
+	}
+
+	// When using both host network and user namespace, we need to bind mount /sys
+	// instead of mounting sysfs, because mounting sysfs will fail with EPERM in this configuration.
+	sandboxNsOpts := sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	if sandboxNsOpts.GetNetwork() == runtime.NamespaceMode_NODE && usernsEnabled {
+		specOpts = append(specOpts, oci.WithoutMounts("/sys"))
+		// Add bind mount for /sys
+		specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
+			{
+				Source:      "/sys",
+				Destination: "/sys",
+				Type:        "bind",
+				Options:     []string{"rbind", "rro", "nosuid", "nodev", "noexec"},
+			},
+		}))
+	}
+
 	specOpts = append(specOpts,
 		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
 		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, uids, gids),
