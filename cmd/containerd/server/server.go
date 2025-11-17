@@ -84,10 +84,11 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 		return err
 	}
 	// chmod is needed for upgrading from an older release that created the dir with 0o711
-	if err := os.Chmod(config.Root, 0o700); err != nil {
+	// We ignore file permission issues due to non-standard rootless deployments that do not put the daemon in UserNS: https://github.com/containerd/containerd/issues/12520
+	// These deployments fundamentally cannot perform this migration without sudo intervention.
+	if err := os.Chmod(config.Root, 0o700); err != nil && !errors.Is(err, os.ErrPermission) {
 		return err
 	}
-
 	// For supporting userns-remapped containers, the state dir cannot be just mkdired with 0o700.
 	// Each of plugins creates a dedicated directory beneath the state dir with appropriate permission bits.
 	if err := sys.MkdirAllWithACL(config.State, 0o711); err != nil {
@@ -108,7 +109,9 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 			return err
 		}
 		// chmod is needed for upgrading from an older release that created the dir with 0o711
-		if err := os.Chmod(config.Root, 0o700); err != nil {
+		// We ignore file permission issues due to non-standard rootless deployments that do not put the daemon in UserNS: https://github.com/containerd/containerd/issues/12520
+		// These deployments fundamentally cannot perform this migration without sudo intervention.
+		if err := os.Chmod(config.TempDir, 0o700); err != nil && !errors.Is(err, os.ErrPermission) {
 			return err
 		}
 		if runtime.GOOS == "windows" {
