@@ -1,5 +1,3 @@
-//go:build !windows && !darwin
-
 /*
    Copyright The containerd Authors.
 
@@ -19,6 +17,6 @@
 package diff
 
 var defaultDifferConfig = &config{
-	Order:  []string{"walking"},
+	Order:  []string{"erofs", "walking"},
 	SyncFs: false,
 }
