@@ -24,6 +24,11 @@ import (
 	"github.com/containerd/errdefs"
 )
 
+// defaultWritableSize is the default size allocation for writable
+// layers on non-Linux platforms. This is set to 64MiB but may be
+// adjusted in the user configuration or per snapshot.
+const defaultWritableSize = 64 * 1024 * 1024
+
 func checkCompatibility(root string) error {
 	return nil
 }

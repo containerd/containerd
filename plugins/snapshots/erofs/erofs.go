@@ -95,7 +95,9 @@ type snapshotter struct {
 // NewSnapshotter returns a Snapshotter which uses EROFS+OverlayFS. The layers
 // are stored under the provided root. A metadata file is stored under the root.
 func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
-	var config SnapshotterConfig
+	config := SnapshotterConfig{
+		defaultSize: defaultWritableSize,
+	}
 	for _, opt := range opts {
 		opt(&config)
 	}
@@ -104,8 +106,11 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 
-	if err := checkCompatibility(root); err != nil {
-		return nil, err
+	if config.defaultSize == 0 {
+		// If not block mode, check root compatibility
+		if err := checkCompatibility(root); err != nil {
+			return nil, err
+		}
 	}
 
 	// Check fsverity support if enabled
