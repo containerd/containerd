@@ -33,6 +33,10 @@ import (
 	"github.com/containerd/containerd/v2/internal/erofsutils"
 )
 
+// defaultWritableSize is set to 0 for Linux to match the default behavior of
+// other snapshotters available on Linux.
+const defaultWritableSize = 0
+
 // check if EROFS kernel filesystem is registered or not
 func findErofs() bool {
 	fs, err := os.ReadFile("/proc/filesystems")
