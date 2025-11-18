@@ -129,7 +129,12 @@ command. As part of this process, we do the following:
 				return errors.New("cannot specify both --platform and --all-platforms")
 			}
 			if len(p) == 0 && !allPlatforms {
-				p = append(p, platforms.DefaultSpec())
+				spec := platforms.DefaultSpec()
+				// Use linux by default for unpacking images on darwin as configured by transfer service
+				if spec.OS == "darwin" {
+					spec.OS = "linux"
+				}
+				p = append(p, spec)
 			}
 			// we use an empty `Platform` slice to indicate that we want to pull all platforms
 			sopts = append(sopts, image.WithPlatforms(p...))
