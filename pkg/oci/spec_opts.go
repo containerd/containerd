@@ -1711,6 +1711,23 @@ func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
 	}
 }
 
+func WithRlimit(rlimit *specs.POSIXRlimit) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setProcess(s)
+		if s.Process.Rlimits == nil {
+			s.Process.Rlimits = make([]specs.POSIXRlimit, 0)
+		}
+		for i := range s.Process.Rlimits {
+			if s.Process.Rlimits[i].Type == rlimit.Type {
+				s.Process.Rlimits[i] = *rlimit
+				return nil
+			}
+		}
+		s.Process.Rlimits = append(s.Process.Rlimits, *rlimit)
+		return nil
+	}
+}
+
 // WithWindowsCPUCount sets the `Windows.Resources.CPU.Count` section to the
 // `count` specified. It is a no-op for non-Windows specs.
 func WithWindowsCPUCount(count uint64) SpecOpts {

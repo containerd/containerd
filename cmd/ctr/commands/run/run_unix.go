@@ -83,6 +83,10 @@ var platformRunFlags = []cli.Flag{
 		Name:  "cpuset-mems",
 		Usage: "Set the memory nodes the container will run in (e.g., 1-2,4)",
 	},
+	&cli.StringFlag{
+		Name:  "rlimit-nofile",
+		Usage: "Set RLIMIT_NOFILE (soft:hard)",
+	},
 }
 
 // NewContainer creates a new container
@@ -410,6 +414,26 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		}
 		if hostname := cliContext.String("hostname"); hostname != "" {
 			opts = append(opts, oci.WithHostname(hostname))
+		}
+		if c := cliContext.String("rlimit-nofile"); c != "" {
+			softS, hardS, found := strings.Cut(c, ":")
+			if !found {
+				hardS = softS
+			}
+			soft, err := strconv.ParseUint(softS, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse rlimit-nofile %q: %w", c, err)
+			}
+			hard, err := strconv.ParseUint(hardS, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse rlimit-nofile %q: %w", c, err)
+			}
+			rlimit := &specs.POSIXRlimit{
+				Type: "RLIMIT_NOFILE",
+				Hard: hard,
+				Soft: soft,
+			}
+			opts = append(opts, oci.WithRlimit(rlimit))
 		}
 	}
 
