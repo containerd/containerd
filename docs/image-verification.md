@@ -10,9 +10,12 @@ To enable image verification, add a stanza like the following to the containerd 
     bin_dir = "/opt/containerd/image-verifier/bin"
     max_verifiers = 10
     per_verifier_timeout = "10s"
+    pod_metadata = false
 ```
 
 All files in `bin_dir`, if it exists, must be verifier executables which conform to the following API.
+
+Images must be pulled with the transfer service in order to use this plugin.
 
 ## Image Verifier Binary API
 
@@ -31,6 +34,12 @@ payload has a media type of `application/vnd.oci.descriptor.v1+json` and
 represents the OCI Content Descriptor of the image that may be pulled. See
 [the OCI specification](https://github.com/opencontainers/image-spec/blob/main/descriptor.md)
 for more details.
+
+### File Descriptor 3
+
+When `pod_metadata = true` is set in the configuration and pod metadata is
+available from the CRI layer (ex. when pulling images for a Kubernetes pod),
+runtime configuration is passed on file descriptor 3. The payload is defined in [the image verifier plugin code](../pkg/imageverifier/image_verifier.go):
 
 ### Image Pull Judgement
 
