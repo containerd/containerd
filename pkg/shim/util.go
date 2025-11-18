@@ -49,6 +49,30 @@ type CommandConfig struct {
 	Env          []string
 }
 
+// validateRuntimePath validates and sanitizes the runtime path to prevent code injection
+func validateRuntimePath(runtime string) (string, error) {
+	if runtime == "" {
+		return "", fmt.Errorf("runtime cannot be empty")
+	}
+	
+	// Clean the path to normalize it and prevent path traversal
+	cleanRuntime := filepath.Clean(runtime)
+	
+	// Validate that the runtime path doesn't contain shell metacharacters
+	// that could be used for code injection
+	if strings.ContainsAny(cleanRuntime, ";|&$`(){}[]<>*?~") {
+		return "", fmt.Errorf("runtime path contains invalid characters: %s", cleanRuntime)
+	}
+	
+	// Verify the runtime binary exists and is executable
+	validatedRuntime, err := exec.LookPath(cleanRuntime)
+	if err != nil {
+		return "", fmt.Errorf("invalid runtime binary: %w", err)
+	}
+	
+	return validatedRuntime, nil
+}
+
 // Command returns the shim command with the provided args and configuration
 func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
@@ -59,13 +83,20 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	if err != nil {
 		return nil, err
 	}
+	
+	// Validate and sanitize the runtime path to prevent code injection
+	validatedRuntime, err := validateRuntimePath(config.Runtime)
+	if err != nil {
+		return nil, err
+	}
+	
 	args := []string{
 		"-namespace", ns,
 		"-address", config.Address,
 		"-publish-binary", self,
 	}
 	args = append(args, config.Args...)
-	cmd := exec.CommandContext(ctx, config.Runtime, args...)
+	cmd := exec.CommandContext(ctx, validatedRuntime, args...)
 	cmd.Dir = config.Path
 	cmd.Env = append(
 		os.Environ(),
