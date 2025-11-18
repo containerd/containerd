@@ -34,9 +34,16 @@ jobs:
 
       - name: Set env
         shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        env:
+          GITHUB_EVENT_INPUTS_UPSTREAM: ${{ GITHUB.EVENT.INPUTS.UPSTREAM }}
+          GITHUB_EVENT_INPUTS_IMAGE: ${{ GITHUB.EVENT.INPUTS.IMAGE }}
+          GITHUB_ACTOR: ${{ GITHUB.ACTOR }}
+          SECRETS_GITHUB_TOKEN: ${{ SECRETS.GITHUB_TOKEN }}
+run: |
+          echo "GOPATH="$GITHUB_WORKSPACE"" >> $GITHUB_ENV
+          echo ""$GITHUB_WORKSPACE"/bin" >> $GITHUB_PATH
 
       - name: Install containerd dependencies
         env:
@@ -54,13 +61,18 @@ jobs:
 
       - name: Pull and push image
         shell: bash
+        env:
+          GITHUB_EVENT_INPUTS_UPSTREAM: "$"$GITHUB_EVENT_INPUTS_UPSTREAM""
+          GITHUB_EVENT_INPUTS_IMAGE: "$"$GITHUB_EVENT_INPUTS_IMAGE""
+          GITHUB_ACTOR: "$"$GITHUB_ACTOR""
+          SECRETS_GITHUB_TOKEN: "$"$SECRETS_GITHUB_TOKEN""
         run: |
           sudo containerd -l debug & > /tmp/containerd.out
           containerd_pid=$!
           sleep 5
 
-          upstream=${{ github.event.inputs.upstream }}
-          target=${{ github.event.inputs.image }}
+          upstream="$GITHUB_EVENT_INPUTS_UPSTREAM"
+          target="$GITHUB_EVENT_INPUTS_IMAGE"
           if [[ "$target" == "" ]]; then
             mirror="ghcr.io/containerd/${upstream##*/}"
           else
@@ -71,6 +83,6 @@ jobs:
 
           sudo ctr content fetch --all-platforms ${upstream}
           sudo ctr images ls
-          sudo ctr --debug images push -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} ${mirror} ${upstream}
+          sudo ctr --debug images push -u "$GITHUB_ACTOR":"$SECRETS_GITHUB_TOKEN" ${mirror} ${upstream}
 
           sudo kill $containerd_pid
