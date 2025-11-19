@@ -622,6 +622,159 @@ func (r *result) adjustHooks(hooks *Hooks, plugin string) error {
 	return nil
 }
 
+func (r *result) adjustMemoryResource(mem, targetContainer, targetReply *LinuxMemory, id, plugin string) error {
+	if mem == nil {
+		return nil
+	}
+
+	if v := mem.GetLimit(); v != nil {
+		if err := r.owners.ClaimMemLimit(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Limit = Int64(v.GetValue())
+		if targetReply != nil {
+			targetReply.Limit = Int64(v.GetValue())
+		}
+	}
+	if v := mem.GetReservation(); v != nil {
+		if err := r.owners.ClaimMemReservation(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Reservation = Int64(v.GetValue())
+		if targetReply != nil {
+			targetReply.Reservation = Int64(v.GetValue())
+		}
+	}
+	if v := mem.GetSwap(); v != nil {
+		if err := r.owners.ClaimMemSwapLimit(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Swap = Int64(v.GetValue())
+		if targetReply != nil {
+			targetReply.Swap = Int64(v.GetValue())
+		}
+	}
+	if v := mem.GetKernel(); v != nil {
+		if err := r.owners.ClaimMemKernelLimit(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Kernel = Int64(v.GetValue())
+		if targetReply != nil {
+			targetReply.Kernel = Int64(v.GetValue())
+		}
+	}
+	if v := mem.GetKernelTcp(); v != nil {
+		if err := r.owners.ClaimMemTCPLimit(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.KernelTcp = Int64(v.GetValue())
+		if targetReply != nil {
+			targetReply.KernelTcp = Int64(v.GetValue())
+		}
+	}
+	if v := mem.GetSwappiness(); v != nil {
+		if err := r.owners.ClaimMemSwappiness(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Swappiness = UInt64(v.GetValue())
+		if targetReply != nil {
+			targetReply.Swappiness = UInt64(v.GetValue())
+		}
+	}
+	if v := mem.GetDisableOomKiller(); v != nil {
+		if err := r.owners.ClaimMemDisableOomKiller(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.DisableOomKiller = Bool(v.GetValue())
+		if targetReply != nil {
+			targetReply.DisableOomKiller = Bool(v.GetValue())
+		}
+	}
+	if v := mem.GetUseHierarchy(); v != nil {
+		if err := r.owners.ClaimMemUseHierarchy(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.UseHierarchy = Bool(v.GetValue())
+		if targetReply != nil {
+			targetReply.UseHierarchy = Bool(v.GetValue())
+		}
+	}
+
+	return nil
+}
+
+func (r *result) adjustCPUResource(cpu, targetContainer, targetReply *LinuxCPU, id, plugin string) error {
+	if cpu == nil {
+		return nil
+	}
+
+	if v := cpu.GetShares(); v != nil {
+		if err := r.owners.ClaimCPUShares(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Shares = UInt64(v.GetValue())
+		if targetReply != nil {
+			targetReply.Shares = UInt64(v.GetValue())
+		}
+	}
+	if v := cpu.GetQuota(); v != nil {
+		if err := r.owners.ClaimCPUQuota(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Quota = Int64(v.GetValue())
+		if targetReply != nil {
+			targetReply.Quota = Int64(v.GetValue())
+		}
+	}
+	if v := cpu.GetPeriod(); v != nil {
+		if err := r.owners.ClaimCPUPeriod(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Period = UInt64(v.GetValue())
+		if targetReply != nil {
+			targetReply.Period = UInt64(v.GetValue())
+		}
+	}
+	if v := cpu.GetRealtimeRuntime(); v != nil {
+		if err := r.owners.ClaimCPURealtimeRuntime(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.RealtimeRuntime = Int64(v.GetValue())
+		if targetReply != nil {
+			targetReply.RealtimeRuntime = Int64(v.GetValue())
+		}
+	}
+	if v := cpu.GetRealtimePeriod(); v != nil {
+		if err := r.owners.ClaimCPURealtimePeriod(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.RealtimePeriod = UInt64(v.GetValue())
+		if targetReply != nil {
+			targetReply.RealtimePeriod = UInt64(v.GetValue())
+		}
+	}
+	if v := cpu.GetCpus(); v != "" {
+		if err := r.owners.ClaimCPUSetCPUs(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Cpus = v
+		if targetReply != nil {
+			targetReply.Cpus = v
+		}
+	}
+	if v := cpu.GetMems(); v != "" {
+		if err := r.owners.ClaimCPUSetMems(id, plugin); err != nil {
+			return err
+		}
+		targetContainer.Mems = v
+		if targetReply != nil {
+			targetReply.Mems = v
+		}
+	}
+
+	return nil
+}
+
 func (r *result) adjustResources(resources *LinuxResources, plugin string) error {
 	if resources == nil {
 		return nil
@@ -631,114 +784,12 @@ func (r *result) adjustResources(resources *LinuxResources, plugin string) error
 	container := create.Container.Linux.Resources
 	reply := r.reply.adjust.Linux.Resources
 
-	if mem := resources.Memory; mem != nil {
-		if v := mem.GetLimit(); v != nil {
-			if err := r.owners.ClaimMemLimit(id, plugin); err != nil {
-				return err
-			}
-			container.Memory.Limit = Int64(v.GetValue())
-			reply.Memory.Limit = Int64(v.GetValue())
-		}
-		if v := mem.GetReservation(); v != nil {
-			if err := r.owners.ClaimMemReservation(id, plugin); err != nil {
-				return err
-			}
-			container.Memory.Reservation = Int64(v.GetValue())
-			reply.Memory.Reservation = Int64(v.GetValue())
-		}
-		if v := mem.GetSwap(); v != nil {
-			if err := r.owners.ClaimMemSwapLimit(id, plugin); err != nil {
-				return err
-			}
-			container.Memory.Swap = Int64(v.GetValue())
-			reply.Memory.Swap = Int64(v.GetValue())
-		}
-		if v := mem.GetKernel(); v != nil {
-			if err := r.owners.ClaimMemKernelLimit(id, plugin); err != nil {
-				return err
-			}
-			container.Memory.Kernel = Int64(v.GetValue())
-			reply.Memory.Kernel = Int64(v.GetValue())
-		}
-		if v := mem.GetKernelTcp(); v != nil {
-			if err := r.owners.ClaimMemTCPLimit(id, plugin); err != nil {
-				return err
-			}
-			container.Memory.KernelTcp = Int64(v.GetValue())
-			reply.Memory.KernelTcp = Int64(v.GetValue())
-		}
-		if v := mem.GetSwappiness(); v != nil {
-			if err := r.owners.ClaimMemSwappiness(id, plugin); err != nil {
-				return err
-			}
-			container.Memory.Swappiness = UInt64(v.GetValue())
-			reply.Memory.Swappiness = UInt64(v.GetValue())
-		}
-		if v := mem.GetDisableOomKiller(); v != nil {
-			if err := r.owners.ClaimMemDisableOomKiller(id, plugin); err != nil {
-				return err
-			}
-			container.Memory.DisableOomKiller = Bool(v.GetValue())
-			reply.Memory.DisableOomKiller = Bool(v.GetValue())
-		}
-		if v := mem.GetUseHierarchy(); v != nil {
-			if err := r.owners.ClaimMemUseHierarchy(id, plugin); err != nil {
-				return err
-			}
-			container.Memory.UseHierarchy = Bool(v.GetValue())
-			reply.Memory.UseHierarchy = Bool(v.GetValue())
-		}
+	if err := r.adjustMemoryResource(resources.Memory, container.Memory, reply.Memory, id, plugin); err != nil {
+		return err
 	}
-	if cpu := resources.Cpu; cpu != nil {
-		if v := cpu.GetShares(); v != nil {
-			if err := r.owners.ClaimCPUShares(id, plugin); err != nil {
-				return err
-			}
-			container.Cpu.Shares = UInt64(v.GetValue())
-			reply.Cpu.Shares = UInt64(v.GetValue())
-		}
-		if v := cpu.GetQuota(); v != nil {
-			if err := r.owners.ClaimCPUQuota(id, plugin); err != nil {
-				return err
-			}
-			container.Cpu.Quota = Int64(v.GetValue())
-			reply.Cpu.Quota = Int64(v.GetValue())
-		}
-		if v := cpu.GetPeriod(); v != nil {
-			if err := r.owners.ClaimCPUPeriod(id, plugin); err != nil {
-				return err
-			}
-			container.Cpu.Period = UInt64(v.GetValue())
-			reply.Cpu.Period = UInt64(v.GetValue())
-		}
-		if v := cpu.GetRealtimeRuntime(); v != nil {
-			if err := r.owners.ClaimCPURealtimeRuntime(id, plugin); err != nil {
-				return err
-			}
-			container.Cpu.RealtimeRuntime = Int64(v.GetValue())
-			reply.Cpu.RealtimeRuntime = Int64(v.GetValue())
-		}
-		if v := cpu.GetRealtimePeriod(); v != nil {
-			if err := r.owners.ClaimCPURealtimePeriod(id, plugin); err != nil {
-				return err
-			}
-			container.Cpu.RealtimePeriod = UInt64(v.GetValue())
-			reply.Cpu.RealtimePeriod = UInt64(v.GetValue())
-		}
-		if v := cpu.GetCpus(); v != "" {
-			if err := r.owners.ClaimCPUSetCPUs(id, plugin); err != nil {
-				return err
-			}
-			container.Cpu.Cpus = v
-			reply.Cpu.Cpus = v
-		}
-		if v := cpu.GetMems(); v != "" {
-			if err := r.owners.ClaimCPUSetMems(id, plugin); err != nil {
-				return err
-			}
-			container.Cpu.Mems = v
-			reply.Cpu.Mems = v
-		}
+
+	if err := r.adjustCPUResource(resources.Cpu, container.Cpu, reply.Cpu, id, plugin); err != nil {
+		return err
 	}
 
 	for _, l := range resources.HugepageLimits {
@@ -886,99 +937,12 @@ func (r *result) updateResources(reply, u *ContainerUpdate, plugin string) error
 		resources = reply.Linux.Resources.Copy()
 	}
 
-	if mem := u.Linux.Resources.Memory; mem != nil {
-		if v := mem.GetLimit(); v != nil {
-			if err := r.owners.ClaimMemLimit(id, plugin); err != nil {
-				return err
-			}
-			resources.Memory.Limit = Int64(v.GetValue())
-		}
-		if v := mem.GetReservation(); v != nil {
-			if err := r.owners.ClaimMemReservation(id, plugin); err != nil {
-				return err
-			}
-			resources.Memory.Reservation = Int64(v.GetValue())
-		}
-		if v := mem.GetSwap(); v != nil {
-			if err := r.owners.ClaimMemSwapLimit(id, plugin); err != nil {
-				return err
-			}
-			resources.Memory.Swap = Int64(v.GetValue())
-		}
-		if v := mem.GetKernel(); v != nil {
-			if err := r.owners.ClaimMemKernelLimit(id, plugin); err != nil {
-				return err
-			}
-			resources.Memory.Kernel = Int64(v.GetValue())
-		}
-		if v := mem.GetKernelTcp(); v != nil {
-			if err := r.owners.ClaimMemTCPLimit(id, plugin); err != nil {
-				return err
-			}
-			resources.Memory.KernelTcp = Int64(v.GetValue())
-		}
-		if v := mem.GetSwappiness(); v != nil {
-			if err := r.owners.ClaimMemSwappiness(id, plugin); err != nil {
-				return err
-			}
-			resources.Memory.Swappiness = UInt64(v.GetValue())
-		}
-		if v := mem.GetDisableOomKiller(); v != nil {
-			if err := r.owners.ClaimMemDisableOomKiller(id, plugin); err != nil {
-				return err
-			}
-			resources.Memory.DisableOomKiller = Bool(v.GetValue())
-		}
-		if v := mem.GetUseHierarchy(); v != nil {
-			if err := r.owners.ClaimMemUseHierarchy(id, plugin); err != nil {
-				return err
-			}
-			resources.Memory.UseHierarchy = Bool(v.GetValue())
-		}
+	if err := r.adjustMemoryResource(u.Linux.Resources.Memory, resources.Memory, nil, id, plugin); err != nil {
+		return err
 	}
-	if cpu := u.Linux.Resources.Cpu; cpu != nil {
-		if v := cpu.GetShares(); v != nil {
-			if err := r.owners.ClaimCPUShares(id, plugin); err != nil {
-				return err
-			}
-			resources.Cpu.Shares = UInt64(v.GetValue())
-		}
-		if v := cpu.GetQuota(); v != nil {
-			if err := r.owners.ClaimCPUQuota(id, plugin); err != nil {
-				return err
-			}
-			resources.Cpu.Quota = Int64(v.GetValue())
-		}
-		if v := cpu.GetPeriod(); v != nil {
-			if err := r.owners.ClaimCPUPeriod(id, plugin); err != nil {
-				return err
-			}
-			resources.Cpu.Period = UInt64(v.GetValue())
-		}
-		if v := cpu.GetRealtimeRuntime(); v != nil {
-			if err := r.owners.ClaimCPURealtimeRuntime(id, plugin); err != nil {
-				return err
-			}
-			resources.Cpu.RealtimeRuntime = Int64(v.GetValue())
-		}
-		if v := cpu.GetRealtimePeriod(); v != nil {
-			if err := r.owners.ClaimCPURealtimePeriod(id, plugin); err != nil {
-				return err
-			}
-			resources.Cpu.RealtimePeriod = UInt64(v.GetValue())
-		}
-		if v := cpu.GetCpus(); v != "" {
-			if err := r.owners.ClaimCPUSetCPUs(id, plugin); err != nil {
-				return err
-			}
-			resources.Cpu.Cpus = v
-		}
-		if v := cpu.GetMems(); v != "" {
-			if err := r.owners.ClaimCPUSetMems(id, plugin); err != nil {
-				return err
-			}
-			resources.Cpu.Mems = v
-		}
+
+	if err := r.adjustCPUResource(u.Linux.Resources.Cpu, resources.Cpu, nil, id, plugin); err != nil {
+		return err
 	}
 
 	for _, l := range u.Linux.Resources.HugepageLimits {
