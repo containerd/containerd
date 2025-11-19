@@ -58,6 +58,10 @@ jobs:
         with:
           working-directory: src/github.com/containerd/containerd
           repo-access-token: ${{ secrets.GITHUB_TOKEN }}
+          # github.com/cyphar/filepath-securejoin: MPL-2.0 AND BSD-3-Clause
+          # Approval: https://github.com/cncf/foundation/issues/1154#issuecomment-3562385979
+          go-licenses-ignore: |
+            github.com/cyphar/filepath-securejoin
 
       - name: verify go modules and vendor directory
         run: |
