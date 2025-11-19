@@ -327,17 +327,8 @@ func initalizeBlockDevice(td string, a fstest.Applier) (string, error) {
 	dpath := file.Name()
 	file.Close()
 
-	loopdev, err := mount.AttachLoopDevice(dpath)
-	if err != nil {
-		return "", fmt.Errorf("failed to attach loop: %w", err)
-	}
-
-	if out, err := exec.Command("mkfs.ext4", loopdev).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("could not mkfs.ext4 %s: %w (out: %s)", loopdev, err, string(out))
-	}
-
-	if err := mount.DetachLoopDevice(loopdev); err != nil {
-		return "", fmt.Errorf("failed to detach loop: %w", err)
+	if out, err := exec.Command("mkfs.ext4", dpath).CombinedOutput(); err != nil {
+		return "", fmt.Errorf("could not mkfs.ext4 %s: %w (out: %s)", dpath, err, string(out))
 	}
 
 	m := mount.Mount{
