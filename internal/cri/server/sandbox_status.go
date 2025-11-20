@@ -72,6 +72,13 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		info = cstatus.Info
 	}
 
+	if info == nil {
+		info = make(map[string]string)
+	}
+	if err := setUpdatedResources(ctx, sandbox, info); err != nil {
+		return nil, err
+	}
+
 	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip, additionalIPs)
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
@@ -104,6 +111,34 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 	}
 
 	return sandbox.IP, sandbox.AdditionalIPs, nil
+}
+
+// setUpdatedResources sets updated pod sandbox resources in the sandbox info.
+func setUpdatedResources(ctx context.Context, sandbox sandboxstore.Sandbox, info map[string]string) error {
+	var sbInfo types.SandboxInfo
+	if info == nil {
+		return nil
+	}
+	if i, ok := info["info"]; ok {
+		if err := json.Unmarshal([]byte(i), &sbInfo); err != nil {
+			return fmt.Errorf("failed to unmarshal sandbox info: %w", err)
+		}
+	}
+
+	if overhead := sandbox.Status.Get().Overhead; overhead != nil {
+		sbInfo.Overhead = overhead
+	}
+	if resources := sandbox.Status.Get().Resources; resources != nil {
+		sbInfo.Resources = resources
+	}
+
+	infoBytes, err := json.Marshal(sbInfo)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sandbox info: %w", err)
+	}
+	info["info"] = string(infoBytes)
+
+	return nil
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
