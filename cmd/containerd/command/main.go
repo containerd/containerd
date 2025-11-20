@@ -254,18 +254,8 @@ can be used and modified as necessary as a custom configuration.`
 		case serverC <- server:
 		}
 
-		if config.Debug.Address != "" {
-			var l net.Listener
-			if isLocalAddress(config.Debug.Address) {
-				if l, err = sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID); err != nil {
-					return fmt.Errorf("failed to get listener for debug endpoint: %w", err)
-				}
-			} else {
-				if l, err = net.Listen("tcp", config.Debug.Address); err != nil {
-					return fmt.Errorf("failed to get listener for debug endpoint: %w", err)
-				}
-			}
-			serve(ctx, l, server.ServeDebug)
+		if err := server.Start(ctx); err != nil {
+			return err
 		}
 		if config.Metrics.Address != "" {
 			l, err := net.Listen("tcp", config.Metrics.Address)

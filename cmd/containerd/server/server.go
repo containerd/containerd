@@ -21,12 +21,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"expvar"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -299,6 +297,14 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		}
 
 		delete(required, id)
+		if p.Type == plugins.ServerPlugin {
+			srv, ok := instance.(server)
+			if !ok {
+				log.G(ctx).WithField("id", id).Warn("plugin does not implement server interface, will not be started")
+			}
+			s.servers = append(s.servers, srv)
+		}
+
 		// check for grpc services that should be registered with the server
 		if src, ok := instance.(grpcService); ok {
 			grpcServices = append(grpcServices, src)
@@ -364,12 +370,17 @@ func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set
 	_ = warn
 }
 
+type server interface {
+	Start(context.Context) error
+}
+
 // Server is the containerd main daemon
 type Server struct {
 	prometheusServerMetrics *grpc_prometheus.ServerMetrics
 	grpcServer              *grpc.Server
 	ttrpcServer             *ttrpc.Server
 	tcpServer               *grpc.Server
+	servers                 []server
 	config                  *srvconfig.Config
 	plugins                 []*plugin.Plugin
 	ready                   sync.WaitGroup
@@ -403,22 +414,15 @@ func (s *Server) ServeTCP(l net.Listener) error {
 	return trapClosedConnErr(s.tcpServer.Serve(l))
 }
 
-// ServeDebug provides a debug endpoint
-func (s *Server) ServeDebug(l net.Listener) error {
-	// don't use the default http server mux to make sure nothing gets registered
-	// that we don't want to expose via containerd
-	m := http.NewServeMux()
-	m.Handle("/debug/vars", expvar.Handler())
-	m.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	m.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	srv := &http.Server{
-		Handler:           m,
-		ReadHeaderTimeout: 5 * time.Minute, // "G112: Potential Slowloris Attack (gosec)"; not a real concern for our use, so setting a long timeout.
+// Start the services, this will normally start listening on sockets
+// and serving requests.
+func (s *Server) Start(ctx context.Context) error {
+	for _, srv := range s.servers {
+		if err := srv.Start(ctx); err != nil {
+			return err
+		}
 	}
-	return trapClosedConnErr(srv.Serve(l))
+	return nil
 }
 
 // Stop the containerd server canceling any open connections
