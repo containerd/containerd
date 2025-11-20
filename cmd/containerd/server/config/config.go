@@ -46,9 +46,10 @@ import (
 
 // migrations hold the migration functions for every prior containerd config version
 var migrations = []func(context.Context, *Config) error{
-	nil,       // Version 0 is not defined, treated at version 1
-	v1Migrate, // Version 1 plugins renamed to URI for version 2
-	nil,       // Version 2 has only plugin changes to version 3
+	nil,            // Version 0 is not defined, treated at version 1
+	v1Migrate,      // Version 1 plugins renamed to URI for version 2
+	nil,            // Version 2 has only plugin changes to version 3
+	serviceMigrate, // Version 3 has server properties moved to plugins for version 4
 }
 
 // NOTE: Any new map fields added also need to be handled in mergeConfig.
@@ -67,7 +68,7 @@ type Config struct {
 	GRPC GRPCConfig `toml:"grpc"`
 	// TTRPC configuration settings
 	TTRPC TTRPCConfig `toml:"ttrpc"`
-	// Debug and profiling settings
+	// Debug log settings
 	Debug Debug `toml:"debug"`
 	// Metrics and monitoring settings
 	Metrics MetricsConfig `toml:"metrics"`
@@ -204,6 +205,20 @@ func v1Migrate(ctx context.Context, c *Config) error {
 	return nil
 }
 
+func serviceMigrate(ctx context.Context, c *Config) error {
+	if c.Debug.Address != "" && c.Plugins["io.containerd.server.v1.debug"] == nil {
+		c.Plugins["io.containerd.server.v1.debug"] = map[string]any{
+			"address": c.Debug.Address,
+			"uid":     c.Debug.UID,
+			"gid":     c.Debug.GID,
+		}
+		c.Debug.Address = ""
+		c.Debug.UID = 0
+		c.Debug.GID = 0
+	}
+	return nil
+}
+
 // GRPCConfig provides GRPC configuration for the socket
 type GRPCConfig struct {
 	Address        string `toml:"address"`
@@ -227,12 +242,16 @@ type TTRPCConfig struct {
 
 // Debug provides debug configuration
 type Debug struct {
-	Address string `toml:"address"`
-	UID     int    `toml:"uid"`
-	GID     int    `toml:"gid"`
-	Level   string `toml:"level"`
+	Level string `toml:"level"`
 	// Format represents the logging format. Supported values are 'text' and 'json'.
 	Format string `toml:"format"`
+
+	// deprecated: use server plugin io.containerd.server.v1.debug
+	Address string `toml:"address,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.debug
+	UID int `toml:"uid,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.debug
+	GID int `toml:"gid,omitempty"`
 }
 
 // MetricsConfig provides metrics configuration

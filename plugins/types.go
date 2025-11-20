@@ -77,6 +77,8 @@ const (
 	ShimPlugin plugin.Type = "io.containerd.shim.v1"
 	// HTTPHandler implements an http handler
 	HTTPHandler plugin.Type = "io.containerd.http.v1"
+	// ServerHandler implements an server to start with the main process, e.g. api listeners
+	ServerPlugin plugin.Type = "io.containerd.server.v1"
 	// MountManagerPlugin implements the mount manager interface
 	MountManagerPlugin plugin.Type = "io.containerd.mount-manager.v1"
 	// MountHandlerPlugin implements the mount handler interface
