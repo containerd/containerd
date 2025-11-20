@@ -34,8 +34,10 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer/image"
 	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/pkg/progress"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
+	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli/v2"
@@ -89,6 +91,10 @@ command. As part of this process, we do the following:
 			Name:  "sync-fs",
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
+		&cli.BoolFlag{
+			Name:  "force",
+			Usage: "Force pulling by removing existing image and ALL its content blobs (including layers shared with other images) before re-downloading from registry. Use with caution.",
+		},
 	),
 	Action: func(cliContext *cli.Context) error {
 		var (
@@ -104,6 +110,14 @@ command. As part of this process, we do the following:
 		}
 		defer cancel()
 
+		if cliContext.Bool("force") {
+			log.G(ctx).WithField("image", ref).Warn("--force specified: removing existing image and ALL its content blobs")
+			log.G(ctx).Warn("content blobs (layers) shared with other images will also be deleted")
+			if err := removeImageAndContent(ctx, client, ref); err != nil {
+				return fmt.Errorf("failed to remove existing image and content: %w", err)
+			}
+			log.G(ctx).WithField("image", ref).Info("successfully removed existing image and content, proceeding with fresh pull")
+		}
 		if !cliContext.Bool("local") {
 			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid",
 				"skip-verify", "tlscacert", "tlscert", "tlskey", // RegistryFlags
@@ -524,4 +538,52 @@ func Display(w io.Writer, status string, statuses []transfer.Progress, start tim
 		// data into the start time before.
 		progress.Bytes(total),
 		progress.NewBytesPerSecond(total, time.Since(start)))
+}
+
+// removeImageAndContent removes the existing image to force a re-pull.
+func removeImageAndContent(ctx context.Context, client *containerd.Client, ref string) error {
+	imageService := client.ImageService()
+	contentStore := client.ContentStore()
+
+	// Try to get the image
+	img, err := imageService.Get(ctx, ref)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			// Image does not exist, nothing to remove
+			return nil
+		}
+		return fmt.Errorf("failed to get image %q: %w", ref, err)
+	}
+
+	digests := map[digest.Digest]struct{}{}
+	collectDigests := func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		digests[desc.Digest] = struct{}{}
+		return nil, nil
+	}
+
+	if err := images.Walk(
+		ctx,
+		images.Handlers(
+			images.ChildrenHandler(contentStore),
+			images.HandlerFunc(collectDigests),
+		),
+		img.Target,
+	); err != nil {
+		log.G(ctx).WithError(err).Warn("failed to walk image content")
+	}
+
+	if err := imageService.Delete(ctx, ref); err != nil {
+		return fmt.Errorf("failed to delete image %q: %w", ref, err)
+	}
+
+	//WARNING: This also deletes shared blobs.
+	for dgst := range digests {
+		if err := contentStore.Delete(ctx, dgst); err != nil {
+			if !errdefs.IsNotFound(err) {
+				log.G(ctx).WithError(err).WithField("digest", dgst).Warn("failed to delete content")
+			}
+		}
+	}
+
+	return nil
 }
