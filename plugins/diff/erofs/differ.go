@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 	"time"
 
@@ -81,6 +82,9 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 	for _, opt := range opts {
 		opt(d)
 	}
+
+	// Add default block size on darwin if not already specified
+	d.mkfsExtraOpts = addDefaultMkfsOpts(d.mkfsExtraOpts)
 
 	return d
 }
@@ -210,4 +214,22 @@ func (rc *readCounter) Read(p []byte) (n int, err error) {
 	n, err = rc.r.Read(p)
 	rc.c += int64(n)
 	return
+}
+
+// addDefaultMkfsOpts adds default options for mkfs.erofs
+func addDefaultMkfsOpts(mkfsExtraOpts []string) []string {
+	if runtime.GOOS != "darwin" {
+		return mkfsExtraOpts
+	}
+
+	// Check if -b argument is already present
+	for _, opt := range mkfsExtraOpts {
+		if strings.HasPrefix(opt, "-b") {
+			return mkfsExtraOpts
+		}
+	}
+
+	// Add -b4096 as the first option to prevent unusable block
+	// size from being used on macOS.
+	return append([]string{"-b4096"}, mkfsExtraOpts...)
 }

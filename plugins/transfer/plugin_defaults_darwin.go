@@ -1,5 +1,3 @@
-//go:build !windows && !darwin
-
 /*
    Copyright The containerd Authors.
 
@@ -16,9 +14,24 @@
    limitations under the License.
 */
 
-package diff
+package transfer
 
-var defaultDifferConfig = &config{
-	Order:  []string{"walking"},
-	SyncFs: false,
+import (
+	"github.com/containerd/platforms"
+
+	"github.com/containerd/containerd/v2/defaults"
+)
+
+func defaultUnpackConfig() []unpackConfiguration {
+	spec := platforms.DefaultSpec()
+	// default to Linux for unpacking as darwin images are not defined
+	// and only linux is supported with the default snapshotter and differ.
+	spec.OS = "linux"
+	return []unpackConfiguration{
+		{
+			Platform:    platforms.Format(spec),
+			Snapshotter: defaults.DefaultSnapshotter,
+			Differ:      defaults.DefaultDiffer,
+		},
+	}
 }
