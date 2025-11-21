@@ -19,9 +19,11 @@ package images
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/images/converter"
+	"github.com/containerd/containerd/v2/core/images/converter/erofs"
 	"github.com/containerd/containerd/v2/core/images/converter/uncompress"
 	"github.com/containerd/platforms"
 	"github.com/urfave/cli/v2"
@@ -33,7 +35,9 @@ var convertCommand = &cli.Command{
 	ArgsUsage: "[flags] <source_ref> <target_ref>",
 	Description: `Convert an image format.
 
-e.g., 'ctr convert --uncompress --oci example.com/foo:orig example.com/foo:converted'
+e.g., 'ctr image convert --uncompress --oci example.com/foo:orig example.com/foo:converted'
+      'ctr image convert --erofs raw example.com/foo:orig example.com/foo:erofs'
+      'ctr image convert --erofs zstd example.com/foo:orig example.com/foo:erofs-zstd'
 
 Use '--platform' to define the output platform.
 When '--all-platforms' is given all images in a manifest list must be available.
@@ -47,6 +51,19 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		&cli.BoolFlag{
 			Name:  "oci",
 			Usage: "Convert Docker media types to OCI media types",
+		},
+		// erofs flags
+		&cli.StringFlag{
+			Name:  "erofs",
+			Usage: "Convert layers to EROFS format, must specify 'raw' or 'zstd' (e.g. --erofs raw, --erofs zstd)",
+		},
+		&cli.StringFlag{
+			Name:  "erofs-compressors",
+			Usage: "Specify compression algorithm list when converting EROFS layers",
+		},
+		&cli.StringFlag{
+			Name:  "erofs-mkfs-options",
+			Usage: "Extra mkfs options applied when converting EROFS layers. (e.g. '-Efragments,dedupe')",
 		},
 		// platform flags
 		&cli.StringSliceFlag{
@@ -81,6 +98,25 @@ When '--all-platforms' is given all images in a manifest list must be available.
 
 		if cliContext.Bool("uncompress") {
 			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(uncompress.LayerConvertFunc))
+		}
+
+		if cliContext.IsSet("erofs") {
+			var erofsOpts []erofs.ConvertOpt
+			switch cliContext.String("erofs") {
+			case "raw":
+			case "zstd":
+				erofsOpts = append(erofsOpts, erofs.WithBlobCompression("zstd"))
+			default:
+				return fmt.Errorf("unsupported erofs format %q, supported: raw, zstd", cliContext.String("erofs"))
+			}
+			if compressors := cliContext.String("erofs-compressors"); compressors != "" {
+				erofsOpts = append(erofsOpts, erofs.WithCompressors(compressors))
+			}
+			if mkfsOptsStr := cliContext.String("erofs-mkfs-options"); mkfsOptsStr != "" {
+				mkfsOpts := strings.Fields(mkfsOptsStr)
+				erofsOpts = append(erofsOpts, erofs.WithMkfsOptions(mkfsOpts))
+			}
+			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(erofs.LayerConvertFunc(erofsOpts...)))
 		}
 
 		if cliContext.Bool("oci") {

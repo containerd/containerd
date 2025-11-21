@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 	"time"
 
@@ -93,13 +92,9 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 	}
 
 	// Add default block size on darwin if not already specified
-	d.mkfsExtraOpts = addDefaultMkfsOpts(d.mkfsExtraOpts)
+	d.mkfsExtraOpts = erofsutils.AddDefaultMkfsOpts(d.mkfsExtraOpts)
 
 	return d
-}
-
-func isErofsMediaType(mt string) bool {
-	return strings.HasSuffix(mt, ".erofs") || strings.HasPrefix(mt, "application/vnd.erofs.layer")
 }
 
 func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
@@ -120,7 +115,7 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		fastcopy       bool
 	)
 	diffLayerType := desc.MediaType
-	native := isErofsMediaType(diffLayerType)
+	native := erofsutils.IsErofsMediaType(diffLayerType)
 	if native {
 		base, ext, hasExt := strings.Cut(diffLayerType, "+")
 		// Mimic the OCI layer for EROFS blobs for diff.NewProcessorChain(), so
@@ -258,22 +253,4 @@ func (rc *readCounter) Read(p []byte) (n int, err error) {
 	n, err = rc.r.Read(p)
 	rc.c += int64(n)
 	return
-}
-
-// addDefaultMkfsOpts adds default options for mkfs.erofs
-func addDefaultMkfsOpts(mkfsExtraOpts []string) []string {
-	if runtime.GOOS != "darwin" {
-		return mkfsExtraOpts
-	}
-
-	// Check if -b argument is already present
-	for _, opt := range mkfsExtraOpts {
-		if strings.HasPrefix(opt, "-b") {
-			return mkfsExtraOpts
-		}
-	}
-
-	// Add -b4096 as the first option to prevent unusable block
-	// size from being used on macOS.
-	return append([]string{"-b4096"}, mkfsExtraOpts...)
 }

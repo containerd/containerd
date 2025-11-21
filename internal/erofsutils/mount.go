@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/containerd/errdefs"
@@ -31,6 +32,11 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 )
+
+// IsErofsMediaType returns true if the media type is an EROFS layer type.
+func IsErofsMediaType(mt string) bool {
+	return strings.HasPrefix(mt, "application/vnd.erofs.layer")
+}
 
 func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {
 	args := append([]string{"--tar=f", "--aufs", "--quiet", "-Enoinline_data"}, mkfsExtraOpts...)
@@ -101,6 +107,24 @@ func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath, u
 	log.G(ctx).Infof("Successfully generated EROFS layer with tar index and tar content: %s", layerPath)
 
 	return nil
+}
+
+// AddDefaultMkfsOpts adds default options for mkfs.erofs
+func AddDefaultMkfsOpts(mkfsExtraOpts []string) []string {
+	if runtime.GOOS != "darwin" {
+		return mkfsExtraOpts
+	}
+
+	// Check if -b argument is already present
+	for _, opt := range mkfsExtraOpts {
+		if strings.HasPrefix(opt, "-b") {
+			return mkfsExtraOpts
+		}
+	}
+
+	// Add -b4096 as the first option to prevent unusable block
+	// size from being used on macOS.
+	return append([]string{"-b4096"}, mkfsExtraOpts...)
 }
 
 func ConvertErofs(ctx context.Context, layerPath string, srcDir string, mkfsExtraOpts []string) error {
