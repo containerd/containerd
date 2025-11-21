@@ -218,10 +218,12 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	opts := runtime.CreateOpts{
 		Spec: container.Spec,
 		IO: runtime.IO{
-			Stdin:    r.Stdin,
-			Stdout:   r.Stdout,
-			Stderr:   r.Stderr,
-			Terminal: r.Terminal,
+			Stdin:         r.Stdin,
+			Stdout:        r.Stdout,
+			Stderr:        r.Stderr,
+			AttachableOut: r.AttachableOut,
+			AttachableErr: r.AttachableErr,
+			Terminal:      r.Terminal,
 		},
 		Checkpoint:      checkpointPath,
 		RestoreFromPath: restoreFromPath,
