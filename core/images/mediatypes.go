@@ -102,6 +102,18 @@ func DiffCompression(ctx context.Context, mediaType string) (string, error) {
 		}
 		return "", nil
 	default:
+		// Keep this in default so vendor-prefixed EROFS media types still resolve their suffix compression.
+		if strings.HasSuffix(base, ".erofs") {
+			if len(ext) > 0 {
+				switch ext[len(ext)-1] {
+				case "gzip":
+					return "gzip", nil
+				case "zstd":
+					return "zstd", nil
+				}
+			}
+			return "", nil
+		}
 		return "", fmt.Errorf("unrecognised mediatype %s: %w", mediaType, errdefs.ErrNotImplemented)
 	}
 }
