@@ -97,7 +97,7 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 //
 // Since `images.DiffCompression` doesn't support arbitrary media types,
 // disallow non-empty suffixes for now.
-func isErofsMediaType(mt string) bool {
+func IsErofsMediaType(mt string) bool {
 	if !strings.HasSuffix(mt, ".erofs") && !strings.HasPrefix(mt, "application/vnd.erofs.layer") {
 		return false
 	}
@@ -119,7 +119,7 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	}()
 
 	native := false
-	if isErofsMediaType(desc.MediaType) {
+	if IsErofsMediaType(desc.MediaType) {
 		native = true
 	} else if _, err := images.DiffCompression(ctx, desc.MediaType); err != nil {
 		return emptyDesc, fmt.Errorf("currently unsupported media type: %s", desc.MediaType)
