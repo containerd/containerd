@@ -41,11 +41,21 @@ BDIR="$(mktemp -d -p $PWD)"
 traverse_path "$BDIR"
 
 function cleanup() {
-    pkill containerd || true
+    # Preserve the original exit code
+    local exit_code=$?
+
+    # Only kill containerd if coverage didn't already handle it
+    if [ -z "${GOCOVERDIR:-}" ]; then
+        pkill containerd || true
+    fi
+
     echo ::group::containerd logs
-    cat "$report_dir/containerd.log"
+    cat "$report_dir/containerd.log" || true
     echo ::endgroup::
-    rm -rf ${BDIR}
+    rm -rf ${BDIR} || true
+
+    # Exit with the preserved exit code
+    exit $exit_code
 }
 trap cleanup EXIT
 
@@ -82,12 +92,22 @@ fi
 
 ls /etc/cni/net.d
 
-/usr/local/bin/containerd \
+# Use containerd-coverage binary if GOCOVERDIR is set, otherwise use regular containerd
+if [ -n "${GOCOVERDIR:-}" ]; then
+    echo "Running containerd with coverage enabled (GOCOVERDIR=$GOCOVERDIR)"
+    mkdir -p "$GOCOVERDIR"
+    CONTAINERD_BIN=/usr/local/bin/containerd-coverage
+else
+    CONTAINERD_BIN=/usr/local/bin/containerd
+fi
+
+$CONTAINERD_BIN \
     -a ${BDIR}/c.sock \
     --config ${BDIR}/config.toml \
     --root ${BDIR}/root \
     --state ${BDIR}/state \
     --log-level debug &> "$report_dir/containerd.log" &
+CONTAINERD_PID=$!
 
 # Make sure containerd is ready before calling critest.
 for i in $(seq 1 10)
@@ -95,4 +115,20 @@ do
     crictl --runtime-endpoint ${BDIR}/c.sock info && break || sleep 1
 done
 
+# Run critest but do not let set -e stop execution so we can always perform
+# teardown/coverage flush. Capture the test exit code and exit with it.
+set +e
 critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8 "${GINKGO_SKIP_TEST[@]}" "${GINKGO_FOCUS_TEST[@]}" "${EXTRA_CRITEST_OPTIONS:-""}"
+_CRITEST_RC=$?
+set -e
+
+# If coverage is enabled, signal containerd to flush coverage and wait for it to exit
+if [ -n "${GOCOVERDIR:-}" ]; then
+    echo "Flushing coverage data..."
+    sudo kill -TERM "$CONTAINERD_PID" || true
+    # Wait for containerd to exit gracefully
+    sleep 3
+fi
+
+# Exit with the captured critest return code so the workflow status reflects tests
+exit "${_CRITEST_RC}"
