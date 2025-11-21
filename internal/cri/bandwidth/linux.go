@@ -38,6 +38,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -112,7 +113,7 @@ func (t *tcShaper) nextClassID() (int, error) {
 		}
 	}
 	// This should really never happen
-	return -1, fmt.Errorf("exhausted class space, please try again")
+	return -1, errors.New("exhausted class space, please try again")
 }
 
 // Convert a CIDR from text to a hex representation
