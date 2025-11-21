@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/v2/core/runtime/restart"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -206,7 +207,7 @@ func testRestartMonitorAlways(t *testing.T, client *Client, interval time.Durati
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
 		t.Fatal(err)
 	}
 
