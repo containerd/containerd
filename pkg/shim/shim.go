@@ -250,8 +250,6 @@ func run(ctx context.Context, manager Manager, config Config) error {
 
 	ctx = namespaces.WithNamespace(ctx, namespaceFlag)
 	ctx = context.WithValue(ctx, OptsKey{}, Opts{BundlePath: bundlePath, Debug: debugFlag})
-	ctx, sd := shutdown.WithShutdown(ctx)
-	defer sd.Shutdown()
 
 	// Handle explicit actions
 	switch action {
@@ -303,7 +301,8 @@ func run(ctx context.Context, manager Manager, config Config) error {
 
 		return nil
 	}
-
+	ctx, sd := shutdown.WithShutdown(ctx)
+	defer sd.Shutdown()
 	if !config.NoSetupLogger {
 		ctx, err = setLogger(ctx, id)
 		if err != nil {
@@ -432,6 +431,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 
 	select {
 	case <-sd.Done():
+		log.G(ctx).Infof("shim shutdown with pid %d", os.Getpid())
 		return nil
 	case <-time.After(5 * time.Second):
 		return errors.New("shim shutdown timeout")
