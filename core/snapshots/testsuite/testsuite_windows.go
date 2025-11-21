@@ -16,6 +16,12 @@
 
 package testsuite
 
+import "testing"
+
 func clearMask() func() {
 	return func() {}
+}
+
+func debugDiskUsage(_ *testing.T, _ string) {
+	// No-op for Windows.
 }
