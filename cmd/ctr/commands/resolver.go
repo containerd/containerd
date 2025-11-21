@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/containerd/console"
@@ -33,6 +34,8 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/pkg/httpdbg"
+	"github.com/containerd/containerd/v2/pkg/reference"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/urfave/cli/v2"
 )
 
@@ -196,4 +199,85 @@ func (sc *staticCredentials) GetCredentials(ctx context.Context, ref, host strin
 		}, nil
 	}
 	return registry.Credentials{}, nil
+}
+
+func CreateTmpHostConfig(cliContext *cli.Context, imageRef string) (string, func(), error) {
+	refspec, err := reference.Parse(imageRef)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to parse image reference %q: %w", imageRef, err)
+	}
+	host := refspec.Hostname()
+
+	tempDir, err := os.MkdirTemp("", "ctr-hosts-*")
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	cleanup := func() {
+		os.RemoveAll(tempDir)
+	}
+
+	hostDir := filepath.Join(tempDir, host)
+	if err := os.MkdirAll(hostDir, 0755); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("failed to create host directory: %w", err)
+	}
+
+	tomlContent, err := generateHostsToml(cliContext, host)
+	if err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("failed to generate hosts.toml: %w", err)
+	}
+
+	hostsTomlPath := filepath.Join(hostDir, "hosts.toml")
+	if err := os.WriteFile(hostsTomlPath, []byte(tomlContent), 0644); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("failed to write hosts.toml: %w", err)
+	}
+
+	return tempDir, cleanup, nil
+}
+
+type hostFileConfig struct {
+	SkipVerify *bool       `toml:"skip_verify,omitempty"`
+	CACert     string      `toml:"ca,omitempty"`
+	Client     [][2]string `toml:"client,omitempty"`
+}
+
+func generateHostsToml(cliContext *cli.Context, host string) (string, error) {
+	config := hostFileConfig{}
+
+	if cliContext.Bool("skip-verify") {
+		skipVerify := true
+		config.SkipVerify = &skipVerify
+	}
+
+	if tlscacert := cliContext.String("tlscacert"); tlscacert != "" {
+		absPath, err := filepath.Abs(tlscacert)
+		if err != nil {
+			return "", fmt.Errorf("failed to get absolute path for tlscacert: %w", err)
+		}
+		config.CACert = absPath
+	}
+
+	tlscert := cliContext.String("tlscert")
+	tlskey := cliContext.String("tlskey")
+	if tlscert != "" && tlskey != "" {
+		absCert, err := filepath.Abs(tlscert)
+		if err != nil {
+			return "", fmt.Errorf("failed to get absolute path for tlscert: %w", err)
+		}
+		absKey, err := filepath.Abs(tlskey)
+		if err != nil {
+			return "", fmt.Errorf("failed to get absolute path for tlskey: %w", err)
+		}
+		config.Client = [][2]string{{absCert, absKey}}
+	}
+
+	data, err := toml.Marshal(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal hosts config: %w", err)
+	}
+
+	return string(data), nil
 }
