@@ -84,8 +84,13 @@ func NewStore(root string) (content.Store, error) {
 // require labels and should use `NewStore`. `NewLabeledStore` is primarily
 // useful for tests or standalone implementations.
 func NewLabeledStore(root string, ls LabelStore) (content.Store, error) {
-	supported, _ := fsverity.IsSupported(root)
-
+	if err := os.MkdirAll(root, 0755); err != nil {
+		return nil, err
+	}
+	supported, err := fsverity.IsSupported(root)
+	if err != nil {
+		log.G(context.Background()).WithField("root", root).WithError(err).Warnf("failed to check fsverity support")
+	}
 	s := &store{
 		root:               root,
 		ls:                 ls,
