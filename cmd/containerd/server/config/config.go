@@ -64,10 +64,6 @@ type Config struct {
 	State string `toml:"state"`
 	// TempDir is the path to a directory where to place containerd temporary files
 	TempDir string `toml:"temp"`
-	// GRPC configuration settings
-	GRPC GRPCConfig `toml:"grpc"`
-	// TTRPC configuration settings
-	TTRPC TTRPCConfig `toml:"ttrpc"`
 	// Debug log settings
 	Debug Debug `toml:"debug"`
 	// Metrics and monitoring settings
@@ -81,7 +77,7 @@ type Config struct {
 	// RequiredPlugins must use a fully qualified plugin URI.
 	RequiredPlugins []string `toml:"required_plugins"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
-	Plugins map[string]interface{} `toml:"plugins"`
+	Plugins map[string]any `toml:"plugins"`
 	// OOMScore adjust the containerd's oom score
 	OOMScore int `toml:"oom_score"`
 	// Cgroup specifies cgroup information for the containerd daemon process
@@ -94,6 +90,15 @@ type Config struct {
 	Imports []string `toml:"imports"`
 	// StreamProcessors configuration
 	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
+
+	// Deprecated fields must remain but should not be output when generating default or migrated configs
+
+	// GRPC configuration settings
+	// deprecated: use server plugins io.containerd.server.v1.grpc and io.containerd.server.v1.grpc-tcp
+	GRPC GRPCConfig `toml:"grpc,omitempty"`
+	// TTRPC configuration settings
+	// deprecated: use server plugin io.containerd.server.v1.ttrpc
+	TTRPC TTRPCConfig `toml:"ttrpc,omitempty"`
 }
 
 // StreamProcessor provides configuration for diff content processors
@@ -216,28 +221,87 @@ func serviceMigrate(ctx context.Context, c *Config) error {
 		c.Debug.UID = 0
 		c.Debug.GID = 0
 	}
+	grpcAddress := c.GRPC.Address
+	if c.GRPC.Address != "" && c.Plugins["io.containerd.server.v1.grpc"] == nil {
+		c.Plugins["io.containerd.server.v1.grpc"] = map[string]any{
+			"address":               c.GRPC.Address,
+			"uid":                   c.GRPC.UID,
+			"gid":                   c.GRPC.GID,
+			"max_recv_message_size": c.GRPC.MaxRecvMsgSize,
+			"max_send_message_size": c.GRPC.MaxSendMsgSize,
+		}
+		c.GRPC.Address = ""
+		c.GRPC.UID = 0
+		c.GRPC.GID = 0
+		c.GRPC.MaxRecvMsgSize = 0
+		c.GRPC.MaxSendMsgSize = 0
+	}
+	if c.GRPC.TCPAddress != "" && c.Plugins["io.containerd.server.v1.grpc-tcp"] == nil {
+		c.Plugins["io.containerd.server.v1.grpc-tcp"] = map[string]any{
+			"address":               c.GRPC.TCPAddress,
+			"tls_ca":                c.GRPC.TCPTLSCA,
+			"tls_cert":              c.GRPC.TCPTLSCert,
+			"tls_key":               c.GRPC.TCPTLSKey,
+			"tls_common_name":       c.GRPC.TCPTLSCName,
+			"max_recv_message_size": c.GRPC.MaxRecvMsgSize,
+			"max_send_message_size": c.GRPC.MaxSendMsgSize,
+		}
+		c.GRPC.TCPAddress = ""
+		c.GRPC.TCPTLSCA = ""
+		c.GRPC.TCPTLSCert = ""
+		c.GRPC.TCPTLSKey = ""
+		c.GRPC.TCPTLSCName = ""
+		c.GRPC.MaxRecvMsgSize = 0
+		c.GRPC.MaxSendMsgSize = 0
+	}
+	if c.Plugins["io.containerd.server.v1.ttrpc"] == nil {
+		ttrpcAddress := c.TTRPC.Address
+		if ttrpcAddress == "" && grpcAddress != "" {
+			ttrpcAddress = grpcAddress + ".ttrpc"
+		}
+		if ttrpcAddress != "" || c.TTRPC.UID != 0 || c.TTRPC.GID != 0 {
+			c.Plugins["io.containerd.server.v1.ttrpc"] = map[string]any{
+				"address": ttrpcAddress,
+				"uid":     c.TTRPC.UID,
+				"gid":     c.TTRPC.GID,
+			}
+			c.TTRPC.Address = ""
+			c.TTRPC.UID = 0
+			c.TTRPC.GID = 0
+		}
+	}
 	return nil
 }
 
 // GRPCConfig provides GRPC configuration for the socket
 type GRPCConfig struct {
-	Address        string `toml:"address"`
-	TCPAddress     string `toml:"tcp_address"`
-	TCPTLSCA       string `toml:"tcp_tls_ca"`
-	TCPTLSCert     string `toml:"tcp_tls_cert"`
-	TCPTLSKey      string `toml:"tcp_tls_key"`
-	UID            int    `toml:"uid"`
-	GID            int    `toml:"gid"`
-	MaxRecvMsgSize int    `toml:"max_recv_message_size"`
-	MaxSendMsgSize int    `toml:"max_send_message_size"`
-	TCPTLSCName    string `toml:"tcp_tls_common_name"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	Address string `toml:"address,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPAddress string `toml:"tcp_address,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPTLSCA string `toml:"tcp_tls_ca,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPTLSCert string `toml:"tcp_tls_cert,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPTLSKey string `toml:"tcp_tls_key,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	UID int `toml:"uid,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	GID int `toml:"gid,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	MaxRecvMsgSize int `toml:"max_recv_message_size,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	MaxSendMsgSize int `toml:"max_send_message_size,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPTLSCName string `toml:"tcp_tls_common_name,omitempty"`
 }
 
 // TTRPCConfig provides TTRPC configuration for the socket
 type TTRPCConfig struct {
-	Address string `toml:"address"`
-	UID     int    `toml:"uid"`
-	GID     int    `toml:"gid"`
+	Address string `toml:"address,omitempty"`
+	UID     int    `toml:"uid,omitempty"`
+	GID     int    `toml:"gid,omitempty"`
 }
 
 // Debug provides debug configuration
@@ -256,8 +320,9 @@ type Debug struct {
 
 // MetricsConfig provides metrics configuration
 type MetricsConfig struct {
-	Address       string `toml:"address"`
-	GRPCHistogram bool   `toml:"grpc_histogram"`
+	Address string `toml:"address"`
+	// deprecated: use metrics plugin io.containerd.metrics.v1.grpc-prometheus
+	GRPCHistogram bool `toml:"grpc_histogram,omitempty"`
 }
 
 // CgroupConfig provides cgroup configuration
