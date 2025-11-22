@@ -57,6 +57,8 @@ const (
 	StreamingPlugin plugin.Type = "io.containerd.streaming.v1"
 	// TracingProcessorPlugin implements an open telemetry span processor
 	TracingProcessorPlugin plugin.Type = "io.containerd.tracing.processor.v1"
+	// MetricsPlugin implements a metrics handler
+	MetricsPlugin plugin.Type = "io.containerd.metrics.v1"
 	// NRIApiPlugin implements the NRI adaptation interface for containerd.
 	NRIApiPlugin plugin.Type = "io.containerd.nri.v1"
 	// TransferPlugin implements a transfer service

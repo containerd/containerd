@@ -18,8 +18,6 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -33,15 +31,10 @@ import (
 	"time"
 
 	"github.com/containerd/log"
-	"github.com/containerd/ttrpc"
 	"github.com/docker/go-metrics"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
@@ -58,7 +51,6 @@ import (
 	sbproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
 	ssproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/internal/wintls"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -143,104 +135,14 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	for id, p := range config.StreamProcessors {
 		diff.RegisterProcessor(diff.BinaryHandler(id, p.Returns, p.Accepts, p.Path, p.Args, p.Env))
 	}
-
-	var prometheusServerMetricsOpts []grpc_prometheus.ServerMetricsOption
-	if config.Metrics.GRPCHistogram {
-		// Enable grpc time histograms to measure rpc latencies
-		prometheusServerMetricsOpts = append(prometheusServerMetricsOpts, grpc_prometheus.WithServerHandlingTimeHistogram())
-	}
-
-	prometheusServerMetrics := grpc_prometheus.NewServerMetrics(prometheusServerMetricsOpts...)
-	prometheus.MustRegister(prometheusServerMetrics)
-
-	serverOpts := []grpc.ServerOption{
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainStreamInterceptor(
-			streamNamespaceInterceptor,
-			prometheusServerMetrics.StreamServerInterceptor(),
-		),
-		grpc.ChainUnaryInterceptor(
-			unaryNamespaceInterceptor,
-			prometheusServerMetrics.UnaryServerInterceptor(),
-		),
-	}
-	if config.GRPC.MaxRecvMsgSize > 0 {
-		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(config.GRPC.MaxRecvMsgSize))
-	}
-	if config.GRPC.MaxSendMsgSize > 0 {
-		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(config.GRPC.MaxSendMsgSize))
-	}
-	ttrpcServer, err := newTTRPCServer()
-	if err != nil {
-		return nil, err
-	}
-	tcpServerOpts := serverOpts
-	if config.GRPC.TCPTLSCert != "" {
-		log.G(ctx).Info("setting up tls on tcp GRPC services...")
-
-		tlsCert, err := tls.LoadX509KeyPair(config.GRPC.TCPTLSCert, config.GRPC.TCPTLSKey)
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig := &tls.Config{Certificates: []tls.Certificate{tlsCert}}
-
-		if config.GRPC.TCPTLSCA != "" {
-			caCertPool := x509.NewCertPool()
-			caCert, err := os.ReadFile(config.GRPC.TCPTLSCA)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load CA file: %w", err)
-			}
-			caCertPool.AppendCertsFromPEM(caCert)
-			tlsConfig.ClientCAs = caCertPool
-			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		}
-		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
-	} else if config.GRPC.TCPTLSCName != "" {
-		tlsConfig, CA, res, err :=
-			wintls.SetupTLSFromWindowsCertStore(ctx, config.GRPC.TCPTLSCName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup TLS from Windows cert store: %w", err)
-		}
-		// Cache resource for cleanup (Windows only)
-		setTLSResource(res)
-		if CA != nil {
-			tlsConfig.ClientCAs = CA
-			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		}
-		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
-	}
-
-	// grpcService allows GRPC services to be registered with the underlying server
-	type grpcService interface {
-		Register(*grpc.Server) error
-	}
-
-	// tcpService allows GRPC services to be registered with the underlying tcp server
-	type tcpService interface {
-		RegisterTCP(*grpc.Server) error
-	}
-
-	// ttrpcService allows TTRPC services to be registered with the underlying server
-	type ttrpcService interface {
-		RegisterTTRPC(*ttrpc.Server) error
-	}
-
 	var (
-		grpcServer = grpc.NewServer(serverOpts...)
-		tcpServer  = grpc.NewServer(tcpServerOpts...)
-
-		grpcServices  []grpcService
-		tcpServices   []tcpService
-		ttrpcServices []ttrpcService
-		s             = &Server{
-			prometheusServerMetrics: prometheusServerMetrics,
-			grpcServer:              grpcServer,
-			tcpServer:               tcpServer,
-			ttrpcServer:             ttrpcServer,
-			config:                  config,
+		s = &Server{
+			config: config,
 		}
-		initialized = plugin.NewPluginSet()
-		required    = make(map[string]struct{})
+		initialized  = plugin.NewPluginSet()
+		required     = make(map[string]struct{})
+		grpcAddress  = readString(config.Plugins, "io.containerd.server.v1.grpc", "address")
+		ttrpcAddress = readString(config.Plugins, "io.containerd.server.v1.ttrpc", "address")
 	)
 	for _, r := range config.RequiredPlugins {
 		required[r] = struct{}{}
@@ -257,8 +159,8 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			map[string]string{
 				plugins.PropertyRootDir:      filepath.Join(config.Root, id),
 				plugins.PropertyStateDir:     filepath.Join(config.State, id),
-				plugins.PropertyGRPCAddress:  config.GRPC.Address,
-				plugins.PropertyTTRPCAddress: config.TTRPC.Address,
+				plugins.PropertyGRPCAddress:  grpcAddress,
+				plugins.PropertyTTRPCAddress: ttrpcAddress,
 			},
 		)
 		initContext.RegisterReadiness = func() func() {
@@ -305,17 +207,6 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			s.servers = append(s.servers, srv)
 		}
 
-		// check for grpc services that should be registered with the server
-		if src, ok := instance.(grpcService); ok {
-			grpcServices = append(grpcServices, src)
-		}
-		if src, ok := instance.(ttrpcService); ok {
-			ttrpcServices = append(ttrpcServices, src)
-		}
-		if service, ok := instance.(tcpService); ok {
-			tcpServices = append(tcpServices, service)
-		}
-
 		s.plugins = append(s.plugins, result)
 	}
 	if len(required) != 0 {
@@ -324,23 +215,6 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			missing = append(missing, id)
 		}
 		return nil, fmt.Errorf("required plugin %s not included", missing)
-	}
-
-	// register services after all plugins have been initialized
-	for _, service := range grpcServices {
-		if err := service.Register(grpcServer); err != nil {
-			return nil, err
-		}
-	}
-	for _, service := range ttrpcServices {
-		if err := service.RegisterTTRPC(ttrpcServer); err != nil {
-			return nil, err
-		}
-	}
-	for _, service := range tcpServices {
-		if err := service.RegisterTCP(tcpServer); err != nil {
-			return nil, err
-		}
 	}
 
 	recordConfigDeprecations(ctx, config, initialized)
@@ -376,25 +250,10 @@ type server interface {
 
 // Server is the containerd main daemon
 type Server struct {
-	prometheusServerMetrics *grpc_prometheus.ServerMetrics
-	grpcServer              *grpc.Server
-	ttrpcServer             *ttrpc.Server
-	tcpServer               *grpc.Server
-	servers                 []server
-	config                  *srvconfig.Config
-	plugins                 []*plugin.Plugin
-	ready                   sync.WaitGroup
-}
-
-// ServeGRPC provides the containerd grpc APIs on the provided listener
-func (s *Server) ServeGRPC(l net.Listener) error {
-	s.prometheusServerMetrics.InitializeMetrics(s.grpcServer)
-	return trapClosedConnErr(s.grpcServer.Serve(l))
-}
-
-// ServeTTRPC provides the containerd ttrpc APIs on the provided listener
-func (s *Server) ServeTTRPC(l net.Listener) error {
-	return trapClosedConnErr(s.ttrpcServer.Serve(context.Background(), l))
+	servers []server
+	config  *srvconfig.Config
+	plugins []*plugin.Plugin
+	ready   sync.WaitGroup
 }
 
 // ServeMetrics provides a prometheus endpoint for exposing metrics
@@ -406,12 +265,6 @@ func (s *Server) ServeMetrics(l net.Listener) error {
 		ReadHeaderTimeout: 5 * time.Minute, // "G112: Potential Slowloris Attack (gosec)"; not a real concern for our use, so setting a long timeout.
 	}
 	return trapClosedConnErr(srv.Serve(l))
-}
-
-// ServeTCP allows services to serve over tcp
-func (s *Server) ServeTCP(l net.Listener) error {
-	s.prometheusServerMetrics.InitializeMetrics(s.tcpServer)
-	return trapClosedConnErr(s.tcpServer.Serve(l))
 }
 
 // Start the services, this will normally start listening on sockets
@@ -427,9 +280,6 @@ func (s *Server) Start(ctx context.Context) error {
 
 // Stop the containerd server canceling any open connections
 func (s *Server) Stop() {
-	s.grpcServer.Stop()
-	// Clean up TLS resources (Windows only)
-	cleanupTLSResources()
 	for i := len(s.plugins) - 1; i >= 0; i-- {
 		p := s.plugins[i]
 		instance, err := p.Instance()
@@ -573,6 +423,26 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 	pc.clients[address] = conn
 
 	return conn, nil
+}
+
+func readString(properties map[string]any, key ...string) string {
+	for _, k := range key {
+		if v, ok := properties[k]; ok {
+			switch v := v.(type) {
+			case map[string]any:
+				properties = v
+				continue
+			case string:
+				return v
+			case fmt.Stringer:
+				return v.String()
+			case []byte:
+				return string(v)
+			}
+		}
+		break
+	}
+	return ""
 }
 
 func trapClosedConnErr(err error) error {
