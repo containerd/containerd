@@ -653,3 +653,23 @@ func TestGetCommonDirectory(t *testing.T) {
 		})
 	}
 }
+
+func TestXContainerdOptionsFiltered(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	target := filepath.Join(t.TempDir(), "mnt")
+	require.NoError(t, os.MkdirAll(target, 0755))
+
+	m := Mount{
+		Type:   "tmpfs",
+		Source: "tmpfs",
+		Options: []string{
+			"size=10M",
+			"X-containerd.custom=test-value",
+			"mode=0755",
+		},
+	}
+
+	err := m.Mount(target)
+	require.Error(t, err, "X-containerd.* options should cause an error")
+}
