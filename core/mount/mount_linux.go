@@ -92,6 +92,14 @@ func (m *Mount) mount(target string) (err error) {
 		options   = m.Options
 	)
 
+	// X-containerd.* options are internal mount options that should be processed
+	// by the mount manager before reaching this layer.
+	for _, opt := range options {
+		if strings.HasPrefix(opt, "X-containerd.") {
+			return fmt.Errorf("internal mount option %q was not consumed by the mount manager", opt)
+		}
+	}
+
 	opt := parseMountOptions(options)
 	// The only remapping of both GID and UID is supported
 	if opt.uidmap != "" && opt.gidmap != "" {
