@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
 )
@@ -71,16 +70,10 @@ func startDaemon() {
 			return
 		}
 
-		l, err := sys.GetLocalListener(srvconfig.GRPC.Address, srvconfig.GRPC.UID, srvconfig.GRPC.GID)
-		if err != nil {
-			errC <- err
-			return
-		}
-
 		go func() {
-			defer l.Close()
-			if err := server.ServeGRPC(l); err != nil {
-				log.G(ctx).WithError(err).WithField("address", srvconfig.GRPC.Address).Fatal("serve failure")
+			defer server.Stop()
+			if err := server.Start(ctx); err != nil {
+				log.G(ctx).WithError(err).WithField("address", defaultAddress).Fatal("serve failure")
 			}
 		}()
 

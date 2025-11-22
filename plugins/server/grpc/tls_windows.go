@@ -14,16 +14,11 @@
    limitations under the License.
 */
 
-package server
+package grpc
 
 import (
-	"context"
-
-	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/internal/wintls"
 	"github.com/containerd/log"
-	"github.com/containerd/otelttrpc"
-	"github.com/containerd/ttrpc"
 )
 
 // tlsResource holds Windows-specific TLS resources for cleanup on Stop.
@@ -40,15 +35,4 @@ func cleanupTLSResources() {
 		}
 		tlsResource = nil
 	}
-}
-
-// Windows-specific apply and TTRPC server constructor
-func apply(_ context.Context, _ *srvconfig.Config) error {
-	return nil
-}
-
-func newTTRPCServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(
-		ttrpc.WithUnaryServerInterceptor(otelttrpc.UnaryServerInterceptor()),
-	)
 }
