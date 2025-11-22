@@ -59,6 +59,7 @@ func TestLoopbackMount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	mounts := []mount.Mount{
 		{
 			Type:    "loop",
@@ -79,6 +80,20 @@ func TestLoopbackMount(t *testing.T) {
 	defer func() {
 		assert.NoError(t, m.Deactivate(ctx, "id1"))
 	}()
+
+	/*
+		loopdev, err := os.Readlink(ainfo.System[0].Source)
+		assert.NoError(t, err)
+		fmt.Println(loopdev, "-->", ainfo.System[0].Source)
+
+		newSource, err := initalizeBlockDevice(td, a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = mount.TestONLYSetupLoopDevWithName(newSource, loopdev, mount.LoopParams{Autoclear: true})
+		assert.Error(t, err)
+		fmt.Println(err)
+	*/
 
 	tm, err := os.MkdirTemp(td, "test-mount-")
 	if err != nil {

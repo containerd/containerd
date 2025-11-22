@@ -61,6 +61,10 @@ func getFreeLoopDev() (uint32, error) {
 	return uint32(num), nil
 }
 
+func TestONLYSetupLoopDevWithName(backingFile, loopDev string, param LoopParams) (*os.File, error) {
+	return setupLoopDev(backingFile, loopDev, param)
+}
+
 // setupLoopDev attaches the backing file to the loop device and returns
 // the file handle for the loop device. The caller is responsible for
 // closing the file handle.

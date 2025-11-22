@@ -457,8 +457,12 @@ jobs:
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
         run: |
+          set -euo pipefail
           make test
-          sudo -E PATH=$PATH make root-test
+          for i in {1..100}; do
+            echo "root-test run #$i"
+            sudo -E PATH=$PATH make root-test
+          done
       - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
       - run: script/test/test2annotation.sh *-gotest.json
