@@ -1,3 +1,5 @@
+//go:build !linux && !windows && !solaris
+
 /*
    Copyright The containerd Authors.
 
@@ -14,26 +16,12 @@
    limitations under the License.
 */
 
-package internal
+package ttrpc
 
 import (
-	"context"
-	"errors"
-	"net"
-	"net/http"
-
-	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 )
 
-func Serve(ctx context.Context, l net.Listener, serveFunc func(net.Listener) error) {
-	path := l.Addr().String()
-	log.G(ctx).WithField("address", path).Info("serving...")
-	go func() {
-		defer l.Close()
-
-		if err := serveFunc(l); err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, ttrpc.ErrServerClosed) {
-			log.G(ctx).WithError(err).WithField("address", path).Fatal("serve failure")
-		}
-	}()
+func newTTRPCServer() (*ttrpc.Server, error) {
+	return ttrpc.NewServer()
 }

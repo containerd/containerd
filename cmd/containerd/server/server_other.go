@@ -1,3 +1,6 @@
+//go:build !linux
+// +build !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -14,26 +17,14 @@
    limitations under the License.
 */
 
-package internal
+package server
 
 import (
 	"context"
-	"errors"
-	"net"
-	"net/http"
 
-	"github.com/containerd/log"
-	"github.com/containerd/ttrpc"
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 )
 
-func Serve(ctx context.Context, l net.Listener, serveFunc func(net.Listener) error) {
-	path := l.Addr().String()
-	log.G(ctx).WithField("address", path).Info("serving...")
-	go func() {
-		defer l.Close()
-
-		if err := serveFunc(l); err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, ttrpc.ErrServerClosed) {
-			log.G(ctx).WithError(err).WithField("address", path).Fatal("serve failure")
-		}
-	}()
+func apply(_ context.Context, _ *srvconfig.Config) error {
+	return nil
 }

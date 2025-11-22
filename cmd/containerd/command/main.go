@@ -34,7 +34,6 @@ import (
 	_ "github.com/containerd/containerd/v2/core/metrics" // import containerd build info
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -156,16 +155,6 @@ can be used and modified as necessary as a custom configuration.`
 			return err
 		}
 
-		if config.GRPC.Address == "" {
-			return fmt.Errorf("grpc address cannot be empty: %w", errdefs.ErrInvalidArgument)
-		}
-		if config.TTRPC.Address == "" {
-			// If TTRPC was not explicitly configured, use defaults based on GRPC.
-			config.TTRPC.Address = config.GRPC.Address + ".ttrpc"
-			config.TTRPC.UID = config.GRPC.UID
-			config.TTRPC.GID = config.GRPC.GID
-		}
-
 		// Make sure top-level directories are created early.
 		if err := server.CreateTopLevelDirectories(config); err != nil {
 			return err
@@ -216,6 +205,7 @@ can be used and modified as necessary as a custom configuration.`
 		go func() {
 			defer close(chsrv)
 
+			// TODO: When to set grpc address from flag? Migration should be done first
 			server, err := server.New(ctx, config)
 			if err != nil {
 				select {
@@ -257,6 +247,8 @@ can be used and modified as necessary as a custom configuration.`
 		if err := server.Start(ctx); err != nil {
 			return err
 		}
+
+		// TODO: Move to server.Start(ctx) error
 		if config.Metrics.Address != "" {
 			l, err := net.Listen("tcp", config.Metrics.Address)
 			if err != nil {
@@ -264,26 +256,8 @@ can be used and modified as necessary as a custom configuration.`
 			}
 			serve(ctx, l, server.ServeMetrics)
 		}
-		// setup the ttrpc endpoint
-		tl, err := sys.GetLocalListener(config.TTRPC.Address, config.TTRPC.UID, config.TTRPC.GID)
-		if err != nil {
-			return fmt.Errorf("failed to get listener for main ttrpc endpoint: %w", err)
-		}
-		serve(ctx, tl, server.ServeTTRPC)
 
-		if config.GRPC.TCPAddress != "" {
-			l, err := net.Listen("tcp", config.GRPC.TCPAddress)
-			if err != nil {
-				return fmt.Errorf("failed to get listener for TCP grpc endpoint: %w", err)
-			}
-			serve(ctx, l, server.ServeTCP)
-		}
-		// setup the main grpc endpoint
-		l, err := sys.GetLocalListener(config.GRPC.Address, config.GRPC.UID, config.GRPC.GID)
-		if err != nil {
-			return fmt.Errorf("failed to get listener for main endpoint: %w", err)
-		}
-		serve(ctx, l, server.ServeGRPC)
+		// end s.Start
 
 		readyC := make(chan struct{})
 		go func() {
@@ -338,10 +312,6 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 			name: "state",
 			d:    &config.State,
 		},
-		{
-			name: "address",
-			d:    &config.GRPC.Address,
-		},
 	} {
 		if s := cliContext.String(v.name); s != "" {
 			*v.d = s
@@ -353,6 +323,33 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 				*v.d = absPath
 			}
 		}
+	}
+
+	if s := cliContext.String("address"); s != "" {
+		var (
+			grpcConfig  map[string]any
+			ttrpcConfig map[string]any
+		)
+		v, ok := config.Plugins["io.containerd.server.v1.grpc"]
+		if !ok {
+			grpcConfig = make(map[string]any)
+		} else if grpcConfig, ok = v.(map[string]any); !ok {
+			return fmt.Errorf("grpc plugin has invalid configuration: %w", errdefs.ErrInvalidArgument)
+		}
+		grpcConfig["address"] = s
+		config.Plugins["io.containerd.server.v1.grpc"] = grpcConfig
+
+		_, ok = config.Plugins["io.containerd.server.v1.ttrpc"]
+		if !ok {
+			ttrpcConfig = map[string]any{
+				"address": s + ".ttrpc",
+				"uid":     grpcConfig["uid"],
+				"gid":     grpcConfig["gid"],
+			}
+			config.Plugins["io.containerd.server.v1.ttrpc"] = ttrpcConfig
+		}
+
+		return nil
 	}
 
 	applyPlatformFlags(cliContext)

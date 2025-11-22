@@ -24,11 +24,8 @@ import (
 	cgroup1 "github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
-	"github.com/containerd/containerd/v2/internal/wintls"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/log"
-	"github.com/containerd/otelttrpc"
-	"github.com/containerd/ttrpc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -66,14 +63,3 @@ func apply(ctx context.Context, config *srvconfig.Config) error {
 	}
 	return nil
 }
-
-func newTTRPCServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(
-		ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()),
-		ttrpc.WithUnaryServerInterceptor(otelttrpc.UnaryServerInterceptor()),
-	)
-}
-
-// TLS resource helpers are no-ops on Linux.
-func setTLSResource(r wintls.CertResource) {}
-func cleanupTLSResources()                 {}
