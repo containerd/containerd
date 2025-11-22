@@ -92,6 +92,17 @@ func (m *Mount) mount(target string) (err error) {
 		options   = m.Options
 	)
 
+	// X-containerd.* options are reserved for containerd-internal use and must not reach the kernel.
+	// Filter them as a safety net.
+	filteredOptions := make([]string, 0, len(options))
+	for _, opt := range options {
+		if strings.HasPrefix(opt, "X-containerd.") {
+			continue
+		}
+		filteredOptions = append(filteredOptions, opt)
+	}
+	options = filteredOptions
+
 	opt := parseMountOptions(options)
 	// The only remapping of both GID and UID is supported
 	if opt.uidmap != "" && opt.gidmap != "" {
