@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -248,17 +247,6 @@ can be used and modified as necessary as a custom configuration.`
 			return err
 		}
 
-		// TODO: Move to server.Start(ctx) error
-		if config.Metrics.Address != "" {
-			l, err := net.Listen("tcp", config.Metrics.Address)
-			if err != nil {
-				return fmt.Errorf("failed to get listener for metrics endpoint: %w", err)
-			}
-			serve(ctx, l, server.ServeMetrics)
-		}
-
-		// end s.Start
-
 		readyC := make(chan struct{})
 		go func() {
 			server.Wait()
@@ -277,17 +265,6 @@ can be used and modified as necessary as a custom configuration.`
 		return nil
 	}
 	return app
-}
-
-func serve(ctx context.Context, l net.Listener, serveFunc func(net.Listener) error) {
-	path := l.Addr().String()
-	log.G(ctx).WithField("address", path).Info("serving...")
-	go func() {
-		defer l.Close()
-		if err := serveFunc(l); err != nil {
-			log.G(ctx).WithError(err).WithField("address", path).Fatal("serve failure")
-		}
-	}()
 }
 
 func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
