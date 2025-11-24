@@ -21,8 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -31,7 +29,6 @@ import (
 	"time"
 
 	"github.com/containerd/log"
-	"github.com/docker/go-metrics"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -256,17 +253,6 @@ type Server struct {
 	ready   sync.WaitGroup
 }
 
-// ServeMetrics provides a prometheus endpoint for exposing metrics
-func (s *Server) ServeMetrics(l net.Listener) error {
-	m := http.NewServeMux()
-	m.Handle("/v1/metrics", metrics.Handler())
-	srv := &http.Server{
-		Handler:           m,
-		ReadHeaderTimeout: 5 * time.Minute, // "G112: Potential Slowloris Attack (gosec)"; not a real concern for our use, so setting a long timeout.
-	}
-	return trapClosedConnErr(srv.Serve(l))
-}
-
 // Start the services, this will normally start listening on sockets
 // and serving requests.
 func (s *Server) Start(ctx context.Context) error {
@@ -443,11 +429,4 @@ func readString(properties map[string]any, key ...string) string {
 		break
 	}
 	return ""
-}
-
-func trapClosedConnErr(err error) error {
-	if err == nil || errors.Is(err, net.ErrClosed) {
-		return nil
-	}
-	return err
 }
