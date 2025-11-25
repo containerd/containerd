@@ -409,7 +409,7 @@ jobs:
           sudo apt-get install -y criu
 
       # "apt-get install erofs-utils" installs an older version (1.7.1 as of 2025-09-18)
-      # Build and install erofs-utils 1.8.8 from source to get a newer version
+      # Build and install erofs-utils 1.8.10 from source to get a newer version
       - name: Build and install erofs-utils from source
         run: |
           # Install dependencies
@@ -420,10 +420,9 @@ jobs:
           BUILD_DIR="$(mktemp -d)"
           cd "$BUILD_DIR"
 
-          # get erofs-utils-1.8.8.tar.gz
-          wget https://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs-utils.git/snapshot/erofs-utils-1.8.8.tar.gz
-          tar -xzf erofs-utils-1.8.8.tar.gz
-          cd erofs-utils-1.8.8
+          # get erofs-utils-1.8.10.tar.gz
+          curl -L https://github.com/erofs/erofs-utils/archive/refs/tags/v1.8.10.tar.gz | tar -xzf -
+          cd erofs-utils-1.8.10
 
           # Build and install erofs-utils
           ./autogen.sh
