@@ -132,7 +132,10 @@ command. As part of this process, we do the following:
 				sopts = append(sopts, image.WithAllMetadata)
 			}
 
-			reg := registry.NewOCIRegistry(ref, nil, ch)
+			reg, err := registry.NewOCIRegistry(ctx, ref, registry.WithCredentials(ch), registry.WithHostDir(context.String("hosts-dir")))
+			if err != nil {
+				return err
+			}
 			is := image.NewStore(ref, sopts...)
 
 			pf, done := ProgressHandler(ctx, os.Stdout)
