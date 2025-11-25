@@ -55,10 +55,12 @@ func startDaemon() {
 			Debug: config.Debug{
 				Level: "debug",
 			},
-			GRPC: config.GRPCConfig{
-				Address:        defaultAddress,
-				MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
-				MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
+			Plugins: map[string]any{
+				"io.containerd.server.v1.grpc": map[string]any{
+					"address":               defaultAddress,
+					"max_recv_message_size": defaults.DefaultMaxRecvMsgSize,
+					"max_send_message_size": defaults.DefaultMaxSendMsgSize,
+				},
 			},
 			DisabledPlugins: []string{},
 			RequiredPlugins: []string{},
