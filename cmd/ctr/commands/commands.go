@@ -72,7 +72,8 @@ var (
 			Usage: "Refresh token for authorization server",
 		},
 		&cli.StringFlag{
-			Name: "hosts-dir",
+			Name:  "hosts-dir",
+			Value: "/etc/containerd/certs.d",
 			// compatible with "/etc/docker/certs.d"
 			Usage: "Custom hosts configuration directory",
 		},
