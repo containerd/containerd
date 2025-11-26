@@ -32,10 +32,11 @@ import (
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
+
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
-	"github.com/containerd/errdefs"
 )
 
 // ListContainerStats returns stats of all running containers.
@@ -385,39 +386,46 @@ func (c *criService) linuxContainerMetrics(
 		Annotations: meta.Config.GetAnnotations(),
 	}
 
-	if stats != nil {
-		var data interface{}
-		switch {
-		case typeurl.Is(stats.Data, (*cg1.Metrics)(nil)):
-			data = &cg1.Metrics{}
-			if err := typeurl.UnmarshalTo(stats.Data, data); err != nil {
-				return containerStats{}, fmt.Errorf("failed to extract container metrics: %w", err)
-			}
-			pids = data.(*cg1.Metrics).GetPids().GetCurrent()
-		case typeurl.Is(stats.Data, (*cg2.Metrics)(nil)):
-			data = &cg2.Metrics{}
-			if err := typeurl.UnmarshalTo(stats.Data, data); err != nil {
-				return containerStats{}, fmt.Errorf("failed to extract container metrics: %w", err)
-			}
-			pids = data.(*cg2.Metrics).GetPids().GetCurrent()
-		default:
-			return containerStats{}, errors.New("cannot convert metric data to cgroups.Metrics")
-		}
+	if stats == nil {
+		return containerStats{&cs, pids}, nil
+	}
 
-		cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, data, protobuf.FromTimestamp(stats.Timestamp))
-		if err != nil {
-			return containerStats{}, fmt.Errorf("failed to obtain cpu stats: %w", err)
-		}
-		cs.Cpu = cpuStats
+	taskMetricsAny, err := typeurl.UnmarshalAny(stats.Data)
+	if err != nil {
+		return containerStats{}, fmt.Errorf("failed to extract container metrics: %w", err)
+	}
 
-		memoryStats, err := c.memoryContainerStats(meta.ID, data, protobuf.FromTimestamp(stats.Timestamp))
-		if err != nil {
-			return containerStats{}, fmt.Errorf("failed to obtain memory stats: %w", err)
+	var metrics cgroupMetrics
+	switch v := taskMetricsAny.(type) {
+	case *cg1.Metrics:
+		metrics.v1 = v
+
+		if metrics.v1.Pids != nil {
+			pids = metrics.v1.Pids.Current
 		}
-		cs.Memory = memoryStats
-		if err != nil {
-			return containerStats{}, fmt.Errorf("failed to obtain pid count: %w", err)
+	case *cg2.Metrics:
+		metrics.v2 = v
+
+		if metrics.v2.Pids != nil {
+			pids = metrics.v2.Pids.Current
 		}
+	default:
+		return containerStats{}, fmt.Errorf("unexpected metrics type: %T from %s", taskMetricsAny, reflect.TypeOf(taskMetricsAny).Elem().PkgPath())
+	}
+
+	cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, metrics, protobuf.FromTimestamp(stats.Timestamp))
+	if err != nil {
+		return containerStats{}, fmt.Errorf("failed to obtain cpu stats: %w", err)
+	}
+	cs.Cpu = cpuStats
+
+	memoryStats, err := c.memoryContainerStats(meta.ID, metrics, protobuf.FromTimestamp(stats.Timestamp))
+	if err != nil {
+		return containerStats{}, fmt.Errorf("failed to obtain memory stats: %w", err)
+	}
+	cs.Memory = memoryStats
+	if err != nil {
+		return containerStats{}, fmt.Errorf("failed to obtain pid count: %w", err)
 	}
 
 	return containerStats{&cs, pids}, nil
@@ -474,9 +482,10 @@ func getAvailableBytesV2(memory *cg2.MemoryStat, workingSetBytes uint64) uint64 
 	return 0
 }
 
-func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interface{}, timestamp time.Time) (*runtime.CpuUsage, error) {
-	switch metrics := stats.(type) {
-	case *cg1.Metrics:
+func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats cgroupMetrics, timestamp time.Time) (*runtime.CpuUsage, error) {
+	switch {
+	case stats.v1 != nil:
+		metrics := stats.v1
 		metrics.GetCPU().GetUsage()
 		if metrics.CPU != nil && metrics.CPU.Usage != nil {
 			return &runtime.CpuUsage{
@@ -484,7 +493,8 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interfac
 				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: metrics.CPU.Usage.Total},
 			}, nil
 		}
-	case *cg2.Metrics:
+	case stats.v2 != nil:
+		metrics := stats.v2
 		if metrics.CPU != nil {
 			// convert to nano seconds
 			usageCoreNanoSeconds := metrics.CPU.UsageUsec * 1000
@@ -494,15 +504,14 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interfac
 				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: usageCoreNanoSeconds},
 			}, nil
 		}
-	default:
-		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
 	return nil, nil
 }
 
-func (c *criService) memoryContainerStats(ID string, stats interface{}, timestamp time.Time) (*runtime.MemoryUsage, error) {
-	switch metrics := stats.(type) {
-	case *cg1.Metrics:
+func (c *criService) memoryContainerStats(ID string, stats cgroupMetrics, timestamp time.Time) (*runtime.MemoryUsage, error) {
+	switch {
+	case stats.v1 != nil:
+		metrics := stats.v1
 		if metrics.Memory != nil && metrics.Memory.Usage != nil {
 			workingSetBytes := getWorkingSet(metrics.Memory)
 
@@ -518,7 +527,8 @@ func (c *criService) memoryContainerStats(ID string, stats interface{}, timestam
 				MajorPageFaults: &runtime.UInt64Value{Value: metrics.Memory.TotalPgMajFault},
 			}, nil
 		}
-	case *cg2.Metrics:
+	case stats.v2 != nil:
+		metrics := stats.v2
 		if metrics.Memory != nil {
 			workingSetBytes := getWorkingSetV2(metrics.Memory)
 
@@ -536,8 +546,6 @@ func (c *criService) memoryContainerStats(ID string, stats interface{}, timestam
 				MajorPageFaults: &runtime.UInt64Value{Value: metrics.Memory.Pgmajfault},
 			}, nil
 		}
-	default:
-		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
 	return nil, nil
 }

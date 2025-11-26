@@ -31,17 +31,19 @@ import (
 
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
-	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/containers"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 // Rate limiter to prevent overwhelming the system with concurrent requests
@@ -50,15 +52,23 @@ var limiter = rate.NewLimiter(rate.Limit(10), 10) // Allow 10 concurrent request
 // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
 func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
 	ctx = util.WithNamespace(ctx)
-	sandboxes := c.sandboxStore.List()
-	podMetrics := make([]*runtime.PodSandboxMetrics, 0, len(sandboxes))
-	var mu sync.Mutex
 
 	// Create errgroup with context and limit concurrency to 10
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(10)
 
-	for _, sandbox := range sandboxes {
+	// Fetch all containers before executing any metric collection
+	// to correctly map them to each sandbox.
+	sandboxContainerMap := make(map[string][]containerstore.Container)
+	for _, container := range c.containerStore.List() {
+		sandboxContainerMap[container.SandboxID] = append(sandboxContainerMap[container.SandboxID], container)
+	}
+
+	var (
+		podSandboxMetrics []*runtime.PodSandboxMetrics
+		metricsMu         sync.Mutex
+	)
+	for _, sandbox := range c.sandboxStore.List() {
 		// Only collect metrics for ready sandboxes
 		if sandbox.Status.Get().State != sandboxstore.StateReady {
 			continue
@@ -67,161 +77,158 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 		// Wait for rate limiter permission
 		if err := limiter.Wait(ctx); err != nil {
 			log.G(ctx).WithError(err).Debug("rate limiter context cancelled")
-			break
+			return nil, err
 		}
 
-		sb := sandbox
 		g.Go(func() error {
-			metrics, err := c.collectPodSandboxMetrics(gctx, sb)
+			// Extract pod-level labels
+			baseLabels := []string{sandbox.Config.GetMetadata().GetName(), sandbox.Config.GetMetadata().GetNamespace()}
+
+			sandboxMetrics, err := c.collectPodSandboxMetrics(gctx, sandbox, baseLabels)
 			if err != nil {
 				switch {
 				case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
-					log.G(gctx).WithField("podsandboxid", sb.ID).WithError(err).Debug("failed to get pod sandbox metrics, this is likely a transient error")
+					log.G(gctx).WithField("podsandboxid", sandbox.ID).WithError(err).Error("failed to get pod sandbox metrics, this is likely a transient error")
 					// Don't return error for transient issues, just log and continue
 					return nil
 				case errdefs.IsCanceled(err):
-					log.G(gctx).WithField("podsandboxid", sb.ID).WithError(err).Debug("metrics collection cancelled")
+					log.G(gctx).WithField("podsandboxid", sandbox.ID).WithError(err).Debug("metrics collection cancelled")
 					// Return the cancellation error to stop other goroutines
 					return err
 				default:
-					log.G(gctx).WithField("podsandboxid", sb.ID).WithError(err).Error("failed to collect pod sandbox metrics")
+					log.G(gctx).WithField("podsandboxid", sandbox.ID).WithError(err).Error("failed to collect pod sandbox metrics")
 					// Don't return error for individual failures, just log and continue
 					return nil
 				}
 			}
 
-			mu.Lock()
-			podMetrics = append(podMetrics, metrics)
-			mu.Unlock()
+			for _, container := range sandboxContainerMap[sandbox.ID] {
+				containerMetrics, err := c.collectContainerMetrics(ctx, container, baseLabels)
+				if err != nil {
+					switch {
+					case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
+						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to get container metrics, this is likely a transient error")
+						// Don't return error for transient issues, just log and continue
+						return nil
+					case errdefs.IsCanceled(err):
+						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Debug("metrics collection cancelled")
+						// Return the cancellation error to stop other goroutines
+						return err
+					default:
+						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to collect container metrics")
+						// Don't return error for individual failures, just log and continue
+						return nil
+					}
+				}
+
+				sandboxMetrics.ContainerMetrics = append(sandboxMetrics.ContainerMetrics, containerMetrics)
+			}
+
+			// If we already exited the loop because of a canceled request
+			// we don't want to write to a potentially closed channel
+			if gctx.Err() != nil {
+				return gctx.Err()
+			}
+
+			metricsMu.Lock()
+			podSandboxMetrics = append(podSandboxMetrics, sandboxMetrics)
+			metricsMu.Unlock()
 			return nil
 		})
 	}
 
-	// Wait for all goroutines to complete
 	if err := g.Wait(); err != nil {
 		// log the error and return the metrics that we have collected so far
 		log.G(ctx).WithError(err).Error("error during metrics collection, returning partial results")
 	}
 
 	return &runtime.ListPodSandboxMetricsResponse{
-		PodMetrics: podMetrics,
+		PodMetrics: podSandboxMetrics,
 	}, nil
 }
 
-// collectPodSandboxMetrics collects metrics for a specific pod sandbox and its containers
-func (c *criService) collectPodSandboxMetrics(ctx context.Context, sandbox sandboxstore.Sandbox) (*runtime.PodSandboxMetrics, error) {
-	meta := sandbox.Metadata
-	config := sandbox.Config
-
-	// Get sandbox stats
-	stats, err := metricsForSandbox(sandbox)
-	if err != nil {
-		return nil, fmt.Errorf("failed getting metrics for sandbox %s: %w", sandbox.ID, err)
-	}
-
+// collectPodSandboxMetrics collects metrics for a specific pod sandbox
+func (c *criService) collectPodSandboxMetrics(ctx context.Context, sandbox sandboxstore.Sandbox, labels []string) (*runtime.PodSandboxMetrics, error) {
 	podMetrics := &runtime.PodSandboxMetrics{
-		PodSandboxId: meta.ID,
-		Metrics:      []*runtime.Metric{},
+		PodSandboxId: sandbox.Metadata.ID,
 	}
 
+	// container and image label is set to "" as these are pod level metrics
+	podLabels := append(append([]string(nil), labels...), "", sandbox.ID, "")
 	timestamp := time.Now().UnixNano()
 
-	// Extract pod-level labels
-	podName := config.GetMetadata().GetName()
-	namespace := config.GetMetadata().GetNamespace()
-	podLabels := []string{podName, namespace, meta.ID}
-
-	if stats != nil {
-		// Collect pod-level network metrics
-		if sandbox.NetNSPath != "" {
-			rxBytes, rxErrors, txBytes, txErrors, rxPackets, rxDropped, txPackets, txDropped := getContainerNetIO(ctx, sandbox.NetNSPath)
-
-			podMetrics.Metrics = append(podMetrics.Metrics, []*runtime.Metric{
-				{
-					Name:        "container_network_receive_bytes_total",
-					Timestamp:   timestamp,
-					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(podLabels, "eth0"),
-					Value:       &runtime.UInt64Value{Value: rxBytes},
-				},
-				{
-					Name:        "container_network_receive_packets_total",
-					Timestamp:   timestamp,
-					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(podLabels, "eth0"),
-					Value:       &runtime.UInt64Value{Value: rxPackets},
-				},
-				{
-					Name:        "container_network_receive_packets_dropped_total",
-					Timestamp:   timestamp,
-					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(podLabels, "eth0"),
-					Value:       &runtime.UInt64Value{Value: rxDropped},
-				},
-				{
-					Name:        "container_network_receive_errors_total",
-					Timestamp:   timestamp,
-					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(podLabels, "eth0"),
-					Value:       &runtime.UInt64Value{Value: rxErrors},
-				},
-				{
-					Name:        "container_network_transmit_bytes_total",
-					Timestamp:   timestamp,
-					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(podLabels, "eth0"),
-					Value:       &runtime.UInt64Value{Value: txBytes},
-				},
-				{
-					Name:        "container_network_transmit_packets_total",
-					Timestamp:   timestamp,
-					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(podLabels, "eth0"),
-					Value:       &runtime.UInt64Value{Value: txPackets},
-				},
-				{
-					Name:        "container_network_transmit_packets_dropped_total",
-					Timestamp:   timestamp,
-					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(podLabels, "eth0"),
-					Value:       &runtime.UInt64Value{Value: txDropped},
-				},
-				{
-					Name:        "container_network_transmit_errors_total",
-					Timestamp:   timestamp,
-					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(podLabels, "eth0"),
-					Value:       &runtime.UInt64Value{Value: txErrors},
-				},
-			}...)
-		}
-	}
-
-	// Collect container metrics
-	containers := c.containerStore.List()
-	for _, container := range containers {
-		if container.SandboxID != sandbox.ID {
-			continue
-		}
-
-		containerMetrics, err := c.collectContainerMetrics(ctx, container, podName, namespace)
+	// Collect pod-level network metrics
+	if sandbox.NetNSPath != "" {
+		linkStats, err := getContainerNetIO(ctx, sandbox.NetNSPath)
 		if err != nil {
-			log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to collect container metrics")
-			continue
+			return nil, err
 		}
 
-		podMetrics.ContainerMetrics = append(podMetrics.ContainerMetrics, containerMetrics)
+		podNetworkLabels := append(append([]string(nil), podLabels...), defaultIfName)
+		podMetrics.Metrics = append(podMetrics.Metrics, []*runtime.Metric{
+			{
+				Name:        containerNetworkReceiveBytesTotal.Name,
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: podNetworkLabels,
+				Value:       &runtime.UInt64Value{Value: linkStats.RxBytes},
+			},
+			{
+				Name:        containerNetworkReceivePacketsTotal.Name,
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: podNetworkLabels,
+				Value:       &runtime.UInt64Value{Value: linkStats.RxPackets},
+			},
+			{
+				Name:        containerNetworkReceivePacketsDroppedTotal.Name,
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: podNetworkLabels,
+				Value:       &runtime.UInt64Value{Value: linkStats.RxDropped},
+			},
+			{
+				Name:        containerNetworkReceiveErrorsTotal.Name,
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: podNetworkLabels,
+				Value:       &runtime.UInt64Value{Value: linkStats.RxErrors},
+			},
+			{
+				Name:        containerNetworkTransmitBytesTotal.Name,
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: podNetworkLabels,
+				Value:       &runtime.UInt64Value{Value: linkStats.TxBytes},
+			},
+			{
+				Name:        containerNetworkTransmitPacketsTotal.Name,
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: podNetworkLabels,
+				Value:       &runtime.UInt64Value{Value: linkStats.TxPackets},
+			},
+			{
+				Name:        containerNetworkTransmitPacketsDroppedTotal.Name,
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: podNetworkLabels,
+				Value:       &runtime.UInt64Value{Value: linkStats.TxDropped},
+			},
+			{
+				Name:        containerNetworkTransmitErrorsTotal.Name,
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_COUNTER,
+				LabelValues: podNetworkLabels,
+				Value:       &runtime.UInt64Value{Value: linkStats.TxErrors},
+			},
+		}...)
 	}
 
 	return podMetrics, nil
 }
 
-// collectContainerMetrics collects metrics for a specific container
-func (c *criService) collectContainerMetrics(ctx context.Context, container containerstore.Container, podName, namespace string) (*runtime.ContainerMetrics, error) {
-	meta := container.Metadata
-	config := container.Config
-
-	// Get container stats
+func (c *criService) collectContainerMetrics(ctx context.Context, container containerstore.Container, labels []string) (*runtime.ContainerMetrics, error) {
 	task, err := container.Container.Task(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task for container %s: %w", container.ID, err)
@@ -232,231 +239,230 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 		return nil, fmt.Errorf("failed to get metrics for container %s: %w", container.ID, err)
 	}
 
-	stats, err := typeurl.UnmarshalAny(taskMetrics.Data)
+	taskMetricsAny, err := typeurl.UnmarshalAny(taskMetrics.Data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal metrics for container %s: %w", container.ID, err)
 	}
 
-	containerName := config.GetMetadata().GetName()
-	containerLabels := []string{containerName, podName, namespace, meta.ID}
+	var metrics cgroupMetrics
+	switch v := taskMetricsAny.(type) {
+	case *cg1.Metrics:
+		metrics.v1 = v
+	case *cg2.Metrics:
+		metrics.v2 = v
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", taskMetricsAny, reflect.TypeOf(taskMetricsAny).Elem().PkgPath())
+	}
+
+	containerLabels := append(append([]string(nil), labels...), container.Config.Metadata.Name, container.ID, container.Config.Image.UserSpecifiedImage)
 	timestamp := time.Now().UnixNano()
 
 	containerMetrics := &runtime.ContainerMetrics{
-		ContainerId: meta.ID,
-		Metrics:     []*runtime.Metric{},
+		ContainerId: container.Metadata.ID,
 	}
 
 	// miscellaneous metrics
 	containerMetrics.Metrics = append(containerMetrics.Metrics, []*runtime.Metric{
 		{
-			Name:       "container_last_seen",
-			Timestamp:  timestamp,
-			MetricType: runtime.MetricType_GAUGE,
-			Value:      &runtime.UInt64Value{Value: uint64(time.Now().Unix())},
+			Name:        containerLastSeen.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_GAUGE,
+			LabelValues: containerLabels,
+			Value:       &runtime.UInt64Value{Value: uint64(time.Now().Unix())},
 		},
 		{
-			Name:       "container_start_time_seconds",
-			Timestamp:  timestamp,
-			MetricType: runtime.MetricType_GAUGE,
-			Value:      &runtime.UInt64Value{Value: uint64(container.Status.Get().StartedAt)},
+			Name:        containerStartTimeSeconds.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_GAUGE,
+			LabelValues: containerLabels,
+			Value:       &runtime.UInt64Value{Value: uint64(container.Status.Get().StartedAt)},
 		},
 	}...)
 
-	// Collect CPU metrics
-	cpuMetrics, err := c.extractCPUMetrics(stats, containerLabels, timestamp)
+	cpuMetrics, err := c.extractCPUMetrics(metrics, containerLabels, timestamp)
 	if err != nil {
-		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract CPU metrics")
-	} else {
-		containerMetrics.Metrics = append(containerMetrics.Metrics, cpuMetrics...)
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Info("failed to extract CPU metrics")
 	}
+	containerMetrics.Metrics = append(containerMetrics.Metrics, cpuMetrics...)
 
-	// Collect memory metrics
-	memoryMetrics, err := c.extractMemoryMetrics(stats, containerLabels, timestamp)
+	memoryMetrics, err := c.extractMemoryMetrics(metrics, containerLabels, timestamp)
 	if err != nil {
-		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract memory metrics")
-	} else {
-		containerMetrics.Metrics = append(containerMetrics.Metrics, memoryMetrics...)
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Info("failed to extract memory metrics")
 	}
+	containerMetrics.Metrics = append(containerMetrics.Metrics, memoryMetrics...)
 
-	// Collect disk I/O metrics
-	diskMetrics, err := c.extractDiskMetrics(stats, containerLabels, timestamp)
+	diskMetrics, err := c.extractDiskIOMetrics(metrics, containerLabels, timestamp)
 	if err != nil {
-		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract disk metrics")
-	} else {
-		containerMetrics.Metrics = append(containerMetrics.Metrics, diskMetrics...)
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Info("failed to extract disk metrics")
 	}
+	containerMetrics.Metrics = append(containerMetrics.Metrics, diskMetrics...)
 
-	// Collect filesystem metrics
-	fsMetrics, err := c.extractFilesystemMetrics(ctx, container.ID, containerLabels, timestamp)
+	fsMetrics, err := c.extractFilesystemMetrics(ctx, container, containerLabels, timestamp)
 	if err != nil {
-		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract filesystem metrics")
-	} else {
-		containerMetrics.Metrics = append(containerMetrics.Metrics, fsMetrics...)
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Info("failed to extract filesystem metrics")
 	}
+	containerMetrics.Metrics = append(containerMetrics.Metrics, fsMetrics...)
 
-	// Collect process metrics
-	processMetrics, err := c.extractProcessMetrics(ctx, container.ID, stats, containerLabels, timestamp)
+	processMetrics, err := c.extractProcessMetrics(ctx, task, metrics, containerLabels, timestamp)
 	if err != nil {
-		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract process metrics")
-	} else {
-		containerMetrics.Metrics = append(containerMetrics.Metrics, processMetrics...)
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Info("failed to extract process metrics")
 	}
+	containerMetrics.Metrics = append(containerMetrics.Metrics, processMetrics...)
 
-	// Collect container spec metrics
-	containerSpecMetrics, err := c.extractContainerSpecMetrics(ctx, container.ID, containerLabels, timestamp)
+	containerSpecMetrics, err := c.extractContainerSpecMetrics(ctx, task, containerLabels, timestamp)
 	if err != nil {
-		log.G(ctx).WithField("containerid", container.ID).WithError(err).Debug("failed to extract container spec metrics")
-	} else {
-		containerMetrics.Metrics = append(containerMetrics.Metrics, containerSpecMetrics...)
+		log.G(ctx).WithField("containerid", container.ID).WithError(err).Info("failed to extract container spec metrics")
 	}
+	containerMetrics.Metrics = append(containerMetrics.Metrics, containerSpecMetrics...)
 
 	return containerMetrics, nil
 }
 
-// extractCPUMetrics extracts CPU-related metrics from container stats
-func (c *criService) extractCPUMetrics(stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+func (c *criService) extractCPUMetrics(stats cgroupMetrics, labels []string, timestamp int64) ([]*runtime.Metric, error) {
 	var metrics []*runtime.Metric
 
-	switch s := stats.(type) {
-	case *cg1.Metrics:
+	switch {
+	case stats.v1 != nil:
+		s := stats.v1
+
 		if s.CPU != nil && s.CPU.Usage != nil {
 			metrics = append(metrics, &runtime.Metric{
-				Name:        "container_cpu_usage_seconds_total",
+				Name:        containerCPUUsageSecondsTotal.Name,
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_COUNTER,
 				LabelValues: labels,
-				Value:       &runtime.UInt64Value{Value: s.CPU.Usage.Total / 1e9}, // Convert to seconds
+				Value:       &runtime.UInt64Value{Value: s.CPU.Usage.Total / uint64(time.Second)},
 			})
 
 			metrics = append(metrics, []*runtime.Metric{
 				{
-					Name:        "container_cpu_user_seconds_total",
+					Name:        containerCPUUserSecondsTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
-					Value:       &runtime.UInt64Value{Value: s.CPU.Usage.User / 1e9},
+					Value:       &runtime.UInt64Value{Value: s.CPU.Usage.User / uint64(time.Second)},
 				},
 				{
-					Name:        "container_cpu_system_seconds_total",
+					Name:        containerCPUSystemSecondsTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
-					Value:       &runtime.UInt64Value{Value: s.CPU.Usage.Kernel / 1e9},
+					Value:       &runtime.UInt64Value{Value: s.CPU.Usage.Kernel / uint64(time.Second)},
 				},
 			}...)
 
 			if s.CPU.Throttling != nil {
 				metrics = append(metrics, []*runtime.Metric{
 					{
-						Name:        "container_cpu_cfs_periods_total",
+						Name:        containerCPUCfsPeriodsTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
 						LabelValues: labels,
 						Value:       &runtime.UInt64Value{Value: s.CPU.Throttling.Periods},
 					},
 					{
-						Name:        "container_cpu_cfs_throttled_periods_total",
+						Name:        containerCPUCfsThrottledPeriodsTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
 						LabelValues: labels,
 						Value:       &runtime.UInt64Value{Value: s.CPU.Throttling.ThrottledPeriods},
 					},
 					{
-						Name:        "container_cpu_cfs_throttled_seconds_total",
+						Name:        containerCPUCfsThrottledSecondsTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
 						LabelValues: labels,
-						Value:       &runtime.UInt64Value{Value: s.CPU.Throttling.ThrottledTime / 1e9},
+						Value:       &runtime.UInt64Value{Value: s.CPU.Throttling.ThrottledTime / uint64(time.Second)},
 					},
 				}...)
 			}
 		}
 
-	case *cg2.Metrics:
+	case stats.v2 != nil:
+		s := stats.v2
+
 		if s.CPU != nil {
 			metrics = append(metrics, &runtime.Metric{
-				Name:        "container_cpu_usage_seconds_total",
+				Name:        containerCPUUsageSecondsTotal.Name,
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_COUNTER,
 				LabelValues: labels,
-				Value:       &runtime.UInt64Value{Value: s.CPU.UsageUsec / 1e6}, // Convert microseconds to seconds
+				Value:       &runtime.UInt64Value{Value: s.CPU.UsageUsec * 1000 / uint64(time.Second)},
 			})
 
 			metrics = append(metrics, []*runtime.Metric{
 				{
-					Name:        "container_cpu_user_seconds_total",
+					Name:        containerCPUUserSecondsTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
-					Value:       &runtime.UInt64Value{Value: s.CPU.UserUsec / 1e6}, // Convert microseconds to seconds
+					Value:       &runtime.UInt64Value{Value: s.CPU.UserUsec * 1000 / uint64(time.Second)},
 				},
 				{
-					Name:        "container_cpu_system_seconds_total",
+					Name:        containerCPUSystemSecondsTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
-					Value:       &runtime.UInt64Value{Value: s.CPU.SystemUsec / 1e6}, // Convert microseconds to seconds
+					Value:       &runtime.UInt64Value{Value: s.CPU.SystemUsec * 1000 / uint64(time.Second)},
 				},
 			}...)
 
 			// Always include CFS throttling metrics, even if zero
 			metrics = append(metrics, []*runtime.Metric{
 				{
-					Name:        "container_cpu_cfs_periods_total",
+					Name:        containerCPUCfsPeriodsTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.CPU.NrPeriods},
 				},
 				{
-					Name:        "container_cpu_cfs_throttled_periods_total",
+					Name:        containerCPUCfsThrottledPeriodsTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.CPU.NrThrottled},
 				},
 				{
-					Name:        "container_cpu_cfs_throttled_seconds_total",
+					Name:        containerCPUCfsThrottledSecondsTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
-					Value:       &runtime.UInt64Value{Value: s.CPU.ThrottledUsec / 1e6}, // Convert microseconds to seconds
+					Value:       &runtime.UInt64Value{Value: s.CPU.ThrottledUsec * 1000 / uint64(time.Second)},
 				},
 			}...)
 		}
-
-	default:
-		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
 	}
 
 	return metrics, nil
 }
 
-// extractMemoryMetrics extracts memory-related metrics from container stats
-func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+func (c *criService) extractMemoryMetrics(stats cgroupMetrics, labels []string, timestamp int64) ([]*runtime.Metric, error) {
 	var metrics []*runtime.Metric
 
-	switch s := stats.(type) {
-	case *cg1.Metrics:
+	switch {
+	case stats.v1 != nil:
+		s := stats.v1
+
 		if s.Memory != nil {
 			if s.Memory.Usage != nil {
 				metrics = append(metrics, []*runtime.Metric{
 					{
-						Name:        "container_memory_usage_bytes",
+						Name:        containerMemoryUsageBytes.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_GAUGE,
 						LabelValues: labels,
 						Value:       &runtime.UInt64Value{Value: s.Memory.Usage.Usage},
 					},
 					{
-						Name:        "container_memory_working_set_bytes",
+						Name:        containerMemoryWorkingSetBytes.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_GAUGE,
 						LabelValues: labels,
 						Value:       &runtime.UInt64Value{Value: getWorkingSet(s.Memory)},
 					},
 					{
-						Name:        "container_memory_max_usage_bytes",
+						Name:        containerMemoryMaxUsageBytes.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_GAUGE,
 						LabelValues: labels,
@@ -467,60 +473,59 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 
 			metrics = append(metrics, []*runtime.Metric{
 				{
-					Name:        "container_memory_rss",
+					Name:        containerMemoryRss.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.TotalRSS},
 				},
 				{
-					Name:        "container_memory_cache",
+					Name:        containerMemoryCache.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.TotalCache},
 				},
 				{
-					Name:        "container_memory_mapped_file",
+					Name:        containerMemoryMappedFile.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.TotalMappedFile},
 				},
 				{
-					Name:        "container_memory_total_active_file_bytes",
+					Name:        containerMemoryTotalActiveFileBytes.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.TotalActiveFile},
 				},
 				{
-					Name:        "container_memory_total_inactive_file_bytes",
+					Name:        containerMemoryTotalInactiveFileBytes.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.TotalInactiveFile},
 				},
 				{
-					Name:        "container_memory_failures_total",
+					Name:        containerMemoryFailuresTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(labels, "pgfault", "container"),
+					LabelValues: append(append([]string(nil), labels...), "pgfault", "container"),
 					Value:       &runtime.UInt64Value{Value: s.Memory.PgFault},
 				},
 				{
-					Name:        "container_memory_failures_total",
+					Name:        containerMemoryFailuresTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(labels, "pgmajfault", "container"),
+					LabelValues: append(append([]string(nil), labels...), "pgmajfault", "container"),
 					Value:       &runtime.UInt64Value{Value: s.Memory.PgMajFault},
 				},
 			}...)
 
-			// Add kernel memory metrics if available
 			if s.Memory.Kernel != nil {
 				metrics = append(metrics, &runtime.Metric{
-					Name:        "container_memory_kernel_usage",
+					Name:        containerMemoryKernelUsage.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
@@ -528,10 +533,9 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 				})
 			}
 
-			// Add swap metrics if available
 			if s.Memory.Swap != nil {
 				metrics = append(metrics, &runtime.Metric{
-					Name:        "container_memory_swap",
+					Name:        containerMemorySwap.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
@@ -539,10 +543,9 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 				})
 			}
 
-			// Add usage failcnt if available
 			if s.Memory.Usage != nil {
 				metrics = append(metrics, &runtime.Metric{
-					Name:        "container_memory_failcnt",
+					Name:        containerMemoryFailcnt.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
@@ -555,7 +558,7 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 		if s.MemoryOomControl != nil {
 			metrics = append(metrics, []*runtime.Metric{
 				{
-					Name:        "container_oom_events_total",
+					Name:        containerOomEventsTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
@@ -564,81 +567,83 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 			}...)
 		}
 
-	case *cg2.Metrics:
+	case stats.v2 != nil:
+		s := stats.v2
+
 		if s.Memory != nil {
 			metrics = append(metrics, []*runtime.Metric{
 				{
-					Name:        "container_memory_usage_bytes",
+					Name:        containerMemoryUsageBytes.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.Usage},
 				},
 				{
-					Name:        "container_memory_max_usage_bytes",
+					Name:        containerMemoryMaxUsageBytes.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.UsageLimit},
 				},
 				{
-					Name:        "container_memory_working_set_bytes",
+					Name:        containerMemoryWorkingSetBytes.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: getWorkingSetV2(s.Memory)},
 				},
 				{
-					Name:        "container_memory_rss",
+					Name:        containerMemoryRss.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.Anon},
 				},
 				{
-					Name:        "container_memory_cache",
+					Name:        containerMemoryCache.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.File},
 				},
 				{
-					Name:        "container_memory_kernel_usage",
+					Name:        containerMemoryKernelUsage.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.KernelStack},
 				},
 				{
-					Name:        "container_memory_mapped_file",
+					Name:        containerMemoryMappedFile.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.FileMapped},
 				},
 				{
-					Name:        "container_memory_swap",
+					Name:        containerMemorySwap.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.SwapUsage},
 				},
 				{
-					Name:        "container_memory_failcnt",
+					Name:        containerMemoryFailcnt.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: 0}, // cgroups v2 doesn't expose failcnt, provide 0
 				},
 				{
-					Name:        "container_memory_total_active_file_bytes",
+					Name:        containerMemoryTotalActiveFileBytes.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Memory.ActiveFile},
 				},
 				{
-					Name:        "container_memory_total_inactive_file_bytes",
+					Name:        containerMemoryTotalInactiveFileBytes.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
@@ -646,17 +651,17 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 				},
 				// TODO how to get hierarchical ?
 				{
-					Name:        "container_memory_failures_total",
+					Name:        containerMemoryFailuresTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(labels, "pgfault", "container"),
+					LabelValues: append(append([]string(nil), labels...), "pgfault", "container"),
 					Value:       &runtime.UInt64Value{Value: s.Memory.Pgfault},
 				},
 				{
-					Name:        "container_memory_failures_total",
+					Name:        containerMemoryFailuresTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: append(labels, "pgmajfault", "container"),
+					LabelValues: append(append([]string(nil), labels...), "pgmajfault", "container"),
 					Value:       &runtime.UInt64Value{Value: s.Memory.Pgmajfault},
 				},
 			}...)
@@ -666,7 +671,7 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 		if s.MemoryEvents != nil {
 			metrics = append(metrics, []*runtime.Metric{
 				{
-					Name:        "container_oom_events_total",
+					Name:        containerOomEventsTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
 					LabelValues: labels,
@@ -674,51 +679,47 @@ func (c *criService) extractMemoryMetrics(stats interface{}, labels []string, ti
 				},
 			}...)
 		}
-
-	default:
-		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
 	}
 
 	return metrics, nil
 }
 
-// extractDiskMetrics extracts disk I/O metrics from container stats
-func (c *criService) extractDiskMetrics(stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+func (c *criService) extractDiskIOMetrics(stats cgroupMetrics, labels []string, timestamp int64) ([]*runtime.Metric, error) {
 	var metrics []*runtime.Metric
 
-	switch s := stats.(type) {
-	case *cg1.Metrics:
+	switch {
+	case stats.v1 != nil:
+		s := stats.v1
+
 		if s.Blkio != nil {
 			// Process blkio device usage stats
 			for _, entry := range s.Blkio.IoServiceBytesRecursive {
-				deviceLabels := append(labels, fmt.Sprintf("%d:%d", entry.Major, entry.Minor), fmt.Sprintf("%d", entry.Major), fmt.Sprintf("%d", entry.Minor), strings.ToLower(entry.Op))
 				metrics = append(metrics, &runtime.Metric{
-					Name:        "container_blkio_device_usage_total",
+					Name:        containerBlkioDeviceUsageTotal.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_COUNTER,
-					LabelValues: deviceLabels,
+					LabelValues: append(append([]string(nil), labels...), entry.Device, strconv.FormatUint(entry.Major, 10), strconv.FormatUint(entry.Minor, 10), entry.Op),
 					Value:       &runtime.UInt64Value{Value: entry.Value},
 				})
 			}
 
 			// Process filesystem read/write stats
 			for _, entry := range s.Blkio.IoServicedRecursive {
-				device := fmt.Sprintf("%d:%d", entry.Major, entry.Minor)
 				switch strings.ToLower(entry.Op) {
 				case "read":
 					metrics = append(metrics, &runtime.Metric{
-						Name:        "container_fs_reads_total",
+						Name:        containerFsReadsTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
+						LabelValues: append(append([]string(nil), labels...), entry.Device),
 						Value:       &runtime.UInt64Value{Value: entry.Value},
 					})
 				case "write":
 					metrics = append(metrics, &runtime.Metric{
-						Name:        "container_fs_writes_total",
+						Name:        containerFsWritesTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
+						LabelValues: append(append([]string(nil), labels...), entry.Device),
 						Value:       &runtime.UInt64Value{Value: entry.Value},
 					})
 				}
@@ -726,161 +727,90 @@ func (c *criService) extractDiskMetrics(stats interface{}, labels []string, time
 
 			// Process filesystem bytes read/written
 			for _, entry := range s.Blkio.IoServiceBytesRecursive {
-				device := fmt.Sprintf("%d:%d", entry.Major, entry.Minor)
 				switch strings.ToLower(entry.Op) {
 				case "read":
 					metrics = append(metrics, &runtime.Metric{
-						Name:        "container_fs_reads_bytes_total",
+						Name:        containerFsReadsBytesTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
+						LabelValues: append(append([]string(nil), labels...), entry.Device),
 						Value:       &runtime.UInt64Value{Value: entry.Value},
 					})
 				case "write":
 					metrics = append(metrics, &runtime.Metric{
-						Name:        "container_fs_writes_bytes_total",
+						Name:        containerFsWritesBytesTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
+						LabelValues: append(append([]string(nil), labels...), entry.Device),
 						Value:       &runtime.UInt64Value{Value: entry.Value},
 					})
 				}
 			}
 		}
 
-	case *cg2.Metrics:
+	case stats.v2 != nil:
+		s := stats.v2
+
 		if s.Io != nil {
 			// Process cgroups v2 I/O stats
 			for _, entry := range s.Io.Usage {
 				device := fmt.Sprintf("%d:%d", entry.Major, entry.Minor)
-
 				metrics = append(metrics, []*runtime.Metric{
 					{
-						Name:        "container_fs_reads_bytes_total",
+						Name:        containerFsReadsBytesTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
+						LabelValues: append(append([]string(nil), labels...), device),
 						Value:       &runtime.UInt64Value{Value: entry.Rbytes},
 					},
 					{
-						Name:        "container_fs_writes_bytes_total",
+						Name:        containerFsWritesBytesTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
+						LabelValues: append(append([]string(nil), labels...), device),
 						Value:       &runtime.UInt64Value{Value: entry.Wbytes},
 					},
 					{
-						Name:        "container_fs_reads_total",
+						Name:        containerFsReadsTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
+						LabelValues: append(append([]string(nil), labels...), device),
 						Value:       &runtime.UInt64Value{Value: entry.Rios},
 					},
 					{
-						Name:        "container_fs_writes_total",
+						Name:        containerFsWritesTotal.Name,
 						Timestamp:   timestamp,
 						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
+						LabelValues: append(append([]string(nil), labels...), device),
 						Value:       &runtime.UInt64Value{Value: entry.Wios},
 					},
-					{
-						Name:        "container_fs_sector_reads_total",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: entry.Rbytes / 512}, // Convert bytes to sectors
-					},
-					{
-						Name:        "container_fs_sector_writes_total",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: entry.Wbytes / 512}, // Convert bytes to sectors
-					},
-					{
-						Name:        "container_fs_reads_merged_total",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: 0}, // Not available in cgroups v2, provide 0
-					},
-					{
-						Name:        "container_fs_writes_merged_total",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: 0}, // Not available in cgroups v2, provide 0
-					},
-					{
-						Name:        "container_fs_read_seconds_total",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: 0}, // Not available in cgroups v2, provide 0
-					},
-					{
-						Name:        "container_fs_write_seconds_total",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: 0}, // Not available in cgroups v2, provide 0
-					},
-					{
-						Name:        "container_fs_io_current",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_GAUGE,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: 0}, // Not available in cgroups v2, provide 0
-					},
-					{
-						Name:        "container_fs_io_time_seconds_total",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: 0}, // Not available in cgroups v2, provide 0
-					},
-					{
-						Name:        "container_fs_io_time_weighted_seconds_total",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: 0}, // Not available in cgroups v2, provide 0
-					},
-					{
-						Name:        "container_blkio_device_usage_total",
-						Timestamp:   timestamp,
-						MetricType:  runtime.MetricType_COUNTER,
-						LabelValues: append(labels, device),
-						Value:       &runtime.UInt64Value{Value: entry.Rbytes + entry.Wbytes},
-					},
 				}...)
+
 			}
 		}
-
-	default:
-		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
 	}
 
 	return metrics, nil
 }
 
-// extractProcessMetrics extracts process-related metrics from container stats
-func (c *criService) extractProcessMetrics(ctx context.Context, containerID string, stats interface{}, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+func (c *criService) extractProcessMetrics(ctx context.Context, task containerd.Task, stats cgroupMetrics, labels []string, timestamp int64) ([]*runtime.Metric, error) {
 	var metrics []*runtime.Metric
 
-	switch s := stats.(type) {
-	case *cg1.Metrics:
+	switch {
+	case stats.v1 != nil:
+		s := stats.v1
+
 		if s.Pids != nil {
 			metrics = append(metrics, []*runtime.Metric{
 				{
-					Name:        "container_processes",
+					Name:        containerProcesses.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Pids.Current},
 				},
 				{
-					Name:        "container_threads_max",
+					Name:        containerThreadsMax.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
@@ -889,25 +819,27 @@ func (c *criService) extractProcessMetrics(ctx context.Context, containerID stri
 			}...)
 		}
 
-	case *cg2.Metrics:
+	case stats.v2 != nil:
+		s := stats.v2
+
 		if s.Pids != nil {
 			metrics = append(metrics, []*runtime.Metric{
 				{
-					Name:        "container_processes",
+					Name:        containerProcesses.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Pids.Current},
 				},
 				{
-					Name:        "container_threads_max",
+					Name:        containerThreadsMax.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Pids.Limit},
 				},
 				{
-					Name:        "container_threads",
+					Name:        containerThreads.Name,
 					Timestamp:   timestamp,
 					MetricType:  runtime.MetricType_GAUGE,
 					LabelValues: labels,
@@ -915,85 +847,78 @@ func (c *criService) extractProcessMetrics(ctx context.Context, containerID stri
 				},
 			}...)
 		}
-
-	default:
-		return nil, fmt.Errorf("unexpected metrics type: %T from %s", s, reflect.TypeOf(s).Elem().PkgPath())
 	}
 
-	container, err := c.containerStore.Get(containerID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get container: %w", err)
-	}
-	task, err := container.Container.Task(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get container task: %w", err)
-	}
 	taskSpec, err := task.Spec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get task spec: %w", err)
+		return metrics, fmt.Errorf("failed to get task spec: %w", err)
 	}
 
-	if taskSpec != nil {
-		if taskSpec.Process != nil {
-			for _, rlimit := range taskSpec.Process.Rlimits {
-				metrics = append(metrics, &runtime.Metric{
-					Name:        "container_ulimits_soft",
-					Timestamp:   timestamp,
-					MetricType:  runtime.MetricType_GAUGE,
-					LabelValues: append(labels, rlimit.Type),
-					Value:       &runtime.UInt64Value{Value: rlimit.Soft},
-				})
-			}
+	if taskSpec != nil && taskSpec.Process != nil {
+		for _, rlimit := range taskSpec.Process.Rlimits {
+			metrics = append(metrics, &runtime.Metric{
+				Name:        containerUlimitsSoft.Name,
+				Timestamp:   timestamp,
+				MetricType:  runtime.MetricType_GAUGE,
+				LabelValues: append(append([]string(nil), labels...), rlimit.Type),
+				Value:       &runtime.UInt64Value{Value: rlimit.Soft},
+			})
 		}
 	}
 
 	// Collect file descriptor and socket metrics
 	pidsInfo, err := task.Pids(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container PIDs for FD/socket metrics: %w", err)
-	} else {
-		pids := make([]int, 0, len(pidsInfo))
-		for _, pidInfo := range pidsInfo {
-			pids = append(pids, int(pidInfo.Pid))
-		}
-		fdCount, socketCount, err := c.getContainerProcessDescriptorCount(ctx, pids)
-		if err != nil {
-			log.G(ctx).WithField("containerid", containerID).WithError(err).Debug("failed to count file descriptors and sockets")
-		} else {
-			metrics = append(metrics, &runtime.Metric{
-				Name:        "container_file_descriptors",
-				Timestamp:   timestamp,
-				MetricType:  runtime.MetricType_GAUGE,
-				LabelValues: labels,
-				Value:       &runtime.UInt64Value{Value: fdCount},
-			})
-			metrics = append(metrics, &runtime.Metric{
-				Name:        "container_sockets",
-				Timestamp:   timestamp,
-				MetricType:  runtime.MetricType_GAUGE,
-				LabelValues: labels,
-				Value:       &runtime.UInt64Value{Value: socketCount},
-			})
-		}
+		return metrics, fmt.Errorf("failed to get container PIDs for FD/socket metrics: %w", err)
 	}
+
+	pids := make([]int, 0, len(pidsInfo))
+	for _, pidInfo := range pidsInfo {
+		pids = append(pids, int(pidInfo.Pid))
+	}
+
+	fdCount, socketCount, err := c.getContainerProcessDescriptorCount(ctx, pids)
+	if err != nil {
+		return metrics, fmt.Errorf("failed to count file descriptors and sockets: %w", err)
+	}
+
+	metrics = append(metrics, []*runtime.Metric{
+		{
+			Name:        containerFileDescriptors.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_GAUGE,
+			LabelValues: labels,
+			Value:       &runtime.UInt64Value{Value: fdCount},
+		},
+		{
+			Name:        containerSockets.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_GAUGE,
+			LabelValues: labels,
+			Value:       &runtime.UInt64Value{Value: socketCount},
+		},
+	}...)
 
 	return metrics, nil
 }
 
-// extractContainerSpecMetrics extracts container spec related metrics from the task/oci spec
-func (c *criService) extractContainerSpecMetrics(ctx context.Context, containerID string, labels []string, timestamp int64) ([]*runtime.Metric, error) {
-
-	var metrics []*runtime.Metric
-
-	resource, err := c.getContainerLinuxResources(ctx, containerID)
+func (c *criService) extractContainerSpecMetrics(ctx context.Context, task containerd.Task, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+	taskSpec, err := task.Spec(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get task spec: %w", err)
 	}
 
+	// No resource limits are set. No error but no metrics too.
+	if taskSpec.Linux == nil || taskSpec.Linux.Resources == nil {
+		return nil, nil
+	}
+	resource := taskSpec.Linux.Resources
+
+	var metrics []*runtime.Metric
 	if cpuResource := resource.CPU; cpuResource != nil {
 		if cpuResource.Period != nil {
 			metrics = append(metrics, &runtime.Metric{
-				Name:        "container_spec_cpu_period",
+				Name:        containerSpecCPUPeriod.Name,
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
@@ -1002,7 +927,7 @@ func (c *criService) extractContainerSpecMetrics(ctx context.Context, containerI
 		}
 		if cpuResource.Shares != nil {
 			metrics = append(metrics, &runtime.Metric{
-				Name:        "container_spec_cpu_shares",
+				Name:        containerSpecCPUShares.Name,
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
@@ -1014,7 +939,7 @@ func (c *criService) extractContainerSpecMetrics(ctx context.Context, containerI
 	if memoryResource := resource.Memory; memoryResource != nil {
 		if memoryResource.Limit != nil {
 			metrics = append(metrics, &runtime.Metric{
-				Name:        "container_spec_memory_limit_bytes",
+				Name:        containerSpecMemoryLimitBytes.Name,
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
@@ -1023,7 +948,7 @@ func (c *criService) extractContainerSpecMetrics(ctx context.Context, containerI
 		}
 		if memoryResource.Reservation != nil {
 			metrics = append(metrics, &runtime.Metric{
-				Name:        "container_spec_memory_reservation_limit_bytes",
+				Name:        containerSpecMemoryReservationLimitBytes.Name,
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
@@ -1032,7 +957,7 @@ func (c *criService) extractContainerSpecMetrics(ctx context.Context, containerI
 		}
 		if memoryResource.Swap != nil {
 			metrics = append(metrics, &runtime.Metric{
-				Name:        "container_spec_memory_swap_limit_bytes",
+				Name:        containerSpecMemorySwapLimitBytes.Name,
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
@@ -1043,134 +968,30 @@ func (c *criService) extractContainerSpecMetrics(ctx context.Context, containerI
 	return metrics, nil
 }
 
-// extractFilesystemMetrics extracts filesystem-related metrics from container stats
-func (c *criService) extractFilesystemMetrics(ctx context.Context, containerID string, labels []string, timestamp int64) ([]*runtime.Metric, error) {
-	var metrics []*runtime.Metric
-
-	// Get filesystem usage from the container's snapshotter
-	usage, limit, inodes, inodesFree, err := c.getContainerFilesystemUsage(ctx, containerID)
-	if err != nil {
-		// If we can't get filesystem stats, log debug and return zero values
-		log.G(ctx).WithField("containerid", containerID).WithError(err).Debug("failed to get filesystem usage")
-		usage = 0
-		limit = 0
-		inodes = 0
-		inodesFree = 0
+// findContainerTaskRootfs tries to find the rootfs of a container,
+// but it's inherently broken as this info should be provided by
+// the task itself. Sadly taskSpec.Root.Path is filled with a
+// relative path instead of the spec required absolute path.
+// TODO: Fix this mess
+func (c *criService) findContainerTaskRootfs(container containers.Container) (string, error) {
+	// TODO: Can't we just read the used plugin from the container?
+	var pluginPath string
+	switch container.Runtime.Name {
+	case "runc":
+		pluginPath = string(plugins.RuntimePlugin) + ".linux"
+	default:
+		pluginPath = string(plugins.RuntimePluginV2) + ".task"
 	}
-
-	metrics = append(metrics, []*runtime.Metric{
-		{
-			Name:        "container_fs_usage_bytes",
-			Timestamp:   timestamp,
-			MetricType:  runtime.MetricType_GAUGE,
-			LabelValues: labels,
-			Value:       &runtime.UInt64Value{Value: usage},
-		},
-		{
-			Name:        "container_fs_limit_bytes",
-			Timestamp:   timestamp,
-			MetricType:  runtime.MetricType_GAUGE,
-			LabelValues: labels,
-			Value:       &runtime.UInt64Value{Value: limit},
-		},
-		{
-			Name:        "container_fs_inodes_total",
-			Timestamp:   timestamp,
-			MetricType:  runtime.MetricType_GAUGE,
-			LabelValues: labels,
-			Value:       &runtime.UInt64Value{Value: inodes},
-		},
-		{
-			Name:        "container_fs_inodes_free",
-			Timestamp:   timestamp,
-			MetricType:  runtime.MetricType_GAUGE,
-			LabelValues: labels,
-			Value:       &runtime.UInt64Value{Value: inodesFree},
-		},
-	}...)
-
-	return metrics, nil
-}
-
-// getContainerFilesystemUsage gets filesystem usage statistics for a container
-func (c *criService) getContainerFilesystemUsage(ctx context.Context, containerID string) (usage, limit, inodes, inodesFree uint64, err error) {
-	// Get the container from the store
-	container, err := c.containerStore.Get(containerID)
-	if err != nil {
-		return 0, 0, 0, 0, fmt.Errorf("failed to get container: %w", err)
-	}
-
-	// Get container info for snapshotter and snapshot key
-	ctrInfo, err := container.Container.Info(ctx)
-	if err != nil {
-		return 0, 0, 0, 0, fmt.Errorf("failed to get container info: %w", err)
-	}
-
-	// Get the snapshotter and snapshot key
-	snapshotter := c.client.SnapshotService(ctrInfo.Snapshotter)
-
-	// Try to get usage from the snapshotter
-	snapshotUsage, err := snapshotter.Usage(ctx, ctrInfo.SnapshotKey)
-	if err != nil {
-		// If snapshotter usage fails, try to get the container's root filesystem path
-		// and calculate usage directly
-		return c.getFilesystemUsageFromPath(ctx, containerID)
-	}
-
-	// Convert snapshotter usage to our format
-	usage = uint64(snapshotUsage.Size)
-
-	// Get filesystem statistics from the underlying filesystem
-	// For limits and inodes, we need to check the actual filesystem
-	if rootPath, err := c.getContainerRootPath(ctx, containerID); err == nil {
-		var stat syscall.Statfs_t
-		if err := syscall.Statfs(rootPath, &stat); err == nil {
-			// Calculate filesystem total size as limit
-			limit = stat.Blocks * uint64(stat.Bsize)
-
-			// Inode information
-			inodes = stat.Files
-			inodesFree = stat.Ffree
-		}
-	}
-
-	return usage, limit, inodes, inodesFree, nil
-}
-
-// getContainerRootPath attempts to get the container's root filesystem path
-func (c *criService) getContainerRootPath(ctx context.Context, containerID string) (string, error) {
-	// Get the container from the store
-	container, err := c.containerStore.Get(containerID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get container: %w", err)
-	}
-
-	// Get container info for runtime information
-	ctrInfo, err := container.Container.Info(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get container info: %w", err)
-	}
-
-	// Try to get the task to access the bundle
-	task, err := container.Container.Task(ctx, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to get container task: %w", err)
-	}
-
-	// Get the container's runtime status
-	_, err = task.Status(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get task status: %w", err)
-	}
-
-	// Use a default namespace if we can't determine it
-	namespace := "k8s.io"
 
 	// For containerd, the typical bundle path structure is:
-	// /var/lib/containerd/io.containerd.runtime.v2.task/{namespace}/{id}
+	// {stateDir/../}/{plugin}/{namespace}/{id}
 	// The rootfs is typically at: {bundle}/rootfs
-	bundlePath := fmt.Sprintf("%s/io.containerd.runtime.v2.task/%s/%s",
-		c.config.ContainerdRootDir, namespace, containerID)
+	bundlePath := filepath.Join(
+		filepath.Join(c.config.StateDir, "../"),
+		pluginPath,
+		c.nri.GetName(),
+		container.ID,
+	)
 	rootfsPath := filepath.Join(bundlePath, "rootfs")
 
 	// Check if the path exists
@@ -1178,78 +999,79 @@ func (c *criService) getContainerRootPath(ctx context.Context, containerID strin
 		return rootfsPath, nil
 	}
 
-	// If that doesn't work, try alternate paths based on runtime
-	if ctrInfo.Runtime.Name != "" {
-		// Try runtime-specific paths
-		if strings.Contains(ctrInfo.Runtime.Name, "runc") {
-			// For runc, bundle path might be different
-			bundlePath = fmt.Sprintf("%s/io.containerd.runtime.v1.linux/%s/%s",
-				c.config.ContainerdRootDir, namespace, containerID)
-			rootfsPath = filepath.Join(bundlePath, "rootfs")
-			if _, err := os.Stat(rootfsPath); err == nil {
-				return rootfsPath, nil
-			}
-		}
-	}
-
 	return "", fmt.Errorf("could not determine container root path")
 }
 
-// getFilesystemUsageFromPath calculates filesystem usage from a specific path
-func (c *criService) getFilesystemUsageFromPath(ctx context.Context, containerID string) (usage, limit, inodes, inodesFree uint64, err error) {
-	rootPath, err := c.getContainerRootPath(ctx, containerID)
+func (c *criService) extractFilesystemMetrics(ctx context.Context, container containerstore.Container, labels []string, timestamp int64) ([]*runtime.Metric, error) {
+	ctrInfo, err := container.Container.Info(ctx)
 	if err != nil {
-		return 0, 0, 0, 0, err
+		return nil, fmt.Errorf("failed to get container info: %w", err)
 	}
 
-	// Use syscall.Statfs to get filesystem statistics
+	rootfs, err := c.findContainerTaskRootfs(ctrInfo)
+	if err != nil {
+		return nil, err
+	}
+
 	var stat syscall.Statfs_t
-	if err := syscall.Statfs(rootPath, &stat); err != nil {
-		return 0, 0, 0, 0, fmt.Errorf("failed to stat filesystem: %w", err)
+	if err := syscall.Statfs(rootfs, &stat); err != nil {
+		return nil, fmt.Errorf("failed to get root filesystem info: %w", err)
 	}
 
-	// Calculate usage (used = total - available)
-	totalBytes := stat.Blocks * uint64(stat.Bsize)
-	availableBytes := stat.Bavail * uint64(stat.Bsize)
-	usage = totalBytes - availableBytes
+	var (
+		totalBytes     = stat.Blocks * uint64(stat.Bsize)
+		availableBytes = stat.Bavail * uint64(stat.Bsize)
+		usedBytes      = totalBytes - availableBytes
+		limit          = stat.Blocks * uint64(stat.Bsize)
+		inodes         = stat.Files
+		inodesFree     = stat.Ffree
+	)
 
-	// Filesystem limit is the total size
-	limit = totalBytes
-
-	// Inode information
-	inodes = stat.Files
-	inodesFree = stat.Ffree
-
-	return usage, limit, inodes, inodesFree, nil
-}
-
-// getLinuxResources from the task spec
-func (c *criService) getContainerLinuxResources(ctx context.Context, containerID string) (*spec.LinuxResources, error) {
-	container, err := c.containerStore.Get(containerID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get container: %w", err)
-	}
-	task, err := container.Container.Task(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get container task: %w", err)
-	}
-	taskSpec, err := task.Spec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get task spec: %w", err)
+	snapshotUsage, err := c.client.SnapshotService(ctrInfo.Snapshotter).Usage(ctx, ctrInfo.SnapshotKey)
+	if err == nil {
+		usedBytes = uint64(snapshotUsage.Size)
+		inodes = uint64(snapshotUsage.Inodes)
 	}
 
-	if taskSpec.Linux != nil {
-		if taskSpec.Linux.Resources != nil {
-			return taskSpec.Linux.Resources, nil
-		}
+	// TODO: These are wrong, but I (fionera) don't know the internals enough to correctly fetch
+	// the correct device metrics.
+	metrics := []*runtime.Metric{
+		{
+			Name:        containerFsUsageBytes.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_GAUGE,
+			LabelValues: append(append([]string(nil), labels...), "/"),
+			Value:       &runtime.UInt64Value{Value: usedBytes},
+		},
+		{
+			Name:        containerFsLimitBytes.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_GAUGE,
+			LabelValues: append(append([]string(nil), labels...), "/"),
+			Value:       &runtime.UInt64Value{Value: limit},
+		},
+		{
+			Name:        containerFsInodesTotal.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_GAUGE,
+			LabelValues: append(append([]string(nil), labels...), "/"),
+			Value:       &runtime.UInt64Value{Value: inodes},
+		},
+		{
+			Name:        containerFsInodesFree.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_GAUGE,
+			LabelValues: append(append([]string(nil), labels...), "/"),
+			Value:       &runtime.UInt64Value{Value: inodesFree},
+		},
 	}
-	return nil, fmt.Errorf("container spec resources is empty")
+
+	return metrics, nil
 }
 
 // getContainerProcessDescriptorCount gets the total no of fds and sockets in a pid
 // Referenced from https://github.com/google/cadvisor/blob/master/container/libcontainer/handler.go
 func (c *criService) getContainerProcessDescriptorCount(ctx context.Context, pids []int) (fdCount, socketCount uint64, err error) {
-
 	for _, pid := range pids {
 		fdDir := path.Join("/proc", strconv.Itoa(pid), "fd")
 		fds, err := os.ReadDir(fdDir)
