@@ -336,6 +336,9 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		if err != nil {
 			return fmt.Errorf("failed to get NRI adjustment for container: %w", err)
 		}
+		if adjust == nil {
+			return nil
+		}
 
 		sgen := generate.Generator{Config: spec}
 		ngen := nrigen.SpecGenerator(&sgen, generatorOptions...)
