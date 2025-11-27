@@ -353,13 +353,25 @@ jobs:
           Start-Process -FilePath containerd.exe -NoNewWindow -RedirectStandardError true -PassThru
           get-process | sls containerd
           start-sleep 5
-          # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
-          # Info: https://github.com/containerd/containerd/issues/6652
           if( '${{ matrix.os }}' -eq 'windows-2022' )
           {
-            $skip = "-ginkgo.skip=runtime should support exec with tty=true and stdin=true"
+            $skipTests = @(
+              # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
+              # Info: https://github.com/containerd/containerd/issues/6652
+              "runtime should support exec with tty=true and stdin=true",
+
+              # Skip tests that are known to be flaky on Windows
+              # See https://github.com/containerd/containerd/issues/12580
+              "public image with tag should be pulled and removed",
+              "public image without tag should be pulled and removed",
+              "image status should support all kinds of references",
+              "listImage should get exactly 3 image in the result list",
+              "listImage should get exactly 3 repoTags in the result image"
+            )
+            $skip = $skipTests -join "|"
           }
-          critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
+          Write-Host "Skip parameters: $skip"
+          critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' --ginkgo.skip="$skip"
 
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         if: always()
