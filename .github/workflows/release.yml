@@ -12,9 +12,6 @@ on:
 
 name: Release
 
-env:
-  GO_VERSION: "1.24.9"
-
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
@@ -115,7 +112,7 @@ jobs:
             export PREFIX_LEN=12
             BUILD_ARGS="--build-arg GATEWAY --build-arg PREFIX_LEN"
           fi
-          docker buildx build ${cache} --build-arg RELEASE_VER --build-arg UBUNTU_VERSION=${{ matrix.dockerfile-ubuntu }} --build-arg GO_VERSION ${BUILD_ARGS} -f .github/workflows/release/Dockerfile --platform=${PLATFORM} -o releases/ .
+          docker buildx build ${cache} --build-arg RELEASE_VER --build-arg UBUNTU_VERSION=${{ matrix.dockerfile-ubuntu }} ${BUILD_ARGS} -f .github/workflows/release/Dockerfile --platform=${PLATFORM} -o releases/ .
           echo PLATFORM_CLEAN=${PLATFORM/\//-} >> $GITHUB_ENV
 
           # Remove symlinks since we don't want these in the release Artifacts (if any)
