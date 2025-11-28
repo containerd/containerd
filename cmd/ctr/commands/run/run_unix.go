@@ -505,7 +505,8 @@ func validNamespace(ns string) bool {
 		specs.MountNamespace,
 		specs.UserNamespace,
 		specs.IPCNamespace,
-		specs.CgroupNamespace:
+		specs.CgroupNamespace,
+		specs.TimeNamespace:
 		return true
 	default:
 		return false
