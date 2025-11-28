@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	oomv1 "github.com/containerd/containerd/v2/pkg/oom/v1"
@@ -85,6 +86,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		execCountSubscribers: make(map[*runc.Container]chan<- int),
 		containerInitExit:    make(map[*runc.Container]runcC.Exit),
 		exitSubscribers:      make(map[*map[int][]runcC.Exit]struct{}),
+		locker:               kmutex.New(),
 	}
 	go s.processExits()
 	runcC.Monitor = reaper.Default
@@ -140,6 +142,7 @@ type service struct {
 	exitSubscribers map[*map[int][]runcC.Exit]struct{}
 
 	shutdown shutdown.Service
+	locker   kmutex.KeyedLocker
 }
 
 type containerProcess struct {
@@ -354,6 +357,8 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 
 // Delete the initial process and container
 func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAPI.DeleteResponse, error) {
+	s.locker.Lock(context.Background(), r.ID)
+	defer s.locker.Unlock(r.ID)
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
