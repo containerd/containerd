@@ -143,12 +143,17 @@ func TestPodUserNS(t *testing.T) {
 		t.Fatalf("failed to setup volume host path: %v", err)
 	}
 
+	hostname, err := os.Hostname()
+	require.NoError(t, err)
+
 	for name, test := range map[string]struct {
-		sandboxOpts   []PodSandboxOpts
-		containerOpts []ContainerOpts
-		checkOutput   func(t *testing.T, output string)
-		hostVolumes   bool // whether to config uses host Volumes
-		expectErr     bool
+		sandboxOpts      []PodSandboxOpts
+		containerOpts    []ContainerOpts
+		checkOutput      func(t *testing.T, output string, expectedHostn string)
+		hostVolumes      bool // whether to config uses host Volumes
+		expectErr        bool
+		expectedHostname string
+		needsHostNetwork bool
 	}{
 		"userns uid mapping": {
 			sandboxOpts: []PodSandboxOpts{
@@ -158,7 +163,7 @@ func TestPodUserNS(t *testing.T) {
 				WithUserNamespace(containerID, hostID, size),
 				WithCommand("cat", "/proc/self/uid_map"),
 			},
-			checkOutput: func(t *testing.T, output string) {
+			checkOutput: func(t *testing.T, output string, expectedHostn string) {
 				// The output should contain the length of the userns requested.
 				assert.Contains(t, output, fmt.Sprint(size))
 			},
@@ -171,7 +176,7 @@ func TestPodUserNS(t *testing.T) {
 				WithUserNamespace(containerID, hostID, size),
 				WithCommand("cat", "/proc/self/gid_map"),
 			},
-			checkOutput: func(t *testing.T, output string) {
+			checkOutput: func(t *testing.T, output string, expectedHostn string) {
 				// The output should contain the length of the userns requested.
 				assert.Contains(t, output, fmt.Sprint(size))
 			},
@@ -189,7 +194,7 @@ func TestPodUserNS(t *testing.T) {
 				// We can't use assert.Equal() easily as it contains timestamp, etc.
 				WithCommand("stat", "-c", "'=%u=%g='", "/root/"),
 			},
-			checkOutput: func(t *testing.T, output string) {
+			checkOutput: func(t *testing.T, output string, expectedHostname string) {
 				// The UID and GID should be 0 (root) if the chown/remap is done correctly.
 				assert.Contains(t, output, "=0=0=")
 			},
@@ -209,7 +214,7 @@ func TestPodUserNS(t *testing.T) {
 				// We can't use assert.Equal() easily as it contains timestamp, etc.
 				WithCommand("stat", "-c", "'=%u=%g='", "/mnt/"),
 			},
-			checkOutput: func(t *testing.T, output string) {
+			checkOutput: func(t *testing.T, output string, expectedHostname string) {
 				// The UID and GID should be the current user if chown/remap is done correctly.
 				uid := "0"
 				user, err := user.Current()
@@ -225,6 +230,51 @@ func TestPodUserNS(t *testing.T) {
 				WithPodUserNs(containerID*2, hostID*2, size*2),
 			},
 			expectErr: true,
+		},
+		"regular userns pod with custom hostname": {
+			sandboxOpts: []PodSandboxOpts{
+				WithPodHostname("test-hostname"),
+				WithPodUserNs(containerID, hostID, size),
+			},
+			containerOpts: []ContainerOpts{
+				WithUserNamespace(containerID, hostID, size),
+				WithCommand("sh", "-c",
+					"echo -n /etc/hostname= && hostname && env"),
+			},
+			expectedHostname: "test-hostname",
+			checkOutput: func(t *testing.T, output string, expectedHostn string) {
+				assert.Contains(t, string(output), "HOSTNAME="+expectedHostn)
+			},
+		},
+		"host network userns pod without custom hostname": {
+			sandboxOpts: []PodSandboxOpts{
+				WithPodUserNs(containerID, hostID, size),
+				WithHostNetwork,
+			},
+			containerOpts: []ContainerOpts{
+				WithUserNamespace(containerID, hostID, size),
+				WithCommand("sh", "-c",
+					"echo -n /etc/hostname= && hostname && env"),
+			},
+			expectedHostname: hostname,
+			needsHostNetwork: true,
+			checkOutput: func(t *testing.T, output string, expectedHostn string) {
+				assert.Contains(t, string(output), "HOSTNAME="+expectedHostn)
+			},
+		},
+		"host network userns pod with custom hostname should fail": {
+			sandboxOpts: []PodSandboxOpts{
+				WithPodUserNs(containerID, hostID, size),
+				WithHostNetwork,
+				WithPodHostname("test-hostname"),
+			},
+			containerOpts: []ContainerOpts{
+				WithUserNamespace(containerID, hostID, size),
+				WithCommand("sh", "-c",
+					"echo -n /etc/hostname= && hostname && env"),
+			},
+			expectErr:        true,
+			needsHostNetwork: true,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -299,7 +349,7 @@ func TestPodUserNS(t *testing.T) {
 			assert.NoError(t, err)
 
 			t.Log("Running check function")
-			test.checkOutput(t, string(content))
+			test.checkOutput(t, string(content), test.expectedHostname)
 		})
 	}
 }
