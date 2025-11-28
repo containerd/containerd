@@ -52,6 +52,7 @@ type CreateOpts struct {
 	// As an alternative full abs path to binary may be specified instead.
 	Runtime string
 	// SandboxID is an optional ID of sandbox this container belongs to
+	OOMPath   string
 	SandboxID string
 	// Address is an optional Address for Task API server
 	Address string

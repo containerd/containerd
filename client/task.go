@@ -143,6 +143,7 @@ type TaskInfo struct {
 	// RuntimePath is an absolute path that can be used to overwrite path
 	// to a shim runtime binary.
 	RuntimePath string
+	OOMPath     string
 
 	// runtime is the runtime name for the container, and cannot be changed.
 	runtime string

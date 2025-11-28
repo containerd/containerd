@@ -271,6 +271,9 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		})
 	}
 	request.RuntimePath = info.RuntimePath
+	if info.OOMPath != "" {
+		request.OomPath = info.OOMPath
+	}
 	if info.Options != nil {
 		o, err := typeurl.MarshalAny(info.Options)
 		if err != nil {
