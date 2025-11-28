@@ -197,7 +197,8 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		}
 
 		if resp == nil {
-			resp, err = req.doWithRetries(ctx, true)
+			preq := requestWithMount(req, desc.Digest.String())
+			resp, err = preq.doWithRetries(ctx, true)
 			if err != nil {
 				if errors.Is(err, ErrInvalidAuthorization) {
 					return nil, fmt.Errorf("push access denied, repository does not exist or may require authorization: %w", err)
@@ -566,5 +567,17 @@ func requestWithMountFrom(req *request, mount, from string) *request {
 
 	creq.path = creq.path + sep + "mount=" + mount + "&from=" + from
 
+	return &creq
+}
+
+func requestWithMount(req *request, mount string) *request {
+	creq := *req
+
+	sep := "?"
+	if strings.Contains(creq.path, sep) {
+		sep = "&"
+	}
+
+	creq.path = creq.path + sep + "mount=" + mount
 	return &creq
 }
