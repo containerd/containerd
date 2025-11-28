@@ -38,6 +38,16 @@ func main() {
 		panic(err)
 	}
 
+	if runtimeFile := os.NewFile(3, "runtime"); runtimeFile != nil {
+		data, err := io.ReadAll(runtimeFile)
+		if err == nil && len(data) > 0 {
+			err = os.WriteFile(`{{.DataFile}}`, data, 0644)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
 	fmt.Println("Reason A line 1")
 	fmt.Fprintln(os.Stderr, "Debug A line 1")
 	fmt.Println("Reason A line 2")
