@@ -31,6 +31,7 @@ import (
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/typeurl/v2"
 
@@ -39,6 +40,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestEmpty(t *testing.T) {
+	// NOTE: It's used to register -test.root for all platforms.
+	testutil.RequiresRoot(t)
+}
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.
 func TestGetUserFromImage(t *testing.T) {
