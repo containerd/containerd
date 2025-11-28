@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package server
+package grpc
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func unaryNamespaceInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func unaryNamespaceInterceptor(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	if ns, ok := namespaces.Namespace(ctx); ok {
 		// The above call checks the *incoming* metadata, this makes sure the outgoing metadata is also set
 		ctx = namespaces.WithNamespace(ctx, ns)
@@ -31,7 +31,7 @@ func unaryNamespaceInterceptor(ctx context.Context, req interface{}, _ *grpc.Una
 	return handler(ctx, req)
 }
 
-func streamNamespaceInterceptor(srv interface{}, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+func streamNamespaceInterceptor(srv any, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	ctx := ss.Context()
 	if ns, ok := namespaces.Namespace(ctx); ok {
 		// The above call checks the *incoming* metadata, this makes sure the outgoing metadata is also set

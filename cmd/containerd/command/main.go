@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -32,7 +31,6 @@ import (
 	_ "github.com/containerd/containerd/v2/core/metrics" // import containerd build info
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -140,18 +138,9 @@ can be used and modified as necessary as a custom configuration.`
 		}
 
 		// Apply flags to the config
-		if err := applyFlags(cliContext, config); err != nil {
+		changes, err := applyFlags(cliContext, config)
+		if err != nil {
 			return err
-		}
-
-		if config.GRPC.Address == "" {
-			return fmt.Errorf("grpc address cannot be empty: %w", errdefs.ErrInvalidArgument)
-		}
-		if config.TTRPC.Address == "" {
-			// If TTRPC was not explicitly configured, use defaults based on GRPC.
-			config.TTRPC.Address = config.GRPC.Address + ".ttrpc"
-			config.TTRPC.UID = config.GRPC.UID
-			config.TTRPC.GID = config.GRPC.GID
 		}
 
 		// Make sure top-level directories are created early.
@@ -204,7 +193,8 @@ can be used and modified as necessary as a custom configuration.`
 		go func() {
 			defer close(chsrv)
 
-			server, err := server.New(ctx, config)
+			// TODO: When to set grpc address from flag? Migration should be done first
+			server, err := server.New(ctx, config, changes...)
 			if err != nil {
 				select {
 				case chsrv <- srvResp{err: err}:
@@ -242,46 +232,9 @@ can be used and modified as necessary as a custom configuration.`
 		case serverC <- server:
 		}
 
-		if config.Debug.Address != "" {
-			var l net.Listener
-			if isLocalAddress(config.Debug.Address) {
-				if l, err = sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID); err != nil {
-					return fmt.Errorf("failed to get listener for debug endpoint: %w", err)
-				}
-			} else {
-				if l, err = net.Listen("tcp", config.Debug.Address); err != nil {
-					return fmt.Errorf("failed to get listener for debug endpoint: %w", err)
-				}
-			}
-			serve(ctx, l, server.ServeDebug)
+		if err := server.Start(ctx); err != nil {
+			return err
 		}
-		if config.Metrics.Address != "" {
-			l, err := net.Listen("tcp", config.Metrics.Address)
-			if err != nil {
-				return fmt.Errorf("failed to get listener for metrics endpoint: %w", err)
-			}
-			serve(ctx, l, server.ServeMetrics)
-		}
-		// setup the ttrpc endpoint
-		tl, err := sys.GetLocalListener(config.TTRPC.Address, config.TTRPC.UID, config.TTRPC.GID)
-		if err != nil {
-			return fmt.Errorf("failed to get listener for main ttrpc endpoint: %w", err)
-		}
-		serve(ctx, tl, server.ServeTTRPC)
-
-		if config.GRPC.TCPAddress != "" {
-			l, err := net.Listen("tcp", config.GRPC.TCPAddress)
-			if err != nil {
-				return fmt.Errorf("failed to get listener for TCP grpc endpoint: %w", err)
-			}
-			serve(ctx, l, server.ServeTCP)
-		}
-		// setup the main grpc endpoint
-		l, err := sys.GetLocalListener(config.GRPC.Address, config.GRPC.UID, config.GRPC.GID)
-		if err != nil {
-			return fmt.Errorf("failed to get listener for main endpoint: %w", err)
-		}
-		serve(ctx, l, server.ServeGRPC)
 
 		readyC := make(chan struct{})
 		go func() {
@@ -303,25 +256,14 @@ can be used and modified as necessary as a custom configuration.`
 	return app
 }
 
-func serve(ctx context.Context, l net.Listener, serveFunc func(net.Listener) error) {
-	path := l.Addr().String()
-	log.G(ctx).WithField("address", path).Info("serving...")
-	go func() {
-		defer l.Close()
-		if err := serveFunc(l); err != nil {
-			log.G(ctx).WithError(err).WithField("address", path).Fatal("serve failure")
-		}
-	}()
-}
-
-func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
+func applyFlags(cliContext *cli.Context, config *srvconfig.Config) ([]server.UpdateConfig, error) {
 	// the order for config vs flag values is that flags will always override
 	// the config values if they are set
 	if err := setLogLevel(cliContext, config); err != nil {
-		return err
+		return nil, err
 	}
 	if err := setLogFormat(config); err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, v := range []struct {
@@ -336,26 +278,53 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 			name: "state",
 			d:    &config.State,
 		},
-		{
-			name: "address",
-			d:    &config.GRPC.Address,
-		},
 	} {
 		if s := cliContext.String(v.name); s != "" {
 			*v.d = s
 			if v.name == "root" || v.name == "state" {
 				absPath, err := filepath.Abs(s)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				*v.d = absPath
 			}
 		}
 	}
 
+	var updates []server.UpdateConfig
+
+	if s := cliContext.String("address"); s != "" {
+		updates = append(updates, func(_ context.Context, cfg *srvconfig.Config) error {
+			var (
+				grpcConfig  map[string]any
+				ttrpcConfig map[string]any
+			)
+			v, ok := cfg.Plugins["io.containerd.server.v1.grpc"]
+			if !ok {
+				grpcConfig = make(map[string]any)
+			} else if grpcConfig, ok = v.(map[string]any); !ok {
+				return fmt.Errorf("grpc plugin has invalid configuration: %w", errdefs.ErrInvalidArgument)
+			}
+			grpcConfig["address"] = s
+			cfg.Plugins["io.containerd.server.v1.grpc"] = grpcConfig
+
+			_, ok = cfg.Plugins["io.containerd.server.v1.ttrpc"]
+			if !ok {
+				ttrpcConfig = map[string]any{
+					"address": s + ".ttrpc",
+					"uid":     grpcConfig["uid"],
+					"gid":     grpcConfig["gid"],
+				}
+				cfg.Plugins["io.containerd.server.v1.ttrpc"] = ttrpcConfig
+			}
+
+			return nil
+		})
+	}
+
 	applyPlatformFlags(cliContext)
 
-	return nil
+	return updates, nil
 }
 
 func setLogLevel(cliContext *cli.Context, config *srvconfig.Config) error {
