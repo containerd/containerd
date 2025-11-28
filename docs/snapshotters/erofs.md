@@ -239,8 +239,6 @@ For the EROFS differ:
 
 ## TODO
 
- - EROFS Flatten filesystem support (EROFS fsmerge feature);
-
- - ID-mapped mount spport;
+ - ID-mapped mount support;
 
  - DMVerity support.
