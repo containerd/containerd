@@ -38,6 +38,7 @@ import (
 
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/config"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/internal/cri/util"
@@ -1665,4 +1666,103 @@ containerEdits:
 			}
 		})
 	}
+}
+
+func TestBaseRuntimeSpecCapability(t *testing.T) {
+	//test no value set, should use default profile
+	c := newTestCRIService(withRuntimeService(&fakeRuntimeService{
+		ocispecs: map[string]*oci.Spec{
+			"/etc/containerd/cri-base.json": {
+				Version:  "1.0.2",
+				Hostname: "old",
+			},
+		},
+	}))
+
+	out, err := c.runtimeSpec(
+		"id1",
+		platforms.DefaultSpec(),
+		"",
+		oci.WithHostname("new-host"),
+		oci.WithDomainname("new-domain"),
+	)
+	assert.NoError(t, err)
+
+	caps := out.Process.Capabilities
+	assert.NotNil(t, caps)
+	assert.Contains(t, caps.Bounding, "CAP_NET_RAW")
+	assert.Contains(t, caps.Effective, "CAP_NET_RAW")
+	assert.Contains(t, caps.Permitted, "CAP_NET_RAW")
+
+	assert.Contains(t, caps.Bounding, "CAP_AUDIT_WRITE")
+	assert.Contains(t, caps.Effective, "CAP_AUDIT_WRITE")
+	assert.Contains(t, caps.Permitted, "CAP_AUDIT_WRITE")
+
+	assert.Contains(t, caps.Bounding, "CAP_MKNOD")
+	assert.Contains(t, caps.Effective, "CAP_MKNOD")
+	assert.Contains(t, caps.Permitted, "CAP_MKNOD")
+
+	assert.Contains(t, caps.Bounding, "CAP_SETFCAP")
+	assert.Contains(t, caps.Effective, "CAP_SETFCAP")
+	assert.Contains(t, caps.Permitted, "CAP_SETFCAP")
+
+	//test reduced profile
+	c.config.CapabilityProfile = string(criconfig.CapabilityProfileReduced)
+
+	out, err = c.runtimeSpec(
+		"id1",
+		platforms.DefaultSpec(),
+		"",
+		oci.WithHostname("new-host"),
+		oci.WithDomainname("new-domain"),
+	)
+	assert.NoError(t, err)
+
+	caps = out.Process.Capabilities
+	assert.NotNil(t, caps)
+	assert.NotContains(t, caps.Bounding, "CAP_NET_RAW")
+	assert.NotContains(t, caps.Effective, "CAP_NET_RAW")
+	assert.NotContains(t, caps.Permitted, "CAP_NET_RAW")
+
+	assert.NotContains(t, caps.Bounding, "CAP_AUDIT_WRITE")
+	assert.NotContains(t, caps.Effective, "CAP_AUDIT_WRITE")
+	assert.NotContains(t, caps.Permitted, "CAP_AUDIT_WRITE")
+
+	assert.NotContains(t, caps.Bounding, "CAP_MKNOD")
+	assert.NotContains(t, caps.Effective, "CAP_MKNOD")
+	assert.NotContains(t, caps.Permitted, "CAP_MKNOD")
+
+	assert.NotContains(t, caps.Bounding, "CAP_SETFCAP")
+	assert.NotContains(t, caps.Effective, "CAP_SETFCAP")
+	assert.NotContains(t, caps.Permitted, "CAP_SETFCAP")
+
+	//test default profile
+	c.config.CapabilityProfile = string(criconfig.CapabilityProfileDefault)
+
+	out, err = c.runtimeSpec(
+		"id1",
+		platforms.DefaultSpec(),
+		"",
+		oci.WithHostname("new-host"),
+		oci.WithDomainname("new-domain"),
+	)
+	assert.NoError(t, err)
+
+	caps = out.Process.Capabilities
+	assert.NotNil(t, caps)
+	assert.Contains(t, caps.Bounding, "CAP_NET_RAW")
+	assert.Contains(t, caps.Effective, "CAP_NET_RAW")
+	assert.Contains(t, caps.Permitted, "CAP_NET_RAW")
+
+	assert.Contains(t, caps.Bounding, "CAP_AUDIT_WRITE")
+	assert.Contains(t, caps.Effective, "CAP_AUDIT_WRITE")
+	assert.Contains(t, caps.Permitted, "CAP_AUDIT_WRITE")
+
+	assert.Contains(t, caps.Bounding, "CAP_MKNOD")
+	assert.Contains(t, caps.Effective, "CAP_MKNOD")
+	assert.Contains(t, caps.Permitted, "CAP_MKNOD")
+
+	assert.Contains(t, caps.Bounding, "CAP_SETFCAP")
+	assert.Contains(t, caps.Effective, "CAP_SETFCAP")
+	assert.Contains(t, caps.Permitted, "CAP_SETFCAP")
 }

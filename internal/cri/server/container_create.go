@@ -556,12 +556,19 @@ func (c *criService) runtimeSpec(id string, platform imagespec.Platform, baseSpe
 		return &spec, nil
 	}
 
-	spec, err := oci.GenerateSpecWithPlatform(ctx, nil, platforms.Format(platform), container, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate spec: %w", err)
+	if c.config.CapabilityProfile == string(criconfig.CapabilityProfileReduced) && platform.OS == "linux" {
+		spec, err := oci.GenerateSpecWithCapabilityProfileForLinux(ctx, nil, container, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate reduced spec: %w", err)
+		}
+		return spec, nil
+	} else {
+		spec, err := oci.GenerateSpecWithPlatform(ctx, nil, platforms.Format(platform), container, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate spec: %w", err)
+		}
+		return spec, nil
 	}
-
-	return spec, nil
 }
 
 const (

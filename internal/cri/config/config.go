@@ -427,7 +427,19 @@ type RuntimeConfig struct {
 	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
+
+	// CapabilityProfile indicates to use a more secure set of default capabilities
+	// when creating containers. This removes capabilities that are not typically
+	// needed for most workloads, such as NET_RAW, SETFCAP, MKNOD and AUDIT_WRITE.
+	CapabilityProfile string `toml:"capability_profile" json:"capabilityProfile"`
 }
+
+type CapabilityProfile string
+
+const (
+	CapabilityProfileDefault CapabilityProfile = "default"
+	CapabilityProfileReduced CapabilityProfile = "reduced"
+)
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
 type X509KeyPairStreaming struct {
