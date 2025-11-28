@@ -46,6 +46,10 @@ type Config struct {
 
 	// DefaultSize is the default size of a writable layer in string
 	DefaultSize string `toml:"default_size"`
+
+	// EnableDmverity enables dmverity for EROFS layers
+	// Linux only
+	EnableDmverity bool `toml:"enable_dmverity"`
 }
 
 func init() {
@@ -85,6 +89,10 @@ func init() {
 					return nil, fmt.Errorf("failed to parse default_size '%v': %w", config.DefaultSize, err)
 				}
 				opts = append(opts, erofs.WithDefaultSize(size))
+			}
+
+			if config.EnableDmverity {
+				opts = append(opts, erofs.WithDmverity())
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
