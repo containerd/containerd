@@ -26,7 +26,13 @@ import (
 
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/snapshots/erofs"
+	overlayutils "github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/docker/go-units"
+)
+
+const (
+	capaRemapIDs     = "remap-ids"
+	capaOnlyRemapIDs = "only-remap-ids"
 )
 
 // Config represents configuration for the native plugin.
@@ -85,6 +91,13 @@ func init() {
 					return nil, fmt.Errorf("failed to parse default_size '%v': %w", config.DefaultSize, err)
 				}
 				opts = append(opts, erofs.WithDefaultSize(size))
+			}
+
+			// Don't bother supporting overlay's slow_chown, only RemapIDs
+			ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaOnlyRemapIDs)
+			if ok, err := overlayutils.SupportsIDMappedMounts(); err == nil && ok {
+				opts = append(opts, erofs.WithRemapIDs())
+				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaRemapIDs)
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
