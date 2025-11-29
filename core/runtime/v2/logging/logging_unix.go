@@ -45,8 +45,20 @@ func Run(fn LoggerFunc) {
 	)
 	signal.Notify(sigCh, unix.SIGTERM)
 
+	// ready signals the shim that the logging binary is ready for the container to start.
+	// It writes a byte to the wait pipe before closing it - the shim verifies this byte
+	// was received to distinguish between "ready() called" vs "logger crashed".
+	ready := func() error {
+		_, err := wait.Write([]byte{0})
+		if err != nil {
+			wait.Close()
+			return err
+		}
+		return wait.Close()
+	}
+
 	go func() {
-		errCh <- fn(ctx, config, wait.Close)
+		errCh <- fn(ctx, config, ready)
 	}()
 
 	for {

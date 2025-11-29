@@ -305,9 +305,15 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 	}
 
 	// wait for the logging binary to be ready
+	// The logging binary signals readiness by writing a byte then closing the pipe.
+	// If the binary crashes without calling ready(), we'll get EOF without data.
 	b := make([]byte, 1)
-	if _, err := r.Read(b); err != nil && err != io.EOF {
+	n, err := r.Read(b)
+	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("failed to read from logging binary: %w", err)
+	}
+	if n == 0 {
+		return nil, fmt.Errorf("logging binary did not call ready (it may have crashed or exited prematurely)")
 	}
 
 	return &binaryIO{
