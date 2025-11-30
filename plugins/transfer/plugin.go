@@ -18,6 +18,7 @@ package transfer
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -236,5 +237,6 @@ func defaultConfig() *transferConfig {
 		MaxConcurrentUploadedLayers: 3,
 		MaxConcurrentUnpacks:        1,
 		CheckPlatformSupported:      false,
+		RegistryConfigPath:          filepath.Join(defaults.DefaultConfigDir, "certs.d"),
 	}
 }

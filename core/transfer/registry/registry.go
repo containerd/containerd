@@ -82,9 +82,8 @@ func WithHostDir(hostDir string) Opt {
 	}
 }
 
-// WithConfigPath specifies the registry configuration path.
-// This is typically used to set the default hosts directory from plugin configuration.
-// WithHostDir takes precedence over WithConfigPath when both are specified.
+// WithConfigPath specifies the default registry configuration path.
+// When hostDir is not provided, this path will be used as a fallback.
 func WithConfigPath(configPath string) Opt {
 	return func(o *registryOpts) error {
 		o.configPath = configPath
@@ -134,11 +133,15 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		}
 	}
 
+	// Determine the effective host directory: use hostDir if specified, otherwise configPath
+	hostDir := ropts.hostDir
+	if hostDir == "" && ropts.configPath != "" {
+		hostDir = ropts.configPath
+	}
+
 	hostOptions := config.HostOptions{}
-	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
-	} else if ropts.configPath != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.configPath)
+	if hostDir != "" {
+		hostOptions.HostDir = config.HostDirFromRoot(hostDir)
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
@@ -170,18 +173,12 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		Headers: ropts.headers,
 	})
 
-	// Use hostDir if specified, otherwise fall back to configPath
-	effectiveHostDir := ropts.hostDir
-	if effectiveHostDir == "" && ropts.configPath != "" {
-		effectiveHostDir = ropts.configPath
-	}
-
 	return &OCIRegistry{
 		reference:     ref,
 		headers:       ropts.headers,
 		creds:         ropts.creds,
 		resolver:      resolver,
-		hostDir:       effectiveHostDir,
+		hostDir:       hostDir,
 		defaultScheme: ropts.defaultScheme,
 		httpDebug:     ropts.httpDebug,
 		httpTrace:     ropts.httpTrace,
