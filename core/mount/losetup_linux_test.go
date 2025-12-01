@@ -17,13 +17,17 @@
 package mount
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/continuity/testutil"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
 var randomData = []byte("randomdata")
@@ -100,23 +104,50 @@ func TestAttachDetachLoopDevice(t *testing.T) {
 func TestAutoclearTrueLoop(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	dev := func() string {
-		backingFile := createTempFile(t)
+	backingFile := createTempFile(t)
+	bInfo, err := os.Stat(backingFile)
+	require.NoError(t, err)
+	bInode := bInfo.Sys().(*syscall.Stat_t).Ino
 
-		file, err := SetupLoop(backingFile, LoopParams{Autoclear: true})
-		require.NoError(t, err)
-		dev := file.Name()
-		file.Close()
-		return dev
-	}()
+	file, err := SetupLoop(backingFile, LoopParams{Autoclear: true})
+	require.NoError(t, err)
+	dev := file.Name()
+	file.Close()
+
+	var checkFn = func(loopDev string, expectedInode uint64) (_shouldRetry bool, _ error) {
+		loop, err := os.Open(loopDev)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return false, nil
+			}
+			return false, fmt.Errorf("failed to open loop device: %w", err)
+		}
+		info, err := unix.IoctlLoopGetStatus64(int(loop.Fd()))
+		loop.Close()
+		if err != nil {
+			if errors.Is(err, unix.ENXIO) {
+				return false, nil
+			}
+			return false, fmt.Errorf("failed to get loop device info: %w", err)
+		}
+
+		if info.Inode != expectedInode {
+			return false, nil
+		}
+
+		t.Logf("loop device %s still present with backing inode %d", loopDev, expectedInode)
+		return true, nil
+	}
+
 	for range 10 {
-		if err := removeLoop(dev); err != nil {
-			// Expected to fail as Autoclear should have already removed the loop device
+		retry, err := checkFn(dev, bInode)
+		require.NoError(t, err)
+		if !retry {
 			return
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
-	t.Fatalf("removeLoop should fail if Autoclear is true")
+	t.Fatalf("loop device %s still present after autoclear", dev)
 }
 
 func TestAutoclearFalseLoop(t *testing.T) {
