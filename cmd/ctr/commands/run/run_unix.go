@@ -33,7 +33,6 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/contrib/apparmor"
-	"github.com/containerd/containerd/v2/contrib/nvidia"
 	"github.com/containerd/containerd/v2/contrib/seccomp"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/diff"
@@ -354,8 +353,12 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				Path: nsPath,
 			}))
 		}
+		var cdiDeviceIDs []string
 		if cliContext.IsSet("gpus") {
-			opts = append(opts, nvidia.WithGPUs(nvidia.WithDevices(cliContext.IntSlice("gpus")...), nvidia.WithAllCapabilities))
+			for _, id := range cliContext.IntSlice("gpus") {
+				cdiDeviceID := fmt.Sprintf("nvidia.com/gpu=%d", id)
+				cdiDeviceIDs = append(cdiDeviceIDs, cdiDeviceID)
+			}
 		}
 		if cliContext.IsSet("allow-new-privs") {
 			opts = append(opts, oci.WithNewPrivileges)
@@ -368,7 +371,6 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		if limit != 0 {
 			opts = append(opts, oci.WithMemoryLimit(limit))
 		}
-		var cdiDeviceIDs []string
 		for _, dev := range cliContext.StringSlice("device") {
 			if parser.IsQualifiedName(dev) {
 				cdiDeviceIDs = append(cdiDeviceIDs, dev)
