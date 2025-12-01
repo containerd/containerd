@@ -656,7 +656,7 @@ go.uber.org/goleak/internal/stack
 # go.yaml.in/yaml/v2 v2.4.2
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
-# golang.org/x/crypto v0.43.0
+# golang.org/x/crypto v0.45.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/cast5
 golang.org/x/crypto/cryptobyte
@@ -673,7 +673,7 @@ golang.org/x/exp/constraints
 # golang.org/x/mod v0.30.0
 ## explicit; go 1.24.0
 golang.org/x/mod/semver
-# golang.org/x/net v0.46.1-0.20251013234738-63d1a5100f82
+# golang.org/x/net v0.47.0
 ## explicit; go 1.24.0
 golang.org/x/net/bpf
 golang.org/x/net/html
@@ -706,10 +706,10 @@ golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/debug
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/term v0.36.0
+# golang.org/x/term v0.37.0
 ## explicit; go 1.24.0
 golang.org/x/term
-# golang.org/x/text v0.30.0
+# golang.org/x/text v0.31.0
 ## explicit; go 1.24.0
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
