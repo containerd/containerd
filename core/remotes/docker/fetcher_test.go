@@ -34,6 +34,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/assert"
@@ -473,15 +475,6 @@ func TestDockerFetcherOpen(t *testing.T) {
 			wantPlainError: true,
 			retries:        5,
 			lastHost:       true,
-		}, {
-			name:           "should return StatusTooManyRequests after 5 retries",
-			mockedStatus:   http.StatusTooManyRequests,
-			mockedErr:      errors.New(http.StatusText(http.StatusTooManyRequests)),
-			want:           nil,
-			wantErr:        true,
-			wantPlainError: true,
-			retries:        5,
-			lastHost:       true,
 		},
 		{
 			name:         "should retry once after 500",
@@ -556,6 +549,186 @@ func TestDockerFetcherOpen(t *testing.T) {
 
 			}
 
+		})
+	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return fn(r)
+}
+
+func TestDockerFetcherOpenError429(t *testing.T) {
+	type mockedResponse struct {
+		mockedHeaders http.Header
+		mockedStatus  int
+		mockedErr     error
+	}
+	tests := []struct {
+		name                   string
+		mockedResponses        []mockedResponse
+		retries                int
+		timeToExecute          time.Duration
+		lastHost               bool
+		wantErr                bool
+		wantServerMessageError bool
+		wantPlainError         bool
+	}{
+		{
+			name: "should retry after a delay if `Retry-After` response header is missing",
+			mockedResponses: []mockedResponse{
+				{
+					mockedStatus: http.StatusTooManyRequests,
+					mockedErr:    errors.New(http.StatusText(http.StatusTooManyRequests)),
+				},
+			},
+			retries: 5,
+			// Based on backoff
+			// 1s -> 2s -> 4s -> 8s -> 16s
+			timeToExecute: 31,
+			lastHost:      true,
+
+			wantErr:        true,
+			wantPlainError: true,
+		},
+		{
+			name: "should retry after specified seconds in `Retry-After` response header",
+			mockedResponses: []mockedResponse{
+				{
+					mockedStatus:  http.StatusTooManyRequests,
+					mockedErr:     errors.New(http.StatusText(http.StatusTooManyRequests)),
+					mockedHeaders: http.Header{"Retry-After": {"3"}},
+				},
+				{
+					mockedStatus: http.StatusOK,
+					mockedErr:    nil,
+				},
+			},
+
+			timeToExecute: 3,
+			retries:       1,
+			lastHost:      true,
+
+			wantErr:        false,
+			wantPlainError: false,
+		},
+		{
+			name: "should cap delay to 20 seconds",
+			mockedResponses: []mockedResponse{
+				{
+					mockedStatus:  http.StatusTooManyRequests,
+					mockedErr:     errors.New(http.StatusText(http.StatusTooManyRequests)),
+					mockedHeaders: http.Header{"Retry-After": {"30"}},
+				},
+				{
+					mockedStatus: http.StatusOK,
+					mockedErr:    nil,
+				},
+			},
+
+			timeToExecute: 20,
+			retries:       1,
+			lastHost:      true,
+
+			wantErr:        false,
+			wantPlainError: false,
+		},
+		{
+			name: "should retry after specified date time in `Retry-After` response header",
+			mockedResponses: []mockedResponse{
+				{
+					mockedStatus: http.StatusTooManyRequests,
+					mockedErr:    errors.New(http.StatusText(http.StatusTooManyRequests)),
+					// In synctest bubble, initial time is at midnight UTC 2000-01-01
+					// docs: https://pkg.go.dev/testing/synctest#hdr-Time
+					mockedHeaders: http.Header{"Retry-After": {"Sat, 01 Jan 2000 00:00:08 GMT"}},
+				},
+				{
+					mockedStatus: http.StatusOK,
+					mockedErr:    nil,
+				},
+			},
+
+			timeToExecute: 8,
+			retries:       1,
+			lastHost:      true,
+
+			wantErr:        false,
+			wantPlainError: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				requestCount := 0
+
+				client := &http.Client{
+					Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+						if requestCount != 0 {
+							tt.retries--
+						}
+
+						var body []byte
+						var mock mockedResponse
+						if requestCount >= len(tt.mockedResponses) {
+							mock = tt.mockedResponses[0]
+						} else {
+							mock = tt.mockedResponses[requestCount]
+						}
+						if mock.mockedErr != nil {
+							body, _ = json.Marshal(mock.mockedErr)
+						}
+
+						resp := &http.Response{
+							StatusCode: mock.mockedStatus,
+							Status:     fmt.Sprintf("%d %s", mock.mockedStatus, http.StatusText(mock.mockedStatus)),
+							Header:     make(http.Header, 1),
+							Body:       io.NopCloser(bytes.NewReader(body)),
+							Request:    req,
+						}
+
+						for key, values := range mock.mockedHeaders {
+							for _, value := range values {
+								resp.Header.Add(key, value)
+							}
+						}
+
+						requestCount++
+						return resp, nil
+					}),
+				}
+
+				f := dockerFetcher{&dockerBase{
+					repository: "ns",
+				}}
+
+				h := "test.com"
+				s := "http"
+				host := RegistryHost{
+					Client: client,
+					Host:   h,
+					Scheme: s,
+					Path:   "",
+				}
+
+				want := time.Now().Add(tt.timeToExecute * time.Second)
+				req := f.request(host, http.MethodGet)
+
+				_, _, err := f.open(context.TODO(), req, "", 0, tt.lastHost)
+
+				assert.Equal(t, want, time.Now())
+				assert.Equal(t, tt.wantErr, err != nil)
+				assert.Equal(t, 0, tt.retries)
+				if tt.wantErr {
+					mock := tt.mockedResponses[len(tt.mockedResponses)-1]
+					expectedError := fmt.Sprintf("unexpected status from GET request to %s/ns: %v %s", fmt.Sprintf("%s://%s", s, h), mock.mockedStatus, http.StatusText(mock.mockedStatus))
+					if tt.wantServerMessageError {
+						expectedError += "\n" + mock.mockedErr.Error()
+					}
+					assert.Equal(t, expectedError, err.Error())
+				}
+			})
 		})
 	}
 }
