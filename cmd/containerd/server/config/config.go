@@ -28,10 +28,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"dario.cat/mergo"
 	"github.com/pelletier/go-toml/v2"
@@ -287,6 +289,15 @@ func (c *Config) Decode(ctx context.Context, id string, config interface{}) (int
 
 // LoadConfig loads the containerd server config from the provided path
 func LoadConfig(ctx context.Context, path string, out *Config) error {
+	return LoadConfigWithPlugins(ctx, path, nil, out)
+}
+
+// PluginFunc returns an iterator to the plugin registrations
+type PluginFunc func() iter.Seq[plugin.Registration]
+
+// LoadConfigWithPlugins loads the containerd server config from the provided path
+// and using the migration functions from the provided plugins.
+func LoadConfigWithPlugins(ctx context.Context, path string, plugins PluginFunc, out *Config) error {
 	if out == nil {
 		return fmt.Errorf("argument out must not be nil: %w", errdefs.ErrInvalidArgument)
 	}
@@ -318,13 +329,29 @@ func LoadConfig(ctx context.Context, path string, out *Config) error {
 			return fmt.Errorf("drop-in config version %d higher than root config version %d", config.Version, rootConfigVersion)
 		}
 
-		switch config.Version {
-		case 0, 1:
-			if err := config.MigrateConfigTo(ctx, out.Version); err != nil {
-				return err
+		if config.Version < out.Version {
+			var (
+				currentVersion = config.Version
+				t1             = time.Now()
+			)
+			for v := currentVersion; v < out.Version; v++ {
+				if err := config.MigrateConfigTo(ctx, v+1); err != nil {
+					return err
+				}
+				if plugins != nil {
+					// Run migration for each configuration version
+					// Run each plugin migration for each version to ensure that migration logic is simple and
+					// focused on upgrading from one version at a time.
+					for p := range plugins() {
+						if p.ConfigMigration != nil {
+							if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
+								return err
+							}
+						}
+					}
+				}
 			}
-		default:
-			// NOP
+			log.G(ctx).WithField("t", time.Since(t1)).Warnf("Configuration migrated from version %d, use `containerd config migrate` to avoid migration", currentVersion)
 		}
 
 		if err := mergeConfig(out, config); err != nil {
