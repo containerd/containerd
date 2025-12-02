@@ -179,6 +179,7 @@ The following pieces of container metadata are available to plugins in NRI:
   - command line arguments
   - environment variables
   - mounts
+  - user, group and supplemental group IDs
   - OCI hooks
   - rlimits
   - I/O priority

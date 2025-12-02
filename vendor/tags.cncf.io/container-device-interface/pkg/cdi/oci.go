@@ -59,7 +59,5 @@ func (i *IntelRdt) toOCI() *spec.LinuxIntelRdt {
 		ClosID:        i.ClosID,
 		L3CacheSchema: i.L3CacheSchema,
 		MemBwSchema:   i.MemBwSchema,
-		EnableCMT:     i.EnableCMT,
-		EnableMBM:     i.EnableMBM,
 	}
 }
