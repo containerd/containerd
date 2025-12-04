@@ -213,11 +213,16 @@ func migrateConfig(dst, src map[string]interface{}) {
 	if runtime.GOOS == "linux" {
 		if value, ok := dst["registry"]; ok {
 			regMap := value.(map[string]any)
-			if configPath, ok := regMap["config_path"]; ok {
-				if configPath == "" {
-					// Fill in default from config_unix.go (DefaultImageConfig)
-					regMap["config_path"] = "/etc/containerd/certs.d:/etc/docker/certs.d"
+			configPath, configPathExists := regMap["config_path"]
+			if _, ok := regMap["mirrors"]; ok {
+				// This is needed because if the config_path value is set along with mirrors, it should be made
+				// empty
+				if configPathExists {
+					regMap["config_path"] = ""
 				}
+			} else if configPathExists && configPath == "" {
+				// Fill in default from config_unix.go (DefaultImageConfig)
+				regMap["config_path"] = "/etc/containerd/certs.d:/etc/docker/certs.d"
 			}
 			dst["registry"] = regMap
 		}

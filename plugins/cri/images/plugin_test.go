@@ -46,6 +46,76 @@ func TestSandboxImageConfigMigration(t *testing.T) {
 	assert.Equal(t, image, sandbox)
 }
 
+// This can be removed when Registry.Mirrors is removed as part of 2.3
+func TestRegistryConfigMigrationWithMirror(t *testing.T) {
+
+	defaultRegistryConfigPath := "/etc/containerd/certs.d:/etc/docker/certs.d"
+	dockerMirrors := map[string]interface{}{
+		"docker.io": map[string]interface{}{
+			"endpoint": []string{"https://registry-1.docker.io"},
+		},
+	}
+
+	for name, test := range map[string]struct {
+		registryConfig  map[string]interface{}
+		expectedConfig  *string
+		expectedMirrors map[string]interface{}
+	}{
+		"both config_path and mirrors does not exist": {
+			registryConfig:  map[string]interface{}{},
+			expectedConfig:  nil,
+			expectedMirrors: nil,
+		},
+		"empty config_path and mirrors does not exist": {
+			registryConfig: map[string]interface{}{
+				"config_path": "",
+			},
+			expectedConfig:  &defaultRegistryConfigPath,
+			expectedMirrors: nil,
+		},
+		"config_path does not exist and valid mirrors": {
+			registryConfig: map[string]interface{}{
+				"mirrors": dockerMirrors,
+			},
+			expectedConfig:  nil,
+			expectedMirrors: dockerMirrors,
+		},
+		"empty config_path and valid mirrors": {
+			registryConfig: map[string]interface{}{
+				"config_path": &defaultRegistryConfigPath,
+				"mirrors":     dockerMirrors,
+			},
+			expectedConfig:  new(string),
+			expectedMirrors: dockerMirrors,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pluginConfigs := map[string]interface{}{
+				string(plugins.GRPCPlugin) + ".cri": map[string]interface{}{
+					"registry": test.registryConfig,
+				},
+			}
+			configMigration(context.Background(), 2, pluginConfigs)
+			v, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".images"]
+			images := v.(map[string]interface{})
+			require.True(t, ok)
+			v, ok = images["registry"]
+			require.True(t, ok)
+			registry := v.(map[string]interface{})
+			v, ok = registry["config_path"]
+			assert.Equal(t, test.expectedConfig != nil, ok)
+			if ok {
+				assert.Equal(t, *test.expectedConfig, v)
+			}
+			v, ok = registry["mirrors"]
+			assert.Equal(t, test.expectedMirrors != nil, ok)
+			if ok {
+				assert.Equal(t, test.expectedMirrors, v)
+			}
+		})
+	}
+}
+
 func TestRegistryConfigMigration(t *testing.T) {
 	path := "/etc/containerd/certs.d"
 	grpcCri := map[string]interface{}{
