@@ -145,7 +145,7 @@ func TestReplaceOrAppendEnvValues(t *testing.T) {
 		"x=bar", "y", "a=42", "o=", "e", "s=",
 	}
 	expected := []string{
-		"o=", "p=$e", "x=bar", "z", "t=", "a=42", "s=",
+		"p=$e", "t=", "x=bar", "a=42", "o=", "s=",
 	}
 
 	defaultsOrig := make([]string, len(defaults))
@@ -235,6 +235,31 @@ func TestWithEnv(t *testing.T) {
 	err = WithEnv([]string{"env2"})(context.Background(), nil, nil, &s)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"DEFAULT=test", "env=1"}, s.Process.Env, "didn't update")
+}
+
+func TestWithEnv2(t *testing.T) {
+	t.Parallel()
+
+	var (
+		imageConfigEnv = []string{"MYENV=void", "IMAGE_ENV2=image_val2", "IMAGE_ENV1=image_val1", "IMAGE_ENV2=image_val_duplicate"}
+		configEnv      = []string{"MYENV=override", "IMAGE_ENV1", "CONFIG_ENV=config_val", "CONFIG_ENV=config_val_duplicate"}
+		expected       = []string{"IMAGE_ENV2=image_val_duplicate", "MYENV=override", "CONFIG_ENV=config_val_duplicate"}
+	)
+
+	env := append([]string{}, imageConfigEnv...)
+	env = append(env, configEnv...)
+
+	s := Spec{Process: &specs.Process{}}
+	_ = WithEnv(env)(context.Background(), nil, nil, &s)
+
+	if len(s.Process.Env) != len(expected) {
+		t.Fatal("didn't append")
+	}
+	for i, v := range s.Process.Env {
+		if v != expected[i] {
+			t.Fatalf("expected %s, got %s on position %d", expected[i], v, i)
+		}
+	}
 }
 
 func TestWithMounts(t *testing.T) {
@@ -605,7 +630,7 @@ func TestWithImageConfigArgs(t *testing.T) {
 		WithImageConfigArgs(img, []string{"--boo", "bar"}),
 	}
 
-	expectedEnv := []string{"z=bar", "y=boo", "x=foo"}
+	expectedEnv := []string{"z=bar", "x=foo", "y=boo"}
 	expectedArgs := []string{"create", "--namespace=test", "--boo", "bar"}
 
 	for _, opt := range opts {
