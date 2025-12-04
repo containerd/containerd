@@ -238,8 +238,9 @@ func TestDriveMounts(t *testing.T) {
 		{&runtime.Mount{HostPath: `C:\`, ContainerPath: `C:`}, ``, fmt.Errorf("destination path can not be C drive")},
 	}
 	var realOS osinterface.RealOS
+	statManager := osinterface.NewStatManager(realOS)
 	for _, test := range tests {
-		parsedMount, err := parseMount(realOS, test.mnt)
+		parsedMount, err := parseMount(t.Context(), realOS, statManager, test.mnt)
 		if err != nil && !strings.EqualFold(err.Error(), test.expectedError.Error()) {
 			t.Fatalf("expected err: %s, got %s instead", test.expectedError, err)
 		} else if err == nil && test.expectedContainerPath != parsedMount.Destination {
