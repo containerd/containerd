@@ -160,6 +160,8 @@ type criService struct {
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
+	// statsCollector collects CPU stats in background for UsageNanoCores calculation
+	statsCollector *StatsCollector
 }
 
 type CRIServiceOptions struct {
@@ -265,6 +267,11 @@ func (c *criService) Run(ready func()) error {
 	// then you have to manually filter namespace foo
 	c.eventMonitor.Subscribe(c.client, []string{`topic=="/tasks/oom"`, `topic~="/images/"`})
 
+	// Start the background stats collector for UsageNanoCores calculation
+	log.L.Info("Start stats collector")
+	c.statsCollector = NewStatsCollector(c)
+	c.statsCollector.Start()
+
 	log.L.Infof("Start recovering state")
 	if err := c.recover(ctrdutil.NamespacedContext()); err != nil {
 		return fmt.Errorf("failed to recover state: %w", err)
@@ -359,6 +366,9 @@ func (c *criService) Close() error {
 		}
 	}
 	c.eventMonitor.Stop()
+	if c.statsCollector != nil {
+		c.statsCollector.Stop()
+	}
 	if err := c.streamServer.Stop(); err != nil {
 		return fmt.Errorf("failed to stop stream server: %w", err)
 	}
