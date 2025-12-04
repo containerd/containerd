@@ -373,7 +373,7 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 				if status.State() != runtime.ContainerState_CONTAINER_CREATED {
 					return fmt.Errorf("unexpected container state for created task: %q", status.State())
 				}
-			case containerd.Running:
+			case containerd.Running, containerd.Paused:
 				// Task is running. Container must be in `RUNNING` state, based on our assumption that
 				// "task should not be started when containerd is down".
 				switch status.State() {
