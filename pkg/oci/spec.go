@@ -81,6 +81,15 @@ func GenerateSpecWithPlatform(ctx context.Context, client Client, platform strin
 	return &s, ApplyOpts(ctx, client, c, &s, opts...)
 }
 
+func GenerateSpecWithCapabilityProfileForLinux(ctx context.Context, client Client, c *containers.Container, opts ...SpecOpts) (*Spec, error) {
+	var s Spec
+	if err := populatereducedUnixSpec(ctx, &s, c.ID); err != nil {
+		return nil, err
+	}
+
+	return &s, ApplyOpts(ctx, client, c, &s, opts...)
+}
+
 func generateDefaultSpecWithPlatform(ctx context.Context, platform, id string, s *Spec) error {
 	plat, err := platforms.Parse(platform)
 	if err != nil {
@@ -134,6 +143,21 @@ func defaultUnixCaps() []string {
 	}
 }
 
+func reducedUnixCaps() []string {
+	return []string{
+		"CAP_CHOWN",
+		"CAP_DAC_OVERRIDE",
+		"CAP_FSETID",
+		"CAP_FOWNER",
+		"CAP_SETGID",
+		"CAP_SETUID",
+		"CAP_SETPCAP",
+		"CAP_NET_BIND_SERVICE",
+		"CAP_SYS_CHROOT",
+		"CAP_KILL",
+	}
+}
+
 func defaultUnixNamespaces() []specs.LinuxNamespace {
 	return []specs.LinuxNamespace{
 		{
@@ -155,6 +179,14 @@ func defaultUnixNamespaces() []specs.LinuxNamespace {
 }
 
 func populateDefaultUnixSpec(ctx context.Context, s *Spec, id string) error {
+	return createDefaultUnixSpec(ctx, s, id, defaultUnixCaps())
+}
+
+func populatereducedUnixSpec(ctx context.Context, s *Spec, id string) error {
+	return createDefaultUnixSpec(ctx, s, id, reducedUnixCaps())
+}
+
+func createDefaultUnixSpec(ctx context.Context, s *Spec, id string, capabilities []string) error {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
@@ -173,9 +205,9 @@ func populateDefaultUnixSpec(ctx context.Context, s *Spec, id string) error {
 				GID: 0,
 			},
 			Capabilities: &specs.LinuxCapabilities{
-				Bounding:  defaultUnixCaps(),
-				Permitted: defaultUnixCaps(),
-				Effective: defaultUnixCaps(),
+				Bounding:  capabilities,
+				Permitted: capabilities,
+				Effective: capabilities,
 			},
 			Rlimits: []specs.POSIXRlimit{
 				{
