@@ -17,12 +17,14 @@
 package podsandbox
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/moby/sys/userns"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -39,6 +41,11 @@ import (
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
 	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (_ *runtimespec.Spec, retErr error) {
+	ctx := tracing.ContextWithSandboxID(context.Background(), id)
+	_, span := tracing.StartSpan(ctx, tracing.Name("cri.sandbox", "make_spec"),
+		tracing.WithAttribute("sandbox.id", id))
+	defer func() { span.SetStatus(retErr); span.End() }()
+
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
 	specOpts := []oci.SpecOpts{
@@ -58,12 +65,18 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		return nil, fmt.Errorf("invalid empty entrypoint and cmd in image config %+v", imageConfig)
 	}
 	specOpts = append(specOpts, oci.WithProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...)...))
+	span.SetAttributes(
+		tracing.Attribute("image.entrypoint.set", len(imageConfig.Entrypoint) > 0),
+		tracing.Attribute("image.cmd.set", len(imageConfig.Cmd) > 0),
+		tracing.Attribute("ns.path", nsPath),
+	)
 
 	// Set cgroups parent.
 	if config.GetLinux().GetCgroupParent() != "" {
 		cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id)
 		specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 	}
+	span.SetAttributes(tracing.Attribute("cgroup.parent.set", config.GetLinux().GetCgroupParent() != ""))
 
 	// When cgroup parent is not set, containerd-shim will create container in a child cgroup
 	// of the cgroup itself is in.
@@ -73,6 +86,11 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	var (
 		securityContext = config.GetLinux().GetSecurityContext()
 		nsOptions       = securityContext.GetNamespaceOptions()
+	)
+	span.SetAttributes(
+		tracing.Attribute("ns.network", nsOptions.GetNetwork().String()),
+		tracing.Attribute("ns.pid", nsOptions.GetPid().String()),
+		tracing.Attribute("ns.ipc", nsOptions.GetIpc().String()),
 	)
 	if nsOptions.GetNetwork() == runtime.NamespaceMode_NODE {
 		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.NetworkNamespace))
@@ -95,14 +113,17 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	uids, gids, err := parseUsernsIDs(usernsOpts)
 	var usernsEnabled bool
 	if err != nil {
+		span.RecordError(err)
 		return nil, fmt.Errorf("user namespace configuration: %w", err)
 	}
 
 	if usernsOpts != nil {
 		switch mode := usernsOpts.GetMode(); mode {
 		case runtime.NamespaceMode_NODE:
+			span.SetAttributes(tracing.Attribute("userns.mode", "node"))
 			specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UserNamespace))
 		case runtime.NamespaceMode_POD:
+			span.SetAttributes(tracing.Attribute("userns.mode", "pod"))
 			specOpts = append(specOpts, oci.WithUserNamespace(uids, gids))
 			usernsEnabled = true
 
@@ -110,6 +131,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 				return nil, fmt.Errorf("failed to pin user namespace: %w", err)
 			}
 			specOpts = append(specOpts, customopts.WithNamespacePath(runtimespec.UserNamespace, c.getSandboxPinnedUserNamespace(id)))
+			span.AddEvent("userns.pinned", tracing.Attribute("path", c.getSandboxPinnedUserNamespace(id)))
 		default:
 			return nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
 		}
@@ -141,9 +163,14 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 			Options:     []string{"rbind", "ro", "nosuid", "nodev", "noexec"},
 		},
 	}))
+	span.AddEvent("mount.inject",
+		tracing.Attribute("devshm", sandboxDevShm),
+		tracing.Attribute("resolv", c.getResolvPath(id)),
+	)
 
 	processLabel, mountLabel, err := initLabelsFromOpt(securityContext.GetSelinuxOptions())
 	if err != nil {
+		span.RecordError(err)
 		return nil, fmt.Errorf("failed to init selinux options %+v: %w", securityContext.GetSelinuxOptions(), err)
 	}
 	defer func() {
@@ -166,6 +193,9 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	_, ipUnprivilegedPortStart := sysctls["net.ipv4.ip_unprivileged_port_start"]
 	_, pingGroupRange := sysctls["net.ipv4.ping_group_range"]
 	if nsOptions.GetNetwork() != runtime.NamespaceMode_NODE {
+		span.AddEvent("sysctls.check",
+			tracing.Attribute("unprivPorts.enabled", c.config.EnableUnprivilegedPorts),
+			tracing.Attribute("unprivICMP.enabled", c.config.EnableUnprivilegedICMP))
 		if c.config.EnableUnprivilegedPorts && !ipUnprivilegedPortStart {
 			sysctls["net.ipv4.ip_unprivileged_port_start"] = "0"
 		}
@@ -174,6 +204,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		}
 	}
 	specOpts = append(specOpts, customopts.WithSysctls(sysctls))
+	span.AddEvent("sysctls.set", tracing.Attribute("count", len(sysctls)))
 
 	// Note: LinuxSandboxSecurityContext does not currently provide an apparmor profile
 
@@ -195,13 +226,22 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 
 	specOpts = append(specOpts, annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...)
+	span.AddEvent("annotations.added")
 
-	return c.runtimeSpec(id, "", specOpts...)
+	spec, err := c.runtimeSpec(id, "", specOpts...)
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+	return spec, nil
 }
 
 // sandboxContainerSpecOpts generates OCI spec options for
 // the sandbox container.
 func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+	_, span := tracing.StartSpan(context.Background(), tracing.Name("cri.sandbox", "spec_opts"))
+	defer span.End()
+
 	var (
 		securityContext = config.GetLinux().GetSecurityContext()
 		specOpts        []oci.SpecOpts
@@ -213,6 +253,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
 			c.config.UnsetSeccompProfile)
 		if err != nil {
+			span.RecordError(err)
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 		}
 	}
@@ -221,6 +262,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
 	if err != nil {
+		span.RecordError(err)
 		return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 	}
 	if seccompSpecOpts != nil {
@@ -233,6 +275,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		securityContext.GetRunAsGroup(),
 	)
 	if err != nil {
+		span.RecordError(err)
 		return nil, fmt.Errorf("failed to generate user string: %w", err)
 	}
 	if userstr == "" {
@@ -242,6 +285,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 	}
 	if userstr != "" {
 		specOpts = append(specOpts, oci.WithUser(userstr))
+		span.SetAttributes(tracing.Attribute("user.effective", userstr))
 	}
 	return specOpts, nil
 }
@@ -249,24 +293,34 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 // setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts,
 // /etc/resolv.conf and /etc/hostname.
 func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+	ctx := tracing.ContextWithSandboxID(context.Background(), id)
+	_, span := tracing.StartSpan(ctx, tracing.Name("cri.sandbox", "setup_files"),
+		tracing.WithAttribute("sandbox.id", id))
+	defer span.End()
+
 	sandboxEtcHostname := c.getSandboxHostname(id)
 	hostname := config.GetHostname()
 	if hostname == "" {
 		var err error
 		hostname, err = c.os.Hostname()
 		if err != nil {
+			span.RecordError(err)
 			return fmt.Errorf("failed to get hostname: %w", err)
 		}
 	}
 	if err := c.os.WriteFile(sandboxEtcHostname, []byte(hostname+"\n"), 0644); err != nil {
+		span.RecordError(err)
 		return fmt.Errorf("failed to write hostname to %q: %w", sandboxEtcHostname, err)
 	}
+	span.AddEvent("write.hostname", tracing.Attribute("path", sandboxEtcHostname), tracing.Attribute("value", hostname))
 
 	// TODO(random-liu): Consider whether we should maintain /etc/hosts and /etc/resolv.conf in kubelet.
 	sandboxEtcHosts := c.getSandboxHosts(id)
 	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0644); err != nil {
+		span.RecordError(err)
 		return fmt.Errorf("failed to generate sandbox hosts file %q: %w", sandboxEtcHosts, err)
 	}
+	span.AddEvent("copy.hosts", tracing.Attribute("src", etcHosts), tracing.Attribute("dst", sandboxEtcHosts))
 
 	// Set DNS options. Maintain a resolv.conf for the sandbox.
 	resolvPath := c.getResolvPath(id)
@@ -277,30 +331,38 @@ func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 			return fmt.Errorf("failed to parse sandbox DNSConfig %+v: %w", dnsConfig, err)
 		}
 		if err := c.os.WriteFile(resolvPath, []byte(resolvContent), 0644); err != nil {
+			span.RecordError(err)
 			return fmt.Errorf("failed to write resolv content to %q: %w", resolvPath, err)
 		}
+		span.AddEvent("write.resolv", tracing.Attribute("path", resolvPath))
 	} else {
 		// The DnsConfig was nil - we interpret that to mean "use the global
 		// default", which is dubious but backwards-compatible.
 		if err := c.os.CopyFile(resolvConfPath, resolvPath, 0644); err != nil {
+			span.RecordError(err)
 			return fmt.Errorf("failed to copy host's resolv.conf to %q: %w", resolvPath, err)
 		}
+		span.AddEvent("copy.resolv", tracing.Attribute("src", resolvConfPath), tracing.Attribute("dst", resolvPath))
 	}
 
 	// Setup sandbox /dev/shm.
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
 		if _, err := c.os.Stat(devShm); err != nil {
+			span.RecordError(err)
 			return fmt.Errorf("host %q is not available for host ipc: %w", devShm, err)
 		}
 	} else {
 		sandboxDevShm := c.getSandboxDevShm(id)
 		if err := c.os.MkdirAll(sandboxDevShm, 0700); err != nil {
+			span.RecordError(err)
 			return fmt.Errorf("failed to create sandbox shm: %w", err)
 		}
 		shmproperty := fmt.Sprintf("mode=1777,size=%d", defaultShmSize)
 		if err := c.os.Mount("shm", sandboxDevShm, "tmpfs", uintptr(unix.MS_NOEXEC|unix.MS_NOSUID|unix.MS_NODEV), shmproperty); err != nil {
+			span.RecordError(err)
 			return fmt.Errorf("failed to mount sandbox shm: %w", err)
 		}
+		span.AddEvent("mount.shm", tracing.Attribute("target", sandboxDevShm), tracing.Attribute("size", defaultShmSize))
 	}
 
 	return nil
@@ -329,14 +391,22 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 // cleanupSandboxFiles unmount some sandbox files, we rely on the removal of sandbox root directory to
 // remove these files. Unmount should *NOT* return error if the mount point is already unmounted.
 func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+	ctx := tracing.ContextWithSandboxID(context.Background(), id)
+	_, span := tracing.StartSpan(ctx, tracing.Name("cri.sandbox", "cleanup_files"),
+		tracing.WithAttribute("sandbox.id", id))
+	defer span.End()
+
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() != runtime.NamespaceMode_NODE {
 		path, err := c.os.FollowSymlinkInScope(c.getSandboxDevShm(id), "/")
 		if err != nil {
+			span.RecordError(err)
 			return fmt.Errorf("failed to follow symlink: %w", err)
 		}
 		if err := c.os.Unmount(path); err != nil && !os.IsNotExist(err) {
+			span.RecordError(err)
 			return fmt.Errorf("failed to unmount %q: %w", path, err)
 		}
+		span.AddEvent("unmount.shm", tracing.Attribute("path", path))
 	}
 	return nil
 }
@@ -344,6 +414,10 @@ func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 // sandboxSnapshotterOpts generates any platform specific snapshotter options
 // for a sandbox container.
 func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	_, span := tracing.StartSpan(context.Background(), tracing.Name("snapshot", "opts.sandbox"))
+	defer span.End()
+
 	nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	span.SetAttributes(tracing.Attribute("ns.user.mode", nsOpts.GetUsernsOptions().GetMode().String()))
 	return snapshotterRemapOpts(nsOpts)
 }
