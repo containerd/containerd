@@ -58,6 +58,10 @@ linters:
   exclusions:
     generated: lax
     rules:
+      # Metric descriptors are currently only used for linux
+      - path: cri[\\/]server[\\/]list_metric_descriptors.go
+        linters:
+          - unused
       - path: cmd[\\/]containerd[\\/]builtins[\\/]
         text: 'blank-imports:'
       - path: contrib[\\/]fuzz[\\/]

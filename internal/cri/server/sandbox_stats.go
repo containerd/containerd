@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
+	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -33,11 +35,15 @@ func (c *criService) PodSandboxStats(
 		return nil, fmt.Errorf("an error occurred when trying to find sandbox %s: %w", r.GetPodSandboxId(), err)
 	}
 
-	// issue 12279: this is tautologically true where interface is stubbed out.
-	podSandboxStats, err := c.podSandboxStats(ctx, sandbox) //nolint: staticcheck
-	if err != nil {                                         //nolint: staticcheck
+	podSandboxStats, err := c.podSandboxStats(ctx, sandbox)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode pod sandbox metrics %s: %w", r.GetPodSandboxId(), err)
 	}
 
 	return &runtime.PodSandboxStatsResponse{Stats: podSandboxStats}, nil
+}
+
+type cgroupMetrics struct {
+	v1 *cg1.Metrics
+	v2 *cg2.Metrics
 }

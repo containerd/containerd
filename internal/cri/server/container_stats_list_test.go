@@ -28,14 +28,15 @@ import (
 	v1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/api/types"
-	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
-	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 )
 
 func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
@@ -243,12 +244,12 @@ func TestContainerMetricsMemory(t *testing.T) {
 
 	for _, test := range []struct {
 		desc     string
-		metrics  interface{}
+		metrics  cgroupMetrics
 		expected *runtime.MemoryUsage
 	}{
 		{
 			desc: "v1 metrics - no memory limit",
-			metrics: &v1.Metrics{
+			metrics: cgroupMetrics{v1: &v1.Metrics{
 				Memory: &v1.MemoryStat{
 					Usage: &v1.MemoryEntry{
 						Limit: math.MaxUint64, // no limit
@@ -259,7 +260,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 					TotalPgMajFault:   12,
 					TotalInactiveFile: 500,
 				},
-			},
+			}},
 			expected: &runtime.MemoryUsage{
 				Timestamp:       timestamp.UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{Value: 500},
@@ -272,7 +273,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 		},
 		{
 			desc: "v1 metrics - memory limit",
-			metrics: &v1.Metrics{
+			metrics: cgroupMetrics{v1: &v1.Metrics{
 				Memory: &v1.MemoryStat{
 					Usage: &v1.MemoryEntry{
 						Limit: 5000,
@@ -283,7 +284,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 					TotalPgMajFault:   12,
 					TotalInactiveFile: 500,
 				},
-			},
+			}},
 			expected: &runtime.MemoryUsage{
 				Timestamp:       timestamp.UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{Value: 500},
@@ -296,7 +297,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 		},
 		{
 			desc: "v2 metrics - memory limit",
-			metrics: &v2.Metrics{
+			metrics: cgroupMetrics{v2: &v2.Metrics{
 				Memory: &v2.MemoryStat{
 					Usage:        1000,
 					UsageLimit:   5000,
@@ -304,7 +305,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 					Pgfault:      11,
 					Pgmajfault:   12,
 				},
-			},
+			}},
 			expected: &runtime.MemoryUsage{
 				Timestamp:       timestamp.UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{Value: 1000},
@@ -317,7 +318,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 		},
 		{
 			desc: "v2 metrics - no memory limit",
-			metrics: &v2.Metrics{
+			metrics: cgroupMetrics{v2: &v2.Metrics{
 				Memory: &v2.MemoryStat{
 					Usage:        1000,
 					UsageLimit:   math.MaxUint64, // no limit
@@ -325,7 +326,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 					Pgfault:      11,
 					Pgmajfault:   12,
 				},
-			},
+			}},
 			expected: &runtime.MemoryUsage{
 				Timestamp:       timestamp.UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{Value: 1000},
