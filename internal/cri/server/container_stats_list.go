@@ -403,7 +403,6 @@ func (c *criService) linuxContainerMetrics(
 		default:
 			return containerStats{}, errors.New("cannot convert metric data to cgroups.Metrics")
 		}
-
 		cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, data, protobuf.FromTimestamp(stats.Timestamp))
 		if err != nil {
 			return containerStats{}, fmt.Errorf("failed to obtain cpu stats: %w", err)
@@ -415,9 +414,11 @@ func (c *criService) linuxContainerMetrics(
 			return containerStats{}, fmt.Errorf("failed to obtain memory stats: %w", err)
 		}
 		cs.Memory = memoryStats
+		memorySwap, err := c.memoryContainerSwap(meta.ID, data, protobuf.FromTimestamp(stats.Timestamp))
 		if err != nil {
-			return containerStats{}, fmt.Errorf("failed to obtain pid count: %w", err)
+			return containerStats{}, fmt.Errorf("failed to obtain memory swap: %w", err)
 		}
+		cs.Swap = memorySwap
 	}
 
 	return containerStats{&cs, pids}, nil
@@ -534,6 +535,32 @@ func (c *criService) memoryContainerStats(ID string, stats interface{}, timestam
 				RssBytes:        &runtime.UInt64Value{Value: metrics.Memory.Anon},
 				PageFaults:      &runtime.UInt64Value{Value: metrics.Memory.Pgfault},
 				MajorPageFaults: &runtime.UInt64Value{Value: metrics.Memory.Pgmajfault},
+			}, nil
+		}
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
+	}
+	return nil, nil
+}
+
+func (c *criService) memoryContainerSwap(ID string, stats interface{}, timestamp time.Time) (*runtime.SwapUsage, error) {
+	switch metrics := stats.(type) {
+	case *cg1.Metrics:
+		if metrics.GetMemory() != nil {
+			if swap := metrics.GetMemory().GetSwap(); swap != nil {
+				return &runtime.SwapUsage{
+					Timestamp:          timestamp.UnixNano(),
+					SwapUsageBytes:     &runtime.UInt64Value{Value: swap.GetUsage()},
+					SwapAvailableBytes: &runtime.UInt64Value{Value: swap.GetLimit() - swap.GetUsage()},
+				}, nil
+			}
+		}
+	case *cg2.Metrics:
+		if metrics.GetMemory() != nil {
+			return &runtime.SwapUsage{
+				Timestamp:          timestamp.UnixNano(),
+				SwapUsageBytes:     &runtime.UInt64Value{Value: metrics.GetMemory().GetSwapUsage()},
+				SwapAvailableBytes: &runtime.UInt64Value{Value: metrics.GetMemory().GetSwapLimit() - metrics.GetMemory().GetSwapUsage()},
 			}, nil
 		}
 	default:
