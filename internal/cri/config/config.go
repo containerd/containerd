@@ -427,6 +427,19 @@ type RuntimeConfig struct {
 	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
+
+	// StatsCollectionPeriod is the period for collecting container/sandbox CPU stats
+	// used for calculating UsageNanoCores. This matches cAdvisor's default housekeeping interval.
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	// Default: "1s"
+	StatsCollectionPeriod string `toml:"stats_collection_period" json:"statsCollectionPeriod"`
+
+	// StatsRetentionPeriod is how long to retain CPU stats samples for calculating UsageNanoCores.
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	// Default: "2m"
+	StatsRetentionPeriod string `toml:"stats_retention_period" json:"statsRetentionPeriod"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -667,6 +680,18 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	if c.DrainExecSyncIOTimeout != "" {
 		if _, err := time.ParseDuration(c.DrainExecSyncIOTimeout); err != nil {
 			return warnings, fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
+		}
+	}
+	// Validation for stats_collection_period
+	if c.StatsCollectionPeriod != "" {
+		if _, err := time.ParseDuration(c.StatsCollectionPeriod); err != nil {
+			return warnings, fmt.Errorf("invalid `stats_collection_period`: %w", err)
+		}
+	}
+	// Validation for stats_retention_period
+	if c.StatsRetentionPeriod != "" {
+		if _, err := time.ParseDuration(c.StatsRetentionPeriod); err != nil {
+			return warnings, fmt.Errorf("invalid `stats_retention_period`: %w", err)
 		}
 	}
 	if err := ValidateEnableUnprivileged(ctx, c); err != nil {
