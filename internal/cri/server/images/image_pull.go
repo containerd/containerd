@@ -184,7 +184,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	if c.config.UseLocalImagePull {
 		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
 	} else {
-		image, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout, sandboxConfig)
 	}
 
 	if err != nil {
@@ -293,6 +293,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	snapshotter string,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
+	sandboxConfig *runtime.PodSandboxConfig,
 ) (containerd.Image, error) {
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
 	rctx, rcancel := context.WithCancel(ctx)
@@ -315,9 +316,17 @@ func (c *CRIImageService) pullImageWithTransferService(
 		return nil, fmt.Errorf("failed to create OCI registry: %w", err)
 	}
 
+	// Build transfer options
+	var transferOpts []transfer.Opt
+	transferOpts = append(transferOpts, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx)))
+
+	if sandboxConfig != nil {
+		transferOpts = append(transferOpts, transfer.WithSandboxConfig(sandboxConfig))
+	}
+
 	transferProgressReporter.start(rctx)
 	log.G(ctx).Debugf("Calling cri transfer service")
-	err = c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx)))
+	err = c.transferrer.Transfer(rctx, reg, is, transferOpts...)
 	rcancel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)

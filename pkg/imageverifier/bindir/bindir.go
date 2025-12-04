@@ -41,6 +41,7 @@ type Config struct {
 	BinDir             string           `toml:"bin_dir"`
 	MaxVerifiers       int              `toml:"max_verifiers"`
 	PerVerifierTimeout tomlext.Duration `toml:"per_verifier_timeout"`
+	PodMetadata        bool             `toml:"pod_metadata"`
 }
 
 type ImageVerifier struct {
@@ -55,7 +56,7 @@ func NewImageVerifier(c *Config) *ImageVerifier {
 	}
 }
 
-func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor) (*imageverifier.Judgement, error) {
+func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor, runtimeConfig *imageverifier.RuntimeConfig) (*imageverifier.Judgement, error) {
 	// os.ReadDir sorts entries by name.
 	entries, err := os.ReadDir(v.config.BinDir)
 	if err != nil {
@@ -85,10 +86,10 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 
 		bin := entry.Name()
 		start := time.Now()
-		exitCode, vr, err := v.runVerifier(ctx, bin, name, desc)
-		runtime := time.Since(start)
+		exitCode, vr, err := v.runVerifier(ctx, bin, name, desc, runtimeConfig)
+		elapsed := time.Since(start)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call verifier %v (runtime %v): %w", bin, runtime, err)
+			return nil, fmt.Errorf("failed to call verifier %v (runtime %v): %w", bin, elapsed, err)
 		}
 
 		if exitCode != 0 {
@@ -110,7 +111,7 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 	}, nil
 }
 
-func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc ocispec.Descriptor) (exitCode int, reason string, err error) {
+func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc ocispec.Descriptor, runtimeConfig *imageverifier.RuntimeConfig) (exitCode int, reason string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, tomlext.ToStdTime(v.config.PerVerifierTimeout))
 	defer cancel()
 
@@ -119,6 +120,19 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 		"-name", imageName,
 		"-digest", desc.Digest.String(),
 		"-stdin-media-type", ocispec.MediaTypeDescriptor,
+	}
+
+	var runtimeJSON []byte
+	if v.config.PodMetadata && runtimeConfig != nil {
+		runtimeJSON, err = json.Marshal(runtimeConfig)
+		if err != nil {
+			return -1, "", fmt.Errorf("failed to marshal runtime config: %w", err)
+		}
+
+		log.G(ctx).WithFields(log.Fields{
+			"pod_namespace": runtimeConfig.Metadata.Namespace,
+			"pod_name":      runtimeConfig.Metadata.Name,
+		}).Debug("Passing runtime config to image verifier")
 	}
 
 	cmd := exec.CommandContext(ctx, binPath, args...)
@@ -149,12 +163,25 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 	defer stderrRead.Close()
 	defer stderrWrite.Close()
 
+	// Create fd 3 for runtime config
+	var runtimeRead, runtimeWrite *os.File
+	if runtimeJSON != nil {
+		runtimeRead, runtimeWrite, err = os.Pipe()
+		if err != nil {
+			return -1, "", err
+		}
+		cmd.ExtraFiles = []*os.File{runtimeRead}
+	}
+
 	// Close parent ends of pipes on timeout. Without this, I/O may hang in the
 	// parent process.
 	if d, ok := ctx.Deadline(); ok {
 		stdinWrite.SetDeadline(d)
 		stdoutRead.SetDeadline(d)
 		stderrRead.SetDeadline(d)
+		if runtimeWrite != nil {
+			runtimeWrite.SetDeadline(d)
+		}
 	}
 
 	// Finish configuring, and then fork & exec the child process.
@@ -168,6 +195,9 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 	stdinRead.Close()
 	stdoutWrite.Close()
 	stderrWrite.Close()
+	if runtimeRead != nil {
+		runtimeRead.Close()
+	}
 
 	// Write the descriptor to stdin.
 	go func() {
@@ -186,6 +216,16 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 		}
 		stdinWrite.Close()
 	}()
+
+	if runtimeWrite != nil {
+		go func() {
+			_, err := runtimeWrite.Write(runtimeJSON)
+			if err != nil {
+				log.G(ctx).WithError(err).Warn("failed to write runtime config to fd 3")
+			}
+			runtimeWrite.Close()
+		}()
+	}
 
 	// Pipe verifier stderr lines to debug logs.
 	stderrLog := log.G(ctx).Logger.WithFields(log.Fields{
