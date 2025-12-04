@@ -22,7 +22,7 @@ import (
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	testingclock "github.com/containerd/containerd/v2/internal/cri/clock/testing"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/prototestutil"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -144,7 +144,7 @@ func TestBackOff(t *testing.T) {
 	for k := range inputQueues {
 		actQueue := actual.deBackOff(k)
 		doneQueues[k] = actQueue
-		assert.True(t, cmp.Equal(actQueue.events, expectedQueues[k].events, protobuf.Compare))
+		assert.True(t, cmp.Equal(actQueue.events, expectedQueues[k].events, prototestutil.Compare))
 	}
 
 	t.Logf("Should not get out the event again after having got out the backOff event")
