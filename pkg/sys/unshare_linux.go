@@ -20,12 +20,55 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	"golang.org/x/sys/unix"
 )
+
+var (
+	unprivilegedUsernsSupported     bool
+	unprivilegedUsernsSupportedOnce sync.Once
+)
+
+// SupportsUnprivilegedUsernsCreation returns true if creating user namespaces
+// as an unprivileged user is supported
+func SupportsUnprivilegedUsernsCreation() bool {
+	unprivilegedUsernsSupportedOnce.Do(func() {
+		if err := checkUnprivilegedUsernsCreation(); err != nil {
+			unprivilegedUsernsSupported = false
+			return
+		}
+		unprivilegedUsernsSupported = true
+	})
+	return unprivilegedUsernsSupported
+}
+
+// checkUnprivilegedUsernsCreation tests if we can create a user namespace
+// as an unprivileged user. This can fail on systems that deny unprivileged
+// user namespaces through various means like AppArmor
+func checkUnprivilegedUsernsCreation() error {
+	// Assume nobody user is unprivileged
+	nobodyUID := 65534
+	var pidfd int
+
+	_, pidfd, err := startProcessWithUserNamespace(nobodyUID, syscall.CLONE_NEWIPC)
+	if err != nil {
+		return fmt.Errorf("user namespace creation as unprivileged user failed: %w", err)
+	}
+
+	// Clean up the test process
+	if pidfd != -1 {
+		unix.PidfdSendSignal(pidfd, unix.SIGKILL, nil, 0)
+		pidfdWaitid(pidfd)
+		unix.Close(pidfd)
+	}
+
+	return nil
+}
 
 // UnshareAfterEnterUserns allows to disassociate parts of its execution context
 // within a user namespace.
@@ -48,34 +91,17 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 		return err
 	}
 
-	var pidfd int
-	proc, err := os.StartProcess("/proc/self/exe", []string{"UnshareAfterEnterUserns"}, &os.ProcAttr{
-		Sys: &syscall.SysProcAttr{
-			// clone new user namespace first and then unshare
-			Cloneflags:                 unix.CLONE_NEWUSER,
-			Unshareflags:               unshareFlags,
-			UidMappings:                uidMaps,
-			GidMappings:                gidMaps,
-			GidMappingsEnableSetgroups: true,
-			// NOTE: It's reexec but it's not heavy because subprocess
-			// be in PTRACE_TRACEME mode before performing execve.
-			Ptrace:    true,
-			Pdeathsig: syscall.SIGKILL,
-			PidFD:     &pidfd,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to start noop process for unshare: %w", err)
+	targetUID := os.Geteuid()
+	if SupportsUnprivilegedUsernsCreation() {
+		targetUID = uidMaps[0].HostID
 	}
 
-	if pidfd == -1 {
-		proc.Kill()
-		proc.Wait()
-		return fmt.Errorf("kernel doesn't support CLONE_PIDFD")
+	pid, pidfd, err := startProcessWithUserNamespace(targetUID, unshareFlags)
+	if err != nil {
+		return err
 	}
 
 	defer unix.Close(pidfd)
-
 	defer func() {
 		derr := unix.PidfdSendSignal(pidfd, unix.SIGKILL, nil, 0)
 		if derr != nil {
@@ -87,8 +113,21 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 		pidfdWaitid(pidfd)
 	}()
 
+	// Now we can write the uid/gid mappings
+	uidMapPath := fmt.Sprintf("/proc/%d/uid_map", pid)
+	uidMapContent := fmt.Sprintf("%d %d %d\n", uidMaps[0].ContainerID, uidMaps[0].HostID, uidMaps[0].Size)
+	if err := os.WriteFile(uidMapPath, []byte(uidMapContent), 0644); err != nil {
+		return fmt.Errorf("failed to write UID mapping: %w", err)
+	}
+
+	gidMapPath := fmt.Sprintf("/proc/%d/gid_map", pid)
+	gidMapContent := fmt.Sprintf("%d %d %d\n", gidMaps[0].ContainerID, gidMaps[0].HostID, gidMaps[0].Size)
+	if err := os.WriteFile(gidMapPath, []byte(gidMapContent), 0644); err != nil {
+		return fmt.Errorf("failed to write GID mapping: %w", err)
+	}
+
 	if f != nil {
-		if err := f(proc.Pid); err != nil {
+		if err := f(pid); err != nil {
 			return err
 		}
 	}
@@ -135,6 +174,54 @@ func parseIDMapping(mapping string) ([]syscall.SysProcIDMap, error) {
 			Size:        size,
 		},
 	}, nil
+}
+
+// startProcessWithUserNamespace starts a ptraced dummy process to create
+// a user namespace. It runs the thread as targetHostUID when creating the process
+// and user namespace, ensuring that the kernel attributes user limits to targetHostUID
+// and not containerd's user. On success it the pid, pidfd and no error.
+// It is expected that the caller sets up the uid_map/gid_map for the
+// pid (this cannot be done as part of os.StartProcess() since targetHostUID doesn't
+// have CAP_SETUID)
+func startProcessWithUserNamespace(targetHostUID int, unshareFlags uintptr) (int, int, error) {
+	var pidfd int
+	originalEUID := os.Geteuid()
+
+	// Lock the thread, and use setresuid() directly to only apply the effective uid to this thread
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	if _, _, errno := syscall.RawSyscall(unix.SYS_SETRESUID, ^uintptr(0), uintptr(targetHostUID), ^uintptr(0)); errno != 0 {
+		return -1, -1, fmt.Errorf("failed to set effective UID: %w", errno)
+	}
+	defer func() {
+		syscall.RawSyscall(unix.SYS_SETRESUID, ^uintptr(0), uintptr(originalEUID), ^uintptr(0))
+	}()
+
+	proc, err := os.StartProcess("/proc/self/exe", []string{"UnshareAfterEnterUserns"}, &os.ProcAttr{
+		Sys: &syscall.SysProcAttr{
+			// clone new user namespace first and then unshare
+			Cloneflags:   unix.CLONE_NEWUSER,
+			Unshareflags: unshareFlags,
+			// NOTE: It's reexec but it's not heavy because subprocess
+			// be in PTRACE_TRACEME mode before performing execve.
+			Ptrace:    true,
+			Pdeathsig: syscall.SIGKILL,
+			PidFD:     &pidfd,
+		},
+	})
+
+	if err != nil {
+		return -1, -1, fmt.Errorf("failed to start noop process for unshare: %w", err)
+	}
+
+	if pidfd == -1 {
+		proc.Kill()
+		proc.Wait()
+		return -1, -1, fmt.Errorf("kernel doesn't support CLONE_PIDFD")
+	}
+
+	return proc.Pid, pidfd, nil
 }
 
 func pidfdWaitid(pidfd int) error {
