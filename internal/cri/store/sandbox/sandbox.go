@@ -76,18 +76,20 @@ func NewSandbox(metadata Metadata, status Status) Sandbox {
 
 // Store stores all sandboxes.
 type Store struct {
-	lock      sync.RWMutex
-	sandboxes map[string]Sandbox
-	idIndex   *truncindex.TruncIndex
-	labels    *label.Store
+	lock           sync.RWMutex
+	sandboxes      map[string]Sandbox
+	idIndex        *truncindex.TruncIndex
+	labels         *label.Store
+	statsCollector store.StatsCollector
 }
 
 // NewStore creates a sandbox store.
-func NewStore(labels *label.Store) *Store {
+func NewStore(labels *label.Store, statsCollector store.StatsCollector) *Store {
 	return &Store{
-		sandboxes: make(map[string]Sandbox),
-		idIndex:   truncindex.NewTruncIndex([]string{}),
-		labels:    labels,
+		sandboxes:      make(map[string]Sandbox),
+		idIndex:        truncindex.NewTruncIndex([]string{}),
+		labels:         labels,
+		statsCollector: statsCollector,
 	}
 }
 
@@ -106,6 +108,9 @@ func (s *Store) Add(sb Sandbox) error {
 		return err
 	}
 	s.sandboxes[sb.ID] = sb
+	if s.statsCollector != nil {
+		s.statsCollector.AddContainer(sb.ID)
+	}
 	return nil
 }
 
@@ -175,4 +180,7 @@ func (s *Store) Delete(id string) {
 	s.labels.Release(s.sandboxes[id].ProcessLabel)
 	s.idIndex.Delete(id)
 	delete(s.sandboxes, id)
+	if s.statsCollector != nil {
+		s.statsCollector.RemoveContainer(id)
+	}
 }
