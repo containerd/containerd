@@ -25,10 +25,10 @@ import (
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/internal/nlwrap"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/vishvananda/netlink"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -112,7 +112,7 @@ func (c *criService) podSandboxStats(
 // https://github.com/cri-o/cri-o/blob/74a5cf8dffd305b311eb1c7f43a4781738c388c1/internal/oci/stats.go#L32
 func getContainerNetIO(ctx context.Context, netNsPath string) (rxBytes, rxErrors, txBytes, txErrors, rxPackets, rxDropped, txPackets, txDropped uint64) {
 	ns.WithNetNSPath(netNsPath, func(_ ns.NetNS) error {
-		link, err := netlink.LinkByName(defaultIfName)
+		link, err := nlwrap.LinkByName(defaultIfName)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("unable to retrieve network namespace stats for netNsPath: %v, interface: %v", netNsPath, defaultIfName)
 			return err

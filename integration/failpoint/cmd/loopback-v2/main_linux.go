@@ -21,12 +21,12 @@ import (
 	"log"
 	"net"
 
-	"github.com/vishvananda/netlink"
+	"github.com/containerd/containerd/v2/internal/nlwrap"
 )
 
 // isLoInterfaceUp validates whether the lo interface is up
 func isLoInterfaceUp() (bool, error) {
-	link, err := netlink.LinkByName("lo")
+	link, err := nlwrap.LinkByName("lo")
 	if err != nil {
 		return false, fmt.Errorf("could not find interface lo: %w", err)
 	}

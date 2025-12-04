@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"syscall"
 
+	"github.com/containerd/containerd/v2/internal/nlwrap"
 	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/containerd/v2/pkg/sys"
 
@@ -30,7 +31,7 @@ import (
 
 func (c *criService) bringUpLoopback(netns string) error {
 	if err := ns.WithNetNSPath(netns, func(_ ns.NetNS) error {
-		link, err := netlink.LinkByName("lo")
+		link, err := nlwrap.LinkByName("lo")
 		if err != nil {
 			return err
 		}
