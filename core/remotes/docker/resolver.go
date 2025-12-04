@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,6 +30,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -756,8 +758,25 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response, 
 			r.method = http.MethodGet
 			return true, nil
 		}
-	case http.StatusRequestTimeout, http.StatusTooManyRequests:
+	case http.StatusRequestTimeout:
 		return true, nil
+	case http.StatusTooManyRequests:
+		duration, err := getRetryAfterDuration(responses)
+		if err != nil {
+			return false, nil
+		}
+
+		const maxDuration = 20 * time.Second
+		duration = min(duration, maxDuration)
+
+		timer := time.NewTimer(duration)
+		select {
+		case <-timer.C:
+			return true, nil
+		case <-ctx.Done():
+			timer.Stop()
+			return false, ctx.Err()
+		}
 	case http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusInternalServerError:
 		// Do not retry if the same error was seen in the last request
 		if len(responses) > 1 && responses[len(responses)-2].StatusCode == last.StatusCode {
@@ -786,6 +805,41 @@ func (r *request) setMediaType(mediatype string) {
 
 func (r *request) setOffset(offset int64) {
 	r.header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+}
+
+func parseRetryAfterHeader(resp *http.Response) (time.Duration, error) {
+	retryAfter := resp.Header.Get("Retry-After")
+
+	if d, err := time.ParseDuration(retryAfter + "s"); err == nil {
+		return d, nil
+	}
+
+	// Try parsing as date
+	// Docs: https://httpwg.org/specs/rfc9110.html#http.date
+	if t, err := time.Parse("Mon, 02 Jan 2006 15:04:05 GMT", retryAfter); err == nil {
+		d := time.Until(t)
+		return d, nil
+	}
+
+	return 0, fmt.Errorf("invalid Retry-After header: %q (not a valid number or date)", retryAfter)
+}
+
+func backoff(resps []*http.Response) time.Duration {
+	attempts := len(resps)
+	delay := 0.5 * math.Pow(2, float64(attempts))
+	return time.Duration(delay * float64(time.Second))
+}
+
+func getRetryAfterDuration(resps []*http.Response) (time.Duration, error) {
+	// Response header `Retry-After` can be a number (indicating seconds) or a date
+	// docs: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Retry-After
+	duration, err := parseRetryAfterHeader(resps[len(resps)-1])
+	if err == nil {
+		return duration, nil
+	}
+
+	duration = backoff(resps)
+	return duration, nil
 }
 
 func requestFields(req *http.Request) log.Fields {
