@@ -212,6 +212,9 @@ func v1Migrate(ctx context.Context, c *Config) error {
 }
 
 func serviceMigrate(ctx context.Context, c *Config) error {
+	if c.Plugins == nil {
+		c.Plugins = make(map[string]any)
+	}
 	if c.Debug.Address != "" && c.Plugins["io.containerd.server.v1.debug"] == nil {
 		c.Plugins["io.containerd.server.v1.debug"] = map[string]any{
 			"address": c.Debug.Address,
