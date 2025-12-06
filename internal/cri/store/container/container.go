@@ -107,18 +107,20 @@ func (c *Container) Delete() error {
 
 // Store stores all Containers.
 type Store struct {
-	lock       sync.RWMutex
-	containers map[string]Container
-	idIndex    *truncindex.TruncIndex
-	labels     *label.Store
+	lock           sync.RWMutex
+	containers     map[string]Container
+	idIndex        *truncindex.TruncIndex
+	labels         *label.Store
+	statsCollector store.StatsCollector
 }
 
 // NewStore creates a container store.
-func NewStore(labels *label.Store) *Store {
+func NewStore(labels *label.Store, statsCollector store.StatsCollector) *Store {
 	return &Store{
-		containers: make(map[string]Container),
-		idIndex:    truncindex.NewTruncIndex([]string{}),
-		labels:     labels,
+		containers:     make(map[string]Container),
+		idIndex:        truncindex.NewTruncIndex([]string{}),
+		labels:         labels,
+		statsCollector: statsCollector,
 	}
 }
 
@@ -137,6 +139,9 @@ func (s *Store) Add(c Container) error {
 		return err
 	}
 	s.containers[c.ID] = c
+	if s.statsCollector != nil {
+		s.statsCollector.AddContainer(c.ID)
+	}
 	return nil
 }
 
@@ -210,4 +215,7 @@ func (s *Store) Delete(id string) {
 	s.labels.Release(c.ProcessLabel)
 	s.idIndex.Delete(id)
 	delete(s.containers, id)
+	if s.statsCollector != nil {
+		s.statsCollector.RemoveContainer(id)
+	}
 }
