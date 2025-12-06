@@ -14,12 +14,12 @@ jobs:
     steps:
     - name: Build Fuzzers
       id: build
-      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@abe2c06d0e162320403dd10e8268adbb0b8923f8 # master
+      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@c8c1b257db4da92299bdf9fd058fff1bb008b2ad # ubuntu-24-04 support
       with:
         oss-fuzz-project-name: 'containerd'
         language: go
     - name: Run Fuzzers
-      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@abe2c06d0e162320403dd10e8268adbb0b8923f8 # master
+      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@c8c1b257db4da92299bdf9fd058fff1bb008b2ad # ubuntu-24-04 support
       with:
         oss-fuzz-project-name: 'containerd'
         fuzz-seconds: 300
