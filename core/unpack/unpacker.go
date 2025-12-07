@@ -417,8 +417,35 @@ func (u *Unpacker) unpack(
 						// Try again, this should be rare, log it
 						log.G(ctx).WithField("key", key).WithField("chainid", chainID).Debug("extraction snapshot already exists, chain id not found")
 					} else {
-						log.G(ctx).Debugf("snapshot %s with chainID %s already exists skip fetch blob %q ", snInfo.Name, chainID, desc.Digest)
-						// no need to handle, snapshot now found with chain id
+						// Snapshot exists. For local snapshotters, we need to ensure
+						// the content blob also exists in the content store. This is
+						// needed for export/push operations. Without this check, pulling
+						// an image that shares rootfs with a previously pulled image
+						// (but from a different registry with different compression)
+						// would result in missing blobs.
+						//
+						// Remote snapshotters intentionally skip content download
+						// (they fetch lazily on access), so we don't force-fetch for them.
+						// See: https://github.com/containerd/containerd/issues/8973
+						remoteSnapshotter := unpack.SnapshotterExports["enable_remote_snapshot_annotations"] == "true"
+						if !remoteSnapshotter {
+							if _, contentErr := cs.Info(ctx, desc.Digest); contentErr != nil {
+								if errdefs.IsNotFound(contentErr) {
+									// Content missing but snapshot exists - fetch the content
+									log.G(ctx).WithFields(log.Fields{
+										"digest":  desc.Digest,
+										"chainID": chainID,
+									}).Debug("snapshot exists but content missing, fetching content")
+
+									if fetchErr := u.fetch(ctx, h, []ocispec.Descriptor{desc}, nil); fetchErr != nil {
+										return nil, fmt.Errorf("failed to fetch missing content for %s: %w", desc.Digest, fetchErr)
+									}
+								} else {
+									return nil, fmt.Errorf("failed to check content %s: %w", desc.Digest, contentErr)
+								}
+							}
+						}
+						log.G(ctx).Debugf("snapshot %s with chainID %s already exists, skip unpacking blob %q", snInfo.Name, chainID, desc.Digest)
 						return nil, nil
 					}
 				} else {
