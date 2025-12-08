@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - uses: ./.github/actions/install-go
-      - uses: golangci/golangci-lint-action@0a35821d5c230e903fcfe077583637dea1b27b47  # v9.0.0
+      - uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20  # v9.2.0
         with:
           version: v2.1.5
           skip-cache: true
