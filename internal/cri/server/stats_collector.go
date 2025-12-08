@@ -33,6 +33,8 @@ import (
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
@@ -65,8 +67,12 @@ type StatsCollector struct {
 	doneCh chan struct{}
 	// stopOnce ensures Stop() only closes stopCh once
 	stopOnce sync.Once
-	// service provides access to task metrics
-	service *criService
+	// taskService provides access to task metrics
+	taskService tasks.TasksClient
+	// listContainers returns the list of containers
+	listContainers func() []containerstore.Container
+	// listSandboxes returns the list of sandboxes
+	listSandboxes func() []sandboxstore.Sandbox
 }
 
 // NewStatsCollector creates a new StatsCollector.
@@ -103,9 +109,16 @@ func NewStatsCollector(config criconfig.Config) *StatsCollector {
 	}
 }
 
-// SetService sets the criService reference. Must be called before Start.
-func (c *StatsCollector) SetService(service *criService) {
-	c.service = service
+// SetDependencies sets the dependencies needed for stats collection.
+// Must be called before Start.
+func (c *StatsCollector) SetDependencies(
+	taskService tasks.TasksClient,
+	listContainers func() []containerstore.Container,
+	listSandboxes func() []sandboxstore.Sandbox,
+) {
+	c.taskService = taskService
+	c.listContainers = listContainers
+	c.listSandboxes = listSandboxes
 }
 
 // Start begins the background stats collection loop.
@@ -155,7 +168,7 @@ func (c *StatsCollector) collect() {
 
 // collectContainerStats fetches metrics for all containers.
 func (c *StatsCollector) collectContainerStats(ctx context.Context) {
-	containers := c.service.containerStore.List()
+	containers := c.listContainers()
 	if len(containers) == 0 {
 		return
 	}
@@ -166,7 +179,7 @@ func (c *StatsCollector) collectContainerStats(ctx context.Context) {
 		req.Filters = append(req.Filters, "id=="+cntr.ID)
 	}
 
-	resp, err := c.service.client.TaskService().Metrics(ctx, req)
+	resp, err := c.taskService.Metrics(ctx, req)
 	if err != nil {
 		log.G(ctx).WithError(err).Debug("StatsCollector: failed to fetch container metrics")
 		return
@@ -187,7 +200,7 @@ func (c *StatsCollector) collectContainerStats(ctx context.Context) {
 // containers in the pod), not from the pause container's task metrics.
 // This matches how sandbox_stats_linux.go retrieves pod-level CPU stats.
 func (c *StatsCollector) collectSandboxStats(ctx context.Context) {
-	sandboxes := c.service.sandboxStore.List()
+	sandboxes := c.listSandboxes()
 	if len(sandboxes) == 0 {
 		return
 	}

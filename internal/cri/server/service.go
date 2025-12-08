@@ -274,7 +274,11 @@ func (c *criService) Run(ready func()) error {
 	// Start the background stats collector for UsageNanoCores calculation
 	log.L.Info("Start stats collector")
 	if c.statsCollector != nil {
-		c.statsCollector.SetService(c)
+		c.statsCollector.SetDependencies(
+			c.client.TaskService(),
+			c.containerStore.List,
+			c.sandboxStore.List,
+		)
 		c.statsCollector.Start()
 	}
 

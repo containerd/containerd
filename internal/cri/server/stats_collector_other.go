@@ -19,7 +19,10 @@
 package server
 
 import (
+	"github.com/containerd/containerd/api/services/tasks/v1"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 )
 
@@ -33,8 +36,13 @@ func NewStatsCollector(config criconfig.Config) *StatsCollector {
 	return &StatsCollector{}
 }
 
-// SetService sets the criService reference (no-op on non-Linux).
-func (c *StatsCollector) SetService(service *criService) {}
+// SetDependencies sets the dependencies needed for stats collection (no-op on non-Linux).
+func (c *StatsCollector) SetDependencies(
+	taskService tasks.TasksClient,
+	listContainers func() []containerstore.Container,
+	listSandboxes func() []sandboxstore.Sandbox,
+) {
+}
 
 // Start begins the background stats collection loop (no-op on non-Linux).
 func (c *StatsCollector) Start() {}
