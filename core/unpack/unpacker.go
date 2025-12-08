@@ -67,6 +67,12 @@ type unpackerConfig struct {
 	duplicationSuppressor KeyedLocker
 
 	unpackLimiter Limiter
+
+	// fetchMissingContent ensures content blobs are fetched even when
+	// snapshots already exist. This is needed for export/push operations
+	// when images share layers but have different compressed blob digests.
+	// Defaults to true. See https://github.com/containerd/containerd/issues/8973
+	fetchMissingContent bool
 }
 
 // Platform represents a platform-specific unpack configuration which includes
@@ -154,6 +160,18 @@ func WithUnpackLimiter(l Limiter) UnpackerOpt {
 	})
 }
 
+// WithFetchMissingContent configures the unpacker to fetch content blobs
+// when snapshots already exist but the content is missing from the content store.
+// This is enabled by default and is needed for export/push operations when
+// images share layers but have different compressed blob digests.
+// See https://github.com/containerd/containerd/issues/8973
+func WithFetchMissingContent(fetch bool) UnpackerOpt {
+	return UnpackerOpt(func(c *unpackerConfig) error {
+		c.fetchMissingContent = fetch
+		return nil
+	})
+}
+
 // Unpacker unpacks images by hooking into the image handler process.
 // Unpacks happen in the backgrounds and waited on to complete.
 type Unpacker struct {
@@ -174,6 +192,7 @@ func NewUnpacker(ctx context.Context, cs content.Store, opts ...UnpackerOpt) (*U
 		unpackerConfig: unpackerConfig{
 			content:               cs,
 			duplicationSuppressor: kmutex.NewNoop(),
+			fetchMissingContent:   true, // Default to fetching missing content
 		},
 		ctx: ctx,
 		eg:  eg,
@@ -417,7 +436,7 @@ func (u *Unpacker) unpack(
 						// Try again, this should be rare, log it
 						log.G(ctx).WithField("key", key).WithField("chainid", chainID).Debug("extraction snapshot already exists, chain id not found")
 					} else {
-						// Snapshot exists. For local snapshotters, we need to ensure
+						// Snapshot exists. If fetchMissingContent is enabled, ensure
 						// the content blob also exists in the content store. This is
 						// needed for export/push operations. Without this check, pulling
 						// an image that shares rootfs with a previously pulled image
@@ -427,21 +446,23 @@ func (u *Unpacker) unpack(
 						// Remote snapshotters intentionally skip content download
 						// (they fetch lazily on access), so we don't force-fetch for them.
 						// See: https://github.com/containerd/containerd/issues/8973
-						remoteSnapshotter := unpack.SnapshotterExports["enable_remote_snapshot_annotations"] == "true"
-						if !remoteSnapshotter {
-							if _, contentErr := cs.Info(ctx, desc.Digest); contentErr != nil {
-								if errdefs.IsNotFound(contentErr) {
-									// Content missing but snapshot exists - fetch the content
-									log.G(ctx).WithFields(log.Fields{
-										"digest":  desc.Digest,
-										"chainID": chainID,
-									}).Debug("snapshot exists but content missing, fetching content")
+						if u.fetchMissingContent {
+							remoteSnapshotter := unpack.SnapshotterExports["enable_remote_snapshot_annotations"] == "true"
+							if !remoteSnapshotter {
+								if _, contentErr := cs.Info(ctx, desc.Digest); contentErr != nil {
+									if errdefs.IsNotFound(contentErr) {
+										// Content missing but snapshot exists - fetch the content
+										log.G(ctx).WithFields(log.Fields{
+											"digest":  desc.Digest,
+											"chainID": chainID,
+										}).Debug("snapshot exists but content missing, fetching content")
 
-									if fetchErr := u.fetch(ctx, h, []ocispec.Descriptor{desc}, nil); fetchErr != nil {
-										return nil, fmt.Errorf("failed to fetch missing content for %s: %w", desc.Digest, fetchErr)
+										if fetchErr := u.fetch(ctx, h, []ocispec.Descriptor{desc}, nil); fetchErr != nil {
+											return nil, fmt.Errorf("failed to fetch missing content for %s: %w", desc.Digest, fetchErr)
+										}
+									} else {
+										return nil, fmt.Errorf("failed to check content %s: %w", desc.Digest, contentErr)
 									}
-								} else {
-									return nil, fmt.Errorf("failed to check content %s: %w", desc.Digest, contentErr)
 								}
 							}
 						}

@@ -131,6 +131,9 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if uconfig.Limiter != nil {
 			uopts = append(uopts, unpack.WithUnpackLimiter(uconfig.Limiter))
 		}
+		if uconfig.FetchMissingContent != nil {
+			uopts = append(uopts, unpack.WithFetchMissingContent(*uconfig.FetchMissingContent))
+		}
 		unpacker, err = unpack.NewUnpacker(ctx, c.ContentStore(), uopts...)
 		if err != nil {
 			return nil, fmt.Errorf("unable to initialize unpacker: %w", err)
