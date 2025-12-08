@@ -182,6 +182,9 @@ func init() {
 			lc.RegistryConfigPath = config.RegistryConfigPath
 			lc.DuplicationSuppressor = kmutex.New()
 
+			// Export config_path so clients can query it via introspection
+			ic.Meta.Exports["config_path"] = config.RegistryConfigPath
+
 			return local.NewTransferService(ms.ContentStore(), metadata.NewImageStore(ms), lc), nil
 		},
 	})

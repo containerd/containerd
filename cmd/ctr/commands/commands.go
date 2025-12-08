@@ -17,12 +17,14 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 
@@ -73,8 +75,7 @@ var (
 		},
 		&cli.StringFlag{
 			Name:  "hosts-dir",
-			Value: "/etc/containerd/certs.d",
-			// compatible with "/etc/docker/certs.d"
+			Value: filepath.Join(defaults.DefaultConfigDir, "certs.d"),
 			Usage: "Custom hosts configuration directory",
 		},
 		&cli.StringFlag{
@@ -294,4 +295,21 @@ func WritePidFile(path string, pid int) error {
 		return err
 	}
 	return f.Close()
+}
+
+// GetRegistryConfigPath queries the transfer plugin's config_path via introspection.
+// Returns empty string if the plugin is not found or doesn't export config_path.
+// This allows CLI commands to respect daemon configuration instead of relying solely on flags.
+func GetRegistryConfigPath(ctx context.Context, client interface{ IntrospectionService() introspection.Service }) string {
+	resp, err := client.IntrospectionService().Plugins(ctx, "id==io.containerd.transfer.v1.local")
+	if err != nil {
+		return ""
+	}
+	if len(resp.Plugins) != 1 {
+		return ""
+	}
+	if configPath, ok := resp.Plugins[0].Exports["config_path"]; ok {
+		return configPath
+	}
+	return ""
 }

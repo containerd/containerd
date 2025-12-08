@@ -133,7 +133,8 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		}
 	}
 
-	// Determine the effective host directory: use hostDir if specified, otherwise configPath
+	// Determine the effective host directory.
+	// Priority: WithHostDir (explicit) > WithConfigPath (daemon config) > empty (use default resolver)
 	hostDir := ropts.hostDir
 	if hostDir == "" && ropts.configPath != "" {
 		hostDir = ropts.configPath
