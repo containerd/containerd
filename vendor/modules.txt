@@ -183,7 +183,7 @@ github.com/containerd/nri/types/v1
 ## explicit; go 1.21
 github.com/containerd/otelttrpc
 github.com/containerd/otelttrpc/internal
-# github.com/containerd/platforms v1.0.0-rc.1
+# github.com/containerd/platforms v1.0.0-rc.2
 ## explicit; go 1.20
 github.com/containerd/platforms
 # github.com/containerd/plugin v1.0.0
@@ -196,8 +196,8 @@ github.com/containerd/ttrpc
 # github.com/containerd/typeurl/v2 v2.2.3
 ## explicit; go 1.21
 github.com/containerd/typeurl/v2
-# github.com/containerd/zfs/v2 v2.0.0-rc.0
-## explicit; go 1.22.0
+# github.com/containerd/zfs/v2 v2.0.0
+## explicit; go 1.23.0
 github.com/containerd/zfs/v2
 github.com/containerd/zfs/v2/plugin
 # github.com/containernetworking/cni v1.3.0

@@ -23,11 +23,11 @@ require (
 	github.com/containerd/log v0.1.0
 	github.com/containerd/nri v0.8.0
 	github.com/containerd/otelttrpc v0.1.0
-	github.com/containerd/platforms v1.0.0-rc.1
+	github.com/containerd/platforms v1.0.0-rc.2
 	github.com/containerd/plugin v1.0.0
 	github.com/containerd/ttrpc v1.2.7
 	github.com/containerd/typeurl/v2 v2.2.3
-	github.com/containerd/zfs/v2 v2.0.0-rc.0
+	github.com/containerd/zfs/v2 v2.0.0
 	github.com/containernetworking/cni v1.3.0
 	github.com/containernetworking/plugins v1.9.0
 	github.com/coreos/go-systemd/v22 v22.6.0
