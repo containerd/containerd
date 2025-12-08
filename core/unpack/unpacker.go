@@ -451,15 +451,18 @@ func (u *Unpacker) unpack(
 							if !remoteSnapshotter {
 								if _, contentErr := cs.Info(ctx, desc.Digest); contentErr != nil {
 									if errdefs.IsNotFound(contentErr) {
-										// Content missing but snapshot exists - fetch the content
+										// Content missing but snapshot exists - fetch the content asynchronously
 										log.G(ctx).WithFields(log.Fields{
 											"digest":  desc.Digest,
 											"chainID": chainID,
-										}).Debug("snapshot exists but content missing, fetching content")
+										}).Debug("snapshot exists but content missing, fetching content asynchronously")
 
-										if fetchErr := u.fetch(ctx, h, []ocispec.Descriptor{desc}, nil); fetchErr != nil {
-											return nil, fmt.Errorf("failed to fetch missing content for %s: %w", desc.Digest, fetchErr)
-										}
+										u.eg.Go(func() error {
+											if fetchErr := u.fetch(ctx, h, []ocispec.Descriptor{desc}, nil); fetchErr != nil {
+												return fmt.Errorf("failed to fetch missing content for %s: %w", desc.Digest, fetchErr)
+											}
+											return nil
+										})
 									} else {
 										return nil, fmt.Errorf("failed to check content %s: %w", desc.Digest, contentErr)
 									}

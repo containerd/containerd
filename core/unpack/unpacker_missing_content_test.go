@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
@@ -115,7 +114,8 @@ func TestSnapshotExistsButContentMissing(t *testing.T) {
 	}
 
 	_ = images.Dispatch(ctx, handler, nil, manifestDesc)
-	time.Sleep(100 * time.Millisecond)
+	// Wait for async fetch to complete
+	_, _ = unpacker.Wait()
 
 	// Verify layer was fetched even though snapshot existed
 	_, fetched := fetchedDigests.Load(layerDigest)
