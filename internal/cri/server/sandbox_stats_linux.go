@@ -83,17 +83,15 @@ func (c *criService) podSandboxStats(
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain network stats: %w", err)
 		}
-		defaultInterface := &runtime.NetworkInterfaceUsage{
-			Name:     defaultIfName,
-			RxBytes:  &runtime.UInt64Value{Value: linkStats.RxBytes},
-			RxErrors: &runtime.UInt64Value{Value: linkStats.RxErrors},
-			TxBytes:  &runtime.UInt64Value{Value: linkStats.TxBytes},
-			TxErrors: &runtime.UInt64Value{Value: linkStats.TxErrors},
-		}
 		podSandboxStats.Linux.Network = &runtime.NetworkUsage{
-			Timestamp:        timestamp.UnixNano(),
-			DefaultInterface: defaultInterface,
-			Interfaces:       []*runtime.NetworkInterfaceUsage{defaultInterface},
+			Timestamp: timestamp.UnixNano(),
+			DefaultInterface: &runtime.NetworkInterfaceUsage{
+				Name:     defaultIfName,
+				RxBytes:  &runtime.UInt64Value{Value: linkStats.RxBytes},
+				RxErrors: &runtime.UInt64Value{Value: linkStats.RxErrors},
+				TxBytes:  &runtime.UInt64Value{Value: linkStats.TxBytes},
+				TxErrors: &runtime.UInt64Value{Value: linkStats.TxErrors},
+			},
 		}
 	}
 
