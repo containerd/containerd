@@ -274,6 +274,13 @@ func (c *CRIImageService) pullImageWithLocalPull(
 		// Allows GC to clean layers up from the content store after unpacking
 		pullOpts = append(pullOpts,
 			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
+		// When discarding unpacked layers, ensure we fetch content that may have
+		// been GC'd or never fetched (e.g., when snapshot exists from a different
+		// image with same diffID but different compressed blob digest).
+		pullOpts = append(pullOpts,
+			containerd.WithUnpackOpts([]containerd.UnpackOpt{
+				containerd.WithUnpackFetchMissingContent(true),
+			}))
 	}
 
 	pullReporter.start(pctx)
