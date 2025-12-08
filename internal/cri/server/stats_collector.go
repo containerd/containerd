@@ -76,8 +76,8 @@ func NewStatsCollector(config criconfig.Config) *StatsCollector {
 	statsAge := defaultStatsAge
 
 	// Use config values if provided
-	if config.StatsCollectionPeriod != "" {
-		if d, err := time.ParseDuration(config.StatsCollectionPeriod); err == nil {
+	if config.StatsCollectPeriod != "" {
+		if d, err := time.ParseDuration(config.StatsCollectPeriod); err == nil {
 			interval = d
 		}
 	}

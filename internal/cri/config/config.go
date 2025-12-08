@@ -428,12 +428,12 @@ type RuntimeConfig struct {
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
 
-	// StatsCollectionPeriod is the period for collecting container/sandbox CPU stats
+	// StatsCollectPeriod is the period for collecting container/sandbox CPU stats
 	// used for calculating UsageNanoCores. This matches cAdvisor's default housekeeping interval.
 	// The string is in the golang duration format, see:
 	//   https://golang.org/pkg/time/#ParseDuration
 	// Default: "1s"
-	StatsCollectionPeriod string `toml:"stats_collection_period" json:"statsCollectionPeriod"`
+	StatsCollectPeriod string `toml:"stats_collect_period" json:"statsCollectPeriod"`
 
 	// StatsRetentionPeriod is how long to retain CPU stats samples for calculating UsageNanoCores.
 	// The string is in the golang duration format, see:
@@ -682,10 +682,10 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 			return warnings, fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
 		}
 	}
-	// Validation for stats_collection_period
-	if c.StatsCollectionPeriod != "" {
-		if _, err := time.ParseDuration(c.StatsCollectionPeriod); err != nil {
-			return warnings, fmt.Errorf("invalid `stats_collection_period`: %w", err)
+	// Validation for stats_collect_period
+	if c.StatsCollectPeriod != "" {
+		if _, err := time.ParseDuration(c.StatsCollectPeriod); err != nil {
+			return warnings, fmt.Errorf("invalid `stats_collect_period`: %w", err)
 		}
 	}
 	// Validation for stats_retention_period
