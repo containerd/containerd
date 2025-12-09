@@ -821,7 +821,7 @@ func parseRetryAfterHeader(resp *http.Response) (time.Duration, error) {
 		return d, nil
 	}
 
-	return 0, fmt.Errorf("invalid Retry-After header: %q (not a valid number or date)", retryAfter)
+	return 0, fmt.Errorf("Invalid Retry-After header: %q (not a valid number or date)", retryAfter)
 }
 
 func backoff(resps []*http.Response) time.Duration {
