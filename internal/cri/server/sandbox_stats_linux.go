@@ -63,6 +63,13 @@ func (c *criService) podSandboxStats(
 	if err != nil {
 		return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
 	}
+	if cpuStats != nil && cpuStats.UsageCoreNanoSeconds != nil {
+		nanoUsage, err := c.getUsageNanoCores(meta.ID, true /* isSandbox */, cpuStats.UsageCoreNanoSeconds.Value, timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get usage nano cores: %w", err)
+		}
+		cpuStats.UsageNanoCores = &runtime.UInt64Value{Value: nanoUsage}
+	}
 	podSandboxStats.Linux.Cpu = cpuStats
 
 	memoryStats, err := c.memoryContainerStats(meta.ID, *stats, timestamp)
@@ -77,6 +84,7 @@ func (c *criService) podSandboxStats(
 			return nil, fmt.Errorf("failed to obtain network stats: %w", err)
 		}
 		podSandboxStats.Linux.Network = &runtime.NetworkUsage{
+			Timestamp: timestamp.UnixNano(),
 			DefaultInterface: &runtime.NetworkInterfaceUsage{
 				Name:     defaultIfName,
 				RxBytes:  &runtime.UInt64Value{Value: linkStats.RxBytes},

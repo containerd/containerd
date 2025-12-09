@@ -130,7 +130,7 @@ func TestSandboxStore(t *testing.T) {
 		},
 	}
 	assert := assertlib.New(t)
-	s := NewStore(label.NewStore())
+	s := NewStore(label.NewStore(), nil)
 
 	t.Logf("should be able to add sandbox")
 	for _, sb := range sandboxes {

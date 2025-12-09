@@ -11,6 +11,25 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
+      - name: Clean up disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet \
+            /usr/local/graalvm \
+            /usr/local/.ghcup \
+            /usr/local/share/powershell \
+            /usr/local/share/chromium \
+            /usr/local/share/firefox \
+            /usr/local/lib/android \
+            /usr/local/lib/node_modules \
+            /usr/local/share/podman \
+            /usr/local/aws-cli/ \
+            /usr/local/lib/heroku \
+            /usr/local/rustup \
+            /usr/local/cargo \
+            /usr/local/google-cloud-sdk
+          df -h
+
       - name: Checkout containerd
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
@@ -21,6 +40,7 @@ jobs:
         with:
           repository: kubernetes/kubernetes
           path: src/k8s.io/kubernetes
+          fetch-depth: 0
 
       - name: Install Go
         uses: ./src/github.com/containerd/containerd/.github/actions/install-go

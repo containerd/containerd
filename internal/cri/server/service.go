@@ -160,6 +160,8 @@ type criService struct {
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
+	// statsCollector collects CPU stats in background for UsageNanoCores calculation
+	statsCollector *StatsCollector
 }
 
 type CRIServiceOptions struct {
@@ -187,6 +189,9 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	labels := label.NewStore()
 	config := options.RuntimeService.Config()
 
+	// Create the stats collector first so it can be passed to the stores
+	statsCollector := NewStatsCollector(config)
+
 	c := &criService{
 		RuntimeService:     options.RuntimeService,
 		ImageService:       options.ImageService,
@@ -194,13 +199,14 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		client:             options.Client,
 		imageFSPaths:       options.ImageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
-		sandboxStore:       sandboxstore.NewStore(labels),
-		containerStore:     containerstore.NewStore(labels),
+		sandboxStore:       sandboxstore.NewStore(labels, statsCollector),
+		containerStore:     containerstore.NewStore(labels, statsCollector),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
+		statsCollector:     statsCollector,
 	}
 
 	// TODO: Make discard time configurable
@@ -264,6 +270,17 @@ func (c *criService) Run(ready func()) error {
 	// note: filters are any match, if you want any match but not in namespace foo
 	// then you have to manually filter namespace foo
 	c.eventMonitor.Subscribe(c.client, []string{`topic=="/tasks/oom"`, `topic~="/images/"`})
+
+	// Start the background stats collector for UsageNanoCores calculation
+	log.L.Info("Start stats collector")
+	if c.statsCollector != nil {
+		c.statsCollector.SetDependencies(
+			c.client.TaskService(),
+			c.containerStore.List,
+			c.sandboxStore.List,
+		)
+		c.statsCollector.Start()
+	}
 
 	log.L.Infof("Start recovering state")
 	if err := c.recover(ctrdutil.NamespacedContext()); err != nil {
@@ -359,6 +376,9 @@ func (c *criService) Close() error {
 		}
 	}
 	c.eventMonitor.Stop()
+	if c.statsCollector != nil {
+		c.statsCollector.Stop()
+	}
 	if err := c.streamServer.Stop(); err != nil {
 		return fmt.Errorf("failed to stop stream server: %w", err)
 	}
