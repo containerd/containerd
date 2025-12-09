@@ -66,20 +66,20 @@ require (
 	github.com/vishvananda/netlink v1.3.1
 	github.com/vishvananda/netns v0.0.5
 	go.etcd.io/bbolt v1.4.3
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
-	go.opentelemetry.io/otel v1.38.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.38.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.38.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.38.0
-	go.opentelemetry.io/otel/sdk v1.38.0
-	go.opentelemetry.io/otel/trace v1.38.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.64.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0
+	go.opentelemetry.io/otel v1.39.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.39.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.39.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.39.0
+	go.opentelemetry.io/otel/sdk v1.39.0
+	go.opentelemetry.io/otel/trace v1.39.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/mod v0.31.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.39.0
 	golang.org/x/time v0.14.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217
 	google.golang.org/grpc v1.77.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/inf.v0 v0.9.1
@@ -112,7 +112,7 @@ require (
 	github.com/google/deck v0.0.0-20230104221208-105ad94aa8ae // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/knqyf263/go-plugin v0.9.0 // indirect
@@ -140,8 +140,8 @@ require (
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/otel/metric v1.38.0 // indirect
-	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
+	go.opentelemetry.io/otel/metric v1.39.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
@@ -149,7 +149,7 @@ require (
 	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/term v0.37.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251022142026-3a174f9686a8 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.34.2 // indirect
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 // indirect
