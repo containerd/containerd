@@ -19,6 +19,8 @@ package image
 import (
 	"context"
 	"fmt"
+	"maps"
+	"time"
 
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -283,10 +285,21 @@ func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store image
 			if ref.AddDigest {
 				name = fmt.Sprintf("%s@%s", name, desc.Digest)
 			}
+
+			labels := is.imageLabels
+			if is.imageName != "" {
+				labels = make(map[string]string, len(is.imageLabels)+2)
+				maps.Copy(labels, is.imageLabels)
+				// Delete this image when the parent is deleted
+				labels["containerd.io/gc.bref.image"] = is.imageName
+				// Immediately expire to allow collection
+				labels["containerd.io/gc.expire"] = time.Now().Format(time.RFC3339)
+			}
+
 			imgs = append(imgs, images.Image{
 				Name:   name,
 				Target: desc,
-				Labels: is.imageLabels,
+				Labels: labels,
 			})
 		}
 	}
