@@ -27,7 +27,7 @@ require (
 	github.com/containerd/plugin v1.0.0
 	github.com/containerd/ttrpc v1.2.7
 	github.com/containerd/typeurl/v2 v2.2.3
-	github.com/containerd/zfs/v2 v2.0.0-rc.0
+	github.com/containerd/zfs/v2 v2.0.0
 	github.com/containernetworking/cni v1.3.0
 	github.com/containernetworking/plugins v1.9.0
 	github.com/coreos/go-systemd/v22 v22.6.0
@@ -158,19 +158,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 	tags.cncf.io/container-device-interface/specs-go v1.0.0 // indirect
-)
-
-exclude (
-	// These dependencies were updated to "master" in some modules we depend on,
-	// but have no code-changes since their last release. Unfortunately, this also
-	// causes a ripple effect, forcing all users of the containerd module to also
-	// update these dependencies to an unrelease / un-tagged version.
-	//
-	// Both these dependencies will unlikely do a new release in the near future,
-	// so exclude these versions so that we can downgrade to the current release.
-	//
-	// For additional details, see this PR and links mentioned in that PR:
-	// https://github.com/kubernetes-sigs/kustomize/pull/5830#issuecomment-2569960859
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
