@@ -102,7 +102,7 @@ func (c *collector) describeL3(feature string) *prometheus.Desc {
 }
 
 func (c *collector) collectMonGroupMetrics(ch chan<- prometheus.Metric, mg MonGroup) {
-	annotations := map[string]string{} // mg.GetAnnotations()
+	annotations := mg.GetAnnotations()
 	customLabelValues := make([]string, len(customLabels))
 	for i, name := range customLabels {
 		customLabelValues[i] = annotations[name]
@@ -127,10 +127,22 @@ func (c *collector) collectGroupMetrics(ch chan<- prometheus.Metric, g ResctrlGr
 		for feature, value := range data {
 			ch <- prometheus.MustNewConstMetric(
 				c.describeL3(feature),
-				prometheus.CounterValue,
+				promValueTypeL3(feature),
 				float64(value),
 				labels...,
 			)
 		}
+	}
+}
+
+// promValueTypeL3 returns Prometheus value type for given L3 metric.
+func promValueTypeL3(feature string) prometheus.ValueType {
+	switch feature {
+	case "llc_occupancy":
+		return prometheus.GaugeValue
+	case "mbm_local_bytes", "mbm_total_bytes":
+		return prometheus.CounterValue
+	default:
+		return prometheus.GaugeValue
 	}
 }
