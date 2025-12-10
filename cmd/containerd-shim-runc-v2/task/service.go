@@ -698,12 +698,21 @@ func (s *service) processExits() {
 }
 
 func (s *service) oomEvent(id string) {
+	send := make(chan struct{})
+	go func() {
+		s.shutdown.RegisterCallback(func(context.Context) error {
+			// Wait oomEvent publish done.
+			<-send
+			return nil
+		})
+	}()
 	err := s.publisher.Publish(s.context, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 		ContainerID: id,
 	})
 	if err != nil {
 		log.G(s.context).WithError(err).Error("post event")
 	}
+	close(send)
 }
 
 func (s *service) send(evt interface{}) {
