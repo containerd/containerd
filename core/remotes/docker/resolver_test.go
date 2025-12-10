@@ -878,7 +878,7 @@ func testFetch(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) 
 	}
 	r2, desc2, err := fByDigest.FetchByDigest(ctx, desc.Digest)
 	if err != nil {
-		return fmt.Errorf("FetcherByDigest: faild to fetch %v: %w", desc.Digest, err)
+		return fmt.Errorf("FetcherByDigest: failed to fetch %v: %w", desc.Digest, err)
 	}
 	if desc2.Size != desc.Size {
 		r2b, err := io.ReadAll(r2)
@@ -889,7 +889,7 @@ func testFetch(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) 
 	}
 	dgstr2 := desc.Digest.Algorithm().Digester()
 	if _, err = io.Copy(dgstr2.Hash(), r2); err != nil {
-		return fmt.Errorf("FetcherByDigest: faild to copy: %w", err)
+		return fmt.Errorf("FetcherByDigest: failed to copy: %w", err)
 	}
 	if dgstr2.Digest() != desc.Digest {
 		return fmt.Errorf("FetcherByDigest: content mismatch: %s != %s", dgstr2.Digest(), desc.Digest)
