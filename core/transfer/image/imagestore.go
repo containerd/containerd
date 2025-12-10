@@ -276,7 +276,7 @@ func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store image
 
 		// If extra references, store all complete references (skip prefixes)
 		for _, ref := range is.extraReferences {
-			if ref.IsPrefix {
+			if ref.IsPrefix && !ref.AddDigest {
 				continue
 			}
 			name := ref.Name
