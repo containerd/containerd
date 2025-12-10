@@ -54,6 +54,10 @@ message TaskIO {
 	string stdout = 2;
 	string stderr = 3;
 	bool terminal = 4;
+	// Path to attachable FIFO for binary stdout
+	string attachable_out = 5;
+	// Path to attachable FIFO for binary stderr
+	string attachable_err = 6;
 }
 
 message TaskExit {
