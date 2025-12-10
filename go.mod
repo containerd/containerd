@@ -87,7 +87,7 @@ require (
 	k8s.io/client-go v0.34.1
 	k8s.io/cri-api v0.34.1
 	k8s.io/klog/v2 v2.130.1
-	tags.cncf.io/container-device-interface v1.0.2-0.20251114135136-1b24d969689f
+	tags.cncf.io/container-device-interface v1.1.0
 )
 
 require (
@@ -157,7 +157,7 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
-	tags.cncf.io/container-device-interface/specs-go v1.0.0 // indirect
+	tags.cncf.io/container-device-interface/specs-go v1.1.0 // indirect
 )
 
 exclude (
