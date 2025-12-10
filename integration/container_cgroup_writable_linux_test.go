@@ -87,7 +87,8 @@ func TestContainerCgroupWritable(t *testing.T) {
 			})
 
 			imageName := images.Get(images.BusyBox)
-			pullImagesByCRI(t, currentProc.criImageService(t), imageName)
+			pauseImage := images.Get(images.Pause)
+			pullImagesByCRI(t, currentProc.criImageService(t), imageName, pauseImage)
 
 			// Create a test sandbox
 			sbConfig := &runtime.PodSandboxConfig{
