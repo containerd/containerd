@@ -52,18 +52,43 @@ func newSnapshotsSyncer(store *snapshotstore.Store, snapshotters map[string]snap
 // the syncer doesn't update any persistent states, it's fine to let it
 // exit with the process.
 func (s *snapshotsSyncer) start() {
-	tick := time.NewTicker(s.syncPeriod)
+	const (
+		minPeriod  = 100 * time.Millisecond
+		maxPeriod  = 10 * time.Second
+		upFactor   = 1.5 // sync too slow add time
+		downFactor = 0.9 // sync too fast reduce time
+	)
+	period := clampDuration(s.syncPeriod, minPeriod, maxPeriod)
 	go func() {
-		defer tick.Stop()
 		// TODO(random-liu): This is expensive. We should do benchmark to
 		// check the resource usage and optimize this.
 		for {
+			begin := time.Now()
 			if err := s.sync(); err != nil {
 				log.L.WithError(err).Error("Failed to sync snapshot stats")
 			}
-			<-tick.C
+			cost := time.Since(begin)
+			switch {
+			case cost >= period:
+				period = clampDuration(time.Duration(float64(cost)*upFactor), minPeriod, maxPeriod)
+			case cost*2 < period: // we are too fast, decrease the period.
+				period = clampDuration(time.Duration(float64(period)*downFactor), minPeriod, maxPeriod)
+			}
+			if sleep := period - cost; sleep > 0 {
+				time.Sleep(sleep)
+			}
 		}
 	}()
+}
+
+func clampDuration(d, min, max time.Duration) time.Duration {
+	if d < min {
+		return min
+	}
+	if d > max {
+		return max
+	}
+	return d
 }
 
 // sync updates all snapshots stats.
