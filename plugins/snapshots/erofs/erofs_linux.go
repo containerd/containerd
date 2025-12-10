@@ -56,7 +56,7 @@ func checkCompatibility(root string) error {
 	}
 
 	if !findErofs() {
-		return fmt.Errorf("EROFS unsupported, please `modprobe erofs`: %w", plugin.ErrSkipPlugin)
+		return fmt.Errorf("erofs unsupported, please `modprobe erofs`: %w", plugin.ErrSkipPlugin)
 	}
 
 	return nil
