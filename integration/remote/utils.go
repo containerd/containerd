@@ -70,7 +70,7 @@ func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 	}
 
 	if status.CreatedAt == 0 {
-		return fmt.Errorf("CreatedAt is not set")
+		return fmt.Errorf("createdAt is not set")
 	}
 
 	return nil
@@ -92,7 +92,7 @@ func verifyContainerStatus(status *runtimeapi.ContainerStatus) error {
 	}
 
 	if status.CreatedAt == 0 {
-		return fmt.Errorf("CreatedAt is not set")
+		return fmt.Errorf("createdAt is not set")
 	}
 
 	if status.Image == nil || status.Image.Image == "" {
@@ -100,7 +100,7 @@ func verifyContainerStatus(status *runtimeapi.ContainerStatus) error {
 	}
 
 	if status.ImageRef == "" {
-		return fmt.Errorf("ImageRef is not set")
+		return fmt.Errorf("imageRef is not set")
 	}
 
 	return nil
