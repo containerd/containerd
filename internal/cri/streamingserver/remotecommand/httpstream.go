@@ -75,7 +75,7 @@ func NewOptions(req *http.Request) (*Options, error) {
 	}
 
 	if !stdin && !stdout && !stderr {
-		return nil, fmt.Errorf("you must specify at least 1 of stdin, stdout, stderr")
+		return nil, errors.New("you must specify at least 1 of stdin, stdout, stderr")
 	}
 
 	return &Options{
