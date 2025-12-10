@@ -261,6 +261,11 @@ type UnpackConfig struct {
 	DuplicationSuppressor kmutex.KeyedLocker
 	// Limiter is used to limit concurrent unpacks
 	Limiter *semaphore.Weighted
+	// FetchMissingContent ensures content blobs are fetched even when
+	// snapshots already exist. This is needed for export/push operations
+	// when images share layers but have different compressed blob digests.
+	// Defaults to true if not set. See https://github.com/containerd/containerd/issues/8973
+	FetchMissingContent *bool
 }
 
 // UnpackOpt provides configuration for unpack
@@ -294,6 +299,18 @@ func WithUnpackApplyOpts(opts ...diff.ApplyOpt) UnpackOpt {
 func WithUnpackLimiter(limiter *semaphore.Weighted) UnpackOpt {
 	return func(ctx context.Context, uc *UnpackConfig) error {
 		uc.Limiter = limiter
+		return nil
+	}
+}
+
+// WithUnpackFetchMissingContent configures whether to fetch content blobs
+// when snapshots already exist but the content is missing from the content store.
+// This is enabled by default and is needed for export/push operations when
+// images share layers but have different compressed blob digests.
+// See https://github.com/containerd/containerd/issues/8973
+func WithUnpackFetchMissingContent(fetch bool) UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.FetchMissingContent = &fetch
 		return nil
 	}
 }
