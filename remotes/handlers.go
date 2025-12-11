@@ -210,7 +210,7 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 // If the passed in content.Provider is also a content.InfoProvider (such as
 // content.Manager) then this will also annotate the distribution sources using
 // labels prefixed with "containerd.io/distribution.source".
-func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, store content.Provider, limiter *semaphore.Weighted, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler) error {
+func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, store content.Provider, limiter *semaphore.Weighted, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler, appendDistSrcLabelHandler images.HandlerFunc) error {
 
 	var m sync.Mutex
 	manifests := []ocispec.Descriptor{}
@@ -240,9 +240,9 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 	var handler images.Handler
 	if m, ok := store.(content.InfoProvider); ok {
 		annotateHandler := annotateDistributionSourceHandler(platformFilterhandler, m)
-		handler = images.Handlers(annotateHandler, filterHandler, pushHandler)
+		handler = images.Handlers(annotateHandler, filterHandler, pushHandler, appendDistSrcLabelHandler)
 	} else {
-		handler = images.Handlers(platformFilterhandler, filterHandler, pushHandler)
+		handler = images.Handlers(platformFilterhandler, filterHandler, pushHandler, appendDistSrcLabelHandler)
 	}
 
 	if wrapper != nil {
