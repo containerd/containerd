@@ -18,6 +18,7 @@ package podsandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -36,9 +37,11 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/pkg/apparmordelivery"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/seccompdelivery"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/errdefs"
@@ -82,6 +85,32 @@ func init() {
 				return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 			}
 
+			var seccompSvc seccompdelivery.Service
+			if svc, err := ic.GetByID(plugins.ServicePlugin, "seccompdelivery"); err != nil {
+				if !errors.Is(err, plugin.ErrPluginNotFound) {
+					return nil, fmt.Errorf("unable to load seccomp delivery service plugin dependency: %w", err)
+				}
+			} else {
+				converted, ok := svc.(seccompdelivery.Service)
+				if !ok {
+					return nil, fmt.Errorf("seccomp delivery plugin has unexpected type %T", svc)
+				}
+				seccompSvc = converted
+			}
+
+			var apparmorSvc apparmordelivery.Service
+			if svc, err := ic.GetByID(plugins.ServicePlugin, "apparmordelivery"); err != nil {
+				if !errors.Is(err, plugin.ErrPluginNotFound) {
+					return nil, fmt.Errorf("unable to load apparmor delivery service plugin dependency: %w", err)
+				}
+			} else {
+				converted, ok := svc.(apparmordelivery.Service)
+				if !ok {
+					return nil, fmt.Errorf("apparmor delivery plugin has unexpected type %T", svc)
+				}
+				apparmorSvc = converted
+			}
+
 			warningPlugin, err := ic.GetSingle(plugins.WarningPlugin)
 			if err != nil {
 				return nil, fmt.Errorf("unable to load CRI warning service plugin dependency: %w", err)
@@ -95,6 +124,8 @@ func init() {
 				imageService:   criImagePlugin.(ImageService),
 				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
+				seccompDelivery:  seccompSvc,
+				apparmorDelivery: apparmorSvc,
 			}
 
 			// There is no need to subscribe to the exit event for the pause container,
@@ -144,6 +175,9 @@ type Controller struct {
 	eventMonitor *events.EventMonitor
 
 	store *Store
+
+	seccompDelivery  seccompdelivery.Service
+	apparmorDelivery apparmordelivery.Service
 }
 
 var _ sandbox.Controller = (*Controller)(nil)

@@ -52,8 +52,10 @@ import (
 	"github.com/containerd/containerd/v2/internal/eventq"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/internal/registrar"
+	"github.com/containerd/containerd/v2/pkg/apparmordelivery"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
+	"github.com/containerd/containerd/v2/pkg/seccompdelivery"
 	"github.com/containerd/containerd/v2/plugins"
 )
 
@@ -162,6 +164,10 @@ type criService struct {
 	runtimeFeatures *runtime.RuntimeFeatures
 	// statsCollector collects CPU stats in background for UsageNanoCores calculation
 	statsCollector *StatsCollector
+	// seccompDelivery delivers image-provided seccomp profiles onto the node
+	seccompDelivery seccompdelivery.Service
+	// apparmorDelivery delivers image-provided AppArmor profiles onto the node
+	apparmorDelivery apparmordelivery.Service
 }
 
 type CRIServiceOptions struct {
@@ -180,6 +186,11 @@ type CRIServiceOptions struct {
 	//
 	// TODO: Replace this gradually with directly configured instances
 	Client *containerd.Client
+
+	// SeccompDelivery provides seccomp profile materialization helpers.
+	SeccompDelivery seccompdelivery.Service
+	// AppArmorDelivery provides AppArmor profile materialization helpers.
+	AppArmorDelivery apparmordelivery.Service
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -207,6 +218,8 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
 		statsCollector:     statsCollector,
+		seccompDelivery:    options.SeccompDelivery,
+		apparmorDelivery:   options.AppArmorDelivery,
 	}
 
 	// TODO: Make discard time configurable

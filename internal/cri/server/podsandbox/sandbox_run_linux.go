@@ -17,6 +17,7 @@
 package podsandbox
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -215,6 +216,17 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 		}
+	}
+	if c.seccompDelivery != nil && ssp != nil && ssp.ProfileType == runtime.SecurityProfile_Localhost && !securityContext.GetPrivileged() {
+		var labels map[string]string
+		if imageConfig != nil {
+			labels = imageConfig.Labels
+		}
+		path, err := c.seccompDelivery.EnsureProfile(context.Background(), ssp.LocalhostRef, labels)
+		if err != nil {
+			return nil, fmt.Errorf("ensure seccomp profile %q: %w", ssp.LocalhostRef, err)
+		}
+		ssp.LocalhostRef = path
 	}
 	seccompSpecOpts, err := sputil.GenerateSeccompSpecOpts(
 		ssp,
