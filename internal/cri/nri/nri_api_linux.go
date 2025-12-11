@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -321,6 +322,14 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		// CDI injector
 		nrigen.WithCDIDeviceInjector(
 			func(s *runtimespec.Spec, devices []string) error {
+				if len(devices) == 0 {
+					return nil
+				}
+
+				if !a.cri.Config().EnableCDI {
+					return fmt.Errorf("can't inject CDI devices (%s): CDI is disabled by configuration", strings.Join(devices, ", "))
+				}
+
 				return cdispec.WithCDIDevices(devices...)(context.TODO(), nil, nil, s)
 			},
 		),
