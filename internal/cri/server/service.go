@@ -255,6 +255,14 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		SupplementalGroupsPolicy: true,
 	}
 
+	if !c.config.EnableCDI {
+		log.L.Warn("CDI support is explicitly disabled by configuration. This will cause")
+		log.L.Warn("container creation requests with CDI devices to be rejected with an")
+		log.L.Warn("error. The possibility to disable CDI will be removed in a future")
+		log.L.Warn("release, at which point CDI support will always be enabled.")
+		log.L.Warn("In preparation for that consider enabling CDI now.")
+	}
+
 	return c, c, nil
 }
 
