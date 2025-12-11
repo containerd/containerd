@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -34,6 +35,7 @@ import (
 	"github.com/containerd/containerd/pkg/blockio"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/constants"
+	criopts "github.com/containerd/containerd/pkg/cri/opts"
 	cstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
@@ -319,6 +321,36 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		},
 	)
 
+	cdiInjectOpt := nrigen.WithCDIDeviceInjector(
+		func(s *runtimespec.Spec, devices []string) error {
+			if len(devices) == 0 {
+				return nil
+			}
+
+			if !a.cri.Config().EnableCDI {
+				return fmt.Errorf("can't inject CDI devices (%s): CDI is disabled by configuration", strings.Join(devices, ", "))
+			}
+
+			devs := make([]*cri.CDIDevice, 0, len(devices))
+			for _, name := range devices {
+				devs = append(devs, &cri.CDIDevice{Name: name})
+			}
+
+			// This is iffy at best, but as long as we pass in nil
+			// annotations, then ID is the only member accessed in
+			// the option WithCDI returns, and it is only used for
+			// log messages.
+			//
+			// The alternative would be to do a CDI cache refresh
+			// followed by CDI injection of devices, which is what
+			// the option returned by WithCDI essentially does.
+			fakeCtr := &containers.Container{
+				ID: "NRI CDI device adjustment",
+			}
+			return criopts.WithCDI(nil, devs)(context.TODO(), nil, fakeCtr, s)
+		},
+	)
+
 	return func(ctx context.Context, _ *containerd.Client, c *containers.Container) error {
 		spec := &specs.Spec{}
 		if err := json.Unmarshal(c.Spec.GetValue(), spec); err != nil {
@@ -331,7 +363,7 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		}
 
 		sgen := generate.Generator{Config: spec}
-		ngen := nrigen.SpecGenerator(&sgen, resourceCheckOpt, rdtResolveOpt, blkioResolveOpt)
+		ngen := nrigen.SpecGenerator(&sgen, resourceCheckOpt, rdtResolveOpt, blkioResolveOpt, cdiInjectOpt)
 
 		err = ngen.Adjust(adjust)
 		if err != nil {
