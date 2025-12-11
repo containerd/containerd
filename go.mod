@@ -26,6 +26,12 @@ require (
 	github.com/containerd/typeurl/v2 v2.1.1
 	github.com/containerd/zfs v1.1.0
 	github.com/containernetworking/cni v1.1.2
+	// containernetworking/plugins prior to v1.9.0 is known to have
+	// CVE-2025-67499: "Portmap nftables backend can intercept non-local traffic".
+	// The vulnerability is not exploitable here, as we only import
+	// `containernetworking/plugins/pkg/ns` as a library.
+	// For the version of the CNI plugins included in `cri-cni-containerd-*-linux-*.tar.gz`,
+	// see `script/setup/cni-plugins-version`.
 	github.com/containernetworking/plugins v1.2.0
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/davecgh/go-spew v1.1.1

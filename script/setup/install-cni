@@ -21,7 +21,8 @@
 #
 set -eu -o pipefail
 
-CNI_COMMIT=${1:-$(go list -f "{{.Version}}" -m github.com/containernetworking/plugins)}
+script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
+CNI_COMMIT=${1:-$(cat "${script_dir}/cni-plugins-version")}
 CNI_DIR=${DESTDIR:=''}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 : "${CNI_REPO:=https://github.com/containernetworking/plugins.git}"
