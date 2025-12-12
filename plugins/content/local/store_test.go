@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -101,6 +102,43 @@ func TestContent(t *testing.T) {
 			return nil
 		}, nil
 	})
+}
+
+func TestContentRootDir(t *testing.T) {
+	// test dir exist
+	dirExist := t.TempDir()
+	_, err := NewLabeledStore(dirExist, newMemoryLabelStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// test dir doesn't exist
+	dir := filepath.Join(t.TempDir(), "test_dir001")
+	_, err = NewLabeledStore(dir, newMemoryLabelStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	// test dir permissions are invalid
+	if os.Getuid() != 0 {
+		t.Skip("skipping test that requires root")
+	}
+	dirBadPermission := t.TempDir()
+	cmd := exec.Command("chattr", "+i", dirBadPermission)
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		cmd := exec.Command("chattr", "-i", dirBadPermission)
+		_, err = cmd.CombinedOutput()
+	}()
+	_, err = fsverity.IsSupported(dirBadPermission)
+	if err == nil {
+		t.Fatal(fmt.Errorf("err can't be nil"))
+	}
 }
 
 func TestContentWriter(t *testing.T) {
