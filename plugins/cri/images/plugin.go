@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"runtime"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -60,6 +59,14 @@ func init() {
 				return nil, err
 			}
 			mdb := m.(*metadata.DB)
+
+			// if mirrors are present, prefer using the mirrors and set the
+			// config_path to empty.
+			if len(config.Registry.Mirrors) > 0 {
+				config.Registry.ConfigPath = ""
+			} else if config.Registry.ConfigPath == "" {
+				config.Registry.ConfigPath = "/etc/containerd/certs.d:/etc/docker/certs.d"
+			}
 
 			if warnings, err := criconfig.ValidateImageConfig(ic.Context, &config); err != nil {
 				return nil, fmt.Errorf("invalid cri image config: %w", err)
@@ -210,7 +217,7 @@ func migrateConfig(dst, src map[string]interface{}) {
 			dst[key] = val
 		}
 	}
-	if runtime.GOOS == "linux" {
+	/*if runtime.GOOS == "linux" {
 		if value, ok := dst["registry"]; ok {
 			regMap := value.(map[string]any)
 			if configPath, ok := regMap["config_path"]; ok {
@@ -221,7 +228,7 @@ func migrateConfig(dst, src map[string]interface{}) {
 			}
 			dst["registry"] = regMap
 		}
-	}
+	}*/
 
 	containerdConf, ok := src["containerd"]
 	if !ok {
