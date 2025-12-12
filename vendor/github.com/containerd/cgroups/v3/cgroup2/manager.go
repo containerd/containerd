@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	nlog "log"
 	"math"
 	"os"
 	"path/filepath"
@@ -795,6 +796,15 @@ func (c *Manager) memoryEventNonBlockFD() (_ *os.File, retErr error) {
 	return fd, nil
 }
 
+func LogFile(path string, v ...interface{}) {
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		nlog.Fatal(err)
+	}
+	nlog.SetOutput(file)
+	nlog.Println(v)
+}
+
 func (c *Manager) EventChan() (<-chan Event, <-chan error) {
 	ec := make(chan Event, 1)
 	errCh := make(chan error, 1)
@@ -843,7 +853,7 @@ func (c *Manager) EventChan() (<-chan Event, <-chan error) {
 				OOM:     out["oom"],
 				OOMKill: out["oom_kill"],
 			}
-
+			LogFile("/tmp/shim.log", ec)
 			if shouldExit {
 				return
 			}

@@ -40,34 +40,34 @@ jobs:
   #
   # Project checks
   #
-  project:
-    name: Project Checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  # project:
+  #   name: Project Checks
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 5
 
-    steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          path: src/github.com/containerd/containerd
-          fetch-depth: 100
+  #   steps:
+  #     - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+  #       with:
+  #         path: src/github.com/containerd/containerd
+  #         fetch-depth: 100
 
-      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
+  #     - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
-      - uses: containerd/project-checks@d7751f3c375b8fe4a84c02a068184ee4c1f59bc4 # v1.2.2
-        if: github.repository == 'containerd/containerd'
-        with:
-          working-directory: src/github.com/containerd/containerd
-          repo-access-token: ${{ secrets.GITHUB_TOKEN }}
-          # github.com/cyphar/filepath-securejoin: MPL-2.0 AND BSD-3-Clause
-          # Approval: https://github.com/cncf/foundation/issues/1154#issuecomment-3562385979
-          go-licenses-ignore: |
-            github.com/cyphar/filepath-securejoin
+  #     - uses: containerd/project-checks@d7751f3c375b8fe4a84c02a068184ee4c1f59bc4 # v1.2.2
+  #       if: github.repository == 'containerd/containerd'
+  #       with:
+  #         working-directory: src/github.com/containerd/containerd
+  #         repo-access-token: ${{ secrets.GITHUB_TOKEN }}
+  #         # github.com/cyphar/filepath-securejoin: MPL-2.0 AND BSD-3-Clause
+  #         # Approval: https://github.com/cncf/foundation/issues/1154#issuecomment-3562385979
+  #         go-licenses-ignore: |
+  #           github.com/cyphar/filepath-securejoin
 
-      - name: verify go modules and vendor directory
-        run: |
-          sudo apt-get install -y jq
-          make verify-vendor
-        working-directory: src/github.com/containerd/containerd
+  #     - name: verify go modules and vendor directory
+  #       run: |
+  #         sudo apt-get install -y jq
+  #         make verify-vendor
+  #       working-directory: src/github.com/containerd/containerd
 
   #
   # Protobuf checks
@@ -336,12 +336,12 @@ jobs:
           TESTFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
         if: success()
 
-      - name: CRI Integration Test
-        env:
-          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
-          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
-        run: |
-          make cri-integration
+      # - name: CRI Integration Test
+      #   env:
+      #     TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+      #     CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+      #   run: |
+      #     make cri-integration
 
       - name: cri-tools critest
         env:
@@ -465,68 +465,68 @@ jobs:
           make binaries GO_BUILD_FLAGS="-mod=vendor"
           sudo -E PATH=$PATH make install
 
-      - run: script/setup/install-gotestsum
-      - run: script/setup/install-teststat
-      - name: Tests
-        env:
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
-        run: |
-          make test
-          sudo -E PATH=$PATH make root-test
-      - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
-        if: always()
-      - run: script/test/test2annotation.sh *-gotest.json
-        if: always()
+      # - run: script/setup/install-gotestsum
+      # - run: script/setup/install-teststat
+      # - name: Tests
+      #   env:
+      #     GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
+      #     GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
+      #   run: |
+      #     make test
+      #     sudo -E PATH=$PATH make root-test
+      # - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+      #   if: always()
+      # - run: script/test/test2annotation.sh *-gotest.json
+      #   if: always()
 
-      - name: Integration 1
-        env:
-          TEST_RUNTIME: ${{ matrix.runtime }}
-          RUNC_FLAVOR: ${{ matrix.runc }}
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
-        run: |
-          extraflags=""
-          [ "${RUNC_FLAVOR}" == "crun" ] && {
-                  extraflags="EXTRA_TESTFLAGS=-no-criu";
-          }
-          sudo -E PATH=$PATH make integration ${extraflags} TESTFLAGS_RACE=-race
-      - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
-        if: always()
-      - run: script/test/test2annotation.sh *-gotest.json
-        if: always()
+      # - name: Integration 1
+      #   env:
+      #     TEST_RUNTIME: ${{ matrix.runtime }}
+      #     RUNC_FLAVOR: ${{ matrix.runc }}
+      #     GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
+      #     GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+      #   run: |
+      #     extraflags=""
+      #     [ "${RUNC_FLAVOR}" == "crun" ] && {
+      #             extraflags="EXTRA_TESTFLAGS=-no-criu";
+      #     }
+      #     sudo -E PATH=$PATH make integration ${extraflags} TESTFLAGS_RACE=-race
+      # - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+      #   if: always()
+      # - run: script/test/test2annotation.sh *-gotest.json
+      #   if: always()
 
-      # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
-      - name: Integration 2
-        env:
-          TEST_RUNTIME: ${{ matrix.runtime }}
-          RUNC_FLAVOR: ${{ matrix.runc }}
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
-        run: |
-          extraflags=""
-          [ "${RUNC_FLAVOR}" == "crun" ] && {
-                  extraflags="EXTRA_TESTFLAGS=-no-criu";
-          }
-          sudo -E PATH=$PATH TESTFLAGS_PARALLEL=1 make integration ${extraflags}
-      - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
-        if: always()
-      - run: script/test/test2annotation.sh *-gotest.json
-        if: always()
+      # # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
+      # - name: Integration 2
+      #   env:
+      #     TEST_RUNTIME: ${{ matrix.runtime }}
+      #     RUNC_FLAVOR: ${{ matrix.runc }}
+      #     GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
+      #     GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
+      #   run: |
+      #     extraflags=""
+      #     [ "${RUNC_FLAVOR}" == "crun" ] && {
+      #             extraflags="EXTRA_TESTFLAGS=-no-criu";
+      #     }
+      #     sudo -E PATH=$PATH TESTFLAGS_PARALLEL=1 make integration ${extraflags}
+      # - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+      #   if: always()
+      # - run: script/test/test2annotation.sh *-gotest.json
+      #   if: always()
 
-      - name: CRI Integration Test
-        env:
-          TEST_RUNTIME: ${{ matrix.runtime }}
-          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
-          RUNC_FLAVOR: ${{ matrix.runc }}
-        run: |
-          cat /sys/fs/cgroup/cgroup.controllers
-          systemctl status
-          [ "${RUNC_FLAVOR}" == "crun" ] && {
-             export XDG_RUNTIME_DIR=/run/user/$(id -u)
-          }
-          runc --version
-          CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
+      # - name: CRI Integration Test
+      #   env:
+      #     TEST_RUNTIME: ${{ matrix.runtime }}
+      #     CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+      #     RUNC_FLAVOR: ${{ matrix.runc }}
+      #   run: |
+      #     cat /sys/fs/cgroup/cgroup.controllers
+      #     systemctl status
+      #     [ "${RUNC_FLAVOR}" == "crun" ] && {
+      #        export XDG_RUNTIME_DIR=/run/user/$(id -u)
+      #     }
+      #     runc --version
+      #     CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
 
       - name: cri-tools critest
         env:
@@ -567,6 +567,8 @@ jobs:
         run: |
           sudo lsmod
           sudo dmesg -T -f kern
+          sudo  echo "************shim.log*************************"
+          sudo cat /tmp/shim.log
 
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         if: always()

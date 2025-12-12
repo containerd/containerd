@@ -94,5 +94,8 @@ for i in $(seq 1 10)
 do
     crictl --runtime-endpoint ${BDIR}/c.sock info && break || sleep 1
 done
-
-critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8 "${GINKGO_SKIP_TEST[@]}" "${GINKGO_FOCUS_TEST[@]}" "${EXTRA_CRITEST_OPTIONS:-""}"
+for i in {1..10}
+do
+   echo "执行第 $i 次"
+   critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8 "${GINKGO_SKIP_TEST[@]}" "${GINKGO_FOCUS_TEST[@]}" "${EXTRA_CRITEST_OPTIONS:-""}"
+done
