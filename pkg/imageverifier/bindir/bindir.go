@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/internal/tomlext"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/log"
@@ -41,6 +42,7 @@ type Config struct {
 	BinDir             string           `toml:"bin_dir"`
 	MaxVerifiers       int              `toml:"max_verifiers"`
 	PerVerifierTimeout tomlext.Duration `toml:"per_verifier_timeout"`
+	PodMetadata        bool             `toml:"pod_metadata"`
 }
 
 type ImageVerifier struct {
@@ -55,7 +57,7 @@ func NewImageVerifier(c *Config) *ImageVerifier {
 	}
 }
 
-func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor) (*imageverifier.Judgement, error) {
+func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor, runtimeConfig *imageverifier.RuntimeConfig) (*imageverifier.Judgement, error) {
 	// os.ReadDir sorts entries by name.
 	entries, err := os.ReadDir(v.config.BinDir)
 	if err != nil {
@@ -85,10 +87,10 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 
 		bin := entry.Name()
 		start := time.Now()
-		exitCode, vr, err := v.runVerifier(ctx, bin, name, desc)
-		runtime := time.Since(start)
+		exitCode, vr, err := v.runVerifier(ctx, bin, name, desc, runtimeConfig)
+		elapsed := time.Since(start)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call verifier %v (runtime %v): %w", bin, runtime, err)
+			return nil, fmt.Errorf("failed to call verifier %v (runtime %v): %w", bin, elapsed, err)
 		}
 
 		if exitCode != 0 {
@@ -110,15 +112,20 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 	}, nil
 }
 
-func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc ocispec.Descriptor) (exitCode int, reason string, err error) {
+func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc ocispec.Descriptor, runtimeConfig *imageverifier.RuntimeConfig) (exitCode int, reason string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, tomlext.ToStdTime(v.config.PerVerifierTimeout))
 	defer cancel()
 
 	binPath := filepath.Join(v.config.BinDir, bin)
+
+	stdinMediaType := ocispec.MediaTypeDescriptor
+	if v.config.PodMetadata {
+		stdinMediaType = images.MediaTypeContainerd1ImageVerificationInput
+	}
 	args := []string{
 		"-name", imageName,
 		"-digest", desc.Digest.String(),
-		"-stdin-media-type", ocispec.MediaTypeDescriptor,
+		"-stdin-media-type", stdinMediaType,
 	}
 
 	cmd := exec.CommandContext(ctx, binPath, args...)
@@ -177,7 +184,18 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 		// the parent to block if the descriptor is larger than the pipe buffer and
 		// the child process doesn't read stdin. Therefore, we write to stdin
 		// asynchronously, limited by the stdinWrite deadline set above.
-		err := json.NewEncoder(stdinWrite).Encode(desc)
+		var err error
+		if v.config.PodMetadata {
+			input := imageverifier.PodMetadataInput{
+				Descriptor:    &desc,
+				RuntimeConfig: runtimeConfig,
+			}
+
+			err = json.NewEncoder(stdinWrite).Encode(input)
+		} else {
+			err = json.NewEncoder(stdinWrite).Encode(desc)
+		}
+
 		if err != nil {
 			// This may error out with a "broken pipe" error if the descriptor is
 			// larger than the pipe buffer and the child process does not read all
