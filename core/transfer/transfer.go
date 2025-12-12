@@ -23,6 +23,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -153,7 +154,8 @@ type UnpackConfiguration struct {
 type ProgressFunc func(Progress)
 
 type Config struct {
-	Progress ProgressFunc
+	Progress      ProgressFunc
+	SandboxConfig *runtime.PodSandboxConfig
 }
 
 type Opt func(*Config)
@@ -161,6 +163,12 @@ type Opt func(*Config)
 func WithProgress(f ProgressFunc) Opt {
 	return func(opts *Config) {
 		opts.Progress = f
+	}
+}
+
+func WithSandboxConfig(sc *runtime.PodSandboxConfig) Opt {
+	return func(opts *Config) {
+		opts.SandboxConfig = sc
 	}
 }
 
