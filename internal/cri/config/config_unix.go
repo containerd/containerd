@@ -106,7 +106,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		TolerateMissingHugetlbController: true,
 		DisableHugetlbController:         true,
 		IgnoreImageDefinedVolumes:        false,
-		EnableCDI:                        true,
+		EnableCDI:                        func() *bool { v := true; return &v }(),
 		CDISpecDirs:                      []string{"/etc/cdi", "/var/run/cdi"},
 		DrainExecSyncIOTimeout:           "0s",
 		EnableUnprivilegedPorts:          true,

@@ -37,6 +37,8 @@ const (
 	NRIV010Plugin Warning = Prefix + "nri-v010-plugin"
 	// CgroupV1 is a warning for the use of cgroup v1
 	CgroupV1 Warning = Prefix + "cgroup-v1"
+	// CRIEnableCDI is a warning for the use of the `enable_cdi` property
+	CRIEnableCDI Warning = Prefix + "enable-cdi"
 )
 
 const (
@@ -59,6 +61,7 @@ var messages = map[Warning]string{
 		"Use OTEL environment variables instead: https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/",
 	NRIV010Plugin: "NRI 0.1.0-style plugins are deprecated since containerd 2.2 and should only be used through the v010-adapter plugin.",
 	CgroupV1:      "The support for cgroup v1 is deprecated since containerd v2.2 and will be removed by no later than May 2029. Upgrade the host to use cgroup v2.",
+	CRIEnableCDI:  "The `enable_cdi` property of `[plugins.\"io.containerd.cri.v1.runtime\"]` is deprecated, will be removed in containerd v2.3, and CDI support will always be enabled.",
 }
 
 // Valid checks whether a given Warning is valid
