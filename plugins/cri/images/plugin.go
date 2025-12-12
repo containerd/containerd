@@ -61,6 +61,16 @@ func init() {
 			}
 			mdb := m.(*metadata.DB)
 
+			// only set the default value of config path, if both mirrors and
+			// config path are empty and we are on Linux.
+			// This also makes sure that if the loaded config already contains both config path and mirrors
+			// the validation will fail.
+			if runtime.GOOS == "linux" {
+				if config.Registry.ConfigPath == "" && len(config.Registry.Mirrors) == 0 {
+					config.Registry.ConfigPath = "/etc/containerd/certs.d:/etc/docker/certs.d"
+				}
+			}
+
 			if warnings, err := criconfig.ValidateImageConfig(ic.Context, &config); err != nil {
 				return nil, fmt.Errorf("invalid cri image config: %w", err)
 			} else if len(warnings) > 0 {
@@ -208,18 +218,6 @@ func migrateConfig(dst, src map[string]interface{}) {
 	} {
 		if val, ok := src[key]; ok {
 			dst[key] = val
-		}
-	}
-	if runtime.GOOS == "linux" {
-		if value, ok := dst["registry"]; ok {
-			regMap := value.(map[string]any)
-			if configPath, ok := regMap["config_path"]; ok {
-				if configPath == "" {
-					// Fill in default from config_unix.go (DefaultImageConfig)
-					regMap["config_path"] = "/etc/containerd/certs.d:/etc/docker/certs.d"
-				}
-			}
-			dst["registry"] = regMap
 		}
 	}
 
