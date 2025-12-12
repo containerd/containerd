@@ -68,6 +68,8 @@ func init() {
 		},
 		Config: &config{
 			Address:        defaults.DefaultAddress,
+			UID:            os.Geteuid(),
+			GID:            os.Getegid(),
 			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
 			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
 		},
