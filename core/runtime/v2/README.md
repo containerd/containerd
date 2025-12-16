@@ -283,7 +283,7 @@ message CreateTaskRequest {
 }
 ```
 
-A shim author can create their own protobuf message for configuration and clients can import and provide this information is needed.
+A shim author can create their own protobuf message for configuration and clients can import and provide this information if needed.
 
 ### I/O
 
