@@ -38,6 +38,24 @@ func NewRegistrar() *Registrar {
 	}
 }
 
+type ReservedErr struct {
+	Field string
+	Name  string
+	Key   string
+}
+
+func (e *ReservedErr) Error() string {
+	switch e.Field {
+	case "name":
+		return fmt.Sprintf("name %q is reserved for %q", e.Name, e.Key)
+	case "key":
+		return fmt.Sprintf("key %q is reserved for %q", e.Key, e.Name)
+	}
+	return fmt.Sprintf("name %q is reserved for %q", e.Name, e.Key)
+}
+
+func (e *ReservedErr) Conflict() {}
+
 // Reserve registers a name<->key mapping, name or key must not
 // be empty.
 // Reserve is idempotent.
@@ -54,14 +72,14 @@ func (r *Registrar) Reserve(name, key string) error {
 
 	if k, exists := r.nameToKey[name]; exists {
 		if k != key {
-			return fmt.Errorf("name %q is reserved for %q", name, k)
+			return &ReservedErr{Field: "name", Name: name, Key: k}
 		}
 		return nil
 	}
 
 	if n, exists := r.keyToName[key]; exists {
 		if n != name {
-			return fmt.Errorf("key %q is reserved for %q", key, n)
+			return &ReservedErr{Field: "key", Name: n, Key: key}
 		}
 		return nil
 	}
