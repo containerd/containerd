@@ -25,6 +25,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/containerd/typeurl/v2"
+	"github.com/davecgh/go-spew/spew"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux/label"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
@@ -35,18 +45,10 @@ import (
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/containerd/typeurl/v2"
-	"github.com/davecgh/go-spew/spew"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/opencontainers/selinux/go-selinux/label"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func init() {
@@ -94,6 +96,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	name := makeContainerName(metadata, sandboxMetadata)
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
+		var resErr *registrar.ReservedErr
+		if errors.As(err, &resErr) {
+			log.G(ctx).WithError(err).Warn("possible concurrent CreateContainer request")
+			return nil, fmt.Errorf("failed to reserve container name %q; check if another CreateContainer request is in progress: %w", name, err)
+		}
 		return nil, fmt.Errorf("failed to reserve container name %q: %w", name, err)
 	}
 	span.SetAttributes(
