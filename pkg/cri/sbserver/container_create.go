@@ -25,14 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/typeurl/v2"
-	"github.com/davecgh/go-spew/spew"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/opencontainers/selinux/go-selinux/label"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
@@ -43,8 +35,16 @@ import (
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/pkg/registrar"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
+	"github.com/containerd/typeurl/v2"
+	"github.com/davecgh/go-spew/spew"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux/label"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func init() {
@@ -89,6 +89,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
+		var resErr *registrar.ReservedErr
+		if errors.As(err, &resErr) {
+			log.G(ctx).WithError(err).Warn("possible concurrent CreateContainer request")
+			return nil, fmt.Errorf("failed to reserve container name %q; check if another CreateContainer request is in progress: %w", name, err)
+		}
 		return nil, fmt.Errorf("failed to reserve container name %q: %w", name, err)
 	}
 	defer func() {
