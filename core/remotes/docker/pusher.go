@@ -76,6 +76,10 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	if err != nil {
 		return nil, err
 	}
+	ctx = context.WithValue(ctx, warningSourceKey{}, WarningSource{
+		Desc:   &desc,
+		Digest: &desc.Digest,
+	})
 	status, err := p.tracker.GetStatus(ref)
 	if err == nil {
 		if status.Committed && status.Offset == status.Total {
