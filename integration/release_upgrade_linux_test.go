@@ -680,6 +680,27 @@ func (pCtx *podTCtx) createContainer(name, imageRef string, wantedState crirunti
 	return cnID
 }
 
+func (pCtx *podTCtx) createContainerWithConfig(cfg *criruntime.ContainerConfig, wantedState criruntime.ContainerState, opts ...ContainerOpts) string {
+	t := pCtx.t
+
+	t.Logf("Create a container %s (wantedState: %s) in pod %s", cfg.Metadata.Name, wantedState, pCtx.name)
+	cnID, err := pCtx.rSvc.CreateContainer(pCtx.id, cfg, pCtx.cfg)
+	require.NoError(t, err)
+
+	switch wantedState {
+	case criruntime.ContainerState_CONTAINER_CREATED:
+		// no-op
+	case criruntime.ContainerState_CONTAINER_RUNNING:
+		require.NoError(t, pCtx.rSvc.StartContainer(cnID))
+	case criruntime.ContainerState_CONTAINER_EXITED:
+		require.NoError(t, pCtx.rSvc.StartContainer(cnID))
+		require.NoError(t, pCtx.rSvc.StopContainer(cnID, 0))
+	default:
+		t.Fatalf("unsupport state %s", wantedState)
+	}
+	return cnID
+}
+
 // containerDataDir returns container metadata dir maintained by CRI plugin.
 func (pCtx *podTCtx) containerDataDir(cntrID string) string {
 	t := pCtx.t
