@@ -112,6 +112,10 @@ func (l *LinuxContainerAdjustment) Strip() *LinuxContainerAdjustment {
 		empty = false
 	}
 
+	if l.Rdt = l.Rdt.Strip(); l.Rdt != nil {
+		empty = false
+	}
+
 	if empty {
 		return nil
 	}
@@ -294,6 +298,23 @@ func (m *LinuxMemory) Strip() *LinuxMemory {
 	}
 
 	return m
+}
+
+// Strip empty fields from a linux RDT configuration, reducing a fully empty one
+// to nil. Strip allows comparison of two sets of resources for semantic
+// equality using go-cmp.
+func (r *LinuxRdt) Strip() *LinuxRdt {
+	if r == nil {
+		return nil
+	}
+
+	switch {
+	case r.ClosId != nil, r.Schemata != nil, r.EnableMonitoring != nil:
+		// non-empty
+		return r
+	}
+
+	return nil
 }
 
 // Strip empty fields from a container update, reducing a fully empty one

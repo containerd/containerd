@@ -92,6 +92,11 @@ type (
 	LinuxDeviceCgroup        = api.LinuxDeviceCgroup
 	LinuxIOPriority          = api.LinuxIOPriority
 	LinuxSeccomp             = api.LinuxSeccomp
+	LinuxNetDevice           = api.LinuxNetDevice
+	LinuxScheduler           = api.LinuxScheduler
+	LinuxSchedulerPolicy     = api.LinuxSchedulerPolicy
+	LinuxSchedulerFlag       = api.LinuxSchedulerFlag
+	LinuxRdt                 = api.LinuxRdt
 	CDIDevice                = api.CDIDevice
 	HugepageLimit            = api.HugepageLimit
 	Hooks                    = api.Hooks
@@ -152,14 +157,15 @@ type (
 
 // Aliased functions for api/optional.go.
 var (
-	String   = api.String
-	Int      = api.Int
-	Int32    = api.Int32
-	UInt32   = api.UInt32
-	Int64    = api.Int64
-	UInt64   = api.UInt64
-	Bool     = api.Bool
-	FileMode = api.FileMode
+	String         = api.String
+	RepeatedString = api.RepeatedString
+	Int            = api.Int
+	Int32          = api.Int32
+	UInt32         = api.UInt32
+	Int64          = api.Int64
+	UInt64         = api.UInt64
+	Bool           = api.Bool
+	FileMode       = api.FileMode
 )
 
 // Aliased functions for api/types.go.
