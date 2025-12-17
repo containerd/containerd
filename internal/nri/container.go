@@ -49,6 +49,7 @@ type LinuxContainer interface {
 	GetScheduler() *nri.LinuxScheduler
 	GetNetDevices() map[string]*nri.LinuxNetDevice
 	GetRdt() *nri.LinuxRdt
+	GetSeccompProfile() *nri.SecurityProfile
 }
 
 func commonContainerToNRI(ctr Container) *nri.Container {
