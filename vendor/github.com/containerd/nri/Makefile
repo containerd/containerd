@@ -53,7 +53,8 @@ PLUGINS := \
 	$(BIN_PATH)/template \
 	$(BIN_PATH)/wasm \
 	$(BIN_PATH)/network-device-injector \
-	$(BIN_PATH)/network-logger
+	$(BIN_PATH)/network-logger \
+	$(BIN_PATH)/rdt
 
 ifneq ($(V),1)
   Q := @
@@ -128,9 +129,9 @@ $(BIN_PATH)/wasm build/bin/wasm: FORCE
 # test targets
 #
 
-test-gopkgs: ginkgo-tests test-ulimits
+test-gopkgs: ginkgo-tests test-ulimits test-rdt
 
-SKIPPED_PKGS="ulimit-adjuster,device-injector"
+SKIPPED_PKGS="ulimit-adjuster,device-injector,rdt"
 
 ginkgo-tests:
 	$(Q)$(GINKGO) run \
@@ -151,6 +152,9 @@ test-ulimits:
 
 test-device-injector:
 	$(Q)cd ./plugins/device-injector && $(GO_TEST) -v
+
+test-rdt:
+	$(Q)cd ./plugins/rdt && $(GO_TEST) -v
 
 codecov: SHELL := $(shell which bash)
 codecov:

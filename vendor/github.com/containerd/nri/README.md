@@ -209,6 +209,8 @@ The following pieces of container metadata are available to plugins in NRI:
       - RDT class
       - Unified cgroup v2 parameter map
     - Linux seccomp profile and policy
+    - Linux network devices
+    - scheduling policy parameters
   - container (init) process ID
   - container (init process) exit status
   - timestamp of container creation
@@ -257,7 +259,9 @@ container parameters:
       - RDT class
       - Unified cgroup v2 parameter map
       - Linux seccomp policy
+      - Linux network devices
     - Linux namespaces
+    - scheduling policy parameters
 
 ### Container Updates
 
@@ -420,6 +424,7 @@ The following sample plugins exist for NRI:
   - [ulimit adjuster](plugins/ulimit-adjuster)
   - [NRI v0.1.0 plugin adapter](plugins/v010-adapter)
   - [WebAssembly plugin](plugins/wasm)
+  - [RDT](plugins/rdt)
   - [template](plugins/template)
 
 Please see the documentation of these plugins for further details
@@ -449,6 +454,9 @@ implemented like for the ttRPC plugins for simplicity reasons. If logging from
 the WebAssembly plugin is required, then the NRI provides a host function helper
 [`Log`](https://github.com/containerd/nri/blob/8ebdb076ea6aa524094a7f1c2c9ca31c30852328/plugins/wasm/plugin.go#L31-L36)
 for that.
+
+WebAssembly support is enabled by default. It can be disabled at compile
+time using the `nri_no_wasm` build tag.
 
 ## Security Considerations
 
