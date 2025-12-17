@@ -46,6 +46,7 @@ type LinuxContainer interface {
 	GetOOMScoreAdj() *int
 	GetCgroupsPath() string
 	GetIOPriority() *nri.LinuxIOPriority
+	GetScheduler() *nri.LinuxScheduler
 }
 
 func commonContainerToNRI(ctr Container) *nri.Container {

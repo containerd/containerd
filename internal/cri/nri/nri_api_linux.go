@@ -875,6 +875,13 @@ func (c *criContainer) GetIOPriority() *api.LinuxIOPriority {
 	return api.FromOCILinuxIOPriority(c.spec.Process.IOPriority)
 }
 
+func (c *criContainer) GetScheduler() *api.LinuxScheduler {
+	if c.spec.Process == nil || c.spec.Process.Scheduler == nil {
+		return nil
+	}
+	return api.FromOCILinuxScheduler(c.spec.Process.Scheduler)
+}
+
 func (c *criContainer) GetPid() uint32 {
 	return c.pid
 }
