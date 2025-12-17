@@ -900,6 +900,22 @@ func (c *criContainer) GetRdt() *api.LinuxRdt {
 	}
 }
 
+func (c *criContainer) GetSeccompProfile() *api.SecurityProfile {
+	if c == nil || c.meta == nil || c.meta.Config == nil {
+		return nil
+	}
+
+	profile := c.meta.Config.GetLinux().GetSecurityContext().GetSeccomp()
+	if profile == nil {
+		return nil
+	}
+
+	return &api.SecurityProfile{
+		ProfileType:  api.SecurityProfile_ProfileType(profile.GetProfileType()),
+		LocalhostRef: profile.GetLocalhostRef(),
+	}
+}
+
 func (c *criContainer) GetPid() uint32 {
 	return c.pid
 }
