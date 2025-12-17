@@ -88,6 +88,11 @@ type Authorizer interface {
 	AddResponses(context.Context, []*http.Response) error
 }
 
+// WarningHandler is a callback function that receives warnings from the registry.
+// Warnings are extracted from HTTP Warning headers as defined in RFC 7234.
+// The warning parameter contains the warn-text from the header.
+type WarningHandler func(warning string)
+
 // ResolverOptions are used to configured a new Docker register resolver
 type ResolverOptions struct {
 	// Hosts returns registry host configurations for a namespace.
@@ -100,6 +105,11 @@ type ResolverOptions struct {
 	// since the registry does not have upload tracking and the existing
 	// mechanism for getting blob upload status is expensive.
 	Tracker StatusTracker
+
+	// WarningHandler is called for each warning received from the registry.
+	// Warnings are reported via HTTP Warning headers with warn-code 299.
+	// If nil, warnings are ignored.
+	WarningHandler WarningHandler
 
 	// Authorizer is used to authorize registry requests
 	//
@@ -138,11 +148,12 @@ func DefaultHost(ns string) (string, error) {
 }
 
 type dockerResolver struct {
-	hosts         RegistryHosts
-	header        http.Header
-	resolveHeader http.Header
-	tracker       StatusTracker
-	config        transfer.ImageResolverOptions
+	hosts          RegistryHosts
+	header         http.Header
+	resolveHeader  http.Header
+	tracker        StatusTracker
+	config         transfer.ImageResolverOptions
+	warningHandler WarningHandler
 }
 
 // NewResolver returns a new resolver to a Docker registry
@@ -197,10 +208,11 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 		options.Hosts = ConfigureDefaultRegistries(opts...)
 	}
 	return &dockerResolver{
-		hosts:         options.Hosts,
-		header:        options.Headers,
-		resolveHeader: resolveHeader,
-		tracker:       options.Tracker,
+		hosts:          options.Hosts,
+		header:         options.Headers,
+		resolveHeader:  resolveHeader,
+		tracker:        options.Tracker,
+		warningHandler: options.WarningHandler,
 	}
 }
 
@@ -466,12 +478,13 @@ func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
 }
 
 type dockerBase struct {
-	refspec      reference.Spec
-	repository   string
-	hosts        []RegistryHost
-	header       http.Header
-	performances transfer.ImageResolverPerformanceSettings
-	limiter      *semaphore.Weighted
+	refspec        reference.Spec
+	repository     string
+	hosts          []RegistryHost
+	header         http.Header
+	performances   transfer.ImageResolverPerformanceSettings
+	limiter        *semaphore.Weighted
+	warningHandler WarningHandler
 }
 
 func (r *dockerBase) Acquire(ctx context.Context, weight int64) error {
@@ -494,12 +507,13 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 		return nil, err
 	}
 	return &dockerBase{
-		refspec:      refspec,
-		repository:   strings.TrimPrefix(refspec.Locator, host+"/"),
-		hosts:        hosts,
-		header:       r.header,
-		performances: r.config.Performances,
-		limiter:      r.config.DownloadLimiter,
+		refspec:        refspec,
+		repository:     strings.TrimPrefix(refspec.Locator, host+"/"),
+		hosts:          hosts,
+		header:         r.header,
+		performances:   r.config.Performances,
+		limiter:        r.config.DownloadLimiter,
+		warningHandler: r.warningHandler,
 	}, nil
 }
 
@@ -533,10 +547,11 @@ func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *re
 		p = p + "/"
 	}
 	return &request{
-		method: method,
-		path:   p,
-		header: header,
-		host:   host,
+		method:         method,
+		path:           p,
+		header:         header,
+		host:           host,
+		warningHandler: r.warningHandler,
 	}
 }
 
@@ -579,12 +594,13 @@ func (r *request) addNamespace(ns string) error {
 }
 
 type request struct {
-	method string
-	path   string
-	header http.Header
-	host   RegistryHost
-	body   func() (io.ReadCloser, error)
-	size   int64
+	method         string
+	path           string
+	header         http.Header
+	host           RegistryHost
+	body           func() (io.ReadCloser, error)
+	size           int64
+	warningHandler WarningHandler
 }
 
 func (r *request) clone() *request {
@@ -645,6 +661,7 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 		return nil, fmt.Errorf("failed to do request: %w", err)
 	}
 	log.G(ctx).WithFields(responseFields(resp)).Debug("fetch response received")
+	reportWarnings(resp.Header, r.warningHandler)
 	return resp, nil
 }
 
@@ -825,6 +842,71 @@ func responseFields(resp *http.Response) log.Fields {
 	}
 
 	return fields
+}
+
+// reportWarnings extracts and reports warnings from HTTP Warning headers.
+// Per RFC 7234 and OCI distribution spec, warnings use warn-code 299,
+// warn-agent "-", and the format: Warning: 299 - "message"
+func reportWarnings(header http.Header, handler WarningHandler) {
+	if handler == nil {
+		return
+	}
+	for _, warning := range header.Values("Warning") {
+		// Parse RFC 7234 warning format: warn-code warn-agent "warn-text"
+		// Expected format for OCI: 299 - "message"
+		if text := parseWarningText(warning); text != "" {
+			handler(text)
+		}
+	}
+}
+
+// parseWarningText extracts the warn-text from an RFC 7234 Warning header value.
+// Expected format: 299 - "message"
+func parseWarningText(warning string) string {
+	before, text, ok := strings.Cut(warning, "299 - ")
+
+	if strings.TrimSpace(before) != "" {
+		return ""
+	}
+
+	// Not an OCI registry warning
+	if !ok {
+		return ""
+	}
+
+	text = strings.TrimSpace(text)
+
+	ln := len(text)
+	// Invalid warn-text (must be a quoted-string per RFC 7234)
+	if ln == 0 || text[0] != '"' || text[ln-1] != '"' {
+		return ""
+	}
+
+	out := strings.Builder{}
+	idx := 1 // skip opening quote
+
+	for idx < ln {
+		c := text[idx]
+		nextC := byte(0)
+		if len(text) > idx+1 {
+			nextC = text[idx+1]
+		}
+
+		// Check for escaped quote
+		if c == '\\' && nextC == '"' {
+			out.WriteByte('"')
+			idx += 2
+			continue
+		}
+		if c == '"' {
+			return out.String()
+		}
+		out.WriteByte(c)
+		idx++
+	}
+
+	// No closing quote found, invalid warning header
+	return ""
 }
 
 // IsLocalhost checks if the registry host is local.
