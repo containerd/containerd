@@ -48,6 +48,7 @@ type LinuxContainer interface {
 	GetIOPriority() *nri.LinuxIOPriority
 	GetScheduler() *nri.LinuxScheduler
 	GetNetDevices() map[string]*nri.LinuxNetDevice
+	GetRdt() *nri.LinuxRdt
 }
 
 func commonContainerToNRI(ctr Container) *nri.Container {
