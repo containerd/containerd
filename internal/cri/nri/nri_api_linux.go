@@ -882,6 +882,13 @@ func (c *criContainer) GetScheduler() *api.LinuxScheduler {
 	return api.FromOCILinuxScheduler(c.spec.Process.Scheduler)
 }
 
+func (c *criContainer) GetNetDevices() map[string]*api.LinuxNetDevice {
+	if c.spec.Linux == nil {
+		return nil
+	}
+	return api.FromOCILinuxNetDevices(c.spec.Linux.NetDevices)
+}
+
 func (c *criContainer) GetPid() uint32 {
 	return c.pid
 }

@@ -47,6 +47,7 @@ type LinuxContainer interface {
 	GetCgroupsPath() string
 	GetIOPriority() *nri.LinuxIOPriority
 	GetScheduler() *nri.LinuxScheduler
+	GetNetDevices() map[string]*nri.LinuxNetDevice
 }
 
 func commonContainerToNRI(ctr Container) *nri.Container {
