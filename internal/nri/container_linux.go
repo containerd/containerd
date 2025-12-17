@@ -32,6 +32,7 @@ func containerToNRI(ctr Container) *nri.Container {
 		OomScoreAdj: nri.Int(lnxCtr.GetOOMScoreAdj()),
 		CgroupsPath: lnxCtr.GetCgroupsPath(),
 		IoPriority:  lnxCtr.GetIOPriority(),
+		Scheduler:   lnxCtr.GetScheduler(),
 	}
 	return nriCtr
 }
