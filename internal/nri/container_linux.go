@@ -33,6 +33,7 @@ func containerToNRI(ctr Container) *nri.Container {
 		CgroupsPath: lnxCtr.GetCgroupsPath(),
 		IoPriority:  lnxCtr.GetIOPriority(),
 		Scheduler:   lnxCtr.GetScheduler(),
+		NetDevices:  lnxCtr.GetNetDevices(),
 	}
 	return nriCtr
 }
