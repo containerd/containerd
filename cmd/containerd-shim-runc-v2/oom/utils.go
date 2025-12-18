@@ -47,6 +47,12 @@ func memoryEventNonBlockFD(cgroupPath string) (_ *os.File, retErr error) {
 	if _, err := unix.InotifyAddWatch(rawFd, fpath, unix.IN_MODIFY); err != nil {
 		return nil, fmt.Errorf("failed to add inotify watch for %q: %w", fpath, err)
 	}
+
+	// monitor to detect process exit/cgroup deletion
+	evpath := filepath.Join(cgroupPath, "cgroup.events")
+	if _, err = unix.InotifyAddWatch(rawFd, evpath, unix.IN_MODIFY); err != nil {
+		return nil, fmt.Errorf("failed to add inotify watch for %q: %w", evpath, err)
+	}
 	return fd, nil
 }
 
