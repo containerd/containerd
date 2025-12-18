@@ -479,40 +479,6 @@ func (c *Container) HasPid(pid int) bool {
 	return false
 }
 
-func (c *Container) OOMWatch(ctx context.Context, eventf func(string)) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	cg, ok := c.cgroup.(*cgroupsv2.Manager)
-	if !ok {
-		return fmt.Errorf("expected *cgroupsv2.Manager, got: %T", c.cgroup)
-	}
-
-	// FIXME: cgroupsv2.Manager does not support closing eventCh routine currently.
-	// The routine shuts down when an error happens, mostly when the cgroup is deleted.
-	eventCh, errCh := cg.EventChan()
-	go func() {
-		var oomKills uint64
-		for {
-			select {
-			case ev := <-eventCh:
-				if ev.OOMKill > oomKills {
-					oomKills = ev.OOMKill
-					eventf(c.ID)
-				}
-			case err := <-errCh:
-				// channel is closed when cgroup gets deleted
-				if err != nil {
-					// we no longer get any event/err when we got an err
-					log.L.WithError(err).Warn("error from *cgroupsv2.Manager.EventChan")
-				}
-				return
-			}
-		}
-	}()
-
-	return nil
-}
-
 func loadProcessCgroup(ctx context.Context, pid int) (cg interface{}, err error) {
 	if cgroups.Mode() == cgroups.Unified {
 		g, err := cgroupsv2.PidGroupPath(pid)
