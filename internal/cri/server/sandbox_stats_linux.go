@@ -79,20 +79,37 @@ func (c *criService) podSandboxStats(
 	podSandboxStats.Linux.Memory = memoryStats
 
 	if sandbox.NetNSPath != "" {
-		linkStats, err := getContainerNetIO(ctx, sandbox.NetNSPath)
+		allStats, err := getAllContainerNetIO(ctx, sandbox.NetNSPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain network stats: %w", err)
 		}
-		podSandboxStats.Linux.Network = &runtime.NetworkUsage{
+
+		networkUsage := &runtime.NetworkUsage{
 			Timestamp: timestamp.UnixNano(),
-			DefaultInterface: &runtime.NetworkInterfaceUsage{
-				Name:     defaultIfName,
-				RxBytes:  &runtime.UInt64Value{Value: linkStats.RxBytes},
-				RxErrors: &runtime.UInt64Value{Value: linkStats.RxErrors},
-				TxBytes:  &runtime.UInt64Value{Value: linkStats.TxBytes},
-				TxErrors: &runtime.UInt64Value{Value: linkStats.TxErrors},
-			},
 		}
+
+		for _, ifStats := range allStats {
+			interfaceUsage := &runtime.NetworkInterfaceUsage{
+				Name:     ifStats.name,
+				RxBytes:  &runtime.UInt64Value{Value: ifStats.stats.RxBytes},
+				RxErrors: &runtime.UInt64Value{Value: ifStats.stats.RxErrors},
+				TxBytes:  &runtime.UInt64Value{Value: ifStats.stats.TxBytes},
+				TxErrors: &runtime.UInt64Value{Value: ifStats.stats.TxErrors},
+			}
+			networkUsage.Interfaces = append(networkUsage.Interfaces, interfaceUsage)
+
+			// Set the default interface to eth0, or the first interface if eth0 is not found
+			if ifStats.name == defaultIfName {
+				networkUsage.DefaultInterface = interfaceUsage
+			}
+		}
+
+		// If we didn't find eth0, use the first interface as default
+		if networkUsage.DefaultInterface == nil && len(networkUsage.Interfaces) > 0 {
+			networkUsage.DefaultInterface = networkUsage.Interfaces[0]
+		}
+
+		podSandboxStats.Linux.Network = networkUsage
 	}
 
 	listContainerStatsRequest := &runtime.ListContainerStatsRequest{Filter: &runtime.ContainerStatsFilter{PodSandboxId: meta.ID}}
@@ -113,6 +130,13 @@ func (c *criService) podSandboxStats(
 	return podSandboxStats, nil
 }
 
+// interfaceStats contains statistics for a single network interface
+type interfaceStats struct {
+	name  string
+	stats netlink.LinkStatistics64
+}
+
+// getContainerNetIO returns network stats for the default interface (eth0)
 // https://github.com/cri-o/cri-o/blob/74a5cf8dffd305b311eb1c7f43a4781738c388c1/internal/oci/stats.go#L32
 func getContainerNetIO(ctx context.Context, netNsPath string) (netlink.LinkStatistics64, error) {
 	var stats netlink.LinkStatistics64
@@ -130,6 +154,39 @@ func getContainerNetIO(ctx context.Context, netNsPath string) (netlink.LinkStati
 	})
 
 	return stats, err
+}
+
+// getAllContainerNetIO returns network stats for all interfaces in the network namespace
+func getAllContainerNetIO(ctx context.Context, netNsPath string) ([]interfaceStats, error) {
+	var allStats []interfaceStats
+	err := ns.WithNetNSPath(netNsPath, func(_ ns.NetNS) error {
+		links, err := netlink.LinkList()
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("unable to list network interfaces for netNsPath: %v", netNsPath)
+			return err
+		}
+		for _, link := range links {
+			attrs := link.Attrs()
+			if attrs == nil {
+				continue
+			}
+			// Skip loopback interface
+			if attrs.Name == "lo" {
+				continue
+			}
+			var stats netlink.LinkStatistics64
+			if attrs.Statistics != nil {
+				stats = netlink.LinkStatistics64(*attrs.Statistics)
+			}
+			allStats = append(allStats, interfaceStats{
+				name:  attrs.Name,
+				stats: stats,
+			})
+		}
+		return nil
+	})
+
+	return allStats, err
 }
 
 func cgroupMetricsForSandbox(sandbox sandboxstore.Sandbox) (*cgroupMetrics, error) {
