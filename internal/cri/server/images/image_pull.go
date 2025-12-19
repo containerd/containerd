@@ -263,8 +263,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 		}),
 	}
 
-	// Temporarily removed for v2 upgrade
-	//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
 	if !c.config.DisableSnapshotAnnotations {
 		pullOpts = append(pullOpts,
 			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
@@ -636,7 +635,6 @@ func (c *CRIImageService) registryEndpoints(host string) ([]string, error) {
 
 // encryptedImagesPullOpts returns the necessary list of pull options required
 // for decryption of encrypted images based on the cri decryption configuration.
-// Temporarily removed for v2 upgrade
 func (c *CRIImageService) encryptedImagesPullOpts() []containerd.RemoteOpt {
 	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
 		ltdd := imgcrypt.Payload{}
