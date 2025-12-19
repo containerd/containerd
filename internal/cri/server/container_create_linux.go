@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/containerd/log"
+
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -102,6 +104,10 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	}
 	if c.config.EnableCDI {
 		specOpts = append(specOpts, customopts.WithCDI(config.Annotations, config.CDIDevices))
+	} else {
+		if len(config.CDIDevices) > 0 {
+			log.L.Error("create container request config includes a request for CDI device injection, but CDI is disabled in the runtime configuration")
+		}
 	}
 	return specOpts, nil
 }
