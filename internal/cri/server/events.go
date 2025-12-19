@@ -19,11 +19,16 @@ package server
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
+	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
+	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	eventtypes "github.com/containerd/containerd/api/events"
@@ -186,6 +191,52 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 			return fmt.Errorf("failed to load task for container: %w", err)
 		}
 	} else {
+		if e.ExitStatus == oomExitCodeInLinux && cntr.Status.Get().Reason != oomExitReason {
+			var oomKilled bool
+
+			// NOTE(fuweid):
+			//
+			// 1. Even if the container’s main process is not OOM-killed, an OOM kill of an exec
+			//    process or a child process can still update status.Reason to OOMKilled.
+			//    This appears to be a CRI design issue and is worth highlighting.
+			//
+			// 2. The CRI plugin handles all OOM events in a single goroutine. This can lead to
+			//    a race condition where the Wait response is returned before the OOM event is
+			//    processed. As a result, the client may first observe status.Reason as Error,
+			//    and only later see it updated to OOMKilled. This behavior is inconsistent.
+			//    To avoid this, we should check metrics to determine whether an OOM event
+			//    occurred before reporting the final status.
+			//
+			// 3. With the systemd cgroup driver, the container runtime uses a scope unit to
+			//    maintain the container’s cgroup path. Scope units do not have a “main”
+			//    process; their lifetime is tied to the existence of at least one process
+			//    in the scope, not to the exit status of any particular process. When the
+			//    last process in the scope exits, systemd may immediately garbage-collect
+			//    the scope unit and remove its associated cgroup.
+			//
+			//    This creates a race between systemd GC and containerd’s OOM handling logic:
+			//    if the cgroup is removed first, containerd can no longer read cgroup memory
+			//    events or counters to determine whether an OOM kill occurred, resulting in
+			//    flaky or missing OOMKilled detection.
+			//
+			//    In theory, this could be mitigated by inspecting the unit logs
+			//    (e.g. `journalctl -u XXX.scope`) and searching for OOM-related messages.
+			//    However, this approach depends on journalctl and systemd logging behavior
+			//    and should therefore be avoided.
+			//
+			//    Ref: https://www.freedesktop.org/software/systemd/man/latest/systemd.scope.html
+			oomKilled, err = c.oomMetricsEventOccurred(ctx, sandboxID, task)
+			if err == nil && oomKilled {
+				err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+					status.Reason = oomExitReason
+					return status, nil
+				})
+			}
+			if err != nil {
+				log.L.WithError(err).Warningf("failed to check and update container %s if oom event occurred", cntr.Container.ID())
+			}
+		}
+
 		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
 		if _, err = task.Delete(ctx, c.nri.WithContainerExit(&cntr), containerd.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
@@ -318,6 +369,11 @@ func (ce *criEventHandler) HandleEvent(any interface{}) error {
 			}
 			return nil
 		}
+
+		if cntr.Status.Get().Reason == oomExitReason {
+			return nil
+		}
+
 		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 			status.Reason = oomExitReason
 			return status, nil
@@ -337,4 +393,48 @@ func (ce *criEventHandler) HandleEvent(any interface{}) error {
 	}
 
 	return nil
+}
+
+// oomMetricsEventOccurred returns true if the cgroup reports one or more OOM kill events.
+func (c *criService) oomMetricsEventOccurred(ctx context.Context, sandboxID string, task containerd.Task) (bool, error) {
+	platform, err := c.getPlatformFromSandboxID(ctx, sandboxID)
+	if err != nil {
+		return false, err
+	}
+
+	if isLinux := platform.OS == "linux"; !isLinux {
+		return false, nil
+	}
+
+	taskMetrics, err := task.Metrics(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get metrics for task %s: %w", task.ID(), err)
+	}
+
+	taskMetricsAny, err := typeurl.UnmarshalAny(taskMetrics.Data)
+	if err != nil {
+		return false, fmt.Errorf("failed to unmarshal metrics for task %s: %w", task.ID(), err)
+	}
+
+	switch v := taskMetricsAny.(type) {
+	case *cg1.Metrics:
+		return v.GetMemoryOomControl().GetOomKill() > 0, nil
+	case *cg2.Metrics:
+		return v.GetMemoryEvents().GetOomKill() > 0, nil
+	default:
+		return false, fmt.Errorf("unexpected metrics type: %T from %s", taskMetricsAny, reflect.TypeOf(taskMetricsAny).Elem().PkgPath())
+	}
+}
+
+func (c *criService) getPlatformFromSandboxID(ctx context.Context, sandboxID string) (imagespec.Platform, error) {
+	sandbox, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return imagespec.Platform{}, fmt.Errorf("failed to get sandbox %s: %w", sandboxID, err)
+	}
+
+	platform, err := c.sandboxService.SandboxPlatform(ctx, sandbox.Sandboxer, sandbox.ID)
+	if err != nil {
+		return imagespec.Platform{}, fmt.Errorf("failed to query sandbox %s platform: %w", sandbox.ID, err)
+	}
+	return platform, nil
 }
