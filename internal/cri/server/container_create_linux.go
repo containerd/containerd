@@ -100,9 +100,19 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	if seccompSpecOpts != nil {
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
-	if c.config.EnableCDI {
+	if c.config.EnableCDI == nil || *c.config.EnableCDI {
 		specOpts = append(specOpts, customopts.WithCDI(config.Annotations, config.CDIDevices))
+	} else {
+		if len(config.CDIDevices) > 0 {
+			names, sep := "", ""
+			for _, dev := range config.CDIDevices {
+				names += sep + dev.Name
+				sep = ", "
+			}
+			return nil, fmt.Errorf("CDI devices (%s) requested but CDI support is explicitly disabled", names)
+		}
 	}
+
 	return specOpts, nil
 }
 
