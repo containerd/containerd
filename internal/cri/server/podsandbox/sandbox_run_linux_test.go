@@ -421,6 +421,84 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 				assert.EqualValues(t, "0", value)
 			},
 		},
+		{
+			desc: "host network with user namespace should bind mount /sys",
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+					NamespaceOptions: &runtime.NamespaceOption{
+						Network: runtime.NamespaceMode_NODE,
+						UsernsOptions: &runtime.UserNamespace{
+							Mode: runtime.NamespaceMode_POD,
+							Uids: []*runtime.IDMapping{&idMap},
+							Gids: []*runtime.IDMapping{&idMap},
+						},
+					},
+				}
+			},
+			specCheck: func(t *testing.T, c *Controller, spec *runtimespec.Spec) {
+				require.NotNil(t, spec.Linux)
+
+				// Find user namespace
+				var userNs *runtimespec.LinuxNamespace
+				for i := range spec.Linux.Namespaces {
+					if spec.Linux.Namespaces[i].Type == runtimespec.UserNamespace {
+						userNs = &spec.Linux.Namespaces[i]
+						break
+					}
+				}
+				require.NotNil(t, userNs, "user namespace should be present")
+				assert.Empty(t, userNs.Path, "user namespace should not be pinned when using host network")
+				var sysMounts []runtimespec.Mount
+				for _, m := range spec.Mounts {
+					if m.Destination == "/sys" {
+						sysMounts = append(sysMounts, m)
+					}
+				}
+
+				require.Len(t, sysMounts, 1, "expected exactly one /sys mount")
+				sysMount := sysMounts[0]
+				assert.Equal(t, "/sys", sysMount.Source, "/sys should be bind mounted from host")
+				assert.Equal(t, "bind", sysMount.Type, "mount type should be bind")
+
+				require.Equal(t, spec.Linux.UIDMappings, []runtimespec.LinuxIDMapping{expIDMap})
+				require.Equal(t, spec.Linux.GIDMappings, []runtimespec.LinuxIDMapping{expIDMap})
+			},
+		},
+		{
+			desc: "pod network with user namespace should pin namespace and not bind mount /sys",
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+					NamespaceOptions: &runtime.NamespaceOption{
+						Network: runtime.NamespaceMode_POD,
+						UsernsOptions: &runtime.UserNamespace{
+							Mode: runtime.NamespaceMode_POD,
+							Uids: []*runtime.IDMapping{&idMap},
+							Gids: []*runtime.IDMapping{&idMap},
+						},
+					},
+				}
+			},
+			specCheck: func(t *testing.T, ctrl *Controller, spec *runtimespec.Spec) {
+				require.NotNil(t, spec.Linux)
+
+				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+					Type: runtimespec.UserNamespace,
+					Path: filepath.Join(ctrl.config.StateDir, "sandboxes", testID, "pinned-namespaces", "user"),
+				})
+
+				var sysMounts []runtimespec.Mount
+				for _, m := range spec.Mounts {
+					if m.Destination == "/sys" {
+						sysMounts = append(sysMounts, m)
+					}
+				}
+
+				for _, m := range sysMounts {
+					assert.False(t, m.Type == "bind" && m.Source == "/sys",
+						"should not bind mount /sys from host when using pod network, but found: %+v", m)
+				}
+			},
+		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			c := newControllerService()
