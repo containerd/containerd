@@ -1666,3 +1666,89 @@ containerEdits:
 		})
 	}
 }
+
+func TestUserNamespaceWithHostNetwork(t *testing.T) {
+	testID := "test-id"
+	testPid := uint32(1234)
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	idMap := runtime.IDMapping{
+		HostId:      1000,
+		ContainerId: 1000,
+		Length:      10,
+	}
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
+	c := newTestCRIService()
+
+	for _, test := range []struct {
+		desc             string
+		userNS           *runtime.UserNamespace
+		networkMode      runtime.NamespaceMode
+		expectedSysMount *runtimespec.Mount
+	}{
+		{
+			desc: "host network with user namespace should bind mount /sys",
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			networkMode: runtime.NamespaceMode_NODE,
+			expectedSysMount: &runtimespec.Mount{
+				Source:      "/sys",
+				Destination: "/sys",
+				Type:        "bind",
+				Options:     []string{"rbind", "ro", "nosuid", "nodev", "noexec"},
+			},
+		},
+		{
+			desc: "pod network with user namespace should use default sysfs",
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			networkMode:      runtime.NamespaceMode_POD,
+			expectedSysMount: nil,
+		},
+		{
+			desc:             "host network without user namespace should use default sysfs",
+			userNS:           &runtime.UserNamespace{Mode: runtime.NamespaceMode_NODE},
+			networkMode:      runtime.NamespaceMode_NODE,
+			expectedSysMount: nil,
+		},
+		{
+			desc:             "pod network without user namespace should use default sysfs",
+			userNS:           &runtime.UserNamespace{Mode: runtime.NamespaceMode_NODE},
+			networkMode:      runtime.NamespaceMode_POD,
+			expectedSysMount: nil,
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{
+				UsernsOptions: test.userNS,
+			}
+			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+				NamespaceOptions: &runtime.NamespaceOption{
+					Network:       test.networkMode,
+					UsernsOptions: test.userNS,
+				},
+			}
+
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			require.NoError(t, err)
+			require.NotNil(t, spec)
+
+			if test.expectedSysMount != nil {
+				checkMount(t, spec.Mounts, test.expectedSysMount.Source, test.expectedSysMount.Destination,
+					test.expectedSysMount.Type, test.expectedSysMount.Options, nil)
+			} else {
+				for _, m := range spec.Mounts {
+					assert.False(t, m.Destination == "/sys" && m.Type == "bind",
+						"unexpected /sys bind mount found: %+v", m)
+				}
+			}
+		})
+	}
+}
