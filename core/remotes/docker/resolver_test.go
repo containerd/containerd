@@ -48,7 +48,7 @@ func TestHTTPResolver(t *testing.T) {
 		s := httptest.NewServer(h)
 
 		options := ResolverOptions{}
-		base := s.URL[7:] // strip "http://"
+		base := s.URL[len("http://"):]
 		return base, options, s.Close
 	}
 	runBasicTest(t, "testname", s)
@@ -68,7 +68,7 @@ func TestResolverOptionsRace(t *testing.T) {
 		options := ResolverOptions{
 			Headers: header,
 		}
-		base := s.URL[7:] // strip "http://"
+		base := s.URL[len("http://"):]
 		return base, options, s.Close
 	}
 
@@ -314,7 +314,7 @@ func TestWrongBasicAuthResolver(t *testing.T) {
 func TestHostFailureFallbackResolver(t *testing.T) {
 	sf := func(h http.Handler) (string, ResolverOptions, func()) {
 		s := httptest.NewServer(h)
-		base := s.URL[7:] // strip "http://"
+		base := s.URL[len("http://"):]
 
 		options := ResolverOptions{}
 		createHost := func(host string) RegistryHost {
@@ -596,7 +596,7 @@ func TestResolveProxyFallback(t *testing.T) {
 	s := httptest.NewServer(logHandler{t, nr})
 	defer s.Close()
 
-	base := s.URL[7:] // strip "http://"
+	base := s.URL[len("http://"):]
 
 	ro := ResolverOptions{
 		Hosts: func(host string) ([]RegistryHost, error) {
@@ -1119,7 +1119,7 @@ func TestResolverErrorStatusCodeOnFetch(t *testing.T) {
 			}))
 			defer s.Close()
 
-			base := s.URL[7:] // strip "http://"
+			base := s.URL[len("http://"):]
 			options := ResolverOptions{}
 			resolver := NewResolver(options)
 
