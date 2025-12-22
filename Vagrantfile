@@ -328,7 +328,15 @@ EOF
         fi
         trap cleanup EXIT
         ctr version
-        critest --parallel=$[$(nproc)+2] --ginkgo.skip='HostIpc is true' --report-dir="${REPORT_DIR}"
+
+        skip_tests=(
+          'HostIpc is true'
+        )
+        if [[ $CGROUP_DRIVER == "systemd" ]]; then
+          skip_tests+=("should terminate with exitCode 137 and reason OOMKilled")
+        fi
+        skip_test_args=$(IFS='|'; echo "${skip_tests[*]}")
+        critest --parallel=$[$(nproc)+2] --ginkgo.skip="${skip_test_args}" --report-dir="${REPORT_DIR}"
     SHELL
   end
 
