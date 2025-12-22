@@ -110,7 +110,7 @@ jobs:
         run: |
           sudo make test-e2e-node \
             FOCUS='\[NodeConformance\]|\[Feature:.+\]|\[Feature\]' \
-            SKIP='\[Flaky\]|\[Slow\]|\[Serial\]|\[Feature:UserNamespacesSupport\]|\[Feature:PodLifecycleSleepActionAllowZero\]|\[Feature:UserNamespacesPodSecurityStandards\]|\[Feature:KubeletCredentialProviders\]|\[Feature:LockContention\]|\[Feature:SCTPConnectivity\]|\[Feature:ResourceMetrics\]|\[Alpha\]' \
+            SKIP='\[Flaky\]|\[Slow\]|\[Serial\]|\[Feature:UserNamespacesSupport\]|\[Feature:PodLifecycleSleepActionAllowZero\]|\[Feature:UserNamespacesPodSecurityStandards\]|\[Feature:KubeletCredentialProviders\]|\[Feature:LockContention\]|\[Feature:SCTPConnectivity\]|\[Alpha\]' \
             TEST_ARGS='--feature-gates=PodAndContainerStatsFromCRI=true --kubelet-flags="--cgroup-driver=systemd --cgroups-per-qos=true --cgroup-root=/ --runtime-cgroups=/system.slice/containerd.service --feature-gates=PodAndContainerStatsFromCRI=true"'
 
       - name: Collect Logs on Failure
