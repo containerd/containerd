@@ -381,42 +381,62 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 	tests := []struct {
 		desc                string
 		podSandboxConfig    *runtime.PodSandboxConfig
+		runtimeHandler      string
 		expectedSnapshotter string
 		expectedErr         bool
 	}{
 		{
 			desc:                "should return default snapshotter for nil podSandboxConfig",
+			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
-			desc:                "should return default snapshotter for nil podSandboxConfig.Annotations",
+			desc:                "should return default snapshotter for empty runtimeHandler",
 			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
-			desc: "should return default snapshotter for empty podSandboxConfig.Annotations",
-			podSandboxConfig: &runtime.PodSandboxConfig{
-				Annotations: make(map[string]string),
-			},
+			desc:                "should return default snapshotter for runtime not found",
+			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "runtime-not-exists",
 			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
-			desc: "should return default snapshotter for runtime not found",
-			podSandboxConfig: &runtime.PodSandboxConfig{
-				Annotations: map[string]string{
-					annotations.RuntimeHandler: "runtime-not-exists",
-				},
-			},
-			expectedSnapshotter: defaultSnapshotter,
+			desc:                "should return snapshotter for existing runtime",
+			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "existing-runtime",
+			expectedSnapshotter: runtimeSnapshotter,
 		},
 		{
-			desc: "should return snapshotter provided in podSandboxConfig.Annotations",
+			desc: "should fall back to annotation when runtimeHandler is empty",
 			podSandboxConfig: &runtime.PodSandboxConfig{
 				Annotations: map[string]string{
 					annotations.RuntimeHandler: "existing-runtime",
 				},
 			},
+			runtimeHandler:      "",
 			expectedSnapshotter: runtimeSnapshotter,
+		},
+		{
+			desc: "should prefer runtimeHandler parameter over annotation",
+			podSandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.RuntimeHandler: "runtime-not-exists",
+				},
+			},
+			runtimeHandler:      "existing-runtime",
+			expectedSnapshotter: runtimeSnapshotter,
+		},
+		{
+			desc: "should return default when annotation has unknown runtime and runtimeHandler is empty",
+			podSandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.RuntimeHandler: "runtime-not-exists",
+				},
+			},
+			runtimeHandler:      "",
+			expectedSnapshotter: defaultSnapshotter,
 		},
 	}
 
@@ -428,7 +448,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
-			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
+			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig, tt.runtimeHandler)
 			assert.Equal(t, tt.expectedSnapshotter, snapshotter)
 			if tt.expectedErr {
 				assert.Error(t, err)
