@@ -375,11 +375,12 @@ func TestEncryptedImagePullOpts(t *testing.T) {
 	}
 }
 
-func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
+func TestDetermineSnapshotter(t *testing.T) {
 	defaultSnapshotter := "native"
 	runtimeSnapshotter := "devmapper"
 	tests := []struct {
 		desc                string
+		runtimeHandler      string
 		podSandboxConfig    *runtime.PodSandboxConfig
 		expectedSnapshotter string
 		expectedErr         bool
@@ -410,6 +411,11 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
+			desc:                "should return runtime snapshotter",
+			runtimeHandler:      "existing-runtime",
+			expectedSnapshotter: runtimeSnapshotter,
+		},
+		{
 			desc: "should return snapshotter provided in podSandboxConfig.Annotations",
 			podSandboxConfig: &runtime.PodSandboxConfig{
 				Annotations: map[string]string{
@@ -428,7 +434,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
-			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
+			snapshotter, err := cri.determineSnapshotter(context.Background(), "test-image", tt.runtimeHandler, tt.podSandboxConfig)
 			assert.Equal(t, tt.expectedSnapshotter, snapshotter)
 			if tt.expectedErr {
 				assert.Error(t, err)
