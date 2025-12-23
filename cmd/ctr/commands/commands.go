@@ -304,10 +304,10 @@ func WritePidFile(path string, pid int) error {
 // Returns:
 //   - The config_path value (e.g., "/etc/containerd/certs.d") if the plugin exists and exports it
 //   - Empty string in the following cases:
-//     - Introspection query fails (daemon communication error)
-//     - Plugin "io.containerd.transfer.v1.local" is not found
-//     - Multiple plugins match (should never happen with exact ID match)
-//     - Plugin doesn't export "config_path" field
+//   - Introspection query fails (daemon communication error)
+//   - Plugin "io.containerd.transfer.v1.local" is not found
+//   - Multiple plugins match (should never happen with exact ID match)
+//   - Plugin doesn't export "config_path" field
 //
 // The function returns empty string instead of an error to allow graceful fallback
 // to CLI flag defaults when daemon configuration is unavailable.
