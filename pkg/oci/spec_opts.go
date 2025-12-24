@@ -724,6 +724,16 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 	}
 }
 
+// WithUmask sets the process user's umask in the OCI spec's Process.User.Umask
+func WithUmask(umask uint32) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setProcess(s)
+		u := umask
+		s.Process.User.Umask = &u
+		return nil
+	}
+}
+
 // WithUserID sets the correct UID and GID for the container based
 // on the image's /etc/passwd contents. If /etc/passwd does not exist,
 // or uid is not found in /etc/passwd, it sets the requested uid,
