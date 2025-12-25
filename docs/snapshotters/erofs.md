@@ -241,6 +241,4 @@ For the EROFS differ:
 
  - EROFS Flatten filesystem support (EROFS fsmerge feature);
 
- - ID-mapped mount spport;
-
  - DMVerity support.
