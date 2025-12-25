@@ -60,11 +60,14 @@ func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool)
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
 func toCRISandboxInfo(ctx context.Context, sb *types.PodSandbox) (map[string]string, error) {
+	status := sb.Status.Get()
 	si := &critypes.SandboxInfo{
-		Pid:       sb.Status.Get().Pid,
+		Pid:       status.Pid,
 		Config:    sb.Metadata.Config,
 		CNIResult: sb.Metadata.CNIResult,
 		Metadata:  &sb.Metadata,
+		Overhead:  status.Overhead,
+		Resources: status.Resources,
 	}
 
 	if container := sb.Container; container != nil {

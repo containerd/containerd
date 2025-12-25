@@ -94,6 +94,28 @@ func (a *API) RunPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
 	return err
 }
 
+func (a *API) UpdatePodSandboxResources(ctx context.Context, criPod *sstore.Sandbox, overhead *cri.LinuxContainerResources, req *cri.LinuxContainerResources) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	err := a.nri.UpdatePodSandbox(ctx, pod, fromCRILinuxResources(overhead), fromCRILinuxResources(req))
+
+	return err
+}
+
+func (a *API) PostUpdatePodSandboxResources(ctx context.Context, criPod *sstore.Sandbox) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	err := a.nri.PostUpdatePodSandbox(ctx, pod)
+
+	return err
+}
+
 func (a *API) StopPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
 	if a.IsDisabled() {
 		return nil

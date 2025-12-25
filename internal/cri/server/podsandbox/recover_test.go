@@ -27,13 +27,15 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/api/types"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
-	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
@@ -203,7 +205,7 @@ func (f *fakeContainer) Restore(context.Context, cio.Creator, string) (int, erro
 }
 
 func sandboxExtension(id string) map[string]typeurl.Any {
-	metadata := sandbox.Metadata{
+	metadata := sandboxstore.Metadata{
 		ID: id,
 	}
 
@@ -213,16 +215,47 @@ func sandboxExtension(id string) map[string]typeurl.Any {
 	}
 }
 
+type mockSandboxStore struct {
+	get func(context.Context, string) (sandbox.Sandbox, error)
+}
+
+func (m *mockSandboxStore) Create(ctx context.Context, sandbox sandbox.Sandbox) (sandbox.Sandbox, error) {
+	return sandbox, nil
+}
+
+func (m *mockSandboxStore) Update(ctx context.Context, sandbox sandbox.Sandbox, fieldpaths ...string) (sandbox.Sandbox, error) {
+	return sandbox, nil
+}
+
+func (m *mockSandboxStore) Get(ctx context.Context, id string) (sandbox.Sandbox, error) {
+	if m.get != nil {
+		return m.get(ctx, id)
+	}
+	return sandbox.Sandbox{}, errdefs.ErrNotFound
+}
+
+func (m *mockSandboxStore) List(ctx context.Context, filters ...string) ([]sandbox.Sandbox, error) {
+	return nil, nil
+}
+
+func (m *mockSandboxStore) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
 func TestRecoverContainer(t *testing.T) {
 	controller := &Controller{
-		config: criconfig.Config{},
-		store:  NewStore(),
+		config:        criconfig.Config{},
+		store:         NewStore(),
+		metadataStore: &mockSandboxStore{},
 	}
 	containers := []struct {
 		container        fakeContainer
-		expectedState    sandbox.State
+		expectedState    sandboxstore.State
 		expectedPid      uint32
 		expectedExitCode uint32
+		mockGet          func(context.Context, string) (sandbox.Sandbox, error)
+		expectedOverhead *runtime.ContainerResources
+		expectedRes      *runtime.ContainerResources
 	}{
 		// sandbox container with task status running, and wait returns exit after 100 millisecond
 		{
@@ -246,9 +279,63 @@ func TestRecoverContainer(t *testing.T) {
 					waitExitCh: make(chan struct{}),
 				},
 			},
-			expectedState:    sandbox.StateReady,
+			expectedState:    sandboxstore.StateReady,
 			expectedPid:      233333,
 			expectedExitCode: 128,
+		},
+
+		// sandbox container with updated resources extension
+		{
+			container: fakeContainer{
+				c: containers.Container{
+					ID:         "sandbox_updated_resources",
+					CreatedAt:  time.Time{},
+					UpdatedAt:  time.Time{},
+					Extensions: sandboxExtension("sandbox_updated_resources"),
+				},
+				t: fakeTask{
+					id:  "sandbox_updated_resources_task",
+					pid: 233333,
+					status: containerd.Status{
+						Status:     containerd.Running,
+						ExitStatus: 128,
+						ExitTime:   time.Time{},
+					},
+					statusErr:  nil,
+					waitErr:    nil,
+					waitExitCh: make(chan struct{}),
+				},
+			},
+			expectedState:    sandboxstore.StateReady,
+			expectedPid:      233333,
+			expectedExitCode: 128,
+			mockGet: func(ctx context.Context, id string) (sandbox.Sandbox, error) {
+				updatedRes := UpdatedResources{
+					Overhead: &runtime.LinuxContainerResources{
+						MemoryLimitInBytes: 1024,
+					},
+					Resources: &runtime.LinuxContainerResources{
+						CpuPeriod: 100000,
+					},
+				}
+				ext, _ := typeurl.MarshalAny(&updatedRes)
+				return sandbox.Sandbox{
+					ID: id,
+					Extensions: map[string]typeurl.Any{
+						UpdatedResourcesKey: ext,
+					},
+				}, nil
+			},
+			expectedOverhead: &runtime.ContainerResources{
+				Linux: &runtime.LinuxContainerResources{
+					MemoryLimitInBytes: 1024,
+				},
+			},
+			expectedRes: &runtime.ContainerResources{
+				Linux: &runtime.LinuxContainerResources{
+					CpuPeriod: 100000,
+				},
+			},
 		},
 
 		// sandbox container with task status return error
@@ -265,7 +352,7 @@ func TestRecoverContainer(t *testing.T) {
 					statusErr: errors.New("some unknown error"),
 				},
 			},
-			expectedState: sandbox.StateUnknown,
+			expectedState: sandboxstore.StateUnknown,
 		},
 
 		// sandbox container with task status return not found
@@ -282,7 +369,7 @@ func TestRecoverContainer(t *testing.T) {
 					statusErr: errdefs.ErrNotFound,
 				},
 			},
-			expectedState: sandbox.StateNotReady,
+			expectedState: sandboxstore.StateNotReady,
 		},
 
 		// sandbox container with task not found
@@ -296,7 +383,7 @@ func TestRecoverContainer(t *testing.T) {
 				},
 				taskErr: errdefs.ErrNotFound,
 			},
-			expectedState: sandbox.StateNotReady,
+			expectedState: sandboxstore.StateNotReady,
 		},
 
 		// sandbox container with error when call Task()
@@ -310,7 +397,7 @@ func TestRecoverContainer(t *testing.T) {
 				},
 				taskErr: errors.New("some unknown error"),
 			},
-			expectedState: sandbox.StateUnknown,
+			expectedState: sandboxstore.StateUnknown,
 		},
 
 		// sandbox container with task wait error
@@ -331,7 +418,7 @@ func TestRecoverContainer(t *testing.T) {
 					waitErr: errors.New("some unknown error"),
 				},
 			},
-			expectedState: sandbox.StateUnknown,
+			expectedState: sandboxstore.StateUnknown,
 		},
 
 		// sandbox container with task wait not found
@@ -352,7 +439,7 @@ func TestRecoverContainer(t *testing.T) {
 					waitErr: errdefs.ErrNotFound,
 				},
 			},
-			expectedState: sandbox.StateNotReady,
+			expectedState: sandboxstore.StateNotReady,
 		},
 
 		// sandbox container with task delete error
@@ -374,7 +461,7 @@ func TestRecoverContainer(t *testing.T) {
 					deleteErr: errors.New("some unknown error"),
 				},
 			},
-			expectedState: sandbox.StateUnknown,
+			expectedState: sandboxstore.StateUnknown,
 		},
 
 		// sandbox container with task delete not found
@@ -396,11 +483,12 @@ func TestRecoverContainer(t *testing.T) {
 					deleteErr: errdefs.ErrNotFound,
 				},
 			},
-			expectedState: sandbox.StateNotReady,
+			expectedState: sandboxstore.StateNotReady,
 		},
 	}
 
 	for _, c := range containers {
+		controller.metadataStore = &mockSandboxStore{get: c.mockGet}
 		cont := c.container
 		sb, err := controller.RecoverContainer(context.Background(), &cont)
 		assert.NoError(t, err)
@@ -418,6 +506,12 @@ func TestRecoverContainer(t *testing.T) {
 		assert.Equal(t, c.expectedState, status.State, "%s sandbox state is not expected", cont.ID())
 		if c.expectedPid > 0 {
 			assert.Equal(t, c.expectedPid, status.Pid, "%s sandbox pid is not expected", cont.ID())
+		}
+		if c.expectedOverhead != nil {
+			assert.Equal(t, c.expectedOverhead, status.Overhead, "%s overhead is not expected", cont.ID())
+		}
+		if c.expectedRes != nil {
+			assert.Equal(t, c.expectedRes, status.Resources, "%s resources is not expected", cont.ID())
 		}
 	}
 
