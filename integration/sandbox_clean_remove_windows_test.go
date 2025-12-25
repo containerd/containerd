@@ -77,7 +77,7 @@ func getTestImage() (string, error) {
 		if buildNum > osversion.V21H2Server {
 			return "ghcr.io/containerd/windows/nanoserver:ltsc2022", nil
 		}
-		return "", fmt.Errorf("No test image defined for Windows build version: %s", b)
+		return "", fmt.Errorf("no test image defined for Windows build version: %s", b)
 	}
 }
 
