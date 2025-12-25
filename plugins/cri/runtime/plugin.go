@@ -40,13 +40,15 @@ import (
 	"github.com/containerd/platforms"
 )
 
+const containerdRuntime string = "runtime"
+
 func init() {
 	config := criconfig.DefaultRuntimeConfig()
 
 	// Base plugin that other CRI services depend on.
 	registry.Register(&plugin.Registration{
 		Type:   plugins.CRIServicePlugin,
-		ID:     "runtime",
+		ID:     containerdRuntime,
 		Config: &config,
 		Requires: []plugin.Type{
 			plugins.WarningPlugin,
@@ -101,6 +103,12 @@ func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
 	if err := setGLogLevel(); err != nil {
 		return nil, fmt.Errorf("failed to set glog level: %w", err)
 	}
+
+	configData, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+	ic.Meta.Exports[containerdRuntime] = string(configData)
 
 	ociSpec, err := loadBaseOCISpecs(&c)
 	if err != nil {
