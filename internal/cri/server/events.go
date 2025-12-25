@@ -19,6 +19,8 @@ package server
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -245,7 +247,10 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 			status.FinishedAt = protobuf.FromTimestamp(e.ExitedAt).UnixNano()
 			status.ExitCode = int32(e.ExitStatus)
 		}
-
+		cdir := c.getContainerRootDir(cntr.ID)
+		if os.Stat(filepath.Join(cdir, "oom")); err == nil {
+			status.Reason = oomExitReason
+		}
 		// Unknown state can only transit to EXITED state, so we need
 		// to handle unknown state here.
 		if status.Unknown {
@@ -318,6 +323,7 @@ func (ce *criEventHandler) HandleEvent(any interface{}) error {
 			}
 			return nil
 		}
+		time.Sleep(time.Second * 10)
 		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 			status.Reason = oomExitReason
 			return status, nil
