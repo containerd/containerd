@@ -83,10 +83,6 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 	if err := sys.MkdirAllWithACL(config.Root, 0o700); err != nil {
 		return err
 	}
-	// chmod is needed for upgrading from an older release that created the dir with 0o711
-	if err := os.Chmod(config.Root, 0o700); err != nil {
-		return err
-	}
 
 	// For supporting userns-remapped containers, the state dir cannot be just mkdired with 0o700.
 	// Each of plugins creates a dedicated directory beneath the state dir with appropriate permission bits.
@@ -105,10 +101,6 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 
 	if config.TempDir != "" {
 		if err := sys.MkdirAllWithACL(config.TempDir, 0o700); err != nil {
-			return err
-		}
-		// chmod is needed for upgrading from an older release that created the dir with 0o711
-		if err := os.Chmod(config.Root, 0o700); err != nil {
 			return err
 		}
 		if runtime.GOOS == "windows" {
