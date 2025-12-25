@@ -21,8 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	gruntime "runtime"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/containerd/log"
@@ -32,6 +35,7 @@ import (
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
@@ -132,6 +136,13 @@ type Runtime struct {
 	IOType string `toml:"io_type" json:"io_type"`
 }
 
+func (r *Runtime) setDefaults() {
+	// If empty, use default podSandbox mode
+	if len(r.Sandboxer) == 0 {
+		r.Sandboxer = string(ModePodSandbox)
+	}
+}
+
 // ContainerdConfig contains toml config related to containerd
 type ContainerdConfig struct {
 	// DefaultRuntimeName is the default runtime name to use from the runtimes table.
@@ -139,7 +150,13 @@ type ContainerdConfig struct {
 
 	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
 	// configurations, to the matching configurations.
+	// Runtimes specified here that conflict with runtimes in the RuntimeConfigPath will cause an error.
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
+
+	// RuntimeConfigDir is the directory to load dynamic runtime configurations from.
+	// These should be in the format of:
+	// <RuntimeConfigDir>/<runtime_name>/config.toml
+	RuntimeConfigDir string `toml:"runtime_config_dir" json:"runtimeConfigDir"`
 
 	// IgnoreBlockIONotEnabledErrors is a boolean flag to ignore
 	// blockio related errors when blockio support has not been
@@ -630,7 +647,10 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		return warnings, errors.New("`default_runtime_name` is empty")
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
-		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+		_, err := c.loadRuntime(c.ContainerdConfig.DefaultRuntimeName)
+		if err != nil {
+			return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+		}
 	}
 
 	// Validation for CNI config
@@ -663,15 +683,14 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
 			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
 		}
-		// If empty, use default podSandbox mode
-		if len(r.Sandboxer) == 0 {
-			r.Sandboxer = string(ModePodSandbox)
-			c.ContainerdConfig.Runtimes[k] = r
-		}
+
+		r.setDefaults()
+		c.ContainerdConfig.Runtimes[k] = r
 
 		if len(r.IOType) == 0 {
 			r.IOType = IOTypeFifo
 		}
+
 		if r.IOType != IOTypeStreaming && r.IOType != IOTypeFifo {
 			return warnings, errors.New("`io_type` can only be `streaming` or `named_pipe`")
 		}
@@ -719,6 +738,88 @@ func ValidateServerConfig(ctx context.Context, c *ServerConfig) ([]deprecation.W
 	return warnings, nil
 }
 
+func (config *ContainerdConfig) loadRuntime(handler string) (Runtime, error) {
+	r, ok := config.Runtimes[handler]
+	if ok {
+		return r, nil
+	}
+
+	if !filepath.IsLocal(handler) {
+		return Runtime{}, fmt.Errorf("invalid runtime handler %q, it should be a local path", handler)
+	}
+	if strings.Contains(handler, string(filepath.Separator)) {
+		return Runtime{}, fmt.Errorf("invalid runtime handler %q, it should not contain path separator", handler)
+	}
+	p := filepath.Join(config.RuntimeConfigDir, handler, "config.toml")
+	dt, err := os.ReadFile(p)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return Runtime{}, fmt.Errorf("no runtime for %q is configured", handler)
+		}
+		return Runtime{}, fmt.Errorf("failed to read runtime config for %q: %w", handler, err)
+	}
+
+	var rt Runtime
+	if err := toml.Unmarshal(dt, &rt); err != nil {
+		return Runtime{}, fmt.Errorf("failed to unmarshal runtime config for %q from path %s: %w", handler, p, err)
+	}
+
+	rt.setDefaults()
+	return rt, nil
+}
+
+func (config *ContainerdConfig) LoadRuntime(ctx context.Context, name string) (Runtime, bool) {
+	r, ok := config.Runtimes[name]
+	if ok {
+		return r, true
+	}
+
+	r, err := config.loadRuntime(name)
+	if err != nil {
+		log.G(ctx).WithError(err).WithField("runtime", name).Warn("Failed to load runtime handler")
+		return Runtime{}, false
+	}
+	return r, true
+}
+
+func (config *ContainerdConfig) LoadRuntimes(ctx context.Context) map[string]Runtime {
+	runtimes := make(map[string]Runtime, len(config.Runtimes))
+	for name, runtime := range config.Runtimes {
+		runtimes[name] = runtime
+	}
+
+	runtimesDir := filepath.Join(defaults.DefaultConfigDir, "runtimes")
+	entries, err := os.ReadDir(runtimesDir)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			log.G(ctx).WithError(err).Warn("failed to read runtimes directory")
+		}
+		return runtimes
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			log.G(ctx).WithField("entry", entry.Name()).Debug("Skipping non-directory entry in runtimes directory")
+			continue
+		}
+
+		if _, ok := runtimes[entry.Name()]; ok {
+			log.G(ctx).WithField("handler", entry.Name()).Warn("Runtime handler already exists from config, skipping dynamic runtime handler")
+			continue
+		}
+
+		rt, err := config.loadRuntime(entry.Name())
+		if err != nil {
+			log.G(ctx).WithError(err).WithField("handler", entry.Name()).Warn("Failed to load runtime handler")
+			continue
+		}
+
+		runtimes[entry.Name()] = rt
+	}
+
+	return runtimes
+}
+
 func (config *Config) GetSandboxRuntime(podSandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (Runtime, error) {
 	if untrustedWorkload(podSandboxConfig) {
 		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
@@ -742,13 +843,7 @@ func (config *Config) GetSandboxRuntime(podSandboxConfig *runtime.PodSandboxConf
 	if runtimeHandler == "" {
 		runtimeHandler = config.DefaultRuntimeName
 	}
-
-	r, ok := config.Runtimes[runtimeHandler]
-	if !ok {
-		return Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
-	}
-	return r, nil
-
+	return config.loadRuntime(runtimeHandler)
 }
 
 // untrustedWorkload returns true if the sandbox contains untrusted workload.
