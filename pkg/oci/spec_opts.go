@@ -1152,7 +1152,7 @@ func UserFromPath(root string, filter func(user.User) bool) (user.User, error) {
 // UserFromFS inspects the user object using /etc/passwd in the specified fs.FS.
 // filter can be nil.
 func UserFromFS(root fs.FS, filter func(user.User) bool) (user.User, error) {
-	f, err := root.Open("etc/passwd")
+	f, err := openUserFile(root, "etc/passwd")
 	if err != nil {
 		return user.User{}, err
 	}
@@ -1184,7 +1184,7 @@ func GIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err err
 // GIDFromFS inspects the GID using /etc/group in the specified fs.FS.
 // filter can be nil.
 func GIDFromFS(root fs.FS, filter func(user.Group) bool) (gid uint32, err error) {
-	f, err := root.Open("etc/group")
+	f, err := openUserFile(root, "etc/group")
 	if err != nil {
 		return 0, err
 	}
@@ -1815,4 +1815,35 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
 		s.Windows.Network.NetworkNamespace = ns
 		return nil
 	}
+}
+
+// readLinker defines the ReadLink method locally to avoid a dependency
+// on the fs.ReadLinkFS interface introduced in Go 1.23.
+type readLinker interface {
+	ReadLink(name string) (string, error)
+}
+
+// openUserFile attempts to open a file within the root fs.
+// It handles cases where the file is an absolute symlink (e.g., NixOS /etc/passwd -> /nix/store/...),
+// which triggers "path escapes from parent" errors in Go 1.24+ due to stricter os.DirFS validation.
+func openUserFile(root fs.FS, name string) (fs.File, error) {
+	f, err := root.Open(name)
+	if err == nil {
+		return f, nil
+	}
+
+	// Check if the FS implements ReadLink via type assertion.
+	// This allows compatibility with older Go versions while supporting symlink resolution.
+	if lfs, ok := root.(readLinker); ok {
+		if target, lerr := lfs.ReadLink(name); lerr == nil {
+			if strings.HasPrefix(target, "/") {
+				// Re-anchor the absolute path to the root.
+				// e.g. /nix/store/... becomes nix/store/... (relative to root fs)
+				return root.Open(strings.TrimPrefix(target, "/"))
+			}
+		}
+	}
+
+	// Return the original error if we couldn't resolve it
+	return nil, err
 }
