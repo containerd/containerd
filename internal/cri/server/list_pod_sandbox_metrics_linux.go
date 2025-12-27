@@ -991,48 +991,54 @@ func (c *criService) extractContainerSpecMetrics(ctx context.Context, containerI
 	}
 
 	if cpuResource := resource.CPU; cpuResource != nil {
-		metrics = append(metrics, []*runtime.Metric{
-			{
+		if cpuResource.Period != nil {
+			metrics = append(metrics, &runtime.Metric{
 				Name:        "container_spec_cpu_period",
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
 				Value:       &runtime.UInt64Value{Value: *cpuResource.Period},
-			},
-			{
+			})
+		}
+		if cpuResource.Shares != nil {
+			metrics = append(metrics, &runtime.Metric{
 				Name:        "container_spec_cpu_shares",
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
 				Value:       &runtime.UInt64Value{Value: *cpuResource.Shares},
-			},
-		}...)
+			})
+		}
 	}
 
 	if memoryResource := resource.Memory; memoryResource != nil {
-		metrics = append(metrics, []*runtime.Metric{
-			{
+		if memoryResource.Limit != nil {
+			metrics = append(metrics, &runtime.Metric{
 				Name:        "container_spec_memory_limit_bytes",
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
 				Value:       &runtime.UInt64Value{Value: uint64(*memoryResource.Limit)},
-			},
-			{
+			})
+		}
+		if memoryResource.Reservation != nil {
+			metrics = append(metrics, &runtime.Metric{
 				Name:        "container_spec_memory_reservation_limit_bytes",
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
 				Value:       &runtime.UInt64Value{Value: uint64(*memoryResource.Reservation)},
-			},
-			{
+			})
+		}
+		if memoryResource.Swap != nil {
+			metrics = append(metrics, &runtime.Metric{
 				Name:        "container_spec_memory_swap_limit_bytes",
 				Timestamp:   timestamp,
 				MetricType:  runtime.MetricType_GAUGE,
 				LabelValues: labels,
 				Value:       &runtime.UInt64Value{Value: uint64(*memoryResource.Swap)},
-			},
-		}...)
+			})
+		}
 	}
 	return metrics, nil
 }
