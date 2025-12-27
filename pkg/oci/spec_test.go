@@ -18,6 +18,9 @@ package oci
 
 import (
 	"context"
+	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -323,5 +326,38 @@ func TestWithPrivileged(t *testing.T) {
 	}
 	if !foundCgroup {
 		t.Error("Did not find mount for cgroupfs")
+	}
+}
+
+func TestOpenUserFile_AbsoluteSymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	targetName := "passwd"
+	targetPath := filepath.Join(tmpDir, targetName)
+	expectedContent := []byte("root:x:0:0:root:/root:/bin/bash")
+	if err := os.WriteFile(targetPath, expectedContent, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	linkName := "abs_link"
+	linkPath := filepath.Join(tmpDir, linkName)
+	if err := os.Symlink(targetPath, linkPath); err != nil {
+		t.Fatal(err)
+	}
+
+	rootFS := os.DirFS(tmpDir)
+
+	f, err := openUserFile(rootFS, linkName)
+	if err != nil {
+		t.Fatalf("openUserFile failed on absolute symlink: %v", err)
+	}
+	defer f.Close()
+
+	content, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != string(expectedContent) {
+		t.Errorf("expected content %q, got %q", string(expectedContent), string(content))
 	}
 }
