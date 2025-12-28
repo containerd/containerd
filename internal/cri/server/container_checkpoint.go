@@ -30,7 +30,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string) (string, error) {
+func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string, snapshotter string) (string, error) {
 	return "", nil
 }
 

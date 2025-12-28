@@ -61,7 +61,8 @@ import (
 
 // checkIfCheckpointOCIImage returns checks if the input refers to a checkpoint image.
 // It returns the StorageImageID of the image the input resolves to, nil otherwise.
-func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string) (string, error) {
+// If snapshotter is empty, the default snapshotter is used.
+func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string, snapshotter string) (string, error) {
 	if input == "" {
 		return "", nil
 	}
@@ -69,7 +70,7 @@ func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string
 		return "", nil
 	}
 
-	image, err := c.LocalResolve(input)
+	image, err := c.LocalResolve(input, snapshotter)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve image %q: %w", input, err)
 	}
@@ -124,7 +125,13 @@ func (c *criService) CRImportCheckpoint(
 	createAnnotations := meta.Config.Annotations
 	createLabels := meta.Config.Labels
 
-	restoreStorageImageID, err := c.checkIfCheckpointOCIImage(ctx, inputImage)
+	ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
+	if err != nil {
+		return "", fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+	snapshotter := c.RuntimeSnapshotter(ctx, ociRuntime)
+
+	restoreStorageImageID, err := c.checkIfCheckpointOCIImage(ctx, inputImage, snapshotter)
 	if err != nil {
 		return "", err
 	}
@@ -156,11 +163,7 @@ func (c *criService) CRImportCheckpoint(
 			return "", err
 		}
 		chainID := identity.ChainID(diffIDs).String()
-		ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
-		if err != nil {
-			return "", fmt.Errorf("failed to get sandbox runtime: %w", err)
-		}
-		s := c.client.SnapshotService(c.RuntimeSnapshotter(ctx, ociRuntime))
+		s := c.client.SnapshotService(snapshotter)
 
 		mounts, err := s.View(ctx, mountPoint, chainID)
 		if err != nil {
