@@ -123,6 +123,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			Applier:                 c.DiffService(),
 			ApplyOpts:               uconfig.ApplyOpts,
 			SnapshotterCapabilities: snCapabilities,
+			FetchMissingContent:     uconfig.FetchMissingContent,
 		}
 		uopts := []unpack.UnpackerOpt{unpack.WithUnpackPlatform(platform)}
 		if uconfig.DuplicationSuppressor != nil {

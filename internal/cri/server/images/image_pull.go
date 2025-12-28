@@ -260,6 +260,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 		containerd.WithUnpackOpts([]containerd.UnpackOpt{
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
 			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
+			containerd.WithUnpackFetchMissingContent(!c.snapshotStore.IsRemoteSnapshotter(snapshotter)),
 		}),
 	}
 
