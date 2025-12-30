@@ -34,6 +34,7 @@ import (
 	servertesting "github.com/containerd/containerd/v2/internal/cri/testing"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 )
 
@@ -140,10 +141,12 @@ func withRuntimeService(rs RuntimeService) testOpt {
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService(opts ...testOpt) *criService {
 	labels := label.NewStore()
+	fakeOS := ostesting.NewFakeOS()
 	service := &criService{
 		config:             testConfig,
-		os:                 ostesting.NewFakeOS(),
 		sandboxStore:       sandboxstore.NewStore(labels, nil),
+		os:                 fakeOS,
+		statManager:        osinterface.NewStatManager(fakeOS),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(labels, nil),
 		containerNameIndex: registrar.NewRegistrar(),

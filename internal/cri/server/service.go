@@ -123,6 +123,9 @@ type criService struct {
 	imageFSPaths map[string]string
 	// os is an interface for all required os operations.
 	os osinterface.OS
+	// statManager is like a side-car interface to os for performing stat-related
+	// pre-validations/checks/etc.
+	statManager *osinterface.StatManager
 	// sandboxStore stores all resources associated with sandboxes.
 	sandboxStore *sandboxstore.Store
 	// sandboxNameIndex stores all sandbox names and make sure each name
@@ -192,6 +195,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 
 	// Create the stats collector first so it can be passed to the stores
 	statsCollector := NewStatsCollector(config)
+	realOS := osinterface.RealOS{}
 
 	c := &criService{
 		RuntimeService:     options.RuntimeService,
@@ -202,6 +206,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		os:                 osinterface.RealOS{},
 		sandboxStore:       sandboxstore.NewStore(labels, statsCollector),
 		containerStore:     containerstore.NewStore(labels, statsCollector),
+		statManager:        osinterface.NewStatManager(realOS),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
