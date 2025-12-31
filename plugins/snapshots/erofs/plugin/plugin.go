@@ -49,6 +49,10 @@ type Config struct {
 
 	// MaxUnmergedLayers (>0) enables fsmerge when the number of image layers exceeds this value.
 	MaxUnmergedLayers uint `toml:"max_unmerged_layers"`
+
+	// DmverityMode controls dm-verity behavior: "auto" (use if available), "on" (require), "off" (disable)
+	// Linux only
+	DmverityMode string `toml:"dmverity_mode"`
 }
 
 func init() {
@@ -92,6 +96,10 @@ func init() {
 
 			if config.MaxUnmergedLayers > 0 {
 				opts = append(opts, erofs.WithFsMergeThreshold(config.MaxUnmergedLayers))
+			}
+
+			if config.DmverityMode != "" {
+				opts = append(opts, erofs.WithDmverityMode(config.DmverityMode))
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
