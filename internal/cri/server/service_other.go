@@ -28,6 +28,11 @@ func (c *criService) initPlatform() error {
 	return nil
 }
 
+// cniOptions returns cni options for non-windows and non-linux platforms.
+func (c *criService) cniOptions() []cni.Opt {
+	return []cni.Opt{}
+}
+
 // cniLoadOptions returns cni load options for non-windows and non-linux
 // platforms.
 func (c *criService) cniLoadOptions() []cni.Opt {
