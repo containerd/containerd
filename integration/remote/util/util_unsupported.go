@@ -62,7 +62,7 @@ func UnlockPath(fileHandles []uintptr) {
 
 // LocalEndpoint empty implementation
 func LocalEndpoint(path, file string) (string, error) {
-	return "", fmt.Errorf("LocalEndpoints are unsupported in this build")
+	return "", fmt.Errorf("LocalEndpoint is unsupported in this build")
 }
 
 // GetBootTime empty implementation
