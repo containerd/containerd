@@ -60,6 +60,7 @@ func (p *bufferPool) Get() *bytes.Buffer {
 }
 
 func (p *bufferPool) Put(buffer *bytes.Buffer) {
+	buffer.Reset()
 	p.pool.Put(buffer)
 }
 
