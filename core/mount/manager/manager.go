@@ -430,9 +430,9 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	// TODO: Add config for whether to add the bind mount?
 	if config.Temporary && firstSystemMount > 0 {
 		mounts = append(mounts, mount.Mount{
-			Type:   "bind",
-			Source: mounted[firstSystemMount-1].MountPoint,
-			// TODO : Configurable bind mount options?
+			Type:    "bind",
+			Source:  mounted[firstSystemMount-1].MountPoint,
+			Options: []string{"rbind"},
 		})
 	}
 
