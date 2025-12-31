@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
 func TestNewBinaryIO(t *testing.T) {
@@ -35,7 +36,7 @@ func TestNewBinaryIO(t *testing.T) {
 
 	before := descriptorCount(t)
 
-	io, err := NewBinaryIO(ctx, "1", uri)
+	io, err := NewBinaryIO(ctx, "1", "", "", uri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,8 +47,32 @@ func TestNewBinaryIO(t *testing.T) {
 	}
 
 	after := descriptorCount(t)
+
 	if before != after-1 { // one descriptor must be closed from shim logger side
 		t.Fatalf("some descriptors weren't closed (%d != %d -1)", before, after)
+	}
+}
+
+func TestNewAttachableBinaryIO(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	uri, _ := url.Parse("binary:///bin/echo?test")
+
+	before := descriptorCount(t)
+
+	tempDir := t.TempDir()
+	_, err := NewBinaryIO(ctx, "1", filepath.Join(tempDir, "attach-stdout"), filepath.Join(tempDir, "attach-stderr"), uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	after := descriptorCount(t)
+	// The value `11` represents the number of file descriptors (FIFOs)
+	// opened and kept open when `NewBinaryIO` is called with attachable
+	// FIFOs for stdout and stderr.
+	if before != after-11 {
+		t.Fatalf("descriptors weren't created correctly (%d != %d - 11)", before, after)
 	}
 }
 
@@ -56,7 +81,7 @@ func TestNewBinaryIOCleanup(t *testing.T) {
 	uri, _ := url.Parse("binary:///not/existing")
 
 	before := descriptorCount(t)
-	_, err := NewBinaryIO(ctx, "2", uri)
+	_, err := NewBinaryIO(ctx, "2", "", "", uri)
 	if err == nil {
 		t.Fatal("error expected for invalid binary")
 	}
@@ -71,7 +96,6 @@ func descriptorCount(t *testing.T) int {
 	t.Helper()
 	const dir = "/proc/self/fd"
 	files, _ := os.ReadDir(dir)
-
 	// Go 1.23+ uses pidfd instead of PID for processes started by a user,
 	// if possible (see https://go.dev/cl/570036). As a side effect, every
 	// os.StartProcess or os.FindProcess call results in an extra opened

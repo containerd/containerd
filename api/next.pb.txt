@@ -847,6 +847,20 @@ file {
       type: TYPE_BOOL
       json_name: "terminal"
     }
+    field {
+      name: "attachable_out"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "attachableOut"
+    }
+    field {
+      name: "attachable_err"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "attachableErr"
+    }
   }
   message_type {
     name: "TaskExit"
@@ -2417,6 +2431,20 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "options"
+    }
+    field {
+      name: "attachable_out"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "attachableOut"
+    }
+    field {
+      name: "attachable_err"
+      number: 12
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "attachableErr"
     }
   }
   message_type {
@@ -6856,6 +6884,20 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "runtimePath"
+    }
+    field {
+      name: "attachable_out"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "attachableOut"
+    }
+    field {
+      name: "attachable_err"
+      number: 12
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "attachableErr"
     }
   }
   message_type {
