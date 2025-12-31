@@ -143,10 +143,13 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status string, createdAt tim
 // but if controller.Status() returns a NotFound error,
 // we should fallback to get SandboxInfo from cached sandbox itself.
 func toDeletedCRISandboxInfo(sandbox sandboxstore.Sandbox) (map[string]string, error) {
+	status := sandbox.Status.Get()
 	si := &types.SandboxInfo{
-		Pid:       sandbox.Status.Get().Pid,
+		Pid:       status.Pid,
 		Config:    sandbox.Config,
 		CNIResult: sandbox.CNIResult,
+		Overhead:  status.Overhead,
+		Resources: status.Resources,
 	}
 
 	// If processStatus is empty, it means that the task is deleted. Apply "deleted"

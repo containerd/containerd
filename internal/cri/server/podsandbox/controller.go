@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
@@ -95,6 +97,7 @@ func init() {
 				imageService:   criImagePlugin.(ImageService),
 				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
+				metadataStore:  client.SandboxStore(),
 			}
 
 			// There is no need to subscribe to the exit event for the pause container,
@@ -143,7 +146,8 @@ type Controller struct {
 	// actually we only use it's backoff mechanism to make sure pause container is cleaned up.
 	eventMonitor *events.EventMonitor
 
-	store *Store
+	store         *Store
+	metadataStore sandbox.Store
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
@@ -174,6 +178,77 @@ func (c *Controller) Update(
 	sandboxID string,
 	sandbox sandbox.Sandbox,
 	fields ...string) error {
+	podSandbox := c.store.Get(sandboxID)
+	if podSandbox == nil {
+		return fmt.Errorf("unable to find pod sandbox with id %q: %w", sandboxID, errdefs.ErrNotFound)
+	}
+
+	for _, field := range fields {
+		switch field {
+		case "extensions":
+			if sandbox.Extensions == nil {
+				continue
+			}
+			if err := c.updateExtensions(ctx, podSandbox, sandbox.Extensions); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("update field %q not supported", field)
+		}
+	}
+	return nil
+}
+
+func (c *Controller) updateExtensions(ctx context.Context, podSandbox *types.PodSandbox, extensions map[string]typeurl.Any) error {
+	for key, ext := range extensions {
+		switch key {
+		case UpdatedResourcesKey:
+			if err := c.handleUpdatedResources(ctx, podSandbox, ext); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("update extension key %q not supported", key)
+		}
+	}
+	return nil
+}
+
+func (c *Controller) handleUpdatedResources(ctx context.Context, podSandbox *types.PodSandbox, ext typeurl.Any) error {
+	var updatedRes UpdatedResources
+	if err := typeurl.UnmarshalTo(ext, &updatedRes); err != nil {
+		return fmt.Errorf("failed to unmarshal updated resources extension: %w", err)
+	}
+
+	sb, err := c.metadataStore.Get(ctx, podSandbox.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox %s from sandbox store: %w", podSandbox.ID, err)
+	}
+	if sb.Extensions == nil {
+		sb.Extensions = make(map[string]typeurl.Any)
+	}
+	sb.Extensions[UpdatedResourcesKey] = ext
+	if _, err := c.metadataStore.Update(ctx, sb, "extensions"); err != nil {
+		return fmt.Errorf("failed to update sandbox %s in core store: %w", podSandbox.ID, err)
+	}
+
+	err = podSandbox.Status.Update(
+		func(status sandboxstore.Status) (sandboxstore.Status, error) {
+			if updatedRes.Overhead != nil {
+				status.Overhead = &runtime.ContainerResources{
+					Linux: updatedRes.Overhead,
+				}
+			}
+			if updatedRes.Resources != nil {
+				status.Resources = &runtime.ContainerResources{
+					Linux: updatedRes.Resources,
+				}
+			}
+			return status, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update sandbox store: %w", err)
+	}
 	return nil
 }
 

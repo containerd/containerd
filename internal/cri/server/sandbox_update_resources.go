@@ -18,11 +18,59 @@ package server
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox"
+	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
 )
 
 func (c *criService) UpdatePodSandboxResources(ctx context.Context, r *runtime.UpdatePodSandboxResourcesRequest) (*runtime.UpdatePodSandboxResourcesResponse, error) {
-	return nil, errors.New("not implemented yet")
+	span := tracing.SpanFromContext(ctx)
+	criSandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	if err != nil {
+		return nil, fmt.Errorf("failed to find sandbox: %w", err)
+	}
+
+	span.SetAttributes(tracing.Attribute("sandbox.id", criSandbox.ID))
+
+	overhead := r.GetOverhead()
+	resources := r.GetResources()
+	err = c.nri.UpdatePodSandboxResources(ctx, &criSandbox, overhead, resources)
+	if err != nil {
+		return nil, fmt.Errorf("NRI sandbox update failed: %w", err)
+	}
+
+	updatedRes := podsandbox.UpdatedResources{
+		Overhead:  overhead,
+		Resources: resources,
+	}
+	ext, err := typeurl.MarshalAny(&updatedRes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal updated resources: %w", err)
+	}
+
+	ctrl, err := c.sandboxService.SandboxController(criSandbox.Sandboxer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
+	}
+
+	if err := ctrl.Update(ctx, criSandbox.ID, sandbox.Sandbox{
+		Extensions: map[string]typeurl.Any{
+			podsandbox.UpdatedResourcesKey: ext,
+		},
+	}, "extensions"); err != nil {
+		return nil, fmt.Errorf("failed to update sandbox resources: %w", err)
+	}
+
+	err = c.nri.PostUpdatePodSandboxResources(ctx, &criSandbox)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI post-update notification failed")
+	}
+
+	return &runtime.UpdatePodSandboxResourcesResponse{}, nil
 }
