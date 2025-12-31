@@ -32,13 +32,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/errdefs"
-
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
 	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/internal/randutil"
 	"github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/containerd/errdefs"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -93,7 +92,7 @@ func (mls *memoryLabelStore) Update(d digest.Digest, update map[string]string) (
 
 func TestContent(t *testing.T) {
 	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
-		cs, err := NewLabeledStore(root, newMemoryLabelStore())
+		cs, err := NewLabeledStore(root, newMemoryLabelStore(), nil)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -350,7 +349,7 @@ func checkWrite(ctx context.Context, t checker, cs content.Store, dgst digest.Di
 }
 
 func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
-	cs, err := NewStore(t.TempDir())
+	cs, err := NewStore(t.TempDir(), nil)
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
