@@ -196,6 +196,17 @@ func WithHostPid(p *runtime.PodSandboxConfig) {
 	p.Linux.SecurityContext.NamespaceOptions.Pid = runtime.NamespaceMode_NODE
 }
 
+func WithCgroupParent(cgroupParent string) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		if cgroupParent != "" {
+			if p.Linux == nil {
+				p.Linux = &runtime.LinuxPodSandboxConfig{}
+			}
+			p.Linux.CgroupParent = cgroupParent
+		}
+	}
+}
+
 // Set pod pid.
 func WithPodPid(p *runtime.PodSandboxConfig) {
 	if p.Linux == nil {
