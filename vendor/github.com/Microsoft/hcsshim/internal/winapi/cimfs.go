@@ -59,3 +59,4 @@ type CimFsImagePath struct {
 //sys CimSealImage(blockCimPath string, hashSize *uint64, fixedHeaderSize *uint64, hash *byte) (hr error) = cimfs.CimSealImage?
 //sys CimGetVerificationInformation(blockCimPath string, isSealed *uint32, hashSize *uint64, signatureSize *uint64, fixedHeaderSize *uint64, hash *byte, signature *byte) (hr error) = cimfs.CimGetVerificationInformation?
 //sys CimMountVerifiedImage(imagePath string, fsName string, flags uint32, volumeID *g, hashSize uint16, hash *byte) (hr error) = cimfs.CimMountVerifiedImage?
+//sys CimMergeMountVerifiedImage(numCimPaths uint32, backingImagePaths *CimFsImagePath, flags uint32, volumeID *g, hashSize uint16, hash *byte) (hr error) = cimfs.CimMergeMountVerifiedImage
