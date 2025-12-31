@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -241,10 +242,13 @@ func (t *task) Pid() uint32 {
 }
 
 func (t *task) Start(ctx context.Context) error {
-	ctx, span := tracing.StartSpan(ctx, "task.Start",
-		tracing.WithAttribute("task.id", t.ID()),
-	)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Start"),
+		tracing.WithAttribute("task.id", t.ID()))
 	defer span.End()
+	if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
+		span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
+	}
+
 	r, err := t.client.TaskService().Start(ctx, &tasks.StartRequest{
 		ContainerID: t.id,
 	})
@@ -261,11 +265,15 @@ func (t *task) Start(ctx context.Context) error {
 }
 
 func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) error {
-	ctx, span := tracing.StartSpan(ctx, "task.Kill",
+	_, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Kill"),
 		tracing.WithAttribute("task.id", t.ID()),
 		tracing.WithAttribute("task.pid", int(t.Pid())),
 	)
 	defer span.End()
+	if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
+		span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
+	}
+
 	var i KillInfo
 	for _, o := range opts {
 		if err := o(ctx, &i); err != nil {
@@ -347,6 +355,7 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 			}
 			return
 		}
+
 		c <- ExitStatus{
 			code:     r.ExitStatus,
 			exitedAt: protobuf.FromTimestamp(r.ExitedAt),
@@ -359,10 +368,13 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 // it returns the exit status of the task and any errors that were encountered
 // during cleanup
 func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStatus, error) {
-	ctx, span := tracing.StartSpan(ctx, "task.Delete",
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Delete"),
 		tracing.WithAttribute("task.id", t.ID()),
 	)
 	defer span.End()
+	if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
+		span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
+	}
 	for _, o := range opts {
 		if err := o(ctx, t); err != nil {
 			return nil, err
@@ -414,18 +426,29 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
 	}
+
+	es := &ExitStatus{code: r.ExitStatus, exitedAt: protobuf.FromTimestamp(r.ExitedAt)}
+	span.SetAttributes(
+		tracing.Attribute("task.exit_status", int64(es.code)),
+		tracing.Attribute("task.exited_at", es.exitedAt.Format(time.RFC3339)),
+	)
+
 	// Only cleanup the IO after a successful Delete
 	if t.io != nil {
 		t.io.Close()
 	}
-	return &ExitStatus{code: r.ExitStatus, exitedAt: protobuf.FromTimestamp(r.ExitedAt)}, nil
+	return es, nil
 }
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, retErr error) {
-	ctx, span := tracing.StartSpan(ctx, "task.Exec",
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Exec"),
 		tracing.WithAttribute("task.id", t.ID()),
 	)
 	defer span.End()
+	if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
+		span.SetAttributes(tracing.Attribute("containerd.namespace", ns))
+	}
+
 	if id == "" {
 		return nil, fmt.Errorf("exec id must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
@@ -507,10 +530,15 @@ func (t *task) IO() cio.IO {
 }
 
 func (t *task) Resize(ctx context.Context, w, h uint32) error {
-	ctx, span := tracing.StartSpan(ctx, "task.Resize",
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Resize"),
 		tracing.WithAttribute("task.id", t.ID()),
 	)
 	defer span.End()
+	span.SetAttributes(
+		tracing.Attribute("task.pty.width", int64(w)),
+		tracing.Attribute("task.pty.height", int64(h)),
+	)
+
 	_, err := t.client.TaskService().ResizePty(ctx, &tasks.ResizePtyRequest{
 		ContainerID: t.id,
 		Width:       w,

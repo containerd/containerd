@@ -126,10 +126,15 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 		tracing.WithAttribute("container.id", container.ID),
 	)
 	defer span.End()
+	if container.SandboxID != "" {
+		span.SetAttributes(tracing.Attribute("sandbox.id", container.SandboxID))
+	}
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
 	}
+
+	span.SetAttributes(tracing.Attribute("containerd.namespace", namespace))
 
 	if err := validateContainer(&container); err != nil {
 		return containers.Container{}, fmt.Errorf("create container failed validation: %w", err)
@@ -157,6 +162,7 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 
 		span.SetAttributes(
 			tracing.Attribute("container.createdAt", container.CreatedAt.Format(time.RFC3339)),
+			tracing.Attribute("container.updatedAt", container.UpdatedAt.Format(time.RFC3339)),
 		)
 		return nil
 	}); err != nil {
@@ -172,6 +178,9 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 		tracing.WithAttribute("container.id", container.ID),
 	)
 	defer span.End()
+	if container.SandboxID != "" {
+		span.SetAttributes(tracing.Attribute("sandbox.id", container.SandboxID))
+	}
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
@@ -180,6 +189,11 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 	if container.ID == "" {
 		return containers.Container{}, fmt.Errorf("must specify a container id: %w", errdefs.ErrInvalidArgument)
 	}
+
+	span.SetAttributes(
+		tracing.Attribute("container.id", container.ID),
+		tracing.Attribute("containerd.namespace", namespace),
+	)
 
 	var updated containers.Container
 	if err := update(ctx, s.db, func(tx *bolt.Tx) error {
@@ -282,10 +296,16 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 	)
 	defer span.End()
 
+	if meta, err := s.Get(ctx, id); err == nil && meta.SandboxID != "" {
+		span.SetAttributes(tracing.Attribute("sandbox.id", meta.SandboxID))
+	}
+
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
 	}
+
+	span.SetAttributes(tracing.Attribute("containerd.namespace", namespace))
 
 	return update(ctx, s.db, func(tx *bolt.Tx) error {
 		bkt := getContainersBucket(tx, namespace)
