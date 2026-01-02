@@ -239,6 +239,5 @@ For the EROFS differ:
 
 ## TODO
 
- - ID-mapped mount spport;
 
  - DMVerity support.
