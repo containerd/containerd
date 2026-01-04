@@ -22,6 +22,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -50,6 +51,8 @@ const (
 )
 
 const (
+	enablePigzEnv   = "CONTAINERD_ENABLE_PIGZ_COMPRESSION"
+	enableIgzipEnv  = "CONTAINERD_ENABLE_IGZIP_COMPRESSION"
 	disablePigzEnv  = "CONTAINERD_DISABLE_PIGZ"
 	disableIgzipEnv = "CONTAINERD_DISABLE_IGZIP"
 )
@@ -57,6 +60,9 @@ const (
 var (
 	initGzip sync.Once
 	gzipPath string
+
+	initGzipForCompression sync.Once
+	gzipPathForCompression string
 )
 
 var (
@@ -246,7 +252,19 @@ func CompressStream(dest io.Writer, compression Compression) (io.WriteCloser, er
 	case Uncompressed:
 		return &writeCloserWrapper{dest, nil}, nil
 	case Gzip:
-		return gzip.NewWriter(dest), nil
+		ctx, cancel := context.WithCancel(context.Background())
+		gzWriter, err := gzipCompress(ctx, dest)
+		if err != nil {
+			cancel()
+			return nil, err
+		}
+		return &writeCloserWrapper{
+			Writer: gzWriter,
+			closer: func() error {
+				defer cancel()
+				return gzWriter.Close()
+			},
+		}, nil
 	case Zstd:
 		return zstd.NewWriter(dest)
 	default:
@@ -284,6 +302,22 @@ func gzipDecompress(ctx context.Context, buf io.Reader) (io.ReadCloser, error) {
 	return cmdStream(exec.CommandContext(ctx, gzipPath, "-d", "-c"), buf)
 }
 
+func gzipCompress(ctx context.Context, dest io.Writer) (io.WriteCloser, error) {
+	initGzipForCompression.Do(func() {
+		if gzipPathForCompression = detectCommandDefaultDisabled("igzip", enableIgzipEnv); gzipPathForCompression != "" {
+			log.L.Debug("using igzip for compression")
+			return
+		}
+		if gzipPathForCompression = detectCommandDefaultDisabled("pigz", enablePigzEnv); gzipPathForCompression != "" {
+			log.L.Debug("using pigz for compression")
+		}
+	})
+	if gzipPathForCompression == "" {
+		return gzip.NewWriter(dest), nil
+	}
+	return cmdStreamForCompression(exec.CommandContext(ctx, gzipPathForCompression, "-c"), dest)
+}
+
 func cmdStream(cmd *exec.Cmd, in io.Reader) (io.ReadCloser, error) {
 	reader, writer := io.Pipe()
 
@@ -308,6 +342,32 @@ func cmdStream(cmd *exec.Cmd, in io.Reader) (io.ReadCloser, error) {
 	return reader, nil
 }
 
+func cmdStreamForCompression(cmd *exec.Cmd, out io.Writer) (io.WriteCloser, error) {
+	reader, writer := io.Pipe()
+
+	cmd.Stdin = reader
+	cmd.Stdout = out
+
+	var errBuf bytes.Buffer
+	cmd.Stderr = &errBuf
+
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	return &writeCloserWrapper{
+		Writer: writer,
+		closer: func() error {
+			closeErr := writer.Close()
+			waitErr := cmd.Wait()
+			if waitErr != nil {
+				waitErr = fmt.Errorf("%s: %s", waitErr, errBuf.String())
+			}
+			return errors.Join(closeErr, waitErr)
+		},
+	}, nil
+}
+
 func detectCommand(path, disableEnvName string) string {
 	// Check if this command is disabled via the env variable
 	value := os.Getenv(disableEnvName)
@@ -323,6 +383,30 @@ func detectCommand(path, disableEnvName string) string {
 	}
 
 	path, err := exec.LookPath(path)
+	if err != nil {
+		log.L.WithError(err).Debugf("%s not found", path)
+		return ""
+	}
+
+	return path
+}
+
+func detectCommandDefaultDisabled(path, enableEnvName string) string {
+	// Check if this command is disabled via the env variable
+	value := os.Getenv(enableEnvName)
+	if value == "" {
+		return ""
+	}
+	enable, err := strconv.ParseBool(value)
+	if err != nil {
+		log.L.WithError(err).Warnf("could not parse %s: %s", enableEnvName, value)
+	}
+
+	if !enable {
+		return ""
+	}
+
+	path, err = exec.LookPath(path)
 	if err != nil {
 		log.L.WithError(err).Debugf("%s not found", path)
 		return ""
