@@ -18,11 +18,13 @@ package config
 
 import (
 	"context"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criruntime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 )
 
@@ -50,6 +52,49 @@ func TestValidateConfig(t *testing.T) {
 				},
 			},
 			runtimeExpectedErr: "no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"default\"",
+		},
+		"specify both cni.bin_dir and cni_bin_dirs": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				CniConfig: CniConfig{
+					NetworkPluginBinDir:  "/opt/mycni/bin",
+					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
+				},
+			},
+			runtimeExpectedErr: "`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time",
+			warnings:           []deprecation.Warning{deprecation.CRICNIBinDir},
+		},
+		"cni.bin_dir, if used, is moved to cni.bin_dirs": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				CniConfig: CniConfig{
+					NetworkPluginBinDir: "/opt/mycni/bin",
+				},
+			},
+			runtimeExpected: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Sandboxer: string(ModePodSandbox),
+						},
+					},
+				},
+				CniConfig: CniConfig{
+					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRICNIBinDir},
 		},
 
 		"deprecated auths": {
@@ -189,6 +234,40 @@ func TestValidateConfig(t *testing.T) {
 			},
 			warnings: []deprecation.Warning{deprecation.CRIRegistryConfigs},
 		},
+		"cgroup_writable enabled": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							CgroupWritable: true,
+						},
+					},
+				},
+			},
+			runtimeExpectedErr: func() string {
+				if !opts.IsCgroup2UnifiedMode() {
+					return "`cgroup_writable` is only supported on cgroup v2"
+				}
+				return ""
+			}(),
+			runtimeExpected: func() *RuntimeConfig {
+				if !opts.IsCgroup2UnifiedMode() {
+					return nil
+				}
+				return &RuntimeConfig{
+					ContainerdConfig: ContainerdConfig{
+						DefaultRuntimeName: RuntimeDefault,
+						Runtimes: map[string]Runtime{
+							RuntimeDefault: {
+								CgroupWritable: true,
+								Sandboxer:      string(ModePodSandbox),
+							},
+						},
+					},
+				}
+			}(),
+		},
 		"privileged_without_host_devices_all_devices_allowed without privileged_without_host_devices": {
 			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
@@ -218,12 +297,36 @@ func TestValidateConfig(t *testing.T) {
 			},
 			runtimeExpectedErr: "invalid `drain_exec_sync_io_timeout`",
 		},
+		"deprecated enable_cdi false": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				EnableCDI: func() *bool { v := false; return &v }(),
+			},
+			runtimeExpected: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Sandboxer: string(ModePodSandbox),
+						},
+					},
+				},
+				EnableCDI: func() *bool { v := false; return &v }(),
+			},
+			warnings: []deprecation.Warning{deprecation.CRIEnableCDI},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			var warnings []deprecation.Warning
 			if test.runtimeConfig != nil {
 				w, err := ValidateRuntimeConfig(context.Background(), test.runtimeConfig)
 				if test.runtimeExpectedErr != "" {
+					assert.Error(t, err)
 					assert.Contains(t, err.Error(), test.runtimeExpectedErr)
 				} else {
 					assert.NoError(t, err)
@@ -262,35 +365,35 @@ func TestValidateConfig(t *testing.T) {
 }
 
 func TestHostAccessingSandbox(t *testing.T) {
-	privilegedContext := &runtime.PodSandboxConfig{
-		Linux: &runtime.LinuxPodSandboxConfig{
-			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+	privilegedContext := &criruntime.PodSandboxConfig{
+		Linux: &criruntime.LinuxPodSandboxConfig{
+			SecurityContext: &criruntime.LinuxSandboxSecurityContext{
 				Privileged: true,
 			},
 		},
 	}
-	nonPrivilegedContext := &runtime.PodSandboxConfig{
-		Linux: &runtime.LinuxPodSandboxConfig{
-			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+	nonPrivilegedContext := &criruntime.PodSandboxConfig{
+		Linux: &criruntime.LinuxPodSandboxConfig{
+			SecurityContext: &criruntime.LinuxSandboxSecurityContext{
 				Privileged: false,
 			},
 		},
 	}
-	hostNamespace := &runtime.PodSandboxConfig{
-		Linux: &runtime.LinuxPodSandboxConfig{
-			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+	hostNamespace := &criruntime.PodSandboxConfig{
+		Linux: &criruntime.LinuxPodSandboxConfig{
+			SecurityContext: &criruntime.LinuxSandboxSecurityContext{
 				Privileged: false,
-				NamespaceOptions: &runtime.NamespaceOption{
-					Network: runtime.NamespaceMode_NODE,
-					Pid:     runtime.NamespaceMode_NODE,
-					Ipc:     runtime.NamespaceMode_NODE,
+				NamespaceOptions: &criruntime.NamespaceOption{
+					Network: criruntime.NamespaceMode_NODE,
+					Pid:     criruntime.NamespaceMode_NODE,
+					Ipc:     criruntime.NamespaceMode_NODE,
 				},
 			},
 		},
 	}
 	tests := []struct {
 		name   string
-		config *runtime.PodSandboxConfig
+		config *criruntime.PodSandboxConfig
 		want   bool
 	}{
 		{"Security Context is nil", nil, false},
@@ -299,11 +402,132 @@ func TestHostAccessingSandbox(t *testing.T) {
 		{"Security Context namespace host access", hostNamespace, true},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := hostAccessingSandbox(tt.config); got != tt.want {
 				t.Errorf("hostAccessingSandbox() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestCheckLocalImagePullConfigs(t *testing.T) {
+	testCases := []struct {
+		name            string
+		imageConfigFn   func(*ImageConfig)
+		expectLocalPull bool
+	}{
+		{
+			name: "already using local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.UseLocalImagePull = true
+			},
+			expectLocalPull: true,
+		},
+		{
+			name: "no conflicting configs",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.Snapshotter = "overlayfs"
+				ic.ImagePullProgressTimeout = "5m"
+				ic.StatsCollectPeriod = 10
+			},
+			expectLocalPull: false,
+		},
+		{
+			name: "DisableSnapshotAnnotations triggers local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				if runtime.GOOS == "windows" {
+					ic.DisableSnapshotAnnotations = true
+				} else {
+					ic.DisableSnapshotAnnotations = false
+				}
+			},
+			expectLocalPull: true,
+		},
+		{
+			name: "DiscardUnpackedLayers triggers local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.DiscardUnpackedLayers = true
+			},
+			expectLocalPull: true,
+		},
+		{
+			name: "Registry.Mirrors triggers local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.Registry.Mirrors = map[string]Mirror{
+					"docker.io": {
+						Endpoints: []string{"https://mirror.example.com"},
+					},
+				}
+			},
+			expectLocalPull: true,
+		},
+		{
+			name: "Registry.Configs triggers local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.Registry.Configs = map[string]RegistryConfig{
+					"docker.io": {
+						Auth: &AuthConfig{
+							Username: "user",
+							Password: "pass",
+						},
+					},
+				}
+			},
+			expectLocalPull: true,
+		},
+		{
+			name: "Registry.Auths triggers local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.Registry.Auths = map[string]AuthConfig{
+					"https://docker.io": {
+						Username: "user",
+						Password: "pass",
+					},
+				}
+			},
+			expectLocalPull: true,
+		},
+		{
+			name: "MaxConcurrentDownloads triggers local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.MaxConcurrentDownloads = 5
+			},
+			expectLocalPull: true,
+		},
+		{
+			name: "MaxConcurrentDownloads when set to 3 don't trigger local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.MaxConcurrentDownloads = 3
+			},
+			expectLocalPull: false,
+		},
+		{
+			name: "ImagePullWithSyncFs triggers local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.ImagePullWithSyncFs = true
+			},
+			expectLocalPull: true,
+		},
+		{
+			name: "Registry.ConfigPath and Headers don't trigger local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.Registry.ConfigPath = "/etc/containerd/certs.d"
+				ic.Registry.Headers = map[string][]string{
+					"User-Agent": {"containerd/2.x"},
+				}
+			},
+			expectLocalPull: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			config := DefaultImageConfig()
+			imageConfig := &config
+			tc.imageConfigFn(imageConfig)
+			CheckLocalImagePullConfigs(ctx, imageConfig)
+			assert.Equal(t, tc.expectLocalPull, imageConfig.UseLocalImagePull)
 		})
 	}
 }

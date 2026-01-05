@@ -19,6 +19,7 @@ type FilterAttrs struct {
 	Parent    uint32
 	Priority  uint16 // lower is higher priority
 	Protocol  uint16 // unix.ETH_P_*
+	Chain     *uint32
 }
 
 func (q FilterAttrs) String() string {
@@ -26,6 +27,11 @@ func (q FilterAttrs) String() string {
 }
 
 type TcAct int32
+
+const (
+	TC_ACT_EXT_SHIFT    = 28
+	TC_ACT_EXT_VAL_MASK = (1 << TC_ACT_EXT_SHIFT) - 1
+)
 
 const (
 	TC_ACT_UNSPEC     TcAct = -1
@@ -39,6 +45,22 @@ const (
 	TC_ACT_REDIRECT   TcAct = 7
 	TC_ACT_JUMP       TcAct = 0x10000000
 )
+
+func getTcActExt(local int32) int32 {
+	return local << TC_ACT_EXT_SHIFT
+}
+
+func getTcActGotoChain() TcAct {
+	return TcAct(getTcActExt(2))
+}
+
+func getTcActExtOpcode(combined int32) int32 {
+	return combined & (^TC_ACT_EXT_VAL_MASK)
+}
+
+func TcActExtCmp(combined int32, opcode int32) bool {
+	return getTcActExtOpcode(combined) == opcode
+}
 
 func (a TcAct) String() string {
 	switch a {
@@ -62,6 +84,9 @@ func (a TcAct) String() string {
 		return "redirect"
 	case TC_ACT_JUMP:
 		return "jump"
+	}
+	if TcActExtCmp(int32(a), int32(getTcActGotoChain())) {
+		return "goto"
 	}
 	return fmt.Sprintf("0x%x", int32(a))
 }
@@ -93,16 +118,31 @@ func (a TcPolAct) String() string {
 }
 
 type ActionAttrs struct {
-	Index   int
-	Capab   int
-	Action  TcAct
-	Refcnt  int
-	Bindcnt int
+	Index      int
+	Capab      int
+	Action     TcAct
+	Refcnt     int
+	Bindcnt    int
+	Statistics *ActionStatistic
+	Timestamp  *ActionTimestamp
 }
 
 func (q ActionAttrs) String() string {
 	return fmt.Sprintf("{Index: %d, Capab: %x, Action: %s, Refcnt: %d, Bindcnt: %d}", q.Index, q.Capab, q.Action.String(), q.Refcnt, q.Bindcnt)
 }
+
+type ActionTimestamp struct {
+	Installed uint64
+	LastUsed  uint64
+	Expires   uint64
+	FirstUsed uint64
+}
+
+func (t ActionTimestamp) String() string {
+	return fmt.Sprintf("Installed %d LastUsed %d Expires %d FirstUsed %d", t.Installed, t.LastUsed, t.Expires, t.FirstUsed)
+}
+
+type ActionStatistic ClassStatistics
 
 // Action represents an action in any supported filter.
 type Action interface {
@@ -112,6 +152,7 @@ type Action interface {
 
 type GenericAction struct {
 	ActionAttrs
+	Chain int32
 }
 
 func (action *GenericAction) Type() string {
@@ -184,6 +225,35 @@ func (action *CsumAction) Attrs() *ActionAttrs {
 
 func NewCsumAction() *CsumAction {
 	return &CsumAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
+type VlanAct int8
+
+type VlanAction struct {
+	ActionAttrs
+	Action VlanAct
+	VlanID uint16
+}
+
+const (
+	TCA_VLAN_ACT_POP  VlanAct = 1
+	TCA_VLAN_ACT_PUSH VlanAct = 2
+)
+
+func (action *VlanAction) Type() string {
+	return "vlan"
+}
+
+func (action *VlanAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewVlanAction() *VlanAction {
+	return &VlanAction{
 		ActionAttrs: ActionAttrs{
 			Action: TC_ACT_PIPE,
 		},
@@ -275,6 +345,7 @@ type SkbEditAction struct {
 	PType        *uint16
 	Priority     *uint32
 	Mark         *uint32
+	Mask         *uint32
 }
 
 func (action *SkbEditAction) Type() string {
@@ -327,6 +398,29 @@ func NewPoliceAction() *PoliceAction {
 	}
 }
 
+type SampleAction struct {
+	ActionAttrs
+	Group     uint32
+	Rate      uint32
+	TruncSize uint32
+}
+
+func (action *SampleAction) Type() string {
+	return "sample"
+}
+
+func (action *SampleAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewSampleAction() *SampleAction {
+	return &SampleAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
 // MatchAll filters match all packets
 type MatchAll struct {
 	FilterAttrs
@@ -348,6 +442,7 @@ type FwFilter struct {
 	InDev   string
 	Mask    uint32
 	Police  *PoliceAction
+	Actions []Action
 }
 
 func (filter *FwFilter) Attrs() *FilterAttrs {
@@ -389,4 +484,31 @@ func (filter *GenericFilter) Attrs() *FilterAttrs {
 
 func (filter *GenericFilter) Type() string {
 	return filter.FilterType
+}
+
+type PeditAction struct {
+	ActionAttrs
+	Proto      uint8
+	SrcMacAddr net.HardwareAddr
+	DstMacAddr net.HardwareAddr
+	SrcIP      net.IP
+	DstIP      net.IP
+	SrcPort    uint16
+	DstPort    uint16
+}
+
+func (p *PeditAction) Attrs() *ActionAttrs {
+	return &p.ActionAttrs
+}
+
+func (p *PeditAction) Type() string {
+	return "pedit"
+}
+
+func NewPeditAction() *PeditAction {
+	return &PeditAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
 }

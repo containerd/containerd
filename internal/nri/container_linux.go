@@ -26,11 +26,16 @@ func containerToNRI(ctr Container) *nri.Container {
 	nriCtr := commonContainerToNRI(ctr)
 	lnxCtr := ctr.GetLinuxContainer()
 	nriCtr.Linux = &nri.LinuxContainer{
-		Namespaces:  lnxCtr.GetLinuxNamespaces(),
-		Devices:     lnxCtr.GetLinuxDevices(),
-		Resources:   lnxCtr.GetLinuxResources(),
-		OomScoreAdj: nri.Int(lnxCtr.GetOOMScoreAdj()),
-		CgroupsPath: lnxCtr.GetCgroupsPath(),
+		Namespaces:     lnxCtr.GetLinuxNamespaces(),
+		Devices:        lnxCtr.GetLinuxDevices(),
+		Resources:      lnxCtr.GetLinuxResources(),
+		OomScoreAdj:    nri.Int(lnxCtr.GetOOMScoreAdj()),
+		CgroupsPath:    lnxCtr.GetCgroupsPath(),
+		IoPriority:     lnxCtr.GetIOPriority(),
+		Scheduler:      lnxCtr.GetScheduler(),
+		NetDevices:     lnxCtr.GetNetDevices(),
+		Rdt:            lnxCtr.GetRdt(),
+		SeccompProfile: lnxCtr.GetSeccompProfile(),
 	}
 	return nriCtr
 }

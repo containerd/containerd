@@ -179,9 +179,9 @@ encodeLoop:
 				if repIndex >= 0 && load3232(src, repIndex) == uint32(cv>>(repOff*8)) {
 					// Consider history as well.
 					var seq seq
-					lenght := 4 + e.matchlen(s+4+repOff, repIndex+4, src)
+					length := 4 + e.matchlen(s+4+repOff, repIndex+4, src)
 
-					seq.matchLen = uint32(lenght - zstdMinMatch)
+					seq.matchLen = uint32(length - zstdMinMatch)
 
 					// We might be able to match backwards.
 					// Extend as long as we can.
@@ -190,10 +190,7 @@ encodeLoop:
 					// and have to do special offset treatment.
 					startLimit := nextEmit + 1
 
-					tMin := s - e.maxMatchOff
-					if tMin < 0 {
-						tMin = 0
-					}
+					tMin := max(s-e.maxMatchOff, 0)
 					for repIndex > tMin && start > startLimit && src[repIndex-1] == src[start-1] && seq.matchLen < maxMatchLength-zstdMinMatch-1 {
 						repIndex--
 						start--
@@ -210,12 +207,12 @@ encodeLoop:
 
 					// Index match start+1 (long) -> s - 1
 					index0 := s + repOff
-					s += lenght + repOff
+					s += length + repOff
 
 					nextEmit = s
 					if s >= sLimit {
 						if debugEncoder {
-							println("repeat ended", s, lenght)
+							println("repeat ended", s, length)
 
 						}
 						break encodeLoop
@@ -241,9 +238,9 @@ encodeLoop:
 				if false && repIndex >= 0 && load6432(src, repIndex) == load6432(src, s+repOff) {
 					// Consider history as well.
 					var seq seq
-					lenght := 8 + e.matchlen(s+8+repOff2, repIndex+8, src)
+					length := 8 + e.matchlen(s+8+repOff2, repIndex+8, src)
 
-					seq.matchLen = uint32(lenght - zstdMinMatch)
+					seq.matchLen = uint32(length - zstdMinMatch)
 
 					// We might be able to match backwards.
 					// Extend as long as we can.
@@ -252,10 +249,7 @@ encodeLoop:
 					// and have to do special offset treatment.
 					startLimit := nextEmit + 1
 
-					tMin := s - e.maxMatchOff
-					if tMin < 0 {
-						tMin = 0
-					}
+					tMin := max(s-e.maxMatchOff, 0)
 					for repIndex > tMin && start > startLimit && src[repIndex-1] == src[start-1] && seq.matchLen < maxMatchLength-zstdMinMatch-1 {
 						repIndex--
 						start--
@@ -270,11 +264,11 @@ encodeLoop:
 					}
 					blk.sequences = append(blk.sequences, seq)
 
-					s += lenght + repOff2
+					s += length + repOff2
 					nextEmit = s
 					if s >= sLimit {
 						if debugEncoder {
-							println("repeat ended", s, lenght)
+							println("repeat ended", s, length)
 
 						}
 						break encodeLoop
@@ -480,10 +474,7 @@ encodeLoop:
 		l := matched
 
 		// Extend backwards
-		tMin := s - e.maxMatchOff
-		if tMin < 0 {
-			tMin = 0
-		}
+		tMin := max(s-e.maxMatchOff, 0)
 		for t > tMin && s > nextEmit && src[t-1] == src[s-1] && l < maxMatchLength {
 			s--
 			t--
@@ -708,9 +699,9 @@ encodeLoop:
 				if repIndex >= 0 && load3232(src, repIndex) == uint32(cv>>(repOff*8)) {
 					// Consider history as well.
 					var seq seq
-					lenght := 4 + e.matchlen(s+4+repOff, repIndex+4, src)
+					length := 4 + e.matchlen(s+4+repOff, repIndex+4, src)
 
-					seq.matchLen = uint32(lenght - zstdMinMatch)
+					seq.matchLen = uint32(length - zstdMinMatch)
 
 					// We might be able to match backwards.
 					// Extend as long as we can.
@@ -719,10 +710,7 @@ encodeLoop:
 					// and have to do special offset treatment.
 					startLimit := nextEmit + 1
 
-					tMin := s - e.maxMatchOff
-					if tMin < 0 {
-						tMin = 0
-					}
+					tMin := max(s-e.maxMatchOff, 0)
 					for repIndex > tMin && start > startLimit && src[repIndex-1] == src[start-1] && seq.matchLen < maxMatchLength-zstdMinMatch-1 {
 						repIndex--
 						start--
@@ -738,12 +726,12 @@ encodeLoop:
 					blk.sequences = append(blk.sequences, seq)
 
 					// Index match start+1 (long) -> s - 1
-					s += lenght + repOff
+					s += length + repOff
 
 					nextEmit = s
 					if s >= sLimit {
 						if debugEncoder {
-							println("repeat ended", s, lenght)
+							println("repeat ended", s, length)
 
 						}
 						break encodeLoop
@@ -772,9 +760,9 @@ encodeLoop:
 				if false && repIndex >= 0 && load6432(src, repIndex) == load6432(src, s+repOff) {
 					// Consider history as well.
 					var seq seq
-					lenght := 8 + e.matchlen(s+8+repOff2, repIndex+8, src)
+					length := 8 + e.matchlen(s+8+repOff2, repIndex+8, src)
 
-					seq.matchLen = uint32(lenght - zstdMinMatch)
+					seq.matchLen = uint32(length - zstdMinMatch)
 
 					// We might be able to match backwards.
 					// Extend as long as we can.
@@ -783,10 +771,7 @@ encodeLoop:
 					// and have to do special offset treatment.
 					startLimit := nextEmit + 1
 
-					tMin := s - e.maxMatchOff
-					if tMin < 0 {
-						tMin = 0
-					}
+					tMin := max(s-e.maxMatchOff, 0)
 					for repIndex > tMin && start > startLimit && src[repIndex-1] == src[start-1] && seq.matchLen < maxMatchLength-zstdMinMatch-1 {
 						repIndex--
 						start--
@@ -801,11 +786,11 @@ encodeLoop:
 					}
 					blk.sequences = append(blk.sequences, seq)
 
-					s += lenght + repOff2
+					s += length + repOff2
 					nextEmit = s
 					if s >= sLimit {
 						if debugEncoder {
-							println("repeat ended", s, lenght)
+							println("repeat ended", s, length)
 
 						}
 						break encodeLoop
@@ -1005,10 +990,7 @@ encodeLoop:
 		l := matched
 
 		// Extend backwards
-		tMin := s - e.maxMatchOff
-		if tMin < 0 {
-			tMin = 0
-		}
+		tMin := max(s-e.maxMatchOff, 0)
 		for t > tMin && s > nextEmit && src[t-1] == src[s-1] && l < maxMatchLength {
 			s--
 			t--

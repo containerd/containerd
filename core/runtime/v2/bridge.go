@@ -25,7 +25,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	v2 "github.com/containerd/containerd/api/runtime/task/v2"
-	v3 "github.com/containerd/containerd/api/runtime/task/v3"
 
 	api "github.com/containerd/containerd/api/runtime/task/v3" // Current version used by TaskServiceClient
 )
@@ -70,7 +69,7 @@ func NewTaskClient(client interface{}, version int) (TaskServiceClient, error) {
 		case 2:
 			return &ttrpcV2Bridge{client: v2.NewTaskClient(c)}, nil
 		case 3:
-			return v3.NewTTRPCTaskClient(c), nil
+			return api.NewTTRPCTaskClient(c), nil
 		default:
 			return nil, fmt.Errorf("containerd client supports only v2 and v3 TTRPC task client (got %d)", version)
 		}
@@ -80,7 +79,7 @@ func NewTaskClient(client interface{}, version int) (TaskServiceClient, error) {
 			return nil, fmt.Errorf("containerd client supports only v3 GRPC task service (got %d)", version)
 		}
 
-		return &grpcV3Bridge{v3.NewTaskClient(c)}, nil
+		return &grpcV3Bridge{api.NewTaskClient(c)}, nil
 	default:
 		return nil, fmt.Errorf("unsupported shim client type %T", c)
 	}
@@ -99,7 +98,7 @@ func (b *ttrpcV2Bridge) State(ctx context.Context, request *api.StateRequest) (*
 		ExecID: request.GetExecID(),
 	})
 
-	return &v3.StateResponse{
+	return &api.StateResponse{
 		ID:         resp.GetID(),
 		Bundle:     resp.GetBundle(),
 		Pid:        resp.GetPid(),
@@ -257,7 +256,7 @@ func (b *ttrpcV2Bridge) Shutdown(ctx context.Context, request *api.ShutdownReque
 // grpcV3Bridge implements task service client for v3 GRPC server.
 // GRPC uses same request/response structures as TTRPC, so it just wraps GRPC calls.
 type grpcV3Bridge struct {
-	client v3.TaskClient
+	client api.TaskClient
 }
 
 var _ TaskServiceClient = (*grpcV3Bridge)(nil)

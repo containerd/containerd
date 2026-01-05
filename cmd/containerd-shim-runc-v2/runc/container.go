@@ -32,13 +32,15 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
 )
 
 // NewContainer returns a new runc container
@@ -130,10 +132,10 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		rootfs,
 	)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	if err := p.Create(ctx, config); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	container := &Container{
 		ID:              r.ID,
@@ -144,24 +146,9 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	}
 	pid := p.Pid()
 	if pid > 0 {
-		var cg interface{}
-		if cgroups.Mode() == cgroups.Unified {
-			g, err := cgroupsv2.PidGroupPath(pid)
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", pid)
-				return container, nil
-			}
-			cg, err = cgroupsv2.Load(g)
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", pid)
-			}
-		} else {
-			cg, err = cgroup1.Load(cgroup1.PidPath(pid))
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading cgroup for %d", pid)
-			}
+		if cg, err := loadProcessCgroup(ctx, pid); err == nil {
+			container.cgroup = cg
 		}
-		container.cgroup = cg
 	}
 	return container, nil
 }
@@ -364,25 +351,6 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 	if err := p.Start(ctx); err != nil {
 		return p, err
 	}
-	if c.Cgroup() == nil && p.Pid() > 0 {
-		var cg interface{}
-		if cgroups.Mode() == cgroups.Unified {
-			g, err := cgroupsv2.PidGroupPath(p.Pid())
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", p.Pid())
-			}
-			cg, err = cgroupsv2.Load(g)
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", p.Pid())
-			}
-		} else {
-			cg, err = cgroup1.Load(cgroup1.PidPath(p.Pid()))
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading cgroup for %d", p.Pid())
-			}
-		}
-		c.cgroup = cg
-	}
 	return p, nil
 }
 
@@ -509,4 +477,60 @@ func (c *Container) HasPid(pid int) bool {
 		}
 	}
 	return false
+}
+
+func (c *Container) OOMWatch(ctx context.Context, eventf func(string)) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cg, ok := c.cgroup.(*cgroupsv2.Manager)
+	if !ok {
+		return fmt.Errorf("expected *cgroupsv2.Manager, got: %T", c.cgroup)
+	}
+
+	// FIXME: cgroupsv2.Manager does not support closing eventCh routine currently.
+	// The routine shuts down when an error happens, mostly when the cgroup is deleted.
+	eventCh, errCh := cg.EventChan()
+	go func() {
+		var oomKills uint64
+		for {
+			select {
+			case ev := <-eventCh:
+				if ev.OOMKill > oomKills {
+					oomKills = ev.OOMKill
+					eventf(c.ID)
+				}
+			case err := <-errCh:
+				// channel is closed when cgroup gets deleted
+				if err != nil {
+					// we no longer get any event/err when we got an err
+					log.L.WithError(err).Warn("error from *cgroupsv2.Manager.EventChan")
+				}
+				return
+			}
+		}
+	}()
+
+	return nil
+}
+
+func loadProcessCgroup(ctx context.Context, pid int) (cg interface{}, err error) {
+	if cgroups.Mode() == cgroups.Unified {
+		g, err := cgroupsv2.PidGroupPath(pid)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", pid)
+			return nil, err
+		}
+		cg, err = cgroupsv2.Load(g)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", pid)
+			return nil, err
+		}
+	} else {
+		cg, err = cgroup1.Load(cgroup1.PidPath(pid))
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("loading cgroup for %d", pid)
+			return nil, err
+		}
+	}
+	return cg, nil
 }

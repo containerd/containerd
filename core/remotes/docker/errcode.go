@@ -18,8 +18,12 @@ package docker
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 )
 
 // ErrorCoder is the base interface for ErrorCode and Error allowing
@@ -42,7 +46,7 @@ func (ec ErrorCode) ErrorCode() ErrorCode {
 // Error returns the ID/Value
 func (ec ErrorCode) Error() string {
 	// NOTE(stevvooe): Cannot use message here since it may have unpopulated args.
-	return strings.ToLower(strings.Replace(ec.String(), "_", " ", -1))
+	return strings.ToLower(strings.ReplaceAll(ec.String(), "_", " "))
 }
 
 // Descriptor returns the descriptor for the error code.
@@ -280,4 +284,22 @@ func (errs *Errors) UnmarshalJSON(data []byte) error {
 
 	*errs = newErrs
 	return nil
+}
+
+func unexpectedResponseErr(resp *http.Response) (retErr error) {
+	retErr = remoteerrors.NewUnexpectedStatusErr(resp)
+
+	// Decode registry error if provided
+	if rerr := retErr.(remoteerrors.ErrUnexpectedStatus); len(rerr.Body) > 0 {
+		var registryErr Errors
+		if err := json.Unmarshal(rerr.Body, &registryErr); err == nil && registryErr.Len() > 0 {
+			// Join the unexpected error with the typed errors, when printed it will
+			// show the unexpected error message and the registry errors. The body
+			// is always excluded from the unexpected error message. This also allows
+			// clients to decode into either type.
+			retErr = errors.Join(rerr, registryErr)
+		}
+	}
+
+	return
 }

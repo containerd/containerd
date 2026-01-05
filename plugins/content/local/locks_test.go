@@ -24,11 +24,13 @@ import (
 )
 
 func TestTryLock(t *testing.T) {
-	err := tryLock("testref")
-	assert.NoError(t, err)
-	defer unlock("testref")
+	s := &store{locks: map[string]*lock{}}
 
-	err = tryLock("testref")
+	err := s.tryLock("testref")
+	assert.NoError(t, err)
+	defer s.unlock("testref")
+
+	err = s.tryLock("testref")
 	require.NotNil(t, err)
 	assert.Contains(t, err.Error(), "ref testref locked for ")
 }

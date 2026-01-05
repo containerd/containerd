@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -41,6 +40,12 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
 )
+
+var emptySpecs = map[string]Spec{
+	"empty":   {},
+	"linux":   {Linux: &specs.Linux{}},
+	"windows": {Windows: &specs.Windows{}},
+}
 
 type blob []byte
 
@@ -215,29 +220,21 @@ func TestWithEnv(t *testing.T) {
 		Env: []string{"DEFAULT=test"},
 	}
 
-	WithEnv([]string{"env=1"})(context.Background(), nil, nil, &s)
+	err := WithEnv([]string{"env=1"})(context.Background(), nil, nil, &s)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"DEFAULT=test", "env=1"}, s.Process.Env, "didn't append")
 
-	if len(s.Process.Env) != 2 {
-		t.Fatal("didn't append")
-	}
+	err = WithEnv([]string{"env2=1"})(context.Background(), nil, nil, &s)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"DEFAULT=test", "env=1", "env2=1"}, s.Process.Env, "didn't append")
 
-	WithEnv([]string{"env2=1"})(context.Background(), nil, nil, &s)
+	err = WithEnv([]string{"env2=2"})(context.Background(), nil, nil, &s)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"DEFAULT=test", "env=1", "env2=2"}, s.Process.Env, "didn't update")
 
-	if len(s.Process.Env) != 3 {
-		t.Fatal("didn't append")
-	}
-
-	WithEnv([]string{"env2=2"})(context.Background(), nil, nil, &s)
-
-	if s.Process.Env[2] != "env2=2" {
-		t.Fatal("couldn't update")
-	}
-
-	WithEnv([]string{"env2"})(context.Background(), nil, nil, &s)
-
-	if len(s.Process.Env) != 2 {
-		t.Fatal("couldn't unset")
-	}
+	err = WithEnv([]string{"env2"})(context.Background(), nil, nil, &s)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"DEFAULT=test", "env=1"}, s.Process.Env, "didn't update")
 }
 
 func TestWithMounts(t *testing.T) {
@@ -253,24 +250,16 @@ func TestWithMounts(t *testing.T) {
 		},
 	}
 
-	WithMounts([]specs.Mount{
+	err := WithMounts([]specs.Mount{
 		{
 			Source:      "new-source",
 			Destination: "new-dest",
 		},
 	})(nil, nil, nil, &s)
-
-	if len(s.Mounts) != 2 {
-		t.Fatal("didn't append")
-	}
-
-	if s.Mounts[1].Source != "new-source" {
-		t.Fatal("invalid mount")
-	}
-
-	if s.Mounts[1].Destination != "new-dest" {
-		t.Fatal("invalid mount")
-	}
+	assert.NoError(t, err)
+	assert.Len(t, s.Mounts, 2, "didn't append")
+	assert.Equal(t, "new-source", s.Mounts[1].Source, "invalid mount")
+	assert.Equal(t, "new-dest", s.Mounts[1].Destination, "invalid mount")
 }
 
 func TestWithDefaultSpec(t *testing.T) {
@@ -281,35 +270,22 @@ func TestWithDefaultSpec(t *testing.T) {
 		ctx = namespaces.WithNamespace(context.Background(), "test")
 	)
 
-	if err := ApplyOpts(ctx, nil, &c, &s, WithDefaultSpec()); err != nil {
-		t.Fatal(err)
-	}
+	err := ApplyOpts(ctx, nil, &c, &s, WithDefaultSpec())
+	assert.NoError(t, err)
 
-	var (
-		expected Spec
-		err      error
-	)
+	var expected Spec
 
 	switch runtime.GOOS {
 	case "windows":
-		err = populateDefaultWindowsSpec(ctx, &expected, c.ID)
+		assert.NoError(t, populateDefaultWindowsSpec(ctx, &expected, c.ID))
 	case "darwin":
-		err = populateDefaultDarwinSpec(&expected)
+		assert.NoError(t, populateDefaultDarwinSpec(&expected))
 	default:
-		err = populateDefaultUnixSpec(ctx, &expected, c.ID)
+		assert.NoError(t, populateDefaultUnixSpec(ctx, &expected, c.ID))
 	}
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if reflect.DeepEqual(s, Spec{}) {
-		t.Fatalf("spec should not be empty")
-	}
-
-	if !reflect.DeepEqual(&s, &expected) {
-		t.Fatalf("spec from option differs from default: \n%#v != \n%#v", &s, expected)
-	}
+	assert.NotEmpty(t, s)
+	assert.Equal(t, &expected, &s)
 }
 
 func TestWithSpecFromFile(t *testing.T) {
@@ -320,42 +296,20 @@ func TestWithSpecFromFile(t *testing.T) {
 		ctx = namespaces.WithNamespace(context.Background(), "test")
 	)
 
-	fp, err := os.CreateTemp("", "testwithdefaultspec.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Remove(fp.Name()); err != nil {
-			log.Printf("failed to remove tempfile %v: %v", fp.Name(), err)
-		}
-	}()
-	defer fp.Close()
-
 	expected, err := GenerateSpec(ctx, nil, &c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	p, err := json.Marshal(expected)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if _, err := fp.Write(p); err != nil {
-		t.Fatal(err)
-	}
+	specFile := filepath.Join(t.TempDir(), "testwithdefaultspec.json")
+	err = os.WriteFile(specFile, p, 0o600)
+	assert.NoError(t, err)
 
-	if err := ApplyOpts(ctx, nil, &c, &s, WithSpecFromFile(fp.Name())); err != nil {
-		t.Fatal(err)
-	}
-
-	if reflect.DeepEqual(s, Spec{}) {
-		t.Fatalf("spec should not be empty")
-	}
-
-	if !reflect.DeepEqual(&s, expected) {
-		t.Fatalf("spec from option differs from default: \n%#v != \n%#v", &s, expected)
-	}
+	err = ApplyOpts(ctx, nil, &c, &s, WithSpecFromFile(specFile))
+	assert.NoError(t, err)
+	assert.NotEmpty(t, s)
+	assert.Equal(t, expected, &s)
 }
 
 func TestWithMemoryLimit(t *testing.T) {
@@ -413,6 +367,131 @@ func TestWithMemoryLimit(t *testing.T) {
 				t.Fatalf("spec.Linux section should not be set for windows/amd64 spec ever")
 			}
 		}
+	}
+}
+
+func TestWithMemorySwap(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := int64(123)
+			err := WithMemorySwap(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, *spec.Linux.Resources.Memory.Swap)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithPidsLimit(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := int64(123)
+			err := WithPidsLimit(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, *spec.Linux.Resources.Pids.Limit)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithBlockIO(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			v := uint16(123)
+			expected := &specs.LinuxBlockIO{
+				Weight:     &v,
+				LeafWeight: &v,
+			}
+			err := WithBlockIO(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, spec.Linux.Resources.BlockIO)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPUShares(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint64(123)
+			err := WithCPUShares(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, *spec.Linux.Resources.CPU.Shares)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPUs(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := "0,1"
+			err := WithCPUs(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, spec.Linux.Resources.CPU.Cpus)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPUsMems(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := "0,1"
+			err := WithCPUsMems(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, spec.Linux.Resources.CPU.Mems)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPUBurst(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint64(123)
+			err := WithCPUBurst(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, *spec.Linux.Resources.CPU.Burst)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPURT(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expectedRT, expectedPeriod := int64(123), uint64(456)
+			err := WithCPURT(expectedRT, expectedPeriod)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expectedRT, *spec.Linux.Resources.CPU.RealtimeRuntime)
+				assert.Equal(t, expectedPeriod, *spec.Linux.Resources.CPU.RealtimePeriod)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
 	}
 }
 
@@ -587,9 +666,8 @@ func TestDevShmSize(t *testing.T) {
 
 	expected := "1024k"
 	for _, s := range ss {
-		s := s
 		if err := WithDevShmSize(1024)(nil, nil, nil, &s); err != nil {
-			if err != ErrNoShmMount {
+			if !errors.Is(err, ErrNoShmMount) {
 				t.Fatal(err)
 			}
 
@@ -700,6 +778,32 @@ func TestWithoutMounts(t *testing.T) {
 	}
 }
 
+func TestWithParentCgroupDevices(t *testing.T) {
+	t.Parallel()
+
+	// TODO(thaJeztah): WithParentCgroupDevices should probably be a no-op if the Spec is non-Linux.
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			err := WithParentCgroupDevices(context.Background(), nil, nil, &spec)
+			assert.NoError(t, err)
+			assert.Nil(t, spec.Linux.Resources.Devices)
+		})
+	}
+
+	t.Run("reset existing", func(t *testing.T) {
+		s := Spec{
+			Linux: &specs.Linux{
+				Resources: &specs.LinuxResources{
+					Devices: []specs.LinuxDeviceCgroup{{Allow: true, Access: rwm}},
+				},
+			},
+		}
+		err := WithParentCgroupDevices(context.Background(), nil, nil, &s)
+		assert.NoError(t, err)
+		assert.Nil(t, s.Linux.Resources.Devices)
+	})
+}
+
 func TestWithWindowsDevice(t *testing.T) {
 	testcases := []struct {
 		name   string
@@ -767,6 +871,51 @@ func TestWithWindowsDevice(t *testing.T) {
 				assert.ElementsMatch(t, spec.Windows.Devices, tc.expectedWindowsDevices)
 			} else if spec.Windows != nil && spec.Windows.Devices != nil {
 				assert.ElementsMatch(t, spec.Windows.Devices, tc.expectedWindowsDevices)
+			}
+		})
+	}
+}
+
+func TestWithWindowsCPUCount(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint64(123)
+			err := WithWindowsCPUCount(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "windows" {
+				assert.Equal(t, expected, *spec.Windows.Resources.CPU.Count)
+			} else {
+				assert.Empty(t, spec.Windows, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithWindowsCPUShares(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint16(123)
+			err := WithWindowsCPUShares(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "windows" {
+				assert.Equal(t, expected, *spec.Windows.Resources.CPU.Shares)
+			} else {
+				assert.Empty(t, spec.Windows, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithWindowsCPUMaximum(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint16(123)
+			err := WithWindowsCPUMaximum(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "windows" {
+				assert.Equal(t, expected, *spec.Windows.Resources.CPU.Maximum)
+			} else {
+				assert.Empty(t, spec.Windows, "should not have modified spec")
 			}
 		})
 	}

@@ -25,10 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/filters"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/typeurl/v2"
@@ -37,6 +33,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
+	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 )
 
 func init() {
@@ -71,7 +73,7 @@ func TestContainersList(t *testing.T) {
 
 		if err := db.Update(func(tx *bolt.Tx) error {
 			now := time.Now()
-			result, err := store.Create(WithTransactionContext(ctx, tx), *testset[id])
+			result, err := store.Create(boltutil.WithTransaction(ctx, tx), *testset[id])
 			if err != nil {
 				return err
 			}
@@ -148,7 +150,6 @@ func TestContainersList(t *testing.T) {
 			}
 
 			for _, result := range results {
-				result := result
 				checkContainersEqual(t, &result, testset[result.ID], "list results did not match")
 			}
 		})
@@ -618,7 +619,6 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			},
 		},
 	} {
-		testcase := testcase
 		t.Run(testcase.name, func(t *testing.T) {
 			testcase.original.ID = testcase.name
 			if testcase.input.ID == "" {

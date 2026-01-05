@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestWithImageConfigNoEnv(t *testing.T) {
@@ -68,5 +68,47 @@ func TestWithImageConfigNoEnv(t *testing.T) {
 
 	if err := assertEqualsStringArrays(s.Process.Env, expectedEnv); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestWithUmask_SetsUmaskOnEmptySpec(t *testing.T) {
+	t.Parallel()
+	var s Spec
+
+	if err := WithUmask(0o027)(nil, nil, nil, &s); err != nil {
+		t.Fatalf("WithUmask returned error: %v", err)
+	}
+	if s.Process == nil {
+		t.Fatalf("expected Process to be initialized")
+	}
+	if s.Process.User.Umask == nil {
+		t.Fatalf("expected Umask to be set")
+	}
+	if *s.Process.User.Umask != 0o027 {
+		t.Fatalf("unexpected umask: got %03O, want %03O", *s.Process.User.Umask, 0o027)
+	}
+}
+
+func TestWithUmask_WithDefaultSpec(t *testing.T) {
+	t.Parallel()
+	var s Spec
+	c := containers.Container{ID: t.Name()}
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	// populate defaults first
+	if err := populateDefaultUnixSpec(ctx, &s, c.ID); err != nil {
+		t.Fatalf("populateDefaultUnixSpec error: %v", err)
+	}
+
+	// apply umask
+	if err := WithUmask(0o077)(ctx, nil, &c, &s); err != nil {
+		t.Fatalf("WithUmask returned error: %v", err)
+	}
+
+	if s.Process == nil || s.Process.User.Umask == nil {
+		t.Fatalf("expected umask to be set on spec")
+	}
+	if *s.Process.User.Umask != 0o077 {
+		t.Fatalf("unexpected umask: got %03O, want %03O", *s.Process.User.Umask, 0o077)
 	}
 }

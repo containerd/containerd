@@ -16,8 +16,9 @@
 
 package api
 
-//nolint
 // SetContainerId sets the id of the container to update.
+//
+//nolint:revive
 func (u *ContainerUpdate) SetContainerId(id string) {
 	u.ContainerId = id
 }
@@ -112,6 +113,12 @@ func (u *ContainerUpdate) SetLinuxCPUSetMems(value string) {
 	u.Linux.Resources.Cpu.Mems = value
 }
 
+// SetLinuxPidLimits records setting the pid max number for a container.
+func (u *ContainerUpdate) SetLinuxPidLimits(value int64) {
+	u.initLinuxResourcesPids()
+	u.Linux.Resources.Pids.Limit = value
+}
+
 // AddLinuxHugepageLimit records adding a hugepage limit for a container.
 func (u *ContainerUpdate) AddLinuxHugepageLimit(pageSize string, value uint64) {
 	u.initLinuxResources()
@@ -182,5 +189,12 @@ func (u *ContainerUpdate) initLinuxResourcesUnified() {
 	u.initLinuxResources()
 	if u.Linux.Resources.Unified == nil {
 		u.Linux.Resources.Unified = make(map[string]string)
+	}
+}
+
+func (u *ContainerUpdate) initLinuxResourcesPids() {
+	u.initLinuxResources()
+	if u.Linux.Resources.Pids == nil {
+		u.Linux.Resources.Pids = &LinuxPids{}
 	}
 }

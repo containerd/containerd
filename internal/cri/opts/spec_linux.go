@@ -31,9 +31,11 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"tags.cncf.io/container-device-interface/pkg/cdi"
 
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	cdispec "github.com/containerd/containerd/v2/pkg/cdi"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 // Linux dependent OCI spec opts.
@@ -149,7 +151,7 @@ func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci
 			devices = append(devices, deviceName)
 			seen[deviceName] = true
 		}
-		log.G(ctx).Infof("Container %v: CDI devices from CRI Config.CDIDevices: %v", c.ID, devices)
+		log.G(ctx).Debugf("Container %v: CDI devices from CRI Config.CDIDevices: %v", c.ID, devices)
 
 		// Add devices from CDI annotations
 		_, devsFromAnnotations, err := cdi.ParseAnnotations(annotations)
@@ -158,7 +160,7 @@ func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci
 		}
 
 		if devsFromAnnotations != nil {
-			log.G(ctx).Infof("Container %v: CDI devices from annotations: %v", c.ID, devsFromAnnotations)
+			log.G(ctx).Debugf("Container %v: CDI devices from annotations: %v", c.ID, devsFromAnnotations)
 			for _, deviceName := range devsFromAnnotations {
 				if seen[deviceName] {
 					// TODO: change to Warning when passing CDI devices as annotations is deprecated
@@ -172,6 +174,6 @@ func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci
 			log.G(ctx).Debug("Passing CDI devices as annotations will be deprecated soon, please use CRI CDIDevices instead")
 		}
 
-		return oci.WithCDIDevices(devices...)(ctx, client, c, s)
+		return cdispec.WithCDIDevices(devices...)(ctx, client, c, s)
 	}
 }

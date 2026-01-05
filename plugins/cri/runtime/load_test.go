@@ -19,6 +19,7 @@ package runtime
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,13 +32,11 @@ import (
 func TestLoadBaseOCISpec(t *testing.T) {
 	spec := oci.Spec{Version: "1.0.2", Hostname: "default"}
 
-	file, err := os.CreateTemp("", "spec-test-")
+	file, err := os.Create(filepath.Join(t.TempDir(), "spec-test-"))
 	require.NoError(t, err)
-
-	defer func() {
-		assert.NoError(t, file.Close())
-		assert.NoError(t, os.RemoveAll(file.Name()))
-	}()
+	t.Cleanup(func() {
+		file.Close()
+	})
 
 	err = json.NewEncoder(file).Encode(&spec)
 	assert.NoError(t, err)

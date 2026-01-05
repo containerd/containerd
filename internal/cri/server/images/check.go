@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/platforms"
 )
 
-// LoadImages checks all existing images to ensure they are ready to
+// CheckImages checks all existing images to ensure they are ready to
 // be used for CRI. It may try to recover images which are not ready
 // but will only log errors, not return any.
 func (c *CRIImageService) CheckImages(ctx context.Context) error {
@@ -41,7 +41,6 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 	var wg sync.WaitGroup
 	for _, i := range cImages {
 		wg.Add(1)
-		i := i
 		go func() {
 			defer wg.Done()
 			// TODO: Check platform/snapshot combination. Snapshot check should come first

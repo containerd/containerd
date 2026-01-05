@@ -29,6 +29,7 @@ import (
 	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/blockio"
+	cdispec "github.com/containerd/containerd/v2/pkg/cdi"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -180,12 +181,12 @@ func (a *API) UpdateContainerResources(ctx context.Context, criPod *sstore.Sandb
 	pod := a.nriPodSandbox(criPod)
 	ctr := a.nriContainer(criCtr, nil)
 
-	r, err := a.nri.UpdateContainer(ctx, pod, ctr, api.FromCRILinuxResources(req))
+	r, err := a.nri.UpdateContainer(ctx, pod, ctr, fromCRILinuxResources(req))
 	if err != nil {
 		return nil, err
 	}
 
-	return r.ToCRI(noOomAdj), nil
+	return toCRIResources(r, noOomAdj), nil
 }
 
 func (a *API) PostUpdateContainerResources(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
@@ -281,40 +282,49 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		}
 	}
 
-	resourceCheckOpt := nrigen.WithResourceChecker(
-		func(r *runtimespec.LinuxResources) error {
-			if r != nil {
-				if a.cri.Config().DisableHugetlbController {
-					r.HugepageLimits = nil
+	generatorOptions := []nrigen.GeneratorOption{
+		// resource checker
+		nrigen.WithResourceChecker(
+			func(r *runtimespec.LinuxResources) error {
+				if r != nil {
+					if a.cri.Config().DisableHugetlbController {
+						r.HugepageLimits = nil
+					}
 				}
-			}
-			return nil
-		},
-	)
-
-	rdtResolveOpt := nrigen.WithRdtResolver(
-		func(className string) (*runtimespec.LinuxIntelRdt, error) {
-			if className == "" {
-				return nil, nil
-			}
-			return &runtimespec.LinuxIntelRdt{
-				ClosID: className,
-			}, nil
-		},
-	)
-
-	blkioResolveOpt := nrigen.WithBlockIOResolver(
-		func(className string) (*runtimespec.LinuxBlockIO, error) {
-			if className == "" {
-				return nil, nil
-			}
-			blockIO, err := blockio.ClassNameToLinuxOCI(className)
-			if err != nil {
-				return nil, err
-			}
-			return blockIO, nil
-		},
-	)
+				return nil
+			},
+		),
+		// RDT class resolver
+		nrigen.WithRdtResolver(
+			func(className string) (*runtimespec.LinuxIntelRdt, error) {
+				if className == "" {
+					return nil, nil
+				}
+				return &runtimespec.LinuxIntelRdt{
+					ClosID: className,
+				}, nil
+			},
+		),
+		// Block I/O throttling class resolver
+		nrigen.WithBlockIOResolver(
+			func(className string) (*runtimespec.LinuxBlockIO, error) {
+				if className == "" {
+					return nil, nil
+				}
+				blockIO, err := blockio.ClassNameToLinuxOCI(className)
+				if err != nil {
+					return nil, err
+				}
+				return blockIO, nil
+			},
+		),
+		// CDI injector
+		nrigen.WithCDIDeviceInjector(
+			func(s *runtimespec.Spec, devices []string) error {
+				return cdispec.WithCDIDevices(devices...)(context.TODO(), nil, nil, s)
+			},
+		),
+	}
 
 	return func(ctx context.Context, _ *containerd.Client, c *containers.Container) error {
 		spec := &runtimespec.Spec{}
@@ -326,9 +336,12 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		if err != nil {
 			return fmt.Errorf("failed to get NRI adjustment for container: %w", err)
 		}
+		if adjust == nil {
+			return nil
+		}
 
 		sgen := generate.Generator{Config: spec}
-		ngen := nrigen.SpecGenerator(&sgen, resourceCheckOpt, rdtResolveOpt, blkioResolveOpt)
+		ngen := nrigen.SpecGenerator(&sgen, generatorOptions...)
 
 		err = ngen.Adjust(adjust)
 		if err != nil {
@@ -356,6 +369,15 @@ func (a *API) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDele
 		a.NotifyContainerExit(context.Background(), criCtr)
 		return nil
 	}
+}
+
+type PluginSyncBlock = nri.PluginSyncBlock
+
+func (a *API) BlockPluginSync() *PluginSyncBlock {
+	if a.IsDisabled() {
+		return nil
+	}
+	return a.nri.BlockPluginSync()
 }
 
 //
@@ -394,7 +416,6 @@ func (a *API) ListContainers() []nri.Container {
 		case cri.ContainerState_CONTAINER_UNKNOWN:
 			continue
 		}
-		ctr := ctr
 		containers = append(containers, a.nriContainer(&ctr, nil))
 	}
 	return containers
@@ -428,7 +449,7 @@ func (a *API) UpdateContainer(ctx context.Context, u *api.ContainerUpdate) error
 		func(status cstore.Status) (cstore.Status, error) {
 			criReq := &cri.UpdateContainerResourcesRequest{
 				ContainerId: u.ContainerId,
-				Linux:       u.GetLinux().GetResources().ToCRI(0),
+				Linux:       toCRIResources(u.GetLinux().GetResources(), 0),
 			}
 			newStatus, err := a.cri.UpdateContainerResources(ctx, ctr, criReq, status)
 			return newStatus, err
@@ -482,6 +503,11 @@ func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 		if !errdefs.IsNotFound(err) {
 			log.L.WithError(err).Errorf("failed to get task for sandbox container %s",
 				pod.Container.ID())
+		}
+		// the containers no longer exist but the oci.Spec may still be available to use on the StopPodSandbox hook
+		spec, err := pod.Container.Spec(ctx)
+		if err == nil {
+			criPod.spec = spec
 		}
 		return criPod
 	}
@@ -599,13 +625,13 @@ func (p *criPodSandbox) GetPodLinuxOverhead() *api.LinuxResources {
 	if p.Sandbox == nil {
 		return nil
 	}
-	return api.FromCRILinuxResources(p.Config.GetLinux().GetOverhead())
+	return fromCRILinuxResources(p.Config.GetLinux().GetOverhead())
 }
 func (p *criPodSandbox) GetPodLinuxResources() *api.LinuxResources {
 	if p.Sandbox == nil {
 		return nil
 	}
-	return api.FromCRILinuxResources(p.Config.GetLinux().GetResources())
+	return fromCRILinuxResources(p.Config.GetLinux().GetResources())
 }
 
 func (p *criPodSandbox) GetLinuxResources() *api.LinuxResources {
@@ -631,6 +657,14 @@ func (p *criPodSandbox) GetCgroupsPath() string {
 
 func (p *criPodSandbox) GetPid() uint32 {
 	return p.pid
+}
+
+func (p *criPodSandbox) GetIPs() []string {
+	if p.IP == "" {
+		return nil
+	}
+	ips := append([]string{p.IP}, p.AdditionalIPs...)
+	return ips
 }
 
 //
@@ -834,6 +868,125 @@ func (c *criContainer) GetCgroupsPath() string {
 	return c.spec.Linux.CgroupsPath
 }
 
+func (c *criContainer) GetIOPriority() *api.LinuxIOPriority {
+	if c.spec.Process == nil {
+		return nil
+	}
+	return api.FromOCILinuxIOPriority(c.spec.Process.IOPriority)
+}
+
+func (c *criContainer) GetScheduler() *api.LinuxScheduler {
+	if c.spec.Process == nil || c.spec.Process.Scheduler == nil {
+		return nil
+	}
+	return api.FromOCILinuxScheduler(c.spec.Process.Scheduler)
+}
+
+func (c *criContainer) GetNetDevices() map[string]*api.LinuxNetDevice {
+	if c.spec.Linux == nil {
+		return nil
+	}
+	return api.FromOCILinuxNetDevices(c.spec.Linux.NetDevices)
+}
+
+func (c *criContainer) GetRdt() *api.LinuxRdt {
+	if c.spec.Linux == nil || c.spec.Linux.IntelRdt == nil {
+		return nil
+	}
+	return &api.LinuxRdt{
+		ClosId:           api.String(c.spec.Linux.IntelRdt.ClosID),
+		Schemata:         api.RepeatedString(c.spec.Linux.IntelRdt.Schemata),
+		EnableMonitoring: api.Bool(c.spec.Linux.IntelRdt.EnableMonitoring),
+	}
+}
+
+func (c *criContainer) GetSeccompProfile() *api.SecurityProfile {
+	if c == nil || c.meta == nil || c.meta.Config == nil {
+		return nil
+	}
+
+	profile := c.meta.Config.GetLinux().GetSecurityContext().GetSeccomp()
+	if profile == nil {
+		return nil
+	}
+
+	return &api.SecurityProfile{
+		ProfileType:  api.SecurityProfile_ProfileType(profile.GetProfileType()),
+		LocalhostRef: profile.GetLocalhostRef(),
+	}
+}
+
 func (c *criContainer) GetPid() uint32 {
 	return c.pid
+}
+
+//
+// conversion to/from CRI types
+//
+
+// fromCRILinuxResources converts linux container resources from CRI to NRI representation.
+func fromCRILinuxResources(c *cri.LinuxContainerResources) *api.LinuxResources {
+	if c == nil {
+		return nil
+	}
+	shares, quota, period := uint64(c.CpuShares), c.CpuQuota, uint64(c.CpuPeriod)
+	r := &api.LinuxResources{
+		Cpu: &api.LinuxCPU{
+			Shares: api.UInt64(&shares),
+			Quota:  api.Int64(&quota),
+			Period: api.UInt64(&period),
+			Cpus:   c.CpusetCpus,
+			Mems:   c.CpusetMems,
+		},
+		Memory: &api.LinuxMemory{
+			Limit: api.Int64(&c.MemoryLimitInBytes),
+		},
+	}
+	for _, l := range c.HugepageLimits {
+		r.HugepageLimits = append(r.HugepageLimits,
+			&api.HugepageLimit{
+				PageSize: l.PageSize,
+				Limit:    l.Limit,
+			})
+	}
+	if len(c.Unified) != 0 {
+		r.Unified = make(map[string]string)
+		for k, v := range c.Unified {
+			r.Unified[k] = v
+		}
+	}
+	return r
+}
+
+// toCRIResources converts linux container resources from NRI to CRI representation.
+func toCRIResources(r *api.LinuxResources, oomScoreAdj int64) *cri.LinuxContainerResources {
+	if r == nil {
+		return nil
+	}
+	o := &cri.LinuxContainerResources{}
+	if r.Memory != nil {
+		o.MemoryLimitInBytes = r.Memory.GetLimit().GetValue()
+		o.OomScoreAdj = oomScoreAdj
+	}
+	if r.Cpu != nil {
+		o.CpuShares = int64(r.Cpu.GetShares().GetValue())
+		o.CpuPeriod = int64(r.Cpu.GetPeriod().GetValue())
+		o.CpuQuota = r.Cpu.GetQuota().GetValue()
+		o.CpusetCpus = r.Cpu.Cpus
+		o.CpusetMems = r.Cpu.Mems
+	}
+	for _, l := range r.HugepageLimits {
+		o.HugepageLimits = append(o.HugepageLimits, &cri.HugepageLimit{
+			PageSize: l.PageSize,
+			Limit:    l.Limit,
+		})
+	}
+	if len(r.Unified) != 0 {
+		o.Unified = make(map[string]string)
+		for k, v := range r.Unified {
+			o.Unified[k] = v
+		}
+	}
+
+	return o
 }

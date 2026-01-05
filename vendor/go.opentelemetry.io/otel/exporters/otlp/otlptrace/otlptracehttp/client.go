@@ -14,24 +14,26 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
-	"google.golang.org/protobuf/proto"
-
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal/otlpconfig"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal/retry"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
+
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal/counter"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal/observ"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal/otlpconfig"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal/retry"
 )
 
 const contentTypeProto = "application/x-protobuf"
 
 var gzPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		w := gzip.NewWriter(io.Discard)
 		return w
 	},
@@ -62,6 +64,9 @@ type client struct {
 	client      *http.Client
 	stopCh      chan struct{}
 	stopOnce    sync.Once
+
+	instID int64
+	inst   *observ.Instrumentation
 }
 
 var _ otlptrace.Client = (*client)(nil)
@@ -70,20 +75,24 @@ var _ otlptrace.Client = (*client)(nil)
 func NewClient(opts ...Option) otlptrace.Client {
 	cfg := otlpconfig.NewHTTPConfig(asHTTPOptions(opts)...)
 
-	httpClient := &http.Client{
-		Transport: ourTransport,
-		Timeout:   cfg.Traces.Timeout,
-	}
+	httpClient := cfg.Traces.HTTPClient
 
-	if cfg.Traces.TLSCfg != nil || cfg.Traces.Proxy != nil {
-		clonedTransport := ourTransport.Clone()
-		httpClient.Transport = clonedTransport
-
-		if cfg.Traces.TLSCfg != nil {
-			clonedTransport.TLSClientConfig = cfg.Traces.TLSCfg
+	if httpClient == nil {
+		httpClient = &http.Client{
+			Transport: ourTransport,
+			Timeout:   cfg.Traces.Timeout,
 		}
-		if cfg.Traces.Proxy != nil {
-			clonedTransport.Proxy = cfg.Traces.Proxy
+
+		if cfg.Traces.TLSCfg != nil || cfg.Traces.Proxy != nil {
+			clonedTransport := ourTransport.Clone()
+			httpClient.Transport = clonedTransport
+
+			if cfg.Traces.TLSCfg != nil {
+				clonedTransport.TLSClientConfig = cfg.Traces.TLSCfg
+			}
+			if cfg.Traces.Proxy != nil {
+				clonedTransport.Proxy = cfg.Traces.Proxy
+			}
 		}
 	}
 
@@ -95,18 +104,29 @@ func NewClient(opts ...Option) otlptrace.Client {
 		requestFunc: cfg.RetryConfig.RequestFunc(evaluate),
 		stopCh:      stopCh,
 		client:      httpClient,
+		instID:      counter.NextExporterID(),
 	}
 }
 
 // Start does nothing in a HTTP client.
-func (d *client) Start(ctx context.Context) error {
+func (c *client) Start(ctx context.Context) error {
+	// Initialize the instrumentation if not already done.
+	//
+	// Initialize here instead of NewClient to allow any errors to be passed
+	// back to the caller and so that any setup of the environment variables to
+	// enable instrumentation can be set via code.
+	var err error
+	if c.inst == nil {
+		c.inst, err = observ.NewInstrumentation(c.instID, c.cfg.Endpoint)
+	}
+
 	// nothing to do
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		err = errors.Join(err, ctx.Err())
 	default:
 	}
-	return nil
+	return err
 }
 
 // Stop shuts down the client and interrupt any in-flight request.
@@ -123,7 +143,7 @@ func (d *client) Stop(ctx context.Context) error {
 }
 
 // UploadTraces sends a batch of spans to the collector.
-func (d *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.ResourceSpans) error {
+func (d *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.ResourceSpans) (uploadErr error) {
 	pbRequest := &coltracepb.ExportTraceServiceRequest{
 		ResourceSpans: protoSpans,
 	}
@@ -140,7 +160,13 @@ func (d *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 		return err
 	}
 
-	return d.requestFunc(ctx, func(ctx context.Context) error {
+	var statusCode int
+	if d.inst != nil {
+		op := d.inst.ExportSpans(ctx, len(protoSpans))
+		defer func() { op.End(uploadErr, statusCode) }()
+	}
+
+	return errors.Join(uploadErr, d.requestFunc(ctx, func(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -151,7 +177,7 @@ func (d *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 		resp, err := d.client.Do(request.Request)
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) && urlErr.Temporary() {
-			return newResponseError(http.Header{})
+			return newResponseError(http.Header{}, err)
 		}
 		if err != nil {
 			return err
@@ -160,13 +186,13 @@ func (d *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 		if resp != nil && resp.Body != nil {
 			defer func() {
 				if err := resp.Body.Close(); err != nil {
-					otel.Handle(err)
+					uploadErr = errors.Join(uploadErr, err)
 				}
 			}()
 		}
 
-		switch sc := resp.StatusCode; {
-		case sc >= 200 && sc <= 299:
+		statusCode = resp.StatusCode
+		if statusCode >= 200 && statusCode <= 299 {
 			// Success, do not retry.
 			// Read the partial success message, if any.
 			var respData bytes.Buffer
@@ -188,30 +214,45 @@ func (d *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 					n := respProto.PartialSuccess.GetRejectedSpans()
 					if n != 0 || msg != "" {
 						err := internal.TracePartialSuccessError(n, msg)
-						otel.Handle(err)
+						uploadErr = errors.Join(uploadErr, err)
 					}
 				}
 			}
 			return nil
-
-		case sc == http.StatusTooManyRequests,
-			sc == http.StatusBadGateway,
-			sc == http.StatusServiceUnavailable,
-			sc == http.StatusGatewayTimeout:
-			// Retry-able failures.  Drain the body to reuse the connection.
-			if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-				otel.Handle(err)
-			}
-			return newResponseError(resp.Header)
-		default:
-			return fmt.Errorf("failed to send to %s: %s", request.URL, resp.Status)
 		}
-	})
+		// Error cases.
+
+		// server may return a message with the response
+		// body, so we read it to include in the error
+		// message to be returned. It will help in
+		// debugging the actual issue.
+		var respData bytes.Buffer
+		if _, err := io.Copy(&respData, resp.Body); err != nil {
+			return err
+		}
+		respStr := strings.TrimSpace(respData.String())
+		if respStr == "" {
+			respStr = "(empty)"
+		}
+		bodyErr := fmt.Errorf("body: %s", respStr)
+
+		switch statusCode {
+		case http.StatusTooManyRequests,
+			http.StatusBadGateway,
+			http.StatusServiceUnavailable,
+			http.StatusGatewayTimeout:
+			// Retryable failure.
+			return newResponseError(resp.Header, bodyErr)
+		default:
+			// Non-retryable failure.
+			return fmt.Errorf("failed to send to %s: %s (%w)", request.URL, resp.Status, bodyErr)
+		}
+	}))
 }
 
 func (d *client) newRequest(body []byte) (request, error) {
 	u := url.URL{Scheme: d.getScheme(), Host: d.cfg.Endpoint, Path: d.cfg.URLPath}
-	r, err := http.NewRequest(http.MethodPost, u.String(), nil)
+	r, err := http.NewRequest(http.MethodPost, u.String(), http.NoBody)
 	if err != nil {
 		return request{Request: r}, err
 	}
@@ -227,7 +268,7 @@ func (d *client) newRequest(body []byte) (request, error) {
 	req := request{Request: r}
 	switch Compression(d.cfg.Compression) {
 	case NoCompression:
-		r.ContentLength = (int64)(len(body))
+		r.ContentLength = int64(len(body))
 		req.bodyReader = bodyReader(body)
 	case GzipCompression:
 		// Ensure the content length is not used.
@@ -255,13 +296,13 @@ func (d *client) newRequest(body []byte) (request, error) {
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Client.
-func (d *client) MarshalLog() interface{} {
+func (d *client) MarshalLog() any {
 	return struct {
 		Type     string
 		Endpoint string
 		Insecure bool
 	}{
-		Type:     "otlphttphttp",
+		Type:     "otlptracehttp",
 		Endpoint: d.cfg.Endpoint,
 		Insecure: d.cfg.Insecure,
 	}
@@ -285,28 +326,54 @@ type request struct {
 // reset reinitializes the request Body and uses ctx for the request.
 func (r *request) reset(ctx context.Context) {
 	r.Body = r.bodyReader()
-	r.Request = r.Request.WithContext(ctx)
+	r.Request = r.WithContext(ctx)
 }
 
 // retryableError represents a request failure that can be retried.
 type retryableError struct {
 	throttle int64
+	err      error
 }
 
 // newResponseError returns a retryableError and will extract any explicit
-// throttle delay contained in headers.
-func newResponseError(header http.Header) error {
+// throttle delay contained in headers. The returned error wraps wrapped
+// if it is not nil.
+func newResponseError(header http.Header, wrapped error) error {
 	var rErr retryableError
 	if s, ok := header["Retry-After"]; ok {
 		if t, err := strconv.ParseInt(s[0], 10, 64); err == nil {
 			rErr.throttle = t
 		}
 	}
+
+	rErr.err = wrapped
 	return rErr
 }
 
 func (e retryableError) Error() string {
+	if e.err != nil {
+		return "retry-able request failure: " + e.err.Error()
+	}
+
 	return "retry-able request failure"
+}
+
+func (e retryableError) Unwrap() error {
+	return e.err
+}
+
+func (e retryableError) As(target any) bool {
+	if e.err == nil {
+		return false
+	}
+
+	switch v := target.(type) {
+	case **retryableError:
+		*v = &e
+		return true
+	default:
+		return false
+	}
 }
 
 // evaluate returns if err is retry-able. If it is and it includes an explicit

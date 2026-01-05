@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/v2/internal/lazyregexp"
 )
 
 var (
-	regexCleanLine = regexp.MustCompile("\x1b\\[[0-9]+m[\x1b]?")
+	regexCleanLine = lazyregexp.New("\x1b\\[[0-9]+m[\x1b]?")
 )
 
 // Writer buffers writes until flush, at which time the last screen is cleared

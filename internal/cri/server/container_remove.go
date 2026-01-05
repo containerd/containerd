@@ -24,6 +24,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -31,6 +32,7 @@ import (
 
 // RemoveContainer removes the container.
 func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
+	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
 	ctrID := r.GetContainerId()
 	container, err := c.containerStore.Get(ctrID)
@@ -42,7 +44,11 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		log.G(ctx).Tracef("RemoveContainer called for container %q that does not exist", ctrID)
 		return &runtime.RemoveContainerResponse{}, nil
 	}
+
+	defer c.nri.BlockPluginSync().Unblock()
+
 	id := container.ID
+	span.SetAttributes(tracing.Attribute("container.id", id))
 	i, err := container.Container.Info(ctx)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -62,7 +68,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	if state == runtime.ContainerState_CONTAINER_RUNNING ||
 		state == runtime.ContainerState_CONTAINER_UNKNOWN {
 		log.L.Infof("Forcibly stopping container %q", id)
-		if err := c.stopContainer(ctx, container, 0); err != nil {
+		if err := c.stopContainerRetryOnConnectionClosed(ctx, container, 0); err != nil {
 			return nil, fmt.Errorf("failed to forcibly stop container %q: %w", id, err)
 		}
 
@@ -128,6 +134,11 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	c.generateAndSendContainerEvent(ctx, id, container.SandboxID, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
 
 	containerRemoveTimer.WithValues(i.Runtime.Name).UpdateSince(start)
+
+	span.AddEvent("container removed",
+		tracing.Attribute("container.id", container.ID),
+		tracing.Attribute("container.remove.duration", time.Since(start).String()),
+	)
 
 	return &runtime.RemoveContainerResponse{}, nil
 }

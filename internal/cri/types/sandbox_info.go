@@ -27,16 +27,12 @@ import (
 // SandboxInfo is extra information for sandbox.
 // TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
 type SandboxInfo struct {
-	Pid         uint32 `json:"pid"`
-	Status      string `json:"processStatus"`
-	NetNSClosed bool   `json:"netNamespaceClosed"`
-	Image       string `json:"image"`
-	SnapshotKey string `json:"snapshotKey"`
-	Snapshotter string `json:"snapshotter"`
-	// Note: a new field `RuntimeHandler` has been added into the CRI PodSandboxStatus struct, and
-	// should be set. This `RuntimeHandler` field will be deprecated after containerd 1.3 (tracked
-	// in https://github.com/containerd/cri/issues/1064).
-	RuntimeHandler string                    `json:"runtimeHandler"` // see the Note above
+	Pid            uint32                    `json:"pid"`
+	Status         string                    `json:"processStatus"`
+	NetNSClosed    bool                      `json:"netNamespaceClosed"`
+	Image          string                    `json:"image"`
+	SnapshotKey    string                    `json:"snapshotKey"`
+	Snapshotter    string                    `json:"snapshotter"`
 	RuntimeType    string                    `json:"runtimeType"`
 	RuntimeOptions interface{}               `json:"runtimeOptions"`
 	Config         *runtime.PodSandboxConfig `json:"config"`

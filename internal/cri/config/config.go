@@ -21,17 +21,20 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	gruntime "runtime"
+	"slices"
 	"time"
 
 	"github.com/containerd/log"
 	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubelet/pkg/cri/streaming"
 
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
+	"github.com/containerd/containerd/v2/internal/cri/opts"
+	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/plugins"
 )
@@ -70,7 +73,7 @@ const (
 	ModeShim SandboxControllerMode = "shim"
 	// DefaultSandboxImage is the default image to use for sandboxes when empty or
 	// for default configurations.
-	DefaultSandboxImage = "registry.k8s.io/pause:3.10"
+	DefaultSandboxImage = "registry.k8s.io/pause:3.10.1"
 	// IOTypeFifo is container io implemented by creating named pipe
 	IOTypeFifo = "fifo"
 	// IOTypeStreaming is container io implemented by connecting the streaming api to sandbox endpoint
@@ -102,6 +105,8 @@ type Runtime struct {
 	// to the runtime spec when the container when PrivilegedWithoutHostDevices is already enabled. Requires
 	// PrivilegedWithoutHostDevices to be enabled. Defaults to false.
 	PrivilegedWithoutHostDevicesAllDevicesAllowed bool `toml:"privileged_without_host_devices_all_devices_allowed" json:"privileged_without_host_devices_all_devices_allowed"`
+	// CgroupWritable enables writable cgroups in non-privileged containers
+	CgroupWritable bool `toml:"cgroup_writable" json:"cgroupWritable"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
 	// NetworkPluginConfDir is a directory containing the CNI network information for the runtime class.
@@ -149,7 +154,13 @@ type ContainerdConfig struct {
 // CniConfig contains toml config related to cni
 type CniConfig struct {
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
+	//
+	// DEPRECATED: use `NetworkPluginBinDirs` instead.`
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
+	// NetworkPluginBinDirs is the directories in which the binaries for the plugin is kept.
+	//
+	// Only use one of NetworkPluginBinDir and NetworkPluginBinDirs, not both.
+	NetworkPluginBinDirs []string `toml:"bin_dirs" json:"binDirs"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
 	// NetworkPluginMaxConfNum is the max number of plugin config files that will
@@ -217,18 +228,23 @@ type Registry struct {
 	// ConfigPath is a path to the root directory containing registry-specific
 	// configurations.
 	// If ConfigPath is set, the rest of the registry specific options are ignored.
+	// If no registry-specific options are set, ConfigPath defaults to
+	// "/etc/containerd/certs.d:/etc/docker/certs.d" for compatibility with Docker.
 	ConfigPath string `toml:"config_path" json:"configPath"`
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	// This option will not be used when ConfigPath is provided.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.0.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.3.
+	// Supported in 1.x releases.
 	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
 	// Configs are configs for each registry.
 	// The key is the domain name or IP of the registry.
-	// DEPRECATED: Use ConfigPath instead.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.3.
+	// Supported in 1.x releases.
 	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.0, supported in 1.x releases.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.3.
+	// Supported in 1.x releases.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
 	Headers map[string][]string `toml:"headers" json:"headers"`
@@ -284,7 +300,7 @@ type ImageConfig struct {
 	// by other plugins to lookup the current image name.
 	// Image names should be full names including domain and tag
 	// Examples:
-	//   "sandbox": "k8s.gcr.io/pause:3.10"
+	//   "sandbox": "registry.k8s.io/pause:3.10.1"
 	//   "base": "docker.io/library/ubuntu:latest"
 	// Migrated from:
 	// (PluginConfig).SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
@@ -306,6 +322,9 @@ type ImageConfig struct {
 	// TODO: Migrate to transfer service
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
 
+	// ConcurrentLayerFetchBuffer restricts the maximum concurrent chunks size in for each image during a download.
+	ConcurrentLayerFetchBuffer int `toml:"concurrent_layer_fetch_buffer" json:"concurrentLayerFetchBuffer"`
+
 	// ImagePullProgressTimeout is the maximum duration that there is no
 	// image data read from image registry in the open connection. It will
 	// be reset whatever a new byte has been read. If timeout, the image
@@ -322,6 +341,12 @@ type ImageConfig struct {
 
 	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
+
+	// Uses client.Pull to pull images locally, instead of containerd's Transfer Service.
+	// By default it is set to false, i.e. use transfer service to pull images.
+	// When transfer service is used to pull images, pull related configs, like max_concurrent_downloads
+	// and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
+	UseLocalImagePull bool `toml:"use_local_image_pull" json:"useLocalImagePull"`
 }
 
 // RuntimeConfig contains toml config related to CRI plugin,
@@ -339,10 +364,7 @@ type RuntimeConfig struct {
 	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
-	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
-	// DisableCgroup indicates to disable the cgroup support.
-	// This is useful when the containerd does not have permission to access cgroup.
-	DisableCgroup bool `toml:"disable_cgroup" json:"disableCgroup"`
+	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogLineSize"`
 	// DisableApparmor indicates to disable the apparmor support.
 	// This is useful when the containerd does not have permission to access Apparmor.
 	DisableApparmor bool `toml:"disable_apparmor" json:"disableApparmor"`
@@ -378,24 +400,21 @@ type RuntimeConfig struct {
 	// EnableUnprivilegedPorts configures net.ipv4.ip_unprivileged_port_start=0
 	// for all containers which are not using host network
 	// and if it is not overwritten by PodSandboxConfig
-	// Note that currently default is set to disabled but target change it in future, see:
-	//   https://github.com/kubernetes/kubernetes/issues/102612
 	EnableUnprivilegedPorts bool `toml:"enable_unprivileged_ports" json:"enableUnprivilegedPorts"`
 	// EnableUnprivilegedICMP configures net.ipv4.ping_group_range="0 2147483647"
 	// for all containers which are not using host network, are not running in user namespace
 	// and if it is not overwritten by PodSandboxConfig
-	// Note that currently default is set to disabled but target change it in future together with EnableUnprivilegedPorts
 	EnableUnprivilegedICMP bool `toml:"enable_unprivileged_icmp" json:"enableUnprivilegedICMP"`
 	// EnableCDI indicates to enable injection of the Container Device Interface Specifications
 	// into the OCI config
 	// For more details about CDI and the syntax of CDI Spec files please refer to
 	// https://tags.cncf.io/container-device-interface.
-	EnableCDI bool `toml:"enable_cdi" json:"enableCDI"`
+	// DEPRECATED: CDI support will always be enabled in a future release.
+	EnableCDI *bool `toml:"enable_cdi" json:"enableCDI"`
 	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
 	// For more details about CDI configuration please refer to
 	// https://tags.cncf.io/container-device-interface#containerd-configuration
 	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
-
 	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
 	// API' IO EOF event after exec init process exits. A zero value means
 	// there is no timeout.
@@ -409,6 +428,19 @@ type RuntimeConfig struct {
 	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
+
+	// StatsCollectPeriod is the period for collecting container/sandbox CPU stats
+	// used for calculating UsageNanoCores. This matches cAdvisor's default housekeeping interval.
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	// Default: "1s"
+	StatsCollectPeriod string `toml:"stats_collect_period" json:"statsCollectPeriod"`
+
+	// StatsRetentionPeriod is how long to retain CPU stats samples for calculating UsageNanoCores.
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	// Default: "2m"
+	StatsRetentionPeriod string `toml:"stats_retention_period" json:"statsRetentionPeriod"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -487,7 +519,6 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 			c.Registry.Configs = make(map[string]RegistryConfig)
 		}
 		for endpoint, auth := range c.Registry.Auths {
-			auth := auth
 			u, err := url.Parse(endpoint)
 			if err != nil {
 				return warnings, fmt.Errorf("failed to parse registry url %q from `registry.auths`: %w", endpoint, err)
@@ -514,6 +545,79 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 	return warnings, nil
 }
 
+// CheckLocalImagePullConfigs checks if there are CRI Image Config options configured that are not supported
+// with transfer service and sets UseLocalImagePull to true. This ensures compatibility with configurations
+// that aren't supported or need to be configured differently when using transfer service.
+func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
+	// If already using local image pull, no need to check for conflicts
+	if c.UseLocalImagePull {
+		return
+	}
+
+	// List of Config options that automatically trigger fallback to local image pull
+	localPullOnlyConfigs := []struct {
+		Name      string
+		IsPresent func() bool
+		Reason    string
+	}{
+		{
+			Name: "DisableSnapshotAnnotations",
+			IsPresent: func() bool {
+				if gruntime.GOOS == "windows" {
+					return c.DisableSnapshotAnnotations
+				}
+				return !c.DisableSnapshotAnnotations
+			},
+			Reason: "moved to snapshotter plugin when using transfer service",
+		},
+		{
+			Name:      "DiscardUnpackedLayers",
+			IsPresent: func() bool { return c.DiscardUnpackedLayers },
+			Reason:    "not supported with transfer service",
+		},
+		{
+			Name:      "Registry.Mirrors",
+			IsPresent: func() bool { return len(c.Registry.Mirrors) > 0 },
+			Reason:    "not supported with transfer service (also deprecated)",
+		},
+		{
+			Name:      "Registry.Configs",
+			IsPresent: func() bool { return len(c.Registry.Configs) > 0 },
+			Reason:    "not supported with transfer service (also deprecated)",
+		},
+		{
+			Name:      "Registry.Auths",
+			IsPresent: func() bool { return len(c.Registry.Auths) > 0 },
+			Reason:    "not supported with transfer service (also deprecated)",
+		},
+		{
+			Name:      "MaxConcurrentDownloads",
+			IsPresent: func() bool { return c.MaxConcurrentDownloads != 3 },
+			Reason:    "must be configured in transfer service plugin: plugins.\"io.containerd.transfer.v1.local\"",
+		},
+		{
+			Name:      "ImagePullWithSyncFs",
+			IsPresent: func() bool { return c.ImagePullWithSyncFs },
+			Reason:    "not supported with transfer service",
+		},
+	}
+
+	for _, config := range localPullOnlyConfigs {
+		if config.IsPresent() {
+			// Fall back to local image pull
+			c.UseLocalImagePull = true
+			log.G(ctx).Warnf(
+				"Found '%s' in CRI config which is incompatible with transfer service (%s). "+
+					"Falling back to local image pull mode.",
+				config.Name,
+				config.Reason,
+			)
+			// Break after first conflict is found
+			break
+		}
+	}
+}
+
 // ValidateRuntimeConfig validates the given runtime configuration.
 func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
@@ -529,7 +633,33 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
 	}
 
+	// Validation for CNI config
+	if len(c.CniConfig.NetworkPluginBinDir) != 0 {
+		warnings = append(warnings, deprecation.CRICNIBinDir)
+		log.G(ctx).Warning("`bin_dir` is deprecated, please use `bin_dirs` instead")
+
+		if slices.Equal(c.CniConfig.NetworkPluginBinDirs, defaultNetworkPluginBinDirs()) {
+			// if a user set `bin_dir` explicitly, we remove the default value of `bin_dirs`
+			// to avoid the unexpected conflict between the two since we don't allow setting both.
+			c.CniConfig.NetworkPluginBinDirs = nil
+		}
+		if len(c.CniConfig.NetworkPluginBinDirs) == 0 {
+			// Before `NetworkPluginBinDir` is deprecated and removed, we manually move it
+			// into `NetworkPluginBinDirs` (if `NetworkPluginBinDirs` is empty)
+			// so that we can use it in the rest of the code.
+			c.CniConfig.NetworkPluginBinDirs = []string{c.CniConfig.NetworkPluginBinDir}
+			c.CniConfig.NetworkPluginBinDir = ""
+		}
+	}
+	if len(c.CniConfig.NetworkPluginBinDirs) != 0 && len(c.CniConfig.NetworkPluginBinDir) != 0 {
+		return warnings, errors.New("`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time")
+	}
+
 	for k, r := range c.ContainerdConfig.Runtimes {
+		if r.CgroupWritable && !opts.IsCgroup2UnifiedMode() {
+			return warnings, fmt.Errorf("runtime %s: `cgroup_writable` is only supported on cgroup v2", k)
+		}
+
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
 			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
 		}
@@ -553,9 +683,27 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 			return warnings, fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
 		}
 	}
+	// Validation for stats_collect_period
+	if c.StatsCollectPeriod != "" {
+		if _, err := time.ParseDuration(c.StatsCollectPeriod); err != nil {
+			return warnings, fmt.Errorf("invalid `stats_collect_period`: %w", err)
+		}
+	}
+	// Validation for stats_retention_period
+	if c.StatsRetentionPeriod != "" {
+		if _, err := time.ParseDuration(c.StatsRetentionPeriod); err != nil {
+			return warnings, fmt.Errorf("invalid `stats_retention_period`: %w", err)
+		}
+	}
 	if err := ValidateEnableUnprivileged(ctx, c); err != nil {
 		return warnings, err
 	}
+
+	// Validation for enable_cdi
+	if c.EnableCDI != nil && !*c.EnableCDI {
+		warnings = append(warnings, deprecation.CRIEnableCDI)
+	}
+
 	return warnings, nil
 }
 

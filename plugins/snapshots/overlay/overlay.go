@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
@@ -424,41 +425,6 @@ func (o *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, erro
 	return cleanup, nil
 }
 
-func validateIDMapping(mapping string) error {
-	var (
-		hostID int
-		ctrID  int
-		length int
-	)
-
-	if _, err := fmt.Sscanf(mapping, "%d:%d:%d", &ctrID, &hostID, &length); err != nil {
-		return err
-	}
-	// Almost impossible, but snapshots.WithLabels doesn't check it
-	if ctrID < 0 || hostID < 0 || length < 0 {
-		return fmt.Errorf("invalid mapping \"%d:%d:%d\"", ctrID, hostID, length)
-	}
-	if ctrID != 0 {
-		return fmt.Errorf("container mapping of 0 is only supported")
-	}
-	return nil
-}
-
-func hostID(mapping string) (int, error) {
-	var (
-		hostID int
-		ctrID  int
-		length int
-	)
-	if err := validateIDMapping(mapping); err != nil {
-		return -1, fmt.Errorf("invalid mapping: %w", err)
-	}
-	if _, err := fmt.Sscanf(mapping, "%d:%d:%d", &ctrID, &hostID, &length); err != nil {
-		return -1, err
-	}
-	return hostID, nil
-}
-
 func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
 	var (
 		s        storage.Snapshot
@@ -499,22 +465,35 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			return fmt.Errorf("failed to get snapshot info: %w", err)
 		}
 
-		mappedUID := -1
-		mappedGID := -1
+		var (
+			mappedUID, mappedGID     = -1, -1
+			uidmapLabel, gidmapLabel string
+			needsRemap               = false
+		)
 		// NOTE: if idmapped mounts' supported by hosted kernel there may be
 		// no parents at all, so overlayfs will not work and snapshotter
 		// will use bind mount. To be able to create file objects inside the
 		// rootfs -- just chown this only bound directory according to provided
 		// {uid,gid}map. In case of one/multiple parents -- chown upperdir.
 		if v, ok := info.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
-			if mappedUID, err = hostID(v); err != nil {
-				return fmt.Errorf("failed to parse UID mapping: %w", err)
-			}
+			uidmapLabel = v
+			needsRemap = true
 		}
 		if v, ok := info.Labels[snapshots.LabelSnapshotGIDMapping]; ok {
-			if mappedGID, err = hostID(v); err != nil {
-				return fmt.Errorf("failed to parse GID mapping: %w", err)
+			gidmapLabel = v
+			needsRemap = true
+		}
+
+		if needsRemap {
+			var idMap userns.IDMap
+			if err = idMap.Unmarshal(uidmapLabel, gidmapLabel); err != nil {
+				return fmt.Errorf("failed to unmarshal snapshot ID mapped labels: %w", err)
 			}
+			root, err := idMap.RootPair()
+			if err != nil {
+				return fmt.Errorf("failed to find root pair: %w", err)
+			}
+			mappedUID, mappedGID = int(root.Uid), int(root.Gid)
 		}
 
 		if mappedUID == -1 || mappedGID == -1 {

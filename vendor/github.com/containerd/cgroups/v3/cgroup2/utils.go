@@ -32,9 +32,9 @@ import (
 
 	"github.com/containerd/cgroups/v3/cgroup2/stats"
 
+	"github.com/containerd/log"
 	"github.com/godbus/dbus/v5"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -135,22 +135,44 @@ func parseCgroupFile(path string) (string, error) {
 func parseCgroupFromReader(r io.Reader) (string, error) {
 	s := bufio.NewScanner(r)
 	for s.Scan() {
-		var (
-			text  = s.Text()
-			parts = strings.SplitN(text, ":", 3)
-		)
-		if len(parts) < 3 {
-			return "", fmt.Errorf("invalid cgroup entry: %q", text)
-		}
-		// text is like "0::/user.slice/user-1001.slice/session-1.scope"
-		if parts[0] == "0" && parts[1] == "" {
-			return parts[2], nil
+		// "0::/user.slice/user-1001.slice/session-1.scope"
+		if path, ok := strings.CutPrefix(s.Text(), "0::"); ok {
+			return path, nil
 		}
 	}
 	if err := s.Err(); err != nil {
 		return "", err
 	}
 	return "", fmt.Errorf("cgroup path not found")
+}
+
+// ConvertCPUSharesToCgroupV2Value converts CPU shares, used by cgroup v1,
+// to CPU weight, used by cgroup v2.
+//
+// Cgroup v1 CPU shares has a range of [2^1...2^18], i.e. [2...262144],
+// and the default value is 1024.
+//
+// Cgroup v2 CPU weight has a range of [10^0...10^4], i.e. [1...10000],
+// and the default value is 100.
+//
+// Taken from https://github.com/opencontainers/cgroups/blob/v0.0.5/utils.go#L417-L441
+// (Apache License 2.0)
+func ConvertCPUSharesToCgroupV2Value(cpuShares uint64) uint64 {
+	// The value of 0 means "unset".
+	if cpuShares == 0 {
+		return 0
+	}
+	if cpuShares <= 2 {
+		return 1
+	}
+	if cpuShares >= 262144 {
+		return 10000
+	}
+	l := math.Log2(float64(cpuShares))
+	// Quadratic function which fits min, max, and default.
+	exponent := (l*l+125*l)/612.0 - 7.0/34.0
+
+	return uint64(math.Ceil(math.Pow(10, exponent)))
 }
 
 // ToResources converts the oci LinuxResources struct into a
@@ -166,7 +188,7 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 			Mems: cpu.Mems,
 		}
 		if shares := cpu.Shares; shares != nil {
-			convertedWeight := 1 + ((*shares-2)*9999)/262142
+			convertedWeight := ConvertCPUSharesToCgroupV2Value(*shares)
 			resources.CPU.Weight = &convertedWeight
 		}
 		if period := cpu.Period; period != nil {
@@ -199,9 +221,9 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 		}
 		resources.HugeTlb = &hugeTlbUsage
 	}
-	if pids := spec.Pids; pids != nil {
+	if pids := spec.Pids; pids != nil && pids.Limit != nil {
 		resources.Pids = &Pids{
-			Max: pids.Limit,
+			Max: *pids.Limit,
 		}
 	}
 	if i := spec.BlockIO; i != nil {
@@ -264,11 +286,36 @@ func getStatFileContentUint64(filePath string) uint64 {
 
 	res, err := parseUint(trimmed, 10, 64)
 	if err != nil {
-		logrus.Errorf("unable to parse %q as a uint from Cgroup file %q", trimmed, filePath)
+		log.L.Errorf("unable to parse %q as a uint from Cgroup file %q", trimmed, filePath)
 		return res
 	}
 
 	return res
+}
+
+// getKVStatsFileContentUint64 gets uint64 parsed content of key-value cgroup stat file
+func getKVStatsFileContentUint64(filePath string, propertyName string) uint64 {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		name, value, err := parseKV(s.Text())
+		if name == propertyName {
+			if err != nil {
+				log.L.WithError(err).Errorf("unable to parse %q as a uint from Cgroup file %q", propertyName, filePath)
+				return 0
+			}
+			return value
+		}
+	}
+	if err = s.Err(); err != nil {
+		log.L.WithError(err).Errorf("error reading Cgroup file %q for property %q", filePath, propertyName)
+	}
+	return 0
 }
 
 func readIoStats(path string) []*stats.IOEntry {
@@ -340,22 +387,25 @@ func parseRdmaKV(raw string, entry *stats.RdmaEntry) {
 	var value uint64
 	var err error
 
-	parts := strings.Split(raw, "=")
-	switch len(parts) {
-	case 2:
-		if parts[1] == "max" {
-			value = math.MaxUint32
-		} else {
-			value, err = parseUint(parts[1], 10, 32)
-			if err != nil {
-				return
-			}
+	k, v, found := strings.Cut(raw, "=")
+	if !found {
+		return
+	}
+
+	if v == "max" {
+		value = math.MaxUint32
+	} else {
+		value, err = parseUint(v, 10, 32)
+		if err != nil {
+			return
 		}
-		if parts[0] == "hca_handle" {
-			entry.HcaHandles = uint32(value)
-		} else if parts[0] == "hca_object" {
-			entry.HcaObjects = uint32(value)
-		}
+	}
+
+	switch k {
+	case "hca_handle":
+		entry.HcaHandles = uint32(value)
+	case "hca_object":
+		entry.HcaObjects = uint32(value)
 	}
 }
 
@@ -401,6 +451,7 @@ func readHugeTlbStats(path string) []*stats.HugeTlbStat {
 			Max:      getStatFileContentUint64(filepath.Join(path, "hugetlb."+pagesize+".max")),
 			Current:  getStatFileContentUint64(filepath.Join(path, "hugetlb."+pagesize+".current")),
 			Pagesize: pagesize,
+			Failcnt:  getKVStatsFileContentUint64(filepath.Join(path, "hugetlb."+pagesize+".events"), "max"),
 		}
 	}
 	return usage
@@ -424,15 +475,15 @@ func hugePageSizes() []string {
 		if err != nil {
 			return
 		}
+		defer dir.Close()
 		files, err := dir.Readdirnames(0)
-		dir.Close()
 		if err != nil {
 			return
 		}
 
 		hPageSizes, err = getHugePageSizeFromFilenames(files)
 		if err != nil {
-			logrus.Warnf("hugePageSizes: %s", err)
+			log.L.Warnf("hugePageSizes: %s", err)
 		}
 	})
 
@@ -507,14 +558,16 @@ func getStatPSIFromFile(path string) *stats.PSIStats {
 		if pv != nil {
 			err = parsePSIData(parts[1:], pv)
 			if err != nil {
-				logrus.Errorf("failed to read file %s: %v", path, err)
+				log.L.WithError(err).Errorf("failed to read file %s", path)
 				return nil
 			}
 		}
 	}
 
 	if err := sc.Err(); err != nil {
-		logrus.Errorf("unable to parse PSI data: %v", err)
+		if !errors.Is(err, unix.ENOTSUP) && !errors.Is(err, unix.EOPNOTSUPP) {
+			log.L.WithError(err).Error("unable to parse PSI data")
+		}
 		return nil
 	}
 	return psistats

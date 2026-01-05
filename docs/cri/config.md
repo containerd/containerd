@@ -9,6 +9,18 @@ for more information about containerd config.
 Note that the `[plugins."io.containerd.grpc.v1.cri"]` section is specific to CRI,
 and not recognized by other containerd clients such as `ctr`, `nerdctl`, and Docker/Moby.
 
+## Config versions
+The content of `/etc/containerd/config.toml` must start with a version header, for example:
+```toml
+version = 3
+```
+
+The config version 3 was introduced in containerd v2.0.
+The config version 2 used in containerd 1.x is still supported and automatically
+converted to the config version 3.
+
+For the further information, see [`../PLUGINS.md`](../PLUGINS.md).
+
 ## Basic configuration
 ### Cgroup Driver
 While containerd and Kubernetes use the legacy `cgroupfs` driver for managing cgroups by default,
@@ -16,6 +28,13 @@ it is recommended to use the `systemd` driver on systemd-based hosts for complia
 [the "single-writer" rule](https://systemd.io/CGROUP_DELEGATION/) of cgroups.
 
 To configure containerd to use the `systemd` driver, set the following option in `/etc/containerd/config.toml`:
++ In containerd 2.x
+```toml
+version = 3
+[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+  SystemdCgroup = true
+```
++ In containerd 1.x
 ```toml
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
@@ -51,6 +70,13 @@ kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/
 ### Snapshotter
 
 The default snapshotter is set to `overlayfs` (akin to Docker's `overlay2` storage driver):
++ In containerd 2.x
+```toml
+version = 3
+[plugins.'io.containerd.cri.v1.images']
+  snapshotter = "overlayfs"
+```
++ In containerd 1.x
 ```toml
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd]
@@ -62,6 +88,25 @@ See [here](https://github.com/containerd/containerd/blob/main/docs/snapshotters)
 ### Runtime classes
 
 The following example registers custom runtimes into containerd:
++ In containerd 2.x
+```toml
+version = 3
+[plugins."io.containerd.cri.v1.runtime".containerd]
+  default_runtime_name = "crun"
+  [plugins."io.containerd.cri.v1.runtime".containerd.runtimes]
+    # crun: https://github.com/containers/crun
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.crun]
+      runtime_type = "io.containerd.runc.v2"
+      [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.crun.options]
+        BinaryName = "/usr/local/bin/crun"
+    # gVisor: https://gvisor.dev/
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.gvisor]
+      runtime_type = "io.containerd.runsc.v1"
+    # Kata Containers: https://katacontainers.io/
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.kata]
+      runtime_type = "io.containerd.kata.v2"
+```
++ In containerd 1.x
 ```toml
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd]
@@ -114,16 +159,192 @@ spec:
 
 See also [the Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/).
 
+
+## Image Pull Configuration (since containerd v2.1)
+
+### Transfer Service for Image Pull
+
+Starting with containerd v2.1, the CRI plugin uses containerd's Transfer Service for image pull by default, instead of client-based pull.
+
+To configure Transfer Service, use the following settings in your config.toml:
+
+```toml
+[plugins.'io.containerd.transfer.v1.local']
+  # Transfer service specific configurations
+  max_concurrent_downloads = 3
+  unpack_config = { ... }
+```
+
+### Local Pull Mode
+
+If you prefer to use the client-based pull method instead of the Transfer Service, you can set `use_local_image_pull = true` in your CRI image configuration:
+
+```toml
+[plugins.'io.containerd.cri.v1.images']
+  use_local_image_pull = true
+```
+
+### Configuration differences and automatic fallback to Local Mode
+
+There are some differences in how image pull configurations are specified between the Transfer Service and Local Pull mode:
+
+| CRI Image Config Option | Local Pull | Transfer Service Pull |
+|------------------------|------------|---------------------|
+| Snapshotter | ✅ Supported | ✅ Supported |
+| DisableSnapshotAnnotations | ✅ Supported | ⚠️ Must be configured in snapshotter plugin:<br>`[proxy_plugins.stargz.exports]`<br>`enable_remote_snapshot_annotations = "true"` |
+| ImagePullProgressTimeout | ✅ Supported | ✅ Supported |
+| DiscardUnpackedLayers | ✅ Supported | ❌ Not Supported |
+| PinnedImages | ✅ Supported | ✅ Supported |
+| Registry Settings | ✅ All supported | ⚠️ Only ConfigPath and Headers supported<br>(Mirrors, Configs, Auths not supported, also deprecated) |
+| ImageDecryption | ❌ Disabled | ❌ Disabled |
+| MaxConcurrentDownloads | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
+| ImagePullWithSyncFs | ✅ Supported | ❌ Not Supported |
+| StatsCollectPeriod | ✅ Supported | ✅ Supported |
+
+To ensure compatibility, ***containerd 2.1 automatically detects configuration conflicts and falls back to local image pull mode when necessary***.
+
+If you have any of the following configurations in your CRI image config, containerd will automatically set `use_local_image_pull = true` and log a warning:
+
+- `DisableSnapshotAnnotations = false`
+- `DiscardUnpackedLayers = true`
+- `Registry.Mirrors` is configured
+- `Registry.Configs` is configured
+- `Registry.Auths` is configured
+- `MaxConcurrentDownloads != 3`
+- `ImagePullWithSyncFs = true`
+
+The warning message will indicate which configuration option triggered the fallback and provide guidance on how to properly configure the option when using the Transfer Service.
+
 ## Full configuration
 The explanation and default value of each configuration item are as follows:
++ In containerd 2.x
 <details>
 
 <p>
 
 ```toml
-# Use config version 2 to enable new configuration fields.
-# Config file is parsed as version 1 by default.
-# Version 2 uses long plugin names, i.e. "io.containerd.grpc.v1.cri" vs "cri".
+# containerd has several configuration versions:
+# - Version 3 (Recommended for containerd 2.x): Introduced in containerd 2.0.
+#   Several plugin IDs have changed in this version.
+# - Version 2 (Recommended for containerd 1.x): Introduced in containerd 1.3.
+#   Still supported in containerd v2.x.
+#   Plugin IDs are changed to have prefixes like "io.containerd.".
+# - Version 1 (Default): Introduced in containerd 1.0. Removed in containerd 2.0.
+version = 3
+
+[plugins]
+  [plugins.'io.containerd.cri.v1.images']
+    snapshotter = 'overlayfs'
+    disable_snapshot_annotations = true
+    discard_unpacked_layers = false
+    max_concurrent_downloads = 3
+    image_pull_progress_timeout = '5m0s'
+    image_pull_with_sync_fs = false
+    stats_collect_period = 10
+    use_local_image_pull = false
+
+    [plugins.'io.containerd.cri.v1.images'.pinned_images]
+      sandbox = 'registry.k8s.io/pause:3.10.1'
+
+    [plugins.'io.containerd.cri.v1.images'.registry]
+      config_path = ''
+
+    [plugins.'io.containerd.cri.v1.images'.image_decryption]
+      key_model = 'node'
+
+  [plugins.'io.containerd.cri.v1.runtime']
+    enable_selinux = false
+    selinux_category_range = 1024
+    max_container_log_line_size = 16384
+    disable_cgroup = false
+    disable_apparmor = false
+    restrict_oom_score_adj = false
+    disable_proc_mount = false
+    unset_seccomp_profile = ''
+    tolerate_missing_hugetlb_controller = true
+    disable_hugetlb_controller = true
+    device_ownership_from_security_context = false
+    ignore_image_defined_volumes = false
+    netns_mounts_under_state_dir = false
+    enable_unprivileged_ports = true
+    enable_unprivileged_icmp = true
+    enable_cdi = true
+    cdi_spec_dirs = ['/etc/cdi', '/var/run/cdi']
+    drain_exec_sync_io_timeout = '0s'
+    ignore_deprecation_warnings = []
+    stats_collect_period = '1s'
+    stats_retention_period = '2m'
+
+    [plugins.'io.containerd.cri.v1.runtime'.containerd]
+      default_runtime_name = 'runc'
+      ignore_blockio_not_enabled_errors = false
+      ignore_rdt_not_enabled_errors = false
+
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes]
+        [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc]
+          runtime_type = 'io.containerd.runc.v2'
+          runtime_path = ''
+          pod_annotations = []
+          container_annotations = []
+          privileged_without_host_devices = false
+          privileged_without_host_devices_all_devices_allowed = false
+          cgroup_writable = false
+          base_runtime_spec = ''
+          cni_conf_dir = ''
+          cni_max_conf_num = 0
+          snapshotter = ''
+          sandboxer = 'podsandbox'
+          io_type = ''
+
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+            BinaryName = ''
+            CriuImagePath = ''
+            CriuWorkPath = ''
+            IoGid = 0
+            IoUid = 0
+            NoNewKeyring = false
+            Root = ''
+            ShimCgroup = ''
+
+    [plugins.'io.containerd.cri.v1.runtime'.cni]
+      # DEPRECATED, use `bin_dirs` instead (since containerd v2.1).
+      bin_dir = ''
+      bin_dirs = ['/opt/cni/bin']
+      conf_dir = '/etc/cni/net.d'
+      max_conf_num = 1
+      setup_serially = false
+      conf_template = ''
+      ip_pref = ''
+      use_internal_loopback = false
+
+  [plugins.'io.containerd.grpc.v1.cri']
+    disable_tcp_service = true
+    stream_server_address = '127.0.0.1'
+    stream_server_port = '0'
+    stream_idle_timeout = '4h0m0s'
+    enable_tls_streaming = false
+
+    [plugins.'io.containerd.grpc.v1.cri'.x509_key_pair_streaming]
+      tls_cert_file = ''
+      tls_key_file = ''
+```
+
+</p>
+</details>
+
++ In containerd 1.x
+<details>
+
+<p>
+
+```toml
+# containerd has several configuration versions:
+# - Version 3 (Recommended for containerd 2.x): Introduced in containerd 2.0.
+#   Several plugin IDs have changed in this version.
+# - Version 2 (Recommended for containerd 1.x): Introduced in containerd 1.3.
+#   Still supported in containerd v2.x.
+#   Plugin IDs are changed to have prefixes like "io.containerd.".
+# - Version 1 (Default): Introduced in containerd 1.0. Removed in containerd 2.0.
 version = 2
 
 # The 'plugins."io.containerd.grpc.v1.cri"' table contains all of the server options.
@@ -153,7 +374,7 @@ version = 2
   selinux_category_range = 1024
 
   # sandbox_image is the image used by sandbox container.
-  sandbox_image = "registry.k8s.io/pause:3.10"
+  sandbox_image = "registry.k8s.io/pause:3.10.1"
 
   # stats_collect_period is the period (in seconds) of snapshots stats collection.
   stats_collect_period = 10
@@ -168,22 +389,14 @@ version = 2
   tolerate_missing_hugetlb_controller = true
 
   # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
-	# isolation, security and early detection of issues in the mount configuration when using
-	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
+  # isolation, security and early detection of issues in the mount configuration when using
+  # ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
   ignore_image_defined_volumes = false
 
   # netns_mounts_under_state_dir places all mounts for network namespaces under StateDir/netns
   # instead of being placed under the hardcoded directory /var/run/netns. Changing this setting
   # requires that all containers are deleted.
   netns_mounts_under_state_dir = false
-
-  # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
-  [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
-    # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
-    tls_cert_file = ""
-
-    # tls_key_file is the filepath to the private key paired with the "tls_cert_file"
-    tls_key_file = ""
 
   # max_container_log_line_size is the maximum log line size in bytes for a container.
   # Log line longer than the limit will be split into multiple lines. -1 means no
@@ -223,15 +436,15 @@ version = 2
   # enable_unprivileged_ports configures net.ipv4.ip_unprivileged_port_start=0
   # for all containers which are not using host network
   # and if it is not overwritten by PodSandboxConfig
-  # Note that currently default is set to disabled but target change it in future, see:
+  # Note that before containerd v2.0, this value defaulted to false.
   #   [k8s discussion](https://github.com/kubernetes/kubernetes/issues/102612)
-  enable_unprivileged_ports = false
+  enable_unprivileged_ports = true
 
   # enable_unprivileged_icmp configures net.ipv4.ping_group_range="0 2147483647"
   # for all containers which are not using host network, are not running in user namespace
   # and if it is not overwritten by PodSandboxConfig
-  # Note that currently default is set to disabled but target change it in future together with enable_unprivileged_ports
-  enable_unprivileged_icmp = false
+  # Note that before containerd v2.0, this value defaulted to false.
+  enable_unprivileged_icmp = true
 
   # enable_cdi enables support of the Container Device Interface (CDI)
   # For more details about CDI and the syntax of CDI Spec files please refer to
@@ -258,6 +471,14 @@ version = 2
   #
   # For example, the value can be '5h', '2h30m', '10s'.
   drain_exec_sync_io_timeout = "0s"
+
+  # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
+  [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
+    # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
+    tls_cert_file = ""
+
+    # tls_key_file is the filepath to the private key paired with the "tls_cert_file"
+    tls_key_file = ""
 
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
@@ -316,6 +537,11 @@ version = 2
       # The default value was "io.containerd.runc.v1" in containerd 1.3, "io.containerd.runtime.v1.linux" in prior releases.
       runtime_type = "io.containerd.runc.v2"
 
+      # runtime_path is an optional field that can be used to overwrite path to a shim runtime binary.
+      # When specified, containerd will ignore runtime name field when resolving shim location.
+      # Path must be abs.
+      runtime_path = ""
+
       # pod_annotations is a list of pod annotations passed to both pod
       # sandbox as well as container OCI annotations. Pod_annotations also
       # supports golang path match pattern - https://golang.org/pkg/path/#Match.
@@ -344,6 +570,9 @@ version = 2
       # option so that even when no host devices are implicitly added to the container, all devices allowlisting is still enabled.
       # Requires privileged_without_host_devices to be enabled. Defaults to false.
       privileged_without_host_devices_all_devices_allowed = false
+
+      # cgroup_writable field enables the support for writable cgroups in unprivileged containers with cgroup v2 enabled. When disabled, the cgroup interface (/sys/fs/cgroup) is mounted as read-only, preventing containers from managing their own cgroup hierarchies.
+      cgroup_writable = false
 
       # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
       # container's are created from.
@@ -481,7 +710,8 @@ version = 2
     #
     # *** registry.configs and registry.mirrors that were a part of containerd 1.4
     # are now DEPRECATED and will only be used if the config_path is not specified.
-    config_path = ""
+    # It is an error to specify both config_path and the deprecated configs or mirrors
+    config_path = "/etc/containerd/certs.d:/etc/docker/certs.d"
 ```
 
 </p>

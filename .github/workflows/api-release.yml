@@ -6,7 +6,7 @@ on:
 name: API Release
 
 env:
-  GO_VERSION: "1.22.5"
+  GO_VERSION: "1.24.11"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
@@ -50,7 +50,7 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
       - name: Save release notes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: containerd-release-notes
           path: src/github.com/containerd/containerd/release-notes.md
@@ -65,11 +65,11 @@ jobs:
     needs: [check]
     steps:
       - name: Download release notes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           path: builds
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: true
@@ -77,4 +77,4 @@ jobs:
           draft: false
           make_latest: false
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-          body_path: ./builds/containerd-release-notes/release-notes.md
+          body_path: ./builds/release-notes.md

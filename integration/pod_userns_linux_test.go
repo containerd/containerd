@@ -304,6 +304,258 @@ func TestPodUserNS(t *testing.T) {
 	}
 }
 
+// TestIssue10598 tests a case[1] that init processes in container should be able
+// to open /dev/stdout or /dev/stderr if init processes are running in their
+// user namespace instead of root user.
+//
+// The shim server creates pipe for init processes' standard output. By default,
+// the owner of pipe is the same to shim server (root user). Let's say, the init
+// process is running with uid=1000/gid=1000 user. Init processes inherits the
+// pipe created by shim server so that it can just write data into that pipe.
+// However, if that init process tries to open /dev/stderr, the kernel will
+// return no permission error.
+//
+// The following output is from retsnoop[2].
+//
+//	→ do_open
+//	         → inode_permission
+//	             → generic_permission
+//	                 ↔ make_vfsuid      [0]                     0.500us
+//	                 ↔ make_vfsuid      [0]                     6.501us
+//	                 ↔ from_kuid        [0xffffffff]            0.700us
+//	             ← generic_permission   [-EACCES]              13.501us
+//
+// Since uid_map/gid_map doesn't cover uid=0/gid=0, the kernel can't convert
+// uid=0 into valid uid in that uid_map. So, `from_kuid` returns invalid uid
+// value and then `do_open` returns EACCES error.
+//
+// [1]: https://github.com/containerd/containerd/issues/10598
+// [2]: https://github.com/anakryiko/retsnoop
+func TestIssue10598(t *testing.T) {
+	if !supportsUserNS() {
+		t.Skip("User namespaces are not supported")
+	}
+	if !supportsIDMap(defaultRoot) {
+		t.Skipf("ID mappings are not supported on: %v", defaultRoot)
+	}
+	if err := supportsRuncIDMap(); err != nil {
+		t.Skipf("OCI runtime doesn't support idmap mounts: %v", err)
+	}
+
+	testPodLogDir := t.TempDir()
+
+	containerID := uint32(0)
+	hostID := uint32(65536)
+	size := uint32(65536)
+
+	t.Log("Create a sandbox with userns")
+	sandboxOpts := []PodSandboxOpts{
+		WithPodUserNs(containerID, hostID, size),
+		WithPodLogDirectory(testPodLogDir),
+	}
+	sbConfig := PodSandboxConfig("issue10598", "userns", sandboxOpts...)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	require.NoError(t, err)
+
+	// Make sure the sandbox is cleaned up.
+	defer func() {
+		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+	}()
+
+	t.Log("Create a container for userns")
+
+	containerName := "nginx-userns"
+	testImage := images.Get(images.Nginx)
+
+	EnsureImageExists(t, testImage)
+
+	containerOpts := []ContainerOpts{
+		WithUserNamespace(containerID, hostID, size),
+		WithLogPath(containerName),
+		// The SELinux policy enforced by container-selinux prevents
+		// NGINX from opening the /proc/self/fd/2 pipe. This scenario
+		// is not intended to verify SELinux behavior in the user namespace
+		// but rather to confirm the ownership of the standard output
+		// file descriptor. The following option demonstrates how to
+		// disable the restrictive SELinux rule for the NGINX process.
+		WithSELinuxOptions(
+			"unconfined_u",
+			"unconfined_r",
+			"container_runtime_t",
+			"s0",
+		),
+	}
+
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		containerOpts...,
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	t.Log("Wait for container to start")
+	require.NoError(t, Eventually(func() (bool, error) {
+		content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
+		if err != nil {
+			return false, err
+		}
+
+		s, err := runtimeService.ContainerStatus(cn)
+		if err != nil {
+			return false, err
+		}
+
+		if state := s.GetState(); state != runtime.ContainerState_CONTAINER_RUNNING {
+			return false, fmt.Errorf("%s is not running\nstate: %s\nlog: %s",
+				containerName, state, string(content))
+		}
+
+		started := strings.Contains(string(content), "start worker processes")
+		if started {
+			t.Log(string(content))
+		}
+		return started, nil
+	}, time.Second, 30*time.Second))
+}
+
+// TestUsernsVolumeCopyUp tests the volume-copy-up feature in user namespaces. It's inspired in
+// TestVolumeCopyUp but adapted to run with user namespaces and check file owners.
+// For more info, see:
+//
+//	https://github.com/containerd/containerd/issues/11852
+func TestUsernsVolumeCopyUp(t *testing.T) {
+	if !supportsUserNS() {
+		t.Skip("User namespaces are not supported")
+	}
+	if !supportsIDMap(defaultRoot) {
+		t.Skipf("ID mappings are not supported on: %v", defaultRoot)
+	}
+	if err := supportsRuncIDMap(); err != nil {
+		t.Skipf("OCI runtime doesn't support idmap mounts: %v", err)
+	}
+
+	var (
+		testImage   = images.Get(images.VolumeCopyUp)
+		execTimeout = time.Minute
+		containerID = uint32(0)
+		hostID      = uint32(65536)
+		size        = uint32(65536)
+	)
+
+	t.Logf("Create a sandbox")
+	sbOpts := []PodSandboxOpts{
+		WithPodUserNs(containerID, hostID, size),
+	}
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "volume-ownership", sbOpts...)
+
+	EnsureImageExists(t, testImage)
+
+	t.Logf("Create a container with volume-copy-up test image")
+	cnConfig := ContainerConfig(
+		"container",
+		testImage,
+		WithCommand("sleep", "150"),
+		WithUserNamespace(containerID, hostID, size),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Logf("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	expectedVolumes := []containerVolume{
+		{
+			containerPath: "/test_dir",
+			files: []volumeFile{
+				{
+					fileName: "test_file",
+					contents: "test_content\n",
+				},
+			},
+		},
+		{
+			containerPath: "/:colon_prefixed",
+			files: []volumeFile{
+				{
+					fileName: "colon_prefixed_file",
+					contents: "test_content\n",
+				},
+			},
+		},
+		{
+			containerPath: "/C:/weird_test_dir",
+			files: []volumeFile{
+				{
+					fileName: "weird_test_file",
+					contents: "test_content\n",
+				},
+			},
+		},
+	}
+
+	volumeMappings, err := getContainerBindVolumes(t, cn)
+	require.NoError(t, err)
+
+	t.Logf("Check host path of the volume")
+	for _, vol := range expectedVolumes {
+		_, ok := volumeMappings[vol.containerPath]
+		assert.Equalf(t, true, ok, "expected to find volume %s", vol.containerPath)
+	}
+
+	// ghcr.io/containerd/volume-copy-up:2.2 contains 3 volumes on Linux and 2 volumes on Windows.
+	// On linux, each of the volumes contains a single file, all with the same content. On Windows,
+	// non C volumes defined in the image start out as empty.
+	for _, vol := range expectedVolumes {
+		files, err := os.ReadDir(volumeMappings[vol.containerPath])
+		require.NoError(t, err)
+		assert.Equal(t, len(vol.files), len(files))
+
+		for _, file := range vol.files {
+			t.Logf("Check whether volume %s contains the test file %s", vol.containerPath, file.fileName)
+			stdout, stderr, err := runtimeService.ExecSync(cn, []string{
+				"cat",
+				filepath.ToSlash(filepath.Join(vol.containerPath, file.fileName)),
+			}, execTimeout)
+			require.NoError(t, err)
+			assert.Empty(t, stderr)
+			assert.Equal(t, file.contents, string(stdout))
+
+			t.Logf("Check whether volume %s contains the test file %s with proper permissions", vol.containerPath, file.fileName)
+			stdout, stderr, err = runtimeService.ExecSync(cn, []string{
+				"stat", "-c", "=%u=%g=",
+				filepath.ToSlash(filepath.Join(vol.containerPath, file.fileName)),
+			}, execTimeout)
+			require.NoError(t, err)
+			assert.Empty(t, stderr)
+			assert.Equal(t, "=0=0=\n", string(stdout))
+		}
+	}
+
+	testFilePath := filepath.Join(volumeMappings[expectedVolumes[0].containerPath], expectedVolumes[0].files[0].fileName)
+	inContainerPath := filepath.Join(expectedVolumes[0].containerPath, expectedVolumes[0].files[0].fileName)
+	contents, err := os.ReadFile(testFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, "test_content\n", string(contents))
+
+	t.Logf("Update volume from inside the container")
+	_, _, err = runtimeService.ExecSync(cn, []string{
+		"sh",
+		"-c",
+		fmt.Sprintf("echo new_content > %s", filepath.ToSlash(inContainerPath)),
+	}, execTimeout)
+	require.NoError(t, err)
+
+	t.Logf("Check whether host path of the volume is updated")
+	contents, err = os.ReadFile(testFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, "new_content\n", string(contents))
+}
+
 func supportsRuncIDMap() error {
 	var r runc.Runc
 	features, err := r.Features(context.Background())

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 	"sync"
 
@@ -45,6 +46,7 @@ func WithMediaTypeKeyPrefix(ctx context.Context, mediaType, prefix string) conte
 	var values map[string]string
 	if v := ctx.Value(refKeyPrefix{}); v != nil {
 		values = v.(map[string]string)
+		values = maps.Clone(values)
 	} else {
 		values = make(map[string]string)
 	}
@@ -80,6 +82,8 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 		return "layer-" + key
 	case images.IsKnownConfig(desc.MediaType):
 		return "config-" + key
+	case images.IsAttestationType(desc.MediaType):
+		return "attestation-" + key
 	default:
 		log.G(ctx).Warnf("reference for unknown type: %s", desc.MediaType)
 		return "unknown-" + key

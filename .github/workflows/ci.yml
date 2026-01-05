@@ -23,17 +23,17 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-24.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
         exclude:
-          - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
+          - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
 
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/install-go
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20  # v9.2.0
         with:
-          version: v1.59.1
+          version: v2.1.5
           skip-cache: true
           args: --timeout=8m
 
@@ -42,22 +42,26 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
 
       - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
-      - uses: containerd/project-checks@v1.1.0
+      - uses: containerd/project-checks@d7751f3c375b8fe4a84c02a068184ee4c1f59bc4 # v1.2.2
         if: github.repository == 'containerd/containerd'
         with:
           working-directory: src/github.com/containerd/containerd
           repo-access-token: ${{ secrets.GITHUB_TOKEN }}
+          # github.com/cyphar/filepath-securejoin: MPL-2.0 AND BSD-3-Clause
+          # Approval: https://github.com/cncf/foundation/issues/1154#issuecomment-3562385979
+          go-licenses-ignore: |
+            github.com/cyphar/filepath-securejoin
 
       - name: verify go modules and vendor directory
         run: |
@@ -70,7 +74,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
 
     defaults:
@@ -78,7 +82,7 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           path: src/github.com/containerd/containerd
 
@@ -104,13 +108,13 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/install-go
-      - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.2
+      - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.7
       - run: make man
 
   # Make sure binaries compile with other minor platforms.
@@ -118,7 +122,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -139,7 +143,7 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/install-go
       - run: |
           set -e -x
@@ -190,12 +194,12 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
-        go-version: ["1.22.5"]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+        go-version: ["1.24.11", "1.25.5"]
         exclude:
-          - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
+          - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/install-go
         with:
           go-version: ${{ matrix.go-version }}
@@ -218,7 +222,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022, windows-2019]
+        os: [windows-2022]
+        cgroup_driver: [cgroupfs]
 
     defaults:
       run:
@@ -226,13 +231,13 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           path: src/github.com/containerd/containerd
 
       - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: kubernetes-sigs/cri-tools
           path: src/github.com/kubernetes-sigs/cri-tools
@@ -246,17 +251,6 @@ jobs:
           echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin/windows/amd64" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
-
-      # needs to be a separate step since terminal reload is required to bring in new env variables and PATH
-      - name: Upgrade Chocolaty on Windows 2019
-        if: matrix.os == 'windows-2019'
-        shell: powershell
-        run: .\script\setup\upgrade_chocolaty_windows_2019.ps1
-
-      - name: Upgrade MinGW on Windows 2019
-        if: matrix.os == 'windows-2019'
-        shell: powershell
-        run: .\script\setup\upgrade_mingw_windows_2019.ps1
 
       - name: Binaries
         shell: bash
@@ -321,10 +315,10 @@ jobs:
         run: mingw32-make.exe integration
       - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
-      - run: script/test/test2annotation.sh ${TESTFILE}
+      - run: script/test/test2annotation.sh "$TESTFILE"
         env:
           TESTFILE: ${{github.workspace}}/test-integration-serial-gotest.json
-        if: always()
+        if: success()
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
@@ -337,37 +331,51 @@ jobs:
         run: mingw32-make.exe integration
       - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
-      - run: script/test/test2annotation.sh ${TESTFILE}
+      - run: script/test/test2annotation.sh "$TESTFILE"
         env:
           TESTFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
-        if: always()
+        if: success()
 
       - name: CRI Integration Test
         env:
           TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         run: |
           make cri-integration
 
       - name: cri-tools critest
         env:
           CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         shell: powershell
         run: |
           Start-Process -FilePath containerd.exe -NoNewWindow -RedirectStandardError true -PassThru
           get-process | sls containerd
           start-sleep 5
-          # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
-          # Info: https://github.com/containerd/containerd/issues/6652
           if( '${{ matrix.os }}' -eq 'windows-2022' )
           {
-            $skip = "-ginkgo.skip=runtime should support exec with tty=true and stdin=true"
-          }
-          critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
+            $skipTests = @(
+              # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
+              # Info: https://github.com/containerd/containerd/issues/6652
+              "runtime should support exec with tty=true and stdin=true",
 
-      - uses: actions/upload-artifact@v4
+              # Skip tests that are known to be flaky on Windows
+              # See https://github.com/containerd/containerd/issues/12580
+              "public image with tag should be pulled and removed",
+              "public image without tag should be pulled and removed",
+              "image status should support all kinds of references",
+              "listImage should get exactly 3 image in the result list",
+              "listImage should get exactly 3 repoTags in the result image"
+            )
+            $skip = $skipTests -join "|"
+          }
+          Write-Host "Skip parameters: $skip"
+          critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' --ginkgo.skip="$skip"
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
-          name: TestResults ${{ matrix.os }}
+          name: TestResults ${{ matrix.os }} ${{ matrix.cgroup_driver }}
           path: |
             ${{github.workspace}}/*-junit.xml
             ${{github.workspace}}/*-gotest.json
@@ -376,7 +384,7 @@ jobs:
   integration-linux:
     name: Linux Integration
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 60
     needs: [project, linters, protos, man]
 
     strategy:
@@ -384,15 +392,16 @@ jobs:
       matrix:
         runtime:
           - io.containerd.runc.v2
-        runc: [runc, crun]
-        os: [ubuntu-22.04, ubuntu-24.04, actuated-arm64-4cpu-16gb]
+        runc: [runc]  # crun can be added here to debug crun issues
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm]
+        cgroup_driver: [cgroupfs, systemd]
         exclude:
-          - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
+          - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
 
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/install-go
 
       - name: Install containerd dependencies
@@ -407,15 +416,47 @@ jobs:
           script/setup/install-critools
           script/setup/install-failpoint-binaries
 
-      - name: Install criu
-        # NOTE: Required actuated enable CONFIG_CHECKPOINT_RESTORE
-        #
-        # REF: https://criu.org/Linux_kernel
-        if: matrix.os != 'actuated-arm64-4cpu-16gb'
+      # Disable criu testing on arm64 until we can solve the consistent failures of restore testing
+      - if: matrix.os != 'ubuntu-24.04-arm'
+        name: Install criu
         run: |
           sudo add-apt-repository -y ppa:criu/ppa
           sudo apt-get update
           sudo apt-get install -y criu
+
+      # "apt-get install erofs-utils" installs an older version (1.7.1 as of 2025-09-18)
+      # Build and install erofs-utils 1.8.10 from source to get a newer version
+      - name: Build and install erofs-utils from source
+        run: |
+          # Install dependencies
+          sudo apt-get update
+          sudo apt-get install -y wget make gcc libz-dev liblz4-dev libfuse-dev autoconf libtool pkg-config uuid-dev
+
+          # Create temporary build directory
+          BUILD_DIR="$(mktemp -d)"
+          cd "$BUILD_DIR"
+
+          # get erofs-utils-1.8.10.tar.gz
+          curl -L https://github.com/erofs/erofs-utils/archive/refs/tags/v1.8.10.tar.gz | tar -xzf -
+          cd erofs-utils-1.8.10
+
+          # Build and install erofs-utils
+          ./autogen.sh
+          ./configure --enable-lz4 --enable-fuse --with-uuid
+          make -j"$(nproc)"
+          sudo make install
+          sudo ldconfig
+
+          # Clean up
+          cd -
+          rm -rf "$BUILD_DIR"
+
+          # Verify installation
+          mkfs.erofs --version
+
+      - name: Load EROFS kernel module
+        run: |
+          sudo modprobe erofs
 
       - name: Install containerd
         env:
@@ -476,21 +517,41 @@ jobs:
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
+          cat /sys/fs/cgroup/cgroup.controllers
+          systemctl status
+          [ "${RUNC_FLAVOR}" == "crun" ] && {
+             export XDG_RUNTIME_DIR=/run/user/$(id -u)
+          }
+          runc --version
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
-
-      - name: Fix up for actuated
-        # https://github.com/containerd/containerd/pull/9920#issuecomment-2024823587
-        if: ${{ (matrix.os == 'actuated-arm64-4cpu-16gb') && (matrix.runc == 'crun') }}
-        run: |
-          echo "EXTRA_CRITEST_OPTIONS=--ginkgo.skip=runtime should support NamespaceMode_POD" >> $GITHUB_ENV
 
       - name: cri-tools critest
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         run: |
           env
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
+
+      - name: Install tools
+        # The GitHub Actions image already has buildah and podman included. Not the
+        # ubuntu-24.04-arm images. buildah and podman  is needed to convert the
+        # Kubernetes checkpoint archive to an OCI image.
+        # See contrib/checkpoint/checkpoint-restore-cri-test.sh
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: sudo apt-get install -y buildah podman
+
+      - if: matrix.os != 'ubuntu-24.04-arm'
+        name: Checkpoint/Restore via CRI
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+        run: |
+          env
+          sudo -E PATH=$PATH ./contrib/checkpoint/checkpoint-restore-cri-test.sh
 
       # Log the status of this VM to investigate issues like
       # https://github.com/containerd/containerd/issues/4969
@@ -507,10 +568,10 @@ jobs:
           sudo lsmod
           sudo dmesg -T -f kern
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
-          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }}
+          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }} ${{ matrix.cgroup_driver }}
           path: |
             *-junit.xml
             *-gotest.json
@@ -519,24 +580,46 @@ jobs:
 
   integration-vagrant:
     name: Vagrant integration
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: [project, linters, protos, man]
 
     strategy:
       fail-fast: false
       matrix:
-        box:
-          - fedora/40-cloud-base
-          # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
-          # The image was changed from rockylinux/8 to almalinux/8,
-          # as the former one no longer works:
-          # https://github.com/containerd/containerd/pull/10297
-          - almalinux/8
-          - rockylinux/9@4.0.0
+        include:
+          - box: fedora/43-cloud-base
+            cgroup_driver: cgroupfs
+            runc: runc
+          - box: fedora/43-cloud-base
+            cgroup_driver: systemd
+            runc: runc
+          - box: fedora/43-cloud-base
+            cgroup_driver: cgroupfs
+            runc: crun
+          - box: fedora/43-cloud-base
+            cgroup_driver: systemd
+            runc: crun
+            # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
+            # The image was changed from rockylinux/8 to almalinux/8,
+            # as the former one no longer works:
+            # https://github.com/containerd/containerd/pull/10297
+          - box: almalinux/8
+            cgroup_driver: cgroupfs
+            runc: runc
+          - box: almalinux/8
+            cgroup_driver: systemd
+            runc: runc
+          - box: almalinux/9
+            cgroup_driver: cgroupfs
+            runc: runc
+          - box: almalinux/9
+            cgroup_driver: systemd
+            runc: runc
     env:
       BOX: ${{ matrix.box }}
-
+      CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+      RUNC_FLAVOR: ${{ matrix.runc }}
     steps:
       - name: Show the host info
         run: |
@@ -545,8 +628,8 @@ jobs:
           cat /etc/os-release
           cat /proc/cpuinfo
           free -mt
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: /root/.vagrant.d
           key: vagrant-${{ matrix.box }}
@@ -555,50 +638,47 @@ jobs:
           # Canonical's Vagrant 2.2.19 dpkg cannot download Fedora 38 image: https://bugs.launchpad.net/vagrant/+bug/2017828
           # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
           curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com jammy main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
-          # we use vagrant from jammy since the sources are not yet available in noble for vagrant
-          # TODO: once vagrant package sources are available in ubuntu-24 this can be removed
-          sudo tee -a /etc/apt/sources.list.d/ubuntu.sources <<EOF
-          Types: deb deb-src
-          URIs: http://archive.ubuntu.com/ubuntu
-          Suites: jammy
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          EOF
-          echo "" | sudo tee -a /etc/apt/sources.list.d/ubuntu.sources > /dev/null
-          # jammy security needs to be added so that the compatible ovmf package can be fetched
-          sudo tee -a /etc/apt/sources.list.d/ubuntu.sources <<EOF
-          Types: deb deb-src
-          URIs: http://security.archive.ubuntu.com/ubuntu
-          Suites: jammy-security
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          EOF
           sudo apt-get update
-          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant ovmf=2022.02-3ubuntu0.22.04.2
+          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant ovmf
+          # https://github.com/vagrant-libvirt/vagrant-libvirt/issues/1725#issuecomment-1454058646
+          sudo cp /usr/share/OVMF/OVMF_VARS_4M.fd /var/lib/libvirt/qemu/nvram/
           sudo systemctl enable --now libvirtd
-          sudo apt-get build-dep -y vagrant ruby-libvirt
+          sudo apt-get build-dep -y ruby-libvirt
           sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
-          sudo vagrant plugin install vagrant-libvirt
+          sudo env VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1 vagrant plugin install vagrant-libvirt
       - name: Boot VM
-        run: sudo BOX=$BOX vagrant up --no-tty
+        run: |
+          if  [ "$BOX" = "fedora/43-cloud-base" ]; then
+            # fedora/41-cloud-base seems the last version available in https://portal.cloud.hashicorp.com/vagrant/discover/fedora
+            sudo vagrant box add fedora/43-cloud-base https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-libvirt-43-1.6.x86_64.vagrant.libvirt.box
+          fi
+          sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --no-tty
       - name: test-integration
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
+        run: sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
       - name: test-cri-integration
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
       - name: test-cri
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: dump-dmesg
+        if: always()
+        run: sudo BOX=$BOX vagrant ssh -c "sudo dmesg -T -f kern"
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
+    strategy:
+      fail-fast: false
+      matrix:
+        cgroup_driver: [cgroupfs, systemd]
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - name: Set up cgroup v2 delegation
         run: |
           sudo mkdir -p /etc/systemd/system/user@.service.d
@@ -608,22 +688,46 @@ jobs:
           EOF
           sudo systemctl daemon-reload
       - name: Build cri-in-userns image
-        run: podman build --target cri-in-userns -t cri-in-userns -f ./contrib/Dockerfile.test .
+        env:
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+        run: |
+          if [ "$CGROUP_DRIVER" = "systemd" ];then
+            podman build --target cri-in-userns-systemd -t cri-in-userns-systemd -f ./contrib/Dockerfile.test .
+          else
+            podman build --target cri-in-userns -t cri-in-userns -f ./contrib/Dockerfile.test .
+          fi
+
       - name: Run cri-in-userns image
+        env:
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         # Rootless Podman is used for testing CRI-in-UserNS
         # (We could use rootless Docker or rootless nerdctl, but we are using Podman here because it is preinstalled)
-        run: podman run --rm --privileged cri-in-userns
+        run: |
+          if [ "$CGROUP_DRIVER" = "systemd" ];then
+              set +e
+              touch ./critest_exit_code.txt
+              podman run --rm --privileged --group-add keep-groups -v ./critest_exit_code.txt:/tmp/critest_exit_code.txt cri-in-userns-systemd
+              exit_code=`cat ./critest_exit_code.txt`
+              echo "exit_code:"$exit_code
+              if [ "$exit_code" -gt 0 ]; then
+                exit 1
+              else
+                exit 0
+              fi
+          else
+            podman run --rm --privileged cri-in-userns
+          fi
 
   tests-mac-os:
     name: MacOS unit tests
-    runs-on: macos-12
+    runs-on: macos-latest
     timeout-minutes: 10
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/install-go
       - run: script/setup/install-gotestsum
       - run: script/setup/install-teststat
@@ -636,13 +740,17 @@ jobs:
         if: always()
       - run: script/test/test2annotation.sh *-gotest.json
         if: always()
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: TestResults MacOS
           path: |
             *-junit.xml
             *-gotest.json
+
+  node-e2e:
+    name: E2E
+    uses: ./.github/workflows/node-e2e.yml
 
   # Currently Github actions UI supports no masks to mark matrix jobs as required to pass status checks.
   # This means that every time version of Go, containerd, or OS is changed, a corresponding job should
@@ -655,7 +763,7 @@ jobs:
     name: Report required job statuses
     runs-on: ubuntu-latest
     # List job dependencies which are required to pass status checks in order to be merged via merge queue.
-    needs: [linters, project, protos, binaries, integration-linux, integration-windows, tests-cri-in-userns, tests-mac-os]
+    needs: [linters, project, protos, binaries, integration-linux, integration-windows, tests-cri-in-userns, tests-mac-os, node-e2e]
     if: ${{ always() }}
     steps:
       - run: exit 1

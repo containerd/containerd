@@ -59,7 +59,8 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 	if n > 0 || err == nil {
 		hrs.errsWithNoProgress = 0
 	}
-	if err == io.ErrUnexpectedEOF {
+	switch err {
+	case io.ErrUnexpectedEOF:
 		// connection closed unexpectedly. try reconnecting.
 		if n == 0 {
 			hrs.errsWithNoProgress++
@@ -76,7 +77,7 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 		if _, err2 := hrs.reader(); err2 == nil {
 			return n, nil
 		}
-	} else if err == io.EOF {
+	case io.EOF:
 		// The CRI's imagePullProgressTimeout relies on responseBody.Close to
 		// update the process monitor's status. If the err is io.EOF, close
 		// the connection since there is no more available data.

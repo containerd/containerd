@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/urfave/cli/v2"
 )
@@ -39,6 +40,7 @@ var Command = &cli.Command{
 		runCommand,
 		listCommand,
 		removeCommand,
+		infoCommand,
 	},
 }
 
@@ -188,6 +190,33 @@ var removeCommand = &cli.Command{
 			log.G(ctx).Infof("deleted: %s", id)
 		}
 
+		return nil
+	},
+}
+
+var infoCommand = &cli.Command{
+	Name:      "info",
+	Aliases:   []string{"i"},
+	Usage:     "Get info about a sandbox",
+	ArgsUsage: "<sandbox id>",
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+
+		id := cliContext.Args().First()
+		if id == "" {
+			return fmt.Errorf("sandbox id must be provided: %w", errdefs.ErrInvalidArgument)
+		}
+		sandbox, err := client.LoadSandbox(ctx, id)
+		if err != nil {
+			return fmt.Errorf("failed to load sandbox %s", id)
+		}
+
+		info := sandbox.Metadata()
+		commands.PrintAsJSON(info)
 		return nil
 	},
 }

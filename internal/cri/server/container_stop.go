@@ -27,6 +27,7 @@ import (
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
@@ -36,6 +37,7 @@ import (
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (*runtime.StopContainerResponse, error) {
+	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
 	// Get container config from container store.
 	container, err := c.containerStore.Get(r.GetContainerId())
@@ -50,7 +52,10 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 		return &runtime.StopContainerResponse{}, nil
 	}
 
-	if err := c.stopContainer(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
+	defer c.nri.BlockPluginSync().Unblock()
+
+	span.SetAttributes(tracing.Attribute("container.id", container.ID))
+	if err := c.stopContainerRetryOnConnectionClosed(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
 		return nil, err
 	}
 
@@ -74,8 +79,38 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 	return &runtime.StopContainerResponse{}, nil
 }
 
+// stopContainerRetryOnConnectionClosed attempts to stop the container.
+//
+// If the container has already exited and the connection is closed (like, ttrpc: closed),
+// it retries up to 3 times since this is a race condition where the container
+// self-exited before we attempted to stop it.
+func (c *criService) stopContainerRetryOnConnectionClosed(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
+	const maxRetries = 3
+
+	var err error
+	for i := 1; i <= maxRetries; i++ {
+		err = c.stopContainer(ctx, container, timeout)
+		if err == nil {
+			return nil
+		}
+
+		if !ctrdutil.IsShimTTRPCClosed(err) {
+			return err
+		}
+
+		if i+1 <= maxRetries {
+			retryAfter := time.Duration(100*i*i) * time.Millisecond
+			log.G(ctx).WithError(err).Warnf("Shim ttrpc connection closed when stopping container %q, retry after %s", container.ID, retryAfter)
+			time.Sleep(retryAfter)
+		}
+	}
+	return err
+}
+
 // stopContainer stops a container based on the container metadata.
 func (c *criService) stopContainer(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
+	span := tracing.SpanFromContext(ctx)
+	start := time.Now()
 	id := container.ID
 	sandboxID := container.SandboxID
 
@@ -199,6 +234,12 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	if err != nil {
 		return fmt.Errorf("an error occurs during waiting for container %q to be killed: %w", id, err)
 	}
+
+	span.AddEvent("container stopped",
+		tracing.Attribute("container.id", id),
+		tracing.Attribute("container.stop.duration", time.Since(start).String()),
+	)
+
 	return nil
 }
 

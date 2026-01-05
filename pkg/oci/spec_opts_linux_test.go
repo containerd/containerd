@@ -23,15 +23,107 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/cap"
-	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/fs/fstest"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/cap"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
+
+//nolint:gosec
+func TestWithUser(t *testing.T) {
+	t.Parallel()
+
+	expectedPasswd := `root:x:0:0:root:/root:/bin/ash
+guest:x:405:100:guest:/dev/null:/sbin/nologin
+`
+	expectedGroup := `root:x:0:root
+bin:x:1:root,bin,daemon
+daemon:x:2:root,bin,daemon
+sys:x:3:root,bin,adm
+guest:x:100:guest
+`
+	td := t.TempDir()
+	apply := fstest.Apply(
+		fstest.CreateDir("/etc", 0777),
+		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0777),
+		fstest.CreateFile("/etc/group", []byte(expectedGroup), 0777),
+	)
+	if err := apply.Apply(td); err != nil {
+		t.Fatalf("failed to apply: %v", err)
+	}
+	c := containers.Container{ID: t.Name()}
+	testCases := []struct {
+		user        string
+		expectedUID uint32
+		expectedGID uint32
+		err         string
+	}{
+		{
+			user:        "0",
+			expectedUID: 0,
+			expectedGID: 0,
+		},
+		{
+			user:        "root:root",
+			expectedUID: 0,
+			expectedGID: 0,
+		},
+		{
+			user:        "guest",
+			expectedUID: 405,
+			expectedGID: 100,
+		},
+		{
+			user:        "guest:guest",
+			expectedUID: 405,
+			expectedGID: 100,
+		},
+		{
+			user: "guest:nobody",
+			err:  "no groups found",
+		},
+		{
+			user:        "405:100",
+			expectedUID: 405,
+			expectedGID: 100,
+		},
+		{
+			user: "405:2147483648",
+			err:  "no groups found",
+		},
+		{
+			user: "-1000",
+			err:  "no users found",
+		},
+		{
+			user: "2147483648",
+			err:  "no users found",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.user, func(t *testing.T) {
+			t.Parallel()
+			s := Spec{
+				Version: specs.Version,
+				Root: &specs.Root{
+					Path: td,
+				},
+				Linux: &specs.Linux{},
+			}
+			err := WithUser(testCase.user)(context.Background(), nil, &c, &s)
+			if err != nil {
+				assert.EqualError(t, err, testCase.err)
+			}
+			assert.Equal(t, testCase.expectedUID, s.Process.User.UID)
+			assert.Equal(t, testCase.expectedGID, s.Process.User.GID)
+		})
+	}
+}
 
 //nolint:gosec
 func TestWithUserID(t *testing.T) {
@@ -71,7 +163,6 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 		},
 	}
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(fmt.Sprintf("user %d", testCase.userID), func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
@@ -131,7 +222,6 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 		},
 	}
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.user, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
@@ -201,7 +291,6 @@ sys:x:3:root,bin,adm
 		},
 	}
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.user, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
@@ -409,7 +498,7 @@ func TestDropCaps(t *testing.T) {
 func TestGetDevices(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	dir, err := os.MkdirTemp("/dev", t.Name())
+	dir, err := os.MkdirTemp("/dev", t.Name()) //nolint:usetesting
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -605,7 +694,6 @@ daemon:x:2:root,bin,daemon
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
@@ -652,7 +740,7 @@ func TestWithAppendAdditionalGroupsNoEtcGroup(t *testing.T) {
 		{
 			name:     "no additional gids, append root group",
 			groups:   []string{"root"},
-			err:      fmt.Sprintf("unable to find group root: open %s: no such file or directory", filepath.Join(td, "etc", "group")),
+			err:      "unable to find group root: openat etc/group: no such file or directory",
 			expected: []uint32{0},
 		},
 		{
@@ -663,7 +751,6 @@ func TestWithAppendAdditionalGroupsNoEtcGroup(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{

@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -34,6 +35,7 @@ type ProgressTracker struct {
 	root          string
 	transferState string
 	added         chan jobUpdate
+	extraction    chan extractionUpdate
 	waitC         chan struct{}
 
 	parents map[digest.Digest][]ocispec.Descriptor
@@ -46,6 +48,8 @@ const (
 	jobAdded jobState = iota
 	jobInProgress
 	jobComplete
+	jobExtracting
+	jobExtracted
 )
 
 type jobStatus struct {
@@ -71,12 +75,18 @@ type StatusTracker interface {
 	Check(context.Context, digest.Digest) (bool, error)
 }
 
+type extractionUpdate struct {
+	desc     ocispec.Descriptor
+	progress int64
+}
+
 // NewProgressTracker tracks content download progress
 func NewProgressTracker(root, transferState string) *ProgressTracker {
 	return &ProgressTracker{
 		root:          root,
 		transferState: transferState,
 		added:         make(chan jobUpdate, 1),
+		extraction:    make(chan extractionUpdate, 1),
 		waitC:         make(chan struct{}),
 		parents:       map[digest.Digest][]ocispec.Descriptor{},
 	}
@@ -96,7 +106,8 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 			log.G(ctx).WithError(err).Error("failed to get statuses for progress")
 		}
 		for dgst, job := range jobs {
-			if job.state != jobComplete {
+			switch job.state {
+			case jobAdded, jobInProgress:
 				status, ok := active.Status(job.name)
 				if ok {
 					if status.Offset > job.progress {
@@ -125,11 +136,34 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 							Total:    job.desc.Size,
 							Desc:     &job.desc,
 						})
-
+						job.state = jobComplete
+						jobs[dgst] = job
 					}
-					job.state = jobComplete
-					jobs[dgst] = job
 				}
+			case jobExtracting:
+				if job.progress == job.desc.Size {
+					pf(transfer.Progress{
+						Event:    "extracted",
+						Name:     job.name,
+						Parents:  job.parents,
+						Progress: job.desc.Size,
+						Total:    job.desc.Size,
+						Desc:     &job.desc,
+					})
+					job.state = jobExtracted
+					jobs[dgst] = job
+				} else {
+					pf(transfer.Progress{
+						Event:    "extracting",
+						Name:     job.name,
+						Parents:  job.parents,
+						Progress: job.progress,
+						Total:    job.desc.Size,
+						Desc:     &job.desc,
+					})
+				}
+			case jobComplete, jobExtracted:
+				// No progress to send
 			}
 		}
 	}
@@ -161,10 +195,9 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 				}
 				jobs[update.desc.Digest] = job
 				pf(transfer.Progress{
-					Event:   "waiting",
-					Name:    name,
-					Parents: parents,
-					//Digest:   desc.Digest.String(),
+					Event:    "waiting",
+					Name:     name,
+					Parents:  parents,
 					Progress: 0,
 					Total:    update.desc.Size,
 					Desc:     &job.desc,
@@ -181,7 +214,37 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 				job.state = jobComplete
 				job.progress = job.desc.Size
 			}
+		case extraction := <-j.extraction:
+			job, ok := jobs[extraction.desc.Digest]
+			if !ok {
+				// Only captures the parents defined before,
+				// could handle parent updates in same thread
+				// if there is a synchronization issue
+				var parents []string
+				j.parentL.Lock()
+				for _, parent := range j.parents[extraction.desc.Digest] {
+					parents = append(parents, remotes.MakeRefKey(ctx, parent))
+				}
+				j.parentL.Unlock()
+				if len(parents) == 0 {
+					parents = []string{j.root}
+				}
+				name := remotes.MakeRefKey(ctx, extraction.desc)
 
+				job = &jobStatus{
+					state:    jobExtracting,
+					name:     name,
+					parents:  parents,
+					progress: extraction.progress,
+					desc:     extraction.desc,
+				}
+				jobs[extraction.desc.Digest] = job
+			} else {
+				if job.state != jobExtracting {
+					job.state = jobExtracting
+				}
+				job.progress = extraction.progress
+			}
 		case <-tc.C:
 			update()
 			// Next timer?
@@ -197,8 +260,12 @@ func (j *ProgressTracker) Add(desc ocispec.Descriptor) {
 	if j == nil {
 		return
 	}
-	j.added <- jobUpdate{
+	up := jobUpdate{
 		desc: desc,
+	}
+	select {
+	case j.added <- up:
+	case <-j.waitC:
 	}
 }
 
@@ -206,11 +273,14 @@ func (j *ProgressTracker) MarkExists(desc ocispec.Descriptor) {
 	if j == nil {
 		return
 	}
-	j.added <- jobUpdate{
+	up := jobUpdate{
 		desc:   desc,
 		exists: true,
 	}
-
+	select {
+	case j.added <- up:
+	case <-j.waitC:
+	}
 }
 
 // AddChildren adds hierarchy information
@@ -224,6 +294,20 @@ func (j *ProgressTracker) AddChildren(desc ocispec.Descriptor, children []ocispe
 		j.parents[child.Digest] = append(j.parents[child.Digest], desc)
 	}
 
+}
+
+func (j *ProgressTracker) ExtractProgress(desc ocispec.Descriptor, progress int64) {
+	if j == nil {
+		return
+	}
+	up := extractionUpdate{
+		desc:     desc,
+		progress: progress,
+	}
+	select {
+	case j.extraction <- up:
+	case <-j.waitC:
+	}
 }
 
 func (j *ProgressTracker) Wait() {
@@ -277,5 +361,8 @@ func (c *contentStatusTracker) Check(ctx context.Context, dgst digest.Digest) (b
 	if err == nil {
 		return true, nil
 	}
-	return false, nil
+	if errdefs.IsNotFound(err) {
+		err = nil
+	}
+	return false, err
 }

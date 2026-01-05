@@ -28,15 +28,26 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 
+	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
 	eventstypes "github.com/containerd/containerd/api/events"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
+	"github.com/containerd/otelttrpc"
+	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/pkg/archive"
+	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
@@ -44,10 +55,6 @@ import (
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl/v2"
 )
 
 const (
@@ -87,9 +94,9 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		// To prevent flood of error messages, the expected error
 		// should be reset, like os.ErrClosed or os.ErrNotExist, which
 		// depends on platform.
-		err = checkCopyShimLogError(ctx, err)
+		err = checkCopyShimLogError(shimCtx, err)
 		if err != nil {
-			log.G(ctx).WithError(err).Error("copy shim log after reload")
+			log.G(shimCtx).WithError(err).Error("copy shim log after reload")
 		}
 	}()
 	onCloseWithShimLog := func() {
@@ -100,7 +107,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 
 	params, err := restoreBootstrapParams(bundle.Path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read boostrap.json when restoring bundle %q: %w", bundle.ID, err)
+		return nil, fmt.Errorf("failed to read bootstrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
 	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog)
@@ -131,7 +138,7 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
 
-	log.G(ctx).WithField("id", id).Warn("cleaning up after shim disconnected")
+	log.G(ctx).WithField("id", id).Info("cleaning up after shim disconnected")
 	response, err := binaryCall.Delete(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to clean up after shim disconnected")
@@ -195,6 +202,23 @@ type ShimInstance interface {
 	Endpoint() (string, int)
 }
 
+type clientVersionDowngrader interface {
+	// Downgrade is to lower shim's client version.
+	//
+	// Assume there is a running pod created by containerd-shim-runc-v2 from v1.7.x.
+	// After upgrading to v2.x, the containerd-shim-runc-v2 binary will support the
+	// sandbox API, and calling `shim start` for the existing running pod will return
+	// a version=3 address. However, that pod shim does not support the streaming IO API,
+	// so we should downgrade the shim version.
+	//
+	// Additionally, if a container record was created with v1.7.x, it will not have
+	// a SandboxID field in the metadata store. In the CRI case, this will cause
+	// the new shim client to use the v3 protocol to send requests to a running shim
+	// that still uses the v2 protocol, resulting in a failure to start.
+	// In this case, we should also downgrade the shim version and retry.
+	Downgrade() error
+}
+
 func parseStartResponse(response []byte) (client.BootstrapParams, error) {
 	var params client.BootstrapParams
 
@@ -224,7 +248,7 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 		return err
 	}
 
-	f, err := atomicfile.New(path, 0o666)
+	f, err := atomicfile.New(path, 0o644)
 	if err != nil {
 		return err
 	}
@@ -273,10 +297,15 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 			}
 		}()
 
-		return ttrpc.NewClient(conn, ttrpc.WithOnClose(onClose)), nil
+		return ttrpc.NewClient(
+			conn,
+			ttrpc.WithOnClose(onClose),
+			ttrpc.WithUnaryClientInterceptor(otelttrpc.UnaryClientInterceptor()),
+		), nil
 	case "grpc":
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		}
 		return grpcDialContext(params.Address, onClose, gopts...)
 	default:
@@ -367,6 +396,7 @@ type shim struct {
 }
 
 var _ ShimInstance = (*shim)(nil)
+var _ clientVersionDowngrader = (*shim)(nil)
 
 // ID of the shim/task
 func (s *shim) ID() string {
@@ -375,6 +405,15 @@ func (s *shim) ID() string {
 
 func (s *shim) Endpoint() (string, int) {
 	return s.address, s.version
+}
+
+func (s *shim) Downgrade() error {
+	if s.version >= CurrentShimVersion {
+		s.version--
+		return nil
+	}
+	return fmt.Errorf("unable to downgrade because shim version (%d) is lower than CurrentShimVersion (%d)",
+		s.version, CurrentShimVersion)
 }
 
 func (s *shim) Namespace() string {
@@ -459,7 +498,7 @@ func (s *shimTask) Shutdown(ctx context.Context) error {
 		ID: s.ID(),
 	})
 	if err != nil && !errors.Is(err, ttrpc.ErrClosed) {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -476,7 +515,7 @@ func (s *shimTask) PID(ctx context.Context) (uint32, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return 0, errdefs.FromGRPC(err)
+		return 0, errgrpc.ToNative(err)
 	}
 
 	return response.TaskPid, nil
@@ -487,9 +526,9 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		ID: s.ID(),
 	})
 	if shimErr != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Debug("failed to delete task")
+		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Error("failed to delete task")
 		if !errors.Is(shimErr, ttrpc.ErrClosed) {
-			shimErr = errdefs.FromGRPC(shimErr)
+			shimErr = errgrpc.ToNative(shimErr)
 			if !errdefs.IsNotFound(shimErr) {
 				return nil, shimErr
 			}
@@ -514,6 +553,11 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	// REF: https://github.com/containerd/containerd/issues/4769
 	if shimErr == nil {
 		removeTask(ctx, s.ID())
+	}
+
+	const supportSandboxAPIVersion = 3
+	if _, apiVer := s.ShimInstance.Endpoint(); apiVer < supportSandboxAPIVersion {
+		sandboxed = false
 	}
 
 	// Don't shutdown sandbox as there may be other containers running.
@@ -573,7 +617,51 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 
 	_, err := s.task.Create(ctx, request)
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
+	}
+
+	if opts.RestoreFromPath {
+		// Unpack rootfs-diff.tar if it exists.
+		// This needs to happen between the 'Create()' from above and before the 'Start()' from below.
+		rootfsDiff := filepath.Join(opts.Checkpoint, "..", crmetadata.RootFsDiffTar)
+
+		_, err = os.Stat(rootfsDiff)
+		if err == nil {
+			rootfsDiffTar, err := os.Open(rootfsDiff)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open rootfs-diff archive %s for import: %w", rootfsDiffTar.Name(), err)
+			}
+			defer func(f *os.File) {
+				if err := f.Close(); err != nil {
+					log.G(ctx).Errorf("Unable to close file %s: %q", f.Name(), err)
+				}
+			}(rootfsDiffTar)
+
+			decompressed, err := compression.DecompressStream(rootfsDiffTar)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decompress archive %s for import: %w", rootfsDiffTar.Name(), err)
+			}
+
+			rootfs := filepath.Join(s.Bundle(), "rootfs")
+			_, err = archive.Apply(
+				ctx,
+				rootfs,
+				decompressed,
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("unpacking of rootfs-diff archive %s into %s failed: %w", rootfsDiffTar.Name(), rootfs, err)
+			}
+			log.G(ctx).Debugf("Unpacked checkpoint in %s", rootfs)
+		}
+		// (adrianreber): This is unclear to me. But it works (and it is necessary).
+		// This is probably connected to my misunderstanding why
+		// restoring a container goes through Create().
+		log.G(ctx).Infof("About to start with opts.Checkpoint %s", opts.Checkpoint)
+		err = s.Start(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return s, nil
@@ -583,7 +671,7 @@ func (s *shimTask) Pause(ctx context.Context) error {
 	if _, err := s.task.Pause(ctx, &task.PauseRequest{
 		ID: s.ID(),
 	}); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -592,7 +680,7 @@ func (s *shimTask) Resume(ctx context.Context) error {
 	if _, err := s.task.Resume(ctx, &task.ResumeRequest{
 		ID: s.ID(),
 	}); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -602,7 +690,7 @@ func (s *shimTask) Start(ctx context.Context) error {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -613,7 +701,7 @@ func (s *shimTask) Kill(ctx context.Context, signal uint32, all bool) error {
 		Signal: signal,
 		All:    all,
 	}); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -632,7 +720,7 @@ func (s *shimTask) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (
 		Spec:     opts.Spec,
 	}
 	if _, err := s.task.Exec(ctx, request); err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return &process{
 		id:   id,
@@ -645,7 +733,7 @@ func (s *shimTask) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	var processList []runtime.ProcessInfo
 	for _, p := range resp.Processes {
@@ -664,7 +752,7 @@ func (s *shimTask) ResizePty(ctx context.Context, size runtime.ConsoleSize) erro
 		Height: size.Height,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -675,7 +763,7 @@ func (s *shimTask) CloseIO(ctx context.Context) error {
 		Stdin: true,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -689,7 +777,7 @@ func (s *shimTask) Wait(ctx context.Context) (*runtime.Exit, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return &runtime.Exit{
 		Pid:       taskPid,
@@ -705,7 +793,7 @@ func (s *shimTask) Checkpoint(ctx context.Context, path string, options *ptypes.
 		Options: options,
 	}
 	if _, err := s.task.Checkpoint(ctx, request); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -716,7 +804,7 @@ func (s *shimTask) Update(ctx context.Context, resources *ptypes.Any, annotation
 		Resources:   resources,
 		Annotations: annotations,
 	}); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -726,7 +814,7 @@ func (s *shimTask) Stats(ctx context.Context) (*ptypes.Any, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return response.Stats, nil
 }
@@ -751,7 +839,7 @@ func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
 			return runtime.State{}, err
 		}
 		if !errors.Is(err, ttrpc.ErrClosed) {
-			return runtime.State{}, errdefs.FromGRPC(err)
+			return runtime.State{}, errgrpc.ToNative(err)
 		}
 		return runtime.State{}, errdefs.ErrNotFound
 	}

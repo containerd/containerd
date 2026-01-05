@@ -37,29 +37,9 @@ import (
 	sandboxsapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	apitypes "github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/core/content"
-	contentproxy "github.com/containerd/containerd/v2/core/content/proxy"
-	"github.com/containerd/containerd/v2/core/events"
-	eventsproxy "github.com/containerd/containerd/v2/core/events/proxy"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/core/introspection"
-	introspectionproxy "github.com/containerd/containerd/v2/core/introspection/proxy"
-	"github.com/containerd/containerd/v2/core/leases"
-	leasesproxy "github.com/containerd/containerd/v2/core/leases/proxy"
-	"github.com/containerd/containerd/v2/core/remotes"
-	"github.com/containerd/containerd/v2/core/remotes/docker"
-	"github.com/containerd/containerd/v2/core/sandbox"
-	sandboxproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
-	"github.com/containerd/containerd/v2/core/snapshots"
-	snproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
-	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/dialer"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
@@ -71,6 +51,33 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/content"
+	contentproxy "github.com/containerd/containerd/v2/core/content/proxy"
+	"github.com/containerd/containerd/v2/core/events"
+	eventsproxy "github.com/containerd/containerd/v2/core/events/proxy"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/introspection"
+	introspectionproxy "github.com/containerd/containerd/v2/core/introspection/proxy"
+	"github.com/containerd/containerd/v2/core/leases"
+	leasesproxy "github.com/containerd/containerd/v2/core/leases/proxy"
+	"github.com/containerd/containerd/v2/core/mount"
+	mountproxy "github.com/containerd/containerd/v2/core/mount/proxy"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/sandbox"
+	sandboxproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	snproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
+	"github.com/containerd/containerd/v2/core/transfer"
+	transferproxy "github.com/containerd/containerd/v2/core/transfer/proxy"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/pkg/dialer"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 func init() {
@@ -110,9 +117,11 @@ func New(address string, opts ...Opt) (*Client, error) {
 	}
 
 	if copts.defaultRuntime != "" {
-		c.runtime = copts.defaultRuntime
-	} else {
-		c.runtime = defaults.DefaultRuntime
+		c.defaults.runtime = copts.defaultRuntime
+	}
+
+	if copts.defaultSandboxer != "" {
+		c.defaults.sandboxer = copts.defaultSandboxer
 	}
 
 	if copts.defaultPlatform != nil {
@@ -128,7 +137,8 @@ func New(address string, opts ...Opt) (*Client, error) {
 		backoffConfig := backoff.DefaultConfig
 		backoffConfig.MaxDelay = copts.timeout
 		connParams := grpc.ConnectParams{
-			Backoff: backoffConfig,
+			Backoff:           backoffConfig,
+			MinConnectTimeout: copts.timeout,
 		}
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -138,6 +148,8 @@ func New(address string, opts ...Opt) (*Client, error) {
 		if len(copts.dialOptions) > 0 {
 			gopts = copts.dialOptions
 		}
+		gopts = append(gopts, copts.extraDialOpts...)
+
 		gopts = append(gopts, grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize),
 			grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)))
@@ -167,15 +179,6 @@ func New(address string, opts ...Opt) (*Client, error) {
 		return nil, fmt.Errorf("no grpc connection or services is available: %w", errdefs.ErrUnavailable)
 	}
 
-	// check namespace labels for default runtime
-	if copts.defaultRuntime == "" && c.defaultns != "" {
-		if label, err := c.GetLabel(context.Background(), defaults.DefaultRuntimeNSLabel); err != nil {
-			return nil, err
-		} else if label != "" {
-			c.runtime = label
-		}
-	}
-
 	return c, nil
 }
 
@@ -191,22 +194,20 @@ func NewWithConn(conn *grpc.ClientConn, opts ...Opt) (*Client, error) {
 	c := &Client{
 		defaultns: copts.defaultns,
 		conn:      conn,
-		runtime:   defaults.DefaultRuntime,
+	}
+
+	if copts.defaultRuntime != "" {
+		c.defaults.runtime = copts.defaultRuntime
+	}
+
+	if copts.defaultSandboxer != "" {
+		c.defaults.sandboxer = copts.defaultSandboxer
 	}
 
 	if copts.defaultPlatform != nil {
 		c.platform = copts.defaultPlatform
 	} else {
 		c.platform = platforms.Default()
-	}
-
-	// check namespace labels for default runtime
-	if copts.defaultRuntime == "" && c.defaultns != "" {
-		if label, err := c.GetLabel(context.Background(), defaults.DefaultRuntimeNSLabel); err != nil {
-			return nil, err
-		} else if label != "" {
-			c.runtime = label
-		}
 	}
 
 	if copts.services != nil {
@@ -221,10 +222,16 @@ type Client struct {
 	services
 	connMu    sync.Mutex
 	conn      *grpc.ClientConn
-	runtime   string
 	defaultns string
 	platform  platforms.MatchComparer
 	connector func() (*grpc.ClientConn, error)
+
+	// this should only be accessed via default*() functions
+	defaults struct {
+		runtime   string
+		sandboxer string
+		mut       sync.Mutex
+	}
 }
 
 // Reconnect re-establishes the GRPC connection to the containerd daemon
@@ -245,7 +252,54 @@ func (c *Client) Reconnect() error {
 
 // Runtime returns the name of the runtime being used
 func (c *Client) Runtime() string {
-	return c.runtime
+	runtime, _ := c.defaultRuntime(context.TODO())
+	return runtime
+}
+
+func (c *Client) defaultRuntime(ctx context.Context) (string, error) {
+	c.defaults.mut.Lock()
+	defer c.defaults.mut.Unlock()
+
+	if c.defaults.runtime != "" {
+		return c.defaults.runtime, nil
+	}
+
+	if c.defaultns != "" {
+		label, err := c.GetLabel(ctx, defaults.DefaultRuntimeNSLabel)
+		if err != nil {
+			// Don't set the runtime value if there's an error
+			return defaults.DefaultRuntime, fmt.Errorf("failed to get default runtime label: %w", err)
+		}
+		if label != "" {
+			c.defaults.runtime = label
+			return label, nil
+		}
+	}
+	c.defaults.runtime = defaults.DefaultRuntime
+	return c.defaults.runtime, nil
+}
+
+func (c *Client) defaultSandboxer(ctx context.Context) (string, error) {
+	c.defaults.mut.Lock()
+	defer c.defaults.mut.Unlock()
+
+	if c.defaults.sandboxer != "" {
+		return c.defaults.sandboxer, nil
+	}
+
+	if c.defaultns != "" {
+		label, err := c.GetLabel(ctx, defaults.DefaultSandboxerNSLabel)
+		if err != nil {
+			// Don't set the sandboxer value if there's an error
+			return defaults.DefaultSandboxer, fmt.Errorf("failed to get default sandboxer label: %w", err)
+		}
+		if label != "" {
+			c.defaults.sandboxer = label
+			return label, nil
+		}
+	}
+	c.defaults.sandboxer = defaults.DefaultSandboxer
+	return c.defaults.sandboxer, nil
 }
 
 // IsServing returns true if the client can successfully connect to the
@@ -284,16 +338,23 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 // NewContainer will create a new container with the provided id.
 // The id must be unique within the namespace.
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
+	ctx, span := tracing.StartSpan(ctx, "client.NewContainer")
+	defer span.End()
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer done(ctx)
 
+	runtime, err := c.defaultRuntime(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	container := containers.Container{
 		ID: id,
 		Runtime: containers.RuntimeInfo{
-			Name: c.runtime,
+			Name: runtime,
 		},
 	}
 	for _, o := range opts {
@@ -301,6 +362,13 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 			return nil, err
 		}
 	}
+
+	span.SetAttributes(
+		tracing.Attribute("container.id", container.ID),
+		tracing.Attribute("container.image.ref", container.Image),
+		tracing.Attribute("container.runtime.name", container.Runtime.Name),
+		tracing.Attribute("container.snapshotter.name", container.Snapshotter),
+	)
 	r, err := c.ContainerService().Create(ctx, container)
 	if err != nil {
 		return nil, err
@@ -310,10 +378,21 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 
 // LoadContainer loads an existing container from metadata
 func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error) {
+	ctx, span := tracing.StartSpan(ctx, "client.LoadContainer")
+	defer span.End()
 	r, err := c.ContainerService().Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
+
+	span.SetAttributes(
+		tracing.Attribute("container.id", r.ID),
+		tracing.Attribute("container.image.ref", r.Image),
+		tracing.Attribute("container.runtime.name", r.Runtime.Name),
+		tracing.Attribute("container.snapshotter.name", r.Snapshotter),
+		tracing.Attribute("container.createdAt", r.CreatedAt.Format(time.RFC3339)),
+		tracing.Attribute("container.updatedAt", r.UpdatedAt.Format(time.RFC3339)),
+	)
 	return containerFromRecord(c, r), nil
 }
 
@@ -358,21 +437,25 @@ type RemoteContext struct {
 	// after it has completed transferring.
 	HandlerWrapper func(images.Handler) images.Handler
 
-	// ConvertSchema1 is whether to convert Docker registry schema 1
-	// manifests. If this option is false then any image which resolves
-	// to schema 1 will return an error since schema 1 is not supported.
-	//
-	// Deprecated: use Schema 2 or OCI images.
-	ConvertSchema1 bool
-
 	// Platforms defines which platforms to handle when doing the image operation.
 	// Platforms is ignored when a PlatformMatcher is set, otherwise the
 	// platforms will be used to create a PlatformMatcher with no ordering
 	// preference.
 	Platforms []string
 
-	// MaxConcurrentDownloads is the max concurrent content downloads for each pull.
+	DownloadLimiter *semaphore.Weighted
+
+	// MaxConcurrentDownloads restricts the total number of concurrent downloads
+	// across all layers during an image pull operation. This helps control the
+	// overall network bandwidth usage.
 	MaxConcurrentDownloads int
+
+	// ConcurrentLayerFetchBuffer sets the maximum size in bytes for each chunk
+	// when downloading layers in parallel. Larger chunks reduce coordination
+	// overhead but use more memory. When ConcurrentLayerFetchBuffer is above
+	// 512 bytes, parallel layer fetch is enabled. It can accelerate pulls for
+	// big images.
+	ConcurrentLayerFetchBuffer int
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploaded layers for each push.
 	MaxConcurrentUploadedLayers int
@@ -383,6 +466,10 @@ type RemoteContext struct {
 	// ChildLabelMap sets the labels used to reference child objects in the content
 	// store. By default, all GC reference labels will be set for all fetched content.
 	ChildLabelMap func(ocispec.Descriptor) []string
+
+	// ReferrersProvider provides a way to lookup additional referrers for a given
+	// descriptor. For example pulling them with remotes.ReferrerFetcher.
+	ReferrersProvider content.ReferrersProvider
 }
 
 func defaultRemoteContext() *RemoteContext {
@@ -732,7 +819,27 @@ func (c *Client) SandboxController(name string) sandbox.Controller {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn))
+	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn), name)
+}
+
+// TranferService returns the underlying transferrer
+func (c *Client) TransferService() transfer.Transferrer {
+	if c.transferService != nil {
+		return c.transferService
+	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return transferproxy.NewTransferrer(transferapi.NewTransferClient(c.conn), c.streamCreator())
+}
+
+// MountManager returns the underlying mount manager client
+func (c *Client) MountManager() mount.Manager {
+	if c.mountManager != nil {
+		return c.mountManager
+	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return mountproxy.NewMountManager(c.conn)
 }
 
 // VersionService returns the underlying VersionClient
@@ -894,14 +1001,16 @@ type RuntimeInfo struct {
 }
 
 func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOptions interface{}) (*RuntimeInfo, error) {
-	rt := c.runtime
+	runtime, err := c.defaultRuntime(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if runtimePath != "" {
-		rt = runtimePath
+		runtime = runtimePath
 	}
 	rr := &apitypes.RuntimeRequest{
-		RuntimePath: rt,
+		RuntimePath: runtime,
 	}
-	var err error
 	if runtimeOptions != nil {
 		rr.Options, err = typeurl.MarshalAnyToProto(runtimeOptions)
 		if err != nil {

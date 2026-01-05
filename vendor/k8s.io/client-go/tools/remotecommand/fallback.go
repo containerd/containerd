@@ -18,6 +18,8 @@ package remotecommand
 
 import (
 	"context"
+
+	"k8s.io/klog/v2"
 )
 
 var _ Executor = &FallbackExecutor{}
@@ -50,7 +52,8 @@ func (f *FallbackExecutor) Stream(options StreamOptions) error {
 // initial primary call to upgrade to a websocket connection fails.
 func (f *FallbackExecutor) StreamWithContext(ctx context.Context, options StreamOptions) error {
 	err := f.primary.StreamWithContext(ctx, options)
-	if f.shouldFallback(err) {
+	if err != nil && f.shouldFallback(err) {
+		klog.V(4).Infof("RemoteCommand fallback: %v", err)
 		return f.secondary.StreamWithContext(ctx, options)
 	}
 	return err

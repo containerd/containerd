@@ -23,14 +23,16 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"google.golang.org/protobuf/types/known/anypb"
 
 	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/api/types"
+
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/mount"
@@ -66,12 +68,16 @@ func init() {
 			state := ic.Properties[plugins.PropertyStateDir]
 			root := ic.Properties[plugins.PropertyRootDir]
 			for _, d := range []string{root, state} {
-				if err := os.MkdirAll(d, 0711); err != nil {
+				if err := os.MkdirAll(d, 0700); err != nil {
+					return nil, err
+				}
+				// chmod is needed for upgrading from an older release that created the dir with 0o711
+				if err := os.Chmod(d, 0o700); err != nil {
 					return nil, err
 				}
 			}
 
-			if err := shims.LoadExistingShims(ic.Context, root, state); err != nil {
+			if err := shims.LoadExistingShims(ic.Context, state, root); err != nil {
 				return nil, fmt.Errorf("failed to load existing shim sandboxes, %v", err)
 			}
 
@@ -150,23 +156,15 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 		return err
 	}
 
-	var options *anypb.Any
-	if coptions.Options != nil {
-		options = &anypb.Any{
-			TypeUrl: coptions.Options.GetTypeUrl(),
-			Value:   coptions.Options.GetValue(),
-		}
-	}
-
 	if _, err := svc.CreateSandbox(ctx, &runtimeAPI.CreateSandboxRequest{
 		SandboxID:  sandboxID,
 		BundlePath: shim.Bundle(),
 		Rootfs:     mount.ToProto(coptions.Rootfs),
-		Options:    options,
+		Options:    typeurl.MarshalProto(coptions.Options),
 		NetnsPath:  coptions.NetNSPath,
 	}); err != nil {
 		c.cleanupShim(ctx, sandboxID, svc)
-		return fmt.Errorf("failed to create sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
+		return fmt.Errorf("failed to create sandbox %s: %w", sandboxID, errgrpc.ToNative(err))
 	}
 
 	return nil
@@ -186,7 +184,7 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 	resp, err := svc.StartSandbox(ctx, &runtimeAPI.StartSandboxRequest{SandboxID: sandboxID})
 	if err != nil {
 		c.cleanupShim(ctx, sandboxID, svc)
-		return sandbox.ControllerInstance{}, fmt.Errorf("failed to start sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
+		return sandbox.ControllerInstance{}, fmt.Errorf("failed to start sandbox %s: %w", sandboxID, errgrpc.ToNative(err))
 	}
 	address, version := shim.Endpoint()
 	return sandbox.ControllerInstance{
@@ -206,7 +204,7 @@ func (c *controllerLocal) Platform(ctx context.Context, sandboxID string) (image
 
 	response, err := svc.Platform(ctx, &runtimeAPI.PlatformRequest{SandboxID: sandboxID})
 	if err != nil {
-		return imagespec.Platform{}, fmt.Errorf("failed to get sandbox platform: %w", errdefs.FromGRPC(err))
+		return imagespec.Platform{}, fmt.Errorf("failed to get sandbox platform: %w", errgrpc.ToNative(err))
 	}
 
 	var platform imagespec.Platform
@@ -237,7 +235,7 @@ func (c *controllerLocal) Stop(ctx context.Context, sandboxID string, opts ...sa
 	}
 
 	if _, err := svc.StopSandbox(ctx, req); err != nil {
-		err = errdefs.FromGRPC(err)
+		err = errgrpc.ToNative(err)
 		if !errdefs.IsNotFound(err) && !errdefs.IsUnavailable(err) {
 			return fmt.Errorf("failed to stop sandbox: %w", err)
 		}
@@ -254,7 +252,7 @@ func (c *controllerLocal) Shutdown(ctx context.Context, sandboxID string) error 
 
 	_, err = svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{SandboxID: sandboxID})
 	if err != nil {
-		return fmt.Errorf("failed to shutdown sandbox: %w", errdefs.FromGRPC(err))
+		return fmt.Errorf("failed to shutdown sandbox: %w", errgrpc.ToNative(err))
 	}
 
 	if err := c.shims.Delete(ctx, sandboxID); err != nil {
@@ -275,7 +273,7 @@ func (c *controllerLocal) Wait(ctx context.Context, sandboxID string) (sandbox.E
 	})
 
 	if err != nil {
-		return sandbox.ExitStatus{}, fmt.Errorf("failed to wait sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
+		return sandbox.ExitStatus{}, fmt.Errorf("failed to wait sandbox %s: %w", sandboxID, errgrpc.ToNative(err))
 	}
 
 	return sandbox.ExitStatus{

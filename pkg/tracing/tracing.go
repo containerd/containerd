@@ -25,7 +25,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -35,6 +34,14 @@ type StartConfig struct {
 }
 
 type SpanOpt func(config *StartConfig)
+
+// WithAttribute appends attributes to a new created span.
+func WithAttribute(k string, v interface{}) SpanOpt {
+	return func(config *StartConfig) {
+		config.spanOpts = append(config.spanOpts,
+			trace.WithAttributes(Attribute(k, v)))
+	}
+}
 
 // UpdateHTTPClient updates the http client with the necessary otel transport
 func UpdateHTTPClient(client *http.Client, name string) {
@@ -80,8 +87,13 @@ func (s *Span) End() {
 }
 
 // AddEvent adds an event with provided name and options.
-func (s *Span) AddEvent(name string, options ...trace.EventOption) {
-	s.otelSpan.AddEvent(name, options...)
+func (s *Span) AddEvent(name string, attributes ...attribute.KeyValue) {
+	s.otelSpan.AddEvent(name, trace.WithAttributes(attributes...))
+}
+
+// RecordError will record err as an exception span event for this span
+func (s *Span) RecordError(err error, options ...trace.EventOption) {
+	s.otelSpan.RecordError(err, options...)
 }
 
 // SetStatus sets the status of the current span.
@@ -112,8 +124,11 @@ func Attribute(k string, v any) attribute.KeyValue {
 	return keyValue(k, v)
 }
 
-// HTTPStatusCodeAttributes generates attributes of the HTTP namespace as specified by the OpenTelemetry
-// specification for a span.
+// HTTPStatusCodeAttributes generates HTTP response status code attributes
+// as specified by the current OpenTelemetry semantic conventions.
 func HTTPStatusCodeAttributes(code int) []attribute.KeyValue {
-	return []attribute.KeyValue{semconv.HTTPStatusCodeKey.Int(code)}
+	return []attribute.KeyValue{
+		attribute.Int("http.response.status_code", code),
+		attribute.Int("http.status_code", code), // Deprecated: SemConv <= v1.21
+	}
 }

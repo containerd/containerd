@@ -33,10 +33,9 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
-	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
@@ -63,6 +62,8 @@ const (
 	sandboxesDir = "sandboxes"
 	// containersDir contains all container root.
 	containersDir = "containers"
+	// imageVolumeDir contains all image volume root.
+	imageVolumeDir = "image-volumes"
 	// Delimiter used to construct container/sandbox names.
 	nameDelimiter = "_"
 
@@ -139,6 +140,16 @@ func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetada
 // e.g. state checkpoint.
 func (c *criService) getContainerRootDir(id string) string {
 	return filepath.Join(c.config.RootDir, containersDir, id)
+}
+
+// getImageVolumeHostPath returns the image volume directory for share.
+func (c *criService) getImageVolumeHostPath(podID, imageID string) string {
+	return filepath.Join(c.config.StateDir, imageVolumeDir, podID, imageID)
+}
+
+// getImageVolumeBaseDir returns the image volume base directory for cleanup.
+func (c *criService) getImageVolumeBaseDir(podID string) string {
+	return filepath.Join(c.config.StateDir, imageVolumeDir, podID)
 }
 
 // getVolatileContainerRootDir returns the root directory for managing volatile container files,
@@ -220,27 +231,6 @@ func filterLabel(k, v string) string {
 	return fmt.Sprintf("labels.%q==%q", k, v)
 }
 
-// buildLabel builds the labels from config to be passed to containerd
-func buildLabels(configLabels, imageConfigLabels map[string]string, containerType string) map[string]string {
-	labels := make(map[string]string)
-
-	for k, v := range imageConfigLabels {
-		if err := clabels.Validate(k, v); err == nil {
-			labels[k] = v
-		} else {
-			// In case the image label is invalid, we output a warning and skip adding it to the
-			// container.
-			log.L.WithError(err).Warnf("unable to add image label with key %s to the container", k)
-		}
-	}
-	// labels from the CRI request (config) will override labels in the image config
-	for k, v := range configLabels {
-		labels[k] = v
-	}
-	labels[crilabels.ContainerKindLabel] = containerType
-	return labels
-}
-
 // getRuntimeOptions get runtime options from container metadata.
 func getRuntimeOptions(c containers.Container) (interface{}, error) {
 	from := c.Runtime.Options
@@ -271,25 +261,6 @@ func unknownContainerStatus() containerstore.Status {
 		Reason:     unknownExitReason,
 		Unknown:    true,
 	}
-}
-
-// getPassthroughAnnotations filters requested pod annotations by comparing
-// against permitted annotations for the given runtime.
-func getPassthroughAnnotations(podAnnotations map[string]string,
-	runtimePodAnnotations []string) (passthroughAnnotations map[string]string) {
-	passthroughAnnotations = make(map[string]string)
-
-	for podAnnotationKey, podAnnotationValue := range podAnnotations {
-		for _, pattern := range runtimePodAnnotations {
-			// Use path.Match instead of filepath.Match here.
-			// filepath.Match treated `\\` as path separator
-			// on windows, which is not what we want.
-			if ok, _ := path.Match(pattern, podAnnotationKey); ok {
-				passthroughAnnotations[podAnnotationKey] = podAnnotationValue
-			}
-		}
-	}
-	return passthroughAnnotations
 }
 
 // copyResourcesToStatus copys container resource contraints from spec to
@@ -395,7 +366,19 @@ func (c *criService) generateAndSendContainerEvent(ctx context.Context, containe
 		ContainersStatuses: containerStatuses,
 	}
 
-	c.containerEventsQ.Send(event)
+	c.containerEventsQ.Send(&event)
+}
+
+func (c *criService) getPodSandboxRuntime(sandboxID string) (runtime criconfig.Runtime, err error) {
+	sandbox, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return criconfig.Runtime{}, err
+	}
+	runtime, err = c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
+	if err != nil {
+		return criconfig.Runtime{}, err
+	}
+	return runtime, nil
 }
 
 func (c *criService) getPodSandboxStatus(ctx context.Context, podSandboxID string) (*runtime.PodSandboxStatus, error) {
@@ -519,7 +502,7 @@ func parseUsernsIDMap(runtimeIDMap []*runtime.IDMapping) ([]runtimespec.LinuxIDM
 	if runtimeIDMap[0] == nil {
 		return m, nil
 	}
-	uidMap := *runtimeIDMap[0]
+	uidMap := runtimeIDMap[0]
 
 	if uidMap.Length < 1 {
 		return m, fmt.Errorf("invalid mapping length: %v", uidMap.Length)

@@ -24,12 +24,10 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/containerd/log"
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 	"golang.org/x/sys/unix"
 )
 
@@ -56,10 +54,7 @@ func init() {
 //
 // It returns:
 //  1. New options that include new "lowedir=..." mount option.
-//  2. "Clean up" function -- it should be called as a defer one before
-//     checking for error, because if do the second and avoid calling "clean up",
-//     you're going to have "dirty" setup -- there's no guarantee that those
-//     temporary mount points for lowedirs will be cleaned properly.
+//  2. "Clean up" function -- it should be called only if no error is returned.
 //  3. Error -- nil if everything's fine, otherwise an error.
 func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), error) {
 	lowerIdx, lowerDirs := findOverlayLowerdirs(options)
@@ -67,7 +62,7 @@ func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), e
 		return options, nil, fmt.Errorf("failed to parse overlay lowerdir's from given options")
 	}
 
-	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(lowerDirs, usernsFd)
+	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(tempMountLocation, lowerDirs, usernsFd)
 	if err != nil {
 		return options, idMapCleanUp, fmt.Errorf("failed to create idmapped mount: %w", err)
 	}
@@ -111,11 +106,11 @@ func (m *Mount) mount(target string) (err error) {
 				userNsCleanUp func()
 			)
 			options, userNsCleanUp, err = prepareIDMappedOverlay(int(usernsFd.Fd()), options)
-			defer userNsCleanUp()
-
 			if err != nil {
 				return fmt.Errorf("failed to prepare idmapped overlay: %w", err)
 			}
+			defer userNsCleanUp()
+
 			// To not meet concurrency issues while using the same lowedirs
 			// for different containers, replace them by temporary directories,
 			if optionsSize(options) >= pagesize-512 {
@@ -164,7 +159,7 @@ func (m *Mount) mount(target string) (err error) {
 		// or remount with changed data
 		source := m.Source
 		if opt.losetup {
-			loFile, err := setupLoop(m.Source, loopParams)
+			loFile, err := SetupLoop(m.Source, loopParams)
 			if err != nil {
 				return err
 			}
@@ -245,119 +240,86 @@ func getUnprivilegedMountFlags(path string) (int, error) {
 	return flags, nil
 }
 
-func doPrepareIDMappedOverlay(lowerDirs []string, usernsFd int) (tmpLowerDirs []string, _ func(), _ error) {
-	td, err := os.MkdirTemp(tempMountLocation, "ovl-idmapped")
+func doPrepareIDMappedOverlay(tmpDir string, lowerDirs []string, usernsFd int) (_ []string, _ func(), retErr error) {
+	commonDir, err := getCommonDirectory(lowerDirs)
 	if err != nil {
+		return nil, nil, fmt.Errorf("failed to determine common parent: %w", err)
+	}
+
+	tempRemountsLocation, err := os.MkdirTemp(tmpDir, "ovl-idmapped")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
+	}
+	cleanDir := func() {
+		if err := os.Remove(tempRemountsLocation); err != nil {
+			log.L.WithError(err).Infof("failed to remove idmapped directory")
+		}
+	}
+	defer func() {
+		if retErr != nil {
+			cleanDir()
+		}
+	}()
+
+	// IDMapMount the directory containing all the layers
+	if err := IDMapMountWithAttrs(commonDir, tempRemountsLocation, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
 		return nil, nil, err
 	}
-	cleanUp := func() {
-		for _, lowerDir := range tmpLowerDirs {
-			if err := unix.Unmount(lowerDir, 0); err != nil {
-				log.L.WithError(err).Warnf("failed to unmount temp lowerdir %s", lowerDir)
-			}
-		}
-		if terr := os.RemoveAll(filepath.Clean(filepath.Join(tmpLowerDirs[0], ".."))); terr != nil {
-			log.L.WithError(terr).Warnf("failed to remove temporary overlay lowerdir's")
+	cleanMount := func() {
+		// Use the Unmount helper that does retries because there can be easily an open fd
+		// to the idmapped directory and when containerd forks to create a userns fd (maybe
+		// for another container), it will make the mount busy for a few ms.
+		err := Unmount(tempRemountsLocation, 0)
+		if err != nil {
+			log.L.WithError(err).Warnf("failed to unmount idmapped directory %s: %v", tempRemountsLocation, err)
 		}
 	}
-	for i, lowerDir := range lowerDirs {
-		tmpLowerDir := filepath.Join(td, strconv.Itoa(i))
-		tmpLowerDirs = append(tmpLowerDirs, tmpLowerDir)
+	defer func() {
+		if retErr != nil {
+			cleanMount()
+		}
+	}()
 
-		if err = os.MkdirAll(tmpLowerDir, 0700); err != nil {
-			return nil, cleanUp, fmt.Errorf("failed to create temporary dir: %w", err)
-		}
-		if err = IDMapMount(lowerDir, tmpLowerDir, usernsFd); err != nil {
-			return nil, cleanUp, err
-		}
+	// Build new lower dir paths through the idmapped directory
+	tmpLowerDirs := buildIDMappedPaths(lowerDirs, commonDir, tempRemountsLocation)
+
+	cleanup := func() {
+		cleanMount()
+		cleanDir()
 	}
-	return tmpLowerDirs, cleanUp, nil
+	return tmpLowerDirs, cleanup, nil
 }
 
-// Unmount the provided mount path with the flags
-func Unmount(target string, flags int) error {
-	if err := unmount(target, flags); err != nil && err != unix.EINVAL {
-		return err
+// getCommonDirectory finds the common directory among the lowerDirs passed in.
+// "/" and "." are considered invalid common directories and are treated as error
+func getCommonDirectory(lowerDirs []string) (string, error) {
+	commonPrefix := longestCommonPrefix(lowerDirs)
+	if commonPrefix == "" {
+		return "", fmt.Errorf("no common prefix found")
 	}
-	return nil
+
+	// Ensure the common prefix ends at a directory boundary
+	commonPrefix = path.Dir(commonPrefix)
+
+	if commonPrefix == "." || commonPrefix == "/" {
+		return "", fmt.Errorf("invalid common directory: %s", commonPrefix)
+	}
+
+	return commonPrefix, nil
 }
 
-// fuseSuperMagic is defined in statfs(2)
-const fuseSuperMagic = 0x65735546
+// buildIDMappedPaths constructs new lower directory paths through an idmapped mount of the commonDir.
+// It takes the original lowerDirs, the commonDir of those dirs, and rewrites the paths
+// to go through the idMappedDir directory to achieve idmapped lowerdirs ready for overlayfs
+func buildIDMappedPaths(lowerDirs []string, commonDir, idMappedDir string) []string {
+	tmpLowerDirs := make([]string, 0, len(lowerDirs))
 
-func isFUSE(dir string) bool {
-	var st unix.Statfs_t
-	if err := unix.Statfs(dir, &st); err != nil {
-		return false
-	}
-	return st.Type == fuseSuperMagic
-}
-
-// unmountFUSE attempts to unmount using fusermount/fusermount3 helper binary.
-//
-// For FUSE mounts, using these helper binaries is preferred, see:
-// https://github.com/containerd/containerd/pull/3765#discussion_r342083514
-func unmountFUSE(target string) error {
-	var err error
-	for _, helperBinary := range []string{"fusermount3", "fusermount"} {
-		cmd := exec.Command(helperBinary, "-u", target)
-		err = cmd.Run()
-		if err == nil {
-			return nil
-		}
-	}
-	return err
-}
-
-func unmount(target string, flags int) error {
-	if isFUSE(target) {
-		if err := unmountFUSE(target); err == nil {
-			return nil
-		}
-	}
-	for i := 0; i < 50; i++ {
-		if err := unix.Unmount(target, flags); err != nil {
-			switch err {
-			case unix.EBUSY:
-				time.Sleep(50 * time.Millisecond)
-				continue
-			default:
-				return err
-			}
-		}
-		return nil
-	}
-	return fmt.Errorf("failed to unmount target %s: %w", target, unix.EBUSY)
-}
-
-// UnmountAll repeatedly unmounts the given mount point until there
-// are no mounts remaining (EINVAL is returned by mount), which is
-// useful for undoing a stack of mounts on the same mount point.
-// UnmountAll all is noop when the first argument is an empty string.
-// This is done when the containerd client did not specify any rootfs
-// mounts (e.g. because the rootfs is managed outside containerd)
-// UnmountAll is noop when the mount path does not exist.
-func UnmountAll(mount string, flags int) error {
-	if mount == "" {
-		return nil
-	}
-	if _, err := os.Stat(mount); os.IsNotExist(err) {
-		return nil
+	for _, lowerDir := range lowerDirs {
+		relativePath := strings.TrimPrefix(lowerDir, commonDir)
+		tmpLowerDirs = append(tmpLowerDirs, filepath.Join(idMappedDir, relativePath))
 	}
 
-	for {
-		if err := unmount(mount, flags); err != nil {
-			// EINVAL is returned if the target is not a
-			// mount point, indicating that we are
-			// done. It can also indicate a few other
-			// things (such as invalid flags) which we
-			// unfortunately end up squelching here too.
-			if err == unix.EINVAL {
-				return nil
-			}
-			return err
-		}
-	}
+	return tmpLowerDirs
 }
 
 // parseMountOptions takes fstab style mount options and parses them for
@@ -535,7 +497,11 @@ func optionsSize(opts []string) int {
 
 func mountAt(chdir string, source, target, fstype string, flags uintptr, data string) error {
 	if chdir == "" {
-		return unix.Mount(source, target, fstype, flags, data)
+		err := unix.Mount(source, target, fstype, flags, data)
+		if err != nil {
+			return fmt.Errorf("mount source: %q, target: %q, fstype: %s, flags: %d, data: %q, err: %w", source, target, fstype, flags, data, err)
+		}
+		return nil
 	}
 
 	ch := make(chan error, 1)
@@ -557,8 +523,11 @@ func mountAt(chdir string, source, target, fstype string, flags uintptr, data st
 			ch <- err
 			return
 		}
-
-		ch <- unix.Mount(source, target, fstype, flags, data)
+		err := unix.Mount(source, target, fstype, flags, data)
+		if err != nil {
+			err = fmt.Errorf("mount source: %q, target: %q, fstype: %s, flags: %d, data: %q, err: %w", source, target, fstype, flags, data, err)
+		}
+		ch <- err
 	}()
 	return <-ch
 }

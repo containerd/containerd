@@ -10,7 +10,7 @@
 // for their specific task. If you are required to interoperate with OpenPGP
 // systems and need a maintained package, consider a community fork.
 // See https://golang.org/issue/44226.
-package s2k // import "golang.org/x/crypto/openpgp/s2k"
+package s2k
 
 import (
 	"crypto"
@@ -53,7 +53,7 @@ func (c *Config) hash() crypto.Hash {
 
 func (c *Config) encodedCount() uint8 {
 	if c == nil || c.S2KCount == 0 {
-		return 96 // The common case. Correspoding to 65536
+		return 96 // The common case. Corresponding to 65536
 	}
 
 	i := c.S2KCount

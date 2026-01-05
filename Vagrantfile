@@ -17,7 +17,7 @@
 
 # Vagrantfile for Fedora and EL
 Vagrant.configure("2") do |config|
-  config.vm.box = ENV["BOX"] ? ENV["BOX"].split("@")[0] : "fedora/40-cloud-base"
+  config.vm.box = ENV["BOX"] ? ENV["BOX"].split("@")[0] : "fedora/43-cloud-base"
   # BOX_VERSION is deprecated. Use "BOX=<BOX>@<BOX_VERSION>".
   config.vm.box_version = ENV["BOX_VERSION"] || (ENV["BOX"].split("@")[1] if ENV["BOX"])
 
@@ -35,7 +35,10 @@ Vagrant.configure("2") do |config|
     v.memory = memory
     v.cpus = cpus
     v.machine_virtual_size = disk_size
-    v.loader = "/usr/share/OVMF/OVMF_CODE.fd"
+    # https://github.com/vagrant-libvirt/vagrant-libvirt/issues/1725#issuecomment-1454058646
+    # Needs `sudo cp /usr/share/OVMF/OVMF_VARS_4M.fd /var/lib/libvirt/qemu/nvram/`
+    v.loader = '/usr/share/OVMF/OVMF_CODE_4M.fd'
+    v.nvram = '/var/lib/libvirt/qemu/nvram/OVMF_VARS_4M.fd'
   end
 
   config.vm.synced_folder ".", "/vagrant", type: "rsync"
@@ -104,7 +107,7 @@ EOF
   config.vm.provision "install-golang", type: "shell", run: "once" do |sh|
     sh.upload_path = "/tmp/vagrant-install-golang"
     sh.env = {
-        'GO_VERSION': ENV['GO_VERSION'] || "1.22.5",
+        'GO_VERSION': ENV['GO_VERSION'] || "1.24.11",
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
@@ -272,6 +275,7 @@ EOF
         'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
         'GOTESTSUM_JSONFILE': ENV['GOTESTSUM_JSONFILE'],
         'GITHUB_WORKSPACE': '',
+        'CGROUP_DRIVER': ENV['CGROUP_DRIVER'],
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
@@ -299,6 +303,7 @@ EOF
     sh.env = {
         'GOTEST': ENV['GOTEST'] || "go test",
         'REPORT_DIR': ENV['REPORT_DIR'],
+        'CGROUP_DRIVER': ENV['CGROUP_DRIVER'],
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash

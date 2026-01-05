@@ -146,7 +146,7 @@ func benchmarkSnapshotter(b *testing.B, snapshotter snapshots.Snapshotter) {
 	var (
 		total      = 0
 		layers     = make([]fstest.Applier, 0, layerCount)
-		layerIndex = int64(0)
+		layerIndex = atomic.Int64{}
 	)
 
 	for i := 1; i <= layerCount; i++ {
@@ -181,7 +181,7 @@ func benchmarkSnapshotter(b *testing.B, snapshotter snapshots.Snapshotter) {
 		var timer time.Time
 		for i := 0; i < b.N; i++ {
 			for l := 0; l < layerCount; l++ {
-				current = fmt.Sprintf("prepare-layer-%d", atomic.AddInt64(&layerIndex, 1))
+				current = fmt.Sprintf("prepare-layer-%d", layerIndex.Add(1))
 
 				timer = time.Now()
 				mounts, err := snapshotter.Prepare(ctx, current, parent)
@@ -193,7 +193,7 @@ func benchmarkSnapshotter(b *testing.B, snapshotter snapshots.Snapshotter) {
 				assert.Nil(b, err)
 				writeDuration += time.Since(timer)
 
-				parent = fmt.Sprintf("committed-%d", atomic.AddInt64(&layerIndex, 1))
+				parent = fmt.Sprintf("committed-%d", layerIndex.Add(1))
 
 				timer = time.Now()
 				err = snapshotter.Commit(ctx, parent, current)

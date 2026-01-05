@@ -16,6 +16,13 @@ type pendingCimOp interface {
 	apply(cw *cimfs.CimFsWriter) error
 }
 
+type pendingCimOpFunc func(cw *cimfs.CimFsWriter) error
+
+func (f pendingCimOpFunc) apply(cw *cimfs.CimFsWriter) error {
+	return f(cw)
+
+}
+
 // add op represents a pending operation of adding a new file inside the cim
 type addOp struct {
 	// path inside the cim at which the file should be added

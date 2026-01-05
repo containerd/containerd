@@ -22,6 +22,9 @@ type CreateScratchOpts struct {
 	// CacheFile is the path to an existing `scratch.vhx` to copy. If
 	// `CacheFile` does not exit the scratch will be created.
 	CacheFile string
+	// UseVirtualMemory indicates whether the UVM used to create the
+	// scratch should be backed with virtual memory or not.
+	UseVirtualMemory bool
 }
 
 func (opt *CreateScratchOpts) args() ([]string, error) {
@@ -37,6 +40,9 @@ func (opt *CreateScratchOpts) args() ([]string, error) {
 			return nil, err
 		}
 		out = append(out, "--cache-path", abs)
+	}
+	if opt.UseVirtualMemory {
+		out = append(out, "--use-virtual-memory")
 	}
 	return out, nil
 }

@@ -23,11 +23,18 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+func defaultNetworkPluginBinDirs() []string {
+	return []string{"/opt/cni/bin"}
+}
+
 func DefaultImageConfig() ImageConfig {
 	return ImageConfig{
 		Snapshotter:                defaults.DefaultSnapshotter,
 		DisableSnapshotAnnotations: true,
 		MaxConcurrentDownloads:     3,
+		Registry: Registry{
+			ConfigPath: "/etc/containerd/certs.d:/etc/docker/certs.d",
+		},
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
@@ -61,6 +68,9 @@ func DefaultRuntimeConfig() RuntimeConfig {
 	# Root is the runc root directory.
 	Root = ""
 
+	# SystemdCgroup enables systemd cgroups.
+	SystemdCgroup = false
+
 	# CriuImagePath is the criu image path
 	CriuImagePath = ""
 
@@ -72,7 +82,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 
 	return RuntimeConfig{
 		CniConfig: CniConfig{
-			NetworkPluginBinDir:        "/opt/cni/bin",
+			NetworkPluginBinDirs:       defaultNetworkPluginBinDirs(),
 			NetworkPluginConfDir:       "/etc/cni/net.d",
 			NetworkPluginMaxConfNum:    1, // only one CNI plugin config file will be loaded
 			NetworkPluginSetupSerially: false,
@@ -96,7 +106,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		TolerateMissingHugetlbController: true,
 		DisableHugetlbController:         true,
 		IgnoreImageDefinedVolumes:        false,
-		EnableCDI:                        true,
+		EnableCDI:                        func() *bool { v := true; return &v }(),
 		CDISpecDirs:                      []string{"/etc/cdi", "/var/run/cdi"},
 		DrainExecSyncIOTimeout:           "0s",
 		EnableUnprivilegedPorts:          true,

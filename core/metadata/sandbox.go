@@ -28,9 +28,15 @@ import (
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
+)
+
+const (
+	spanSandboxPrefix = "metadata.sandbox"
 )
 
 type sandboxStore struct {
@@ -46,6 +52,11 @@ func NewSandboxStore(db *DB) api.Store {
 
 // Create a sandbox record in the store
 func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.Sandbox, error) {
+	ctx, span := tracing.StartSpan(ctx,
+		tracing.Name(spanSandboxPrefix, "Create"),
+		tracing.WithAttribute("sandbox.id", sandbox.ID),
+	)
+	defer span.End()
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return api.Sandbox{}, err
@@ -68,6 +79,9 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 			return fmt.Errorf("write error: %w", err)
 		}
 
+		span.SetAttributes(
+			tracing.Attribute("sandbox.CreatedAt", sandbox.CreatedAt.Format(time.RFC3339)),
+		)
 		return nil
 	}); err != nil {
 		return api.Sandbox{}, err
@@ -78,6 +92,11 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 
 // Update the sandbox with the provided sandbox object and fields
 func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpaths ...string) (api.Sandbox, error) {
+	ctx, span := tracing.StartSpan(ctx,
+		tracing.Name(spanSandboxPrefix, "Update"),
+		tracing.WithAttribute("sandbox.id", sandbox.ID),
+	)
+	defer span.End()
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return api.Sandbox{}, err
@@ -142,6 +161,10 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 			return err
 		}
 
+		span.SetAttributes(
+			tracing.Attribute("sandbox.CreatedAt", updated.CreatedAt.Format(time.RFC3339)),
+			tracing.Attribute("sandbox.UpdatedAt", updated.UpdatedAt.Format(time.RFC3339)),
+		)
 		ret = updated
 		return nil
 	}); err != nil {
@@ -227,6 +250,11 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 
 // Delete a sandbox from metadata store using the id
 func (s *sandboxStore) Delete(ctx context.Context, id string) error {
+	ctx, span := tracing.StartSpan(ctx,
+		tracing.Name(spanSandboxPrefix, "Delete"),
+		tracing.WithAttribute("sandbox.id", id),
+	)
+	defer span.End()
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
@@ -239,7 +267,7 @@ func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 		}
 
 		if err := buckets.DeleteBucket([]byte(id)); err != nil {
-			if err == bbolt.ErrBucketNotFound {
+			if err == errbolt.ErrBucketNotFound {
 				err = errdefs.ErrNotFound
 			}
 			return fmt.Errorf("failed to delete sandbox %q: %w", id, err)
@@ -272,7 +300,7 @@ func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwr
 	} else {
 		bucket, err = parent.CreateBucket(id)
 		if err != nil {
-			if err == bbolt.ErrBucketExists {
+			if err == errbolt.ErrBucketExists {
 				return fmt.Errorf("sandbox bucket %q already exists: %w", instance.ID, errdefs.ErrAlreadyExists)
 			}
 			return err

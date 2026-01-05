@@ -26,21 +26,23 @@ import (
 	"strings"
 	"sync"
 
+	apitypes "github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/containerd/typeurl/v2"
 )
 
 // ShimConfig for the shim
@@ -154,6 +156,8 @@ type ShimManager struct {
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
 	runtimePaths sync.Map
 	sandboxStore sandbox.Store
+	// shimInfos is a cache of the shim info
+	shimInfos sync.Map
 }
 
 // ID of the shim manager
@@ -163,37 +167,68 @@ func (m *ShimManager) ID() string {
 
 // Start launches a new shim instance
 func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
-	// This container belongs to sandbox which supposed to be already started via sandbox API.
-	if opts.SandboxID != "" {
-		var params shimbinary.BootstrapParams
-		if opts.Address != "" {
-			// The address returned from sandbox controller should be in the form like ttrpc+unix://<uds-path>
-			// or grpc+vsock://<cid>:<port>, we should get the protocol from the url first.
-			protocol, address, ok := strings.Cut(opts.Address, "+")
-			if !ok {
-				return nil, fmt.Errorf("the scheme of sandbox address should be in " +
-					" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
-			}
-			params = shimbinary.BootstrapParams{
-				Version:  int(opts.Version),
-				Protocol: protocol,
-				Address:  address,
-			}
-		} else {
-			// For those sandbox we can not get endpoint,
-			// fallback to legacy implementation
-			process, err := m.Get(ctx, opts.SandboxID)
-			if err != nil {
-				return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
-			}
-			p, restoreErr := restoreBootstrapParams(process.Bundle())
-			if restoreErr != nil {
-				return nil, fmt.Errorf("failed to get bootstrap "+
-					"params of sandbox %s, %v, legacy restore error %v", opts.SandboxID, err, restoreErr)
-			}
-			params = p
-		}
+	shouldInvokeShimBinary := false
 
+	var params shimbinary.BootstrapParams
+	if opts.SandboxID != "" {
+		_, sbErr := m.sandboxStore.Get(ctx, opts.SandboxID)
+		if sbErr != nil {
+			if !errors.Is(sbErr, errdefs.ErrNotFound) {
+				return nil, sbErr
+			}
+
+			log.G(ctx).WithField("id", id).Warningf("sandbox (id=%s) not found, maybe created from v1.x", opts.SandboxID)
+			// NOTE: If sandbox container, like pause, is created by
+			// v1.6.x or v1.7.x, the shim may be not able to group
+			// multiple containers. We should invoke shim binary and
+			// establish new connection based on returned address.
+			shouldInvokeShimBinary = true
+		} else {
+			if opts.Address != "" {
+				// The address returned from sandbox controller should
+				// be in the form like ttrpc+unix://<uds-path> or grpc+vsock://<cid>:<port>,
+				// we should get the protocol from the url first.
+				protocol, address, ok := strings.Cut(opts.Address, "+")
+				if !ok {
+					return nil, fmt.Errorf("the scheme of sandbox address should be in " +
+						" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
+				}
+				params = shimbinary.BootstrapParams{
+					Version:  int(opts.Version),
+					Protocol: protocol,
+					Address:  address,
+				}
+			} else {
+				process, err := m.Get(ctx, opts.SandboxID)
+				if err != nil {
+					return nil, fmt.Errorf("can't find shim for sandbox %s: %w", opts.SandboxID, err)
+				}
+
+				p, err := restoreBootstrapParams(process.Bundle())
+				if err != nil {
+					return nil, fmt.Errorf("failed to get bootstrap "+
+						"params of sandbox %s: %w", opts.SandboxID, err)
+				}
+				params = p
+			}
+		}
+	}
+	// Even though one shim can be able to group multiple containers,
+	// it doesn't mean it supports sandbox API. The old shim implementation
+	// still requires containerd to invoke `shim delete` to cleanup
+	// container's resource when each container exits. So, if the
+	// shim version is not higher than 3, we should fallback to invoke
+	// shim binary.
+	//
+	// NOTE: The shim version indicates that the shim supports streaming I/O.
+	// It's rolled out together with the sandbox API and can be used
+	// to determine whether we should invoke the shim binary.
+	const supportSandboxAPIVersion = 3
+	if params.Version < supportSandboxAPIVersion {
+		shouldInvokeShimBinary = true
+	}
+
+	if !shouldInvokeShimBinary {
 		// Write sandbox ID this task belongs to.
 		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
 			return nil, err
@@ -258,7 +293,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	shim, err := b.Start(ctx, typeurl.MarshalProto(topts), func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, b)
+		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b)
 		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
 		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
 		// disconnect and there is no chance to remove this dead task from runtime task lists.
@@ -385,7 +420,7 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 
 // cleanupShim attempts to properly delete and cleanup shim after error
 func (m *ShimManager) cleanupShim(ctx context.Context, shim *shim) {
-	dctx, cancel := timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
+	dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
 	defer cancel()
 
 	_ = shim.Delete(dctx)
@@ -407,4 +442,41 @@ func (m *ShimManager) Delete(ctx context.Context, id string) error {
 	m.shims.Delete(ctx, id)
 
 	return err
+}
+
+type shimInfo struct {
+	handledMounts []string
+}
+
+func (m *ShimManager) loadShimInfo(ctx context.Context, shim string) (*shimInfo, error) {
+	if i, ok := m.shimInfos.Load(shim); ok {
+		return i.(*shimInfo), nil
+	}
+	// Avoid fetching info for default shims with known behavior
+	if shim == "io.containerd.runc.v2" || shim == "io.containerd.runhcs.v1" {
+		sinfo := &shimInfo{}
+		m.shimInfos.Store(shim, sinfo)
+		return sinfo, nil
+	}
+
+	rinfo, err := getRuntimeInfo(ctx, m, &apitypes.RuntimeRequest{RuntimePath: shim})
+	if err != nil {
+		return nil, err
+	}
+	sinfo := &shimInfo{}
+
+	if rinfo.Annotations != nil {
+		if v, ok := rinfo.Annotations[allowedMounts]; ok {
+			sinfo.handledMounts = strings.Split(v, ",")
+		}
+	}
+
+	fields := log.Fields{}
+	for k, v := range rinfo.Annotations {
+		fields[k] = v
+	}
+	log.G(ctx).WithFields(fields).WithField("shim", shim).Debug("loaded shim info")
+
+	m.shimInfos.Store(shim, sinfo)
+	return sinfo, nil
 }

@@ -74,7 +74,7 @@ func init() {
 }
 
 var (
-	_ = shim.TTRPCServerOptioner(&taskServiceWithFp{})
+	_ = shim.TTRPCServerUnaryOptioner(&taskServiceWithFp{})
 )
 
 type taskServiceWithFp struct {
@@ -87,7 +87,7 @@ func (s *taskServiceWithFp) RegisterTTRPC(server *ttrpc.Server) error {
 	return nil
 }
 
-func (s *taskServiceWithFp) UnaryInterceptor() ttrpc.UnaryServerInterceptor {
+func (s *taskServiceWithFp) UnaryServerInterceptor() ttrpc.UnaryServerInterceptor {
 	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (interface{}, error) {
 		methodName := filepath.Base(info.FullMethod)
 		if fp, ok := s.fps[methodName]; ok {

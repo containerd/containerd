@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/continuity/fs"

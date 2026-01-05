@@ -22,9 +22,8 @@ import (
 // of the job and a mutex for synchronized handle access.
 type JobObject struct {
 	handle windows.Handle
-	// All accesses to this MUST be done atomically except in `Open` as the object
-	// is being created in the function. 1 signifies that this job is currently a silo.
-	silo       uint32
+	// silo signifies that this job is currently a silo.
+	silo       atomic.Bool
 	mq         *queue.MessageQueue
 	handleLock sync.RWMutex
 }
@@ -188,7 +187,7 @@ func Open(ctx context.Context, options *Options) (_ *JobObject, err error) {
 			return nil, winapi.RtlNtStatusToDosError(status)
 		}
 	} else {
-		jobHandle, err = winapi.OpenJobObject(winapi.JOB_OBJECT_ALL_ACCESS, 0, unicodeJobName.Buffer)
+		jobHandle, err = winapi.OpenJobObject(winapi.JOB_OBJECT_ALL_ACCESS, false, unicodeJobName.Buffer)
 		if err != nil {
 			return nil, err
 		}
@@ -204,9 +203,7 @@ func Open(ctx context.Context, options *Options) (_ *JobObject, err error) {
 		handle: jobHandle,
 	}
 
-	if isJobSilo(jobHandle) {
-		job.silo = 1
-	}
+	job.silo.Store(isJobSilo(jobHandle))
 
 	// If the IOCP we'll be using to receive messages for all jobs hasn't been
 	// created, create it and start polling.
@@ -479,7 +476,7 @@ func (job *JobObject) ApplyFileBinding(root, target string, readOnly bool) error
 		return ErrAlreadyClosed
 	}
 
-	if !job.isSilo() {
+	if !job.silo.Load() {
 		return ErrNotSilo
 	}
 
@@ -523,12 +520,9 @@ func (job *JobObject) ApplyFileBinding(root, target string, readOnly bool) error
 func isJobSilo(h windows.Handle) bool {
 	// None of the information from the structure that this info class expects will be used, this is just used as
 	// the call will fail if the job hasn't been upgraded to a silo so we can use this to tell when we open a job
-	// if it's a silo or not. Because none of the info matters simply define a dummy struct with the size that the call
-	// expects which is 16 bytes.
-	type isSiloObj struct {
-		_ [16]byte
-	}
-	var siloInfo isSiloObj
+	// if it's a silo or not. We still need to define the struct layout as expected by Win32, else the struct
+	// alignment might be different and the call will fail.
+	var siloInfo winapi.SILOOBJECT_BASIC_INFORMATION
 	err := winapi.QueryInformationJobObject(
 		h,
 		winapi.JobObjectSiloBasicInformation,
@@ -549,7 +543,7 @@ func (job *JobObject) PromoteToSilo() error {
 		return ErrAlreadyClosed
 	}
 
-	if job.isSilo() {
+	if job.silo.Load() {
 		return nil
 	}
 
@@ -572,13 +566,8 @@ func (job *JobObject) PromoteToSilo() error {
 		return fmt.Errorf("failed to promote job to silo: %w", err)
 	}
 
-	atomic.StoreUint32(&job.silo, 1)
+	job.silo.Store(true)
 	return nil
-}
-
-// isSilo returns if the job object is a silo.
-func (job *JobObject) isSilo() bool {
-	return atomic.LoadUint32(&job.silo) == 1
 }
 
 // QueryPrivateWorkingSet returns the private working set size for the job. This is calculated by adding up the

@@ -34,6 +34,7 @@ type PodSandbox interface {
 	GetLinuxPodSandbox() LinuxPodSandbox
 
 	GetPid() uint32
+	GetIPs() []string
 }
 
 type LinuxPodSandbox interface {
@@ -55,6 +56,7 @@ func commonPodSandboxToNRI(pod PodSandbox) *nri.PodSandbox {
 		Annotations:    pod.GetAnnotations(),
 		RuntimeHandler: pod.GetRuntimeHandler(),
 		Pid:            pod.GetPid(),
+		Ips:            pod.GetIPs(),
 	}
 }
 

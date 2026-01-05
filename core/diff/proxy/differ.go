@@ -20,15 +20,16 @@ import (
 	"context"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/typeurl/v2"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // NewDiffApplier returns a new comparer and applier which communicates
@@ -55,7 +56,9 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 	for k, v := range config.ProcessorPayloads {
 		payloads[k] = typeurl.MarshalProto(v)
 	}
-
+	if config.Progress != nil {
+		config.Progress(0)
+	}
 	req := &diffapi.ApplyRequest{
 		Diff:     oci.DescriptorToProto(desc),
 		Mounts:   mount.ToProto(mounts),
@@ -64,7 +67,10 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 	}
 	resp, err := r.client.Apply(ctx, req)
 	if err != nil {
-		return ocispec.Descriptor{}, errdefs.FromGRPC(err)
+		return ocispec.Descriptor{}, errgrpc.ToNative(err)
+	}
+	if config.Progress != nil {
+		config.Progress(desc.Size)
 	}
 	return oci.DescriptorFromProto(resp.Applied), nil
 }
@@ -93,7 +99,7 @@ func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...di
 	}
 	resp, err := r.client.Diff(ctx, req)
 	if err != nil {
-		return ocispec.Descriptor{}, errdefs.FromGRPC(err)
+		return ocispec.Descriptor{}, errgrpc.ToNative(err)
 	}
 	return oci.DescriptorFromProto(resp.Diff), nil
 }

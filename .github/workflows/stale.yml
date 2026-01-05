@@ -10,6 +10,8 @@ permissions: read-all
 
 jobs:
   stale:
+    # Prevents triggering on forks or other repos
+    if: github.repository == 'containerd/containerd'
     runs-on: ubuntu-latest
 
     permissions:
@@ -17,7 +19,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@997185467fa4f803885201cee163a9f38240193d # v10.1.1
         # All stale bot options: https://github.com/actions/stale#all-options
         with:
           # Idle number of days before marking issues/PRs stale

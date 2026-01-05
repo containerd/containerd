@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !darwin
 
 /*
    Copyright The containerd Authors.
@@ -28,6 +28,7 @@ func defaultUnpackConfig() []unpackConfiguration {
 		{
 			Platform:    platforms.Format(platforms.DefaultSpec()),
 			Snapshotter: defaults.DefaultSnapshotter,
+			Differ:      defaults.DefaultDiffer,
 		},
 	}
 }

@@ -235,9 +235,9 @@ func testCreateThinDevice(t *testing.T, pool *PoolDevice) {
 func testMakeFileSystem(t *testing.T, pool *PoolDevice) {
 	devicePath := dmsetup.GetFullDevicePath(thinDevice1)
 	args := []string{
-		devicePath,
 		"-E",
 		"nodiscard,lazy_itable_init=0,lazy_journal_init=0",
+		devicePath,
 	}
 
 	output, err := exec.Command("mkfs.ext4", args...).CombinedOutput()

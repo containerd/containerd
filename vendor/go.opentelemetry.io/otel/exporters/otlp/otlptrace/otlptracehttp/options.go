@@ -62,8 +62,10 @@ func (w wrappedOption) applyHTTPOption(cfg otlpconfig.Config) otlpconfig.Config 
 //
 // If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 // environment variable is set, and this option is not passed, that variable
-// value will be used. If both are set, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-// will take precedence. Note, both environment variables include the full
+// value will be used. If both environment variables are set,
+// OTEL_EXPORTER_OTLP_TRACES_ENDPOINT will take precedence. If an environment
+// variable is set, and this option is passed, this option will take precedence.
+// Note, both environment variables include the full
 // scheme and path, while WithEndpoint sets only the host and port.
 //
 // If both this option and WithEndpointURL are used, the last used option will
@@ -82,8 +84,9 @@ func WithEndpoint(endpoint string) Option {
 //
 // If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 // environment variable is set, and this option is not passed, that variable
-// value will be used. If both are set, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-// will take precedence.
+// value will be used. If both environment variables are set,
+// OTEL_EXPORTER_OTLP_TRACES_ENDPOINT will take precedence. If an environment
+// variable is set, and this option is passed, this option will take precedence.
 //
 // If both this option and WithEndpoint are used, the last used option will
 // take precedence.
@@ -149,4 +152,20 @@ func WithRetry(rc RetryConfig) Option {
 // will use [http.ProxyFromEnvironment].
 func WithProxy(pf HTTPTransportProxyFunc) Option {
 	return wrappedOption{otlpconfig.WithProxy(otlpconfig.HTTPTransportProxyFunc(pf))}
+}
+
+// WithHTTPClient sets the HTTP client to used by the exporter.
+//
+// This option will take precedence over [WithProxy], [WithTimeout],
+// [WithTLSClientConfig] options as well as OTEL_EXPORTER_OTLP_CERTIFICATE,
+// OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE, OTEL_EXPORTER_OTLP_TIMEOUT,
+// OTEL_EXPORTER_OTLP_TRACES_TIMEOUT environment variables.
+//
+// Timeout and all other fields of the passed [http.Client] are left intact.
+//
+// Be aware that passing an HTTP client with transport like
+// [go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp.NewTransport] can
+// cause the client to be instrumented twice and cause infinite recursion.
+func WithHTTPClient(c *http.Client) Option {
+	return wrappedOption{otlpconfig.WithHTTPClient(c)}
 }

@@ -21,11 +21,12 @@ package oci
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"runtime"
 	"testing"
 
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,7 +71,7 @@ func TestHostDevicesOSReadDirFailureInUserNS(t *testing.T) {
 				t.Fatalf("Unexpected error %v", err)
 			}
 
-			return []os.DirEntry{fileInfoToDirEntry(fi)}, nil
+			return []os.DirEntry{fs.FileInfoToDirEntry(fi)}, nil
 		}
 		return nil, testError
 	}
