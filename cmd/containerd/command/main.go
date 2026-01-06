@@ -119,6 +119,10 @@ can be used and modified as necessary as a custom configuration.`
 		ociHook,
 	}
 	app.Action = func(cliContext *cli.Context) error {
+		if args := cliContext.Args(); args.First() != "" {
+			return cli.ShowCommandHelp(cliContext, args.First())
+		}
+
 		var (
 			start       = time.Now()
 			signals     = make(chan os.Signal, 2048)
