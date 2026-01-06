@@ -52,7 +52,7 @@ func newSnapshotter(t *testing.T, opts ...Opt) func(ctx context.Context, root st
 		t.Skipf("could not find mkfs.erofs: %v", err)
 	}
 
-	if !findErofs() {
+	if !FindErofs() {
 		t.Skip("check for erofs kernel support failed, skipping test")
 	}
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
@@ -180,7 +180,7 @@ func TestErofsDifferWithTarIndexMode(t *testing.T) {
 	testutil.RequiresRoot(t)
 	ctx := context.Background()
 
-	if !findErofs() {
+	if !FindErofs() {
 		t.Skip("check for erofs kernel support failed, skipping test")
 	}
 

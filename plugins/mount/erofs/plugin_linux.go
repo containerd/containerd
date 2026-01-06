@@ -24,11 +24,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/fsmount"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 
@@ -64,7 +66,7 @@ func (erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string, _ 
 	var err error = unix.ENOTBLK
 	if !forceloop {
 		// Try to use file-backed mount feature if available (Linux 6.12+) first
-		err = m.Mount(mp)
+		err = doMount(m, mp)
 	}
 	if errors.Is(err, unix.ENOTBLK) {
 		var loops []*os.File
@@ -96,9 +98,10 @@ func (erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string, _ 
 					return mount.ActiveMount{}, err
 				}
 				m.Options[i] = "device=" + loop.Name()
+				loops = append(loops, loop)
 			}
 		}
-		err = m.Mount(mp)
+		err = doMount(m, mp)
 		if err != nil {
 			return mount.ActiveMount{}, err
 		}
@@ -112,6 +115,18 @@ func (erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string, _ 
 		MountedAt:  &t,
 		MountPoint: mp,
 	}, nil
+}
+
+func doMount(m mount.Mount, target string) error {
+	if err := fsmount.Fsmount(m, target); err != nil {
+		// Fall back to traditional mount() if fsmount syscall not available (Linux < 5.2)
+		if errors.Is(err, unix.ENOSYS) {
+			log.L.WithError(err).Debug("fsmount not available, falling back to traditional mount")
+			return m.Mount(target)
+		}
+		return err
+	}
+	return nil
 }
 
 func (erofsMountHandler) Unmount(ctx context.Context, path string) error {
