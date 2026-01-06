@@ -37,9 +37,7 @@ func TestPauseThreshold(t *testing.T) {
 	}
 
 	scheduler := newScheduler(tc, cfg)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	go scheduler.run(ctx)
 
@@ -74,9 +72,7 @@ func TestDeletionThreshold(t *testing.T) {
 	}
 
 	scheduler := newScheduler(tc, cfg)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	go scheduler.run(ctx)
 
@@ -110,17 +106,14 @@ func TestDeletionThreshold(t *testing.T) {
 
 func TestTrigger(t *testing.T) {
 	var (
-		cfg = &config{}
-		tc  = &testCollector{
-			d: time.Millisecond * 10,
-		}
-		ctx, cancel = context.WithCancel(context.Background())
-		scheduler   = newScheduler(tc, cfg)
-		stats       gc.Stats
-		err         error
+		cfg       = &config{}
+		tc        = &testCollector{d: time.Millisecond * 10}
+		ctx       = t.Context()
+		scheduler = newScheduler(tc, cfg)
+		stats     gc.Stats
+		err       error
 	)
 
-	defer cancel()
 	go scheduler.run(ctx)
 
 	// Block until next GC finishes
@@ -155,13 +148,10 @@ func TestStartupDelay(t *testing.T) {
 			PauseThreshold: 0.001,
 			StartupDelay:   tomlext.Duration(startupDelay),
 		}
-		tc = &testCollector{
-			d: time.Second,
-		}
-		ctx, cancel = context.WithCancel(context.Background())
-		scheduler   = newScheduler(tc, cfg)
+		tc        = &testCollector{d: time.Second}
+		ctx       = t.Context()
+		scheduler = newScheduler(tc, cfg)
 	)
-	defer cancel()
 
 	t1 := time.Now()
 	go scheduler.run(ctx)

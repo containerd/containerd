@@ -1315,16 +1315,12 @@ func TestBaseOCISpec(t *testing.T) {
 	assert.Equal(t, *spec.Linux.Resources.Memory.Limit, containerConfig.Linux.Resources.MemoryLimitInBytes)
 }
 
-func writeFilesToTempDir(tmpDirPattern string, content []string) (string, error) {
+func writeFilesToTempDir(t *testing.T, content []string) (string, error) {
 	if len(content) == 0 {
 		return "", nil
 	}
 
-	dir, err := os.MkdirTemp("", tmpDirPattern)
-	if err != nil {
-		return "", err
-	}
-
+	dir := t.TempDir()
 	for idx, data := range content {
 		file := filepath.Join(dir, fmt.Sprintf("spec-%d.yaml", idx))
 		err := os.WriteFile(file, []byte(data), 0644)
@@ -1638,10 +1634,7 @@ containerEdits:
 
 			specCheck(t, testID, testSandboxID, testPid, spec)
 
-			cdiDir, err := writeFilesToTempDir("containerd-test-CDI-injections-", test.cdiSpecFiles)
-			if cdiDir != "" {
-				defer os.RemoveAll(cdiDir)
-			}
+			cdiDir, err := writeFilesToTempDir(t, test.cdiSpecFiles)
 			require.NoError(t, err)
 
 			err = cdi.Configure(cdi.WithSpecDirs(cdiDir))
