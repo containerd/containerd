@@ -164,8 +164,8 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	// task from containerd after it handles the Exited event.
 	if timeout > 0 {
 		stopSignal := "SIGTERM"
-		if signal := container.Config.GetStopSignal().String(); signal != "" {
-			stopSignal = signal
+		if signal := container.Config.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
+			stopSignal = signal.String()
 		} else if container.StopSignal != "" {
 			stopSignal = container.StopSignal
 		} else {
