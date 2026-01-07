@@ -483,7 +483,7 @@ func toCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string 
 
 // toCNIBandWidth converts CRI annotations to CNI bandwidth.
 func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
-	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
+	ingress, egress, ingressBurst, egressBurst, err := bandwidth.ExtractPodBandwidthResources(annotations)
 	if err != nil {
 		return nil, fmt.Errorf("reading pod bandwidth annotations: %w", err)
 	}
@@ -502,6 +502,14 @@ func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 	if egress != nil {
 		bandWidth.EgressRate = uint64(egress.Value())
 		bandWidth.EgressBurst = math.MaxUint32
+	}
+
+	if ingressBurst != nil && uint64(ingress.Value()) <= uint64(ingressBurst.Value()) {
+		bandWidth.IngressBurst = uint64(ingressBurst.Value())
+	}
+
+	if egressBurst != nil && uint64(egress.Value()) <= uint64(egressBurst.Value()) {
+		bandWidth.EgressBurst = uint64(egressBurst.Value())
 	}
 
 	return bandWidth, nil
