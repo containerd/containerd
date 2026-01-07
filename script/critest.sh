@@ -73,6 +73,41 @@ fi
 GINKGO_SKIP_TEST=()
 if [ -n "${SKIP_TEST:-}" ]; then
   GINKGO_SKIP_TEST+=("--ginkgo.skip" "$SKIP_TEST")
+
+  # With the systemd cgroup driver, the container runtime uses a scope unit to
+  # manage the cgroup path. According to the scope unit documentation:
+  #
+  #   Unlike service units, scope units have no “main” process: all processes in
+  #   the scope are equivalent. The lifecycle of a scope unit is therefore not
+  #   bound to a specific process, but to the existence of at least one process in
+  #   the scope. As a result, individual process exit statuses are not relevant to
+  #   the scope unit’s failure state.
+  #
+  # We cannot rely on CollectMode=inactive-or-failed to preserve the cgroup path.
+  # So there is a race condition between containerd and systemd garbage collection.
+  # If systemd GC removes the scope unit’s cgroup before containerd reads it,
+  # containerd loses the opportunity to inspect the cgroup and determine the OOM status.
+  #
+  # So we disable the OOMKilled testcase.
+  #
+  # FIXME(fuweid):
+  #
+  # In theory, this could be mitigated by inspecting the unit logs (e.g.
+  # `journalctl -u XXX.scope`) and searching for the "OOMKilled" keyword.
+  # However, this approach depends on journalctl and systemd logging behavior,
+  # so it should be avoided.
+  #
+  # Example journal output:
+  #
+  #   Dec 22 01:24:58 devbox systemd[1]: Started /usr/bin/bash -c dd if=/dev/zero of=/dev/null bs=20M.
+  #   Dec 22 01:24:58 devbox systemd[1]: XXX.service: A process of this unit has been killed by the OOM killer.
+  #   Dec 22 01:24:58 devbox systemd[1]: XXX.service: Main process exited, code=killed, status=9/KILL
+  #   Dec 22 01:24:58 devbox systemd[1]: XXX.service: Failed with result 'oom-kill'.
+  #
+  # Ref: https://www.freedesktop.org/software/systemd/man/latest/systemd.scope.html
+  if [ ! -z "$CGROUP_DRIVER" ] && [ "$CGROUP_DRIVER" = "systemd" ];then
+    GINKGO_SKIP_TEST+=("--ginkgo.skip" "should terminate with exitCode 137 and reason OOMKilled")
+  fi
 fi
 
 GINKGO_FOCUS_TEST=()
