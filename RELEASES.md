@@ -149,10 +149,10 @@ of containerd for every supported version of Kubernetes.
 
 | Kubernetes Version | containerd Version               | CRI Version     |
 |--------------------|----------------------------------|-----------------|
-| 1.31               | 2.1.0+, 2.0.0+, 1.7.20+, 1.6.34+ | v1              |
 | 1.32               | 2.1.0+, 2.0.1+, 1.7.24+, 1.6.36+ | v1              |
 | 1.33               | 2.1.0+, 2.0.4+, 1.7.24+, 1.6.36+ | v1              |
 | 1.34               | 2.1.3+, 2.0.6+, 1.7.28+, 1.6.39+ | v1              |
+| 1.35               | 2.2.0+, 2.1.5+, 1.7.28+  | v1              |
 
 Deprecated containerd and kubernetes versions
 
