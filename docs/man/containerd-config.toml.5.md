@@ -38,6 +38,10 @@ config as version 1 has been deprecated.
 **plugin_dir**
 : The directory for dynamic plugins to be stored
 
+**max_label_size**
+:The threshold for validating the total byte length of label key-value pairs is 4096 bytes by default.
+It can be configured to a larger positive integer.
+
 **[grpc]**
 : Section for gRPC socket listener settings. Contains the following properties:
 

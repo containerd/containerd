@@ -91,6 +91,8 @@ type Config struct {
 	Imports []string `toml:"imports"`
 	// StreamProcessors configuration
 	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
+	// MaxLabelSize specifies the maximum size of all labels in bytes
+	MaxLabelSize int `toml:"max_label_size"`
 }
 
 // StreamProcessor provides configuration for diff content processors
