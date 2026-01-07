@@ -39,11 +39,11 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/moby/sys/userns"
 
-	oomv2 "github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/oom"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/runtime"
+	oomv2 "github.com/containerd/containerd/v2/internal/oom"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	oomv1 "github.com/containerd/containerd/v2/pkg/oom/v1"
