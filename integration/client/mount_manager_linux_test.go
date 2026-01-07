@@ -223,10 +223,7 @@ func createImgFile(t *testing.T, name string) string {
 }
 
 func setupMount(t *testing.T, f string) {
-	root, err := os.MkdirTemp(t.TempDir(), "")
-	require.NoError(t, err)
-	defer os.RemoveAll(root)
-
+	root := t.TempDir()
 	m := []mount.Mount{
 		{
 			Type:    "xfs",

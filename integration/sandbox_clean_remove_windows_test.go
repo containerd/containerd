@@ -243,7 +243,7 @@ func TestCreateContainer(t *testing.T) {
 	client, err := RawRuntimeClient()
 	require.NoError(t, err, "failed to get raw grpc runtime service client")
 	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(func() { cancel() })
+	t.Cleanup(cancel)
 
 	t.Log("Create a pod sandbox")
 	sbConfig := &runtime.PodSandboxConfig{

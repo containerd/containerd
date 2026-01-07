@@ -66,12 +66,7 @@ func newSnapshotter(t *testing.T, opts ...Opt) func(ctx context.Context, root st
 }
 
 func testMount(t *testing.T, scratchFile string) error {
-	root, err := os.MkdirTemp(t.TempDir(), "")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(root)
-
+	root := t.TempDir()
 	m := []mount.Mount{
 		{
 			Type:    "ext4",

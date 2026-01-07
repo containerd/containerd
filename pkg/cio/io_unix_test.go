@@ -65,9 +65,7 @@ func TestOpenFifos(t *testing.T) {
 // TestOpenFifosWithTerminal tests openFifos should not open stderr if terminal
 // is set.
 func TestOpenFifosWithTerminal(t *testing.T) {
-	var ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
-
+	ctx := t.Context()
 	ioFifoDir := t.TempDir()
 
 	cfg := Config{

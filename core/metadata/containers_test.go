@@ -707,7 +707,7 @@ func checkContainersEqual(t *testing.T, a, b *containers.Container, format strin
 }
 
 func testEnv(t *testing.T) (context.Context, *bolt.DB) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := t.Context()
 	ctx = namespaces.WithNamespace(ctx, "testing")
 	ctx = logtest.WithT(ctx, t)
 	dirname := t.TempDir()
@@ -717,7 +717,6 @@ func testEnv(t *testing.T) (context.Context, *bolt.DB) {
 
 	t.Cleanup(func() {
 		assert.NoError(t, db.Close())
-		cancel()
 	})
 
 	return ctx, db
