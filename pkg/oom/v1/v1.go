@@ -41,9 +41,10 @@ func New(publisher events.Publisher) (oom.Watcher, error) {
 		return nil, err
 	}
 	return &epoller{
-		fd:        fd,
-		publisher: publisher,
-		set:       make(map[uintptr]*item),
+		fd:         fd,
+		publisher:  publisher,
+		set:        make(map[uintptr]*item),
+		containers: make(map[string]struct{}),
 	}, nil
 }
 
@@ -51,9 +52,10 @@ func New(publisher events.Publisher) (oom.Watcher, error) {
 type epoller struct {
 	mu sync.Mutex
 
-	fd        int
-	publisher events.Publisher
-	set       map[uintptr]*item
+	fd         int
+	publisher  events.Publisher
+	set        map[uintptr]*item
+	containers map[string]struct{}
 }
 
 type item struct {
@@ -97,6 +99,24 @@ func (e *epoller) Run(ctx context.Context) {
 	}
 }
 
+func (e *epoller) GetOOMContainers() map[string]struct{} {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.containers
+}
+
+func (e *epoller) addOOMContainer(id string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.containers[id] = struct{}{}
+}
+
+func (e *epoller) DeleteOOMContainer(id string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	delete(e.containers, id)
+}
+
 // Add cgroups.Cgroup to the epoll monitor
 func (e *epoller) Add(id string, cgx interface{}) error {
 	cg, ok := cgx.(cgroup1.Cgroup)
@@ -136,6 +156,7 @@ func (e *epoller) process(ctx context.Context, fd uintptr) {
 		unix.Close(int(fd))
 		return
 	}
+	e.addOOMContainer(i.id)
 	if err := e.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 		ContainerID: i.id,
 	}); err != nil {

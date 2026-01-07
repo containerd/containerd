@@ -61,6 +61,7 @@ message CreateTaskRequest {
 	string checkpoint = 8;
 	string parent_checkpoint = 9;
 	google.protobuf.Any options = 10;
+	string oom_path = 11;
 }
 
 message CreateTaskResponse {

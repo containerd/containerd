@@ -366,6 +366,7 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 	if r.ExecID == "" {
 		s.mu.Lock()
 		delete(s.containers, r.ID)
+		s.ep.DeleteOOMContainer(r.ID)
 		s.mu.Unlock()
 		s.send(&eventstypes.TaskDelete{
 			ContainerID: container.ID,
@@ -765,6 +766,15 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
 	p.SetExited(e.Status)
+	oomContainers := s.ep.GetOOMContainers()
+	if _, ok := oomContainers[c.ID]; ok {
+		file, err := os.Create(c.OOMPath)
+		if err != nil {
+			log.G(s.context).WithError(err).Error("filed to create oom file")
+		}
+		defer file.Close()
+		s.ep.DeleteOOMContainer(c.ID)
+	}
 	s.send(&eventstypes.TaskExit{
 		ContainerID: c.ID,
 		ID:          p.ID(),

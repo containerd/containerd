@@ -226,6 +226,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		Checkpoint:      checkpointPath,
 		RestoreFromPath: restoreFromPath,
 		Runtime:         container.Runtime.Name,
+		OOMPath:         r.OomPath,
 		RuntimeOptions:  container.Runtime.Options,
 		TaskOptions:     r.Options,
 		SandboxID:       container.SandboxID,

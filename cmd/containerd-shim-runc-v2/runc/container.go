@@ -140,6 +140,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	container := &Container{
 		ID:              r.ID,
 		Bundle:          r.Bundle,
+		OOMPath:         r.OomPath,
 		process:         p,
 		processes:       make(map[string]process.Process),
 		reservedProcess: make(map[string]struct{}),
@@ -233,6 +234,8 @@ type Container struct {
 	ID string
 	// Bundle path
 	Bundle string
+	// OOM path of the container
+	OOMPath string
 
 	// cgroup is either cgroups.Cgroup or *cgroupsv2.Manager
 	cgroup          interface{}
