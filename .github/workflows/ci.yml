@@ -94,14 +94,6 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
-      - name: Install protobuf
-        run: |
-          sudo -E PATH=$PATH script/setup/install-protobuf
-          sudo chmod +x /usr/local/bin/protoc
-          sudo chmod og+rx /usr/local/include/google /usr/local/include/google/protobuf /usr/local/include/google/protobuf/compiler
-          sudo chmod -R og+r /usr/local/include/google/protobuf/
-          protoc --version
-
       - run: script/setup/install-dev-tools
       - run: make proto-fmt
       - run: make check-protos check-api-descriptors
