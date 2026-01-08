@@ -299,5 +299,28 @@ func TestLogURIGenerator(t *testing.T) {
 			// NOTE: Windows paths should not be parse-able outside of Windows:
 			err: "must be absolute",
 		},
+		{
+			scheme: "binary",
+			path:   "/full/path/bin",
+			args: map[string]string{
+				"env.LOG_LEVEL": "debug",
+			},
+			expected: "binary:///full/path/bin?env.LOG_LEVEL=debug",
+		},
+		{
+			scheme: "binary",
+			path:   "/full/path/bin",
+			args: map[string]string{
+				"id":         "testing",
+				"env.SECRET": "mysecret",
+			},
+			expected: "binary:///full/path/bin?env.SECRET=mysecret&id=testing",
+		},
+		{
+			scheme:   "binary",
+			path:     "/full/path/bin",
+			args:     map[string]string{},
+			expected: "binary:///full/path/bin",
+		},
 	})
 }
