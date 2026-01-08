@@ -178,15 +178,32 @@ generate: protos
 
 protos: bin/protoc-gen-go-fieldpath bin/go-buildtag
 	@echo "$(WHALE) $@"
-	@find . -path ./vendor -prune -false -o -name '*.pb.go' | xargs rm
+
+	# This part is only required because we historically do a fully qualified import in proto files,
+	# so we require a corresponding directory structure (with github.com/containerd/containerd/api).
+	# We should migrate imports in future and drop this.
 	$(eval TMPDIR := $(shell mktemp -d))
-	@mv ${ROOTDIR}/vendor ${TMPDIR}
-	@(cd ${ROOTDIR}/api && PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${API_PACKAGES})
-	@mv ${TMPDIR}/vendor ${ROOTDIR}
-	@rm -rf ${TMPDIR} v2
-	go-fix-acronym -w -a '^Os' $(shell find api/ -name '*.pb.go')
-	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ -name '*.pb.go')
-	bin/go-buildtag -w --tags '!no_grpc' $(shell find api/ -name '*_grpc.pb.go')
+	@mkdir -p $(TMPDIR)/github.com/containerd/containerd
+	@cp -r api $(TMPDIR)/github.com/containerd/containerd/
+	@cp buf.* $(TMPDIR)/
+
+	@cd $(TMPDIR) && PATH="$(ROOTDIR)/bin:$$PATH" buf dep update
+	@cd $(TMPDIR) && PATH="$(ROOTDIR)/bin:$$PATH" buf generate
+
+	# Unfortunally, buf doesn't offer granular per-directory generator selection
+	# so we have to just delete files we don't want.
+	@rm -f $(TMPDIR)/github.com/containerd/containerd/api/runtime/task/v2/shim_grpc.pb.go $(TMPDIR)/github.com/containerd/containerd/api/services/ttrpc/events/v1/events_grpc.pb.go
+	@find $(TMPDIR)/github.com/containerd/containerd/api -name '*_fieldpath.pb.go' ! -path '*/api/events/*' -delete
+
+	# Move the generated files back into the api directory.
+	@rm -rf api
+	@mv $(TMPDIR)/github.com/containerd/containerd/api .
+	@mv $(TMPDIR)/buf.lock .
+	@rm -rf $(TMPDIR)
+
+	go-fix-acronym -w -a '^Os' $$(find api/ -name '*.pb.go')
+	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $$(find api/ -name '*.pb.go')
+	bin/go-buildtag -w --tags '!no_grpc' $$(find api/ -name '*_grpc.pb.go')
 	@test -z "$$(git status --short | grep "api/next.pb.txt" | tee /dev/stderr)" || \
 		$(GO) mod edit -replace=github.com/containerd/containerd/api=./api
 
