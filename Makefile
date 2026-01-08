@@ -176,7 +176,7 @@ generate: protos
 	@echo "$(WHALE) $@"
 	@PATH="${ROOTDIR}/bin:${PATH}" $(GO) generate -x ${PACKAGES}
 
-protos: bin/protoc-gen-go-fieldpath bin/go-buildtag
+protos: bin/protoc-gen-go-fieldpath bin/go-buildtag bin/buf
 	@echo "$(WHALE) $@"
 
 	# This part is only required because we historically do a fully qualified import in proto files,
@@ -292,6 +292,10 @@ bin/gen-manpages: cmd/gen-manpages FORCE
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
 	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
+
+bin/buf:
+	@echo "$(WHALE) $@"
+	GOBIN=$(CURDIR)/bin $(GO) install github.com/bufbuild/buf/cmd/buf@v1.63.0
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
