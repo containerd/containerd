@@ -172,6 +172,106 @@ func TestParseWarningText(t *testing.T) {
 			want:   `quoted "text" inside`,
 		},
 		{
+			name:   "escaped backslash",
+			header: `299 - "path\\to\\file"`,
+			want:   `path\to\file`,
+		},
+		{
+			name:   "escaped tab",
+			header: "299 - \"escaped\\\ttab\"",
+			want:   "escaped\ttab",
+		},
+		{
+			name:   "escaped space",
+			header: `299 - "escaped\ space"`,
+			want:   "escaped space",
+		},
+		{
+			name:   "backslash followed by NUL rejected",
+			header: "299 - \"bad\\\x00text\"",
+			want:   "",
+		},
+		{
+			name:   "backslash followed by newline rejected",
+			header: "299 - \"bad\\\ntext\"",
+			want:   "",
+		},
+		{
+			name:   "backslash followed by DEL rejected",
+			header: "299 - \"bad\\\x7ftext\"",
+			want:   "",
+		},
+		{
+			name:   "bare control char NUL in qdtext rejected",
+			header: "299 - \"bad\x00text\"",
+			want:   "",
+		},
+		{
+			name:   "bare control char BEL in qdtext rejected",
+			header: "299 - \"bad\x07text\"",
+			want:   "",
+		},
+		{
+			name:   "bare DEL in qdtext rejected",
+			header: "299 - \"bad\x7ftext\"",
+			want:   "",
+		},
+		{
+			name:   "obs-text byte in qdtext accepted",
+			header: "299 - \"caf\xe9\"",
+			want:   "caf\xe9",
+		},
+		{
+			name:   "multi-byte UTF-8 accepted as obs-text bytes",
+			header: "299 - \"\xc3\xa9l\xc3\xa8ve\"",
+			want:   "\xc3\xa9l\xc3\xa8ve",
+		},
+		{
+			name:   "backslash followed by obs-text accepted",
+			header: "299 - \"test\\\x80value\"",
+			want:   "test\x80value",
+		},
+		{
+			name:   "percent-encoded space",
+			header: `299 - "hello%20world"`,
+			want:   "hello world",
+		},
+		{
+			name:   "percent-encoded special chars",
+			header: `299 - "100%25 complete"`,
+			want:   "100% complete",
+		},
+		{
+			name:   "percent-encoded quote rejected",
+			header: `299 - "say %22hello%22"`,
+			want:   "",
+		},
+		{
+			name:   "invalid percent-encoding treated as literal",
+			header: `299 - "100%ZZ invalid"`,
+			want:   "100%ZZ invalid",
+		},
+		{
+			name:   "incomplete percent-encoding at end",
+			header: `299 - "trailing%2"`,
+			want:   "trailing%2",
+		},
+		{
+			name:   "percent-encoded newline rejected",
+			header: `299 - "inject%0aline"`,
+			want:   "",
+		},
+		{
+			name:   "percent-encoded CR rejected",
+			header: `299 - "inject%0dline"`,
+			want:   "",
+		},
+		{
+			name:   "percent-encoded NUL rejected",
+			header: `299 - "inject%00byte"`,
+			want:   "",
+		},
+		{
 			name:   "trailing characters invalid",
 			header: `299 - "warn text" extra data`,
 			want:   "",

@@ -18,6 +18,7 @@ package docker
 
 import (
 	"context"
+	"encoding/hex"
 	"net"
 	"net/http"
 	"strings"
@@ -81,7 +82,15 @@ func reportWarnings(ctx context.Context, header http.Header, handler WarningHand
 }
 
 // parseWarningText extracts the warn-text from an RFC 7234 Warning header value.
-// Expected format: 299 - "message"
+// Only the OCI distribution spec recommended format is supported:
+// 299 - "message"
+// Other warn-agent values (tokens other than "-") and optional warn-date
+// suffixes defined in RFC 7234 are not supported and will cause the
+// warning to be silently ignored.
+// Characters are validated per RFC 7230 section 3.2.6 quoted-string rules:
+//   - qdtext: HTAB / SP / %x21 / %x23-5B / %x5D-7E / obs-text
+//   - quoted-pair: "\" ( HTAB / SP / VCHAR / obs-text )
+//   - percent-encoding: %xx where xx is a hex value; decoded byte must be valid qdtext
 func parseWarningText(warning string) string {
 	text, ok := strings.CutPrefix(warning, "299 - ")
 	if !ok {
@@ -101,19 +110,32 @@ func parseWarningText(warning string) string {
 
 	for idx < end {
 		c := text[idx]
-		nextC := byte(0)
-		if len(text) > idx+1 {
-			nextC = text[idx+1]
-		}
 
-		// Check for escaped quote
-		if c == '\\' && nextC == '"' {
-			out.WriteByte('"')
+		if c == '\\' {
+			if idx+1 >= end {
+				return ""
+			}
+			nextC := text[idx+1]
+			if !isQuotedPairChar(nextC) {
+				return ""
+			}
+			out.WriteByte(nextC)
 			idx += 2
 			continue
 		}
-		if c == '"' {
-			return out.String()
+
+		// Handle percent-encoding (%xx)
+		if c == '%' && idx+2 < end {
+			decoded, err := hex.DecodeString(text[idx+1 : idx+3])
+			if err == nil && len(decoded) == 1 {
+				if !isQdtext(decoded[0]) {
+					return ""
+				}
+				out.WriteByte(decoded[0])
+				idx += 3
+				continue
+			}
+			// Invalid percent-encoding, treat as literal
 		}
 
 		if !isQdtext(c) {
