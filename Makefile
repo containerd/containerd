@@ -178,8 +178,8 @@ generate: protos
 
 protos: bin/protoc-gen-go-fieldpath bin/go-buildtag bin/buf
 	@echo "$(WHALE) $@"
-	PATH="$(ROOTDIR)/bin:$$PATH" buf dep update
-	PATH="$(ROOTDIR)/bin:$$PATH" buf generate
+	(cd api && PATH="$(ROOTDIR)/bin:$$PATH" buf dep update)
+	(cd api && PATH="$(ROOTDIR)/bin:$$PATH" buf generate)
 	@rm -f api/runtime/task/v2/shim_grpc.pb.go api/services/ttrpc/events/v1/events_grpc.pb.go
 	@find api/ -name '*_fieldpath.pb.go' ! -path 'api/events/*' -delete
 	go-fix-acronym -w -a '^Os' $$(find api/ -name '*.pb.go')
