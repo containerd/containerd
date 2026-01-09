@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/namespaces/v1/namespace.proto
+// source: services/namespaces/v1/namespace.proto
 
 package namespaces
 
@@ -248,5 +248,5 @@ var Namespaces_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "github.com/containerd/containerd/api/services/namespaces/v1/namespace.proto",
+	Metadata: "services/namespaces/v1/namespace.proto",
 }

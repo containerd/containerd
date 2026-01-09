@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/leases/v1/leases.proto
+// source: services/leases/v1/leases.proto
 
 package leases
 
@@ -304,5 +304,5 @@ var Leases_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "github.com/containerd/containerd/api/services/leases/v1/leases.proto",
+	Metadata: "services/leases/v1/leases.proto",
 }

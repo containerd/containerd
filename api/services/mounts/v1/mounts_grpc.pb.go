@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/mounts/v1/mounts.proto
+// source: services/mounts/v1/mounts.proto
 
 package mounts
 
@@ -276,5 +276,5 @@ var Mounts_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "github.com/containerd/containerd/api/services/mounts/v1/mounts.proto",
+	Metadata: "services/mounts/v1/mounts.proto",
 }

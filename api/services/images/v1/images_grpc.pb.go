@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/images/v1/images.proto
+// source: services/images/v1/images.proto
 
 package images
 
@@ -264,5 +264,5 @@ var Images_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "github.com/containerd/containerd/api/services/images/v1/images.proto",
+	Metadata: "services/images/v1/images.proto",
 }

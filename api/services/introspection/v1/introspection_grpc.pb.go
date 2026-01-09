@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/introspection/v1/introspection.proto
+// source: services/introspection/v1/introspection.proto
 
 package introspection
 
@@ -188,5 +188,5 @@ var Introspection_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "github.com/containerd/containerd/api/services/introspection/v1/introspection.proto",
+	Metadata: "services/introspection/v1/introspection.proto",
 }

@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/content/v1/content.proto
+// source: services/content/v1/content.proto
 
 package content
 
@@ -567,5 +567,5 @@ var Content_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "github.com/containerd/containerd/api/services/content/v1/content.proto",
+	Metadata: "services/content/v1/content.proto",
 }

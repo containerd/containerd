@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/transfer/v1/transfer.proto
+// source: services/transfer/v1/transfer.proto
 
 package transfer
 
@@ -104,5 +104,5 @@ var Transfer_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "github.com/containerd/containerd/api/services/transfer/v1/transfer.proto",
+	Metadata: "services/transfer/v1/transfer.proto",
 }

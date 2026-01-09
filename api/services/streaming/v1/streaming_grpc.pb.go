@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/streaming/v1/streaming.proto
+// source: services/streaming/v1/streaming.proto
 
 package streaming
 
@@ -136,5 +136,5 @@ var Streaming_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "github.com/containerd/containerd/api/services/streaming/v1/streaming.proto",
+	Metadata: "services/streaming/v1/streaming.proto",
 }

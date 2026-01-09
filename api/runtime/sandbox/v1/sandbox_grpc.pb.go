@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/runtime/sandbox/v1/sandbox.proto
+// source: runtime/sandbox/v1/sandbox.proto
 
 package sandbox
 
@@ -413,5 +413,5 @@ var Sandbox_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "github.com/containerd/containerd/api/runtime/sandbox/v1/sandbox.proto",
+	Metadata: "runtime/sandbox/v1/sandbox.proto",
 }

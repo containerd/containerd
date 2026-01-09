@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/diff/v1/diff.proto
+// source: services/diff/v1/diff.proto
 
 package diff
 
@@ -149,5 +149,5 @@ var Diff_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "github.com/containerd/containerd/api/services/diff/v1/diff.proto",
+	Metadata: "services/diff/v1/diff.proto",
 }

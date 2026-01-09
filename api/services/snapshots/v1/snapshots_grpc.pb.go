@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto
+// source: services/snapshots/v1/snapshots.proto
 
 package snapshots
 
@@ -456,5 +456,5 @@ var Snapshots_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto",
+	Metadata: "services/snapshots/v1/snapshots.proto",
 }

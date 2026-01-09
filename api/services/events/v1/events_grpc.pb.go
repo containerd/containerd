@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: github.com/containerd/containerd/api/services/events/v1/events.proto
+// source: services/events/v1/events.proto
 
 package events
 
@@ -237,5 +237,5 @@ var Events_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "github.com/containerd/containerd/api/services/events/v1/events.proto",
+	Metadata: "services/events/v1/events.proto",
 }
