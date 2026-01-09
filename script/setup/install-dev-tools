@@ -23,3 +23,4 @@ go install github.com/containerd/protobuild/cmd/go-fix-acronym@v0.3.0
 go install github.com/cpuguy83/go-md2man/v2@v2.0.7
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.5
 go install github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@v1.2.5
+go install github.com/bufbuild/buf/cmd/buf@v1.63.0
