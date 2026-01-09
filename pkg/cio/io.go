@@ -47,6 +47,10 @@ type Config struct {
 	Stdout string
 	// Stderr path
 	Stderr string
+	// AttachableOut path
+	AttachableOut string
+	// AttachableErr path
+	AttachableErr string
 }
 
 // IO holds the io information for a task or process
@@ -71,6 +75,9 @@ type Creator func(id string) (IO, error)
 // because fifo's can only be read from one reader or the output
 // will be sent only to the first reads
 type Attach func(*FIFOSet) (IO, error)
+
+// AttachableOpt customize the configuration of Attachable IO.
+type AttachableOpt func(cfg *Config)
 
 // FIFOSet is a set of file paths to FIFOs for a task's standard IO streams,
 // Although it supports streaming io other than FIFOs,
@@ -254,7 +261,7 @@ func LogURI(uri *url.URL) Creator {
 }
 
 // BinaryIO forwards container STDOUT|STDERR directly to a logging binary
-func BinaryIO(binary string, args map[string]string) Creator {
+func BinaryIO(binary string, args map[string]string, opts ...AttachableOpt) Creator {
 	return func(_ string) (IO, error) {
 		uri, err := LogURIGenerator("binary", binary, args)
 		if err != nil {
@@ -262,11 +269,17 @@ func BinaryIO(binary string, args map[string]string) Creator {
 		}
 
 		res := uri.String()
+
+		cfg := Config{
+			Stdout: res,
+			Stderr: res,
+		}
+		for _, opt := range opts {
+			opt(&cfg)
+		}
+
 		return &logURI{
-			config: Config{
-				Stdout: res,
-				Stderr: res,
-			},
+			config: cfg,
 		}, nil
 	}
 }

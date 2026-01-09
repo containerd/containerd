@@ -174,9 +174,16 @@ func TerminalLogURI(uri *url.URL) Creator {
 	}
 }
 
+func WithAttachable(AttachableOut, attachableErr string) AttachableOpt {
+	return func(cfg *Config) {
+		cfg.AttachableOut = AttachableOut
+		cfg.AttachableErr = attachableErr
+	}
+}
+
 // TerminalBinaryIO forwards container STDOUT|STDERR directly to a logging binary
 // It also sets the terminal option to true
-func TerminalBinaryIO(binary string, args map[string]string) Creator {
+func TerminalBinaryIO(binary string, args map[string]string, opts ...AttachableOpt) Creator {
 	return func(_ string) (IO, error) {
 		uri, err := LogURIGenerator("binary", binary, args)
 		if err != nil {
@@ -184,12 +191,18 @@ func TerminalBinaryIO(binary string, args map[string]string) Creator {
 		}
 
 		res := uri.String()
+
+		cfg := Config{
+			Stdout:   res,
+			Stderr:   res,
+			Terminal: true,
+		}
+		for _, opt := range opts {
+			opt(&cfg)
+		}
+
 		return &logURI{
-			config: Config{
-				Stdout:   res,
-				Stderr:   res,
-				Terminal: true,
-			},
+			config: cfg,
 		}, nil
 	}
 }

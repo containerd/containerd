@@ -106,7 +106,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 		pio.copy = true
 		pio.io, err = runc.NewPipeIO(ioUID, ioGID, withConditionalIO(stdio))
 	case "binary":
-		pio.io, err = NewBinaryIO(ctx, id, u)
+		pio.io, err = NewBinaryIO(ctx, id, stdio.AttachableOut, stdio.AttachableErr, u)
 	case "file":
 		filePath := u.Path
 		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
@@ -253,14 +253,19 @@ func (c *countingWriteCloser) Close() error {
 	return c.WriteCloser.Close()
 }
 
-// NewBinaryIO runs a custom binary process for pluggable shim logging
-func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err error) {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return nil, err
-	}
+type pipesWriter struct {
+	stdout io.WriteCloser
+	stderr io.WriteCloser
+}
 
-	var closers []func() error
+// NewBinaryIO initializes and runs a custom binary process for pluggable shim logging.
+// The `attachableOut` and `attachableErr` parameters specify paths to FIFOs used for capturing
+// binary stdout and stderr streams. These FIFOs enable external tools or processes (e.g., nerdctl)
+// to attach and read the output streams in real-time.
+func NewBinaryIO(ctx context.Context, id, attachableOut, attachableErr string, uri *url.URL) (_ runc.IO, err error) {
+	type closer func() error
+	var closers []closer
+
 	defer func() {
 		if err == nil {
 			return
@@ -272,17 +277,17 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 		err = errors.Join(result...)
 	}()
 
-	out, err := newPipe()
+	runcOut, err := newPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stdout pipes: %w", err)
 	}
-	closers = append(closers, out.Close)
+	closers = append(closers, runcOut.Close)
 
-	serr, err := newPipe()
+	runcErr, err := newPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stderr pipes: %w", err)
 	}
-	closers = append(closers, serr.Close)
+	closers = append(closers, runcErr.Close)
 
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -290,8 +295,62 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 	}
 	closers = append(closers, r.Close, w.Close)
 
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	cmd := NewBinaryCmd(uri, id, ns)
-	cmd.ExtraFiles = append(cmd.ExtraFiles, out.r, serr.r, w)
+	var attachable bool
+	if attachableOut != "" && attachableErr != "" {
+		attachable = true
+		binaryOut, err := newPipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stdout pipes: %w", err)
+		}
+		closers = append(closers, binaryOut.Close)
+
+		binaryErr, err := newPipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stderr pipes: %w", err)
+		}
+		closers = append(closers, binaryErr.Close)
+
+		cmd.ExtraFiles = append(cmd.ExtraFiles, binaryOut.r, binaryErr.r, w)
+
+		pipesAttachableFifosPipes, err := openAttachableFifos(ctx, attachableOut, attachableErr)
+		if err != nil {
+			return nil, err
+		}
+		closers = append(closers, []closer{pipesAttachableFifosPipes.stdout.Close, pipesAttachableFifosPipes.stderr.Close}...)
+
+		stdoutWriters := io.MultiWriter(binaryOut.w, pipesAttachableFifosPipes.stdout)
+		stderrWriters := io.MultiWriter(binaryErr.w, pipesAttachableFifosPipes.stderr)
+
+		go func() {
+			if _, err := copyBuffered(ctx, stdoutWriters, runcOut.r); err != nil {
+				log.G(ctx).Warn(err.Error())
+				log.G(ctx).Warn("error copying stdout")
+			}
+
+			runcOut.r.Close()
+			binaryOut.w.Close()
+			pipesAttachableFifosPipes.stdout.Close()
+		}()
+		go func() {
+			if _, err := copyBuffered(ctx, stderrWriters, runcErr.r); err != nil {
+				log.G(ctx).Warn(err.Error())
+				log.G(ctx).Warn("error copying stderr")
+			}
+
+			runcErr.r.Close()
+			binaryErr.w.Close()
+			pipesAttachableFifosPipes.stderr.Close()
+		}()
+	} else {
+		cmd.ExtraFiles = append(cmd.ExtraFiles, runcOut.r, runcOut.r, w)
+	}
+
 	// don't need to register this with the reaper or wait when
 	// running inside a shim
 	if err := cmd.Start(); err != nil {
@@ -311,18 +370,87 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 	}
 
 	return &binaryIO{
-		cmd: cmd,
-		out: out,
-		err: serr,
+		cmd:        cmd,
+		out:        runcOut,
+		err:        runcErr,
+		attachable: attachable,
 	}, nil
 }
 
+func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written int64, err error) {
+	buf := bufPool.Get().(*[]byte)
+	defer bufPool.Put(buf)
+
+	for {
+		log.G(ctx).Warn("herre")
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+			return
+		default:
+		}
+		log.G(ctx).Warn("ici")
+		nr, er := src.Read(*buf)
+		log.G(ctx).Warn(nr)
+		if nr > 0 {
+			nw, ew := dst.Write((*buf)[0:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if ew != nil {
+				if errors.Is(ew, syscall.EAGAIN) {
+					log.G(ctx).WithError(ew).Warn("AttachableFifos are full")
+				} else {
+					err = ew
+					break
+				}
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			if er != io.EOF {
+				err = er
+			}
+			break
+		}
+	}
+	return written, err
+
+}
+
+func openAttachableFifos(ctx context.Context, attachableOut, attachableErr string) (f pipesWriter, retErr error) {
+	if attachableOut != "" {
+		if f.stdout, retErr = fifo.OpenFifo(ctx, attachableOut, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
+			return f, fmt.Errorf("failed to open stdout fifo: %w", retErr)
+		}
+	}
+	if attachableErr != "" {
+		defer func() {
+			if retErr != nil {
+				f.stdout.Close()
+			}
+		}()
+		if f.stderr, retErr = fifo.OpenFifo(ctx, attachableErr, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
+			return f, fmt.Errorf("failed to open stderr fifo: %w", retErr)
+		}
+	}
+	return f, nil
+}
+
 type binaryIO struct {
-	cmd      *exec.Cmd
-	out, err *pipe
+	cmd        *exec.Cmd
+	out, err   *pipe
+	attachable bool
 }
 
 func (b *binaryIO) CloseAfterStart() error {
+	// need to keep the pipes open until the process is closed
+	if b.attachable {
+		return nil
+	}
 	var result []error
 
 	for _, v := range []*pipe{b.out, b.err} {

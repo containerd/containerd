@@ -26,10 +26,12 @@ import (
 
 // IO holds process IO information
 type IO struct {
-	Stdin    string
-	Stdout   string
-	Stderr   string
-	Terminal bool
+	Stdin         string
+	Stdout        string
+	Stderr        string
+	AttachableOut string
+	AttachableErr string
+	Terminal      bool
 }
 
 // CreateOpts contains task creation data

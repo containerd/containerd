@@ -237,12 +237,15 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		}
 	}()
 	cfg := i.Config()
+
 	request := &tasks.CreateTaskRequest{
-		ContainerID: c.id,
-		Terminal:    cfg.Terminal,
-		Stdin:       cfg.Stdin,
-		Stdout:      cfg.Stdout,
-		Stderr:      cfg.Stderr,
+		ContainerID:   c.id,
+		Terminal:      cfg.Terminal,
+		AttachableOut: cfg.AttachableOut,
+		AttachableErr: cfg.AttachableErr,
+		Stdin:         cfg.Stdin,
+		Stdout:        cfg.Stdout,
+		Stderr:        cfg.Stderr,
 	}
 	if err := c.handleMounts(ctx, request); err != nil {
 		return nil, err

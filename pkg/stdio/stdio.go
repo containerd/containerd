@@ -18,10 +18,12 @@ package stdio
 
 // Stdio of a process
 type Stdio struct {
-	Stdin    string
-	Stdout   string
-	Stderr   string
-	Terminal bool
+	Stdin         string
+	Stdout        string
+	Stderr        string
+	AttachableOut string
+	AttachableErr string
+	Terminal      bool
 }
 
 // IsNull returns true if the stdio is not defined

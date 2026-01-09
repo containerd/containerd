@@ -597,14 +597,16 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 		topts = opts.RuntimeOptions
 	}
 	request := &task.CreateTaskRequest{
-		ID:         s.ID(),
-		Bundle:     s.Bundle(),
-		Stdin:      opts.IO.Stdin,
-		Stdout:     opts.IO.Stdout,
-		Stderr:     opts.IO.Stderr,
-		Terminal:   opts.IO.Terminal,
-		Checkpoint: opts.Checkpoint,
-		Options:    typeurl.MarshalProto(topts),
+		ID:            s.ID(),
+		Bundle:        s.Bundle(),
+		Stdin:         opts.IO.Stdin,
+		Stdout:        opts.IO.Stdout,
+		Stderr:        opts.IO.Stderr,
+		AttachableOut: opts.IO.AttachableOut,
+		AttachableErr: opts.IO.AttachableErr,
+		Terminal:      opts.IO.Terminal,
+		Checkpoint:    opts.Checkpoint,
+		Options:       typeurl.MarshalProto(topts),
 	}
 	for _, m := range opts.Rootfs {
 		request.Rootfs = append(request.Rootfs, &types.Mount{
