@@ -911,6 +911,19 @@ func (c *criContainer) GetNetDevices() map[string]*api.LinuxNetDevice {
 	return api.FromOCILinuxNetDevices(c.spec.Linux.NetDevices)
 }
 
+func (c *criContainer) GetCDIDevices() []*api.CDIDevice {
+	if c.meta != nil && c.meta.Config != nil {
+		devices := make([]*api.CDIDevice, 0, len(c.meta.Config.CDIDevices))
+		for _, d := range c.meta.Config.CDIDevices {
+			devices = append(devices, &api.CDIDevice{
+				Name: d.Name,
+			})
+		}
+		return devices
+	}
+	return nil
+}
+
 func (c *criContainer) GetRdt() *api.LinuxRdt {
 	if c.spec.Linux == nil || c.spec.Linux.IntelRdt == nil {
 		return nil
