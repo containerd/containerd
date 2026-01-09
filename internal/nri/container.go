@@ -50,6 +50,7 @@ type LinuxContainer interface {
 	GetNetDevices() map[string]*nri.LinuxNetDevice
 	GetRdt() *nri.LinuxRdt
 	GetSeccompProfile() *nri.SecurityProfile
+	GetSysctl() map[string]string
 }
 
 func commonContainerToNRI(ctr Container) *nri.Container {

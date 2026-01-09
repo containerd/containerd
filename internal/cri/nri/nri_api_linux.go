@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -914,6 +915,13 @@ func (c *criContainer) GetSeccompProfile() *api.SecurityProfile {
 		ProfileType:  api.SecurityProfile_ProfileType(profile.GetProfileType()),
 		LocalhostRef: profile.GetLocalhostRef(),
 	}
+}
+
+func (c *criContainer) GetSysctl() map[string]string {
+	if c.spec.Linux == nil || len(c.spec.Linux.Sysctl) == 0 {
+		return nil
+	}
+	return maps.Clone(c.spec.Linux.Sysctl)
 }
 
 func (c *criContainer) GetPid() uint32 {
