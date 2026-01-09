@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -961,6 +962,18 @@ func (c *criContainer) GetSysctl() map[string]string {
 
 func (c *criContainer) GetPid() uint32 {
 	return c.pid
+}
+
+func (c *criContainer) GetUser() *api.User {
+	if c.spec.Process == nil {
+		return nil
+	}
+
+	return &api.User{
+		Uid:            c.spec.Process.User.UID,
+		Gid:            c.spec.Process.User.GID,
+		AdditionalGids: slices.Clone(c.spec.Process.User.AdditionalGids),
+	}
 }
 
 //
