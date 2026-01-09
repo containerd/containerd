@@ -18,6 +18,7 @@ package docker
 
 import (
 	"context"
+	"encoding/hex"
 	"net"
 	"net/http"
 	"strings"
@@ -81,6 +82,9 @@ func reportWarnings(ctx context.Context, header http.Header, handler WarningHand
 
 // parseWarningText extracts the warn-text from an RFC 7234 Warning header value.
 // Expected format: 299 - "message"
+// Per RFC 7230 section 3.2.6, quoted-string values may contain:
+// - quoted-pair: backslash followed by any character (e.g., \", \\)
+// - percent-encoding: %xx where xx is a hex value
 func parseWarningText(warning string) string {
 	before, text, ok := strings.Cut(warning, "299 - ")
 
@@ -106,17 +110,25 @@ func parseWarningText(warning string) string {
 
 	for idx < ln {
 		c := text[idx]
-		nextC := byte(0)
-		if len(text) > idx+1 {
-			nextC = text[idx+1]
-		}
 
-		// Check for escaped quote
-		if c == '\\' && nextC == '"' {
-			out.WriteByte('"')
+		if c == '\\' && len(text) > idx+1 {
+			nextC := text[idx+1]
+			out.WriteByte(nextC)
 			idx += 2
 			continue
 		}
+
+		// Handle percent-encoding (%xx)
+		if c == '%' && idx+2 < ln {
+			decoded, err := hex.DecodeString(text[idx+1 : idx+3])
+			if err == nil && len(decoded) == 1 {
+				out.WriteByte(decoded[0])
+				idx += 3
+				continue
+			}
+			// Invalid percent-encoding, treat as literal
+		}
+
 		if c == '"' {
 			return out.String()
 		}
