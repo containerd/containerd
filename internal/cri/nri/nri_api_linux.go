@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
@@ -1041,6 +1042,18 @@ func (c *criContainer) GetRlimits() []*api.POSIXRlimit {
 	}
 
 	return rlimits
+}
+
+func (c *criContainer) GetUser() *api.User {
+	if c.spec.Process == nil {
+		return nil
+	}
+
+	return &api.User{
+		Uid:            c.spec.Process.User.UID,
+		Gid:            c.spec.Process.User.GID,
+		AdditionalGids: slices.Clone(c.spec.Process.User.AdditionalGids),
+	}
 }
 
 //
