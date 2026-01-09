@@ -178,29 +178,10 @@ generate: protos
 
 protos: bin/protoc-gen-go-fieldpath bin/go-buildtag bin/buf
 	@echo "$(WHALE) $@"
-
-	# This part is only required because we historically do a fully qualified import in proto files,
-	# so we require a corresponding directory structure (with github.com/containerd/containerd/api).
-	# We should migrate imports in future and drop this.
-	$(eval TMPDIR := $(shell mktemp -d))
-	@mkdir -p $(TMPDIR)/github.com/containerd/containerd
-	@cp -r api $(TMPDIR)/github.com/containerd/containerd/
-	@cp buf.* $(TMPDIR)/
-
-	@cd $(TMPDIR) && PATH="$(ROOTDIR)/bin:$$PATH" buf dep update
-	@cd $(TMPDIR) && PATH="$(ROOTDIR)/bin:$$PATH" buf generate
-
-	# Unfortunally, buf doesn't offer granular per-directory generator selection
-	# so we have to just delete files we don't want.
-	@rm -f $(TMPDIR)/github.com/containerd/containerd/api/runtime/task/v2/shim_grpc.pb.go $(TMPDIR)/github.com/containerd/containerd/api/services/ttrpc/events/v1/events_grpc.pb.go
-	@find $(TMPDIR)/github.com/containerd/containerd/api -name '*_fieldpath.pb.go' ! -path '*/api/events/*' -delete
-
-	# Move the generated files back into the api directory.
-	@rm -rf api
-	@mv $(TMPDIR)/github.com/containerd/containerd/api .
-	@mv $(TMPDIR)/buf.lock .
-	@rm -rf $(TMPDIR)
-
+	PATH="$(ROOTDIR)/bin:$$PATH" buf dep update
+	PATH="$(ROOTDIR)/bin:$$PATH" buf generate
+	@rm -f api/runtime/task/v2/shim_grpc.pb.go api/services/ttrpc/events/v1/events_grpc.pb.go
+	@find api/ -name '*_fieldpath.pb.go' ! -path 'api/events/*' -delete
 	go-fix-acronym -w -a '^Os' $$(find api/ -name '*.pb.go')
 	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $$(find api/ -name '*.pb.go')
 	bin/go-buildtag -w --tags '!no_grpc' $$(find api/ -name '*_grpc.pb.go')

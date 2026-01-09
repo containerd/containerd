@@ -1,20 +1,20 @@
 version: v2
 plugins:
   - remote: buf.build/protocolbuffers/go:v1.28.1
-    out: .
+    out: api
     opt:
       - paths=source_relative
       - Mgoogle/rpc/status.proto=google.golang.org/genproto/googleapis/rpc/status
   - remote: buf.build/grpc/go:v1.2.0
-    out: .
+    out: api
     opt:
       - paths=source_relative
   - local: protoc-gen-go-ttrpc
-    out: .
+    out: api
     opt:
       - paths=source_relative
       - prefix=TTRPC
   - local: protoc-gen-go-fieldpath
-    out: .
+    out: api
     opt:
       - paths=source_relative
