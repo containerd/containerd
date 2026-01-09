@@ -546,6 +546,7 @@ func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *re
 		path:           p,
 		header:         header,
 		host:           host,
+		refspec:        r.refspec,
 		warningHandler: r.warningHandler,
 	}
 }
@@ -595,6 +596,7 @@ type request struct {
 	host           RegistryHost
 	body           func() (io.ReadCloser, error)
 	size           int64
+	refspec        reference.Spec
 	warningHandler WarningHandler
 }
 
@@ -707,7 +709,7 @@ func withOffsetCheck(offset, parallelism int64) doChecks {
 }
 
 func (r *request) doWithRetries(ctx context.Context, lastHost bool, checks ...doChecks) (resp *http.Response, err error) {
-	ctx = updateWarningSource(ctx, r)
+	ctx = updateWarningSource(ctx, r.refspec)
 	resp, err = r.doWithRetriesInner(ctx, nil, lastHost)
 	if err != nil {
 		return nil, err

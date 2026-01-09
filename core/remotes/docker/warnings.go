@@ -25,12 +25,14 @@ import (
 
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/pkg/reference"
 )
 
 // WarningSource contains the information about the request that caused the warning.
 type WarningSource struct {
-	// URL is the URL of the request that caused the warning.
-	URL string
+	// Ref is the reference specification of the content that the warning is for.
+	Ref reference.Spec
 
 	// Desc is the descriptor of the content that the warning is for.
 	// Can be nil if the warning is not for a specific content.
@@ -154,13 +156,12 @@ func IsLocalhost(host string) bool {
 	return ip.IsLoopback()
 }
 
-func updateWarningSource(ctx context.Context, req *request) context.Context {
-	url := req.host.Scheme + "://" + req.host.Host + req.path
+func updateWarningSource(ctx context.Context, ref reference.Spec) context.Context {
 	var warnSrc WarningSource
 	if v := ctx.Value(warningSourceKey{}); v != nil {
 		warnSrc = v.(WarningSource)
 	}
-	warnSrc.URL = url
+	warnSrc.Ref = ref
 	ctx = context.WithValue(ctx, warningSourceKey{}, warnSrc)
 	return ctx
 }
