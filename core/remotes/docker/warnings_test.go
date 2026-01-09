@@ -21,10 +21,13 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/pkg/reference"
 )
 
 func TestWarningHandler(t *testing.T) {
@@ -56,6 +59,14 @@ func TestWarningHandler(t *testing.T) {
 
 	image := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(s.URL, "http://"), name, tag)
 
+	// Create expected descriptors and digests
+	mcDesc := mc.Descriptor()
+	mcDigest := mc.Digest()
+	configDesc := m.config.Descriptor()
+	configDigest := m.config.Digest()
+	layer0Desc := m.references[0].Descriptor()
+	layer0Digest := m.references[0].Digest()
+
 	type expectedWarning struct {
 		warning string
 		src     WarningSource
@@ -71,22 +82,50 @@ func TestWarningHandler(t *testing.T) {
 			name:    "Resolve",
 			resolve: true,
 			expectedWarnings: []expectedWarning{
-				{warning: "Manifest access warning", src: WarningSource{URL: fmt.Sprintf("%s/v2/%s/manifests/%s", s.URL, name, tag)}},
+				{
+					warning: "Manifest access warning",
+					src: WarningSource{
+						Ref:    mustParseRef(t, image),
+						Desc:   &mcDesc,
+						Digest: &mcDigest,
+					},
+				},
 			},
 		},
 		{
 			name:        "Fetch manifest",
 			descriptors: []ocispec.Descriptor{mc.Descriptor()},
 			expectedWarnings: []expectedWarning{
-				{warning: "Manifest access warning", src: WarningSource{URL: fmt.Sprintf("%s/v2/%s/manifests/%s", s.URL, name, mc.Digest())}},
+				{
+					warning: "Manifest access warning",
+					src: WarningSource{
+						Ref:    mustParseRef(t, image),
+						Desc:   &mcDesc,
+						Digest: &mcDigest,
+					},
+				},
 			},
 		},
 		{
 			name:        "Fetch blob",
 			descriptors: []ocispec.Descriptor{m.config.Descriptor(), m.references[0].Descriptor()},
 			expectedWarnings: []expectedWarning{
-				{warning: "Blob access warning", src: WarningSource{URL: fmt.Sprintf("%s/v2/%s/blobs/%s", s.URL, name, m.config.Digest())}},
-				{warning: "Blob access warning", src: WarningSource{URL: fmt.Sprintf("%s/v2/%s/blobs/%s", s.URL, name, m.references[0].Digest())}},
+				{
+					warning: "Blob access warning",
+					src: WarningSource{
+						Ref:    mustParseRef(t, image),
+						Desc:   &configDesc,
+						Digest: &configDigest,
+					},
+				},
+				{
+					warning: "Blob access warning",
+					src: WarningSource{
+						Ref:    mustParseRef(t, image),
+						Desc:   &layer0Desc,
+						Digest: &layer0Digest,
+					},
+				},
 			},
 		},
 	}
@@ -136,8 +175,26 @@ func TestWarningHandler(t *testing.T) {
 				if w.warning != expected.warning {
 					t.Fatalf("Expected warning %q, got: %s", expected.warning, w.warning)
 				}
-				if !strings.Contains(w.src.URL, expected.src.URL) {
-					t.Fatalf("Expected warning source URL to contain %q, got: %s", expected.src.URL, w.src.URL)
+				if w.src.Ref.String() != expected.src.Ref.String() {
+					t.Fatalf("Expected warning source ref %q, got: %s", expected.src.Ref.String(), w.src.Ref.String())
+				}
+				// Check descriptor if present in expected
+				if expected.src.Desc != nil {
+					if w.src.Desc == nil {
+						t.Fatalf("Expected warning source descriptor %+v, got nil", expected.src.Desc)
+					}
+					if !reflect.DeepEqual(*w.src.Desc, *expected.src.Desc) {
+						t.Fatalf("Expected warning source descriptor %+v, got: %+v", expected.src.Desc, w.src.Desc)
+					}
+				}
+				// Check digest if present in expected
+				if expected.src.Digest != nil {
+					if w.src.Digest == nil {
+						t.Fatalf("Expected warning source digest %v, got nil", expected.src.Digest)
+					}
+					if *w.src.Digest != *expected.src.Digest {
+						t.Fatalf("Expected warning source digest %v, got: %v", expected.src.Digest, w.src.Digest)
+					}
 				}
 			}
 		})
@@ -230,4 +287,12 @@ func TestParseWarningText(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustParseRef(t *testing.T, ref string) reference.Spec {
+	spec, err := reference.Parse(ref)
+	if err != nil {
+		t.Fatalf("failed to parse reference %q: %v", ref, err)
+	}
+	return spec
 }
