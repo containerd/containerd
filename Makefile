@@ -178,15 +178,13 @@ generate: protos
 
 protos: bin/protoc-gen-go-fieldpath bin/go-buildtag
 	@echo "$(WHALE) $@"
-	@find . -path ./vendor -prune -false -o -name '*.pb.go' | xargs rm
-	$(eval TMPDIR := $(shell mktemp -d))
-	@mv ${ROOTDIR}/vendor ${TMPDIR}
-	@(cd ${ROOTDIR}/api && PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${API_PACKAGES})
-	@mv ${TMPDIR}/vendor ${ROOTDIR}
-	@rm -rf ${TMPDIR} v2
-	go-fix-acronym -w -a '^Os' $(shell find api/ -name '*.pb.go')
-	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ -name '*.pb.go')
-	bin/go-buildtag -w --tags '!no_grpc' $(shell find api/ -name '*_grpc.pb.go')
+	(cd api && buf dep update)
+	(cd api && PATH="$(ROOTDIR)/bin:$$PATH" buf generate)
+	@rm -f api/runtime/task/v2/shim_grpc.pb.go api/services/ttrpc/events/v1/events_grpc.pb.go
+	@find api/ -name '*_fieldpath.pb.go' ! -path 'api/events/*' -delete
+	go-fix-acronym -w -a '^Os' $$(find api/ -name '*.pb.go')
+	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $$(find api/ -name '*.pb.go')
+	bin/go-buildtag -w --tags '!no_grpc' $$(find api/ -name '*_grpc.pb.go')
 	@test -z "$$(git status --short | grep "api/next.pb.txt" | tee /dev/stderr)" || \
 		$(GO) mod edit -replace=github.com/containerd/containerd/api=./api
 

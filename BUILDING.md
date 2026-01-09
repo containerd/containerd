@@ -43,8 +43,6 @@ You need `git` to checkout the source code:
 git clone https://github.com/containerd/containerd
 ```
 
-For proper results, install the `protoc` release into `/usr/local` on your build system. When generating source code from `.proto` files, containerd may rely on some external protocol buffer files. These external dependencies should be added to the `/usr/local/include` directory. To install the appropriate version of `protoc` and download any necessary external protocol buffer files on a Linux host, run the install script located at `script/setup/install-protobuf`.
-
 To enable optional [Btrfs](https://en.wikipedia.org/wiki/Btrfs) snapshotter, you should have the headers from the Linux kernel 4.12 or later.
 The dependency on the kernel headers only affects users building containerd from source.
 Users on older kernels may opt to not compile the btrfs support (see `BUILDTAGS=no_btrfs` below),
