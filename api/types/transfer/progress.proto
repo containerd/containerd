@@ -18,7 +18,7 @@ syntax = "proto3";
 
 package containerd.types.transfer;
 
-import "github.com/containerd/containerd/api/types/descriptor.proto";
+import "types/descriptor.proto";
 
 option go_package = "github.com/containerd/containerd/api/types/transfer";
 

@@ -28,10 +28,10 @@ package containerd.services.sandbox.v1;
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
-import "github.com/containerd/containerd/api/types/sandbox.proto";
-import "github.com/containerd/containerd/api/types/mount.proto";
-import "github.com/containerd/containerd/api/types/platform.proto";
-import "github.com/containerd/containerd/api/types/metrics.proto";
+import "types/sandbox.proto";
+import "types/mount.proto";
+import "types/platform.proto";
+import "types/metrics.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/sandbox/v1;sandbox";
 
