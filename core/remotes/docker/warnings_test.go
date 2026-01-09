@@ -166,6 +166,36 @@ func TestParseWarningText(t *testing.T) {
 			want:   `quoted "text" inside`,
 		},
 		{
+			name:   "escaped backslash",
+			header: `299 - "path\\to\\file"`,
+			want:   `path\to\file`,
+		},
+		{
+			name:   "percent-encoded space",
+			header: `299 - "hello%20world"`,
+			want:   "hello world",
+		},
+		{
+			name:   "percent-encoded special chars",
+			header: `299 - "100%25 complete"`,
+			want:   "100% complete",
+		},
+		{
+			name:   "percent-encoded quote",
+			header: `299 - "say %22hello%22"`,
+			want:   `say "hello"`,
+		},
+		{
+			name:   "invalid percent-encoding treated as literal",
+			header: `299 - "100%ZZ invalid"`,
+			want:   "100%ZZ invalid",
+		},
+		{
+			name:   "incomplete percent-encoding at end",
+			header: `299 - "trailing%2"`,
+			want:   "trailing%2",
+		},
+		{
 			name:   "trailing characters invalid",
 			header: `299 - "warn text" extra data`,
 			want:   "",
