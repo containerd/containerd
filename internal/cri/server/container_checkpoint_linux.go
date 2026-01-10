@@ -253,6 +253,9 @@ func (c *criService) CRImportCheckpoint(
 	}
 
 	originalAnnotations := containerStatus.GetAnnotations()
+	if originalAnnotations == nil {
+		return "", fmt.Errorf("containerStatus Annotations is nil")
+	}
 	originalLabels := containerStatus.GetLabels()
 
 	sandboxUID := sandboxConfig.GetMetadata().GetUid()
