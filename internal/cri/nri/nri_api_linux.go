@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"maps"
 
+	eventtypes "github.com/containerd/containerd/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
@@ -31,6 +32,7 @@ import (
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/blockio"
 	cdispec "github.com/containerd/containerd/v2/pkg/cdi"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -141,7 +143,7 @@ func (a *API) RemovePodSandbox(ctx context.Context, criPod *sstore.Sandbox) erro
 }
 
 func (a *API) CreateContainer(ctx context.Context, ctrs *containers.Container, spec *runtimespec.Spec) (*api.ContainerAdjustment, error) {
-	ctr := a.nriContainer(ctrs, spec)
+	ctr := a.nriContainer(ctrs, withContainerSpec(spec))
 
 	criPod, err := a.cri.SandboxStore().Get(ctr.GetPodSandboxID())
 	if err != nil {
@@ -161,7 +163,7 @@ func (a *API) PostCreateContainer(ctx context.Context, criPod *sstore.Sandbox, c
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.PostCreateContainer(ctx, pod, ctr)
 
@@ -174,7 +176,7 @@ func (a *API) StartContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.StartContainer(ctx, pod, ctr)
 
@@ -187,7 +189,7 @@ func (a *API) PostStartContainer(ctx context.Context, criPod *sstore.Sandbox, cr
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.PostStartContainer(ctx, pod, ctr)
 
@@ -202,7 +204,7 @@ func (a *API) UpdateContainerResources(ctx context.Context, criPod *sstore.Sandb
 	const noOomAdj = 0
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	r, err := a.nri.UpdateContainer(ctx, pod, ctr, fromCRILinuxResources(req))
 	if err != nil {
@@ -218,7 +220,7 @@ func (a *API) PostUpdateContainerResources(ctx context.Context, criPod *sstore.S
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.PostUpdateContainer(ctx, pod, ctr)
 
@@ -230,7 +232,7 @@ func (a *API) StopContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr 
 		return nil
 	}
 
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	if criPod == nil || criPod.ID == "" {
 		criPod = &sstore.Sandbox{
@@ -246,12 +248,12 @@ func (a *API) StopContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr 
 	return err
 }
 
-func (a *API) NotifyContainerExit(ctx context.Context, criCtr *cstore.Container) {
+func (a *API) NotifyContainerExit(ctx context.Context, criCtr *cstore.Container, e *eventtypes.TaskExit) {
 	if a.IsDisabled() {
 		return
 	}
 
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr, withExitEvent(e))
 
 	criPod, _ := a.cri.SandboxStore().Get(ctr.GetPodSandboxID())
 	if criPod.ID == "" {
@@ -272,7 +274,7 @@ func (a *API) RemoveContainer(ctx context.Context, criPod *sstore.Sandbox, criCt
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.RemoveContainer(ctx, pod, ctr)
 
@@ -285,7 +287,7 @@ func (a *API) UndoCreateContainer(ctx context.Context, criPod *sstore.Sandbox, i
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(&containers.Container{ID: id}, spec)
+	ctr := a.nriContainer(&containers.Container{ID: id}, withContainerSpec(spec))
 
 	err := a.nri.StopContainer(ctx, pod, ctr)
 	if err != nil {
@@ -381,7 +383,7 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 	}
 }
 
-func (a *API) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDeleteOpts {
+func (a *API) WithContainerExit(criCtr *cstore.Container, e *eventtypes.TaskExit) containerd.ProcessDeleteOpts {
 	if a.IsDisabled() {
 		return func(_ context.Context, _ containerd.Process) error {
 			return nil
@@ -389,7 +391,7 @@ func (a *API) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDele
 	}
 
 	return func(_ context.Context, _ containerd.Process) error {
-		a.NotifyContainerExit(context.Background(), criCtr)
+		a.NotifyContainerExit(context.Background(), criCtr, e)
 		return nil
 	}
 }
@@ -439,7 +441,7 @@ func (a *API) ListContainers() []nri.Container {
 		case cri.ContainerState_CONTAINER_UNKNOWN:
 			continue
 		}
-		containers = append(containers, a.nriContainer(&ctr, nil))
+		containers = append(containers, a.nriContainer(&ctr))
 	}
 	return containers
 }
@@ -459,7 +461,7 @@ func (a *API) GetContainer(id string) (nri.Container, bool) {
 		return nil, false
 	}
 
-	return a.nriContainer(&ctr, nil), true
+	return a.nriContainer(&ctr), true
 }
 
 func (a *API) UpdateContainer(ctx context.Context, u *api.ContainerUpdate) error {
@@ -694,15 +696,36 @@ func (p *criPodSandbox) GetIPs() []string {
 // NRI integration wrapper for CRI Containers
 //
 
+type criContainerOption func(*criContainer)
+
+func withContainerSpec(spec *runtimespec.Spec) criContainerOption {
+	return func(c *criContainer) {
+		c.spec = spec
+	}
+}
+
+func withExitEvent(e *eventtypes.TaskExit) criContainerOption {
+	return func(c *criContainer) {
+		c.exit = e
+	}
+}
+
 type criContainer struct {
 	api  *API
 	ctrs *containers.Container
 	spec *runtimespec.Spec
 	meta *cstore.Metadata
 	pid  uint32
+	exit *eventtypes.TaskExit
 }
 
-func (a *API) nriContainer(ctr interface{}, spec *runtimespec.Spec) *criContainer {
+func (a *API) nriContainer(ctr interface{}, opts ...criContainerOption) *criContainer {
+	criCtr := &criContainer{}
+	for _, o := range opts {
+		o(criCtr)
+	}
+	criCtr.api = a
+
 	switch c := ctr.(type) {
 	case *cstore.Container:
 		ctx := ctrdutil.NamespacedContext()
@@ -726,13 +749,12 @@ func (a *API) nriContainer(ctr interface{}, spec *runtimespec.Spec) *criContaine
 			pid = task.Pid()
 		}
 
-		return &criContainer{
-			api:  a,
-			ctrs: &ctrs,
-			meta: &c.Metadata,
-			spec: spec,
-			pid:  pid,
-		}
+		criCtr.ctrs = &ctrs
+		criCtr.meta = &c.Metadata
+		criCtr.spec = spec
+		criCtr.pid = pid
+
+		return criCtr
 
 	case *containers.Container:
 		ctrs := c
@@ -744,20 +766,17 @@ func (a *API) nriContainer(ctr interface{}, spec *runtimespec.Spec) *criContaine
 			}
 		}
 
-		return &criContainer{
-			api:  a,
-			ctrs: ctrs,
-			meta: meta,
-			spec: spec,
-		}
+		criCtr.ctrs = ctrs
+		criCtr.meta = meta
+
+		return criCtr
 	}
 
 	log.L.Errorf("can't wrap %T as NRI container", ctr)
-	return &criContainer{
-		api:  a,
-		meta: &cstore.Metadata{},
-		spec: &runtimespec.Spec{},
-	}
+	criCtr.meta = &cstore.Metadata{}
+	criCtr.spec = &runtimespec.Spec{}
+
+	return criCtr
 }
 
 func (c *criContainer) GetDomain() string {
@@ -779,21 +798,56 @@ func (c *criContainer) GetName() string {
 	return c.spec.Annotations[annotations.ContainerName]
 }
 
-func (c *criContainer) GetState() api.ContainerState {
-	criCtr, err := c.api.cri.ContainerStore().Get(c.GetID())
-	if err != nil {
-		return api.ContainerState_CONTAINER_UNKNOWN
-	}
-	switch criCtr.Status.Get().State() {
-	case cri.ContainerState_CONTAINER_CREATED:
-		return api.ContainerState_CONTAINER_CREATED
-	case cri.ContainerState_CONTAINER_RUNNING:
-		return api.ContainerState_CONTAINER_RUNNING
-	case cri.ContainerState_CONTAINER_EXITED:
-		return api.ContainerState_CONTAINER_STOPPED
+func (c *criContainer) GetStatus() *nri.ContainerStatus {
+	const (
+		// completedExitReason is the exit reason when container exits with 0.
+		completedExitReason = "Completed"
+		// errorExitReason is the exit reason when container exits with non-zero.
+		errorExitReason = "Error"
+	)
+
+	status := &nri.ContainerStatus{
+		State: api.ContainerState_CONTAINER_UNKNOWN,
 	}
 
-	return api.ContainerState_CONTAINER_UNKNOWN
+	criCtr, err := c.api.cri.ContainerStore().Get(c.GetID())
+	if err == nil {
+		s := criCtr.Status.Get()
+		switch s.State() {
+		case cri.ContainerState_CONTAINER_CREATED:
+			status.State = api.ContainerState_CONTAINER_CREATED
+		case cri.ContainerState_CONTAINER_RUNNING:
+			status.State = api.ContainerState_CONTAINER_RUNNING
+		case cri.ContainerState_CONTAINER_EXITED:
+			if s.ExitCode == 0 {
+				status.Reason = completedExitReason
+			} else {
+				status.Reason = errorExitReason
+			}
+		}
+
+		if status.Reason == "" {
+			status.Reason = s.Reason
+		}
+		status.Message = s.Message
+		status.Pid = s.Pid
+		status.CreatedAt = s.CreatedAt
+		status.StartedAt = s.StartedAt
+		status.FinishedAt = s.FinishedAt
+		status.ExitCode = s.ExitCode
+
+		if status.Pid == 0 { // in StartContainer we don't have the PID in status yet
+			status.Pid = c.pid
+		}
+	}
+
+	if c.exit != nil { // when handling an exit event use the exit info
+		status.State = api.ContainerState_CONTAINER_STOPPED
+		status.FinishedAt = protobuf.FromTimestamp(c.exit.ExitedAt).UnixNano()
+		status.ExitCode = int32(c.exit.ExitStatus)
+	}
+
+	return status
 }
 
 func (c *criContainer) GetLabels() map[string]string {
