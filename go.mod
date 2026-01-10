@@ -37,6 +37,7 @@ require (
 	github.com/docker/go-metrics v0.0.1
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.13.0
+	github.com/erofs/go-erofs v0.0.0-20251218022805-9629ce7d5f1f
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/certtostore v1.0.6
 	github.com/google/go-cmp v0.7.0
