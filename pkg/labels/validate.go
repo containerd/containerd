@@ -22,20 +22,20 @@ import (
 	"github.com/containerd/errdefs"
 )
 
-const (
-	maxSize = 4096
-	// maximum length of key portion of error message if len of key + len of value > maxSize
-	keyMaxLen = 64
-)
+// MaxLabelSize specifies the maximum size of a label in bytes, configurable via containerd config
+var MaxLabelSize = 4096
 
-// Validate a label's key and value are under 4096 bytes
+// maximum length of key portion of error message if len of key + len of value > MaxLabelSize
+const keyMaxLen = 64
+
+// Validate a label's key and value are under MaxLabelSize
 func Validate(k, v string) error {
 	total := len(k) + len(v)
-	if total > maxSize {
+	if total > MaxLabelSize {
 		if len(k) > keyMaxLen {
 			k = k[:keyMaxLen]
 		}
-		return fmt.Errorf("label key and value length (%d bytes) greater than maximum size (%d bytes), key: %s: %w", total, maxSize, k, errdefs.ErrInvalidArgument)
+		return fmt.Errorf("label key and value length (%d bytes) greater than maximum size (%d bytes), key: %s: %w", total, MaxLabelSize, k, errdefs.ErrInvalidArgument)
 	}
 	return nil
 }
