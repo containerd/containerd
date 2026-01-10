@@ -93,7 +93,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB) {
 		snapshotters[name] = snapshotter
 	}
 
-	cs, err := local.NewStore(filepath.Join(dirname, "content"))
+	cs, err := local.NewStore(filepath.Join(dirname, "content"), nil)
 	require.NoError(t, err)
 
 	bdb, err := bolt.Open(filepath.Join(dirname, "metadata.db"), 0644, nil)
@@ -895,7 +895,7 @@ func newStores(t testing.TB) (*DB, content.Store, snapshots.Snapshotter, func())
 		t.Fatal(err)
 	}
 
-	lcs, err := local.NewStore(filepath.Join(td, "content"))
+	lcs, err := local.NewStore(filepath.Join(td, "content"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
