@@ -28,6 +28,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
+	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -69,6 +70,10 @@ type CRIImageService struct {
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
 	snapshotStore *snapshotstore.Store
+	// snapshotters contains all snapshotters.
+	snapshotters map[string]snapshots.Snapshotter
+	// snapshotterExports contains exports metadata for each snapshotter.
+	snapshotterExports map[string]map[string]string
 	// transferrer is used to pull image with transfer service
 	transferrer transfer.Transferrer
 	// unpackDuplicationSuppressor is used to make sure that there is only
@@ -94,6 +99,8 @@ type CRIImageServiceOptions struct {
 	RuntimePlatforms map[string]ImagePlatform
 
 	Snapshotters map[string]snapshots.Snapshotter
+
+	SnapshotterExports map[string]map[string]string
 
 	Client imageClient
 
@@ -123,6 +130,8 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
 		snapshotStore:               snapshotstore.NewStore(),
+		snapshotters:                options.Snapshotters,
+		snapshotterExports:          options.SnapshotterExports,
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
 		downloadLimiter:             downloadLimiter,
@@ -139,9 +148,15 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	return &svc, nil
 }
 
-// LocalResolve resolves image reference locally and returns corresponding image metadata. It
-// returns errdefs.ErrNotFound if the reference doesn't exist.
-func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
+// LocalResolve resolves image reference locally and returns corresponding image metadata.
+// Optional snapshotter can be provided; if not specified, the default snapshotter from config is used.
+// It returns errdefs.ErrNotFound if the reference doesn't exist.
+func (c *CRIImageService) LocalResolve(refOrID string, snapshotter ...string) (imagestore.Image, error) {
+	sn := ""
+	if len(snapshotter) > 0 {
+		sn = snapshotter[0]
+	}
+
 	getImageID := func(refOrId string) string {
 		if _, err := imagedigest.Parse(refOrID); err == nil {
 			return refOrID
@@ -166,7 +181,35 @@ func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error)
 		// Try to treat ref as imageID
 		imageID = refOrID
 	}
-	return c.imageStore.Get(imageID)
+	image, err := c.imageStore.Get(imageID)
+	if err != nil {
+		return image, err
+	}
+	if image.ChainID != "" {
+		if sn == "" {
+			sn = c.config.Snapshotter
+		}
+
+		// For local snapshotters , verify snapshot existence.
+		// For remote snapshotters), we skip the strict check to avoid
+		// breaking lazy loading workflows where snapshots may not be in the cache yet.
+		if !c.isRemoteSnapshotter(sn) {
+			if snSvc, ok := c.snapshotters[sn]; ok {
+				ctx := ctrdutil.NamespacedContext()
+				if _, err := snSvc.Stat(ctx, image.ChainID); err != nil {
+					log.L.Infof("LocalResolve: snapshot %q missing in snapshotter %q: %v. Cleaning up cache and returning NotFound to trigger pull.", image.ChainID, sn, err)
+					// Cleanup the stale snapshot record from the store so that the next PullImage doesn't skip it.
+					key := snapshotstore.Key{
+						Key:         image.ChainID,
+						Snapshotter: sn,
+					}
+					c.snapshotStore.Delete(key)
+					return imagestore.Image{}, err
+				}
+			}
+		}
+	}
+	return image, nil
 }
 
 // RuntimeSnapshotter overrides the default snapshotter if Snapshotter is set for this runtime.
@@ -208,4 +251,16 @@ func (c *CRIImageService) PinnedImage(name string) string {
 // GRPCService returns a new CRI Image Service grpc server.
 func (c *CRIImageService) GRPCService() runtime.ImageServiceServer {
 	return &GRPCCRIImageService{c}
+}
+
+// isRemoteSnapshotter returns true if the snapshotter is a remote snapshotter
+// (like stargz or nydus) that supports lazy loading.
+// Remote snapshotters are identified by the "enable_remote_snapshot_annotations" export.
+func (c *CRIImageService) isRemoteSnapshotter(snapshotter string) bool {
+	if exports, ok := c.snapshotterExports[snapshotter]; ok {
+		if v, exists := exports["enable_remote_snapshot_annotations"]; exists && v == "true" {
+			return true
+		}
+	}
+	return false
 }
