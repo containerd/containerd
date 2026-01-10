@@ -18,7 +18,7 @@ syntax = "proto3";
 
 package containerd.services.events.ttrpc.v1;
 
-import "github.com/containerd/containerd/api/types/event.proto";
+import "types/event.proto";
 import "google/protobuf/empty.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/ttrpc/events/v1;events";

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -90,6 +91,28 @@ func (a *API) RunPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
 		a.nri.StopPodSandbox(ctx, pod)
 		a.nri.RemovePodSandbox(ctx, pod)
 	}
+
+	return err
+}
+
+func (a *API) UpdatePodSandboxResources(ctx context.Context, criPod *sstore.Sandbox, overhead *cri.LinuxContainerResources, req *cri.LinuxContainerResources) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	err := a.nri.UpdatePodSandbox(ctx, pod, fromCRILinuxResources(overhead), fromCRILinuxResources(req))
+
+	return err
+}
+
+func (a *API) PostUpdatePodSandboxResources(ctx context.Context, criPod *sstore.Sandbox) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	err := a.nri.PostUpdatePodSandbox(ctx, pod)
 
 	return err
 }
@@ -889,6 +912,19 @@ func (c *criContainer) GetNetDevices() map[string]*api.LinuxNetDevice {
 	return api.FromOCILinuxNetDevices(c.spec.Linux.NetDevices)
 }
 
+func (c *criContainer) GetCDIDevices() []*api.CDIDevice {
+	if c.meta != nil && c.meta.Config != nil {
+		devices := make([]*api.CDIDevice, 0, len(c.meta.Config.CDIDevices))
+		for _, d := range c.meta.Config.CDIDevices {
+			devices = append(devices, &api.CDIDevice{
+				Name: d.Name,
+			})
+		}
+		return devices
+	}
+	return nil
+}
+
 func (c *criContainer) GetRdt() *api.LinuxRdt {
 	if c.spec.Linux == nil || c.spec.Linux.IntelRdt == nil {
 		return nil
@@ -914,6 +950,13 @@ func (c *criContainer) GetSeccompProfile() *api.SecurityProfile {
 		ProfileType:  api.SecurityProfile_ProfileType(profile.GetProfileType()),
 		LocalhostRef: profile.GetLocalhostRef(),
 	}
+}
+
+func (c *criContainer) GetSysctl() map[string]string {
+	if c.spec.Linux == nil || len(c.spec.Linux.Sysctl) == 0 {
+		return nil
+	}
+	return maps.Clone(c.spec.Linux.Sysctl)
 }
 
 func (c *criContainer) GetPid() uint32 {

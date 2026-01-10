@@ -21,9 +21,9 @@ package containerd.runtime.sandbox.v1;
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
-import "github.com/containerd/containerd/api/types/mount.proto";
-import "github.com/containerd/containerd/api/types/platform.proto";
-import "github.com/containerd/containerd/api/types/metrics.proto";
+import "types/mount.proto";
+import "types/platform.proto";
+import "types/metrics.proto";
 
 option go_package = "github.com/containerd/containerd/api/runtime/sandbox/v1;sandbox";
 

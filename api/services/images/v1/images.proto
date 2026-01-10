@@ -21,7 +21,7 @@ package containerd.services.images.v1;
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
-import "github.com/containerd/containerd/api/types/descriptor.proto";
+import "types/descriptor.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/images/v1;images";
 

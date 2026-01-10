@@ -37,7 +37,9 @@ type SandboxInfo struct {
 	RuntimeOptions interface{}               `json:"runtimeOptions"`
 	Config         *runtime.PodSandboxConfig `json:"config"`
 	// Note: RuntimeSpec may not be populated if the sandbox has not been fully created.
-	RuntimeSpec *specs.Spec       `json:"runtimeSpec"`
-	CNIResult   *cni.Result       `json:"cniResult"`
-	Metadata    *sandbox.Metadata `json:"sandboxMetadata"`
+	RuntimeSpec *specs.Spec                 `json:"runtimeSpec"`
+	CNIResult   *cni.Result                 `json:"cniResult"`
+	Metadata    *sandbox.Metadata           `json:"sandboxMetadata"`
+	Overhead    *runtime.ContainerResources `json:"overhead,omitempty"`
+	Resources   *runtime.ContainerResources `json:"resources,omitempty"`
 }

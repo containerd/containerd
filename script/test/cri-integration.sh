@@ -25,6 +25,7 @@ trap test_teardown EXIT
 
 ROOT="$( cd "${basedir}" && pwd )"/../..
 cd "${ROOT}"
+ROOT="$(pwd)"
 
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-""}
@@ -51,6 +52,7 @@ ${CMD} --test.run="${FOCUS}" --test.v \
   --cri-endpoint="${CONTAINERD_SOCK}" \
   --runtime-handler="${RUNTIME}" \
   --containerd-bin="${CONTAINERD_BIN}" \
+  --build-dir="${ROOT}/bin" \
   --image-list="${TEST_IMAGE_LIST:-}" "@" && test_exit_code=$? || test_exit_code=$?
 
 if [[ "$test_exit_code" -ne 0 ]]; then

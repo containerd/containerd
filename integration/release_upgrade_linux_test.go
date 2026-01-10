@@ -632,7 +632,6 @@ func newPodTCtx(t *testing.T, rSvc cri.RuntimeService,
 func newPodTCtxWithRuntimeHandler(t *testing.T, rSvc cri.RuntimeService,
 	name, ns, runtimeHandler string, opts ...PodSandboxOpts) *podTCtx {
 
-	t.Logf("Run a sandbox %s in namespace %s with runtimeHandler %s", name, ns, runtimeHandler)
 	sbConfig := PodSandboxConfig(name, ns, opts...)
 	sbID, err := rSvc.RunPodSandbox(sbConfig, runtimeHandler)
 	require.NoError(t, err)
@@ -661,7 +660,6 @@ type podTCtx struct {
 func (pCtx *podTCtx) createContainer(name, imageRef string, wantedState criruntime.ContainerState, opts ...ContainerOpts) string {
 	t := pCtx.t
 
-	t.Logf("Create a container %s (wantedState: %s) in pod %s", name, wantedState, pCtx.name)
 	cfg := ContainerConfig(name, imageRef, opts...)
 	cnID, err := pCtx.rSvc.CreateContainer(pCtx.id, cfg, pCtx.cfg)
 	require.NoError(t, err)

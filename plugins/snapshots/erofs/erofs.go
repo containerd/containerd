@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/containerd/v2/internal/fsverity"
+	"github.com/containerd/containerd/v2/internal/userns"
 )
 
 // SnapshotterConfig is used to configure the erofs snapshotter instance
@@ -48,6 +49,7 @@ type SnapshotterConfig struct {
 	defaultSize int64
 	// fsMergeThreshold (>0) enables fsmerge when the number of image layers exceeds this value
 	fsMergeThreshold uint
+	remapIDs         bool
 }
 
 // Opt is an option to configure the erofs snapshotter
@@ -88,6 +90,13 @@ func WithFsMergeThreshold(v uint) Opt {
 	}
 }
 
+// WithRemapIDs enables kernel ID-mapped mounts for user namespace support
+func WithRemapIDs() Opt {
+	return func(config *SnapshotterConfig) {
+		config.remapIDs = true
+	}
+}
+
 type MetaStore interface {
 	TransactionContext(ctx context.Context, writable bool) (context.Context, storage.Transactor, error)
 	WithTransaction(ctx context.Context, writable bool, fn storage.TransactionCallback) error
@@ -103,6 +112,7 @@ type snapshotter struct {
 	defaultWritable  int64
 	blockMode        bool
 	fsMergeThreshold uint
+	remapIDs         bool
 }
 
 // NewSnapshotter returns a Snapshotter which uses EROFS+OverlayFS. The layers
@@ -160,6 +170,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		defaultWritable:  config.defaultSize,
 		blockMode:        config.defaultSize > 0,
 		fsMergeThreshold: config.fsMergeThreshold,
+		remapIDs:         config.remapIDs,
 	}, nil
 }
 
@@ -241,7 +252,7 @@ func (s *snapshotter) mountFsMeta(snap storage.Snapshot, id int) (mount.Mount, b
 	return m, true
 }
 
-func (s *snapshotter) mounts(snap storage.Snapshot, _ snapshots.Info) ([]mount.Mount, error) {
+func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]mount.Mount, error) {
 	var options []string
 
 	if len(snap.ParentIDs) == 0 {
@@ -377,6 +388,16 @@ func (s *snapshotter) mounts(snap storage.Snapshot, _ snapshots.Info) ([]mount.M
 	} else {
 		options = append(options, fmt.Sprintf("lowerdir={{ overlay %d %d }}", first, len(mounts)-1))
 	}
+
+	if s.remapIDs {
+		if v, ok := info.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
+			options = append(options, fmt.Sprintf("uidmap=%s", v))
+		}
+		if v, ok := info.Labels[snapshots.LabelSnapshotGIDMapping]; ok {
+			options = append(options, fmt.Sprintf("gidmap=%s", v))
+		}
+	}
+
 	options = append(options, s.ovlOptions...)
 
 	return append(mounts, mount.Mount{
@@ -426,9 +447,48 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			return fmt.Errorf("failed to get snapshot info: %w", err)
 		}
 
-		if len(snap.ParentIDs) > 0 {
-			if err := upperDirectoryPermission(filepath.Join(td, "fs"), s.upperPath(snap.ParentIDs[0])); err != nil {
-				return err
+		var (
+			mappedUID, mappedGID     = -1, -1
+			uidmapLabel, gidmapLabel string
+			needsRemap               = false
+		)
+		if v, ok := info.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
+			uidmapLabel = v
+			needsRemap = true
+		}
+		if v, ok := info.Labels[snapshots.LabelSnapshotGIDMapping]; ok {
+			gidmapLabel = v
+			needsRemap = true
+		}
+
+		if needsRemap {
+			var idMap userns.IDMap
+			if err = idMap.Unmarshal(uidmapLabel, gidmapLabel); err != nil {
+				return fmt.Errorf("failed to unmarshal snapshot ID mapped labels: %w", err)
+			}
+			root, err := idMap.RootPair()
+			if err != nil {
+				return fmt.Errorf("failed to find root pair: %w", err)
+			}
+			mappedUID, mappedGID = int(root.Uid), int(root.Gid)
+		}
+
+		// Fall back to copying ownership from parent if no ID mapping labels
+		if mappedUID == -1 || mappedGID == -1 {
+			if len(snap.ParentIDs) > 0 {
+				uid, gid, err := getParentOwnership(s.upperPath(snap.ParentIDs[0]))
+				if err != nil {
+					return fmt.Errorf("failed to get parent ownership: %w", err)
+				}
+				mappedUID = uid
+				mappedGID = gid
+			}
+		}
+
+		// Apply the ownership if we have valid UID/GID
+		if mappedUID != -1 && mappedGID != -1 {
+			if err := os.Lchown(filepath.Join(td, "fs"), mappedUID, mappedGID); err != nil {
+				return fmt.Errorf("failed to chown: %w", err)
 			}
 		}
 

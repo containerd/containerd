@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/runtime"
+	oomv2 "github.com/containerd/containerd/v2/internal/oom"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	oomv1 "github.com/containerd/containerd/v2/pkg/oom/v1"
@@ -77,6 +78,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		events:               make(chan interface{}, 128),
 		ec:                   reaper.Default.Subscribe(),
 		cg1oom:               ep,
+		cg2oom:               oomv2.New(),
 		publisher:            publisher,
 		shutdown:             sd,
 		containers:           make(map[string]*runc.Container),
@@ -114,6 +116,7 @@ type service struct {
 	platform stdio.Platform
 	ec       chan runcC.Exit
 	cg1oom   oom.Watcher
+	cg2oom   oomv2.Interface
 
 	publisher events.Publisher
 
@@ -273,7 +276,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 			}
 		}
 
-		if err := container.OOMWatch(ctx, s.oomEvent); err != nil {
+		if err := s.cg2oom.Add(container.ID, container.Pid(), s.oomEvent); err != nil {
 			log.G(ctx).WithError(err).WithField("container_id", container.ID).Error("failed to watch oom events")
 		}
 	}
@@ -765,6 +768,15 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
 	p.SetExited(e.Status)
+	_, isInit := p.(*process.Init)
+	if isInit {
+		if err := s.cg2oom.Stop(c.ID); err != nil {
+			log.G(context.Background()).
+				WithField("container_id", c.ID).
+				WithError(err).
+				Error("failed to stop oom event watcher")
+		}
+	}
 	s.send(&eventstypes.TaskExit{
 		ContainerID: c.ID,
 		ID:          p.ID(),
@@ -772,7 +784,7 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 		ExitStatus:  uint32(e.Status),
 		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 	})
-	if _, init := p.(*process.Init); !init {
+	if !isInit {
 		s.lifecycleMu.Lock()
 		s.runningExecs[c]--
 		if ch, ok := s.execCountSubscribers[c]; ok {

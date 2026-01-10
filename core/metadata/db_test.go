@@ -66,7 +66,7 @@ func withSnapshotter(name string, fn func(string) (snapshots.Snapshotter, error)
 }
 
 func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := t.Context()
 	ctx = namespaces.WithNamespace(ctx, "testing")
 	ctx = logtest.WithT(ctx, t)
 
@@ -104,7 +104,6 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB) {
 
 	t.Cleanup(func() {
 		assert.NoError(t, bdb.Close())
-		cancel()
 	})
 
 	return ctx, db

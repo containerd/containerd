@@ -18,7 +18,7 @@ syntax = "proto3";
 
 package containerd.services.events.v1;
 
-import "github.com/containerd/containerd/api/types/event.proto";
+import "types/event.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
 

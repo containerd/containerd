@@ -486,7 +486,7 @@ func getLogDirPath(runtimeVersion, id string) string {
 	case "v2":
 		return filepath.Join(defaultState, "io.containerd.runtime.v2.task", testNamespace, id)
 	default:
-		panic(fmt.Errorf("Unsupported runtime version %s", runtimeVersion))
+		panic(fmt.Errorf("unsupported runtime version %s", runtimeVersion))
 	}
 }
 

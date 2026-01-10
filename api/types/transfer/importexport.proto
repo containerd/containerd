@@ -20,7 +20,7 @@ package containerd.types.transfer;
 
 option go_package = "github.com/containerd/containerd/api/types/transfer";
 
-import "github.com/containerd/containerd/api/types/platform.proto";
+import "types/platform.proto";
 
 message ImageImportStream {
 	// Stream is used to identify the binary input stream for the import operation.

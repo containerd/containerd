@@ -77,7 +77,7 @@ func getTestImage() (string, error) {
 		if buildNum > osversion.V21H2Server {
 			return "ghcr.io/containerd/windows/nanoserver:ltsc2022", nil
 		}
-		return "", fmt.Errorf("No test image defined for Windows build version: %s", b)
+		return "", fmt.Errorf("no test image defined for Windows build version: %s", b)
 	}
 }
 
@@ -243,7 +243,7 @@ func TestCreateContainer(t *testing.T) {
 	client, err := RawRuntimeClient()
 	require.NoError(t, err, "failed to get raw grpc runtime service client")
 	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(func() { cancel() })
+	t.Cleanup(cancel)
 
 	t.Log("Create a pod sandbox")
 	sbConfig := &runtime.PodSandboxConfig{

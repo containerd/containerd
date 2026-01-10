@@ -37,6 +37,7 @@ type Container interface {
 	GetLinuxContainer() LinuxContainer
 
 	GetPid() uint32
+	GetCDIDevices() []*nri.CDIDevice
 }
 
 type LinuxContainer interface {
@@ -50,6 +51,7 @@ type LinuxContainer interface {
 	GetNetDevices() map[string]*nri.LinuxNetDevice
 	GetRdt() *nri.LinuxRdt
 	GetSeccompProfile() *nri.SecurityProfile
+	GetSysctl() map[string]string
 }
 
 func commonContainerToNRI(ctr Container) *nri.Container {
@@ -65,6 +67,7 @@ func commonContainerToNRI(ctr Container) *nri.Container {
 		Mounts:       ctr.GetMounts(),
 		Hooks:        ctr.GetHooks(),
 		Pid:          ctr.GetPid(),
+		CDIDevices:   ctr.GetCDIDevices(),
 	}
 }
 

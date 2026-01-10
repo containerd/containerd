@@ -1848,10 +1848,7 @@ func TestShimSockLength(t *testing.T) {
 	// Max length of namespace should be 76
 	namespace := strings.Repeat("n", 76)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, namespace)
+	ctx := namespaces.WithNamespace(t.Context(), namespace)
 
 	client, err := newClient(t, address)
 	if err != nil {
@@ -2072,10 +2069,7 @@ func TestRegressionIssue4769(t *testing.T) {
 	id := t.Name()
 	ns := fmt.Sprintf("%s-%s", testNamespace, id)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, ns)
+	ctx := namespaces.WithNamespace(t.Context(), ns)
 	ctx = logtest.WithT(ctx, t)
 
 	image, err := client.Pull(ctx, testImage, WithPullUnpack)
@@ -2180,10 +2174,7 @@ func TestRegressionIssue6429(t *testing.T) {
 	id := t.Name()
 	ns := fmt.Sprintf("%s-%s", testNamespace, id)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, ns)
+	ctx := namespaces.WithNamespace(t.Context(), ns)
 	ctx = logtest.WithT(ctx, t)
 
 	image, err := client.Pull(ctx, testImage, WithPullUnpack)

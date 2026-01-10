@@ -17,15 +17,13 @@
 package v2
 
 import (
-	"context"
 	"errors"
 	"os"
 	"testing"
 )
 
 func TestCheckCopyShimLogError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	testError := errors.New("test error")
 
 	if err := checkCopyShimLogError(ctx, nil); err != nil {

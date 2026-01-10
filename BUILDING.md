@@ -26,7 +26,6 @@ A codespace will open in a web-based version of Visual Studio Code. The [dev con
 To build the `containerd` daemon, and the `ctr` simple test client, the following build system dependencies are required:
 
 * Go compiler (download from https://go.dev/dl/). The two most recent major Go versions are supported. For example, if Go 1.25 is the latest, then 1.25 and 1.24 are supported.
-* Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/protocolbuffers/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
 
 > *Note*: On macOS, you need a third party runtime to run containers on containerd
@@ -42,8 +41,6 @@ You need `git` to checkout the source code:
 ```sh
 git clone https://github.com/containerd/containerd
 ```
-
-For proper results, install the `protoc` release into `/usr/local` on your build system. When generating source code from `.proto` files, containerd may rely on some external protocol buffer files. These external dependencies should be added to the `/usr/local/include` directory. To install the appropriate version of `protoc` and download any necessary external protocol buffer files on a Linux host, run the install script located at `script/setup/install-protobuf`.
 
 To enable optional [Btrfs](https://en.wikipedia.org/wiki/Btrfs) snapshotter, you should have the headers from the Linux kernel 4.12 or later.
 The dependency on the kernel headers only affects users building containerd from source.
