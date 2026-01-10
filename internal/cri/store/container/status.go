@@ -17,14 +17,17 @@
 package container
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 
 	"github.com/containerd/continuity"
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -174,6 +177,13 @@ func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 	}
 	path := filepath.Join(root, "status")
 	if err := continuity.AtomicWriteFile(path, data, 0600); err != nil {
+		if errors.Is(err, syscall.ENOSPC) {
+			log.G(context.Background()).Warnf("No Space to store status file: %q", path)
+			return &statusStorage{
+				path:   path,
+				status: status,
+			}, nil
+		}
 		return nil, fmt.Errorf("failed to checkpoint status to %q: %w", path, err)
 	}
 	return &statusStorage{
@@ -274,7 +284,10 @@ func (s *statusStorage) UpdateSync(u UpdateFunc) error {
 		return fmt.Errorf("failed to encode status: %w", err)
 	}
 	if err := continuity.AtomicWriteFile(s.path, data, 0600); err != nil {
-		return fmt.Errorf("failed to checkpoint status to %q: %w", s.path, err)
+		if !errors.Is(err, syscall.ENOSPC) {
+			return fmt.Errorf("failed to checkpoint status to %q: %w", s.path, err)
+		}
+		log.G(context.Background()).Warnf("No Space to store status file: %q", s.path)
 	}
 	s.status = newStatus
 	return nil
