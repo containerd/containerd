@@ -151,6 +151,9 @@ func defaultUnixNamespaces() []specs.LinuxNamespace {
 		{
 			Type: specs.NetworkNamespace,
 		},
+		{
+			Type: specs.TimeNamespace,
+		},
 	}
 }
 
