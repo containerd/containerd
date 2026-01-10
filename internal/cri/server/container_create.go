@@ -148,7 +148,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		// it to the checkpoint code.
 
 		if sandboxConfig.GetMetadata() == nil {
-			return nil, fmt.Errorf("sandboxConfig must not be empty")
+			return nil, errors.New("sandboxConfig must not be empty")
 		}
 
 		ctrID, err := c.CRImportCheckpoint(

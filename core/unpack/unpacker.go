@@ -113,7 +113,7 @@ func WithUnpackPlatform(u Platform) UnpackerOpt {
 			u.Platform = platforms.All
 		}
 		if u.Snapshotter == nil {
-			return fmt.Errorf("snapshotter must be provided to unpack")
+			return errors.New("snapshotter must be provided to unpack")
 		}
 		if u.SnapshotterKey == "" {
 			if s, ok := u.Snapshotter.(fmt.Stringer); ok {
@@ -123,7 +123,7 @@ func WithUnpackPlatform(u Platform) UnpackerOpt {
 			}
 		}
 		if u.Applier == nil {
-			return fmt.Errorf("applier must be provided to unpack")
+			return errors.New("applier must be provided to unpack")
 		}
 
 		c.platforms = append(c.platforms, &u)
