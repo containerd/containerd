@@ -22,12 +22,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
+	"github.com/erofs/go-erofs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/term"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -156,8 +160,13 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 		for i := range manifest.Layers {
 			if len(manifest.Layers) == i+1 {
 				subprefix = childprefix + p.format.LastDrop
+				subchild = childprefix + p.format.Spacer
 			}
 			fmt.Fprintf(p.w, "%s%s @%s (%d bytes)\n", subprefix, manifest.Layers[i].MediaType, manifest.Layers[i].Digest, manifest.Layers[i].Size)
+
+			if err := p.showContent(ctx, store, manifest.Layers[i], subchild); err != nil {
+				return err
+			}
 		}
 	} else if images.IsIndexType(desc.MediaType) {
 		var idx ocispec.Index
@@ -192,18 +201,126 @@ func (p *ImageTreePrinter) showContent(ctx context.Context, store content.InfoRe
 			}
 			fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
 		}
-	}
-	if p.verbose && strings.HasSuffix(desc.MediaType, "json") {
-		// Print content for config
-		cb, err := content.ReadBlob(ctx, store, desc)
-		if err != nil {
-			return err
+		if strings.HasSuffix(desc.MediaType, "json") {
+			// Print content for config
+			cb, err := content.ReadBlob(ctx, store, desc)
+			if err != nil {
+				return err
+			}
+			dst := bytes.NewBuffer(nil)
+			if err := json.Indent(dst, cb, prefix+"│", "   "); err != nil {
+				return fmt.Errorf("invalid JSON content for %s: %w", desc.Digest, err)
+			}
+			fmt.Fprintf(p.w, "%s┌────────Content────────\n", prefix)
+			fmt.Fprintf(p.w, "%s│%s\n", prefix, strings.TrimSpace(dst.String()))
+			fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
+		} else if strings.HasPrefix(desc.MediaType, images.MediaTypeErofsLayer) {
+			fmt.Fprintf(p.w, "%s┌──────EROFS Layer──────\n", prefix)
+
+			f, err := store.ReaderAt(ctx, desc)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			img, err := erofs.Open(f)
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintf(p.w, "%s│ /\n", prefix)
+			PrintDirectory(p.w, img, "/", prefix+"│ ")
+
+			fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
+
 		}
-		dst := bytes.NewBuffer(nil)
-		json.Indent(dst, cb, prefix+"│", "   ")
-		fmt.Fprintf(p.w, "%s┌────────Content────────\n", prefix)
-		fmt.Fprintf(p.w, "%s│%s\n", prefix, strings.TrimSpace(dst.String()))
-		fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
 	}
 	return nil
+}
+
+// but if root itself is a symbolic link, its target will be walked.
+// func WalkDir(fsys FS, root string, fn WalkDirFunc) error {
+func PrintDirectory(f io.Writer, fsys fs.FS, dir string, prefix string) {
+	dirEnts, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		fmt.Fprintf(f, "%sError reading directory %q: %v\n", prefix, dir, err)
+	}
+	var files, dirs []string
+	for _, entry := range dirEnts {
+		if entry.IsDir() {
+			dirs = append(dirs, entry.Name())
+		} else {
+			f := entry.Name()
+			if strings.Contains(f, " ") {
+				f = fmt.Sprintf("%q", f)
+			}
+			files = append(files, f)
+		}
+
+	}
+	if len(files) > 0 {
+		spacer := "  "
+		if len(dirs) > 0 {
+			spacer = "│ "
+		}
+		width := terminalWidth(f)
+		if width > len(prefix)+len(spacer)+10 {
+			var b strings.Builder
+			b.WriteString(prefix)
+			b.WriteString(spacer)
+			for i, file := range files {
+				if b.Len()+len(file) > width && i > 0 {
+					fmt.Fprintln(f, strings.TrimRight(b.String(), " "))
+					b.Reset()
+					b.WriteString(prefix)
+					b.WriteString(spacer)
+				}
+				b.WriteString(file)
+				b.WriteString(" ")
+			}
+			fmt.Fprintln(f, strings.TrimRight(b.String(), " "))
+		} else {
+			for _, file := range files {
+				fmt.Fprintf(f, "%s%s%s\n", prefix, spacer, file)
+			}
+		}
+	}
+	for i, d := range dirs {
+		isLast := i == len(dirs)-1
+		var newPrefix string
+		if isLast {
+			fmt.Fprintf(f, "%s└─ %s/\n", prefix, d)
+			newPrefix = prefix + "    "
+		} else {
+			fmt.Fprintf(f, "%s├─ %s/\n", prefix, d)
+			newPrefix = prefix + "│  "
+		}
+		PrintDirectory(f, fsys, path.Join(dir, d), newPrefix)
+	}
+
+}
+
+func terminalWidth(w io.Writer) int {
+	// Check if w has FD method
+	type fdWriter interface {
+		Fd() uintptr
+	}
+	fw, ok := w.(fdWriter)
+	if !ok {
+		return -1
+	}
+	// Get the file descriptor
+	fd := int(fw.Fd())
+
+	// Check if the file descriptor is a terminal before attempting to get its size
+	if !term.IsTerminal(fd) {
+		return -1
+	}
+
+	// Get the terminal width and height
+	width, _, err := term.GetSize(fd)
+	if err != nil {
+		return -1
+	}
+
+	return width
 }
