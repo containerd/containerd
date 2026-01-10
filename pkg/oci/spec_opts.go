@@ -1408,6 +1408,27 @@ func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container
 	return nil
 }
 
+func WithDevConsole(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	setLinux(s)
+	if s.Linux.Resources == nil {
+		s.Linux.Resources = &specs.LinuxResources{}
+	}
+	intptr := func(i int64) *int64 {
+		return &i
+	}
+	s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, []specs.LinuxDeviceCgroup{
+		{
+			// "/dev/console",
+			Type:   "c",
+			Major:  intptr(5),
+			Minor:  intptr(1),
+			Access: rwm,
+			Allow:  true,
+		},
+	}...)
+	return nil
+}
+
 // WithPrivileged sets up options for a privileged container
 func WithPrivileged(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 	return Compose(
