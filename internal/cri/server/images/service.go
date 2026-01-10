@@ -199,10 +199,9 @@ func (c *CRIImageService) ImageFSPaths() map[string]string {
 	return c.imageFSPaths
 }
 
-// PinnedImage is used to lookup a pinned image by name.
-// Most often used to get the "sandbox" image.
-func (c *CRIImageService) PinnedImage(name string) string {
-	return c.config.PinnedImages[name]
+// Config returns the image configuration.
+func (c *CRIImageService) Config() criconfig.ImageConfig {
+	return c.config
 }
 
 // GRPCService returns a new CRI Image Service grpc server.

@@ -83,31 +83,10 @@ func (c *Controller) toContainerdImage(ctx context.Context, image imagestore.Ima
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func (c *Controller) runtimeSpec(id string, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *Controller) runtimeSpec(id string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := ctrdutil.NamespacedContext()
 	container := &containers.Container{ID: id}
-
-	if baseSpecFile != "" {
-		baseSpec, err := c.runtimeService.LoadOCISpec(baseSpecFile)
-		if err != nil {
-			return nil, fmt.Errorf("can't load base OCI spec %q: %w", baseSpecFile, err)
-		}
-
-		spec := oci.Spec{}
-		if err := ctrdutil.DeepCopy(&spec, &baseSpec); err != nil {
-			return nil, fmt.Errorf("failed to clone OCI spec: %w", err)
-		}
-
-		// Fix up cgroups path
-		applyOpts := append([]oci.SpecOpts{oci.WithNamespacedCgroup()}, opts...)
-
-		if err := oci.ApplyOpts(ctx, nil, container, &spec, applyOpts...); err != nil {
-			return nil, fmt.Errorf("failed to apply OCI options: %w", err)
-		}
-
-		return &spec, nil
-	}
 
 	spec, err := oci.GenerateSpec(ctx, nil, container, opts...)
 	if err != nil {

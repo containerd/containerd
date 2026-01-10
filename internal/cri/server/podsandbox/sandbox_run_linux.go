@@ -196,7 +196,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	specOpts = append(specOpts, annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...)
 
-	return c.runtimeSpec(id, "", specOpts...)
+	return c.runtimeSpec(id, specOpts...)
 }
 
 // sandboxContainerSpecOpts generates OCI spec options for

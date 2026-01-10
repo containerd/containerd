@@ -27,9 +27,8 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (_ *runtimespec.Spec, retErr error) {
-	return c.runtimeSpec(id, "", annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...)
+func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig, _ *imagespec.ImageConfig, _ string, _ []string) (_ *runtimespec.Spec, _ error) {
+	return c.runtimeSpec(id, annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...)
 }
 
 // sandboxContainerSpecOpts generates OCI spec options for
