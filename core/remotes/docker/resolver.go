@@ -311,6 +311,9 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				req.header[key] = append(req.header[key], value...)
 			}
 
+			// Don't report warnings during resolution; will report after descriptor construction
+			req.warningHandler = nil
+
 			log.G(ctx).Debug("resolving")
 			resp, err := req.doWithRetries(ctx, i == len(hosts)-1)
 			if err != nil {
@@ -324,6 +327,8 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				log.G(ctx).WithError(err).Info(nextHostOrFail(i))
 				continue // try another host
 			}
+			// Save response headers for warning reporting later
+			respHeaders := resp.Header.Clone()
 			resp.Body.Close() // don't care about body contents.
 
 			if resp.StatusCode > 299 {
@@ -376,10 +381,16 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					req.header[key] = append(req.header[key], value...)
 				}
 
+				// Don't report warnings during resolution
+				req.warningHandler = nil
+
 				resp, err := req.doWithRetries(ctx, true)
 				if err != nil {
 					return "", ocispec.Descriptor{}, err
 				}
+
+				// Save response headers for warning reporting later
+				respHeaders = resp.Header.Clone()
 
 				bodyReader := countingReader{reader: resp.Body}
 
@@ -418,6 +429,13 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				MediaType: contentType,
 				Size:      size,
 			}
+
+			// Report any warnings with the warning source
+			reportWarningsWithSource(respHeaders, r.warningHandler, WarningSource{
+				Ref:    refspec,
+				Desc:   &desc,
+				Digest: &dgst,
+			})
 
 			log.G(ctx).WithField("desc.digest", desc.Digest).Debug("resolved")
 			return ref, desc, nil
