@@ -54,7 +54,7 @@ func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, m
 // The `--tar=i` option instructs mkfs.erofs to only generate the tar index
 // for the tar content. The resulting file structure is:
 // [Tar index][Original tar content]
-func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath string, mkfsExtraOpts []string) error {
+func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {
 	// Create a temporary file for storing the tar content
 	tarFile, err := os.CreateTemp("", "erofs-tar-*")
 	if err != nil {
@@ -68,6 +68,9 @@ func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath st
 
 	// Generate tar index directly to layerPath using --tar=i option
 	args := append([]string{"--tar=i", "--aufs", "--quiet"}, mkfsExtraOpts...)
+	if uuid != "" {
+		args = append(args, []string{"-U", uuid}...)
+	}
 	args = append(args, layerPath)
 	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
 	cmd.Stdin = teeReader
