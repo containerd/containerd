@@ -72,6 +72,10 @@ func reportWarnings(ctx context.Context, header http.Header, handler WarningHand
 		warnSrc = v.(WarningSource)
 	}
 
+	reportWarningsWithSource(header, handler, warnSrc)
+}
+
+func reportWarningsWithSource(header http.Header, handler WarningHandler, warnSrc WarningSource) {
 	for _, warning := range header.Values("Warning") {
 		// Parse RFC 7234 warning format: warn-code warn-agent "warn-text"
 		// Expected format for OCI: 299 - "message"
