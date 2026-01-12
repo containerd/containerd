@@ -62,6 +62,7 @@ type LinuxContainer interface {
 	GetRdt() *nri.LinuxRdt
 	GetSeccompProfile() *nri.SecurityProfile
 	GetSysctl() map[string]string
+	GetSeccompPolicy() *nri.LinuxSeccomp
 }
 
 func commonContainerToNRI(ctr Container) *nri.Container {
