@@ -47,6 +47,7 @@ type Container interface {
 	GetHooks() *nri.Hooks
 	GetLinuxContainer() LinuxContainer
 	GetCDIDevices() []*nri.CDIDevice
+	GetRlimits() []*nri.POSIXRlimit
 }
 
 type LinuxContainer interface {
@@ -82,6 +83,7 @@ func commonContainerToNRI(ctr Container) *nri.Container {
 		StartedAt:    status.StartedAt,
 		FinishedAt:   status.FinishedAt,
 		ExitCode:     status.ExitCode,
+		Rlimits:      ctr.GetRlimits(),
 	}
 }
 
