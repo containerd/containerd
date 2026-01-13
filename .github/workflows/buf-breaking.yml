@@ -1,0 +1,35 @@
+# Detects breaking changes in protobuf files using buf.
+# This check can be bypassed by adding the 'breaking-api-change' label to the PR.
+# For more info: https://buf.build/docs/bsr/ci-cd/github-actions/
+
+name: Protobuf
+
+on:
+  pull_request:
+    branches: ['main', 'release/**']
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - 'api/**/*.proto'
+      - 'api/buf.yaml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  breaking:
+    name: Detect breaking API changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: bufbuild/buf-action@v1
+        with:
+          version: 1.63.0
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          input: 'api'
+          breaking: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-api-change') }}
+          lint: false
+          format: false
+          pr_comment: false
