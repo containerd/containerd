@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -94,13 +95,48 @@ func (mls *memoryLabelStore) Update(d digest.Digest, update map[string]string) (
 func TestContent(t *testing.T) {
 	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
 		cs, err := NewLabeledStore(root, newMemoryLabelStore())
-		if err != nil {
-			return nil, nil, nil, err
-		}
+		assert.NoError(t, err)
 		return ctx, cs, func() error {
 			return nil
 		}, nil
 	})
+}
+
+func TestContentRootDir(t *testing.T) {
+	// test dir exist
+	dirExist := t.TempDir()
+	_, err := NewLabeledStore(dirExist, newMemoryLabelStore())
+	assert.NoError(t, err)
+	// test dir doesn't exist
+	dir := filepath.Join(t.TempDir(), "test_dir001")
+	_, err = NewLabeledStore(dir, newMemoryLabelStore())
+	assert.NoError(t, err)
+	_, err = os.Stat(dir)
+	assert.NoError(t, err)
+}
+
+func TestInvalidPermissionRootDir(t *testing.T) {
+	// test dir permissions are invalid
+	if os.Getuid() != 0 {
+		t.Skip("skipping test that requires root")
+	}
+	_, err := exec.LookPath("chattr")
+	if err != nil {
+		t.Skip("skipping test that requires chattr command")
+	}
+	dirBadPermission := t.TempDir()
+	cmd := exec.Command("chattr", "+i", dirBadPermission)
+	_, err = cmd.CombinedOutput()
+	assert.NoError(t, err)
+	defer func() {
+		cmd := exec.Command("chattr", "-i", dirBadPermission)
+		_, err = cmd.CombinedOutput()
+		assert.NoError(t, err)
+	}()
+	_, err = fsverity.IsSupported(dirBadPermission)
+	if err == nil {
+		t.Fatal(fmt.Errorf("err can't be nil"))
+	}
 }
 
 func TestContentWriter(t *testing.T) {
