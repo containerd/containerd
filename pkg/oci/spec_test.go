@@ -19,16 +19,17 @@ package oci
 import (
 	"context"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
-
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/containerd/continuity/fs/fstest"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestGenerateSpec(t *testing.T) {
@@ -330,24 +331,35 @@ func TestWithPrivileged(t *testing.T) {
 }
 
 func TestOpenUserFile_AbsoluteSymlink(t *testing.T) {
-	tmpDir := t.TempDir()
+	if runtime.GOOS == "windows" {
+		t.Skip("absolute symlink handling is only supported on non-Windows platforms")
+	}
 
-	targetName := "passwd"
-	targetPath := filepath.Join(tmpDir, targetName)
-	expectedContent := []byte("root:x:0:0:root:/root:/bin/bash")
-	if err := os.WriteFile(targetPath, expectedContent, 0644); err != nil {
+	expectedContent := []byte("root:x:0:0:root:/root:/bin/bash" + t.Name())
+
+	root := t.TempDir()
+	// Use 'continuity' library to create a directory structure simulating NixOS
+	if err := fstest.Apply(
+		fstest.CreateDir("/etc", 0o755),
+		fstest.CreateDir("/nix/store/abcd", 0o755),
+		fstest.CreateFile("/nix/store/abcd/passwd", expectedContent, 0o644),
+		// /etc/passwd -> /nix/store/abcd/passwd (absolute symlink)
+		fstest.Symlink("/nix/store/abcd/passwd", "/etc/passwd"),
+	).Apply(root); err != nil {
 		t.Fatal(err)
 	}
 
-	linkName := "abs_link"
-	linkPath := filepath.Join(tmpDir, linkName)
-	if err := os.Symlink(targetPath, linkPath); err != nil {
-		t.Fatal(err)
+	rootFS := os.DirFS(root)
+
+	// Ensure the FS implements the ReadLink interface.
+	// If the native os.DirFS doesn't implement it (depending on Go version),
+	// wrap it in our readLinkFS helper.
+	if _, ok := rootFS.(readLinker); !ok {
+		t.Logf("os.DirFS does not implement ReadLink; wrapping to use ReadLink")
+		rootFS = readLinkFS{root: root, fs: rootFS}
 	}
 
-	rootFS := os.DirFS(tmpDir)
-
-	f, err := openUserFile(rootFS, linkName)
+	f, err := openUserFile(rootFS, "etc/passwd")
 	if err != nil {
 		t.Fatalf("openUserFile failed on absolute symlink: %v", err)
 	}
@@ -360,4 +372,19 @@ func TestOpenUserFile_AbsoluteSymlink(t *testing.T) {
 	if string(content) != string(expectedContent) {
 		t.Errorf("expected content %q, got %q", string(expectedContent), string(content))
 	}
+}
+
+// Helpers for testing ReadLink support
+type readLinkFS struct {
+	root string
+	fs   fs.FS
+}
+
+func (r readLinkFS) Open(name string) (fs.File, error) {
+	return r.fs.Open(name)
+}
+
+func (r readLinkFS) ReadLink(name string) (string, error) {
+	// Force link reading using the actual path on disk
+	return os.Readlink(filepath.Join(r.root, filepath.FromSlash(name)))
 }
