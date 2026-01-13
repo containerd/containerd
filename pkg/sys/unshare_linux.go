@@ -23,52 +23,10 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 
 	"golang.org/x/sys/unix"
 )
-
-var (
-	unprivilegedUsernsSupported     bool
-	unprivilegedUsernsSupportedOnce sync.Once
-)
-
-// SupportsUnprivilegedUsernsCreation returns true if creating user namespaces
-// as an unprivileged user is supported
-func SupportsUnprivilegedUsernsCreation() bool {
-	unprivilegedUsernsSupportedOnce.Do(func() {
-		if err := checkUnprivilegedUsernsCreation(); err != nil {
-			unprivilegedUsernsSupported = false
-			return
-		}
-		unprivilegedUsernsSupported = true
-	})
-	return unprivilegedUsernsSupported
-}
-
-// checkUnprivilegedUsernsCreation tests if we can create a user namespace
-// as an unprivileged user. This can fail on systems that deny unprivileged
-// user namespaces through various means like AppArmor
-func checkUnprivilegedUsernsCreation() error {
-	// Assume nobody user is unprivileged
-	nobodyUID := 65534
-	var pidfd int
-
-	// CLONE_NEWIPC is a random namespace to unshare to, we just need to verify
-	// that we can indeed make a user namespace, then unshare into another namespace
-	// as the target user without hitting any sort of apparmor restrictions
-	_, pidfd, err := startProcessWithUserNamespace(nobodyUID, syscall.CLONE_NEWIPC)
-	if err != nil {
-		return fmt.Errorf("user namespace creation as unprivileged user failed: %w", err)
-	}
-
-	unix.PidfdSendSignal(pidfd, unix.SIGKILL, nil, 0)
-	pidfdWaitid(pidfd)
-	unix.Close(pidfd)
-
-	return nil
-}
 
 // UnshareAfterEnterUserns allows to disassociate parts of its execution context
 // within a user namespace.
@@ -91,13 +49,8 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 		return err
 	}
 
-	// -1 corresponds to no change in setresuid()!
-	targetUID := -1
-	if SupportsUnprivilegedUsernsCreation() {
-		targetUID = uidMaps[0].HostID
-	}
-
-	pid, pidfd, err := startProcessWithUserNamespace(targetUID, unshareFlags)
+	targetUID := uidMaps[0].HostID
+	pid, pidfd, err := startProcessWithUserNamespace(targetUID, unshareFlags, uidMaps, gidMaps)
 	if err != nil {
 		return err
 	}
@@ -113,19 +66,6 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 		}
 		pidfdWaitid(pidfd)
 	}()
-
-	// Now we can write the uid/gid mappings
-	uidMapPath := fmt.Sprintf("/proc/%d/uid_map", pid)
-	uidMapContent := fmt.Sprintf("%d %d %d\n", uidMaps[0].ContainerID, uidMaps[0].HostID, uidMaps[0].Size)
-	if err := os.WriteFile(uidMapPath, []byte(uidMapContent), 0644); err != nil {
-		return fmt.Errorf("failed to write UID mapping: %w", err)
-	}
-
-	gidMapPath := fmt.Sprintf("/proc/%d/gid_map", pid)
-	gidMapContent := fmt.Sprintf("%d %d %d\n", gidMaps[0].ContainerID, gidMaps[0].HostID, gidMaps[0].Size)
-	if err := os.WriteFile(gidMapPath, []byte(gidMapContent), 0644); err != nil {
-		return fmt.Errorf("failed to write GID mapping: %w", err)
-	}
 
 	if f != nil {
 		if err := f(pid); err != nil {
@@ -181,10 +121,8 @@ func parseIDMapping(mapping string) ([]syscall.SysProcIDMap, error) {
 // a user namespace. It runs a goroutine on a single thread as targetHostUID
 // when creating the process and user namespace, ensuring that the kernel
 // attributes user limits to targetHostUID and not containerd's user. On success
-// it returns the pid, pidfd and no error. It is expected that the caller sets
-// up the uid_map/gid_map for the pid (this cannot be done as part of os.StartProcess()
-// since targetHostUID doesn't have CAP_SETUID)
-func startProcessWithUserNamespace(targetHostUID int, unshareFlags uintptr) (int, int, error) {
+// it returns the pid, pidfd and no error.
+func startProcessWithUserNamespace(targetHostUID int, unshareFlags uintptr, uidMaps, gidMaps []syscall.SysProcIDMap) (int, int, error) {
 	type result struct {
 		pid   int
 		pidfd int
@@ -194,7 +132,7 @@ func startProcessWithUserNamespace(targetHostUID int, unshareFlags uintptr) (int
 
 	go func() {
 		runtime.LockOSThread()
-		pid, pidfd, err := startProcessWithUsernsLocked(targetHostUID, unshareFlags)
+		pid, pidfd, err := startProcessWithUsernsLocked(targetHostUID, unshareFlags, uidMaps, gidMaps)
 
 		// If this errored out let the go runtime reap the thread by not unlocking
 		if err == nil {
@@ -208,30 +146,42 @@ func startProcessWithUserNamespace(targetHostUID int, unshareFlags uintptr) (int
 }
 
 // startProcessWithUsernsLocked expects the os thread to be locked already. It does
-// a setresuid() to the targetHostUID user, spawns a new ptraced process in a new user namespace,
-// unshares into unshareFlags within that namespace, and returns the pid, pidfd, and error
-// information of that process. On error the process is already killed, and the thread
-// is *not* setresuid()'ed back to the original user. In this case the thread should be killed off
-// by the caller to avoid using a thread in a bad state
-func startProcessWithUsernsLocked(targetHostUID int, unshareFlags uintptr) (int, int, error) {
-	// -1 means no change in setresuid()
-	originalEUID := -1
+//  1. setresuid() to the targetHostUID user to attribute further user namespace creations to it
+//  2. sets the thread's effective capabilities back to the original user's to allow writing
+//     to /proc/uid_map as well as to create the user namespace as a "privileged" process in
+//     some distro's eyes,
+//  3. spawns a new ptraced process in a new user namespace
+//  4. unshares into unshareFlags within that user namespace
+//
+// returns the pid, pidfd, and error information of that process. On error the process is already
+// killed, and the thread is *not* setresuid()'ed back to the original user. In this case the
+// thread should be killed off by the caller to avoid using a thread in a bad state
+func startProcessWithUsernsLocked(targetHostUID int, unshareFlags uintptr, uidMaps, gidMaps []syscall.SysProcIDMap) (int, int, error) {
+	originalEUID := os.Geteuid()
 
-	if targetHostUID != -1 {
-		// We're changing users, so we need to figure out what user to return to
-		originalEUID = os.Geteuid()
+	originalCaps, err := getCurrentCaps()
+	if err != nil {
+		return -1, -1, fmt.Errorf("failed to read current capabilities: %w", err)
 	}
 
 	if _, _, errno := syscall.RawSyscall(unix.SYS_SETRESUID, ^uintptr(0), uintptr(targetHostUID), ^uintptr(0)); errno != 0 {
 		return -1, -1, fmt.Errorf("failed to set effective UID: %w", errno)
 	}
 
+	err = setCurrentCaps(originalCaps)
+	if err != nil {
+		return -1, -1, fmt.Errorf("failed to restore capabilities: %w", err)
+	}
+
 	var pidfd int
 	proc, err := os.StartProcess("/proc/self/exe", []string{"UnshareAfterEnterUserns"}, &os.ProcAttr{
 		Sys: &syscall.SysProcAttr{
 			// clone new user namespace first and then unshare
-			Cloneflags:   unix.CLONE_NEWUSER,
-			Unshareflags: unshareFlags,
+			Cloneflags:                 unix.CLONE_NEWUSER,
+			Unshareflags:               unshareFlags,
+			UidMappings:                uidMaps,
+			GidMappings:                gidMaps,
+			GidMappingsEnableSetgroups: true,
 			// NOTE: It's reexec but it's not heavy because subprocess
 			// be in PTRACE_TRACEME mode before performing execve.
 			Ptrace:    true,
@@ -263,4 +213,24 @@ func pidfdWaitid(pidfd int) error {
 	return IgnoringEINTR(func() error {
 		return unix.Waitid(unix.P_PIDFD, pidfd, nil, unix.WEXITED, nil)
 	})
+}
+
+type capSnapshot struct {
+	hdr  unix.CapUserHeader
+	data [2]unix.CapUserData
+}
+
+func getCurrentCaps() (*capSnapshot, error) {
+	caps := &capSnapshot{}
+	caps.hdr.Version = unix.LINUX_CAPABILITY_VERSION_3
+
+	err := unix.Capget(&caps.hdr, &caps.data[0])
+	if err != nil {
+		return nil, err
+	}
+	return caps, nil
+}
+
+func setCurrentCaps(caps *capSnapshot) error {
+	return unix.Capset(&caps.hdr, &caps.data[0])
 }
