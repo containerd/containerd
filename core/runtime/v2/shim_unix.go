@@ -21,12 +21,15 @@ package v2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/fifo"
 	"golang.org/x/sys/unix"
 )
@@ -44,4 +47,21 @@ func checkCopyShimLogError(ctx context.Context, err error) error {
 	default:
 	}
 	return err
+}
+
+func defaultSocketDir() string {
+	defaultDir := filepath.Join(defaults.DefaultStateDir, "s")
+	uid := os.Getuid()
+	if uid == 0 {
+		return defaultDir
+	}
+
+	// Check if default state dir is already setup for this non-root user
+	if st, err := os.Stat(defaults.DefaultStateDir); err == nil {
+		if int(st.Sys().(*syscall.Stat_t).Uid) == uid {
+			return defaultDir
+		}
+	}
+
+	return fmt.Sprintf("/tmp/containerd-s-%d", uid)
 }
