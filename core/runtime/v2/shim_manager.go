@@ -78,9 +78,11 @@ func init() {
 			events := ep.(*exchange.Exchange)
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
 			ss := metadata.NewSandboxStore(m.(*metadata.DB))
+			socketDir := filepath.Join(ic.Properties[plugins.PropertyStateDir], "..", "s")
 			return NewShimManager(&ManagerConfig{
 				Address:      ic.Properties[plugins.PropertyGRPCAddress],
 				TTRPCAddress: ic.Properties[plugins.PropertyTTRPCAddress],
+				SocketDir:    socketDir,
 				Events:       events,
 				Store:        cs,
 				ShimEnv:      config.Env,
@@ -124,6 +126,7 @@ type ManagerConfig struct {
 	Events       *exchange.Exchange
 	Address      string
 	TTRPCAddress string
+	SocketDir    string
 	SandboxStore sandbox.Store
 	ShimEnv      []string
 }
@@ -133,6 +136,7 @@ func NewShimManager(config *ManagerConfig) (*ShimManager, error) {
 	m := &ShimManager{
 		containerdAddress:      config.Address,
 		containerdTTRPCAddress: config.TTRPCAddress,
+		socketDir:              config.SocketDir,
 		shims:                  runtime.NewNSMap[ShimInstance](),
 		events:                 config.Events,
 		containers:             config.Store,
@@ -154,6 +158,7 @@ type ShimManager struct {
 	shims                  *runtime.NSMap[ShimInstance]
 	events                 *exchange.Exchange
 	containers             containers.Store
+	socketDir              string
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
 	runtimePaths sync.Map
 	sandboxStore sandbox.Store
@@ -289,6 +294,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		runtime:      runtimePath,
 		address:      m.containerdAddress,
 		ttrpcAddress: m.containerdTTRPCAddress,
+		socketDir:    m.socketDir,
 		env:          m.env,
 	})
 	shim, err := b.Start(ctx, typeurl.MarshalProto(topts), func() {

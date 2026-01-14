@@ -54,6 +54,7 @@ type CommandConfig struct {
 	Env          []string
 	LogLevel     log.Level
 	Action       string // Either "start" or "delete"
+	SocketDir    string
 }
 
 // Command returns the shim command with the provided args and configuration
@@ -133,6 +134,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 			ContainerdGrpcAddress:  config.GRPCAddress,
 			ContainerdTtrpcAddress: config.TTRPCAddress,
 			ContainerdBinary:       self,
+			SocketDir:              config.SocketDir,
 		}
 
 		if config.Opts != nil {

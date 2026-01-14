@@ -72,10 +72,15 @@ func AdjustOOMScore(pid int) error {
 	return nil
 }
 
-const socketRoot = defaults.DefaultStateDir
-
-// SocketAddress returns a socket address
+// SocketAddress returns a socket address in the default state directory
+//
+// TODO: Consider deprecating for CreateSocketAddress
 func SocketAddress(ctx context.Context, socketPath, id string, debug bool) (string, error) {
+	return CreateSocketAddress(ctx, filepath.Join(defaults.DefaultStateDir, "s"), socketPath, id, debug)
+}
+
+// CreateSocketAddress returns a shim socket address under socketRoot.
+func CreateSocketAddress(ctx context.Context, socketRoot, socketPath, id string, debug bool) (string, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return "", err
@@ -85,7 +90,7 @@ func SocketAddress(ctx context.Context, socketPath, id string, debug bool) (stri
 		path = filepath.Join(path, "debug")
 	}
 	d := sha256.Sum256([]byte(path))
-	return fmt.Sprintf("unix://%s/%x", filepath.Join(socketRoot, "s"), d), nil
+	return fmt.Sprintf("unix://%s/%x", socketRoot, d), nil
 }
 
 // AnonDialer returns a dialer for a socket
@@ -281,18 +286,33 @@ func dialHybridVsock(address string, timeout time.Duration) (net.Conn, error) {
 	return hybridVsockDialer(addr, port, timeout)
 }
 
+const socketDirLink = "s"
+
+// writeSocketDir creates a symlink in the bundle working directory pointing
+// to the socket directory so the long-running server process can resolve it
+// for cleanup.
+func writeSocketDir(dir string) error {
+	// Remove any existing symlink before creating a new one.
+	_ = os.Remove(socketDirLink)
+	return os.Symlink(dir, socketDirLink)
+}
+
 func cleanupSockets(ctx context.Context) {
 	if address, err := ReadAddress("address"); err == nil {
 		_ = RemoveSocket(address)
 	}
+	socketDir, _ := os.Readlink(socketDirLink)
+	if socketDir == "" {
+		socketDir = filepath.Join(defaults.DefaultStateDir, "s")
+	}
 	if len(socketFlag) > 0 {
 		_ = RemoveSocket("unix://" + socketFlag)
-	} else if address, err := SocketAddress(ctx, addressFlag, id, false); err == nil {
+	} else if address, err := CreateSocketAddress(ctx, socketDir, addressFlag, id, false); err == nil {
 		_ = RemoveSocket(address)
 	}
 	if len(debugSocketFlag) > 0 {
 		_ = RemoveSocket("unix://" + debugSocketFlag)
-	} else if address, err := SocketAddress(ctx, addressFlag, id, true); err == nil {
+	} else if address, err := CreateSocketAddress(ctx, socketDir, addressFlag, id, true); err == nil {
 		_ = RemoveSocket(address)
 	}
 }
