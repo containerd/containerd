@@ -49,6 +49,13 @@ import (
 type ShimConfig struct {
 	// Env is environment variables added to shim processes
 	Env []string `toml:"env"`
+
+	// SocketDir is the directory to place shim sockets, note that this
+	// directory length must be no longer than 32 characters in length
+	// Defaults:
+	//  Linux (UID 0):  /run/containerd/s
+	//  Linux (UID >0): /tmp/containerd-s-$(UID)
+	SocketDir string `toml:"socket_dir"`
 }
 
 func init() {
@@ -77,11 +84,20 @@ func init() {
 			events := ep.(*exchange.Exchange)
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
 			ss := metadata.NewSandboxStore(m.(*metadata.DB))
-			socketDir := filepath.Join(ic.Properties[plugins.PropertyStateDir], "..", "s")
+
+			// Allow configurable directory
+			if config.SocketDir != "" {
+				if len(config.SocketDir) > 32 {
+					return nil, fmt.Errorf("socket_dir length must be no longer than 32 characters")
+				}
+			} else {
+				config.SocketDir = defaultSocketDir()
+			}
+
 			return NewShimManager(&ManagerConfig{
 				Address:      ic.Properties[plugins.PropertyGRPCAddress],
 				TTRPCAddress: ic.Properties[plugins.PropertyTTRPCAddress],
-				SocketDir:    socketDir,
+				SocketDir:    config.SocketDir,
 				Events:       events,
 				Store:        cs,
 				ShimEnv:      config.Env,
