@@ -292,8 +292,11 @@ const socketDirLink = "s"
 // to the socket directory so the long-running server process can resolve it
 // for cleanup.
 func writeSocketDir(dir string) error {
-	// Remove any existing symlink before creating a new one.
-	_ = os.Remove(socketDirLink)
+	if _, err := os.Lstat(socketDirLink); err == nil {
+		if err := os.Remove(socketDirLink); err != nil {
+			return fmt.Errorf("remove existing socket dir link: %w", err)
+		}
+	}
 	return os.Symlink(dir, socketDirLink)
 }
 

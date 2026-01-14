@@ -134,7 +134,9 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 			ContainerdGrpcAddress:  config.GRPCAddress,
 			ContainerdTtrpcAddress: config.TTRPCAddress,
 			ContainerdBinary:       self,
-			SocketDir:              config.SocketDir,
+		}
+		if config.SocketDir != "" {
+			params.SocketDir = &config.SocketDir
 		}
 
 		if config.Opts != nil {

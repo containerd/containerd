@@ -50,6 +50,13 @@ import (
 type ShimConfig struct {
 	// Env is environment variables added to shim processes
 	Env []string `toml:"env"`
+
+	// SocketDir is the directory to place shim sockets. The path must be
+	// short enough to fit within the platform's unix socket path limit.
+	// Defaults:
+	//  Linux (UID 0):  /run/containerd/s
+	//  Linux (UID >0): /run/$UID/containerd/s or /tmp/containerd-s-$(UID)
+	SocketDir string `toml:"socket_dir"`
 }
 
 func init() {
@@ -78,11 +85,27 @@ func init() {
 			events := ep.(*exchange.Exchange)
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
 			ss := metadata.NewSandboxStore(m.(*metadata.DB))
-			socketDir := filepath.Join(ic.Properties[plugins.PropertyStateDir], "..", "s")
+
+			// Allow configurable directory
+			if config.SocketDir != "" {
+				if !filepath.IsAbs(config.SocketDir) {
+					return nil, fmt.Errorf("socket_dir must be an absolute path: %q", config.SocketDir)
+				}
+				config.SocketDir = filepath.Clean(config.SocketDir)
+				if len(config.SocketDir) > maxSocketDirLen {
+					return nil, fmt.Errorf("socket_dir length must be no longer than %d characters", maxSocketDirLen)
+				}
+			} else {
+				config.SocketDir = defaultSocketDir()
+				if config.SocketDir == "" {
+					return nil, fmt.Errorf("failed to find a suitable socket directory for shim, please configure one")
+				}
+			}
+
 			return NewShimManager(&ManagerConfig{
 				Address:      ic.Properties[plugins.PropertyGRPCAddress],
 				TTRPCAddress: ic.Properties[plugins.PropertyTTRPCAddress],
-				SocketDir:    socketDir,
+				SocketDir:    config.SocketDir,
 				Events:       events,
 				Store:        cs,
 				ShimEnv:      config.Env,
