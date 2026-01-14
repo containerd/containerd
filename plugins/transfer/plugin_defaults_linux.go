@@ -1,5 +1,3 @@
-//go:build !darwin && !linux && !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -19,6 +17,7 @@
 package transfer
 
 import (
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/platforms"
 )
@@ -29,6 +28,12 @@ func defaultUnpackConfig() []unpackConfiguration {
 			Platform:    platforms.Format(platforms.DefaultSpec()),
 			Snapshotter: defaults.DefaultSnapshotter,
 			Differ:      defaults.DefaultDiffer,
+		},
+		{
+			Platform:    platforms.Format(platforms.DefaultSpec()),
+			Snapshotter: "erofs",
+			Differ:      "erofs",
+			LayerTypes:  []string{images.MediaTypeErofsLayer},
 		},
 	}
 }
