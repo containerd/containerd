@@ -39,6 +39,7 @@ type shimBinaryConfig struct {
 	runtime      string
 	address      string
 	ttrpcAddress string
+	socketDir    string
 	env          []string
 }
 
@@ -48,6 +49,7 @@ func shimBinary(bundle *Bundle, config shimBinaryConfig) *binary {
 		runtime:                config.runtime,
 		containerdAddress:      config.address,
 		containerdTTRPCAddress: config.ttrpcAddress,
+		socketDir:              config.socketDir,
 		env:                    config.env,
 	}
 }
@@ -56,6 +58,7 @@ type binary struct {
 	runtime                string
 	containerdAddress      string
 	containerdTTRPCAddress string
+	socketDir              string
 	bundle                 *Bundle
 	env                    []string
 }
@@ -78,6 +81,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 			Opts:         opts,
 			Args:         args,
 			Env:          b.env,
+			SocketDir:    b.socketDir,
 		})
 	if err != nil {
 		return nil, err
