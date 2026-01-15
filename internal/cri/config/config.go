@@ -608,7 +608,8 @@ func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
 			c.UseLocalImagePull = true
 			log.G(ctx).Warnf(
 				"Found '%s' in CRI config which is incompatible with transfer service (%s). "+
-					"Falling back to local image pull mode.",
+					"Falling back to local image pull mode. Image verifiers will not work "+
+					"as it requires transfer service.",
 				config.Name,
 				config.Reason,
 			)
