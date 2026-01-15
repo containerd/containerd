@@ -18,7 +18,7 @@ syntax = "proto3";
 
 package containerd.types;
 
-import "github.com/containerd/containerd/api/types/fieldpath.proto";
+import "types/fieldpath.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
