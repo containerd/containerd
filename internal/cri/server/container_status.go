@@ -41,9 +41,17 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 	// Current assumption:
 	// * ImageSpec in container config is image ID.
 	// * ImageSpec in container status is image tag.
-	// * ImageRef in container status is repo digest.
+	// * ImageRef in container status is repo digest (manifest list digest for multi-arch images).
+	// * ImageId in container status is the node-local image config digest.
 	spec := container.Config.GetImage()
+
+	// Note: container.ImageRef holds the platform-specific image config digest that was
+	// resolved during container creation. For multi-arch images, this differs from the
+	// manifest list digest. We capture it here as imageID before imageRef gets overwritten
+	// below with repoDigests[0] (the manifest list digest).
 	imageRef := container.ImageRef
+	imageID := container.ImageRef
+
 	image, err := c.GetImage(imageRef)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -57,11 +65,13 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 			spec = &runtime.ImageSpec{Image: repoTags[0]}
 		}
 		if len(repoDigests) > 0 {
-			// Based on the CRI definition, this field will be consumed by user.
+			// repoDigests[0] is the manifest list digest for multi-arch images.
+			// This overwrites imageRef (originally the platform-specific digest)
+			// for backwards compatibility with existing CRI consumers.
 			imageRef = repoDigests[0]
 		}
 	}
-	status, err := toCRIContainerStatus(ctx, container, spec, imageRef)
+	status, err := toCRIContainerStatus(ctx, container, spec, imageRef, imageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ContainerStatus: %w", err)
 	}
@@ -86,7 +96,7 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 }
 
 // toCRIContainerStatus converts internal container object to CRI container status.
-func toCRIContainerStatus(ctx context.Context, container containerstore.Container, spec *runtime.ImageSpec, imageRef string) (*runtime.ContainerStatus, error) {
+func toCRIContainerStatus(ctx context.Context, container containerstore.Container, spec *runtime.ImageSpec, imageRef string, imageID string) (*runtime.ContainerStatus, error) {
 	meta := container.Metadata
 	status := container.Status.Get()
 	reason := status.Reason
@@ -124,6 +134,7 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 		ExitCode:    status.ExitCode,
 		Image:       spec,
 		ImageRef:    imageRef,
+		ImageId:     imageID,
 		Reason:      reason,
 		Message:     status.Message,
 		Labels:      meta.Config.GetLabels(),

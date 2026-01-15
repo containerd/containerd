@@ -85,6 +85,7 @@ func getContainerStatusTestData(t *testing.T) (*containerstore.Metadata, contain
 		CreatedAt:   createdAt,
 		Image:       &runtime.ImageSpec{Image: "gcr.io/library/busybox:latest"},
 		ImageRef:    "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		ImageId:     imageID,
 		Reason:      completeExitReason,
 		Labels:      config.GetLabels(),
 		Annotations: config.GetAnnotations(),
@@ -170,7 +171,8 @@ func TestToCRIContainerStatus(t *testing.T) {
 			containerStatus, err := toCRIContainerStatus(context.Background(),
 				container,
 				expected.Image,
-				expected.ImageRef)
+				expected.ImageRef,
+				expected.ImageId)
 			assert.Nil(t, err)
 			assert.Equal(t, expected, containerStatus, test.desc)
 		})
