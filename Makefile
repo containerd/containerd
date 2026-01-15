@@ -194,12 +194,6 @@ check-protos: protos ## check if protobufs needs to be generated again
 		((git diff | cat) && \
 		(echo "$(ONI) please run 'make protos' when making changes to proto files" && false))
 
-check-api-descriptors: protos ## check that protobuf changes aren't present.
-	@echo "$(WHALE) $@"
-	@test -z "$$(git status --short api/ | tee /dev/stderr)" || \
-		((git diff api/ | cat) && \
-		(echo "$(ONI) please run 'make protos' when making changes to proto files and check-in the generated API changes" && false))
-
 proto-fmt: ## check format of proto files
 	@echo "$(WHALE) $@"
 	@test -z "$$(find . -path ./vendor -prune -o -path ./protobuf/google/rpc -prune -o -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
