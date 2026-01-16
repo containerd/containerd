@@ -74,6 +74,10 @@ jobs:
           - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/arm64
           - dockerfile-ubuntu: 22.04
+            dockerfile-platform: linux/arm/v6
+          - dockerfile-ubuntu: 22.04
+            dockerfile-platform: linux/arm/v7
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/ppc64le
           - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/s390x
