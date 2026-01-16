@@ -57,8 +57,12 @@ version = 3
 
 	t.Logf("Starting containerd")
 	currentProc := newCtrdProc(t, "containerd", workDir, nil)
+	logPath := currentProc.logPath()
 	require.NoError(t, currentProc.isReady())
 	t.Cleanup(func() {
+		if t.Failed() {
+			dumpFileContent(t, logPath)
+		}
 		t.Log("Cleanup all the pods")
 		cleanupPods(t, currentProc.criRuntimeService(t))
 

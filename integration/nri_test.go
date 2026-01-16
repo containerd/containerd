@@ -612,7 +612,6 @@ func TestUpdatePodSandboxWithRestart(t *testing.T) {
 	assert.Equal(t, overhead.MemoryLimitInBytes, info.Overhead.GetLinux().GetMemoryLimitInBytes())
 }
 
-
 // Test NRI vs. containerd restart.
 func TestNriPluginContainerdRestart(t *testing.T) {
 	skipNriTestIfNecessary(t)

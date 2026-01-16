@@ -47,8 +47,13 @@ version = 3
 	require.NoError(t, err)
 
 	currentProc := newCtrdProc(t, "containerd", configDir, nil)
+	logPath := currentProc.logPath()
+	t.Cleanup(func() {
+		if t.Failed() {
+			dumpFileContent(t, logPath)
+		}
+	})
 	require.NoError(t, currentProc.isReady())
-
 	return currentProc
 }
 
