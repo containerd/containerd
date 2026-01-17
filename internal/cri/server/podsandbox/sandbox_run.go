@@ -188,8 +188,13 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	}
 	snapshotterOpt = append(snapshotterOpt, extraSOpts...)
 
+	sandboxSnapshotter := c.imageConfig.Snapshotter
+	if ociRuntime.Snapshotter != "" {
+		sandboxSnapshotter = ociRuntime.Snapshotter
+	}
+
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.imageService.RuntimeSnapshotter(ctx, ociRuntime)),
+		containerd.WithSnapshotter(sandboxSnapshotter),
 		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt...),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
@@ -346,11 +351,9 @@ func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *
 func (c *Controller) getSandboxImageName() string {
 	// returns the name of the sandbox image used to scope pod shared resources used by the pod's containers,
 	// if empty return the default sandbox image.
-	if c.imageService != nil {
-		sandboxImage := c.imageService.PinnedImage("sandbox")
-		if sandboxImage != "" {
-			return sandboxImage
-		}
+	if image, ok := c.imageConfig.PinnedImages["sandbox"]; ok && image != "" {
+		return image
 	}
+
 	return criconfig.DefaultSandboxImage
 }

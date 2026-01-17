@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
@@ -74,7 +73,6 @@ func init() {
 			if err != nil {
 				return nil, fmt.Errorf("unable to load CRI runtime service plugin dependency: %w", err)
 			}
-			runtimeService := criRuntimePlugin.(RuntimeService)
 
 			// Get image service.
 			criImagePlugin, err := ic.GetByID(plugins.CRIServicePlugin, "images")
@@ -89,9 +87,9 @@ func init() {
 
 			c := Controller{
 				client:         client,
-				config:         runtimeService.Config(),
+				config:         criRuntimePlugin.(interface{ Config() criconfig.Config }).Config(),
+				imageConfig:    criImagePlugin.(interface{ Config() criconfig.ImageConfig }).Config(),
 				os:             osinterface.RealOS{},
-				runtimeService: runtimeService,
 				imageService:   criImagePlugin.(ImageService),
 				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
@@ -111,28 +109,20 @@ func init() {
 	})
 }
 
-// RuntimeService specifies dependencies to CRI runtime service.
-type RuntimeService interface {
-	Config() criconfig.Config
-	LoadOCISpec(string) (*oci.Spec, error)
-}
-
 // ImageService specifies dependencies to CRI image service.
 type ImageService interface {
 	LocalResolve(refOrID string) (imagestore.Image, error)
 	GetImage(id string) (imagestore.Image, error)
 	PullImage(ctx context.Context, name string, creds func(string) (string, string, error), sc *runtime.PodSandboxConfig, runtimeHandler string) (string, error)
-	RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string
-	PinnedImage(string) string
 }
 
 type Controller struct {
 	// config contains all configurations.
 	config criconfig.Config
+	// imageConfig contains CRI image configuration.
+	imageConfig criconfig.ImageConfig
 	// client is an instance of the containerd client
 	client *containerd.Client
-	// runtimeService is a dependency to CRI runtime service.
-	runtimeService RuntimeService
 	// imageService is a dependency to CRI image service.
 	imageService ImageService
 	// warningService is used to emit deprecation warnings.
