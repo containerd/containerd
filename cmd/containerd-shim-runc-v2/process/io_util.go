@@ -45,7 +45,7 @@ func NewBinaryCmd(binaryURI *url.URL, id, ns string) *exec.Cmd {
 }
 
 // CloseFiles closes any files passed in.
-// It it used for cleanup in the event of unexpected errors.
+// It is used for cleanup in the event of unexpected errors.
 func CloseFiles(files ...*os.File) {
 	for _, file := range files {
 		file.Close()
