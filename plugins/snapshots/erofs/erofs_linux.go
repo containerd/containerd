@@ -38,7 +38,7 @@ import (
 const defaultWritableSize = 0
 
 // check if EROFS kernel filesystem is registered or not
-func findErofs() bool {
+func FindErofs() bool {
 	fs, err := os.ReadFile("/proc/filesystems")
 	if err != nil {
 		return false
@@ -55,7 +55,7 @@ func checkCompatibility(root string) error {
 		return fmt.Errorf("%s does not support d_type. If the backing filesystem is xfs, please reformat with ftype=1 to enable d_type support", root)
 	}
 
-	if !findErofs() {
+	if !FindErofs() {
 		return fmt.Errorf("EROFS unsupported, please `modprobe erofs`: %w", plugin.ErrSkipPlugin)
 	}
 
