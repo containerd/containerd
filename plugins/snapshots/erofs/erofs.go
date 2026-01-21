@@ -728,9 +728,23 @@ func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		}
 	}()
 	return s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
-		var k snapshots.Kind
+		id, info, _, err := storage.GetInfo(ctx, key)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("failed to get snapshot info: %w", err)
+		}
 
-		id, k, err = storage.Remove(ctx, key)
+		// The layer blob is only persisted for committed snapshots.
+		if info.Kind == snapshots.KindCommitted {
+			// Clear IMMUTABLE_FL before removal, since this flag avoids it.
+			err = setImmutable(s.layerBlobPath(id), false)
+			if err != nil && !errdefs.IsNotImplemented(err) {
+				return fmt.Errorf("failed to clear IMMUTABLE_FL: %w", err)
+			}
+		}
+		_, _, err = storage.Remove(ctx, key)
 		if err != nil {
 			return fmt.Errorf("failed to remove snapshot %s: %w", key, err)
 		}
@@ -738,14 +752,6 @@ func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		removals, err = s.getCleanupDirectories(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get directories for removal: %w", err)
-		}
-		// The layer blob is only persisted for committed snapshots.
-		if k == snapshots.KindCommitted {
-			// Clear IMMUTABLE_FL before removal, since this flag avoids it.
-			err = setImmutable(s.layerBlobPath(id), false)
-			if err != nil && !errdefs.IsNotImplemented(err) {
-				return fmt.Errorf("failed to clear IMMUTABLE_FL: %w", err)
-			}
 		}
 		return nil
 	})
