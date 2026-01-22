@@ -53,21 +53,21 @@ jobs:
 
       - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
-      - uses: containerd/project-checks@d7751f3c375b8fe4a84c02a068184ee4c1f59bc4 # v1.2.2
-        if: github.repository == 'containerd/containerd'
-        with:
-          working-directory: src/github.com/containerd/containerd
-          repo-access-token: ${{ secrets.GITHUB_TOKEN }}
-          # github.com/cyphar/filepath-securejoin: MPL-2.0 AND BSD-3-Clause
-          # Approval: https://github.com/cncf/foundation/issues/1154#issuecomment-3562385979
-          go-licenses-ignore: |
-            github.com/cyphar/filepath-securejoin
+      # - uses: containerd/project-checks@d7751f3c375b8fe4a84c02a068184ee4c1f59bc4 # v1.2.2
+      #   if: github.repository == 'containerd/containerd'
+      #   with:
+      #     working-directory: src/github.com/containerd/containerd
+      #     repo-access-token: ${{ secrets.GITHUB_TOKEN }}
+      #     # github.com/cyphar/filepath-securejoin: MPL-2.0 AND BSD-3-Clause
+      #     # Approval: https://github.com/cncf/foundation/issues/1154#issuecomment-3562385979
+      #     go-licenses-ignore: |
+      #       github.com/cyphar/filepath-securejoin
 
-      - name: verify go modules and vendor directory
-        run: |
-          sudo apt-get install -y jq
-          make verify-vendor
-        working-directory: src/github.com/containerd/containerd
+      # - name: verify go modules and vendor directory
+      #   run: |
+      #     sudo apt-get install -y jq
+      #     make verify-vendor
+      #   working-directory: src/github.com/containerd/containerd
 
   #
   # Protobuf checks

@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -26,9 +27,11 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/opencontainers/selinux/go-selinux"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"golang.org/x/sync/errgroup"
 )
@@ -137,20 +140,21 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		log.G(ctx).WithError(err).Error("failed to read `runtime` path from bundle")
 	}
 
+	container, err := m.containers.Get(ctx, id)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("loading container %s", id)
+		if err := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
+			log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
+		}
+		return err
+	}
+
 	// Query runtime name from metadata store
 	if runtime == "" {
-		container, err := m.containers.Get(ctx, id)
-		if err != nil {
-			log.G(ctx).WithError(err).Errorf("loading container %s", id)
-			if err := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
-				log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
-			}
-			return err
-		}
 		runtime = container.Runtime.Name
 	}
 
-	runtime, err := m.resolveRuntimePath(runtime)
+	runtime, err = m.resolveRuntimePath(runtime)
 	if err != nil {
 		bundle.Delete()
 
@@ -195,6 +199,20 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		shim.delete(ctx, false, func(ctx context.Context, id string) {})
 	} else {
 		m.shims.Add(ctx, shim.ShimInstance)
+	}
+	var s oci.Spec
+	if err := json.Unmarshal(container.Spec.GetValue(), &s); err != nil {
+		return err
+	}
+	if container.Labels != nil {
+		if _, ok := container.Labels["CUSTOM_SELINUX_LABEL"]; ok {
+			if s.Process != nil && s.Process.SelinuxLabel != "" {
+				if err := selinux.CheckLabel(s.Process.SelinuxLabel); err != nil {
+					return err
+				}
+				selinux.ReserveLabel(s.Process.SelinuxLabel)
+			}
+		}
 	}
 	return nil
 }

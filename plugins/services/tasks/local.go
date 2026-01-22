@@ -19,6 +19,7 @@ package tasks
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -52,6 +53,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -59,6 +61,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
+	"github.com/opencontainers/selinux/go-selinux"
 )
 
 var (
@@ -265,6 +268,21 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task pid: %w", err)
 	}
+	var s oci.Spec
+	if err := json.Unmarshal(container.Spec.GetValue(), &s); err != nil {
+		return nil, err
+	}
+
+	if container.Labels != nil {
+		if _, ok := container.Labels["CUSTOM_SELINUX_LABEL"]; ok {
+			if s.Process != nil && s.Process.SelinuxLabel != "" {
+				if err := selinux.CheckLabel(s.Process.SelinuxLabel); err != nil {
+					return nil, err
+				}
+				selinux.ReserveLabel(s.Process.SelinuxLabel)
+			}
+		}
+	}
 	return &api.CreateTaskResponse{
 		ContainerID: r.ContainerID,
 		Pid:         pid,
@@ -315,6 +333,17 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 		return nil, errgrpc.ToGRPC(err)
 	}
 
+	var s oci.Spec
+	if err := json.Unmarshal(container.Spec.GetValue(), &s); err != nil {
+		return nil, err
+	}
+	if container.Labels != nil {
+		if _, ok := container.Labels["CUSTOM_SELINUX_LABEL"]; ok {
+			if s.Process != nil && s.Process.SelinuxLabel != "" {
+				selinux.ReleaseLabel(s.Process.SelinuxLabel)
+			}
+		}
+	}
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
 		ExitedAt:   protobuf.ToTimestamp(exit.Timestamp),
