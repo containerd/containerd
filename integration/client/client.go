@@ -46,7 +46,7 @@ func init() {
 
 func testContext(t testing.TB) (context.Context, context.CancelFunc) {
 	// This needs work to convert from context.Background() to t.Context().
-	ctx, cancel := context.WithCancel(context.Background())  //nolint:all
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:all
 	ctx = namespaces.WithNamespace(ctx, testNamespace)
 	if t != nil {
 		ctx = logtest.WithT(ctx, t)
