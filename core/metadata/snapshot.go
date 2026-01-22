@@ -933,10 +933,23 @@ func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err 
 	// and having a cleanup method which actually performs the
 	// deletions on the snapshotters which support it.
 
+	// Collect errors from all root nodes but continue processing other roots.
+	// This ensures that a failure in one snapshot tree doesn't prevent GC of other trees.
+	var failedSnapshots []string
 	for _, node := range roots {
-		if err := s.pruneBranch(ctx, node); err != nil {
+		if err := ctx.Err(); err != nil {
+			if len(failedSnapshots) > 0 {
+				return 0, fmt.Errorf("context done, partially failed to remove snapshots: %v: %w", failedSnapshots, err)
+			}
 			return 0, err
 		}
+		if err := s.pruneBranch(ctx, node, &failedSnapshots); err != nil {
+			// Continue processing other root nodes
+		}
+	}
+
+	if len(failedSnapshots) > 0 {
+		return 0, fmt.Errorf("failed to remove snapshots: %v", failedSnapshots)
 	}
 
 	return
@@ -982,17 +995,36 @@ func (s *snapshotter) walkTree(ctx context.Context, seen map[string]struct{}) ([
 	return roots, nil
 }
 
-func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode) error {
+func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode, failedSnapshots *[]string) error {
+	// Check if context is canceled or deadline exceeded at the beginning of each recursion level
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// Collect errors from all children without early return.
+	// This ensures that sibling branches can continue to be pruned even if one branch fails.
+	var hasChildFailures bool
 	for _, child := range node.children {
-		if err := s.pruneBranch(ctx, child); err != nil {
-			return err
+		if err := s.pruneBranch(ctx, child, failedSnapshots); err != nil {
+			hasChildFailures = true
+			// Continue processing other children instead of returning immediately
 		}
 	}
 
+	// If any child failed, propagate the error upward regardless of whether current node needs removal.
+	// This ensures errors are not swallowed when parent nodes don't need GC.
+	if hasChildFailures {
+		return fmt.Errorf("child cleanup failed")
+	}
+
 	if node.remove {
+		// Only attempt to remove the current node if all children were successfully removed.
 		logger := log.G(ctx).WithField("snapshotter", s.name)
 		if err := s.Snapshotter.Remove(ctx, node.info.Name); err != nil {
 			if !errdefs.IsFailedPrecondition(err) {
+				// Log the failure and record the failed snapshot name
+				logger.WithError(err).WithField("key", node.info.Name).Errorf("failed to remove snapshot")
+				*failedSnapshots = append(*failedSnapshots, node.info.Name)
 				return err
 			}
 			logger.WithError(err).WithField("key", node.info.Name).Warnf("failed to remove snapshot")
