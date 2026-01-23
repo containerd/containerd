@@ -96,7 +96,7 @@ jobs:
 
       - run: script/setup/install-dev-tools
       - run: make proto-fmt
-      - run: make check-protos check-api-descriptors
+      - run: make check-protos
 
   man:
     name: Manpages

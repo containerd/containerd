@@ -185,7 +185,7 @@ protos: bin/protoc-gen-go-fieldpath bin/go-buildtag
 	go-fix-acronym -w -a '^Os' $$(find api/ -name '*.pb.go')
 	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $$(find api/ -name '*.pb.go')
 	bin/go-buildtag -w --tags '!no_grpc' $$(find api/ -name '*_grpc.pb.go')
-	@test -z "$$(git status --short | grep "api/next.pb.txt" | tee /dev/stderr)" || \
+	@test -z "$$(git status --short | grep '\.go$$' | tee /dev/stderr)" || \
 		$(GO) mod edit -replace=github.com/containerd/containerd/api=./api
 
 check-protos: protos ## check if protobufs needs to be generated again
@@ -193,12 +193,6 @@ check-protos: protos ## check if protobufs needs to be generated again
 	@test -z "$$(git status --short | grep ".pb.go" | tee /dev/stderr)" || \
 		((git diff | cat) && \
 		(echo "$(ONI) please run 'make protos' when making changes to proto files" && false))
-
-check-api-descriptors: protos ## check that protobuf changes aren't present.
-	@echo "$(WHALE) $@"
-	@test -z "$$(git status --short | grep ".pb.txt" | tee /dev/stderr)" || \
-		((git diff $$(find . -name '*.pb.txt') | cat) && \
-		(echo "$(ONI) please run 'make protos' when making changes to proto files and check-in the generated descriptor file changes" && false))
 
 proto-fmt: ## check format of proto files
 	@echo "$(WHALE) $@"
