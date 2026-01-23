@@ -44,7 +44,7 @@ func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, m
 	if err != nil {
 		return fmt.Errorf("erofs apply failed: %s: %w", out, err)
 	}
-	log.G(ctx).Infof("running %s %s %v", cmd.Path, cmd.Args, string(out))
+	log.G(ctx).Debugf("running %s %s %v", cmd.Path, cmd.Args, string(out))
 	return nil
 }
 
@@ -79,10 +79,7 @@ func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath, u
 		return fmt.Errorf("tar index generation failed with command 'mkfs.erofs %s': %s: %w",
 			strings.Join(args, " "), out, err)
 	}
-
-	// Log the command execution for debugging
-	log.G(ctx).Tracef("Generated tar index with command: %s %s, output: %s",
-		cmd.Path, strings.Join(cmd.Args, " "), string(out))
+	log.G(ctx).Debugf("running %s %v %s", cmd.Path, cmd.Args, string(out))
 
 	// Open layerPath for appending
 	f, err := os.OpenFile(layerPath, os.O_APPEND|os.O_WRONLY, 0644)
