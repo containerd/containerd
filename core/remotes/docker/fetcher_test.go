@@ -32,15 +32,22 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/transfer"
 )
+
+type writeFunc func(p []byte) (int, error)
+
+func (f writeFunc) Write(p []byte) (int, error) { return f(p) }
 
 func TestFetcherOpen(t *testing.T) {
 	content := make([]byte, 128)
@@ -284,6 +291,109 @@ func TestFetcherOpenParallel(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = io.ReadAll(body)
 	assert.Error(t, err, "this should have failed")
+}
+
+func TestFetcherOpenParallel_CloseAfterCopyError(t *testing.T) {
+	size := int64(10 * 1024 * 1024)
+	content := make([]byte, size)
+	rr, err := rand.New(rand.NewSource(1)).Read(content)
+	require.NoError(t, err)
+	require.Equal(t, int(size), rr)
+
+	type errWriter struct {
+		max int64
+		n   int64
+	}
+
+	ew := &errWriter{max: 1024}
+	ewWrite := func(p []byte) (int, error) {
+		n := len(p)
+		ew.n += int64(n)
+		if ew.n >= ew.max {
+			return 0, errors.New("simulated write failure after limit reached")
+		}
+		return n, nil
+	}
+
+	// simulate Close should not wait for download to complete after write error
+	unblockOnce := sync.Once{}
+	unblock := make(chan struct{})
+	unblockAll := func() { unblockOnce.Do(func() { close(unblock) }) }
+	defer unblockAll()
+
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rng, err := parseRange(r.Header.Get("Range"), size)
+		if errors.Is(err, errNoOverlap) {
+			err = nil
+		}
+		assert.NoError(t, err)
+		if len(rng) == 0 {
+			rw.Header().Set("content-length", strconv.Itoa(len(content)))
+			_, _ = rw.Write(content)
+			return
+		}
+		if rng[0].start > 0 {
+			select {
+			case <-r.Context().Done():
+				return
+			case <-unblock:
+			}
+		}
+		b := content[rng[0].start : rng[0].start+rng[0].length]
+		rw.Header().Set("content-range", rng[0].contentRange(size))
+		rw.Header().Set("content-length", strconv.Itoa(len(b)))
+		_, err = rw.Write(b)
+		t.Logf("wrote range %s, err=%v", rng[0].contentRange(size), err)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f := dockerFetcher{
+		&dockerBase{
+			repository: "nonempty",
+			limiter:    semaphore.NewWeighted(4),
+			performances: transfer.ImageResolverPerformanceSettings{
+				MaxConcurrentDownloads:     4,
+				ConcurrentLayerFetchBuffer: 1 * 1024 * 1024,
+			},
+		},
+	}
+
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
+	req := f.request(host, http.MethodGet)
+	rc, _, err := f.open(context.Background(), req, "", 0, true)
+	require.NoError(t, err, "failed to open reader")
+
+	_, copyErr := io.Copy(writeFunc(ewWrite), rc)
+	require.NotNil(t, copyErr, "expected write error during copy")
+
+	closeDone := make(chan error, 1)
+	go func() {
+		closeDone <- rc.Close()
+	}()
+
+	timer := time.NewTimer(10 * time.Second)
+	defer timer.Stop()
+	select {
+	case err := <-closeDone:
+		if err != nil {
+			t.Errorf("close error: %v", err)
+		}
+	case <-timer.C:
+		t.Errorf("close blocked after write error")
+		unblockAll()
+		<-closeDone
+	}
 }
 
 func TestContentEncoding(t *testing.T) {
