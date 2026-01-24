@@ -111,6 +111,7 @@ github.com/containerd/console
 # github.com/containerd/containerd/api v1.10.0 => ./api
 ## explicit; go 1.23.0
 github.com/containerd/containerd/api/events
+github.com/containerd/containerd/api/runtime/boot/v1
 github.com/containerd/containerd/api/runtime/sandbox/v1
 github.com/containerd/containerd/api/runtime/task/v2
 github.com/containerd/containerd/api/runtime/task/v3
