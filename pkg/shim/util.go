@@ -19,6 +19,7 @@ package shim
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,7 @@ import (
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 
+	bootapi "github.com/containerd/containerd/api/runtime/boot/v1"
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
@@ -67,21 +69,20 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: Deprecate this in 2.3 and remove in the next LTS in favor of Bootstrap protocol.
 	args := []string{
 		"-namespace", ns,
 		"-address", config.GRPCAddress,
 		"-publish-binary", self,
 		"-id", config.ID,
 	}
-
 	if config.BundlePath != "" {
 		args = append(args, "-bundle", config.BundlePath)
 	}
-
 	if config.Debug {
 		args = append(args, "-debug")
 	}
-
 	if config.Action == "" {
 		return nil, errors.New("action must be specified in CommandConfig")
 	}
@@ -98,6 +99,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 		os.Environ(),
 		"GOMAXPROCS=2",
 		fmt.Sprintf("%s=2", maxVersionEnv),
+		// TODO: Deprecate this in 2.3 and remove in the next LTS in favor of Bootstrap protocol.
 		fmt.Sprintf("%s=%s", ttrpcAddressEnv, config.TTRPCAddress),
 		fmt.Sprintf("%s=%s", grpcAddressEnv, config.GRPCAddress),
 		fmt.Sprintf("%s=%s", namespaceEnv, ns),
@@ -106,13 +108,43 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 		cmd.Env = append(cmd.Env, config.Env...)
 	}
 	cmd.SysProcAttr = getSysProcAttr()
-	if config.Opts != nil {
-		d, err := proto.Marshal(config.Opts)
-		if err != nil {
-			return nil, err
+
+	// Special path when upgrading from 1.7 runc v1 shims to 2.x containerd.
+	// v1 shims would fail if passed wrong stdin data.
+	// TODO: Deprecate and remove in the next LTS
+	if strings.Contains(config.RuntimePath, "shim-runc-v1") {
+		if config.Opts != nil {
+			d, err := proto.Marshal(config.Opts)
+			if err != nil {
+				return nil, err
+			}
+			cmd.Stdin = bytes.NewReader(d)
 		}
-		cmd.Stdin = bytes.NewReader(d)
+	} else if config.Action == "start" {
+		// Use the new Bootstrap protocol for all newer shims.
+		params := bootapi.BootstrapParams{
+			ID:                     config.ID,
+			Namespace:              ns,
+			EnableDebug:            config.Debug,
+			ContainerdGrpcAddress:  config.GRPCAddress,
+			ContainerdTtrpcAddress: config.TTRPCAddress,
+			ContainerdBinary:       self,
+		}
+
+		if config.Opts != nil {
+			if err := params.AddExtension(config.Opts); err != nil {
+				return nil, fmt.Errorf("unable to add runtime options extensions: %w", err)
+			}
+		}
+
+		data, err := json.Marshal(&params)
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal bootstrap params: %w", err)
+		}
+
+		cmd.Stdin = bytes.NewReader(data)
 	}
+
 	return cmd, nil
 }
 
