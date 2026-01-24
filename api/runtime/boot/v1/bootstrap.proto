@@ -108,12 +108,6 @@ message BootstrapResult {
 }
 
 message RuncV2Extensions {
-	// Annotations are spec annotations read from config.json.
-	map<string, string> annotations = 1;
-
-	// Enable core scheduling if available
-	bool sched_core = 2;
-
-	// Cgroup path to place the shim process into
-	string shim_cgroup = 3;
+	// Spec annotations read from config.json.
+	map<string, string> spec_annotations = 1;
 }
