@@ -67,8 +67,8 @@ func (m manager) Name() string {
 	return m.name
 }
 
-func (m manager) Start(ctx context.Context, id string, opts shim.StartOpts) (shim.BootstrapParams, error) {
-	return shim.BootstrapParams{}, errdefs.ErrNotImplemented
+func (m manager) Start(ctx context.Context, opts *shim.BootstrapParams) (*shim.BootstrapResult, error) {
+	return nil, errdefs.ErrNotImplemented
 }
 
 func (m manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
