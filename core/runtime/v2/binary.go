@@ -61,23 +61,24 @@ type binary struct {
 }
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
-	args := []string{"-id", b.bundle.ID}
+	debug := false
 	switch log.GetLevel() {
 	case log.DebugLevel, log.TraceLevel:
-		args = append(args, "-debug")
+		debug = true
 	}
-	args = append(args, "start")
 
 	cmd, err := client.Command(
 		ctx,
 		&client.CommandConfig{
+			ID:           b.bundle.ID,
 			RuntimePath:  b.runtime,
 			GRPCAddress:  b.containerdAddress,
 			TTRPCAddress: b.containerdTTRPCAddress,
 			WorkDir:      b.bundle.Path,
 			Opts:         opts,
-			Args:         args,
 			Env:          b.env,
+			Debug:        debug,
+			Action:       "start",
 		})
 	if err != nil {
 		return nil, err
@@ -165,24 +166,24 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	if gruntime.GOOS != "windows" && gruntime.GOOS != "freebsd" {
 		bundlePath = b.bundle.Path
 	}
-	args := []string{
-		"-id", b.bundle.ID,
-		"-bundle", b.bundle.Path,
-	}
+
+	debug := false
 	switch log.GetLevel() {
 	case log.DebugLevel, log.TraceLevel:
-		args = append(args, "-debug")
+		debug = true
 	}
-	args = append(args, "delete")
 
 	cmd, err := client.Command(ctx,
 		&client.CommandConfig{
+			ID:           b.bundle.ID,
 			RuntimePath:  b.runtime,
+			BundlePath:   b.bundle.Path,
 			GRPCAddress:  b.containerdAddress,
 			TTRPCAddress: b.containerdTTRPCAddress,
 			WorkDir:      bundlePath,
 			Opts:         nil,
-			Args:         args,
+			Debug:        debug,
+			Action:       "delete",
 		})
 
 	if err != nil {
