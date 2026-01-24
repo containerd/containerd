@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: services/version/v1/version.proto
+// source: containerd/services/version/v1/version.proto
 
 package version
 
@@ -104,5 +104,5 @@ var Version_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "services/version/v1/version.proto",
+	Metadata: "containerd/services/version/v1/version.proto",
 }

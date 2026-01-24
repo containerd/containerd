@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: services/sandbox/v1/sandbox.proto
+// source: containerd/services/sandbox/v1/sandbox.proto
 
 package sandbox
 
@@ -247,7 +247,7 @@ var Store_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "services/sandbox/v1/sandbox.proto",
+	Metadata: "containerd/services/sandbox/v1/sandbox.proto",
 }
 
 // ControllerClient is the client API for Controller service.
@@ -621,5 +621,5 @@ var Controller_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "services/sandbox/v1/sandbox.proto",
+	Metadata: "containerd/services/sandbox/v1/sandbox.proto",
 }

@@ -2,5 +2,5 @@ version: v2
 deps:
   - buf.build/googleapis/googleapis
 modules:
-  - path: .
+  - path: proto
     name: buf.build/containerd/api-dev
