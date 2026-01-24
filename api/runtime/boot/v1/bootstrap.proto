@@ -106,8 +106,3 @@ message BootstrapResult {
 	// Optional: Additional metadata from shim
 	map<string, string> metadata = 5;
 }
-
-message RuncV2Extensions {
-	// Spec annotations read from config.json.
-	map<string, string> spec_annotations = 1;
-}
