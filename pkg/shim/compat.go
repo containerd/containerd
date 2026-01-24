@@ -22,6 +22,7 @@ package shim
 // Once settled, this file should be removed.
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -30,7 +31,7 @@ import (
 	"github.com/containerd/containerd/api/types/runc/options"
 )
 
-func readBootstrapParamsFromDeprecatedFields(params *BootstrapParams) error {
+func readBootstrapParamsFromDeprecatedFields(input []byte, params *BootstrapParams) error {
 	params.ID = id
 	params.Namespace = namespaceFlag
 	params.ContainerdTtrpcAddress = os.Getenv(ttrpcAddressEnv)
@@ -42,8 +43,7 @@ func readBootstrapParamsFromDeprecatedFields(params *BootstrapParams) error {
 
 	// Runc v2 specific extensions
 
-	os.Stdin.Seek(0, 0) // Reset as we previously tried to read bootstrap params from it
-	if opts, err := ReadRuntimeOptions[*options.Options](os.Stdin); err == nil {
+	if opts, err := ReadRuntimeOptions[*options.Options](bytes.NewBuffer(input)); err == nil {
 		if err := params.AddExtension(opts); err != nil {
 			return fmt.Errorf("unable to add runc options: %w", err)
 		}

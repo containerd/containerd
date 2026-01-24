@@ -274,10 +274,17 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		}
 		return nil
 	case "start":
+		// We try reading stdin twice: first for the new boot API, then runc Options.
+		// The stdin pipe is not seekable, so this should be read into memory first.
+		input, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("failed to read stdin: %w", err)
+		}
+
 		var params bootapi.BootstrapParams
-		if err := json.NewDecoder(os.Stdin).Decode(&params); err != nil {
+		if err := json.Unmarshal(input, &params); err != nil {
 			// TODO: Return error once the new API is stable
-			if err := readBootstrapParamsFromDeprecatedFields(&params); err != nil {
+			if err := readBootstrapParamsFromDeprecatedFields(input, &params); err != nil {
 				return err
 			}
 		}
