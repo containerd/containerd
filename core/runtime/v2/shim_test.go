@@ -31,13 +31,13 @@ func TestParseStartResponse(t *testing.T) {
 	for _, tc := range []struct {
 		Name     string
 		Response string
-		Expected client.BootstrapParams
+		Expected client.BootstrapResult
 		Err      error
 	}{
 		{
 			Name:     "v2 shim",
 			Response: "/somedirectory/somesocket",
-			Expected: client.BootstrapParams{
+			Expected: client.BootstrapResult{
 				Version:  2,
 				Address:  "/somedirectory/somesocket",
 				Protocol: "ttrpc",
@@ -46,7 +46,7 @@ func TestParseStartResponse(t *testing.T) {
 		{
 			Name:     "v2 shim using grpc",
 			Response: `{"version":2,"address":"/somedirectory/somesocket","protocol":"grpc"}`,
-			Expected: client.BootstrapParams{
+			Expected: client.BootstrapResult{
 				Version:  2,
 				Address:  "/somedirectory/somesocket",
 				Protocol: "grpc",
@@ -55,7 +55,7 @@ func TestParseStartResponse(t *testing.T) {
 		{
 			Name:     "v2 shim using ttrpc",
 			Response: `{"version":2,"address":"/somedirectory/somesocket","protocol":"ttrpc"}`,
-			Expected: client.BootstrapParams{
+			Expected: client.BootstrapResult{
 				Version:  2,
 				Address:  "/somedirectory/somesocket",
 				Protocol: "ttrpc",
@@ -64,7 +64,7 @@ func TestParseStartResponse(t *testing.T) {
 		{
 			Name:     "invalid shim v2 response",
 			Response: `{"address":"/somedirectory/somesocket","protocol":"ttrpc"}`,
-			Expected: client.BootstrapParams{
+			Expected: client.BootstrapResult{
 				Version:  2,
 				Address:  `{"address":"/somedirectory/somesocket","protocol":"ttrpc"}`,
 				Protocol: "ttrpc",
@@ -73,7 +73,7 @@ func TestParseStartResponse(t *testing.T) {
 		{
 			Name:     "later unsupported shim",
 			Response: `{"Version": 4,"Address":"/somedirectory/somesocket","Protocol":"ttrpc"}`,
-			Expected: client.BootstrapParams{},
+			Expected: client.BootstrapResult{},
 			Err:      errdefs.ErrNotImplemented,
 		},
 	} {
@@ -109,7 +109,7 @@ func TestRestoreBootstrapParams(t *testing.T) {
 	restored, err := restoreBootstrapParams(bundlePath)
 	require.NoError(t, err)
 
-	expected := client.BootstrapParams{
+	expected := &client.BootstrapResult{
 		Version:  2,
 		Address:  "unix://123",
 		Protocol: "ttrpc",
