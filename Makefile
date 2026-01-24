@@ -180,12 +180,13 @@ protos: bin/protoc-gen-go-fieldpath bin/go-buildtag
 	@echo "$(WHALE) $@"
 	(cd api && buf dep update)
 	(cd api && PATH="$(ROOTDIR)/bin:$$PATH" buf generate)
+	(cd api && buf build -o next.txtpb)
 	@rm -f api/runtime/task/v2/shim_grpc.pb.go api/services/ttrpc/events/v1/events_grpc.pb.go
 	@find api/ -name '*_fieldpath.pb.go' ! -path 'api/events/*' -delete
 	go-fix-acronym -w -a '^Os' $$(find api/ -name '*.pb.go')
 	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $$(find api/ -name '*.pb.go')
 	bin/go-buildtag -w --tags '!no_grpc' $$(find api/ -name '*_grpc.pb.go')
-	@test -z "$$(git status --short | grep '\.go$$' | tee /dev/stderr)" || \
+	@test -z "$$(git status --short | grep "api/next.txtpb" | tee /dev/stderr)" || \
 		$(GO) mod edit -replace=github.com/containerd/containerd/api=./api
 
 check-protos: protos ## check if protobufs needs to be generated again
