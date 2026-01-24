@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-	boot "github.com/containerd/containerd/api/runtime/boot/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
@@ -66,6 +65,14 @@ func NewShimManager(name string) shim.Manager {
 var groupLabels = []string{
 	"io.containerd.runc.v2.group",
 	"io.kubernetes.cri.sandbox-id",
+}
+
+// spec is a shallow version of [oci.Spec] containing only the
+// fields we need for the hook. We use a shallow struct to reduce
+// the overhead of unmarshaling.
+type spec struct {
+	// Annotations contains arbitrary metadata for the container.
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type manager struct {
@@ -101,6 +108,20 @@ func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddre
 		Setpgid: true,
 	}
 	return cmd, nil
+}
+
+func readSpec() (*spec, error) {
+	const configFileName = "config.json"
+	f, err := os.Open(configFileName)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var s spec
+	if err := json.NewDecoder(f).Decode(&s); err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 func (m manager) Name() string {
@@ -172,14 +193,13 @@ func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.B
 		return nil, err
 	}
 	grouping := id
-
-	var runcExt boot.RuncV2Extensions
-	if err := opts.FindExtension(&runcExt); err != nil {
-		return nil, fmt.Errorf("failed to fetch runc v2 extensions: %w", err)
+	spec, err := readSpec()
+	if err != nil {
+		return nil, err
 	}
 
 	for _, group := range groupLabels {
-		if groupID, ok := runcExt.SpecAnnotations[group]; ok {
+		if groupID, ok := spec.Annotations[group]; ok {
 			grouping = groupID
 			break
 		}
