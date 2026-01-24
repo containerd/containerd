@@ -67,6 +67,7 @@ func TestToCRIContainer(t *testing.T) {
 		Metadata:     config.GetMetadata(),
 		Image:        config.GetImage(),
 		ImageRef:     "test-image-ref",
+		ImageId:      "test-image-ref",
 		State:        runtime.ContainerState_CONTAINER_EXITED,
 		CreatedAt:    createdAt,
 		Labels:       config.GetLabels(),

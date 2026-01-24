@@ -51,10 +51,23 @@ func toCRIContainer(container containerstore.Container) *runtime.Container {
 		Metadata:     container.Config.GetMetadata(),
 		Image:        container.Config.GetImage(),
 		ImageRef:     container.ImageRef,
-		State:        status.State(),
-		CreatedAt:    status.CreatedAt,
-		Labels:       container.Config.GetLabels(),
-		Annotations:  container.Config.GetAnnotations(),
+		// container.ImageRef stores the platform-specific image config digest
+		// (e.g., sha256:901dd1e7...) that was resolved when the container was created.
+		//
+		// Ideally, ImageRef should contain the manifest list digest (e.g.,
+		// cr.io/library/busybox@sha256:e6693c20...) while ImageId contains the
+		// config digest. However, resolving the manifest list digest requires an
+		// image store lookup (as done in ContainerStatus). For ListContainers,
+		// we skip this lookup and set both fields to the config digest.
+		//
+		// This is acceptable because:
+		// - ImageId (used for kubelet GC) is correct with the config digest
+		// - ImageRef has historically remained the config digest for backwards compatibility
+		ImageId:     container.ImageRef,
+		State:       status.State(),
+		CreatedAt:   status.CreatedAt,
+		Labels:      container.Config.GetLabels(),
+		Annotations: container.Config.GetAnnotations(),
 	}
 }
 
