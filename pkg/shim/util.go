@@ -40,13 +40,17 @@ import (
 )
 
 type CommandConfig struct {
+	ID           string
 	RuntimePath  string
+	BundlePath   string
 	GRPCAddress  string
 	TTRPCAddress string
 	WorkDir      string
 	Args         []string
 	Opts         *types.Any
 	Env          []string
+	Debug        bool
+	Action       string // Either "start" or "delete"
 }
 
 // Command returns the shim command with the provided args and configuration
@@ -67,8 +71,27 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 		"-namespace", ns,
 		"-address", config.GRPCAddress,
 		"-publish-binary", self,
+		"-id", config.ID,
 	}
-	args = append(args, config.Args...)
+
+	if config.BundlePath != "" {
+		args = append(args, "-bundle", config.BundlePath)
+	}
+
+	if config.Debug {
+		args = append(args, "-debug")
+	}
+
+	if config.Action == "" {
+		return nil, errors.New("action must be specified in CommandConfig")
+	}
+
+	args = append(args, config.Action)
+
+	if len(config.Args) > 0 {
+		args = append(args, config.Args...)
+	}
+
 	cmd := exec.CommandContext(ctx, config.RuntimePath, args...)
 	cmd.Dir = config.WorkDir
 	cmd.Env = append(
