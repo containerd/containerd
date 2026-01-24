@@ -23,11 +23,9 @@ package shim
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 
-	bootapi "github.com/containerd/containerd/api/runtime/boot/v1"
 	"github.com/containerd/containerd/api/types/runc/options"
 )
 
@@ -41,7 +39,7 @@ func readBootstrapParamsFromDeprecatedFields(input []byte, params *BootstrapPara
 	params.ContainerdBinary = containerdBinaryFlag
 	params.EnableDebug = debugFlag
 
-	// Runc v2 specific extensions
+	// Task options
 
 	if opts, err := ReadRuntimeOptions[*options.Options](bytes.NewBuffer(input)); err == nil {
 		if err := params.AddExtension(opts); err != nil {
@@ -49,37 +47,5 @@ func readBootstrapParamsFromDeprecatedFields(input []byte, params *BootstrapPara
 		}
 	}
 
-	var runcExt bootapi.RuncV2Extensions
-
-	if spec, err := readSpec(); err == nil {
-		runcExt.SpecAnnotations = spec.Annotations
-	}
-
-	if err := params.AddExtension(&runcExt); err != nil {
-		return fmt.Errorf("unable to add runc v2 extensions: %w", err)
-	}
-
 	return nil
-}
-
-// spec is a shallow version of [oci.Spec] used by Runc V2 shim,
-// containing only the fields we need for the hook. We use a shallow struct to reduce
-// the overhead of unmarshaling.
-type spec struct {
-	// Annotations contains arbitrary metadata for the container.
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-func readSpec() (*spec, error) {
-	const configFileName = "config.json"
-	f, err := os.Open(configFileName)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	var s spec
-	if err := json.NewDecoder(f).Decode(&s); err != nil {
-		return nil, err
-	}
-	return &s, nil
 }
