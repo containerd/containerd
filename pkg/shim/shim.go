@@ -140,7 +140,7 @@ func parseFlags() {
 	flag.StringVar(&id, "id", "", "id of the task")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
 	flag.StringVar(&debugSocketFlag, "debug-socket", "", "debug socket path to serve")
-	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
+	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir") // Provided only during -delete action
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
 	flag.StringVar(&containerdBinaryFlag, "publish-binary", "",
