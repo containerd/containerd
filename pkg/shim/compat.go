@@ -23,6 +23,7 @@ package shim
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	bootapi "github.com/containerd/containerd/api/runtime/boot/v1"
@@ -39,21 +40,26 @@ func readBootstrapParamsFromDeprecatedFields(params *BootstrapParams) error {
 	params.ContainerdBinary = containerdBinaryFlag
 	params.EnableDebug = debugFlag
 
-	// Runc v2 specific fields (implemented as an extensions in the new boot API)
+	// Runc v2 specific extensions
+
+	os.Stdin.Seek(0, 0) // Reset as we previously tried to read bootstrap params from it
+	if opts, err := ReadRuntimeOptions[*options.Options](os.Stdin); err == nil {
+		if err := params.AddExtension(opts); err != nil {
+			return fmt.Errorf("unable to add runc options: %w", err)
+		}
+	}
 
 	var runcExt bootapi.RuncV2Extensions
 
-	runcExt.SchedCore = os.Getenv("SCHED_CORE") != ""
-
-	if opts, err := ReadRuntimeOptions[*options.Options](os.Stdin); err == nil {
-		runcExt.ShimCgroup = opts.ShimCgroup
-	}
-
 	if spec, err := readSpec(); err == nil {
-		runcExt.Annotations = spec.Annotations
+		runcExt.SpecAnnotations = spec.Annotations
 	}
 
-	return params.AddExtension(&runcExt)
+	if err := params.AddExtension(&runcExt); err != nil {
+		return fmt.Errorf("unable to add runc v2 extensions: %w", err)
+	}
+
+	return nil
 }
 
 // spec is a shallow version of [oci.Spec] used by Runc V2 shim,

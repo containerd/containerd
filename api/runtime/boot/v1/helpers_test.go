@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestExtensions(t *testing.T) {
@@ -29,14 +30,35 @@ func TestExtensions(t *testing.T) {
 	err := params.AddExtension(&RuncV2Extensions{SchedCore: true})
 	require.NoError(t, err)
 
-	got, err := GetExtension[*RuncV2Extensions](params)
+	got := &RuncV2Extensions{}
+	err = params.FindExtension(got)
 	require.NoError(t, err)
-
 	assert.True(t, got.SchedCore)
 }
+
 func TestExtensionNotFound(t *testing.T) {
 	params := &BootstrapParams{}
 
-	_, err := GetExtension[*RuncV2Extensions](params)
-	assert.Error(t, err)
+	got := &RuncV2Extensions{}
+	err := params.FindExtension(got)
+	require.NoError(t, err)
+}
+
+func TestAddExtensionWithAny(t *testing.T) {
+	params := &BootstrapParams{}
+
+	ext := &RuncV2Extensions{SchedCore: true, ShimCgroup: "/test/cgroup"}
+	anyVal, err := anypb.New(ext)
+	require.NoError(t, err)
+
+	err = params.AddExtension(anyVal)
+	require.NoError(t, err)
+
+	got := &RuncV2Extensions{}
+	err = params.FindExtension(got)
+	require.NoError(t, err)
+	assert.True(t, got.SchedCore)
+	assert.Equal(t, "/test/cgroup", got.ShimCgroup)
+
+	assert.Contains(t, params.Extensions[0].Value.TypeUrl, "RuncV2Extensions")
 }

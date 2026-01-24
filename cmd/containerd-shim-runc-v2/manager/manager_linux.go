@@ -173,13 +173,13 @@ func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.B
 	}
 	grouping := id
 
-	runcExt, err := boot.GetExtension[*boot.RuncV2Extensions](opts)
-	if err != nil {
+	var runcExt boot.RuncV2Extensions
+	if err := opts.FindExtension(&runcExt); err != nil {
 		return nil, fmt.Errorf("failed to fetch runc v2 extensions: %w", err)
 	}
 
 	for _, group := range groupLabels {
-		if groupID, ok := runcExt.Annotations[group]; ok {
+		if groupID, ok := runcExt.SpecAnnotations[group]; ok {
 			grouping = groupID
 			break
 		}
@@ -215,7 +215,7 @@ func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.B
 	}
 
 	goruntime.LockOSThread()
-	if runcExt.GetSchedCore() {
+	if os.Getenv("SCHED_CORE") != "" {
 		if err := schedcore.Create(schedcore.ProcessGroup); err != nil {
 			return nil, fmt.Errorf("enable sched core support: %w", err)
 		}
@@ -235,7 +235,12 @@ func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.B
 	// make sure to wait after start
 	go cmd.Wait()
 
-	if shimCgroup := runcExt.GetShimCgroup(); shimCgroup != "" {
+	var runcOpts options.Options
+	if err := opts.FindExtension(&runcOpts); err != nil {
+		return nil, fmt.Errorf("failed to fetch runc options: %w", err)
+	}
+
+	if shimCgroup := runcOpts.GetShimCgroup(); shimCgroup != "" {
 		if cgroups.Mode() == cgroups.Unified {
 			cg, err := cgroupsv2.Load(shimCgroup)
 			if err != nil {
