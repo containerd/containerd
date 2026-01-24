@@ -40,16 +40,20 @@ import (
 )
 
 type CommandConfig struct {
-	Runtime      string
-	Address      string
+	RuntimePath  string
+	GRPCAddress  string
 	TTRPCAddress string
-	Path         string
+	WorkDir      string
 	Args         []string
 	Opts         *types.Any
 	Env          []string
 }
 
 // Command returns the shim command with the provided args and configuration
+//
+// TODO(refactor): move this function to core containerd runtime. This function is only used
+// by the containerd daemon for the initial shim launches (e.g. shim -start) and makes
+// no sense for shim implementations.
 func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
@@ -61,18 +65,18 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	}
 	args := []string{
 		"-namespace", ns,
-		"-address", config.Address,
+		"-address", config.GRPCAddress,
 		"-publish-binary", self,
 	}
 	args = append(args, config.Args...)
-	cmd := exec.CommandContext(ctx, config.Runtime, args...)
-	cmd.Dir = config.Path
+	cmd := exec.CommandContext(ctx, config.RuntimePath, args...)
+	cmd.Dir = config.WorkDir
 	cmd.Env = append(
 		os.Environ(),
 		"GOMAXPROCS=2",
 		fmt.Sprintf("%s=2", maxVersionEnv),
 		fmt.Sprintf("%s=%s", ttrpcAddressEnv, config.TTRPCAddress),
-		fmt.Sprintf("%s=%s", grpcAddressEnv, config.Address),
+		fmt.Sprintf("%s=%s", grpcAddressEnv, config.GRPCAddress),
 		fmt.Sprintf("%s=%s", namespaceEnv, ns),
 	)
 	if len(config.Env) > 0 {
