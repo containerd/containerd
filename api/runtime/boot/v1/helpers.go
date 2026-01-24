@@ -25,33 +25,37 @@ import (
 
 // AddExtension adds a new extension to the BootstrapParams.
 // The message is wrapped in a google.protobuf.Any with its type URL automatically set.
+// If the message is already an *anypb.Any, it is used directly without double-wrapping.
 func (p *BootstrapParams) AddExtension(msg proto.Message) error {
-	anyVal, err := anypb.New(msg)
-	if err != nil {
-		return err
+	var anyVal *anypb.Any
+	if a, ok := msg.(*anypb.Any); ok {
+		// Already an Any, use it directly
+		anyVal = a
+	} else {
+		var err error
+		anyVal, err = anypb.New(msg)
+		if err != nil {
+			return err
+		}
 	}
 
 	p.Extensions = append(p.Extensions, &Extension{Value: anyVal})
 	return nil
 }
 
-func GetExtension[T proto.Message](p *BootstrapParams) (T, error) {
-	var (
-		empty   T
-		reflect = empty.ProtoReflect()
-		name    = reflect.Descriptor().FullName()
-		out     = reflect.New().Interface().(T)
-	)
+// FindExtension finds an extension matching the type of dst and unmarshals it.
+// Returns true if found, false if not found.
+func (p *BootstrapParams) FindExtension(dst proto.Message) error {
+	name := dst.ProtoReflect().Descriptor().FullName()
 
 	for _, ext := range p.Extensions {
-		if ext.GetValue().MessageIs(out) {
-			if err := ext.GetValue().UnmarshalTo(out); err != nil {
-				return out, fmt.Errorf("failed to unmarshal extension %q: %w", name, err)
+		if ext.GetValue().MessageIs(dst) {
+			if err := ext.GetValue().UnmarshalTo(dst); err != nil {
+				return fmt.Errorf("failed to unmarshal extension %q: %w", name, err)
 			}
-
-			return out, nil
+			return nil
 		}
 	}
 
-	return out, fmt.Errorf("extension %q not found", name)
+	return nil
 }
