@@ -27,13 +27,13 @@ import (
 func TestExtensions(t *testing.T) {
 	params := &BootstrapParams{}
 
-	err := params.AddExtension(&RuncV2Extensions{SchedCore: true})
+	err := params.AddExtension(&RuncV2Extensions{SpecAnnotations: map[string]string{"test": "value"}})
 	require.NoError(t, err)
 
 	got := &RuncV2Extensions{}
 	err = params.FindExtension(got)
 	require.NoError(t, err)
-	assert.True(t, got.SchedCore)
+	assert.Equal(t, "value", got.SpecAnnotations["test"])
 }
 
 func TestExtensionNotFound(t *testing.T) {
@@ -47,7 +47,7 @@ func TestExtensionNotFound(t *testing.T) {
 func TestAddExtensionWithAny(t *testing.T) {
 	params := &BootstrapParams{}
 
-	ext := &RuncV2Extensions{SchedCore: true, ShimCgroup: "/test/cgroup"}
+	ext := &RuncV2Extensions{SpecAnnotations: map[string]string{"test": "annotation"}}
 	anyVal, err := anypb.New(ext)
 	require.NoError(t, err)
 
@@ -57,8 +57,7 @@ func TestAddExtensionWithAny(t *testing.T) {
 	got := &RuncV2Extensions{}
 	err = params.FindExtension(got)
 	require.NoError(t, err)
-	assert.True(t, got.SchedCore)
-	assert.Equal(t, "/test/cgroup", got.ShimCgroup)
+	assert.Equal(t, "annotation", got.SpecAnnotations["test"])
 
 	assert.Contains(t, params.Extensions[0].Value.TypeUrl, "RuncV2Extensions")
 }
