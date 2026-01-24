@@ -71,10 +71,10 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	cmd, err := client.Command(
 		ctx,
 		&client.CommandConfig{
-			Runtime:      b.runtime,
-			Address:      b.containerdAddress,
+			RuntimePath:  b.runtime,
+			GRPCAddress:  b.containerdAddress,
 			TTRPCAddress: b.containerdTTRPCAddress,
-			Path:         b.bundle.Path,
+			WorkDir:      b.bundle.Path,
 			Opts:         opts,
 			Args:         args,
 			Env:          b.env,
@@ -177,10 +177,10 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 
 	cmd, err := client.Command(ctx,
 		&client.CommandConfig{
-			Runtime:      b.runtime,
-			Address:      b.containerdAddress,
+			RuntimePath:  b.runtime,
+			GRPCAddress:  b.containerdAddress,
 			TTRPCAddress: b.containerdTTRPCAddress,
-			Path:         bundlePath,
+			WorkDir:      bundlePath,
 			Opts:         nil,
 			Args:         args,
 		})
