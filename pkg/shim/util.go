@@ -112,7 +112,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	// Special path when upgrading from 1.7 runc v1 shims to 2.x containerd.
 	// v1 shims would fail if passed wrong stdin data.
 	// TODO: Deprecate and remove in the next LTS
-	if strings.Contains(config.RuntimePath, "shim-runc-v1") {
+	if strings.Contains(config.RuntimePath, "shim-runc-v1") || strings.Contains(config.RuntimePath, "shim-runhcs-v1") {
 		if config.Opts != nil {
 			d, err := proto.Marshal(config.Opts)
 			if err != nil {
