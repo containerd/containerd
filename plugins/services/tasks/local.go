@@ -349,7 +349,7 @@ func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, err
 
 	state, err := p.State(ctx)
 	if err != nil {
-		if errdefs.IsNotFound(err) || errdefs.IsUnavailable(err) {
+		if errdefs.IsNotFound(err) || errdefs.IsUnavailable(err) || errdefs.IsDeadlineExceeded(err) {
 			return nil, err
 		}
 		log.G(ctx).WithError(err).Errorf("get state for %s", p.ID())
