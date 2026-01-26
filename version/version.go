@@ -33,16 +33,19 @@ var (
 	// GoVersion is Go tree's version.
 	GoVersion = runtime.Version()
 
-	// UserAgent is the default User-Agent header for http-requests such as
-	// authenticating and pulling images from registries using the
-	// core/remotes/docker package. This variable is filled in at linking
-	// time, and users of containerd as a go module must set this variable
-	// to a value matching their product, following the guidelines outlined
-	// in [RFC9110, section 10.1.5], or to configure the User-Agent header
-	// through other means.
+	// UserAgentOverride overrides the default User-Agent header for HTTP
+	// requests such as authenticating and pulling images from registries
+	// using the core/remotes/docker package. This variable is filled in
+	// at linking time, and users of containerd as a go module must set this
+	// variable to a value matching their product, following the guidelines
+	// outlined in [RFC9110, section 10.1.5], or to configure the User-Agent
+	// header through other means.
+	//
+	// If this variable is empty, a generic User-Agent is used, based on [Name]
+	// and [Version].
 	//
 	// [RFC9110, section 10.1.5]: https://httpwg.org/specs/rfc9110.html#field.user-agent
-	UserAgent = "containerd/2.0.0-rc.3+unknown"
+	UserAgentOverride = ""
 )
 
 // ConfigVersion is the current highest supported configuration version.
@@ -50,3 +53,20 @@ var (
 // Any configuration less than this version which has structural changes
 // should migrate the configuration structures used by this version.
 const ConfigVersion = 3
+
+// UserAgent returns the default User-Agent header ([RFC9110, section 10.1.5])
+// to use for HTTP requests such as authenticating and pulling images from
+// registries using the core/remotes/docker package.
+//
+// The User-Agent can be set at linking time through the [UserAgentOverride]
+// variable, and users of containerd as a Go module must set this variable to
+// a value matching their product. If [UserAgentOverride] is empty, a generic
+// User-Agent is used, based on [Name] and [Version].
+//
+// [RFC9110, section 10.1.5]: https://httpwg.org/specs/rfc9110.html#field.user-agent
+func UserAgent() string {
+	if UserAgentOverride != "" {
+		return UserAgentOverride
+	}
+	return Name + "/" + Version
+}

@@ -128,7 +128,7 @@ func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.
 		req.Header[k] = append(req.Header[k], v...)
 	}
 	if len(req.Header.Get("User-Agent")) == 0 {
-		req.Header.Set("User-Agent", version.UserAgent)
+		req.Header.Set("User-Agent", version.UserAgent())
 	}
 
 	resp, err := client.Do(req)
@@ -179,7 +179,7 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 		req.Header[k] = append(req.Header[k], v...)
 	}
 	if len(req.Header.Get("User-Agent")) == 0 {
-		req.Header.Set("User-Agent", version.UserAgent)
+		req.Header.Set("User-Agent", version.UserAgent())
 	}
 
 	reqParams := req.URL.Query()

@@ -523,7 +523,7 @@ func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *re
 	}
 
 	if len(header.Get("User-Agent")) == 0 {
-		header.Set("User-Agent", version.UserAgent)
+		header.Set("User-Agent", version.UserAgent())
 	}
 
 	parts := append([]string{"/", host.Path, r.repository}, ps...)
