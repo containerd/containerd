@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
@@ -160,6 +161,14 @@ func (s *imageStore) Create(ctx context.Context, image images.Image) (images.Ima
 		return images.Image{}, err
 	}
 
+	if s.db.dbopts.publisher != nil {
+		if err := s.db.dbopts.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
+			Name:   image.Name,
+			Labels: image.Labels,
+		}); err != nil {
+			return images.Image{}, err
+		}
+	}
 	return image, nil
 }
 
@@ -247,6 +256,14 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 		return images.Image{}, err
 	}
 
+	if s.db.dbopts.publisher != nil {
+		if err := s.db.dbopts.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
+			Name:   updated.Name,
+			Labels: updated.Labels,
+		}); err != nil {
+			return images.Image{}, err
+		}
+	}
 	return updated, nil
 
 }
@@ -257,7 +274,7 @@ func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.Del
 		return err
 	}
 
-	return update(ctx, s.db, func(tx *bolt.Tx) error {
+	err = update(ctx, s.db, func(tx *bolt.Tx) error {
 		bkt := getImagesBucket(tx, namespace)
 		if bkt == nil {
 			return fmt.Errorf("image %q: %w", name, errdefs.ErrNotFound)
@@ -274,6 +291,20 @@ func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.Del
 
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	if s.db.dbopts.publisher != nil {
+		if err := s.db.dbopts.publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
+			Name: name,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func validateImage(image *images.Image) error {

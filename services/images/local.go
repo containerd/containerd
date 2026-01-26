@@ -25,7 +25,6 @@ import (
 
 	"github.com/containerd/log"
 
-	eventstypes "github.com/containerd/containerd/api/events"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -130,13 +129,6 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 
 	resp.Image = imageToProto(&created)
 
-	if err := l.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
-		Name:   resp.Image.Name,
-		Labels: resp.Image.Labels,
-	}); err != nil {
-		return nil, err
-	}
-
 	l.emitSchema1DeprecationWarning(ctx, &image)
 	return &resp, nil
 
@@ -169,13 +161,6 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 
 	resp.Image = imageToProto(&updated)
 
-	if err := l.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
-		Name:   resp.Image.Name,
-		Labels: resp.Image.Labels,
-	}); err != nil {
-		return nil, err
-	}
-
 	l.emitSchema1DeprecationWarning(ctx, &image)
 	return &resp, nil
 }
@@ -185,12 +170,6 @@ func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _
 
 	if err := l.store.Delete(ctx, req.Name); err != nil {
 		return nil, errdefs.ToGRPC(err)
-	}
-
-	if err := l.publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
-		Name: req.Name,
-	}); err != nil {
-		return nil, err
 	}
 
 	if req.Sync {
