@@ -349,15 +349,7 @@ jobs:
             $skipTests = @(
               # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
               # Info: https://github.com/containerd/containerd/issues/6652
-              "runtime should support exec with tty=true and stdin=true",
-
-              # Skip tests that are known to be flaky on Windows
-              # See https://github.com/containerd/containerd/issues/12580
-              "public image with tag should be pulled and removed",
-              "public image without tag should be pulled and removed",
-              "image status should support all kinds of references",
-              "listImage should get exactly 3 image in the result list",
-              "listImage should get exactly 3 repoTags in the result image"
+              "runtime should support exec with tty=true and stdin=true"
             )
             $skip = $skipTests -join "|"
           }
