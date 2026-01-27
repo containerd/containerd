@@ -600,6 +600,12 @@ jobs:
           - box: almalinux/9
             cgroup_driver: systemd
             runc: runc
+          - box: almalinux/10
+            cgroup_driver: cgroupfs
+            runc: runc
+          - box: almalinux/10
+            cgroup_driver: systemd
+            runc: runc
     env:
       BOX: ${{ matrix.box }}
       CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
