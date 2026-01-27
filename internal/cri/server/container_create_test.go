@@ -70,7 +70,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
-	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+	spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -145,7 +145,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			ociRuntime := config.Runtime{
 				PodAnnotations: test.podAnnotations,
 			}
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -507,7 +507,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations:       test.podAnnotations,
 				ContainerAnnotations: test.containerAnnotations,
 			}
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -530,6 +530,7 @@ func TestBaseRuntimeSpec(t *testing.T) {
 	}))
 
 	out, err := c.runtimeSpec(
+		t.Context(),
 		"id1",
 		platforms.DefaultSpec(),
 		"/etc/containerd/cri-base.json",

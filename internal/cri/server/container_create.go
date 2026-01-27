@@ -305,6 +305,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	}
 
 	spec, err := c.buildContainerSpec(
+		r.ctx,
 		platform,
 		r.containerID,
 		r.sandboxID,
@@ -537,9 +538,9 @@ func (c *criService) volumeMounts(platform imagespec.Platform, containerRootDir 
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func (c *criService) runtimeSpec(id string, platform imagespec.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *criService) runtimeSpec(ctx context.Context, id string, platform imagespec.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
-	ctx := util.NamespacedContext()
+	ctx = util.WithNamespace(ctx)
 	container := &containers.Container{ID: id}
 
 	if baseSpecFile != "" {
@@ -629,6 +630,7 @@ func (c *criService) platformSpecOpts(
 
 // buildContainerSpec build container's OCI spec depending on controller's target platform OS.
 func (c *criService) buildContainerSpec(
+	ctx context.Context,
 	platform imagespec.Platform,
 	id string,
 	sandboxID string,
@@ -703,7 +705,7 @@ func (c *criService) buildContainerSpec(
 		return nil, fmt.Errorf("failed to generate spec opts: %w", err)
 	}
 
-	return c.runtimeSpec(id, platform, ociRuntime.BaseRuntimeSpec, specOpts...)
+	return c.runtimeSpec(ctx, id, platform, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 func (c *criService) buildLinuxSpec(

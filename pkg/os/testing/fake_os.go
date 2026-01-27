@@ -17,6 +17,7 @@
 package testing
 
 import (
+	"context"
 	"os"
 	"sync"
 
@@ -41,6 +42,7 @@ type FakeOS struct {
 	MkdirAllFn             func(string, os.FileMode) error
 	RemoveAllFn            func(string) error
 	StatFn                 func(string) (os.FileInfo, error)
+	ExistsFn               func(context.Context, string) error
 	ResolveSymbolicLinkFn  func(string) (string, error)
 	FollowSymlinkInScopeFn func(string, string) (string, error)
 	CopyFileFn             func(string, string, os.FileMode) error
@@ -147,6 +149,19 @@ func (f *FakeOS) Stat(name string) (os.FileInfo, error) {
 		return f.StatFn(name)
 	}
 	return nil, nil
+}
+
+// Exists is a fake call that invokes ExistsFn or just return nil.
+func (f *FakeOS) Exists(ctx context.Context, path string) error {
+	f.appendCalls("Exists", path)
+	if err := f.getError("Exists"); err != nil {
+		return err
+	}
+
+	if f.ExistsFn != nil {
+		return f.ExistsFn(ctx, path)
+	}
+	return nil
 }
 
 // ResolveSymbolicLink is a fake call that invokes ResolveSymbolicLinkFn or returns its input
