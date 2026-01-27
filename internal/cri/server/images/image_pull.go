@@ -313,7 +313,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	opts := []registry.Opt{
 		registry.WithCredentials(ch),
 		registry.WithHeaders(c.config.Registry.Headers),
-		registry.WithHostDir(c.config.Registry.ConfigPath),
+		registry.WithHostDirRoots(filepath.SplitList(c.config.Registry.ConfigPath)),
 	}
 
 	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
@@ -476,22 +476,6 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	return nil
 }
 
-func hostDirFromRoots(roots []string) func(string) (string, error) {
-	rootfn := make([]func(string) (string, error), len(roots))
-	for i := range roots {
-		rootfn[i] = config.HostDirFromRoot(roots[i])
-	}
-	return func(host string) (dir string, err error) {
-		for _, fn := range rootfn {
-			dir, err = fn(host)
-			if (err != nil && !errdefs.IsNotFound(err)) || (dir != "") {
-				break
-			}
-		}
-		return
-	}
-}
-
 // registryHosts is the registry hosts to be used by the resolver.
 func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(host string) (string, string, error), updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
 	paths := filepath.SplitList(c.config.Registry.ConfigPath)
@@ -500,7 +484,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 			UpdateClient: updateClientFn,
 		}
 		hostOptions.Credentials = credentials
-		hostOptions.HostDir = hostDirFromRoots(paths)
+		hostOptions.HostDir = config.HostDirFromRoots(paths)
 		// need to pass cri global headers to per-host authorizers
 		hostOptions.AuthorizerOpts = []docker.AuthorizerOpt{
 			docker.WithAuthHeader(c.config.Registry.Headers),
