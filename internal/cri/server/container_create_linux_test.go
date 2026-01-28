@@ -167,6 +167,10 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 			Type: runtimespec.PIDNamespace,
 			Path: opts.GetPIDNamespace(sandboxPid),
 		})
+		assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+			Type: runtimespec.TimeNamespace,
+			Path: opts.GetTimeNamespace(sandboxPid),
+		})
 
 		t.Logf("Check PodSandbox annotations")
 		assert.Contains(t, spec.Annotations, annotations.SandboxID)
