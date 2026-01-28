@@ -17,8 +17,12 @@
 package os
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"time"
 
 	"github.com/moby/sys/symlink"
 
@@ -31,6 +35,7 @@ type OS interface {
 	MkdirAll(path string, perm os.FileMode) error
 	RemoveAll(path string) error
 	Stat(name string) (os.FileInfo, error)
+	Exists(ctx context.Context, path string) error
 	ResolveSymbolicLink(name string) (string, error)
 	FollowSymlinkInScope(path, scope string) (string, error)
 	CopyFile(src, dest string, perm os.FileMode) error
@@ -57,6 +62,35 @@ func (RealOS) RemoveAll(path string) error {
 // Stat will call os.Stat to get the status of the given file.
 func (RealOS) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
+}
+
+// Exists will execute "stat" with a context to verify if the given path exists.
+// If the context does not have a deadline set, then a default 5 sec timeout
+// will be used while calling stat.
+func (RealOS) Exists(ctx context.Context, path string) error {
+	var cancel context.CancelFunc
+	if _, hasDeadlineSet := ctx.Deadline(); !hasDeadlineSet {
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+	}
+	cmd := exec.CommandContext(ctx, "stat", path)
+	err := cmd.Run()
+	if err != nil {
+		if ctx.Err() != nil { // Context expired
+			return ctx.Err()
+		}
+
+		// If stat exits with a non-zero status (usually 1), it means Not Found.
+		// In some environments, if a path is restricted, it might also return 1.
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				return os.ErrNotExist
+			}
+			return fmt.Errorf("stat failed with %v: %w", exitErr.ExitCode(), err)
+		}
+		return err
+	}
+	return nil
 }
 
 // FollowSymlinkInScope will call symlink.FollowSymlinkInScope.
