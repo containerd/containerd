@@ -204,7 +204,7 @@ build: ## build the go packages
 	@echo "$(WHALE) $@"
 	@$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} ${EXTRA_FLAGS} ${GO_LDFLAGS} ${PACKAGES}
 
-test: ## run tests, except integration tests and tests that require root
+test: binaries ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
 	@$(GOTEST) ${TESTFLAGS} ${PACKAGES}
 
