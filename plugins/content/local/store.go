@@ -395,6 +395,26 @@ func (s *store) WalkStatusRefs(ctx context.Context, fn func(string) error) error
 
 // status works like stat above except uses the path to the ingest.
 func (s *store) status(ingestPath string) (content.Status, error) {
+	refp := filepath.Join(ingestPath, "ref")
+	ref, err := readFileString(refp)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return content.Status{}, errdefs.ErrNotFound.WithMessage(fmt.Sprintf("ingest path %s not found", ingestPath))
+		}
+		return content.Status{}, fmt.Errorf("could not read ingest ref %s: %w", refp, err)
+	}
+
+	reffi, err := os.Stat(refp)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return content.Status{}, errdefs.ErrNotFound.WithMessage(fmt.Sprintf("ingest path %s not found", ingestPath))
+		}
+
+		return content.Status{}, fmt.Errorf("could not stat ingest ref %s: %w", ingestPath, err)
+	}
+
+	startedAt := reffi.ModTime() // use modtime of ingest directory for startedAt time.
+
 	dp := filepath.Join(ingestPath, "data")
 	fi, err := os.Stat(dp)
 	if err != nil {
@@ -404,29 +424,7 @@ func (s *store) status(ingestPath string) (content.Status, error) {
 		return content.Status{}, err
 	}
 
-	ref, err := readFileString(filepath.Join(ingestPath, "ref"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = fmt.Errorf("%s: %w", err.Error(), errdefs.ErrNotFound)
-		}
-		return content.Status{}, err
-	}
-
-	startedAt, err := readFileTimestamp(filepath.Join(ingestPath, "startedat"))
-	if err != nil {
-		return content.Status{}, fmt.Errorf("could not read startedat: %w", err)
-	}
-
-	updatedAt, err := readFileTimestamp(filepath.Join(ingestPath, "updatedat"))
-	if err != nil {
-		return content.Status{}, fmt.Errorf("could not read updatedat: %w", err)
-	}
-
-	// because we don't write updatedat on every write, the mod time may
-	// actually be more up to date.
-	if fi.ModTime().After(updatedAt) {
-		updatedAt = fi.ModTime()
-	}
+	updatedAt := fi.ModTime() // use modtime of data file for updatedAt time.
 
 	return content.Status{
 		Ref:       ref,
@@ -559,7 +557,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 	}
 
 	// ensure that the ingest path has been created.
-	if err := os.Mkdir(path, 0755); err != nil {
+	if err := os.Mkdir(path, 0o755); err != nil {
 		if !os.IsExist(err) {
 			return nil, err
 		}
@@ -581,33 +579,20 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 
 		// the ingest is new, we need to setup the target location.
 		// write the ref to a file for later use
-		if err := os.WriteFile(refp, []byte(ref), 0666); err != nil {
-			return nil, err
-		}
-
-		if err := writeTimestampFile(filepath.Join(path, "startedat"), startedAt); err != nil {
-			return nil, err
-		}
-
-		if err := writeTimestampFile(filepath.Join(path, "updatedat"), startedAt); err != nil {
+		if err := os.WriteFile(refp, []byte(ref), 0o666); err != nil {
 			return nil, err
 		}
 
 		if total > 0 {
-			if err := os.WriteFile(filepath.Join(path, "total"), []byte(fmt.Sprint(total)), 0666); err != nil {
+			if err := os.WriteFile(filepath.Join(path, "total"), []byte(fmt.Sprint(total)), 0o666); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	fp, err := os.OpenFile(data, os.O_WRONLY|os.O_CREATE, 0666)
+	fp, err := os.OpenFile(data, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o666)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open data file: %w", err)
-	}
-
-	if _, err := fp.Seek(offset, io.SeekStart); err != nil {
-		fp.Close()
-		return nil, fmt.Errorf("could not seek to current write offset: %w", err)
 	}
 
 	return &writer{
@@ -669,54 +654,10 @@ func (s *store) ingestPaths(ref string) (string, string, string) {
 }
 
 func (s *store) ensureIngestRoot() error {
-	return os.MkdirAll(filepath.Join(s.root, "ingest"), 0777)
+	return os.MkdirAll(filepath.Join(s.root, "ingest"), 0o777)
 }
 
 func readFileString(path string) (string, error) {
 	p, err := os.ReadFile(path)
 	return string(p), err
-}
-
-// readFileTimestamp reads a file with just a timestamp present.
-func readFileTimestamp(p string) (time.Time, error) {
-	b, err := os.ReadFile(p)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = fmt.Errorf("%s: %w", err.Error(), errdefs.ErrNotFound)
-		}
-		return time.Time{}, err
-	}
-
-	var t time.Time
-	if err := t.UnmarshalText(b); err != nil {
-		return time.Time{}, fmt.Errorf("could not parse timestamp file %v: %w", p, err)
-	}
-
-	return t, nil
-}
-
-func writeTimestampFile(p string, t time.Time) error {
-	b, err := t.MarshalText()
-	if err != nil {
-		return err
-	}
-	return writeToCompletion(p, b, 0666)
-}
-
-func writeToCompletion(path string, data []byte, mode os.FileMode) error {
-	tmp := fmt.Sprintf("%s.tmp", path)
-	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_SYNC, mode)
-	if err != nil {
-		return fmt.Errorf("create tmp file: %w", err)
-	}
-	_, err = f.Write(data)
-	f.Close()
-	if err != nil {
-		return fmt.Errorf("write tmp file: %w", err)
-	}
-	err = os.Rename(tmp, path)
-	if err != nil {
-		return fmt.Errorf("rename tmp file: %w", err)
-	}
-	return nil
 }
