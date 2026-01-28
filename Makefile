@@ -102,13 +102,18 @@ SHIM_GO_BUILDTAGS := $(GO_BUILDTAGS) no_grpc
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
 SHIM_GO_TAGS=$(if $(SHIM_GO_BUILDTAGS),-tags "$(strip $(SHIM_GO_BUILDTAGS))",)
 
-GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
+GO_LD_X = \
+	-X $(PKG)/version.Version=$(VERSION) \
+	-X $(PKG)/version.Revision=$(REVISION) \
+	-X $(PKG)/version.Package=$(PACKAGE)
+
+GO_LDFLAGS=-ldflags '$(GO_LD_X) $(EXTRA_LDFLAGS)
 ifneq ($(STATIC),)
 	GO_LDFLAGS += -extldflags "-static"
 endif
 GO_LDFLAGS+='
 
-SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
+SHIM_GO_LDFLAGS=-ldflags '$(GO_LD_X) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 # Project packages.
 PACKAGES=$(shell $(GO) list ${GO_TAGS} ./... | grep -v /vendor/ | grep -v /integration)
