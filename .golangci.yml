@@ -5,10 +5,14 @@ linters:
     - depguard # Checks for dependencies that should not be (re)introduced. See "settings" for further details.
     - dupword # Checks for duplicate words in the source code
     - gosec
+    - govet
+    - ineffassign
     - misspell
     - nolintlint
     - revive
+    - staticcheck
     - unconvert
+    - unused
     - usetesting
   disable:
     - errcheck
@@ -40,21 +44,19 @@ linters:
         - G301
         - G302
         - G304
-    staticcheck:
-      checks:
-        - all
-        - -QF1008 # Excludes QF1008 from staticcheck
-        - -ST1000
-        - -ST1020
-        - -ST1021
+    nolintlint:
+      allow-unused: true
     revive:
       rules:
         - name: package-comments
-          severity: warning
           disabled: true
-          exclude: [ "" ]
-    nolintlint:
-      allow-unused: true
+    staticcheck:
+      checks:
+        - all
+        - -QF1008 # Omit embedded fields from selector expression
+        - -ST1000 # Incorrect or missing package comment
+        - -ST1020 # The documentation of an exported function should start with the function’s name
+        - -ST1021 # The documentation of an exported type should start with type’s name
   exclusions:
     generated: lax
     rules:
@@ -100,6 +102,8 @@ linters:
       - docs/man
       - releases
       - test
+    # Log a warning if an exclusion rule is unused.
+    warn-unused: true
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
