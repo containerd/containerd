@@ -45,15 +45,46 @@ type Snapshot struct {
 	Timestamp int64
 }
 
-// Store stores all snapshots.
+// Store stores all snapshots and snapshotter metadata.
 type Store struct {
 	lock      sync.RWMutex
 	snapshots map[Key]Snapshot
+	// snapshotters contains all snapshotters indexed by name.
+	snapshotters map[string]snapshot.Snapshotter
+	// snapshotterExports contains exports metadata for each snapshotter.
+	snapshotterExports map[string]map[string]string
 }
 
 // NewStore creates a snapshot store.
-func NewStore() *Store {
-	return &Store{snapshots: make(map[Key]Snapshot)}
+func NewStore(snapshotters map[string]snapshot.Snapshotter, exports map[string]map[string]string) *Store {
+	return &Store{
+		snapshots:          make(map[Key]Snapshot),
+		snapshotters:       snapshotters,
+		snapshotterExports: exports,
+	}
+}
+
+// Snapshotters returns all snapshotters.
+func (s *Store) Snapshotters() map[string]snapshot.Snapshotter {
+	return s.snapshotters
+}
+
+// GetSnapshotter returns the snapshotter with specified name.
+func (s *Store) GetSnapshotter(name string) (snapshot.Snapshotter, bool) {
+	sn, ok := s.snapshotters[name]
+	return sn, ok
+}
+
+// IsRemoteSnapshotter returns true if the snapshotter is a remote snapshotter
+// (like stargz or nydus) that supports lazy loading.
+// Remote snapshotters are identified by the "enable_remote_snapshot_annotations" export.
+func (s *Store) IsRemoteSnapshotter(name string) bool {
+	if exports, ok := s.snapshotterExports[name]; ok {
+		if v, exists := exports["enable_remote_snapshot_annotations"]; exists && v == "true" {
+			return true
+		}
+	}
+	return false
 }
 
 // Add a snapshot into the store.
