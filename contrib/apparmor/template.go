@@ -40,6 +40,9 @@ import (
 const dir = "/etc/apparmor.d"
 
 const defaultTemplate = `
+{{- if .ABI}}
+abi <abi/{{.ABI}}>,
+{{end}}
 {{range $value := .Imports}}
 {{$value}}
 {{end}}
@@ -98,6 +101,7 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 
 type data struct {
 	Name          string
+	ABI           string
 	Imports       []string
 	InnerImports  []string
 	DaemonProfile string
@@ -117,6 +121,14 @@ func cleanProfileName(profile string) string {
 func loadData(name string) (*data, error) {
 	p := data{
 		Name: name,
+	}
+
+	// Check for ABI support, preferring the newest available version.
+	// This ensures consistent behavior across different kernel versions.
+	if macroExists("abi/4.0") {
+		p.ABI = "4.0"
+	} else if macroExists("abi/3.0") {
+		p.ABI = "3.0"
 	}
 
 	if macroExists("tunables/global") {
