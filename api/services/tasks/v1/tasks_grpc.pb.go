@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: services/tasks/v1/tasks.proto
+// source: containerd/services/tasks/v1/tasks.proto
 
 package tasks
 
@@ -688,5 +688,5 @@ var Tasks_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "services/tasks/v1/tasks.proto",
+	Metadata: "containerd/services/tasks/v1/tasks.proto",
 }

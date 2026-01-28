@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: runtime/task/v3/shim.proto
+// source: containerd/runtime/task/v3/shim.proto
 
 package task
 
@@ -680,5 +680,5 @@ var Task_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "runtime/task/v3/shim.proto",
+	Metadata: "containerd/runtime/task/v3/shim.proto",
 }
