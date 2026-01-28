@@ -18,6 +18,7 @@ package podsandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -112,7 +113,7 @@ func getMetadata(ctx context.Context, container containerd.Container) (*sandboxs
 	}
 	meta, ok := data.(*sandboxstore.Metadata)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert the extension to sandbox metadata")
+		return nil, errors.New("failed to convert the extension to sandbox metadata")
 	}
 	return meta, nil
 }

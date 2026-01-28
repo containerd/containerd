@@ -59,7 +59,7 @@ func init() {
 func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), error) {
 	lowerIdx, lowerDirs := findOverlayLowerdirs(options)
 	if lowerIdx == -1 {
-		return options, nil, fmt.Errorf("failed to parse overlay lowerdir's from given options")
+		return options, nil, errors.New("failed to parse overlay lowerdir's from given options")
 	}
 
 	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(tempMountLocation, lowerDirs, usernsFd)
@@ -296,7 +296,7 @@ func doPrepareIDMappedOverlay(tmpDir string, lowerDirs []string, usernsFd int) (
 func getCommonDirectory(lowerDirs []string) (string, error) {
 	commonPrefix := longestCommonPrefix(lowerDirs)
 	if commonPrefix == "" {
-		return "", fmt.Errorf("no common prefix found")
+		return "", errors.New("no common prefix found")
 	}
 
 	// Ensure the common prefix ends at a directory boundary
