@@ -50,6 +50,7 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 {{end}}
 
   network,
+  unix,
   capability,
   file,
   umount,
