@@ -31,7 +31,8 @@ import (
 
 func TestNewBinaryIO(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
-	uri, _ := url.Parse("binary:///bin/echo?test")
+	// Use a shell command that writes a byte to fd 5 (CONTAINER_WAIT) to signal readiness
+	uri, _ := url.Parse("binary:///bin/sh?-c=printf%20x%20%3E%265")
 
 	before := descriptorCount(t)
 
@@ -48,6 +49,27 @@ func TestNewBinaryIO(t *testing.T) {
 	after := descriptorCount(t)
 	if before != after-1 { // one descriptor must be closed from shim logger side
 		t.Fatalf("some descriptors weren't closed (%d != %d -1)", before, after)
+	}
+}
+
+func TestNewBinaryIOFailsWhenLoggerDoesNotSignalReady(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	// Use /bin/true which exits without writing to fd 5 (CONTAINER_WAIT)
+	uri, _ := url.Parse("binary:///bin/true")
+
+	before := descriptorCount(t)
+
+	_, err := NewBinaryIO(ctx, "3", uri)
+	if err == nil {
+		t.Fatal("expected error when logger doesn't signal readiness")
+	}
+	if !strings.Contains(err.Error(), "did not call ready") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	after := descriptorCount(t)
+	if before != after {
+		t.Fatalf("some descriptors weren't closed (%d != %d)", before, after)
 	}
 }
 
