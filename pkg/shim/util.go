@@ -47,6 +47,7 @@ type CommandConfig struct {
 	Args         []string
 	Opts         *types.Any
 	Env          []string
+	SocketDir    string
 }
 
 // Command returns the shim command with the provided args and configuration
@@ -75,6 +76,9 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 		fmt.Sprintf("%s=%s", grpcAddressEnv, config.Address),
 		fmt.Sprintf("%s=%s", namespaceEnv, ns),
 	)
+	if config.SocketDir != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", socketDirEnv, config.SocketDir))
+	}
 	if len(config.Env) > 0 {
 		cmd.Env = append(cmd.Env, config.Env...)
 	}
