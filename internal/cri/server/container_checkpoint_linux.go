@@ -106,6 +106,7 @@ func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string
 
 	return image.ID, nil
 }
+
 // validateCheckpointPath ensures a path is safe from directory traversal attacks.
 // It returns an error if the path contains ".." or is an absolute path.
 func validateCheckpointPath(path string) error {
