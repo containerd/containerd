@@ -124,8 +124,14 @@ func (c *criService) mutateImageMount(
 		}
 		chainID := identity.ChainID(diffIDs).String()
 
+		// Get snapshot options with user namespace idmap labels if needed
+		snapshotOpts, err := c.getImageVolumeSnapshotOpts(ctx, extraMount)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot options for image volume: %w", err)
+		}
+
 		s := c.client.SnapshotService(snapshotter)
-		mounts, err := s.Prepare(ctx, target, chainID)
+		mounts, err := s.Prepare(ctx, target, chainID, snapshotOpts...)
 		if err != nil {
 			if errdefs.IsAlreadyExists(err) {
 				mounts, err = s.Mounts(ctx, target)
