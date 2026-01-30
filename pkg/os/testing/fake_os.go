@@ -17,6 +17,7 @@
 package testing
 
 import (
+	"context"
 	"os"
 	"sync"
 
@@ -40,7 +41,7 @@ type FakeOS struct {
 	sync.Mutex
 	MkdirAllFn             func(string, os.FileMode) error
 	RemoveAllFn            func(string) error
-	StatFn                 func(string) (os.FileInfo, error)
+	StatFn                 func(context.Context, string) error
 	ResolveSymbolicLinkFn  func(string) (string, error)
 	FollowSymlinkInScopeFn func(string, string) (string, error)
 	CopyFileFn             func(string, string, os.FileMode) error
@@ -137,16 +138,16 @@ func (f *FakeOS) RemoveAll(path string) error {
 }
 
 // Stat is a fake call that invokes StatFn or just return nil.
-func (f *FakeOS) Stat(name string) (os.FileInfo, error) {
+func (f *FakeOS) Stat(ctx context.Context, name string) error {
 	f.appendCalls("Stat", name)
 	if err := f.getError("Stat"); err != nil {
-		return nil, err
+		return err
 	}
 
 	if f.StatFn != nil {
-		return f.StatFn(name)
+		return f.StatFn(ctx, name)
 	}
-	return nil, nil
+	return nil
 }
 
 // ResolveSymbolicLink is a fake call that invokes ResolveSymbolicLinkFn or returns its input
