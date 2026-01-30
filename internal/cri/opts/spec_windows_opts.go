@@ -45,7 +45,7 @@ func cleanMount(p string) string {
 	return filepath.Clean(p)
 }
 
-func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, error) {
+func parseMount(ctx context.Context, osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, error) {
 	var (
 		dst = mount.GetContainerPath()
 		src = mount.GetHostPath()
@@ -55,7 +55,7 @@ func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, e
 	// the listening process. filepath.Clean also breaks named pipe
 	// paths, so don't use it.
 	if !namedPipePath(src) {
-		if _, err := osi.Stat(src); err != nil {
+		if err := osi.Stat(ctx, src); err != nil {
 			// Create the host path if it doesn't exist. This will align
 			// the behavior with the Linux implementation, but it doesn't
 			// align with Docker's behavior on Windows.
@@ -150,7 +150,7 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 		}
 
 		for _, mount := range mounts {
-			parsedMount, err := parseMount(osi, mount)
+			parsedMount, err := parseMount(ctx, osi, mount)
 			if err != nil {
 				return err
 			}

@@ -450,7 +450,7 @@ func (c *criService) CRImportCheckpoint(
 
 	// Restore container log file (if it exists)
 	containerLog := filepath.Join(containerRootDir, "container.log")
-	_, err = c.os.Stat(containerLog)
+	err = c.os.Stat(ctx, containerLog)
 	if err == nil {
 		if err := c.os.CopyFile(containerLog, meta.LogPath, 0600); err != nil {
 			return "", fmt.Errorf("restoring container log file %s failed: %w", containerLog, err)
@@ -584,7 +584,7 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	}
 
 	// Save the existing container log file
-	_, err = c.os.Stat(criContainerStatus.GetStatus().GetLogPath())
+	err = c.os.Stat(ctx, criContainerStatus.GetStatus().GetLogPath())
 	if err == nil {
 		if err := c.os.CopyFile(
 			criContainerStatus.GetStatus().GetLogPath(),

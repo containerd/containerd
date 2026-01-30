@@ -17,8 +17,12 @@
 package os
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"time"
 
 	"github.com/moby/sys/symlink"
 
@@ -30,7 +34,7 @@ import (
 type OS interface {
 	MkdirAll(path string, perm os.FileMode) error
 	RemoveAll(path string) error
-	Stat(name string) (os.FileInfo, error)
+	Stat(ctx context.Context, name string) error
 	ResolveSymbolicLink(name string) (string, error)
 	FollowSymlinkInScope(path, scope string) (string, error)
 	CopyFile(src, dest string, perm os.FileMode) error
@@ -54,9 +58,35 @@ func (RealOS) RemoveAll(path string) error {
 	return os.RemoveAll(path)
 }
 
-// Stat will call os.Stat to get the status of the given file.
-func (RealOS) Stat(name string) (os.FileInfo, error) {
-	return os.Stat(name)
+// Stat will execute "stat" to verify if the given path exists.
+// A timeout is enforced to prevent the call from getting stuck when the
+// underlying path is non-responsive.
+// If the context does not have a deadline set, then a default 5 sec timeout
+// will be used while calling stat.
+func (RealOS) Stat(ctx context.Context, name string) error {
+	var cancel context.CancelFunc
+	if _, hasDeadlineSet := ctx.Deadline(); !hasDeadlineSet {
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+	}
+	cmd := exec.CommandContext(ctx, "stat", name)
+	err := cmd.Run()
+	if err != nil {
+		if ctx.Err() != nil { // Context expired
+			return ctx.Err()
+		}
+
+		// If stat exits with a non-zero status (usually 1), it means Not Found.
+		// In some environments, if a path is restricted, it might also return 1.
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				return os.ErrNotExist
+			}
+			return fmt.Errorf("stat failed with %v: %w", exitErr.ExitCode(), err)
+		}
+		return err
+	}
+	return nil
 }
 
 // FollowSymlinkInScope will call symlink.FollowSymlinkInScope.
