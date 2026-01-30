@@ -108,6 +108,12 @@ type ImageService interface {
 	LocalResolve(refOrID string) (imagestore.Image, error)
 
 	ImageFSPaths() map[string]string
+
+	// IsImageUnpacked checks if an image is unpacked for the given snapshotter.
+	IsImageUnpacked(ctx context.Context, ref string, snapshotter string) (bool, error)
+
+	// UnpackImage unpacks an existing image into the specified snapshotter without contacting the registry.
+	UnpackImage(ctx context.Context, ref string, snapshotter string) error
 }
 
 // criService implements CRIService.

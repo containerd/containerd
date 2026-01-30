@@ -170,10 +170,33 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
-	image, err := c.LocalResolve(config.GetImage().GetImage())
+	imageRef := config.GetImage().GetImage()
+	image, err := c.LocalResolve(imageRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve image %q: %w", config.GetImage().GetImage(), err)
+		return nil, fmt.Errorf("failed to resolve image %q: %w", imageRef, err)
 	}
+
+	// Check if the image is unpacked for the target snapshotter.
+	// For remote/proxy snapshotters (like nydus), the image needs to be unpacked
+	// through the snapshotter to set up proper metadata and annotations.
+	runtimeHandler := sandbox.Metadata.RuntimeHandler
+	if runtimeHandler != "" {
+		ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, runtimeHandler)
+		if err == nil && ociRuntime.Snapshotter != "" {
+			unpacked, err := c.IsImageUnpacked(ctx, imageRef, ociRuntime.Snapshotter)
+			if err != nil {
+				log.G(ctx).WithError(err).Warnf("Failed to check if image %q is unpacked for snapshotter %q", imageRef, ociRuntime.Snapshotter)
+			} else if !unpacked {
+				// Image exists but not unpacked for target snapshotter - unpack it locally
+				// without contacting the registry.
+				log.G(ctx).Infof("Image %q exists but not unpacked for snapshotter %q, unpacking", imageRef, ociRuntime.Snapshotter)
+				if err := c.ImageService.UnpackImage(ctx, imageRef, ociRuntime.Snapshotter); err != nil {
+					return nil, fmt.Errorf("failed to unpack image %q for snapshotter %q: %w", imageRef, ociRuntime.Snapshotter, err)
+				}
+			}
+		}
+	}
+
 	containerdImage, err := c.toContainerdImage(ctx, image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
