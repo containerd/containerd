@@ -318,6 +318,14 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	sandbox.ProcessLabel = labels["selinux_label"]
 
+	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		status.Pid = ctrl.Pid // NRI reads the pid from status during RunPodSandbox hook
+		status.CreatedAt = ctrl.CreatedAt
+		return status, nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to update sandbox pid: %w", err)
+	}
+
 	defer c.nri.BlockPluginSync().Unblock()
 
 	err = c.nri.RunPodSandbox(ctx, &sandbox)
@@ -335,9 +343,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		// Set the pod sandbox as ready after successfully start sandbox container.
-		status.Pid = ctrl.Pid
 		status.State = sandboxstore.StateReady
-		status.CreatedAt = ctrl.CreatedAt
 		return status, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update sandbox status: %w", err)
