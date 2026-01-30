@@ -353,13 +353,6 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				Path: nsPath,
 			}))
 		}
-		var cdiDeviceIDs []string
-		if cliContext.IsSet("gpus") {
-			for _, id := range cliContext.IntSlice("gpus") {
-				cdiDeviceID := fmt.Sprintf("nvidia.com/gpu=%d", id)
-				cdiDeviceIDs = append(cdiDeviceIDs, cdiDeviceID)
-			}
-		}
 		if cliContext.IsSet("allow-new-privs") {
 			opts = append(opts, oci.WithNewPrivileges)
 		}
@@ -371,6 +364,8 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		if limit != 0 {
 			opts = append(opts, oci.WithMemoryLimit(limit))
 		}
+
+		var cdiDeviceIDs []string
 		for _, dev := range cliContext.StringSlice("device") {
 			if parser.IsQualifiedName(dev) {
 				cdiDeviceIDs = append(cdiDeviceIDs, dev)
@@ -378,10 +373,14 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			}
 			opts = append(opts, oci.WithDevices(dev, "", "rwm"))
 		}
-		if len(cdiDeviceIDs) > 0 {
+		gpuIDs := cliContext.IntSlice("gpus")
+		if len(cdiDeviceIDs) > 0 || len(gpuIDs) > 0 {
 			opts = append(opts, withStaticCDIRegistry())
 		}
-		opts = append(opts, cdispec.WithCDIDevices(cdiDeviceIDs...))
+		opts = append(opts,
+			cdispec.WithGPUs(gpuIDs...),
+			cdispec.WithCDIDevices(cdiDeviceIDs...),
+		)
 
 		rootfsPropagation := cliContext.String("rootfs-propagation")
 		if rootfsPropagation != "" {

@@ -54,3 +54,19 @@ func WithCDIDevices(devices ...string) oci.SpecOpts {
 		return nil
 	}
 }
+
+// WithGPUs injects CDI GPU devices into the OCI specification.
+// It auto-detects the GPU vendor (nvidia.com or amd.com) from available
+// CDI specs. If no GPU vendor is found, it returns an error.
+//
+// The gpuIDs parameter specifies which GPU indices to inject (e.g., 0, 1, 2).
+// Each GPU ID is converted to a qualified CDI device name like "vendor.com/gpu=0".
+func WithGPUs(gpuIDs ...int) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *oci.Spec) error {
+		devices, err := gpuDeviceNames(ctx, gpuIDs...)
+		if err != nil {
+			return err
+		}
+		return WithCDIDevices(devices...)(ctx, client, c, s)
+	}
+}
