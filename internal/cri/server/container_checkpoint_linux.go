@@ -107,16 +107,6 @@ func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string
 	return image.ID, nil
 }
 
-// validateCheckpointPath ensures a path is safe from directory traversal attacks.
-// It returns an error if the path contains ".." or is an absolute path.
-func validateCheckpointPath(path string) error {
-	cleaned := filepath.Clean(path)
-	if strings.Contains(cleaned, "..") || filepath.IsAbs(cleaned) {
-		return fmt.Errorf("invalid path: path traversal detected in %q", path)
-	}
-	return nil
-}
-
 func (c *criService) CRImportCheckpoint(
 	ctx context.Context,
 	meta *containerstore.Metadata,
@@ -186,12 +176,8 @@ func (c *criService) CRImportCheckpoint(
 		}
 	} else {
 
-		// Validate checkpoint archive path to prevent path traversal
-		if err := validateCheckpointPath(inputImage); err != nil {
-			return "", fmt.Errorf("invalid checkpoint image path: %w", err)
-		}
-
-		archiveFile, err = os.Open(inputImage)
+		// Use os.OpenInRoot to safely open the checkpoint archive within the current working directory
+		archiveFile, err = os.OpenInRoot(".",inputImage)
 		if err != nil {
 			return "", fmt.Errorf("failed to open checkpoint archive %s for import: %w", inputImage, err)
 		}
@@ -648,18 +634,14 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	// write final tarball of all content
 	tar := archive.Diff(ctx, "", cpPath)
 
-	// Validate and restrict checkpoint location to container's root directory
-	if err := validateCheckpointPath(r.Location); err != nil {
-		return nil, fmt.Errorf("invalid checkpoint location: %w", err)
-	}
-	// Ensure the checkpoint is written within the container's root directory
+	// Use os.OpenInRoot to safely open the checkpoint file for writing within the container's root directory
 	checkpointDir := c.getContainerRootDir(container.ID)
 	resolvedLocation := filepath.Join(checkpointDir, filepath.Clean(r.Location))
 	if !strings.HasPrefix(resolvedLocation, checkpointDir) {
 		return nil, fmt.Errorf("checkpoint location %q escapes container directory", r.Location)
 	}
 
-	outFile, err := os.OpenFile(r.Location, os.O_RDWR|os.O_CREATE, 0o600)
+	outFile, err := OpenInRoot(checkpointDir, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, err
 	}
