@@ -177,7 +177,7 @@ func (c *criService) CRImportCheckpoint(
 	} else {
 
 		// Use os.OpenInRoot to safely open the checkpoint archive within the current working directory
-		archiveFile, err = os.OpenInRoot(".",inputImage)
+		archiveFile, err = os.OpenInRoot(".", inputImage, os.O_RDONLY, 0)
 		if err != nil {
 			return "", fmt.Errorf("failed to open checkpoint archive %s for import: %w", inputImage, err)
 		}
@@ -634,14 +634,8 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	// write final tarball of all content
 	tar := archive.Diff(ctx, "", cpPath)
 
-	// Use os.OpenInRoot to safely open the checkpoint file for writing within the container's root directory
-	checkpointDir := c.getContainerRootDir(container.ID)
-	resolvedLocation := filepath.Join(checkpointDir, filepath.Clean(r.Location))
-	if !strings.HasPrefix(resolvedLocation, checkpointDir) {
-		return nil, fmt.Errorf("checkpoint location %q escapes container directory", r.Location)
-	}
-
-	outFile, err := OpenInRoot(checkpointDir, os.O_RDWR|os.O_CREATE, 0o600)
+	// Use os.OpenInRoot to safely open the checkpoint file for writing within the container's root
+	outFile, err := os.OpenInRoot(checkpointDir, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, err
 	}
