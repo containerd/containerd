@@ -19,7 +19,6 @@ package sandbox
 import (
 	"sync"
 
-	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/internal/cri/store"
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
@@ -35,8 +34,6 @@ type Sandbox struct {
 	Metadata
 	// Status stores the status of the sandbox.
 	Status StatusStorage
-	// Container is the containerd sandbox container client.
-	Container containerd.Container
 	// Sandboxer is the sandbox controller name of the sandbox
 	Sandboxer string
 	// CNI network namespace client.

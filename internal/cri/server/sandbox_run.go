@@ -304,17 +304,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}
 
-	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-		return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
-	}
+	sandboxInfo.Labels = ctrl.Labels
+	sandboxInfo.Spec = ctrl.Spec
 
-	// TODO: get rid of this. sandbox object should no longer have Container field.
-	if ociRuntime.Sandboxer == string(criconfig.ModePodSandbox) {
-		container, err := c.client.LoadContainer(ctx, id)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
-		}
-		sandbox.Container = container
+	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions", "spec", "labels"); err != nil {
+		return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
 	}
 
 	labels := ctrl.Labels

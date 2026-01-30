@@ -509,8 +509,9 @@ func (a *API) EvictContainer(ctx context.Context, e *api.ContainerEviction) erro
 
 type criPodSandbox struct {
 	*sstore.Sandbox
-	spec *runtimespec.Spec
-	pid  uint32
+	spec   *runtimespec.Spec
+	labels map[string]string
+	pid    uint32
 }
 
 func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
@@ -519,33 +520,32 @@ func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 		spec:    &runtimespec.Spec{},
 	}
 
-	if pod == nil || pod.Container == nil {
+	if pod == nil {
 		return criPod
 	}
 
-	ctx := ctrdutil.NamespacedContext()
-	task, err := pod.Container.Task(ctx, nil)
+	sandbox, err := a.cri.SandboxStore().Get(pod.ID)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			log.L.WithError(err).Errorf("failed to get task for sandbox container %s",
-				pod.Container.ID())
+			log.L.WithError(err).Errorf("failed to get sandbox for pod %s", pod.ID)
 		}
-		// the containers no longer exist but the oci.Spec may still be available to use on the StopPodSandbox hook
-		spec, err := pod.Container.Spec(ctx)
-		if err == nil {
-			criPod.spec = spec
-		}
+
 		return criPod
 	}
 
-	criPod.pid = task.Pid()
-	spec, err := task.Spec(ctx)
+	criPod.pid = sandbox.Status.Get().Pid
+
+	sandboxInfo, err := a.cri.SandboxMetadataStore().Get(context.Background(), pod.ID)
 	if err != nil {
-		log.L.WithError(err).Errorf("failed to get spec for sandbox container %s",
-			pod.Container.ID())
+		log.L.WithError(err).Errorf("failed to get sandbox metadata for pod %s", pod.ID)
 		return criPod
 	}
-	criPod.spec = spec
+
+	criPod.labels = sandboxInfo.Labels
+
+	if err := typeurl.UnmarshalTo(sandboxInfo.Spec, &criPod.spec); err != nil {
+		log.L.WithError(err).Errorf("failed to unmarshal sandbox spec for pod %s", pod.ID)
+	}
 
 	return criPod
 }
@@ -610,19 +610,8 @@ func (p *criPodSandbox) GetLabels() map[string]string {
 		labels[key] = value
 	}
 
-	if p.Sandbox.Container == nil {
-		return labels
-	}
-
-	ctx := ctrdutil.NamespacedContext()
-	ctrd := p.Sandbox.Container
-	ctrs, err := ctrd.Info(ctx, containerd.WithoutRefreshedMetadata)
-	if err != nil {
-		log.L.WithError(err).Errorf("failed to get info for sandbox container %s", ctrd.ID())
-		return labels
-	}
-
-	for key, value := range ctrs.Labels {
+	// Append sandbox labels
+	for key, value := range p.labels {
 		labels[key] = value
 	}
 

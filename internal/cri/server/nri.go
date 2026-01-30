@@ -17,6 +17,7 @@
 package server
 
 import (
+	sbstore "github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	cstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -41,4 +42,8 @@ func (i *criImplementation) ContainerStore() *cstore.Store {
 
 func (i *criImplementation) ContainerMetadataExtensionKey() string {
 	return crilabels.ContainerMetadataExtension
+}
+
+func (i *criImplementation) SandboxMetadataStore() sbstore.Store {
+	return i.c.client.SandboxStore()
 }

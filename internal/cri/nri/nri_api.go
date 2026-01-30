@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	sbstore "github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -33,4 +34,5 @@ type CRIImplementation interface {
 	ContainerMetadataExtensionKey() string
 	UpdateContainerResources(context.Context, cstore.Container, *cri.UpdateContainerResourcesRequest, cstore.Status) (cstore.Status, error)
 	StopContainer(context.Context, cstore.Container, time.Duration) error
+	SandboxMetadataStore() sbstore.Store
 }
