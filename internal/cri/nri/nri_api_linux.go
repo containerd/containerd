@@ -524,27 +524,22 @@ func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 		return criPod
 	}
 
-	sandbox, err := a.cri.SandboxStore().Get(pod.ID)
+	criPod.pid = pod.Status.Get().Pid
+
+	sandboxInfo, err := a.cri.SandboxMetadataStore().Get(ctrdutil.NamespacedContext(), pod.ID)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			log.L.WithError(err).Errorf("failed to get sandbox for pod %s", pod.ID)
+			log.L.WithError(err).Errorf("failed to get sandbox metadata for pod %s", pod.ID)
 		}
-
-		return criPod
-	}
-
-	criPod.pid = sandbox.Status.Get().Pid
-
-	sandboxInfo, err := a.cri.SandboxMetadataStore().Get(context.Background(), pod.ID)
-	if err != nil {
-		log.L.WithError(err).Errorf("failed to get sandbox metadata for pod %s", pod.ID)
 		return criPod
 	}
 
 	criPod.labels = sandboxInfo.Labels
 
-	if err := typeurl.UnmarshalTo(sandboxInfo.Spec, &criPod.spec); err != nil {
-		log.L.WithError(err).Errorf("failed to unmarshal sandbox spec for pod %s", pod.ID)
+	if sandboxInfo.Spec != nil {
+		if err := typeurl.UnmarshalTo(sandboxInfo.Spec, criPod.spec); err != nil {
+			log.L.WithError(err).Errorf("failed to unmarshal sandbox spec for pod %s", pod.ID)
+		}
 	}
 
 	return criPod
