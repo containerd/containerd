@@ -78,6 +78,7 @@ message StartSandboxRequest {
 message StartSandboxResponse {
   uint32 pid = 1;
   google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Any spec = 3;
 }
 
 message PlatformRequest {
