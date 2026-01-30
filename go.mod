@@ -3,6 +3,7 @@ module github.com/containerd/containerd/v2
 go 1.24.3
 
 require (
+	bazil.org/fuse v0.0.0-20230120002735-62a210ff1fd5
 	dario.cat/mergo v1.0.2
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
 	github.com/Microsoft/go-winio v0.6.2

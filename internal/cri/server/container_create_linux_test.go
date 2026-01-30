@@ -17,16 +17,22 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/pkg/fifosync"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	osi "github.com/containerd/containerd/v2/pkg/os"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -251,7 +257,7 @@ func TestContainerCapabilities(t *testing.T) {
 			c.allCaps = allCaps
 
 			containerConfig.Linux.SecurityContext.Capabilities = test.capability
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			require.NoError(t, err)
 
 			if selinux.GetEnabled() {
@@ -286,7 +292,7 @@ func TestContainerSpecTty(t *testing.T) {
 	c := newTestCRIService()
 	for _, tty := range []bool{true, false} {
 		containerConfig.Tty = tty
-		spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+		spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Equal(t, tty, spec.Process.Terminal)
@@ -313,7 +319,7 @@ func TestContainerSpecDefaultPath(t *testing.T) {
 			imageConfig.Env = append(imageConfig.Env, pathenv)
 			expected = pathenv
 		}
-		spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+		spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Contains(t, spec.Process.Env, expected)
@@ -330,7 +336,7 @@ func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	c := newTestCRIService()
 	for _, readonly := range []bool{true, false} {
 		containerConfig.Linux.SecurityContext.ReadonlyRootfs = readonly
-		spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+		spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Equal(t, readonly, spec.Root.Readonly)
@@ -364,7 +370,7 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 			Readonly:      false,
 		},
 	}
-	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, extraMounts, ociRuntime, nil)
+	spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, extraMounts, ociRuntime, nil)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 	var mounts, sysMounts []runtimespec.Mount
@@ -430,7 +436,7 @@ func TestContainerAndSandboxPrivileged(t *testing.T) {
 			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 				Privileged: test.sandboxPrivileged,
 			}
-			_, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			_, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
@@ -470,7 +476,7 @@ func TestPrivilegedBindMount(t *testing.T) {
 			containerConfig.Linux.SecurityContext.Privileged = test.privileged
 			sandboxConfig.Linux.SecurityContext.Privileged = test.privileged
 
-			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 
 			assert.NoError(t, err)
 			if test.expectedSysFSRO {
@@ -601,6 +607,145 @@ func TestMountPropagation(t *testing.T) {
 	}
 }
 
+func TestIssue10828(t *testing.T) {
+	testutil.RequiresRoot(t)
+	const (
+		fuseMountPointName       = "fakeFUSERootDir"
+		fuseFIFODirectoryName    = "FUSEFIFOs"
+		fuseReadyFIFOFileName    = "fuseReadyTrigger.fifo"
+		fuseCloseFIFOFileName    = "fuseCloseTrigger.fifo"
+		fuseShutdownFIFOFileName = "fuseShutdownTrigger.fifo"
+
+		statHangFIFOFileName = "statHang.fifo"
+	)
+
+	testDir := t.TempDir()
+	t.Logf("using test dir: %v", testDir)
+
+	fuseReadyFIFOFile := filepath.Join(testDir, fuseFIFODirectoryName, fuseReadyFIFOFileName)
+	fuseCloseFIFOFile := filepath.Join(testDir, fuseFIFODirectoryName, fuseCloseFIFOFileName)
+	fuseShutdownFIFOFile := filepath.Join(testDir, fuseFIFODirectoryName, fuseShutdownFIFOFileName)
+	statHangResumeFIFOFile := filepath.Join(testDir, fuseFIFODirectoryName, statHangFIFOFileName)
+
+	// This path comes from the script/setup/install-failpoint-binaries file.
+	fuseRunCmd := filepath.Join("/usr/local/bin", "fake-fuse")
+	fuseCmd := exec.CommandContext(t.Context(), fuseRunCmd, "--fuse-dir", testDir, "--hang-during-stat")
+	var outBuffer, errBuffer bytes.Buffer
+	fuseCmd.Stdout, fuseCmd.Stderr = &outBuffer, &errBuffer
+	err := fuseCmd.Start()
+	require.NoErrorf(t, err, "failed to start the FUSE process via %v", fuseRunCmd)
+	defer func() {
+		fuseCmd.Cancel()
+	}()
+
+	// Wait for some time until FUSE sets up the FIFOs
+	require.Eventually(t, func() bool {
+		_, statErr := os.Stat(fuseReadyFIFOFile)
+		if statErr == nil {
+			return true // Directory exists
+		}
+		if !os.IsNotExist(statErr) {
+			t.Logf("Unexpected error stating FIFO directory %s: %v", fuseReadyFIFOFile, statErr)
+		}
+		return false
+	}, 5*time.Second, 100*time.Millisecond, "FIFO directory was not created in time")
+
+	fuseReadyWaiter, err := fifosync.NewWaiter(fuseReadyFIFOFile, 0600)
+	require.NoErrorf(t, err, "failed to create a new waiter for checking FUSE's readiness: %v", fuseReadyWaiter.Name())
+	err = fuseReadyWaiter.Wait()
+	require.NoError(t, err, "FUSE server didn't start")
+	t.Logf("FUSE is ready")
+
+	// TEST
+	c := newTestCRIService()
+	c.os.(*ostesting.FakeOS).StatFn = osi.RealOS{}.Stat
+	statTimeout := 10 * time.Second
+	tCtx, tCancel := context.WithTimeout(t.Context(), statTimeout)
+	t.Cleanup(func() { tCancel() })
+
+	container1Config, sandbox1Config, imageConfig, _ := getCreateContainerTestData()
+	sandbox1Config.Metadata.Name = "sandbox-1-name"
+	container1Config.Metadata.Name = "container-1-name"
+	container1Config.Mounts = []*runtime.Mount{
+		{
+			ContainerPath: "container-path-1",
+			HostPath:      filepath.Join(testDir, fuseMountPointName),
+		},
+	}
+	var err1Ch = make(chan error, 1)
+	go func() {
+		_, err := c.buildContainerSpec(tCtx, currentPlatform, "testID-1", "testSandboxID-1", uint32(1234), "", "ctr-1", testImageName, container1Config, sandbox1Config, imageConfig, nil, config.Runtime{}, nil)
+		err1Ch <- err
+	}()
+
+	var err2Ch = make(chan error, 1)
+	go func() {
+		_, err := c.buildContainerSpec(tCtx, currentPlatform, "testID-2", "testSandboxID-1", uint32(1234), "", "ctr-2", testImageName, container1Config, sandbox1Config, imageConfig, nil, config.Runtime{}, nil)
+		err2Ch <- err
+	}()
+
+	workingDir := filepath.Join(testDir, "dir3")
+	err = os.MkdirAll(workingDir, os.ModeDir)
+	require.NoErrorf(t, err, "failed to create a directory to test a normal case: %v", workingDir)
+	container3Config, sandbox3Config, _, _ := getCreateContainerTestData()
+	sandbox3Config.Metadata.Name = "sandbox-3-name"
+	sandbox3Config.Metadata.Uid = "2345"
+	container3Config.Metadata.Name = "container-3-name"
+	container3Config.Mounts = []*runtime.Mount{
+		{
+			ContainerPath: "container-path-3",
+			HostPath:      workingDir,
+		},
+	}
+	var err3Ch = make(chan error, 1)
+	go func() {
+		_, err := c.buildContainerSpec(tCtx, currentPlatform, "testID-3", "testSandboxID-3", uint32(2345), "", "ctr-3", testImageName, container3Config, sandbox3Config, imageConfig, nil, config.Runtime{}, nil)
+		err3Ch <- err
+	}()
+
+	// Verify the test cases
+	select {
+	case err1 := <-err1Ch:
+		require.Error(t, err1, "err1 should've returned an error")
+	case <-time.After(statTimeout + 50*time.Millisecond):
+		t.Errorf("stat (err1) did not return any result within the given timeout")
+	}
+
+	select {
+	case err2 := <-err2Ch:
+		require.Error(t, err2, "err2 should've returned an error")
+	case <-time.After(statTimeout + 50*time.Millisecond):
+		t.Errorf("stat (err2) did not return any result within the given timeout")
+	}
+
+	select {
+	case err3 := <-err3Ch:
+		require.NoError(t, err3, "err3 should not have returned an error")
+	case <-time.After(statTimeout + 50*time.Millisecond):
+		t.Errorf("stat (err3) did not return any result within the given timeout")
+	}
+	// END TEST
+
+	// Resume the hanging Stat call before finishing the test
+	statHangResume, err := fifosync.NewTrigger(statHangResumeFIFOFile, 0600)
+	require.NoErrorf(t, err, "failed to create a trigger to resume the Stat call", statHangResume.Name())
+	err = statHangResume.Trigger()
+	require.NoError(t, err, "failed to resume the stuck Stat call")
+
+	fuseClosetrigger, err := fifosync.NewTrigger(fuseCloseFIFOFile, 0600)
+	require.NoErrorf(t, err, "failed to create a trigger to close FUSE's connection: %v", fuseClosetrigger.Name())
+	t.Logf("closing the FUSE conn")
+	fuseClosetrigger.Trigger()
+
+	fuseShutdownWaiter, err := fifosync.NewWaiter(fuseShutdownFIFOFile, 0600)
+	require.NoErrorf(t, err, "failed to create a new waiter to check if FUSE has shut down: %v", fuseShutdownWaiter.Name())
+	err = fuseShutdownWaiter.Wait()
+	require.NoError(t, err, "FUSE server did not shut down")
+
+	// Wait for the FUSE process to actually exit.
+	_ = fuseCmd.Wait()
+}
+
 func TestPidNamespace(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
@@ -640,7 +785,7 @@ func TestPidNamespace(t *testing.T) {
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{Pid: test.pidNS}
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			require.NoError(t, err)
 			assert.Contains(t, spec.Linux.Namespaces, test.expected)
 		})
@@ -814,7 +959,7 @@ func TestUserNamespace(t *testing.T) {
 				sandboxUserns = test.sandboxUserNS
 			}
 			sandboxConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{UsernsOptions: sandboxUserns}
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 
 			if test.err {
 				require.Error(t, err)
@@ -844,7 +989,7 @@ func TestNoDefaultRunMount(t *testing.T) {
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 
-	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+	spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 	assert.NoError(t, err)
 	for _, mount := range spec.Mounts {
 		assert.NotEqual(t, "/run", mount.Destination)
@@ -937,7 +1082,7 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 				Privileged: test.privileged,
 			}
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			require.NoError(t, err)
 			if !test.privileged { // specCheck presumes an unprivileged container
 				specCheck(t, testID, testSandboxID, testPid, spec)
@@ -989,7 +1134,7 @@ func TestHostname(t *testing.T) {
 			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 				NamespaceOptions: &runtime.NamespaceOption{Network: test.networkNs},
 			}
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			require.NoError(t, err)
 			specCheck(t, testID, testSandboxID, testPid, spec)
 			assert.Contains(t, spec.Process.Env, test.expectedEnv)
@@ -1098,7 +1243,7 @@ additional-group-for-root:x:22222:root
 			containerConfig.Linux.SecurityContext = test.securityContext
 			imageConfig.User = test.imageConfigUser
 
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			require.NoError(t, err)
 
 			spec.Root.Path = tempRootDir // simulating /etc/{passwd, group}
@@ -1173,7 +1318,7 @@ func TestNonRootUserAndDevices(t *testing.T) {
 				},
 			}
 
-			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{}, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{}, nil)
 			assert.NoError(t, err)
 
 			assert.Equal(t, test.expectedDeviceUID, *spec.Linux.Devices[0].UID)
@@ -1246,7 +1391,7 @@ func TestPrivilegedDevices(t *testing.T) {
 				PrivilegedWithoutHostDevices:                  test.privilegedWithoutHostDevices,
 				PrivilegedWithoutHostDevicesAllDevicesAllowed: test.privilegedWithoutHostDevicesAllDevicesAllowed,
 			}
-			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			assert.NoError(t, err)
 
 			hostDevicesRaw, err := oci.HostDevices()
@@ -1301,7 +1446,7 @@ func TestBaseOCISpec(t *testing.T) {
 	testPid := uint32(1234)
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 
-	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+	spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 	assert.NoError(t, err)
 
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -1629,7 +1774,7 @@ containerEdits:
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			require.NoError(t, err)
 
 			specCheck(t, testID, testSandboxID, testPid, spec)
