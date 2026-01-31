@@ -97,6 +97,14 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 		}
 	}
 
+	// Try overlay fast path on Linux - this avoids walking the entire
+	// rootfs by leveraging overlayfs's native diff directory
+	if upperDir := getOverlayUpperDir(upper); upperDir != "" {
+		log.G(ctx).WithField("upperDir", upperDir).Debug("using overlay fast diff path")
+		return s.compareOverlay(ctx, lower, upperDir, compressionType, &config)
+	}
+
+	// Fall back to the generic double-walk implementation
 	var ocidesc ocispec.Descriptor
 	if err := mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
 		return mount.WithReadonlyTempMount(ctx, upper, func(upperRoot string) error {
