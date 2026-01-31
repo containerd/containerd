@@ -19,8 +19,10 @@ package nri
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 
 	eventtypes "github.com/containerd/containerd/api/events"
@@ -625,10 +627,26 @@ func (p *criPodSandbox) GetLinuxPodSandbox() nri.LinuxPodSandbox {
 }
 
 func (p *criPodSandbox) GetLinuxNamespaces() []*api.LinuxNamespace {
-	if p.spec.Linux != nil {
-		return api.FromOCILinuxNamespaces(p.spec.Linux.Namespaces)
+	if p.Sandbox == nil {
+		return nil
 	}
-	return nil
+
+	var namespaces []*api.LinuxNamespace
+	if p.spec.Linux != nil {
+		namespaces = api.FromOCILinuxNamespaces(p.spec.Linux.Namespaces)
+	}
+
+	// Filter out stale network namespaces (netns is torn down before RemovePodSandbox).
+	return slices.DeleteFunc(namespaces, func(ns *api.LinuxNamespace) bool {
+		if ns.GetType() != "network" {
+			return false
+		}
+		if ns.GetPath() == "" {
+			return true
+		}
+		_, err := os.Stat(ns.GetPath())
+		return err != nil && errors.Is(err, os.ErrNotExist)
+	})
 }
 
 func (p *criPodSandbox) GetPodLinuxOverhead() *api.LinuxResources {
