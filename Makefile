@@ -189,16 +189,15 @@ protos: bin/protoc-gen-go-fieldpath bin/go-buildtag
 	@test -z "$$(git status --short | grep "api/next.txtpb" | tee /dev/stderr)" || \
 		$(GO) mod edit -replace=github.com/containerd/containerd/api=./api
 
-check-protos: protos ## check if protobufs needs to be generated again
+check-protos: ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
-	@test -z "$$(git status --short | grep ".pb.go" | tee /dev/stderr)" || \
-		((git diff | cat) && \
-		(echo "$(ONI) please run 'make protos' when making changes to proto files" && false))
+	@(cd api && buf format --diff --exit-code --exclude-path vendor \
+		$(if $(GITHUB_ACTIONS),--error-format github-actions)) || \
+		(echo "$(ONI) please run 'make protos' when making changes to proto files" && false)
 
-proto-fmt: ## check format of proto files
+proto-fmt: ## format proto files
 	@echo "$(WHALE) $@"
-	@test -z "$$(find . -path ./vendor -prune -o -path ./protobuf/google/rpc -prune -o -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
-		(echo "$(ONI) please indent proto files with tabs only" && false)
+	@cd api && buf format --write --exclude-path vendor
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"
