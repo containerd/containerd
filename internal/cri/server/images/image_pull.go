@@ -170,6 +170,47 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", err
 	}
 
+	// Check if the image is already properly unpacked for this snapshotter.
+	// If the image exists but is missing required labels (e.g., pulled before
+	// the runtime-snapshotter fix), we need to force a full pull to get proper labels.
+	if unpacked, err := c.IsImageUnpackedForSnapshotter(ctx, ref, snapshotter); err == nil && unpacked {
+		// Image is ready, just return it
+		existingImage, err := c.client.GetImage(ctx, ref)
+		if err == nil {
+			// Get the config descriptor to return the correct imageID (config digest)
+			configDesc, err := existingImage.Config(ctx)
+			if err == nil {
+				imageID := configDesc.Digest.String()
+				// Ensure image has proper labels and update image store
+				if err := c.ensureImageLabels(ctx, existingImage, ref); err != nil {
+					log.G(ctx).WithError(err).Warnf("Failed to ensure image labels for %s", ref)
+				}
+				if err := c.imageStore.Update(ctx, ref); err != nil {
+					log.G(ctx).WithError(err).Warnf("Failed to update image store for %s", ref)
+				}
+				return imageID, nil
+			}
+		}
+		// If we can't get the image or config, fall through to pull
+	}
+
+	// If ref is a digest (sha256:...), we need to find a pullable reference.
+	// Registry pull requires a full reference like docker.io/library/nginx:latest,
+	// not just sha256:abc123...
+	if img, err := c.LocalResolve(ref); err == nil && len(img.References) > 0 {
+		// Find a pullable reference (prefer one that's not a digest)
+		for _, imgRef := range img.References {
+			if !strings.Contains(imgRef, "@sha256:") {
+				ref = imgRef
+				break
+			}
+		}
+		// If all references are digest-based, just use the first one
+		if strings.HasPrefix(ref, "sha256:") && len(img.References) > 0 {
+			ref = img.References[0]
+		}
+	}
+
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
@@ -421,24 +462,11 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 	return labels
 }
 
-// UpdateImage updates image store to reflect the newest state of an image reference
-// in containerd. If the reference is not managed by the cri plugin, the function also
-// generates necessary metadata for the image and make it managed.
-func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
-	// TODO: Use image service
-	img, err := c.client.GetImage(ctx, r)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("get image by reference: %w", err)
-		}
-		// If the image is not found, we should continue updating the cache,
-		// so that the image can be removed from the cache.
-		if err := c.imageStore.Update(ctx, r); err != nil {
-			return fmt.Errorf("update image store for %q: %w", r, err)
-		}
-		return nil
-	}
-
+// ensureImageLabels ensures that an image has the required CRI labels.
+// If the image is not managed by the cri plugin, the function generates
+// necessary metadata for the image and makes it managed.
+// This function takes an already-fetched image to avoid redundant GetImage calls.
+func (c *CRIImageService) ensureImageLabels(ctx context.Context, img containerd.Image, r string) error {
 	labels := img.Labels()
 	criLabels := c.getLabels(ctx, r)
 	for key, value := range criLabels {
@@ -462,6 +490,30 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 			}
 			break
 		}
+	}
+	return nil
+}
+
+// UpdateImage updates image store to reflect the newest state of an image reference
+// in containerd. If the reference is not managed by the cri plugin, the function also
+// generates necessary metadata for the image and make it managed.
+func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
+	// TODO: Use image service
+	img, err := c.client.GetImage(ctx, r)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("get image by reference: %w", err)
+		}
+		// If the image is not found, we should continue updating the cache,
+		// so that the image can be removed from the cache.
+		if err := c.imageStore.Update(ctx, r); err != nil {
+			return fmt.Errorf("update image store for %q: %w", r, err)
+		}
+		return nil
+	}
+
+	if err := c.ensureImageLabels(ctx, img, r); err != nil {
+		return err
 	}
 	if err := c.imageStore.Update(ctx, r); err != nil {
 		return fmt.Errorf("update image store for %q: %w", r, err)

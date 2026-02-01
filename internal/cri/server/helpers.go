@@ -613,3 +613,19 @@ func sameMapping(a, b []runtimespec.LinuxIDMapping) bool {
 	}
 	return true
 }
+
+// runtimeSnapshotter returns the snapshotter for the given runtime handler.
+// If the runtime handler is empty or has no specific snapshotter configured,
+// returns the default snapshotter.
+func (c *criService) runtimeSnapshotter(ctx context.Context, runtimeHandler string, sandboxConfig *runtime.PodSandboxConfig) string {
+	if runtimeHandler == "" {
+		// No runtime handler, use default snapshotter
+		return c.ImageService.RuntimeSnapshotter(ctx, criconfig.Runtime{})
+	}
+	ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, runtimeHandler)
+	if err != nil {
+		log.G(ctx).WithError(err).Warnf("Failed to get runtime %q, using default snapshotter", runtimeHandler)
+		return c.ImageService.RuntimeSnapshotter(ctx, criconfig.Runtime{})
+	}
+	return c.ImageService.RuntimeSnapshotter(ctx, ociRuntime)
+}

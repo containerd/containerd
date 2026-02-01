@@ -170,10 +170,24 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
-	image, err := c.LocalResolve(config.GetImage().GetImage())
+	imageRef := config.GetImage().GetImage()
+	image, err := c.LocalResolve(imageRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve image %q: %w", config.GetImage().GetImage(), err)
+		return nil, fmt.Errorf("failed to resolve image %q: %w", imageRef, err)
 	}
+
+	// Ensure the image is unpacked for the target snapshotter.
+	// For remote/proxy snapshotters (like nydus), the image needs proper metadata labels.
+	snapshotter := c.runtimeSnapshotter(ctx, sandbox.Metadata.RuntimeHandler, sandboxConfig)
+	unpacked, err := c.IsImageUnpackedForSnapshotter(ctx, imageRef, snapshotter)
+	if err != nil {
+		log.G(ctx).WithError(err).Warnf("Failed to check if image %q is unpacked for snapshotter %q", imageRef, snapshotter)
+	} else if !unpacked {
+		if err := c.ImageService.UnpackImage(ctx, imageRef, snapshotter); err != nil {
+			return nil, fmt.Errorf("failed to unpack image %q for snapshotter %q: %w", imageRef, snapshotter, err)
+		}
+	}
+
 	containerdImage, err := c.toContainerdImage(ctx, image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
