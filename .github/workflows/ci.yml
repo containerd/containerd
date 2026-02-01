@@ -241,6 +241,7 @@ jobs:
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
           echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
           echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin/windows/amd64" >> $GITHUB_PATH
+          echo "CRITOOLS_VERSION=$(cat script/setup/critools-version)" >> $GITHUB_ENV
 
       - run: script/setup/install-dev-tools
 
@@ -251,9 +252,8 @@ jobs:
         run: |
           set -o xtrace
           mingw32-make.exe binaries
-          CRITEST_VERSION=$(cat script/setup/critools-version)
           cd ../../kubernetes-sigs/cri-tools
-          git checkout "${CRITEST_VERSION}"
+          git checkout "${CRITOOLS_VERSION}"
           make critest
 
       - run: script/setup/install-cni-windows
@@ -278,7 +278,7 @@ jobs:
         shell: powershell
         run: |
           # Get critctl tool. Used for cri-integration tests
-          $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.26.0/crictl-v1.26.0-windows-amd64.tar.gz"
+          $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/$env:CRITOOLS_VERSION/crictl-$env:CRITOOLS_VERSION-windows-amd64.tar.gz"
           curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
           tar -xvf c:\crictl.tar.gz
           mv crictl.exe "${{ github.workspace }}/bin/crictl.exe" # Move crictl somewhere in path
