@@ -187,7 +187,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
-        go-version: ["1.24.13", "1.25.7"]
+        go-version: ["1.25.7", "1.26.0"]
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
     steps:
