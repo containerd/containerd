@@ -23,6 +23,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	api "github.com/containerd/containerd/api/services/containers/v1"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/run"
@@ -101,17 +102,26 @@ var listCommand = &cli.Command{
 			Aliases: []string{"q"},
 			Usage:   "Print only the container id",
 		},
+		&cli.BoolFlag{
+			Name:    "stream",
+			Aliases: []string{"s"},
+			Usage:   "Enable streaming output mode",
+		},
 	},
 	Action: func(cliContext *cli.Context) error {
 		var (
 			filters = cliContext.Args().Slice()
 			quiet   = cliContext.Bool("quiet")
+			stream  = cliContext.Bool("stream")
 		)
 		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
+		if stream {
+			return streamPrint(ctx, client, quiet, filters...)
+		}
 		containers, err := client.Containers(ctx, filters...)
 		if err != nil {
 			return err
@@ -143,6 +153,46 @@ var listCommand = &cli.Command{
 		}
 		return w.Flush()
 	},
+}
+
+func streamPrint(ctx context.Context, client *containerd.Client, quiet bool, filters ...string) error {
+	ch := make(chan *api.Container)
+	var w *tabwriter.Writer
+	if !quiet {
+		w = tabwriter.NewWriter(os.Stdout, 4, 8, 4, ' ', 0)
+		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\t")
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for con := range ch {
+			imageName := con.Image
+			if imageName == "" {
+				imageName = "-"
+			}
+			if !quiet {
+				if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t\n",
+					con.ID,
+					imageName,
+					con.Runtime.Name,
+				); err != nil {
+					return
+				}
+			} else {
+				fmt.Printf("%s\n", con.ID)
+			}
+		}
+	}()
+
+	err := client.ListContainerStream(ctx, ch, filters...)
+	if err != nil {
+		return err
+	}
+	<-done
+	if !quiet {
+		return w.Flush()
+	}
+	return nil
 }
 
 var deleteCommand = &cli.Command{
