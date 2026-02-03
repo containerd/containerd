@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
-	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -111,7 +110,6 @@ func init() {
 
 // ImageService specifies dependencies to CRI image service.
 type ImageService interface {
-	LocalResolve(refOrID string) (imagestore.Image, error)
 	PullImage(ctx context.Context, name string, creds func(string) (string, string, error), sc *runtime.PodSandboxConfig, runtimeHandler string) (string, error)
 }
 

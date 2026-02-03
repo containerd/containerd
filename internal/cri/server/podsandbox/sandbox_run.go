@@ -327,22 +327,21 @@ func (c *Controller) Create(_ctx context.Context, info sandbox.Sandbox, opts ...
 }
 
 func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig, runtimeHandler string) (containerd.Image, error) {
-	// Try to get the image from local store first
-	image, err := c.imageService.LocalResolve(ref)
-	if err != nil && !errdefs.IsNotFound(err) {
+	img, err := c.client.GetImage(ctx, ref)
+	if err == nil {
+		return img, nil
+	} else if !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
 	}
-	if err == nil {
-		// Image exists in cache, get it from containerd
-		return c.toContainerdImage(ctx, image)
-	}
+
 	// Pull image to ensure the image exists
 	imageID, err := c.imageService.PullImage(ctx, ref, nil, config, runtimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
+
 	// Get the image directly from containerd using the imageID
-	img, err := c.client.GetImage(ctx, imageID)
+	img, err = c.client.GetImage(ctx, imageID)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.
 		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
