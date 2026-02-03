@@ -340,7 +340,9 @@ func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
-	newImage, err := c.imageService.GetImage(imageID)
+	// Use LocalResolve to get the image from cache after pulling.
+	// After a successful pull, the image should be in the imageStore cache.
+	newImage, err := c.imageService.LocalResolve(imageID)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.
 		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
