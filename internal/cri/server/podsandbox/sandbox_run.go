@@ -38,7 +38,6 @@ import (
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
-	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
@@ -80,14 +79,15 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 	sandboxImage := c.getSandboxImageName()
 	// Ensure sandbox container image snapshot.
-	image, err := c.ensureImageExists(ctx, sandboxImage, config, metadata.RuntimeHandler)
+	containerdImage, err := c.ensureImageExists(ctx, sandboxImage, config, metadata.RuntimeHandler)
 	if err != nil {
 		return cin, fmt.Errorf("failed to get sandbox image %q: %w", sandboxImage, err)
 	}
 
-	containerdImage, err := c.toContainerdImage(ctx, *image)
+	// Get the image spec from containerd image
+	imageSpec, err := containerdImage.Spec(ctx)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
+		return cin, fmt.Errorf("failed to get image spec: %w", err)
 	}
 
 	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
@@ -135,7 +135,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
 	// it safely.
-	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
+	spec, err := c.sandboxContainerSpec(id, config, &imageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
@@ -174,12 +174,12 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	}
 
 	// Generate spec options that will be applied to the spec later.
-	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)
+	specOpts, err := c.sandboxContainerSpecOpts(config, &imageSpec.Config)
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
 	}
 
-	sandboxLabels := ctrdutil.BuildLabels(config.Labels, image.ImageSpec.Config.Labels, crilabels.ContainerKindSandbox)
+	sandboxLabels := ctrdutil.BuildLabels(config.Labels, imageSpec.Config.Labels, crilabels.ContainerKindSandbox)
 
 	snapshotterOpt := []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))}
 	extraSOpts, err := sandboxSnapshotterOpts(config)
@@ -326,28 +326,28 @@ func (c *Controller) Create(_ctx context.Context, info sandbox.Sandbox, opts ...
 	return c.store.Save(podSandbox)
 }
 
-func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig, runtimeHandler string) (*imagestore.Image, error) {
+func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig, runtimeHandler string) (containerd.Image, error) {
+	// Try to get the image from local store first
 	image, err := c.imageService.LocalResolve(ref)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
 	}
 	if err == nil {
-		return &image, nil
+		// Image exists in cache, get it from containerd
+		return c.toContainerdImage(ctx, image)
 	}
 	// Pull image to ensure the image exists
-	// TODO: Cleaner interface
 	imageID, err := c.imageService.PullImage(ctx, ref, nil, config, runtimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
-	// Use LocalResolve to get the image from cache after pulling.
-	// After a successful pull, the image should be in the imageStore cache.
-	newImage, err := c.imageService.LocalResolve(imageID)
+	// Get the image directly from containerd using the imageID
+	img, err := c.client.GetImage(ctx, imageID)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.
 		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
 	}
-	return &newImage, nil
+	return img, nil
 }
 
 func (c *Controller) getSandboxImageName() string {
