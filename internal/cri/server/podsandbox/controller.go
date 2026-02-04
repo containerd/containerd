@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
@@ -89,7 +88,6 @@ func init() {
 				config:         criRuntimePlugin.(interface{ Config() criconfig.Config }).Config(),
 				imageConfig:    criImagePlugin.(interface{ Config() criconfig.ImageConfig }).Config(),
 				os:             osinterface.RealOS{},
-				imageService:   criImagePlugin.(ImageService),
 				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
 			}
@@ -108,11 +106,6 @@ func init() {
 	})
 }
 
-// ImageService specifies dependencies to CRI image service.
-type ImageService interface {
-	PullImage(ctx context.Context, name string, creds func(string) (string, string, error), sc *runtime.PodSandboxConfig, runtimeHandler string) (string, error)
-}
-
 type Controller struct {
 	// config contains all configurations.
 	config criconfig.Config
@@ -120,8 +113,6 @@ type Controller struct {
 	imageConfig criconfig.ImageConfig
 	// client is an instance of the containerd client
 	client *containerd.Client
-	// imageService is a dependency to CRI image service.
-	imageService ImageService
 	// warningService is used to emit deprecation warnings.
 	warningService warning.Service
 	// os is an interface for all required os operations.

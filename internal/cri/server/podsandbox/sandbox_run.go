@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/opencontainers/selinux/go-selinux"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
@@ -78,14 +77,14 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	)
 
 	sandboxImage := c.getSandboxImageName()
-	// Ensure sandbox container image snapshot.
-	containerdImage, err := c.ensureImageExists(ctx, sandboxImage, config, metadata.RuntimeHandler)
+
+	pauseImage, err := c.client.GetImage(ctx, sandboxImage)
 	if err != nil {
 		return cin, fmt.Errorf("failed to get sandbox image %q: %w", sandboxImage, err)
 	}
 
 	// Get the image spec from containerd image
-	imageSpec, err := containerdImage.Spec(ctx)
+	imageSpec, err := pauseImage.Spec(ctx)
 	if err != nil {
 		return cin, fmt.Errorf("failed to get image spec: %w", err)
 	}
@@ -195,7 +194,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(sandboxSnapshotter),
-		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt...),
+		customopts.WithNewSnapshot(id, pauseImage, snapshotterOpt...),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(crilabels.SandboxMetadataExtension, &metadata),
@@ -324,29 +323,6 @@ func (c *Controller) Create(_ctx context.Context, info sandbox.Sandbox, opts ...
 	podSandbox.Metadata = metadata
 	podSandbox.Runtime = info.Runtime
 	return c.store.Save(podSandbox)
-}
-
-func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig, runtimeHandler string) (containerd.Image, error) {
-	img, err := c.client.GetImage(ctx, ref)
-	if err == nil {
-		return img, nil
-	} else if !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
-	}
-
-	// Pull image to ensure the image exists
-	imageID, err := c.imageService.PullImage(ctx, ref, nil, config, runtimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
-	}
-
-	// Get the image directly from containerd using the imageID
-	img, err = c.client.GetImage(ctx, imageID)
-	if err != nil {
-		// It's still possible that someone removed the image right after it is pulled.
-		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
-	}
-	return img, nil
 }
 
 func (c *Controller) getSandboxImageName() string {
