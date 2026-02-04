@@ -30,7 +30,7 @@ require (
 	github.com/containerd/zfs/v2 v2.0.0
 	github.com/containernetworking/cni v1.3.0
 	github.com/containernetworking/plugins v1.9.0
-	github.com/coreos/go-systemd/v22 v22.6.0
+	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
