@@ -34,6 +34,7 @@ package remote
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -57,11 +58,11 @@ func getContextWithCancel() (context.Context, context.CancelFunc) {
 // verifySandboxStatus verified whether all required fields are set in PodSandboxStatus.
 func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 	if status.Id == "" {
-		return fmt.Errorf("id is not set")
+		return errors.New("id is not set")
 	}
 
 	if status.Metadata == nil {
-		return fmt.Errorf("metadata is not set")
+		return errors.New("metadata is not set")
 	}
 
 	metadata := status.Metadata
@@ -70,7 +71,7 @@ func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 	}
 
 	if status.CreatedAt == 0 {
-		return fmt.Errorf("CreatedAt is not set")
+		return errors.New("CreatedAt is not set")
 	}
 
 	return nil
@@ -79,11 +80,11 @@ func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 // verifyContainerStatus verified whether all required fields are set in ContainerStatus.
 func verifyContainerStatus(status *runtimeapi.ContainerStatus) error {
 	if status.Id == "" {
-		return fmt.Errorf("id is not set")
+		return errors.New("id is not set")
 	}
 
 	if status.Metadata == nil {
-		return fmt.Errorf("metadata is not set")
+		return errors.New("metadata is not set")
 	}
 
 	metadata := status.Metadata
@@ -92,15 +93,15 @@ func verifyContainerStatus(status *runtimeapi.ContainerStatus) error {
 	}
 
 	if status.CreatedAt == 0 {
-		return fmt.Errorf("CreatedAt is not set")
+		return errors.New("CreatedAt is not set")
 	}
 
 	if status.Image == nil || status.Image.Image == "" {
-		return fmt.Errorf("image is not set")
+		return errors.New("image is not set")
 	}
 
 	if status.ImageRef == "" {
-		return fmt.Errorf("ImageRef is not set")
+		return errors.New("ImageRef is not set")
 	}
 
 	return nil

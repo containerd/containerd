@@ -134,7 +134,7 @@ type TaskManager struct {
 // shims is  ShimManager for TaskManager to create/delete shims
 func NewTaskManager(ctx context.Context, root, state string, shims *ShimManager) (*TaskManager, error) {
 	if err := shims.LoadExistingShims(ctx, state, root); err != nil {
-		return nil, fmt.Errorf("failed to load existing shims for task manager")
+		return nil, errors.New("failed to load existing shims for task manager")
 	}
 	m := &TaskManager{
 		root:    root,

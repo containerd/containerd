@@ -18,7 +18,7 @@ package nri
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -143,7 +143,7 @@ func (t *domainTable) updateContainers(ctx context.Context, updates []*nri.Conta
 	}
 
 	if len(failed) != 0 {
-		return failed, fmt.Errorf("NRI update of some containers failed")
+		return failed, errors.New("NRI update of some containers failed")
 	}
 
 	return nil, nil
@@ -171,7 +171,7 @@ func (t *domainTable) evictContainers(ctx context.Context, evict []*nri.Containe
 	}
 
 	if len(failed) != 0 {
-		return failed, fmt.Errorf("NRI eviction of some containers failed")
+		return failed, errors.New("NRI eviction of some containers failed")
 	}
 
 	return nil, nil

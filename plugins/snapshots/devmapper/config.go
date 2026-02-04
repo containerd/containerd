@@ -101,15 +101,15 @@ func (c *Config) Validate() error {
 	var result []error
 
 	if c.PoolName == "" {
-		result = append(result, fmt.Errorf("pool_name is required"))
+		result = append(result, errors.New("pool_name is required"))
 	}
 
 	if c.RootPath == "" {
-		result = append(result, fmt.Errorf("root_path is required"))
+		result = append(result, errors.New("root_path is required"))
 	}
 
 	if c.BaseImageSize == "" {
-		result = append(result, fmt.Errorf("base_image_size is required"))
+		result = append(result, errors.New("base_image_size is required"))
 	}
 
 	if c.FileSystemType != "" {
@@ -119,7 +119,7 @@ func (c *Config) Validate() error {
 			result = append(result, fmt.Errorf("unsupported Filesystem Type: %q", c.FileSystemType))
 		}
 	} else {
-		result = append(result, fmt.Errorf("filesystem type cannot be empty"))
+		result = append(result, errors.New("filesystem type cannot be empty"))
 	}
 
 	return errors.Join(result...)

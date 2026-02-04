@@ -761,7 +761,7 @@ func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapsh
 
 func (t *task) checkpointImage(ctx context.Context, index *v1.Index, image string) error {
 	if image == "" {
-		return fmt.Errorf("cannot checkpoint image with empty name")
+		return errors.New("cannot checkpoint image with empty name")
 	}
 	ir, err := t.client.ImageService().Get(ctx, image)
 	if err != nil {

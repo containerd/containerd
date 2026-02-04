@@ -477,7 +477,7 @@ func cleanupOrphanedIDDirs(ctx context.Context, cntrs []containerd.Container, ba
 
 func (c *criService) createContainerIO(containerID, sandboxID string, config *runtime.ContainerConfig) (*cio.ContainerIO, error) {
 	if config == nil {
-		return nil, fmt.Errorf("ContainerConfig should not be nil when create container io")
+		return nil, errors.New("ContainerConfig should not be nil when create container io")
 	}
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {

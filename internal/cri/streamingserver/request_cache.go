@@ -36,7 +36,7 @@ import (
 	"container/list"
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
+	"errors"
 	"math"
 	"sync"
 	"time"
@@ -142,7 +142,7 @@ func (c *requestCache) uniqueToken() (string, error) {
 			return token, nil
 		}
 	}
-	return "", fmt.Errorf("failed to generate unique token")
+	return "", errors.New("failed to generate unique token")
 }
 
 // Must be write-locked prior to calling.

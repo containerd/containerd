@@ -697,7 +697,7 @@ func writeCriuCheckpointData(ctx context.Context, store content.Store, desc v1.D
 			return err
 		}
 		if strings.Contains(header.Name, "..") {
-			return fmt.Errorf("found illegal string '..' in checkpoint archive")
+			return errors.New("found illegal string '..' in checkpoint archive")
 		}
 		destFile, err := os.Create(filepath.Join(checkpointDirectory, header.Name))
 		if err != nil {

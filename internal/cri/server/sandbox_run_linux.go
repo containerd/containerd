@@ -17,6 +17,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"syscall"
 
@@ -43,7 +44,7 @@ func (c *criService) bringUpLoopback(netns string) error {
 
 func (c *criService) setupNetnsWithinUserns(netnsMountDir string, opt *runtime.UserNamespace) (*netns.NetNS, error) {
 	if opt.GetMode() != runtime.NamespaceMode_POD {
-		return nil, fmt.Errorf("required pod-level user namespace setting")
+		return nil, errors.New("required pod-level user namespace setting")
 	}
 
 	uidMaps := opt.GetUids()
@@ -51,7 +52,7 @@ func (c *criService) setupNetnsWithinUserns(netnsMountDir string, opt *runtime.U
 		return nil, fmt.Errorf("required only one uid mapping, but got %d uid mapping(s)", len(uidMaps))
 	}
 	if uidMaps[0] == nil {
-		return nil, fmt.Errorf("required only one uid mapping, but got empty uid mapping")
+		return nil, errors.New("required only one uid mapping, but got empty uid mapping")
 	}
 
 	gidMaps := opt.GetGids()
@@ -59,7 +60,7 @@ func (c *criService) setupNetnsWithinUserns(netnsMountDir string, opt *runtime.U
 		return nil, fmt.Errorf("required only one gid mapping, but got %d gid mapping(s)", len(gidMaps))
 	}
 	if gidMaps[0] == nil {
-		return nil, fmt.Errorf("required only one gid mapping, but got empty gid mapping")
+		return nil, errors.New("required only one gid mapping, but got empty gid mapping")
 	}
 
 	var netNs *netns.NetNS
