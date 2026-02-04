@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -37,6 +38,25 @@ var (
 	// contain an authorization token.
 	ErrNoToken = errors.New("authorization server did not include a token in the response")
 )
+
+// ErrInvalidTokenResponse is returned when the token endpoint returns a non-JSON
+// (or otherwise invalid) response body.
+//
+// This can happen when a registry auth service does not support the OAuth POST
+// flow and responds with an HTML error page.
+type ErrInvalidTokenResponse struct {
+	ContentType string
+	Body        []byte
+	Err         error
+}
+
+func (e *ErrInvalidTokenResponse) Error() string {
+	return fmt.Sprintf("invalid token response: %v", e.Err)
+}
+
+func (e *ErrInvalidTokenResponse) Unwrap() error {
+	return e.Err
+}
 
 // GenerateTokenOptions generates options for fetching a token based on a challenge
 func GenerateTokenOptions(ctx context.Context, host, username, secret string, c Challenge) (TokenOptions, error) {
@@ -141,11 +161,18 @@ func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.
 		return nil, remoteserrors.NewUnexpectedStatusErr(resp)
 	}
 
-	decoder := json.NewDecoder(resp.Body)
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 64000)) // 64KB
+	if err != nil {
+		return nil, err
+	}
 
 	var tr OAuthTokenResponse
-	if err = decoder.Decode(&tr); err != nil {
-		return nil, fmt.Errorf("unable to decode token response: %w", err)
+	if err := json.Unmarshal(b, &tr); err != nil {
+		return nil, &ErrInvalidTokenResponse{
+			ContentType: resp.Header.Get("Content-Type"),
+			Body:        b,
+			Err:         fmt.Errorf("unable to decode token response: %w", err),
+		}
 	}
 
 	if tr.AccessToken == "" {
@@ -212,11 +239,18 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 		return nil, remoteserrors.NewUnexpectedStatusErr(resp)
 	}
 
-	decoder := json.NewDecoder(resp.Body)
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 64000)) // 64KB
+	if err != nil {
+		return nil, err
+	}
 
 	var tr FetchTokenResponse
-	if err = decoder.Decode(&tr); err != nil {
-		return nil, fmt.Errorf("unable to decode token response: %w", err)
+	if err := json.Unmarshal(b, &tr); err != nil {
+		return nil, &ErrInvalidTokenResponse{
+			ContentType: resp.Header.Get("Content-Type"),
+			Body:        b,
+			Err:         fmt.Errorf("unable to decode token response: %w", err),
+		}
 	}
 
 	// `access_token` is equivalent to `token` and if both are specified
