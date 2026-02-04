@@ -293,8 +293,6 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 	for _, u := range paths {
 		for i, host := range hosts {
-			ctx := log.WithLogger(ctx, log.G(ctx).WithField("host", host.Host))
-
 			req := base.request(host, http.MethodHead, u...)
 			if err := req.addNamespace(base.refspec.Hostname()); err != nil {
 				return "", ocispec.Descriptor{}, err
@@ -304,6 +302,11 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				req.header[key] = append(req.header[key], value...)
 			}
 
+			ctx := log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+				"host":   req.host.Host,
+				"method": req.method,
+				"url":    req.sanitizedURL(),
+			}))
 			log.G(ctx).Debug("resolving")
 			resp, err := req.doWithRetries(ctx, i == len(hosts)-1)
 			if err != nil {
