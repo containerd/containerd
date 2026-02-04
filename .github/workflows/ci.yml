@@ -187,7 +187,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
-        go-version: ["1.24.11", "1.25.5"]
+        go-version: ["1.24.12", "1.25.6"]
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
     steps:
@@ -642,7 +642,13 @@ jobs:
         run: |
           if  [ "$BOX" = "fedora/43-cloud-base" ]; then
             # fedora/41-cloud-base seems the last version available in https://portal.cloud.hashicorp.com/vagrant/discover/fedora
-            sudo vagrant box add fedora/43-cloud-base https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-libvirt-43-1.6.x86_64.vagrant.libvirt.box
+            # Download the box file with curl (with retry) to handle flaky Fedora mirrors
+            curl -fL --retry 5 --retry-delay 5 --retry-all-errors \
+              --connect-timeout 30 --max-time 600 \
+              -o /tmp/fedora43.box \
+              https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-libvirt-43-1.6.x86_64.vagrant.libvirt.box
+            sudo vagrant box add fedora/43-cloud-base /tmp/fedora43.box
+            rm -f /tmp/fedora43.box
           fi
           sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --no-tty
       - name: test-integration
