@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images/converter"
 	"github.com/containerd/containerd/v2/core/images/converter/uncompress"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
-	"github.com/containerd/containerd/v2/pkg/labels"
+	labelsPkg "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/plugins/diff/erofs"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -84,18 +84,18 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			return nil, fmt.Errorf("failed to get content info: %w", err)
 		}
 
-		labelz := info.Labels
-		if labelz == nil {
-			labelz = make(map[string]string)
+		labels := info.Labels
+		if labels == nil {
+			labels = make(map[string]string)
 		}
 
-		ra, err := cs.ReaderAt(ctx, *uncompressedDesc)
+		readerAt, err := cs.ReaderAt(ctx, *uncompressedDesc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get reader: %w", err)
 		}
-		defer ra.Close()
+		defer readerAt.Close()
 
-		sr := io.NewSectionReader(ra, 0, uncompressedDesc.Size)
+		sr := io.NewSectionReader(readerAt, 0, uncompressedDesc.Size)
 
 		blob, err := os.CreateTemp("", "erofs-layer-*.img")
 		if err != nil {
@@ -154,8 +154,8 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			return nil, fmt.Errorf("size mismatch: copied %d bytes, expected %d bytes", n, stat.Size())
 		}
 
-		labelz[labels.LabelUncompressed] = w.Digest().String()
-		if err = w.Commit(ctx, n, "", content.WithLabels(labelz)); err != nil && !errdefs.IsAlreadyExists(err) {
+		labels[labelsPkg.LabelUncompressed] = w.Digest().String()
+		if err = w.Commit(ctx, n, "", content.WithLabels(labels)); err != nil && !errdefs.IsAlreadyExists(err) {
 			return nil, fmt.Errorf("failed to commit: %w", err)
 		}
 
