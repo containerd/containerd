@@ -23,11 +23,12 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/google/uuid"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -35,8 +36,8 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
-
-	"github.com/google/uuid"
+	seekableerofs "github.com/containerd/containerd/v2/internal/erofsutils/seekable"
+	"github.com/containerd/log"
 )
 
 var emptyDesc = ocispec.Descriptor{}
@@ -98,11 +99,16 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 // Since `images.DiffCompression` doesn't support arbitrary media types,
 // disallow non-empty suffixes for now.
 func IsErofsMediaType(mt string) bool {
-	if !strings.HasSuffix(mt, ".erofs") && !strings.HasPrefix(mt, "application/vnd.erofs.layer") {
-		return false
+	base, ext, _ := strings.Cut(mt, "+")
+	// Legacy EROFS media types historically used ".erofs" suffix.
+	if strings.HasSuffix(base, ".erofs") {
+		return ext == ""
 	}
-	_, _, hasExt := strings.Cut(mt, "+")
-	return !hasExt
+	// Preferred EROFS media types.
+	if base == images.MediaTypeErofsLayer {
+		return ext == ""
+	}
+	return strings.HasPrefix(base, "application/vnd.erofs.layer") && ext == ""
 }
 
 func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
@@ -119,10 +125,13 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	}()
 
 	native := false
-	if IsErofsMediaType(desc.MediaType) {
+	seekable := false
+	if images.IsSeekableErofsMediaType(desc.MediaType) {
+		seekable = true
+	} else if IsErofsMediaType(desc.MediaType) {
 		native = true
 	} else if _, err := images.DiffCompression(ctx, desc.MediaType); err != nil {
-		return emptyDesc, fmt.Errorf("currently unsupported media type: %s", desc.MediaType)
+		return emptyDesc, fmt.Errorf("unsupported media type: %s", desc.MediaType)
 	}
 
 	var config diff.ApplyConfig
@@ -137,11 +146,11 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		return emptyDesc, err
 	}
 
-	ra, err := s.store.ReaderAt(ctx, desc)
+	readerAt, err := s.store.ReaderAt(ctx, desc)
 	if err != nil {
 		return emptyDesc, fmt.Errorf("failed to get reader from content store: %w", err)
 	}
-	defer ra.Close()
+	defer readerAt.Close()
 
 	layerBlobPath := path.Join(layer, "layer.erofs")
 	if native {
@@ -149,15 +158,61 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		if err != nil {
 			return emptyDesc, err
 		}
-		_, err = io.Copy(f, content.NewReader(ra))
-		f.Close()
-		if err != nil {
-			return emptyDesc, err
+		_, copyErr := io.Copy(f, content.NewReader(readerAt))
+		if closeErr := f.Close(); closeErr != nil && copyErr == nil {
+			copyErr = closeErr
+		}
+		if copyErr != nil {
+			return emptyDesc, copyErr
 		}
 		return desc, nil
 	}
+	if seekable {
+		f, err := os.Create(layerBlobPath)
+		if err != nil {
+			return emptyDesc, err
+		}
 
-	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
+		// Compute digest of decompressed content (the diffID).
+		digester := digest.Canonical.Digester()
+		multiWriter := io.MultiWriter(f, digester.Hash())
+
+		written, err := seekableerofs.DecodeErofsAll(ctx, content.NewReader(readerAt), multiWriter)
+		closeErr := f.Close()
+		if err == nil && closeErr != nil {
+			err = closeErr
+		}
+		if err != nil {
+			return emptyDesc, err
+		}
+
+		// Optional dm-verity materialization (single-device mode): append payload bytes to layer.erofs
+		// and write JSON metadata alongside it.
+		if desc.Annotations != nil {
+			dmOffsetStr := desc.Annotations[seekableerofs.AnnotationDMVerityOffset]
+			if dmOffsetStr != "" {
+				dmOffset, parseErr := strconv.ParseInt(dmOffsetStr, 10, 64)
+				if parseErr != nil {
+					return emptyDesc, fmt.Errorf("invalid dm-verity offset annotation %q: %w", dmOffsetStr, parseErr)
+				}
+
+				// Materialize dm-verity data. Block size is read from the superblock.
+				rootDigest := desc.Annotations[seekableerofs.AnnotationDMVerityRootDigest]
+				if _, err := seekableerofs.MaterializeDMVerity(ctx, readerAt, desc.Size, dmOffset, layerBlobPath, rootDigest); err != nil {
+					return emptyDesc, err
+				}
+			}
+		}
+
+		// Return descriptor with the diffID (digest of uncompressed EROFS content).
+		return ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Size:      written,
+			Digest:    digester.Digest(),
+		}, nil
+	}
+
+	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(readerAt))
 	for {
 		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
 			return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
@@ -175,17 +230,17 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 
 	// Choose between tar index or tar conversion mode
 	// Generate deterministic UUID from layer digest
-	u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+desc.Digest))
+	uuidVal := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+desc.Digest))
 	if s.enableTarIndex {
 		// Use the tar index method: generate tar index and append tar
-		err = erofsutils.GenerateTarIndexAndAppendTar(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
+		err = erofsutils.GenerateTarIndexAndAppendTar(ctx, rc, layerBlobPath, uuidVal.String(), s.mkfsExtraOpts)
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to generate tar index: %w", err)
 		}
 		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer using tar index mode")
 	} else {
 		// Use the tar method: fully convert tar to EROFS
-		err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
+		err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, uuidVal.String(), s.mkfsExtraOpts)
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to convert tar to erofs: %w", err)
 		}
