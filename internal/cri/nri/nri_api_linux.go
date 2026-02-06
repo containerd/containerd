@@ -19,8 +19,10 @@ package nri
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 
 	eventtypes "github.com/containerd/containerd/api/events"
@@ -509,8 +511,9 @@ func (a *API) EvictContainer(ctx context.Context, e *api.ContainerEviction) erro
 
 type criPodSandbox struct {
 	*sstore.Sandbox
-	spec *runtimespec.Spec
-	pid  uint32
+	spec   *runtimespec.Spec
+	labels map[string]string
+	pid    uint32
 }
 
 func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
@@ -519,33 +522,27 @@ func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 		spec:    &runtimespec.Spec{},
 	}
 
-	if pod == nil || pod.Container == nil {
+	if pod == nil {
 		return criPod
 	}
 
-	ctx := ctrdutil.NamespacedContext()
-	task, err := pod.Container.Task(ctx, nil)
+	criPod.pid = pod.Status.Get().Pid
+
+	sandboxInfo, err := a.cri.SandboxMetadataStore().Get(ctrdutil.NamespacedContext(), pod.ID)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			log.L.WithError(err).Errorf("failed to get task for sandbox container %s",
-				pod.Container.ID())
-		}
-		// the containers no longer exist but the oci.Spec may still be available to use on the StopPodSandbox hook
-		spec, err := pod.Container.Spec(ctx)
-		if err == nil {
-			criPod.spec = spec
+			log.L.WithError(err).Errorf("failed to get sandbox metadata for pod %s", pod.ID)
 		}
 		return criPod
 	}
 
-	criPod.pid = task.Pid()
-	spec, err := task.Spec(ctx)
-	if err != nil {
-		log.L.WithError(err).Errorf("failed to get spec for sandbox container %s",
-			pod.Container.ID())
-		return criPod
+	criPod.labels = sandboxInfo.Labels
+
+	if sandboxInfo.Spec != nil {
+		if err := typeurl.UnmarshalTo(sandboxInfo.Spec, criPod.spec); err != nil {
+			log.L.WithError(err).Errorf("failed to unmarshal sandbox spec for pod %s", pod.ID)
+		}
 	}
-	criPod.spec = spec
 
 	return criPod
 }
@@ -610,19 +607,8 @@ func (p *criPodSandbox) GetLabels() map[string]string {
 		labels[key] = value
 	}
 
-	if p.Sandbox.Container == nil {
-		return labels
-	}
-
-	ctx := ctrdutil.NamespacedContext()
-	ctrd := p.Sandbox.Container
-	ctrs, err := ctrd.Info(ctx, containerd.WithoutRefreshedMetadata)
-	if err != nil {
-		log.L.WithError(err).Errorf("failed to get info for sandbox container %s", ctrd.ID())
-		return labels
-	}
-
-	for key, value := range ctrs.Labels {
+	// Append sandbox labels
+	for key, value := range p.labels {
 		labels[key] = value
 	}
 
@@ -641,10 +627,26 @@ func (p *criPodSandbox) GetLinuxPodSandbox() nri.LinuxPodSandbox {
 }
 
 func (p *criPodSandbox) GetLinuxNamespaces() []*api.LinuxNamespace {
-	if p.spec.Linux != nil {
-		return api.FromOCILinuxNamespaces(p.spec.Linux.Namespaces)
+	if p.Sandbox == nil {
+		return nil
 	}
-	return nil
+
+	var namespaces []*api.LinuxNamespace
+	if p.spec.Linux != nil {
+		namespaces = api.FromOCILinuxNamespaces(p.spec.Linux.Namespaces)
+	}
+
+	// Filter out stale network namespaces (netns is torn down before RemovePodSandbox).
+	return slices.DeleteFunc(namespaces, func(ns *api.LinuxNamespace) bool {
+		if ns.GetType() != "network" {
+			return false
+		}
+		if ns.GetPath() == "" {
+			return true
+		}
+		_, err := os.Stat(ns.GetPath())
+		return err != nil && errors.Is(err, os.ErrNotExist)
+	})
 }
 
 func (p *criPodSandbox) GetPodLinuxOverhead() *api.LinuxResources {

@@ -194,6 +194,7 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 		Address:   address,
 		Version:   uint32(version),
 		CreatedAt: resp.GetCreatedAt().AsTime(),
+		Spec:      resp.GetSpec(),
 	}, nil
 }
 
