@@ -4,7 +4,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: services/containers/v1/containers.proto
+// source: containerd/services/containers/v1/containers.proto
 
 package containers
 
@@ -312,5 +312,5 @@ var Containers_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "services/containers/v1/containers.proto",
+	Metadata: "containerd/services/containers/v1/containers.proto",
 }
