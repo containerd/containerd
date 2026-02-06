@@ -18,14 +18,23 @@ set -o pipefail
 set -o errexit
 set -x
 
-IFS=$'\n'
+# Fix for git 'dubious ownership' error inside Docker
+if [ -d "$SRC/containerd" ]; then
+    git config --global --add safe.directory $SRC/containerd
+fi
+
+IFS=$'
+'
 
 compile_fuzzers() {
     local regex=$1
     local compile_fuzzer=$2
     local blocklist=$3
 
-    for line in $(git grep --full-name "$regex" | grep -v -E "$blocklist"); do
+    # Exclude docs directory from the fuzzer search
+    local exclude_docs_regex='docs/'
+
+    for line in $(git grep --full-name "$regex" | grep -v -E "$blocklist" | grep -v -E "$exclude_docs_regex"); do
         if [[ "$line" =~ (.*)/.*:.*(Fuzz[A-Za-z0-9]+) ]]; then
             local pkg=${BASH_REMATCH[1]}
             local func=${BASH_REMATCH[2]}
@@ -37,23 +46,10 @@ compile_fuzzers() {
     done
 }
 
-apt-get update && apt-get install -y wget
-cd $SRC
-wget --quiet https://go.dev/dl/go1.25.7.linux-amd64.tar.gz
-
-mkdir temp-go
-rm -rf /root/.go/*
-tar -C temp-go/ -xzf go1.25.7.linux-amd64.tar.gz
-mv temp-go/go/* /root/.go/
 cd $SRC/containerd
 
-printf "package client\nimport _ \"github.com/AdamKorcz/go-118-fuzz-build/testing\"\n" > client/registerfuzzdep.go
-go mod tidy
-
-cd "$(dirname "${BASH_SOURCE[0]}")"
-cd ../../
-
-rm -r vendor
+# Clean up any leftover temporary files from previous build attempts
+rm -f client/registerfuzzdep.go
 
 # Add temporary CXXFLAGS
 OLDCXXFLAGS=$CXXFLAGS
@@ -75,7 +71,9 @@ export GOARCH=amd64
 
 # Build runc
 cd $SRC/
-git clone https://github.com/opencontainers/runc --branch release-1.1
+if [ ! -d "runc" ]; then
+    git clone https://github.com/opencontainers/runc --branch release-1.1
+fi
 cd runc
 make
 make install
