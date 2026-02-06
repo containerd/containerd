@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images/converter"
 	"github.com/containerd/containerd/v2/core/images/converter/erofs"
 	"github.com/containerd/containerd/v2/core/images/converter/uncompress"
+	"github.com/containerd/containerd/v2/internal/erofsutils/seekable"
 	"github.com/containerd/platforms"
 	"github.com/urfave/cli/v2"
 )
@@ -35,9 +36,11 @@ var convertCommand = &cli.Command{
 	ArgsUsage: "[flags] <source_ref> <target_ref>",
 	Description: `Convert an image format.
 
-e.g., 'ctr convert --uncompress --oci example.com/foo:orig example.com/foo:converted'
-      'ctr convert --erofs example.com/foo:orig example.com/foo:erofs'
-      'ctr convert --erofs --erofs-compression='lzma:lz4hc,12' example.com/foo:orig example.com/foo:erofs'
+e.g., 'ctr images convert --uncompress --oci example.com/foo:orig example.com/foo:converted'
+      'ctr images convert --erofs example.com/foo:orig example.com/foo:erofs'
+      'ctr images convert --erofs --erofs-compression='lzma:lz4hc,12' example.com/foo:orig example.com/foo:erofs'
+      'ctr images convert --erofs-seekable example.com/foo:orig example.com/foo:seekable-erofs'
+      'ctr images convert --erofs-seekable --erofs-dm-verity example.com/foo:orig example.com/foo:seekable-erofs-verity'
 
 Use '--platform' to define the output platform.
 When '--all-platforms' is given all images in a manifest list must be available.
@@ -65,6 +68,25 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Name:  "erofs-mkfs-opts",
 			Usage: "Extra options for mkfs.erofs (e.g., '-zlz4')",
 		},
+		// seekable erofs flags
+		&cli.BoolFlag{
+			Name:  "erofs-seekable",
+			Usage: "Wrap EROFS in seekable zstd frames with custom chunk table",
+		},
+		&cli.IntFlag{
+			Name:  "erofs-chunk-size",
+			Usage: "Uncompressed bytes per zstd frame (random access granularity)",
+			Value: seekable.DefaultChunkSize,
+		},
+		&cli.BoolFlag{
+			Name:  "erofs-dm-verity",
+			Usage: "Include dm-verity payload at EOF",
+		},
+		&cli.IntFlag{
+			Name:  "erofs-dm-verity-block-size",
+			Usage: "dm-verity block size in bytes",
+			Value: seekable.DefaultDMVerityBlockSize,
+		},
 		// platform flags
 		&cli.StringSliceFlag{
 			Name:  "platform",
@@ -85,8 +107,8 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		}
 
 		if !cliContext.Bool("all-platforms") {
-			if pss := cliContext.StringSlice("platform"); len(pss) > 0 {
-				all, err := platforms.ParseAll(pss)
+			if platformStrs := cliContext.StringSlice("platform"); len(platformStrs) > 0 {
+				all, err := platforms.ParseAll(platformStrs)
 				if err != nil {
 					return err
 				}
@@ -100,15 +122,25 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(uncompress.LayerConvertFunc))
 		}
 
-		if cliContext.Bool("erofs") {
-			var erofsOpts []erofs.ConvertOpt
-			if compressors := cliContext.String("erofs-compression"); compressors != "" {
-				erofsOpts = append(erofsOpts, erofs.WithCompressors(compressors))
+		if cliContext.Bool("erofs-seekable") {
+			// Seekable EROFS: wrap raw EROFS in zstd frames with chunk table.
+			var seekableOpts []erofs.SeekableConvertOpt
+			if cliContext.IsSet("erofs-chunk-size") {
+				seekableOpts = append(seekableOpts, erofs.WithSeekableChunkSize(cliContext.Int("erofs-chunk-size")))
 			}
-			if mkfsOptsStr := cliContext.String("erofs-mkfs-opts"); mkfsOptsStr != "" {
-				mkfsOpts := strings.Fields(mkfsOptsStr)
-				erofsOpts = append(erofsOpts, erofs.WithMkfsOptions(mkfsOpts))
+			seekableOpts = append(seekableOpts, erofs.WithSeekableDMVerity(cliContext.Bool("erofs-dm-verity")))
+			if cliContext.IsSet("erofs-dm-verity-block-size") {
+				seekableOpts = append(seekableOpts, erofs.WithSeekableDMVerityBlockSize(cliContext.Int("erofs-dm-verity-block-size")))
 			}
+			// Pass through raw EROFS options (compression, mkfs-opts).
+			rawOpts := buildErofsOpts(cliContext)
+			if len(rawOpts) > 0 {
+				seekableOpts = append(seekableOpts, erofs.WithSeekableRawErofsOpts(rawOpts...))
+			}
+			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(erofs.SeekableLayerConvertFunc(seekableOpts...)))
+		} else if cliContext.Bool("erofs") {
+			// Raw EROFS (non-seekable).
+			erofsOpts := buildErofsOpts(cliContext)
 			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(erofs.LayerConvertFunc(erofsOpts...)))
 		}
 
@@ -129,4 +161,16 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		fmt.Fprintln(cliContext.App.Writer, newImg.Target.Digest.String())
 		return nil
 	},
+}
+
+func buildErofsOpts(cliContext *cli.Context) []erofs.ConvertOpt {
+	var opts []erofs.ConvertOpt
+	if compressors := cliContext.String("erofs-compression"); compressors != "" {
+		opts = append(opts, erofs.WithCompressors(compressors))
+	}
+	if mkfsOptsStr := cliContext.String("erofs-mkfs-opts"); mkfsOptsStr != "" {
+		mkfsOpts := strings.Fields(mkfsOptsStr)
+		opts = append(opts, erofs.WithMkfsOptions(mkfsOpts))
+	}
+	return opts
 }
