@@ -16,13 +16,17 @@ Key components often include:
 
 ```go
 func FuzzPull(f *testing.F) {
-	if os.Getuid() != 0 {
-		f.Skip("skipping fuzz test that requires root")
-	}
+	// ... client setup ...
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		initDaemon.Do(startDaemon) // Initialize a containerd daemon
-		// ... client setup ...
+
+		client, err := containerd.New(defaultAddress)
+		if err != nil {
+			// This can happen if the daemon is not ready
+			return
+		}
+		defer client.Close()
 
 		fuzzer := fuzz.NewConsumer(data)
 		// ... fuzzer logic using fuzzer.GenerateStruct, fuzzer.GetBytes, etc. ...
@@ -30,7 +34,7 @@ func FuzzPull(f *testing.F) {
 		ctx, cancel := pullFuzzContext() // Use a helper function for context
 		defer cancel()
 
-		_, _ = client.Pull(ctx, "fuzz-image", containerd.WithResolver(resolver), containd.WithPlatformMatcher(platforms.All))
+		_, _ = client.Pull(ctx, "fuzz-image", containerd.WithResolver(resolver), containerd.WithPlatformMatcher(platforms.All))
 	})
 }
 ```
