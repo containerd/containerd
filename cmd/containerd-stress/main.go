@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/integration/remote"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
 	metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli/v2"
@@ -64,6 +65,19 @@ func init() {
 		panic(err)
 	}
 
+	cli.VersionPrinter = func(cliContext *cli.Context) {
+		fmt.Println(cliContext.App.Name, version.Package, cliContext.App.Version)
+	}
+
+	// Override the default flag descriptions for '--version' and '--help'
+	// to align with other flags and start with uppercase.
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"v"},
+		Usage:   "Print the version",
+
+		DisableDefaultText: true,
+	}
 	cli.HelpFlag = &cli.BoolFlag{
 		Name:    "help",
 		Aliases: []string{"h"},
@@ -132,6 +146,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "containerd-stress"
 	app.Description = "stress test a containerd daemon"
+	app.Version = version.Version
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "debug",
