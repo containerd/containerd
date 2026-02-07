@@ -324,9 +324,10 @@ func (u *Unpacker) unpack(
 
 	// TODO: Support multiple unpacks rather than just first match
 	var unpack *Platform
+	var candidates []*Platform
 
 	imgPlatform := platforms.Normalize(i.Platform)
-	for _, up := range u.platforms {
+	outer: for _, up := range u.platforms {
 		if up.ConfigType != "" && up.ConfigType != config.MediaType {
 			continue
 		}
@@ -334,10 +335,22 @@ func (u *Unpacker) unpack(
 		if (up.ConfigType == "" || images.IsConfigType(up.ConfigType)) && i.RootFS.Type != "" && i.RootFS.Type != "layers" {
 			continue
 		}
+
 		if up.Platform.Match(imgPlatform) {
-			unpack = up
-			break
+			for _, l := range up.LayerTypes {
+				// If the bottom layer type matches the exact unpack configuration
+				if layers[0].MediaType == l {
+					unpack = up
+					break outer
+				}
+			}
+			candidates = append(candidates, up)
 		}
+	}
+
+	if unpack == nil && len(candidates) > 0 {
+		unpack = candidates[0]
+		candidates = nil
 	}
 
 	if unpack == nil {
