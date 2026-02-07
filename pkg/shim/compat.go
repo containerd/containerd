@@ -34,8 +34,6 @@ func readBootstrapParamsFromDeprecatedFields(input []byte, params *BootstrapPara
 	params.Namespace = namespaceFlag
 	params.ContainerdTtrpcAddress = os.Getenv(ttrpcAddressEnv)
 	params.ContainerdGrpcAddress = os.Getenv(grpcAddressEnv)
-	params.SocketPath = socketFlag
-	params.SocketPathDebug = debugSocketFlag
 	params.ContainerdBinary = containerdBinaryFlag
 	params.EnableDebug = debugFlag
 

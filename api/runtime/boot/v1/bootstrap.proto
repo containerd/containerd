@@ -1,17 +1,17 @@
 /*
-	Copyright The containerd Authors.
+   Copyright The containerd Authors.
 
-	Licensed under the Apache License, Version 2.0 (the "License");
-	you may not use this file except in compliance with the License.
-	You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-		http://www.apache.org/licenses/LICENSE-2.0
+        http://www.apache.org/licenses/LICENSE-2.0
 
-	Unless required by applicable law or agreed to in writing, software
-	distributed under the License is distributed on an "AS IS" BASIS,
-	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-	See the License for the specific language governing permissions and
-	limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 // Bootstrap Protocol
@@ -46,63 +46,57 @@ option go_package = "github.com/containerd/containerd/api/runtime/bootstrap/v1;b
 
 // BootstrapParams contains all configuration passed from containerd to shim at startup.
 message BootstrapParams {
-	// Container/sandbox ID
-	string id = 1;
+  // Container/sandbox ID
+  string id = 1;
 
-	// Namespace for the container
-	string namespace = 2;
+  // Namespace for the container
+  string namespace = 2;
 
-	// Enable debug messages in logs.
-	bool enable_debug = 3;
+  // Enable debug messages in logs.
+  bool enable_debug = 3;
 
-	// Containerd's TTRPC API address (e.g., "unix:///run/containerd/containerd.sock.ttrpc")
-	string containerd_ttrpc_address = 4;
+  // Containerd's TTRPC API address (e.g., "unix:///run/containerd/containerd.sock.ttrpc")
+  string containerd_ttrpc_address = 4;
 
-	// Containerd's gRPC API address (e.g., "unix:///run/containerd/containerd.sock")
-	string containerd_grpc_address = 5;
+  // Containerd's gRPC API address (e.g., "unix:///run/containerd/containerd.sock")
+  string containerd_grpc_address = 5;
 
-	// Socket path to serve.
-	string socket_path = 6;
+  // Path to containerd binary for event publishing
+  string containerd_binary = 8;
 
-	// Debug socket path to serve.
-	string socket_path_debug = 7;
-
-	// Path to containerd binary for event publishing
-	string containerd_binary = 8;
-
-	// Extensible configuration sections for new features
-	// Each section can contain arbitrary structured data identified by type URL
-	// Examples: CRI config, NRI config, sandbox config, etc.
-	repeated Extension extensions = 9;
+  // Extensible configuration sections for new features
+  // Each section can contain arbitrary structured data identified by type URL
+  // Examples: CRI config, NRI config, sandbox config, etc.
+  repeated Extension extensions = 9;
 }
 
 // Extension provides extensibility for new configuration types
 // without changing the core BootstrapParams protocol
 message Extension {
-	// Configuration data with embedded type URL
-	// Examples of type URLs:
-	//   - "containerd.io/cri.v1.PodSandboxConfig"
-	//   - "containerd.io/nri.v1.PluginConfig"
-	//   - "containerd.io/sandbox.v1.SandboxConfig"
-	google.protobuf.Any value = 1;
+  // Configuration data with embedded type URL
+  // Examples of type URLs:
+  //   - "containerd.io/cri.v1.PodSandboxConfig"
+  //   - "containerd.io/nri.v1.PluginConfig"
+  //   - "containerd.io/sandbox.v1.SandboxConfig"
+  google.protobuf.Any value = 1;
 }
 
 // BootstrapResult is returned by shim via stdout after successful startup
 message BootstrapResult {
-	// Version of shim parameters (expected 2 for shim v2)
-	int32 version = 1;
+  // Version of shim parameters (expected 2 for shim v2)
+  int32 version = 1;
 
-	// Address where shim is listening (e.g., "unix:///run/containerd/shim.sock")
-	// Containerd will connect to this address for task operations
-	string address = 2;
+  // Address where shim is listening (e.g., "unix:///run/containerd/shim.sock")
+  // Containerd will connect to this address for task operations
+  string address = 2;
 
-	// Protocol used by shim: "ttrpc" or "grpc"
-	string protocol = 3;
+  // Protocol used by shim: "ttrpc" or "grpc"
+  string protocol = 3;
 
-	// Optional: Capabilities supported by this shim instance
-	// Allows shim to advertise what features it supports
-	repeated string capabilities = 4;
+  // Optional: Capabilities supported by this shim instance
+  // Allows shim to advertise what features it supports
+  repeated string capabilities = 4;
 
-	// Optional: Additional metadata from shim
-	map<string, string> metadata = 5;
+  // Optional: Additional metadata from shim
+  map<string, string> metadata = 5;
 }
