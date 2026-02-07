@@ -324,6 +324,41 @@ func sbserverSandboxInfo(id string) (*criapiv1.PodSandboxStatus, *types.SandboxI
 	return status, &info, nil
 }
 
+// TestRunPodSandboxNoCNIPlugins checks if the sandbox creation fails
+// with the expected error message when no CNI plugins are initialized.
+func TestRunPodSandboxNoCNIPlugins(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip()
+	}
+
+	t.Log("Init PodSandboxConfig with specific label")
+	labels := map[string]string{
+		t.Name(): "true",
+	}
+
+	sbConfig := PodSandboxConfig(t.Name(), "nocni", WithPodLabels(labels))
+	t.Log("Inject CNI plugin initialization failpoint")
+	conf := &failpointConf{
+		Add: "1*error(no CNI plugins initialized)",
+	}
+	injectCNIFailpoint(t, sbConfig, conf)
+
+	t.Log("Create a pod sandbox while having no CNI plugins initialized")
+	_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "no CNI plugins initialized")
+
+	t.Log("No pods should be up, as CNI failure is expected to clean up the pod that was attempted to be created")
+	l, err := runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{LabelSelector: labels})
+	require.NoError(t, err)
+	assert.Len(t, l, 0)
+
+	if len(l) > 0 {
+		t.Log("Cleanup leaky pod(s)")
+		cleanupPods(t, runtimeService)
+	}
+}
+
 func ensureCNIAddRunning(t *testing.T, sbName string) error {
 	return Eventually(func() (bool, error) {
 		pids, err := PidsOf(failpointCNIBinary)
