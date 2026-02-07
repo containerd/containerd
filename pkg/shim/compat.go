@@ -27,15 +27,19 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/log"
 )
 
 func readBootstrapParamsFromDeprecatedFields(input []byte, params *BootstrapParams) error {
-	params.ID = id
+	params.InstanceID = id
 	params.Namespace = namespaceFlag
 	params.ContainerdTtrpcAddress = os.Getenv(ttrpcAddressEnv)
 	params.ContainerdGrpcAddress = os.Getenv(grpcAddressEnv)
 	params.ContainerdBinary = containerdBinaryFlag
-	params.EnableDebug = debugFlag
+
+	if debugFlag {
+		params.LogLevel = log.DebugLevel.String()
+	}
 
 	// Task options
 
