@@ -61,12 +61,6 @@ type binary struct {
 }
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
-	debug := false
-	switch log.GetLevel() {
-	case log.DebugLevel, log.TraceLevel:
-		debug = true
-	}
-
 	cmd, err := client.Command(
 		ctx,
 		&client.CommandConfig{
@@ -77,7 +71,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 			WorkDir:      b.bundle.Path,
 			Opts:         opts,
 			Env:          b.env,
-			Debug:        debug,
+			LogLevel:     log.GetLevel(),
 			Action:       "start",
 		})
 	if err != nil {
@@ -167,12 +161,6 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 		bundlePath = b.bundle.Path
 	}
 
-	debug := false
-	switch log.GetLevel() {
-	case log.DebugLevel, log.TraceLevel:
-		debug = true
-	}
-
 	cmd, err := client.Command(ctx,
 		&client.CommandConfig{
 			ID:           b.bundle.ID,
@@ -182,7 +170,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 			TTRPCAddress: b.containerdTTRPCAddress,
 			WorkDir:      bundlePath,
 			Opts:         nil,
-			Debug:        debug,
+			LogLevel:     log.GetLevel(),
 			Action:       "delete",
 		})
 

@@ -40,6 +40,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 )
 
 type CommandConfig struct {
@@ -52,7 +53,7 @@ type CommandConfig struct {
 	Args         []string
 	Opts         *types.Any
 	Env          []string
-	Debug        bool
+	LogLevel     log.Level
 	Action       string // Either "start" or "delete"
 }
 
@@ -81,7 +82,8 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	if config.BundlePath != "" {
 		args = append(args, "-bundle", config.BundlePath)
 	}
-	if config.Debug {
+	switch config.LogLevel {
+	case log.DebugLevel, log.TraceLevel:
 		args = append(args, "-debug")
 	}
 	if config.Action == "" {
@@ -124,9 +126,9 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	} else if config.Action == "start" {
 		// Use the new Bootstrap protocol for all newer shims.
 		params := bootapi.BootstrapParams{
-			ID:                     config.ID,
+			InstanceID:             config.ID,
 			Namespace:              ns,
-			EnableDebug:            config.Debug,
+			LogLevel:               config.LogLevel.String(),
 			ContainerdVersion:      version.Version,
 			ContainerdGrpcAddress:  config.GRPCAddress,
 			ContainerdTtrpcAddress: config.TTRPCAddress,

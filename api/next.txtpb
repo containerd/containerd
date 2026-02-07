@@ -24933,11 +24933,11 @@ file: {
   message_type: {
     name: "BootstrapParams"
     field: {
-      name: "id"
+      name: "instance_id"
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      json_name: "id"
+      json_name: "instanceId"
     }
     field: {
       name: "namespace"
@@ -24947,11 +24947,11 @@ file: {
       json_name: "namespace"
     }
     field: {
-      name: "enable_debug"
+      name: "log_level"
       number: 3
       label: LABEL_OPTIONAL
-      type: TYPE_BOOL
-      json_name: "enableDebug"
+      type: TYPE_STRING
+      json_name: "logLevel"
     }
     field: {
       name: "containerd_version"
@@ -25128,7 +25128,7 @@ file: {
       path: 0
       span: 49
       span: 2
-      span: 16
+      span: 25
       leading_comments: " Container/sandbox ID\n"
     }
     location: {
@@ -25149,7 +25149,7 @@ file: {
       path: 1
       span: 49
       span: 9
-      span: 11
+      span: 20
     }
     location: {
       path: 4
@@ -25158,8 +25158,8 @@ file: {
       path: 0
       path: 3
       span: 49
-      span: 14
-      span: 15
+      span: 23
+      span: 24
     }
     location: {
       path: 4
@@ -25208,8 +25208,8 @@ file: {
       path: 2
       span: 55
       span: 2
-      span: 24
-      leading_comments: " Enable debug messages in logs.\n"
+      span: 23
+      leading_comments: " Requested shim log level.\n"
     }
     location: {
       path: 4
@@ -25219,7 +25219,7 @@ file: {
       path: 5
       span: 55
       span: 2
-      span: 6
+      span: 8
     }
     location: {
       path: 4
@@ -25228,8 +25228,8 @@ file: {
       path: 2
       path: 1
       span: 55
-      span: 7
-      span: 19
+      span: 9
+      span: 18
     }
     location: {
       path: 4
@@ -25238,8 +25238,8 @@ file: {
       path: 2
       path: 3
       span: 55
+      span: 21
       span: 22
-      span: 23
     }
     location: {
       path: 4

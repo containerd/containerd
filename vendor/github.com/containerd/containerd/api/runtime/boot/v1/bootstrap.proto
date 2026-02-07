@@ -47,13 +47,13 @@ option go_package = "github.com/containerd/containerd/api/runtime/bootstrap/v1;b
 // BootstrapParams contains all configuration passed from containerd to shim at startup.
 message BootstrapParams {
   // Container/sandbox ID
-  string id = 1;
+  string instance_id = 1;
 
   // Namespace for the container
   string namespace = 2;
 
-  // Enable debug messages in logs.
-  bool enable_debug = 3;
+  // Requested shim log level.
+  string log_level = 3;
 
   // containerd daemon version that is launching this shim.
   string containerd_version = 4;
