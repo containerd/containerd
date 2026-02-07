@@ -336,19 +336,13 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		if target != "" {
 			if tbkt := bkt.Bucket([]byte(target)); tbkt != nil {
 				rerr = fmt.Errorf("target snapshot %q: %w", target, errdefs.ErrAlreadyExists)
-				if err := addSnapshotLease(ctx, tx, s.name, target); err != nil {
-					return err
-				}
-				return nil
+				return addSnapshotLease(ctx, tx, s.name, target)
 			}
 		}
 
 		if bbkt := bkt.Bucket([]byte(key)); bbkt != nil {
 			rerr = fmt.Errorf("snapshot %q: %w", key, errdefs.ErrAlreadyExists)
-			if err := addSnapshotLease(ctx, tx, s.name, key); err != nil {
-				return err
-			}
-			return nil
+			return addSnapshotLease(ctx, tx, s.name, key)
 		}
 
 		if parent != "" {
