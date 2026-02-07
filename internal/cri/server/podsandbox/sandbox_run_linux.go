@@ -105,11 +105,12 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		case runtime.NamespaceMode_POD:
 			specOpts = append(specOpts, oci.WithUserNamespace(uids, gids))
 			usernsEnabled = true
-
-			if err := c.pinUserNamespace(id, nsPath); err != nil {
-				return nil, fmt.Errorf("failed to pin user namespace: %w", err)
+			if !hostNetwork(config) {
+				if err := c.pinUserNamespace(id, nsPath); err != nil {
+					return nil, fmt.Errorf("failed to pin user namespace: %w", err)
+				}
+				specOpts = append(specOpts, customopts.WithNamespacePath(runtimespec.UserNamespace, c.getSandboxPinnedUserNamespace(id)))
 			}
-			specOpts = append(specOpts, customopts.WithNamespacePath(runtimespec.UserNamespace, c.getSandboxPinnedUserNamespace(id)))
 		default:
 			return nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
 		}
@@ -126,7 +127,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	// When user-namespace is enabled, the `nosuid, nodev, noexec` flags are
 	// required, otherwise the remount will fail with EPERM. Just use them
 	// unconditionally, they are nice to have anyways.
-	specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
+	mounts := []runtimespec.Mount{
 		{
 			Source:      sandboxDevShm,
 			Destination: devShm,
@@ -140,7 +141,21 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 			Type:        "bind",
 			Options:     []string{"rbind", "ro", "nosuid", "nodev", "noexec"},
 		},
-	}))
+	}
+
+	// When using both host network and user namespace, we need to bind mount /sys
+	// instead of mounting sysfs, because mounting sysfs will fail with EPERM in this configuration.
+	if nsOptions.GetNetwork() == runtime.NamespaceMode_NODE && usernsEnabled {
+		specOpts = append(specOpts, oci.WithoutMounts("/sys"))
+		mounts = append(mounts, runtimespec.Mount{
+			Source:      "/sys",
+			Destination: "/sys",
+			Type:        "bind",
+			Options:     []string{"rbind", "rro", "nosuid", "nodev", "noexec"},
+		})
+	}
+
+	specOpts = append(specOpts, oci.WithMounts(mounts))
 
 	processLabel, mountLabel, err := initLabelsFromOpt(securityContext.GetSelinuxOptions())
 	if err != nil {
