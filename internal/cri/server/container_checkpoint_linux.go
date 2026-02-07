@@ -61,7 +61,7 @@ import (
 
 // checkIfCheckpointOCIImage returns checks if the input refers to a checkpoint image.
 // It returns the StorageImageID of the image the input resolves to, nil otherwise.
-func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string) (string, error) {
+func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string, snapshotter string) (string, error) {
 	if input == "" {
 		return "", nil
 	}
@@ -69,7 +69,7 @@ func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string
 		return "", nil
 	}
 
-	image, err := c.LocalResolve(input)
+	image, err := c.LocalResolve(input, snapshotter)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve image %q: %w", input, err)
 	}
@@ -124,7 +124,7 @@ func (c *criService) CRImportCheckpoint(
 	createAnnotations := meta.Config.Annotations
 	createLabels := meta.Config.Labels
 
-	restoreStorageImageID, err := c.checkIfCheckpointOCIImage(ctx, inputImage)
+	restoreStorageImageID, err := c.checkIfCheckpointOCIImage(ctx, inputImage, "")
 	if err != nil {
 		return "", err
 	}
@@ -325,7 +325,7 @@ func (c *criService) CRImportCheckpoint(
 		// checkpoint archive as NAME@DIGEST. The checkpoint archive also contains
 		// the tag with which it was initially pulled.
 		// First step is to pull NAME@DIGEST
-		containerdImage, err = c.client.Pull(ctx, config.RootfsImageRef)
+		containerdImage, err = c.client.Pull(ctx, config.RootfsImageRef, client.WithPullUnpack)
 		if err != nil {
 			return "", fmt.Errorf("failed to pull checkpoint base image %s: %w", config.RootfsImageRef, err)
 		}

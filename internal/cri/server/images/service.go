@@ -28,6 +28,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
+	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -95,6 +96,8 @@ type CRIImageServiceOptions struct {
 
 	Snapshotters map[string]snapshots.Snapshotter
 
+	SnapshotterExports map[string]map[string]string
+
 	Client imageClient
 
 	Transferrer transfer.Transferrer
@@ -122,7 +125,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
-		snapshotStore:               snapshotstore.NewStore(),
+		snapshotStore:               snapshotstore.NewStore(options.Snapshotters, options.SnapshotterExports),
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
 		downloadLimiter:             downloadLimiter,
@@ -131,7 +134,6 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	log.L.Info("Start snapshots syncer")
 	snapshotsSyncer := newSnapshotsSyncer(
 		svc.snapshotStore,
-		options.Snapshotters,
 		time.Duration(svc.config.StatsCollectPeriod)*time.Second,
 	)
 	snapshotsSyncer.start()
@@ -139,9 +141,10 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	return &svc, nil
 }
 
-// LocalResolve resolves image reference locally and returns corresponding image metadata. It
-// returns errdefs.ErrNotFound if the reference doesn't exist.
-func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
+// LocalResolve resolves image reference locally and returns corresponding image metadata.
+// Optional snapshotter can be provided; if not specified, the default snapshotter from config is used.
+// It returns errdefs.ErrNotFound if the reference doesn't exist.
+func (c *CRIImageService) LocalResolve(refOrID string, snapshotter ...string) (imagestore.Image, error) {
 	getImageID := func(refOrId string) string {
 		if _, err := imagedigest.Parse(refOrID); err == nil {
 			return refOrID
@@ -166,7 +169,36 @@ func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error)
 		// Try to treat ref as imageID
 		imageID = refOrID
 	}
-	return c.imageStore.Get(imageID)
+	image, err := c.imageStore.Get(imageID)
+	if err != nil {
+		return image, err
+	}
+	if image.ChainID != "" {
+		sn := c.config.Snapshotter
+		if len(snapshotter) > 0 && snapshotter[0] != "" {
+			sn = snapshotter[0]
+		}
+
+		// For local snapshotters , verify snapshot existence.
+		// For remote snapshotters), we skip the strict check to avoid
+		// breaking lazy loading workflows where snapshots may not be in the cache yet.
+		if !c.snapshotStore.IsRemoteSnapshotter(sn) {
+			if snSvc, ok := c.snapshotStore.GetSnapshotter(sn); ok {
+				ctx := ctrdutil.NamespacedContext()
+				if _, err := snSvc.Stat(ctx, image.ChainID); err != nil {
+					log.L.Debugf("LocalResolve: snapshot %q missing in snapshotter %q: %v. Cleaning up cache and returning NotFound to trigger pull.", image.ChainID, sn, err)
+					// Cleanup the stale snapshot record from the store so that the next PullImage doesn't skip it.
+					key := snapshotstore.Key{
+						Key:         image.ChainID,
+						Snapshotter: sn,
+					}
+					c.snapshotStore.Delete(key)
+					return imagestore.Image{}, err
+				}
+			}
+		}
+	}
+	return image, nil
 }
 
 // RuntimeSnapshotter overrides the default snapshotter if Snapshotter is set for this runtime.

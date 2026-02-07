@@ -261,10 +261,20 @@ type UnpackConfig struct {
 	DuplicationSuppressor kmutex.KeyedLocker
 	// Limiter is used to limit concurrent unpacks
 	Limiter *semaphore.Weighted
+	// FetchMissingContent enables verification of content blob existence even if snapshot exists.
+	FetchMissingContent bool
 }
 
 // UnpackOpt provides configuration for unpack
 type UnpackOpt func(context.Context, *UnpackConfig) error
+
+// WithUnpackFetchMissingContent configures whether to check content integrity.
+func WithUnpackFetchMissingContent(check bool) UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.FetchMissingContent = check
+		return nil
+	}
+}
 
 // WithSnapshotterPlatformCheck sets `CheckPlatformSupported` on the UnpackConfig
 func WithSnapshotterPlatformCheck() UnpackOpt {

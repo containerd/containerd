@@ -243,7 +243,7 @@ func TestContainerdSandboxImagePulledOutsideCRI(t *testing.T) {
 	imageService.RemoveImage(&runtime.ImageSpec{Image: pauseImage})
 
 	t.Log("pull pause image")
-	_, err := containerdClient.Pull(ctx, pauseImage)
+	_, err := containerdClient.Pull(ctx, pauseImage, containerd.WithPullUnpack)
 	assert.NoError(t, err)
 
 	t.Log("pause image should be seen by cri plugin")
