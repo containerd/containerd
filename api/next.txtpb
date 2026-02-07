@@ -24954,29 +24954,36 @@ file: {
       json_name: "enableDebug"
     }
     field: {
-      name: "containerd_ttrpc_address"
+      name: "containerd_version"
       number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerdVersion"
+    }
+    field: {
+      name: "containerd_ttrpc_address"
+      number: 5
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "containerdTtrpcAddress"
     }
     field: {
       name: "containerd_grpc_address"
-      number: 5
+      number: 6
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "containerdGrpcAddress"
     }
     field: {
       name: "containerd_binary"
-      number: 8
+      number: 7
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "containerdBinary"
     }
     field: {
       name: "extensions"
-      number: 9
+      number: 8
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.runtime.bootstrap.v1.Extension"
@@ -25060,7 +25067,7 @@ file: {
     location: {
       span: 38
       span: 0
-      span: 101
+      span: 104
       span: 1
     }
     location: {
@@ -25102,7 +25109,7 @@ file: {
       path: 0
       span: 47
       span: 0
-      span: 70
+      span: 73
       span: 1
       leading_comments: " BootstrapParams contains all configuration passed from containerd to shim at startup.\n"
     }
@@ -25241,8 +25248,8 @@ file: {
       path: 3
       span: 58
       span: 2
-      span: 38
-      leading_comments: " Containerd's TTRPC API address (e.g., \"unix:///run/containerd/containerd.sock.ttrpc\")\n"
+      span: 32
+      leading_comments: " containerd daemon version that is launching this shim.\n"
     }
     location: {
       path: 4
@@ -25262,7 +25269,7 @@ file: {
       path: 1
       span: 58
       span: 9
-      span: 33
+      span: 27
     }
     location: {
       path: 4
@@ -25271,8 +25278,8 @@ file: {
       path: 3
       path: 3
       span: 58
-      span: 36
-      span: 37
+      span: 30
+      span: 31
     }
     location: {
       path: 4
@@ -25280,6 +25287,46 @@ file: {
       path: 2
       path: 4
       span: 61
+      span: 2
+      span: 38
+      leading_comments: " Containerd's TTRPC API address (e.g., \"unix:///run/containerd/containerd.sock.ttrpc\")\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 5
+      span: 61
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 1
+      span: 61
+      span: 9
+      span: 33
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 3
+      span: 61
+      span: 36
+      span: 37
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 5
+      span: 64
       span: 2
       span: 37
       leading_comments: " Containerd's gRPC API address (e.g., \"unix:///run/containerd/containerd.sock\")\n"
@@ -25288,9 +25335,9 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 4
       path: 5
-      span: 61
+      path: 5
+      span: 64
       span: 2
       span: 8
     }
@@ -25298,9 +25345,9 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 4
+      path: 5
       path: 1
-      span: 61
+      span: 64
       span: 9
       span: 32
     }
@@ -25308,9 +25355,9 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 4
+      path: 5
       path: 3
-      span: 61
+      span: 64
       span: 35
       span: 36
     }
@@ -25318,8 +25365,8 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 5
-      span: 64
+      path: 6
+      span: 67
       span: 2
       span: 31
       leading_comments: " Path to containerd binary for event publishing\n"
@@ -25328,9 +25375,9 @@ file: {
       path: 4
       path: 0
       path: 2
+      path: 6
       path: 5
-      path: 5
-      span: 64
+      span: 67
       span: 2
       span: 8
     }
@@ -25338,9 +25385,9 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 5
+      path: 6
       path: 1
-      span: 64
+      span: 67
       span: 9
       span: 26
     }
@@ -25348,9 +25395,9 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 5
+      path: 6
       path: 3
-      span: 64
+      span: 67
       span: 29
       span: 30
     }
@@ -25358,8 +25405,8 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 6
-      span: 69
+      path: 7
+      span: 72
       span: 2
       span: 36
       leading_comments: " Extensible configuration sections for new features\n Each section can contain arbitrary structured data identified by type URL\n Examples: CRI config, NRI config, sandbox config, etc.\n"
@@ -25368,9 +25415,9 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 6
+      path: 7
       path: 4
-      span: 69
+      span: 72
       span: 2
       span: 10
     }
@@ -25378,9 +25425,9 @@ file: {
       path: 4
       path: 0
       path: 2
+      path: 7
       path: 6
-      path: 6
-      span: 69
+      span: 72
       span: 11
       span: 20
     }
@@ -25388,9 +25435,9 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 6
+      path: 7
       path: 1
-      span: 69
+      span: 72
       span: 21
       span: 31
     }
@@ -25398,18 +25445,18 @@ file: {
       path: 4
       path: 0
       path: 2
-      path: 6
+      path: 7
       path: 3
-      span: 69
+      span: 72
       span: 34
       span: 35
     }
     location: {
       path: 4
       path: 1
-      span: 74
+      span: 77
       span: 0
-      span: 81
+      span: 84
       span: 1
       leading_comments: " Extension provides extensibility for new configuration types\n without changing the core BootstrapParams protocol\n"
     }
@@ -25417,7 +25464,7 @@ file: {
       path: 4
       path: 1
       path: 1
-      span: 74
+      span: 77
       span: 8
       span: 17
     }
@@ -25426,7 +25473,7 @@ file: {
       path: 1
       path: 2
       path: 0
-      span: 80
+      span: 83
       span: 2
       span: 32
       leading_comments: " Configuration data with embedded type URL\n Examples of type URLs:\n   - \"containerd.io/cri.v1.PodSandboxConfig\"\n   - \"containerd.io/nri.v1.PluginConfig\"\n   - \"containerd.io/sandbox.v1.SandboxConfig\"\n"
@@ -25437,7 +25484,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 80
+      span: 83
       span: 2
       span: 21
     }
@@ -25447,7 +25494,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 80
+      span: 83
       span: 22
       span: 27
     }
@@ -25457,16 +25504,16 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 80
+      span: 83
       span: 30
       span: 31
     }
     location: {
       path: 4
       path: 2
-      span: 84
+      span: 87
       span: 0
-      span: 101
+      span: 104
       span: 1
       leading_comments: " BootstrapResult is returned by shim via stdout after successful startup\n"
     }
@@ -25474,7 +25521,7 @@ file: {
       path: 4
       path: 2
       path: 1
-      span: 84
+      span: 87
       span: 8
       span: 23
     }
@@ -25483,7 +25530,7 @@ file: {
       path: 2
       path: 2
       path: 0
-      span: 86
+      span: 89
       span: 2
       span: 20
       leading_comments: " Version of shim parameters (expected 2 for shim v2)\n"
@@ -25494,7 +25541,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 86
+      span: 89
       span: 2
       span: 7
     }
@@ -25504,7 +25551,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 86
+      span: 89
       span: 8
       span: 15
     }
@@ -25514,7 +25561,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 86
+      span: 89
       span: 18
       span: 19
     }
@@ -25523,7 +25570,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 90
+      span: 93
       span: 2
       span: 21
       leading_comments: " Address where shim is listening (e.g., \"unix:///run/containerd/shim.sock\")\n Containerd will connect to this address for task operations\n"
@@ -25534,7 +25581,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 90
+      span: 93
       span: 2
       span: 8
     }
@@ -25544,7 +25591,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 90
+      span: 93
       span: 9
       span: 16
     }
@@ -25554,7 +25601,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 90
+      span: 93
       span: 19
       span: 20
     }
@@ -25563,7 +25610,7 @@ file: {
       path: 2
       path: 2
       path: 2
-      span: 93
+      span: 96
       span: 2
       span: 22
       leading_comments: " Protocol used by shim: \"ttrpc\" or \"grpc\"\n"
@@ -25574,7 +25621,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 93
+      span: 96
       span: 2
       span: 8
     }
@@ -25584,7 +25631,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 93
+      span: 96
       span: 9
       span: 17
     }
@@ -25594,7 +25641,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 93
+      span: 96
       span: 20
       span: 21
     }
@@ -25603,7 +25650,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 97
+      span: 100
       span: 2
       span: 35
       leading_comments: " Optional: Capabilities supported by this shim instance\n Allows shim to advertise what features it supports\n"
@@ -25614,7 +25661,7 @@ file: {
       path: 2
       path: 3
       path: 4
-      span: 97
+      span: 100
       span: 2
       span: 10
     }
@@ -25624,7 +25671,7 @@ file: {
       path: 2
       path: 3
       path: 5
-      span: 97
+      span: 100
       span: 11
       span: 17
     }
@@ -25634,7 +25681,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 97
+      span: 100
       span: 18
       span: 30
     }
@@ -25644,7 +25691,7 @@ file: {
       path: 2
       path: 3
       path: 3
-      span: 97
+      span: 100
       span: 33
       span: 34
     }
@@ -25653,7 +25700,7 @@ file: {
       path: 2
       path: 2
       path: 4
-      span: 100
+      span: 103
       span: 2
       span: 35
       leading_comments: " Optional: Additional metadata from shim\n"
@@ -25664,7 +25711,7 @@ file: {
       path: 2
       path: 4
       path: 6
-      span: 100
+      span: 103
       span: 2
       span: 21
     }
@@ -25674,7 +25721,7 @@ file: {
       path: 2
       path: 4
       path: 1
-      span: 100
+      span: 103
       span: 22
       span: 30
     }
@@ -25684,7 +25731,7 @@ file: {
       path: 2
       path: 4
       path: 3
-      span: 100
+      span: 103
       span: 33
       span: 34
     }
