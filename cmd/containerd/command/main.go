@@ -57,15 +57,22 @@ func init() {
 	cli.VersionPrinter = func(cliContext *cli.Context) {
 		fmt.Println(cliContext.App.Name, version.Package, cliContext.App.Version, version.Revision)
 	}
+
+	// Override the default flag descriptions for '--version' and '--help'
+	// to align with other flags and start with uppercase.
 	cli.VersionFlag = &cli.BoolFlag{
 		Name:    "version",
 		Aliases: []string{"v"},
 		Usage:   "Print the version",
+
+		DisableDefaultText: true,
 	}
 	cli.HelpFlag = &cli.BoolFlag{
 		Name:    "help",
 		Aliases: []string{"h"},
 		Usage:   "Show help",
+
+		DisableDefaultText: true,
 	}
 }
 
