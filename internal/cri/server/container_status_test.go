@@ -167,6 +167,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expected.FinishedAt = test.finishedAt
 			expected.ExitCode = test.exitCode
 			expected.Message = test.message
+			expected.StopSignal = runtime.Signal_SIGTERM
 			patchExceptedWithState(expected, test.expectedState)
 			containerStatus, err := toCRIContainerStatus(context.Background(),
 				container,
@@ -272,6 +273,7 @@ func TestContainerStatus(t *testing.T) {
 			expected.StartedAt = test.startedAt
 			expected.FinishedAt = test.finishedAt
 			expected.Reason = test.reason
+			expected.StopSignal = runtime.Signal_SIGTERM
 			patchExceptedWithState(expected, test.expectedState)
 			assert.Equal(t, expected, resp.GetStatus())
 		})
