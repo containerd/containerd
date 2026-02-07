@@ -303,6 +303,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	sopts = append(sopts, transferimage.WithPlatforms(platforms.DefaultSpec()))
 	sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
 	sopts = append(sopts, transferimage.WithImageLabels(labels))
+	sopts = append(sopts, transferimage.WithManifestLimit(c.config.ManifestLimit))
 	is := transferimage.NewStore(ref, sopts...)
 	log.G(ctx).Debugf("Getting new CRI credentials")
 	ch := newCRICredentials(ref, credentials)
