@@ -38,6 +38,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/errdefs"
 )
 
 func TestResolverWithHostsDir(t *testing.T) {
@@ -314,5 +315,37 @@ func (m testManifest) OCIManifest() []byte {
 func (m testManifest) RegisterHandler(r *http.ServeMux, name string) {
 	for _, c := range append(m.references, m.config) {
 		r.Handle(fmt.Sprintf("/v2/%s/blobs/%s", name, c.Digest()), c)
+	}
+}
+
+func TestHostDirFromPathList_SearchesMultipleRoots(t *testing.T) {
+	t.Parallel()
+
+	// root1 intentionally does not exist
+	root1 := filepath.Join(t.TempDir(), "does-not-exist")
+	root2 := t.TempDir()
+
+	host := "registry.k8s.io"
+	want := filepath.Join(root2, host)
+	if err := os.MkdirAll(want, 0o755); err != nil {
+		t.Fatalf("mkdir %q: %v", want, err)
+	}
+
+	pathList := root1 + string(os.PathListSeparator) + root2
+	dir, err := HostDirFromPathList(pathList)(host)
+	if err != nil {
+		t.Fatalf("HostDirFromPathList(%q)(%q) returned error: %v", pathList, host, err)
+	}
+	if dir != want {
+		t.Fatalf("unexpected host dir: got %q, want %q", dir, want)
+	}
+}
+
+func TestHostDirFromRoots_ReturnsNotFoundWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	_, err := HostDirFromRoots(nil)("registry.k8s.io")
+	if !errdefs.IsNotFound(err) {
+		t.Fatalf("expected not found, got %v", err)
 	}
 }

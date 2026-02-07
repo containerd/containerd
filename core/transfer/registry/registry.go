@@ -125,7 +125,9 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 
 	hostOptions := config.HostOptions{}
 	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+		// ropts.hostDir may be a filepath.SplitList-compatible path list
+		// (e.g. "/etc/containerd/certs.d:/etc/docker/certs.d" on Unix).
+		hostOptions.HostDir = config.HostDirFromPathList(ropts.hostDir)
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
