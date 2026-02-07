@@ -117,16 +117,16 @@ message ControllerStartRequest {
 }
 
 message ControllerStartResponse {
-	string sandbox_id = 1;
-	uint32 pid = 2;
-	google.protobuf.Timestamp created_at = 3;
-	map<string, string> labels = 4;
-	// Address of the sandbox for containerd to connect,
-	// for calling Task or other APIs serving in the sandbox.
-	// it is in the form of ttrpc+unix://path/to/uds or grpc+vsock://<vsock cid>:<port>.
-	string address = 5;
-	uint32 version = 6;
-	google.protobuf.Any spec = 7;
+  string sandbox_id = 1;
+  uint32 pid = 2;
+  google.protobuf.Timestamp created_at = 3;
+  map<string, string> labels = 4;
+  // Address of the sandbox for containerd to connect,
+  // for calling Task or other APIs serving in the sandbox.
+  // it is in the form of ttrpc+unix://path/to/uds or grpc+vsock://<vsock cid>:<port>.
+  string address = 5;
+  uint32 version = 6;
+  google.protobuf.Any spec = 7;
 }
 
 message ControllerPlatformRequest {
