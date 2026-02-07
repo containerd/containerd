@@ -186,9 +186,15 @@ func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.B
 	params.Version = 3
 	params.Protocol = "ttrpc"
 
-	id := opts.GetID()
+	id := opts.GetInstanceID()
 
-	cmd, err := newCommand(ctx, id, opts.GetContainerdGrpcAddress(), opts.GetContainerdTtrpcAddress(), opts.GetEnableDebug())
+	debugLog := false
+	switch log.GetLevel() {
+	case log.DebugLevel, log.TraceLevel:
+		debugLog = true
+	}
+
+	cmd, err := newCommand(ctx, id, opts.GetContainerdGrpcAddress(), opts.GetContainerdTtrpcAddress(), debugLog)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +231,7 @@ func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.B
 	sockets = append(sockets, s)
 	cmd.ExtraFiles = append(cmd.ExtraFiles, s.f)
 
-	if opts.GetEnableDebug() {
+	if debugLog {
 		s, err = newShimSocket(ctx, opts.GetContainerdGrpcAddress(), grouping, true)
 		if err != nil {
 			return nil, err
