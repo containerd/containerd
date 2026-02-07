@@ -55,19 +55,22 @@ message BootstrapParams {
   // Enable debug messages in logs.
   bool enable_debug = 3;
 
+  // containerd daemon version that is launching this shim.
+  string containerd_version = 4;
+
   // Containerd's TTRPC API address (e.g., "unix:///run/containerd/containerd.sock.ttrpc")
-  string containerd_ttrpc_address = 4;
+  string containerd_ttrpc_address = 5;
 
   // Containerd's gRPC API address (e.g., "unix:///run/containerd/containerd.sock")
-  string containerd_grpc_address = 5;
+  string containerd_grpc_address = 6;
 
   // Path to containerd binary for event publishing
-  string containerd_binary = 8;
+  string containerd_binary = 7;
 
   // Extensible configuration sections for new features
   // Each section can contain arbitrary structured data identified by type URL
   // Examples: CRI config, NRI config, sandbox config, etc.
-  repeated Extension extensions = 9;
+  repeated Extension extensions = 8;
 }
 
 // Extension provides extensibility for new configuration types

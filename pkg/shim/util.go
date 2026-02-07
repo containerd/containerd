@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 )
 
@@ -126,6 +127,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 			ID:                     config.ID,
 			Namespace:              ns,
 			EnableDebug:            config.Debug,
+			ContainerdVersion:      version.Version,
 			ContainerdGrpcAddress:  config.GRPCAddress,
 			ContainerdTtrpcAddress: config.TTRPCAddress,
 			ContainerdBinary:       self,
