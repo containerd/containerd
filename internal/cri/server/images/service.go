@@ -18,6 +18,7 @@ package images
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -29,13 +30,14 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/internal/kmutex"
+	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
-	"golang.org/x/sync/semaphore"
-
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -43,6 +45,7 @@ type imageClient interface {
 	ListImages(context.Context, ...string) ([]containerd.Image, error)
 	GetImage(context.Context, string) (containerd.Image, error)
 	Pull(context.Context, string, ...containerd.RemoteOpt) (containerd.Image, error)
+	SnapshotService(snapshotterName string) snapshots.Snapshotter
 }
 
 type ImagePlatform struct {
@@ -69,6 +72,8 @@ type CRIImageService struct {
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
 	snapshotStore *snapshotstore.Store
+	// snapshotters provides access to snapshotter instances.
+	snapshotters map[string]snapshots.Snapshotter
 	// transferrer is used to pull image with transfer service
 	transferrer transfer.Transferrer
 	// unpackDuplicationSuppressor is used to make sure that there is only
@@ -123,6 +128,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
 		snapshotStore:               snapshotstore.NewStore(),
+		snapshotters:                options.Snapshotters,
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
 		downloadLimiter:             downloadLimiter,
@@ -207,4 +213,159 @@ func (c *CRIImageService) Config() criconfig.ImageConfig {
 // GRPCService returns a new CRI Image Service grpc server.
 func (c *CRIImageService) GRPCService() runtime.ImageServiceServer {
 	return &GRPCCRIImageService{c}
+}
+
+// IsImageUnpacked checks if an image is unpacked for the given snapshotter.
+// When using a runtime-specific snapshotter (different from the default),
+// this also verifies that the required labels are present on the snapshots.
+// If labels are missing (e.g., from images pulled before the label fix),
+// returns false to trigger a re-pull with proper labels.
+func (c *CRIImageService) IsImageUnpacked(ctx context.Context, ref string, snapshotter string) (bool, error) {
+	image, err := c.client.GetImage(ctx, ref)
+	if err != nil {
+		return false, err
+	}
+
+	unpacked, err := image.IsUnpacked(ctx, snapshotter)
+	if err != nil || !unpacked {
+		return unpacked, err
+	}
+
+	// When using a runtime-specific snapshotter (not the default),
+	// verify that snapshots have required labels. This ensures that images
+	// pulled before the runtime-snapshotter fix get re-pulled with proper labels.
+	defaultSnapshotter := c.config.Snapshotter
+	if snapshotter != defaultSnapshotter {
+		hasLabels, err := c.verifySnapshotLabels(ctx, image, snapshotter)
+		if err != nil {
+			log.G(ctx).WithError(err).Warnf("Failed to verify snapshot labels for %s", ref)
+			// If we can't verify, assume it's OK to avoid breaking existing setups
+			return true, nil
+		}
+		if !hasLabels {
+			log.G(ctx).Debugf("Image %s unpacked for %s but missing required labels", ref, snapshotter)
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// UnpackImage unpacks an existing image into the specified snapshotter.
+// This is used when an image exists locally but needs to be unpacked for a different
+// snapshotter (e.g., for remote/proxy snapshotters like nydus).
+// Unlike PullImage, this does not contact the registry.
+//
+// For remote snapshotters that need metadata labels (like nydus in proxy mode),
+// the required labels are passed to the snapshotter during unpack.
+//
+// If snapshots already exist with incorrect labels (e.g., from a previous unpack
+// with wrong configuration), they are updated with the correct labels.
+func (c *CRIImageService) UnpackImage(ctx context.Context, ref string, snapshotter string) error {
+	image, err := c.client.GetImage(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	// Fix existing snapshot labels if they have wrong values.
+	// This handles the case where image was previously unpacked for this snapshotter
+	// but with incorrect labels (e.g., digest instead of pullable reference).
+	if err := c.fixSnapshotLabels(ctx, image, snapshotter, ref); err != nil {
+		log.G(ctx).WithError(err).Warnf("Failed to fix snapshot labels for %s, continuing anyway", ref)
+	}
+
+	// Pass labels required by remote snapshotters.
+	// These labels are normally set during PullImage via AppendInfoHandlerWrapper,
+	// but when unpacking an existing image for a different snapshotter, we need
+	// to pass them explicitly.
+	labels := map[string]string{
+		snpkg.TargetRefLabel: ref,
+	}
+
+	return image.Unpack(ctx, snapshotter, containerd.WithUnpackSnapshotOpts(snapshots.WithLabels(labels)))
+}
+
+// fixSnapshotLabels updates snapshot labels if they have incorrect values.
+// This is needed when an image was previously unpacked with wrong metadata
+// (e.g., digest instead of pullable reference) and needs the correct label
+// for remote snapshotters like nydus.
+func (c *CRIImageService) fixSnapshotLabels(ctx context.Context, image containerd.Image, snapshotter string, expectedRef string) error {
+	ss := c.client.SnapshotService(snapshotter)
+
+	// Get image layer chain IDs
+	diffIDs, err := image.RootFS(ctx)
+	if err != nil {
+		return err
+	}
+	if len(diffIDs) == 0 {
+		return nil
+	}
+
+	// Check and fix each layer's snapshot labels
+	for i := range diffIDs {
+		chainID := identity.ChainID(diffIDs[:i+1]).String()
+
+		info, err := ss.Stat(ctx, chainID)
+		if err != nil {
+			// Snapshot doesn't exist, that's fine
+			continue
+		}
+
+		// Check if the label value is wrong (digest instead of pullable reference)
+		if labelVal, ok := info.Labels[snpkg.TargetRefLabel]; ok {
+			if strings.HasPrefix(labelVal, "sha256:") && labelVal != expectedRef {
+				// Update the label with the correct value
+				info.Labels[snpkg.TargetRefLabel] = expectedRef
+				if _, err := ss.Update(ctx, info, "labels."+snpkg.TargetRefLabel); err != nil {
+					log.G(ctx).WithError(err).Warnf("Failed to update label on snapshot %s", chainID)
+				}
+			}
+		} else {
+			// Label doesn't exist, add it
+			if info.Labels == nil {
+				info.Labels = make(map[string]string)
+			}
+			info.Labels[snpkg.TargetRefLabel] = expectedRef
+			if _, err := ss.Update(ctx, info, "labels."+snpkg.TargetRefLabel); err != nil {
+				log.G(ctx).WithError(err).Warnf("Failed to add label to snapshot %s", chainID)
+			}
+		}
+	}
+
+	return nil
+}
+
+// verifySnapshotLabels checks if the image's snapshots have the required labels
+// for runtime-specific snapshotters.
+func (c *CRIImageService) verifySnapshotLabels(ctx context.Context, image containerd.Image, snapshotter string) (bool, error) {
+	ss := c.client.SnapshotService(snapshotter)
+
+	// Get the image's root filesystem descriptor to find the top layer
+	diffIDs, err := image.RootFS(ctx)
+	if err != nil {
+		return false, err
+	}
+	if len(diffIDs) == 0 {
+		return true, nil // No layers, nothing to check
+	}
+
+	// The snapshot key for the top layer is the ChainID
+	chainID := identity.ChainID(diffIDs).String()
+
+	// Check if the snapshot has the TargetRefLabel
+	info, err := ss.Stat(ctx, chainID)
+	if err != nil {
+		return false, err
+	}
+
+	// Check for the required label with a pullable reference (not just a digest).
+	// A pullable reference should NOT start with "sha256:" - that's just a digest
+	// and can't be used by remote snapshotters to pull the image.
+	if ref, ok := info.Labels[snpkg.TargetRefLabel]; ok {
+		if !strings.HasPrefix(ref, "sha256:") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
