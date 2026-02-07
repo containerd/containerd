@@ -68,6 +68,8 @@ func init() {
 		Name:    "help",
 		Aliases: []string{"h"},
 		Usage:   "Show help",
+
+		DisableDefaultText: true,
 	}
 }
 
