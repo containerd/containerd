@@ -45,6 +45,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/fsview"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
@@ -924,6 +925,13 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 }
 
 func withReadonlyFS(ctx context.Context, client Client, mounts []mount.Mount, fn func(fs.FS) error) error {
+	// Try to avoid mount if possible by using fsview to directly open
+	// overlay/erofs/bind mounts without actually mounting them
+	if viewFS, err := fsview.FSMounts(mounts); err == nil && viewFS != nil {
+		defer viewFS.Close()
+		return fn(viewFS)
+	}
+
 	var mm mount.Manager
 	if cwm, ok := client.(interface{ MountManager() mount.Manager }); ok {
 		mm = cwm.MountManager()
