@@ -21,13 +21,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/resolver"
+	"google.golang.org/grpc/status"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
@@ -41,6 +44,7 @@ import (
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -333,6 +337,48 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 		out[i] = containerFromRecord(c, container)
 	}
 	return out, nil
+}
+
+func (c *Client) ListStream(ctx context.Context, filters ...string) (containersapi.Containers_ListStreamClient, error) {
+	if r, ok := c.ContainerService().(*remoteContainers); ok {
+		session, err := r.client.ListStream(ctx, &containersapi.ListContainersRequest{
+			Filters: filters,
+		})
+		if err != nil {
+			return nil, errgrpc.ToNative(err)
+		}
+		return session, nil
+	}
+	return nil, fmt.Errorf("c.ContainerService() is not a *remoteContainers")
+}
+
+func (c *Client) ListContainerStream(ctx context.Context, out chan<- *containersapi.Container, filters ...string) error {
+	session, err := c.ListStream(ctx, filters...)
+	defer close(out)
+	if err != nil {
+		return err
+	}
+
+	for {
+		receive, err := session.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			if s, ok := status.FromError(err); ok {
+				if s.Code() == codes.Unimplemented {
+					return errStreamNotAvailable
+				}
+			}
+			return errgrpc.ToNative(err)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			out <- receive.Container
+		}
+	}
 }
 
 // NewContainer will create a new container with the provided id.
