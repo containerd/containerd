@@ -17,6 +17,7 @@
 package podsandbox
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -248,7 +249,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 
 // setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts,
 // /etc/resolv.conf and /etc/hostname.
-func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+func (c *Controller) setupSandboxFiles(ctx context.Context, id string, config *runtime.PodSandboxConfig) error {
 	sandboxEtcHostname := c.getSandboxHostname(id)
 	hostname := config.GetHostname()
 	if hostname == "" {
@@ -289,7 +290,7 @@ func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 
 	// Setup sandbox /dev/shm.
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
-		if _, err := c.os.Stat(devShm); err != nil {
+		if err := c.os.Stat(ctx, devShm); err != nil {
 			return fmt.Errorf("host %q is not available for host ipc: %w", devShm, err)
 		}
 	} else {
