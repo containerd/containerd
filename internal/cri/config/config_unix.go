@@ -38,6 +38,9 @@ func DefaultImageConfig() ImageConfig {
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
+		RuntimePlatforms: map[string]ImagePlatform{
+			"runc": {},
+		},
 		PinnedImages: map[string]string{
 			"sandbox": DefaultSandboxImage,
 		},
