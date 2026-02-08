@@ -146,24 +146,6 @@ COPY contrib/Dockerfile.test.d/critest.sh /critest.sh
 ENTRYPOINT ["/critest.sh","start"]
 
 
-# Install proto3
-FROM golang AS proto3
-ARG DESTDIR=/build
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    autoconf \
-    automake \
-    g++ \
-    libtool \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY script/setup/install-protobuf install-protobuf
-RUN ./install-protobuf \
-    && mkdir -p $DESTDIR/usr/local/bin $DESTDIR/usr/local/include \
-    && mv /usr/local/bin/protoc $DESTDIR/usr/local/bin/protoc \
-    && mv /usr/local/include/google $DESTDIR/usr/local/include/google
-
 FROM build-env AS dev
-COPY --from=proto3 /build/ /
 COPY --from=runc   /build/ /
 COPY . .
