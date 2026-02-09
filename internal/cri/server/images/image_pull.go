@@ -340,9 +340,6 @@ func (c *CRIImageService) pullImageWithTransferService(
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, error) {
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
-	rctx, rcancel := context.WithCancel(ctx)
-	defer rcancel()
-	transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
 
 	// Set image store opts
 	var sopts []transferimage.StoreOpt
@@ -360,18 +357,21 @@ func (c *CRIImageService) pullImageWithTransferService(
 		return nil, fmt.Errorf("failed to create OCI registry: %w", err)
 	}
 
-	transferProgressReporter.start(rctx)
-	log.G(ctx).Debugf("Calling cri transfer service")
-	err = c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx)))
-	rcancel()
-	if err != nil {
-		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+	doTransfer := func() (containerd.Image, error) {
+		rctx, rcancel := context.WithCancel(ctx)
+		defer rcancel()
+		transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
+		transferProgressReporter.start(rctx)
+		log.G(ctx).Debugf("Calling cri transfer service")
+		if err := c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx))); err != nil {
+			return nil, err
+		}
+		return c.client.GetImage(ctx, ref)
 	}
 
-	// Image should be pulled, unpacked and present in containerd image store at this moment
-	image, err := c.client.GetImage(ctx, ref)
+	image, err := doTransfer()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
+		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
 	return image, nil
 }
