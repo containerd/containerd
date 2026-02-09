@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/util"
@@ -221,140 +222,12 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 }
 
 func toCRISignal(stopsignal string) runtime.Signal {
-	signalValue := runtime.Signal_RUNTIME_DEFAULT
+	stopsignal = strings.Replace(stopsignal, "+", "PLUS", 1)
+	stopsignal = strings.Replace(stopsignal, "-", "MINUS", 1)
 
-	switch stopsignal {
-	case "SIGABRT":
-		signalValue = runtime.Signal_SIGABRT
-	case "SIGALRM":
-		signalValue = runtime.Signal_SIGALRM
-	case "SIGBUS":
-		signalValue = runtime.Signal_SIGBUS
-	case "SIGCHLD":
-		signalValue = runtime.Signal_SIGCHLD
-	case "SIGCLD":
-		signalValue = runtime.Signal_SIGCLD
-	case "SIGCONT":
-		signalValue = runtime.Signal_SIGCONT
-	case "SIGFPE":
-		signalValue = runtime.Signal_SIGFPE
-	case "SIGHUP":
-		signalValue = runtime.Signal_SIGHUP
-	case "SIGILL":
-		signalValue = runtime.Signal_SIGILL
-	case "SIGINT":
-		signalValue = runtime.Signal_SIGINT
-	case "SIGIO":
-		signalValue = runtime.Signal_SIGIO
-	case "SIGIOT":
-		signalValue = runtime.Signal_SIGIOT
-	case "SIGKILL":
-		signalValue = runtime.Signal_SIGKILL
-	case "SIGPIPE":
-		signalValue = runtime.Signal_SIGPIPE
-	case "SIGPOLL":
-		signalValue = runtime.Signal_SIGPOLL
-	case "SIGPROF":
-		signalValue = runtime.Signal_SIGPROF
-	case "SIGPWR":
-		signalValue = runtime.Signal_SIGPWR
-	case "SIGQUIT":
-		signalValue = runtime.Signal_SIGQUIT
-	case "SIGSEGV":
-		signalValue = runtime.Signal_SIGSEGV
-	case "SIGSTKFLT":
-		signalValue = runtime.Signal_SIGSTKFLT
-	case "SIGSTOP":
-		signalValue = runtime.Signal_SIGSTOP
-	case "SIGSYS":
-		signalValue = runtime.Signal_SIGSYS
-	case "SIGTERM":
-		signalValue = runtime.Signal_SIGTERM
-	case "SIGTRAP":
-		signalValue = runtime.Signal_SIGTRAP
-	case "SIGTSTP":
-		signalValue = runtime.Signal_SIGTSTP
-	case "SIGTTIN":
-		signalValue = runtime.Signal_SIGTTIN
-	case "SIGTTOU":
-		signalValue = runtime.Signal_SIGTTOU
-	case "SIGURG":
-		signalValue = runtime.Signal_SIGURG
-	case "SIGUSR1":
-		signalValue = runtime.Signal_SIGUSR1
-	case "SIGUSR2":
-		signalValue = runtime.Signal_SIGUSR2
-	case "SIGVTALRM":
-		signalValue = runtime.Signal_SIGVTALRM
-	case "SIGWINCH":
-		signalValue = runtime.Signal_SIGWINCH
-	case "SIGXCPU":
-		signalValue = runtime.Signal_SIGXCPU
-	case "SIGXFSZ":
-		signalValue = runtime.Signal_SIGXFSZ
-	case "SIGRTMIN":
-		signalValue = runtime.Signal_SIGRTMIN
-	case "SIGRTMIN+1":
-		signalValue = runtime.Signal_SIGRTMINPLUS1
-	case "SIGRTMIN+2":
-		signalValue = runtime.Signal_SIGRTMINPLUS2
-	case "SIGRTMIN+3":
-		signalValue = runtime.Signal_SIGRTMINPLUS3
-	case "SIGRTMIN+4":
-		signalValue = runtime.Signal_SIGRTMINPLUS4
-	case "SIGRTMIN+5":
-		signalValue = runtime.Signal_SIGRTMINPLUS5
-	case "SIGRTMIN+6":
-		signalValue = runtime.Signal_SIGRTMINPLUS6
-	case "SIGRTMIN+7":
-		signalValue = runtime.Signal_SIGRTMINPLUS7
-	case "SIGRTMIN+8":
-		signalValue = runtime.Signal_SIGRTMINPLUS8
-	case "SIGRTMIN+9":
-		signalValue = runtime.Signal_SIGRTMINPLUS9
-	case "SIGRTMIN+10":
-		signalValue = runtime.Signal_SIGRTMINPLUS10
-	case "SIGRTMIN+11":
-		signalValue = runtime.Signal_SIGRTMINPLUS11
-	case "SIGRTMIN+12":
-		signalValue = runtime.Signal_SIGRTMINPLUS12
-	case "SIGRTMIN+13":
-		signalValue = runtime.Signal_SIGRTMINPLUS13
-	case "SIGRTMIN+14":
-		signalValue = runtime.Signal_SIGRTMINPLUS14
-	case "SIGRTMIN+15":
-		signalValue = runtime.Signal_SIGRTMINPLUS15
-	case "SIGRTMAX-14":
-		signalValue = runtime.Signal_SIGRTMAXMINUS14
-	case "SIGRTMAX-13":
-		signalValue = runtime.Signal_SIGRTMAXMINUS13
-	case "SIGRTMAX-12":
-		signalValue = runtime.Signal_SIGRTMAXMINUS12
-	case "SIGRTMAX-11":
-		signalValue = runtime.Signal_SIGRTMAXMINUS11
-	case "SIGRTMAX-10":
-		signalValue = runtime.Signal_SIGRTMAXMINUS10
-	case "SIGRTMAX-9":
-		signalValue = runtime.Signal_SIGRTMAXMINUS9
-	case "SIGRTMAX-8":
-		signalValue = runtime.Signal_SIGRTMAXMINUS8
-	case "SIGRTMAX-7":
-		signalValue = runtime.Signal_SIGRTMAXMINUS7
-	case "SIGRTMAX-6":
-		signalValue = runtime.Signal_SIGRTMAXMINUS6
-	case "SIGRTMAX-5":
-		signalValue = runtime.Signal_SIGRTMAXMINUS5
-	case "SIGRTMAX-4":
-		signalValue = runtime.Signal_SIGRTMAXMINUS4
-	case "SIGRTMAX-3":
-		signalValue = runtime.Signal_SIGRTMAXMINUS3
-	case "SIGRTMAX-2":
-		signalValue = runtime.Signal_SIGRTMAXMINUS2
-	case "SIGRTMAX-1":
-		signalValue = runtime.Signal_SIGRTMAXMINUS1
-	case "SIGRTMAX":
-		signalValue = runtime.Signal_SIGRTMAX
+	signalValue, ok := runtime.Signal_value[stopsignal]
+	if !ok {
+		return runtime.Signal_RUNTIME_DEFAULT
 	}
-
-	return signalValue
+	return runtime.Signal(signalValue)
 }
