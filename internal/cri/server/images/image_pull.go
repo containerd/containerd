@@ -171,8 +171,17 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	}
 
 	// Check if image is already properly unpacked for this snapshotter
-	if imageID, err := c.getImageIDIfUnpacked(ctx, ref, snapshotter); err == nil {
+	imageID, err := c.getImageIDIfUnpacked(ctx, ref, snapshotter)
+	if err == nil {
 		return imageID, nil
+	}
+	// If image exists but is not properly unpacked, delete it to force a fresh pull.
+	// Stale snapshots are handled by the retry logic in pullWithStaleSnapshotRetry.
+	if errdefs.IsFailedPrecondition(err) {
+		log.G(ctx).Infof("Image %q not properly unpacked for %q, deleting to force fresh pull", ref, snapshotter)
+		if delErr := c.images.Delete(ctx, ref, containerdimages.SynchronousDelete()); delErr != nil {
+			log.G(ctx).WithError(delErr).Warnf("Failed to delete image %q, will try pull anyway", ref)
+		}
 	}
 
 	// If ref is a digest (sha256:...), we need to find a pullable reference.
@@ -219,7 +228,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	if err != nil {
 		return "", fmt.Errorf("get image config descriptor: %w", err)
 	}
-	imageID := configDesc.Digest.String()
+	imageID = configDesc.Digest.String()
 
 	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
@@ -304,7 +313,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 		return c.client.Pull(pctx, ref, pullOpts...)
 	}
 
-	image, err := doPull()
+	image, err := c.pullWithStaleSnapshotRetry(ctx, ref, snapshotter, doPull)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
@@ -350,7 +359,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 		return c.client.GetImage(ctx, ref)
 	}
 
-	image, err := doTransfer()
+	image, err := c.pullWithStaleSnapshotRetry(ctx, ref, snapshotter, doTransfer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
@@ -392,6 +401,105 @@ func (c *CRIImageService) getImageIDIfUnpacked(ctx context.Context, ref, snapsho
 	}
 
 	return imageID, nil
+}
+
+// pullWithStaleSnapshotRetry executes a pull operation and retries if it fails
+// due to stale snapshots that can be cleaned up. It retries up to the number of
+// layers in the image to handle cases where multiple layer snapshots are stale.
+func (c *CRIImageService) pullWithStaleSnapshotRetry(
+	ctx context.Context,
+	ref string,
+	snapshotter string,
+	doPull func() (containerd.Image, error),
+) (containerd.Image, error) {
+	var image containerd.Image
+	var err error
+
+	// First attempt
+	image, err = doPull()
+	if err == nil {
+		return image, nil
+	}
+
+	// Check if this is a stale snapshot error we can retry
+	if !errdefs.IsAlreadyExists(err) {
+		return nil, err
+	}
+
+	// Determine max retries from the image's layer count if possible.
+	// The image metadata might exist even if content is corrupted.
+	maxRetries := c.getImageLayerCount(ctx, ref)
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		if !c.tryRemoveStaleSnapshot(ctx, err, snapshotter) {
+			return nil, err
+		}
+
+		log.G(ctx).Infof("Retrying pull after stale snapshot cleanup (attempt %d/%d)", attempt, maxRetries)
+		image, err = doPull()
+		if err == nil {
+			return image, nil
+		}
+
+		if !errdefs.IsAlreadyExists(err) {
+			return nil, err
+		}
+	}
+
+	log.G(ctx).WithError(err).Warn("Pull failed after maximum retries for stale snapshot cleanup")
+	return nil, err
+}
+
+// getImageLayerCount returns the number of layers in an image, or a default
+// value if the image cannot be found or the layer count cannot be determined.
+func (c *CRIImageService) getImageLayerCount(ctx context.Context, ref string) int {
+	const defaultMaxRetries = 10
+
+	img, err := c.client.GetImage(ctx, ref)
+	if err != nil {
+		return defaultMaxRetries
+	}
+
+	diffIDs, err := img.RootFS(ctx)
+	if err != nil || len(diffIDs) == 0 {
+		return defaultMaxRetries
+	}
+
+	return len(diffIDs)
+}
+
+// tryRemoveStaleSnapshot attempts to extract a snapshot key from an "already exists"
+// error and remove it. This handles the case where content was garbage collected but
+// snapshot metadata remains, causing subsequent pulls to fail.
+// Returns true if a stale snapshot was successfully removed.
+func (c *CRIImageService) tryRemoveStaleSnapshot(ctx context.Context, err error, snapshotter string) bool {
+	ss := c.client.SnapshotService(snapshotter)
+	if ss == nil {
+		return false
+	}
+
+	// Parse snapshot key from error message like: target snapshot "sha256:xxx": already exists
+	errStr := err.Error()
+	idx := strings.Index(errStr, "target snapshot \"")
+	if idx == -1 {
+		return false
+	}
+
+	start := idx + len("target snapshot \"")
+	end := strings.Index(errStr[start:], "\"")
+	if end == -1 {
+		return false
+	}
+
+	snapshotKey := errStr[start : start+end]
+	log.G(ctx).Infof("Attempting to remove stale snapshot: %s", snapshotKey)
+
+	if rmErr := ss.Remove(ctx, snapshotKey); rmErr != nil {
+		log.G(ctx).WithError(rmErr).Warnf("Failed to remove stale snapshot %s", snapshotKey)
+		return false
+	}
+
+	return true
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
