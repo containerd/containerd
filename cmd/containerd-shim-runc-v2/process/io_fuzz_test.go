@@ -21,6 +21,7 @@ package process
 import (
 	"context"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,8 @@ import (
 	"time"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/stdio"
 )
 
 type mockRIO struct {
@@ -135,5 +138,61 @@ func FuzzCopyPipes(f *testing.F) {
 		stdoutR.Close()
 		stderrR.Close()
 		stdinR.Close()
+	})
+}
+
+func FuzzCreateIO(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		ff := fuzz.NewConsumer(data)
+
+		id, _ := ff.GetString()
+		uid, _ := ff.GetInt()
+		gid, _ := ff.GetInt()
+
+		var std stdio.Stdio
+		if err := ff.GenerateStruct(&std); err != nil {
+			return
+		}
+
+		tmpDir, err := os.MkdirTemp("", "fuzz-create-io-")
+		if err != nil {
+			return
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Create paths within tmpDir for any relative paths generated
+		if std.Stdin != "" && !filepath.IsAbs(std.Stdin) {
+			std.Stdin = filepath.Join(tmpDir, std.Stdin)
+		}
+		if std.Stdout != "" && !filepath.IsAbs(std.Stdout) {
+			std.Stdout = filepath.Join(tmpDir, std.Stdout)
+		}
+		if std.Stderr != "" && !filepath.IsAbs(std.Stderr) {
+			std.Stderr = filepath.Join(tmpDir, std.Stderr)
+		}
+
+		// Ensure we don't accidentally execute random binaries from fuzzer input in NewBinaryIO
+		u, err := url.Parse(std.Stdout)
+		if err == nil && u.Scheme == "binary" {
+			if _, err := os.Stat("/bin/true"); err == nil {
+				u.Path = "/bin/true"
+				std.Stdout = u.String()
+			} else {
+				// If /bin/true is not available, just use a dummy path
+				u.Path = "/dev/null"
+				std.Stdout = u.String()
+			}
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		// Set namespace for NewBinaryIO
+		ctx = namespaces.WithNamespace(ctx, "fuzz")
+
+		pio, err := createIO(ctx, id, uid, gid, std)
+		if err == nil && pio != nil {
+			pio.Close()
+		}
 	})
 }
