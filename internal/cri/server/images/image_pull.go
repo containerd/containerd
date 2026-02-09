@@ -281,44 +281,49 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, error) {
-	pctx, pcancel := context.WithCancel(ctx)
-	defer pcancel()
-	pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Headers: c.config.Registry.Headers,
-		Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
-	})
-
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, snapshotter)
-	pullOpts := []containerd.RemoteOpt{
-		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(snapshotter),
-		containerd.WithPullUnpack,
-		containerd.WithPullLabels(labels),
-		containerd.WithDownloadLimiter(c.downloadLimiter),
-		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
-		containerd.WithConcurrentLayerFetchBuffer(c.config.ConcurrentLayerFetchBuffer),
-		containerd.WithUnpackOpts([]containerd.UnpackOpt{
-			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
-			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
-		}),
+
+	doPull := func() (containerd.Image, error) {
+		pctx, pcancel := context.WithCancel(ctx)
+		defer pcancel()
+		pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
+
+		resolver := docker.NewResolver(docker.ResolverOptions{
+			Headers: c.config.Registry.Headers,
+			Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
+		})
+
+		pullOpts := []containerd.RemoteOpt{
+			containerd.WithResolver(resolver),
+			containerd.WithPullSnapshotter(snapshotter),
+			containerd.WithPullUnpack,
+			containerd.WithPullLabels(labels),
+			containerd.WithDownloadLimiter(c.downloadLimiter),
+			containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+			containerd.WithConcurrentLayerFetchBuffer(c.config.ConcurrentLayerFetchBuffer),
+			containerd.WithUnpackOpts([]containerd.UnpackOpt{
+				containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
+				containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
+			}),
+		}
+
+		pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+		if !c.config.DisableSnapshotAnnotations {
+			pullOpts = append(pullOpts,
+				containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
+		}
+
+		if c.config.DiscardUnpackedLayers {
+			// Allows GC to clean layers up from the content store after unpacking
+			pullOpts = append(pullOpts,
+				containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
+		}
+
+		pullReporter.start(pctx)
+		return c.client.Pull(pctx, ref, pullOpts...)
 	}
 
-	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
-	if !c.config.DisableSnapshotAnnotations {
-		pullOpts = append(pullOpts,
-			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
-	}
-
-	if c.config.DiscardUnpackedLayers {
-		// Allows GC to clean layers up from the content store after unpacking
-		pullOpts = append(pullOpts,
-			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
-	}
-
-	pullReporter.start(pctx)
-	image, err := c.client.Pull(pctx, ref, pullOpts...)
-	pcancel()
+	image, err := doPull()
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
