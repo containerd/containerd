@@ -280,6 +280,85 @@ func TestContainerStatus(t *testing.T) {
 	}
 }
 
+func TestToCRISignal(t *testing.T) {
+        tests := []struct {
+                input    string
+                expected runtime.Signal
+        }{
+                {input: "SIGABRT", expected: runtime.Signal_SIGABRT},
+                {input: "SIGALRM", expected: runtime.Signal_SIGALRM},
+                {input: "SIGBUS", expected: runtime.Signal_SIGBUS},
+                {input: "SIGCHLD", expected: runtime.Signal_SIGCHLD},
+                {input: "SIGCLD", expected: runtime.Signal_SIGCLD},
+                {input: "SIGCONT", expected: runtime.Signal_SIGCONT},
+                {input: "SIGFPE", expected: runtime.Signal_SIGFPE},
+                {input: "SIGHUP", expected: runtime.Signal_SIGHUP},
+                {input: "SIGILL", expected: runtime.Signal_SIGILL},
+                {input: "SIGINT", expected: runtime.Signal_SIGINT},
+                {input: "SIGIO", expected: runtime.Signal_SIGIO},
+                {input: "SIGIOT", expected: runtime.Signal_SIGIOT},
+                {input: "SIGKILL", expected: runtime.Signal_SIGKILL},
+                {input: "SIGPIPE", expected: runtime.Signal_SIGPIPE},
+                {input: "SIGPOLL", expected: runtime.Signal_SIGPOLL},
+                {input: "SIGPROF", expected: runtime.Signal_SIGPROF},
+                {input: "SIGPWR", expected: runtime.Signal_SIGPWR},
+                {input: "SIGQUIT", expected: runtime.Signal_SIGQUIT},
+                {input: "SIGSEGV", expected: runtime.Signal_SIGSEGV},
+                {input: "SIGSTKFLT", expected: runtime.Signal_SIGSTKFLT},
+                {input: "SIGSTOP", expected: runtime.Signal_SIGSTOP},
+                {input: "SIGSYS", expected: runtime.Signal_SIGSYS},
+                {input: "SIGTERM", expected: runtime.Signal_SIGTERM},
+                {input: "SIGTRAP", expected: runtime.Signal_SIGTRAP},
+                {input: "SIGTSTP", expected: runtime.Signal_SIGTSTP},
+                {input: "SIGTTIN", expected: runtime.Signal_SIGTTIN},
+                {input: "SIGTTOU", expected: runtime.Signal_SIGTTOU},
+                {input: "SIGURG", expected: runtime.Signal_SIGURG},
+                {input: "SIGUSR1", expected: runtime.Signal_SIGUSR1},
+                {input: "SIGUSR2", expected: runtime.Signal_SIGUSR2},
+                {input: "SIGVTALRM", expected: runtime.Signal_SIGVTALRM},
+                {input: "SIGWINCH", expected: runtime.Signal_SIGWINCH},
+                {input: "SIGXCPU", expected: runtime.Signal_SIGXCPU},
+                {input: "SIGXFSZ", expected: runtime.Signal_SIGXFSZ},
+                {input: "SIGRTMIN", expected: runtime.Signal_SIGRTMIN},
+                {input: "SIGRTMIN+1", expected: runtime.Signal_SIGRTMINPLUS1},
+                {input: "SIGRTMIN+2", expected: runtime.Signal_SIGRTMINPLUS2},
+                {input: "SIGRTMIN+3", expected: runtime.Signal_SIGRTMINPLUS3},
+                {input: "SIGRTMIN+4", expected: runtime.Signal_SIGRTMINPLUS4},
+                {input: "SIGRTMIN+5", expected: runtime.Signal_SIGRTMINPLUS5},
+                {input: "SIGRTMIN+6", expected: runtime.Signal_SIGRTMINPLUS6},
+                {input: "SIGRTMIN+7", expected: runtime.Signal_SIGRTMINPLUS7},
+                {input: "SIGRTMIN+8", expected: runtime.Signal_SIGRTMINPLUS8},
+                {input: "SIGRTMIN+9", expected: runtime.Signal_SIGRTMINPLUS9},
+                {input: "SIGRTMIN+10", expected: runtime.Signal_SIGRTMINPLUS10},
+                {input: "SIGRTMIN+11", expected: runtime.Signal_SIGRTMINPLUS11},
+                {input: "SIGRTMIN+12", expected: runtime.Signal_SIGRTMINPLUS12},
+                {input: "SIGRTMIN+13", expected: runtime.Signal_SIGRTMINPLUS13},
+                {input: "SIGRTMIN+14", expected: runtime.Signal_SIGRTMINPLUS14},
+                {input: "SIGRTMIN+15", expected: runtime.Signal_SIGRTMINPLUS15},
+                {input: "SIGRTMAX-14", expected: runtime.Signal_SIGRTMAXMINUS14},
+                {input: "SIGRTMAX-13", expected: runtime.Signal_SIGRTMAXMINUS13},
+                {input: "SIGRTMAX-12", expected: runtime.Signal_SIGRTMAXMINUS12},
+                {input: "SIGRTMAX-11", expected: runtime.Signal_SIGRTMAXMINUS11},
+                {input: "SIGRTMAX-10", expected: runtime.Signal_SIGRTMAXMINUS10},
+                {input: "SIGRTMAX-9", expected: runtime.Signal_SIGRTMAXMINUS9},
+                {input: "SIGRTMAX-8", expected: runtime.Signal_SIGRTMAXMINUS8},
+                {input: "SIGRTMAX-7", expected: runtime.Signal_SIGRTMAXMINUS7},
+                {input: "SIGRTMAX-6", expected: runtime.Signal_SIGRTMAXMINUS6},
+                {input: "SIGRTMAX-5", expected: runtime.Signal_SIGRTMAXMINUS5},
+                {input: "SIGRTMAX-4", expected: runtime.Signal_SIGRTMAXMINUS4},
+                {input: "SIGRTMAX-3", expected: runtime.Signal_SIGRTMAXMINUS3},
+                {input: "SIGRTMAX-2", expected: runtime.Signal_SIGRTMAXMINUS2},
+                {input: "SIGRTMAX-1", expected: runtime.Signal_SIGRTMAXMINUS1},
+                {input: "SIGRTMAX", expected: runtime.Signal_SIGRTMAX},
+                {input: "SIGNOPE", expected: runtime.Signal_RUNTIME_DEFAULT},
+        }
+        for _, test := range tests {
+                t.Run(test.input, func(t *testing.T) {
+                        assert.Equal(t, test.expected, toCRISignal(test.input))
+                })
+        }
+}
+
 type fakeImageService struct {
 	imageStore *imagestore.Store
 }
