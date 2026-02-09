@@ -253,7 +253,16 @@ func LogURI(uri *url.URL) Creator {
 	}
 }
 
-// BinaryIO forwards container STDOUT|STDERR directly to a logging binary
+// BinaryIO forwards container STDOUT|STDERR directly to a logging binary.
+// Keys in the args map with the "env." prefix become environment variables
+// (with the prefix stripped), while other keys become command-line arguments.
+//
+// Example:
+//
+//	BinaryIO("/usr/bin/logger", map[string]string{
+//	    "format":        "json",   // arg: --format json
+//	    "env.LOG_LEVEL": "debug",  // env var: LOG_LEVEL=debug
+//	})
 func BinaryIO(binary string, args map[string]string) Creator {
 	return func(_ string) (IO, error) {
 		uri, err := LogURIGenerator("binary", binary, args)
@@ -291,6 +300,8 @@ func LogFile(path string) Creator {
 }
 
 // LogURIGenerator is the helper to generate log uri with specific scheme.
+// Args with the "env." prefix are passed through as-is and will be interpreted
+// as environment variables by the shim.
 func LogURIGenerator(scheme string, path string, args map[string]string) (*url.URL, error) {
 	path = filepath.Clean(path)
 	if !filepath.IsAbs(path) {

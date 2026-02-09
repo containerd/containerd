@@ -62,6 +62,56 @@ func TestBinaryIOFailOnRelativePath(t *testing.T) {
 	assert.Error(t, err, "absolute path needed")
 }
 
+func TestBinaryIOWithEnvs(t *testing.T) {
+	testCases := []struct {
+		name     string
+		binary   string
+		args     map[string]string
+		checkURI func(t *testing.T, uri string)
+	}{
+		{
+			name:   "envs only",
+			binary: prefix + "/usr/bin/logger",
+			args:   map[string]string{"env.LOG_LEVEL": "debug"},
+			checkURI: func(t *testing.T, uri string) {
+				parsed, err := url.Parse(uri)
+				require.NoError(t, err)
+				assert.Equal(t, "debug", parsed.Query().Get("env.LOG_LEVEL"))
+			},
+		},
+		{
+			name:   "args and envs combined",
+			binary: prefix + "/usr/bin/logger",
+			args:   map[string]string{"id": "container1", "env.API_KEY": "secret"},
+			checkURI: func(t *testing.T, uri string) {
+				parsed, err := url.Parse(uri)
+				require.NoError(t, err)
+				assert.Equal(t, "container1", parsed.Query().Get("id"))
+				assert.Equal(t, "secret", parsed.Query().Get("env.API_KEY"))
+			},
+		},
+		{
+			name:   "empty args behaves like nil",
+			binary: prefix + "/usr/bin/logger",
+			args:   map[string]string{},
+			checkURI: func(t *testing.T, uri string) {
+				parsed, err := url.Parse(uri)
+				require.NoError(t, err)
+				assert.Empty(t, parsed.RawQuery)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := BinaryIO(tc.binary, tc.args)("")
+			require.NoError(t, err)
+			tc.checkURI(t, res.Config().Stdout)
+			tc.checkURI(t, res.Config().Stderr)
+		})
+	}
+}
+
 func TestLogFileAbsolutePath(t *testing.T) {
 	res, err := LogFile(prefix + "/full/path/file.txt")("!")
 	require.NoError(t, err)
