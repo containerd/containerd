@@ -194,6 +194,10 @@ func openFormatMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 		if strings.HasPrefix(opt, "upperdir=") {
 			upper, err := handleOverlayFormat(strings.TrimPrefix(opt, "upperdir="), preceding)
 			if err != nil {
+				if errors.Is(err, errdefs.ErrNotImplemented) {
+					// Do no include upper if not locally viewable, likely ephemeral and empty
+					continue
+				}
 				return nil, fmt.Errorf("failed to handle upperdir option: %w", err)
 			}
 			// Extract the upperdir value and format it
