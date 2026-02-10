@@ -67,27 +67,35 @@ func TestBinaryIOWithEnvs(t *testing.T) {
 		name     string
 		binary   string
 		args     map[string]string
+		opts     []BinaryIOOpt
 		checkURI func(t *testing.T, uri string)
 	}{
 		{
 			name:   "envs only",
 			binary: prefix + "/usr/bin/logger",
-			args:   map[string]string{"env.LOG_LEVEL": "debug"},
+			args:   nil,
+			opts:   []BinaryIOOpt{WithBinaryIOEnv(map[string]string{"LOG_LEVEL": "debug"})},
 			checkURI: func(t *testing.T, uri string) {
 				parsed, err := url.Parse(uri)
 				require.NoError(t, err)
-				assert.Equal(t, "debug", parsed.Query().Get("env.LOG_LEVEL"))
+				assert.Empty(t, parsed.RawQuery)
+				envs, err := url.ParseQuery(parsed.Fragment)
+				require.NoError(t, err)
+				assert.Equal(t, "debug", envs.Get("LOG_LEVEL"))
 			},
 		},
 		{
 			name:   "args and envs combined",
 			binary: prefix + "/usr/bin/logger",
-			args:   map[string]string{"id": "container1", "env.API_KEY": "secret"},
+			args:   map[string]string{"id": "container1"},
+			opts:   []BinaryIOOpt{WithBinaryIOEnv(map[string]string{"API_KEY": "secret"})},
 			checkURI: func(t *testing.T, uri string) {
 				parsed, err := url.Parse(uri)
 				require.NoError(t, err)
 				assert.Equal(t, "container1", parsed.Query().Get("id"))
-				assert.Equal(t, "secret", parsed.Query().Get("env.API_KEY"))
+				envs, err := url.ParseQuery(parsed.Fragment)
+				require.NoError(t, err)
+				assert.Equal(t, "secret", envs.Get("API_KEY"))
 			},
 		},
 		{
@@ -98,13 +106,14 @@ func TestBinaryIOWithEnvs(t *testing.T) {
 				parsed, err := url.Parse(uri)
 				require.NoError(t, err)
 				assert.Empty(t, parsed.RawQuery)
+				assert.Empty(t, parsed.Fragment)
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := BinaryIO(tc.binary, tc.args)("")
+			res, err := BinaryIO(tc.binary, tc.args, tc.opts...)("")
 			require.NoError(t, err)
 			tc.checkURI(t, res.Config().Stdout)
 			tc.checkURI(t, res.Config().Stderr)
@@ -138,6 +147,8 @@ type LogURIGeneratorTestCase struct {
 	path string
 	// Extra query args expected to be in the URL (e.g. "id=123")
 	args map[string]string
+	// Environment variables to encode in the URL fragment
+	envs map[string]string
 	// What the test case is expecting as an output (e.g. "binary:///some/path/to/bin.exe?id=123")
 	expected string
 	// Error string to be expected:
@@ -146,7 +157,8 @@ type LogURIGeneratorTestCase struct {
 
 func baseTestLogURIGenerator(t *testing.T, testCases []LogURIGeneratorTestCase) {
 	for _, tc := range testCases {
-		uri, err := LogURIGenerator(tc.scheme, tc.path, tc.args)
+		// Use the internal generateLogURI to test both args and envs.
+		uri, err := generateLogURI(tc.scheme, tc.path, tc.args, tc.envs)
 		if tc.err != "" {
 			assert.ErrorContains(t, err, tc.err)
 			continue

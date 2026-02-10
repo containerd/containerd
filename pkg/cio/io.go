@@ -253,19 +253,28 @@ func LogURI(uri *url.URL) Creator {
 	}
 }
 
+type BinaryIOOpt func(*binaryIOConfig)
+
+type binaryIOConfig struct {
+	env map[string]string
+}
+
+// WithBinaryIOEnv sets environment variables for the logging binary.
+func WithBinaryIOEnv(env map[string]string) BinaryIOOpt {
+	return func(c *binaryIOConfig) {
+		c.env = env
+	}
+}
+
 // BinaryIO forwards container STDOUT|STDERR directly to a logging binary.
-// Keys in the args map with the "env." prefix become environment variables
-// (with the prefix stripped), while other keys become command-line arguments.
-//
-// Example:
-//
-//	BinaryIO("/usr/bin/logger", map[string]string{
-//	    "format":        "json",   // arg: --format json
-//	    "env.LOG_LEVEL": "debug",  // env var: LOG_LEVEL=debug
-//	})
-func BinaryIO(binary string, args map[string]string) Creator {
+func BinaryIO(binary string, args map[string]string, opts ...BinaryIOOpt) Creator {
+	cfg := &binaryIOConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	return func(_ string) (IO, error) {
-		uri, err := LogURIGenerator("binary", binary, args)
+		uri, err := logURIGeneratorWithEnv("binary", binary, args, cfg.env)
 		if err != nil {
 			return nil, err
 		}
@@ -300,9 +309,17 @@ func LogFile(path string) Creator {
 }
 
 // LogURIGenerator is the helper to generate log uri with specific scheme.
-// Args with the "env." prefix are passed through as-is and will be interpreted
-// as environment variables by the shim.
 func LogURIGenerator(scheme string, path string, args map[string]string) (*url.URL, error) {
+	return generateLogURI(scheme, path, args, nil)
+}
+
+// logURIGeneratorWithEnv generates a log URI with args as query parameters
+// and environment variables encoded in the fragment.
+func logURIGeneratorWithEnv(scheme string, path string, args map[string]string, envs map[string]string) (*url.URL, error) {
+	return generateLogURI(scheme, path, args, envs)
+}
+
+func generateLogURI(scheme string, path string, args map[string]string, envs map[string]string) (*url.URL, error) {
 	path = filepath.Clean(path)
 	if !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("%q must be absolute", path)
@@ -320,15 +337,22 @@ func LogURIGenerator(scheme string, path string, args map[string]string) (*url.U
 	}
 	uri := &url.URL{Scheme: scheme, Path: p}
 
-	if len(args) == 0 {
-		return uri, nil
+	if len(args) > 0 {
+		q := uri.Query()
+		for k, v := range args {
+			q.Set(k, v)
+		}
+		uri.RawQuery = q.Encode()
 	}
 
-	q := uri.Query()
-	for k, v := range args {
-		q.Set(k, v)
+	if len(envs) > 0 {
+		e := url.Values{}
+		for k, v := range envs {
+			e.Set(k, v)
+		}
+		uri.Fragment = e.Encode()
 	}
-	uri.RawQuery = q.Encode()
+
 	return uri, nil
 }
 

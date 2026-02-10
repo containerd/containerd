@@ -176,11 +176,14 @@ func TerminalLogURI(uri *url.URL) Creator {
 
 // TerminalBinaryIO forwards container STDOUT|STDERR directly to a logging binary
 // and sets the terminal option to true.
-// Keys in the args map with the "env." prefix become environment variables
-// (with the prefix stripped), while other keys become command-line arguments.
-func TerminalBinaryIO(binary string, args map[string]string) Creator {
+func TerminalBinaryIO(binary string, args map[string]string, opts ...BinaryIOOpt) Creator {
+	cfg := &binaryIOConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	return func(_ string) (IO, error) {
-		uri, err := LogURIGenerator("binary", binary, args)
+		uri, err := logURIGeneratorWithEnv("binary", binary, args, cfg.env)
 		if err != nil {
 			return nil, err
 		}

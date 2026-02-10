@@ -57,25 +57,25 @@ func TestNewBinaryCmd(t *testing.T) {
 		},
 		{
 			name:     "envs only",
-			uri:      "binary:///bin/logger?env.LOG_LEVEL=debug&env.API_KEY=secret",
+			uri:      "binary:///bin/logger#LOG_LEVEL=debug&API_KEY=secret",
 			wantArgs: []string{},
 			wantEnvs: []string{"LOG_LEVEL=debug", "API_KEY=secret"},
 		},
 		{
 			name:     "mixed args and envs",
-			uri:      "binary:///bin/logger?id=container1&env.LOG_LEVEL=debug",
+			uri:      "binary:///bin/logger?id=container1#LOG_LEVEL=debug",
 			wantArgs: []string{"id", "container1"},
 			wantEnvs: []string{"LOG_LEVEL=debug"},
 		},
 		{
 			name:        "cannot override CONTAINER_ID",
-			uri:         "binary:///bin/logger?env.CONTAINER_ID=custom-id",
+			uri:         "binary:///bin/logger#CONTAINER_ID=custom-id",
 			wantArgs:    []string{},
 			wantEnvsNot: []string{"CONTAINER_ID=custom-id"},
 		},
 		{
 			name:        "cannot override CONTAINER_NAMESPACE",
-			uri:         "binary:///bin/logger?env.CONTAINER_NAMESPACE=custom-ns",
+			uri:         "binary:///bin/logger#CONTAINER_NAMESPACE=custom-ns",
 			wantArgs:    []string{},
 			wantEnvsNot: []string{"CONTAINER_NAMESPACE=custom-ns"},
 		},
@@ -86,7 +86,7 @@ func TestNewBinaryCmd(t *testing.T) {
 		},
 		{
 			name:     "empty env value",
-			uri:      "binary:///bin/logger?env.EMPTY_VAR=",
+			uri:      "binary:///bin/logger#EMPTY_VAR=",
 			wantArgs: []string{},
 			wantEnvs: []string{"EMPTY_VAR="},
 		},

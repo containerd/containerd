@@ -20,31 +20,17 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"strings"
 )
 
-const envPrefix = "env."
-
 // NewBinaryCmd returns a Cmd to be used to start a logging binary.
-// The Cmd is generated from the provided uri. Query parameters with the
-// "env." prefix are interpreted as environment variables (prefix stripped)
-// and appended to the Cmd environment with the container ID and namespace.
-// Other query parameters are passed as args.
+// The Cmd is generated from the provided uri, and the container ID and
+// namespace are appended to the Cmd environment.
 func NewBinaryCmd(binaryURI *url.URL, id, ns string) *exec.Cmd {
 	var args []string
-	envs := make(map[string]string)
-
 	for k, vs := range binaryURI.Query() {
-		if strings.HasPrefix(k, envPrefix) {
-			envKey := strings.TrimPrefix(k, envPrefix)
-			if len(vs) > 0 {
-				envs[envKey] = vs[0]
-			}
-		} else {
-			args = append(args, k)
-			if len(vs) > 0 {
-				args = append(args, vs[0])
-			}
+		args = append(args, k)
+		if len(vs) > 0 {
+			args = append(args, vs[0])
 		}
 	}
 
@@ -55,11 +41,16 @@ func NewBinaryCmd(binaryURI *url.URL, id, ns string) *exec.Cmd {
 		"CONTAINER_NAMESPACE="+ns,
 	)
 
-	for k, v := range envs {
-		if k == "CONTAINER_ID" || k == "CONTAINER_NAMESPACE" {
-			continue
+	if binaryURI.Fragment != "" {
+		envs, _ := url.ParseQuery(binaryURI.Fragment)
+		for k, vs := range envs {
+			if k == "CONTAINER_ID" || k == "CONTAINER_NAMESPACE" {
+				continue
+			}
+			if len(vs) > 0 {
+				cmd.Env = append(cmd.Env, k+"="+vs[0])
+			}
 		}
-		cmd.Env = append(cmd.Env, k+"="+v)
 	}
 
 	return cmd
