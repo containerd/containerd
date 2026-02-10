@@ -130,9 +130,6 @@ jobs:
             goarch: amd64
           - goos: freebsd
             goarch: arm64
-          - goos: windows
-            goarch: arm
-            goarm: "7"
 
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
