@@ -155,6 +155,11 @@ func (f *fakeContainer) Info(ctx context.Context, opts ...containerd.InfoOpts) (
 	return f.c, nil
 }
 
+
+func (f *fakeContainer) InfoWithRefresh(context.Context, bool, ...containerd.InfoOpts) (containers.Container, error) {
+	return f.c, nil
+}
+
 func (f *fakeContainer) Delete(ctx context.Context, opts ...containerd.DeleteOpts) error {
 	return nil
 }

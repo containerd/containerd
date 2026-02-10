@@ -53,6 +53,8 @@ type Container interface {
 	ID() string
 	// Info returns the underlying container record type
 	Info(context.Context, ...InfoOpts) (containers.Container, error)
+	// InfoWithRefresh returns the underlying container record type
+	InfoWithRefresh(context.Context, bool, ...InfoOpts) (containers.Container, error)
 	// Delete removes the container
 	Delete(context.Context, ...DeleteOpts) error
 	// NewTask creates a new task based on the container metadata
@@ -111,9 +113,12 @@ func (c *container) ID() string {
 }
 
 func (c *container) Info(ctx context.Context, opts ...InfoOpts) (containers.Container, error) {
+	return c.InfoWithRefresh(ctx, true, opts...)
+}
+
+func (c *container) InfoWithRefresh(ctx context.Context, Refresh bool, opts ...InfoOpts) (containers.Container, error) {
 	i := &InfoConfig{
-		// default to refreshing the container's local metadata
-		Refresh: true,
+		Refresh: Refresh,
 	}
 	for _, o := range opts {
 		o(i)

@@ -324,6 +324,12 @@ type fakeSpecOnlyContainer struct {
 	errOnSpec error
 }
 
+// InfoWithRefresh implements client.Container.
+func (c *fakeSpecOnlyContainer) InfoWithRefresh(context.Context, bool, ...containerd.InfoOpts) (containers.Container, error) {
+	c.t.Error("fakeSpecOnlyContainer.InfoWithRefresh: not implemented")
+	return containers.Container{}, errors.New("not implemented")
+}
+
 // Spec implements client.Container.
 func (c *fakeSpecOnlyContainer) Spec(context.Context) (*specs.Spec, error) {
 	if c.errOnSpec != nil {
