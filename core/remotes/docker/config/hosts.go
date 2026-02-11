@@ -302,12 +302,6 @@ func HostDirFromRoot(root string) func(string) (string, error) {
 	}
 }
 
-// HostDirFromPathList returns a function which finds a host directory by searching
-// a filepath.SplitList()-compatible path list (":" on Unix, ";" on Windows).
-func HostDirFromPathList(pathList string) func(string) (string, error) {
-	return HostDirFromRoots(filepath.SplitList(pathList))
-}
-
 // HostDirFromRoots returns a function which finds a host directory by searching
 // multiple roots in order.
 //
@@ -315,28 +309,19 @@ func HostDirFromPathList(pathList string) func(string) (string, error) {
 // `registry.config_path`, which is formatted as a filepath.SplitList() compatible
 // path list (":" on Unix, ";" on Windows).
 func HostDirFromRoots(roots []string) func(string) (string, error) {
-	// Pre-build host dir resolvers per root to avoid allocating a new closure
-	// on each lookup.
 	hostDirFns := make([]func(string) (string, error), 0, len(roots))
 	for _, r := range roots {
-		if r == "" {
-			continue
-		}
 		hostDirFns = append(hostDirFns, HostDirFromRoot(r))
 	}
 
-	return func(host string) (string, error) {
+	return func(host string) (dir string, err error) {
 		for _, fn := range hostDirFns {
-			dir, err := fn(host)
-			if err == nil {
-				return dir, nil
+			dir, err = fn(host)
+			if (err != nil && !errdefs.IsNotFound(err)) || (dir != "") {
+				break
 			}
-			if errdefs.IsNotFound(err) {
-				continue
-			}
-			return "", err
 		}
-		return "", errdefs.ErrNotFound
+		return
 	}
 }
 

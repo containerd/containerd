@@ -48,6 +48,7 @@ type registryOpts struct {
 	headers       http.Header
 	creds         CredentialHelper
 	hostDir       string
+	hostDirRoots  []string
 	defaultScheme string
 	httpDebug     bool
 	httpTrace     bool
@@ -77,6 +78,15 @@ func WithCredentials(creds CredentialHelper) Opt {
 func WithHostDir(hostDir string) Opt {
 	return func(o *registryOpts) error {
 		o.hostDir = hostDir
+		return nil
+	}
+}
+
+// WithHostDirRoots specifies multiple host configuration directory roots to
+// search in order (e.g. CRI's registry.config_path split by filepath.SplitList()).
+func WithHostDirRoots(roots []string) Opt {
+	return func(o *registryOpts) error {
+		o.hostDirRoots = append([]string{}, roots...)
 		return nil
 	}
 }
@@ -124,10 +134,10 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	}
 
 	hostOptions := config.HostOptions{}
-	if ropts.hostDir != "" {
-		// ropts.hostDir may be a filepath.SplitList-compatible path list
-		// (e.g. "/etc/containerd/certs.d:/etc/docker/certs.d" on Unix).
-		hostOptions.HostDir = config.HostDirFromPathList(ropts.hostDir)
+	if len(ropts.hostDirRoots) > 0 {
+		hostOptions.HostDir = config.HostDirFromRoots(ropts.hostDirRoots)
+	} else if ropts.hostDir != "" {
+		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
