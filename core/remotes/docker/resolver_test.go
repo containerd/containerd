@@ -37,6 +37,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker/auth"
@@ -667,6 +668,102 @@ func TestAddQuery(t *testing.T) {
 	}
 }
 
+func TestRequestSanitize(t *testing.T) {
+	tests := []struct {
+		doc      string
+		request  request
+		expected string
+	}{
+		{
+			doc: "no query",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2",
+		},
+		{
+			doc: "with query",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?zzz=123&aaa=456&aaa=789",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2?aaa=REDACTED&aaa=REDACTED&zzz=REDACTED",
+		},
+		{
+			doc: "with query namespace preserved",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?aaa=123&ns=docker.io",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2?aaa=REDACTED&ns=docker.io",
+		},
+		{
+			doc: "with empty query values",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?aaa=&bbb=&bbb",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2?aaa=&bbb=&bbb=",
+		},
+		{
+			doc: "with fragment",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2#?zzz=123&aaa=456&aaa=789",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2#?zzz=123&aaa=456&aaa=789",
+		},
+		{
+			doc: "with auth",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2",
+				host:   RegistryHost{Host: "user:pass@registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://user:xxxxx@registry.example.test/path/v2",
+		},
+		{
+			doc: "with auth and query",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?zzz=123&aaa=456&aaa=789",
+				host:   RegistryHost{Host: "user:pass@registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://user:xxxxx@registry.example.test/path/v2?aaa=REDACTED&aaa=REDACTED&zzz=REDACTED",
+		},
+		{
+			doc: "with auth and fragment",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2#?zzz=123&aaa=456&aaa=789",
+				host:   RegistryHost{Host: "user:pass@registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://user:xxxxx@registry.example.test/path/v2#?zzz=123&aaa=456&aaa=789",
+		},
+		{
+			doc: "malformed missing protocol scheme",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?aaa=123&bbb=456&bbb=789",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "", Path: "/path/v2"},
+			},
+			expected: "://registry.example.test/path/v2?aaa=123&bbb=456&bbb=789",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.doc, func(t *testing.T) {
+			assert.Equal(t, tc.expected, tc.request.sanitizedURL())
+		})
+	}
+}
+
 func flipLocalhost(host string) string {
 	if strings.HasPrefix(host, "127.0.0.1") {
 		return "localhost" + host[9:]
@@ -784,7 +881,7 @@ func (h logHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 type namespaceRouter map[string]http.Handler
 
 func (nr namespaceRouter) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	h, ok := nr[r.URL.Query().Get("ns")]
+	h, ok := nr[r.URL.Query().Get(namespaceQueryArg)]
 	if !ok {
 		rw.WriteHeader(http.StatusNotFound)
 		return
