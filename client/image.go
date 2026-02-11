@@ -412,13 +412,29 @@ func (i *image) getLayers(ctx context.Context, manifest ocispec.Manifest) ([]roo
 	layers := make([]rootfs.Layer, len(diffIDs))
 	for i := range diffIDs {
 		layers[i].Diff = ocispec.Descriptor{
-			// TODO: derive media type from compressed type
-			MediaType: ocispec.MediaTypeImageLayer,
+			// Derive media type from compressed type
+			MediaType: deriveLayerMediaType(imageLayers[i].MediaType),
 			Digest:    diffIDs[i],
 		}
 		layers[i].Blob = imageLayers[i]
 	}
 	return layers, nil
+}
+
+// deriveLayerMediaType derives the media type for the layer's diff descriptor
+// based on the media type of the layer blob.
+func deriveLayerMediaType(mediaType string) string {
+	switch mediaType {
+	// OCI media types
+	case ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayerZstd:
+		return ocispec.MediaTypeImageLayer
+	// Docker media types
+	case images.MediaTypeDockerSchema2LayerGzip, images.MediaTypeDockerSchema2LayerForeignGzip, images.MediaTypeDockerSchema2LayerZstd:
+		return images.MediaTypeDockerSchema2Layer
+	default:
+		// For unknown or already uncompressed types, use uncompressed media type
+		return ocispec.MediaTypeImageLayer
+	}
 }
 
 func (i *image) checkSnapshotterSupport(ctx context.Context, snapshotterName string, manifest ocispec.Manifest) error {
