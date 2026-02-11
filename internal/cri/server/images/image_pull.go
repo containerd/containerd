@@ -170,6 +170,37 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", err
 	}
 
+	// Check if image is already properly unpacked for this snapshotter
+	imageID, err := c.getImageIDIfUnpacked(ctx, ref, snapshotter)
+	if err == nil {
+		return imageID, nil
+	}
+	// If image exists but is not properly unpacked, delete it to force a fresh pull.
+	// Stale snapshots are handled by the retry logic in pullWithStaleSnapshotRetry.
+	if errdefs.IsFailedPrecondition(err) {
+		log.G(ctx).Infof("Image %q not properly unpacked for %q, deleting to force fresh pull", ref, snapshotter)
+		if delErr := c.images.Delete(ctx, ref, containerdimages.SynchronousDelete()); delErr != nil {
+			log.G(ctx).WithError(delErr).Warnf("Failed to delete image %q, will try pull anyway", ref)
+		}
+	}
+
+	// If ref is a digest (sha256:...), we need to find a pullable reference.
+	// Registry pull requires a full reference like docker.io/library/nginx:latest,
+	// not just sha256:abc123...
+	if img, err := c.LocalResolve(ref); err == nil && len(img.References) > 0 {
+		// Find a pullable reference (prefer one that's not a digest)
+		for _, imgRef := range img.References {
+			if !strings.Contains(imgRef, "@sha256:") {
+				ref = imgRef
+				break
+			}
+		}
+		// If all references are digest-based, just use the first one
+		if strings.HasPrefix(ref, "sha256:") && len(img.References) > 0 {
+			ref = img.References[0]
+		}
+	}
+
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
@@ -197,7 +228,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	if err != nil {
 		return "", fmt.Errorf("get image config descriptor: %w", err)
 	}
-	imageID := configDesc.Digest.String()
+	imageID = configDesc.Digest.String()
 
 	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
@@ -240,44 +271,49 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, error) {
-	pctx, pcancel := context.WithCancel(ctx)
-	defer pcancel()
-	pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Headers: c.config.Registry.Headers,
-		Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
-	})
-
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, snapshotter)
-	pullOpts := []containerd.RemoteOpt{
-		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(snapshotter),
-		containerd.WithPullUnpack,
-		containerd.WithPullLabels(labels),
-		containerd.WithDownloadLimiter(c.downloadLimiter),
-		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
-		containerd.WithConcurrentLayerFetchBuffer(c.config.ConcurrentLayerFetchBuffer),
-		containerd.WithUnpackOpts([]containerd.UnpackOpt{
-			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
-			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
-		}),
+
+	doPull := func() (containerd.Image, error) {
+		pctx, pcancel := context.WithCancel(ctx)
+		defer pcancel()
+		pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
+
+		resolver := docker.NewResolver(docker.ResolverOptions{
+			Headers: c.config.Registry.Headers,
+			Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
+		})
+
+		pullOpts := []containerd.RemoteOpt{
+			containerd.WithResolver(resolver),
+			containerd.WithPullSnapshotter(snapshotter),
+			containerd.WithPullUnpack,
+			containerd.WithPullLabels(labels),
+			containerd.WithDownloadLimiter(c.downloadLimiter),
+			containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+			containerd.WithConcurrentLayerFetchBuffer(c.config.ConcurrentLayerFetchBuffer),
+			containerd.WithUnpackOpts([]containerd.UnpackOpt{
+				containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
+				containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
+			}),
+		}
+
+		pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+		if !c.config.DisableSnapshotAnnotations {
+			pullOpts = append(pullOpts,
+				containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
+		}
+
+		if c.config.DiscardUnpackedLayers {
+			// Allows GC to clean layers up from the content store after unpacking
+			pullOpts = append(pullOpts,
+				containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
+		}
+
+		pullReporter.start(pctx)
+		return c.client.Pull(pctx, ref, pullOpts...)
 	}
 
-	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
-	if !c.config.DisableSnapshotAnnotations {
-		pullOpts = append(pullOpts,
-			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
-	}
-
-	if c.config.DiscardUnpackedLayers {
-		// Allows GC to clean layers up from the content store after unpacking
-		pullOpts = append(pullOpts,
-			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
-	}
-
-	pullReporter.start(pctx)
-	image, err := c.client.Pull(pctx, ref, pullOpts...)
-	pcancel()
+	image, err := c.pullWithStaleSnapshotRetry(ctx, ref, snapshotter, doPull)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
@@ -294,9 +330,6 @@ func (c *CRIImageService) pullImageWithTransferService(
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, error) {
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
-	rctx, rcancel := context.WithCancel(ctx)
-	defer rcancel()
-	transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
 
 	// Set image store opts
 	var sopts []transferimage.StoreOpt
@@ -314,20 +347,159 @@ func (c *CRIImageService) pullImageWithTransferService(
 		return nil, fmt.Errorf("failed to create OCI registry: %w", err)
 	}
 
-	transferProgressReporter.start(rctx)
-	log.G(ctx).Debugf("Calling cri transfer service")
-	err = c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx)))
-	rcancel()
+	doTransfer := func() (containerd.Image, error) {
+		rctx, rcancel := context.WithCancel(ctx)
+		defer rcancel()
+		transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
+		transferProgressReporter.start(rctx)
+		log.G(ctx).Debugf("Calling cri transfer service")
+		if err := c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx))); err != nil {
+			return nil, err
+		}
+		return c.client.GetImage(ctx, ref)
+	}
+
+	image, err := c.pullWithStaleSnapshotRetry(ctx, ref, snapshotter, doTransfer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
-
-	// Image should be pulled, unpacked and present in containerd image store at this moment
-	image, err := c.client.GetImage(ctx, ref)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
-	}
 	return image, nil
+}
+
+// getImageIDIfUnpacked checks if an image is already properly unpacked for the given
+// snapshotter and returns its ID if so.
+// Returns the image ID on success, or an error if a pull is needed.
+func (c *CRIImageService) getImageIDIfUnpacked(ctx context.Context, ref, snapshotter string) (string, error) {
+	unpacked, err := c.IsImageUnpackedForSnapshotter(ctx, ref, snapshotter)
+	if err != nil {
+		return "", err
+	}
+
+	if !unpacked {
+		return "", fmt.Errorf("image exists but not unpacked for snapshotter %q: %w", snapshotter, errdefs.ErrFailedPrecondition)
+	}
+
+	// Image is ready - get its ID
+	existingImage, err := c.client.GetImage(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+
+	configDesc, err := existingImage.Config(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	imageID := configDesc.Digest.String()
+
+	// Ensure image has proper labels and update image store
+	if err := c.ensureImageLabels(ctx, existingImage, ref); err != nil {
+		log.G(ctx).WithError(err).Warnf("Failed to ensure image labels for %s", ref)
+	}
+	if err := c.imageStore.Update(ctx, ref); err != nil {
+		log.G(ctx).WithError(err).Warnf("Failed to update image store for %s", ref)
+	}
+
+	return imageID, nil
+}
+
+// pullWithStaleSnapshotRetry executes a pull operation and retries if it fails
+// due to stale snapshots that can be cleaned up. It retries up to the number of
+// layers in the image to handle cases where multiple layer snapshots are stale.
+func (c *CRIImageService) pullWithStaleSnapshotRetry(
+	ctx context.Context,
+	ref string,
+	snapshotter string,
+	doPull func() (containerd.Image, error),
+) (containerd.Image, error) {
+	var image containerd.Image
+	var err error
+
+	// First attempt
+	image, err = doPull()
+	if err == nil {
+		return image, nil
+	}
+
+	// Check if this is a stale snapshot error we can retry
+	if !errdefs.IsAlreadyExists(err) {
+		return nil, err
+	}
+
+	// Determine max retries from the image's layer count if possible.
+	// The image metadata might exist even if content is corrupted.
+	maxRetries := c.getImageLayerCount(ctx, ref)
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		if !c.tryRemoveStaleSnapshot(ctx, err, snapshotter) {
+			return nil, err
+		}
+
+		log.G(ctx).Infof("Retrying pull after stale snapshot cleanup (attempt %d/%d)", attempt, maxRetries)
+		image, err = doPull()
+		if err == nil {
+			return image, nil
+		}
+
+		if !errdefs.IsAlreadyExists(err) {
+			return nil, err
+		}
+	}
+
+	log.G(ctx).WithError(err).Warn("Pull failed after maximum retries for stale snapshot cleanup")
+	return nil, err
+}
+
+// getImageLayerCount returns the number of layers in an image, or a default
+// value if the image cannot be found or the layer count cannot be determined.
+func (c *CRIImageService) getImageLayerCount(ctx context.Context, ref string) int {
+	const defaultMaxRetries = 10
+
+	img, err := c.client.GetImage(ctx, ref)
+	if err != nil {
+		return defaultMaxRetries
+	}
+
+	diffIDs, err := img.RootFS(ctx)
+	if err != nil || len(diffIDs) == 0 {
+		return defaultMaxRetries
+	}
+
+	return len(diffIDs)
+}
+
+// tryRemoveStaleSnapshot attempts to extract a snapshot key from an "already exists"
+// error and remove it. This handles the case where content was garbage collected but
+// snapshot metadata remains, causing subsequent pulls to fail.
+// Returns true if a stale snapshot was successfully removed.
+func (c *CRIImageService) tryRemoveStaleSnapshot(ctx context.Context, err error, snapshotter string) bool {
+	ss := c.client.SnapshotService(snapshotter)
+	if ss == nil {
+		return false
+	}
+
+	// Parse snapshot key from error message like: target snapshot "sha256:xxx": already exists
+	errStr := err.Error()
+	idx := strings.Index(errStr, "target snapshot \"")
+	if idx == -1 {
+		return false
+	}
+
+	start := idx + len("target snapshot \"")
+	end := strings.Index(errStr[start:], "\"")
+	if end == -1 {
+		return false
+	}
+
+	snapshotKey := errStr[start : start+end]
+	log.G(ctx).Infof("Attempting to remove stale snapshot: %s", snapshotKey)
+
+	if rmErr := ss.Remove(ctx, snapshotKey); rmErr != nil {
+		log.G(ctx).WithError(rmErr).Warnf("Failed to remove stale snapshot %s", snapshotKey)
+		return false
+	}
+
+	return true
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
@@ -421,24 +593,11 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 	return labels
 }
 
-// UpdateImage updates image store to reflect the newest state of an image reference
-// in containerd. If the reference is not managed by the cri plugin, the function also
-// generates necessary metadata for the image and make it managed.
-func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
-	// TODO: Use image service
-	img, err := c.client.GetImage(ctx, r)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("get image by reference: %w", err)
-		}
-		// If the image is not found, we should continue updating the cache,
-		// so that the image can be removed from the cache.
-		if err := c.imageStore.Update(ctx, r); err != nil {
-			return fmt.Errorf("update image store for %q: %w", r, err)
-		}
-		return nil
-	}
-
+// ensureImageLabels ensures that an image has the required CRI labels.
+// If the image is not managed by the cri plugin, the function generates
+// necessary metadata for the image and makes it managed.
+// This function takes an already-fetched image to avoid redundant GetImage calls.
+func (c *CRIImageService) ensureImageLabels(ctx context.Context, img containerd.Image, r string) error {
 	labels := img.Labels()
 	criLabels := c.getLabels(ctx, r)
 	for key, value := range criLabels {
@@ -462,6 +621,30 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 			}
 			break
 		}
+	}
+	return nil
+}
+
+// UpdateImage updates image store to reflect the newest state of an image reference
+// in containerd. If the reference is not managed by the cri plugin, the function also
+// generates necessary metadata for the image and make it managed.
+func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
+	// TODO: Use image service
+	img, err := c.client.GetImage(ctx, r)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("get image by reference: %w", err)
+		}
+		// If the image is not found, we should continue updating the cache,
+		// so that the image can be removed from the cache.
+		if err := c.imageStore.Update(ctx, r); err != nil {
+			return fmt.Errorf("update image store for %q: %w", r, err)
+		}
+		return nil
+	}
+
+	if err := c.ensureImageLabels(ctx, img, r); err != nil {
+		return err
 	}
 	if err := c.imageStore.Update(ctx, r); err != nil {
 		return fmt.Errorf("update image store for %q: %w", r, err)

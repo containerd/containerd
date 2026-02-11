@@ -327,14 +327,11 @@ func (c *Controller) Create(_ctx context.Context, info sandbox.Sandbox, opts ...
 }
 
 func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig, runtimeHandler string) (*imagestore.Image, error) {
-	image, err := c.imageService.LocalResolve(ref)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
-	}
-	if err == nil {
-		return &image, nil
-	}
-	// Pull image to ensure the image exists
+	log.G(ctx).Debugf("Ensuring image %q exists for runtime %q", ref, runtimeHandler)
+
+	// Pull image to ensure the image exists and is properly prepared for the target snapshotter.
+	// PullImage checks if the image is already unpacked for the runtime's snapshotter and
+	// returns early if so; otherwise it pulls and unpacks the image.
 	// TODO: Cleaner interface
 	imageID, err := c.imageService.PullImage(ctx, ref, nil, config, runtimeHandler)
 	if err != nil {

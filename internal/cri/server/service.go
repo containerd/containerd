@@ -108,6 +108,10 @@ type ImageService interface {
 	LocalResolve(refOrID string) (imagestore.Image, error)
 
 	ImageFSPaths() map[string]string
+
+	IsImageUnpackedForSnapshotter(ctx context.Context, ref string, snapshotter string) (bool, error)
+
+	UnpackImage(ctx context.Context, ref string, snapshotter string) error
 }
 
 // criService implements CRIService.

@@ -298,6 +298,15 @@ func WithUnpackLimiter(limiter *semaphore.Weighted) UnpackOpt {
 	}
 }
 
+// WithUnpackSnapshotOpts adds snapshot options to be passed to the snapshotter during unpack.
+// This is useful for passing labels to remote snapshotters that need metadata.
+func WithUnpackSnapshotOpts(opts ...snapshots.Opt) UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.SnapshotOpts = append(uc.SnapshotOpts, opts...)
+		return nil
+	}
+}
+
 func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
 	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {

@@ -306,6 +306,14 @@ func (s *fakeImageService) PullImage(context.Context, string, func(string) (stri
 	return "", errors.New("not implemented")
 }
 
+func (s *fakeImageService) IsImageUnpackedForSnapshotter(ctx context.Context, ref string, snapshotter string) (bool, error) {
+	return true, nil
+}
+
+func (s *fakeImageService) UnpackImage(ctx context.Context, ref string, snapshotter string) error {
+	return nil
+}
+
 func patchExceptedWithState(expected *runtime.ContainerStatus, state runtime.ContainerState) {
 	expected.State = state
 	switch state {
