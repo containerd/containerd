@@ -320,9 +320,9 @@ func TestLogURIGenerator(t *testing.T) {
 				"id": "testing",
 			},
 			envs: map[string]string{
-				"SECRET": "mysecret",
+				"LOG_FORMAT": "json",
 			},
-			expected: "binary:///full/path/bin?id=testing#SECRET=mysecret",
+			expected: "binary:///full/path/bin?id=testing#LOG_FORMAT=json",
 		},
 		{
 			scheme: "binary",

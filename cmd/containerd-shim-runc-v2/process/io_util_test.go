@@ -57,9 +57,9 @@ func TestNewBinaryCmd(t *testing.T) {
 		},
 		{
 			name:     "envs only",
-			uri:      "binary:///bin/logger#LOG_LEVEL=debug&API_KEY=secret",
+			uri:      "binary:///bin/logger#LOG_LEVEL=debug&LOG_FORMAT=json",
 			wantArgs: []string{},
-			wantEnvs: []string{"LOG_LEVEL=debug", "API_KEY=secret"},
+			wantEnvs: []string{"LOG_LEVEL=debug", "LOG_FORMAT=json"},
 		},
 		{
 			name:     "mixed args and envs",

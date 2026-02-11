@@ -88,14 +88,14 @@ func TestBinaryIOWithEnvs(t *testing.T) {
 			name:   "args and envs combined",
 			binary: prefix + "/usr/bin/logger",
 			args:   map[string]string{"id": "container1"},
-			opts:   []BinaryIOOpt{WithBinaryIOEnv(map[string]string{"API_KEY": "secret"})},
+			opts:   []BinaryIOOpt{WithBinaryIOEnv(map[string]string{"LOG_FORMAT": "json"})},
 			checkURI: func(t *testing.T, uri string) {
 				parsed, err := url.Parse(uri)
 				require.NoError(t, err)
 				assert.Equal(t, "container1", parsed.Query().Get("id"))
 				envs, err := url.ParseQuery(parsed.Fragment)
 				require.NoError(t, err)
-				assert.Equal(t, "secret", envs.Get("API_KEY"))
+				assert.Equal(t, "json", envs.Get("LOG_FORMAT"))
 			},
 		},
 		{
