@@ -112,14 +112,27 @@ func ApplyLayerWithOpts(ctx context.Context, layer Layer, chain []digest.Digest,
 
 func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn snapshots.Snapshotter, a diff.Applier, opts []snapshots.Opt, applyOpts []diff.ApplyOpt) error {
 	var (
-		parent  = identity.ChainID(chain[:len(chain)-1])
-		chainID = identity.ChainID(chain)
-		layer   = layers[len(layers)-1]
-		diff    ocispec.Descriptor
-		key     string
-		mounts  []mount.Mount
-		err     error
+		parent   = identity.ChainID(chain[:len(chain)-1])
+		chainID  = identity.ChainID(chain)
+		chainStr = chainID.String()
+		layer    = layers[len(layers)-1]
+		diff     ocispec.Descriptor
+		key      string
+		mounts   []mount.Mount
+		err      error
 	)
+
+	// inherits annotations which are provided as snapshot labels.
+	labels := snapshots.FilterInheritedLabels(diff.Annotations)
+	if labels == nil {
+		labels = make(map[string]string)
+		labels["containerd.io/snapshot.ref"] = chainStr
+	} else {
+		if _, ok := labels["containerd.io/snapshot.ref"]; !ok {
+			labels["containerd.io/snapshot.ref"] = chainStr
+		}
+	}
+	opts = append(opts, snapshots.WithLabels(labels))
 
 	for {
 		key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
@@ -137,11 +150,17 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 				layers = nil
 				continue
 			} else if errdefs.IsAlreadyExists(err) {
-				// Try a different key
-				continue
+				if _, err := sn.Stat(ctx, chainStr); err != nil {
+					if !errdefs.IsNotFound(err) {
+						return fmt.Errorf("failed to stat snapshot %s: %w", chainStr, err)
+					}
+					// Try again, this should be rare, log it
+					log.G(ctx).WithField("key", key).WithField("chainid", chainStr).Debug("extraction snapshot already exists, chain id not found")
+					continue
+				}
 			}
 
-			// Already exists should have the caller retry
+			// Already exists - either the snapshot is good and inplace or have the caller retry
 			return fmt.Errorf("failed to prepare extraction snapshot %q: %w", key, err)
 
 		}
