@@ -70,6 +70,10 @@ command. As part of this process, we do the following:
 			Hidden: true,
 		},
 		&cli.BoolFlag{
+			Name:  "metadata-only",
+			Usage: "Pull all metadata including manifests and configs, without image layers",
+		},
+		&cli.BoolFlag{
 			Name:  "skip-metadata",
 			Usage: "Skips metadata for unused platforms (Image may be unable to be pushed without metadata)",
 		},
@@ -145,11 +149,17 @@ command. As part of this process, we do the following:
 			}
 
 			if cliContext.Bool("metadata-only") {
+				if cliContext.Bool("skip-metadata") {
+					return fmt.Errorf("skip-metadata can't be combined with metadata-only")
+				}
 				sopts = append(sopts, image.WithAllMetadata)
 				// Any with an empty set is None
 				// TODO: Specify way to specify not default platform
 				// config.PlatformMatcher = platforms.Any()
 			} else if !cliContext.Bool("skip-metadata") {
+				if cliContext.IsSet("metadata-only") {
+					return fmt.Errorf("skip-metadata can't be combined with metadata-only")
+				}
 				sopts = append(sopts, image.WithAllMetadata)
 			}
 			labels := cliContext.StringSlice("label")
