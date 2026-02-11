@@ -139,7 +139,12 @@ const (
 
 func parseFlags() {
 	flag.BoolVar(&debugFlag, "debug", false, "enable debug output in logs")
-	flag.BoolVar(&versionFlag, "v", false, "show the shim version and exit")
+
+	// short + long form. omitting the usage (description) of the short-form
+	// to group it with the long form.
+	flag.BoolVar(&versionFlag, "v", false, "")
+	flag.BoolVar(&versionFlag, "version", false, "show the shim version and exit")
+
 	// "info" is not a subcommand, because old shims produce very confusing errors for unknown subcommands
 	// https://github.com/containerd/containerd/pull/8509#discussion_r1210021403
 	flag.BoolVar(&infoFlag, "info", false, "get the option protobuf from stdin, print the shim info protobuf to stdout, and exit")
