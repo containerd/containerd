@@ -105,7 +105,7 @@ type ImageService interface {
 	GetImage(id string) (imagestore.Image, error)
 	GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error)
 
-	LocalResolve(refOrID string) (imagestore.Image, error)
+	LocalResolve(refOrID string, snapshotter ...string) (imagestore.Image, error)
 
 	ImageFSPaths() map[string]string
 }

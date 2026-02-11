@@ -89,6 +89,12 @@ type Platform struct {
 	// LayerTypes are the supported types to be considered layers
 	// Defaults to OCI image layers
 	LayerTypes []string
+
+	// fetchMissingContent ensures content blobs are fetched even when
+	// snapshots already exist. This is needed for export/push operations
+	// when images share layers but have different compressed blob digests.
+	// Defaults to true. See https://github.com/containerd/containerd/issues/8973
+	FetchMissingContent bool
 }
 
 // KeyedLocker is an interface for managing job duplication by
@@ -149,6 +155,22 @@ func WithDuplicationSuppressor(d KeyedLocker) UnpackerOpt {
 func WithUnpackLimiter(l Limiter) UnpackerOpt {
 	return UnpackerOpt(func(c *unpackerConfig) error {
 		c.unpackLimiter = l
+		return nil
+	})
+}
+
+// WithFetchMissingContent configures the unpacker to fetch content blobs
+// when snapshots already exist but the content is missing from the content store.
+// This is enabled by default and is needed for export/push operations when
+// images share layers but have different compressed blob digests.
+// See https://github.com/containerd/containerd/issues/8973
+func WithFetchMissingContent(snapshotter string, check bool) UnpackerOpt {
+	return UnpackerOpt(func(c *unpackerConfig) error {
+		for _, p := range c.platforms {
+			if p.SnapshotterKey == snapshotter {
+				p.FetchMissingContent = check
+			}
+		}
 		return nil
 	})
 }
@@ -352,9 +374,10 @@ func (u *Unpacker) unpack(
 		a  = unpack.Applier
 		cs = u.content
 
-		fetchOffset int
-		fetchC      []chan struct{}
-		fetchErr    []chan error
+		fetchOffset   int
+		fetchC        []chan struct{}
+		fetchErr      []chan error
+		needFetchFrom = -1
 
 		parallel = u.supportParallel(unpack)
 	)
@@ -416,6 +439,15 @@ func (u *Unpacker) unpack(
 						// Try again, this should be rare, log it
 						log.G(ctx).WithField("key", key).WithField("chainid", chainID).Debug("extraction snapshot already exists, chain id not found")
 					} else {
+						if unpack.FetchMissingContent && needFetchFrom < 0 {
+							if _, err := cs.Info(ctx, desc.Digest); errdefs.IsNotFound(err) {
+								log.G(ctx).WithField("digest", desc.Digest).Infof("content missing for existing snapshot %s, will fetch", chainID)
+								needFetchFrom = i
+							} else if err != nil {
+								return nil, fmt.Errorf("failed to check content info: %w", err)
+							}
+						}
+
 						log.G(ctx).Debugf("snapshot %s with chainID %s already exists skip fetch blob %q ", snInfo.Name, chainID, desc.Digest)
 						// no need to handle, snapshot now found with chain id
 						return nil, nil
@@ -439,23 +471,27 @@ func (u *Unpacker) unpack(
 		}
 
 		if fetchErr == nil {
-			fetchOffset = i
-			n := len(layers) - fetchOffset
-			fetchErr = make([]chan error, n)
-			fetchC = make([]chan struct{}, n)
-			for i := range n {
-				fetchC[i] = make(chan struct{})
-				fetchErr[i] = make(chan error, 1)
+			if needFetchFrom >= 0 {
+				fetchOffset = needFetchFrom
+			} else {
+				fetchOffset = i
 			}
-			go func(i int) {
-				err := u.fetch(ctx, h, layers[i:], fetchC)
+			n := len(layers) - fetchOffset
+			fetchC = make([]chan struct{}, n)
+			fetchErr = make([]chan error, n)
+			for j := range n {
+				fetchC[j] = make(chan struct{})
+				fetchErr[j] = make(chan error, 1)
+			}
+			go func(offset int) {
+				err := u.fetch(ctx, h, layers[offset:], fetchC)
 				if err != nil {
 					for _, fc := range fetchErr {
 						fc <- err
 						close(fc)
 					}
 				}
-			}(i)
+			}(fetchOffset)
 		}
 
 		if err = u.acquire(ctx, u.unpackLimiter); err != nil {
