@@ -231,6 +231,11 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 		return nil, err
 	}
 
+	ctx = context.WithValue(ctx, warningSourceKey{}, WarningSource{
+		Desc:   &desc,
+		Digest: &desc.Digest,
+	})
+
 	return newHTTPReadSeeker(desc.Size, func(offset int64) (io.ReadCloser, error) {
 		// firstly try fetch via external urls
 		for _, us := range desc.URLs {
@@ -243,6 +248,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				log.G(ctx).Debug("non-http(s) alternative url is unsupported")
 				continue
 			}
+
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
 			log.G(ctx).Info("request")
 
@@ -378,6 +384,10 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 	if err != nil {
 		return nil, desc, err
 	}
+
+	ctx = context.WithValue(ctx, warningSourceKey{}, WarningSource{
+		Digest: &dgst,
+	})
 
 	var (
 		getReq   *request
