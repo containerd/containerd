@@ -68,7 +68,8 @@ version = 3
 	})
 
 	imageName := images.Get(images.VolumeOwnership)
-	pullImagesByCRI(t, currentProc.criImageService(t), imageName)
+	pauseImage := images.Get(images.Pause)
+	pullImagesByCRI(t, currentProc.criImageService(t), imageName, pauseImage)
 
 	podCtx := newPodTCtx(t, currentProc.criRuntimeService(t), "running-pod", "sandbox")
 
