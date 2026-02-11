@@ -304,17 +304,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}
 
-	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-		return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
-	}
+	sandboxInfo.Labels = ctrl.Labels
+	sandboxInfo.Spec = ctrl.Spec
 
-	// TODO: get rid of this. sandbox object should no longer have Container field.
-	if ociRuntime.Sandboxer == string(criconfig.ModePodSandbox) {
-		container, err := c.client.LoadContainer(ctx, id)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
-		}
-		sandbox.Container = container
+	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions", "spec", "labels"); err != nil {
+		return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
 	}
 
 	labels := ctrl.Labels
@@ -323,6 +317,14 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	sandbox.ProcessLabel = labels["selinux_label"]
+
+	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		status.Pid = ctrl.Pid // NRI reads the pid from status during RunPodSandbox hook
+		status.CreatedAt = ctrl.CreatedAt
+		return status, nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to update sandbox pid: %w", err)
+	}
 
 	defer c.nri.BlockPluginSync().Unblock()
 
@@ -341,9 +343,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		// Set the pod sandbox as ready after successfully start sandbox container.
-		status.Pid = ctrl.Pid
 		status.State = sandboxstore.StateReady
-		status.CreatedAt = ctrl.CreatedAt
 		return status, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update sandbox status: %w", err)

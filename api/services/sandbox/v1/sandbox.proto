@@ -126,6 +126,7 @@ message ControllerStartResponse {
   // it is in the form of ttrpc+unix://path/to/uds or grpc+vsock://<vsock cid>:<port>.
   string address = 5;
   uint32 version = 6;
+  google.protobuf.Any spec = 7;
 }
 
 message ControllerPlatformRequest {
