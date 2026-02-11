@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -94,10 +93,12 @@ func generateDefaultSpecWithPlatform(ctx context.Context, platform, id string, s
 		err = populateDefaultDarwinSpec(s)
 	default:
 		err = populateDefaultUnixSpec(ctx, s, id)
-		if err == nil && runtime.GOOS == "windows" {
-			// To run LCOW we have a Linux and Windows section. Add an empty one now.
-			s.Windows = &specs.Windows{}
-		}
+		// Note: Previously this added an empty s.Windows section for LCOW
+		// (Linux Containers on Windows via Hyper-V). This is not needed for
+		// VM-based runtimes like nerdbox that run a full Linux VM, and it
+		// causes container runtimes inside the VM (e.g. crun) to fail with
+		// "Required field 'layerFolders' not present". LCOW users should
+		// set the Windows section explicitly via spec options if needed.
 	}
 
 	return err

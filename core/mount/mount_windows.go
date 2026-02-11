@@ -27,6 +27,7 @@ import (
 
 	"github.com/Microsoft/go-winio/pkg/bindfilter"
 	"github.com/Microsoft/hcsshim"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"golang.org/x/sys/windows"
 )
@@ -36,7 +37,12 @@ const sourceStreamName = "containerd.io-source"
 // Mount to the provided target.
 func (m *Mount) mount(target string) (retErr error) {
 	if m.Type != "windows-layer" {
-		return fmt.Errorf("invalid windows mount type: '%s'", m.Type)
+		// Return ErrNotImplemented for non-Windows mount types (e.g.
+		// ext4, overlay, erofs) so the mount manager can defer them to
+		// the container runtime. This matches Darwin where mount()
+		// always returns ErrNotImplemented, and enables VM-based
+		// runtimes like nerdbox that handle mounts inside the guest.
+		return errdefs.ErrNotImplemented
 	}
 
 	home, layerID := filepath.Split(m.Source)
