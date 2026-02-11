@@ -382,16 +382,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 // getNetworkPlugin returns the network plugin to be used by the runtime class
 // defaults to the global CNI options in the CRI config
 func (c *criService) getNetworkPlugin(runtimeClass string) cni.CNI {
-	if c.netPlugin == nil {
-		return nil
+	if cni := c.cniNetPlugin.get(runtimeClass); cni != nil {
+		return cni
 	}
-	i, ok := c.netPlugin[runtimeClass]
-	if !ok {
-		if i, ok = c.netPlugin[defaultNetworkPlugin]; !ok {
-			return nil
-		}
+	if cni := c.cniNetPlugin.get(defaultNetworkPlugin); cni != nil {
+		return cni
 	}
-	return i
+	return nil
 }
 
 // setupPodNetwork setups up the network for a pod
