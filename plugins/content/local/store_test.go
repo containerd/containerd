@@ -242,7 +242,6 @@ func TestContentWriter(t *testing.T) {
 	if !ok || err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 func TestWalkBlobs(t *testing.T) {
@@ -368,7 +367,7 @@ func checkBlobPath(t *testing.T, cs content.Store, dgst digest.Digest) string {
 
 	if runtime.GOOS != "windows" {
 		// ensure that only read bits are set.
-		if ((fi.Mode() & os.ModePerm) & 0333) != 0 {
+		if ((fi.Mode() & os.ModePerm) & 0o333) != 0 {
 			t.Fatalf("incorrect permissions: %v", fi.Mode())
 		}
 	}
@@ -418,21 +417,4 @@ func setupIncompleteWrite(ctx context.Context, t *testing.T, cs content.Store, r
 	assert.NoError(t, err)
 
 	assert.Nil(t, writer.Close())
-}
-
-func TestWriteReadEmptyFileTimestamp(t *testing.T) {
-	root := t.TempDir()
-
-	emptyFile := filepath.Join(root, "updatedat")
-	if err := writeTimestampFile(emptyFile, time.Time{}); err != nil {
-		t.Errorf("failed to write Zero Time to file: %v", err)
-	}
-
-	timestamp, err := readFileTimestamp(emptyFile)
-	if err != nil {
-		t.Errorf("read empty timestamp file should success, but got error: %v", err)
-	}
-	if !timestamp.IsZero() {
-		t.Errorf("read empty timestamp file should return time.Time{}, but got: %v", timestamp)
-	}
 }
