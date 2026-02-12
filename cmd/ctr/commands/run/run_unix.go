@@ -353,13 +353,6 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				Path: nsPath,
 			}))
 		}
-		var cdiDeviceIDs []string
-		if cliContext.IsSet("gpus") {
-			for _, id := range cliContext.IntSlice("gpus") {
-				cdiDeviceID := fmt.Sprintf("nvidia.com/gpu=%d", id)
-				cdiDeviceIDs = append(cdiDeviceIDs, cdiDeviceID)
-			}
-		}
 		if cliContext.IsSet("allow-new-privs") {
 			opts = append(opts, oci.WithNewPrivileges)
 		}
@@ -371,6 +364,8 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		if limit != 0 {
 			opts = append(opts, oci.WithMemoryLimit(limit))
 		}
+
+		var cdiDeviceIDs []string
 		for _, dev := range cliContext.StringSlice("device") {
 			if parser.IsQualifiedName(dev) {
 				cdiDeviceIDs = append(cdiDeviceIDs, dev)
@@ -378,10 +373,10 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			}
 			opts = append(opts, oci.WithDevices(dev, "", "rwm"))
 		}
-		if len(cdiDeviceIDs) > 0 {
-			opts = append(opts, withStaticCDIRegistry())
+
+		if gpuIDs := cliContext.IntSlice("gpus"); len(cdiDeviceIDs) > 0 || len(gpuIDs) > 0 {
+			opts = append(opts, withCDIDeviceRequests(cdiDeviceIDs, gpuIDs)...)
 		}
-		opts = append(opts, cdispec.WithCDIDevices(cdiDeviceIDs...))
 
 		rootfsPropagation := cliContext.String("rootfs-propagation")
 		if rootfsPropagation != "" {
@@ -518,6 +513,60 @@ func getNetNSPath(_ context.Context, task containerd.Task) (string, error) {
 	return fmt.Sprintf("/proc/%d/ns/net", task.Pid()), nil
 }
 
+// vendorLister is an interface for listing GPU vendors from CDI.
+type vendorLister interface {
+	ListVendors() []string
+}
+
+// detectGPUVendor detects available GPU vendors from CDI spec files.
+// It returns the vendor string for the first known GPU vendor found,
+// or an empty string if no GPU vendor is detected.
+func detectGPUVendor(ctx context.Context, lister vendorLister) (string, error) {
+	if lister == nil {
+		return "", errors.New("vendor lister is nil")
+	}
+
+	availableVendors := lister.ListVendors()
+	knownVendors := []string{"nvidia.com", "amd.com"}
+
+	// Check if a known GPU vendor is available
+	// NVIDIA is checked first followed by AMD
+	for _, known := range knownVendors {
+		for _, available := range availableVendors {
+			if available == known {
+				log.G(ctx).Debugf("Detected GPU vendor from CDI specs: %s", known)
+				return known, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no known GPU vendor detected in CDI specs, only AMD and NVIDIA are supported")
+}
+
+// gpuDeviceNames converts GPU indices to qualified CDI device names.
+// It auto-detects the GPU vendor (e.g., nvidia.com or amd.com) from available CDI specs.
+// Returns the device names and an error if no GPU vendor is found.
+func gpuDeviceNames(ctx context.Context, lister vendorLister, gpuIDs ...int) ([]string, error) {
+	if len(gpuIDs) == 0 {
+		return nil, nil
+	}
+
+	// Detect GPU vendor from CDI specs
+	vendor, err := detectGPUVendor(ctx, lister)
+	if err != nil {
+		return nil, fmt.Errorf("GPU device CDI name resolution failed: %w", err)
+	}
+
+	// Build CDI device names from GPU indices
+	devices := make([]string, 0, len(gpuIDs))
+	for _, id := range gpuIDs {
+		devices = append(devices, fmt.Sprintf("%s/gpu=%d", vendor, id))
+	}
+
+	log.G(ctx).Debugf("Resolved GPU device names: %v", devices)
+	return devices, nil
+}
+
 // withStaticCDIRegistry inits the CDI registry and disables auto-refresh.
 // This is used from the `run` command to avoid creating a registry with auto-refresh enabled.
 // It also provides a way to override the CDI spec file paths if required.
@@ -534,4 +583,30 @@ func withStaticCDIRegistry() oci.SpecOpts {
 		}
 		return nil
 	}
+}
+
+// withCDIDeviceRequests returns a list of OCI spec options for injecting CDI devices
+// which includes both the devices specified via --device and GPU devices specified via --gpus.
+func withCDIDeviceRequests(cdiDeviceIDs []string, gpuIDs []int) []oci.SpecOpts {
+	if len(cdiDeviceIDs) == 0 && len(gpuIDs) == 0 {
+		return nil
+	}
+
+	var opts []oci.SpecOpts
+	opts = append(opts, withStaticCDIRegistry())
+
+	if len(gpuIDs) == 0 {
+		return append(opts, cdispec.WithCDIDevices(cdiDeviceIDs...))
+	}
+
+	modifyingOption := func(ctx context.Context, client oci.Client, c *containers.Container, s *oci.Spec) error {
+		devices, err := gpuDeviceNames(ctx, cdi.GetDefaultCache(), gpuIDs...)
+		if err != nil {
+			return err
+		}
+		return cdispec.WithCDIDevices(append(cdiDeviceIDs, devices...)...)(ctx, client, c, s)
+	}
+
+	return append(opts, modifyingOption)
+
 }
