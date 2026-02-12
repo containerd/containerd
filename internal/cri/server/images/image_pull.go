@@ -308,7 +308,6 @@ func (c *CRIImageService) pullImageWithTransferService(
 	ch := newCRICredentials(ref, credentials)
 	opts := []registry.Opt{registry.WithCredentials(ch)}
 	opts = append(opts, registry.WithHeaders(c.config.Registry.Headers))
-	opts = append(opts, registry.WithHostDir(c.config.Registry.ConfigPath))
 	opts = append(opts, registry.WithHostDirRoots(filepath.SplitList(c.config.Registry.ConfigPath)))
 	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 	if err != nil {

@@ -308,9 +308,14 @@ func HostDirFromRoot(root string) func(string) (string, error) {
 // This is useful for Docker-style multi-root configuration, such as CRI's
 // `registry.config_path`, which is formatted as a filepath.SplitList() compatible
 // path list (":" on Unix, ";" on Windows).
+//
+// Empty root entries are skipped to avoid generating invalid directory lookup functions.
 func HostDirFromRoots(roots []string) func(string) (string, error) {
 	hostDirFns := make([]func(string) (string, error), 0, len(roots))
 	for _, r := range roots {
+		if r == "" {
+			continue
+		}
 		hostDirFns = append(hostDirFns, HostDirFromRoot(r))
 	}
 

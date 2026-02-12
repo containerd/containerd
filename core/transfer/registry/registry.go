@@ -75,6 +75,8 @@ func WithCredentials(creds CredentialHelper) Opt {
 }
 
 // WithHostDir specifies the host configuration directory.
+//
+// To set multiple fallback config directories, use WithHostDirRoots instead.
 func WithHostDir(hostDir string) Opt {
 	return func(o *registryOpts) error {
 		o.hostDir = hostDir
@@ -84,9 +86,12 @@ func WithHostDir(hostDir string) Opt {
 
 // WithHostDirRoots specifies multiple host configuration directory roots to
 // search in order (e.g. CRI's registry.config_path split by filepath.SplitList()).
+//
+// To override all roots and specify only one or more explicitly, use WithHostDirRoots()
+// without setting WithHostDir.
 func WithHostDirRoots(roots []string) Opt {
 	return func(o *registryOpts) error {
-		o.hostDirRoots = append([]string{}, roots...)
+		o.hostDirRoots = append(o.hostDirRoots, roots...)
 		return nil
 	}
 }
@@ -134,10 +139,12 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	}
 
 	hostOptions := config.HostOptions{}
-	if len(ropts.hostDirRoots) > 0 {
-		hostOptions.HostDir = config.HostDirFromRoots(ropts.hostDirRoots)
-	} else if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+
+	if ropts.hostDir != "" || len(ropts.hostDirRoots) > 0 {
+		roots := make([]string, 0)
+		roots = append(roots, ropts.hostDir)
+		roots = append(roots, ropts.hostDirRoots...)
+		hostOptions.HostDir = config.HostDirFromRoots(roots)
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
