@@ -292,8 +292,9 @@ func LoadConfig(ctx context.Context, path string, out *Config) error {
 	}
 
 	var (
-		loaded  = map[string]bool{}
-		pending = []string{path}
+		loaded            = map[string]bool{}
+		pending           = []string{path}
+		rootConfigVersion = 0
 	)
 
 	for len(pending) > 0 {
@@ -307,6 +308,14 @@ func LoadConfig(ctx context.Context, path string, out *Config) error {
 		config, err := loadConfigFile(ctx, path)
 		if err != nil {
 			return err
+		}
+
+		// Check to make sure drop-in configs does not have a higher version than the root config version
+		if rootConfigVersion == 0 {
+			rootConfigVersion = config.Version
+		}
+		if config.Version > rootConfigVersion {
+			return fmt.Errorf("drop-in config version %d higher than root config version %d", config.Version, rootConfigVersion)
 		}
 
 		switch config.Version {
