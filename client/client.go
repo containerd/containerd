@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"iter"
 	"runtime"
 	"strconv"
 	"strings"
@@ -41,6 +42,7 @@ import (
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -333,6 +335,24 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 		out[i] = containerFromRecord(c, container)
 	}
 	return out, nil
+}
+
+func (c *Client) StreamContainers(ctx context.Context, filters ...string) (iter.Seq2[Container, error], error) {
+	r, ok := c.ContainerService().(*remoteContainers)
+	if !ok {
+		return nil, errgrpc.ToNative(fmt.Errorf("c.ContainerService() is not a *remoteContainers"))
+	}
+	return func(yield func(Container, error) bool) {
+		for con, err := range r.streamContainers(ctx, filters...) {
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			if !yield(containerFromRecord(c, con), nil) {
+				return
+			}
+		}
+	}, nil
 }
 
 // NewContainer will create a new container with the provided id.
