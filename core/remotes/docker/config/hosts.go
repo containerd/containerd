@@ -302,6 +302,34 @@ func HostDirFromRoot(root string) func(string) (string, error) {
 	}
 }
 
+// HostDirFromRoots returns a function which finds a host directory by searching
+// multiple roots in order.
+//
+// This is useful for Docker-style multi-root configuration, such as CRI's
+// `registry.config_path`, which is formatted as a filepath.SplitList() compatible
+// path list (":" on Unix, ";" on Windows).
+//
+// Empty root entries are skipped to avoid generating invalid directory lookup functions.
+func HostDirFromRoots(roots []string) func(string) (string, error) {
+	hostDirFns := make([]func(string) (string, error), 0, len(roots))
+	for _, r := range roots {
+		if r == "" {
+			continue
+		}
+		hostDirFns = append(hostDirFns, HostDirFromRoot(r))
+	}
+
+	return func(host string) (dir string, err error) {
+		for _, fn := range hostDirFns {
+			dir, err = fn(host)
+			if (err != nil && !errdefs.IsNotFound(err)) || (dir != "") {
+				break
+			}
+		}
+		return
+	}
+}
+
 // hostDirectory converts ":port" to "_port_" in directory names
 func hostDirectory(host string) string {
 	idx := strings.LastIndex(host, ":")
