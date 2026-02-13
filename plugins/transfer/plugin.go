@@ -17,6 +17,7 @@
 package transfer
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/containerd/errdefs"
@@ -71,7 +72,7 @@ func init() {
 			lc.Leases = l.(leases.Manager)
 
 			vps, err := ic.GetByType(plugins.ImageVerifierPlugin)
-			if err != nil {
+			if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
 				return nil, err
 			}
 			if len(vps) > 0 {
