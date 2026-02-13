@@ -317,7 +317,7 @@ func (m testManifest) RegisterHandler(r *http.ServeMux, name string) {
 	}
 }
 
-func TestHostDirFromPathList_SearchesMultipleRoots(t *testing.T) {
+func TestHostDirFromRoots(t *testing.T) {
 	t.Parallel()
 
 	// root1 intentionally does not exist

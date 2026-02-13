@@ -87,8 +87,7 @@ func WithHostDir(hostDir string) Opt {
 // WithHostDirRoots specifies multiple host configuration directory roots to
 // search in order (e.g. CRI's registry.config_path split by filepath.SplitList()).
 //
-// To override all roots and specify only one or more explicitly, use WithHostDirRoots()
-// without setting WithHostDir.
+// The directory specified by WithHostDir is prepended as a search target.
 func WithHostDirRoots(roots []string) Opt {
 	return func(o *registryOpts) error {
 		o.hostDirRoots = append(o.hostDirRoots, roots...)
