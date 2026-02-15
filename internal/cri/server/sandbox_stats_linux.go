@@ -201,7 +201,7 @@ func cgroupMetricsForSandbox(sandbox sandboxstore.Sandbox) (*cgroupMetrics, erro
 		if err != nil {
 			return nil, fmt.Errorf("failed to load sandbox cgroup: %v: %w", cgroupPath, err)
 		}
-		stats, err := cg.Stat()
+		stats, err := cg.StatFiltered(cgroupsv2.StatCPU | cgroupsv2.StatMemory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get stats for cgroup: %v: %w", cgroupPath, err)
 		}
