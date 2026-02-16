@@ -100,13 +100,16 @@ func (cw *BlockCIMLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo, f
 	if name == wclayer.UtilityVMPath && len(cw.parentLayers) > 0 {
 		// If there are UtilityVM files in non base layers, we will have to merge
 		// those files with the parent layer UtilityVM files - either during image
-		// pull or at runtime (i.e when starting the UVM). In order to merge at image pull time, we will have
-		// to read parent layer block CIMs and copy all the UtilityVM files from
-		// those CIMs into this block CIM one by one i.e effectively merge all
-		// parent layer UtilityVM files in this layer. Or we will need to be able
-		// to boot the UtilityVM with merged block CIMs. None of these options are
-		// implemented yet so error out if we see that.
-		return fmt.Errorf("UtilityVM files in non base layers is not supported for block CIMs")
+		// pull or at runtime (i.e when starting the UVM). In order to merge at
+		// image pull time, we will have to read parent layer block CIMs and copy
+		// all the UtilityVM files from those CIMs into this block CIM one by one
+		// i.e effectively merge all parent layer UtilityVM files in this
+		// layer. Or we will need to be able to boot the UtilityVM with merged
+		// block CIMs. None of these options are implemented yet so log a
+		// warning. However, this shouldn't cause issues with most of the standard
+		// use cases because usually the pod is a nanoserver image and that is
+		// always a single layer.
+		log.G(cw.ctx).Warn("UtilityVM files in non base layers is not supported for block CIMs")
 	}
 	return cw.cimLayerWriter.Add(name, fileInfo, fileSize, securityDescriptor, extendedAttributes, reparseData)
 }

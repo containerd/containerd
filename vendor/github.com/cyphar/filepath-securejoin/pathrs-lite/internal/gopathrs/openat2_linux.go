@@ -9,7 +9,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-package pathrs
+package gopathrs
 
 import (
 	"errors"
@@ -41,6 +41,7 @@ func openat2(dir fd.Fd, path string, how *unix.OpenHow) (*os.File, error) {
 			if err != nil {
 				return nil, err
 			}
+			_ = file.Close()
 			file = newFile
 		}
 	}

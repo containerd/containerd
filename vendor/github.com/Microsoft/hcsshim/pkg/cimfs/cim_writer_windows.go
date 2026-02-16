@@ -346,7 +346,7 @@ func (c *CimFsWriter) Close() (err error) {
 	}
 	if c.sealOnClose {
 		if err = sealBlockCIM(filepath.Dir(c.name)); err != nil {
-			return &OpError{Cim: c.name, Op: "seal", Err: err}
+			return &OpError{Cim: filepath.Dir(c.name), Op: "seal", Err: err}
 		}
 	}
 	return nil
@@ -506,6 +506,10 @@ func MergeBlockCIMs(mergedCIM *BlockCIM, sourceCIMs []*BlockCIM) (err error) {
 func sealBlockCIM(blockPath string) error {
 	var hashSize, fixedHeaderSize uint64
 	hashBuf := make([]byte, cimHashSize)
+
+	// the blockPath could be a path to a block device or a file. In either case there should be no trailing backslash.
+	blockPath = strings.TrimSuffix(blockPath, "\\")
+
 	if err := winapi.CimSealImage(blockPath, &hashSize, &fixedHeaderSize, &hashBuf[0]); err != nil {
 		return fmt.Errorf("failed to seal block CIM: %w", err)
 	} else if hashSize != cimHashSize {
