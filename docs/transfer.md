@@ -104,7 +104,7 @@ Streaming is used by the transfer service to send or receive data streams as par
 
 ### Progress
 
-Progress is an asynchronous callback sent from the server to the client. It is normally representing in the Go interface as a simple callback function, which the the client implements and the server calls.
+Progress is an asynchronous callback sent from the server to the client. It is normally representing in the Go interface as a simple callback function, which the client implements and the server calls.
 
 From Go types progress uses these types
 ```go
