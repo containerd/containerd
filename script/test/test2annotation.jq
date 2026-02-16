@@ -56,7 +56,7 @@ def filter_test_item:
 # Take a list of test groups and make a map of tests keyed on the package name +
 # test name with all the output concatenated.
 #
-# This uses the last test log message to get the the file/line number for the test (as .Details)
+# This uses the last test log message to get the file/line number for the test (as .Details)
 def merge_output: reduce (.[][] | filter_test_item) as $item (
     {};  (
         "\($item.Package).\($item.Test)" as $key
