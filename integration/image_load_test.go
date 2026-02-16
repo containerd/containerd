@@ -68,7 +68,7 @@ func TestImageLoad(t *testing.T) {
 	// Add --local=true option since currently the transfer service
 	// does not provide enough progress to avoid timeout
 	// and --platform to only check for manifests for this platform. The "ctr image import"
-	// command otherwise might fail, if the the above docker commands use the containerd image
+	// command otherwise might fail, if the above docker commands use the containerd image
 	// store, as in that case `docker save` produces OCI artifacts referencing manifests for
 	// other platforms that are not included in what we downloaded. By specifying a platform, we
 	// just ignore the references to other platforms.
