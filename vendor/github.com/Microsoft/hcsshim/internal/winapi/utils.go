@@ -81,3 +81,8 @@ func ConvertStringSetToSlice(buf []byte) ([]string, error) {
 func ParseUtf16LE(b []byte) string {
 	return windows.UTF16PtrToString((*uint16)(unsafe.Pointer(&b[0])))
 }
+
+// CimFsSupported checks if CIM FS dlls are present on the system.
+func CimFsSupported() bool {
+	return modcimfs.Load() == nil && modcimwriter.Load() == nil
+}
