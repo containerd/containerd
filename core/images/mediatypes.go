@@ -61,10 +61,19 @@ const (
 
 	// EROFS media type
 	MediaTypeErofsLayer = "application/vnd.erofs.layer.v1"
+	// MediaTypeErofsLayerZstd is a zstd-compressed EROFS layer format.
+	// This is used by seekable-EROFS blobs (concatenated zstd frames + skippable metadata).
+	MediaTypeErofsLayerZstd = MediaTypeErofsLayer + "+zstd"
 
 	// In-toto attestation
 	MediaTypeInToto = "application/vnd.in-toto+json"
 )
+
+// IsSeekableErofsMediaType checks if the media type is seekable EROFS (+zstd).
+func IsSeekableErofsMediaType(mt string) bool {
+	base, ext, _ := strings.Cut(mt, "+")
+	return base == MediaTypeErofsLayer && ext == "zstd"
+}
 
 // DiffCompression returns the compression as defined by the layer diff media
 // type. For Docker media types without compression, "unknown" is returned to
