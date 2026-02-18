@@ -158,7 +158,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
-		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
+		return nil, fmt.Errorf("unable to create sandbox w/metadata for reserved sandbox id %q in sandboxer store: %w", id, err)
 	}
 	defer func() {
 		if retErr != nil && cleanupErr == nil {
@@ -227,11 +227,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}()
 
 		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
-			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+			return nil, fmt.Errorf("unable to add CRI pod metadata as sandboxer metadata extension for sandbox %q: %w", id, err)
 		}
 		// Save sandbox metadata to store
 		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-			return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
+			return nil, fmt.Errorf("unable to update sandbox %q in sandboxer store with additional metadata extension: %w", id, err)
 		}
 		// Define this defer to teardownPodNetwork prior to the setupPodNetwork function call.
 		// This is because in setupPodNetwork the resource is allocated even if it returns error, unlike other resource
@@ -268,12 +268,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 
 		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
-			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+			return nil, fmt.Errorf("unable to add CRI pod metadata as sandboxer metadata extension for sandbox %q: %w", id, err)
 		}
 
 		// Save sandbox metadata to store
 		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-			return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
+			return nil, fmt.Errorf("unable to update sandbox %q in sandboxer store with additional metadata extension: %w", id, err)
 		}
 	}
 
@@ -305,7 +305,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-		return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
+		return nil, fmt.Errorf("unable to update sandbox %q in sandboxer store: %w", id, err)
 	}
 
 	// TODO: get rid of this. sandbox object should no longer have Container field.
