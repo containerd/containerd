@@ -81,16 +81,12 @@ func NewStatsCollector(config criconfig.Config) *StatsCollector {
 	interval := defaultCollectionInterval
 	statsAge := defaultStatsAge
 
-	// Use config values if provided
+	// Use config values if provided (already validated in config.go)
 	if config.StatsCollectPeriod != "" {
-		if d, err := time.ParseDuration(config.StatsCollectPeriod); err == nil {
-			interval = d
-		}
+		interval, _ = time.ParseDuration(config.StatsCollectPeriod)
 	}
 	if config.StatsRetentionPeriod != "" {
-		if d, err := time.ParseDuration(config.StatsRetentionPeriod); err == nil {
-			statsAge = d
-		}
+		statsAge, _ = time.ParseDuration(config.StatsRetentionPeriod)
 	}
 
 	// Calculate maxSamples from statsAge and interval
