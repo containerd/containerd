@@ -169,7 +169,6 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 	}
 
 	sandbox = sandboxstore.NewSandbox(*meta, s)
-	sandbox.Container = cntr
 	sandbox.Sandboxer = string(config.ModePodSandbox)
 
 	// Load network namespace.
