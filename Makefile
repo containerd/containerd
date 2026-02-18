@@ -88,7 +88,7 @@ COMMANDS=ctr containerd containerd-stress
 MANPAGES=ctr.8 containerd.8 containerd-config.8 containerd-config.toml.5
 
 ifdef BUILDTAGS
-    GO_BUILDTAGS = ${BUILDTAGS}
+	GO_BUILDTAGS = ${BUILDTAGS}
 endif
 GO_BUILDTAGS ?=
 GO_BUILDTAGS += urfave_cli_no_docs
@@ -115,21 +115,21 @@ PACKAGES = $(shell $(GO) list ${GO_TAGS} ./... | grep -v /integration)
 API_PACKAGES = $(shell (cd api && $(GO) list ${GO_TAGS} ./...))
 
 TEST_REQUIRES_ROOT_PACKAGES=$(filter \
-    ${PACKAGES}, \
-    $(shell \
-	for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile); do \
-		d="$$(dirname $$f)"; \
-		[ "$$d" = "." ] && echo "${PKG}" && continue; \
-		echo "${PKG}/$$d"; \
-	done | sort -u) \
-    )
+	${PACKAGES}, \
+	$(shell \
+		for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile); do \
+			d="$$(dirname $$f)"; \
+			[ "$$d" = "." ] && echo "${PKG}" && continue; \
+			echo "${PKG}/$$d"; \
+		done | sort -u) \
+	)
 
 ifdef SKIPTESTS
-    PACKAGES:=$(filter-out ${SKIPTESTS},${PACKAGES})
-    TEST_REQUIRES_ROOT_PACKAGES:=$(filter-out ${SKIPTESTS},${TEST_REQUIRES_ROOT_PACKAGES})
+	PACKAGES := $(filter-out ${SKIPTESTS},${PACKAGES})
+	TEST_REQUIRES_ROOT_PACKAGES := $(filter-out ${SKIPTESTS},${TEST_REQUIRES_ROOT_PACKAGES})
 endif
 
-#Replaces ":" (*nix), ";" (windows) with newline for easy parsing
+# Replaces ":" (*nix), ";" (windows) with newline for easy parsing
 GOPATHS=$(shell $(GO) env GOPATH | tr ":" "\n" | tr ";" "\n")
 
 TESTFLAGS_RACE=
