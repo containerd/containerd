@@ -18,7 +18,7 @@ GO ?= go
 INSTALL ?= install
 
 # Root directory of the project (absolute path).
-ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ROOTDIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
 # Base path used to install.
 # The files will be installed under `$(DESTDIR)/$(PREFIX)`.
