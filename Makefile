@@ -111,10 +111,10 @@ GO_LDFLAGS+='
 SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 # Project packages.
-PACKAGES = $(shell $(GO) list ${GO_TAGS} ./... | grep -v /integration)
-API_PACKAGES = $(shell (cd api && $(GO) list ${GO_TAGS} ./...))
+PACKAGES := $(shell $(GO) list ${GO_TAGS} ./... | grep -v /integration)
+API_PACKAGES := $(shell $(GO) -C api list ${GO_TAGS} ./...)
 
-TEST_REQUIRES_ROOT_PACKAGES=$(filter \
+TEST_REQUIRES_ROOT_PACKAGES := $(filter \
 	${PACKAGES}, \
 	$(shell \
 		for f in $$(git grep -l testutil.RequiresRoot | grep -v Makefile); do \
@@ -130,7 +130,7 @@ ifdef SKIPTESTS
 endif
 
 # Replaces ":" (*nix), ";" (windows) with newline for easy parsing
-GOPATHS=$(shell $(GO) env GOPATH | tr ":" "\n" | tr ";" "\n")
+GOPATHS := $(shell $(GO) env GOPATH | tr ":" "\n" | tr ";" "\n")
 
 TESTFLAGS_RACE=
 GO_BUILD_FLAGS ?=
@@ -214,7 +214,9 @@ root-test: ## run tests, except integration tests
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@cd "${ROOTDIR}/integration/client" && $(GO) mod download && $(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
+	@$(GO) -C "${ROOTDIR}/integration/client" mod download
+	@cd "${ROOTDIR}/integration/client" && \
+		$(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
 bin/cri-integration.test:
 	@echo "$(WHALE) $@"
@@ -488,16 +490,16 @@ vendor: ## ensure all the go.mod/go.sum files are up-to-date including vendor/ d
 	@$(GO) mod tidy
 	@$(GO) mod vendor
 	@$(GO) mod verify
-	@(cd ${ROOTDIR}/api && ${GO} mod tidy)
+	@$(GO) -C ${ROOTDIR}/api mod tidy
 
 verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
 	@echo "$(WHALE) $@"
 	$(eval TMPDIR := $(shell mktemp -d))
 	@cp -R ${ROOTDIR} ${TMPDIR}
-	@(cd ${TMPDIR}/containerd && ${GO} mod tidy)
-	@(cd ${TMPDIR}/containerd && ${GO} mod vendor)
-	@(cd ${TMPDIR}/containerd && ${GO} mod verify)
-	@(cd ${TMPDIR}/containerd/api && ${GO} mod tidy)
+	@$(GO) -C ${TMPDIR}/containerd mod tidy
+	@$(GO) -C ${TMPDIR}/containerd mod vendor
+	@$(GO) -C ${TMPDIR}/containerd mod verify
+	@$(GO) -C ${TMPDIR}/containerd/api mod tidy
 	@diff -r -u -q ${ROOTDIR} ${TMPDIR}/containerd
 	@rm -rf ${TMPDIR}
 
