@@ -124,8 +124,14 @@ func (c *criService) mutateImageMount(
 		}
 		chainID := identity.ChainID(diffIDs).String()
 
+		// Get snapshot options with user namespace idmap labels if needed
+		snapshotOpts, err := c.getImageVolumeSnapshotOpts(ctx, extraMount)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot options for image volume: %w", err)
+		}
+
 		s := c.client.SnapshotService(snapshotter)
-		mounts, err := s.Prepare(ctx, target, chainID)
+		mounts, err := s.Prepare(ctx, target, chainID, snapshotOpts...)
 		if err != nil {
 			if errdefs.IsAlreadyExists(err) {
 				mounts, err = s.Mounts(ctx, target)
@@ -160,6 +166,15 @@ func (c *criService) mutateImageMount(
 	}
 
 	extraMount.HostPath = target
+
+	// Clear UID/GID mappings from the mount to prevent the OCI runtime from
+	// attempting idmap on the bind mount. The idmap is already applied to the
+	// overlay lower layers via the snapshotter when the image volume is prepared.
+	// This must be done regardless of whether the image volume was already mounted
+	// (e.g., by another container in the same pod).
+	extraMount.UidMappings = nil
+	extraMount.GidMappings = nil
+
 	return nil
 }
 

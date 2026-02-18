@@ -25,6 +25,7 @@ import (
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/continuity/testutil"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
 func TestUnshareAfterEnterUserns(t *testing.T) {
@@ -44,6 +45,7 @@ func TestUnshareAfterEnterUserns(t *testing.T) {
 	t.Run("should work", testUnshareAfterEnterUsernsShouldWork)
 	t.Run("killpid", testUnshareAfterEnterUsernsKillPid)
 	t.Run("invalid unshare flags", testUnshareAfterEnterUsernsInvalidFlags)
+	t.Run("user namespace ownership", testUnshareAfterEnterUsernsOwnership)
 }
 
 func testUnshareAfterEnterUsernsShouldWork(t *testing.T) {
@@ -141,6 +143,29 @@ func testUnshareAfterEnterUsernsInvalidFlags(t *testing.T) {
 	uerr := UnshareAfterEnterUserns("0:1000:1", "0:1000:1", syscall.CLONE_IO, nil)
 	require.Error(t, uerr)
 	require.ErrorContains(t, uerr, "fork/exec /proc/self/exe: invalid argument")
+}
+
+func testUnshareAfterEnterUsernsOwnership(t *testing.T) {
+	t.Parallel()
+
+	uerr := UnshareAfterEnterUserns("0:1000:1", "0:1000:1", syscall.CLONE_NEWIPC, func(pid int) error {
+		nsPath := fmt.Sprintf("/proc/%d/ns/user", pid)
+		nsFile, err := os.OpenFile(nsPath, os.O_RDONLY, 0)
+		if err != nil {
+			return fmt.Errorf("failed to open user namespace: %w", err)
+		}
+		defer nsFile.Close()
+
+		ownerUID, err := unix.IoctlGetUint32(int(nsFile.Fd()), unix.NS_GET_OWNER_UID)
+		if err != nil {
+			return fmt.Errorf("NS_GET_OWNER_UID ioctl failed: %w", err)
+		}
+
+		require.Equal(t, uint32(1000), ownerUID, "user namespace should be owned by mapped host UID")
+
+		return nil
+	})
+	require.NoError(t, uerr)
 }
 
 func getNamespaceInode(pid int, typ string) (uint64, error) {

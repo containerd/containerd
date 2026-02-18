@@ -389,8 +389,15 @@ func (c *criService) saveSandBoxMetrics(sandboxID string, sandboxStats *runtime.
 func (c *criService) getSandboxPidCount(ctx context.Context, sandbox sandboxstore.Sandbox) (uint64, error) {
 	var pidCount uint64
 
+	// TODO: Stats queries should be fetched via Controller interface.
+	// We should assume use of podsandbox/ implementation.
+	container, err := c.client.LoadContainer(ctx, sandbox.ID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to load container %q for sandbox: %w", sandbox.ID, err)
+	}
+
 	// get process count inside PodSandbox for Windows
-	task, err := sandbox.Container.Task(ctx, nil)
+	task, err := container.Task(ctx, nil)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			return 0, nil

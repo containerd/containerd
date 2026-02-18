@@ -19,12 +19,16 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
 
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 var (
@@ -89,4 +93,27 @@ func ensureImageVolumeMounted(target string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// getImageVolumeSnapshotOpts returns snapshot options with user namespace idmap labels
+// from the mount's UID/GID mappings. This ensures that image volumes work correctly
+// with user namespaces by applying idmap to the overlay lower layers.
+func (c *criService) getImageVolumeSnapshotOpts(ctx context.Context, mount *runtime.Mount) ([]snapshots.Opt, error) {
+	uids, err := parseUsernsIDMap(mount.GetUidMappings())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse UID mappings: %w", err)
+	}
+
+	gids, err := parseUsernsIDMap(mount.GetGidMappings())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse GID mappings: %w", err)
+	}
+
+	if len(uids) == 0 || len(gids) == 0 {
+		return nil, nil
+	}
+
+	return []snapshots.Opt{
+		containerd.WithRemapperLabels(0, uids[0].HostID, 0, gids[0].HostID, uids[0].Size),
+	}, nil
 }
