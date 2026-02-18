@@ -441,6 +441,19 @@ type RuntimeConfig struct {
 	//   https://golang.org/pkg/time/#ParseDuration
 	// Default: "2m"
 	StatsRetentionPeriod string `toml:"stats_retention_period" json:"statsRetentionPeriod"`
+
+	statsCollectPeriodDuration   time.Duration
+	statsRetentionPeriodDuration time.Duration
+	hasStatsCollectPeriod        bool
+	hasStatsRetentionPeriod      bool
+}
+
+func (c *RuntimeConfig) StatsCollectPeriodDuration() (time.Duration, bool) {
+	return c.statsCollectPeriodDuration, c.hasStatsCollectPeriod
+}
+
+func (c *RuntimeConfig) StatsRetentionPeriodDuration() (time.Duration, bool) {
+	return c.statsRetentionPeriodDuration, c.hasStatsRetentionPeriod
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -685,15 +698,27 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	}
 	// Validation for stats_collect_period
 	if c.StatsCollectPeriod != "" {
-		if _, err := time.ParseDuration(c.StatsCollectPeriod); err != nil {
+		d, err := time.ParseDuration(c.StatsCollectPeriod)
+		if err != nil {
 			return warnings, fmt.Errorf("invalid `stats_collect_period`: %w", err)
 		}
+		c.statsCollectPeriodDuration = d
+		c.hasStatsCollectPeriod = true
+	} else {
+		c.statsCollectPeriodDuration = 0
+		c.hasStatsCollectPeriod = false
 	}
 	// Validation for stats_retention_period
 	if c.StatsRetentionPeriod != "" {
-		if _, err := time.ParseDuration(c.StatsRetentionPeriod); err != nil {
+		d, err := time.ParseDuration(c.StatsRetentionPeriod)
+		if err != nil {
 			return warnings, fmt.Errorf("invalid `stats_retention_period`: %w", err)
 		}
+		c.statsRetentionPeriodDuration = d
+		c.hasStatsRetentionPeriod = true
+	} else {
+		c.statsRetentionPeriodDuration = 0
+		c.hasStatsRetentionPeriod = false
 	}
 	if err := ValidateEnableUnprivileged(ctx, c); err != nil {
 		return warnings, err
