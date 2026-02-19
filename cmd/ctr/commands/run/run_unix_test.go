@@ -23,64 +23,55 @@ import (
 	"testing"
 )
 
-// mockVendorLister implements vendorLister for tests.
-type mockVendorLister struct {
-	vendors []string
-}
-
-func (m *mockVendorLister) ListVendors() []string {
-	return m.vendors
-}
-
 func TestDetectGPUVendor(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name       string
-		lister     vendorLister
-		wantVendor string
-		wantErr    bool
+		name             string
+		availableVendors []string
+		wantVendor       string
+		wantErr          bool
 	}{
 		{
-			name:    "nil lister",
-			lister:  nil,
-			wantErr: true,
+			name:             "empty list",
+			availableVendors: []string{},
+			wantErr:          true,
 		},
 		{
-			name:    "empty list from lister",
-			lister:  &mockVendorLister{vendors: []string{}},
-			wantErr: true,
+			name:             "nil slice",
+			availableVendors: nil,
+			wantErr:          true,
 		},
 		{
-			name:       "single vendor nvidia",
-			lister:     &mockVendorLister{vendors: []string{"nvidia.com"}},
-			wantVendor: "nvidia.com",
+			name:             "single vendor nvidia",
+			availableVendors: []string{"nvidia.com"},
+			wantVendor:       "nvidia.com",
 		},
 		{
-			name:       "single vendor amd",
-			lister:     &mockVendorLister{vendors: []string{"amd.com"}},
-			wantVendor: "amd.com",
+			name:             "single vendor amd",
+			availableVendors: []string{"amd.com"},
+			wantVendor:       "amd.com",
 		},
 		{
-			name:       "multiple vendors with one known",
-			lister:     &mockVendorLister{vendors: []string{"vendor.com", "nvidia.com", "other.com"}},
-			wantVendor: "nvidia.com",
+			name:             "multiple vendors with one known",
+			availableVendors: []string{"vendor.com", "nvidia.com", "other.com"},
+			wantVendor:       "nvidia.com",
 		},
 		{
-			name:       "multiple known vendors returns nvidia first",
-			lister:     &mockVendorLister{vendors: []string{"amd.com", "nvidia.com"}},
-			wantVendor: "nvidia.com",
+			name:             "multiple known vendors returns nvidia first",
+			availableVendors: []string{"amd.com", "nvidia.com"},
+			wantVendor:       "nvidia.com",
 		},
 		{
-			name:    "only unknown vendors",
-			lister:  &mockVendorLister{vendors: []string{"other.com", "unknown.com"}},
-			wantErr: true,
+			name:             "only unknown vendors",
+			availableVendors: []string{"other.com", "unknown.com"},
+			wantErr:          true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := detectGPUVendor(ctx, tt.lister)
+			got, err := detectGPUVendor(ctx, tt.availableVendors)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got none")
@@ -102,52 +93,47 @@ func TestGpuDeviceNames(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		lister      vendorLister
+		vendor      string
 		gpuIDs      []int
 		wantDevices []string
 		wantErr     bool
 	}{
 		{
-			name:    "nil lister",
-			lister:  nil,
-			gpuIDs:  []int{0},
-			wantErr: true,
+			name:        "empty vendor",
+			vendor:      "",
+			gpuIDs:      []int{0},
+			wantDevices: nil,
+			wantErr:     true,
 		},
 		{
-			name:    "vendor detection fails",
-			lister:  &mockVendorLister{vendors: []string{}},
-			gpuIDs:  []int{0},
-			wantErr: true,
+			name:        "nil gpu ids",
+			vendor:      "vendor.com",
+			gpuIDs:      nil,
+			wantDevices: nil,
 		},
 		{
 			name:        "empty gpu ids",
-			lister:      &mockVendorLister{vendors: []string{"nvidia.com"}},
+			vendor:      "vendor.com",
 			gpuIDs:      []int{},
 			wantDevices: nil,
 		},
 		{
-			name:        "single gpu id with nvidia",
-			lister:      &mockVendorLister{vendors: []string{"nvidia.com"}},
+			name:        "single gpu id",
+			vendor:      "vendor.com",
 			gpuIDs:      []int{0},
-			wantDevices: []string{"nvidia.com/gpu=0"},
-		},
-		{
-			name:        "single gpu id with amd",
-			lister:      &mockVendorLister{vendors: []string{"amd.com"}},
-			gpuIDs:      []int{2},
-			wantDevices: []string{"amd.com/gpu=2"},
+			wantDevices: []string{"vendor.com/gpu=0"},
 		},
 		{
 			name:        "multiple gpu ids",
-			lister:      &mockVendorLister{vendors: []string{"nvidia.com"}},
+			vendor:      "vendor.com",
 			gpuIDs:      []int{0, 1, 3},
-			wantDevices: []string{"nvidia.com/gpu=0", "nvidia.com/gpu=1", "nvidia.com/gpu=3"},
+			wantDevices: []string{"vendor.com/gpu=0", "vendor.com/gpu=1", "vendor.com/gpu=3"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := gpuDeviceNames(ctx, tt.lister, tt.gpuIDs...)
+			got, err := gpuDeviceNames(ctx, tt.vendor, tt.gpuIDs...)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got none")

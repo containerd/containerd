@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -513,56 +514,32 @@ func getNetNSPath(_ context.Context, task containerd.Task) (string, error) {
 	return fmt.Sprintf("/proc/%d/ns/net", task.Pid()), nil
 }
 
-// vendorLister is an interface for listing GPU vendors from CDI.
-type vendorLister interface {
-	ListVendors() []string
-}
-
-// detectGPUVendor detects available GPU vendors from CDI spec files.
-// It returns the vendor string for the first known GPU vendor found,
-// or an empty string if no GPU vendor is detected.
-func detectGPUVendor(ctx context.Context, lister vendorLister) (string, error) {
-	if lister == nil {
-		return "", errors.New("vendor lister is nil")
-	}
-
-	availableVendors := lister.ListVendors()
+// detectGPUVendor detects a known GPU vendor from a list of available vendors.
+// It returns the vendor string for the first known GPU vendor found in availableVendors,
+// or an error if no known GPU vendor is detected.
+func detectGPUVendor(ctx context.Context, availableVendors []string) (string, error) {
 	knownVendors := []string{"nvidia.com", "amd.com"}
-
-	// Check if a known GPU vendor is available
-	// NVIDIA is checked first followed by AMD
 	for _, known := range knownVendors {
-		for _, available := range availableVendors {
-			if available == known {
-				log.G(ctx).Debugf("Detected GPU vendor from CDI specs: %s", known)
-				return known, nil
-			}
+		if slices.Contains(availableVendors, known) {
+			log.G(ctx).Debugf("Detected GPU vendor from CDI specs: %s", known)
+			return known, nil
 		}
 	}
-
 	return "", fmt.Errorf("no known GPU vendor detected in CDI specs, only AMD and NVIDIA are supported")
 }
 
-// gpuDeviceNames converts GPU indices to qualified CDI device names.
-// It auto-detects the GPU vendor (e.g., nvidia.com or amd.com) from available CDI specs.
-// Returns the device names and an error if no GPU vendor is found.
-func gpuDeviceNames(ctx context.Context, lister vendorLister, gpuIDs ...int) ([]string, error) {
+// gpuDeviceNames converts GPU indices to qualified CDI device names for the given vendor.
+func gpuDeviceNames(ctx context.Context, vendor string, gpuIDs ...int) ([]string, error) {
 	if len(gpuIDs) == 0 {
 		return nil, nil
 	}
-
-	// Detect GPU vendor from CDI specs
-	vendor, err := detectGPUVendor(ctx, lister)
-	if err != nil {
-		return nil, fmt.Errorf("GPU device CDI name resolution failed: %w", err)
+	if vendor == "" {
+		return nil, fmt.Errorf("gpu vendor can't be empty")
 	}
-
-	// Build CDI device names from GPU indices
 	devices := make([]string, 0, len(gpuIDs))
 	for _, id := range gpuIDs {
 		devices = append(devices, fmt.Sprintf("%s/gpu=%d", vendor, id))
 	}
-
 	log.G(ctx).Debugf("Resolved GPU device names: %v", devices)
 	return devices, nil
 }
@@ -600,9 +577,13 @@ func withCDIDeviceRequests(cdiDeviceIDs []string, gpuIDs []int) []oci.SpecOpts {
 	}
 
 	modifyingOption := func(ctx context.Context, client oci.Client, c *containers.Container, s *oci.Spec) error {
-		devices, err := gpuDeviceNames(ctx, cdi.GetDefaultCache(), gpuIDs...)
+		vendor, err := detectGPUVendor(ctx, cdi.GetDefaultCache().ListVendors())
 		if err != nil {
-			return err
+			return fmt.Errorf("detect GPU vendor failed: %w", err)
+		}
+		devices, err := gpuDeviceNames(ctx, vendor, gpuIDs...)
+		if err != nil {
+			return fmt.Errorf("converting GPU indices to CDI device names failed: %w", err)
 		}
 		return cdispec.WithCDIDevices(append(cdiDeviceIDs, devices...)...)(ctx, client, c, s)
 	}
