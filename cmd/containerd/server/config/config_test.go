@@ -214,6 +214,30 @@ imports = ["data1.toml", "data2.toml"]
 	}, out.Imports)
 }
 
+func TestLoadConfigWithImportsWithHigerVersion(t *testing.T) {
+	data1 := `
+version = 2
+root = "/var/lib/containerd"
+imports = ["data2.toml"]
+`
+
+	data2 := `
+version = 3
+disabled_plugins = ["io.containerd.v1.xyz"]
+`
+	tempDir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0o600)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0o600)
+	assert.NoError(t, err)
+
+	var out Config
+	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
+	assert.Errorf(t, err, "drop-in config version 3 higher than root config version 2")
+}
+
 // https://github.com/containerd/containerd/issues/10905
 func TestLoadConfigWithDefaultConfigVersion(t *testing.T) {
 	data1 := `
