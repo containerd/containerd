@@ -118,6 +118,9 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 			if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
 				return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
 			}
+		} else {
+			log.G(ctx).Warnf("CNI result is not found for sandbox %q, attempting teardown anyway, ignoring errors", id)
+			_ = c.teardownPodNetwork(ctx, sandbox)
 		}
 		if err := sandbox.NetNS.Remove(); err != nil {
 			return fmt.Errorf("failed to remove network namespace for sandbox %q: %w", id, err)
