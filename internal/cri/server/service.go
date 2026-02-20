@@ -42,6 +42,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/nri"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
+	"github.com/containerd/containerd/v2/internal/cri/server/images"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
@@ -110,6 +111,8 @@ type ImageService interface {
 	ImageFSPaths() map[string]string
 
 	Config() criconfig.ImageConfig
+
+	UpdateRuntimeSnapshotter(runtimeName string, imagePlatform images.ImagePlatform)
 }
 
 // criService implements CRIService.

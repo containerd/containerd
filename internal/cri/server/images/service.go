@@ -139,6 +139,22 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	return &svc, nil
 }
 
+// UpdateRuntimeSnapshotter adds or updates the snapshotter mapping for a runtime.
+// This is called by the main CRI plugin after both image and runtime plugins are initialized,
+// to propagate runtime-specific snapshotters configured in the runtime plugin's config.
+func (c *CRIImageService) UpdateRuntimeSnapshotter(runtimeName string, imagePlatform ImagePlatform) {
+	if c.runtimePlatforms == nil {
+		c.runtimePlatforms = make(map[string]ImagePlatform)
+	}
+	// Don't override if already configured
+	if _, exists := c.runtimePlatforms[runtimeName]; exists {
+		log.L.Debugf("Runtime %q already has snapshotter configured, not overriding", runtimeName)
+		return
+	}
+	c.runtimePlatforms[runtimeName] = imagePlatform
+	log.L.Infof("Registered runtime %q with snapshotter %q", runtimeName, imagePlatform.Snapshotter)
+}
+
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It
 // returns errdefs.ErrNotFound if the reference doesn't exist.
 func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
