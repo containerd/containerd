@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -353,13 +354,6 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				Path: nsPath,
 			}))
 		}
-		var cdiDeviceIDs []string
-		if cliContext.IsSet("gpus") {
-			for _, id := range cliContext.IntSlice("gpus") {
-				cdiDeviceID := fmt.Sprintf("nvidia.com/gpu=%d", id)
-				cdiDeviceIDs = append(cdiDeviceIDs, cdiDeviceID)
-			}
-		}
 		if cliContext.IsSet("allow-new-privs") {
 			opts = append(opts, oci.WithNewPrivileges)
 		}
@@ -371,6 +365,8 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		if limit != 0 {
 			opts = append(opts, oci.WithMemoryLimit(limit))
 		}
+
+		var cdiDeviceIDs []string
 		for _, dev := range cliContext.StringSlice("device") {
 			if parser.IsQualifiedName(dev) {
 				cdiDeviceIDs = append(cdiDeviceIDs, dev)
@@ -378,10 +374,10 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			}
 			opts = append(opts, oci.WithDevices(dev, "", "rwm"))
 		}
-		if len(cdiDeviceIDs) > 0 {
-			opts = append(opts, withStaticCDIRegistry())
+
+		if gpuIDs := cliContext.IntSlice("gpus"); len(cdiDeviceIDs) > 0 || len(gpuIDs) > 0 {
+			opts = append(opts, withCDIDeviceRequests(cdiDeviceIDs, gpuIDs)...)
 		}
-		opts = append(opts, cdispec.WithCDIDevices(cdiDeviceIDs...))
 
 		rootfsPropagation := cliContext.String("rootfs-propagation")
 		if rootfsPropagation != "" {
@@ -518,6 +514,36 @@ func getNetNSPath(_ context.Context, task containerd.Task) (string, error) {
 	return fmt.Sprintf("/proc/%d/ns/net", task.Pid()), nil
 }
 
+// detectGPUVendor detects a known GPU vendor from a list of available vendors.
+// It returns the vendor string for the first known GPU vendor found in availableVendors,
+// or an error if no known GPU vendor is detected.
+func detectGPUVendor(ctx context.Context, availableVendors []string) (string, error) {
+	knownVendors := []string{"nvidia.com", "amd.com"}
+	for _, known := range knownVendors {
+		if slices.Contains(availableVendors, known) {
+			log.G(ctx).Debugf("Detected GPU vendor from CDI specs: %s", known)
+			return known, nil
+		}
+	}
+	return "", fmt.Errorf("no known GPU vendor detected in CDI specs, only AMD and NVIDIA are supported")
+}
+
+// gpuDeviceNames converts GPU indices to qualified CDI device names for the given vendor.
+func gpuDeviceNames(ctx context.Context, vendor string, gpuIDs ...int) ([]string, error) {
+	if len(gpuIDs) == 0 {
+		return nil, nil
+	}
+	if vendor == "" {
+		return nil, fmt.Errorf("gpu vendor can't be empty")
+	}
+	devices := make([]string, 0, len(gpuIDs))
+	for _, id := range gpuIDs {
+		devices = append(devices, fmt.Sprintf("%s/gpu=%d", vendor, id))
+	}
+	log.G(ctx).Debugf("Resolved GPU device names: %v", devices)
+	return devices, nil
+}
+
 // withStaticCDIRegistry inits the CDI registry and disables auto-refresh.
 // This is used from the `run` command to avoid creating a registry with auto-refresh enabled.
 // It also provides a way to override the CDI spec file paths if required.
@@ -534,4 +560,34 @@ func withStaticCDIRegistry() oci.SpecOpts {
 		}
 		return nil
 	}
+}
+
+// withCDIDeviceRequests returns a list of OCI spec options for injecting CDI devices
+// which includes both the devices specified via --device and GPU devices specified via --gpus.
+func withCDIDeviceRequests(cdiDeviceIDs []string, gpuIDs []int) []oci.SpecOpts {
+	if len(cdiDeviceIDs) == 0 && len(gpuIDs) == 0 {
+		return nil
+	}
+
+	var opts []oci.SpecOpts
+	opts = append(opts, withStaticCDIRegistry())
+
+	if len(gpuIDs) == 0 {
+		return append(opts, cdispec.WithCDIDevices(cdiDeviceIDs...))
+	}
+
+	modifyingOption := func(ctx context.Context, client oci.Client, c *containers.Container, s *oci.Spec) error {
+		vendor, err := detectGPUVendor(ctx, cdi.GetDefaultCache().ListVendors())
+		if err != nil {
+			return fmt.Errorf("detect GPU vendor failed: %w", err)
+		}
+		devices, err := gpuDeviceNames(ctx, vendor, gpuIDs...)
+		if err != nil {
+			return fmt.Errorf("converting GPU indices to CDI device names failed: %w", err)
+		}
+		return cdispec.WithCDIDevices(append(cdiDeviceIDs, devices...)...)(ctx, client, c, s)
+	}
+
+	return append(opts, modifyingOption)
+
 }
