@@ -347,6 +347,11 @@ type ImageConfig struct {
 	// When transfer service is used to pull images, pull related configs, like max_concurrent_downloads
 	// and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
 	UseLocalImagePull bool `toml:"use_local_image_pull" json:"useLocalImagePull"`
+
+	// Limit the number of manifests that will be unpacked during image pulls.
+	// The default is to unpack all the manifests that match the current platform
+	// but this can help limit the amount of returned manifests further
+	ManifestLimit int `toml:"manifest_limit" json:"manifestLimit"`
 }
 
 // RuntimeConfig contains toml config related to CRI plugin,
