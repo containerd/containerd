@@ -122,6 +122,12 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		Config:    config,
 	}
 
+	ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+	snapshotter := c.RuntimeSnapshotter(ctx, ociRuntime)
+
 	// Check if image is a file. If it is a file it might be a checkpoint archive.
 	checkpointImage, err := func() (bool, error) {
 		if _, err := c.os.Stat(config.GetImage().GetImage()); err == nil {
@@ -132,7 +138,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			return true, nil
 		}
 		// Check if this is an OCI checkpoint image
-		imageID, err := c.checkIfCheckpointOCIImage(ctx, config.GetImage().GetImage())
+		imageID, err := c.checkIfCheckpointOCIImage(ctx, config.GetImage().GetImage(), snapshotter)
 		if err != nil {
 			return false, fmt.Errorf("failed to check if this is a checkpoint image: %w", err)
 		}
@@ -170,7 +176,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
-	image, err := c.LocalResolve(config.GetImage().GetImage())
+	image, err := c.LocalResolve(config.GetImage().GetImage(), snapshotter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve image %q: %w", config.GetImage().GetImage(), err)
 	}

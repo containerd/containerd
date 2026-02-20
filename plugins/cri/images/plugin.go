@@ -84,11 +84,12 @@ func init() {
 			}
 
 			options := &images.CRIImageServiceOptions{
-				Content:          mdb.ContentStore(),
-				RuntimePlatforms: map[string]images.ImagePlatform{},
-				Snapshotters:     map[string]snapshots.Snapshotter{},
-				ImageFSPaths:     map[string]string{},
-				Transferrer:      ts.(transfer.Transferrer),
+				Content:            mdb.ContentStore(),
+				RuntimePlatforms:   map[string]images.ImagePlatform{},
+				Snapshotters:       map[string]snapshots.Snapshotter{},
+				SnapshotterExports: map[string]map[string]string{},
+				ImageFSPaths:       map[string]string{},
+				Transferrer:        ts.(transfer.Transferrer),
 			}
 
 			ctrdCli, err := containerd.New(
@@ -111,6 +112,13 @@ func init() {
 				return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
 			}
 
+			snapshotterExports := func(snapshotter string) map[string]string {
+				if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
+					return plugin.Meta.Exports
+				}
+				return nil
+			}
+
 			snapshotRoot := func(snapshotter string) (snapshotRoot string) {
 				if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
 					snapshotRoot = plugin.Meta.Exports["root"]
@@ -123,6 +131,7 @@ func init() {
 			}
 
 			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot(defaultSnapshotter)
+			options.SnapshotterExports[defaultSnapshotter] = snapshotterExports(defaultSnapshotter)
 			log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[defaultSnapshotter], defaultSnapshotter)
 
 			for runtimeName, rp := range config.RuntimePlatforms {
@@ -133,6 +142,7 @@ func init() {
 
 				if _, ok := options.ImageFSPaths[snapshotter]; !ok {
 					options.ImageFSPaths[snapshotter] = snapshotRoot(snapshotter)
+					options.SnapshotterExports[snapshotter] = snapshotterExports(snapshotter)
 					log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[snapshotter], snapshotter)
 				}
 

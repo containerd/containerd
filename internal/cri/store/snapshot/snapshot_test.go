@@ -64,7 +64,7 @@ func TestSnapshotStore(t *testing.T) {
 	}
 	assert := assertlib.New(t)
 
-	s := NewStore()
+	s := NewStore(nil, nil)
 
 	t.Logf("should be able to add snapshot")
 	for _, sn := range snapshots {

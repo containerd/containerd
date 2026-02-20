@@ -33,18 +33,15 @@ import (
 // TODO(random-liu): Benchmark with high workload. We may need a statsSyncer instead if
 // benchmark result shows that container cpu/memory stats also need to be cached.
 type snapshotsSyncer struct {
-	store        *snapshotstore.Store
-	snapshotters map[string]snapshot.Snapshotter
-	syncPeriod   time.Duration
+	store      *snapshotstore.Store
+	syncPeriod time.Duration
 }
 
 // newSnapshotsSyncer creates a snapshot syncer.
-func newSnapshotsSyncer(store *snapshotstore.Store, snapshotters map[string]snapshot.Snapshotter,
-	period time.Duration) *snapshotsSyncer {
+func newSnapshotsSyncer(store *snapshotstore.Store, period time.Duration) *snapshotsSyncer {
 	return &snapshotsSyncer{
-		store:        store,
-		snapshotters: snapshotters,
-		syncPeriod:   period,
+		store:      store,
+		syncPeriod: period,
 	}
 }
 
@@ -71,7 +68,7 @@ func (s *snapshotsSyncer) sync() error {
 	ctx := ctrdutil.NamespacedContext()
 	start := time.Now().UnixNano()
 
-	for key, snapshotter := range s.snapshotters {
+	for key, snapshotter := range s.store.Snapshotters() {
 		var snapshots []snapshot.Info
 		// Do not call `Usage` directly in collect function, because
 		// `Usage` takes time, we don't want `Walk` to hold read lock
