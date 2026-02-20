@@ -299,16 +299,23 @@ func (c *CRIImageService) pullImageWithTransferService(
 	transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
 
 	// Set image store opts
-	var sopts []transferimage.StoreOpt
-	sopts = append(sopts, transferimage.WithPlatforms(platforms.DefaultSpec()))
-	sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
-	sopts = append(sopts, transferimage.WithImageLabels(labels))
+	sopts := []transferimage.StoreOpt{
+		transferimage.WithPlatforms(platforms.DefaultSpec()),
+		transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter),
+		transferimage.WithImageLabels(labels),
+	}
+
 	is := transferimage.NewStore(ref, sopts...)
+
 	log.G(ctx).Debugf("Getting new CRI credentials")
+
 	ch := newCRICredentials(ref, credentials)
-	opts := []registry.Opt{registry.WithCredentials(ch)}
-	opts = append(opts, registry.WithHeaders(c.config.Registry.Headers))
-	opts = append(opts, registry.WithHostDir(c.config.Registry.ConfigPath))
+	opts := []registry.Opt{
+		registry.WithCredentials(ch),
+		registry.WithHeaders(c.config.Registry.Headers),
+		registry.WithHostDir(c.config.Registry.ConfigPath),
+	}
+
 	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OCI registry: %w", err)

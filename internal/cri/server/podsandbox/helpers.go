@@ -28,7 +28,6 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
-	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -71,15 +70,6 @@ func (c *Controller) getSandboxRootDir(id string) string {
 // e.g. named pipes.
 func (c *Controller) getVolatileSandboxRootDir(id string) string {
 	return filepath.Join(c.config.StateDir, sandboxesDir, id)
-}
-
-// toContainerdImage converts an image object in image store to containerd image handler.
-func (c *Controller) toContainerdImage(ctx context.Context, image imagestore.Image) (containerd.Image, error) {
-	// image should always have at least one reference.
-	if len(image.References) == 0 {
-		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
-	}
-	return c.client.GetImage(ctx, image.References[0])
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.

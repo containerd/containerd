@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -281,6 +282,20 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
 	}
 
+	// HACK: Ensure pause container image is present before starting the sandbox.
+	// Ideally, this should be called from the sandbox implementation itself, but it's
+	// challenging to decouple CRI image APIs and controller, as a lot of information
+	// needs to be pulled from various sources in order to make pull backward compatible
+	// with previous implementations. Additionally, the Image Service relies on an
+	// in-memory image store to store image metadata, making it challenging to pull images
+	// just via containerd client. Since most runtime implementations rely on pause
+	// containers anyway, the CRI layer will pre-pull the pause container to guarantee
+	// it exists (even though it's counter to the purpose of the sandbox API). This may
+	// be removed/deprecated in the distant future, if we decide to remove pause containers.
+	if err := c.ensurePauseImageExists(ctx, r.GetConfig(), r.GetRuntimeHandler()); err != nil {
+		return nil, err
+	}
+
 	ctrl, err := c.sandboxService.StartSandbox(ctx, sandbox.Sandboxer, id)
 	if err != nil {
 		var cerr podsandbox.CleanupErr
@@ -377,6 +392,30 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
+}
+
+func (c *criService) ensurePauseImageExists(ctx context.Context, config *runtime.PodSandboxConfig, runtimeHandler string) error {
+	imageConfig := c.ImageService.Config()
+
+	ref := criconfig.DefaultSandboxImage
+
+	if img, ok := imageConfig.PinnedImages["sandbox"]; ok && img != "" {
+		ref = img
+	}
+
+	_, err := c.ImageService.LocalResolve(ref)
+	if err == nil {
+		return nil
+	} else if !errdefs.IsNotFound(err) {
+		return fmt.Errorf("failed to get image %q: %w", ref, err)
+	}
+
+	_, err = c.ImageService.PullImage(ctx, ref, nil, config, runtimeHandler)
+	if err != nil {
+		return fmt.Errorf("failed to pull image %q: %w", ref, err)
+	}
+
+	return nil
 }
 
 // getNetworkPlugin returns the network plugin to be used by the runtime class
