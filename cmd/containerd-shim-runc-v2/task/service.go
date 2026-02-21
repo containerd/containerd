@@ -95,6 +95,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	}
 	go s.forward(ctx, publisher)
 	sd.RegisterCallback(func(context.Context) error {
+		reaper.Default.Unsubscribe(s.ec)
 		close(s.events)
 		return nil
 	})
@@ -710,6 +711,13 @@ func (s *service) oomEvent(id string) {
 }
 
 func (s *service) send(evt interface{}) {
+	// we need to make sure that we don't panic if the channel is closed
+	// as the shim is shutting down
+	defer func() {
+		if r := recover(); r != nil {
+			log.L.Errorf("RECOVERED in send: %v", r)
+		}
+	}()
 	s.events <- evt
 }
 
