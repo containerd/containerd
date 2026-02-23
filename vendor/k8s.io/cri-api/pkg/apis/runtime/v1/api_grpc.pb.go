@@ -77,6 +77,8 @@ const (
 	RuntimeService_UpdateRuntimeConfig_FullMethodName       = "/runtime.v1.RuntimeService/UpdateRuntimeConfig"
 	RuntimeService_Status_FullMethodName                    = "/runtime.v1.RuntimeService/Status"
 	RuntimeService_CheckpointContainer_FullMethodName       = "/runtime.v1.RuntimeService/CheckpointContainer"
+	RuntimeService_CheckpointPod_FullMethodName             = "/runtime.v1.RuntimeService/CheckpointPod"
+	RuntimeService_RestorePod_FullMethodName                = "/runtime.v1.RuntimeService/RestorePod"
 	RuntimeService_GetContainerEvents_FullMethodName        = "/runtime.v1.RuntimeService/GetContainerEvents"
 	RuntimeService_ListMetricDescriptors_FullMethodName     = "/runtime.v1.RuntimeService/ListMetricDescriptors"
 	RuntimeService_ListPodSandboxMetrics_FullMethodName     = "/runtime.v1.RuntimeService/ListPodSandboxMetrics"
@@ -168,6 +170,11 @@ type RuntimeServiceClient interface {
 	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	// CheckpointContainer checkpoints a container
 	CheckpointContainer(ctx context.Context, in *CheckpointContainerRequest, opts ...grpc.CallOption) (*CheckpointContainerResponse, error)
+	// CheckpointPod creates a Pod-level checkpoint. If the pod sandbox does not
+	// exist or the checkpoint operation fails, the call returns an error.
+	CheckpointPod(ctx context.Context, in *CheckpointPodRequest, opts ...grpc.CallOption) (*CheckpointPodResponse, error)
+	// RestorePod restores a pod sandbox from a checkpoint
+	RestorePod(ctx context.Context, in *RestorePodRequest, opts ...grpc.CallOption) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error)
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
@@ -452,6 +459,26 @@ func (c *runtimeServiceClient) CheckpointContainer(ctx context.Context, in *Chec
 	return out, nil
 }
 
+func (c *runtimeServiceClient) CheckpointPod(ctx context.Context, in *CheckpointPodRequest, opts ...grpc.CallOption) (*CheckpointPodResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckpointPodResponse)
+	err := c.cc.Invoke(ctx, RuntimeService_CheckpointPod_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runtimeServiceClient) RestorePod(ctx context.Context, in *RestorePodRequest, opts ...grpc.CallOption) (*RestorePodResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RestorePodResponse)
+	err := c.cc.Invoke(ctx, RuntimeService_RestorePod_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *runtimeServiceClient) GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[0], RuntimeService_GetContainerEvents_FullMethodName, cOpts...)
@@ -595,6 +622,11 @@ type RuntimeServiceServer interface {
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	// CheckpointContainer checkpoints a container
 	CheckpointContainer(context.Context, *CheckpointContainerRequest) (*CheckpointContainerResponse, error)
+	// CheckpointPod creates a Pod-level checkpoint. If the pod sandbox does not
+	// exist or the checkpoint operation fails, the call returns an error.
+	CheckpointPod(context.Context, *CheckpointPodRequest) (*CheckpointPodResponse, error)
+	// RestorePod restores a pod sandbox from a checkpoint
+	RestorePod(context.Context, *RestorePodRequest) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
@@ -703,6 +735,12 @@ func (UnimplementedRuntimeServiceServer) Status(context.Context, *StatusRequest)
 }
 func (UnimplementedRuntimeServiceServer) CheckpointContainer(context.Context, *CheckpointContainerRequest) (*CheckpointContainerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckpointContainer not implemented")
+}
+func (UnimplementedRuntimeServiceServer) CheckpointPod(context.Context, *CheckpointPodRequest) (*CheckpointPodResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckpointPod not implemented")
+}
+func (UnimplementedRuntimeServiceServer) RestorePod(context.Context, *RestorePodRequest) (*RestorePodResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RestorePod not implemented")
 }
 func (UnimplementedRuntimeServiceServer) GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method GetContainerEvents not implemented")
@@ -1190,6 +1228,42 @@ func _RuntimeService_CheckpointContainer_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RuntimeService_CheckpointPod_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckpointPodRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuntimeServiceServer).CheckpointPod(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuntimeService_CheckpointPod_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuntimeServiceServer).CheckpointPod(ctx, req.(*CheckpointPodRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RuntimeService_RestorePod_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestorePodRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuntimeServiceServer).RestorePod(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuntimeService_RestorePod_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuntimeServiceServer).RestorePod(ctx, req.(*RestorePodRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RuntimeService_GetContainerEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(GetEventsRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -1381,6 +1455,14 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _RuntimeService_CheckpointContainer_Handler,
 		},
 		{
+			MethodName: "CheckpointPod",
+			Handler:    _RuntimeService_CheckpointPod_Handler,
+		},
+		{
+			MethodName: "RestorePod",
+			Handler:    _RuntimeService_RestorePod_Handler,
+		},
+		{
 			MethodName: "ListMetricDescriptors",
 			Handler:    _RuntimeService_ListMetricDescriptors_Handler,
 		},
@@ -1432,8 +1514,16 @@ type ImageServiceClient interface {
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
+	// Note that if the image is referenced by multiple tags (even across different repositories
+	// if they resolve to the same image digest), removing the image by a single tag
+	// will remove all of its tags. For example, if `repo/image:v1` and `another_repo/image:latest`
+	// point to the same image, removing `repo/image:v1` will also remove `another_repo/image:latest`.
+	// The next call to ListImages, ImageStatus, ImageFsInfo will not return this image.
+	// The resources (e.g. disk space) may be cleaned asynchronously
+	// and not guaranteed to be cleaned up by the time this method returns.
 	RemoveImage(ctx context.Context, in *RemoveImageRequest, opts ...grpc.CallOption) (*RemoveImageResponse, error)
 	// ImageFSInfo returns information of the filesystem that is used to store images.
+	// Usage information may include images that were removed, but are still being cleaned up.
 	ImageFsInfo(ctx context.Context, in *ImageFsInfoRequest, opts ...grpc.CallOption) (*ImageFsInfoResponse, error)
 }
 
@@ -1512,8 +1602,16 @@ type ImageServiceServer interface {
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
+	// Note that if the image is referenced by multiple tags (even across different repositories
+	// if they resolve to the same image digest), removing the image by a single tag
+	// will remove all of its tags. For example, if `repo/image:v1` and `another_repo/image:latest`
+	// point to the same image, removing `repo/image:v1` will also remove `another_repo/image:latest`.
+	// The next call to ListImages, ImageStatus, ImageFsInfo will not return this image.
+	// The resources (e.g. disk space) may be cleaned asynchronously
+	// and not guaranteed to be cleaned up by the time this method returns.
 	RemoveImage(context.Context, *RemoveImageRequest) (*RemoveImageResponse, error)
 	// ImageFSInfo returns information of the filesystem that is used to store images.
+	// Usage information may include images that were removed, but are still being cleaned up.
 	ImageFsInfo(context.Context, *ImageFsInfoRequest) (*ImageFsInfoResponse, error)
 	mustEmbedUnimplementedImageServiceServer()
 }
