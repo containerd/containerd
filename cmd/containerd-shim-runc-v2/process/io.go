@@ -105,7 +105,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	case "fifo":
 		pio.copy = true
 		pio.io, err = runc.NewPipeIO(ioUID, ioGID, withConditionalIO(stdio))
-	case "binary":
+	case "binary", "binary-v2":
 		pio.io, err = NewBinaryIO(ctx, id, u)
 	case "file":
 		filePath := u.Path
@@ -305,14 +305,14 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 	}
 
 	// wait for the logging binary to be ready
-	// The logging binary signals readiness by writing a byte then closing the pipe.
-	// If the binary crashes without calling ready(), we'll get EOF without data.
+	// For binary-v2, readiness requires a byte to be written before close.
+	// For binary, EOF is treated as ready for backward compatibility.
 	b := make([]byte, 1)
 	n, err := r.Read(b)
 	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("failed to read from logging binary: %w", err)
 	}
-	if n == 0 {
+	if uri.Scheme == "binary-v2" && n == 0 {
 		return nil, fmt.Errorf("logging binary did not call ready (it may have crashed or exited prematurely)")
 	}
 

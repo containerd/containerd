@@ -465,10 +465,13 @@ Current supported schemes for logging are:
 
 * fifo - Linux
 * binary - Linux & Windows
+* binary-v2 - Linux & Windows
 * file - Linux & Windows
 * npipe - Windows
 
 Binary logging has the ability to forward a container's STDIO to an external binary for consumption.
+The legacy `binary://` scheme treats EOF on `CONTAINER_WAIT` as ready for backward compatibility.
+The `binary-v2://` scheme requires the logging binary to write a byte to `CONTAINER_WAIT` and then close it.
 A sample logging driver that forwards the container's STDOUT and STDERR to `journald` is:
 
 ```go
