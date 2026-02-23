@@ -36,6 +36,7 @@ var (
 	containerStartTimer         metrics.LabeledTimer
 	containerEventsDroppedCount metrics.Counter
 	containerCheckpointTimer    metrics.LabeledTimer
+	podCheckpointTimer          metrics.Timer
 
 	networkPluginOperations        metrics.LabeledCounter
 	networkPluginOperationsErrors  metrics.LabeledCounter
@@ -61,6 +62,7 @@ func init() {
 	containerStartTimer = ns.NewLabeledTimer("container_start", "time to start a container", "runtime")
 	containerEventsDroppedCount = ns.NewCounter("container_events_dropped", "count container discarding event total from server start")
 	containerCheckpointTimer = ns.NewLabeledTimer("container_checkpoint", "time to checkpoint a container", "runtime")
+	podCheckpointTimer = ns.NewTimer("pod_checkpoint", "time to checkpoint a pod")
 
 	networkPluginOperations = ns.NewLabeledCounter("network_plugin_operations_total", "cumulative number of network plugin operations by operation type", "operation_type")
 	networkPluginOperationsErrors = ns.NewLabeledCounter("network_plugin_operations_errors_total", "cumulative number of network plugin operations by operation type", "operation_type")
