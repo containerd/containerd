@@ -22,6 +22,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -122,4 +124,68 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 
 	t.Logf("Should not be able to find the pod ip in host-local checkpoint")
 	assert.False(t, checkIP(ip))
+}
+
+// TestSandboxStopWithNilCNIResult verifies that StopPodSandbox succeeds when
+// CNIResult is nil (network setup never completed) even if the network teardown
+// itself fails. This exercises the condition in sandbox_stop.go where a nil
+// CNIResult causes the teardown error to be logged as a warning instead of
+// returned as a hard error.
+func TestSandboxStopWithNilCNIResult(t *testing.T) {
+	t.Log("Init PodSandboxConfig with specific label")
+	sbName := t.Name()
+	labels := map[string]string{
+		sbName: "true",
+	}
+	sbConfig := PodSandboxConfig(sbName, "failpoint", WithPodLabels(labels))
+
+	t.Log("Inject CNI failpoint: delay Add (so CNIResult is never set) and fail Del")
+	conf := &failpointConf{
+		// Delay CNI Add for 1 day so network setup never completes and CNIResult stays nil
+		Add: "1*delay(86400000)",
+		// Make CNI Del fail so teardownPodNetwork returns an error during stop
+		Del: "1*error(network-teardown-injected-error)",
+	}
+	injectCNIFailpoint(t, sbConfig, conf)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		t.Log("Create a sandbox (will hang on CNI Add)")
+		_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
+		assert.Error(t, err)
+	}()
+
+	t.Log("Wait for CNI Add to start running")
+	assert.NoError(t, ensureCNIAddRunning(t, sbName), "CNI Add should be running")
+
+	// Kill containerd while CNI Add is in progress so CNIResult is never set
+	// and no deferred cleanup runs.
+	t.Log("Kill containerd with SIGKILL to leave sandbox with nil CNIResult")
+	RestartContainerd(t, syscall.SIGKILL)
+
+	wg.Wait()
+
+	t.Log("ListPodSandbox with the specific label")
+	l, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{LabelSelector: labels})
+	require.NoError(t, err)
+	require.Len(t, l, 1)
+
+	sb := l[0]
+	require.Equal(t, runtime.PodSandboxState_SANDBOX_NOTREADY, sb.State)
+
+	t.Log("Get sandbox info and verify CNIResult is nil")
+	_, info, err := SandboxInfo(sb.Id)
+	require.NoError(t, err)
+	require.Nil(t, info.CNIResult, "CNIResult should be nil because CNI setup never completed")
+
+	t.Log("StopPodSandbox should succeed even though CNI Del fails, because CNIResult is nil")
+	err = runtimeService.StopPodSandbox(sb.Id)
+	assert.NoError(t, err, "StopPodSandbox should not return error when CNIResult is nil")
+
+	t.Log("RemovePodSandbox should succeed")
+	err = runtimeService.RemovePodSandbox(sb.Id)
+	assert.NoError(t, err)
 }
