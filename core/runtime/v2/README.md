@@ -465,7 +465,7 @@ Current supported schemes for logging are:
 
 * fifo - Linux
 * binary - Linux & Windows
-* binary-v2 - Linux & Windows
+* binary-v2 (since containerd v2.2) - Linux & Windows
 * file - Linux & Windows
 * npipe - Windows
 
