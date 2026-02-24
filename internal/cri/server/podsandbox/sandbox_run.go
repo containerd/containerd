@@ -194,7 +194,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(sandboxSnapshotter),
-		customopts.WithNewSnapshot(id, pauseImage, snapshotterOpt...),
+		customopts.WithNewSnapshot(id, pauseImage, !c.imageConfig.DisableSnapshotAnnotations, snapshotterOpt...),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(crilabels.SandboxMetadataExtension, &metadata),

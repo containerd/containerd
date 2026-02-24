@@ -357,7 +357,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		// the runtime (runc) a chance to modify (e.g. to create mount
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(r.containerID, *r.containerdImage, sOpts...),
+		customopts.WithNewSnapshot(r.containerID, *r.containerdImage, !c.ImageService.Config().DisableSnapshotAnnotations, sOpts...),
 	}
 	if len(volumeMounts) > 0 {
 		mountMap := make(map[string]string)
