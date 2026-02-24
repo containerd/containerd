@@ -190,7 +190,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.imageService.RuntimeSnapshotter(ctx, ociRuntime)),
-		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt...),
+		customopts.WithNewSnapshot(id, containerdImage, !c.imageService.DisableSnapshotAnnotations(), snapshotterOpt...),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(crilabels.SandboxMetadataExtension, &metadata),
