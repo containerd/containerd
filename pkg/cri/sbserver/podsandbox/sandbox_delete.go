@@ -19,6 +19,7 @@ package podsandbox
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/containerd/log"
 
@@ -117,7 +118,7 @@ func (c *Controller) cleanupSandboxTask(ctx context.Context, sbCntr containerd.C
 		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: sbCntr.ID()})
 		if err != nil {
 			err = errdefs.FromGRPC(err)
-			if !errdefs.IsNotFound(err) {
+			if !errdefs.IsNotFound(err) && !strings.Contains(err.Error(), "container must be created") {
 				return fmt.Errorf("failed to cleanup sandbox %s in task-service: %w", sbCntr.ID(), err)
 			}
 		}

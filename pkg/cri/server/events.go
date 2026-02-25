@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -427,11 +428,11 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	// REF:
 	// 1. https://github.com/containerd/containerd/issues/7496#issuecomment-1671100968
 	// 2. https://github.com/containerd/containerd/issues/8931
-	if errdefs.IsNotFound(err) {
+	if errdefs.IsNotFound(err) && !strings.Contains(err.Error(), "container must be created") {
 		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: cntr.Container.ID()})
 		if err != nil {
 			err = errdefs.FromGRPC(err)
-			if !errdefs.IsNotFound(err) {
+			if !errdefs.IsNotFound(err) && !strings.Contains(err.Error(), "container must be created") {
 				return fmt.Errorf("failed to cleanup container %s in task-service: %w", cntr.Container.ID(), err)
 			}
 		}
@@ -517,7 +518,7 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: sb.Container.ID()})
 		if err != nil {
 			err = errdefs.FromGRPC(err)
-			if !errdefs.IsNotFound(err) {
+			if !errdefs.IsNotFound(err) && !strings.Contains(err.Error(), "container must be created") {
 				return fmt.Errorf("failed to cleanup sandbox %s in task-service: %w", sb.Container.ID(), err)
 			}
 		}
