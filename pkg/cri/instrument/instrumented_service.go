@@ -1778,3 +1778,20 @@ func (in *instrumentedService) ListPodSandboxMetrics(ctx context.Context, r *run
 	res, err = in.c.ListPodSandboxMetrics(ctx, r)
 	return res, errdefs.ToGRPC(err)
 }
+
+func (in *instrumentedService) RuntimeConfig(ctx context.Context, r *runtime.RuntimeConfigRequest) (res *runtime.RuntimeConfigResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("RuntimeConfig failed, error")
+		} else {
+			log.G(ctx).Trace("RuntimeConfig returns successfully")
+		}
+	}()
+
+	res, err = in.c.RuntimeConfig(ctx, r)
+	return res, errdefs.ToGRPC(err)
+}

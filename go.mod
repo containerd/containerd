@@ -87,7 +87,7 @@ require (
 	k8s.io/apiserver v0.26.2
 	k8s.io/client-go v0.26.2
 	k8s.io/component-base v0.26.2
-	k8s.io/cri-api v0.27.1
+	k8s.io/cri-api v0.28.15
 	k8s.io/klog/v2 v2.90.1
 	k8s.io/utils v0.0.0-20230220204549-a5ecb0141aa5
 	tags.cncf.io/container-device-interface v0.8.1
