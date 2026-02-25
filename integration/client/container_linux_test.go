@@ -114,7 +114,7 @@ func TestTaskUpdate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		stat, err := cgroup2.Stat()
+		stat, err := cgroup2.StatFiltered(cgroupsv2.StatMemory)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -144,7 +144,7 @@ func TestTaskUpdate(t *testing.T) {
 	}
 	// check that the task has a limit of 64mb
 	if cgroups.Mode() == cgroups.Unified {
-		stat, err := cgroup2.Stat()
+		stat, err := cgroup2.StatFiltered(cgroupsv2.StatMemory)
 		if err != nil {
 			t.Fatal(err)
 		}
