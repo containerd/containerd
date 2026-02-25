@@ -110,6 +110,9 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		log.G(ctx).WithError(err).Errorf("NRI pod removal notification failed")
 	}
 
+	// Send CONTAINER_DELETED event with both ContainerId and SandboxId equal to SandboxId.
+	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
+
 	// Remove sandbox from sandbox store. Note that once the sandbox is successfully
 	// deleted:
 	// 1) ListPodSandbox will not include this sandbox.
@@ -119,10 +122,6 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 
 	// Release the sandbox name reserved for the sandbox.
 	c.sandboxNameIndex.ReleaseByKey(id)
-
-	// Send CONTAINER_DELETED event with both ContainerId and SandboxId equal to SandboxId.
-	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
-
 	sandboxRemoveTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(start)
 
 	return &runtime.RemovePodSandboxResponse{}, nil
