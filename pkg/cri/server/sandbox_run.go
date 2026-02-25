@@ -175,6 +175,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
 		containerd.WithRuntime(ociRuntime.Type, runtimeOpts)}
 
+	if c.config.ContainerdConfig.DiscardUnpackedLayers {
+		ctx = context.WithValue(ctx, containerd.DiscardUnpackedLayersKey{}, true)
+	}
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %w", err)

@@ -262,6 +262,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	defer c.nri.BlockPluginSync().Unblock()
 
 	var cntr containerd.Container
+	if c.config.ContainerdConfig.DiscardUnpackedLayers {
+		ctx = context.WithValue(ctx, containerd.DiscardUnpackedLayersKey{}, true)
+	}
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %w", err)
 	}
