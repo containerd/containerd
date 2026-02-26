@@ -239,18 +239,11 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 		return nil, remoteserrors.NewUnexpectedStatusErr(resp)
 	}
 
-	b, err := io.ReadAll(io.LimitReader(resp.Body, 64000)) // 64KB
-	if err != nil {
-		return nil, err
-	}
+	decoder := json.NewDecoder(resp.Body)
 
 	var tr FetchTokenResponse
-	if err := json.Unmarshal(b, &tr); err != nil {
-		return nil, &ErrInvalidTokenResponse{
-			ContentType: resp.Header.Get("Content-Type"),
-			Body:        b,
-			Err:         fmt.Errorf("unable to decode token response: %w", err),
-		}
+	if err = decoder.Decode(&tr); err != nil {
+		return nil, fmt.Errorf("unable to decode token response: %w", err)
 	}
 
 	// `access_token` is equivalent to `token` and if both are specified
