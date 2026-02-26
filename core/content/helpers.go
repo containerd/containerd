@@ -126,6 +126,56 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 	return Copy(ctx, cw, r, desc.Size, desc.Digest, opts...)
 }
 
+// WriteUnknownBlob writes a blob to the content store where we don't know or
+// care about the size and digest.
+//
+// If the blob is written successfully, the size and digest of the blob are
+// returned.
+//
+// If the blob of the same digest already exists in the content store, we
+// return the size and digest of the existing blob.
+//
+// This isn't a super common operation in containerd but it is useful when we
+// trust the content store and want to avoid the performance penalty of
+// calculating the digest on both sides.
+func WriteUnknownBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, opts ...Opt) (int64, digest.Digest, error) {
+	cw, err := OpenWriter(ctx, cs, WithRef(ref))
+	if err != nil {
+		if !errdefs.IsAlreadyExists(err) {
+			return 0, "", fmt.Errorf("failed to open writer: %w", err)
+		}
+
+		// this is NOT right for this use case.
+		return 0, "", nil // already present
+	}
+	defer cw.Close()
+
+	// TODO(sjd): Likely need some sort of cleanup here for broken ingests. Its
+	// not clear what conditions that can happen under.
+
+	// someone already squatted this ref but we have no clue what data is
+	// in there so zero it out until we can get better refs for the content
+	// import process.
+	if err := cw.Truncate(0); err != nil {
+		return 0, "", fmt.Errorf("ingest truncate failed: %w", err)
+	}
+
+	nn, err := copyWithBuffer(cw, r)
+	if err != nil {
+		return nn, "", fmt.Errorf("copy failed for ref %v: %w", ref, err)
+	}
+
+	if err := cw.Commit(ctx, nn, "", opts...); err != nil {
+		if !errdefs.IsAlreadyExists(err) {
+			return nn, "", fmt.Errorf("commit %v failed: %w", ref, err)
+		}
+
+		return nn, cw.Digest(), nil
+	}
+
+	return nn, cw.Digest(), nil
+}
+
 // OpenWriter opens a new writer for the given reference, retrying if the writer
 // is locked until the reference is available or returns an error.
 func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, error) {
