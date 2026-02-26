@@ -212,6 +212,9 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		if cliContext.Bool("digests") {
 			opts = append(opts, containerd.WithDigestRef(archive.DigestTranslator(prefix)))
+		} else {
+			opts = append(opts, containerd.WithDigestRef(archive.DanglingImage()))
+			opts = append(opts, containerd.WithSkipDigestRef(func(name string) bool { return name != "" }))
 		}
 		if cliContext.Bool("skip-digest-for-named") {
 			if !cliContext.Bool("digests") {
