@@ -906,8 +906,35 @@ func (p *ctrdProc) criImageService(t *testing.T) cri.ImageManagerService {
 
 // newCtrdProc is to start containerd process.
 func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string, envs []string) *ctrdProc {
-	p := &ctrdProc{workDir: ctrdWorkDir}
+	p := &ctrdProc{
+		workDir: ctrdWorkDir,
+		ctrdBin: ctrdBin,
+		envs:    envs,
+	}
 
+	p.start(t)
+	return p
+}
+
+// ctrdProc is used to control the containerd process's lifecycle.
+type ctrdProc struct {
+	// containerd binary name
+	ctrdBin string
+
+	envs []string
+	// workDir has the following layout:
+	//
+	// - root  (dir)
+	// - state (dir)
+	// - containerd.sock (sock file)
+	// - config.toml (toml file, required)
+	// - containerd.log (log file, always open with O_APPEND)
+	workDir   string
+	cmd       *exec.Cmd
+	waitBlock chan struct{}
+}
+
+func (p *ctrdProc) start(t *testing.T) error {
 	var args []string
 	args = append(args, "--root", p.rootPath())
 	args = append(args, "--state", p.statePath())
@@ -919,8 +946,8 @@ func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string, envs []string
 	require.NoError(t, err, "open log file %s", p.logPath())
 	t.Cleanup(func() { f.Close() })
 
-	cmd := exec.Command(ctrdBin, args...)
-	cmd.Env = append(os.Environ(), envs...)
+	cmd := exec.Command(p.ctrdBin, args...)
+	cmd.Env = append(os.Environ(), p.envs...)
 	cmd.Stdout = f
 	cmd.Stderr = f
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
@@ -937,24 +964,10 @@ func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string, envs []string
 
 		defer close(p.waitBlock)
 
-		require.NoError(t, p.cmd.Start(), "start containerd(%s)", ctrdBin)
+		require.NoError(t, p.cmd.Start(), "start containerd(%s)", p.ctrdBin)
 		assert.NoError(t, p.cmd.Wait())
 	}()
-	return p
-}
-
-// ctrdProc is used to control the containerd process's lifecycle.
-type ctrdProc struct {
-	// workDir has the following layout:
-	//
-	// - root  (dir)
-	// - state (dir)
-	// - containerd.sock (sock file)
-	// - config.toml (toml file, required)
-	// - containerd.log (log file, always open with O_APPEND)
-	workDir   string
-	cmd       *exec.Cmd
-	waitBlock chan struct{}
+	return nil
 }
 
 // kill is to send the signal to containerd process.
@@ -1034,6 +1047,19 @@ func (p *ctrdProc) isReady() error {
 			return fmt.Errorf("context deadline exceeded: %w", err)
 		}
 	}
+}
+
+// restart containerd rerun.
+func (p *ctrdProc) restart(t *testing.T) error {
+	err := p.kill(syscall.SIGTERM)
+	if err != nil {
+		return err
+	}
+	err = p.wait(5 * time.Minute)
+	if err != nil {
+		return err
+	}
+	return p.start(t)
 }
 
 // dumpFileContent dumps file content into t.Log.
