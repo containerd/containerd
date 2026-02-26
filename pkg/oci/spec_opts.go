@@ -29,6 +29,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -960,14 +961,67 @@ func withReadonlyFS(ctx context.Context, client Client, mounts []mount.Mount, fn
 	})
 }
 
+// WithAppendAdditionalGIDs appends supplemental groups for the process. It
+// is a no-op if the spec is a Windows spec.
+//
+// If the list of additional GIDs is non-empty, it makes sure that the process
+// user's primary group is included, appends the additional GIDs, and removes
+// duplicates.
+func WithAppendAdditionalGIDs(gids []uint32) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+		if s == nil {
+			return errors.New("nil spec")
+		}
+		if s.Windows != nil {
+			return nil
+		}
+		if len(gids) == 0 {
+			// prevent modifying the spec, and adding the default (0) gid
+			// if no args were given.
+			return nil
+		}
+		ensureAdditionalGids(s)
+		merged := append(s.Process.User.AdditionalGids, gids...)
+		slices.Sort(merged)
+		s.Process.User.AdditionalGids = slices.Compact(merged)
+		return nil
+	}
+}
+
 // WithAppendAdditionalGroups append additional groups within the container.
-// The passed in groups can be either a gid or a groupname.
+// It is a no-op if the spec is a Windows spec.
+// The passed in groups can be either a gid or a group-name. The given groups
+// are resolved to their numeric GID through the "/etc/groups" file in the
+// container's filesystem. It skips group-name resolution if all groups are
+// numeric values (GIDs), in which case it uses [WithAppendAdditionalGIDs]
+// under the hood.
 func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		// For LCOW or on Darwin additional GID's are not supported
 		if s.Windows != nil || runtime.GOOS == "darwin" {
 			return nil
 		}
+
+		// Fast path: skip looking up groups if all groups are already numeric.
+		var gids []uint32
+		allNumeric := true
+
+		for _, g := range groups {
+			id, err := strconv.ParseUint(g, 10, 32)
+			if err != nil {
+				allNumeric = false
+				break
+			}
+			gids = append(gids, uint32(id))
+		}
+
+		if allNumeric {
+			// Unlike WithAppendAdditionalGIDs, WithAppendAdditionalGroups expects
+			// the default group to be added, even if no groups were passed.
+			defer ensureAdditionalGids(s)
+			return WithAppendAdditionalGIDs(gids)(ctx, client, c, s)
+		}
+
 		setProcess(s)
 		setAdditionalGids := func(root fs.FS) error {
 			defer ensureAdditionalGids(s)
