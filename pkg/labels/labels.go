@@ -27,3 +27,9 @@ const LabelSharedNamespace = "containerd.io/namespace.shareable"
 // LabelDistributionSource is added to content to indicate its origin.
 // e.g., "containerd.io/distribution.source.docker.io=library/redis"
 const LabelDistributionSource = "containerd.io/distribution.source"
+
+// LabelMediaType is automatically set on content at ingest time to record
+// the OCI descriptor media type. The value is the full IANA media type
+// (e.g., "application/vnd.oci.image.manifest.v1+json"). This label is
+// informational and does not affect GC or other containerd subsystems.
+const LabelMediaType = "containerd.io/content.mediatype"
