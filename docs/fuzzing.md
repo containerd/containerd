@@ -81,3 +81,25 @@ If you are verifying a fix for a crash (e.g., found in OSS-Fuzz or locally), you
 ```bash
 python3 infra/helper.py reproduce containerd <fuzz_target_name> <testcase_path>
 ```
+
+## 4. Best Practices and Debugging
+
+### Resource Management and High-Frequency Iterations
+
+Go's native fuzzing engine (`testing.F`) executes the fuzz target thousands of times per second within a single persistent process. This high-churn environment differs significantly from standard unit tests and can expose resource leaks or data races.
+
+- **Shared vs. Per-Iteration Resources**: Evaluate if a resource should be created once per fuzzer run or once per iteration. Background resources (like epoll monitors, long-lived goroutines, or global caches) that are initialized per-iteration can rapidly accumulate and exhaust system limits (file descriptors, memory, or goroutine counts), leading to `exit status 2` or `EOF` errors.
+- **Synchronous Cleanup**: Ensure all background tasks started by an iteration are fully terminated before the iteration function returns. If cleanup is asynchronous, use synchronization primitives (channels, `sync.WaitGroup`, etc.) to wait for completion.
+- **Thread-Safe Mocks**: Mocks used within a fuzzer iteration must be thread-safe if the code under test launches background goroutines that interact with them. Always protect shared state in mocks with `sync.Mutex`.
+
+### Debugging Techniques
+
+Debugging fuzzer crashes is often difficult because `go test -fuzz` suppresses `stdout` and `stderr` unless a crash is reproduced in the final iteration.
+
+- **Persistent Logging**: To see output from all iterations and background goroutines, redirect logs to a file:
+  ```go
+  f, _ := os.OpenFile("fuzz_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+  // Redirect global output or configure your logger to use this file
+  ```
+- **Race Detection**: Periodically run fuzzers with the race detector enabled (`go test -v -race -fuzz=FuzzTarget`) to identify synchronization issues in both the fuzzer and the code under test.
+- **Resource Monitoring**: Logging `runtime.NumGoroutine()` or similar metrics at the start of iterations can help identify systemic leaks that cause the fuzzer process to hang or terminate unexpectedly.
