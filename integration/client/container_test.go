@@ -26,6 +26,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -74,6 +75,83 @@ func TestContainerList(t *testing.T) {
 	if len(containers) != 0 {
 		t.Errorf("expected 0 containers but received %d", len(containers))
 	}
+}
+
+func TestContainerListWithStream(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("test require linux")
+	}
+	_, err := exec.LookPath("time")
+	if err != nil {
+		t.Skip("skipping test that requires time command")
+	}
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var envs []string
+	for key := range 4000 {
+		envs = append(envs, fmt.Sprintf("SFTPV6_CFBFC1C7_C8A8_00C_94AC_4EFD3CE927D2_PORT_0001_TCP_PORT%d=value_%d", key, key))
+	}
+
+	for i := 0; i < 300; i++ {
+		id := fmt.Sprintf("container_%d", i)
+		container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithEnv(envs), withExitStatus(7)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer container.Delete(ctx, WithSnapshotCleanup)
+	}
+
+	cmd := exec.Command("time", "-v", "sh", "-c", "ctr -a /run/containerd-test/containerd.sock -n testing c ls > /dev/null")
+	data, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("ctr c ls output: %s", string(data))
+	cmdStream := exec.Command("time", "-v", "sh", "-c", "ctr -a /run/containerd-test/containerd.sock -n testing c ls --stream > /dev/null")
+	dataStream, err := cmdStream.CombinedOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("ctr c ls  whith stream output: %s", string(dataStream))
+
+	normalSize, err := getMaximumSetSize(string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	streamSize, err := getMaximumSetSize(string(dataStream))
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.Greater(t, normalSize, streamSize, fmt.Sprintf("normalSize:%d should be greater than streamSize:%d", normalSize, streamSize))
+}
+
+func getMaximumSetSize(outPut string) (int64, error) {
+	lines := strings.Split(outPut, "\n")
+	for _, line := range lines {
+		line := strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Maximum resident set size (kbytes)") {
+			memoryStr := strings.Split(line, ":")[1]
+			mem, err := strconv.ParseInt(strings.TrimSpace(memoryStr), 10, 64)
+			if err != nil {
+				return 0, err
+			}
+			return mem, nil
+		}
+	}
+	return 0, fmt.Errorf("Maximum resident set size")
 }
 
 func TestNewContainer(t *testing.T) {
