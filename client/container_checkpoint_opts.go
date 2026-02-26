@@ -52,6 +52,14 @@ func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Cont
 	return nil
 }
 
+// WithCheckpointCriuImagePath includes the CRIU image path in the checkpoint
+func WithCheckpointCriuImagePath(imagePath string) CheckpointOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+		copts.ImagePath = imagePath
+		return nil
+	}
+}
+
 // WithCheckpointTask includes the running task
 func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
 	opt, err := typeurl.MarshalAnyToProto(copts)
