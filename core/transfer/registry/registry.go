@@ -48,6 +48,7 @@ type registryOpts struct {
 	headers       http.Header
 	creds         CredentialHelper
 	hostDir       string
+	configPath    string
 	defaultScheme string
 	httpDebug     bool
 	httpTrace     bool
@@ -77,6 +78,15 @@ func WithCredentials(creds CredentialHelper) Opt {
 func WithHostDir(hostDir string) Opt {
 	return func(o *registryOpts) error {
 		o.hostDir = hostDir
+		return nil
+	}
+}
+
+// WithConfigPath specifies the default registry configuration path.
+// When hostDir is not provided, this path will be used as a fallback.
+func WithConfigPath(configPath string) Opt {
+	return func(o *registryOpts) error {
+		o.configPath = configPath
 		return nil
 	}
 }
@@ -123,9 +133,16 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		}
 	}
 
+	// Determine the effective host directory.
+	// Priority: WithHostDir (explicit) > WithConfigPath (daemon config) > empty (use default resolver)
+	hostDir := ropts.hostDir
+	if hostDir == "" && ropts.configPath != "" {
+		hostDir = ropts.configPath
+	}
+
 	hostOptions := config.HostOptions{}
-	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+	if hostDir != "" {
+		hostOptions.HostDir = config.HostDirFromRoot(hostDir)
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
@@ -162,7 +179,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		headers:       ropts.headers,
 		creds:         ropts.creds,
 		resolver:      resolver,
-		hostDir:       ropts.hostDir,
+		hostDir:       hostDir,
 		defaultScheme: ropts.defaultScheme,
 		httpDebug:     ropts.httpDebug,
 		httpTrace:     ropts.httpTrace,
