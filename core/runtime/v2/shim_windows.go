@@ -23,9 +23,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
@@ -94,4 +96,8 @@ func checkCopyShimLogError(ctx context.Context, err error) error {
 		return nil
 	}
 	return err
+}
+
+func defaultSocketDir() string {
+	return filepath.Join(defaults.DefaultStateDir, "s")
 }

@@ -33,6 +33,7 @@ import (
 	shimapi "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
@@ -55,6 +56,7 @@ type Publisher interface {
 type StartOpts struct {
 	Address      string
 	TTRPCAddress string
+	SocketDir    string
 	Debug        bool
 }
 
@@ -135,6 +137,7 @@ const (
 	grpcAddressEnv  = "GRPC_ADDRESS"
 	namespaceEnv    = "NAMESPACE"
 	maxVersionEnv   = "MAX_SHIM_VERSION"
+	socketDirEnv    = "SHIM_SOCKET_DIR"
 )
 
 func parseFlags() {
@@ -253,6 +256,11 @@ func run(ctx context.Context, manager Manager, config Config) error {
 
 	ttrpcAddress := os.Getenv(ttrpcAddressEnv)
 
+	socketDir := os.Getenv(socketDirEnv)
+	if socketDir == "" {
+		socketDir = filepath.Join(defaults.DefaultStateDir, "s")
+	}
+
 	ctx = namespaces.WithNamespace(ctx, namespaceFlag)
 	ctx = context.WithValue(ctx, OptsKey{}, Opts{BundlePath: bundlePath, Debug: debugFlag})
 	ctx, sd := shutdown.WithShutdown(ctx)
@@ -289,6 +297,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		opts := StartOpts{
 			Address:      addressFlag,
 			TTRPCAddress: ttrpcAddress,
+			SocketDir:    socketDir,
 			Debug:        debugFlag,
 		}
 
