@@ -31,6 +31,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
+	"slices"
 	"strings"
 
 	"dario.cat/mergo"
@@ -357,6 +359,15 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 	}
 	defer f.Close()
 
+	if runtime.GOOS == "windows" {
+		if isUtf16(f) {
+			return nil, fmt.Errorf("config file '%s' detected as UTF-16 encoded, please ensure it is UTF-8 encoded", path)
+		}
+		if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
+			return nil, fmt.Errorf("unable to seek file to start %w", seekerr)
+		}
+	}
+
 	if err := toml.NewDecoder(f).DisallowUnknownFields().Decode(config); err != nil {
 		var serr *toml.StrictMissingError
 		if errors.As(err, &serr) {
@@ -394,6 +405,35 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 	}
 
 	return config, nil
+}
+
+func isUtf16(f *os.File) bool {
+	byteHeader := make([]byte, 2)
+	n, rerr := f.Read(byteHeader)
+
+	if rerr != nil && rerr != io.EOF {
+		return false
+	}
+	if n == 2 { // Little Endian & Big Endian
+		return slices.Equal(byteHeader, []byte{0xFF, 0xFE}) ||
+			slices.Equal(byteHeader, []byte{0xFE, 0xFF}) ||
+			byteHeader[0] == 0x00 || byteHeader[1] == 0x00
+	}
+
+	// Check for null bytes
+	byteHeader = make([]byte, 4096)
+	for {
+		n, rerr := f.Read(byteHeader)
+		if rerr != nil && rerr != io.EOF {
+			return false
+		}
+		if n == 0 {
+			return false
+		}
+		if slices.Contains(byteHeader[:n], 0x00) {
+			return true
+		}
+	}
 }
 
 // resolveImports resolves import strings list to absolute paths list:
