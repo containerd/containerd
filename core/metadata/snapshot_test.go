@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -457,4 +458,437 @@ func (s *tmpSnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...
 
 func (s *tmpSnapshotter) Close() error {
 	return nil
+}
+
+// failingSnapshotter wraps a snapshotter to simulate remove failures
+type failingSnapshotter struct {
+	snapshots.Snapshotter
+	failKeys map[string]bool // keys that should fail on Remove
+}
+
+func (f *failingSnapshotter) Remove(ctx context.Context, key string) error {
+	if f.failKeys[key] {
+		return fmt.Errorf("simulated remove failure for %s", key)
+	}
+	return f.Snapshotter.Remove(ctx, key)
+}
+
+// TestSnapshotGarbageCollectWithFailures tests that GC continues processing
+// other snapshot trees even when some removals fail.
+func TestSnapshotGarbageCollectWithFailures(t *testing.T) {
+	t.Run("LeafNodeFailure", func(t *testing.T) {
+		// Test that when leaf node L fails, only its ancestors (D, A, Root1) are blocked
+		// but siblings (C, E) and other branches (B subtree, Root2) continue
+
+		// Create a simpler mock scenario for unit testing
+		ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+			return NewTmpSnapshotter(), nil
+		}))
+
+		sn := db.Snapshotter("tmp")
+
+		// Create Root -> A -> L (will fail)
+		//              -> B (should succeed)
+		// Note: We create these without leases so they can be GC'd
+		_, err := sn.Prepare(ctx, "Root-tmp", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Commit(ctx, "Root", "Root-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = sn.Prepare(ctx, "A-tmp", "Root")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Commit(ctx, "A", "A-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = sn.Prepare(ctx, "B-tmp", "Root")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Commit(ctx, "B", "B-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = sn.Prepare(ctx, "L-tmp", "A")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Commit(ctx, "L", "L-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Use metadata snapshotter's Remove to delete snapshots
+		// This only removes metadata, not the backend snapshots
+		// Making them unreferenced so GC will try to clean them up from backend
+		err = sn.Remove(ctx, "L")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Remove(ctx, "B")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Remove(ctx, "A")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Remove(ctx, "Root")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Get the internal snapshotter and wrap it to fail on L's backend key
+		ss := db.ss["tmp"]
+		var lKey, aKey string
+		ss.Snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+			// Backend keys are like "testing/N/Name"
+			// Extract the name part after the last slash
+			parts := strings.Split(info.Name, "/")
+			if len(parts) > 0 {
+				name := parts[len(parts)-1]
+				if name == "A" {
+					aKey = info.Name
+				}
+			}
+			return nil
+		})
+
+		// Second pass to find L
+		ss.Snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+			if info.Parent == aKey {
+				lKey = info.Name
+			}
+			return nil
+		})
+
+		if lKey == "" {
+			t.Fatalf("Could not find L's backend key (aKey=%s)", aKey)
+		}
+
+		// Wrap snapshotter to fail on L
+		failingSn := &failingSnapshotter{
+			Snapshotter: ss.Snapshotter,
+			failKeys:    map[string]bool{lKey: true},
+		}
+		ss.Snapshotter = failingSn
+
+		// Run GC - All snapshots are unreferenced so should be removed
+		// Except L (fails), A (blocked by L), Root (blocked by A)
+		// B should be successfully removed
+		d, err := ss.garbageCollect(ctx)
+		t.Logf("GC duration: %v, error: %v", d, err)
+		// GC should return error because some removals failed
+		if err == nil {
+			t.Error("Expected GC to return error when removals fail")
+		}
+
+		// Verify B was removed from backend (sibling of A should not be affected)
+		var found_B bool
+		ss.Snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+			parts := strings.Split(info.Name, "/")
+			if len(parts) > 0 {
+				name := parts[len(parts)-1]
+				if name == "B" {
+					found_B = true
+				}
+			}
+			return nil
+		})
+		if found_B {
+			t.Error("Expected B to be removed from backend")
+		}
+
+		// Verify L, A, Root still exist in backend (blocked by L's failure)
+		var found_L, found_A, found_Root bool
+		ss.Snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+			parts := strings.Split(info.Name, "/")
+			if len(parts) > 0 {
+				name := parts[len(parts)-1]
+				if name == "L" {
+					found_L = true
+				} else if name == "A" {
+					found_A = true
+				} else if name == "Root" {
+					found_Root = true
+				}
+			}
+			return nil
+		})
+
+		if !found_L {
+			t.Error("Expected L to still exist in backend (removal failed)")
+		}
+		if !found_A {
+			t.Error("Expected A to still exist in backend (blocked by L)")
+		}
+		if !found_Root {
+			t.Error("Expected Root to still exist in backend (blocked by A)")
+		}
+	})
+
+	t.Run("MultipleRootFailures", func(t *testing.T) {
+		// Test that failures in multiple root trees don't affect each other
+		ctx3, db3 := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+			return NewTmpSnapshotter(), nil
+		}))
+
+		sn3 := db3.Snapshotter("tmp")
+
+		// Create Root1 -> A (will fail)
+		//        Root2 -> B (should succeed)
+		_, err := sn3.Prepare(ctx3, "Root1-tmp", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn3.Commit(ctx3, "Root1", "Root1-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = sn3.Prepare(ctx3, "A-tmp", "Root1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn3.Commit(ctx3, "A", "A-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = sn3.Prepare(ctx3, "Root2-tmp", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn3.Commit(ctx3, "Root2", "Root2-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = sn3.Prepare(ctx3, "B-tmp", "Root2")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn3.Commit(ctx3, "B", "B-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Use metadata snapshotter's Remove to delete snapshots
+		// This only removes metadata, not the backend snapshots
+		// Making them unreferenced so GC will try to clean them up from backend
+		err = sn3.Remove(ctx3, "B")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn3.Remove(ctx3, "Root2")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn3.Remove(ctx3, "A")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn3.Remove(ctx3, "Root1")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Make A fail
+		ss3 := db3.ss["tmp"]
+		var root1Key, aKey string
+		// First pass: find Root1
+		ss3.Snapshotter.Walk(ctx3, func(ctx context.Context, info snapshots.Info) error {
+			parts := strings.Split(info.Name, "/")
+			if len(parts) > 0 {
+				name := parts[len(parts)-1]
+				if name == "Root1" {
+					root1Key = info.Name
+				}
+			}
+			return nil
+		})
+
+		// Second pass: find A
+		ss3.Snapshotter.Walk(ctx3, func(ctx context.Context, info snapshots.Info) error {
+			parts := strings.Split(info.Name, "/")
+			if len(parts) > 0 {
+				name := parts[len(parts)-1]
+				if name == "A" && info.Parent == root1Key {
+					aKey = info.Name
+				}
+			}
+			return nil
+		})
+
+		if aKey == "" {
+			t.Fatalf("Could not find A's backend key (root1Key=%s)", root1Key)
+		}
+
+		failingSn3 := &failingSnapshotter{
+			Snapshotter: ss3.Snapshotter,
+			failKeys:    map[string]bool{aKey: true},
+		}
+		ss3.Snapshotter = failingSn3
+
+		// Run GC
+		_, err = ss3.garbageCollect(ctx3)
+		if err == nil {
+			t.Error("Expected GC to return error when removals fail")
+		}
+
+		// Verify Root2 tree was completely removed from backend (not affected by Root1's failure)
+		var found_B, found_Root2 bool
+		ss3.Snapshotter.Walk(ctx3, func(ctx context.Context, info snapshots.Info) error {
+			parts := strings.Split(info.Name, "/")
+			if len(parts) > 0 {
+				name := parts[len(parts)-1]
+				if name == "B" {
+					found_B = true
+				} else if name == "Root2" {
+					found_Root2 = true
+				}
+			}
+			return nil
+		})
+
+		if found_B {
+			t.Error("Expected B to be removed from backend")
+		}
+		if found_Root2 {
+			t.Error("Expected Root2 to be removed from backend")
+		}
+
+		// Verify Root1 tree still exists in backend
+		var found_A, found_Root1 bool
+		ss3.Snapshotter.Walk(ctx3, func(ctx context.Context, info snapshots.Info) error {
+			parts := strings.Split(info.Name, "/")
+			if len(parts) > 0 {
+				name := parts[len(parts)-1]
+				if name == "A" {
+					found_A = true
+				} else if name == "Root1" {
+					found_Root1 = true
+				}
+			}
+			return nil
+		})
+
+		if !found_A {
+			t.Error("Expected A to still exist in backend (removal failed)")
+		}
+		if !found_Root1 {
+			t.Error("Expected Root1 to still exist in backend (blocked by A)")
+		}
+	})
+
+	t.Run("ErrorsContainSnapshotIDs", func(t *testing.T) {
+		// Test that errors contain snapshot IDs for debugging
+		ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+			return NewTmpSnapshotter(), nil
+		}))
+
+		sn := db.Snapshotter("tmp")
+
+		// Create Root1 -> A and Root2 -> B
+		_, err := sn.Prepare(ctx, "Root1-tmp", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Commit(ctx, "Root1", "Root1-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = sn.Prepare(ctx, "A-tmp", "Root1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Commit(ctx, "A", "A-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = sn.Prepare(ctx, "Root2-tmp", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Commit(ctx, "Root2", "Root2-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = sn.Prepare(ctx, "B-tmp", "Root2")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Commit(ctx, "B", "B-tmp")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Remove metadata to trigger GC
+		err = sn.Remove(ctx, "A")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Remove(ctx, "Root1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Remove(ctx, "B")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sn.Remove(ctx, "Root2")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Get the internal snapshotter and make both A and B fail
+		ss := db.ss["tmp"]
+		var aKey, bKey string
+		ss.Snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+			parts := strings.Split(info.Name, "/")
+			if len(parts) > 0 {
+				name := parts[len(parts)-1]
+				if name == "A" {
+					aKey = info.Name
+				} else if name == "B" {
+					bKey = info.Name
+				}
+			}
+			return nil
+		})
+
+		if aKey == "" || bKey == "" {
+			t.Fatalf("Could not find snapshot keys (aKey=%s, bKey=%s)", aKey, bKey)
+		}
+
+		failingSn := &failingSnapshotter{
+			Snapshotter: ss.Snapshotter,
+			failKeys:    map[string]bool{aKey: true, bKey: true},
+		}
+		ss.Snapshotter = failingSn
+
+		_, err = ss.garbageCollect(ctx)
+		if err == nil {
+			t.Fatal("Expected GC to return error")
+		}
+
+		errMsg := err.Error()
+		if !strings.Contains(errMsg, "A") {
+			t.Errorf("Expected error message to contain snapshot ID 'A', got: %v", errMsg)
+		}
+		if !strings.Contains(errMsg, "B") {
+			t.Errorf("Expected error message to contain snapshot ID 'B', got: %v", errMsg)
+		}
+	})
 }

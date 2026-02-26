@@ -23,6 +23,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/mount"
@@ -30,10 +35,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	bolt "go.etcd.io/bbolt"
-	errbolt "go.etcd.io/bbolt/errors"
 )
 
 const (
@@ -933,10 +934,20 @@ func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err 
 	// and having a cleanup method which actually performs the
 	// deletions on the snapshotters which support it.
 
+	// Collect errors from all root nodes but continue processing other roots.
+	// This ensures that a failure in one snapshot tree doesn't prevent GC of other trees.
+	failedSnapshots := make([]string, 0, 16)
+	logger := log.G(ctx).WithField("snapshotter", s.name)
 	for _, node := range roots {
-		if err := s.pruneBranch(ctx, node); err != nil {
-			return 0, err
+		if err := s.pruneBranch(ctx, node, &failedSnapshots); err != nil {
+			logger.WithError(err).WithField("key", node.info.Name).Error("failed to prune snapshot root, continuing with next root")
+			// Continue processing other root nodes.
+			continue
 		}
+	}
+
+	if len(failedSnapshots) > 0 {
+		return 0, fmt.Errorf("failed to remove snapshots: %v", failedSnapshots)
 	}
 
 	return
@@ -982,17 +993,31 @@ func (s *snapshotter) walkTree(ctx context.Context, seen map[string]struct{}) ([
 	return roots, nil
 }
 
-func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode) error {
+func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode, failedSnapshots *[]string) error {
+	// Collect errors from all children without early return.
+	// This ensures that sibling branches can continue to be pruned even if one branch fails.
+	var hasChildFailures bool
 	for _, child := range node.children {
-		if err := s.pruneBranch(ctx, child); err != nil {
-			return err
+		if err := s.pruneBranch(ctx, child, failedSnapshots); err != nil {
+			hasChildFailures = true
+			// Continue processing other children instead of returning immediately
 		}
 	}
 
+	// If any child failed, propagate the error upward regardless of whether current node needs removal.
+	// This ensures errors are not swallowed when parent nodes don't need GC.
+	if hasChildFailures {
+		return fmt.Errorf("child cleanup failed")
+	}
+
 	if node.remove {
+		// Only attempt to remove the current node if all children were successfully removed.
 		logger := log.G(ctx).WithField("snapshotter", s.name)
 		if err := s.Snapshotter.Remove(ctx, node.info.Name); err != nil {
 			if !errdefs.IsFailedPrecondition(err) {
+				// Log the failure and record the failed snapshot name
+				logger.WithError(err).WithField("key", node.info.Name).Errorf("failed to remove snapshot")
+				*failedSnapshots = append(*failedSnapshots, node.info.Name)
 				return err
 			}
 			logger.WithError(err).WithField("key", node.info.Name).Warnf("failed to remove snapshot")
