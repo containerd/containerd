@@ -287,6 +287,28 @@ func updateTLSConfigFromHost(tlsConfig *tls.Config, host *hostConfig) error {
 	return nil
 }
 
+// HostDirFromConfigPath returns a function that provides a host configuration directory
+// based on a config path string and a host.
+// The returned function tries each path in order until one is found for the given host.
+//
+// A config path is a list of paths delimited by OS-specific path list separator.
+func HostDirFromConfigPath(configPath string) func(string) (string, error) {
+	roots := filepath.SplitList(configPath)
+	rootfn := make([]func(string) (string, error), len(roots))
+	for i := range roots {
+		rootfn[i] = HostDirFromRoot(roots[i])
+	}
+	return func(host string) (dir string, err error) {
+		for _, fn := range rootfn {
+			dir, err = fn(host)
+			if (err != nil && !errdefs.IsNotFound(err)) || (dir != "") {
+				break
+			}
+		}
+		return
+	}
+}
+
 // HostDirFromRoot returns a function which finds a host directory
 // based at the given root.
 func HostDirFromRoot(root string) func(string) (string, error) {

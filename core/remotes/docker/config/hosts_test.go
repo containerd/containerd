@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -505,6 +506,99 @@ func TestHTTPFallback(t *testing.T) {
 				t.Fatal("expected http fallback configured for defaulted localhost endpoint")
 			} else if !defaultTransport && !tc.usesFallback {
 				t.Fatalf("expected no http fallback configured for defaulted localhost endpoint")
+			}
+		})
+	}
+}
+
+func TestHostDirFromConfigPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsDir1 := filepath.Join(tmpDir, "/etc/containerd/certs.d")
+	certsDir2 := filepath.Join(tmpDir, "/etc/docker/certs.d")
+
+	hostDirs := []string{
+		filepath.Join(certsDir1, "docker.io"),
+		filepath.Join(certsDir1, "example.com_8080_"),
+		filepath.Join(certsDir2, "registry.example.com"),
+	}
+
+	for _, dir := range hostDirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tests := []struct {
+		name       string
+		configPath string
+		host       string
+		expectDir  string
+		expectErr  bool
+	}{
+		{
+			name:       "single path with existing host",
+			configPath: certsDir1,
+			host:       "docker.io",
+			expectDir:  filepath.Join(certsDir1, "docker.io"),
+			expectErr:  false,
+		},
+		{
+			name:       "single path with non existing host",
+			configPath: certsDir1,
+			host:       "nonexistent.com",
+			expectErr:  true,
+		},
+		{
+			name:       "single path with existing host with port",
+			configPath: certsDir1,
+			host:       "example.com:8080",
+			expectDir:  filepath.Join(certsDir1, "example.com_8080_"),
+			expectErr:  false,
+		},
+		{
+			name:       "multiple paths with existing host in first path",
+			configPath: certsDir1 + string(os.PathListSeparator) + certsDir2,
+			host:       "example.com:8080",
+			expectDir:  filepath.Join(certsDir1, "example.com_8080_"),
+			expectErr:  false,
+		},
+		{
+			name:       "multiple paths with existing host in second path",
+			configPath: certsDir1 + string(os.PathListSeparator) + certsDir2,
+			host:       "registry.example.com",
+			expectDir:  filepath.Join(certsDir2, "registry.example.com"),
+			expectErr:  false,
+		},
+		{
+			name:       "multiple paths with non existing host",
+			configPath: certsDir1 + string(os.PathListSeparator) + certsDir2,
+			host:       "nonexistent.com",
+			expectErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hostDirFunc := HostDirFromConfigPath(tt.configPath)
+			dir, err := hostDirFunc(tt.host)
+
+			dir = strings.TrimPrefix(dir, tmpDir)
+			expectDir := strings.TrimPrefix(tt.expectDir, tmpDir)
+
+			if tt.expectErr {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				if dir != "" {
+					t.Errorf("expected empty dir but got %q", dir)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if dir != expectDir {
+					t.Errorf("expected dir %q but got %q", expectDir, dir)
+				}
 			}
 		})
 	}
