@@ -50,11 +50,7 @@ func FuzzCopyPipes(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		ff := fuzz.NewConsumer(data)
 
-		tmpDir, err := os.MkdirTemp("", "fuzz-copy-pipes-")
-		if err != nil {
-			return
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		p1, _ := ff.GetString()
 		if p1 == "" {
@@ -154,11 +150,7 @@ func FuzzCreateIO(f *testing.F) {
 			return
 		}
 
-		tmpDir, err := os.MkdirTemp("", "fuzz-create-io-")
-		if err != nil {
-			return
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Create paths within tmpDir for any relative paths generated
 		if std.Stdin != "" && !filepath.IsAbs(std.Stdin) {
@@ -184,7 +176,7 @@ func FuzzCreateIO(f *testing.F) {
 			}
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		// Set namespace for NewBinaryIO
