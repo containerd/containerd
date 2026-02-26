@@ -19,9 +19,11 @@ package images
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/images/converter"
+	"github.com/containerd/containerd/v2/core/images/converter/erofs"
 	"github.com/containerd/containerd/v2/core/images/converter/uncompress"
 	"github.com/containerd/platforms"
 	"github.com/urfave/cli/v2"
@@ -34,6 +36,8 @@ var convertCommand = &cli.Command{
 	Description: `Convert an image format.
 
 e.g., 'ctr convert --uncompress --oci example.com/foo:orig example.com/foo:converted'
+      'ctr convert --erofs example.com/foo:orig example.com/foo:erofs'
+      'ctr convert --erofs --erofs-compression='lz4hc,12' example.com/foo:orig example.com/foo:erofs'
 
 Use '--platform' to define the output platform.
 When '--all-platforms' is given all images in a manifest list must be available.
@@ -47,6 +51,19 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		&cli.BoolFlag{
 			Name:  "oci",
 			Usage: "Convert Docker media types to OCI media types",
+		},
+		// erofs flags
+		&cli.BoolFlag{
+			Name:  "erofs",
+			Usage: "Convert layers to EROFS format",
+		},
+		&cli.StringFlag{
+			Name:  "erofs-compression",
+			Usage: "Compression algorithms for EROFS",
+		},
+		&cli.StringFlag{
+			Name:  "erofs-mkfs-opts",
+			Usage: "Extra mkfs options applied when converting EROFS layers. (e.g. '-Efragments,dedupe')",
 		},
 		// platform flags
 		&cli.StringSliceFlag{
@@ -81,6 +98,18 @@ When '--all-platforms' is given all images in a manifest list must be available.
 
 		if cliContext.Bool("uncompress") {
 			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(uncompress.LayerConvertFunc))
+		}
+
+		if cliContext.Bool("erofs") {
+			var erofsOpts []erofs.ConvertOpt
+			if compressors := cliContext.String("erofs-compression"); compressors != "" {
+				erofsOpts = append(erofsOpts, erofs.WithCompressors(compressors))
+			}
+			if mkfsOptsStr := cliContext.String("erofs-mkfs-opts"); mkfsOptsStr != "" {
+				mkfsOpts := strings.Fields(mkfsOptsStr)
+				erofsOpts = append(erofsOpts, erofs.WithMkfsOptions(mkfsOpts))
+			}
+			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(erofs.LayerConvertFunc(erofsOpts...)))
 		}
 
 		if cliContext.Bool("oci") {
