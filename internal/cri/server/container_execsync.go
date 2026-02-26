@@ -70,6 +70,15 @@ func (cw *cappedWriter) isFull() bool {
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
 func (c *criService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (*runtime.ExecSyncResponse, error) {
+	cntr, err := c.containerStore.Get(r.GetContainerId())
+	if err != nil {
+		return nil, fmt.Errorf("failed to find container %q in store: %w", r.GetContainerId(), err)
+	}
+	state := cntr.Status.Get().State()
+	if state != runtime.ContainerState_CONTAINER_RUNNING {
+		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))
+	}
+
 	const maxStreamSize = 1024 * 1024 * 16
 
 	var stdout, stderr bytes.Buffer
