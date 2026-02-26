@@ -116,9 +116,9 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 
 	binPath := filepath.Join(v.config.BinDir, bin)
 	args := []string{
-		"-name", imageName,
-		"-digest", desc.Digest.String(),
-		"-stdin-media-type", ocispec.MediaTypeDescriptor,
+		"--name", imageName,
+		"--digest", desc.Digest.String(),
+		"--stdin-media-type", ocispec.MediaTypeDescriptor,
 	}
 
 	cmd := exec.CommandContext(ctx, binPath, args...)
