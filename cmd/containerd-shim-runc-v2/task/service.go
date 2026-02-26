@@ -61,7 +61,7 @@ var (
 )
 
 // NewTaskService creates a new instance of a task service
-func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TTRPCTaskService, error) {
+func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service, opts ...Opt) (taskAPI.TTRPCTaskService, error) {
 	var (
 		ep  oom.Watcher
 		err error
@@ -88,6 +88,11 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		containerInitExit:    make(map[*runc.Container]runcC.Exit),
 		exitSubscribers:      make(map[*map[int][]runcC.Exit]struct{}),
 	}
+	for _, o := range opts {
+		if err := o(s); err != nil {
+			return nil, err
+		}
+	}
 	go s.processExits()
 	runcC.Monitor = reaper.Default
 	if err := s.initPlatform(); err != nil {
@@ -106,6 +111,16 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		})
 	}
 	return s, nil
+}
+
+// Opt is an option for a task service
+type Opt func(*service) error
+
+func withPlatform(platform stdio.Platform) Opt {
+	return func(s *service) error {
+		s.platform = platform
+		return nil
+	}
 }
 
 // service is the shim implementation of a remote shim over GRPC
