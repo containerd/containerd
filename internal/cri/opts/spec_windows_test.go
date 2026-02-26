@@ -239,7 +239,7 @@ func TestDriveMounts(t *testing.T) {
 	}
 	var realOS osinterface.RealOS
 	for _, test := range tests {
-		parsedMount, err := parseMount(realOS, test.mnt)
+		parsedMount, err := parseMount(t.Context(), realOS, test.mnt)
 		if err != nil && !strings.EqualFold(err.Error(), test.expectedError.Error()) {
 			t.Fatalf("expected err: %s, got %s instead", test.expectedError, err)
 		} else if err == nil && test.expectedContainerPath != parsedMount.Destination {

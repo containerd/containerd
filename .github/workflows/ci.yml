@@ -452,6 +452,7 @@ jobs:
         env:
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
+          EXTRA_TESTFLAGS: "-v"
         run: |
           make test
           sudo -E PATH=$PATH make root-test

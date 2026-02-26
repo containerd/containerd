@@ -106,9 +106,10 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				dst = mount.GetContainerPath()
 				src = mount.GetHostPath()
 			)
+
 			// Create the host path if it doesn't exist.
 			// TODO(random-liu): Add CRI validation test for this case.
-			if _, err := osi.Stat(src); err != nil {
+			if err := osi.Stat(ctx, src); err != nil {
 				if !os.IsNotExist(err) {
 					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}
