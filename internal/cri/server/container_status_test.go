@@ -291,7 +291,12 @@ func (s *fakeImageService) UpdateImage(ctx context.Context, r string) error { re
 
 func (s *fakeImageService) CheckImages(ctx context.Context) error { return nil }
 
-func (s *fakeImageService) GetImage(id string) (imagestore.Image, error) { return s.imageStore.Get(id) }
+func (s *fakeImageService) GetImage(id string) (imagestore.Image, error) {
+	if s.imageStore == nil {
+		return imagestore.Image{}, nil
+	}
+	return s.imageStore.Get(id)
+}
 
 func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error) {
 	return snapshotstore.Snapshot{}, errors.New("not implemented")
