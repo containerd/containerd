@@ -69,9 +69,7 @@ func HandleConsoleResize(ctx context.Context, task resizer, con console.Console)
 
 // NewTask creates a new task
 func NewTask(ctx context.Context, client *containerd.Client, container containerd.Container, checkpoint string, con console.Console, nullIO bool, logURI string, ioOpts []cio.Opt, opts ...containerd.NewTaskOpts) (containerd.Task, error) {
-	stdinC := &stdinCloser{
-		stdin: os.Stdin,
-	}
+	stdinC := cio.NewStdinCloser(os.Stdin)
 	if checkpoint != "" {
 		im, err := client.GetImage(ctx, checkpoint)
 		if err != nil {
@@ -114,9 +112,9 @@ func NewTask(ctx context.Context, client *containerd.Client, container container
 	if err != nil {
 		return nil, err
 	}
-	stdinC.closer = func() {
+	stdinC.SetCloser(func() {
 		t.CloseIO(ctx, containerd.WithStdinCloser)
-	}
+	})
 	return t, nil
 }
 
