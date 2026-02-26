@@ -293,8 +293,6 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 	for _, u := range paths {
 		for i, host := range hosts {
-			ctx := log.WithLogger(ctx, log.G(ctx).WithField("host", host.Host))
-
 			req := base.request(host, http.MethodHead, u...)
 			if err := req.addNamespace(base.refspec.Hostname()); err != nil {
 				return "", ocispec.Descriptor{}, err
@@ -304,6 +302,11 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				req.header[key] = append(req.header[key], value...)
 			}
 
+			ctx := log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+				"host":   req.host.Host,
+				"method": req.method,
+				"url":    req.sanitizedURL(),
+			}))
 			log.G(ctx).Debug("resolving")
 			resp, err := req.doWithRetries(ctx, i == len(hosts)-1)
 			if err != nil {
@@ -571,11 +574,13 @@ func (r *request) addQuery(key, value string) (err error) {
 	return
 }
 
+const namespaceQueryArg = "ns"
+
 func (r *request) addNamespace(ns string) error {
 	if !r.host.isProxy(ns) {
 		return nil
 	}
-	return r.addQuery("ns", ns)
+	return r.addQuery(namespaceQueryArg, ns)
 }
 
 type request struct {
@@ -594,8 +599,7 @@ func (r *request) clone() *request {
 }
 
 func (r *request) do(ctx context.Context) (*http.Response, error) {
-	u := r.host.Scheme + "://" + r.host.Host + r.path
-	req, err := http.NewRequestWithContext(ctx, r.method, u, nil)
+	req, err := http.NewRequestWithContext(ctx, r.method, r.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -616,7 +620,7 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 		}
 	}
 
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", r.sanitizedURL()))
 	log.G(ctx).WithFields(requestFields(req)).Debug("do request")
 	if err := r.authorize(ctx, req); err != nil {
 		return nil, fmt.Errorf("failed to authorize: %w", err)
@@ -653,7 +657,7 @@ type doChecks func(r *request, resp *http.Response) error
 func withErrorCheck(r *request, resp *http.Response) error {
 	if resp.StatusCode > 299 {
 		if resp.StatusCode == http.StatusNotFound {
-			return fmt.Errorf("content at %v not found: %w", r.String(), errdefs.ErrNotFound)
+			return fmt.Errorf("content at %v not found: %w", r.sanitizedURL(), errdefs.ErrNotFound)
 		}
 
 		return unexpectedResponseErr(resp)
@@ -774,6 +778,40 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response, 
 
 func (r *request) String() string {
 	return r.host.Scheme + "://" + r.host.Host + r.path
+}
+
+// sanitizedURL returns the request URL with query parameters and auth (if any)
+// sanitized. It is intended for errors and logging, and similar to [internal/cri/util.sanitizeURL].
+//
+// [internal/cri/util.sanitizeURL]: https://github.com/containerd/containerd/blob/v2.2.1/internal/cri/util/sanitize.go#L53-L75
+func (r *request) sanitizedURL() string {
+	rawURL := r.String()
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		// URL parsing failed; return original (malformed URLs shouldn't leak tokens)
+		return rawURL
+	}
+
+	if parsed.RawQuery == "" {
+		// Fast path: no query arguments to sanitize.
+		return parsed.Redacted()
+	}
+
+	query := parsed.Query()
+	for k := range query {
+		if k == namespaceQueryArg {
+			// preserve namespace query arguments
+			continue
+		}
+		for i := range query[k] {
+			if query[k][i] != "" {
+				query[k][i] = "REDACTED"
+			}
+		}
+	}
+
+	parsed.RawQuery = query.Encode()
+	return parsed.Redacted()
 }
 
 func (r *request) setMediaType(mediatype string) {
