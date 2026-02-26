@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	goruntime "runtime"
 	"slices"
+	"strings"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -77,6 +79,10 @@ func init() {
 				return nil, err
 			}
 			ic.Meta.Platforms = supportedPlatforms
+			if ic.Meta.Exports == nil {
+				ic.Meta.Exports = make(map[string]string, 1)
+			}
+			ic.Meta.Exports["log-uri-schemes"] = strings.Join(supportedLogURISchemes(), ",")
 
 			shimManagerI, err := ic.GetSingle(plugins.ShimPlugin)
 			if err != nil {
@@ -318,6 +324,15 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 	}
 
 	return exit, nil
+}
+
+func supportedLogURISchemes() []string {
+	switch goruntime.GOOS {
+	case "windows":
+		return []string{"binary", "binary-v2", "file", "npipe"}
+	default:
+		return []string{"fifo", "binary", "binary-v2", "file"}
+	}
 }
 
 func getRuntimeInfo(ctx context.Context, shims *ShimManager, req *apitypes.RuntimeRequest) (*apitypes.RuntimeInfo, error) {

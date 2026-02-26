@@ -95,11 +95,12 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 	}
 
 	switch uri.Scheme {
-	case "binary":
+	case "binary", "binary-v2":
 		ns, err := namespaces.NamespaceRequired(ctx)
 		if err != nil {
 			return nil, err
 		}
+		strictReady := uri.Scheme == "binary-v2"
 
 		cmd := process.NewBinaryCmd(uri, id, ns)
 
@@ -153,9 +154,15 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 		}
 
 		// Wait for the logging binary to be ready
+		// For binary-v2, readiness requires a byte to be written before close.
+		// For binary, EOF is treated as ready for backward compatibility.
 		b := make([]byte, 1)
-		if _, err := r.Read(b); err != nil && err != io.EOF {
+		n, err := r.Read(b)
+		if err != nil && err != io.EOF {
 			return nil, fmt.Errorf("failed to read from logging binary: %w", err)
+		}
+		if strictReady && n == 0 {
+			return nil, fmt.Errorf("logging binary did not call ready (it may have crashed or exited prematurely)")
 		}
 		cwg.Wait()
 
