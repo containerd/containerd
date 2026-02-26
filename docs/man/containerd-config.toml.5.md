@@ -46,7 +46,9 @@ config as version 1 has been deprecated.
 - **tcp_tls_cert**
 - **tcp_tls_key**
 - **uid** (Default: 0)
+- **user**
 - **gid** (Default: 0)
+- **group**
 - **max_recv_message_size**
 - **max_send_message_size**
 
@@ -55,14 +57,18 @@ config as version 1 has been deprecated.
 
 - **address** (Default: "")
 - **uid** (Default: 0)
+- **user**
 - **gid** (Default: 0)
+- **group**
 
 **[debug]**
 : Section to enable and configure a debug socket listener. Contains four properties:
 
 - **address** (Default: "/run/containerd/debug.sock")
 - **uid** (Default: 0)
+- **user**
 - **gid** (Default: 0)
+- **group**
 - **level** (Default: "info") sets the debug log level. Supported levels are:
   "trace", "debug", "info", "warn", "error", "fatal", "panic"
 - **format** (Default: "text") sets log format. Supported formats are "text" and "json"

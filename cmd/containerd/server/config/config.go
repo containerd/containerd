@@ -210,7 +210,9 @@ type GRPCConfig struct {
 	TCPTLSCert     string `toml:"tcp_tls_cert"`
 	TCPTLSKey      string `toml:"tcp_tls_key"`
 	UID            int    `toml:"uid"`
+	User           string `toml:"user"`
 	GID            int    `toml:"gid"`
+	Group          string `toml:"group"`
 	MaxRecvMsgSize int    `toml:"max_recv_message_size"`
 	MaxSendMsgSize int    `toml:"max_send_message_size"`
 	TCPTLSCName    string `toml:"tcp_tls_common_name"`
@@ -220,14 +222,18 @@ type GRPCConfig struct {
 type TTRPCConfig struct {
 	Address string `toml:"address"`
 	UID     int    `toml:"uid"`
+	User    string `toml:"user"`
 	GID     int    `toml:"gid"`
+	Group   string `toml:"group"`
 }
 
 // Debug provides debug configuration
 type Debug struct {
 	Address string `toml:"address"`
 	UID     int    `toml:"uid"`
+	User    string `toml:"user"`
 	GID     int    `toml:"gid"`
+	Group   string `toml:"group"`
 	Level   string `toml:"level"`
 	// Format represents the logging format. Supported values are 'text' and 'json'.
 	Format string `toml:"format"`
