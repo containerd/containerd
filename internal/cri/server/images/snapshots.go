@@ -52,16 +52,39 @@ func newSnapshotsSyncer(store *snapshotstore.Store, snapshotters map[string]snap
 // the syncer doesn't update any persistent states, it's fine to let it
 // exit with the process.
 func (s *snapshotsSyncer) start() {
-	tick := time.NewTicker(s.syncPeriod)
+	// Set minimum sleep to half of syncPeriod to ensure adequate CPU release
+	minSleep := s.syncPeriod / 2
+	// Smoothing factor for EMA updates. 0.2 is chosen as a balance between responsiveness and stability:
+	// lower values make the EMA less responsive to recent changes but more stable, while higher values
+	// make it more responsive but noisier. 0.2 is a commonly used value for smoothing in time series analysis.
+	// See: https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
+	emaAlpha := 0.2
+
+	basePeriod := s.syncPeriod
+	targetSleep := float64(basePeriod) / 2
 	go func() {
-		defer tick.Stop()
 		// TODO(random-liu): This is expensive. We should do benchmark to
 		// check the resource usage and optimize this.
 		for {
+			begin := time.Now()
 			if err := s.sync(); err != nil {
 				log.L.WithError(err).Error("Failed to sync snapshot stats")
 			}
-			<-tick.C
+			cost := time.Since(begin)
+			var sleep time.Duration
+			// if cost is less than half of basePeriod, we just sleep the remaining time, the behavior is similar to the old timer
+			if cost < minSleep {
+				sleep = basePeriod - cost
+			} else {
+				targetSleep += emaAlpha * (float64(cost) - targetSleep)
+				sleep = time.Duration(targetSleep)
+			}
+			if sleep < minSleep {
+				sleep = minSleep
+			}
+			if sleep > 0 {
+				time.Sleep(sleep)
+			}
 		}
 	}()
 }
