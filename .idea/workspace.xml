@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="ALL" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="bdcb6adb-6818-49b7-97dd-6258a132df18" name="更改" comment="">
+      <change beforePath="$PROJECT_DIR$/integration/pod_userns_linux_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/integration/pod_userns_linux_test.go" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="GOROOT" url="file://$PROJECT_DIR$/../../../../pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.darwin-arm64" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
+  <component name="ProjectId" id="2sq1kXvvlHUZP4UaqbJmKYFWUjZ" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Go 测试.github.com/containerd/containerd/v2/internal/cri/server 中的 TestMountPropagation/Expect_an_error_if_HostPath_isn't_slave_or_shared_and_mount_propagation_is_MountPropagation_PROPAGATION_HOST_TO_CONTAINER.executor&quot;: &quot;Debug&quot;,
+    &quot;Go 测试.github.com/containerd/containerd/v2/internal/cri/server 中的 TestUserNamespaceWithHostNetwork.executor&quot;: &quot;Run&quot;,
+    &quot;Go 测试.github.com/containerd/containerd/v2/internal/cri/server 中的 TestUserNamespaceWithHostNetwork/host_network_with_user_namespace_should_bind_mount_/sys.executor&quot;: &quot;Debug&quot;,
+    &quot;Go 测试.github.com/containerd/containerd/v2/internal/cri/server/podsandbox 中的 TestLinuxSandboxContainerSpec.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.GoLinterPluginOnboarding&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.GoLinterPluginStorageMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.modules.go.list.on.any.changes.was.set&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;support-hostnetwork-userns&quot;,
+    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
+    &quot;go.sdk.automatically.set&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/bing/go/src/github.com/containerd/containerd&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.goide.configuration.GoProjectSettingsConfigurable&quot;
+  }
+}</component>
+  <component name="RunManager" selected="Go 测试.github.com/containerd/containerd/v2/internal/cri/server 中的 TestUserNamespaceWithHostNetwork">
+    <configuration name="github.com/containerd/containerd/v2/internal/cri/server 中的 TestMountPropagation/Expect_an_error_if_HostPath_isn't_slave_or_shared_and_mount_propagation_is_MountPropagation_PROPAGATION_HOST_TO_CONTAINER" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="containerd" />
+      <working_directory value="$PROJECT_DIR$/internal/cri/server" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="github.com/containerd/containerd/v2/internal/cri/server" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <pattern value="^\QTestMountPropagation\E$/^\QExpect_an_error_if_HostPath_isn't_slave_or_shared_and_mount_propagation_is_MountPropagation_PROPAGATION_HOST_TO_CONTAINER\E$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="github.com/containerd/containerd/v2/internal/cri/server 中的 TestUserNamespaceWithHostNetwork" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="containerd" />
+      <working_directory value="$PROJECT_DIR$/internal/cri/server" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="github.com/containerd/containerd/v2/internal/cri/server" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <pattern value="^\QTestUserNamespaceWithHostNetwork\E$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="github.com/containerd/containerd/v2/internal/cri/server 中的 TestUserNamespaceWithHostNetwork/host_network_with_user_namespace_should_bind_mount_/sys" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="containerd" />
+      <working_directory value="$PROJECT_DIR$/internal/cri/server" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="github.com/containerd/containerd/v2/internal/cri/server" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <pattern value="^\QTestUserNamespaceWithHostNetwork\E$/^\Qhost_network_with_user_namespace_should_bind_mount_\E$/^\Qsys\E$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="github.com/containerd/containerd/v2/internal/cri/server/podsandbox 中的 TestLinuxSandboxContainerSpec" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="containerd" />
+      <working_directory value="$PROJECT_DIR$/internal/cri/server/podsandbox" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="github.com/containerd/containerd/v2/internal/cri/server/podsandbox" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <pattern value="^\QTestLinuxSandboxContainerSpec\E$" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Go 测试.github.com/containerd/containerd/v2/internal/cri/server 中的 TestUserNamespaceWithHostNetwork" />
+        <item itemvalue="Go 测试.github.com/containerd/containerd/v2/internal/cri/server/podsandbox 中的 TestLinuxSandboxContainerSpec" />
+        <item itemvalue="Go 测试.github.com/containerd/containerd/v2/internal/cri/server 中的 TestMountPropagation/Expect_an_error_if_HostPath_isn't_slave_or_shared_and_mount_propagation_is_MountPropagation_PROPAGATION_HOST_TO_CONTAINER" />
+        <item itemvalue="Go 测试.github.com/containerd/containerd/v2/internal/cri/server 中的 TestUserNamespaceWithHostNetwork/host_network_with_user_namespace_should_bind_mount_/sys" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-gosdk-3b128438d3f6-07d2d2d66b1e-org.jetbrains.plugins.go.sharedIndexes.bundled-GO-251.26927.50" />
+        <option value="bundled-js-predefined-d6986cc7102b-09060db00ec0-JavaScript-GO-251.26927.50" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="bdcb6adb-6818-49b7-97dd-6258a132df18" name="更改" comment="" />
+      <created>1752333719209</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1752333719209</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="OPEN_GENERIC_TABS">
+      <map>
+        <entry key="dae07c02-ccc5-4e7e-b0f8-7b282237f944" value="TOOL_WINDOW" />
+        <entry key="08325393-a997-4b06-a54d-7b702d4579ce" value="TOOL_WINDOW" />
+        <entry key="fb136bb5-99fa-4e6e-ba5f-6279e5ab2439" value="TOOL_WINDOW" />
+        <entry key="3f0f2e5a-ddf7-403d-ab21-35da0bd41113" value="TOOL_WINDOW" />
+        <entry key="63c5ee93-945d-4cd8-9681-1d220a042fe0" value="TOOL_WINDOW" />
+        <entry key="5e345e8e-0ad9-4762-80d5-b58dc5f5ff72" value="TOOL_WINDOW" />
+      </map>
+    </option>
+    <option name="TAB_STATES">
+      <map>
+        <entry key="08325393-a997-4b06-a54d-7b702d4579ce">
+          <value>
+            <State />
+          </value>
+        </entry>
+        <entry key="3f0f2e5a-ddf7-403d-ab21-35da0bd41113">
+          <value>
+            <State />
+          </value>
+        </entry>
+        <entry key="5e345e8e-0ad9-4762-80d5-b58dc5f5ff72">
+          <value>
+            <State />
+          </value>
+        </entry>
+        <entry key="63c5ee93-945d-4cd8-9681-1d220a042fe0">
+          <value>
+            <State />
+          </value>
+        </entry>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+        <entry key="dae07c02-ccc5-4e7e-b0f8-7b282237f944">
+          <value>
+            <State />
+          </value>
+        </entry>
+        <entry key="fb136bb5-99fa-4e6e-ba5f-6279e5ab2439">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VgoProject">
+    <settings-migrated>true</settings-migrated>
+  </component>
+</project>
