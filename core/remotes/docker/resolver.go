@@ -101,6 +101,11 @@ type ResolverOptions struct {
 	// mechanism for getting blob upload status is expensive.
 	Tracker StatusTracker
 
+	// WarningHandler is called for each warning received from the registry.
+	// Warnings are reported via HTTP Warning headers with warn-code 299.
+	// If nil, warnings are ignored.
+	WarningHandler WarningHandler
+
 	// Authorizer is used to authorize registry requests
 	//
 	// Deprecated: use Hosts.
@@ -138,11 +143,12 @@ func DefaultHost(ns string) (string, error) {
 }
 
 type dockerResolver struct {
-	hosts         RegistryHosts
-	header        http.Header
-	resolveHeader http.Header
-	tracker       StatusTracker
-	config        transfer.ImageResolverOptions
+	hosts          RegistryHosts
+	header         http.Header
+	resolveHeader  http.Header
+	tracker        StatusTracker
+	config         transfer.ImageResolverOptions
+	warningHandler WarningHandler
 }
 
 // NewResolver returns a new resolver to a Docker registry
@@ -197,10 +203,11 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 		options.Hosts = ConfigureDefaultRegistries(opts...)
 	}
 	return &dockerResolver{
-		hosts:         options.Hosts,
-		header:        options.Headers,
-		resolveHeader: resolveHeader,
-		tracker:       options.Tracker,
+		hosts:          options.Hosts,
+		header:         options.Headers,
+		resolveHeader:  resolveHeader,
+		tracker:        options.Tracker,
+		warningHandler: options.WarningHandler,
 	}
 }
 
@@ -304,6 +311,9 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				req.header[key] = append(req.header[key], value...)
 			}
 
+			// Don't report warnings during resolution; will report after descriptor construction
+			req.warningHandler = nil
+
 			log.G(ctx).Debug("resolving")
 			resp, err := req.doWithRetries(ctx, i == len(hosts)-1)
 			if err != nil {
@@ -317,6 +327,8 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				log.G(ctx).WithError(err).Info(nextHostOrFail(i))
 				continue // try another host
 			}
+			// Save response headers for warning reporting later
+			respHeaders := resp.Header.Clone()
 			resp.Body.Close() // don't care about body contents.
 
 			if resp.StatusCode > 299 {
@@ -369,10 +381,16 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					req.header[key] = append(req.header[key], value...)
 				}
 
+				// Don't report warnings during resolution
+				req.warningHandler = nil
+
 				resp, err := req.doWithRetries(ctx, true)
 				if err != nil {
 					return "", ocispec.Descriptor{}, err
 				}
+
+				// Save response headers for warning reporting later
+				respHeaders = resp.Header.Clone()
 
 				bodyReader := countingReader{reader: resp.Body}
 
@@ -411,6 +429,13 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				MediaType: contentType,
 				Size:      size,
 			}
+
+			// Report any warnings with the warning source
+			reportWarningsWithSource(respHeaders, r.warningHandler, WarningSource{
+				Ref:    refspec,
+				Desc:   &desc,
+				Digest: &dgst,
+			})
 
 			log.G(ctx).WithField("desc.digest", desc.Digest).Debug("resolved")
 			return ref, desc, nil
@@ -466,12 +491,13 @@ func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
 }
 
 type dockerBase struct {
-	refspec      reference.Spec
-	repository   string
-	hosts        []RegistryHost
-	header       http.Header
-	performances transfer.ImageResolverPerformanceSettings
-	limiter      *semaphore.Weighted
+	refspec        reference.Spec
+	repository     string
+	hosts          []RegistryHost
+	header         http.Header
+	performances   transfer.ImageResolverPerformanceSettings
+	limiter        *semaphore.Weighted
+	warningHandler WarningHandler
 }
 
 func (r *dockerBase) Acquire(ctx context.Context, weight int64) error {
@@ -494,12 +520,13 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 		return nil, err
 	}
 	return &dockerBase{
-		refspec:      refspec,
-		repository:   strings.TrimPrefix(refspec.Locator, host+"/"),
-		hosts:        hosts,
-		header:       r.header,
-		performances: r.config.Performances,
-		limiter:      r.config.DownloadLimiter,
+		refspec:        refspec,
+		repository:     strings.TrimPrefix(refspec.Locator, host+"/"),
+		hosts:          hosts,
+		header:         r.header,
+		performances:   r.config.Performances,
+		limiter:        r.config.DownloadLimiter,
+		warningHandler: r.warningHandler,
 	}, nil
 }
 
@@ -533,10 +560,12 @@ func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *re
 		p = p + "/"
 	}
 	return &request{
-		method: method,
-		path:   p,
-		header: header,
-		host:   host,
+		method:         method,
+		path:           p,
+		header:         header,
+		host:           host,
+		refspec:        r.refspec,
+		warningHandler: r.warningHandler,
 	}
 }
 
@@ -579,12 +608,14 @@ func (r *request) addNamespace(ns string) error {
 }
 
 type request struct {
-	method string
-	path   string
-	header http.Header
-	host   RegistryHost
-	body   func() (io.ReadCloser, error)
-	size   int64
+	method         string
+	path           string
+	header         http.Header
+	host           RegistryHost
+	body           func() (io.ReadCloser, error)
+	size           int64
+	refspec        reference.Spec
+	warningHandler WarningHandler
 }
 
 func (r *request) clone() *request {
@@ -645,6 +676,7 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 		return nil, fmt.Errorf("failed to do request: %w", err)
 	}
 	log.G(ctx).WithFields(responseFields(resp)).Debug("fetch response received")
+	reportWarnings(ctx, resp.Header, r.warningHandler)
 	return resp, nil
 }
 
@@ -695,6 +727,7 @@ func withOffsetCheck(offset, parallelism int64) doChecks {
 }
 
 func (r *request) doWithRetries(ctx context.Context, lastHost bool, checks ...doChecks) (resp *http.Response, err error) {
+	ctx = updateWarningSource(ctx, r.refspec)
 	resp, err = r.doWithRetriesInner(ctx, nil, lastHost)
 	if err != nil {
 		return nil, err
