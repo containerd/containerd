@@ -266,6 +266,8 @@ capable of performing. Include only the values that apply.
 capabilities =  ["pull", "resolve", "push"]
 ```
 
+If the field is not specified, it defaults to `["pull", "resolve", "push"]`.
+
 capabilities (or Host capabilities) represent the capabilities of the registry host.
 This also represents the set of operations for which the registry host may be trusted
 to perform.
