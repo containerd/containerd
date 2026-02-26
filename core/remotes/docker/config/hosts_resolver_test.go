@@ -316,3 +316,25 @@ func (m testManifest) RegisterHandler(r *http.ServeMux, name string) {
 		r.Handle(fmt.Sprintf("/v2/%s/blobs/%s", name, c.Digest()), c)
 	}
 }
+
+func TestHostDirFromRoots(t *testing.T) {
+	t.Parallel()
+
+	// root1 intentionally does not exist
+	root1 := filepath.Join(t.TempDir(), "does-not-exist")
+	root2 := t.TempDir()
+
+	host := "registry.k8s.io"
+	want := filepath.Join(root2, host)
+	if err := os.MkdirAll(want, 0o755); err != nil {
+		t.Fatalf("mkdir %q: %v", want, err)
+	}
+
+	dir, err := HostDirFromRoots([]string{root1, root2})(host)
+	if err != nil {
+		t.Fatalf("HostDirFromRoots(...)(%q) returned error: %v", host, err)
+	}
+	if dir != want {
+		t.Fatalf("unexpected host dir: got %q, want %q", dir, want)
+	}
+}
