@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
@@ -79,6 +80,7 @@ func newCNINetConfSyncer(confDir string, netPlugin cni.CNI, loadOpts []cni.Opt) 
 // syncLoop monitors any fs change events from cni conf dir and tries to reload
 // cni configuration.
 func (syncer *cniNetConfSyncer) syncLoop() error {
+loop:
 	for {
 		select {
 		case event, ok := <-syncer.watcher.Events:
@@ -96,18 +98,36 @@ func (syncer *cniNetConfSyncer) syncLoop() error {
 				continue
 			}
 			log.L.Debugf("receiving change event from cni conf dir: %s", event)
-
-			// If the confDir is removed, stop watching.
-			if event.Name == syncer.confDir && (event.Has(fsnotify.Rename) || event.Has(fsnotify.Remove)) {
-				return fmt.Errorf("cni conf dir is removed, stop watching")
-			}
-
 			lerr := syncer.netPlugin.Load(syncer.loadOpts...)
 			if lerr != nil {
 				log.L.WithError(lerr).
 					Errorf("failed to reload cni configuration after receiving fs change event(%s)", event)
 			}
 			syncer.updateLastStatus(lerr)
+			if event.Name == syncer.confDir && (event.Has(fsnotify.Rename) || event.Has(fsnotify.Remove)) {
+				log.L.Warnf("%s is deleted", syncer.confDir)
+				for {
+					time.Sleep(time.Second * 5)
+					exist := exist(syncer.confDir)
+					if exist {
+						log.L.Infof("%s  is recreated", syncer.confDir)
+						lerr := syncer.netPlugin.Load(syncer.loadOpts...)
+						if lerr != nil {
+							log.L.WithError(lerr).
+								Errorf("failed to reload cni configuration after receiving fs change event(%s)", event)
+						}
+						syncer.updateLastStatus(lerr)
+						if !containsDir(syncer.watcher.WatchList(), syncer.confDir) {
+							if err := syncer.watcher.Add(syncer.confDir); err != nil {
+								return fmt.Errorf("failed to watch cni conf dir %s: %w", syncer.confDir, err)
+							}
+						}
+						goto loop
+					} else {
+						log.L.Errorf("%s is not exist", syncer.confDir)
+					}
+				}
+			}
 
 		case err := <-syncer.watcher.Errors:
 			if err != nil {
@@ -135,4 +155,23 @@ func (syncer *cniNetConfSyncer) updateLastStatus(err error) {
 // stop stops watcher in the syncLoop.
 func (syncer *cniNetConfSyncer) stop() error {
 	return syncer.watcher.Close()
+}
+
+func exist(path string) bool {
+	_, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
+}
+
+func containsDir(list []string, target string) bool {
+	for _, item := range list {
+		if item == target {
+			return true
+		}
+	}
+	return false
 }
