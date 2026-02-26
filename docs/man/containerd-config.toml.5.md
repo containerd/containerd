@@ -143,7 +143,7 @@ documentation.
   "io.containerd.timeout.shim.shutdown" = "3s"
   "io.containerd.timeout.task.state" = "2s" -->
 
-**imports**
+**imports** (Default: ["conf/*.toml"])
 : Imports is a list of additional configuration files to include.
 This allows to split the main configuration file and keep some sections
 separately (for example vendors may keep a custom runtime configuration in a
