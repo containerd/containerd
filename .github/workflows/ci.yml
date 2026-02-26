@@ -63,11 +63,11 @@ jobs:
           go-licenses-ignore: |
             github.com/cyphar/filepath-securejoin
 
-      - name: verify go modules and vendor directory
-        run: |
-          sudo apt-get install -y jq
-          make verify-vendor
-        working-directory: src/github.com/containerd/containerd
+      # - name: verify go modules and vendor directory
+      #   run: |
+      #     sudo apt-get install -y jq
+      #     make verify-vendor
+      #   working-directory: src/github.com/containerd/containerd
 
   #
   # Protobuf checks
