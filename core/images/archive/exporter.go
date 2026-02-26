@@ -287,11 +287,18 @@ func Export(ctx context.Context, store content.InfoReaderProvider, writer io.Wri
 					return err
 				}
 
-				var manifests []ocispec.Descriptor
+				type manifestStatus struct {
+					manifest  ocispec.Descriptor
+					hasRecord bool
+				}
+
+				manifests := make(map[digest.Digest]manifestStatus)
+
 				for _, m := range index.Manifests {
 					if eo.platform != nil {
+						// process manifests for desired platform only
 						if m.Platform == nil || eo.platform.Match(*m.Platform) {
-							manifests = append(manifests, m)
+							manifests[m.Digest] = manifestStatus{manifest: m, hasRecord: false}
 						} else if !eo.allPlatforms {
 							continue
 						}
@@ -302,24 +309,38 @@ func Export(ctx context.Context, store content.InfoReaderProvider, writer io.Wri
 						return err
 					}
 
+					if r != nil {
+						// manifest has a record, mark it as such
+						if _, ok := manifests[m.Digest]; ok {
+							manifests[m.Digest] = manifestStatus{manifest: m, hasRecord: true}
+						}
+					}
+
 					records = append(records, r...)
 				}
 
-				if len(manifests) >= 1 {
-					if len(manifests) > 1 {
-						sort.SliceStable(manifests, func(i, j int) bool {
-							if manifests[i].Platform == nil {
+				var manifestsWithRecord []ocispec.Descriptor
+				for _, v := range manifests {
+					if v.hasRecord {
+						manifestsWithRecord = append(manifestsWithRecord, v.manifest)
+					}
+				}
+
+				if len(manifestsWithRecord) >= 1 {
+					if len(manifestsWithRecord) > 1 {
+						sort.SliceStable(manifestsWithRecord, func(i, j int) bool {
+							if manifestsWithRecord[i].Platform == nil {
 								return false
 							}
-							if manifests[j].Platform == nil {
+							if manifestsWithRecord[j].Platform == nil {
 								return true
 							}
-							return eo.platform.Less(*manifests[i].Platform, *manifests[j].Platform)
+							return eo.platform.Less(*manifestsWithRecord[i].Platform, *manifestsWithRecord[j].Platform)
 						})
 					}
-					d = manifests[0].Digest
+					d = manifestsWithRecord[0].Digest
 					dManifests[d] = &exportManifest{
-						manifest: manifests[0],
+						manifest: manifestsWithRecord[0],
 					}
 				} else if eo.platform != nil {
 					return fmt.Errorf("no manifest found for platform: %w", errdefs.ErrNotFound)
