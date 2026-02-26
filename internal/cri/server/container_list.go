@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -71,39 +72,19 @@ func toCRIContainer(container containerstore.Container) *runtime.Container {
 	}
 }
 
-func (c *criService) normalizeContainerFilter(filter *runtime.ContainerFilter) {
-	if cntr, err := c.containerStore.Get(filter.GetId()); err == nil {
-		filter.Id = cntr.ID
-	}
-	if sb, err := c.sandboxStore.Get(filter.GetPodSandboxId()); err == nil {
-		filter.PodSandboxId = sb.ID
-	}
-}
-
 // filterCRIContainers filters CRIContainers.
 func (c *criService) filterCRIContainers(containers []*runtime.Container, filter *runtime.ContainerFilter) []*runtime.Container {
 	if filter == nil {
 		return containers
 	}
 
-	// The containerd cri plugin supports short ids so long as there is only one
-	// match. So we do a lookup against the store here if a pod id has been
-	// included in the filter.
 	sb := filter.GetPodSandboxId()
-	if sb != "" {
-		sandbox, err := c.sandboxStore.Get(sb)
-		if err == nil {
-			sb = sandbox.ID
-		}
-	}
-
-	c.normalizeContainerFilter(filter)
 	filtered := []*runtime.Container{}
 	for _, cntr := range containers {
-		if filter.GetId() != "" && filter.GetId() != cntr.Id {
+		if filter.GetId() != "" && !strings.HasPrefix(cntr.Id, filter.GetId()) {
 			continue
 		}
-		if sb != "" && sb != cntr.PodSandboxId {
+		if sb != "" && !strings.HasPrefix(cntr.PodSandboxId, sb) {
 			continue
 		}
 		if filter.GetState() != nil && filter.GetState().GetState() != cntr.State {
