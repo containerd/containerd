@@ -306,7 +306,7 @@ $ crictl info
     "disableProcMount": false,
     "unsetSeccompProfile": "",
     "tolerateMissingHugetlbController": true,
-    "disableHugetlbController": true,
+    "disableHugetlbController": false,
     "device_ownership_from_security_context": false,
     "ignoreImageDefinedVolumes": false,
     "netnsMountsUnderStateDir": false,
