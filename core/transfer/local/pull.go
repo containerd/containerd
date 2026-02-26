@@ -196,15 +196,17 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			enableRemoteSnapshotAnnotations := false
 			// Only unpack if requested unpackconfig matches default/supported unpackconfigs
 			for _, u := range unpacks {
-				matched, mu := getSupportedPlatform(ctx, u, ts.config.UnpackPlatforms)
-				if matched {
-					if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
-						enableRemoteSnapshotAnnotations = true
+				ma := getSupportedPlatforms(ctx, u, ts.config.UnpackPlatforms)
+				if len(ma) > 0 {
+					for _, mu := range ma {
+						if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
+							enableRemoteSnapshotAnnotations = true
+						}
+						if progressTracker != nil {
+							mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
+						}
+						uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 					}
-					if progressTracker != nil {
-						mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
-					}
-					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 				} else {
 					log.G(ctx).WithFields(log.Fields{
 						"platform":    platforms.FormatAll(u.Platform),
@@ -298,9 +300,11 @@ func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *Progre
 	}
 }
 
-// getSupportedPlatform returns a matched platform comparing input UnpackConfiguration to the supported platform/snapshotter combinations
-// If input platform didn't specify snapshotter, default will be used if there is a match on platform.
-func getSupportedPlatform(ctx context.Context, uc transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) (matched bool, u unpack.Platform) {
+// getSupportedPlatform returns matched platforms comparing input UnpackConfiguration to the supported platform/snapshotter combinations
+// If input platform didn't specify snapshotter, default ones will be used if there are matches on platform.
+func getSupportedPlatforms(ctx context.Context, uc transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) []unpack.Platform {
+	var u, alt []unpack.Platform
+
 	for _, sp := range supportedPlatforms {
 		// If both platform and snapshotter match, return the supportPlatform
 		// If platform matched and SnapshotterKey is empty, we assume client didn't pass SnapshotterKey
@@ -309,16 +313,14 @@ func getSupportedPlatform(ctx context.Context, uc transfer.UnpackConfiguration, 
 			// Assume sp.SnapshotterKey is not empty
 			//nolint:staticcheck // QF1003: could use tagged switch on base (staticcheck)
 			if uc.Snapshotter == sp.SnapshotterKey {
-				return true, sp
+				u = append(u, sp)
 			} else if uc.Snapshotter == "" {
 				if sp.SnapshotterKey == defaults.DefaultSnapshotter {
-					// Return as best match immediately
-					return true, sp
-				} else if !matched {
-					// Match but prefer default if present to prevent configuration
-					// changes from altering default behavior
-					matched = true
-					u = sp
+					// Record the default snapshotter as the most preferred one
+					// Although unpacker may not select it if other configuration has `LayerTypes` hints.
+					u = append(u, sp)
+				} else {
+					alt = append(alt, sp)
 				}
 			}
 		} else if uc.Snapshotter == sp.SnapshotterKey {
@@ -328,5 +330,5 @@ func getSupportedPlatform(ctx context.Context, uc transfer.UnpackConfiguration, 
 			}).Info("Found unpack with matching snapshotter but platform does not match")
 		}
 	}
-	return
+	return append(u, alt...)
 }

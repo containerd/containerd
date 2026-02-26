@@ -95,8 +95,8 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 		if len(unpacks) > 0 {
 			uopts := []unpack.UnpackerOpt{}
 			for _, u := range unpacks {
-				matched, mu := getSupportedPlatform(ctx, u, ts.config.UnpackPlatforms)
-				if matched {
+				ma := getSupportedPlatforms(ctx, u, ts.config.UnpackPlatforms)
+				for _, mu := range ma {
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 				}
 			}
