@@ -402,9 +402,7 @@ func (i *image) getLayers(ctx context.Context, manifest ocispec.Manifest) ([]roo
 	// parse out the image layers from oci artifact layers
 	imageLayers := []ocispec.Descriptor{}
 	for _, ociLayer := range manifest.Layers {
-		if images.IsLayerType(ociLayer.MediaType) {
-			imageLayers = append(imageLayers, ociLayer)
-		}
+		imageLayers = append(imageLayers, ociLayer)
 	}
 	if len(diffIDs) != len(imageLayers) {
 		return nil, errors.New("mismatched image rootfs and manifest layers")
