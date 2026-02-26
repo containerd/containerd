@@ -32,9 +32,7 @@ func DefaultImageConfig() ImageConfig {
 		Snapshotter:                defaults.DefaultSnapshotter,
 		DisableSnapshotAnnotations: true,
 		MaxConcurrentDownloads:     3,
-		Registry: Registry{
-			ConfigPath: "/etc/containerd/certs.d:/etc/docker/certs.d",
-		},
+		Registry:                   Registry{},
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
