@@ -456,6 +456,20 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 	}, nil
 }
 
+func (r *dockerResolver) Lister(ctx context.Context, ref string) (remotes.Lister, error) {
+	base, err := r.resolveDockerBase(ref)
+	if err != nil {
+		return nil, err
+	}
+	if base.refspec.Object != "" {
+		return nil, ErrObjectNotRequired
+	}
+
+	return &dockerLister{
+		dockerBase: base,
+	}, nil
+}
+
 func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
 	refspec, err := reference.Parse(ref)
 	if err != nil {
