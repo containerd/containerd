@@ -140,6 +140,37 @@ containerd.exe --register-service
 Start-Service containerd
 ```
 
+For an **Administrator command prompt** run the following commands:
+
+```bat
+:: If containerd previously installed run:
+net stop containerd
+
+:: Download and extract desired containerd Windows binaries
+set "Version=1.7.13"	& :: update to your preferred version
+set "Arch=amd64"	& :: arm64 also available
+curl.exe -LO "https://github.com/containerd/containerd/releases/download/v%Version%/containerd-%Version%-windows-%Arch%.tar.gz"
+tar.exe xvf .\containerd-%Version%-windows-%Arch%.tar.gz
+
+:: Copy
+xcopy .\bin "%ProgramFiles%\containerd" /E /I /H /Y
+
+:: Add the binaries (containerd.exe, ctr.exe) to the system PATH (environment variables) by copying the output of the below command
+echo %ProgramFiles%\containerd
+
+:: Configure containerd
+"%ProgramFiles%\containerd\containerd.exe" config default > "%ProgramFiles%\containerd\config.toml"
+
+:: Review the configuration (optional)
+type "%ProgramFiles%\containerd\config.toml"
+
+:: Register and start service
+"%ProgramFiles%\containerd\containerd.exe" --register-service
+
+:: Start the containerd service
+net start containerd
+```
+
 > **Tip for Running `containerd` Service on Windows:**
 >
 > `containerd` logs are not persisted when we start it as a service
