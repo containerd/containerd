@@ -35,6 +35,9 @@ func DefaultImageConfig() ImageConfig {
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
+		RuntimePlatforms: map[string]ImagePlatform{
+			"runhcs-wcow-process": {},
+		},
 		PinnedImages: map[string]string{
 			"sandbox": DefaultSandboxImage,
 		},
