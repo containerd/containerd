@@ -315,6 +315,12 @@ func WithTestAnnotations() ContainerOpts {
 	}
 }
 
+func WithStopSignal(signal runtime.Signal) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		c.StopSignal = signal
+	}
+}
+
 // Add container resource limits.
 func WithResources(r *runtime.LinuxContainerResources) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {

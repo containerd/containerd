@@ -367,7 +367,15 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		opts = append(opts, customopts.WithVolumes(mountMap, platform))
 	}
 	r.meta.ImageRef = r.imageID
-	r.meta.StopSignal = r.imageConfig.StopSignal
+	if signal := r.containerConfig.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
+		log.G(r.ctx).Debugf("Override default runtime stopsignal for container %s from %s to CRI container create requested signal %s", r.containerID, runtime.Signal_RUNTIME_DEFAULT, signal)
+		r.meta.StopSignal = signal.String()
+	} else if r.imageConfig.StopSignal != "" {
+		log.G(r.ctx).Debugf("Setting runtime stopsignal for container %s to container image requested signal %s", r.containerID, r.imageConfig.StopSignal)
+		r.meta.StopSignal = r.imageConfig.StopSignal
+	} else {
+		log.G(r.ctx).Debugf("Container %s will be processing with the default stop signal %s", r.containerID, runtime.Signal_SIGTERM)
+	}
 
 	// Validate log paths and compose full container log path.
 	if r.podSandboxConfig.GetLogDirectory() != "" && r.containerConfig.GetLogPath() != "" {
