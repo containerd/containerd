@@ -106,10 +106,13 @@ func (idx *TruncIndex) Delete(id string) error {
 	if _, exists := idx.ids[id]; !exists || id == "" {
 		return fmt.Errorf("no such id: '%s'", id)
 	}
-	delete(idx.ids, id)
+	// Check trie deletion first to ensure it succeeds before removing from map.
+	// This prevents map/trie desync if trie deletion fails (issue #12390).
 	if deleted := idx.trie.Delete(patricia.Prefix(id)); !deleted {
 		return fmt.Errorf("no such id: '%s'", id)
 	}
+	// Only delete from map after trie deletion succeeds
+	delete(idx.ids, id)
 	return nil
 }
 
