@@ -26,7 +26,7 @@ import (
 
 func TestValidLabels(t *testing.T) {
 	shortStr := "s"
-	longStr := strings.Repeat("s", maxSize-1)
+	longStr := strings.Repeat("s", MaxLabelSize-1)
 
 	for key, value := range map[string]string{
 		"some":   "value",
@@ -40,7 +40,7 @@ func TestValidLabels(t *testing.T) {
 
 func TestInvalidLabels(t *testing.T) {
 	addOneStr := "s"
-	maxSizeStr := strings.Repeat("s", maxSize)
+	maxSizeStr := strings.Repeat("s", MaxLabelSize)
 
 	for key, value := range map[string]string{
 		maxSizeStr: addOneStr,
@@ -55,25 +55,25 @@ func TestInvalidLabels(t *testing.T) {
 
 func TestLongKey(t *testing.T) {
 	key := strings.Repeat("s", keyMaxLen+1)
-	value := strings.Repeat("v", maxSize-len(key))
+	value := strings.Repeat("v", MaxLabelSize-len(key))
 
 	err := Validate(key, value)
 	assert.Equal(t, err, nil)
 
 	key = strings.Repeat("s", keyMaxLen+12)
-	value = strings.Repeat("v", maxSize-len(key)+1)
+	value = strings.Repeat("v", MaxLabelSize-len(key)+1)
 
 	err = Validate(key, value)
 	assert.ErrorIs(t, err, errdefs.ErrInvalidArgument)
 
 	key = strings.Repeat("s", keyMaxLen-1)
-	value = strings.Repeat("v", maxSize-len(key))
+	value = strings.Repeat("v", MaxLabelSize-len(key))
 
 	err = Validate(key, value)
 	assert.Equal(t, err, nil)
 
 	key = strings.Repeat("s", keyMaxLen-1)
-	value = strings.Repeat("v", maxSize-len(key)-1)
+	value = strings.Repeat("v", MaxLabelSize-len(key)-1)
 
 	err = Validate(key, value)
 	assert.Equal(t, err, nil)
