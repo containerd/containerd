@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 )
 
@@ -128,8 +127,11 @@ func (r *runtime) Config() criconfig.Config {
 func (r *runtime) LoadOCISpec(filename string) (*oci.Spec, error) {
 	spec, ok := r.baseOCISpecs[filename]
 	if !ok {
-		// TODO: Load here or only allow preloading...
-		return nil, errdefs.ErrNotFound
+		spec, err := loadOCISpec(filename)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load OCI spec: %s: %w", filename, err)
+		}
+		return spec, nil
 	}
 	return spec, nil
 }

@@ -19,6 +19,8 @@
 package config
 
 import (
+	"path/filepath"
+
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/pelletier/go-toml/v2"
 )
@@ -91,6 +93,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		},
 		ContainerdConfig: ContainerdConfig{
 			DefaultRuntimeName: "runc",
+			RuntimeConfigDir:   filepath.Join(defaults.DefaultConfigDir, "runtimes"),
 			Runtimes: map[string]Runtime{
 				"runc": {
 					Type:      "io.containerd.runc.v2",
