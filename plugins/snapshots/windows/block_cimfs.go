@@ -367,13 +367,10 @@ func (s *blockCIMSnapshotter) createScratchLayer(ctx context.Context, snDir stri
 	if s.config.UnformattedScratch {
 		if sizeInBytes == 0 {
 			return copyScratchDisk(filepath.Join(s.root, templateVHDName), filepath.Join(snDir, "sandbox.vhdx"))
-		} else {
-			if sizeInBytes < minimumUnformattedScratchSizeInBytes {
-				return fmt.Errorf("scratch size MUST be at least %d GB, requested size: %d bytes", minimumUnformattedScratchSizeInBytes/(1024*1024*1024), sizeInBytes)
-			}
-			if err := createScratchVHD(ctx, filepath.Join(snDir, "sandbox.vhdx"), WithSize(sizeInBytes)); err != nil {
-				return fmt.Errorf("failed to create scratch VHD of requested size: %w", err)
-			}
+		} else if sizeInBytes < minimumUnformattedScratchSizeInBytes {
+			return fmt.Errorf("scratch size MUST be at least %d GB, requested size: %d bytes", minimumUnformattedScratchSizeInBytes/(1024*1024*1024), sizeInBytes)
+		} else if err := createScratchVHD(ctx, filepath.Join(snDir, "sandbox.vhdx"), WithSize(sizeInBytes)); err != nil {
+			return fmt.Errorf("failed to create scratch VHD of requested size: %w", err)
 		}
 	} else {
 		dest := filepath.Join(snDir, "sandbox.vhdx")

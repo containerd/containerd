@@ -43,10 +43,7 @@ type cgroupsMonitor struct {
 }
 
 func (m *cgroupsMonitor) Monitor(c runtime.Task, labels map[string]string) error {
-	if err := m.collector.Add(c, labels); err != nil {
-		return err
-	}
-	return nil
+	return m.collector.Add(c, labels)
 }
 
 func (m *cgroupsMonitor) Stop(c runtime.Task) error {
