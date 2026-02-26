@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/fs/fstest"
+	"github.com/moby/sys/user"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -371,6 +372,49 @@ func TestOpenUserFile_AbsoluteSymlink(t *testing.T) {
 	}
 	if string(content) != string(expectedContent) {
 		t.Errorf("expected content %q, got %q", string(expectedContent), string(content))
+	}
+}
+
+func TestGroupLookup_AbsoluteSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("absolute symlink handling is only supported on non-Windows platforms")
+	}
+
+	expectedContent := []byte("dummygroup:x:1001:paulo\n")
+
+	root := t.TempDir()
+	if err := fstest.Apply(
+		fstest.CreateDir("/etc", 0o755),
+		fstest.CreateDir("/nix/store/abcd", 0o755),
+		fstest.CreateFile("/nix/store/abcd/group", expectedContent, 0o644),
+		fstest.Symlink("/nix/store/abcd/group", "/etc/group"),
+	).Apply(root); err != nil {
+		t.Fatal(err)
+	}
+
+	rootFS := os.DirFS(root)
+	if _, ok := rootFS.(readLinker); !ok {
+		rootFS = readLinkFS{root: root, fs: rootFS}
+	}
+
+	gid, err := GIDFromFS(rootFS, func(g user.Group) bool {
+		return g.Name == "dummygroup"
+	})
+	if err != nil {
+		t.Fatalf("GIDFromFS failed on absolute symlink: %v", err)
+	}
+	if gid != 1001 {
+		t.Errorf("expected GID 1001, got %d", gid)
+	}
+
+	gids, err := getSupplementalGroupsFromFS(rootFS, func(g user.Group) bool {
+		return g.Name == "dummygroup"
+	})
+	if err != nil {
+		t.Fatalf("getSupplementalGroupsFromFS failed on absolute symlink: %v", err)
+	}
+	if len(gids) != 1 || gids[0] != 1001 {
+		t.Errorf("expected supplemental GIDs [1001], got %v", gids)
 	}
 }
 

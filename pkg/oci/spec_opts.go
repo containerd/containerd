@@ -973,7 +973,7 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 			defer ensureAdditionalGids(s)
 
 			var ugroups []user.Group
-			f, groupErr := root.Open("etc/group")
+			f, groupErr := openUserFile(root, "etc/group")
 			if groupErr == nil {
 				defer f.Close()
 				ugroups, groupErr = user.ParseGroup(f)
@@ -1201,7 +1201,7 @@ func GIDFromFS(root fs.FS, filter func(user.Group) bool) (gid uint32, err error)
 }
 
 func getSupplementalGroupsFromFS(root fs.FS, filter func(user.Group) bool) ([]uint32, error) {
-	f, err := root.Open("etc/group")
+	f, err := openUserFile(root, "etc/group")
 	if err != nil {
 		return []uint32{}, err
 	}
