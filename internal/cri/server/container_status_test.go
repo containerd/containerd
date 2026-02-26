@@ -280,7 +280,8 @@ func TestContainerStatus(t *testing.T) {
 }
 
 type fakeImageService struct {
-	imageStore *imagestore.Store
+	imageStore   *imagestore.Store
+	pinnedImages map[string]string
 }
 
 func (s *fakeImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string {
@@ -296,6 +297,8 @@ func (s *fakeImageService) GetImage(id string) (imagestore.Image, error) { retur
 func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error) {
 	return snapshotstore.Snapshot{}, errors.New("not implemented")
 }
+
+func (s *fakeImageService) PinnedImage(name string) string { return s.pinnedImages[name] }
 
 func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
 	return imagestore.Image{}, errors.New("not implemented")

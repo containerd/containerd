@@ -26,6 +26,7 @@ import (
 	"sort"
 
 	"github.com/containerd/containerd/api/services/introspection/v1"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -70,7 +71,17 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 	})
 
 	if r.Verbose {
-		configByt, err := json.Marshal(c.config)
+		type compatConfig struct {
+			criconfig.Config
+			// kubeadm hardcodes config.sandboxImage
+			SandboxImage string `json:"sandboxImage"`
+		}
+		sandboxImage := c.ImageService.PinnedImage("sandbox")
+		if sandboxImage == "" {
+			sandboxImage = criconfig.DefaultSandboxImage
+		}
+		config := compatConfig{Config: c.config, SandboxImage: sandboxImage}
+		configByt, err := json.Marshal(config)
 		if err != nil {
 			return nil, err
 		}
