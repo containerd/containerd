@@ -48,7 +48,7 @@ func TestHTTPResolver(t *testing.T) {
 		s := httptest.NewServer(h)
 
 		options := ResolverOptions{}
-		base := s.URL[7:] // strip "http://"
+		base := s.URL[len("http://"):]
 		return base, options, s.Close
 	}
 	runBasicTest(t, "testname", s)
@@ -68,7 +68,7 @@ func TestResolverOptionsRace(t *testing.T) {
 		options := ResolverOptions{
 			Headers: header,
 		}
-		base := s.URL[7:] // strip "http://"
+		base := s.URL[len("http://"):]
 		return base, options, s.Close
 	}
 
@@ -314,7 +314,7 @@ func TestWrongBasicAuthResolver(t *testing.T) {
 func TestHostFailureFallbackResolver(t *testing.T) {
 	sf := func(h http.Handler) (string, ResolverOptions, func()) {
 		s := httptest.NewServer(h)
-		base := s.URL[7:] // strip "http://"
+		base := s.URL[len("http://"):]
 
 		options := ResolverOptions{}
 		createHost := func(host string) RegistryHost {
@@ -596,7 +596,7 @@ func TestResolveProxyFallback(t *testing.T) {
 	s := httptest.NewServer(logHandler{t, nr})
 	defer s.Close()
 
-	base := s.URL[7:] // strip "http://"
+	base := s.URL[len("http://"):]
 
 	ro := ResolverOptions{
 		Hosts: func(host string) ([]RegistryHost, error) {
@@ -1132,5 +1132,53 @@ func (srv *refreshTokenServer) BasicTestFunc() func(h http.Handler) (string, Res
 			WithAuthorizer(authorizer),
 		)
 		return base, options, close
+	}
+}
+
+func TestResolverErrorStatusCodeOnFetch(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name       string
+		statusCode int
+	}{
+		{"BadRequest", http.StatusBadRequest},
+		{"NotFound", http.StatusNotFound},
+		{"InternalServerError", http.StatusInternalServerError},
+		{"BadGateway", http.StatusBadGateway},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/manifests/") {
+					// Return the error status code for the GET request
+					rw.WriteHeader(tc.statusCode)
+					return
+				}
+				rw.WriteHeader(http.StatusOK)
+			}))
+			defer s.Close()
+
+			base := s.URL[len("http://"):]
+			options := ResolverOptions{}
+			resolver := NewResolver(options)
+
+			image := fmt.Sprintf("%s/library/hello-world:latest", base)
+			_, _, err := resolver.Resolve(ctx, image)
+
+			if err == nil {
+				t.Fatalf("expected error for status code %d", tc.statusCode)
+			}
+
+			var rerr remoteerrors.ErrUnexpectedStatus
+			if !errors.As(err, &rerr) {
+				t.Fatalf("expected ErrUnexpectedStatus, got %T: %v", err, err)
+			}
+
+			if rerr.StatusCode != tc.statusCode {
+				t.Fatalf("expected status code %d, got %d", tc.statusCode, rerr.StatusCode)
+			}
+		})
 	}
 }
