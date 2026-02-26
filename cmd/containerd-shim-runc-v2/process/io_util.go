@@ -41,6 +41,18 @@ func NewBinaryCmd(binaryURI *url.URL, id, ns string) *exec.Cmd {
 		"CONTAINER_NAMESPACE="+ns,
 	)
 
+	if binaryURI.Fragment != "" {
+		envs, _ := url.ParseQuery(binaryURI.Fragment)
+		for k, vs := range envs {
+			if k == "CONTAINER_ID" || k == "CONTAINER_NAMESPACE" {
+				continue
+			}
+			if len(vs) > 0 {
+				cmd.Env = append(cmd.Env, k+"="+vs[0])
+			}
+		}
+	}
+
 	return cmd
 }
 
