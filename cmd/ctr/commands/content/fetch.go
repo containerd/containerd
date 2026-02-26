@@ -143,10 +143,16 @@ func NewFetchConfig(ctx context.Context, cliContext *cli.Context) (*FetchConfig,
 	}
 
 	if cliContext.Bool("metadata-only") {
+		if cliContext.Bool("skip-metadata") {
+			return nil, fmt.Errorf("skip-metadata can't be combined with metadata-only")
+		}
 		config.AllMetadata = true
 		// Any with an empty set is None
 		config.PlatformMatcher = platforms.Any()
 	} else if !cliContext.Bool("skip-metadata") {
+		if cliContext.IsSet("metadata-only") {
+			return nil, fmt.Errorf("skip-metadata can't be combined with metadata-only")
+		}
 		config.AllMetadata = true
 	}
 
