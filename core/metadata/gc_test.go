@@ -334,6 +334,16 @@ func TestGCRefs(t *testing.T) {
 			string(labelGCImageBackRef), "image2",
 			string(labelGCExpire), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
 
+		// Conditional References
+		addContent("ns3", dgst(20), labelmap(string(labelGCSnapConditional)+".overlay", "usedat<2h|sn6")),
+		addContent("ns3", dgst(21), labelmap(string(labelGCSnapConditional)+".overlay", "usedat<2h|sn7")),
+		addImage("ns1", "image5", dgst(30), labelmap(string(labelGCSnapConditional)+".overlay", "usedat<2h|sn10")),
+		addSnapshot("ns3", "overlay", "sn4", "", nil),
+		addSnapshot("ns3", "overlay", "sn5", "", nil),
+		addSnapshot("ns3", "overlay", "sn6", "sn4", labelmap(string(labelGCConditionalUsedValue), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
+		addSnapshot("ns3", "overlay", "sn7", "sn5", labelmap(string(labelGCConditionalUsedValue), time.Now().Add(-3*time.Hour).Format(time.RFC3339))),
+		addSnapshot("ns1", "overlay", "sn10", "", labelmap(string(labelGCConditionalUsedValue), time.Now().Add(-30*time.Minute).Format(time.RFC3339))),
+
 		addSnapshot("ns3", "overlay", "sn1", "", nil),
 		addSnapshot("ns3", "overlay", "sn2", "sn1", nil),
 		addSnapshot("ns3", "overlay", "sn3", "", labelmap(string(labelGCSnapRef)+"btrfs", "sn1", string(labelGCSnapRef)+"overlay", "sn1")),
@@ -413,10 +423,21 @@ func TestGCRefs(t *testing.T) {
 			gcnode(ResourceImage, "ns1", "image1"),
 			gcnode(ResourceImage, "ns1", "image4"),
 		},
+		gcnode(ResourceImage, "ns1", "image5"): {
+			gcnode(ResourceContent, "ns1", dgst(30).String()),
+			gcnode(ResourceSnapshot, "ns1", "overlay/sn10"),
+		},
 		gcnode(ResourceIngest, "ns1", "ingest-1"): nil,
 		gcnode(ResourceIngest, "ns2", "ingest-2"): {
 			gcnode(ResourceContent, "ns2", dgst(8).String()),
 		},
+		gcnode(ResourceContainer, "ns3", "container1"): {
+			gcnode(ResourceContent, "ns3", dgst(10).String()),
+		},
+		gcnode(ResourceContent, "ns3", dgst(20).String()): {
+			gcnode(ResourceSnapshot, "ns3", "overlay/sn6"),
+		},
+		gcnode(ResourceContent, "ns3", dgst(21).String()): {},
 		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn2"): {
 			gcnode(resourceSnapshotFlat, "ns3", "overlay/sn1"),
 		},
