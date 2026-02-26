@@ -105,9 +105,7 @@ command. As part of this process, we do the following:
 		defer cancel()
 
 		if !cliContext.Bool("local") {
-			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid",
-				"skip-verify", "tlscacert", "tlscert", "tlskey", // RegistryFlags
-			}
+			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid"}
 			for _, s := range unsupportedFlags {
 				if cliContext.IsSet(s) {
 					return fmt.Errorf("\"--%s\" requires \"--local\" flag", s)
@@ -157,9 +155,31 @@ command. As part of this process, we do the following:
 				sopts = append(sopts, image.WithImageLabels(commands.LabelArgs(labels)))
 			}
 
+			var tempHostsDir string
+			var cleanup func()
+			hasTLSFlags := cliContext.IsSet("skip-verify") || cliContext.IsSet("tlscacert") ||
+				cliContext.IsSet("tlscert") || cliContext.IsSet("tlskey")
+
+			var hostsDir string
+			if hasTLSFlags {
+				if cliContext.IsSet("hosts-dir") {
+					return fmt.Errorf("cannot use TLS flags (--skip-verify, --tlscacert, --tlscert, --tlskey) together with --hosts-dir; please configure TLS settings in hosts.toml instead")
+				}
+
+				var err error
+				tempHostsDir, cleanup, err = commands.CreateTmpHostConfig(cliContext, ref)
+				if err != nil {
+					return err
+				}
+				defer cleanup()
+				hostsDir = tempHostsDir
+			} else {
+				hostsDir = cliContext.String("hosts-dir")
+			}
+
 			opts := []registry.Opt{
 				registry.WithCredentials(ch),
-				registry.WithHostDir(cliContext.String("hosts-dir")),
+				registry.WithHostDir(hostsDir),
 			}
 			if cliContext.Bool("plain-http") {
 				opts = append(opts, registry.WithDefaultScheme("http"))
