@@ -10,9 +10,12 @@ To enable image verification, add a stanza like the following to the containerd 
     bin_dir = "/opt/containerd/image-verifier/bin"
     max_verifiers = 10
     per_verifier_timeout = "10s"
+    pod_metadata = false
 ```
 
 All files in `bin_dir`, if it exists, must be verifier executables which conform to the following API.
+
+Images must be pulled with the transfer service in order to use this plugin.
 
 ## Image Verifier Binary API
 
@@ -26,11 +29,14 @@ All files in `bin_dir`, if it exists, must be verifier executables which conform
 
 A JSON encoded payload is passed to the verifier binary's standard input. The
 media type of this payload is specified by the `-stdin-media-type` CLI
-argument, and may change in future versions of containerd. Currently, the
-payload has a media type of `application/vnd.oci.descriptor.v1+json` and
-represents the OCI Content Descriptor of the image that may be pulled. See
-[the OCI specification](https://github.com/opencontainers/image-spec/blob/main/descriptor.md)
-for more details.
+argument, and may change in future versions of containerd.
+
+Currently, there are two media types supported:
+- If `pod_metadata` is disabled (default behavior), the media type will be `application/vnd.oci.descriptor.v1+json`
+  - This represents the OCI Content Descriptor of the image that may be pulled. See [the OCI specification](https://github.com/opencontainers/image-spec/blob/main/descriptor.md) for more details.
+- If `pod_metadata` is enabled, the media type will be `application/vnd.containerd.image-verifier.input.v1+json`.
+  - This media type includes the OCI Content Descriptor of the image, as well as pod metadata from the CRI layer when available (ex. when pulling images for a Kubernetes pod)
+  - This media type is defined in [the image verifier plugin code](../pkg/imageverifier/image_verifier.go)
 
 ### Image Pull Judgement
 
