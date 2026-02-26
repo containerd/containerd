@@ -18,12 +18,16 @@ package server
 
 import (
 	"context"
+	"iter"
+	"os"
+	"slices"
 	"testing"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -141,9 +145,29 @@ func TestMigration(t *testing.T) {
 			"notmigrated": "don't migrate me",
 		},
 	}
+	td := t.TempDir()
+	b, err := toml.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configPath := td + "/config.toml"
+	if err := os.WriteFile(configPath, b, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	g := registry.Graph(func(*plugin.Registration) bool { return false })
+	plugins := func() iter.Seq[plugin.Registration] {
+		return slices.Values(g)
+	}
+	config = &srvconfig.Config{
+		Version: version.ConfigVersion,
+	}
+	if err := srvconfig.LoadConfigWithPlugins(t.Context(), configPath, plugins, config); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
-	_, err := New(ctx, config)
+	_, err = New(ctx, config)
 	if err != nil {
 		t.Fatal(err)
 	}
