@@ -28,10 +28,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"dario.cat/mergo"
 	"github.com/pelletier/go-toml/v2"
@@ -44,9 +46,10 @@ import (
 
 // migrations hold the migration functions for every prior containerd config version
 var migrations = []func(context.Context, *Config) error{
-	nil,       // Version 0 is not defined, treated at version 1
-	v1Migrate, // Version 1 plugins renamed to URI for version 2
-	nil,       // Version 2 has only plugin changes to version 3
+	nil,            // Version 0 is not defined, treated at version 1
+	v1Migrate,      // Version 1 plugins renamed to URI for version 2
+	nil,            // Version 2 has only plugin changes to version 3
+	serviceMigrate, // Version 3 has server properties moved to plugins for version 4
 }
 
 // NOTE: Any new map fields added also need to be handled in mergeConfig.
@@ -61,14 +64,8 @@ type Config struct {
 	State string `toml:"state"`
 	// TempDir is the path to a directory where to place containerd temporary files
 	TempDir string `toml:"temp"`
-	// GRPC configuration settings
-	GRPC GRPCConfig `toml:"grpc"`
-	// TTRPC configuration settings
-	TTRPC TTRPCConfig `toml:"ttrpc"`
-	// Debug and profiling settings
+	// Debug log settings
 	Debug Debug `toml:"debug"`
-	// Metrics and monitoring settings
-	Metrics MetricsConfig `toml:"metrics"`
 	// DisabledPlugins are IDs of plugins to disable. Disabled plugins won't be
 	// initialized and started.
 	// DisabledPlugins must use a fully qualified plugin URI.
@@ -78,7 +75,7 @@ type Config struct {
 	// RequiredPlugins must use a fully qualified plugin URI.
 	RequiredPlugins []string `toml:"required_plugins"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
-	Plugins map[string]interface{} `toml:"plugins"`
+	Plugins map[string]any `toml:"plugins"`
 	// OOMScore adjust the containerd's oom score
 	OOMScore int `toml:"oom_score"`
 	// Cgroup specifies cgroup information for the containerd daemon process
@@ -91,6 +88,18 @@ type Config struct {
 	Imports []string `toml:"imports"`
 	// StreamProcessors configuration
 	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
+
+	// Deprecated fields must remain but should not be output when generating default or migrated configs
+
+	// GRPC configuration settings
+	// deprecated: use server plugins io.containerd.server.v1.grpc and io.containerd.server.v1.grpc-tcp
+	GRPC GRPCConfig `toml:"grpc,omitempty"`
+	// TTRPC configuration settings
+	// deprecated: use server plugin io.containerd.server.v1.ttrpc
+	TTRPC TTRPCConfig `toml:"ttrpc,omitempty"`
+	// Metrics and monitoring settings
+	// deprecated: use server plugin io.containerd.server.v1.metrics
+	Metrics MetricsConfig `toml:"metrics,omitempty"`
 }
 
 // StreamProcessor provides configuration for diff content processors
@@ -202,41 +211,135 @@ func v1Migrate(ctx context.Context, c *Config) error {
 	return nil
 }
 
+func serviceMigrate(ctx context.Context, c *Config) error {
+	if c.Plugins == nil {
+		c.Plugins = make(map[string]any)
+	}
+	if c.Debug.Address != "" && c.Plugins["io.containerd.server.v1.debug"] == nil {
+		c.Plugins["io.containerd.server.v1.debug"] = map[string]any{
+			"address": c.Debug.Address,
+			"uid":     c.Debug.UID,
+			"gid":     c.Debug.GID,
+		}
+		c.Debug.Address = ""
+		c.Debug.UID = 0
+		c.Debug.GID = 0
+	}
+	grpcAddress := c.GRPC.Address
+	if c.GRPC.Address != "" && c.Plugins["io.containerd.server.v1.grpc"] == nil {
+		c.Plugins["io.containerd.server.v1.grpc"] = map[string]any{
+			"address":               c.GRPC.Address,
+			"uid":                   c.GRPC.UID,
+			"gid":                   c.GRPC.GID,
+			"max_recv_message_size": c.GRPC.MaxRecvMsgSize,
+			"max_send_message_size": c.GRPC.MaxSendMsgSize,
+		}
+		c.GRPC.Address = ""
+		c.GRPC.UID = 0
+		c.GRPC.GID = 0
+		c.GRPC.MaxRecvMsgSize = 0
+		c.GRPC.MaxSendMsgSize = 0
+	}
+	if c.GRPC.TCPAddress != "" && c.Plugins["io.containerd.server.v1.grpc-tcp"] == nil {
+		c.Plugins["io.containerd.server.v1.grpc-tcp"] = map[string]any{
+			"address":               c.GRPC.TCPAddress,
+			"tls_ca":                c.GRPC.TCPTLSCA,
+			"tls_cert":              c.GRPC.TCPTLSCert,
+			"tls_key":               c.GRPC.TCPTLSKey,
+			"tls_common_name":       c.GRPC.TCPTLSCName,
+			"max_recv_message_size": c.GRPC.MaxRecvMsgSize,
+			"max_send_message_size": c.GRPC.MaxSendMsgSize,
+		}
+		c.GRPC.TCPAddress = ""
+		c.GRPC.TCPTLSCA = ""
+		c.GRPC.TCPTLSCert = ""
+		c.GRPC.TCPTLSKey = ""
+		c.GRPC.TCPTLSCName = ""
+		c.GRPC.MaxRecvMsgSize = 0
+		c.GRPC.MaxSendMsgSize = 0
+	}
+	if c.Plugins["io.containerd.server.v1.ttrpc"] == nil {
+		ttrpcAddress := c.TTRPC.Address
+		if ttrpcAddress == "" && grpcAddress != "" {
+			ttrpcAddress = grpcAddress + ".ttrpc"
+		}
+		if ttrpcAddress != "" || c.TTRPC.UID != 0 || c.TTRPC.GID != 0 {
+			c.Plugins["io.containerd.server.v1.ttrpc"] = map[string]any{
+				"address": ttrpcAddress,
+				"uid":     c.TTRPC.UID,
+				"gid":     c.TTRPC.GID,
+			}
+			c.TTRPC.Address = ""
+			c.TTRPC.UID = 0
+			c.TTRPC.GID = 0
+		}
+	}
+	if c.Metrics.GRPCHistogram && c.Plugins["io.containerd.metrics.v1.grpc-prometheus"] == nil {
+		c.Plugins["io.containerd.metrics.v1.grpc-prometheus"] = map[string]any{
+			"grpc_histogram": c.Metrics.GRPCHistogram,
+		}
+		c.Metrics.GRPCHistogram = false
+	}
+	if c.Metrics.Address != "" && c.Plugins["io.containerd.server.v1.metrics"] == nil {
+		c.Plugins["io.containerd.server.v1.metrics"] = map[string]any{
+			"address": c.Metrics.Address,
+		}
+		c.Metrics.Address = ""
+	}
+	return nil
+}
+
 // GRPCConfig provides GRPC configuration for the socket
 type GRPCConfig struct {
-	Address        string `toml:"address"`
-	TCPAddress     string `toml:"tcp_address"`
-	TCPTLSCA       string `toml:"tcp_tls_ca"`
-	TCPTLSCert     string `toml:"tcp_tls_cert"`
-	TCPTLSKey      string `toml:"tcp_tls_key"`
-	UID            int    `toml:"uid"`
-	GID            int    `toml:"gid"`
-	MaxRecvMsgSize int    `toml:"max_recv_message_size"`
-	MaxSendMsgSize int    `toml:"max_send_message_size"`
-	TCPTLSCName    string `toml:"tcp_tls_common_name"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	Address string `toml:"address,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPAddress string `toml:"tcp_address,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPTLSCA string `toml:"tcp_tls_ca,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPTLSCert string `toml:"tcp_tls_cert,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPTLSKey string `toml:"tcp_tls_key,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	UID int `toml:"uid,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	GID int `toml:"gid,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	MaxRecvMsgSize int `toml:"max_recv_message_size,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc
+	MaxSendMsgSize int `toml:"max_send_message_size,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.grpc-tcp
+	TCPTLSCName string `toml:"tcp_tls_common_name,omitempty"`
 }
 
 // TTRPCConfig provides TTRPC configuration for the socket
 type TTRPCConfig struct {
-	Address string `toml:"address"`
-	UID     int    `toml:"uid"`
-	GID     int    `toml:"gid"`
+	Address string `toml:"address,omitempty"`
+	UID     int    `toml:"uid,omitempty"`
+	GID     int    `toml:"gid,omitempty"`
 }
 
 // Debug provides debug configuration
 type Debug struct {
-	Address string `toml:"address"`
-	UID     int    `toml:"uid"`
-	GID     int    `toml:"gid"`
-	Level   string `toml:"level"`
+	Level string `toml:"level"`
 	// Format represents the logging format. Supported values are 'text' and 'json'.
 	Format string `toml:"format"`
+
+	// deprecated: use server plugin io.containerd.server.v1.debug
+	Address string `toml:"address,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.debug
+	UID int `toml:"uid,omitempty"`
+	// deprecated: use server plugin io.containerd.server.v1.debug
+	GID int `toml:"gid,omitempty"`
 }
 
 // MetricsConfig provides metrics configuration
 type MetricsConfig struct {
-	Address       string `toml:"address"`
-	GRPCHistogram bool   `toml:"grpc_histogram"`
+	// deprecated: use server plugin io.containerd.server.v1.metrics
+	Address string `toml:"address"`
+	// deprecated: use metrics plugin io.containerd.metrics.v1.grpc-prometheus
+	GRPCHistogram bool `toml:"grpc_histogram,omitempty"`
 }
 
 // CgroupConfig provides cgroup configuration
@@ -287,6 +390,15 @@ func (c *Config) Decode(ctx context.Context, id string, config interface{}) (int
 
 // LoadConfig loads the containerd server config from the provided path
 func LoadConfig(ctx context.Context, path string, out *Config) error {
+	return LoadConfigWithPlugins(ctx, path, nil, out)
+}
+
+// PluginFunc returns an iterator to the plugin registrations
+type PluginFunc func() iter.Seq[plugin.Registration]
+
+// LoadConfigWithPlugins loads the containerd server config from the provided path
+// and using the migration functions from the provided plugins.
+func LoadConfigWithPlugins(ctx context.Context, path string, plugins PluginFunc, out *Config) error {
 	if out == nil {
 		return fmt.Errorf("argument out must not be nil: %w", errdefs.ErrInvalidArgument)
 	}
@@ -318,13 +430,29 @@ func LoadConfig(ctx context.Context, path string, out *Config) error {
 			return fmt.Errorf("drop-in config version %d higher than root config version %d", config.Version, rootConfigVersion)
 		}
 
-		switch config.Version {
-		case 0, 1:
-			if err := config.MigrateConfigTo(ctx, out.Version); err != nil {
-				return err
+		if config.Version < out.Version {
+			var (
+				currentVersion = config.Version
+				t1             = time.Now()
+			)
+			for v := currentVersion; v < out.Version; v++ {
+				if err := config.MigrateConfigTo(ctx, v+1); err != nil {
+					return err
+				}
+				if plugins != nil {
+					// Run migration for each configuration version
+					// Run each plugin migration for each version to ensure that migration logic is simple and
+					// focused on upgrading from one version at a time.
+					for p := range plugins() {
+						if p.ConfigMigration != nil {
+							if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
+								return err
+							}
+						}
+					}
+				}
 			}
-		default:
-			// NOP
+			log.G(ctx).WithField("t", time.Since(t1)).Warnf("Configuration migrated from version %d, use `containerd config migrate` to avoid migration", currentVersion)
 		}
 
 		if err := mergeConfig(out, config); err != nil {

@@ -38,4 +38,4 @@ var (
 // This version is used by the main configuration as well as all plugins.
 // Any configuration less than this version which has structural changes
 // should migrate the configuration structures used by this version.
-const ConfigVersion = 3
+const ConfigVersion = 4
