@@ -202,9 +202,11 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		}
 		e.io = pio
 	}
+
 	opts := &runc.ExecOpts{
 		PidFile: pidFile.Path(),
 		Detach:  true,
+		LogPath: filepath.Join(filepath.Dir(e.parent.runtime.Log), fmt.Sprintf("%s-exec.log", e.id)),
 	}
 	if pio != nil {
 		opts.IO = pio.IO()
@@ -212,6 +214,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	if socket != nil {
 		opts.ConsoleSocket = socket
 	}
+	defer os.RemoveAll(opts.LogPath)
 	if err := e.parent.runtime.Exec(ctx, e.parent.id, e.spec, opts); err != nil {
 		close(e.waitBlock)
 		return e.parent.runtimeError(err, "OCI runtime exec failed")
