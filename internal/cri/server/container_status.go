@@ -34,6 +34,9 @@ import (
 func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerStatusRequest) (*runtime.ContainerStatusResponse, error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
 	}
 

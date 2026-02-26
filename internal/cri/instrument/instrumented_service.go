@@ -230,7 +230,11 @@ func (in *instrumentedService) ContainerStatus(ctx context.Context, r *runtime.C
 	log.G(ctx).Tracef("ContainerStatus for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("ContainerStatus for %q failed", r.GetContainerId())
+			if errdefs.IsNotFound(err) {
+				log.G(ctx).WithError(err).Warnf("ContainerStatus for %q failed", r.GetContainerId())
+			} else {
+				log.G(ctx).WithError(err).Errorf("ContainerStatus for %q failed", r.GetContainerId())
+			}
 		} else {
 			log.G(ctx).Tracef("ContainerStatus for %q returns status %+v", r.GetContainerId(), res.GetStatus())
 		}
