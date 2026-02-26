@@ -1,6 +1,6 @@
 module github.com/containerd/containerd/v2
 
-go 1.24.6
+go 1.25.0
 
 require (
 	dario.cat/mergo v1.0.2
@@ -83,9 +83,9 @@ require (
 	google.golang.org/grpc v1.79.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/inf.v0 v0.9.1
-	k8s.io/apimachinery v0.34.3
-	k8s.io/client-go v0.34.3
-	k8s.io/cri-api v0.34.3
+	k8s.io/apimachinery v0.35.1
+	k8s.io/client-go v0.35.1
+	k8s.io/cri-api v0.35.1
 	k8s.io/klog/v2 v2.130.1
 	tags.cncf.io/container-device-interface v1.1.0
 )
@@ -142,7 +142,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.39.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
 	golang.org/x/net v0.48.0 // indirect
@@ -151,9 +151,10 @@ require (
 	golang.org/x/text v0.32.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.34.3 // indirect
-	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 // indirect
-	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
+	k8s.io/api v0.35.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
+	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
+	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
