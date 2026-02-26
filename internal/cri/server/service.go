@@ -57,6 +57,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/moby/locker"
 )
 
 var kernelSupportsRRO bool
@@ -168,6 +169,7 @@ type criService struct {
 	runtimeFeatures *runtime.RuntimeFeatures
 	// statsCollector collects CPU stats in background for UsageNanoCores calculation
 	statsCollector *StatsCollector
+	locker         *locker.Locker
 }
 
 type CRIServiceOptions struct {
@@ -213,6 +215,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
 		statsCollector:     statsCollector,
+		locker:             locker.New(),
 	}
 
 	// TODO: Make discard time configurable

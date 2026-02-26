@@ -35,6 +35,24 @@ import (
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
 
+// safeUpdate prevent concurrent updates for the same container.
+func (c *criService) safeUpdate(ctx context.Context, container containerstore.Container, r *runtime.UpdateContainerResourcesRequest) error {
+	c.locker.Lock(r.GetContainerId())
+	defer c.locker.Unlock(r.GetContainerId())
+	newStatus, err := c.updateContainerResources(ctx, container, r, container.Status.Get())
+	if err != nil {
+		return fmt.Errorf("failed to update resources: %w", err)
+	}
+	update := func(status containerstore.Status) (containerstore.Status, error) {
+		return newStatus, nil
+	}
+	// Just update the container status' resources and ignore other fields.
+	if err := container.Status.UpdateResource(update); err != nil {
+		return err
+	}
+	return nil
+}
+
 // UpdateContainerResources updates ContainerConfig of the container.
 func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.UpdateContainerResourcesRequest) (retRes *runtime.UpdateContainerResourcesResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
@@ -61,10 +79,9 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 	// Update resources in status update transaction, so that:
 	// 1) There won't be race condition with container start.
 	// 2) There won't be concurrent resource update to the same container.
-	if err := container.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
-		return c.updateContainerResources(ctx, container, r, status)
-	}); err != nil {
-		return nil, fmt.Errorf("failed to update resources: %w", err)
+	err = c.safeUpdate(ctx, container, r)
+	if err != nil {
+		return nil, err
 	}
 
 	err = c.nri.PostUpdateContainerResources(ctx, &sandbox, &container)

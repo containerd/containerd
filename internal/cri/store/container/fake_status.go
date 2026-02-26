@@ -57,6 +57,18 @@ func (f *fakeStatusStorage) Update(u UpdateFunc) error {
 	return nil
 }
 
+// Update the container resources.
+func (f *fakeStatusStorage) UpdateResource(u UpdateFunc) error {
+	f.Lock()
+	defer f.Unlock()
+	newStatus, err := u(f.status)
+	if err != nil {
+		return err
+	}
+	f.status.Resources = newStatus.Resources
+	return nil
+}
+
 func (f *fakeStatusStorage) Delete() error {
 	return nil
 }
