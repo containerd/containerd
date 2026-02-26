@@ -93,6 +93,23 @@ func TestPusherErrClosedRetry(t *testing.T) {
 		t.Errorf("upload should succeed but got %v", err)
 	}
 }
+func TestPusherCustomNamespace(t *testing.T) {
+	ctx := context.Background()
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.uploadable = true
+	reg.putHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path == "/upload" {
+			reg.lastPutQueryParams = r.URL.Query()
+		}
+		return false
+	}
+
+	assert.Nil(t, tryUpload(ctx, t, p, []byte("test")))
+	assert.Equal(t, samplePusherHostname, reg.lastPutQueryParams.Get("ns"))
+	assert.NotEmpty(t, reg.lastPutQueryParams.Get("digest"))
+}
 
 func TestPusherAcceptsMissingDigestHeader(t *testing.T) {
 	ctx := context.Background()
@@ -432,6 +449,7 @@ type uploadableMockRegistry struct {
 	locationPrefix     string
 	username           string
 	secret             string
+	lastPutQueryParams url.Values // Track query params from last PUT request
 }
 
 func (u *uploadableMockRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
