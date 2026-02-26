@@ -79,6 +79,16 @@ type KubernetesContainerCheckpointMetadata struct {
 	Checkpoints   []KubernetesCheckpoint `json:"checkpoints"`
 }
 
+// CheckpointedPodOptions contains metadata about a checkpointed pod
+type CheckpointedPodOptions struct {
+	// Version is the version of the pod checkpoint format
+	Version int `json:"version"`
+	// Containers is a map with the short container name as key and the full name as value
+	Containers map[string]string `json:"containers"`
+	// Annotations stores checkpoint-related annotations (keys defined in annotations.go)
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
 func ReadContainerCheckpointSpecDump(checkpointDirectory string) (*spec.Spec, string, error) {
 	var specDump spec.Spec
 	specDumpFile, err := ReadJSONFile(&specDump, checkpointDirectory, SpecDumpFile)
@@ -105,6 +115,13 @@ func ReadContainerCheckpointStatusFile(checkpointDirectory string) (*ContainerdS
 	statusFile, err := ReadJSONFile(&containerdStatus, checkpointDirectory, StatusFile)
 
 	return &containerdStatus, statusFile, err
+}
+
+func ReadContainerCheckpointPodOptions(checkpointDirectory string) (*CheckpointedPodOptions, string, error) {
+	var podOptions CheckpointedPodOptions
+	podOptionsFile, err := ReadJSONFile(&podOptions, checkpointDirectory, PodOptionsFile)
+
+	return &podOptions, podOptionsFile, err
 }
 
 // WriteJSONFile marshalls and writes the given data to a JSON file
