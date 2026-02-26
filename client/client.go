@@ -567,7 +567,14 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 		limiter = semaphore.NewWeighted(int64(pushCtx.MaxConcurrentUploadedLayers))
 	}
 
-	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), limiter, pushCtx.PlatformMatcher, wrapper)
+	// Add this handler to update layer's label when push to a new registry,
+	// After that the new registry been source too, so same layer can be mount in next push procedure
+	appendDistSrcLabelHandler, err := docker.AppendDistributionSourceLabel(c.ContentStore(), ref)
+	if err != nil {
+		return err
+	}
+
+	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), limiter, pushCtx.PlatformMatcher, wrapper, appendDistSrcLabelHandler)
 }
 
 // GetImage returns an existing image
