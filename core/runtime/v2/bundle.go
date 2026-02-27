@@ -99,8 +99,8 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		}
 	}
 	paths = append(paths, work)
-	// symlink workdir
-	if err := os.Symlink(work, filepath.Join(b.Path, "work")); err != nil {
+	// create work link (symlink on unix, path file on windows)
+	if err := createWorkLink(work, b.Path); err != nil {
 		return nil, err
 	}
 	if spec := spec.GetValue(); spec != nil {
@@ -126,7 +126,7 @@ type Bundle struct {
 
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
-	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
+	work, werr := resolveWorkLink(b.Path)
 	rootfs := filepath.Join(b.Path, "rootfs")
 	if err := mount.UnmountRecursive(rootfs, 0); err != nil {
 		return fmt.Errorf("unmount rootfs %s: %w", rootfs, err)
