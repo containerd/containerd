@@ -404,6 +404,50 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 	}
 }
 
+func TestGetUnprivilegedMountFlags(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	td := t.TempDir()
+	target := filepath.Join(td, "mnt")
+	require.NoError(t, os.Mkdir(target, 0755))
+
+	// Mount a tmpfs with noexec,noatime,nodiratime -- these are the flags
+	// that were previously missed due to iterating over slice indices
+	// instead of values.
+	require.NoError(t, unix.Mount("tmpfs", target, "tmpfs", unix.MS_NOEXEC|unix.MS_NOATIME|unix.MS_NODIRATIME, ""))
+	defer unix.Unmount(target, unix.MNT_DETACH)
+
+	flags, err := getUnprivilegedMountFlags(target)
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		flag int
+		name string
+	}{
+		{unix.MS_NOEXEC, "MS_NOEXEC"},
+		{unix.MS_NOATIME, "MS_NOATIME"},
+		{unix.MS_NODIRATIME, "MS_NODIRATIME"},
+	} {
+		if flags&tc.flag != tc.flag {
+			t.Errorf("expected %s (0x%x) to be set in flags 0x%x", tc.name, tc.flag, flags)
+		}
+	}
+
+	// MS_NOSUID and MS_NODEV should NOT be set since we didn't mount with them.
+	for _, tc := range []struct {
+		flag int
+		name string
+	}{
+		{unix.MS_NOSUID, "MS_NOSUID"},
+		{unix.MS_NODEV, "MS_NODEV"},
+		{unix.MS_RDONLY, "MS_RDONLY"},
+	} {
+		if flags&tc.flag != 0 {
+			t.Errorf("expected %s (0x%x) to NOT be set in flags 0x%x", tc.name, tc.flag, flags)
+		}
+	}
+}
+
 func setupMounts(t *testing.T) (target string, mounts []Mount) {
 	dir1 := t.TempDir()
 	dir2 := t.TempDir()
