@@ -33,13 +33,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/errdefs"
-
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
 	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/internal/randutil"
 	"github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/containerd/errdefs"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -94,7 +93,7 @@ func (mls *memoryLabelStore) Update(d digest.Digest, update map[string]string) (
 
 func TestContent(t *testing.T) {
 	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
-		cs, err := NewLabeledStore(root, newMemoryLabelStore())
+		cs, err := NewLabeledStore(root, newMemoryLabelStore(), nil)
 		assert.NoError(t, err)
 		return ctx, cs, func() error {
 			return nil
@@ -105,11 +104,11 @@ func TestContent(t *testing.T) {
 func TestContentRootDir(t *testing.T) {
 	// test dir exist
 	dirExist := t.TempDir()
-	_, err := NewLabeledStore(dirExist, newMemoryLabelStore())
+	_, err := NewLabeledStore(dirExist, newMemoryLabelStore(), nil)
 	assert.NoError(t, err)
 	// test dir doesn't exist
 	dir := filepath.Join(t.TempDir(), "test_dir001")
-	_, err = NewLabeledStore(dir, newMemoryLabelStore())
+	_, err = NewLabeledStore(dir, newMemoryLabelStore(), nil)
 	assert.NoError(t, err)
 	_, err = os.Stat(dir)
 	assert.NoError(t, err)
@@ -386,7 +385,7 @@ func checkWrite(ctx context.Context, t checker, cs content.Store, dgst digest.Di
 }
 
 func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
-	cs, err := NewStore(t.TempDir())
+	cs, err := NewStore(t.TempDir(), nil)
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())

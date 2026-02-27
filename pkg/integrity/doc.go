@@ -1,5 +1,3 @@
-//go:build !linux
-
 /*
    Copyright The containerd Authors.
 
@@ -16,22 +14,6 @@
    limitations under the License.
 */
 
-package fsverity
-
-import "fmt"
-
-func IsSupported(rootPath string) (bool, error) {
-	return false, fmt.Errorf("fsverity is only supported on Linux systems")
-}
-
-func IsEnabled(path string) (bool, error) {
-	return false, fmt.Errorf("fsverity is only supported on Linux systems")
-}
-
-func Enable(_ string) error {
-	return fmt.Errorf("fsverity is only supported on Linux systems")
-}
-
-func Measure(_ string) (string, error) {
-	return "", fmt.Errorf("fsverity is only supported on Linux systems")
-}
+// Package integrity provides an interface for validating the integrity
+// of content stored in the containerd content store.
+package integrity

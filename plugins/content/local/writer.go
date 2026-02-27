@@ -26,12 +26,10 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
-
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/internal/fsverity"
 )
 
 // writer represents a write transaction against the blob store.
@@ -145,8 +143,9 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	// Enable content blob integrity verification if supported
 
 	if w.s.integritySupported {
-		if err := fsverity.Enable(target); err != nil {
-			log.G(ctx).Warnf("failed to enable integrity for blob %v: %s", target, err.Error())
+		_, err = w.s.iv.Register(target)
+		if err != nil {
+			return fmt.Errorf("failed to enable integrity verification on blob: %v: %w", target, err)
 		}
 	}
 
