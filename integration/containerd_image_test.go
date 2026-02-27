@@ -263,3 +263,78 @@ func TestContainerdSandboxImagePulledOutsideCRI(t *testing.T) {
 	t.Log("ensure correct labels are set on pause image")
 	assert.Equal(t, "pinned", pauseImg.Labels()["io.cri-containerd.pinned"])
 }
+
+func TestImageTagWithoutRegistryNotVisibleInCRI(t *testing.T) {
+	var testImage = images.Get(images.BusyBox)
+	nameNoRegistry := "busybox:no-registry-test"
+	fullNameNoRegistry := "docker.io/library/" + nameNoRegistry
+	ctx := context.Background()
+
+	t.Logf("make sure the test image doesn't exist in the cri plugin")
+	if err := containerdClient.ImageService().Delete(ctx, testImage); err != nil {
+		assert.True(t, errdefs.IsNotFound(err), err)
+	}
+	require.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
+
+	t.Logf("pull the image into containerd")
+	_, err := containerdClient.Pull(ctx, testImage, containerd.WithPullUnpack)
+	assert.NoError(t, err)
+	defer func() {
+		if err := containerdClient.ImageService().Delete(ctx, testImage); err != nil {
+			assert.True(t, errdefs.IsNotFound(err), err)
+		}
+		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
+	}()
+
+	t.Logf("cri plugin should see the image")
+	checkImage := func() (bool, error) {
+		img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
+		if err != nil {
+			return false, err
+		}
+		return img != nil, nil
+	}
+	require.NoError(t, Eventually(checkImage, 100*time.Millisecond, 10*time.Second))
+
+	t.Logf("tag the image excluding registry")
+	img, err := containerdClient.ImageService().Get(ctx, testImage)
+	require.NoError(t, err)
+	img.Name = nameNoRegistry
+	_, err = containerdClient.ImageService().Create(ctx, img)
+	require.NoError(t, err)
+	defer func() {
+		if err := containerdClient.ImageService().Delete(ctx, nameNoRegistry); err != nil {
+			assert.True(t, errdefs.IsNotFound(err), err)
+		}
+		if err := containerdClient.ImageService().Delete(ctx, fullNameNoRegistry); err != nil {
+			assert.True(t, errdefs.IsNotFound(err), err)
+		}
+		// TODO: I think this shouldn't even be in the image service because it's lacking a registry.
+		if err := imageService.RemoveImage(&runtime.ImageSpec{Image: nameNoRegistry}); err != nil {
+			assert.True(t, errdefs.IsNotFound(err), err)
+		}
+		if err = imageService.RemoveImage(&runtime.ImageSpec{Image: fullNameNoRegistry}); err != nil {
+			assert.True(t, errdefs.IsNotFound(err), err)
+		}
+	}()
+
+	t.Logf("cri plugin should not see the image")
+	checkImage = func() (bool, error) {
+		// Check the list because we cannot get the status for these image names
+		// (with or without the registry prefix).
+		imgs, err := imageService.ListImages(nil)
+		if err != nil {
+			return false, err
+		}
+		for _, i := range imgs {
+			for _, tag := range i.RepoTags {
+				// Although we tagged without the registry, the CRI server adds it.
+				if tag == fullNameNoRegistry {
+					return false, nil
+				}
+			}
+		}
+		return true, nil
+	}
+	require.NoError(t, Consistently(checkImage, 100*time.Millisecond, time.Second))
+}
