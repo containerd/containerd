@@ -14,10 +14,11 @@
    limitations under the License.
 */
 
-package walking
+package overlay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -33,12 +34,14 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/archive/compression"
+	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/labels"
 )
 
-// getOverlayUpperDir extracts the upperdir from overlay mount options.
-// Returns empty string if not an overlay mount or upperdir not found.
-func getOverlayUpperDir(mounts []mount.Mount) string {
+// getUpperDir extracts the upperdir path from overlay mount options.
+// Returns an empty string if the last mount is not an overlay mount or
+// if no upperdir option is present (e.g. read-only overlay mounts).
+func getUpperDir(mounts []mount.Mount) string {
 	if len(mounts) == 0 {
 		return ""
 	}
@@ -54,10 +57,11 @@ func getOverlayUpperDir(mounts []mount.Mount) string {
 	return ""
 }
 
-// writeDiffOverlay writes diff using DiffDirChanges for overlay filesystems.
-// This is faster than the naive approach because it only walks the overlay
-// upper directory instead of walking both lower and upper directories.
-func writeDiffOverlay(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir string, opts []archive.ChangeWriterOpt) error {
+// writeDiff writes the layer diff from an overlay upper directory to w.
+// It uses fs.DiffDirChanges with DiffSourceOverlayFS to walk only the upperdir
+// instead of traversing both the lower and upper directory trees. This avoids
+// reading the (potentially large) lower layers entirely.
+func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir string, opts []archive.ChangeWriterOpt) error {
 	return mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
 		cw := archive.NewChangeWriter(w, upperDir, opts...)
 		err := fs.DiffDirChanges(ctx, lowerRoot, upperDir, fs.DiffSourceOverlayFS, cw.HandleChange)
@@ -68,10 +72,48 @@ func writeDiffOverlay(ctx context.Context, w io.Writer, lower []mount.Mount, upp
 	})
 }
 
-// compareOverlay uses the overlay fast path for diff computation.
-// Instead of walking both lower and upper directories, it only walks
-// the overlay upper directory and uses DiffDirChanges to detect changes.
-func (s *walkingDiff) compareOverlay(ctx context.Context, lower []mount.Mount, upperDir string, compressionType compression.Compression, config *diff.Config) (ocispec.Descriptor, error) {
+// Compare creates a diff between the given mounts and uploads the result
+// to the content store. The upper mounts must be overlay-backed; otherwise
+// errdefs.ErrNotImplemented is returned so the caller can fall back to a
+// generic differ such as the walking differ.
+func (s *overlayDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
+	upperDir := getUpperDir(upper)
+	if upperDir == "" {
+		return emptyDesc, fmt.Errorf("upper mounts are not overlay-backed: %w", errdefs.ErrNotImplemented)
+	}
+
+	var config diff.Config
+	for _, opt := range opts {
+		if err := opt(&config); err != nil {
+			return emptyDesc, err
+		}
+	}
+	if tm := epoch.FromContext(ctx); tm != nil && config.SourceDateEpoch == nil {
+		config.SourceDateEpoch = tm
+	}
+
+	var compressionType compression.Compression
+	if config.Compressor != nil {
+		if config.MediaType == "" {
+			return emptyDesc, errors.New("media type must be explicitly specified when using custom compressor")
+		}
+		compressionType = compression.Unknown
+	} else {
+		if config.MediaType == "" {
+			config.MediaType = ocispec.MediaTypeImageLayerGzip
+		}
+		switch config.MediaType {
+		case ocispec.MediaTypeImageLayer:
+			compressionType = compression.Uncompressed
+		case ocispec.MediaTypeImageLayerGzip:
+			compressionType = compression.Gzip
+		case ocispec.MediaTypeImageLayerZstd:
+			compressionType = compression.Zstd
+		default:
+			return emptyDesc, fmt.Errorf("unsupported diff media type: %v: %w", config.MediaType, errdefs.ErrNotImplemented)
+		}
+	}
+
 	var newReference bool
 	if config.Reference == "" {
 		newReference = true
@@ -81,12 +123,14 @@ func (s *walkingDiff) compareOverlay(ctx context.Context, lower []mount.Mount, u
 	cw, err := s.store.Writer(ctx,
 		content.WithRef(config.Reference),
 		content.WithDescriptor(ocispec.Descriptor{
-			MediaType: config.MediaType,
+			MediaType: config.MediaType, // most contentstore implementations just ignore this
 		}))
 	if err != nil {
 		return emptyDesc, fmt.Errorf("failed to open writer: %w", err)
 	}
 
+	// errOpen is set when an error occurs while the content writer has not been
+	// committed or closed yet to force a cleanup.
 	var errOpen error
 	defer func() {
 		if errOpen != nil {
@@ -123,7 +167,7 @@ func (s *walkingDiff) compareOverlay(ctx context.Context, lower []mount.Mount, u
 				return emptyDesc, fmt.Errorf("failed to get compressed stream: %w", errOpen)
 			}
 		}
-		errOpen = writeDiffOverlay(ctx, io.MultiWriter(compressed, dgstr.Hash()), lower, upperDir, changeWriterOpts)
+		errOpen = writeDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lower, upperDir, changeWriterOpts)
 		compressed.Close()
 		if errOpen != nil {
 			return emptyDesc, fmt.Errorf("failed to write compressed diff: %w", errOpen)
@@ -134,7 +178,7 @@ func (s *walkingDiff) compareOverlay(ctx context.Context, lower []mount.Mount, u
 		}
 		config.Labels[labels.LabelUncompressed] = dgstr.Digest().String()
 	} else {
-		if errOpen = writeDiffOverlay(ctx, cw, lower, upperDir, changeWriterOpts); errOpen != nil {
+		if errOpen = writeDiff(ctx, cw, lower, upperDir, changeWriterOpts); errOpen != nil {
 			return emptyDesc, fmt.Errorf("failed to write diff: %w", errOpen)
 		}
 	}
@@ -159,6 +203,7 @@ func (s *walkingDiff) compareOverlay(ctx context.Context, lower []mount.Mount, u
 	if info.Labels == nil {
 		info.Labels = make(map[string]string)
 	}
+	// Set "containerd.io/uncompressed" label if digest already existed without label
 	if _, ok := info.Labels[labels.LabelUncompressed]; !ok {
 		info.Labels[labels.LabelUncompressed] = config.Labels[labels.LabelUncompressed]
 		if _, err := s.store.Update(ctx, info, "labels."+labels.LabelUncompressed); err != nil {

@@ -16,27 +16,20 @@
    limitations under the License.
 */
 
-package walking
+package overlay
 
 import (
 	"context"
-	"errors"
 
+	"github.com/containerd/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/pkg/archive/compression"
 )
 
-// getOverlayUpperDir returns empty string on non-Linux platforms
-// as overlay filesystem is Linux-specific.
-func getOverlayUpperDir(mounts []mount.Mount) string {
-	return ""
-}
-
-// compareOverlay is not supported on non-Linux platforms.
-// This function should never be called since getOverlayUpperDir always returns "".
-func (s *walkingDiff) compareOverlay(ctx context.Context, lower []mount.Mount, upperDir string, compressionType compression.Compression, config *diff.Config) (ocispec.Descriptor, error) {
-	return ocispec.Descriptor{}, errors.New("overlay diff not supported on this platform")
+// Compare returns ErrNotImplemented on non-Linux platforms as the overlay
+// filesystem is Linux-specific.
+func (s *overlayDiff) Compare(_ context.Context, _, _ []mount.Mount, _ ...diff.Opt) (ocispec.Descriptor, error) {
+	return emptyDesc, errdefs.ErrNotImplemented
 }
