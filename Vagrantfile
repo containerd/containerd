@@ -278,6 +278,7 @@ EOF
         'GOTESTSUM_JSONFILE': ENV['GOTESTSUM_JSONFILE'],
         'GITHUB_WORKSPACE': '',
         'CGROUP_DRIVER': ENV['CGROUP_DRIVER'],
+        'RUNC_FLAVOR': ENV['RUNC_FLAVOR'] || "runc",
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
@@ -306,6 +307,7 @@ EOF
         'GOTEST': ENV['GOTEST'] || "go test",
         'REPORT_DIR': ENV['REPORT_DIR'],
         'CGROUP_DRIVER': ENV['CGROUP_DRIVER'],
+        'RUNC_FLAVOR': ENV['RUNC_FLAVOR'] || "runc",
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
