@@ -81,6 +81,18 @@ func WithVolumes(volumeMounts map[string]string, platform imagespec.Platform) co
 		// the case here.
 		mounts = mount.RemoveIDMapOption(mounts)
 
+		mm := client.MountManager()
+		activationKey := fmt.Sprintf("cri-volume-%s", c.SnapshotKey)
+		var needsDeactivation bool
+
+		info, err := mm.Activate(ctx, activationKey, mounts)
+		if err == nil {
+			mounts = info.System
+			needsDeactivation = true
+		} else if !errdefs.IsNotImplemented(err) {
+			return fmt.Errorf("failed to activate mounts: %w", err)
+		}
+
 		root, err := os.MkdirTemp("", "ctd-volume")
 		if err != nil {
 			return err
@@ -99,6 +111,15 @@ func WithVolumes(volumeMounts map[string]string, platform imagespec.Platform) co
 				log.G(ctx).WithError(uerr).Errorf("Failed to unmount snapshot %q", root)
 				if err == nil {
 					err = uerr
+				}
+			}
+			// If we used mount manager, deactivate to cleanup transformers
+			if needsDeactivation {
+				if derr := mm.Deactivate(ctx, activationKey); derr != nil {
+					log.G(ctx).WithError(derr).Errorf("Failed to deactivate mount manager %q", activationKey)
+					if err == nil {
+						err = derr
+					}
 				}
 			}
 		}()
