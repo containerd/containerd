@@ -25,8 +25,11 @@ import (
 
 func init() {
 	registry.Register(&plugin.Registration{
-		Type:   plugins.NRIApiPlugin,
-		ID:     "nri",
+		Type: plugins.NRIApiPlugin,
+		ID:   "nri",
+		Requires: []plugin.Type{
+			plugins.InternalPlugin,
+		},
 		Config: nri.DefaultConfig(),
 		InitFn: initFunc,
 	})
