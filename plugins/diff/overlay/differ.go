@@ -22,11 +22,6 @@
 package overlay
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-	"fmt"
-	"time"
-
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -50,12 +45,4 @@ type overlayDiff struct {
 // errdefs.ErrNotImplemented so that the caller can fall back to a generic differ.
 func NewOverlayDiff(store content.Store) diff.Comparer {
 	return &overlayDiff{store: store}
-}
-
-func uniqueRef() string {
-	t := time.Now()
-	var b [3]byte
-	// Ignore read failures, just decreases uniqueness
-	rand.Read(b[:])
-	return fmt.Sprintf("%d-%s", t.UnixNano(), base64.URLEncoding.EncodeToString(b[:]))
 }
