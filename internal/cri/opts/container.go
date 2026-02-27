@@ -24,19 +24,24 @@ import (
 	"strings"
 
 	"github.com/containerd/continuity/fs"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
+	"github.com/containerd/containerd/v2/core/unpack"
+	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 )
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the
 // snapshot fails we make sure the image is actually unpacked and retry.
-func WithNewSnapshot(id string, i containerd.Image, opts ...snapshots.Opt) containerd.NewContainerOpts {
+func WithNewSnapshot(id string, i containerd.Image, appendSnapshotLabels bool, opts ...snapshots.Opt) containerd.NewContainerOpts {
 	f := containerd.WithNewSnapshot(id, i, opts...)
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 		if err := f(ctx, client, c); err != nil {
@@ -44,13 +49,62 @@ func WithNewSnapshot(id string, i containerd.Image, opts ...snapshots.Opt) conta
 				return err
 			}
 
-			if err := i.Unpack(ctx, c.Snapshotter); err != nil {
+			if err := unpackImage(ctx, client, i, c.Snapshotter, appendSnapshotLabels); err != nil {
 				return fmt.Errorf("error unpacking image: %w", err)
 			}
 			return f(ctx, client, c)
 		}
 		return nil
 	}
+}
+
+func unpackImage(ctx context.Context, client *containerd.Client, i containerd.Image, snapshotter string, appendSnapshotLabels bool) error {
+	ctx, done, err := client.WithLease(ctx)
+	if err != nil {
+		return err
+	}
+	defer done(ctx)
+
+	matcher := platforms.Default()
+
+	capabilities, err := client.GetSnapshotterCapabilities(ctx, snapshotter)
+	if err != nil {
+		return err
+	}
+
+	u, err := unpack.NewUnpacker(
+		ctx,
+		i.ContentStore(),
+		unpack.WithUnpackPlatform(unpack.Platform{
+			Platform:                matcher,
+			SnapshotterKey:          snapshotter,
+			Snapshotter:             client.SnapshotService(snapshotter),
+			Applier:                 client.DiffService(),
+			SnapshotterCapabilities: capabilities,
+		}),
+		unpack.WithUnpackLimiter(semaphore.NewWeighted(3)),
+	)
+	if err != nil {
+		return fmt.Errorf("unable to initialize unpacker: %w", err)
+	}
+
+	childrenHandler := images.ChildrenHandler(i.ContentStore())
+	childrenHandler = images.FilterPlatforms(childrenHandler, matcher)
+	childrenHandler = images.LimitManifests(childrenHandler, matcher, 1)
+
+	var h images.Handler = childrenHandler
+	if appendSnapshotLabels {
+		h = snpkg.AppendInfoHandlerWrapper(i.Name())(h)
+	}
+
+	if err := images.Dispatch(ctx, u.Unpack(h), nil, i.Target()); err != nil {
+		_, _ = u.Wait()
+		return err
+	}
+	if _, err := u.Wait(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // WithVolumes copies ownership of volume in rootfs to its corresponding host path.
