@@ -193,7 +193,7 @@ func TestErofsDifferWithTarIndexMode(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Create content store for the differ
-	contentStore, err := local.NewStore(filepath.Join(tempDir, "content"))
+	contentStore, err := local.NewStore(filepath.Join(tempDir, "content"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

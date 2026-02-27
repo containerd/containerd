@@ -104,11 +104,11 @@ func TestContent(t *testing.T) {
 func TestContentRootDir(t *testing.T) {
 	// test dir exist
 	dirExist := t.TempDir()
-	_, err := NewLabeledStore(dirExist, newMemoryLabelStore())
+	_, err := NewLabeledStore(dirExist, newMemoryLabelStore(), nil)
 	assert.NoError(t, err)
 	// test dir doesn't exist
 	dir := filepath.Join(t.TempDir(), "test_dir001")
-	_, err = NewLabeledStore(dir, newMemoryLabelStore())
+	_, err = NewLabeledStore(dir, newMemoryLabelStore(), nil)
 	assert.NoError(t, err)
 	_, err = os.Stat(dir)
 	assert.NoError(t, err)
