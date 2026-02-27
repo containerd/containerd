@@ -130,6 +130,8 @@ func TestPodUserNS(t *testing.T) {
 	containerID := uint32(0)
 	hostID := uint32(65536)
 	size := uint32(65536)
+	hostNetNS, err := os.Readlink("/proc/self/ns/net")
+	require.NoError(t, err)
 	idmap := []*runtime.IDMapping{
 		{
 			ContainerId: containerID,
@@ -174,6 +176,24 @@ func TestPodUserNS(t *testing.T) {
 			checkOutput: func(t *testing.T, output string) {
 				// The output should contain the length of the userns requested.
 				assert.Contains(t, output, fmt.Sprint(size))
+			},
+		},
+		"userns with host network": {
+			sandboxOpts: []PodSandboxOpts{
+				WithHostNetwork,
+				WithPodUserNs(containerID, hostID, size),
+			},
+			containerOpts: []ContainerOpts{
+				WithUserNamespace(containerID, hostID, size),
+				WithCommand("sh", "-c", "cat /proc/self/uid_map; echo NETNS=$(readlink /proc/self/ns/net); echo USERNS=$(readlink /proc/self/ns/user)"),
+			},
+			checkOutput: func(t *testing.T, output string) {
+				// The output should contain the length of the userns requested.
+				assert.Contains(t, output, fmt.Sprint(size))
+				// When host network is requested, container netns should match host netns.
+				assert.Contains(t, output, "NETNS="+hostNetNS)
+				// Ensure user namespace exists in the container.
+				assert.Contains(t, output, "USERNS=user:[")
 			},
 		},
 		"rootfs permissions": {
