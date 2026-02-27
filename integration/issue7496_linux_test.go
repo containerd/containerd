@@ -42,7 +42,14 @@ import (
 // TestIssue7496 is used to reproduce https://github.com/containerd/containerd/issues/7496
 //
 // NOTE: https://github.com/containerd/containerd/issues/8931 is the same issue.
+
 func TestIssue7496(t *testing.T) {
+	for i := 0; i < 200; i++ {
+		testIssue7496(t)
+	}
+}
+
+func testIssue7496(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
 
 	t.Logf("Create a pod config and run sandbox container")

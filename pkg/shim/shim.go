@@ -437,6 +437,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 
 	select {
 	case <-sd.Done():
+		log.G(ctx).Infof("shim shutdown with pid %d", os.Getpid())
 		return nil
 	case <-time.After(5 * time.Second):
 		return errors.New("shim shutdown timeout")
