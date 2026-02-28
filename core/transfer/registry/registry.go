@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -49,6 +50,7 @@ type registryOpts struct {
 	creds         CredentialHelper
 	hostDir       string
 	defaultScheme string
+	dialContext   func(ctx context.Context, network, addr string) (net.Conn, error)
 	httpDebug     bool
 	httpTrace     bool
 	localStream   io.WriteCloser
@@ -85,6 +87,17 @@ func WithHostDir(hostDir string) Opt {
 func WithDefaultScheme(s string) Opt {
 	return func(o *registryOpts) error {
 		o.defaultScheme = s
+		return nil
+	}
+}
+
+// WithDialContext overrides the dialer used for all registry connections.
+// The provided function is tried before the system resolver for each
+// connection, allowing callers to redirect DNS resolution (e.g. to cluster
+// DNS) while still falling back to system DNS when unreachable.
+func WithDialContext(dial func(ctx context.Context, network, addr string) (net.Conn, error)) Opt {
+	return func(o *registryOpts) error {
+		o.dialContext = dial
 		return nil
 	}
 }
@@ -141,6 +154,9 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	if ropts.defaultScheme != "" {
 		hostOptions.DefaultScheme = ropts.defaultScheme
 	}
+	if ropts.dialContext != nil {
+		hostOptions.DialContext = ropts.dialContext
+	}
 
 	hostOptions.UpdateClient = func(client *http.Client) error {
 		if ropts.httpDebug {
@@ -164,6 +180,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		resolver:      resolver,
 		hostDir:       ropts.hostDir,
 		defaultScheme: ropts.defaultScheme,
+		dialContext:   ropts.dialContext,
 		httpDebug:     ropts.httpDebug,
 		httpTrace:     ropts.httpTrace,
 		localStream:   ropts.localStream,
@@ -191,9 +208,9 @@ type OCIRegistry struct {
 
 	resolver remotes.Resolver
 
-	hostDir string
-
+	hostDir       string
 	defaultScheme string
+	dialContext   func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	httpDebug   bool
 	httpTrace   bool
