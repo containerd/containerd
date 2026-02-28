@@ -398,6 +398,36 @@ func TestDialTimeoutPreservesGlobalDialContext(t *testing.T) {
 	}
 }
 
+// TestNewDNSDialContextFallback verifies that newDNSDialContext falls back to
+// the system resolver when all configured DNS servers are unreachable.
+func TestNewDNSDialContextFallback(t *testing.T) {
+	// Bind a UDP port and immediately close it. Any query sent to that address
+	// will receive a "port unreachable" response, causing LookupHost to
+	// fail.
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	badServer := pc.LocalAddr().(*net.UDPAddr).IP.String()
+	pc.Close()
+
+	dialFn := newDNSDialContext([]string{badServer}, 10*time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	conn, err := dialFn(ctx, "tcp", "localhost:1")
+	if conn != nil {
+		conn.Close()
+	}
+
+	if ctx.Err() != nil {
+		t.Fatal("DialContext timed out: bad DNS server was not failed over to the system resolver")
+	}
+	// TCP "connection refused" is expected
+	_ = err
+}
+
 func TestHTTPFallback(t *testing.T) {
 	for _, tc := range []struct {
 		host           string
