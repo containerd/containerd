@@ -373,6 +373,17 @@ A shorter timeout helps reduce delays when falling back to the original registry
 dial_timeout = "1s"
 ```
 
+## dns_servers field
+
+`dns_servers` is an optional list of DNS server IP addresses to use when resolving
+this registry host. The servers are tried in order; if all are unreachable, the
+system resolver is used as a fallback. When specified, this overrides any
+`dns_servers` set in the global registry config for this host only.
+
+```toml
+dns_servers = ["10.96.0.10"]
+```
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host]."http://namespace"` entries in the
