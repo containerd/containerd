@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -315,7 +316,9 @@ func (c *CRIImageService) pullImageWithTransferService(
 		registry.WithHeaders(c.config.Registry.Headers),
 		registry.WithHostDir(c.config.Registry.ConfigPath),
 	}
-
+	if len(c.config.Registry.DNSServers) > 0 {
+		opts = append(opts, registry.WithDialContext(config.NewDNSDialContext(c.config.Registry.DNSServers)))
+	}
 	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OCI registry: %w", err)
@@ -495,9 +498,16 @@ func hostDirFromRoots(roots []string) func(string) (string, error) {
 // registryHosts is the registry hosts to be used by the resolver.
 func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(host string) (string, string, error), updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
 	paths := filepath.SplitList(c.config.Registry.ConfigPath)
+
+	var dialContext func(context.Context, string, string) (net.Conn, error)
+	if len(c.config.Registry.DNSServers) > 0 {
+		dialContext = config.NewDNSDialContext(c.config.Registry.DNSServers)
+	}
+
 	if len(paths) > 0 {
 		hostOptions := config.HostOptions{
 			UpdateClient: updateClientFn,
+			DialContext:  dialContext,
 		}
 		hostOptions.Credentials = credentials
 		hostOptions.HostDir = hostDirFromRoots(paths)
@@ -527,6 +537,10 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 				client    = &http.Client{Transport: transport}
 				config    = c.config.Registry.Configs[u.Host]
 			)
+
+			if dialContext != nil {
+				transport.DialContext = dialContext
+			}
 
 			if docker.IsLocalhost(host) && u.Scheme == "http" {
 				// Skipping TLS verification for localhost

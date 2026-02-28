@@ -231,6 +231,10 @@ type Registry struct {
 	// If no registry-specific options are set, ConfigPath defaults to
 	// "/etc/containerd/certs.d:/etc/docker/certs.d" for compatibility with Docker.
 	ConfigPath string `toml:"config_path" json:"configPath"`
+	// DNSServers is a list of DNS server IP addresses to use when resolving
+	// registry hostnames during image pulls. When set, these servers are tried
+	// first. The system DNS is used as a fallback if all configured servers are unreachable.
+	DNSServers []string `toml:"dns_servers" json:"dnsServers,omitempty"`
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	// This option will not be used when ConfigPath is provided.
 	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.3.
