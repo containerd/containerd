@@ -86,24 +86,45 @@ func NewDNSDialContext(dnsServers []string) func(context.Context, string, string
 // given connection timeout. Used internally to combine dns_servers with a
 // per-host dial_timeout.
 func newDNSDialContext(dnsServers []string, timeout time.Duration) func(context.Context, string, string) (net.Conn, error) {
-	return (&net.Dialer{
+	// One resolver per server so we can probe each at the resolution level.
+	// Checking reachability via net.Dialer.DialContext does not work for UDP;
+	// it always succeeds, thus an unreachable server is never
+	// detected and fallback to the system resolver is never reached.
+	resolvers := make([]*net.Resolver, len(dnsServers))
+	for i, server := range dnsServers {
+		resolvers[i] = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, network, net.JoinHostPort(server, "53"))
+			},
+		}
+	}
+
+	d := &net.Dialer{
 		Timeout:       timeout,
 		KeepAlive:     30 * time.Second,
 		FallbackDelay: 300 * time.Millisecond,
-		Resolver: &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				d := &net.Dialer{}
-				for _, ip := range dnsServers {
-					conn, err := d.DialContext(ctx, network, net.JoinHostPort(ip, "53"))
-					if err == nil {
-						return conn, nil
-					}
+	}
+
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, _ := net.SplitHostPort(addr)
+		// Only apply custom resolution for hostnames; IP literals need no DNS.
+		if host != "" && net.ParseIP(host) == nil {
+			for _, r := range resolvers {
+				if ctx.Err() != nil {
+					break
 				}
-				return d.DialContext(ctx, network, addr)
-			},
-		},
-	}).DialContext
+				rCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				ips, err := r.LookupHost(rCtx, host)
+				cancel()
+				if err == nil {
+					return d.DialContext(ctx, network, net.JoinHostPort(ips[0], port))
+				}
+			}
+		}
+
+		return d.DialContext(ctx, network, addr)
+	}
 }
 
 // ConfigureHosts creates a registry hosts function from the provided
