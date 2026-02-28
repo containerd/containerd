@@ -30,8 +30,10 @@ import (
 	"runtime/debug"
 	"time"
 
+	bootapi "github.com/containerd/containerd/api/runtime/boot/v1"
 	shimapi "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
+
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -51,22 +53,8 @@ type Publisher interface {
 	io.Closer
 }
 
-// StartOpts describes shim start configuration received from containerd
-type StartOpts struct {
-	Address      string
-	TTRPCAddress string
-	Debug        bool
-}
-
-// BootstrapParams is a JSON payload returned in stdout from shim.Start call.
-type BootstrapParams struct {
-	// Version is the version of shim parameters (expected 2 for shim v2)
-	Version int `json:"version"`
-	// Address is a address containerd should use to connect to shim.
-	Address string `json:"address"`
-	// Protocol is either TTRPC or GRPC.
-	Protocol string `json:"protocol"`
-}
+type BootstrapParams = bootapi.BootstrapParams
+type BootstrapResult = bootapi.BootstrapResult
 
 type StopStatus struct {
 	Pid        int
@@ -77,7 +65,7 @@ type StopStatus struct {
 // Manager is the interface which manages the shim process
 type Manager interface {
 	Name() string
-	Start(ctx context.Context, id string, opts StartOpts) (BootstrapParams, error)
+	Start(ctx context.Context, params *BootstrapParams) (*BootstrapResult, error)
 	Stop(ctx context.Context, id string) (StopStatus, error)
 	Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeInfo, error)
 }
@@ -152,7 +140,7 @@ func parseFlags() {
 	flag.StringVar(&id, "id", "", "id of the task")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
 	flag.StringVar(&debugSocketFlag, "debug-socket", "", "debug socket path to serve")
-	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
+	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir") // Provided only during -delete action
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
 	flag.StringVar(&containerdBinaryFlag, "publish-binary", "",
@@ -286,18 +274,27 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		}
 		return nil
 	case "start":
-		opts := StartOpts{
-			Address:      addressFlag,
-			TTRPCAddress: ttrpcAddress,
-			Debug:        debugFlag,
+		// We try reading stdin twice: first for the new boot API, then runc Options.
+		// The stdin pipe is not seekable, so this should be read into memory first.
+		input, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("failed to read stdin: %w", err)
 		}
 
-		params, err := manager.Start(ctx, id, opts)
+		var params bootapi.BootstrapParams
+		if err := json.Unmarshal(input, &params); err != nil {
+			// TODO: Return error once the new API is stable
+			if err := readBootstrapParamsFromDeprecatedFields(input, &params); err != nil {
+				return err
+			}
+		}
+
+		result, err := manager.Start(ctx, &params)
 		if err != nil {
 			return err
 		}
 
-		data, err := json.Marshal(&params)
+		data, err := json.Marshal(result)
 		if err != nil {
 			return fmt.Errorf("failed to marshal bootstrap params to json: %w", err)
 		}

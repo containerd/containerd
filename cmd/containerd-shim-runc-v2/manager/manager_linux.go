@@ -181,20 +181,29 @@ func newShimSocket(ctx context.Context, path, id string, debug bool) (*shimSocke
 	return s, nil
 }
 
-func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shim.BootstrapParams, retErr error) {
-	var params shim.BootstrapParams
+func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.BootstrapResult, retErr error) {
+	var params shim.BootstrapResult
 	params.Version = 3
 	params.Protocol = "ttrpc"
 
-	cmd, err := newCommand(ctx, id, opts.Address, opts.TTRPCAddress, opts.Debug)
+	id := opts.GetInstanceID()
+
+	debugLog := false
+	switch log.GetLevel() {
+	case log.DebugLevel, log.TraceLevel:
+		debugLog = true
+	}
+
+	cmd, err := newCommand(ctx, id, opts.GetContainerdGrpcAddress(), opts.GetContainerdTtrpcAddress(), debugLog)
 	if err != nil {
-		return params, err
+		return nil, err
 	}
 	grouping := id
 	spec, err := readSpec()
 	if err != nil {
-		return params, err
+		return nil, err
 	}
+
 	for _, group := range groupLabels {
 		if groupID, ok := spec.Annotations[group]; ok {
 			grouping = groupID
@@ -211,21 +220,21 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 		}
 	}()
 
-	s, err := newShimSocket(ctx, opts.Address, grouping, false)
+	s, err := newShimSocket(ctx, opts.GetContainerdGrpcAddress(), grouping, false)
 	if err != nil {
 		if errdefs.IsAlreadyExists(err) {
 			params.Address = s.addr
-			return params, nil
+			return &params, nil
 		}
-		return params, err
+		return nil, err
 	}
 	sockets = append(sockets, s)
 	cmd.ExtraFiles = append(cmd.ExtraFiles, s.f)
 
-	if opts.Debug {
-		s, err = newShimSocket(ctx, opts.Address, grouping, true)
+	if debugLog {
+		s, err = newShimSocket(ctx, opts.GetContainerdGrpcAddress(), grouping, true)
 		if err != nil {
-			return params, err
+			return nil, err
 		}
 		sockets = append(sockets, s)
 		cmd.ExtraFiles = append(cmd.ExtraFiles, s.f)
@@ -234,12 +243,12 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 	goruntime.LockOSThread()
 	if os.Getenv("SCHED_CORE") != "" {
 		if err := schedcore.Create(schedcore.ProcessGroup); err != nil {
-			return params, fmt.Errorf("enable sched core support: %w", err)
+			return nil, fmt.Errorf("enable sched core support: %w", err)
 		}
 	}
 
 	if err := cmd.Start(); err != nil {
-		return params, err
+		return nil, err
 	}
 
 	goruntime.UnlockOSThread()
@@ -252,34 +261,37 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 	// make sure to wait after start
 	go cmd.Wait()
 
-	if opts, err := shim.ReadRuntimeOptions[*options.Options](os.Stdin); err == nil {
-		if opts.ShimCgroup != "" {
-			if cgroups.Mode() == cgroups.Unified {
-				cg, err := cgroupsv2.Load(opts.ShimCgroup)
-				if err != nil {
-					return params, fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
-				}
-				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-					return params, fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
-				}
-			} else {
-				cg, err := cgroup1.Load(cgroup1.StaticPath(opts.ShimCgroup))
-				if err != nil {
-					return params, fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
-				}
-				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-					return params, fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
-				}
+	var runcOpts options.Options
+	if err := opts.FindExtension(&runcOpts); err != nil {
+		return nil, fmt.Errorf("failed to fetch runc options: %w", err)
+	}
+
+	if shimCgroup := runcOpts.GetShimCgroup(); shimCgroup != "" {
+		if cgroups.Mode() == cgroups.Unified {
+			cg, err := cgroupsv2.Load(shimCgroup)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load cgroup %s: %w", shimCgroup, err)
+			}
+			if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
+				return nil, fmt.Errorf("failed to join cgroup %s: %w", shimCgroup, err)
+			}
+		} else {
+			cg, err := cgroup1.Load(cgroup1.StaticPath(shimCgroup))
+			if err != nil {
+				return nil, fmt.Errorf("failed to load cgroup %s: %w", shimCgroup, err)
+			}
+			if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
+				return nil, fmt.Errorf("failed to join cgroup %s: %w", shimCgroup, err)
 			}
 		}
 	}
 
 	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
-		return params, fmt.Errorf("failed to adjust OOM score for shim: %w", err)
+		return nil, fmt.Errorf("failed to adjust OOM score for shim: %w", err)
 	}
 
 	params.Address = sockets[0].addr
-	return params, nil
+	return &params, nil
 }
 
 func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {

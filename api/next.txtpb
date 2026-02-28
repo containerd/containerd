@@ -24927,6 +24927,829 @@ file: {
   }
 }
 file: {
+  name: "runtime/boot/v1/bootstrap.proto"
+  package: "containerd.runtime.bootstrap.v1"
+  dependency: "google/protobuf/any.proto"
+  message_type: {
+    name: "BootstrapParams"
+    field: {
+      name: "instance_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "instanceId"
+    }
+    field: {
+      name: "namespace"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "namespace"
+    }
+    field: {
+      name: "log_level"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "logLevel"
+    }
+    field: {
+      name: "containerd_version"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerdVersion"
+    }
+    field: {
+      name: "containerd_ttrpc_address"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerdTtrpcAddress"
+    }
+    field: {
+      name: "containerd_grpc_address"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerdGrpcAddress"
+    }
+    field: {
+      name: "containerd_binary"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerdBinary"
+    }
+    field: {
+      name: "extensions"
+      number: 8
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.runtime.bootstrap.v1.Extension"
+      json_name: "extensions"
+    }
+  }
+  message_type: {
+    name: "Extension"
+    field: {
+      name: "value"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "value"
+    }
+  }
+  message_type: {
+    name: "BootstrapResult"
+    field: {
+      name: "version"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_INT32
+      json_name: "version"
+    }
+    field: {
+      name: "address"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "address"
+    }
+    field: {
+      name: "protocol"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "protocol"
+    }
+    field: {
+      name: "capabilities"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "capabilities"
+    }
+    field: {
+      name: "metadata"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.runtime.bootstrap.v1.BootstrapResult.MetadataEntry"
+      json_name: "metadata"
+    }
+    nested_type: {
+      name: "MetadataEntry"
+      field: {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field: {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options: {
+        map_entry: true
+      }
+    }
+  }
+  options: {
+    go_package: "github.com/containerd/containerd/api/runtime/bootstrap/v1;bootstrap"
+  }
+  source_code_info: {
+    location: {
+      span: 38
+      span: 0
+      span: 104
+      span: 1
+    }
+    location: {
+      path: 12
+      span: 38
+      span: 0
+      span: 18
+      leading_detached_comments: "\nCopyright The containerd Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\nhttp://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n"
+      leading_detached_comments: " Bootstrap Protocol\n\n This protocol defines the interface between containerd and shims at startup.\n It replaces the previous scattered configuration mechanisms (CLI args, env vars,\n stdin JSON, spec.json annotations) with a single, versioned, extensible protocol.\n\n Flow:\n   1. containerd spawns the shim process\n   2. containerd writes BootstrapParams as JSON to shim's stdin\n   3. shim initializes and writes BootstrapResult as JSON to stdout\n   4. containerd connects to the address provided in BootstrapResult\n\n Note: JSON serialization is used to keep shim binaries small since the\n encoding/json package is already part of the Go runtime. The proto\n definition serves as the schema for detecting breaking changes and\n maintaining forward/backward compatibility.\n\n This design enables:\n   - Forward/backward compatibility via version field\n   - Typed extensibility via google.protobuf.Any and Extension\n   - Clear capability negotiation between containerd and shims\n"
+    }
+    location: {
+      path: 2
+      span: 40
+      span: 0
+      span: 40
+    }
+    location: {
+      path: 3
+      path: 0
+      span: 42
+      span: 0
+      span: 35
+    }
+    location: {
+      path: 8
+      span: 44
+      span: 0
+      span: 90
+    }
+    location: {
+      path: 8
+      path: 11
+      span: 44
+      span: 0
+      span: 90
+    }
+    location: {
+      path: 4
+      path: 0
+      span: 47
+      span: 0
+      span: 73
+      span: 1
+      leading_comments: " BootstrapParams contains all configuration passed from containerd to shim at startup.\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 1
+      span: 47
+      span: 8
+      span: 23
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      span: 49
+      span: 2
+      span: 25
+      leading_comments: " Container/sandbox ID\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      path: 5
+      span: 49
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      path: 1
+      span: 49
+      span: 9
+      span: 20
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      path: 3
+      span: 49
+      span: 23
+      span: 24
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      span: 52
+      span: 2
+      span: 23
+      leading_comments: " Namespace for the container\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      path: 5
+      span: 52
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      path: 1
+      span: 52
+      span: 9
+      span: 18
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      path: 3
+      span: 52
+      span: 21
+      span: 22
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 2
+      span: 55
+      span: 2
+      span: 23
+      leading_comments: " Requested shim log level.\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 2
+      path: 5
+      span: 55
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 2
+      path: 1
+      span: 55
+      span: 9
+      span: 18
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 2
+      path: 3
+      span: 55
+      span: 21
+      span: 22
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 3
+      span: 58
+      span: 2
+      span: 32
+      leading_comments: " containerd daemon version that is launching this shim.\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 3
+      path: 5
+      span: 58
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 3
+      path: 1
+      span: 58
+      span: 9
+      span: 27
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 3
+      path: 3
+      span: 58
+      span: 30
+      span: 31
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      span: 61
+      span: 2
+      span: 38
+      leading_comments: " Containerd's TTRPC API address (e.g., \"unix:///run/containerd/containerd.sock.ttrpc\")\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 5
+      span: 61
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 1
+      span: 61
+      span: 9
+      span: 33
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 3
+      span: 61
+      span: 36
+      span: 37
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 5
+      span: 64
+      span: 2
+      span: 37
+      leading_comments: " Containerd's gRPC API address (e.g., \"unix:///run/containerd/containerd.sock\")\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 5
+      path: 5
+      span: 64
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 5
+      path: 1
+      span: 64
+      span: 9
+      span: 32
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 5
+      path: 3
+      span: 64
+      span: 35
+      span: 36
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 6
+      span: 67
+      span: 2
+      span: 31
+      leading_comments: " Path to containerd binary for event publishing\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 6
+      path: 5
+      span: 67
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 6
+      path: 1
+      span: 67
+      span: 9
+      span: 26
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 6
+      path: 3
+      span: 67
+      span: 29
+      span: 30
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 7
+      span: 72
+      span: 2
+      span: 36
+      leading_comments: " Extensible configuration sections for new features\n Each section can contain arbitrary structured data identified by type URL\n Examples: CRI config, NRI config, sandbox config, etc.\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 7
+      path: 4
+      span: 72
+      span: 2
+      span: 10
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 7
+      path: 6
+      span: 72
+      span: 11
+      span: 20
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 7
+      path: 1
+      span: 72
+      span: 21
+      span: 31
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 7
+      path: 3
+      span: 72
+      span: 34
+      span: 35
+    }
+    location: {
+      path: 4
+      path: 1
+      span: 77
+      span: 0
+      span: 84
+      span: 1
+      leading_comments: " Extension provides extensibility for new configuration types\n without changing the core BootstrapParams protocol\n"
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 1
+      span: 77
+      span: 8
+      span: 17
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 0
+      span: 83
+      span: 2
+      span: 32
+      leading_comments: " Configuration data with embedded type URL\n Examples of type URLs:\n   - \"containerd.io/cri.v1.PodSandboxConfig\"\n   - \"containerd.io/nri.v1.PluginConfig\"\n   - \"containerd.io/sandbox.v1.SandboxConfig\"\n"
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 0
+      path: 6
+      span: 83
+      span: 2
+      span: 21
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 0
+      path: 1
+      span: 83
+      span: 22
+      span: 27
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 0
+      path: 3
+      span: 83
+      span: 30
+      span: 31
+    }
+    location: {
+      path: 4
+      path: 2
+      span: 87
+      span: 0
+      span: 104
+      span: 1
+      leading_comments: " BootstrapResult is returned by shim via stdout after successful startup\n"
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 1
+      span: 87
+      span: 8
+      span: 23
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 0
+      span: 89
+      span: 2
+      span: 20
+      leading_comments: " Version of shim parameters (expected 2 for shim v2)\n"
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 0
+      path: 5
+      span: 89
+      span: 2
+      span: 7
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 0
+      path: 1
+      span: 89
+      span: 8
+      span: 15
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 0
+      path: 3
+      span: 89
+      span: 18
+      span: 19
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 1
+      span: 93
+      span: 2
+      span: 21
+      leading_comments: " Address where shim is listening (e.g., \"unix:///run/containerd/shim.sock\")\n Containerd will connect to this address for task operations\n"
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 1
+      path: 5
+      span: 93
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 1
+      path: 1
+      span: 93
+      span: 9
+      span: 16
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 1
+      path: 3
+      span: 93
+      span: 19
+      span: 20
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 2
+      span: 96
+      span: 2
+      span: 22
+      leading_comments: " Protocol used by shim: \"ttrpc\" or \"grpc\"\n"
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 2
+      path: 5
+      span: 96
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 2
+      path: 1
+      span: 96
+      span: 9
+      span: 17
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 2
+      path: 3
+      span: 96
+      span: 20
+      span: 21
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 3
+      span: 100
+      span: 2
+      span: 35
+      leading_comments: " Optional: Capabilities supported by this shim instance\n Allows shim to advertise what features it supports\n"
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 3
+      path: 4
+      span: 100
+      span: 2
+      span: 10
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 3
+      path: 5
+      span: 100
+      span: 11
+      span: 17
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 3
+      path: 1
+      span: 100
+      span: 18
+      span: 30
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 3
+      path: 3
+      span: 100
+      span: 33
+      span: 34
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 4
+      span: 103
+      span: 2
+      span: 35
+      leading_comments: " Optional: Additional metadata from shim\n"
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 4
+      path: 6
+      span: 103
+      span: 2
+      span: 21
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 4
+      path: 1
+      span: 103
+      span: 22
+      span: 30
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 4
+      path: 3
+      span: 103
+      span: 33
+      span: 34
+    }
+  }
+  syntax: "proto3"
+  buf_extension: {
+    is_import: false
+    module_info: {
+      name: {
+        remote: "buf.build"
+        owner: "containerd"
+        repository: "api-dev"
+      }
+    }
+    is_syntax_unspecified: false
+  }
+}
+file: {
   name: "types/metrics.proto"
   package: "containerd.types"
   dependency: "google/protobuf/any.proto"
