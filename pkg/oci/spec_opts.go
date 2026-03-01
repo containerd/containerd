@@ -1611,6 +1611,11 @@ func WithPidsLimit(limit int64) SpecOpts {
 		if s.Linux.Resources.Pids == nil {
 			s.Linux.Resources.Pids = &specs.LinuxPids{}
 		}
+		// If limit is less than 0, set to nil (unlimited/default)
+		if limit < 0 {
+			s.Linux.Resources.Pids.Limit = nil
+			return nil
+		}
 		// Check if limit is 0, then assign limit to 1
 		if limit == 0 {
 			limit = 1
