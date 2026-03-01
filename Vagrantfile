@@ -73,6 +73,7 @@ Vagrant.configure("2") do |config|
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
         set -eux -o pipefail
+        dnf -y install kernel-modules-$(uname -r) kernel-modules-extra-$(uname -r) || true
         dnf -y install \
             container-selinux \
             curl \
@@ -162,6 +163,8 @@ EOF
         source /etc/environment
         source /etc/profile.d/sh.local
         set -eux -o pipefail
+        modprobe br_netfilter || true
+        modprobe xt_comment || true
         cd ${GOPATH}/src/github.com/containerd/containerd
         script/setup/install-cni
         PATH=/opt/cni/bin:$PATH type ${CNI_BINARIES} || true
