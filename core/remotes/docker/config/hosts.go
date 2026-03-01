@@ -287,6 +287,22 @@ func updateTLSConfigFromHost(tlsConfig *tls.Config, host *hostConfig) error {
 	return nil
 }
 
+func HostDirFromRoots(roots []string) func(string) (string, error) {
+	rootfn := make([]func(string) (string, error), len(roots))
+	for i := range roots {
+		rootfn[i] = HostDirFromRoot(roots[i])
+	}
+	return func(host string) (dir string, err error) {
+		for _, fn := range rootfn {
+			dir, err = fn(host)
+			if (err != nil && !errdefs.IsNotFound(err)) || (dir != "") {
+				break
+			}
+		}
+		return
+	}
+}
+
 // HostDirFromRoot returns a function which finds a host directory
 // based at the given root.
 func HostDirFromRoot(root string) func(string) (string, error) {
