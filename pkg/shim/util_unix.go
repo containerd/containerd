@@ -29,7 +29,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -124,12 +123,6 @@ func NewSocket(address string) (*net.UnixListener, error) {
 		// Directory permissions: need execute bit for traversal
 		dirPerm = os.FileMode(0700)
 	)
-
-	// Darwin needs +x on socket file to access socket, otherwise it'll fail
-	// with "bind: permission denied" when running as non-root.
-	if runtime.GOOS == "darwin" {
-		sockPerm = 0700
-	}
 
 	if !isAbstract {
 		if err := os.MkdirAll(filepath.Dir(path), dirPerm); err != nil {
