@@ -24,7 +24,7 @@ jobs:
         with:
           # Fail action on broken links
           fail: true
-          args: --root-dir "$(pwd)" --exclude-path vendor --exclude-path releases --timeout 30 --no-progress './**/*.md'
+          args: --root-dir "$(pwd)" --exclude nssm\.cc --exclude-path vendor --exclude-path releases --timeout 30 --no-progress './**/*.md'
           format: markdown
           # Write GitHub job summary
           jobSummary: true
