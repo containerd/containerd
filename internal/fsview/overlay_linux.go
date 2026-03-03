@@ -33,7 +33,7 @@ func isOpaque(f fs.File) bool {
 		if err != nil {
 			return false
 		}
-		return sz == 1 && dest[0] == 'y'
+		return sz == 1 && len(dest) == 1 && dest[0] == 'y'
 	}
 
 	// Check for EROFS file by getting Stat and checking xattrs
