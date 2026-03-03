@@ -41,15 +41,21 @@ done against that branch.
 
 ### Release Cadence
 
-Minor releases are provided on a time basis with an initial cadence of 6 months.
-The next two containerd releases should have a target release date scheduled based
-on the current release cadence. Changes to the release cadence will not impact
-releases which are already scheduled.
+Since containerd v2.3 in April 2026, minor releases are provided on a time basis
+with a cadence of 4 months. New minor releases are scheduled for April, August,
+and December of each year. This cadence is synchronized with the Kubernetes
+release schedule to ensure that new features in containerd can be smoothly
+adopted by new Kubernetes releases.
 
 The maintainers will maintain a roadmap and milestones for each release, however,
 features may be pushed to accommodate the release timeline. If your issue or feature
 is not present in the roadmap, please open a Github issue or leave a
 comment requesting it be added to a milestone.
+
+As part of synchronizing with the Kubernetes release schedule, containerd will
+cut beta and release candidates that align with the Kubernetes release cycle.
+This allows for end-to-end testing of new Kubernetes features with a compatible
+containerd version before the final release of either project.
 
 ### Patch Releases
 
@@ -77,24 +83,27 @@ by `<major>.<minor>`. Release branches will be in one of several states:
 - __*LTS*__: The release is a long term stable branch which is currently supported and accepting patches.
 - __*End of Life*__: The release branch is no longer supported and no new patches will be accepted.
 
-Releases will be supported at least one year after a _minor_ release. This means that
-we will accept bug reports and backports to release branches until the end of
-life date. If no new _minor_ release has been made, that release will be
-considered supported until 6 months after the next _minor_ is released or one year,
-whichever is longer. Additionally, releases may have an extended security support
-period after the end of the active period to accept security backports. This
-timeframe will be decided by maintainers before the end of the active status.
+Regular (non-LTS) releases will be supported for 8 months after a _minor_
+release. This means that we will accept bug reports and backports to these
+release branches until the end of life date. Additionally, releases may have an
+extended security support period after the end of the active period to accept
+security backports. This timeframe will be decided by maintainers before the end
+of the active status.
 
-Long term stable (_LTS_) releases are owned by at least two maintainers for at least two
-years after their initial _minor_ (x.y.0) release. The maintainers of the _LTS_ branch may commit to
-a longer period or extend the support period as needed. These branches will accept bug reports and
-backports until the end of life date. They may also accept a wider range of patches than non-_LTS_
-releases to support the longer term maintainability of the branch, including library dependency,
-toolchain (including Go) and other version updates which are needed to ensure each release is built
-with fully supported dependencies. Feature backports are up to the discretion of the maintainers who
-own the branch but should be rejected by default. There is no defined limit to the number of _LTS_
-branches and any branch may become an _LTS_ branch after its initial release. There is no guarantee
-that a new _LTS_ branch will be designated before existing _LTS_ branches reach their end of life.
+One release per year will be designated a Long Term Stable (_LTS_) release. LTS
+releases are supported for at least two years after their initial _minor_
+(x.y.0) release. The maintainers of the _LTS_ branch may commit to a longer period
+or extend the support period as needed. These branches will accept bug reports and
+backports until the end of life date. They may also accept a wider range of
+patches than non-_LTS_ releases to support the longer term maintainability of the
+branch, including library dependency, toolchain (including Go) and other version
+updates which are needed to ensure each release is built with fully supported
+dependencies. Feature backports are up to the discretion of the maintainers who
+own the branch but should be rejected by default.
+
+This combination of regular and LTS releases allows users to choose between
+adopting new features more quickly or prioritizing stability and longer support
+lifecycles.
 
 ### Release Owners
 
@@ -116,23 +125,23 @@ to all committers.
 
 ### Current State of containerd Releases
 
-| Release                                                              | Status        | Start                          | End of Life                    | Owners                 |
-| -------------------------------------------------------------------- | ------------- | ------------------------------ | ------------------------------ | ---------------------- |
-| [0.0](https://github.com/containerd/containerd/releases/tag/0.0.5)   | End of Life   | Dec 4, 2015                    | -                              |                        |
-| [0.1](https://github.com/containerd/containerd/releases/tag/v0.1.0)  | End of Life   | Mar 21, 2016                   | -                              |                        |
-| [0.2](https://github.com/containerd/containerd/tree/v0.2.x)          | End of Life   | Apr 21, 2016                   | December 5, 2017               |                        |
-| [1.0](https://github.com/containerd/containerd/releases/tag/v1.0.3)  | End of Life   | December 5, 2017               | December 5, 2018               |                        |
-| [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.8)  | End of Life   | April 23, 2018                 | October 23, 2019               |                        |
-| [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.13) | End of Life   | October 24, 2018               | October 15, 2020               |                        |
-| [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life   | September 26, 2019             | March 4, 2021                  |                        |
-| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life   | August 17, 2020                | March 3, 2022                  |                        |
-| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life   | May 3, 2021                    | February 28, 2023              |                        |
-| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.39) | End of Life   | February 15, 2022              | August 23, 2025                | @containerd/committers |
-| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS           | March 10, 2023                 | September 2026*                | @containerd/committers |
-| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.7)  | End of Life   | November 5, 2024               | November 7, 2025               | @containerd/committers |
-| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.0)  | Active        | May 7, 2025                    | May 5, 2026                    | @containerd/committers |
-| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.0)  | Active        | November 5, 2025               | November 6, 2026               | @containerd/committers |
-| [2.3](https://github.com/containerd/containerd/milestone/50)         | _Future_      | May 6, 2026 (_tentative_)      | _TBD_                          | _TBD_                  |
+| Release                                                              | Status         | Start                          | End of Life                    | Owners                 |
+| -------------------------------------------------------------------- | -------------- | ------------------------------ | ------------------------------ | ---------------------- |
+| [0.0](https://github.com/containerd/containerd/releases/tag/0.0.5)   | End of Life    | Dec 4, 2015                    | -                              |                        |
+| [0.1](https://github.com/containerd/containerd/releases/tag/v0.1.0)  | End of Life    | Mar 21, 2016                   | -                              |                        |
+| [0.2](https://github.com/containerd/containerd/tree/v0.2.x)          | End of Life    | Apr 21, 2016                   | December 5, 2017               |                        |
+| [1.0](https://github.com/containerd/containerd/releases/tag/v1.0.3)  | End of Life    | December 5, 2017               | December 5, 2018               |                        |
+| [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.8)  | End of Life    | April 23, 2018                 | October 23, 2019               |                        |
+| [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.13) | End of Life    | October 24, 2018               | October 15, 2020               |                        |
+| [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life    | September 26, 2019             | March 4, 2021                  |                        |
+| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life    | August 17, 2020                | March 3, 2022                  |                        |
+| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life    | May 3, 2021                    | February 28, 2023              |                        |
+| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.39) | End of Life    | February 15, 2022              | August 23, 2025                | @containerd/committers |
+| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS            | March 10, 2023                 | September 2026*                | @containerd/committers |
+| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.7)  | End of Life    | November 5, 2024               | November 7, 2025               | @containerd/committers |
+| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.0)  | Active         | May 7, 2025                    | May 5, 2026                    | @containerd/committers |
+| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.0)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
+| [2.3](https://github.com/containerd/containerd/milestone/50)         | LTS (_future_) | April 27, 2026 (_tentative_)   | April 27, 2028 (_tentative_)   | @containerd/committers |
 
 \* Support for the 1.7 release branch is provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by @chrishenzie and @samuelkarp.
 
@@ -174,7 +183,10 @@ Backports in containerd are community driven. As maintainers, we'll try to
 ensure that sensible bugfixes make it into _active_ release, but our main focus
 will be features for the next _minor_ or _major_ release. For the most part,
 this process is straightforward, and we are here to help make it as smooth as
-possible.
+possible. An exception to the general policy of primarily backporting bugfixes
+is for new deprecation warnings. To ensure users have adequate time to respond
+to upcoming breaking changes, new deprecation warnings may be backported to any
+supported release, including LTS releases.
 
 If there are important fixes that need to be backported, please let us know in
 one of three ways:
@@ -243,13 +255,15 @@ release branch should you open a PR with new code.
 
 ### Upgrade Path
 
-The upgrade path for containerd is such that the 0.0.x patch releases are
-always backward compatible with its major and minor version. Minor (0.x.0)
-version will always be compatible with the previous minor release. i.e. 1.2.0
-is backwards compatible with 1.1.0 and 1.1.0 is compatible with 1.0.0. There is
-no compatibility guarantees for upgrades that span multiple, _minor_ releases.
-For example, 1.0.0 to 1.2.0 is not supported. One should first upgrade to 1.1,
-then 1.2.
+Upgrades are supported for sequential minor releases. For example, an upgrade
+from 2.0 to 2.1 is supported, but an upgrade from 2.0 to 2.2 is not. Patch
+releases are always backward compatible with their minor version.
+
+In addition to sequential minor release upgrades, direct upgrades between
+sequential LTS (Long Term Stable) releases are also supported. For example, a
+direct upgrade from 1.7 (LTS) to 2.3 (LTS) will be tested and supported, but 1.7
+(LTS) to 2.6 (LTS, tentatively) will not. This allows users who prefer to stay
+on LTS releases to have a clear and safe upgrade path.
 
 There are no compatibility guarantees with upgrades to _major_ versions. For 2.0, migration was
 added to ensure upgrading from 1.6 or 1.7 to 2.0 is easy. The latest releases of 1.6 and 1.7 provide
@@ -258,6 +272,12 @@ warnings are showing up, the configuration can be safely migrated in 1.6 or 1.7 
 2.0. Once no deprecation warnings are showing up, the upgrade to 2.0 should be smooth. Always
 check the release notes, breaking changes are listed there, and test your configuration before
 upgrading.
+
+Features can only be removed in a release that immediately follows an LTS
+release. Before upgrading, especially across multiple minor versions or to a new
+LTS release, users should ensure that they have addressed any deprecation
+warnings from their current version. This practice ensures a smoother transition
+and avoids issues with removed features.
 
 ## Public API Stability
 
