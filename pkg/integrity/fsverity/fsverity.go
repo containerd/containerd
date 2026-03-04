@@ -56,19 +56,19 @@ func (v validator) Register(blob string) (string, error) {
 	digest := filepath.Base(blob)
 
 	if err := os.MkdirAll(v.integrityStorePath, 0755); err != nil {
-		return verityDigest, fmt.Errorf("Failed to create integrity store: %w", err)
+		return verityDigest, fmt.Errorf("failed to create integrity store: %w", err)
 	}
 
 	integrityFilePath := filepath.Join(v.integrityStorePath, digest)
 	integrityFile, err := os.Create(integrityFilePath)
 	if err != nil {
-		return verityDigest, fmt.Errorf("Failed to register blob integrity: %w", err)
+		return verityDigest, fmt.Errorf("failed to register blob integrity: %w", err)
 	}
 	defer integrityFile.Close()
 
 	_, err = integrityFile.Write([]byte(verityDigest))
 	if err != nil {
-		return verityDigest, fmt.Errorf("Failed to register blob integrity: %w", err)
+		return verityDigest, fmt.Errorf("failed to register blob integrity: %w", err)
 	}
 
 	return verityDigest, nil
@@ -83,7 +83,7 @@ func (v validator) IsValid(blob string) (bool, error) {
 		// if not, it may not be trustworthy
 		enabled, err := fsv.IsEnabled(blob)
 		if err != nil {
-			return verityDigest, fmt.Errorf("Error checking fsverity status of blob %s: %s", blob, err.Error())
+			return verityDigest, fmt.Errorf("error checking fsverity status of blob %s: %s", blob, err.Error())
 		}
 		if !enabled {
 			return verityDigest, fmt.Errorf("fsverity not enabled on blob %s", blob)
