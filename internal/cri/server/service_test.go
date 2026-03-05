@@ -141,6 +141,12 @@ func withRuntimeService(rs RuntimeService) testOpt {
 	}
 }
 
+func withImageService(is ImageService) testOpt {
+	return func(service *criService) {
+		service.ImageService = is
+	}
+}
+
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService(opts ...testOpt) *criService {
 	labels := label.NewStore()
