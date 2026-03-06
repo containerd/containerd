@@ -63,7 +63,7 @@ version = 3
 	var busyboxImage = images.Get(images.BusyBox)
 	pullImagesByCRI(t, ctrd.criImageService(t), busyboxImage)
 
-	n := 8
+	n := 80
 	podCtxs := []*podTCtx{}
 
 	defer func() {
@@ -85,7 +85,7 @@ version = 3
 		podCtxs = append(podCtxs, podCtx)
 	}
 
-	for round := range 10 {
+	for round := range 100 {
 		if t.Failed() {
 			break
 		}
@@ -128,6 +128,9 @@ version = 3
 					}
 
 					if reason := status.GetReason(); reason != "OOMKilled" {
+						// if reason == "Error" {
+						// 	return false, nil
+						// }
 						return false, fmt.Errorf("expected OOMKilled but got %s", reason)
 					}
 					return true, nil

@@ -19,13 +19,16 @@
 package oom
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )
 
@@ -124,7 +127,10 @@ func (w *watcher) start() {
 
 			// TODO: We should export MemoryEventsStat function
 			out := make(map[string]uint64)
-			if err := readKVStatsFile(w.cgroupPath, "memory.events", out); err != nil {
+			t1 := time.Now()
+			err = readKVStatsFile(w.cgroupPath, "memory.events", out)
+			log.G(context.Background()).Infof("nmx001 readKVStatsFile used %v", time.Since(t1))
+			if err != nil {
 				// When cgroup is deleted read may return -ENODEV instead of -ENOENT from open.
 				if _, statErr := os.Lstat(filepath.Join(w.cgroupPath, "memory.events")); !os.IsNotExist(statErr) {
 					w.errCh <- err
