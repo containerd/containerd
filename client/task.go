@@ -161,7 +161,12 @@ func (i *TaskInfo) Runtime() string {
 // getRuncOptions returns a reference to the runtime options for use by the task.
 // If the set of options is not set by the opts passed into the NewTask creation
 // this function first attempts to initialize the runtime options with a copy of the runtimeOptions,
-// otherwise an empty set of options is assigned and returned
+// otherwise an empty set of options is assigned and returned.
+//
+// Note: runtimeOptions may be of a non-runc type (e.g. runtimeoptions.v1.Options used by
+// non-runc runtimes such as Kata Containers). In that case we skip copying from runtimeOptions
+// and return empty runc options so that callers can still set task-level fields such as
+// TaskApiAddress without failing the unmarshal.
 func (i *TaskInfo) getRuncOptions() (*options.Options, error) {
 	if i.Options != nil {
 		opts, ok := i.Options.(*options.Options)
@@ -172,7 +177,7 @@ func (i *TaskInfo) getRuncOptions() (*options.Options, error) {
 	}
 
 	opts := &options.Options{}
-	if i.runtimeOptions != nil && i.runtimeOptions.GetValue() != nil {
+	if i.runtimeOptions != nil && i.runtimeOptions.GetValue() != nil && typeurl.Is(i.runtimeOptions, opts) {
 		if err := typeurl.UnmarshalTo(i.runtimeOptions, opts); err != nil {
 			return nil, fmt.Errorf("failed to get runtime v2 options: %w", err)
 		}
