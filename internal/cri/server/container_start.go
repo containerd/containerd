@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -106,6 +107,23 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 
 	if cntr.Status.Get().Restore {
+		// Restore /dev/shm content
+		sandboxDevShm := c.getSandboxDevShm(meta.SandboxID)
+		shmDirTarFilePath := filepath.Join(c.getContainerRootDir(r.GetContainerId()), crmetadata.DevShmCheckpointTar)
+		if _, err := os.Stat(shmDirTarFilePath); err != nil {
+			log.G(ctx).Debugf("container checkpoint doesn't contain /dev/shm: %v", err)
+		} else {
+			shmDirTarFile, err := os.Open(shmDirTarFilePath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open /dev/shm checkpoint archive: %w", err)
+			}
+			defer shmDirTarFile.Close()
+
+			if _, err := archive.Apply(ctx, sandboxDevShm, shmDirTarFile); err != nil {
+				return nil, fmt.Errorf("failed to restore /dev/shm from checkpoint: %w", err)
+			}
+		}
+
 		// If during start the container is detected as a checkpoint the container
 		// will be marked with Restore() == true. In this case not the normal
 		// start code is needed but this code which does a restore.
@@ -164,6 +182,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			crmetadata.NetworkStatusFile,
 			crmetadata.RootFsDiffTar,
 			crmetadata.DeletedFilesFile,
+			crmetadata.DevShmCheckpointTar,
 			crmetadata.CheckpointDirectory,
 			crmetadata.StatusDumpFile,
 			crmetadata.ConfigDumpFile,

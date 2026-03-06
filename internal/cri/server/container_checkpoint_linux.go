@@ -199,6 +199,7 @@ func (c *criService) CRImportCheckpoint(
 				crmetadata.NetworkStatusFile,
 				crmetadata.DeletedFilesFile,
 				crmetadata.CheckpointDirectory,
+				crmetadata.DevShmCheckpointTar,
 			}
 			for _, pattern := range excludePatterns {
 				if strings.HasPrefix(hdr.Name, pattern) {
@@ -591,6 +592,25 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 			filepath.Join(cpPath, "container.log"),
 			0o600,
 		); err != nil {
+			return nil, err
+		}
+	}
+
+	// Keep the content of /dev/shm directory
+	sandboxDevShm := c.getSandboxDevShm(container.SandboxID)
+	if _, err := c.os.Stat(sandboxDevShm); err == nil {
+		shmDirTarFileFullPath := filepath.Join(cpPath, crmetadata.DevShmCheckpointTar)
+		shmDirTarFile, err := os.Create(shmDirTarFileFullPath)
+		if err != nil {
+			return nil, err
+		}
+		defer shmDirTarFile.Close()
+
+		shmTar := archive.Diff(ctx, "", sandboxDevShm)
+		if _, err = io.Copy(shmDirTarFile, shmTar); err != nil {
+			return nil, err
+		}
+		if err := shmTar.Close(); err != nil {
 			return nil, err
 		}
 	}
