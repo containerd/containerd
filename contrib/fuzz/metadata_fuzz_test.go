@@ -35,22 +35,14 @@ import (
 	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 )
 
-func testEnv(t *testing.T) (context.Context, *bolt.DB, func(), error) {
-	dirname := t.TempDir()
+func FuzzImageStore(f *testing.F) {
+	dirname := f.TempDir()
 	db, err := bolt.Open(filepath.Join(dirname, "meta.db"), 0644, nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
+	defer db.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx = namespaces.WithNamespace(ctx, "testing")
-	return ctx, db, func() {
-		db.Close()
-		cancel()
-	}, nil
-}
-
-func FuzzImageStore(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		const (
 			opCreate = "Create"
@@ -60,10 +52,8 @@ func FuzzImageStore(f *testing.F) {
 		)
 		imageStoreOptions := []string{opCreate, opList, opUpdate, opDelete}
 
-		ctx, db, cancel, err := testEnv(t)
-		if err != nil {
-			return
-		}
+		ctx, cancel := context.WithCancel(context.Background())
+		ctx = namespaces.WithNamespace(ctx, "testing")
 		defer cancel()
 		store := metadata.NewImageStore(metadata.NewDB(db, nil, nil))
 		f := fuzz.NewConsumer(data)
@@ -110,6 +100,13 @@ func FuzzImageStore(f *testing.F) {
 }
 
 func FuzzLeaseManager(f *testing.F) {
+	dirname := f.TempDir()
+	db, err := bolt.Open(filepath.Join(dirname, "meta.db"), 0644, nil)
+	if err != nil {
+		return
+	}
+	defer db.Close()
+
 	f.Fuzz(func(t *testing.T, data []byte) {
 		const (
 			opCreate         = "Create"
@@ -120,10 +117,8 @@ func FuzzLeaseManager(f *testing.F) {
 			opListResources  = "ListResources"
 		)
 		leaseManagerOptions := []string{opCreate, opList, opAddResource, opDelete, opDeleteResource, opListResources}
-		ctx, db, cancel, err := testEnv(t)
-		if err != nil {
-			return
-		}
+		ctx, cancel := context.WithCancel(context.Background())
+		ctx = namespaces.WithNamespace(ctx, "testing")
 		defer cancel()
 		lm := metadata.NewLeaseManager(metadata.NewDB(db, nil, nil))
 
@@ -201,6 +196,13 @@ func FuzzLeaseManager(f *testing.F) {
 }
 
 func FuzzContainerStore(f *testing.F) {
+	dirname := f.TempDir()
+	db, err := bolt.Open(filepath.Join(dirname, "meta.db"), 0644, nil)
+	if err != nil {
+		return
+	}
+	defer db.Close()
+
 	f.Fuzz(func(t *testing.T, data []byte) {
 		const (
 			opCreate = "Create"
@@ -210,10 +212,8 @@ func FuzzContainerStore(f *testing.F) {
 			opGet    = "Get"
 		)
 		containerStoreOptions := []string{opCreate, opList, opDelete, opUpdate, opGet}
-		ctx, db, cancel, err := testEnv(t)
-		if err != nil {
-			return
-		}
+		ctx, cancel := context.WithCancel(context.Background())
+		ctx = namespaces.WithNamespace(ctx, "testing")
 		defer cancel()
 
 		store := metadata.NewContainerStore(metadata.NewDB(db, nil, nil))
@@ -274,7 +274,7 @@ type testOptions struct {
 
 type testOpt func(*testOptions)
 
-func testDB(t *testing.T, opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
+func testDB(f *testing.F, opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, "testing")
 
@@ -284,7 +284,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *metadata.DB, func()
 		o(&topts)
 	}
 
-	dirname := t.TempDir()
+	dirname := f.TempDir()
 
 	snapshotter, err := native.NewSnapshotter(filepath.Join(dirname, "native"))
 	if err != nil {
@@ -325,6 +325,12 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *metadata.DB, func()
 }
 
 func FuzzContentStore(f *testing.F) {
+	ctx, db, cleanup, err := testDB(f)
+	if err != nil {
+		return
+	}
+	defer cleanup()
+
 	f.Fuzz(func(t *testing.T, data []byte) {
 		const (
 			opInfo         = "Info"
@@ -337,11 +343,6 @@ func FuzzContentStore(f *testing.F) {
 			opCommit       = "Commit"
 		)
 		contentStoreOptions := []string{opInfo, opUpdate, opWalk, opDelete, opListStatuses, opStatus, opAbort, opCommit}
-		ctx, db, cancel, err := testDB(t)
-		defer cancel()
-		if err != nil {
-			return
-		}
 
 		cs := db.ContentStore()
 		f := fuzz.NewConsumer(data)

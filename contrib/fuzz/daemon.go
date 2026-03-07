@@ -18,6 +18,8 @@ package fuzz
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -29,8 +31,8 @@ import (
 	"github.com/containerd/log"
 )
 
-const (
-	defaultRoot    = "/var/lib/containerd"
+var (
+	defaultRoot    = "/tmp/containerd-root"
 	defaultState   = "/tmp/containerd"
 	defaultAddress = "/tmp/containerd/containerd.sock"
 )
@@ -43,6 +45,15 @@ func startDaemon() {
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+
+	// Use a unique directory for this daemon instance to avoid collisions
+	tmpDir, err := os.MkdirTemp("", "containerd-fuzz-")
+	if err != nil {
+		panic(err)
+	}
+	defaultRoot = filepath.Join(tmpDir, "root")
+	defaultState = filepath.Join(tmpDir, "state")
+	defaultAddress = filepath.Join(tmpDir, "containerd.sock")
 
 	errC := make(chan error, 1)
 
@@ -60,6 +71,8 @@ func startDaemon() {
 				Address:        defaultAddress,
 				MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
 				MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
+				UID:            os.Getuid(),
+				GID:            os.Getgid(),
 			},
 			DisabledPlugins: []string{},
 			RequiredPlugins: []string{},
@@ -87,7 +100,6 @@ func startDaemon() {
 		server.Wait()
 	}()
 
-	var err error
 	select {
 	case err = <-errC:
 	case <-ctx.Done():
