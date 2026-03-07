@@ -353,6 +353,7 @@ func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid
 		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.NetworkNamespace, Path: GetNetworkNamespace(sandboxPid)}),
 		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.IPCNamespace, Path: GetIPCNamespace(sandboxPid)}),
 		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UTSNamespace, Path: GetUTSNamespace(sandboxPid)}),
+		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.TimeNamespace, Path: GetTimeNamespace(sandboxPid)}),
 	}
 	if namespaces.GetPid() != runtime.NamespaceMode_CONTAINER {
 		opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.PIDNamespace, Path: GetPIDNamespace(targetPid)}))
@@ -382,6 +383,8 @@ const (
 	pidNSFormat = "/proc/%v/ns/pid"
 	// userNSFormat is the format of user namespace of a process.
 	userNSFormat = "/proc/%v/ns/user"
+	// timeNSFormat is the format of time namespace of a process.
+	timeNSFormat = "/proc/%v/ns/time"
 )
 
 // GetNetworkNamespace returns the network namespace of a process.
@@ -407,4 +410,9 @@ func GetPIDNamespace(pid uint32) string {
 // GetUserNamespace returns the user namespace of a process.
 func GetUserNamespace(pid uint32) string {
 	return fmt.Sprintf(userNSFormat, pid)
+}
+
+// GetTimeNamespace returns the time namespace of a process.
+func GetTimeNamespace(pid uint32) string {
+	return fmt.Sprintf(timeNSFormat, pid)
 }
