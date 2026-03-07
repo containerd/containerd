@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 	"time"
 
@@ -84,7 +83,7 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 	}
 
 	// Add default block size on darwin if not already specified
-	d.mkfsExtraOpts = addDefaultMkfsOpts(d.mkfsExtraOpts)
+	d.mkfsExtraOpts = erofsutils.AddDefaultMkfsOpts(d.mkfsExtraOpts)
 
 	return d
 }
@@ -97,7 +96,7 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 //
 // Since `images.DiffCompression` doesn't support arbitrary media types,
 // disallow non-empty suffixes for now.
-func isErofsMediaType(mt string) bool {
+func IsErofsMediaType(mt string) bool {
 	if !strings.HasSuffix(mt, ".erofs") && !strings.HasPrefix(mt, "application/vnd.erofs.layer") {
 		return false
 	}
@@ -119,7 +118,7 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	}()
 
 	native := false
-	if isErofsMediaType(desc.MediaType) {
+	if IsErofsMediaType(desc.MediaType) {
 		native = true
 	} else if _, err := images.DiffCompression(ctx, desc.MediaType); err != nil {
 		return emptyDesc, fmt.Errorf("currently unsupported media type: %s", desc.MediaType)
@@ -213,22 +212,4 @@ func (rc *readCounter) Read(p []byte) (n int, err error) {
 	n, err = rc.r.Read(p)
 	rc.c += int64(n)
 	return
-}
-
-// addDefaultMkfsOpts adds default options for mkfs.erofs
-func addDefaultMkfsOpts(mkfsExtraOpts []string) []string {
-	if runtime.GOOS != "darwin" {
-		return mkfsExtraOpts
-	}
-
-	// Check if -b argument is already present
-	for _, opt := range mkfsExtraOpts {
-		if strings.HasPrefix(opt, "-b") {
-			return mkfsExtraOpts
-		}
-	}
-
-	// Add -b4096 as the first option to prevent unusable block
-	// size from being used on macOS.
-	return append([]string{"-b4096"}, mkfsExtraOpts...)
 }
