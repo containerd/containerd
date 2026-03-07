@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/schedcore"
 	"github.com/containerd/containerd/v2/pkg/shim"
@@ -104,6 +105,7 @@ func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddre
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(), "GOMAXPROCS=4")
 	cmd.Env = append(cmd.Env, "OTEL_SERVICE_NAME=containerd-shim-"+id)
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
@@ -144,8 +146,8 @@ func (s *shimSocket) Close() {
 	_ = shim.RemoveSocket(s.addr)
 }
 
-func newShimSocket(ctx context.Context, path, id string, debug bool) (*shimSocket, error) {
-	address, err := shim.SocketAddress(ctx, path, id, debug)
+func newShimSocket(ctx context.Context, root, path, id string, debug bool) (*shimSocket, error) {
+	address, err := shim.CreateSocketAddress(ctx, root, path, id, debug)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +213,11 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 		}
 	}()
 
-	s, err := newShimSocket(ctx, opts.Address, grouping, false)
+	socketDir := opts.SocketDir
+	if socketDir == "" {
+		socketDir = filepath.Join(defaults.DefaultStateDir, "s")
+	}
+	s, err := newShimSocket(ctx, socketDir, opts.Address, grouping, false)
 	if err != nil {
 		if errdefs.IsAlreadyExists(err) {
 			params.Address = s.addr
@@ -223,7 +229,7 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 	cmd.ExtraFiles = append(cmd.ExtraFiles, s.f)
 
 	if opts.Debug {
-		s, err = newShimSocket(ctx, opts.Address, grouping, true)
+		s, err = newShimSocket(ctx, socketDir, opts.Address, grouping, true)
 		if err != nil {
 			return params, err
 		}

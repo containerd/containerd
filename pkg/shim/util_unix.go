@@ -73,10 +73,15 @@ func AdjustOOMScore(pid int) error {
 	return nil
 }
 
-const socketRoot = defaults.DefaultStateDir
-
-// SocketAddress returns a socket address
+// SocketAddress returns a socket address in the default state directory
+//
+// TODO: Consider deprecating for CreateSocketAddress
 func SocketAddress(ctx context.Context, socketPath, id string, debug bool) (string, error) {
+	return CreateSocketAddress(ctx, filepath.Join(defaults.DefaultStateDir, "s"), socketPath, id, debug)
+}
+
+// CreateSocketAddress returns the default socket address
+func CreateSocketAddress(ctx context.Context, socketRoot, socketPath, id string, debug bool) (string, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return "", err
@@ -86,7 +91,7 @@ func SocketAddress(ctx context.Context, socketPath, id string, debug bool) (stri
 		path = filepath.Join(path, "debug")
 	}
 	d := sha256.Sum256([]byte(path))
-	return fmt.Sprintf("unix://%s/%x", filepath.Join(socketRoot, "s"), d), nil
+	return fmt.Sprintf("unix://%s/%x", socketRoot, d), nil
 }
 
 // AnonDialer returns a dialer for a socket
@@ -288,14 +293,18 @@ func cleanupSockets(ctx context.Context) {
 	if address, err := ReadAddress("address"); err == nil {
 		_ = RemoveSocket(address)
 	}
+	socketDir := os.Getenv(socketDirEnv)
+	if socketDir == "" {
+		socketDir = filepath.Join(defaults.DefaultStateDir, "s")
+	}
 	if len(socketFlag) > 0 {
 		_ = RemoveSocket("unix://" + socketFlag)
-	} else if address, err := SocketAddress(ctx, addressFlag, id, false); err == nil {
+	} else if address, err := CreateSocketAddress(ctx, socketDir, addressFlag, id, false); err == nil {
 		_ = RemoveSocket(address)
 	}
 	if len(debugSocketFlag) > 0 {
 		_ = RemoveSocket("unix://" + debugSocketFlag)
-	} else if address, err := SocketAddress(ctx, addressFlag, id, true); err == nil {
+	} else if address, err := CreateSocketAddress(ctx, socketDir, addressFlag, id, true); err == nil {
 		_ = RemoveSocket(address)
 	}
 }
