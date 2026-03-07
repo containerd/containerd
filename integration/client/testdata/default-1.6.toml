@@ -191,7 +191,7 @@ version = 2
     sched_core = false
 
   [plugins."io.containerd.service.v1.diff-service"]
-    default = ["walking"]
+    default = ["overlay", "walking"]
 
   [plugins."io.containerd.service.v1.tasks-service"]
     rdt_config_file = ""
