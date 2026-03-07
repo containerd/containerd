@@ -146,9 +146,18 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) (retError error) {
 		opts.ConsoleSocket = socket
 	}
 
-	if err := p.runtime.Create(ctx, r.ID, r.Bundle, opts); err != nil {
+	createCtx, createCancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		30*time.Second)
+	defer createCancel()
+	if err := p.runtime.Create(createCtx, r.ID, r.Bundle, opts); err != nil {
 		return p.runtimeError(err, "OCI runtime create failed")
 	}
+
+	if ctx.Err() != nil {
+		return fmt.Errorf("container creation interrupted: %w", createCtx.Err())
+	}
+
 	if r.Stdin != "" {
 		if err := p.openStdin(r.Stdin); err != nil {
 			return err
