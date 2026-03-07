@@ -349,7 +349,7 @@ func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, last
 		headResp.Body.Close()
 	}
 	if headResp.StatusCode > 299 {
-		return nil, 0, fmt.Errorf("unexpected HEAD status code %v: %s", headReq.String(), headResp.Status)
+		return nil, 0, fmt.Errorf("unexpected HEAD status code %v: %s", headReq.sanitizedURL(), headResp.Status)
 	}
 
 	getReq := r.request(host, http.MethodGet, ps...)
