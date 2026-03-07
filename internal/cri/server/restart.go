@@ -184,8 +184,7 @@ func (c *criService) recover(ctx context.Context) error {
 				log.G(ctx2).
 					WithError(err).
 					WithField("container", container.ID()).
-					Error("Failed to load container")
-
+					Error("Failed to load container, and try to delete damaged container")
 				return nil
 			}
 			log.G(ctx2).Debugf("Loaded container %+v", cntr)
@@ -379,6 +378,14 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 				switch status.State() {
 				case runtime.ContainerState_CONTAINER_EXITED:
 					return fmt.Errorf("unexpected container state for running task: %q", status.State())
+				// task is running but the cri status is unknown,try to recover the status to unknown
+				case runtime.ContainerState_CONTAINER_UNKNOWN:
+					log.G(ctx).Warnf("Container %q is in unknown state, but task is running,try to recover", id)
+					status.Message = "Status recover to unknown"
+					if _, err := containerstore.StoreStatus(containerDir, id, status); err != nil {
+						return fmt.Errorf("failed to recover container status: %w", err)
+					}
+					log.G(ctx).Debugf("Container %q recover successful", id)
 				case runtime.ContainerState_CONTAINER_RUNNING:
 				default:
 					// This may happen if containerd gets restarted after task is started, but
