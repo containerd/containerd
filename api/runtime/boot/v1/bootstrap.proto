@@ -1,0 +1,105 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+// Bootstrap Protocol
+//
+// This protocol defines the interface between containerd and shims at startup.
+// It replaces the previous scattered configuration mechanisms (CLI args, env vars,
+// stdin JSON, spec.json annotations) with a single, versioned, extensible protocol.
+//
+// Flow:
+//   1. containerd spawns the shim process
+//   2. containerd writes BootstrapParams as JSON to shim's stdin
+//   3. shim initializes and writes BootstrapResult as JSON to stdout
+//   4. containerd connects to the address provided in BootstrapResult
+//
+// Note: JSON serialization is used to keep shim binaries small since the
+// encoding/json package is already part of the Go runtime. The proto
+// definition serves as the schema for detecting breaking changes and
+// maintaining forward/backward compatibility.
+//
+// This design enables:
+//   - Forward/backward compatibility via version field
+//   - Typed extensibility via google.protobuf.Any and Extension
+//   - Clear capability negotiation between containerd and shims
+
+syntax = "proto3";
+
+package containerd.runtime.bootstrap.v1;
+
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/containerd/containerd/api/runtime/bootstrap/v1;bootstrap";
+
+// BootstrapParams contains all configuration passed from containerd to shim at startup.
+message BootstrapParams {
+  // Container/sandbox ID
+  string instance_id = 1;
+
+  // Namespace for the container
+  string namespace = 2;
+
+  // Requested shim log level.
+  string log_level = 3;
+
+  // containerd daemon version that is launching this shim.
+  string containerd_version = 4;
+
+  // Containerd's TTRPC API address (e.g., "unix:///run/containerd/containerd.sock.ttrpc")
+  string containerd_ttrpc_address = 5;
+
+  // Containerd's gRPC API address (e.g., "unix:///run/containerd/containerd.sock")
+  string containerd_grpc_address = 6;
+
+  // Path to containerd binary for event publishing
+  string containerd_binary = 7;
+
+  // Extensible configuration sections for new features
+  // Each section can contain arbitrary structured data identified by type URL
+  // Examples: CRI config, NRI config, sandbox config, etc.
+  repeated Extension extensions = 8;
+}
+
+// Extension provides extensibility for new configuration types
+// without changing the core BootstrapParams protocol
+message Extension {
+  // Configuration data with embedded type URL
+  // Examples of type URLs:
+  //   - "containerd.io/cri.v1.PodSandboxConfig"
+  //   - "containerd.io/nri.v1.PluginConfig"
+  //   - "containerd.io/sandbox.v1.SandboxConfig"
+  google.protobuf.Any value = 1;
+}
+
+// BootstrapResult is returned by shim via stdout after successful startup
+message BootstrapResult {
+  // Version of shim parameters (expected 2 for shim v2)
+  int32 version = 1;
+
+  // Address where shim is listening (e.g., "unix:///run/containerd/shim.sock")
+  // Containerd will connect to this address for task operations
+  string address = 2;
+
+  // Protocol used by shim: "ttrpc" or "grpc"
+  string protocol = 3;
+
+  // Optional: Capabilities supported by this shim instance
+  // Allows shim to advertise what features it supports
+  repeated string capabilities = 4;
+
+  // Optional: Additional metadata from shim
+  map<string, string> metadata = 5;
+}

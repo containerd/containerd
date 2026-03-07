@@ -128,7 +128,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		bundle:  bundle,
 		client:  conn,
 		address: address,
-		version: params.Version,
+		version: int(params.Version),
 	}
 
 	return shim, nil
@@ -219,8 +219,8 @@ type clientVersionDowngrader interface {
 	Downgrade() error
 }
 
-func parseStartResponse(response []byte) (client.BootstrapParams, error) {
-	var params client.BootstrapParams
+func parseStartResponse(response []byte) (*client.BootstrapResult, error) {
+	var params client.BootstrapResult
 
 	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
 		// Use TTRPC for legacy shims
@@ -230,14 +230,14 @@ func parseStartResponse(response []byte) (client.BootstrapParams, error) {
 	}
 
 	if params.Version > CurrentShimVersion {
-		return client.BootstrapParams{}, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
+		return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
 	}
 
-	return params, nil
+	return &params, nil
 }
 
 // writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
-func writeBootstrapParams(path string, params client.BootstrapParams) error {
+func writeBootstrapParams(path string, params *client.BootstrapResult) error {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -262,15 +262,15 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 	return f.Close()
 }
 
-func readBootstrapParams(path string) (client.BootstrapParams, error) {
+func readBootstrapParams(path string) (*client.BootstrapResult, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	return parseStartResponse(data)
@@ -278,7 +278,7 @@ func readBootstrapParams(path string) (client.BootstrapParams, error) {
 
 // makeConnection creates a new TTRPC or GRPC connection object from address.
 // address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
-func makeConnection(ctx context.Context, id string, params client.BootstrapParams, onClose func()) (_ io.Closer, retErr error) {
+func makeConnection(ctx context.Context, id string, params *client.BootstrapResult, onClose func()) (_ io.Closer, retErr error) {
 	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
