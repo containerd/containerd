@@ -106,6 +106,8 @@ type ImageService interface {
 	GetImage(id string) (imagestore.Image, error)
 	GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error)
 
+	PinnedImage(name string) string
+
 	LocalResolve(refOrID string) (imagestore.Image, error)
 
 	ImageFSPaths() map[string]string
