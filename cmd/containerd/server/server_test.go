@@ -111,7 +111,7 @@ func TestMigration(t *testing.T) {
 		},
 		ConfigMigration: func(ctx context.Context, v int, plugins map[string]interface{}) error {
 			if v != configVersion {
-				t.Errorf("unxpected version: %d", v)
+				t.Errorf("unexpected version: %d", v)
 			}
 			t1, ok := plugins["io.containerd.test.t1"]
 			if !ok {
