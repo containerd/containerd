@@ -111,6 +111,11 @@ can be used and modified as necessary as a custom configuration.`
 			Usage:   "Address for containerd's GRPC server",
 		},
 		&cli.StringFlag{
+			Name:    "group",
+			Aliases: []string{"g"},
+			Usage:   "Group for containerd's GRPC server",
+		},
+		&cli.StringFlag{
 			Name:  "root",
 			Usage: "containerd root directory",
 		},
@@ -162,7 +167,9 @@ can be used and modified as necessary as a custom configuration.`
 			// If TTRPC was not explicitly configured, use defaults based on GRPC.
 			config.TTRPC.Address = config.GRPC.Address + ".ttrpc"
 			config.TTRPC.UID = config.GRPC.UID
+			config.TTRPC.User = config.GRPC.User
 			config.TTRPC.GID = config.GRPC.GID
+			config.TTRPC.Group = config.GRPC.Group
 		}
 
 		// Make sure top-level directories are created early.
@@ -256,7 +263,7 @@ can be used and modified as necessary as a custom configuration.`
 		if config.Debug.Address != "" {
 			var l net.Listener
 			if isLocalAddress(config.Debug.Address) {
-				if l, err = sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID); err != nil {
+				if l, err = sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID, config.Debug.User, config.Debug.Group); err != nil {
 					return fmt.Errorf("failed to get listener for debug endpoint: %w", err)
 				}
 			} else {
@@ -274,7 +281,7 @@ can be used and modified as necessary as a custom configuration.`
 			serve(ctx, l, server.ServeMetrics)
 		}
 		// setup the ttrpc endpoint
-		tl, err := sys.GetLocalListener(config.TTRPC.Address, config.TTRPC.UID, config.TTRPC.GID)
+		tl, err := sys.GetLocalListener(config.TTRPC.Address, config.TTRPC.UID, config.TTRPC.GID, config.TTRPC.User, config.TTRPC.Group)
 		if err != nil {
 			return fmt.Errorf("failed to get listener for main ttrpc endpoint: %w", err)
 		}
@@ -288,7 +295,7 @@ can be used and modified as necessary as a custom configuration.`
 			serve(ctx, l, server.ServeTCP)
 		}
 		// setup the main grpc endpoint
-		l, err := sys.GetLocalListener(config.GRPC.Address, config.GRPC.UID, config.GRPC.GID)
+		l, err := sys.GetLocalListener(config.GRPC.Address, config.GRPC.UID, config.GRPC.GID, config.GRPC.User, config.GRPC.Group)
 		if err != nil {
 			return fmt.Errorf("failed to get listener for main endpoint: %w", err)
 		}
@@ -351,6 +358,10 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 			name: "address",
 			d:    &config.GRPC.Address,
 		},
+		{
+			name: "group",
+			d:    &config.GRPC.Group,
+		},
 	} {
 		if s := cliContext.String(v.name); s != "" {
 			*v.d = s
@@ -360,6 +371,8 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 					return err
 				}
 				*v.d = absPath
+			} else if v.name == "group" {
+				config.GRPC.GID = 0
 			}
 		}
 	}
