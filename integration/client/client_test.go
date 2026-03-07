@@ -19,12 +19,16 @@ package client
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -157,6 +161,13 @@ func TestMain(m *testing.M) {
 		ctrd.Wait()
 		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 		os.Exit(1)
+	}
+
+	// pre-download and cache test images to avoid network timeouts during tests
+	log.G(ctx).Info("pre-downloading test images to cache")
+	if err := predownloadTestImages(ctx, client); err != nil {
+		log.G(ctx).WithError(err).Warn("failed to pre-download test images, tests may be flaky")
+		// Don't exit here - let tests run even if pre-download fails
 	}
 
 	if err := client.Close(); err != nil {
@@ -323,7 +334,26 @@ func TestImagePullAllPlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	img, err := client.Fetch(ctx, imagelist.Get(imagelist.Pause))
+
+	// Retry the fetch operation to handle network flakiness
+	var img images.Image
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		img, err = client.Fetch(ctx, imagelist.Get(imagelist.Pause))
+		if err == nil {
+			break
+		}
+
+		// Check if this is a network-related error that should be retried
+		if isRetryableError(err) && i < maxRetries-1 {
+			t.Logf("Network error on fetch attempt %d/%d, retrying: %v", i+1, maxRetries, err)
+			time.Sleep(time.Duration(i+1) * 2 * time.Second) // exponential backoff
+			continue
+		}
+
+		// If it's not a retryable error or we've exhausted retries, fail
+		break
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,7 +403,26 @@ func TestImagePullSomePlatforms(t *testing.T) {
 
 	// Note: Must be different to the image used in TestImagePullAllPlatforms
 	// or it will see the content pulled by that, and fail.
-	img, err := client.Fetch(ctx, "registry.k8s.io/e2e-test-images/busybox:1.29-2", opts...)
+
+	// Retry the fetch operation to handle network flakiness
+	var img images.Image
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		img, err = client.Fetch(ctx, "registry.k8s.io/e2e-test-images/busybox:1.29-2", opts...)
+		if err == nil {
+			break
+		}
+
+		// Check if this is a network-related error that should be retried
+		if isRetryableError(err) && i < maxRetries-1 {
+			t.Logf("Network error on fetch attempt %d/%d, retrying: %v", i+1, maxRetries, err)
+			time.Sleep(time.Duration(i+1) * 2 * time.Second) // exponential backoff
+			continue
+		}
+
+		// If it's not a retryable error or we've exhausted retries, fail
+		break
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -597,4 +646,80 @@ func TestRuntimeInfo(t *testing.T) {
 	if !rroRecognized {
 		t.Fatalf("expected feat.MountOptions to contain \"rro\", only got %v", feat.MountOptions)
 	}
+}
+
+// predownloadTestImages downloads and caches test images with all manifests to avoid network timeouts during tests
+func predownloadTestImages(ctx context.Context, client *Client) error {
+	imageName := imagelist.Get(imagelist.Pause)
+
+	// Pull with all manifests (no platform restriction) to cache everything locally
+	log.G(ctx).WithField("image", imageName).Info("pre-downloading test image with all manifests")
+
+	// Use a generous timeout for the initial download
+	downloadCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+
+	// Pull all platforms to cache everything locally - this is required for TestImageUsage
+	_, err := client.Pull(downloadCtx, imageName)
+	if err != nil {
+		log.G(ctx).WithError(err).WithField("image", imageName).Warn("failed to pre-download all platforms, falling back to default platform")
+		// Try with just the default platform as fallback
+		_, err = client.Pull(downloadCtx, imageName, WithPlatformMatcher(platforms.Default()))
+		if err != nil {
+			return fmt.Errorf("failed to pre-download test image %s: %w", imageName, err)
+		}
+	}
+
+	// Also fetch all manifests and blobs to ensure everything is cached
+	// Pin to specific digest for consistency
+	img, err := client.ImageService().Get(ctx, imageName)
+	if err != nil {
+		return fmt.Errorf("failed to get image %s: %w", imageName, err)
+	}
+
+	digestName := imageName + "@" + img.Target.Digest.String()
+	_, err = client.Fetch(downloadCtx, digestName)
+	if err != nil {
+		log.G(ctx).WithError(err).WithField("digest", digestName).Warn("failed to fetch all manifests")
+	}
+
+	log.G(ctx).WithField("image", imageName).Info("successfully pre-downloaded test image")
+	return nil
+}
+
+// isRetryableError determines if an error is likely transient and should be retried.
+// temporary unavailability.
+func isRetryableError(err error) bool {
+	// Check for network errors
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return netErr.Timeout()
+	}
+
+	// Check for specific syscall errors that indicate network problems
+	var sysErr syscall.Errno
+	if errors.As(err, &sysErr) {
+		switch sysErr {
+		case syscall.ECONNREFUSED,
+			syscall.ECONNRESET,
+			syscall.ECONNABORTED,
+			syscall.ENETUNREACH,
+			syscall.ENETDOWN,
+			syscall.ETIMEDOUT:
+			return true
+		}
+	}
+
+	// Check for errors from containerd that should be retried
+	if errdefs.IsUnavailable(err) {
+		return true
+	}
+
+	// Fallback to string checks for errors that don't implement specific interfaces
+	errStr := err.Error()
+	return strings.Contains(errStr, "connection reset by peer") ||
+		strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "network is unreachable") ||
+		strings.Contains(errStr, "temporary failure")
 }
