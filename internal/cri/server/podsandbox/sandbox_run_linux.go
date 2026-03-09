@@ -152,10 +152,8 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		}
 	}()
 
-	supplementalGroups := securityContext.GetSupplementalGroups()
 	specOpts = append(specOpts,
 		customopts.WithSelinuxLabels(processLabel, mountLabel),
-		customopts.WithSupplementalGroups(supplementalGroups),
 	)
 
 	// Add sysctls
@@ -243,6 +241,12 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 	if userstr != "" {
 		specOpts = append(specOpts, oci.WithUser(userstr))
 	}
+
+	// Ensure WithSupplementalGroups is applied after WithUser, because
+	// WithUser clears AdditionalGids when setting up user.
+	supplementalGroups := securityContext.GetSupplementalGroups()
+	specOpts = append(specOpts, customopts.WithSupplementalGroups(supplementalGroups))
+
 	return specOpts, nil
 }
 
