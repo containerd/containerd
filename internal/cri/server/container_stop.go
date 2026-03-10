@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -165,7 +166,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	if timeout > 0 {
 		stopSignal := "SIGTERM"
 		if signal := container.Config.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
-			stopSignal = signal.String()
+			stopSignal = convertFromCRISignal(signal.String())
 		} else if container.StopSignal != "" {
 			stopSignal = container.StopSignal
 		} else {
@@ -266,4 +267,10 @@ func (c *criService) cleanupUnknownContainer(ctx context.Context, id string, cnt
 		ExitStatus:  unknownExitCode,
 		ExitedAt:    protobuf.ToTimestamp(time.Now()),
 	}, cntr, sandboxID)
+}
+
+func convertFromCRISignal(criSignal string) string {
+	normalized := strings.Replace(criSignal, "PLUS", "+", 1)
+	normalized = strings.Replace(normalized, "MINUS", "-", 1)
+	return normalized
 }
