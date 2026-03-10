@@ -247,6 +247,11 @@ bin/loopback-v2: integration/failpoint/cmd/loopback-v2 FORCE
 	@echo "$(WHALE) $@"
 	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/loopback-v2
 
+# build a fake FUSE binary with failpoint support, only used by integration test
+bin/fake-fuse: integration/failpoint/cmd/fake-fuse FORCE
+	@echo "$(WHALE) $@"
+	@$(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/fake-fuse
+
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"
 	@$(GO) test ${TESTFLAGS} -bench . -run Benchmark -test.root
@@ -422,6 +427,7 @@ clean-test: ## clean up debris from previously failed tests
 	@rm -rf bin/cri-integration.test
 	@rm -rf bin/cni-bridge-fp
 	@rm -rf bin/containerd-shim-runc-fp-v1
+	@rm -rf bin/fake-fuse
 
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"

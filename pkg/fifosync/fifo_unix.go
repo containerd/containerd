@@ -23,6 +23,7 @@ Package fifosync provides a pattern on Unix-like operating systems for synchroni
 package fifosync
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -45,6 +46,9 @@ type Waiter interface {
 	Name() string
 	// Wait waits for a trigger from another process.
 	Wait() error
+	// WaitCtx waits for a trigger from another process unless the context gets
+	// cancelled early.
+	WaitCtx(ctx context.Context) error
 }
 
 type fifo struct {
@@ -122,4 +126,20 @@ func (f *fifo) Wait() error {
 		return fmt.Errorf("failed to write to %d: %w", fd, err)
 	}
 	return nil
+}
+
+// WaitCtx waits for a trigger from another process unless the context gets
+// cancelled earlier. It internally calls fifo.Wait().
+func (f *fifo) WaitCtx(ctx context.Context) error {
+	waitCh := make(chan error)
+	go func() {
+		waitCh <- f.Wait()
+	}()
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("context cancelled")
+	case err := <-waitCh:
+		return err
+	}
 }
