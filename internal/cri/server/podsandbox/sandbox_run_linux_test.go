@@ -719,7 +719,7 @@ options timeout:1
 					},
 				},
 			}
-			c.setupSandboxFiles(testID, cfg)
+			c.setupSandboxFiles(t.Context(), testID, cfg)
 			calls := c.os.(*ostesting.FakeOS).GetCalls()
 			assert.Len(t, calls, len(test.expectedCalls))
 			for i, expected := range test.expectedCalls {
