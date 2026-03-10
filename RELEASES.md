@@ -493,7 +493,6 @@ The deprecated features are shown in the following table:
 | CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0 ✅                    | Use CRI `v1`                             |
 | Legacy CRI implementation of podsandbox support                                  | containerd v2.0     | containerd v2.0 ✅                    |                                          |
 | Go-Plugin library (`*.so`) as containerd runtime plugin                          | containerd v2.0     | containerd v2.1 ✅                    | Use external plugins (proxy or binary)   |
-| CNI `bin_dir` in CRI runtime config (`plugins.'io.containerd.cri.v1.runtime'.cni.bin_dir`) | containerd v2.1     | containerd v2.3                       | Change `bin_dir` to `bin_dirs` in the same section which supports a list of directories  |
 | NRI v0.1.0 plugin support                                                        | containerd v2.2     | containerd v2.3                       | Use the v010-adapter NRI plugin, or update v0.1.0 plugins to use the current NRI API |
 | cgroup v1 support                                                                | containerd v2.2     | (May 2029)                            | Use cgroup v2                           |
 
@@ -505,20 +504,21 @@ The deprecated features are shown in the following table:
 The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in the following table:
 
 | Property Group                                                       | Property                     | Deprecation release | Target release for removal | Recommendation                                  |
-|----------------------------------------------------------------------|------------------------------|---------------------|----------------------------|-------------------------------------------------|
-|`[plugins."io.containerd.grpc.v1.cri"]`                               | `systemd_cgroup`             | containerd v1.3     | containerd v2.0 ✅         | Use `SystemdCgroup` in runc options (see below) |
-|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `untrusted_workload_runtime` | containerd v1.2     | containerd v2.0 ✅         | Create `untrusted` runtime in `runtimes`        |
-|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `default_runtime`            | containerd v1.3     | containerd v2.0 ✅         | Use `default_runtime_name`                      |
-|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_engine`             | containerd v1.3     | containerd v2.0 ✅         | Use runtime v2                                  |
-|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_root`               | containerd v1.3     | containerd v2.0 ✅         | Use `options.Root`                              |
+|----------------------------------------------------------------------|------------------------------|---------------------|----------------------------|------------------------------------------------------|
+|`[plugins."io.containerd.grpc.v1.cri"]`                               | `systemd_cgroup`             | containerd v1.3     | containerd v2.0 ✅         | Use `SystemdCgroup` in runc options (see below)      |
+|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `untrusted_workload_runtime` | containerd v1.2     | containerd v2.0 ✅         | Create `untrusted` runtime in `runtimes`             |
+|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `default_runtime`            | containerd v1.3     | containerd v2.0 ✅         | Use `default_runtime_name`                           |
+|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_engine`             | containerd v1.3     | containerd v2.0 ✅         | Use runtime v2                                       |
+|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_root`               | containerd v1.3     | containerd v2.0 ✅         | Use `options.Root`                                   |
 |`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `disable_cgroup`             | -                   | containerd v2.0 ✅         | Use [cgroup v2 delegation](https://rootlesscontaine.rs/getting-started/common/cgroup2/) |
-|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*.options]` | `CriuPath`                   | containerd v1.7     | containerd v2.0 ✅         | Set `$PATH` to the `criu` binary                |
-|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `auths`                      | containerd v1.3     | containerd v2.3            | Use [`ImagePullSecrets`](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/). See also [#8228](https://github.com/containerd/containerd/issues/8228). |
-|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `configs`                    | containerd v1.5     | containerd v2.3            | Use [`config_path`](./docs/hosts.md)            |
-|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `mirrors`                    | containerd v1.5     | containerd v2.3            | Use [`config_path`](./docs/hosts.md)            |
-|`[plugins."io.containerd.tracing.processor.v1.otlp"]`                 | `endpoint`, `protocol`, `insecure` | containerd v1.6.29 | containerd v2.3       | Use [OTLP environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), e.g. OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, OTEL_EXPORTER_OTLP_PROTOCOL, OTEL_SDK_DISABLED    |
-|`[plugins."io.containerd.internal.v1.tracing"]`                       | `service_name`, `sampling_ratio`   | containerd v1.6.29 | containerd v2.3       | Instead use [OTel environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), e.g. OTEL_SERVICE_NAME, OTEL_TRACES_SAMPLER*  |
-|`[plugins."io.containerd.cri.v1.runtime"]`                            | `enable_cdi`                 | containerd v2.2     | containerd v2.4            | CDI support will always be enabled              |
+|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*.options]` | `CriuPath`                   | containerd v1.7     | containerd v2.0 ✅         | Set `$PATH` to the `criu` binary                     |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `auths`                      | containerd v1.3     | containerd v2.4            | Use [`ImagePullSecrets`](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/). See also [#8228](https://github.com/containerd/containerd/issues/8228). |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `configs`                    | containerd v1.5     | containerd v2.4            | Use [`config_path`](./docs/hosts.md)                 |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `mirrors`                    | containerd v1.5     | containerd v2.4            | Use [`config_path`](./docs/hosts.md)                 |
+|`[plugins."io.containerd.tracing.processor.v1.otlp"]`                 | `endpoint`, `protocol`, `insecure` | containerd v1.6.29 | containerd v2.4       | Use [OTLP environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), e.g. OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, OTEL_EXPORTER_OTLP_PROTOCOL, OTEL_SDK_DISABLED    |
+|`[plugins."io.containerd.cri.v1.runtime".cni]`                        | `bin_dir`                    | containerd v2.1     | containerd v2.4            | Use `bin_dirs`, which supports a list of directories |
+|`[plugins."io.containerd.internal.v1.tracing"]`                       | `service_name`, `sampling_ratio`   | containerd v1.6.29 | containerd v2.4       | Instead use [OTel environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), e.g. OTEL_SERVICE_NAME, OTEL_TRACES_SAMPLER*  |
+|`[plugins."io.containerd.cri.v1.runtime"]`                            | `enable_cdi`                 | containerd v2.2     | containerd v2.4            | CDI support will always be enabled                   |
 
 
 > **Note**
