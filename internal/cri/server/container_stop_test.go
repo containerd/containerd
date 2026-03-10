@@ -89,3 +89,21 @@ func TestWaitContainerStop(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertFromCRISignal(t *testing.T) {
+	tests := []struct {
+		name           string
+		signal         string
+		expectedSignal string
+	}{
+		{name: "standard signal", signal: "SIGTERM", expectedSignal: "SIGTERM"},
+		{name: "rtmin plus", signal: "SIGRTMINPLUS1", expectedSignal: "SIGRTMIN+1"},
+		{name: "rtmax minus", signal: "SIGRTMAXMINUS1", expectedSignal: "SIGRTMAX-1"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expectedSignal, convertFromCRISignal(test.signal))
+		})
+	}
+}
