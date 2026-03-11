@@ -161,6 +161,12 @@ github.com/containerd/fifo
 # github.com/containerd/go-cni v1.1.13
 ## explicit; go 1.21
 github.com/containerd/go-cni
+# github.com/containerd/go-dmverity v0.0.0-20260121021254-d3f12c7acf04
+## explicit; go 1.24.3
+github.com/containerd/go-dmverity/pkg/dm
+github.com/containerd/go-dmverity/pkg/keyring
+github.com/containerd/go-dmverity/pkg/utils
+github.com/containerd/go-dmverity/pkg/verity
 # github.com/containerd/go-runc v1.1.0
 ## explicit; go 1.18
 github.com/containerd/go-runc
@@ -279,6 +285,10 @@ github.com/docker/go-units
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
 github.com/emicklei/go-restful/v3/log
+# github.com/erofs/go-erofs v0.0.0-20251218022805-9629ce7d5f1f
+## explicit; go 1.23
+github.com/erofs/go-erofs
+github.com/erofs/go-erofs/internal/disk
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
