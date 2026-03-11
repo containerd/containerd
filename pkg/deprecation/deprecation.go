@@ -46,18 +46,18 @@ const (
 )
 
 var messages = map[Warning]string{
-	CRIRegistryMirrors: "The `mirrors` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.1." +
+	CRIRegistryMirrors: "The `mirrors` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.4. " +
 		"Use `config_path` instead.",
-	CRIRegistryAuths: "The `auths` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.3 and will be removed in containerd v2.3." +
+	CRIRegistryAuths: "The `auths` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.3 and will be removed in containerd v2.4. " +
 		"Use `ImagePullSecrets` instead.",
-	CRIRegistryConfigs: "The `configs` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.3." +
+	CRIRegistryConfigs: "The `configs` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.4. " +
 		"Use `config_path` instead.",
-	CRICNIBinDir: "The `bin_dir` property of `[plugins.\"io.containerd.cri.v1.runtime\".cni`] is deprecated since containerd v2.1 and will be removed in containerd v2.3. " +
+	CRICNIBinDir: "The `bin_dir` property of `[plugins.\"io.containerd.cri.v1.runtime\".cni`] is deprecated since containerd v2.1 and will be removed in containerd v2.4. " +
 		"Use `bin_dirs` in the same section instead.",
 
-	TracingOTLPConfig: "The `otlp` property of `[plugins.\"io.containerd.tracing.processor.v1\".otlp]` is deprecated since containerd v1.6 and will be removed in containerd v2.3." +
+	TracingOTLPConfig: "The `otlp` property of `[plugins.\"io.containerd.tracing.processor.v1\".otlp]` is deprecated since containerd v1.6 and will be removed in containerd v2.4. " +
 		"Use OTLP environment variables instead: https://opentelemetry.io/docs/specs/otel/protocol/exporter/",
-	TracingServiceConfig: "The `tracing` property of `[plugins.\"io.containerd.internal.v1\".tracing]` is deprecated since containerd v1.6 and will be removed in containerd v2.3." +
+	TracingServiceConfig: "The `tracing` property of `[plugins.\"io.containerd.internal.v1\".tracing]` is deprecated since containerd v1.6 and will be removed in containerd v2.4. " +
 		"Use OTEL environment variables instead: https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/",
 	NRIV010Plugin: "NRI 0.1.0-style plugins are deprecated since containerd 2.2 and should only be used through the v010-adapter plugin.",
 	CgroupV1:      "The support for cgroup v1 is deprecated since containerd v2.2 and will be removed by no later than May 2029. Upgrade the host to use cgroup v2.",
