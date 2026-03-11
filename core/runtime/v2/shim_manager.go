@@ -480,3 +480,24 @@ func (m *ShimManager) loadShimInfo(ctx context.Context, shim string) (*shimInfo,
 	m.shimInfos.Store(shim, sinfo)
 	return sinfo, nil
 }
+
+// Close implements io.Closer so that Server.Stop() will close all tracked
+// shim client connections during shutdown.
+func (m *ShimManager) Close() error {
+	if m.shims.IsEmpty() {
+		return nil
+	}
+
+	ctx := context.Background()
+	shims, err := m.shims.GetAll(ctx, true)
+	if err != nil {
+		return fmt.Errorf("listing shims for shutdown: %w", err)
+	}
+
+	for _, s := range shims {
+		if err := s.Close(); err != nil {
+			log.G(ctx).WithFields(log.Fields{"id": s.ID(), "error": err}).Warn("failed to close shim")
+		}
+	}
+	return nil
+}
