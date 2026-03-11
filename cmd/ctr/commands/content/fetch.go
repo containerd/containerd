@@ -50,14 +50,9 @@ This command ensures that containerd has all the necessary resources to build
 an image's rootfs and convert the configuration to a runtime format supported
 by containerd.
 
-This command uses the same syntax, of remote and object, as 'ctr fetch-object'.
-We may want to make this nicer, but agnostism is preferred for the moment.
-
-Right now, the responsibility of the daemon and the cli aren't quite clear. Do
-not use this implementation as a guide. The end goal should be having metadata,
-content and snapshots ready for a direct use via the 'ctr run'.
-
-Most of this is experimental and there are few leaps to make this work.`,
+This command pulls image content (manifests, configs, and layers) into the
+content store without unpacking. It can be used to pre-fetch images or to
+pull content that will later be used with 'ctr run' or 'ctr images unpack'.`,
 	Flags: append(commands.RegistryFlags, commands.LabelFlag,
 		&cli.StringSliceFlag{
 			Name:  "platform",
