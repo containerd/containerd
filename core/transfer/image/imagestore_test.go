@@ -229,7 +229,7 @@ func TestStore(t *testing.T) {
 						t.Fatal(err)
 					}
 					if !errors.Is(err, testCase.Err) {
-						t.Fatalf("unexpected error %v: expeceted %v", err, testCase.Err)
+						t.Fatalf("unexpected error %v: expected %v", err, testCase.Err)
 					}
 					return
 				} else if testCase.Err != nil {
