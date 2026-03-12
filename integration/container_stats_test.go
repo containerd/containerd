@@ -158,7 +158,7 @@ func TestContainerListStats(t *testing.T) {
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
@@ -213,7 +213,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
@@ -273,7 +273,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
@@ -334,7 +334,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 
 	t.Logf("Create container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,

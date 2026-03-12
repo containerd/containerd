@@ -35,7 +35,7 @@ func TestImagesList(t *testing.T) {
 	store := NewImageStore(NewDB(db, nil, nil))
 
 	testset := map[string]*images.Image{}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := "image-" + fmt.Sprint(i)
 		testset[id] = &images.Image{
 			Name: id,
@@ -647,9 +647,9 @@ func checkImageTimestamps(t *testing.T, im *images.Image, now time.Time, oncreat
 	}
 }
 
-func checkImagesEqual(t *testing.T, a, b *images.Image, format string, args ...interface{}) {
+func checkImagesEqual(t *testing.T, a, b *images.Image, format string, args ...any) {
 	t.Helper()
 	if !reflect.DeepEqual(a, b) {
-		t.Fatalf("images not equal \n\t%v != \n\t%v: "+format, append([]interface{}{a, b}, args...)...)
+		t.Fatalf("images not equal \n\t%v != \n\t%v: "+format, append([]any{a, b}, args...)...)
 	}
 }

@@ -118,7 +118,7 @@ type CheckpointTaskInfo struct {
 	// ParentCheckpoint is the digest of a parent checkpoint
 	ParentCheckpoint digest.Digest
 	// Options hold runtime specific settings for checkpointing a task
-	Options interface{}
+	Options any
 
 	runtime string
 }
@@ -139,7 +139,7 @@ type TaskInfo struct {
 	// RootFS is a list of mounts to use as the task's root filesystem
 	RootFS []mount.Mount
 	// Options hold runtime specific settings for task creation
-	Options interface{}
+	Options any
 	// RuntimePath is an absolute path that can be used to overwrite path
 	// to a shim runtime binary.
 	RuntimePath string
@@ -636,7 +636,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 // UpdateTaskInfo allows updated specific settings to be changed on a task
 type UpdateTaskInfo struct {
 	// Resources updates a tasks resource constraints
-	Resources interface{}
+	Resources any
 	// Annotations allows arbitrary and/or experimental resource constraints for task update
 	Annotations map[string]string
 }
@@ -795,7 +795,7 @@ func writeContent(ctx context.Context, store content.Ingester, mediaType, ref st
 }
 
 // isCheckpointPathExist only suitable for runc runtime now
-func isCheckpointPathExist(runtime string, v interface{}) bool {
+func isCheckpointPathExist(runtime string, v any) bool {
 	if v == nil {
 		return false
 	}

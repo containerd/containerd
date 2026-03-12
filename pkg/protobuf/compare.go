@@ -22,12 +22,12 @@ import (
 )
 
 var Compare = cmp.FilterValues(
-	func(x, y interface{}) bool {
+	func(x, y any) bool {
 		_, xok := x.(proto.Message)
 		_, yok := y.(proto.Message)
 		return xok && yok
 	},
-	cmp.Comparer(func(x, y interface{}) bool {
+	cmp.Comparer(func(x, y any) bool {
 		vx, ok := x.(proto.Message)
 		if !ok {
 			return false

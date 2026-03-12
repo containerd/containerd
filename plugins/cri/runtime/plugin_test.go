@@ -30,29 +30,29 @@ func TestCRIRuntimePluginConfigMigration(t *testing.T) {
 	runcSandboxer := "podsandbox"
 	cniBinDir := "/opt/cni/bin"
 
-	grpcCri := map[string]interface{}{
+	grpcCri := map[string]any{
 		"enable_selinux":              true,
 		"max_container_log_line_size": 100,
 		"max_concurrent_downloads":    3,    // removed since it's moved to cri image service
 		"disable_tcp_service":         true, // removed since it's moved to cri grpc service
-		"containerd": map[string]interface{}{
-			"runtimes": map[string]interface{}{
-				"runc": map[string]interface{}{
+		"containerd": map[string]any{
+			"runtimes": map[string]any{
+				"runc": map[string]any{
 					"sandbox_mode": runcSandboxer,
 				},
 			},
 		},
-		"cni": map[string]interface{}{
+		"cni": map[string]any{
 			"bin_dir": cniBinDir,
 		},
 	}
 
-	pluginConfigs := map[string]interface{}{
+	pluginConfigs := map[string]any{
 		string(plugins.GRPCPlugin) + ".cri": grpcCri,
 	}
 	configMigration(context.Background(), 2, pluginConfigs)
 
-	runtimeConf, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"].(map[string]interface{})
+	runtimeConf, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"].(map[string]any)
 	require.True(t, ok)
 	require.NotNil(t, runtimeConf)
 	assert.Equal(t, grpcCri["enable_selinux"], runtimeConf["enable_selinux"])
@@ -60,18 +60,18 @@ func TestCRIRuntimePluginConfigMigration(t *testing.T) {
 	assert.NotContains(t, runtimeConf, "max_concurrent_downloads")
 	assert.NotContains(t, runtimeConf, "disable_tcp_service")
 
-	ctd, ok := runtimeConf["containerd"].(map[string]interface{})
+	ctd, ok := runtimeConf["containerd"].(map[string]any)
 	require.True(t, ok)
 	require.NotNil(t, ctd)
 
-	runtimes := ctd["runtimes"].(map[string]interface{})
-	runc, ok := runtimes["runc"].(map[string]interface{})
+	runtimes := ctd["runtimes"].(map[string]any)
+	runc, ok := runtimes["runc"].(map[string]any)
 	require.True(t, ok)
 	require.NotNil(t, runc)
 	assert.Equal(t, runcSandboxer, runc["sandboxer"])
 	assert.NotContains(t, runc, "sandbox_mode")
 
-	cni, ok := runtimeConf["cni"].(map[string]interface{})
+	cni, ok := runtimeConf["cni"].(map[string]any)
 	require.True(t, ok)
 	require.NotNil(t, cni)
 	cniBinDirs, ok := cni["bin_dirs"].([]string)

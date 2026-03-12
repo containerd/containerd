@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strings"
 
@@ -304,9 +305,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	cin.Pid = task.Pid()
 	cin.CreatedAt = info.CreatedAt
 
-	for k, v := range sandboxLabels {
-		labels[k] = v
-	}
+	maps.Copy(labels, sandboxLabels)
 
 	cin.Labels = labels
 

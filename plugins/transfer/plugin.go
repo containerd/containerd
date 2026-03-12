@@ -55,7 +55,7 @@ func init() {
 			plugins.SnapshotPlugin,
 		},
 		Config: defaultConfig(),
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			config := ic.Config.(*transferConfig)
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {

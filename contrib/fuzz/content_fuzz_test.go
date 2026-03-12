@@ -55,7 +55,7 @@ func generateBlobs(f *fuzz.ConsumeFuzzer) (map[digest.Digest][]byte, error) {
 	maxsize := 4096
 	nblobs := blobQty % maxsize
 
-	for i := 0; i < nblobs; i++ {
+	for range nblobs {
 		digestBytes, err := f.GetBytes()
 		if err != nil {
 			return blobs, err

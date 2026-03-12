@@ -61,7 +61,7 @@ func init() {
 		ID:     exporterPlugin,
 		Type:   plugins.TracingProcessorPlugin,
 		Config: &OTLPConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			if err := warnOTLPConfig(ic); err != nil {
 				return nil, err
 			}
@@ -88,7 +88,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.TracingProcessorPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			if err := warnTraceConfig(ic); err != nil {
 				return nil, err
 			}

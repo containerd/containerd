@@ -28,7 +28,7 @@ import (
 func generateRandomDiffIDs(t testing.TB, num int) []digest.Digest {
 	const size = 10
 	diffIDs := make([]digest.Digest, 0, num)
-	for i := 0; i < num; i++ {
+	for range num {
 		b := make([]byte, size)
 		_, err := rand.Read(b)
 		if err != nil {
@@ -44,7 +44,7 @@ func BenchmarkUnpackWithChainID(b *testing.B) {
 	// as we unpack every layers, by calling `identity.ChainID`.
 	unpackWithChainID := func(diffIDs []digest.Digest) {
 		var chain []digest.Digest
-		for i := 0; i < len(diffIDs); i++ {
+		for i := range diffIDs {
 			_ = identity.ChainID(chain) // parent layer chainID
 			chain = append(chain, diffIDs[i])
 			_ = identity.ChainID(chain).String() // current layer chainID
@@ -70,7 +70,7 @@ func BenchmarkUnpackWithChainIDs(b *testing.B) {
 		chainIDs := make([]digest.Digest, len(diffIDs))
 		copy(chainIDs, diffIDs)
 		chainIDs = identity.ChainIDs(chainIDs)
-		for i := 0; i < len(diffIDs); i++ {
+		for i := range diffIDs {
 			if i > 0 {
 				_ = chainIDs[i-1].String() // parent layer chainID
 			}

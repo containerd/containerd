@@ -202,14 +202,14 @@ func chainUnaryServerInterceptors(interceptors ...ttrpc.UnaryServerInterceptor) 
 		return nil
 	}
 
-	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (interface{}, error) {
+	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (any, error) {
 		currentMethod := method
 
 		for i := n - 1; i > 0; i-- {
 			interceptor := interceptors[i]
 			innerMethod := currentMethod
 
-			currentMethod = func(currentCtx context.Context, currentUnmarshal func(interface{}) error) (interface{}, error) {
+			currentMethod = func(currentCtx context.Context, currentUnmarshal func(any) error) (any, error) {
 				return interceptor(currentCtx, currentUnmarshal, info, innerMethod)
 			}
 		}

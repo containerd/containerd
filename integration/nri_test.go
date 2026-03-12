@@ -115,9 +115,9 @@ func TestNriPluginSynchronization(t *testing.T) {
 
 	tc.setup()
 
-	for i := 0; i < podCount; i++ {
+	for i := range podCount {
 		podID := tc.runPod(fmt.Sprintf("pod%d", i))
-		for j := 0; j < ctrPerPod; j++ {
+		for j := range ctrPerPod {
 			tc.startContainer(podID, fmt.Sprintf("ctr%d", j))
 		}
 	}
@@ -628,9 +628,9 @@ func TestNriPluginContainerdRestart(t *testing.T) {
 
 	tc.setup()
 
-	for i := 0; i < podCount; i++ {
+	for i := range podCount {
 		podID := tc.runPod(fmt.Sprintf("pod%d", i))
-		for j := 0; j < ctrPerPod; j++ {
+		for j := range ctrPerPod {
 			tc.startContainer(podID, fmt.Sprintf("ctr%d", j))
 		}
 	}
@@ -789,7 +789,7 @@ type mockPlugin struct {
 
 	closed               bool
 	namespace            string
-	logf                 func(string, ...interface{})
+	logf                 func(string, ...any)
 	synchronize          func(*mockPlugin, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
 	runPodSandbox        func(*mockPlugin, *api.PodSandbox) error
 	updatePodSandbox     func(*mockPlugin, *api.PodSandbox, *api.LinuxResources, *api.LinuxResources) error
@@ -842,7 +842,7 @@ func (m *mockPlugin) Start() error {
 	}
 
 	if m.logf == nil {
-		m.logf = func(format string, args ...interface{}) {
+		m.logf = func(format string, args ...any) {
 			fmt.Printf(format+"\n", args...)
 		}
 	}
@@ -912,7 +912,7 @@ func (m *mockPlugin) inNamespace(namespace string) bool {
 	return strings.HasPrefix(namespace, m.namespace)
 }
 
-func (m *mockPlugin) Log(format string, args ...interface{}) {
+func (m *mockPlugin) Log(format string, args ...any) {
 	m.logf(fmt.Sprintf("[plugin:%s-%s] ", m.idx, m.name)+format, args...)
 }
 
@@ -1374,7 +1374,7 @@ func getXxxset(t *testing.T, kind, path string) []string {
 		return nil
 	}
 
-	for _, rng := range strings.Split(strings.TrimSpace(string(data)), ",") {
+	for rng := range strings.SplitSeq(strings.TrimSpace(string(data)), ",") {
 		var (
 			lo int
 			hi = -1

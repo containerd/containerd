@@ -33,7 +33,7 @@ type noopEventHandler struct {
 	eventCh chan any
 }
 
-func (h *noopEventHandler) HandleEvent(any interface{}) error {
+func (h *noopEventHandler) HandleEvent(any any) error {
 	h.t.Logf("NoopEventHandler: %v", any)
 	h.eventCh <- any
 	return nil
@@ -69,13 +69,13 @@ func TestBackOff(t *testing.T) {
 	testClock := testingclock.NewFakeClock(testStartTime)
 	inputQueues := map[string]*backOffQueue{
 		"container1": {
-			events: []interface{}{
+			events: []any{
 				&eventtypes.TaskOOM{ContainerID: "container1"},
 				&eventtypes.TaskOOM{ContainerID: "container1"},
 			},
 		},
 		"container2": {
-			events: []interface{}{
+			events: []any{
 				&eventtypes.TaskOOM{ContainerID: "container2"},
 				&eventtypes.TaskOOM{ContainerID: "container2"},
 			},
@@ -83,7 +83,7 @@ func TestBackOff(t *testing.T) {
 	}
 	expectedQueues := map[string]*backOffQueue{
 		"container2": {
-			events: []interface{}{
+			events: []any{
 				&eventtypes.TaskOOM{ContainerID: "container2"},
 				&eventtypes.TaskOOM{ContainerID: "container2"},
 			},
@@ -92,7 +92,7 @@ func TestBackOff(t *testing.T) {
 			clock:      testClock,
 		},
 		"container1": {
-			events: []interface{}{
+			events: []any{
 				&eventtypes.TaskOOM{ContainerID: "container1"},
 				&eventtypes.TaskOOM{ContainerID: "container1"},
 			},

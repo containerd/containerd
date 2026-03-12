@@ -65,7 +65,7 @@ func init() {
 	})
 }
 
-func initCRIService(ic *plugin.InitContext) (interface{}, error) {
+func initCRIService(ic *plugin.InitContext) (any, error) {
 	ctx := ic.Context
 	config := ic.Config.(*criconfig.ServerConfig)
 
@@ -253,17 +253,17 @@ func getSandboxControllers(ic *plugin.InitContext) (map[string]sandbox.Controlle
 	return sc, nil
 }
 
-func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 	if configVersion >= version.ConfigVersion {
 		return nil
 	}
 	const pluginName = string(plugins.GRPCPlugin) + ".cri"
-	src, ok := pluginConfigs[pluginName].(map[string]interface{})
+	src, ok := pluginConfigs[pluginName].(map[string]any)
 	if !ok {
 		return nil
 	}
 
-	dst := map[string]interface{}{}
+	dst := map[string]any{}
 	for _, k := range []string{
 		"disable_tcp_service",
 		"stream_server_address",

@@ -83,7 +83,7 @@ func NewV4Options(req *http.Request) (*V4Options, error) {
 		if len(portString) == 0 {
 			return nil, fmt.Errorf("query parameter %q cannot be empty", api.PortHeader)
 		}
-		for _, p := range strings.Split(portString, ",") {
+		for p := range strings.SplitSeq(portString, ",") {
 			port, err := strconv.ParseUint(p, 10, 16)
 			if err != nil {
 				return nil, fmt.Errorf("unable to parse %q as a port: %v", portString, err)

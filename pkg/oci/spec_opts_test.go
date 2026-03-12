@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -185,12 +186,7 @@ func TestWithDefaultSpecForPlatform(t *testing.T) {
 }
 
 func Contains(a []string, x string) bool {
-	for _, n := range a {
-		if x == n {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(a, x)
 }
 
 func TestWithProcessCwd(t *testing.T) {

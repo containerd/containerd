@@ -155,7 +155,7 @@ type ContainerInfo struct {
 	SnapshotKey    string                   `json:"snapshotKey"`
 	Snapshotter    string                   `json:"snapshotter"`
 	RuntimeType    string                   `json:"runtimeType"`
-	RuntimeOptions interface{}              `json:"runtimeOptions"`
+	RuntimeOptions any                      `json:"runtimeOptions"`
 	Config         *runtime.ContainerConfig `json:"config"`
 	RuntimeSpec    *runtimespec.Spec        `json:"runtimeSpec"`
 }

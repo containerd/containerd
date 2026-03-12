@@ -1156,7 +1156,7 @@ func TestAddSubRoundTrip(t *testing.T) {
 	for k := -10; k <= 10; k++ {
 		q := Quantity{Format: DecimalSI}
 		var order []int64
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			j := rand.Int63()
 			order = append(order, j)
 			q.Add(*NewScaledQuantity(j, Scale(k)))
@@ -1173,7 +1173,7 @@ func TestAddSubRoundTrip(t *testing.T) {
 func TestAddSubRoundTripAcrossScales(t *testing.T) {
 	q := Quantity{Format: DecimalSI}
 	var order []int64
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		j := rand.Int63()
 		order = append(order, j)
 		q.Add(*NewScaledQuantity(j, Scale(j%20-10)))
@@ -1189,7 +1189,7 @@ func TestAddSubRoundTripAcrossScales(t *testing.T) {
 func TestNegateRoundTrip(t *testing.T) {
 	for _, asDec := range []bool{false, true} {
 		for k := -10; k <= 10; k++ {
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				j := rand.Int63()
 				q := *NewScaledQuantity(j, Scale(k))
 				if asDec {

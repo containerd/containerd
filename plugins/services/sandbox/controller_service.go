@@ -48,7 +48,7 @@ func init() {
 			plugins.SandboxControllerPlugin,
 			plugins.EventPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			sc := make(map[string]sandbox.Controller)
 
 			sandboxers, err := ic.GetByType(plugins.PodSandboxPlugin)

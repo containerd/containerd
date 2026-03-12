@@ -27,19 +27,19 @@ import (
 
 func TestSandboxImageConfigMigration(t *testing.T) {
 	image := "rancher/mirrored-pause:3.10.1-amd64"
-	grpcCri := map[string]interface{}{
+	grpcCri := map[string]any{
 		"sandbox_image": image,
 	}
-	pluginConfigs := map[string]interface{}{
+	pluginConfigs := map[string]any{
 		string(plugins.GRPCPlugin) + ".cri": grpcCri,
 	}
 	configMigration(context.Background(), 2, pluginConfigs)
 	v, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".images"]
-	images := v.(map[string]interface{})
+	images := v.(map[string]any)
 	require.True(t, ok)
 	v, ok = images["pinned_images"]
 	require.True(t, ok)
-	pinnedImages := v.(map[string]interface{})
+	pinnedImages := v.(map[string]any)
 	v, ok = pinnedImages["sandbox"]
 	require.True(t, ok)
 	sandbox := v.(string)
@@ -48,21 +48,21 @@ func TestSandboxImageConfigMigration(t *testing.T) {
 
 func TestRegistryConfigMigration(t *testing.T) {
 	path := "/etc/containerd/certs.d"
-	grpcCri := map[string]interface{}{
-		"registry": map[string]interface{}{
+	grpcCri := map[string]any{
+		"registry": map[string]any{
 			"config_path": path,
 		},
 	}
-	pluginConfigs := map[string]interface{}{
+	pluginConfigs := map[string]any{
 		string(plugins.GRPCPlugin) + ".cri": grpcCri,
 	}
 	configMigration(context.Background(), 2, pluginConfigs)
 	v, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".images"]
-	images := v.(map[string]interface{})
+	images := v.(map[string]any)
 	require.True(t, ok)
 	v, ok = images["registry"]
 	require.True(t, ok)
-	registry := v.(map[string]interface{})
+	registry := v.(map[string]any)
 	v, ok = registry["config_path"]
 	require.True(t, ok)
 	configPath := v.(string)

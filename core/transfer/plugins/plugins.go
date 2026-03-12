@@ -30,7 +30,7 @@ var register = struct {
 	r map[string]reflect.Type
 }{}
 
-func Register(apiObject, transferObject interface{}) {
+func Register(apiObject, transferObject any) {
 	url, err := typeurl.TypeURL(apiObject)
 	if err != nil {
 		panic(err)
@@ -51,7 +51,7 @@ func Register(apiObject, transferObject interface{}) {
 	register.r[url] = t
 }
 
-func ResolveType(any typeurl.Any) (interface{}, error) {
+func ResolveType(any typeurl.Any) (any, error) {
 	register.RLock()
 	defer register.RUnlock()
 	if register.r != nil {

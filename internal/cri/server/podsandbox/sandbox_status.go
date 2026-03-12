@@ -138,7 +138,7 @@ func toCRISandboxInfo(ctx context.Context, sb *types.PodSandbox) (map[string]str
 }
 
 // getRuntimeOptions get runtime options from container metadata.
-func getRuntimeOptions(c containers.Container) (interface{}, error) {
+func getRuntimeOptions(c containers.Container) (any, error) {
 	from := c.Runtime.Options
 	if from == nil || from.GetValue() == nil {
 		return nil, nil

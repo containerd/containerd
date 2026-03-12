@@ -62,7 +62,7 @@ type TaskServiceClient interface {
 // - TTRPC v2 (compatibility with shims before 2.0)
 // - TTRPC v3
 // - GRPC v3
-func NewTaskClient(client interface{}, version int) (TaskServiceClient, error) {
+func NewTaskClient(client any, version int) (TaskServiceClient, error) {
 	switch c := client.(type) {
 	case *ttrpc.Client:
 		switch version {

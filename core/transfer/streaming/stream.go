@@ -36,7 +36,7 @@ const maxRead = 32 * 1024
 const windowSize = 2 * maxRead
 
 var bufPool = &sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		buffer := make([]byte, maxRead)
 		return &buffer
 	},

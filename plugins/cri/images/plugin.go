@@ -54,7 +54,7 @@ func init() {
 			plugins.TransferPlugin, // For pulling image using transfer service
 			plugins.WarningPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
@@ -172,7 +172,7 @@ func init() {
 	})
 }
 
-func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 	if configVersion >= version.ConfigVersion {
 		return nil
 	}
@@ -180,25 +180,25 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	if !ok {
 		return nil
 	}
-	src := original.(map[string]interface{})
+	src := original.(map[string]any)
 	updated, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".images"]
-	var dst map[string]interface{}
+	var dst map[string]any
 	if ok {
-		dst = updated.(map[string]interface{})
+		dst = updated.(map[string]any)
 	} else {
-		dst = map[string]interface{}{}
+		dst = map[string]any{}
 	}
 
 	migrateConfig(dst, src)
 	pluginConfigs[string(plugins.CRIServicePlugin)+".images"] = dst
 	return nil
 }
-func migrateConfig(dst, src map[string]interface{}) {
-	var pinnedImages map[string]interface{}
+func migrateConfig(dst, src map[string]any) {
+	var pinnedImages map[string]any
 	if v, ok := dst["pinned_images"]; ok {
-		pinnedImages = v.(map[string]interface{})
+		pinnedImages = v.(map[string]any)
 	} else {
-		pinnedImages = map[string]interface{}{}
+		pinnedImages = map[string]any{}
 	}
 
 	if simage, ok := src["sandbox_image"]; ok {
@@ -225,22 +225,22 @@ func migrateConfig(dst, src map[string]interface{}) {
 	if !ok {
 		return
 	}
-	containerdConfMap := containerdConf.(map[string]interface{})
+	containerdConfMap := containerdConf.(map[string]any)
 	runtimesConf, ok := containerdConfMap["runtimes"]
 	if !ok {
 		return
 	}
 
-	var runtimePlatforms map[string]interface{}
+	var runtimePlatforms map[string]any
 	if v, ok := dst["runtime_platform"]; ok {
-		runtimePlatforms = v.(map[string]interface{})
+		runtimePlatforms = v.(map[string]any)
 	} else {
-		runtimePlatforms = map[string]interface{}{}
+		runtimePlatforms = map[string]any{}
 	}
-	for runtime, v := range runtimesConf.(map[string]interface{}) {
-		runtimeConf := v.(map[string]interface{})
+	for runtime, v := range runtimesConf.(map[string]any) {
+		runtimeConf := v.(map[string]any)
 		if snapshotter, ok := runtimeConf["snapshot"]; ok && snapshotter != "" {
-			runtimePlatforms[runtime] = map[string]interface{}{
+			runtimePlatforms[runtime] = map[string]any{
 				"platform":    platforms.DefaultStrict(),
 				"snapshotter": snapshotter,
 			}

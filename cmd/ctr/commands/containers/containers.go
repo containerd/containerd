@@ -288,7 +288,7 @@ var infoCommand = &cli.Command{
 			}
 			commands.PrintAsJSON(struct {
 				containers.Container
-				Spec interface{} `json:"Spec,omitempty"`
+				Spec any `json:"Spec,omitempty"`
 			}{
 				Container: info,
 				Spec:      v,

@@ -96,7 +96,7 @@ func init() {
 	timeout.Set(stateTimeout, 2*time.Second)
 }
 
-func initFunc(ic *plugin.InitContext) (interface{}, error) {
+func initFunc(ic *plugin.InitContext) (any, error) {
 	config := ic.Config.(*Config)
 
 	v2r, err := ic.GetByID(plugins.RuntimePluginV2, "task")
