@@ -111,8 +111,8 @@ type Info struct {
 	// Note: only labels prefixed with `containerd.io/snapshot/` will be inherited
 	// by the snapshotter's `Prepare`, `View`, or `Commit` calls.
 	Labels  map[string]string `json:",omitempty"`
-	Created time.Time         `json:",omitempty"` // Created time
-	Updated time.Time         `json:",omitempty"` // Last update time
+	Created time.Time         // Created time
+	Updated time.Time         // Last update time
 }
 
 // Usage defines statistics for disk resources consumed by the snapshot.
