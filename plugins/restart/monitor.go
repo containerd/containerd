@@ -51,7 +51,7 @@ func init() {
 		Config: &Config{
 			Interval: tomlext.FromStdTime(10 * time.Second),
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Capabilities = []string{"no", "always", "on-failure", "unless-stopped"}
 			client, err := containerd.New("", containerd.WithInMemoryServices(ic))
 			if err != nil {
@@ -63,7 +63,7 @@ func init() {
 			go m.run(tomlext.ToStdTime(ic.Config.(*Config).Interval))
 			return m, nil
 		},
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 			if configVersion >= version.ConfigVersion {
 				return nil
 			}
@@ -106,9 +106,7 @@ func (m *monitor) reconcile(ctx context.Context) error {
 	}
 	var wgNSLoop sync.WaitGroup
 	for _, name := range ns {
-		wgNSLoop.Add(1)
-		go func() {
-			defer wgNSLoop.Done()
+		wgNSLoop.Go(func() {
 			ctx := namespaces.WithNamespace(ctx, name)
 			changes, err := m.monitor(ctx)
 			if err != nil {
@@ -117,16 +115,14 @@ func (m *monitor) reconcile(ctx context.Context) error {
 			}
 			var wgChangesLoop sync.WaitGroup
 			for _, c := range changes {
-				wgChangesLoop.Add(1)
-				go func() {
-					defer wgChangesLoop.Done()
+				wgChangesLoop.Go(func() {
 					if err := c.apply(ctx, m.client); err != nil {
 						log.G(ctx).WithError(err).Error("apply change")
 					}
-				}()
+				})
 			}
 			wgChangesLoop.Wait()
-		}()
+		})
 	}
 	wgNSLoop.Wait()
 	return nil

@@ -34,7 +34,7 @@ func TestChainUnaryServerInterceptors(t *testing.T) {
 	callValue := "init"
 	callCtx := context.WithValue(context.Background(), callKey{}, callValue)
 
-	verifyCallCtxFn := func(ctx context.Context, key interface{}, expected interface{}) {
+	verifyCallCtxFn := func(ctx context.Context, key any, expected any) {
 		got := ctx.Value(key)
 		if !reflect.DeepEqual(expected, got) {
 			t.Fatalf("[context(key:%s) expected %v, but got %v", key, expected, got)
@@ -47,7 +47,7 @@ func TestChainUnaryServerInterceptors(t *testing.T) {
 		}
 	}
 
-	origUnmarshaler := func(obj interface{}) error {
+	origUnmarshaler := func(obj any) error {
 		v := obj.(*int64)
 		*v *= 2
 		return nil
@@ -56,13 +56,13 @@ func TestChainUnaryServerInterceptors(t *testing.T) {
 	type firstKey struct{}
 	firstValue := "from first"
 	var firstUnmarshaler ttrpc.Unmarshaler
-	first := func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (interface{}, error) {
+	first := func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (any, error) {
 		verifyCallCtxFn(ctx, callKey{}, callValue)
 		verifyInfoFn(info)
 
 		ctx = context.WithValue(ctx, firstKey{}, firstValue)
 
-		firstUnmarshaler = func(obj interface{}) error {
+		firstUnmarshaler = func(obj any) error {
 			if err := unmarshal(obj); err != nil {
 				return err
 			}
@@ -77,7 +77,7 @@ func TestChainUnaryServerInterceptors(t *testing.T) {
 
 	type secondKey struct{}
 	secondValue := "from second"
-	second := func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (interface{}, error) {
+	second := func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (any, error) {
 		verifyCallCtxFn(ctx, callKey{}, callValue)
 		verifyCallCtxFn(ctx, firstKey{}, firstValue)
 		verifyInfoFn(info)
@@ -94,7 +94,7 @@ func TestChainUnaryServerInterceptors(t *testing.T) {
 		return method(ctx, unmarshal)
 	}
 
-	methodFn := func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+	methodFn := func(ctx context.Context, unmarshal func(any) error) (any, error) {
 		verifyCallCtxFn(ctx, callKey{}, callValue)
 		verifyCallCtxFn(ctx, firstKey{}, firstValue)
 		verifyCallCtxFn(ctx, secondKey{}, secondValue)

@@ -65,7 +65,7 @@ func NewTransferService(cs content.Store, is images.Store, tc TransferConfig) tr
 	return ts
 }
 
-func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, dest interface{}, opts ...transfer.Opt) error {
+func (ts *localTransferService) Transfer(ctx context.Context, src any, dest any, opts ...transfer.Opt) error {
 	topts := &transfer.Config{}
 	for _, opt := range opts {
 		opt(topts)
@@ -99,7 +99,7 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 	return fmt.Errorf("unable to transfer from %s to %s: %w", name(src), name(dest), errdefs.ErrNotImplemented)
 }
 
-func name(t interface{}) string {
+func name(t any) string {
 	switch s := t.(type) {
 	case fmt.Stringer:
 		return s.String()

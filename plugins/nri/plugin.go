@@ -32,7 +32,7 @@ func init() {
 	})
 }
 
-func initFunc(ic *plugin.InitContext) (interface{}, error) {
+func initFunc(ic *plugin.InitContext) (any, error) {
 	l, err := nri.New(ic.Config.(*nri.Config))
 	return l, err
 }

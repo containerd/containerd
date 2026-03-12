@@ -73,7 +73,7 @@ func TestMigration(t *testing.T) {
 		Type:   "io.containerd.test",
 		ID:     "t1",
 		Config: &testConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			c, ok := ic.Config.(*testConfig)
 			if !ok {
 				t.Error("expected first plugin to have configuration")
@@ -95,7 +95,7 @@ func TestMigration(t *testing.T) {
 		},
 		ID:     "t2",
 		Config: &testConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			c, ok := ic.Config.(*testConfig)
 			if !ok {
 				t.Error("expected second plugin to have configuration")
@@ -109,7 +109,7 @@ func TestMigration(t *testing.T) {
 			}
 			return nil, nil
 		},
-		ConfigMigration: func(ctx context.Context, v int, plugins map[string]interface{}) error {
+		ConfigMigration: func(ctx context.Context, v int, plugins map[string]any) error {
 			if v != configVersion {
 				t.Errorf("unxpected version: %d", v)
 			}
@@ -118,12 +118,12 @@ func TestMigration(t *testing.T) {
 				t.Error("plugin not set as expected")
 				return nil
 			}
-			conf, ok := t1.(map[string]interface{})
+			conf, ok := t1.(map[string]any)
 			if !ok {
 				t.Errorf("unexpected config value: %v", t1)
 				return nil
 			}
-			newconf := map[string]interface{}{
+			newconf := map[string]any{
 				"migrated": conf["migrated"],
 			}
 			delete(conf, "migrated")
@@ -135,8 +135,8 @@ func TestMigration(t *testing.T) {
 
 	config := &srvconfig.Config{}
 	config.Version = configVersion
-	config.Plugins = map[string]interface{}{
-		"io.containerd.test.t1": map[string]interface{}{
+	config.Plugins = map[string]any{
+		"io.containerd.test.t1": map[string]any{
 			"migrated":    "migrate me",
 			"notmigrated": "don't migrate me",
 		},

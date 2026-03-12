@@ -128,7 +128,7 @@ systemd_cgroup = true
 		desc            string
 		r               criconfig.Runtime
 		c               criconfig.Config
-		expectedOptions interface{}
+		expectedOptions any
 	}{
 		{
 			desc:            "when options is nil, should return nil option for io.containerd.runc.v2",

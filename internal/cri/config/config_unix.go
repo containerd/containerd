@@ -75,7 +75,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 	# CriuWorkPath is the criu work path.
 	CriuWorkPath = ""
 `
-	var m map[string]interface{}
+	var m map[string]any
 	toml.Unmarshal([]byte(defaultRuncV2Opts), &m)
 
 	return RuntimeConfig{

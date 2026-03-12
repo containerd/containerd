@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -235,8 +236,8 @@ func ensureShared(path string, lookupMount func(string) (mount.Info, error)) err
 	}
 
 	// Make sure source mount point is shared.
-	optsSplit := strings.Split(mountInfo.Optional, " ")
-	for _, opt := range optsSplit {
+	optsSplit := strings.SplitSeq(mountInfo.Optional, " ")
+	for opt := range optsSplit {
 		if strings.HasPrefix(opt, "shared:") {
 			return nil
 		}
@@ -252,8 +253,8 @@ func ensureSharedOrSlave(path string, lookupMount func(string) (mount.Info, erro
 		return err
 	}
 	// Make sure source mount point is shared.
-	optsSplit := strings.Split(mountInfo.Optional, " ")
-	for _, opt := range optsSplit {
+	optsSplit := strings.SplitSeq(mountInfo.Optional, " ")
+	for opt := range optsSplit {
 		if strings.HasPrefix(opt, "shared:") {
 			return nil
 		} else if strings.HasPrefix(opt, "master:") {
@@ -404,9 +405,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 			if s.Linux.Resources.Unified == nil {
 				s.Linux.Resources.Unified = make(map[string]string)
 			}
-			for k, v := range unified {
-				s.Linux.Resources.Unified[k] = v
-			}
+			maps.Copy(s.Linux.Resources.Unified, unified)
 		}
 		return nil
 	}

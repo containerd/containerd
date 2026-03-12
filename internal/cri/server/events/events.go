@@ -39,7 +39,7 @@ const (
 )
 
 type EventHandler interface {
-	HandleEvent(any interface{}) error
+	HandleEvent(any any) error
 }
 
 // EventMonitor monitors containerd event and updates internal state correspondingly.
@@ -67,7 +67,7 @@ type backOff struct {
 }
 
 type backOffQueue struct {
-	events     []interface{}
+	events     []any
 	expireTime time.Time
 	duration   time.Duration
 	clock      clock.Clock
@@ -90,7 +90,7 @@ func (em *EventMonitor) Subscribe(subscriber events.Subscriber, filters []string
 	em.ch, em.errCh = subscriber.Subscribe(em.ctx, filters...)
 }
 
-func convertEvent(e typeurl.Any) (string, interface{}, error) {
+func convertEvent(e typeurl.Any) (string, any, error) {
 	id := ""
 	evt, err := typeurl.UnmarshalAny(e)
 	if err != nil {
@@ -188,7 +188,7 @@ func (em *EventMonitor) Start() <-chan error {
 	return errCh
 }
 
-func (em *EventMonitor) Backoff(key string, evt interface{}) {
+func (em *EventMonitor) Backoff(key string, evt any) {
 	em.backOff.enBackOff(key, evt)
 }
 
@@ -233,7 +233,7 @@ func (b *backOff) isInBackOff(key string) bool {
 }
 
 // enBackOff start to backOff and put event to the tail of queue
-func (b *backOff) enBackOff(key string, evt interface{}) {
+func (b *backOff) enBackOff(key string, evt any) {
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
 
@@ -241,7 +241,7 @@ func (b *backOff) enBackOff(key string, evt interface{}) {
 		queue.events = append(queue.events, evt)
 		return
 	}
-	b.queuePool[key] = newBackOffQueue([]interface{}{evt}, b.minDuration, b.clock)
+	b.queuePool[key] = newBackOffQueue([]any{evt}, b.minDuration, b.clock)
 }
 
 // deBackOff get out the whole queue
@@ -255,7 +255,7 @@ func (b *backOff) deBackOff(key string) *backOffQueue {
 }
 
 // enBackOff start to backOff again and put events to the queue
-func (b *backOff) reBackOff(key string, events []interface{}, oldDuration time.Duration) {
+func (b *backOff) reBackOff(key string, events []any, oldDuration time.Duration) {
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
 
@@ -278,7 +278,7 @@ func (b *backOff) stop() {
 	}
 }
 
-func newBackOffQueue(events []interface{}, init time.Duration, c clock.Clock) *backOffQueue {
+func newBackOffQueue(events []any, init time.Duration, c clock.Clock) *backOffQueue {
 	return &backOffQueue{
 		events:     events,
 		duration:   init,

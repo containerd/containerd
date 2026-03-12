@@ -63,7 +63,7 @@ func init() {
 			plugins.MetadataPlugin,
 		},
 		Config: &ShimConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			config := ic.Config.(*ShimConfig)
 
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
@@ -86,7 +86,7 @@ func init() {
 				SandboxStore: ss,
 			})
 		},
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 			// Migrate configurations from io.containerd.runtime.v2.task
 			// if the configVersion >= 3 please make sure the config is under io.containerd.shim.v1.manager.
 			if configVersion >= version.ConfigVersion {
@@ -97,8 +97,8 @@ func init() {
 			if !ok {
 				return nil
 			}
-			src := original.(map[string]interface{})
-			dest := map[string]interface{}{}
+			src := original.(map[string]any)
+			dest := map[string]any{}
 
 			if v, ok := src["sched_core"]; ok {
 				if schedCore, ok := v.(bool); schedCore {

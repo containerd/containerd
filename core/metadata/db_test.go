@@ -579,7 +579,7 @@ func benchmarkTrigger(n int) func(b *testing.B) {
 		objects := []object{}
 
 		// TODO: Allow max to be configurable
-		for i := 0; i < n; i++ {
+		for i := range n {
 			objects = append(objects,
 				blob(bytesFor(int64(i)), false),
 				image(fmt.Sprintf("image-%d", i), digestFor(int64(i))),
@@ -682,7 +682,7 @@ func digestFor(i int64) digest.Digest {
 }
 
 type object struct {
-	data    interface{}
+	data    any
 	removed bool
 	labels  map[string]string
 }

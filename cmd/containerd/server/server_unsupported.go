@@ -1,5 +1,4 @@
 //go:build !linux && !windows && !solaris
-// +build !linux,!windows,!solaris
 
 /*
    Copyright The containerd Authors.

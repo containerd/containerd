@@ -129,7 +129,7 @@ func TestTimedStoreMaxItems(t *testing.T) {
 	now := time.Now()
 
 	// Add 5 samples
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		store.Add(now.Add(time.Duration(i)*time.Second), uint64(i)*1000000000)
 	}
 
@@ -192,9 +192,9 @@ func TestTimedStoreConcurrentAccess(t *testing.T) {
 	done := make(chan bool)
 
 	// Start multiple goroutines adding samples
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(id int) {
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				store.Add(now.Add(time.Duration(id*100+j)*time.Millisecond), uint64(id*100+j)*1000000)
 			}
 			done <- true
@@ -202,9 +202,9 @@ func TestTimedStoreConcurrentAccess(t *testing.T) {
 	}
 
 	// Start multiple goroutines reading
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
-			for j := 0; j < 100; j++ {
+			for range 100 {
 				store.GetLatest()
 				store.GetLatestUsageNanoCores()
 				store.Size()
@@ -214,7 +214,7 @@ func TestTimedStoreConcurrentAccess(t *testing.T) {
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		<-done
 	}
 

@@ -145,7 +145,7 @@ func tweakContentInitFnWithDelayer(commitDelayDuration time.Duration) tweakPlugi
 		}
 
 		oldInitFn := p.InitFn
-		p.InitFn = func(ic *plugin.InitContext) (interface{}, error) {
+		p.InitFn = func(ic *plugin.InitContext) (any, error) {
 			instance, err := oldInitFn(ic)
 			if err != nil {
 				return nil, err

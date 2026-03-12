@@ -24,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -228,9 +229,7 @@ func WithPodHostname(hostname string) PodSandboxOpts {
 // Add pod labels.
 func WithPodLabels(kvs map[string]string) PodSandboxOpts {
 	return func(p *runtime.PodSandboxConfig) {
-		for k, v := range kvs {
-			p.Labels[k] = v
-		}
+		maps.Copy(p.Labels, kvs)
 	}
 }
 

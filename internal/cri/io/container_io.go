@@ -174,8 +174,7 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 		// wrapper doesn't close the actual stdin, it only stops io.Copy.
 		// The actual stdin will be closed by stream server.
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
 				log.L.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
 			}
@@ -197,8 +196,7 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 					c.stderrGroup.Remove(stderrKey)
 				}
 			}
-			wg.Done()
-		}()
+		})
 	}
 
 	attachStream := func(key string, close <-chan struct{}) {

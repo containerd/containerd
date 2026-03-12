@@ -275,7 +275,7 @@ version = 2
 	err = LoadConfig(context.Background(), path, &out)
 	assert.NoError(t, err)
 
-	pluginConfig := map[string]interface{}{}
+	pluginConfig := map[string]any{}
 	_, err = out.Decode(ctx, "io.containerd.runtime.v2.task", &pluginConfig)
 	assert.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
@@ -303,7 +303,7 @@ func TestDecodePluginInV1Config(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 3, out.Version)
 
-	pluginConfig := map[string]interface{}{}
+	pluginConfig := map[string]any{}
 	_, err = out.Decode(ctx, "io.containerd.runtime.v2.task", &pluginConfig)
 	assert.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])

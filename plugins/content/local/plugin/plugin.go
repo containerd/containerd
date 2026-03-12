@@ -28,7 +28,7 @@ func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.ContentPlugin,
 		ID:   "content",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			root := ic.Properties[plugins.PropertyRootDir]
 			ic.Meta.Exports["root"] = root
 			return local.NewStore(root)

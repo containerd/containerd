@@ -205,7 +205,7 @@ func WithKillExecID(execID string) KillOpts {
 
 // WithResources sets the provided resources for task updates. Resources must be
 // either a *specs.LinuxResources or a *specs.WindowsResources
-func WithResources(resources interface{}) UpdateTaskOpts {
+func WithResources(resources any) UpdateTaskOpts {
 	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
 		switch resources.(type) {
 		case *specs.LinuxResources:

@@ -97,7 +97,7 @@ type Runtime struct {
 	// Currently, only device plugins populate the annotations.
 	ContainerAnnotations []string `toml:"container_annotations" json:"ContainerAnnotations"`
 	// Options are config options for the runtime.
-	Options map[string]interface{} `toml:"options" json:"options"`
+	Options map[string]any `toml:"options" json:"options"`
 	// PrivilegedWithoutHostDevices overloads the default behaviour for adding host devices to the
 	// runtime spec when the container is privileged. Defaults to false.
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
@@ -772,7 +772,7 @@ func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
 }
 
 // GenerateRuntimeOptions generates runtime options from cri plugin config.
-func GenerateRuntimeOptions(r Runtime) (interface{}, error) {
+func GenerateRuntimeOptions(r Runtime) (any, error) {
 	if r.Options == nil {
 		return nil, nil
 	}
@@ -797,7 +797,7 @@ func GenerateRuntimeOptions(r Runtime) (interface{}, error) {
 }
 
 // getRuntimeOptionsType gets empty runtime options by the runtime type name.
-func getRuntimeOptionsType(t string) interface{} {
+func getRuntimeOptionsType(t string) any {
 	switch t {
 	case plugins.RuntimeRuncV2:
 		return &runcoptions.Options{}

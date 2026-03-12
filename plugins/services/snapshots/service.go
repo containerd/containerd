@@ -53,7 +53,7 @@ type service struct {
 	snapshotsapi.UnimplementedSnapshotsServer
 }
 
-func newService(ic *plugin.InitContext) (interface{}, error) {
+func newService(ic *plugin.InitContext) (any, error) {
 	i, err := ic.GetByID(plugins.ServicePlugin, services.SnapshotsService)
 	if err != nil {
 		return nil, err

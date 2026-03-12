@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"strings"
 
@@ -306,8 +307,6 @@ func buildLabels(cmdLabels, imageLabels map[string]string) map[string]string {
 		}
 	}
 	// labels from the command line will override image and the initial image config labels
-	for k, v := range cmdLabels {
-		labels[k] = v
-	}
+	maps.Copy(labels, cmdLabels)
 	return labels
 }

@@ -78,7 +78,7 @@ func getRuncOptions(cliContext *cli.Context) (*options.Options, error) {
 	return runtimeOpts, nil
 }
 
-func RuntimeOptions(cliContext *cli.Context) (interface{}, error) {
+func RuntimeOptions(cliContext *cli.Context) (any, error) {
 	// validate first
 	if (cliContext.String("runc-binary") != "" || cliContext.Bool("runc-systemd-cgroup")) &&
 		cliContext.String("runtime") != "io.containerd.runc.v2" {
