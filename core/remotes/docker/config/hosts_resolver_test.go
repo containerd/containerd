@@ -38,6 +38,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/errdefs"
 )
 
 func TestResolverWithHostsDir(t *testing.T) {
@@ -336,5 +337,33 @@ func TestHostDirFromRoots(t *testing.T) {
 	}
 	if dir != want {
 		t.Fatalf("unexpected host dir: got %q, want %q", dir, want)
+	}
+}
+
+func TestHostDirFromRoots_SingleRoot(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	host := "registry.k8s.io"
+	want := filepath.Join(root, host)
+	if err := os.MkdirAll(want, 0o755); err != nil {
+		t.Fatalf("mkdir %q: %v", want, err)
+	}
+
+	dir, err := HostDirFromRoots([]string{root})(host)
+	if err != nil {
+		t.Fatalf("HostDirFromRoots(...)(%q) returned error: %v", host, err)
+	}
+	if dir != want {
+		t.Fatalf("unexpected host dir: got %q, want %q", dir, want)
+	}
+}
+
+func TestHostDirFromRoots_EmptyRoots(t *testing.T) {
+	t.Parallel()
+
+	_, err := HostDirFromRoots([]string{"", ""})("registry.k8s.io")
+	if !errdefs.IsNotFound(err) {
+		t.Fatalf("expected not found error, got: %v", err)
 	}
 }

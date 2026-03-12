@@ -318,6 +318,14 @@ func HostDirFromRoots(roots []string) func(string) (string, error) {
 		}
 		hostDirFns = append(hostDirFns, HostDirFromRoot(r))
 	}
+	switch len(hostDirFns) {
+	case 0:
+		return func(string) (string, error) {
+			return "", errdefs.ErrNotFound
+		}
+	case 1:
+		return hostDirFns[0]
+	}
 
 	return func(host string) (dir string, err error) {
 		for _, fn := range hostDirFns {
