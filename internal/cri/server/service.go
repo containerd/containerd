@@ -222,7 +222,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 			log.Fields{
 				"container": event.ContainerId,
 				"type":      event.ContainerEventType,
-			}).Info("container event discarded")
+			}).Debug("container event discarded")
 	})
 
 	if err := c.initPlatform(); err != nil {
