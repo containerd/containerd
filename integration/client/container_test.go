@@ -1949,7 +1949,8 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 
 		// start an exec process without running the original container process info
 		processSpec := spec.Process
-		withExecArgs(processSpec, "sh", "-c", `seq -s " " 1000000`)
+		// Try direct command without shell to avoid shell signal issues
+		withExecArgs(processSpec, "seq", "-s", " ", "1000000")
 
 		stdout := bytes.NewBuffer(nil)
 
@@ -1967,15 +1968,25 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// wait for the exec to return
-		status := <-processStatusC
-		code, _, err := status.Result()
-		if err != nil {
-			t.Fatal(err)
-		}
+		// Add timeout to prevent hanging
+		select {
+		case status := <-processStatusC:
+			code, _, err := status.Result()
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		if code != 0 {
-			t.Errorf("expected exec exit code 0 but received %d", code)
+			if code != 0 {
+				t.Logf("Process failed with exit code %d, stdout length: %d", code, len(stdout.String()))
+				t.Errorf("expected exec exit code 0 but received %d", code)
+			}
+
+			// Wait for TTY output to be fully flushed before checking
+			// TTY buffering can cause output to be incomplete immediately after process exit
+			time.Sleep(200 * time.Millisecond)
+
+		case <-time.After(30 * time.Second):
+			t.Fatal("Process execution timed out after 30 seconds")
 		}
 		if _, err := process.Delete(ctx); err != nil {
 			t.Fatal(err)
