@@ -95,6 +95,17 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 
 		status.CreatedAt = info.CreatedAt
 
+		// Check sandbox snapshots
+		snapstate := true
+		if info.Snapshotter != "" {
+			if ss := c.client.SnapshotService(info.Snapshotter); ss != nil {
+				if _, err := ss.Usage(ctx, info.SnapshotKey); err != nil && !errdefs.IsNotFound(err) {
+					log.G(ctx).WithError(err).Errorf("Failed to get usage for snapshot %q", info.SnapshotKey)
+					snapstate = false
+				}
+			}
+		}
+
 		// Load sandbox state.
 		t, err := cntr.Task(ctx, nil)
 		if err != nil && !errdefs.IsNotFound(err) {
@@ -120,7 +131,7 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 			// Task does not exist, set sandbox state as NOTREADY.
 			status.State = sandboxstore.StateNotReady
 		} else {
-			if taskStatus.Status == containerd.Running {
+			if taskStatus.Status == containerd.Running && snapstate {
 				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
 				if err != nil {
 					if !errdefs.IsNotFound(err) {
