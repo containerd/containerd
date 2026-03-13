@@ -31,17 +31,38 @@ func isNoent(err error) bool {
 	return os.IsNotExist(err)
 }
 
-func dialer(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(filepath.ToSlash(address), "npipe://")
-	return winio.DialPipe(address, &timeout)
+func isNamedPipePath(path string) bool {
+	return strings.HasPrefix(filepath.ToSlash(path), "//./pipe/")
 }
 
-// DialAddress returns the dial address with npipe:// prepended to the
-// provided address
+func dialer(address string, timeout time.Duration) (net.Conn, error) {
+	// accept npipe://<pipe>
+	if strings.HasPrefix(address, "npipe://") {
+		address = strings.TrimPrefix(filepath.ToSlash(address), "npipe://")
+		return winio.DialPipe(address, &timeout)
+	}
+
+	address = strings.TrimPrefix(address, "unix://")
+	// accept //./pipe/ and \\.\pipe\
+	if isNamedPipePath(address) {
+		return winio.DialPipe(address, &timeout)
+	}
+	// other paths are AF_UNIX, like Unix
+	return net.DialTimeout("unix", address, timeout)
+}
+
+// DialAddress returns the address with the appropriate scheme prepended.
+// Named pipe paths get npipe://, everything else gets unix://.
 func DialAddress(address string) string {
 	address = filepath.ToSlash(address)
-	if !strings.HasPrefix(address, "npipe://") {
-		address = fmt.Sprintf("npipe://%s", address)
+	if isNamedPipePath(address) {
+		if !strings.HasPrefix(address, "npipe://") {
+			address = fmt.Sprintf("npipe://%s", address)
+		}
+		return address
+	}
+	if !strings.HasPrefix(address, "unix://") {
+		address = fmt.Sprintf("unix://%s", address)
 	}
 	return address
 }
