@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -43,7 +44,25 @@ func init() {
 				break
 			}
 		}
+		if isRoot, err := IsRootUser(); err == nil {
+			if isRoot {
+				rootEnabled = true
+			}
+		}
 	}
+}
+
+func IsRootUser() (bool, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return false, err
+	}
+
+	uid, err := strconv.Atoi(currentUser.Uid)
+	if err != nil {
+		return false, err
+	}
+	return uid == 0, nil
 }
 
 // DumpDir prints the contents of the directory to the testing logger.
