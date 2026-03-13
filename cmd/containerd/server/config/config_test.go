@@ -301,7 +301,7 @@ func TestDecodePluginInV1Config(t *testing.T) {
 
 	err = out.MigrateConfig(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, out.Version)
+	assert.Equal(t, 4, out.Version)
 
 	pluginConfig := map[string]interface{}{}
 	_, err = out.Decode(ctx, "io.containerd.runtime.v2.task", &pluginConfig)

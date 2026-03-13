@@ -125,18 +125,20 @@ func dumpConfig(cliContext *cli.Context) error {
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
 	return &srvconfig.Config{
-		Version: version.ConfigVersion,
-		Root:    defaults.DefaultRootDir,
-		State:   defaults.DefaultStateDir,
-		GRPC: srvconfig.GRPCConfig{
-			Address:        defaults.DefaultAddress,
-			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
-			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
-		},
+		Version:          version.ConfigVersion,
+		Root:             defaults.DefaultRootDir,
+		State:            defaults.DefaultStateDir,
 		DisabledPlugins:  []string{},
 		RequiredPlugins:  []string{},
 		StreamProcessors: streamProcessors(),
 		Imports:          []string{defaults.DefaultConfigIncludePattern},
+		Plugins: map[string]any{
+			"io.containerd.server.v1.grpc": map[string]any{
+				"address":               defaults.DefaultAddress,
+				"max_recv_message_size": defaults.DefaultMaxRecvMsgSize,
+				"max_send_message_size": defaults.DefaultMaxSendMsgSize,
+			},
+		},
 	}
 }
 
