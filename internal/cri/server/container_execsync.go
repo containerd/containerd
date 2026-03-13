@@ -217,7 +217,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		CloseStdin: func() error {
 			return process.CloseIO(ctx, containerd.WithStdinCloser)
 		},
-	})
+	}, exitCh)
 
 	execCtx := ctx
 	if opts.timeout > 0 {
