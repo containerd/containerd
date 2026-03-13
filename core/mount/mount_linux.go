@@ -32,7 +32,7 @@ import (
 )
 
 type mountOpt struct {
-	flags   int
+	flags   mntFlag
 	data    []string
 	losetup bool
 	uidmap  string
@@ -181,7 +181,7 @@ func (m *Mount) mount(target string) (err error) {
 		}
 	}
 
-	const broflags = unix.MS_BIND | unix.MS_RDONLY
+	const broflags mntFlag = unix.MS_BIND | unix.MS_RDONLY
 	if oflags&broflags == broflags {
 		// Preserve CL_UNPRIVILEGED "locked" flags of the
 		// bind mount target when we remount to make the bind readonly.
@@ -191,13 +191,14 @@ func (m *Mount) mount(target string) (err error) {
 		// CL_UNPRIVILEGED locked flags.
 		var unprivFlags int
 		if userns.RunningInUserNS() {
-			unprivFlags, err = getUnprivilegedMountFlags(target)
+			f, err := getUnprivilegedMountFlags(target)
 			if err != nil {
 				return err
 			}
+			unprivFlags = int(f)
 		}
 		// Remount the bind to apply read only.
-		return unix.Mount("", target, "", uintptr(oflags|unprivFlags|unix.MS_REMOUNT), "")
+		return unix.Mount("", target, "", uintptr(int(oflags)|unprivFlags|unix.MS_REMOUNT), "")
 	}
 
 	// remap non-overlay mount point
@@ -213,14 +214,14 @@ func (m *Mount) mount(target string) (err error) {
 // path and are locked by CL_UNPRIVILEGED.
 //
 // From https://github.com/moby/moby/blob/v23.0.1/daemon/oci_linux.go#L430-L460
-func getUnprivilegedMountFlags(path string) (int, error) {
+func getUnprivilegedMountFlags(path string) (mntFlag, error) {
 	var statfs unix.Statfs_t
 	if err := unix.Statfs(path, &statfs); err != nil {
 		return 0, err
 	}
 
 	// The set of keys come from https://github.com/torvalds/linux/blob/v4.13/fs/namespace.c#L1034-L1048.
-	unprivilegedFlags := []int{
+	unprivilegedFlags := []mntFlag{
 		unix.MS_RDONLY,
 		unix.MS_NODEV,
 		unix.MS_NOEXEC,
@@ -230,9 +231,9 @@ func getUnprivilegedMountFlags(path string) (int, error) {
 		unix.MS_NODIRATIME,
 	}
 
-	var flags int
+	var flags mntFlag
 	for _, flag := range unprivilegedFlags {
-		if int(statfs.Flags)&flag == flag {
+		if mntFlag(statfs.Flags)&flag == flag {
 			flags |= flag
 		}
 	}
@@ -329,7 +330,7 @@ func parseMountOptions(options []string) (opt mountOpt) {
 	loopOpt := "loop"
 	flagsMap := map[string]struct {
 		clear bool
-		flag  int
+		flag  mntFlag
 	}{
 		"async":         {true, unix.MS_SYNCHRONOUS},
 		"atime":         {true, unix.MS_NOATIME},
