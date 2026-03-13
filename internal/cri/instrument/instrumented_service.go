@@ -18,7 +18,6 @@ package instrument
 
 import (
 	"context"
-	"errors"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
@@ -664,5 +663,5 @@ func (in *instrumentedService) RuntimeConfig(ctx context.Context, r *runtime.Run
 }
 
 func (in *instrumentedService) UpdatePodSandboxResources(ctx context.Context, r *runtime.UpdatePodSandboxResourcesRequest) (res *runtime.UpdatePodSandboxResourcesResponse, err error) {
-	return nil, errors.New("not implemented yet")
+	return nil, errgrpc.ToGRPC(errdefs.ErrNotImplemented)
 }
