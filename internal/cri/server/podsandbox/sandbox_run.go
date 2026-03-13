@@ -213,7 +213,8 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 			if cleanupErr = container.Delete(deferCtx, containerd.WithSnapshotCleanup); cleanupErr != nil {
 				log.G(ctx).WithError(cleanupErr).Errorf("Failed to delete containerd container %q", id)
 			}
-			podSandbox.Container = nil
+			// Can not set podSandbox.Container nil. When task Started, many failed scenarios, like timeout, ctx cancle .etc
+			// while cleanup task depend on container information, so it is necessary to keep container.
 		}
 	}()
 
