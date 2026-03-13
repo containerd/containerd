@@ -759,6 +759,16 @@ func TestLinuxContainerMounts(t *testing.T) {
 			}
 			c := newTestCRIService()
 			c.os.(*ostesting.FakeOS).StatFn = test.statFn
+			for _, mount := range test.expectedMounts {
+				if _, err := os.Stat(mount.ContainerPath); os.IsNotExist(err) {
+					if errMkdir := os.MkdirAll(filepath.Base(mount.ContainerPath), 0755); errMkdir != nil {
+						t.Fatal(errMkdir.Error())
+					}
+					if _, errCreate := os.Create(mount.ContainerPath); errCreate != nil {
+						t.Fatal(errCreate.Error())
+					}
+				}
+			}
 			mounts := c.linuxContainerMounts(testSandboxID, config)
 			assert.Equal(t, test.expectedMounts, mounts, test.desc)
 		})
