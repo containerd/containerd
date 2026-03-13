@@ -263,26 +263,26 @@ func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.B
 	go cmd.Wait()
 
 	var runcOpts options.Options
-	if err := opts.FindExtension(&runcOpts); err != nil {
+	if found, err := opts.FindExtension(&runcOpts); err != nil {
 		return nil, fmt.Errorf("failed to fetch runc options: %w", err)
-	}
-
-	if shimCgroup := runcOpts.GetShimCgroup(); shimCgroup != "" {
-		if cgroups.Mode() == cgroups.Unified {
-			cg, err := cgroupsv2.Load(shimCgroup)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load cgroup %s: %w", shimCgroup, err)
-			}
-			if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-				return nil, fmt.Errorf("failed to join cgroup %s: %w", shimCgroup, err)
-			}
-		} else {
-			cg, err := cgroup1.Load(cgroup1.StaticPath(shimCgroup))
-			if err != nil {
-				return nil, fmt.Errorf("failed to load cgroup %s: %w", shimCgroup, err)
-			}
-			if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-				return nil, fmt.Errorf("failed to join cgroup %s: %w", shimCgroup, err)
+	} else if found {
+		if shimCgroup := runcOpts.GetShimCgroup(); shimCgroup != "" {
+			if cgroups.Mode() == cgroups.Unified {
+				cg, err := cgroupsv2.Load(shimCgroup)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load cgroup %s: %w", shimCgroup, err)
+				}
+				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
+					return nil, fmt.Errorf("failed to join cgroup %s: %w", shimCgroup, err)
+				}
+			} else {
+				cg, err := cgroup1.Load(cgroup1.StaticPath(shimCgroup))
+				if err != nil {
+					return nil, fmt.Errorf("failed to load cgroup %s: %w", shimCgroup, err)
+				}
+				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
+					return nil, fmt.Errorf("failed to join cgroup %s: %w", shimCgroup, err)
+				}
 			}
 		}
 	}
