@@ -273,7 +273,7 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 		// Use a buffered channel for progress to allow multiple completed
 		// progress updates to be processed before shutting down the progress
 		// handler. Currently the progress stream does not have an explicit
-		// end, however, done indicates the server has already commpleted
+		// end, however, done indicates the server has already completed
 		// sending all progress.
 		pc     = make(chan transfer.Progress, 5)
 		status string

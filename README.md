@@ -151,7 +151,7 @@ A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/c
 
 #### CRI Guides
 * [Installing with Ansible and Kubeadm](contrib/ansible/README.md)
-* [For Non-Ansible Users, Preforming a Custom Installation Using the Release Tarball and Kubeadm](docs/getting-started.md)
+* [For Non-Ansible Users, Performing a Custom Installation Using the Release Tarball and Kubeadm](docs/getting-started.md)
 * [CRI Plugin Testing Guide](./docs/cri/testing.md)
 * [Debugging Pods, Containers, and Images with `crictl`](./docs/cri/crictl.md)
 * [Configuring `cri` Plugins](./docs/cri/config.md)
