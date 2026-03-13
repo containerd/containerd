@@ -20,11 +20,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"iter"
 	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"time"
 
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
@@ -36,6 +38,8 @@ import (
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc/grpclog"
 )
@@ -145,7 +149,11 @@ can be used and modified as necessary as a custom configuration.`
 		configPath := cliContext.String("config")
 		_, err := os.Stat(configPath)
 		if !os.IsNotExist(err) || cliContext.IsSet("config") {
-			if err := srvconfig.LoadConfig(ctx, configPath, config); err != nil {
+			g := registry.Graph(func(*plugin.Registration) bool { return false })
+			plugins := func() iter.Seq[plugin.Registration] {
+				return slices.Values(g)
+			}
+			if err := srvconfig.LoadConfigWithPlugins(ctx, configPath, plugins, config); err != nil {
 				return err
 			}
 		}
