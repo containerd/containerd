@@ -241,7 +241,8 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	for name, i := range c.netPlugin {
 		path := c.config.NetworkPluginConfDir
 		if name != defaultNetworkPlugin {
-			if rc, ok := c.config.Runtimes[name]; ok {
+			rc, ok := c.config.LoadRuntime(ctx, name)
+			if ok {
 				path = rc.NetworkPluginConfDir
 			}
 		}
@@ -257,7 +258,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	c.nri = nri.NewAPI(options.NRI, &criImplementation{c})
 
 	intro := c.client.IntrospectionService()
-	for name, r := range c.config.Runtimes {
+	for name, r := range c.config.LoadRuntimes(ctx) {
 		if err := c.introspectRuntimeHandler(ctx, intro, name, r); err != nil {
 			return nil, nil, fmt.Errorf("failed to introspect runtime %s: %w", name, err)
 		}
