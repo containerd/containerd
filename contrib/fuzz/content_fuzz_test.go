@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	digest "github.com/opencontainers/go-digest"
@@ -96,7 +97,8 @@ func populateBlobStore(ctx context.Context, cs content.Store, f *fuzz.ConsumeFuz
 // FuzzCSWalk implements a fuzzer that targets contentStore.Walk()
 func FuzzCSWalk(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
 		expected := map[digest.Digest]struct{}{}
 		found := map[digest.Digest]struct{}{}
 		tmpDir := t.TempDir()
@@ -138,7 +140,8 @@ func FuzzArchiveExport(f *testing.F) {
 		if err != nil {
 			return
 		}
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
 		tmpDir := t.TempDir()
 		cs, err := local.NewStore(tmpDir)
 		if err != nil {
