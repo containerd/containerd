@@ -44,18 +44,17 @@ func (p *BootstrapParams) AddExtension(msg proto.Message) error {
 }
 
 // FindExtension finds an extension matching the type of dst and unmarshals it.
-// Returns true if found, false if not found.
-func (p *BootstrapParams) FindExtension(dst proto.Message) error {
+func (p *BootstrapParams) FindExtension(dst proto.Message) (bool, error) {
 	name := dst.ProtoReflect().Descriptor().FullName()
 
 	for _, ext := range p.Extensions {
 		if ext.GetValue().MessageIs(dst) {
 			if err := ext.GetValue().UnmarshalTo(dst); err != nil {
-				return fmt.Errorf("failed to unmarshal extension %q: %w", name, err)
+				return false, fmt.Errorf("failed to unmarshal extension %q: %w", name, err)
 			}
-			return nil
+			return true, nil
 		}
 	}
 
-	return nil
+	return false, nil
 }
