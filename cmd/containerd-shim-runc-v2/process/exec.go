@@ -216,11 +216,6 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		close(e.waitBlock)
 		return e.parent.runtimeError(err, "OCI runtime exec failed")
 	}
-	if e.stdio.Stdin != "" {
-		if err := e.openStdin(e.stdio.Stdin); err != nil {
-			return err
-		}
-	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if socket != nil {
