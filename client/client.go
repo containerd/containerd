@@ -35,6 +35,7 @@ import (
 	leasesapi "github.com/containerd/containerd/api/services/leases/v1"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
 	sandboxsapi "github.com/containerd/containerd/api/services/sandbox/v1"
+	selinuxapi "github.com/containerd/containerd/api/services/selinux/v1"
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
@@ -1050,4 +1051,38 @@ func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOpt
 	}
 	result.Annotations = info.Annotations
 	return &result, nil
+}
+
+func (c *Client) SexlinuxService() selinuxapi.SelinuxClient {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return selinuxapi.NewSelinuxClient(c.conn)
+}
+
+func (c *Client) InitLabel(ctx context.Context, opts []string) (processLabel, mountLabel string, err error) {
+	c.connMu.Lock()
+	if c.conn == nil {
+		c.connMu.Unlock()
+		return "", "", fmt.Errorf("no grpc connection available: %w", errdefs.ErrUnavailable)
+	}
+	c.connMu.Unlock()
+	resp, err := c.SexlinuxService().InitLabel(ctx, &selinuxapi.InitLabelRequest{SelinuxOption: opts})
+	if err != nil {
+		return "", "", err
+	}
+	return resp.ProcessLabel, resp.MountLabel, nil
+}
+
+func (c *Client) ReleaseLabel(ctx context.Context, selinuxLabel string) error {
+	c.connMu.Lock()
+	if c.conn == nil {
+		c.connMu.Unlock()
+		return fmt.Errorf("no grpc connection available: %w", errdefs.ErrUnavailable)
+	}
+	c.connMu.Unlock()
+	_, err := c.SexlinuxService().ReleaseLabel(ctx, &selinuxapi.ReleaseLabelRequest{SelinuxLabel: selinuxLabel})
+	if err != nil {
+		return err
+	}
+	return nil
 }
