@@ -120,7 +120,7 @@ var (
 	debugFlag            bool
 	versionFlag          bool
 	infoFlag             bool
-	id                   string
+	ID                   string
 	namespaceFlag        string
 	socketFlag           string
 	debugSocketFlag      string
@@ -149,7 +149,7 @@ func parseFlags() {
 	// https://github.com/containerd/containerd/pull/8509#discussion_r1210021403
 	flag.BoolVar(&infoFlag, "info", false, "get the option protobuf from stdin, print the shim info protobuf to stdout, and exit")
 	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
-	flag.StringVar(&id, "id", "", "id of the task")
+	flag.StringVar(&ID, "id", "", "id of the task")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
 	flag.StringVar(&debugSocketFlag, "debug-socket", "", "debug socket path to serve")
 	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
@@ -269,7 +269,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 			logger.Logger.SetLevel(log.DebugLevel)
 		}
 		go reap(ctx, logger, signals)
-		ss, err := manager.Stop(ctx, id)
+		ss, err := manager.Stop(ctx, ID)
 		if err != nil {
 			return err
 		}
@@ -292,7 +292,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 			Debug:        debugFlag,
 		}
 
-		params, err := manager.Start(ctx, id, opts)
+		params, err := manager.Start(ctx, ID, opts)
 		if err != nil {
 			return err
 		}
@@ -310,7 +310,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	}
 
 	if !config.NoSetupLogger {
-		ctx, err = setLogger(ctx, id)
+		ctx, err = setLogger(ctx, ID)
 		if err != nil {
 			return err
 		}
