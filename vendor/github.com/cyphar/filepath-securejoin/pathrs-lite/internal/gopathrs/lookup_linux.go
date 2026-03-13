@@ -9,7 +9,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-package pathrs
+package gopathrs
 
 import (
 	"errors"
@@ -166,11 +166,11 @@ func (s *symlinkStack) PopTopSymlink() (*os.File, string, bool) {
 	return tailEntry.dir, tailEntry.remainingPath, true
 }
 
-// partialLookupInRoot tries to lookup as much of the request path as possible
+// PartialLookupInRoot tries to lookup as much of the request path as possible
 // within the provided root (a-la RESOLVE_IN_ROOT) and opens the final existing
 // component of the requested path, returning a file handle to the final
 // existing component and a string containing the remaining path components.
-func partialLookupInRoot(root fd.Fd, unsafePath string) (*os.File, string, error) {
+func PartialLookupInRoot(root fd.Fd, unsafePath string) (*os.File, string, error) {
 	return lookupInRoot(root, unsafePath, true)
 }
 
@@ -193,8 +193,13 @@ func lookupInRoot(root fd.Fd, unsafePath string, partial bool) (Handle *os.File,
 	// managed open, along with the remaining path components not opened.
 
 	// Try to use openat2 if possible.
-	if linux.HasOpenat2() {
-		return lookupOpenat2(root, unsafePath, partial)
+	//
+	// NOTE: If openat2(2) works normally but fails for this lookup, it is
+	// probably not a good idea to fall-back to the O_PATH resolver. An
+	// attacker could find a bug in the O_PATH resolver and uncontionally
+	// falling back to the O_PATH resolver would form a downgrade attack.
+	if handle, remainingPath, err := lookupOpenat2(root, unsafePath, partial); err == nil || linux.HasOpenat2() {
+		return handle, remainingPath, err
 	}
 
 	// Get the "actual" root path from /proc/self/fd. This is necessary if the
