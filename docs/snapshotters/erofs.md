@@ -5,6 +5,14 @@ snapshotter to enable the EROFS filesystem, specifically to keep EROFS‑formatt
 blobs for each committed snapshot and to prepare an OverlayFS mount for each
 active snapshot.
 
+In order to convert OCI container images directly into EROFS-formatted blobs,
+the EROFS differ must be specified with the EROFS snapshotter.  Otherwise,
+if the walking differ is used, the EROFS snapshotter will behave much like the
+existing OverlayFS snapshotter: the applier of the walking differ will unpack
+the current layer into the active EROFS snapshot of the mounted OverlayFS, and
+the EROFS snapshotter will commit it into an EROFS-formatted blob, which is
+slower than using the EROFS differ. Also see _the [Configuration](#configuration) section_.
+
 Although the EROFS snapshotter sounds somewhat similar to an enhanced OverlayFS
 snapshotter, several kernel features are highly tied to the EROFS internals, so
 it would be better to leave it as an independent snapshotter. This way, existing
@@ -20,14 +28,35 @@ The EROFS snapshotter can benefit to several use cases:
 For runC containers, instead of unpacking individual files into a directory
 on the backing filesystem, it applies OCI layers into EROFS blobs, therefore:
 
- - Improved image unpacking performance (~14% for WordPress image with the
-   latest erofs-utils 1.8.2) due to reduced metadata overhead;
+ - Improved image unpacking performance by live-converting tar archives into
+   EROFS-formatted layers during unpacking, compared with directly unpacking
+   to the host filesystem: By converting to EROFS-formatted layers, there is no
+   extra filesystem metadata journal traffic during handling individual files
+   and no need to remove a large number of files when GCing unused snapshots;
+
+   Here are the unpacking benchmark results against the OverlayFS snapshotter
+   using containerd 2.2.1 (pulling from a local registry, without parallel
+   unpacking):
+
+   ![Top25 container images](erofsbench-top25-images.png)
+   ![Large AI container images](erofsbench-ai-images.png)
 
  - Parallel unpacking is now supported natively, similar to the OverlayFS
    snapshotter.  This capability is difficult to implement in
    disk‑snapshot‑style snapshotters such as blockfile, devmapper and ZFS
    snapshotters.  It also uses an efficient method to persist layer data (via
    fsync) compared to the OverlayFS snapshotter, which can only use syncfs;
+
+ - Better data persistence guarantee: compared to directly unpacking to the host
+   filesystem, it provides better semantics by fsyncing the individual
+   EROFS-formatted layer blobs instead of syncfsing the whole disk each time.
+
+ - Full data protection for each snapshot using the FS_IMMUTABLE_FL file
+   attribute and fsverity.  EROFS uses FS_IMMUTABLE_FL and fsverity to protect
+   each EROFS layer blob, ensuring the mounted tree remains immutable.  However,
+   since FS_IMMUTABLE_FL and fsverity protect individual files rather than a
+   sub-filesystem tree, other snapshotter implementations like the overlayfs
+   snapshotter are not quite applicable due to less efficiency at least;
 
  - Support given‑size block devices as the upper layer for OverlayFS to
    limit the disk quota for writable layers (usually ephemeral storage);
@@ -36,13 +65,6 @@ on the backing filesystem, it applies OCI layers into EROFS blobs, therefore:
    to avoid loop devices on runC.  Note that specific runtime shims can
    handle EROFS mounts without this built‑in handler; for more details, see
    [containerd Mounts and Mount Management](../mounts.md);
-
- - Full data protection for each snapshot using the FS_IMMUTABLE_FL file
-   attribute and fsverity.  EROFS uses FS_IMMUTABLE_FL and fsverity to protect
-   each EROFS layer blob, ensuring the mounted tree remains immutable.  However,
-   since FS_IMMUTABLE_FL and fsverity protect individual files rather than a
-   sub-filesystem tree, other snapshotter implementations like the overlayfs
-   snapshotter are not quite applicable due to less efficiency at least;
 
  - Native EROFS layers can be pulled from registries without conversion.
 
@@ -53,6 +75,27 @@ memory footprints) over [virtiofs](https://virtio-fs.gitlab.io) or
 the popular application kernel [gVisor](https://gvisor.dev/) also supports
 [EROFS](https://github.com/google/gvisor/pull/9486) for efficient image
 pass-through.
+
+## Why consider EROFS over other kernel filesystems?
+
+EROFS is specifically designed as an immutable filesystem with the following
+highlights:
+
+ - **Lightweight, flexible on-disk format:** Designed for archival use to
+   avoid any serious filesystem consistency issues and minimize attack vectors.
+   There is no need to estimate filesystem size or total inode counts in
+   advance, unlike generic filesystems like EXT4;
+
+ - **Multi-device support:** Enables native layering or content-addressable
+   storage;
+
+ - **Bdev- and file-backed mounts:** File-backed mounts supported since Linux
+   6.12, eliminating the need for loopback devices.  This covers the latest
+   mainstream distributions such as RHEL 10, Fedora 40, Debian 13, Ubuntu 26.04
+   LTS (or 24.04 LTS with HWE kernels), and more;
+
+ - **Memory sharing:** Supports FSDAX using virtio-pmem and per-inode page cache
+   sharing.
 
 ## Usage
 
