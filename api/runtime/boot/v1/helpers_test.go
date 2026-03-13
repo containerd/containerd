@@ -21,43 +21,47 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	options "github.com/containerd/containerd/api/types/runc/options"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestExtensions(t *testing.T) {
 	params := &BootstrapParams{}
 
-	err := params.AddExtension(&RuncV2Extensions{SpecAnnotations: map[string]string{"test": "value"}})
+	err := params.AddExtension(&options.Options{ShimCgroup: "test-cgroup"})
 	require.NoError(t, err)
 
-	got := &RuncV2Extensions{}
-	err = params.FindExtension(got)
+	got := &options.Options{}
+	found, err := params.FindExtension(got)
 	require.NoError(t, err)
-	assert.Equal(t, "value", got.SpecAnnotations["test"])
+	assert.True(t, found)
+	assert.Equal(t, "test-cgroup", got.ShimCgroup)
 }
 
 func TestExtensionNotFound(t *testing.T) {
 	params := &BootstrapParams{}
 
-	got := &RuncV2Extensions{}
-	err := params.FindExtension(got)
+	got := &options.Options{}
+	found, err := params.FindExtension(got)
 	require.NoError(t, err)
+	assert.False(t, found)
 }
 
 func TestAddExtensionWithAny(t *testing.T) {
 	params := &BootstrapParams{}
 
-	ext := &RuncV2Extensions{SpecAnnotations: map[string]string{"test": "annotation"}}
+	ext := &options.Options{ShimCgroup: "test-cgroup"}
 	anyVal, err := anypb.New(ext)
 	require.NoError(t, err)
 
 	err = params.AddExtension(anyVal)
 	require.NoError(t, err)
 
-	got := &RuncV2Extensions{}
-	err = params.FindExtension(got)
+	got := &options.Options{}
+	found, err := params.FindExtension(got)
 	require.NoError(t, err)
-	assert.Equal(t, "annotation", got.SpecAnnotations["test"])
+	assert.True(t, found)
+	assert.Equal(t, "test-cgroup", got.ShimCgroup)
 
-	assert.Contains(t, params.Extensions[0].Value.TypeUrl, "RuncV2Extensions")
+	assert.Contains(t, params.Extensions[0].Value.TypeUrl, "Options")
 }
