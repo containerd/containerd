@@ -168,6 +168,18 @@ type conditional struct {
 	reference []func(conditionalValue)
 }
 
+// labelRefCallbacks groups the callback functions passed to sendLabelRefs.
+// Each field corresponds to a type of label handler. Only the callbacks
+// relevant to the current scan context need to be set; handlers whose
+// corresponding callback is nil are skipped.
+type labelRefCallbacks struct {
+	fn      func(gc.Node)
+	bref    func(gc.Node)
+	root    func()
+	cond    func(gc.Node, func(conditionalValue) bool)
+	condVal func(conditionalValue)
+}
+
 type gcContext struct {
 	labelHandlers []referenceLabelHandler
 	contexts      map[gc.ResourceType]CollectionContext
@@ -626,19 +638,28 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 
 				if !isExpiredImage(ctx, k, ibkt.Bucket(k), expThreshold) {
 					fn(gcnode(ResourceImage, ns, string(k)))
-					// Process conditional references for non-expired images
-					return c.sendLabelRefs(ns, ibkt.Bucket(k), nil, nil, nil, func(n gc.Node, cv func(conditionalValue) bool) {
-						addCond(gcnode(ResourceImage, ns, string(k)), n, cv)
-					}, nil)
+					// Non-expired images are roots, so regular fn/bref refs are
+					// not needed here — they are followed during graph traversal
+					// via references(). Only conditional refs need processing at
+					// scan time since conditions are collected during scan and
+					// evaluated after all values have been gathered.
+					return c.sendLabelRefs(ns, ibkt.Bucket(k), labelRefCallbacks{
+						cond: func(n gc.Node, cv func(conditionalValue) bool) {
+							addCond(gcnode(ResourceImage, ns, string(k)), n, cv)
+						},
+					})
 				} else {
 					// If the image is expired, still allow it to be referenced from
 					// other resources, the back references are not relevant if the object
 					// is not expired since it is already a root object.
-					return c.sendLabelRefs(ns, ibkt.Bucket(k), nil, func(n gc.Node) {
-						bref(n, gcnode(ResourceImage, ns, string(k)))
-					}, nil, func(n gc.Node, cv func(conditionalValue) bool) {
-						addCond(gcnode(ResourceImage, ns, string(k)), n, cv)
-					}, nil)
+					return c.sendLabelRefs(ns, ibkt.Bucket(k), labelRefCallbacks{
+						bref: func(n gc.Node) {
+							bref(n, gcnode(ResourceImage, ns, string(k)))
+						},
+						cond: func(n gc.Node, cv func(conditionalValue) bool) {
+							addCond(gcnode(ResourceImage, ns, string(k)), n, cv)
+						},
+					})
 
 				}
 
@@ -675,13 +696,17 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 						return nil
 					}
 
-					return c.sendLabelRefs(ns, cbkt.Bucket(k), nil, func(n gc.Node) {
-						bref(n, gcnode(ResourceContent, ns, string(k)))
-					}, func() {
-						fn(gcnode(ResourceContent, ns, string(k)))
-					}, func(n gc.Node, cv func(conditionalValue) bool) {
-						addCond(gcnode(ResourceContent, ns, string(k)), n, cv)
-					}, nil)
+					return c.sendLabelRefs(ns, cbkt.Bucket(k), labelRefCallbacks{
+						bref: func(n gc.Node) {
+							bref(n, gcnode(ResourceContent, ns, string(k)))
+						},
+						root: func() {
+							fn(gcnode(ResourceContent, ns, string(k)))
+						},
+						cond: func(n gc.Node, cv func(conditionalValue) bool) {
+							addCond(gcnode(ResourceContent, ns, string(k)), n, cv)
+						},
+					})
 				}); err != nil {
 					return err
 				}
@@ -697,10 +722,11 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 
 				fn(gcnode(ResourceContainer, ns, string(k)))
 
-				return c.sendLabelRefs(ns, cbkt.Bucket(k), nil, func(n gc.Node) {
-					bref(n, gcnode(ResourceContainer, ns, string(k)))
-
-				}, nil, nil, nil)
+				return c.sendLabelRefs(ns, cbkt.Bucket(k), labelRefCallbacks{
+					bref: func(n gc.Node) {
+						bref(n, gcnode(ResourceContainer, ns, string(k)))
+					},
+				})
 			}); err != nil {
 				return err
 			}
@@ -719,12 +745,16 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 						return nil
 					}
 
-					return c.sendLabelRefs(ns, snbkt.Bucket(k), nil, func(n gc.Node) {
-						bref(n, gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", sk, k)))
-					}, func() {
-						fn(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", sk, k)))
-					}, nil, func(v conditionalValue) {
-						addCondVal(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", sk, k)), v)
+					return c.sendLabelRefs(ns, snbkt.Bucket(k), labelRefCallbacks{
+						bref: func(n gc.Node) {
+							bref(n, gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", sk, k)))
+						},
+						root: func() {
+							fn(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", sk, k)))
+						},
+						condVal: func(v conditionalValue) {
+							addCondVal(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", sk, k)), v)
+						},
 					})
 				})
 			}); err != nil {
@@ -741,7 +771,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 
 				sbbkt := bbkt.Bucket(k)
 
-				return c.sendLabelRefs(ns, sbbkt, fn, nil, nil, nil, nil)
+				return c.sendLabelRefs(ns, sbbkt, labelRefCallbacks{fn: fn})
 			}); err != nil {
 				return err
 			}
@@ -781,7 +811,7 @@ func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, f
 			return nil
 		}
 
-		return c.sendLabelRefs(node.Namespace, bkt, fn, nil, nil, nil, nil)
+		return c.sendLabelRefs(node.Namespace, bkt, labelRefCallbacks{fn: fn})
 	case ResourceSnapshot, resourceSnapshotFlat:
 		ss, name, ok := strings.Cut(node.Key, "/")
 		if !ok {
@@ -802,7 +832,7 @@ func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, f
 			return nil
 		}
 
-		return c.sendLabelRefs(node.Namespace, bkt, fn, nil, nil, nil, nil)
+		return c.sendLabelRefs(node.Namespace, bkt, labelRefCallbacks{fn: fn})
 
 	case ResourceImage, resourceImageFlat:
 		bkt := getBucket(tx, bucketKeyVersion, []byte(node.Namespace), bucketKeyObjectImages, []byte(node.Key))
@@ -826,7 +856,7 @@ func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, f
 			return nil
 		}
 
-		return c.sendLabelRefs(node.Namespace, bkt, fn, nil, nil, nil, nil)
+		return c.sendLabelRefs(node.Namespace, bkt, labelRefCallbacks{fn: fn})
 
 	case ResourceIngest:
 		// Send expected value
@@ -855,7 +885,7 @@ func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, f
 			fn(gcnode(ResourceSnapshot, node.Namespace, fmt.Sprintf("%s/%s", snapshotter, ss)))
 		}
 
-		return c.sendLabelRefs(node.Namespace, bkt, fn, nil, nil, nil, nil)
+		return c.sendLabelRefs(node.Namespace, bkt, labelRefCallbacks{fn: fn})
 	}
 
 	return nil
@@ -1035,25 +1065,25 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (inte
 }
 
 // sendLabelRefs sends all snapshot and content references referred to by the labels in the bkt
-func (c *gcContext) sendLabelRefs(ns string, bkt *bolt.Bucket, fn func(gc.Node), bref func(gc.Node), root func(), addCond func(gc.Node, func(conditionalValue) bool), addCondVal func(conditionalValue)) error {
+func (c *gcContext) sendLabelRefs(ns string, bkt *bolt.Bucket, cb labelRefCallbacks) error {
 	lbkt := bkt.Bucket(bucketKeyObjectLabels)
 	if lbkt != nil {
 		lc := lbkt.Cursor()
 		for i := range c.labelHandlers {
-			if (bref == nil && c.labelHandlers[i].bref != nil) || (fn == nil && c.labelHandlers[i].fn != nil) || (addCond == nil && c.labelHandlers[i].condition != nil) || (addCondVal == nil && c.labelHandlers[i].conditionalV != nil) {
+			if (cb.bref == nil && c.labelHandlers[i].bref != nil) || (cb.fn == nil && c.labelHandlers[i].fn != nil) || (cb.cond == nil && c.labelHandlers[i].condition != nil) || (cb.condVal == nil && c.labelHandlers[i].conditionalV != nil) {
 				continue
 			}
 			for k, v := lc.Seek(c.labelHandlers[i].key); k != nil && bytes.HasPrefix(k, c.labelHandlers[i].key); k, v = lc.Next() {
 				if c.labelHandlers[i].fn != nil {
-					c.labelHandlers[i].fn(ns, k, v, fn)
+					c.labelHandlers[i].fn(ns, k, v, cb.fn)
 				} else if c.labelHandlers[i].bref != nil {
-					c.labelHandlers[i].bref(ns, k, v, bref)
+					c.labelHandlers[i].bref(ns, k, v, cb.bref)
 				} else if c.labelHandlers[i].condition != nil {
-					c.labelHandlers[i].condition(ns, k, v, addCond)
+					c.labelHandlers[i].condition(ns, k, v, cb.cond)
 				} else if c.labelHandlers[i].conditionalV != nil {
-					c.labelHandlers[i].conditionalV(ns, k, v, addCondVal)
-				} else if root != nil {
-					root()
+					c.labelHandlers[i].conditionalV(ns, k, v, cb.condVal)
+				} else if cb.root != nil {
+					cb.root()
 				}
 			}
 		}
