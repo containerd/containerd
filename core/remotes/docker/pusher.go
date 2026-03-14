@@ -60,6 +60,12 @@ func (p dockerPusher) Writer(ctx context.Context, opts ...content.WriterOpt) (co
 	if wOpts.Ref == "" {
 		return nil, fmt.Errorf("ref must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
+	if wOpts.Desc.Digest == "" {
+		return nil, fmt.Errorf("descriptor digest must not be empty: %w", errdefs.ErrInvalidArgument)
+	}
+	if wOpts.Desc.MediaType == "" {
+		return nil, fmt.Errorf("descriptor media type must not be empty: %w", errdefs.ErrInvalidArgument)
+	}
 	return p.push(ctx, wOpts.Desc, wOpts.Ref, true)
 }
 
