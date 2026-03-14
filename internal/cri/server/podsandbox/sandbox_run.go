@@ -218,7 +218,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	}()
 
 	// Setup files required for the sandbox.
-	if err = c.setupSandboxFiles(id, config); err != nil {
+	if err = c.setupSandboxFiles(ctx, id, config); err != nil {
 		return cin, fmt.Errorf("failed to setup sandbox files: %w", err)
 	}
 	defer func() {

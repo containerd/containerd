@@ -17,6 +17,7 @@
 package podsandbox
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -96,7 +97,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 }
 
 // No sandbox files needed for windows.
-func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+func (c *Controller) setupSandboxFiles(ctx context.Context, id string, config *runtime.PodSandboxConfig) error {
 	return nil
 }
 
