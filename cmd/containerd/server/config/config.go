@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -469,17 +470,11 @@ func mergeConfig(to, from *Config) error {
 	}
 
 	// Replace entire sections instead of merging map's values.
-	for k, v := range from.StreamProcessors {
-		to.StreamProcessors[k] = v
-	}
+	maps.Copy(to.StreamProcessors, from.StreamProcessors)
 
-	for k, v := range from.ProxyPlugins {
-		to.ProxyPlugins[k] = v
-	}
+	maps.Copy(to.ProxyPlugins, from.ProxyPlugins)
 
-	for k, v := range from.Timeouts {
-		to.Timeouts[k] = v
-	}
+	maps.Copy(to.Timeouts, from.Timeouts)
 
 	return nil
 }
