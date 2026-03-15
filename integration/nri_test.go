@@ -789,7 +789,7 @@ type mockPlugin struct {
 
 	closed               bool
 	namespace            string
-	logf                 func(string, ...interface{})
+	logf                 func(string, ...any)
 	synchronize          func(*mockPlugin, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
 	runPodSandbox        func(*mockPlugin, *api.PodSandbox) error
 	updatePodSandbox     func(*mockPlugin, *api.PodSandbox, *api.LinuxResources, *api.LinuxResources) error
@@ -842,7 +842,7 @@ func (m *mockPlugin) Start() error {
 	}
 
 	if m.logf == nil {
-		m.logf = func(format string, args ...interface{}) {
+		m.logf = func(format string, args ...any) {
 			fmt.Printf(format+"\n", args...)
 		}
 	}
@@ -912,7 +912,7 @@ func (m *mockPlugin) inNamespace(namespace string) bool {
 	return strings.HasPrefix(namespace, m.namespace)
 }
 
-func (m *mockPlugin) Log(format string, args ...interface{}) {
+func (m *mockPlugin) Log(format string, args ...any) {
 	m.logf(fmt.Sprintf("[plugin:%s-%s] ", m.idx, m.name)+format, args...)
 }
 

@@ -405,7 +405,7 @@ var (
 	defaultBufSize = 1024 * 4
 
 	bufPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			buffer := make([]byte, defaultBufSize)
 			return &buffer
 		},
