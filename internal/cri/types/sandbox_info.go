@@ -34,7 +34,7 @@ type SandboxInfo struct {
 	SnapshotKey    string                    `json:"snapshotKey"`
 	Snapshotter    string                    `json:"snapshotter"`
 	RuntimeType    string                    `json:"runtimeType"`
-	RuntimeOptions interface{}               `json:"runtimeOptions"`
+	RuntimeOptions any                       `json:"runtimeOptions"`
 	Config         *runtime.PodSandboxConfig `json:"config"`
 	// Note: RuntimeSpec may not be populated if the sandbox has not been fully created.
 	RuntimeSpec *specs.Spec                 `json:"runtimeSpec"`

@@ -150,7 +150,7 @@ func (fp *Failpoint) Marshal() string {
 
 type failpointEntry struct {
 	typ   Type
-	arg   interface{}
+	arg   any
 	count int64
 }
 
