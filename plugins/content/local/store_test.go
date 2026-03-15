@@ -311,7 +311,7 @@ func BenchmarkIngests(b *testing.B) {
 }
 
 type checker interface {
-	Fatal(args ...interface{})
+	Fatal(args ...any)
 }
 
 func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {

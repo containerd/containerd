@@ -46,7 +46,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.EventPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ep, err := ic.GetByID(plugins.EventPlugin, "exchange")
 			if err != nil {
 				return nil, err

@@ -39,7 +39,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.SandboxStorePlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			sp, err := ic.GetByID(plugins.SandboxStorePlugin, "local")
 			if err != nil {
 				return nil, err

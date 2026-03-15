@@ -44,7 +44,7 @@ func init() {
 			plugins.MetadataPlugin,
 			plugins.MountHandlerPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err

@@ -51,7 +51,7 @@ func init() {
 		Config: &Config{
 			Interval: tomlext.FromStdTime(10 * time.Second),
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Capabilities = []string{"no", "always", "on-failure", "unless-stopped"}
 			client, err := containerd.New("", containerd.WithInMemoryServices(ic))
 			if err != nil {
@@ -63,7 +63,7 @@ func init() {
 			go m.run(tomlext.ToStdTime(ic.Config.(*Config).Interval))
 			return m, nil
 		},
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 			if configVersion >= version.ConfigVersion {
 				return nil
 			}

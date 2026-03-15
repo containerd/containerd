@@ -47,7 +47,7 @@ func init() {
 			plugins.MetadataPlugin,
 		},
 		Config: &Config{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			tarModeSupported, err := erofsutils.SupportGenerateFromTar()
 			if err != nil {
 				return nil, fmt.Errorf("failed to check mkfs.erofs availability: %v: %w", err, plugin.ErrSkipPlugin)

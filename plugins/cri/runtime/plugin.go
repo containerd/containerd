@@ -56,7 +56,7 @@ func init() {
 	})
 }
 
-func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
+func initCRIRuntime(ic *plugin.InitContext) (any, error) {
 	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
 	ctx := ic.Context
@@ -194,24 +194,24 @@ func setGLogLevel() error {
 	return nil
 }
 
-func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 	if configVersion >= version.ConfigVersion {
 		return nil
 	}
-	src, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"].(map[string]interface{})
+	src, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"].(map[string]any)
 	if !ok {
 		return nil
 	}
-	dst, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"].(map[string]interface{})
+	dst, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"].(map[string]any)
 	if !ok {
-		dst = make(map[string]interface{})
+		dst = make(map[string]any)
 	}
 	migrateConfig(dst, src)
 	pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"] = dst
 	return nil
 }
 
-func migrateConfig(dst, src map[string]interface{}) {
+func migrateConfig(dst, src map[string]any) {
 	for k, v := range src {
 		switch k {
 		case "cni":
@@ -246,10 +246,10 @@ func migrateConfig(dst, src map[string]interface{}) {
 		}
 	}
 
-	if cniConf, ok := src["cni"].(map[string]interface{}); ok {
-		newCniConf, ok := dst["cni"].(map[string]interface{})
+	if cniConf, ok := src["cni"].(map[string]any); ok {
+		newCniConf, ok := dst["cni"].(map[string]any)
 		if !ok {
-			newCniConf = map[string]interface{}{}
+			newCniConf = map[string]any{}
 		}
 		for k, v := range cniConf {
 			switch k {
@@ -269,13 +269,13 @@ func migrateConfig(dst, src map[string]interface{}) {
 	}
 
 	// migrate cri containerd configs
-	containerdConf, ok := src["containerd"].(map[string]interface{})
+	containerdConf, ok := src["containerd"].(map[string]any)
 	if !ok {
 		return
 	}
-	newContainerdConf, ok := dst["containerd"].(map[string]interface{})
+	newContainerdConf, ok := dst["containerd"].(map[string]any)
 	if !ok {
-		newContainerdConf = map[string]interface{}{}
+		newContainerdConf = map[string]any{}
 	}
 	for k, v := range containerdConf {
 		switch k {
@@ -295,8 +295,8 @@ func migrateConfig(dst, src map[string]interface{}) {
 	if !ok {
 		return
 	}
-	for _, v := range runtimesConf.(map[string]interface{}) {
-		runtimeConf := v.(map[string]interface{})
+	for _, v := range runtimesConf.(map[string]any) {
+		runtimeConf := v.(map[string]any)
 		if sandboxMode, ok := runtimeConf["sandbox_mode"]; ok {
 			if _, ok := runtimeConf["sandboxer"]; !ok {
 				runtimeConf["sandboxer"] = sandboxMode

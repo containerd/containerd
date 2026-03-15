@@ -104,7 +104,7 @@ func init() {
 			ContentSharingPolicy: SharingPolicyShared,
 			NoSync:               false,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			root := ic.Properties[plugins.PropertyRootDir]
 			if err := os.MkdirAll(root, 0711); err != nil {
 				return nil, err
