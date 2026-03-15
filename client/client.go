@@ -995,12 +995,12 @@ type RuntimeVersion struct {
 type RuntimeInfo struct {
 	Name        string
 	Version     RuntimeVersion
-	Options     interface{}
-	Features    interface{}
+	Options     any
+	Features    any
 	Annotations map[string]string
 }
 
-func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOptions interface{}) (*RuntimeInfo, error) {
+func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOptions any) (*RuntimeInfo, error) {
 	runtime, err := c.defaultRuntime(ctx)
 	if err != nil {
 		return nil, err
