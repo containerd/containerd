@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -273,9 +274,7 @@ func WithSysctls(sysctls map[string]string) oci.SpecOpts {
 		if s.Linux.Sysctl == nil {
 			s.Linux.Sysctl = make(map[string]string)
 		}
-		for k, v := range sysctls {
-			s.Linux.Sysctl[k] = v
-		}
+		maps.Copy(s.Linux.Sysctl, sysctls)
 		return nil
 	}
 }

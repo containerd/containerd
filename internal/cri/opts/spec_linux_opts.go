@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -404,9 +405,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 			if s.Linux.Resources.Unified == nil {
 				s.Linux.Resources.Unified = make(map[string]string)
 			}
-			for k, v := range unified {
-				s.Linux.Resources.Unified[k] = v
-			}
+			maps.Copy(s.Linux.Resources.Unified, unified)
 		}
 		return nil
 	}
