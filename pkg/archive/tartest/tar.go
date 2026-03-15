@@ -135,7 +135,7 @@ func (ti tarInfo) ModTime() time.Time {
 func (ti tarInfo) IsDir() bool {
 	return (ti.mode & os.ModeDir) != 0
 }
-func (ti tarInfo) Sys() interface{} {
+func (ti tarInfo) Sys() any {
 	return ti.hdr
 }
 
