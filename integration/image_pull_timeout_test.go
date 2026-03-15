@@ -93,7 +93,7 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T, useLocal bool) {
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
 
-	_, err = criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
+	_, err = criService.PullImage(ctx, pullProgressTestImageName, nil, "", nil, "")
 	assert.NoError(t, err)
 }
 
@@ -220,7 +220,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 	go func() {
 		defer close(errCh)
 
-		_, err := criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
+		_, err := criService.PullImage(ctx, pullProgressTestImageName, nil, "", nil, "")
 		errCh <- err
 	}()
 
@@ -316,7 +316,7 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 		dctx, _, err := cli.WithLease(ctx)
 		assert.NoError(t, err)
 
-		_, err = criService.PullImage(dctx, fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"), nil, nil, "")
+		_, err = criService.PullImage(dctx, fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"), nil, "", nil, "")
 
 		assert.Equal(t, context.Canceled, errors.Unwrap(err), "[%v] expected canceled error, but got (%v)", idx, err)
 		assert.True(t, mirrorSrv.limiter.clearHitCircuitBreaker(), "[%v] expected to hit circuit breaker", idx)

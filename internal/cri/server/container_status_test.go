@@ -307,7 +307,7 @@ func (s *fakeImageService) Config() criconfig.ImageConfig {
 	return criconfig.ImageConfig{}
 }
 
-func (s *fakeImageService) PullImage(context.Context, string, func(string) (string, string, error), *runtime.PodSandboxConfig, string) (string, error) {
+func (s *fakeImageService) PullImage(context.Context, string, func(string) (string, string, error), string, *runtime.PodSandboxConfig, string) (string, error) {
 	return "", errors.New("not implemented")
 }
 

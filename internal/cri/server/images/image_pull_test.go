@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/platforms"
 
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
@@ -131,6 +132,34 @@ func TestParseAuth(t *testing.T) {
 			assert.Equal(t, test.expectedSecret, s)
 		})
 	}
+}
+
+func TestCRICredentials(t *testing.T) {
+	t.Run("registry token is returned as header auth", func(t *testing.T) {
+		helper := newCRICredentials("example.com/ns/image:tag", nil, "some-bearer-token")
+
+		creds, err := helper.GetCredentials(context.Background(), "example.com/ns/image:tag", "example.com")
+		assert.NoError(t, err)
+		assert.Equal(t, registry.Credentials{
+			Host:   "example.com",
+			Header: "Bearer some-bearer-token",
+		}, creds)
+	})
+
+	t.Run("username and secret are returned when registry token is absent", func(t *testing.T) {
+		helper := newCRICredentials("example.com/ns/image:tag", func(host string) (string, string, error) {
+			assert.Equal(t, "example.com", host)
+			return "user", "secret", nil
+		}, "")
+
+		creds, err := helper.GetCredentials(context.Background(), "example.com/ns/image:tag", "example.com")
+		assert.NoError(t, err)
+		assert.Equal(t, registry.Credentials{
+			Host:     "example.com",
+			Username: "user",
+			Secret:   "secret",
+		}, creds)
+	})
 }
 
 func TestRegistryEndpoints(t *testing.T) {
