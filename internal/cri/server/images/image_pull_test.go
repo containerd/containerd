@@ -115,6 +115,14 @@ func TestParseAuth(t *testing.T) {
 			expectedUser:   testUser,
 			expectedSecret: testPasswd,
 		},
+		{
+			desc: "should return empty auth for registry token (handled at PullImage level)",
+			auth: &runtime.AuthConfig{
+				RegistryToken: "some-bearer-token",
+			},
+			expectedUser:   "",
+			expectedSecret: "",
+		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			u, s, err := ParseAuth(test.auth, test.host)
