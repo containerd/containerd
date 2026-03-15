@@ -204,11 +204,12 @@ func (errs Errors) Error() string {
 	case 1:
 		return errs[0].Error()
 	default:
-		msg := "errors:\n"
+		var msg strings.Builder
+		msg.WriteString("errors:\n")
 		for _, err := range errs {
-			msg += err.Error() + "\n"
+			msg.WriteString(err.Error() + "\n")
 		}
-		return msg
+		return msg.String()
 	}
 }
 
