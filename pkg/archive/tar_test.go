@@ -1395,7 +1395,7 @@ func makeDiffTarReproTest(a, b fstest.Applier, opts ...WriteDiffOpt) func(*testi
 			delay = 100 * time.Millisecond
 		)
 		var lastDigest digest.Digest
-		for i := 0; i < count; i++ {
+		for i := range count {
 			dgst, _ := makeDiffTar(t, a, b, opts...)
 			t.Logf("#%02d: %v: digest %s", i, time.Now(), dgst)
 			if lastDigest == "" {
