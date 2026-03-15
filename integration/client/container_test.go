@@ -1941,7 +1941,7 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		spec, err := container.Spec(ctx)
 		if err != nil {
 			t.Fatal(err)
