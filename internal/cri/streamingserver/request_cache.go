@@ -131,7 +131,7 @@ func (c *requestCache) uniqueToken() (string, error) {
 	// Number of bytes to be tokenLen when base64 encoded.
 	tokenSize := math.Ceil(float64(tokenLen) * 6 / 8)
 	rawToken := make([]byte, int(tokenSize))
-	for i := 0; i < maxTries; i++ {
+	for range maxTries {
 		if _, err := rand.Read(rawToken); err != nil {
 			return "", err
 		}
