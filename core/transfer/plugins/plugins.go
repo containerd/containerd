@@ -45,7 +45,7 @@ func Register(apiObject, transferObject any) {
 		panic(fmt.Sprintf("url already registered: %v", url))
 	}
 	t := reflect.TypeOf(transferObject)
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	register.r[url] = t

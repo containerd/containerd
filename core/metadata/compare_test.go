@@ -31,7 +31,7 @@ func isNil(x any) bool {
 		return true
 	}
 	v := reflect.ValueOf(x)
-	return v.Kind() == reflect.Ptr && v.IsNil()
+	return v.Kind() == reflect.Pointer && v.IsNil()
 }
 
 var compareNil = cmp.FilterValues(
