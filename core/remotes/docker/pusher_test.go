@@ -426,7 +426,7 @@ var blobUploadRegexp = regexp.MustCompile(`/([a-z0-9]+)/blobs/uploads/(.*)`)
 type uploadableMockRegistry struct {
 	availableContents  []string
 	uploadable         bool
-	omitDigestHdr     bool
+	omitDigestHdr      bool
 	putHandlerFunc     func(w http.ResponseWriter, r *http.Request) bool
 	defaultHandlerFunc func(w http.ResponseWriter, r *http.Request) bool
 	locationPrefix     string
@@ -525,12 +525,7 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 
 // checks if the content is already present in the registry
 func (u *uploadableMockRegistry) isContentAlreadyExist(c string) bool {
-	for _, ct := range u.availableContents {
-		if ct == c {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(u.availableContents, c)
 }
 
 func Test_dockerPusher_push(t *testing.T) {

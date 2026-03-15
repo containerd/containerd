@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/containerd/containerd/api/types"
@@ -89,12 +90,7 @@ func CanonicalizePath(path string) (string, error) {
 // ReadOnly returns a boolean value indicating whether this mount has the "ro"
 // option set.
 func (m *Mount) ReadOnly() bool {
-	for _, option := range m.Options {
-		if option == "ro" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.Options, "ro")
 }
 
 // Mount to the provided target path.

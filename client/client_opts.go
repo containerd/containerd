@@ -18,6 +18,7 @@ package client
 
 import (
 	"maps"
+	"slices"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -138,10 +139,8 @@ func WithPlatform(platform string) RemoteOpt {
 		platform = platforms.DefaultString()
 	}
 	return func(_ *Client, c *RemoteContext) error {
-		for _, p := range c.Platforms {
-			if p == platform {
-				return nil
-			}
+		if slices.Contains(c.Platforms, platform) {
+			return nil
 		}
 
 		c.Platforms = append(c.Platforms, platform)

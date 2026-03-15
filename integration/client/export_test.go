@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -286,10 +287,8 @@ func isImageInArchive(ctx context.Context, t *testing.T, client *Client, dstFile
 	allPresent := true
 	// Check if the archive contains all blobs referenced by the manifest.
 	images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		for _, b := range blobs {
-			if desc.Digest.Hex() == b {
-				return images.Children(ctx, client.ContentStore(), desc)
-			}
+		if slices.Contains(blobs, desc.Digest.Hex()) {
+			return images.Children(ctx, client.ContentStore(), desc)
 		}
 		allPresent = false
 		return nil, images.ErrStopHandler
