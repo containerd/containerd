@@ -23,7 +23,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -175,7 +175,7 @@ func mergeGids(gids1, gids2 []uint32) []uint32 {
 	for gid := range gidsMap {
 		gids = append(gids, gid)
 	}
-	sort.Slice(gids, func(i, j int) bool { return gids[i] < gids[j] })
+	slices.Sort(gids)
 	return gids
 }
 
