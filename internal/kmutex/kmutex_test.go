@@ -148,10 +148,8 @@ func TestMultiAcquireOnSameKey(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range nproc {
-		wg.Add(1)
 
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
 			for range nloops {
 				km.Lock(ctx, key)
@@ -160,7 +158,7 @@ func TestMultiAcquireOnSameKey(t *testing.T) {
 
 				km.Unlock(key)
 			}
-		}()
+		})
 	}
 	km.Unlock(key)
 	wg.Wait()

@@ -106,9 +106,7 @@ func (m *monitor) reconcile(ctx context.Context) error {
 	}
 	var wgNSLoop sync.WaitGroup
 	for _, name := range ns {
-		wgNSLoop.Add(1)
-		go func() {
-			defer wgNSLoop.Done()
+		wgNSLoop.Go(func() {
 			ctx := namespaces.WithNamespace(ctx, name)
 			changes, err := m.monitor(ctx)
 			if err != nil {
@@ -117,16 +115,14 @@ func (m *monitor) reconcile(ctx context.Context) error {
 			}
 			var wgChangesLoop sync.WaitGroup
 			for _, c := range changes {
-				wgChangesLoop.Add(1)
-				go func() {
-					defer wgChangesLoop.Done()
+				wgChangesLoop.Go(func() {
 					if err := c.apply(ctx, m.client); err != nil {
 						log.G(ctx).WithError(err).Error("apply change")
 					}
-				}()
+				})
 			}
 			wgChangesLoop.Wait()
-		}()
+		})
 	}
 	wgNSLoop.Wait()
 	return nil
