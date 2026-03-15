@@ -81,7 +81,7 @@ type Config struct {
 	// RequiredPlugins must use a fully qualified plugin URI.
 	RequiredPlugins []string `toml:"required_plugins"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
-	Plugins map[string]interface{} `toml:"plugins"`
+	Plugins map[string]any `toml:"plugins"`
 	// OOMScore adjust the containerd's oom score
 	OOMScore int `toml:"oom_score"`
 	// Cgroup specifies cgroup information for the containerd daemon process
@@ -190,7 +190,7 @@ func v1MigratePluginName(ctx context.Context, plugin string) string {
 }
 
 func v1Migrate(ctx context.Context, c *Config) error {
-	plugins := make(map[string]interface{}, len(c.Plugins))
+	plugins := make(map[string]any, len(c.Plugins))
 	for plugin, value := range c.Plugins {
 		plugins[v1MigratePluginName(ctx, plugin)] = value
 	}
@@ -257,7 +257,7 @@ type ProxyPlugin struct {
 }
 
 // Decode unmarshals a plugin specific configuration by plugin id
-func (c *Config) Decode(ctx context.Context, id string, config interface{}) (interface{}, error) {
+func (c *Config) Decode(ctx context.Context, id string, config any) (any, error) {
 	data, ok := c.Plugins[id]
 	if !ok {
 		return config, nil

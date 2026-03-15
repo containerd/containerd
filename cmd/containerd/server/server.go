@@ -462,7 +462,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 	for name, pp := range config.ProxyPlugins {
 		var (
 			t plugin.Type
-			f func(*grpc.ClientConn) interface{}
+			f func(*grpc.ClientConn) any
 
 			address = pp.Address
 			p       v1.Platform
@@ -473,23 +473,23 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		case string(plugins.SnapshotPlugin), "snapshot":
 			t = plugins.SnapshotPlugin
 			ssname := name
-			f = func(conn *grpc.ClientConn) interface{} {
+			f = func(conn *grpc.ClientConn) any {
 				return ssproxy.NewSnapshotter(ssapi.NewSnapshotsClient(conn), ssname)
 			}
 
 		case string(plugins.ContentPlugin), "content":
 			t = plugins.ContentPlugin
-			f = func(conn *grpc.ClientConn) interface{} {
+			f = func(conn *grpc.ClientConn) any {
 				return csproxy.NewContentStore(conn)
 			}
 		case string(plugins.SandboxControllerPlugin), "sandbox":
 			t = plugins.SandboxControllerPlugin
-			f = func(conn *grpc.ClientConn) interface{} {
+			f = func(conn *grpc.ClientConn) any {
 				return sbproxy.NewSandboxController(sbapi.NewControllerClient(conn), name)
 			}
 		case string(plugins.DiffPlugin), "diff":
 			t = plugins.DiffPlugin
-			f = func(conn *grpc.ClientConn) interface{} {
+			f = func(conn *grpc.ClientConn) any {
 				return diffproxy.NewDiffApplier(diffapi.NewDiffClient(conn))
 			}
 		default:
@@ -513,7 +513,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		registry.Register(&plugin.Registration{
 			Type: t,
 			ID:   name,
-			InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			InitFn: func(ic *plugin.InitContext) (any, error) {
 				ic.Meta.Exports = exports
 				ic.Meta.Platforms = append(ic.Meta.Platforms, p)
 				ic.Meta.Capabilities = pp.Capabilities
