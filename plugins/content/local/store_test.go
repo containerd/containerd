@@ -317,7 +317,7 @@ type checker interface {
 func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	blobs := map[digest.Digest][]byte{}
 
-	for i := int64(0); i < nblobs; i++ {
+	for range nblobs {
 		p := make([]byte, randutil.Int63n(maxsize))
 
 		if _, err := rand.Read(p); err != nil {
