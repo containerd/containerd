@@ -378,7 +378,7 @@ func clearDockerV1DummyID(cfg DualConfig) (bool, error) {
 // Unmarshalled as map[string]*json.RawMessage to retain unknown fields on remarshalling.
 type DualConfig map[string]*json.RawMessage
 
-func readJSON(ctx context.Context, cs content.Store, x interface{}, desc ocispec.Descriptor) (map[string]string, error) {
+func readJSON(ctx context.Context, cs content.Store, x any, desc ocispec.Descriptor) (map[string]string, error) {
 	info, err := cs.Info(ctx, desc.Digest)
 	if err != nil {
 		return nil, err
@@ -394,7 +394,7 @@ func readJSON(ctx context.Context, cs content.Store, x interface{}, desc ocispec
 	return labels, nil
 }
 
-func writeJSON(ctx context.Context, cs content.Store, x interface{}, oldDesc ocispec.Descriptor, labels map[string]string) (*ocispec.Descriptor, error) {
+func writeJSON(ctx context.Context, cs content.Store, x any, oldDesc ocispec.Descriptor, labels map[string]string) (*ocispec.Descriptor, error) {
 	b, err := json.Marshal(x)
 	if err != nil {
 		return nil, err

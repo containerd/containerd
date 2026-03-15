@@ -702,7 +702,7 @@ func checkContainerTimestamps(t *testing.T, c *containers.Container, now time.Ti
 	}
 }
 
-func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...interface{}) {
+func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...any) {
 	assert.True(t, cmp.Equal(a, b, compareNil, compareAny))
 }
 

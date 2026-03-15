@@ -132,7 +132,7 @@ func (tc ContentStore) RandomBlob(mediaType string, n int) Content {
 
 // JSONObject creates an object in the content store by first marshaling
 // to JSON and then storing the data.
-func (tc ContentStore) JSONObject(mediaType string, i interface{}) Content {
+func (tc ContentStore) JSONObject(mediaType string, i any) Content {
 	tc.t.Helper()
 
 	data, err := json.Marshal(i)

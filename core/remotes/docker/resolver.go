@@ -827,7 +827,7 @@ func (r *request) setOffset(offset int64) {
 }
 
 func requestFields(req *http.Request) log.Fields {
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"request.method": req.Method,
 	}
 	for k, vals := range req.Header {
@@ -848,7 +848,7 @@ func requestFields(req *http.Request) log.Fields {
 }
 
 func responseFields(resp *http.Response) log.Fields {
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"response.status": resp.Status,
 	}
 	for k, vals := range resp.Header {

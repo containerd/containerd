@@ -647,9 +647,9 @@ func checkImageTimestamps(t *testing.T, im *images.Image, now time.Time, oncreat
 	}
 }
 
-func checkImagesEqual(t *testing.T, a, b *images.Image, format string, args ...interface{}) {
+func checkImagesEqual(t *testing.T, a, b *images.Image, format string, args ...any) {
 	t.Helper()
 	if !reflect.DeepEqual(a, b) {
-		t.Fatalf("images not equal \n\t%v != \n\t%v: "+format, append([]interface{}{a, b}, args...)...)
+		t.Fatalf("images not equal \n\t%v != \n\t%v: "+format, append([]any{a, b}, args...)...)
 	}
 }

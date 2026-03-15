@@ -69,7 +69,7 @@ func init() {
 		Config: &TaskConfig{
 			Platforms: defaultPlatforms(),
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			config := ic.Config.(*TaskConfig)
 
 			supportedPlatforms, err := platforms.ParseAll(config.Platforms)
@@ -347,7 +347,7 @@ func getRuntimeInfo(ctx context.Context, shims *ShimManager, req *apitypes.Runti
 	return &info, nil
 }
 
-func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (interface{}, error) {
+func (m *TaskManager) PluginInfo(ctx context.Context, request any) (any, error) {
 	req, ok := request.(*apitypes.RuntimeRequest)
 	if !ok {
 		return nil, fmt.Errorf("unknown request type %T: %w", request, errdefs.ErrNotImplemented)

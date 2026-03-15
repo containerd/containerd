@@ -330,7 +330,7 @@ func (m *DB) RegisterCollectibleResource(t gc.ResourceType, c Collector) {
 // namespacedEvent is used to handle any event for a namespace
 type namespacedEvent struct {
 	namespace string
-	event     interface{}
+	event     any
 }
 
 func (m *DB) publishEvents(events []namespacedEvent) {

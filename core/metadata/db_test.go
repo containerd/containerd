@@ -682,7 +682,7 @@ func digestFor(i int64) digest.Digest {
 }
 
 type object struct {
-	data    interface{}
+	data    any
 	removed bool
 	labels  map[string]string
 }

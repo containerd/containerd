@@ -237,7 +237,7 @@ func validateEnvelope(envelope *events.Envelope) error {
 	return nil
 }
 
-func adapt(ev interface{}) filters.Adaptor {
+func adapt(ev any) filters.Adaptor {
 	if adaptor, ok := ev.(filters.Adaptor); ok {
 		return adaptor
 	}
