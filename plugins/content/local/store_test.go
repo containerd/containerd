@@ -389,8 +389,7 @@ func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
 	cs, err := NewStore(t.TempDir())
 	assert.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	ref := "ref"
 	contentB := []byte("this is the content")
