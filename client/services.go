@@ -18,6 +18,7 @@ package client
 
 import (
 	"fmt"
+	"maps"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/diff/v1"
@@ -85,9 +86,7 @@ func WithImageStore(imageStore images.Store) ServicesOpt {
 func WithSnapshotters(snapshotters map[string]snapshots.Snapshotter) ServicesOpt {
 	return func(s *services) {
 		s.snapshotters = make(map[string]snapshots.Snapshotter)
-		for n, sn := range snapshotters {
-			s.snapshotters[n] = sn
-		}
+		maps.Copy(s.snapshotters, snapshotters)
 	}
 }
 

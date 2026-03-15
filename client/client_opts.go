@@ -17,6 +17,7 @@
 package client
 
 import (
+	"maps"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -202,9 +203,7 @@ func WithPullLabels(labels map[string]string) RemoteOpt {
 			rc.Labels = make(map[string]string)
 		}
 
-		for k, v := range labels {
-			rc.Labels[k] = v
-		}
+		maps.Copy(rc.Labels, labels)
 		return nil
 	}
 }

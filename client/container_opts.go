@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
@@ -150,9 +151,7 @@ func WithAdditionalContainerLabels(labels map[string]string) NewContainerOpts {
 			c.Labels = labels
 			return nil
 		}
-		for k, v := range labels {
-			c.Labels[k] = v
-		}
+		maps.Copy(c.Labels, labels)
 		return nil
 	}
 }
