@@ -1374,7 +1374,7 @@ func getXxxset(t *testing.T, kind, path string) []string {
 		return nil
 	}
 
-	for _, rng := range strings.Split(strings.TrimSpace(string(data)), ",") {
+	for rng := range strings.SplitSeq(strings.TrimSpace(string(data)), ",") {
 		var (
 			lo int
 			hi = -1

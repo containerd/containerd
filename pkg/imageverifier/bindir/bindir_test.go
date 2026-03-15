@@ -367,8 +367,8 @@ func TestBinDirVerifyImage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		lines := strings.Split(string(b), "\n")
-		for _, l := range lines {
+		lines := strings.SplitSeq(string(b), "\n")
+		for l := range lines {
 			// Ignore defunct (zombie) verifier processes if PID 1 hasn't reaped them.
 			// TODO: Remove defunct check once containerd serves as subreaper for verifier processes.
 			if strings.Contains(l, "verifier-") && !strings.Contains(l, "<defunct>") {
