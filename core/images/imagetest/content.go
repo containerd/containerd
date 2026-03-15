@@ -204,7 +204,7 @@ func SimpleIndex(manifests, layerSize int) ContentCreator {
 	manifestFn := SimpleManifest(layerSize)
 	return func(tc ContentStore) Content {
 		var m []Content
-		for i := 0; i < manifests; i++ {
+		for range manifests {
 			m = append(m, manifestFn(tc))
 		}
 		return tc.Index(m...)

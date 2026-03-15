@@ -53,7 +53,7 @@ func TestContainersList(t *testing.T) {
 	require.NoError(t, err)
 
 	testset := map[string]*containers.Container{}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := "container-" + fmt.Sprint(i)
 		testset[id] = &containers.Container{
 			ID: id,

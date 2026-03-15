@@ -73,7 +73,7 @@ func TestResolverOptionsRace(t *testing.T) {
 		return base, options, s.Close
 	}
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		t.Run(fmt.Sprintf("test ResolverOptions race %d", i), func(t *testing.T) {
 			// parallel sub tests so the race condition (if not handled) can be caught
 			// by race detector

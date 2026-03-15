@@ -35,7 +35,7 @@ func TestImagesList(t *testing.T) {
 	store := NewImageStore(NewDB(db, nil, nil))
 
 	testset := map[string]*images.Image{}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := "image-" + fmt.Sprint(i)
 		testset[id] = &images.Image{
 			Name: id,
