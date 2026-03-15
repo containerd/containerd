@@ -20,6 +20,7 @@ import (
 	"archive/tar"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"time"
 )
@@ -160,9 +161,7 @@ func (tc TarContext) WithXattrs(xattrs map[string]string) TarContext {
 	if ntc.Xattrs == nil {
 		ntc.Xattrs = map[string]string{}
 	}
-	for k, v := range xattrs {
-		ntc.Xattrs[k] = v
-	}
+	maps.Copy(ntc.Xattrs, xattrs)
 	return ntc
 }
 

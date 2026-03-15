@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
@@ -1469,9 +1470,7 @@ func WithAnnotations(annotations map[string]string) SpecOpts {
 		if s.Annotations == nil {
 			s.Annotations = make(map[string]string)
 		}
-		for k, v := range annotations {
-			s.Annotations[k] = v
-		}
+		maps.Copy(s.Annotations, annotations)
 		return nil
 	}
 }

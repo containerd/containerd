@@ -17,6 +17,7 @@
 package testing
 
 import (
+	"maps"
 	"os"
 	"sync"
 
@@ -78,9 +79,7 @@ func (f *FakeOS) InjectError(fn string, err error) {
 func (f *FakeOS) InjectErrors(errs map[string]error) {
 	f.Lock()
 	defer f.Unlock()
-	for fn, err := range errs {
-		f.errors[fn] = err
-	}
+	maps.Copy(f.errors, errs)
 }
 
 // ClearErrors clear errors for call
