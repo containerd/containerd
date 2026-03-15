@@ -19,6 +19,7 @@ package snapshots
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"strings"
 	"time"
 
@@ -371,9 +372,7 @@ func WithLabels(labels map[string]string) Opt {
 			info.Labels = make(map[string]string)
 		}
 
-		for k, v := range labels {
-			info.Labels[k] = v
-		}
+		maps.Copy(info.Labels, labels)
 
 		return nil
 	}
