@@ -131,16 +131,16 @@ func readonlyOverlay(opt []string) []string {
 	out := make([]string, 0, len(opt))
 	upper := ""
 	for _, o := range opt {
-		if strings.HasPrefix(o, "upperdir=") {
-			upper = strings.TrimPrefix(o, "upperdir=")
+		if after, ok := strings.CutPrefix(o, "upperdir="); ok {
+			upper = after
 		} else if !isSkippedReadonlyOption(o) {
 			out = append(out, o)
 		}
 	}
 	if upper != "" {
 		for i, o := range out {
-			if strings.HasPrefix(o, "lowerdir=") {
-				out[i] = "lowerdir=" + upper + ":" + strings.TrimPrefix(o, "lowerdir=")
+			if after, ok := strings.CutPrefix(o, "lowerdir="); ok {
+				out[i] = "lowerdir=" + upper + ":" + after
 			}
 		}
 	}
