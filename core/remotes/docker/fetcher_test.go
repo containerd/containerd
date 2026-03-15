@@ -734,11 +734,11 @@ func parseRange(s string, size int64) ([]httpRange, error) {
 		if ra == "" {
 			continue
 		}
-		i := strings.Index(ra, "-")
-		if i < 0 {
+		before, after, ok := strings.Cut(ra, "-")
+		if !ok {
 			return nil, errors.New("invalid range")
 		}
-		start, end := textproto.TrimString(ra[:i]), textproto.TrimString(ra[i+1:])
+		start, end := textproto.TrimString(before), textproto.TrimString(after)
 		var r httpRange
 		if start == "" {
 			// If no start is specified, end specifies the
