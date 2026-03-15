@@ -61,10 +61,7 @@ type TimedStore struct {
 // age specifies how long samples are retained.
 // maxItems specifies the maximum number of samples to keep (-1 for no limit).
 func NewTimedStore(age time.Duration, maxItems int) *TimedStore {
-	capacity := maxItems
-	if capacity < 0 {
-		capacity = 0 // Will grow dynamically
-	}
+	capacity := max(maxItems, 0) // Will grow dynamically
 	return &TimedStore{
 		buffer:   make(timedStoreDataSlice, 0, capacity),
 		age:      age,
