@@ -33,8 +33,7 @@ func FuzzSendAndReceive(f *testing.F) {
 	f.Add([]byte("hello"))
 	f.Add(bytes.Repeat([]byte("hello"), windowSize+1))
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := f.Context()
 	f.Fuzz(func(t *testing.T, expected []byte) {
 		runSendAndReceiveFuzz(ctx, t, expected)
 		runSendAndReceiveChainFuzz(ctx, t, expected)
