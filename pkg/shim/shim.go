@@ -319,7 +319,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	registry.Register(&plugin.Registration{
 		Type: plugins.InternalPlugin,
 		ID:   "shutdown",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			return sd, nil
 		},
 	})
@@ -328,7 +328,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	registry.Register(&plugin.Registration{
 		Type: plugins.EventPlugin,
 		ID:   "publisher",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			return NewPublisher(ttrpcAddress, func(cfg *publisherConfig) {
 				p, _ := ic.GetByID(plugins.TTRPCPlugin, "otelttrpc")
 				if p == nil {

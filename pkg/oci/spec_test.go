@@ -53,7 +53,7 @@ func TestGenerateSpec(t *testing.T) {
 			s.Process.Capabilities.Permitted,
 			s.Process.Capabilities.Effective,
 		} {
-			for i := 0; i < len(defaults); i++ {
+			for i := range defaults {
 				if cl[i] != defaults[i] {
 					t.Errorf("cap at %d does not match set %q != %q", i, defaults[i], cl[i])
 				}

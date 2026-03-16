@@ -311,13 +311,13 @@ func BenchmarkIngests(b *testing.B) {
 }
 
 type checker interface {
-	Fatal(args ...interface{})
+	Fatal(args ...any)
 }
 
 func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	blobs := map[digest.Digest][]byte{}
 
-	for i := int64(0); i < nblobs; i++ {
+	for range nblobs {
 		p := make([]byte, randutil.Int63n(maxsize))
 
 		if _, err := rand.Read(p); err != nil {
@@ -389,8 +389,7 @@ func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
 	cs, err := NewStore(t.TempDir())
 	assert.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	ref := "ref"
 	contentB := []byte("this is the content")

@@ -211,8 +211,8 @@ func validateTopic(topic string) error {
 		return fmt.Errorf("must have at least one component: %w", errdefs.ErrInvalidArgument)
 	}
 
-	components := strings.Split(topic[1:], "/")
-	for _, component := range components {
+	components := strings.SplitSeq(topic[1:], "/")
+	for component := range components {
 		if err := identifiers.Validate(component); err != nil {
 			return fmt.Errorf("failed validation on component %q: %w", component, err)
 		}
@@ -237,7 +237,7 @@ func validateEnvelope(envelope *events.Envelope) error {
 	return nil
 }
 
-func adapt(ev interface{}) filters.Adaptor {
+func adapt(ev any) filters.Adaptor {
 	if adaptor, ok := ev.(filters.Adaptor); ok {
 		return adaptor
 	}

@@ -242,8 +242,8 @@ func WithWindowsDevices(config *runtime.ContainerConfig) oci.SpecOpts {
 			}
 
 			hostPath := device.HostPath
-			if strings.HasPrefix(hostPath, "class/") {
-				hostPath = "class://" + strings.TrimPrefix(hostPath, "class/")
+			if after, ok := strings.CutPrefix(hostPath, "class/"); ok {
+				hostPath = "class://" + after
 			}
 
 			idType, id, ok := strings.Cut(hostPath, "://")

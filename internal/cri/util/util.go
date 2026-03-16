@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path"
 	"strconv"
 	"strings"
@@ -95,9 +96,7 @@ func BuildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 		}
 	}
 	// labels from the CRI request (config) will override labels in the image config
-	for k, v := range configLabels {
-		labels[k] = v
-	}
+	maps.Copy(labels, configLabels)
 	labels[crilabels.ContainerKindLabel] = containerType
 	return labels
 }

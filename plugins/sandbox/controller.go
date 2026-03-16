@@ -50,7 +50,7 @@ func init() {
 			plugins.ShimPlugin,
 			plugins.EventPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			shimPlugin, err := ic.GetSingle(plugins.ShimPlugin)
 			if err != nil {
 				return nil, err

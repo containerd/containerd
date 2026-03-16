@@ -68,7 +68,7 @@ var metricsCommand = &cli.Command{
 			return err
 		}
 
-		var data interface{}
+		var data any
 		switch {
 		case typeurl.Is(metric.Data, (*v1.Metrics)(nil)):
 			data = &v1.Metrics{}

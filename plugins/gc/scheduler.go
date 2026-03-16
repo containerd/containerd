@@ -97,7 +97,7 @@ func init() {
 			ScheduleDelay:     tomlext.FromStdTime(0),
 			StartupDelay:      tomlext.FromStdTime(100 * time.Millisecond),
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err

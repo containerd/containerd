@@ -53,7 +53,7 @@ func TestContainersList(t *testing.T) {
 	require.NoError(t, err)
 
 	testset := map[string]*containers.Container{}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := "container-" + fmt.Sprint(i)
 		testset[id] = &containers.Container{
 			ID: id,
@@ -702,7 +702,7 @@ func checkContainerTimestamps(t *testing.T, c *containers.Container, now time.Ti
 	}
 }
 
-func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...interface{}) {
+func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...any) {
 	assert.True(t, cmp.Equal(a, b, compareNil, compareAny))
 }
 

@@ -35,7 +35,7 @@ func init() {
 			plugins.MetadataPlugin,
 			plugins.GCPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err

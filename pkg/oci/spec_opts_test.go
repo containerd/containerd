@@ -184,15 +184,6 @@ func TestWithDefaultSpecForPlatform(t *testing.T) {
 
 }
 
-func Contains(a []string, x string) bool {
-	for _, n := range a {
-		if x == n {
-			return true
-		}
-	}
-	return false
-}
-
 func TestWithProcessCwd(t *testing.T) {
 	t.Parallel()
 	s := Spec{}

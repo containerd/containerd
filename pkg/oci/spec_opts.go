@@ -25,10 +25,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -130,10 +132,8 @@ func setCapabilities(s *Spec) {
 // ensureAdditionalGids ensures that the primary GID is also included in the additional GID list.
 func ensureAdditionalGids(s *Spec) {
 	setProcess(s)
-	for _, f := range s.Process.User.AdditionalGids {
-		if f == s.Process.User.GID {
-			return
-		}
+	if slices.Contains(s.Process.User.AdditionalGids, s.Process.User.GID) {
+		return
 	}
 	s.Process.User.AdditionalGids = append([]uint32{s.Process.User.GID}, s.Process.User.AdditionalGids...)
 }
@@ -881,12 +881,7 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 				if g.Name == username {
 					return false
 				}
-				for _, entry := range g.List {
-					if entry == username {
-						return true
-					}
-				}
-				return false
+				return slices.Contains(g.List, username)
 			})
 			if err != nil {
 				if os.IsNotExist(err) {
@@ -1057,12 +1052,7 @@ func WithCapabilities(caps []string) SpecOpts {
 }
 
 func capsContain(caps []string, s string) bool {
-	for _, c := range caps {
-		if c == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(caps, s)
 }
 
 func removeCap(caps *[]string, s string) {
@@ -1469,9 +1459,7 @@ func WithAnnotations(annotations map[string]string) SpecOpts {
 		if s.Annotations == nil {
 			s.Annotations = make(map[string]string)
 		}
-		for k, v := range annotations {
-			s.Annotations[k] = v
-		}
+		maps.Copy(s.Annotations, annotations)
 		return nil
 	}
 }

@@ -19,6 +19,7 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"sync"
 	"testing"
@@ -291,9 +292,7 @@ func (s *tmpSnapshotter) Update(ctx context.Context, info snapshots.Info, fieldp
 		return snapshots.Info{}, errdefs.ErrNotFound
 	}
 
-	for k, v := range info.Labels {
-		i.Labels[k] = v
-	}
+	maps.Copy(i.Labels, info.Labels)
 
 	s.snapshots[i.Name] = i
 

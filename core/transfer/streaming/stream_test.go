@@ -33,6 +33,8 @@ func FuzzSendAndReceive(f *testing.F) {
 	f.Add([]byte("hello"))
 	f.Add(bytes.Repeat([]byte("hello"), windowSize+1))
 
+	// TODO(thaJeztah): use f.Context() once github.com/AdamKorcz/go-118-fuzz-build/testing is updated.
+	// see https://github.com/containerd/containerd/pull/13022#discussion_r2937038804
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f.Fuzz(func(t *testing.T, expected []byte) {

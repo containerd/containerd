@@ -330,7 +330,7 @@ func (m *DB) RegisterCollectibleResource(t gc.ResourceType, c Collector) {
 // namespacedEvent is used to handle any event for a namespace
 type namespacedEvent struct {
 	namespace string
-	event     interface{}
+	event     any
 }
 
 func (m *DB) publishEvents(events []namespacedEvent) {
@@ -426,11 +426,9 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	var wg sync.WaitGroup
 
 	// Flush events asynchronously after commit
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		m.publishEvents(events)
-		wg.Done()
-	}()
+	})
 
 	// Reset dirty. Truly don't need to be atomically stored inside of the wlock
 	// but we're using the atomic wrappers that guarantee atomic access everywhere.
@@ -490,13 +488,11 @@ func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{},
 			wg    sync.WaitGroup
 			roots = make(chan gc.Node)
 		)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for n := range roots {
 				nodes = append(nodes, n)
 			}
-		}()
+		})
 		// Call roots
 		if err := c.scanRoots(ctx, tx, roots); err != nil { // From gc context
 			cancel()

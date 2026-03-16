@@ -203,7 +203,7 @@ func TestGC(t *testing.T) {
 	assert.True(t, ok)
 
 	// When full, nothing is expired.
-	for i := 0; i < maxInFlight; i++ {
+	for range maxInFlight {
 		_, err := c.Insert(nextRequest())
 		require.NoError(t, err)
 	}
@@ -232,7 +232,7 @@ func assertCacheSize(t *testing.T, cache *requestCache, expectedSize int) {
 
 var requestUID = 0
 
-func nextRequest() interface{} {
+func nextRequest() any {
 	requestUID++
 	return requestUID
 }

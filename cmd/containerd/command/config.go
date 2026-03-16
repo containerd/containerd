@@ -43,7 +43,7 @@ func outputConfig(ctx context.Context, config *srvconfig.Config) error {
 	}
 	if len(plugins) != 0 {
 		if config.Plugins == nil {
-			config.Plugins = make(map[string]interface{})
+			config.Plugins = make(map[string]any)
 		}
 		for _, p := range plugins {
 			if p.Config == nil {

@@ -17,6 +17,7 @@
 package testing
 
 import (
+	"maps"
 	"os"
 	"sync"
 
@@ -30,7 +31,7 @@ type CalledDetail struct {
 	// Name of the function called.
 	Name string
 	// Arguments of the function called.
-	Arguments []interface{}
+	Arguments []any
 }
 
 // FakeOS mocks out certain OS calls to avoid perturbing the filesystem
@@ -78,9 +79,7 @@ func (f *FakeOS) InjectError(fn string, err error) {
 func (f *FakeOS) InjectErrors(errs map[string]error) {
 	f.Lock()
 	defer f.Unlock()
-	for fn, err := range errs {
-		f.errors[fn] = err
-	}
+	maps.Copy(f.errors, errs)
 }
 
 // ClearErrors clear errors for call
@@ -90,7 +89,7 @@ func (f *FakeOS) ClearErrors() {
 	f.errors = make(map[string]error)
 }
 
-func (f *FakeOS) appendCalls(name string, args ...interface{}) {
+func (f *FakeOS) appendCalls(name string, args ...any) {
 	f.Lock()
 	defer f.Unlock()
 	f.calls = append(f.calls, CalledDetail{Name: name, Arguments: args})

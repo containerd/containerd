@@ -797,7 +797,7 @@ func (c *gcContext) scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx contex
 }
 
 // remove all buckets for the given node.
-func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (interface{}, error) {
+func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (any, error) {
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
 		return nil, nil
