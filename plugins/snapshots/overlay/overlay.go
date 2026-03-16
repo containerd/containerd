@@ -40,6 +40,10 @@ import (
 // the change set between this snapshot and its parent is stored.
 const upperdirKey = "containerd.io/snapshot/overlay.upperdir"
 
+// labelSnapshotParent is the label used to indicate that a snapshot
+// has a parent.
+const labelSnapshotParent = "containerd.io/snapshot/parent-chain-id"
+
 // SnapshotterConfig is used to configure the overlay snapshotter instance
 type SnapshotterConfig struct {
 	asyncRemove   bool
@@ -562,21 +566,25 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 	}
 
 	if len(s.ParentIDs) == 0 {
-		// if we only have one layer/no parents then just return a bind mount as overlay
-		// will not work
-		roFlag := "rw"
-		if s.Kind == snapshots.KindView {
-			roFlag = "ro"
-		}
-		return []mount.Mount{
-			{
-				Source: o.upperPath(s.ID),
-				Type:   "bind",
-				Options: append(options,
-					roFlag,
-					"rbind",
-				),
-			},
+		// If we only have one layer/no parents then just return a bind mount as overlay
+		// will not work. The exception is parallel unpack initially has parentless layers
+		// that need to be rebased on a parent later. For this case, the "overlay" mount
+		// is returned to signal the optimized fast-path in the walking applier.
+		if _, ok := info.Labels[labelSnapshotParent]; !ok {
+			roFlag := "rw"
+			if s.Kind == snapshots.KindView {
+				roFlag = "ro"
+			}
+			return []mount.Mount{
+				{
+					Source: o.upperPath(s.ID),
+					Type:   "bind",
+					Options: append(options,
+						roFlag,
+						"rbind",
+					),
+				},
+			}
 		}
 	}
 

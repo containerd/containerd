@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/moby/sys/userns"
 )
 
 const (
@@ -93,7 +94,12 @@ func init() {
 				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaOnlyRemapIDs)
 			}
 
-			ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaRebase)
+			// When parent is not provided, prepare will not return correct lowerdirs.
+			// The slowpath of diff-apply will fail to mount the overlayfs in userns mode.
+			// https://github.com/containerd/containerd/blob/main/core/diff/apply/apply_linux.go#L39
+			if !userns.RunningInUserNS() {
+				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaRebase)
+			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
 			return overlay.NewSnapshotter(root, oOpts...)
