@@ -45,10 +45,6 @@ mkdir temp-go
 rm -rf /root/.go/*
 tar -C temp-go/ -xzf go1.25.8.linux-amd64.tar.gz
 mv temp-go/go/* /root/.go/
-cd $SRC/containerd
-
-printf "package client\nimport _ \"github.com/AdamKorcz/go-118-fuzz-build/testing\"\n" > client/registerfuzzdep.go
-go mod tidy
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
@@ -63,7 +59,6 @@ export CXXFLAGS="$CXXFLAGS -lresolv"
 sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
 
 compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer vendor
-compile_fuzzers '^func Fuzz.*data' compile_go_fuzzer '(vendor|Integ)'
 
 # The below fuzzers require more setup than the fuzzers above.
 # We need the binaries from "make".
@@ -74,7 +69,7 @@ export CGO_ENABLED=1
 export GOARCH=amd64
 
 # Build runc
-cd $SRC/
+cd $SRC
 git clone https://github.com/opencontainers/runc --branch release-1.1
 cd runc
 make
@@ -84,8 +79,8 @@ make install
 cd $SRC/containerd
 make STATIC=1
 
-mkdir $OUT/containerd-binaries || true
-cd $SRC/containerd/bin && cp * $OUT/containerd-binaries/ && cd -
+mkdir -p $OUT/containerd-binaries
+cd $SRC/containerd/bin && cp * $OUT/containerd-binaries/
 
 # Change defaultState and defaultAddress fron /run/containerd-test to /tmp/containerd-test:
 sed -i 's/\/run\/containerd-test/\/tmp\/containerd-test/g' $SRC/containerd/integration/client/client_unix_test.go
