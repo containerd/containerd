@@ -88,7 +88,7 @@ sed -i 's/\/run\/containerd-test/\/tmp\/containerd-test/g' $SRC/containerd/integ
 
 cd integration/client
 
-compile_fuzzers '^func FuzzInteg.*testing\.F' compile_native_go_fuzzer_v2 vendor
+compile_fuzzers '^func FuzzInteg.*testing\.F' compile_native_go_fuzzer vendor
 
 cp $SRC/containerd/contrib/fuzz/*.options $OUT/
 cp $SRC/containerd/contrib/fuzz/*.dict $OUT/
