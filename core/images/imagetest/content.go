@@ -165,7 +165,7 @@ func (tc ContentStore) Walk(c Content, fn func(context.Context, *Content, conten
 	return c
 }
 
-// AddPlatform alters the content desciptor by setting the platform
+// AddPlatform alters the content descriptor by setting the platform
 func AddPlatform(c Content, p ocispec.Platform) Content {
 	c.Descriptor.Platform = &p
 	return c
