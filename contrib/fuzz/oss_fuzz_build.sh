@@ -59,7 +59,7 @@ export CXXFLAGS="$CXXFLAGS -lresolv"
 # Change path of socket since OSS-fuzz does not grant access to /run
 sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
 
-compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer vendor
+compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer_v2 vendor
 
 # The below fuzzers require more setup than the fuzzers above.
 # We need the binaries from "make".
@@ -88,7 +88,7 @@ sed -i 's/\/run\/containerd-test/\/tmp\/containerd-test/g' $SRC/containerd/integ
 
 cd integration/client
 
-compile_fuzzers '^func FuzzInteg.*testing\.F' compile_native_go_fuzzer vendor
+compile_fuzzers '^func FuzzInteg.*testing\.F' compile_native_go_fuzzer_v2 vendor
 
 cp $SRC/containerd/contrib/fuzz/*.options $OUT/
 cp $SRC/containerd/contrib/fuzz/*.dict $OUT/
