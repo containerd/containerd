@@ -155,6 +155,16 @@ type windowsMatchComparer struct {
 	Matcher
 }
 
+func (c *windowsMatchComparer) MatchRank(platform specs.Platform) int {
+	if ranker, ok := c.Matcher.(interface{ MatchRank(specs.Platform) int }); ok {
+		return ranker.MatchRank(platform)
+	}
+	if c.Match(platform) {
+		return 0
+	}
+	return -1
+}
+
 func (c *windowsMatchComparer) Less(p1, p2 specs.Platform) bool {
 	m1, m2 := c.Match(p1), c.Match(p2)
 	if m1 && m2 {

@@ -31,6 +31,10 @@ type MatchComparer interface {
 	Less(specs.Platform, specs.Platform) bool
 }
 
+type matchRanker interface {
+	MatchRank(specs.Platform) int
+}
+
 type platformVersions struct {
 	major []int
 	minor []int
@@ -207,13 +211,16 @@ func (c orderedPlatformComparer) Match(platform specs.Platform) bool {
 
 func (c orderedPlatformComparer) Less(p1 specs.Platform, p2 specs.Platform) bool {
 	for _, m := range c.matchers {
-		p1m := m.Match(p1)
-		p2m := m.Match(p2)
-		if p1m && !p2m {
+		p1r := matchRank(m, p1)
+		p2r := matchRank(m, p2)
+		if p1r >= 0 && p2r < 0 {
 			return true
 		}
-		if p1m || p2m {
+		if p2r >= 0 && p1r < 0 {
 			return false
+		}
+		if p1r >= 0 && p2r >= 0 {
+			return p1r > p2r
 		}
 	}
 	return false
@@ -233,20 +240,17 @@ func (c anyPlatformComparer) Match(platform specs.Platform) bool {
 }
 
 func (c anyPlatformComparer) Less(p1, p2 specs.Platform) bool {
-	var p1m, p2m bool
+	p1r, p2r := -1, -1
 	for _, m := range c.matchers {
-		if !p1m && m.Match(p1) {
-			p1m = true
+		if rank := matchRank(m, p1); rank > p1r {
+			p1r = rank
 		}
-		if !p2m && m.Match(p2) {
-			p2m = true
-		}
-		if p1m && p2m {
-			return false
+		if rank := matchRank(m, p2); rank > p2r {
+			p2r = rank
 		}
 	}
-	// If one matches, and the other does, sort match first
-	return p1m && !p2m
+
+	return p1r > p2r
 }
 
 type allPlatformComparer struct{}
@@ -257,4 +261,14 @@ func (allPlatformComparer) Match(specs.Platform) bool {
 
 func (allPlatformComparer) Less(specs.Platform, specs.Platform) bool {
 	return false
+}
+
+func matchRank(m Matcher, platform specs.Platform) int {
+	if ranker, ok := m.(matchRanker); ok {
+		return ranker.MatchRank(platform)
+	}
+	if m.Match(platform) {
+		return 0
+	}
+	return -1
 }
