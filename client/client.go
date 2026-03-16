@@ -963,6 +963,8 @@ func toPlatforms(pt []*apitypes.Platform) []ocispec.Platform {
 		platforms[i] = ocispec.Platform{
 			Architecture: p.Architecture,
 			OS:           p.OS,
+			OSFeatures:   append([]string(nil), p.OSFeatures...),
+			OSVersion:    p.OSVersion,
 			Variant:      p.Variant,
 		}
 	}
