@@ -50,6 +50,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
 
 rm -r vendor
+go mod tidy
 
 # Add temporary CXXFLAGS
 OLDCXXFLAGS=$CXXFLAGS
