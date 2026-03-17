@@ -37,7 +37,7 @@ const delegatedPlugin = "bridge"
 type netConf struct {
 	RuntimeConfig struct {
 		PodAnnotations inheritedPodAnnotations `json:"io.kubernetes.cri.pod-annotations"`
-	} `json:"runtimeConfig,omitempty"`
+	} `json:"runtimeConfig"`
 }
 
 type inheritedPodAnnotations struct {
