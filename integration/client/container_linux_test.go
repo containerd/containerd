@@ -35,6 +35,7 @@ import (
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/containerd/containerd/v2/client"
@@ -50,6 +51,7 @@ import (
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/sys/unix"
 )
 
@@ -1811,4 +1813,71 @@ func TestIssue10589(t *testing.T) {
 	t.Logf("task status: %s", status.Status)
 	require.NoError(t, err, "container status")
 	assert.Equal(t, Stopped, status.Status)
+}
+
+// TestIssue13030 is a regression test for parallel image unpacking.
+// The test validates that when multiple layers are unpacked in parallel,
+// that whiteout files are properly processed and do not cause files to
+// be unexpectedly present in the final rootfs.
+//
+// https://github.com/containerd/containerd/issues/13030
+func TestIssue13030(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { client.Close() })
+
+	ctx, cancel := testContext(t)
+	t.Cleanup(cancel)
+
+	image, err := client.Pull(ctx,
+		images.Get(images.Whiteout),
+		WithPlatformMatcher(platforms.Default()),
+		WithPullUnpack,
+		WithUnpackOpts([]UnpackOpt{WithUnpackLimiter(semaphore.NewWeighted(3))}),
+	)
+	t.Cleanup(func() {
+		client.ImageService().Delete(ctx, images.Get(images.Whiteout))
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, t.Name(),
+		WithNewSnapshot(t.Name(), image),
+		WithNewSpec(oci.WithImageConfig(image),
+			withProcessArgs("/bin/sh", "-e", "-c", "test ! -e /file-to-delete && test ! -e /dir-to-delete")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		container.Delete(ctx, WithSnapshotCleanup)
+	})
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		task.Delete(ctx)
+	})
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = task.Start(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := <-statusC
+	code, _, err := status.Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 0 {
+		t.Errorf("expected status 0 from wait but received %d", code)
+	}
 }
