@@ -722,7 +722,7 @@ type criContainer struct {
 	exit *eventtypes.TaskExit
 }
 
-func (a *API) nriContainer(ctr interface{}, opts ...criContainerOption) *criContainer {
+func (a *API) nriContainer(ctr any, opts ...criContainerOption) *criContainer {
 	criCtr := &criContainer{}
 	for _, o := range opts {
 		o(criCtr)
