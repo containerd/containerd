@@ -149,14 +149,12 @@ func TestSandboxStopWithNilCNIResult(t *testing.T) {
 	injectCNIFailpoint(t, sbConfig, conf)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		t.Log("Create a sandbox (will hang on CNI Add)")
 		_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
 		assert.Error(t, err)
-	}()
+	})
 
 	t.Log("Wait for CNI Add to start running")
 	assert.NoError(t, ensureCNIAddRunning(t, sbName), "CNI Add should be running")

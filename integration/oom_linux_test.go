@@ -93,9 +93,7 @@ version = 3
 		t.Logf("Creating %d running container and wait for them OOMKilled", n)
 		var wg sync.WaitGroup
 		for _, podCtx := range podCtxs {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 
 				cntrID := podCtx.createContainer(fmt.Sprintf("round-%d-running", round), busyboxImage,
 					criruntime.ContainerState_CONTAINER_RUNNING,
@@ -134,7 +132,7 @@ version = 3
 				}, time.Second, 90*time.Second), "wait for container %s to exit", cntrID)
 
 				assert.NoError(t, ctrd.criRuntimeService(t).RemoveContainer(cntrID), "failed to remove container %s", cntrID)
-			}()
+			})
 		}
 		wg.Wait()
 	}
