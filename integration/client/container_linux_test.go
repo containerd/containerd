@@ -1482,10 +1482,7 @@ func TestShimOOMScore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedScore := containerdScore + 1
-	if expectedScore > sys.OOMScoreAdjMax {
-		expectedScore = sys.OOMScoreAdjMax
-	}
+	expectedScore := min(containerdScore+1, sys.OOMScoreAdjMax)
 
 	// find the shim's pid
 	if cgroups.Mode() == cgroups.Unified {
