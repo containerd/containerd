@@ -77,10 +77,10 @@ func getOverlayPath(options []string) (upper string, lower []string, err error) 
 	const lowerdirPrefix = "lowerdir="
 
 	for _, o := range options {
-		if strings.HasPrefix(o, upperdirPrefix) {
-			upper = strings.TrimPrefix(o, upperdirPrefix)
-		} else if strings.HasPrefix(o, lowerdirPrefix) {
-			lower = strings.Split(strings.TrimPrefix(o, lowerdirPrefix), ":")
+		if after, ok := strings.CutPrefix(o, upperdirPrefix); ok {
+			upper = after
+		} else if after, ok := strings.CutPrefix(o, lowerdirPrefix); ok {
+			lower = strings.Split(after, ":")
 		}
 	}
 	if upper == "" {

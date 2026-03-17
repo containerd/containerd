@@ -92,8 +92,8 @@ func (erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string, _ 
 
 		for i, v := range m.Options {
 			// Convert raw files in `device=` into loop devices too
-			if strings.HasPrefix(v, "device=") {
-				loop, err := mount.SetupLoop(strings.TrimPrefix(v, "device="), params)
+			if after, ok := strings.CutPrefix(v, "device="); ok {
+				loop, err := mount.SetupLoop(after, params)
 				if err != nil {
 					return mount.ActiveMount{}, err
 				}

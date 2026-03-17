@@ -369,10 +369,10 @@ func parseMountOptions(options []string) (opt mountOpt) {
 			}
 		} else if o == loopOpt {
 			opt.losetup = true
-		} else if strings.HasPrefix(o, "uidmap=") {
-			opt.uidmap = strings.TrimPrefix(o, "uidmap=")
-		} else if strings.HasPrefix(o, "gidmap=") {
-			opt.gidmap = strings.TrimPrefix(o, "gidmap=")
+		} else if after, ok := strings.CutPrefix(o, "uidmap="); ok {
+			opt.uidmap = after
+		} else if after, ok := strings.CutPrefix(o, "gidmap="); ok {
+			opt.gidmap = after
 		} else {
 			opt.data = append(opt.data, o)
 		}
