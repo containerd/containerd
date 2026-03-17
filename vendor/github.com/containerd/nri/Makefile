@@ -80,9 +80,16 @@ FORCE:
 # build targets
 #
 
-build-proto: check-protoc install-ttrpc-plugin install-wasm-plugin install-protoc-dependencies
+build-proto: check-protoc install-ttrpc-plugin install-wasm-plugin install-protoc-dependencies build-protoc-gen-strip build-protoc-gen-owners
 	for src in $(PROTO_SOURCES); do \
-		$(PROTO_COMPILE) $$src; \
+		$(PROTO_COMPILE) \
+			--plugin=protoc-gen-strip=$(abspath $(BIN_PATH)/protoc-gen-strip) \
+			--strip_out=pkg/api \
+			--strip_opt=file=strip.go \
+			--plugin=protoc-gen-owners=$(abspath $(BIN_PATH)/protoc-gen-owners) \
+			--owners_out=pkg/api \
+			--owners_opt=file=owners_generated.go \
+			$$src; \
 	done
 	sed -i '1s;^;//go:build !wasip1\n\n;' pkg/api/api_ttrpc.pb.go
 
@@ -116,6 +123,16 @@ clean-cache:
 # plugins build targets
 #
 
+.PHONY: build-protoc-gen-owners
+build-protoc-gen-owners:
+	$(Q)echo "Building build/bin/protoc-gen-owners..."; \
+	$(GO_BUILD) -C tools/protoc-gen-owners -o $(abspath $(BIN_PATH)/protoc-gen-owners) $(GO_BUILD_FLAGS) .
+
+.PHONY: build-protoc-gen-strip
+build-protoc-gen-strip:
+	$(Q)echo "Building build/bin/protoc-gen-strip..."; \
+	$(GO_BUILD) -C tools/protoc-gen-strip -o $(abspath $(BIN_PATH)/protoc-gen-strip) $(GO_BUILD_FLAGS) .
+
 $(BIN_PATH)/% build/bin/%: FORCE
 	$(Q)echo "Building $@..."; \
 	$(GO_BUILD) -C plugins/$* -o $(abspath $@) $(GO_BUILD_FLAGS) .
@@ -129,9 +146,9 @@ $(BIN_PATH)/wasm build/bin/wasm: FORCE
 # test targets
 #
 
-test-gopkgs: ginkgo-tests test-ulimits test-rdt
+test-gopkgs: ginkgo-tests test-ulimits test-rdt test-hook-injector
 
-SKIPPED_PKGS="ulimit-adjuster,device-injector,rdt"
+SKIPPED_PKGS="ulimit-adjuster,device-injector,rdt,hook-injector"
 
 ginkgo-tests:
 	$(Q)$(GINKGO) run \
@@ -155,6 +172,9 @@ test-device-injector:
 
 test-rdt:
 	$(Q)cd ./plugins/rdt && $(GO_TEST) -v
+
+test-hook-injector:
+	$(Q)cd ./plugins/hook-injector && $(GO_TEST) -v
 
 codecov: SHELL := $(shell which bash)
 codecov:

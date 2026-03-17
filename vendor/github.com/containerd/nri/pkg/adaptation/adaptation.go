@@ -73,6 +73,7 @@ type Adaptation struct {
 	builtin     []*builtin.BuiltinPlugin
 	syncLock    sync.RWMutex
 	wasmService *api.PluginPlugin
+	metrics     Metrics
 }
 
 var (
@@ -135,6 +136,16 @@ func WithBuiltinPlugins(plugins ...*builtin.BuiltinPlugin) Option {
 	}
 }
 
+// WithMetrics allows consumers to register an implementation of the Metrics interface.
+func WithMetrics(m Metrics) Option {
+	return func(r *Adaptation) error {
+		if m != nil {
+			r.metrics = m
+		}
+		return nil
+	}
+}
+
 // WithDefaultValidator sets up builtin validator plugin if it is configured.
 func WithDefaultValidator(cfg *validator.DefaultValidatorConfig) Option {
 	return func(r *Adaptation) error {
@@ -174,6 +185,7 @@ func New(name, version string, syncFn SyncFn, updateFn UpdateFn, opts ...Option)
 		socketPath:  DefaultSocketPath,
 		syncLock:    sync.RWMutex{},
 		wasmService: wasmService,
+		metrics:     &noopMetrics{},
 	}
 
 	for _, o := range opts {
@@ -537,6 +549,7 @@ func (r *Adaptation) removeClosedPlugins() {
 
 	r.plugins = active
 	r.validators = validators
+	r.metrics.UpdatePluginCount(len(r.plugins))
 }
 
 func (r *Adaptation) startListener() error {
@@ -604,6 +617,7 @@ func (r *Adaptation) acceptPluginConnections(l net.Listener) error {
 					r.validators = append(r.validators, p)
 				}
 				r.sortPlugins()
+				r.metrics.UpdatePluginCount(len(r.plugins))
 				r.Unlock()
 				log.Infof(ctx, "plugin %q connected and synchronized", p.name())
 			}

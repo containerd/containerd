@@ -85,6 +85,9 @@ func collectCreateContainerResult(request *CreateContainerRequest) *result {
 	if request.Container.Linux.NetDevices == nil {
 		request.Container.Linux.NetDevices = map[string]*LinuxNetDevice{}
 	}
+	if request.Container.Linux.Sysctl == nil {
+		request.Container.Linux.Sysctl = map[string]string{}
+	}
 
 	return &result{
 		request: resultRequest{
@@ -108,6 +111,7 @@ func collectCreateContainerResult(request *CreateContainerRequest) *result {
 					},
 					Namespaces: []*LinuxNamespace{},
 					NetDevices: map[string]*LinuxNetDevice{},
+					Sysctl:     map[string]string{},
 				},
 			},
 		},
