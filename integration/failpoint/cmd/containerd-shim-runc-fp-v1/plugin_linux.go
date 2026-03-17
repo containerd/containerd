@@ -47,7 +47,7 @@ func init() {
 			plugins.EventPlugin,
 			plugins.InternalPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			pp, err := ic.GetByID(plugins.EventPlugin, "publisher")
 			if err != nil {
 				return nil, err
@@ -88,7 +88,7 @@ func (s *taskServiceWithFp) RegisterTTRPC(server *ttrpc.Server) error {
 }
 
 func (s *taskServiceWithFp) UnaryServerInterceptor() ttrpc.UnaryServerInterceptor {
-	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (interface{}, error) {
+	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (any, error) {
 		methodName := filepath.Base(info.FullMethod)
 		if fp, ok := s.fps[methodName]; ok {
 			if err := fp.Evaluate(); err != nil {

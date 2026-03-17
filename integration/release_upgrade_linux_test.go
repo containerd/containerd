@@ -736,7 +736,7 @@ func buildShimClientFromBundle(t *testing.T, rSvc cri.RuntimeService, cid string
 	case err == nil:
 		rawJSON, err := os.ReadFile(bootstrapJSON)
 		require.NoError(t, err, "failed to read bootstrap.json for container %s", cid)
-		var bootstrapData map[string]interface{}
+		var bootstrapData map[string]any
 		err = json.Unmarshal(rawJSON, &bootstrapData)
 		require.NoError(t, err, "failed to unmarshal bootstrap.json for container %s", cid)
 
@@ -794,11 +794,11 @@ func (pCtx *podTCtx) stop(remove bool) {
 }
 
 // criRuntimeInfo dumps CRI config.
-func criRuntimeInfo(t *testing.T, svc cri.RuntimeService) map[string]interface{} {
+func criRuntimeInfo(t *testing.T, svc cri.RuntimeService) map[string]any {
 	resp, err := svc.Status()
 	require.NoError(t, err)
 
-	cfg := map[string]interface{}{}
+	cfg := map[string]any{}
 	err = json.Unmarshal([]byte(resp.GetInfo()["config"]), &cfg)
 	require.NoError(t, err)
 
