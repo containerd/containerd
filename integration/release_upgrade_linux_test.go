@@ -559,7 +559,7 @@ func shouldParseMetricDataCorrectly(t *testing.T, _ int,
 	scriptInHost := filepath.Join(scriptVolume, "run.sh")
 
 	fileSize := 1024 * 1024 * 96 // 96 MiB
-	require.NoError(t, os.WriteFile(scriptInHost, []byte(fmt.Sprintf(`#!/bin/sh
+	require.NoError(t, os.WriteFile(scriptInHost, fmt.Appendf(nil, `#!/bin/sh
 set -euo pipefail
 
 head -c %d </dev/urandom >/tmp/log
@@ -576,7 +576,6 @@ while true; do
   sleep 1
 done
 `, fileSize,
-	),
 	), 0600))
 
 	podLogDir := t.TempDir()
