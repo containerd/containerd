@@ -140,7 +140,7 @@ func init() {
 		Type:   plugins.MountHandlerPlugin,
 		ID:     "erofs",
 		Config: &Config{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			p := platforms.DefaultSpec()
 			p.OS = runtime.GOOS
 			ic.Meta.Platforms = append(ic.Meta.Platforms, p)

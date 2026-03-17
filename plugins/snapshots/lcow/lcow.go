@@ -50,7 +50,7 @@ func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.SnapshotPlugin,
 		ID:   "windows-lcow",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = append(ic.Meta.Platforms, ocispec.Platform{
 				OS:           "linux",
 				Architecture: runtime.GOARCH,

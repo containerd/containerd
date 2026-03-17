@@ -81,7 +81,7 @@ func init() {
 		Type:   plugins.SnapshotPlugin,
 		ID:     "blockcim",
 		Config: &BlockCIMSnapshotterConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
 
 			config, ok := ic.Config.(*BlockCIMSnapshotterConfig)
