@@ -123,14 +123,14 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 		data, err := io.ReadAll(f)
 		require.NoError(t, err)
 
-		var jsonData map[string]interface{}
+		var jsonData map[string]any
 		err = json.Unmarshal(data, &jsonData)
 		require.NoError(t, err)
 
-		walkJSON := func(initial map[string]interface{}, elementNames ...string) map[string]interface{} {
+		walkJSON := func(initial map[string]any, elementNames ...string) map[string]any {
 			element := initial
 			for _, name := range elementNames {
-				element = element[name].(map[string]interface{})
+				element = element[name].(map[string]any)
 			}
 
 			return element
@@ -139,12 +139,12 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 		pools := walkJSON(jsonData, "IPAM", "AddressSpaces", "local", "Pools")
 
 		ipAddr := net.ParseIP(ip)
-		var ipPool map[string]interface{}
+		var ipPool map[string]any
 		for poolID, pool := range pools {
 			// Each pool will contain its key as its subnet.
 			_, ipnet, _ := net.ParseCIDR(poolID)
 			if ipnet.Contains(ipAddr) {
-				ipPool = pool.(map[string]interface{})
+				ipPool = pool.(map[string]any)
 				break
 			}
 		}
@@ -152,7 +152,7 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 		// Search in the IP Pool and see if it's in use or not.
 		for address, details := range walkJSON(ipPool, "Addresses") {
 			if address == ip {
-				d := details.(map[string]interface{})
+				d := details.(map[string]any)
 				return d["InUse"].(bool)
 			}
 		}

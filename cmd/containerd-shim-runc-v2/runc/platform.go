@@ -36,7 +36,7 @@ import (
 )
 
 var bufPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		// setting to 4096 to align with PIPE_BUF
 		// http://man7.org/linux/man-pages/man7/pipe.7.html
 		buffer := make([]byte, 4096)

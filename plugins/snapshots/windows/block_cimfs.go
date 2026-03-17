@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
    Copyright The containerd Authors.
@@ -81,7 +80,7 @@ func init() {
 		Type:   plugins.SnapshotPlugin,
 		ID:     "blockcim",
 		Config: &BlockCIMSnapshotterConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
 
 			config, ok := ic.Config.(*BlockCIMSnapshotterConfig)
@@ -508,7 +507,7 @@ func (s *blockCIMSnapshotter) prepareMergedCIM(ctx context.Context, snapshotIDs 
 	}
 
 	sourceCIMs := make([]*cimfs.BlockCIM, 0, len(snapshotIDs))
-	for i := 0; i < len(snapshotIDs); i++ {
+	for i := range snapshotIDs {
 		sCIM, err := s.getSnapshotBlockCIM(ctx, snapshotIDs[i], snInfos[i])
 		if err != nil {
 			return err

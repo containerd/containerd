@@ -154,7 +154,7 @@ func TestMountOptionsPageSizeLimit(t *testing.T) {
 	var optionsBuilder strings.Builder
 	optionsBuilder.WriteString("ro")
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		fakeDevice := filepath.Join(tempDir, strings.Repeat("x", 50), "fake_device_"+strings.Repeat("0", 10))
 		opt := "device=" + fakeDevice
 		options = append(options, opt)
@@ -225,7 +225,7 @@ func TestMountOptionsPageSizeLimit(t *testing.T) {
 		var builder strings.Builder
 		builder.WriteString("ro")
 
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			manyOptions = append(manyOptions, "dax=always")
 			builder.WriteString(",dax=always")
 		}

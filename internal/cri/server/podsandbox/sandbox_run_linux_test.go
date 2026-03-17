@@ -475,7 +475,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 				},
 				{
 					Name: "WriteFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
 						[]byte(realhostname + "\n"),
 						os.FileMode(0644),
@@ -483,7 +483,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						"/etc/hosts",
 						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
 						os.FileMode(0644),
@@ -491,7 +491,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						"/etc/resolv.conf",
 						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
 						os.FileMode(0644),
@@ -499,7 +499,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 				},
 				{
 					Name:      "Stat",
-					Arguments: []interface{}{"/dev/shm"},
+					Arguments: []any{"/dev/shm"},
 				},
 			},
 		},
@@ -517,7 +517,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 				},
 				{
 					Name: "WriteFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
 						[]byte(realhostname + "\n"),
 						os.FileMode(0644),
@@ -525,7 +525,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						"/etc/hosts",
 						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
 						os.FileMode(0644),
@@ -533,7 +533,7 @@ func TestSetupSandboxFiles(t *testing.T) {
 				},
 				{
 					Name: "WriteFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
 						[]byte(`search 114.114.114.114
 nameserver 8.8.8.8
@@ -543,7 +543,7 @@ options timeout:1
 				},
 				{
 					Name:      "Stat",
-					Arguments: []interface{}{"/dev/shm"},
+					Arguments: []any{"/dev/shm"},
 				},
 			},
 		},
@@ -557,7 +557,7 @@ options timeout:1
 				},
 				{
 					Name: "WriteFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
 						[]byte(realhostname + "\n"),
 						os.FileMode(0644),
@@ -565,7 +565,7 @@ options timeout:1
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						"/etc/hosts",
 						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
 						os.FileMode(0644),
@@ -573,7 +573,7 @@ options timeout:1
 				},
 				{
 					Name: "WriteFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
 						[]byte{},
 						os.FileMode(0644),
@@ -581,7 +581,7 @@ options timeout:1
 				},
 				{
 					Name:      "Stat",
-					Arguments: []interface{}{"/dev/shm"},
+					Arguments: []any{"/dev/shm"},
 				},
 			},
 		},
@@ -595,7 +595,7 @@ options timeout:1
 				},
 				{
 					Name: "WriteFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
 						[]byte(realhostname + "\n"),
 						os.FileMode(0644),
@@ -603,7 +603,7 @@ options timeout:1
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						"/etc/hosts",
 						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
 						os.FileMode(0644),
@@ -611,7 +611,7 @@ options timeout:1
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join("/etc/resolv.conf"),
 						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
 						os.FileMode(0644),
@@ -619,7 +619,7 @@ options timeout:1
 				},
 				{
 					Name:      "Stat",
-					Arguments: []interface{}{"/dev/shm"},
+					Arguments: []any{"/dev/shm"},
 				},
 			},
 		},
@@ -632,7 +632,7 @@ options timeout:1
 				},
 				{
 					Name: "WriteFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
 						[]byte(realhostname + "\n"),
 						os.FileMode(0644),
@@ -640,7 +640,7 @@ options timeout:1
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						"/etc/hosts",
 						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
 						os.FileMode(0644),
@@ -648,7 +648,7 @@ options timeout:1
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						"/etc/resolv.conf",
 						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
 						os.FileMode(0644),
@@ -656,7 +656,7 @@ options timeout:1
 				},
 				{
 					Name: "MkdirAll",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join(testStateDir, sandboxesDir, testID, "shm"),
 						os.FileMode(0700),
 					},
@@ -674,7 +674,7 @@ options timeout:1
 			expectedCalls: []ostesting.CalledDetail{
 				{
 					Name: "WriteFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
 						[]byte("test-hostname\n"),
 						os.FileMode(0644),
@@ -682,7 +682,7 @@ options timeout:1
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						"/etc/hosts",
 						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
 						os.FileMode(0644),
@@ -690,7 +690,7 @@ options timeout:1
 				},
 				{
 					Name: "CopyFile",
-					Arguments: []interface{}{
+					Arguments: []any{
 						"/etc/resolv.conf",
 						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
 						os.FileMode(0644),
@@ -698,7 +698,7 @@ options timeout:1
 				},
 				{
 					Name:      "Stat",
-					Arguments: []interface{}{"/dev/shm"},
+					Arguments: []any{"/dev/shm"},
 				},
 			},
 		},

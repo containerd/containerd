@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
    Copyright The containerd Authors.
@@ -52,7 +51,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.MetadataPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
@@ -72,7 +71,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.MetadataPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			if !cimfs.IsBlockCimSupported() {
 				return nil, fmt.Errorf("host OS version doesn't support block CIMs: %w", plugin.ErrSkipPlugin)
 			}

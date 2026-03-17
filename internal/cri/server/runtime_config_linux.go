@@ -69,7 +69,7 @@ func (c *criService) getCgroupDriver(ctx context.Context) runtime.CgroupDriver {
 	return d
 }
 
-func getCgroupDriverFromRuntimeHandlerOpts(opts interface{}) (runtime.CgroupDriver, bool) {
+func getCgroupDriverFromRuntimeHandlerOpts(opts any) (runtime.CgroupDriver, bool) {
 	switch v := opts.(type) {
 	case *runcoptions.Options:
 		systemdCgroup := v.SystemdCgroup

@@ -19,6 +19,7 @@ package fsmount
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -91,14 +92,7 @@ func Fsmount(m mount.Mount, target string) error {
 	defer fsctx.Close()
 
 	// Check if "ro" option is present - must be set before source for read-only loop devices
-	roFlag := false
-	for _, o := range m.Options {
-		if o == "ro" {
-			roFlag = true
-			break
-		}
-	}
-	if roFlag {
+	if slices.Contains(m.Options, "ro") {
 		if err := unix.FsconfigSetFlag(int(fsctx.Fd()), "ro"); err != nil {
 			return fmt.Errorf("failed to set ro flag: %w", err)
 		}

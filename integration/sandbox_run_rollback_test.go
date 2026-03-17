@@ -256,15 +256,13 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 	injectCNIFailpoint(t, sbConfig, conf)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		t.Log("Create a sandbox")
 		_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "error reading from server: EOF")
-	}()
+	})
 
 	assert.NoError(t, ensureCNIAddRunning(t, sbName), "check that failpoint CNI.Add is running")
 
@@ -344,7 +342,7 @@ func ensureCNIAddRunning(t *testing.T, sbName string) error {
 				continue
 			}
 
-			for _, arg := range strings.Split(args, ";") {
+			for arg := range strings.SplitSeq(args, ";") {
 				if arg == "K8S_POD_NAME="+sbName {
 					return true, nil
 				}

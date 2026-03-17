@@ -1,11 +1,12 @@
 version: "2"
 linters:
   enable:
-    - copyloopvar # Checks for loop variable copies in Go 1.22+
-    - depguard # Checks for dependencies that should not be (re)introduced. See "settings" for further details.
-    - dupword # Checks for duplicate words in the source code
+    - copyloopvar  # Checks for loop variable copies in Go 1.22+
+    - depguard     # Checks for dependencies that should not be (re)introduced. See "settings" for further details.
+    - dupword      # Checks for duplicate words in the source code
     - gosec
     - misspell
+    - modernize    # Suggests modernizations to Go code; see https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/modernize
     - nolintlint
     - revive
     - unconvert
@@ -40,6 +41,11 @@ linters:
         - G301
         - G302
         - G304
+    modernize:
+      disable:
+        # TODO(thaJeztah): enable testingcontext once github.com/AdamKorcz/go-118-fuzz-build is updated.
+        # see https://github.com/containerd/containerd/pull/13022#discussion_r2937038804
+        - testingcontext
     staticcheck:
       checks:
         - all

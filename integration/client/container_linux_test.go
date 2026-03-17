@@ -528,11 +528,9 @@ func TestContainerAttach(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	task, err := container.NewTask(ctx, direct.IOCreate)
 	if err != nil {
@@ -623,11 +621,9 @@ func testContainerUser(t *testing.T, userstr, expectedOutput string) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	container, err := client.NewContainer(ctx, id,
 		WithNewSnapshot(id, image),
@@ -701,11 +697,9 @@ func TestContainerAttachProcess(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
@@ -872,11 +866,9 @@ func TestContainerUserID(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	// sys user in the busybox image has a uid and gid of 3.
 	container, err := client.NewContainer(ctx, id,
@@ -1482,10 +1474,7 @@ func TestShimOOMScore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedScore := containerdScore + 1
-	if expectedScore > sys.OOMScoreAdjMax {
-		expectedScore = sys.OOMScoreAdjMax
-	}
+	expectedScore := min(containerdScore+1, sys.OOMScoreAdjMax)
 
 	// find the shim's pid
 	if cgroups.Mode() == cgroups.Unified {

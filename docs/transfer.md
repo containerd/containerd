@@ -11,7 +11,7 @@ The transfer API consists of a single operation which can be called with various
 In Go the API looks like,
 ```go
 type Transferrer interface {
-	Transfer(ctx context.Context, source interface{}, destination interface{}, opts ...Opt) error
+	Transfer(ctx context.Context, source any, destination any, opts ...Opt) error
 }
 ```
 

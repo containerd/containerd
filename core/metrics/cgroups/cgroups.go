@@ -48,7 +48,7 @@ func init() {
 			plugins.EventPlugin,
 		},
 		Config: &Config{},
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 			if configVersion >= version.ConfigVersion {
 				return nil
 			}
@@ -66,7 +66,7 @@ func init() {
 }
 
 // New returns a new cgroups monitor
-func New(ic *plugin.InitContext) (interface{}, error) {
+func New(ic *plugin.InitContext) (any, error) {
 	var ns *metrics.Namespace
 	config := ic.Config.(*Config)
 	if !config.NoPrometheus {

@@ -394,7 +394,7 @@ func (p *PoolDevice) createSnapshot(ctx context.Context, baseInfo, snapInfo *Dev
 func (p *PoolDevice) SuspendDevice(ctx context.Context, deviceName string) error {
 	// Retry logic for suspend operations to handle resource contention
 	var lastErr error
-	for attempt := 0; attempt < 3; attempt++ {
+	for attempt := range 3 {
 		if attempt > 0 {
 			// Add exponential backoff between retry attempts
 			time.Sleep(time.Duration(100*attempt) * time.Millisecond)
@@ -427,7 +427,7 @@ func (p *PoolDevice) SuspendDevice(ctx context.Context, deviceName string) error
 func (p *PoolDevice) ResumeDevice(ctx context.Context, deviceName string) error {
 	// Retry logic for resume operations to handle resource contention
 	var lastErr error
-	for attempt := 0; attempt < 3; attempt++ {
+	for attempt := range 3 {
 		if attempt > 0 {
 			// Add exponential backoff between retry attempts
 			time.Sleep(time.Duration(100*attempt) * time.Millisecond)

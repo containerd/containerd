@@ -337,7 +337,7 @@ func (m *PoolMetadata) Close() error {
 	return nil
 }
 
-func putObject(bucket *bolt.Bucket, key string, obj interface{}, overwrite bool) error {
+func putObject(bucket *bolt.Bucket, key string, obj any, overwrite bool) error {
 	keyBytes := []byte(key)
 
 	if !overwrite && bucket.Get(keyBytes) != nil {
@@ -356,7 +356,7 @@ func putObject(bucket *bolt.Bucket, key string, obj interface{}, overwrite bool)
 	return nil
 }
 
-func getObject(bucket *bolt.Bucket, key string, obj interface{}) error {
+func getObject(bucket *bolt.Bucket, key string, obj any) error {
 	data := bucket.Get([]byte(key))
 	if data == nil {
 		return ErrNotFound

@@ -583,7 +583,7 @@ func getSortedHosts(b []byte) ([]string, error) {
 	return hostsInOrder, nil
 }
 
-// makeStringSlice is a helper func to convert from []interface{} to []string.
+// makeStringSlice is a helper func to convert from []any to []string.
 // Additionally an optional cb func may be passed to perform string mapping.
 func makeStringSlice(slice []any, cb func(string) string) ([]string, error) {
 	out := make([]string, len(slice))

@@ -584,16 +584,13 @@ func (p *criPodSandbox) GetAnnotations() map[string]string {
 		return nil
 	}
 
-	annotations := map[string]string{}
-
-	for key, value := range p.Config.GetAnnotations() {
-		annotations[key] = value
+	merged := maps.Clone(p.Config.GetAnnotations())
+	if merged == nil {
+		merged = map[string]string{}
 	}
-	for key, value := range p.spec.Annotations {
-		annotations[key] = value
-	}
+	maps.Copy(merged, p.spec.Annotations)
 
-	return annotations
+	return merged
 }
 
 func (p *criPodSandbox) GetLabels() map[string]string {
@@ -601,16 +598,13 @@ func (p *criPodSandbox) GetLabels() map[string]string {
 		return nil
 	}
 
-	labels := map[string]string{}
-
-	for key, value := range p.Config.GetLabels() {
-		labels[key] = value
+	labels := maps.Clone(p.Config.GetLabels())
+	if labels == nil {
+		labels = make(map[string]string)
 	}
 
 	// Append sandbox labels
-	for key, value := range p.labels {
-		labels[key] = value
-	}
+	maps.Copy(labels, p.labels)
 
 	return labels
 }
@@ -722,7 +716,7 @@ type criContainer struct {
 	exit *eventtypes.TaskExit
 }
 
-func (a *API) nriContainer(ctr interface{}, opts ...criContainerOption) *criContainer {
+func (a *API) nriContainer(ctr any, opts ...criContainerOption) *criContainer {
 	criCtr := &criContainer{}
 	for _, o := range opts {
 		o(criCtr)
@@ -858,30 +852,25 @@ func (c *criContainer) GetLabels() map[string]string {
 		return nil
 	}
 
-	labels := map[string]string{}
-	for key, value := range c.ctrs.Labels {
-		labels[key] = value
+	labels := maps.Clone(c.ctrs.Labels)
+	if labels == nil {
+		labels = map[string]string{}
 	}
 
 	if c.meta != nil && c.meta.Config != nil {
-		for key, value := range c.meta.Config.Labels {
-			labels[key] = value
-		}
+		maps.Copy(labels, c.meta.Config.Labels)
 	}
 
 	return labels
 }
 
 func (c *criContainer) GetAnnotations() map[string]string {
-	annotations := map[string]string{}
-
-	for key, value := range c.spec.Annotations {
-		annotations[key] = value
+	annotations := maps.Clone(c.spec.Annotations)
+	if annotations == nil {
+		annotations = map[string]string{}
 	}
 	if c.meta != nil && c.meta.Config != nil {
-		for key, value := range c.meta.Config.Annotations {
-			annotations[key] = value
-		}
+		maps.Copy(annotations, c.meta.Config.Annotations)
 	}
 
 	return annotations
@@ -1088,10 +1077,7 @@ func fromCRILinuxResources(c *cri.LinuxContainerResources) *api.LinuxResources {
 			})
 	}
 	if len(c.Unified) != 0 {
-		r.Unified = make(map[string]string)
-		for k, v := range c.Unified {
-			r.Unified[k] = v
-		}
+		r.Unified = maps.Clone(c.Unified)
 	}
 	return r
 }
@@ -1120,10 +1106,7 @@ func toCRIResources(r *api.LinuxResources, oomScoreAdj int64) *cri.LinuxContaine
 		})
 	}
 	if len(r.Unified) != 0 {
-		o.Unified = make(map[string]string)
-		for k, v := range r.Unified {
-			o.Unified[k] = v
-		}
+		o.Unified = maps.Clone(r.Unified)
 	}
 
 	return o

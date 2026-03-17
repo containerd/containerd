@@ -93,11 +93,9 @@ func NewStatsCollector(config criconfig.Config) *StatsCollector {
 		}
 	}
 
-	// Calculate maxSamples from statsAge and interval
-	maxSamples := int(statsAge / interval)
-	if maxSamples < 2 {
-		maxSamples = 2 // Need at least 2 samples to calculate rate
-	}
+	// Calculate maxSamples from statsAge and interval.
+	// We need at least 2 samples to calculate rate.
+	maxSamples := max(int(statsAge/interval), 2)
 
 	return &StatsCollector{
 		stores:     make(map[string]*stats.TimedStore),
