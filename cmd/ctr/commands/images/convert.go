@@ -117,6 +117,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 				erofsOpts = append(erofsOpts, erofs.WithMkfsOptions(mkfsOpts))
 			}
 			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(erofs.LayerConvertFunc(erofsOpts...)))
+			convertOpts = append(convertOpts, converter.WithUpdateManifest(erofs.UpdateManifestPlatform))
 		}
 
 		if cliContext.Bool("oci") {

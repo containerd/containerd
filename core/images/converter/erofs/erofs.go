@@ -18,9 +18,11 @@ package erofs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -34,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/google/uuid"
 )
 
@@ -74,6 +77,10 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			return nil, nil
 		}
 
+		if images.IsNonDistributable(desc.MediaType) {
+			return nil, nil
+		}
+
 		uncompressedDesc := &desc
 		if !uncompress.IsUncompressedType(desc.MediaType) {
 			var err error
@@ -82,7 +89,7 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 				return nil, err
 			}
 			if uncompressedDesc == nil {
-				return nil, fmt.Errorf("unexpectedly got the same blob after compression (%s, %q)", desc.Digest, desc.MediaType)
+				return nil, fmt.Errorf("unexpectedly got the same blob after decompression (%s, %q)", desc.Digest, desc.MediaType)
 			}
 			log.G(ctx).Debugf("uncompressed %s into %s", desc.Digest, uncompressedDesc.Digest)
 		}
@@ -190,4 +197,62 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 		newDesc.Size = cInfo.Size
 		return &newDesc, nil
 	}
+}
+
+func UpdateManifestPlatform(ctx context.Context, cs content.Store, originalDesc, convertedDesc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+	if !images.IsManifestType(convertedDesc.MediaType) {
+		return nil, nil
+	}
+
+	var manifest ocispec.Manifest
+	manifestLabels, err := converter.ReadJSON(ctx, cs, &manifest, convertedDesc)
+	if err != nil {
+		return nil, err
+	}
+
+	var platform ocispec.Platform
+	if originalDesc.Platform != nil {
+		platform = *originalDesc.Platform
+	} else {
+		configPlatform, err := images.ConfigPlatform(ctx, cs, manifest.Config)
+		if err != nil {
+			return nil, err
+		}
+		platform = configPlatform
+	}
+
+	normalized := platforms.Normalize(platform)
+	if !slices.Contains(normalized.OSFeatures, "erofs") {
+		normalized.OSFeatures = append(normalized.OSFeatures, "erofs")
+		normalized = platforms.Normalize(normalized)
+	}
+
+	var cfg converter.DualConfig
+	configLabels, err := converter.ReadJSON(ctx, cs, &cfg, manifest.Config)
+	if err != nil {
+		return nil, err
+	}
+	b, err := json.Marshal(normalized.OSFeatures)
+	if err != nil {
+		return nil, err
+	}
+	cfg["os.features"] = (*json.RawMessage)(&b)
+	newConfig, err := converter.WriteJSON(ctx, cs, &cfg, manifest.Config, configLabels)
+	if err != nil {
+		return nil, err
+	}
+
+	if manifestLabels == nil {
+		manifestLabels = make(map[string]string)
+	}
+	converter.ClearGCLabels(manifestLabels, manifest.Config.Digest)
+	manifestLabels["containerd.io/gc.ref.content.config"] = newConfig.Digest.String()
+	manifest.Config = *newConfig
+
+	newManifestDesc, err := converter.WriteJSON(ctx, cs, &manifest, convertedDesc, manifestLabels)
+	if err != nil {
+		return nil, err
+	}
+	newManifestDesc.Platform = &normalized
+	return newManifestDesc, nil
 }
