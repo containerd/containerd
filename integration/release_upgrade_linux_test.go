@@ -375,7 +375,7 @@ func execToExistingContainer(t *testing.T, _ int,
 
 		logSizeChange := false
 		curSize := getFileSize(t, logPath)
-		for i := 0; i < 30; i++ {
+		for range 30 {
 			time.Sleep(1 * time.Second)
 
 			if curSize < getFileSize(t, logPath) {

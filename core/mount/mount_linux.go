@@ -552,7 +552,7 @@ func (m *Mount) mountWithHelper(helperBinary, typePrefix, target string) error {
 	// cmd.CombinedOutput() may intermittently return ECHILD because of our signal handling in shim.
 	// See #4387 and wait(2).
 	const retriesOnECHILD = 10
-	for i := 0; i < retriesOnECHILD; i++ {
+	for range retriesOnECHILD {
 		cmd := exec.Command(helperBinary, args...)
 		out, err := cmd.CombinedOutput()
 		if err == nil {

@@ -76,7 +76,7 @@ version = 3
 	}()
 
 	t.Logf("Creating %d pod sandboxes", n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		podCtx := newPodTCtx(t,
 			ctrd.criRuntimeService(t),
 			fmt.Sprintf("test-oom-event-%d", i),

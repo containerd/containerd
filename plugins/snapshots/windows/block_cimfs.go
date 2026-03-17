@@ -508,7 +508,7 @@ func (s *blockCIMSnapshotter) prepareMergedCIM(ctx context.Context, snapshotIDs 
 	}
 
 	sourceCIMs := make([]*cimfs.BlockCIM, 0, len(snapshotIDs))
-	for i := 0; i < len(snapshotIDs); i++ {
+	for i := range snapshotIDs {
 		sCIM, err := s.getSnapshotBlockCIM(ctx, snapshotIDs[i], snInfos[i])
 		if err != nil {
 			return err

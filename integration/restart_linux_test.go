@@ -108,7 +108,7 @@ func TestReload100Pods(t *testing.T) {
 		assert.NoError(t, ctrd.wait(5*time.Minute))
 	}()
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		podCtx := newPodTCtx(t,
 			ctrd.criRuntimeService(t),
 			fmt.Sprintf("test-restart-%d", i),
