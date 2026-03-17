@@ -147,7 +147,7 @@ func (e Error) WithDetail(detail any) Error {
 	}
 }
 
-// WithArgs uses the passed-in list of interface{} as the substitution
+// WithArgs uses the passed-in list of args as the substitution
 // variables in the Error's Message string, but returns a new Error
 func (e Error) WithArgs(args ...any) Error {
 	return Error{
