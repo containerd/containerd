@@ -99,8 +99,8 @@ func getCgroupPath() (map[string]string, error) {
 		text := scanner.Text()
 		fields := strings.Split(text, " ")
 		// Safe as mountinfo encodes mountpoints with spaces as \040.
-		index := strings.Index(text, " - ")
-		postSeparatorFields := strings.Fields(text[index+3:])
+		_, after, _ := strings.Cut(text, " - ")
+		postSeparatorFields := strings.Fields(after)
 		numPostFields := len(postSeparatorFields)
 
 		// This is an error as we can't detect if the mount is for "cgroup"

@@ -344,7 +344,7 @@ func ensureCNIAddRunning(t *testing.T, sbName string) error {
 				continue
 			}
 
-			for _, arg := range strings.Split(args, ";") {
+			for arg := range strings.SplitSeq(args, ";") {
 				if arg == "K8S_POD_NAME="+sbName {
 					return true, nil
 				}
