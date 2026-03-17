@@ -48,6 +48,10 @@ func TestGetSupportedPlatform(t *testing.T) {
 			Platform:       platforms.DefaultStrict(),
 			SnapshotterKey: defaults.DefaultSnapshotter,
 		},
+		{
+			Platform:       platforms.OnlyStrict(platforms.MustParse("linux(+erofs)/amd64")),
+			SnapshotterKey: "erofs",
+		},
 	}
 
 	for _, testCase := range []struct {
@@ -118,6 +122,18 @@ func TestGetSupportedPlatform(t *testing.T) {
 			ExpectedPlatform: transfer.UnpackConfiguration{
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: defaults.DefaultSnapshotter,
+			},
+		},
+		{
+			Name: "Feature constrained platform auto-selects erofs snapshotter",
+			UnpackConfig: transfer.UnpackConfiguration{
+				Platform: platforms.MustParse("linux(+erofs)/amd64"),
+			},
+			SupportedPlatforms: supportedPlatforms,
+			Match:              true,
+			ExpectedPlatform: transfer.UnpackConfiguration{
+				Platform:    platforms.MustParse("linux(+erofs)/amd64"),
+				Snapshotter: "erofs",
 			},
 		},
 	} {

@@ -66,7 +66,9 @@ func init() {
 		ID:     "erofs",
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
-			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
+			p := platforms.DefaultSpec()
+			p.OSFeatures = []string{"erofs"}
+			ic.Meta.Platforms = append(ic.Meta.Platforms, p)
 
 			config, ok := ic.Config.(*Config)
 			if !ok {
