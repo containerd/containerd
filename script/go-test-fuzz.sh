@@ -21,7 +21,7 @@
 set -euo pipefail
 set -x
 
-fuzztime=30s
+fuzztime=60s
 # keep the filename and Fuzz function name so we can run every fuzz test
 # in a package separately (`go test -fuzz` only supports single fuzz function)
 pkgs=$(git grep 'func Fuzz.*testing\.F' | grep -o '.*testing\.F)' | grep -v -E "vendor" | sort | uniq)
