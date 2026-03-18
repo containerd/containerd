@@ -56,7 +56,7 @@ func init() {
 
 			return diffPlugin{
 				Comparer: walking.NewWalkingDiff(cs),
-				Applier:  apply.NewFileSystemApplierWithMountManager(cs, mm),
+				Applier:  apply.NewFileSystemApplier(cs, apply.WithMountManager(mm)),
 			}, nil
 		},
 	})
