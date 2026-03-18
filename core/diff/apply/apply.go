@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -32,14 +33,58 @@ import (
 
 // NewFileSystemApplier returns an applier which simply mounts
 // and applies diff onto the mounted filesystem.
-func NewFileSystemApplier(cs content.Provider) diff.Applier {
+func NewFileSystemApplier(cs content.Provider, opts ...FileSystemApplierOpt) diff.Applier {
+	config := &fsApplierConfig{
+		applyFunc: apply,
+		parallel:  false,
+	}
+	for _, o := range opts {
+		if err := o(config); err != nil {
+			return nil
+		}
+	}
 	return &fsApplier{
-		store: cs,
+		store:    cs,
+		apply:    config.applyFunc,
+		parallel: config.parallel,
+	}
+}
+
+// FileSystemApplierOpt is used to configure filesystem applier.
+type FileSystemApplierOpt func(*fsApplierConfig) error
+
+// FileSystemApply is a function type that defines the signature for
+// applying a reader content to a set of filesystem mounts. It allows
+// for customized mount/apply logic for different filesystems.
+type FileSystemApply func(context.Context, []mount.Mount, io.Reader, bool) error
+
+// WithCustomApplyFunc allows callers to customize the apply function
+func WithCustomApplyFunc(f FileSystemApply) FileSystemApplierOpt {
+	return func(c *fsApplierConfig) error {
+		c.applyFunc = f
+		return nil
+	}
+}
+
+// WithParallelSupport signifies that the applier supports parallel application of diffs
+// fsaApplier will return ErrNotImplemented error if this option is not set, but
+// the caller requires parallel application of diffs.
+func WithParallelSupport(parallel bool) FileSystemApplierOpt {
+	return func(c *fsApplierConfig) error {
+		c.parallel = parallel
+		return nil
 	}
 }
 
 type fsApplier struct {
-	store content.Provider
+	store    content.Provider
+	apply    FileSystemApply
+	parallel bool
+}
+
+type fsApplierConfig struct {
+	applyFunc FileSystemApply
+	parallel  bool
 }
 
 var emptyDesc = ocispec.Descriptor{}
@@ -65,6 +110,12 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		if err := o(ctx, desc, &config); err != nil {
 			return emptyDesc, fmt.Errorf("failed to apply config opt: %w", err)
 		}
+	}
+
+	// ErrNotImplemented must be returned if the applier does not support parallel apply.
+	// This error tells the diff service to call the next applier in the ordered list.
+	if config.Parallel && !s.parallel {
+		return emptyDesc, fmt.Errorf("parallel application of diffs is not supported by this applier: %w", errdefs.ErrNotImplemented)
 	}
 
 	ra, err := s.store.ReaderAt(ctx, desc)
@@ -98,7 +149,7 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		r: io.TeeReader(processor, digester.Hash()),
 	}
 
-	if err := apply(ctx, mounts, rc, config.SyncFs); err != nil {
+	if err := s.apply(ctx, mounts, rc, config.SyncFs); err != nil {
 		return emptyDesc, err
 	}
 
