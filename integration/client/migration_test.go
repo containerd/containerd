@@ -55,14 +55,18 @@ func TestMigration(t *testing.T) {
 	if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" && strings.Contains(defaultContent, "btrfs") && strings.Contains(defaultContent, "devmapper") {
 		migrationTests = append(migrationTests, []migrationTest{
 			{
-				Name:     "1.6-Default",
-				File:     "testdata/default-1.6.toml",
-				Migrated: defaultContent,
+				Name: "1.6-Default",
+				File: "testdata/default-1.6.toml",
+				Migrated: replaceAllValues(defaultContent, map[string]string{
+					"default": "['walking']",
+				}),
 			},
 			{
-				Name:     "1.7-Default",
-				File:     "testdata/default-1.7.toml",
-				Migrated: defaultContent,
+				Name: "1.7-Default",
+				File: "testdata/default-1.7.toml",
+				Migrated: replaceAllValues(defaultContent, map[string]string{
+					"default": "['walking']",
+				}),
 			},
 			{
 				Name: "1.7-Custom",
@@ -73,6 +77,7 @@ func TestMigration(t *testing.T) {
 					"stream_server_address": "'127.0.1.1'",
 					"stream_server_port":    "'15000'",
 					"enable_tls_streaming":  "true",
+					"default":               "['walking']",
 				}),
 			},
 		}...)
