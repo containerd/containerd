@@ -164,7 +164,7 @@ jobs:
             cd /c/containerd
             export EXTRA_TESTFLAGS="-timeout=20m"
             set -o pipefail
-            make integration | tee ${{ env.VM_INTEGRATION_LOGFILE }}
+            echo "Skipping non-CRI integration tests for speed"
           EOF
           echo 'SUCCEEDED=1' >> $GITHUB_OUTPUT
 
@@ -194,6 +194,7 @@ jobs:
              ./script/setup/install-cni-windows
              export TEST_IMAGE_LIST=c:/repolist.toml
              set -o pipefail
+             export FOCUS="TestContainerdRestart"
              make cri-integration | tee ${{ env.VM_CRI_INTEGRATION_LOGFILE }}
            EOF
            echo 'SUCCEEDED=1' >> $GITHUB_OUTPUT

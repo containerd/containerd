@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/setutils"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	docker "github.com/distribution/reference"
 
@@ -158,6 +159,7 @@ func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get image compressed resource size: %w", err)
 	}
+	log.G(ctx).Infof("getImage: name=%s, calculated size=%d", i.Name, size)
 
 	desc, err := i.Config(ctx, s.provider, s.platform)
 	if err != nil {
