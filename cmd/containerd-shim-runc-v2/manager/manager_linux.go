@@ -189,10 +189,7 @@ func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.B
 
 	id := opts.GetInstanceID()
 
-	lvl, err := logrus.ParseLevel(opts.LogLevel)
-	if err != nil {
-		return nil, err
-	}
+	lvl, _ := logrus.ParseLevel(opts.LogLevel)
 	debugLog := lvl == log.DebugLevel || lvl == log.TraceLevel
 
 	cmd, err := newCommand(ctx, id, opts.GetContainerdGrpcAddress(), opts.GetContainerdTtrpcAddress(), debugLog)
