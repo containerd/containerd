@@ -80,6 +80,7 @@ type Platform struct {
 	SnapshotterCapabilities []string
 
 	Applier   diff.Applier
+	ApplierID string
 	ApplyOpts []diff.ApplyOpt
 
 	// ConfigType is the supported config type to be considered for unpacking
@@ -739,6 +740,16 @@ func (u *Unpacker) supportParallel(unpack *Platform) bool {
 		log.L.Infof("snapshotter does not support rebase capability, unpacking will be sequential")
 		return false
 	}
+	// blacklist certain appliers which are known to not support parallel unpacking
+	// The ApplierID can be empty if the unpack is performed on the client side,
+	// where the applier is just a proxy. In that case the diff service will try each
+	// applier in a configured order.
+	var blacklist = []string{"walking"}
+	if slices.Contains(blacklist, unpack.ApplierID) {
+		log.L.Infof("applier %q does not support parallel unpacking, unpacking will be sequential", unpack.ApplierID)
+		return false
+	}
+
 	return true
 }
 

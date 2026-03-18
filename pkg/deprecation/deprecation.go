@@ -39,6 +39,8 @@ const (
 	CgroupV1 Warning = Prefix + "cgroup-v1"
 	// CRIEnableCDI is a warning for the use of the `enable_cdi` property
 	CRIEnableCDI Warning = Prefix + "enable-cdi"
+	// WalkingDifferParallel is a warning for using the `walking` differ with parallel unpacking
+	WalkingDifferParallel Warning = Prefix + "walking-differ-parallel"
 )
 
 const (
@@ -62,6 +64,9 @@ var messages = map[Warning]string{
 	NRIV010Plugin: "NRI 0.1.0-style plugins are deprecated since containerd 2.2 and should only be used through the v010-adapter plugin.",
 	CgroupV1:      "The support for cgroup v1 is deprecated since containerd v2.2 and will be removed by no later than May 2029. Upgrade the host to use cgroup v2.",
 	CRIEnableCDI:  "The `enable_cdi` property of `[plugins.\"io.containerd.cri.v1.runtime\"]` is deprecated, will be removed in containerd v2.3, and CDI support will always be enabled.",
+
+	WalkingDifferParallel: "The `walking` differ will stop working with \"Parallel Unpacking\" feature from containerd v2.3. If `walking` differ is used, layers will be unpacked " +
+		"sequentially even with \"Parallel Unpacking\" enabled. Please use the `overlay` differ instead.",
 }
 
 // Valid checks whether a given Warning is valid
