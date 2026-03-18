@@ -1,4 +1,4 @@
-//go:build !windows && !darwin
+//go:build !windows && !darwin && !linux
 
 /*
    Copyright The containerd Authors.
@@ -18,7 +18,13 @@
 
 package diff
 
+import "context"
+
 var defaultDifferConfig = &config{
 	Order:  []string{"walking"},
 	SyncFs: false,
+}
+
+func configMigration(context.Context, int, map[string]any) error {
+	return nil
 }

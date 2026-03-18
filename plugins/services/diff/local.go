@@ -88,6 +88,7 @@ func init() {
 				syncfs:  syncFs,
 			}, nil
 		},
+		ConfigMigration: configMigration,
 	})
 }
 
