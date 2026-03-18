@@ -17,10 +17,9 @@
 package bootstrap
 
 import (
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	options "github.com/containerd/containerd/api/types/runc/options"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -29,13 +28,21 @@ func TestExtensions(t *testing.T) {
 	params := &BootstrapParams{}
 
 	err := params.AddExtension(&options.Options{ShimCgroup: "test-cgroup"})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("AddExtension: %v", err)
+	}
 
 	got := &options.Options{}
 	found, err := params.FindExtension(got)
-	require.NoError(t, err)
-	assert.True(t, found)
-	assert.Equal(t, "test-cgroup", got.ShimCgroup)
+	if err != nil {
+		t.Fatalf("FindExtension: %v", err)
+	}
+	if !found {
+		t.Fatal("expected extension to be found")
+	}
+	if got.ShimCgroup != "test-cgroup" {
+		t.Fatalf("expected ShimCgroup %q, got %q", "test-cgroup", got.ShimCgroup)
+	}
 }
 
 func TestExtensionNotFound(t *testing.T) {
@@ -43,8 +50,12 @@ func TestExtensionNotFound(t *testing.T) {
 
 	got := &options.Options{}
 	found, err := params.FindExtension(got)
-	require.NoError(t, err)
-	assert.False(t, found)
+	if err != nil {
+		t.Fatalf("FindExtension: %v", err)
+	}
+	if found {
+		t.Fatal("expected extension to not be found")
+	}
 }
 
 func TestAddExtensionWithAny(t *testing.T) {
@@ -52,16 +63,28 @@ func TestAddExtensionWithAny(t *testing.T) {
 
 	ext := &options.Options{ShimCgroup: "test-cgroup"}
 	anyVal, err := anypb.New(ext)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("anypb.New: %v", err)
+	}
 
 	err = params.AddExtension(anyVal)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("AddExtension: %v", err)
+	}
 
 	got := &options.Options{}
 	found, err := params.FindExtension(got)
-	require.NoError(t, err)
-	assert.True(t, found)
-	assert.Equal(t, "test-cgroup", got.ShimCgroup)
+	if err != nil {
+		t.Fatalf("FindExtension: %v", err)
+	}
+	if !found {
+		t.Fatal("expected extension to be found")
+	}
+	if got.ShimCgroup != "test-cgroup" {
+		t.Fatalf("expected ShimCgroup %q, got %q", "test-cgroup", got.ShimCgroup)
+	}
 
-	assert.Contains(t, params.Extensions[0].Value.TypeUrl, "Options")
+	if !strings.Contains(params.Extensions[0].Value.TypeUrl, "Options") {
+		t.Fatalf("expected TypeUrl to contain %q, got %q", "Options", params.Extensions[0].Value.TypeUrl)
+	}
 }
