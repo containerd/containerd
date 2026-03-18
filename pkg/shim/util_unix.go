@@ -29,7 +29,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -119,16 +118,14 @@ func NewSocket(address string) (*net.UnixListener, error) {
 		sock       = socket(address)
 		path       = sock.path()
 		isAbstract = sock.isAbstract()
-		perm       = os.FileMode(0600)
+		// Socket file permissions: read/write for owner only
+		sockPerm = os.FileMode(0600)
+		// Directory permissions: need execute bit for traversal
+		dirPerm = os.FileMode(0700)
 	)
 
-	// Darwin needs +x to access socket, otherwise it'll fail with "bind: permission denied" when running as non-root.
-	if runtime.GOOS == "darwin" {
-		perm = 0700
-	}
-
 	if !isAbstract {
-		if err := os.MkdirAll(filepath.Dir(path), perm); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), dirPerm); err != nil {
 			return nil, fmt.Errorf("mkdir failed for %s: %w", path, err)
 		}
 	}
@@ -138,7 +135,7 @@ func NewSocket(address string) (*net.UnixListener, error) {
 	}
 
 	if !isAbstract {
-		if err := os.Chmod(path, perm); err != nil {
+		if err := os.Chmod(path, sockPerm); err != nil {
 			os.Remove(sock.path())
 			l.Close()
 			return nil, fmt.Errorf("chmod failed for %s: %w", path, err)
