@@ -1,0 +1,36 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+ignore_deps = [ "github.com/containerd/containerd" ]
+
+# previous release
+previous = "v2.2.0"
+
+pre_release = true
+
+preface = """\
+The third minor release of containerd 2.x focuses on continued stability alongside
+new features and improvements. This is the third time-based release for containerd.
+
+Starting with containerd 2.3, the project has moved to release cadence aligned with
+the Kubernetes release schedule, with new minor releases about every 4 months. The
+containerd 2.3 release is also the first annual LTS (Long Term Stable) release under
+this new schedule, with support planned for at least two years. Direct upgrades
+between sequential LTS releases (e.g., 1.7 to 2.3) will be tested and supported.
+
+This is a beta release and some functionality is still under development.
+"""
+
+postface = """\
+### Which file should I download?
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.35 (Ubuntu 22.04).
+* `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on Linux distributions that do not use glibc >= 2.35. Not position-independent.
+
+In addition to containerd, typically you will have to install [runc](https://github.com/opencontainers/runc/releases)
+and [CNI plugins](https://github.com/containernetworking/plugins/releases) from their official sites too.
+
+See also the [Getting Started](https://github.com/containerd/containerd/blob/main/docs/getting-started.md) documentation.
+"""
