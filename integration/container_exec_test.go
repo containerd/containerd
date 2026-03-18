@@ -18,6 +18,7 @@ package integration
 
 import (
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	criruntime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestContainerDrainExecIOAfterExit(t *testing.T) {
@@ -69,4 +71,66 @@ func TestContainerDrainExecIOAfterExit(t *testing.T) {
 	t.Log("Exec in container")
 	_, _, err = runtimeService.ExecSync(cn, []string{"sh", "-c", "sleep 2s &"}, 10*time.Second)
 	require.NoError(t, err, "should drain IO in time")
+}
+
+func TestContainerRepeatedExecSyncKeepsContainerRunning(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("busybox exec regression coverage is Linux-only")
+	}
+
+	var (
+		testImage     = images.Get(images.BusyBox)
+		containerName = "test-container-repeated-exec"
+	)
+
+	EnsureImageExists(t, testImage)
+
+	sbConfig := PodSandboxConfig("sandbox", Randomize("container-exec-repeated"))
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+	})
+
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		WithCommand("sh", "-c", "sleep 365d"),
+	)
+
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	type execCase struct {
+		name           string
+		cmd            []string
+		expectedStdout string
+	}
+	for _, tc := range []execCase{
+		{
+			name:           "true",
+			cmd:            []string{"/bin/true"},
+			expectedStdout: "",
+		},
+		{
+			name:           "echo",
+			cmd:            []string{"sh", "-c", "echo -n ok"},
+			expectedStdout: "ok",
+		},
+	} {
+		for i := 0; i < 5; i++ {
+			t.Run(tc.name+"-attempt-"+strconv.Itoa(i), func(t *testing.T) {
+				stdout, stderr, err := runtimeService.ExecSync(cn, tc.cmd, 10*time.Second)
+				require.NoError(t, err)
+				assert.Empty(t, stderr)
+				assert.Equal(t, tc.expectedStdout, string(stdout))
+			})
+		}
+	}
+
+	status, err := runtimeService.ContainerStatus(cn)
+	require.NoError(t, err)
+	assert.Equal(t, criruntime.ContainerState_CONTAINER_RUNNING, status.GetState(), "repeated fast execs should not poison the long-lived container state")
 }

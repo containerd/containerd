@@ -52,7 +52,9 @@ import (
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/pkg/stdio"
+	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/sys/reaper"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -94,6 +96,11 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
 	go s.forward(ctx, publisher)
+	sd.RegisterCallback(func(context.Context) error {
+		reaper.Default.Unsubscribe(s.ec)
+		s.closeTrackedPidFDs()
+		return nil
+	})
 	sd.RegisterCallback(func(context.Context) error {
 		close(s.events)
 		return nil
@@ -145,9 +152,16 @@ type service struct {
 	shutdown shutdown.Service
 }
 
+const invalidPidFD = -1
+
 type containerProcess struct {
 	Container *runc.Container
 	Process   process.Process
+	// pidfd is a stable handle to the tracked process, when supported by the
+	// kernel. Unlike a numeric PID, it remains bound to the original process and
+	// can be used to detect stale exits after PID recycling. When pidfds are not
+	// supported or cannot be opened, pidfd is set to invalidPidFD.
+	pidfd int
 }
 
 // preStart prepares for starting a container process and handling its exit.
@@ -177,6 +191,8 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 		for _, cp := range s.running[pid] {
 			if cp.Container != c {
 				newRunning = append(newRunning, cp)
+			} else {
+				closePidFD(cp.pidfd)
 			}
 		}
 		if len(newRunning) > 0 {
@@ -199,14 +215,30 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 		exits = nil
 		if pid == 0 || exited {
 			s.lifecycleMu.Unlock()
-			for _, ee := range ees {
-				s.handleProcessExit(ee, c, p)
+			// Only process the first exit event for this PID. A PID can
+			// only be recycled after Wait4 reaps its zombie, so the first
+			// event is always from the original process. Subsequent events
+			// are from processes that recycled the PID and must be ignored
+			// to avoid publishing spurious TaskExit events with wrong exit
+			// codes or double-decrementing the running exec counter.
+			if len(ees) > 1 {
+				log.G(s.context).WithField("pid", pid).
+					Warnf("PID was recycled (%d exit events), processing only the first", len(ees))
+			}
+			if len(ees) > 0 {
+				s.handleProcessExit(ees[0], c, p)
 			}
 		} else {
 			// Process start was successful, add to `s.running`.
+			pidfd, err := openPidFD(pid)
+			if err != nil {
+				log.G(s.context).WithError(err).WithField("pid", pid).
+					Debug("failed to open pidfd for tracked process")
+			}
 			s.running[pid] = append(s.running[pid], containerProcess{
 				Container: c,
 				Process:   p,
+				pidfd:     pidfd,
 			})
 			s.lifecycleMu.Unlock()
 		}
@@ -665,10 +697,12 @@ func (s *service) processExits() {
 	for e := range s.ec {
 		// While unlikely, it is not impossible for a container process to exit
 		// and have its PID be recycled for a new container process before we
-		// have a chance to process the first exit. As we have no way to tell
-		// for sure which of the processes the exit event corresponds to (until
-		// pidfd support is implemented) there is no way for us to handle the
-		// exit correctly in that case.
+		// process the first exit. If a pidfd for the tracked process still proves
+		// it is alive, the exit must belong to an earlier process that used the
+		// same PID and is ignored.
+		//
+		// A full fix would still be to plumb stable pidfd-backed identity
+		// through the runtime/reaper exit path rather than matching by PID.
 
 		s.lifecycleMu.Lock()
 		// Inform any concurrent s.Start() calls so they can handle the exit
@@ -679,15 +713,28 @@ func (s *service) processExits() {
 		// Handle the exit for a created/started process. If there's more than
 		// one, assume they've all exited. One of them will be the correct
 		// process.
-		var cps []containerProcess
+		var (
+			cps  []containerProcess
+			keep []containerProcess
+		)
 		for _, cp := range s.running[e.Pid] {
+			if isLive, ok := pidFDIsRunning(cp.pidfd); ok && isLive {
+				s.warnIgnoredStaleExit(e, cp, "pidfd-still-alive")
+				keep = append(keep, cp)
+				continue
+			}
+			closePidFD(cp.pidfd)
 			_, init := cp.Process.(*process.Init)
 			if init {
 				s.containerInitExit[cp.Container] = e
 			}
 			cps = append(cps, cp)
 		}
-		delete(s.running, e.Pid)
+		if len(keep) > 0 {
+			s.running[e.Pid] = keep
+		} else {
+			delete(s.running, e.Pid)
+		}
 		s.lifecycleMu.Unlock()
 
 		for _, cp := range cps {
@@ -698,6 +745,63 @@ func (s *service) processExits() {
 			}
 		}
 	}
+}
+
+func openPidFD(pid int) (int, error) {
+	if pid <= 0 || !sys.SupportsPidFD() {
+		return invalidPidFD, nil
+	}
+
+	pidfd, err := unix.PidfdOpen(pid, 0)
+	if err != nil {
+		return invalidPidFD, err
+	}
+	return pidfd, nil
+}
+
+func closePidFD(pidfd int) {
+	if pidfd >= 0 {
+		_ = unix.Close(pidfd)
+	}
+}
+
+func (s *service) closeTrackedPidFDs() {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+
+	for pid, cps := range s.running {
+		for i := range cps {
+			closePidFD(cps[i].pidfd)
+			cps[i].pidfd = invalidPidFD
+		}
+		s.running[pid] = cps
+	}
+}
+
+func pidFDIsRunning(pidfd int) (bool, bool) {
+	if pidfd == invalidPidFD {
+		return false, false
+	}
+
+	if err := unix.PidfdSendSignal(pidfd, 0, nil, 0); err == nil {
+		return true, true
+	} else if err == unix.ESRCH {
+		return false, true
+	}
+
+	return false, false
+}
+
+func (s *service) warnIgnoredStaleExit(e runcC.Exit, cp containerProcess, reason string) {
+	logger := log.G(s.context).WithField("pid", e.Pid).
+		WithField("container_id", cp.Container.ID).
+		WithField("process_id", cp.Process.ID()).
+		WithField("exit_status", e.Status).
+		WithField("reason", reason)
+	if !e.Timestamp.IsZero() {
+		logger = logger.WithField("exit_timestamp", e.Timestamp)
+	}
+	logger.Warn("ignoring stale exit event for recycled PID")
 }
 
 func (s *service) oomEvent(id string) {
