@@ -30,7 +30,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	bootapi "github.com/containerd/containerd/api/runtime/boot/v1"
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	shimapi "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
 
