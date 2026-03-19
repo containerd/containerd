@@ -23,7 +23,8 @@ df_line=$(df -T / | grep '^/dev/')
 if [[ "$df_line" =~ ^/dev/([a-z]+)([0-9+]) ]]; then
     dev="${BASH_REMATCH[1]}"
     part="${BASH_REMATCH[2]}"
-    growpart "/dev/$dev" "$part"
+    # growpart prints "NOCHANGE" when the partition is already at max size
+    out=$(growpart "/dev/$dev" "$part" 2>&1) || grep -q "^NOCHANGE:" <<< "$out"
 
     fstype=$(echo "$df_line" | awk '{print $2}')
     if [[ "$fstype" = 'btrfs' ]]; then
