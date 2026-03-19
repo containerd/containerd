@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
@@ -54,7 +55,7 @@ import (
 
 // NewShimManager returns an implementation of the shim manager
 // using runc
-func NewShimManager(name string) shim.Manager {
+func NewShimManager(name string) shim.Shim {
 	return &manager{
 		name: name,
 	}
@@ -182,8 +183,8 @@ func newShimSocket(ctx context.Context, path, id string, debug bool) (*shimSocke
 	return s, nil
 }
 
-func (manager) Start(ctx context.Context, opts *shim.BootstrapParams) (_ *shim.BootstrapResult, retErr error) {
-	var params shim.BootstrapResult
+func (manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *bootapi.BootstrapResult, retErr error) {
+	var params bootapi.BootstrapResult
 	params.Version = 3
 	params.Protocol = "ttrpc"
 
