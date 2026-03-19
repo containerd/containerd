@@ -539,7 +539,12 @@ func (u *Unpacker) unpack(
 				mounts = bindToOverlay(mounts)
 			}
 
-			diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
+			aopts := unpack.ApplyOpts
+			if parallel {
+				aopts = slices.Clone(unpack.ApplyOpts)
+				aopts = append(aopts, diff.WithParallel(true))
+			}
+			diff, err := a.Apply(ctx, desc, mounts, aopts...)
 			if err != nil {
 				cleanup.Do(ctx, abort)
 				status.err = fmt.Errorf("failed to extract layer (%s %s) to %s as %q: %w", desc.MediaType, desc.Digest, unpack.SnapshotterKey, key, err)

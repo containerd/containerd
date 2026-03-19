@@ -117,7 +117,7 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 	if l.syncfs {
 		er.SyncFs = true
 	}
-	opts = append(opts, diff.WithSyncFs(er.SyncFs))
+	opts = append(opts, diff.WithSyncFs(er.SyncFs), diff.WithParallel(er.Parallel))
 
 	for _, differ := range l.differs {
 		ocidesc, err = differ.Apply(ctx, desc, mounts, opts...)
