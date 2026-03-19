@@ -438,27 +438,11 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse reference %q: %w", r, err)
 	}
-	// If the image is a digest, it shouldn't be skipped.
-	if _, digestErr := imagedigest.Parse(r); digestErr != nil {
-		// If the image is missing a registry, then we know it didn't come from the
-		// CRI service and we should not store it.
-		namedRef, ok := parsedRef.(distribution.Named)
-		registryMissing := ok && r != namedRef.String()
-		log.G(ctx).Infof("UpdateImage: name=%s, namedRef=%s, registryMissing=%v", r, namedRef.String(), registryMissing)
-		if registryMissing {
-			log.G(ctx).Infof("UpdateImage: Skipping unmanaged image reference %q", r)
-			return nil
-		}
-	}
-
-	// TODO: Use image service
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return fmt.Errorf("get image by reference: %w", err)
 		}
-		// If the image is not found, we should continue updating the cache,
-		// so that the image can be removed from the cache.
 		if err := c.imageStore.Update(ctx, r); err != nil {
 			return fmt.Errorf("update image store for %q: %w", r, err)
 		}
@@ -466,6 +450,19 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	}
 
 	labels := img.Labels()
+	isManaged := labels[crilabels.ImageLabelKey] == crilabels.ImageLabelValue
+
+	if !isManaged {
+		if _, digestErr := imagedigest.Parse(r); digestErr != nil {
+			namedRef, ok := parsedRef.(distribution.Named)
+			registryMissing := ok && r != namedRef.String()
+			if registryMissing {
+				log.G(ctx).Infof("UpdateImage: Skipping unmanaged image reference %q", r)
+				return nil
+			}
+		}
+	}
+
 	criLabels := c.getLabels(ctx, r)
 	for key, value := range criLabels {
 		if labels[key] != value {
