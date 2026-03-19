@@ -26,11 +26,12 @@ import (
 	"fmt"
 	"os"
 
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/log"
 )
 
-func readBootstrapParamsFromDeprecatedFields(input []byte, params *BootstrapParams) error {
+func readBootstrapParamsFromDeprecatedFields(input []byte, params *bootapi.BootstrapParams) error {
 	params.InstanceID = id
 	params.Namespace = namespaceFlag
 	params.ContainerdTtrpcAddress = os.Getenv(ttrpcAddressEnv)
