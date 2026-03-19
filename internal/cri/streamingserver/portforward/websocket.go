@@ -47,7 +47,7 @@ import (
 	api "github.com/containerd/containerd/v2/internal/cri/streamingserver/v1"
 	"github.com/containerd/log"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
+	"k8s.io/streaming/pkg/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 

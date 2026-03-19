@@ -39,7 +39,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
+	"k8s.io/streaming/pkg/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 

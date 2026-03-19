@@ -44,8 +44,8 @@ import (
 	api "github.com/containerd/containerd/v2/internal/cri/streamingserver/v1"
 	"github.com/containerd/log"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	"k8s.io/streaming/pkg/httpstream"
+	"k8s.io/streaming/pkg/httpstream/spdy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 

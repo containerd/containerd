@@ -38,7 +38,7 @@ import (
 	"time"
 
 	api "github.com/containerd/containerd/v2/internal/cri/streamingserver/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 func TestHTTPStreamReceived(t *testing.T) {
