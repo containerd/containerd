@@ -224,31 +224,29 @@ type clientVersionDowngrader interface {
 func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
 	var result bootapi.BootstrapResult
 
-	if json.Valid(response) {
-		var params client.BootstrapParams
-		if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
-			// Use TTRPC for legacy shims
-			params.Address = string(response)
-			params.Protocol = "ttrpc"
-			params.Version = 2
-		}
-
-		if params.Version > CurrentShimVersion {
-			return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
-		}
-
-		return &bootapi.BootstrapResult{
-			Version:  int32(params.Version),
-			Address:  params.Address,
-			Protocol: params.Protocol,
-		}, nil
+	if err := proto.Unmarshal(response, &result); err == nil {
+		return &result, nil
 	}
 
-	if err := proto.Unmarshal(response, &result); err != nil {
-		return nil, fmt.Errorf("unable to read shim bootstrap response: %w", err)
+	// Fallback to legacy parsing for backward compatibility with legacy shims that return the address as a plain string or JSON.
+
+	var params client.BootstrapParams //nolint:staticcheck // Used for backward compatibility with legacy shims
+	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
+		// Use TTRPC for legacy shims
+		params.Address = string(response)
+		params.Protocol = "ttrpc"
+		params.Version = 2
 	}
 
-	return &result, nil
+	if params.Version > CurrentShimVersion {
+		return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
+	}
+
+	return &bootapi.BootstrapResult{
+		Version:  int32(params.Version),
+		Address:  params.Address,
+		Protocol: params.Protocol,
+	}, nil
 }
 
 // writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
