@@ -305,7 +305,7 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 		req.Request,
 		s.runtime,
 		"", // unused: podName
-		"", // unusued: podUID
+		"", // unused: podUID
 		exec.ContainerId,
 		exec.Cmd,
 		streamOpts,
@@ -338,7 +338,7 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 		req.Request,
 		s.runtime,
 		"", // unused: podName
-		"", // unusued: podUID
+		"", // unused: podUID
 		attach.ContainerId,
 		streamOpts,
 		s.config.StreamIdleTimeout,

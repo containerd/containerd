@@ -805,7 +805,7 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (any,
 
 	nsbkt := v1bkt.Bucket([]byte(node.Namespace))
 	if nsbkt == nil {
-		// Still remove object if refenced outside the db
+		// Still remove object if referenced outside the db
 		if cc, ok := c.contexts[node.Type]; ok {
 			cc.Remove(node)
 		}

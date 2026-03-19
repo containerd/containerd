@@ -144,7 +144,7 @@ func (h *errOnceHandler) Unmount(_ context.Context, mp string) error {
 	return nil
 }
 
-// TestGC tests the garbage collecion features of the mount manager,
+// TestGC tests the garbage collection features of the mount manager,
 // ensuring that mounts are properly cleaned up when no longer needed.
 func TestGC(t *testing.T) {
 	type gcrun struct {

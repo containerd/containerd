@@ -212,7 +212,7 @@ func testRestartMonitorAlways(t *testing.T, client *Client, interval time.Durati
 
 	// Wait for task exit. If the task takes longer to exit, we risc
 	// wrongfully determining that the task has been restarted when we
-	// check the status in the for loop bellow and find that it's still
+	// check the status in the for loop below and find that it's still
 	// running.
 	select {
 	case <-statusC:

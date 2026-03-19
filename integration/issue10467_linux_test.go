@@ -116,6 +116,6 @@ func TestIssue10467(t *testing.T) {
 	}))
 	require.NoError(t, db.Close())
 
-	t.Log("Verifing")
+	t.Log("Verifying")
 	upgradeCaseFunc(t, currentProc.criRuntimeService(t), currentProc.criImageService(t))
 }

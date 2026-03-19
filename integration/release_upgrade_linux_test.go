@@ -168,7 +168,7 @@ func runUpgradeTestCaseWithExistingConfig(
 		})
 
 		for idx, upgradeCaseFunc := range upgradeCaseFuncs {
-			t.Logf("Verifing upgrade case %d", idx+1)
+			t.Logf("Verifying upgrade case %d", idx+1)
 			upgradeCaseFunc(t, currentProc.criRuntimeService(t), currentProc.criImageService(t))
 
 			if idx == len(upgradeCaseFuncs)-1 {
@@ -672,7 +672,7 @@ func (pCtx *podTCtx) createContainer(name, imageRef string, wantedState crirunti
 		require.NoError(t, pCtx.rSvc.StartContainer(cnID))
 		require.NoError(t, pCtx.rSvc.StopContainer(cnID, 0))
 	default:
-		t.Fatalf("unsupport state %s", wantedState)
+		t.Fatalf("unsupported state %s", wantedState)
 	}
 	return cnID
 }

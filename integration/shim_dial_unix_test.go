@@ -154,7 +154,7 @@ func newTestListener(t testing.TB, abstract bool) (string, net.Listener, func())
 	// The shim stores the abstract socket file without abstract socket
 	// prefix and `unix://`. For the existing shim, if the socket file
 	// only contains the path, it will indicate that it is abstract socket.
-	// Otherwise, it will be normal socket file formated in `unix:///xyz'.
+	// Otherwise, it will be normal socket file formatted in `unix:///xyz'.
 	addr := filepath.Join(tmpDir, "uds.socket")
 	if abstract {
 		addr = abstractSocketPrefix + addr
