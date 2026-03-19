@@ -192,7 +192,6 @@ func RunShim(ctx context.Context, shim Shim, opts ...BinaryOpts) {
 	}
 }
 
-
 func runInfo(ctx context.Context, manager Shim) error {
 	info, err := manager.Info(ctx, os.Stdin)
 	if err != nil {
