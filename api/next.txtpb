@@ -43791,6 +43791,13 @@ file: {
       type: TYPE_BOOL
       json_name: "syncFs"
     }
+    field: {
+      name: "parallel"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "parallel"
+    }
     nested_type: {
       name: "PayloadsEntry"
       field: {
@@ -43924,7 +43931,7 @@ file: {
     location: {
       span: 16
       span: 0
-      span: 89
+      span: 92
       span: 1
     }
     location: {
@@ -44083,7 +44090,7 @@ file: {
       path: 0
       span: 39
       span: 0
-      span: 48
+      span: 51
       span: 1
     }
     location: {
@@ -44264,17 +44271,57 @@ file: {
     }
     location: {
       path: 4
+      path: 0
+      path: 2
+      path: 4
+      span: 50
+      span: 2
+      span: 20
+      leading_comments: " Parallel signifies that the diffs will be applied in parallel.\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 5
+      span: 50
+      span: 2
+      span: 6
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
       path: 1
       span: 50
+      span: 7
+      span: 15
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 3
+      span: 50
+      span: 18
+      span: 19
+    }
+    location: {
+      path: 4
+      path: 1
+      span: 53
       span: 0
-      span: 55
+      span: 58
       span: 1
     }
     location: {
       path: 4
       path: 1
       path: 1
-      span: 50
+      span: 53
       span: 8
       span: 21
     }
@@ -44283,7 +44330,7 @@ file: {
       path: 1
       path: 2
       path: 0
-      span: 54
+      span: 57
       span: 2
       span: 42
       leading_comments: " Applied is the descriptor for the object which was applied.\n If the input was a compressed blob then the result will be\n the descriptor for the uncompressed blob.\n"
@@ -44294,7 +44341,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 54
+      span: 57
       span: 2
       span: 29
     }
@@ -44304,7 +44351,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 54
+      span: 57
       span: 30
       span: 37
     }
@@ -44314,23 +44361,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 54
+      span: 57
       span: 40
       span: 41
     }
     location: {
       path: 4
       path: 2
-      span: 57
+      span: 60
       span: 0
-      span: 84
+      span: 87
       span: 1
     }
     location: {
       path: 4
       path: 2
       path: 1
-      span: 57
+      span: 60
       span: 8
       span: 19
     }
@@ -44339,7 +44386,7 @@ file: {
       path: 2
       path: 2
       path: 0
-      span: 60
+      span: 63
       span: 2
       span: 43
       leading_comments: " Left are the mounts which represent the older copy\n in which is the base of the computed changes.\n"
@@ -44350,7 +44397,7 @@ file: {
       path: 2
       path: 0
       path: 4
-      span: 60
+      span: 63
       span: 2
       span: 10
     }
@@ -44360,7 +44407,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 60
+      span: 63
       span: 11
       span: 33
     }
@@ -44370,7 +44417,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 60
+      span: 63
       span: 34
       span: 38
     }
@@ -44380,7 +44427,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 60
+      span: 63
       span: 41
       span: 42
     }
@@ -44389,7 +44436,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 64
+      span: 67
       span: 2
       span: 44
       leading_comments: " Right are the mounts which represents the newer copy\n in which changes from the left were made into.\n"
@@ -44400,7 +44447,7 @@ file: {
       path: 2
       path: 1
       path: 4
-      span: 64
+      span: 67
       span: 2
       span: 10
     }
@@ -44410,7 +44457,7 @@ file: {
       path: 2
       path: 1
       path: 6
-      span: 64
+      span: 67
       span: 11
       span: 33
     }
@@ -44420,7 +44467,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 64
+      span: 67
       span: 34
       span: 39
     }
@@ -44430,7 +44477,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 64
+      span: 67
       span: 42
       span: 43
     }
@@ -44439,7 +44486,7 @@ file: {
       path: 2
       path: 2
       path: 2
-      span: 68
+      span: 71
       span: 2
       span: 24
       leading_comments: " MediaType is the media type descriptor for the created diff\n object\n"
@@ -44450,7 +44497,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 68
+      span: 71
       span: 2
       span: 8
     }
@@ -44460,7 +44507,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 68
+      span: 71
       span: 9
       span: 19
     }
@@ -44470,7 +44517,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 68
+      span: 71
       span: 22
       span: 23
     }
@@ -44479,7 +44526,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 72
+      span: 75
       span: 2
       span: 17
       leading_comments: " Ref identifies the pre-commit content store object. This\n reference can be used to get the status from the content store.\n"
@@ -44490,7 +44537,7 @@ file: {
       path: 2
       path: 3
       path: 5
-      span: 72
+      span: 75
       span: 2
       span: 8
     }
@@ -44500,7 +44547,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 72
+      span: 75
       span: 9
       span: 12
     }
@@ -44510,7 +44557,7 @@ file: {
       path: 2
       path: 3
       path: 3
-      span: 72
+      span: 75
       span: 15
       span: 16
     }
@@ -44519,7 +44566,7 @@ file: {
       path: 2
       path: 2
       path: 4
-      span: 76
+      span: 79
       span: 2
       span: 33
       leading_comments: " Labels are the labels to apply to the generated content\n on content store commit.\n"
@@ -44530,7 +44577,7 @@ file: {
       path: 2
       path: 4
       path: 6
-      span: 76
+      span: 79
       span: 2
       span: 21
     }
@@ -44540,7 +44587,7 @@ file: {
       path: 2
       path: 4
       path: 1
-      span: 76
+      span: 79
       span: 22
       span: 28
     }
@@ -44550,7 +44597,7 @@ file: {
       path: 2
       path: 4
       path: 3
-      span: 76
+      span: 79
       span: 31
       span: 32
     }
@@ -44559,7 +44606,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 83
+      span: 86
       span: 2
       span: 50
       leading_comments: " SourceDateEpoch specifies the timestamp used to provide control for reproducibility.\n See also https://reproducible-builds.org/docs/source-date-epoch/ .\n\n Since containerd v2.0, the whiteout timestamps are set to zero (1970-01-01),\n not to the source date epoch.\n"
@@ -44570,7 +44617,7 @@ file: {
       path: 2
       path: 5
       path: 6
-      span: 83
+      span: 86
       span: 2
       span: 27
     }
@@ -44580,7 +44627,7 @@ file: {
       path: 2
       path: 5
       path: 1
-      span: 83
+      span: 86
       span: 28
       span: 45
     }
@@ -44590,23 +44637,23 @@ file: {
       path: 2
       path: 5
       path: 3
-      span: 83
+      span: 86
       span: 48
       span: 49
     }
     location: {
       path: 4
       path: 3
-      span: 86
-      span: 0
       span: 89
+      span: 0
+      span: 92
       span: 1
     }
     location: {
       path: 4
       path: 3
       path: 1
-      span: 86
+      span: 89
       span: 8
       span: 20
     }
@@ -44615,7 +44662,7 @@ file: {
       path: 3
       path: 2
       path: 0
-      span: 88
+      span: 91
       span: 2
       span: 39
       leading_comments: " Diff is the descriptor of the diff which can be applied\n"
@@ -44626,7 +44673,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 88
+      span: 91
       span: 2
       span: 29
     }
@@ -44636,7 +44683,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 88
+      span: 91
       span: 30
       span: 34
     }
@@ -44646,7 +44693,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 88
+      span: 91
       span: 37
       span: 38
     }

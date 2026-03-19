@@ -359,6 +359,8 @@ func (u *Unpacker) unpack(
 		parallel = u.supportParallel(unpack)
 	)
 
+	unpack.ApplyOpts = append(unpack.ApplyOpts, diff.WithParallel(parallel))
+
 	// If there is an early return, ensure any ongoing
 	// fetches get their context cancelled
 	ctx, cancel := context.WithCancel(ctx)

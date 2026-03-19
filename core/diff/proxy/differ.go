@@ -64,6 +64,7 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		Mounts:   mount.ToProto(mounts),
 		Payloads: payloads,
 		SyncFs:   config.SyncFs,
+		Parallel: config.Parallel,
 	}
 	resp, err := r.client.Apply(ctx, req)
 	if err != nil {

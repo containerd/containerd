@@ -71,6 +71,8 @@ type ApplyConfig struct {
 	SyncFs bool
 	// Progress is a function which reports status of processed read data
 	Progress func(int64)
+	// Parallel indicates whether the layers will be applied in parallel.
+	Parallel bool
 }
 
 // ApplyOpt is used to configure an Apply operation
@@ -157,6 +159,14 @@ func WithProgress(f func(ocispec.Descriptor, int64)) ApplyOpt {
 func WithSourceDateEpoch(tm *time.Time) Opt {
 	return func(c *Config) error {
 		c.SourceDateEpoch = tm
+		return nil
+	}
+}
+
+// WithParallel toggles whether the layers will be applied in parallel.
+func WithParallel(parallel bool) ApplyOpt {
+	return func(_ context.Context, _ ocispec.Descriptor, c *ApplyConfig) error {
+		c.Parallel = parallel
 		return nil
 	}
 }

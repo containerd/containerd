@@ -46,6 +46,9 @@ message ApplyRequest {
   map<string, google.protobuf.Any> payloads = 3;
   // SyncFs is to synchronize the underlying filesystem containing files.
   bool sync_fs = 4;
+
+  // Parallel signifies that the diffs will be applied in parallel.
+  bool parallel = 5;
 }
 
 message ApplyResponse {
