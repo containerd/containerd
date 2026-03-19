@@ -18,7 +18,6 @@ package shim
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -280,7 +279,7 @@ func run(ctx context.Context, manager Shim, config Config) error {
 		}
 
 		var params bootapi.BootstrapParams
-		if err := json.Unmarshal(input, &params); err != nil {
+		if err := proto.Unmarshal(input, &params); err != nil {
 			// TODO: Return error once the new API is stable
 			if err := readBootstrapParamsFromDeprecatedFields(input, &params); err != nil {
 				return err
@@ -292,9 +291,9 @@ func run(ctx context.Context, manager Shim, config Config) error {
 			return err
 		}
 
-		data, err := json.Marshal(result)
+		data, err := proto.Marshal(result)
 		if err != nil {
-			return fmt.Errorf("failed to marshal bootstrap params to json: %w", err)
+			return fmt.Errorf("failed to marshal bootstrap params: %w", err)
 		}
 
 		if _, err := os.Stdout.Write(data); err != nil {

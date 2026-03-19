@@ -53,6 +53,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -221,20 +222,33 @@ type clientVersionDowngrader interface {
 }
 
 func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
-	var params bootapi.BootstrapResult
+	var result bootapi.BootstrapResult
 
-	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
-		// Use TTRPC for legacy shims
-		params.Address = string(response)
-		params.Protocol = "ttrpc"
-		params.Version = 2
+	if json.Valid(response) {
+		var params client.BootstrapParams
+		if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
+			// Use TTRPC for legacy shims
+			params.Address = string(response)
+			params.Protocol = "ttrpc"
+			params.Version = 2
+		}
+
+		if params.Version > CurrentShimVersion {
+			return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
+		}
+
+		return &bootapi.BootstrapResult{
+			Version:  int32(params.Version),
+			Address:  params.Address,
+			Protocol: params.Protocol,
+		}, nil
 	}
 
-	if params.Version > CurrentShimVersion {
-		return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
+	if err := proto.Unmarshal(response, &result); err != nil {
+		return nil, fmt.Errorf("unable to read shim bootstrap response: %w", err)
 	}
 
-	return &params, nil
+	return &result, nil
 }
 
 // writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
