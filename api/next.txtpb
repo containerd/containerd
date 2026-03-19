@@ -24927,7 +24927,7 @@ file: {
   }
 }
 file: {
-  name: "runtime/boot/v1/bootstrap.proto"
+  name: "runtime/bootstrap/v1/bootstrap.proto"
   package: "containerd.runtime.bootstrap.v1"
   dependency: "google/protobuf/any.proto"
   message_type: {
