@@ -137,13 +137,13 @@ to all committers.
 | [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life    | August 17, 2020                | March 3, 2022                  |                        |
 | [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life    | May 3, 2021                    | February 28, 2023              |                        |
 | [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.39) | End of Life    | February 15, 2022              | August 23, 2025                | @containerd/committers |
-| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS            | March 10, 2023                 | September 2026*                | @containerd/committers |
+| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS            | March 10, 2023                 | September 2026*                | [@samuelkarp](https://github.com/samuelkarp), [@chrishenzie](https://github.com/chrishenzie) |
 | [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.7)  | End of Life    | November 5, 2024               | November 7, 2025               | @containerd/committers |
 | [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.0)  | Active         | May 7, 2025                    | May 5, 2026                    | @containerd/committers |
 | [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.0)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
 | [2.3](https://github.com/containerd/containerd/milestone/50)         | LTS (_future_) | April 27, 2026 (_tentative_)   | April 27, 2028 (_tentative_)   | @containerd/committers |
 
-\* Support for the 1.7 release branch is provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by @chrishenzie and @samuelkarp.
+\* Support for the 1.7 release branch was provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by [@samuelkarp](https://github.com/samuelkarp) and [@chrishenzie](https://github.com/chrishenzie).  This extended support is focused on usage with Kubernetes 1.32, 1.31, and 1.30 via [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).
 
 ### Kubernetes Support
 
