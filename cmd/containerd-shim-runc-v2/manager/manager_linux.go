@@ -49,7 +49,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -190,8 +189,7 @@ func (manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *boo
 
 	id := opts.GetInstanceID()
 
-	lvl, _ := logrus.ParseLevel(opts.LogLevel)
-	debugLog := lvl == log.DebugLevel || lvl == log.TraceLevel
+	debugLog := opts.LogLevel == bootapi.LogLevel_LOG_LEVEL_DEBUG || opts.LogLevel == bootapi.LogLevel_LOG_LEVEL_TRACE
 
 	cmd, err := newCommand(ctx, id, opts.GetContainerdGrpcAddress(), opts.GetContainerdTtrpcAddress(), debugLog)
 	if err != nil {

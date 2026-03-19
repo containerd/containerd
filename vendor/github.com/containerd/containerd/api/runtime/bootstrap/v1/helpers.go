@@ -23,6 +23,27 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// LogLevelFromLogrus converts a logrus log level string (e.g. "debug", "info")
+// to a LogLevel enum value. Returns LOG_LEVEL_UNSPECIFIED for unrecognized strings.
+func LogLevelFromLogrus(s string) LogLevel {
+	switch s {
+	case "trace":
+		return LogLevel_LOG_LEVEL_TRACE
+	case "debug":
+		return LogLevel_LOG_LEVEL_DEBUG
+	case "info":
+		return LogLevel_LOG_LEVEL_INFO
+	case "warn", "warning":
+		return LogLevel_LOG_LEVEL_WARN
+	case "error":
+		return LogLevel_LOG_LEVEL_ERROR
+	case "fatal":
+		return LogLevel_LOG_LEVEL_FATAL
+	default:
+		return LogLevel_LOG_LEVEL_UNSPECIFIED
+	}
+}
+
 // AddExtension adds a new extension to the BootstrapParams.
 // The message is wrapped in a google.protobuf.Any with its type URL automatically set.
 // If the message is already an *anypb.Any, it is used directly without double-wrapping.
