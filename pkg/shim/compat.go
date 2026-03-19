@@ -28,7 +28,6 @@ import (
 
 	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/api/types/runc/options"
-	"github.com/containerd/log"
 )
 
 func readBootstrapParamsFromDeprecatedFields(input []byte, params *bootapi.BootstrapParams) error {
@@ -39,7 +38,7 @@ func readBootstrapParamsFromDeprecatedFields(input []byte, params *bootapi.Boots
 	params.ContainerdBinary = containerdBinaryFlag
 
 	if debugFlag {
-		params.LogLevel = log.DebugLevel.String()
+		params.LogLevel = bootapi.LogLevel_LOG_LEVEL_DEBUG
 	}
 
 	// Task options
