@@ -53,19 +53,17 @@ type Publisher interface {
 	io.Closer
 }
 
-type BootstrapParams = bootapi.BootstrapParams
-type BootstrapResult = bootapi.BootstrapResult
-
 type StopStatus struct {
 	Pid        int
 	ExitStatus int
 	ExitedAt   time.Time
 }
 
-// Manager is the interface which manages the shim process
-type Manager interface {
+// Shim is the interface which manages the shim process lifecycle using the
+// new bootstrap protocol.
+type Shim interface {
 	Name() string
-	Start(ctx context.Context, params *BootstrapParams) (*BootstrapResult, error)
+	Start(ctx context.Context, params *bootapi.BootstrapParams) (*bootapi.BootstrapResult, error)
 	Stop(ctx context.Context, id string) (StopStatus, error)
 	Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeInfo, error)
 }
@@ -179,22 +177,23 @@ func setLogger(ctx context.Context, id string) (context.Context, error) {
 	return log.WithLogger(ctx, l), nil
 }
 
-// Run initializes and runs a shim server.
-func Run(ctx context.Context, manager Manager, opts ...BinaryOpts) {
+// RunShim initializes and runs a shim server using the new bootstrap protocol.
+func RunShim(ctx context.Context, shim Shim, opts ...BinaryOpts) {
 	var config Config
 	for _, o := range opts {
 		o(&config)
 	}
 
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", manager.Name()))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", shim.Name()))
 
-	if err := run(ctx, manager, config); err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %s", manager.Name(), err)
+	if err := run(ctx, shim, config); err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %s", shim.Name(), err)
 		os.Exit(1)
 	}
 }
 
-func runInfo(ctx context.Context, manager Manager) error {
+
+func runInfo(ctx context.Context, manager Shim) error {
 	info, err := manager.Info(ctx, os.Stdin)
 	if err != nil {
 		return err
@@ -207,7 +206,7 @@ func runInfo(ctx context.Context, manager Manager) error {
 	return err
 }
 
-func run(ctx context.Context, manager Manager, config Config) error {
+func run(ctx context.Context, manager Shim, config Config) error {
 	parseFlags()
 	if versionFlag {
 		fmt.Printf("%s:\n", filepath.Base(os.Args[0]))

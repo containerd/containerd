@@ -35,6 +35,7 @@ import (
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
 	eventstypes "github.com/containerd/containerd/api/events"
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
@@ -219,8 +220,8 @@ type clientVersionDowngrader interface {
 	Downgrade() error
 }
 
-func parseStartResponse(response []byte) (*client.BootstrapResult, error) {
-	var params client.BootstrapResult
+func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
+	var params bootapi.BootstrapResult
 
 	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
 		// Use TTRPC for legacy shims
@@ -237,7 +238,7 @@ func parseStartResponse(response []byte) (*client.BootstrapResult, error) {
 }
 
 // writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
-func writeBootstrapParams(path string, params *client.BootstrapResult) error {
+func writeBootstrapParams(path string, params *bootapi.BootstrapResult) error {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -262,7 +263,7 @@ func writeBootstrapParams(path string, params *client.BootstrapResult) error {
 	return f.Close()
 }
 
-func readBootstrapParams(path string) (*client.BootstrapResult, error) {
+func readBootstrapParams(path string) (*bootapi.BootstrapResult, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
@@ -278,7 +279,7 @@ func readBootstrapParams(path string) (*client.BootstrapResult, error) {
 
 // makeConnection creates a new TTRPC or GRPC connection object from address.
 // address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
-func makeConnection(ctx context.Context, id string, params *client.BootstrapResult, onClose func()) (_ io.Closer, retErr error) {
+func makeConnection(ctx context.Context, id string, params *bootapi.BootstrapResult, onClose func()) (_ io.Closer, retErr error) {
 	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
