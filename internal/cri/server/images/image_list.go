@@ -18,7 +18,6 @@ package images
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -33,7 +32,6 @@ func (c *GRPCCRIImageService) ListImages(ctx context.Context, r *runtime.ListIma
 
 	var images []*runtime.Image
 	for _, image := range imagesInStore {
-		fmt.Printf("!!! ListImages: image ID %s has size %d\n", image.ID, image.Size)
 		log.G(ctx).Infof("ListImages: image ID %s has size %d", image.ID, image.Size)
 		// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 		// doesn't exist?

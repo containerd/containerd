@@ -432,7 +432,6 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
-	fmt.Println("!!! UpdateImage called for:", r)
 	parsedRef, err := distribution.ParseAnyReference(r)
 	if err != nil {
 		return fmt.Errorf("failed to parse reference %q: %w", r, err)
@@ -461,7 +460,6 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 			return nil
 		}
 	}
-
 
 	criLabels := c.getLabels(ctx, r)
 	for key, value := range criLabels {
