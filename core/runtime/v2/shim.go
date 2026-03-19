@@ -225,7 +225,7 @@ func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
 	var result bootapi.BootstrapResult
 
 	if json.Valid(response) {
-		var params client.BootstrapParams
+		var params client.BootstrapParams //nolint:staticcheck // Used for backward compatibility with legacy shims
 		if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
 			// Use TTRPC for legacy shims
 			params.Address = string(response)
