@@ -71,7 +71,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 		return nil, err
 	}
 
-	// TODO: Deprecate this in 2.3 and remove in the next LTS in favor of Bootstrap protocol.
+	// TODO: Remove in a future release in favor of Bootstrap protocol.
 	args := []string{
 		"-namespace", ns,
 		"-address", config.GRPCAddress,
@@ -101,7 +101,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 		os.Environ(),
 		"GOMAXPROCS=2",
 		fmt.Sprintf("%s=2", maxVersionEnv),
-		// TODO: Deprecate this in 2.3 and remove in the next LTS in favor of Bootstrap protocol.
+		// TODO: Remove in a future release in favor of Bootstrap protocol.
 		fmt.Sprintf("%s=%s", ttrpcAddressEnv, config.TTRPCAddress),
 		fmt.Sprintf("%s=%s", grpcAddressEnv, config.GRPCAddress),
 		fmt.Sprintf("%s=%s", namespaceEnv, ns),
@@ -111,9 +111,9 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	}
 	cmd.SysProcAttr = getSysProcAttr()
 
-	// Special path when upgrading from 1.7 runc v1 shims to 2.x containerd.
+	// Special path when upgrading from 1.7 shims to 2.x containerd.
 	// v1 shims would fail if passed wrong stdin data.
-	// TODO: Deprecate and remove in the next LTS
+	// TODO: Remove in a future release in favor of Bootstrap protocol.
 	if strings.Contains(config.RuntimePath, "shim-runc-v1") || strings.Contains(config.RuntimePath, "shim-runhcs-v1") {
 		if config.Opts != nil {
 			d, err := proto.Marshal(config.Opts)
