@@ -71,7 +71,7 @@ func (m *managerShim) Start(ctx context.Context, params *bootapi.BootstrapParams
 	opts := StartOpts{
 		Address:      params.ContainerdGrpcAddress,
 		TTRPCAddress: params.ContainerdTtrpcAddress,
-		Debug:        params.LogLevel == "debug" || params.LogLevel == "trace",
+		Debug:        params.LogLevel == bootapi.LogLevel_LOG_LEVEL_DEBUG || params.LogLevel == bootapi.LogLevel_LOG_LEVEL_TRACE,
 	}
 
 	bp, err := m.manager.Start(ctx, params.InstanceID, opts)

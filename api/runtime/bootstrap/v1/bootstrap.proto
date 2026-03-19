@@ -48,7 +48,7 @@ message BootstrapParams {
   string namespace = 2;
 
   // Requested shim log level.
-  string log_level = 3;
+  LogLevel log_level = 3;
 
   // containerd daemon version that is launching this shim.
   string containerd_version = 4;
@@ -91,10 +91,29 @@ message BootstrapResult {
   // Protocol used by shim: "ttrpc" or "grpc"
   string protocol = 3;
 
-  // Optional: Capabilities supported by this shim instance
-  // Allows shim to advertise what features it supports
-  repeated string capabilities = 4;
+  // Optional: Capabilities supported by this shim instance.
+  // Reserved for future use to allow optional capability negotiation
+  // between the daemon and shim.
+  repeated Capability capabilities = 4;
 
   // Optional: Additional metadata from shim
   map<string, string> metadata = 5;
+}
+
+// LogLevel defines log verbosity levels independent of any specific
+// logging library.
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  LOG_LEVEL_TRACE = 1;
+  LOG_LEVEL_DEBUG = 2;
+  LOG_LEVEL_INFO = 3;
+  LOG_LEVEL_WARN = 4;
+  LOG_LEVEL_ERROR = 5;
+  LOG_LEVEL_FATAL = 6;
+}
+
+// Capability defines optional features that can be negotiated between
+// containerd and shims.
+enum Capability {
+  CAPABILITY_UNSPECIFIED = 0;
 }
