@@ -37,7 +37,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	distribution "github.com/distribution/reference"
-	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -443,6 +442,8 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 		if !errdefs.IsNotFound(err) {
 			return fmt.Errorf("get image by reference: %w", err)
 		}
+		// If containerd says it doesn't have the image, calling Update() will
+		// delete the image reference from the CRI internal cache.
 		if err := c.imageStore.Update(ctx, r); err != nil {
 			return fmt.Errorf("update image store for %q: %w", r, err)
 		}
@@ -453,15 +454,14 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	isManaged := labels[crilabels.ImageLabelKey] == crilabels.ImageLabelValue
 
 	if !isManaged {
-		if _, digestErr := imagedigest.Parse(r); digestErr != nil {
-			namedRef, ok := parsedRef.(distribution.Named)
-			registryMissing := ok && r != namedRef.String()
-			if registryMissing {
-				log.G(ctx).Infof("UpdateImage: Skipping unmanaged image reference %q", r)
-				return nil
-			}
+		namedRef, ok := parsedRef.(distribution.Named)
+		registryMissing := ok && r != namedRef.String()
+		if registryMissing {
+			log.G(ctx).Infof("UpdateImage: Skipping unmanaged image reference %q", r)
+			return nil
 		}
 	}
+
 
 	criLabels := c.getLabels(ctx, r)
 	for key, value := range criLabels {
