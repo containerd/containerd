@@ -1,0 +1,63 @@
+name: "Assign and Request Reviews for release/1.7"
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+    branches:
+      - release/1.7
+
+jobs:
+  assign-and-review:
+    name: Assign and Request Reviews
+    runs-on: ubuntu-latest
+    if: github.repository == 'containerd/containerd' && github.event.pull_request.draft == false
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: "Assign and Request Reviews"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const author = context.payload.pull_request.user.login;
+            const samuelkarp = 'samuelkarp';
+            const chrishenzie = 'chrishenzie';
+            const assignees = [];
+            const reviewers = [];
+
+            // Logic:
+            // 1. If samuelkarp is author, assign/review by chrishenzie.
+            // 2. If chrishenzie is author, assign/review by samuelkarp.
+            // 3. Otherwise, assign/review by both.
+            if (author === samuelkarp) {
+              assignees.push(chrishenzie);
+              reviewers.push(chrishenzie);
+            } else if (author === chrishenzie) {
+              assignees.push(samuelkarp);
+              reviewers.push(samuelkarp);
+            } else {
+              assignees.push(samuelkarp, chrishenzie);
+              reviewers.push(samuelkarp, chrishenzie);
+            }
+
+            console.log(`PR #${context.payload.pull_request.number} author: ${author}`);
+            console.log(`Target assignees: ${assignees}`);
+            console.log(`Target reviewers: ${reviewers}`);
+
+            if (assignees.length > 0) {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                assignees: assignees
+              });
+            }
+
+            if (reviewers.length > 0) {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                reviewers: reviewers
+              });
+            }
