@@ -19,7 +19,6 @@ package shim
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -141,7 +140,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 			}
 		}
 
-		data, err := json.Marshal(&params)
+		data, err := proto.Marshal(&params)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal bootstrap params: %w", err)
 		}
