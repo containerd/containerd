@@ -26,11 +26,6 @@
 //   3. shim initializes and writes BootstrapResult as JSON to stdout
 //   4. containerd connects to the address provided in BootstrapResult
 //
-// Note: JSON serialization is used to keep shim binaries small since the
-// encoding/json package is already part of the Go runtime. The proto
-// definition serves as the schema for detecting breaking changes and
-// maintaining forward/backward compatibility.
-//
 // This design enables:
 //   - Forward/backward compatibility via version field
 //   - Typed extensibility via google.protobuf.Any and Extension
