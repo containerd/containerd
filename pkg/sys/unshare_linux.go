@@ -173,14 +173,20 @@ func startProcessWithUsernsLocked(targetHostUID int, unshareFlags uintptr, uidMa
 		return -1, -1, fmt.Errorf("failed to restore capabilities: %w", err)
 	}
 
+	// The noop process only holds the user namespace open; it does not need the
+	// real pod uid/gid mapping. Use HostID=0 (always valid) and Size=1.
+	// The OCI runtime applies the real container uid/gid mapping on startup.
+	noopUIDMaps := []syscall.SysProcIDMap{{ContainerID: 0, HostID: 0, Size: 1}}
+	noopGIDMaps := []syscall.SysProcIDMap{{ContainerID: 0, HostID: 0, Size: 1}}
+
 	var pidfd int
 	proc, err := os.StartProcess("/proc/self/exe", []string{"UnshareAfterEnterUserns"}, &os.ProcAttr{
 		Sys: &syscall.SysProcAttr{
 			// clone new user namespace first and then unshare
 			Cloneflags:                 unix.CLONE_NEWUSER,
 			Unshareflags:               unshareFlags,
-			UidMappings:                uidMaps,
-			GidMappings:                gidMaps,
+			UidMappings:                noopUIDMaps,
+			GidMappings:                noopGIDMaps,
 			GidMappingsEnableSetgroups: true,
 			// NOTE: It's reexec but it's not heavy because subprocess
 			// be in PTRACE_TRACEME mode before performing execve.

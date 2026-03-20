@@ -82,11 +82,11 @@ func testUnshareAfterEnterUsernsShouldWork(t *testing.T) {
 
 		data, err := os.ReadFile(fmt.Sprintf("/proc/%d/uid_map", pid))
 		require.NoError(t, err)
-		require.Equal(t, "         0       1000         10\n", string(data))
+		require.Equal(t, "         0          0          1\n", string(data))
 
 		data, err = os.ReadFile(fmt.Sprintf("/proc/%d/gid_map", pid))
 		require.NoError(t, err)
-		require.Equal(t, "         0       1000         10\n", string(data))
+		require.Equal(t, "         0          0          1\n", string(data))
 
 		data, err = os.ReadFile(fmt.Sprintf("/proc/%d/setgroups", pid))
 		require.NoError(t, err)
