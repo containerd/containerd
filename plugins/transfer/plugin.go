@@ -19,6 +19,7 @@ package transfer
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -33,8 +34,10 @@ import (
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 
 	// Load packages with type registrations
 	_ "github.com/containerd/containerd/v2/core/transfer/archive"
@@ -53,6 +56,7 @@ func init() {
 			plugins.DiffPlugin,
 			plugins.ImageVerifierPlugin,
 			plugins.SnapshotPlugin,
+			plugins.WarningPlugin,
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (any, error) {
@@ -113,7 +117,10 @@ func init() {
 					snCapabilities = p.Meta.Capabilities
 				}
 
-				var applier diff.Applier
+				var (
+					applier   diff.Applier
+					applierID string
+				)
 				target := platforms.Only(p)
 				if uc.Differ != "" {
 					inst, err := ic.GetByID(plugins.DiffPlugin, uc.Differ)
@@ -121,8 +128,8 @@ func init() {
 						return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", uc.Differ, err)
 					}
 					applier = inst.(diff.Applier)
+					applierID = uc.Differ
 				} else {
-					var applierID string
 					for name, plugin := range ic.GetAll() {
 						if plugin.Registration.Type != plugins.DiffPlugin {
 							continue
@@ -174,6 +181,7 @@ func init() {
 					SnapshotterExports:      snExports,
 					SnapshotterCapabilities: snCapabilities,
 					Applier:                 applier,
+					ApplierID:               applierID,
 					ConfigType:              uc.ConfigType,
 					LayerTypes:              uc.LayerTypes,
 				}
@@ -181,6 +189,17 @@ func init() {
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
 			lc.DuplicationSuppressor = kmutex.New()
+
+			if warnings, _ := validateConfig(&lc); len(warnings) > 0 {
+				ws, err := ic.GetSingle(plugins.WarningPlugin)
+				if err != nil {
+					return nil, err
+				}
+				warn := ws.(warning.Service)
+				for _, w := range warnings {
+					warn.Emit(ic.Context, w)
+				}
+			}
 
 			return local.NewTransferService(ms.ContentStore(), metadata.NewImageStore(ms), lc), nil
 		},
@@ -238,4 +257,16 @@ func defaultConfig() *transferConfig {
 		MaxConcurrentUnpacks:        1,
 		CheckPlatformSupported:      false,
 	}
+}
+
+func validateConfig(c *local.TransferConfig) ([]deprecation.Warning, error) {
+	var warnings []deprecation.Warning
+	if c.MaxConcurrentUnpacks > 1 {
+		for _, up := range c.UnpackPlatforms {
+			if slices.Contains(up.SnapshotterCapabilities, "rebase") && up.ApplierID == "walking" {
+				warnings = append(warnings, deprecation.WalkingDifferParallel)
+			}
+		}
+	}
+	return warnings, nil
 }

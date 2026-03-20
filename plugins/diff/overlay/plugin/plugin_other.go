@@ -1,4 +1,4 @@
-//go:build !windows && !darwin
+//go:build !linux
 
 /*
    Copyright The containerd Authors.
@@ -16,9 +16,6 @@
    limitations under the License.
 */
 
-package diff
-
-var defaultDifferConfig = &config{
-	Order:  []string{"walking", "overlay"},
-	SyncFs: false,
-}
+// Package plugin is a no-op on non-Linux platforms as the overlay filesystem
+// is a Linux kernel feature.
+package plugin
