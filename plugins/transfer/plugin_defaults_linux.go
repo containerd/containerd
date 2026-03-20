@@ -1,5 +1,3 @@
-//go:build !windows && !darwin && !linux
-
 /*
    Copyright The containerd Authors.
 
@@ -21,7 +19,16 @@ package transfer
 import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/platforms"
+
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
+
+// Use EROFS snapshotter to extract EROFS native images
+func erofsPlatformSpec() specs.Platform {
+	p := platforms.DefaultSpec()
+	p.OSFeatures = []string{"erofs"}
+	return p
+}
 
 func defaultUnpackConfig() []unpackConfiguration {
 	return []unpackConfiguration{
@@ -29,6 +36,13 @@ func defaultUnpackConfig() []unpackConfiguration {
 			Platform:    platforms.Format(platforms.DefaultSpec()),
 			Snapshotter: defaults.DefaultSnapshotter,
 			Differ:      defaults.DefaultDiffer,
+		},
+
+		{
+			Platform:    platforms.FormatAll(erofsPlatformSpec()),
+			Snapshotter: "erofs",
+			Differ:      "erofs",
+			Optional:    true,
 		},
 	}
 }
