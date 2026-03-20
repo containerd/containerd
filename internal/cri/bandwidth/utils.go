@@ -35,7 +35,7 @@ package bandwidth
 import (
 	"fmt"
 
-	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
 var minRsrc = resource.MustParse("1k")
