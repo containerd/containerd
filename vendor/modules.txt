@@ -660,10 +660,6 @@ go.opentelemetry.io/proto/otlp/collector/trace/v1
 go.opentelemetry.io/proto/otlp/common/v1
 go.opentelemetry.io/proto/otlp/resource/v1
 go.opentelemetry.io/proto/otlp/trace/v1
-# go.uber.org/goleak v1.3.0
-## explicit; go 1.20
-go.uber.org/goleak
-go.uber.org/goleak/internal/stack
 # go.yaml.in/yaml/v2 v2.4.3
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
@@ -935,6 +931,12 @@ k8s.io/client-go/util/workqueue
 ## explicit; go 1.26.0
 k8s.io/cri-api/pkg/apis/runtime/v1
 k8s.io/cri-api/pkg/errors
+# k8s.io/cri-streaming v0.36.0-beta.0
+## explicit; go 1.26.0
+k8s.io/cri-streaming/pkg/streaming
+k8s.io/cri-streaming/pkg/streaming/internal/httpresponse
+k8s.io/cri-streaming/pkg/streaming/portforward
+k8s.io/cri-streaming/pkg/streaming/remotecommand
 # k8s.io/klog/v2 v2.140.0
 ## explicit; go 1.21
 k8s.io/klog/v2
@@ -959,6 +961,7 @@ k8s.io/streaming/pkg/runtime
 ## explicit; go 1.23
 k8s.io/utils/clock
 k8s.io/utils/dump
+k8s.io/utils/exec
 k8s.io/utils/internal/third_party/forked/golang/net
 k8s.io/utils/net
 k8s.io/utils/ptr
