@@ -195,10 +195,6 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	var err error
 	labels := label.NewStore()
 	config := options.RuntimeService.Config()
-
-	// Create the stats collector first so it can be passed to the stores
-	statsCollector := NewStatsCollector(config)
-
 	c := &criService{
 		RuntimeService:     options.RuntimeService,
 		ImageService:       options.ImageService,
@@ -206,14 +202,22 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		client:             options.Client,
 		imageFSPaths:       options.ImageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
-		sandboxStore:       sandboxstore.NewStore(labels, statsCollector),
-		containerStore:     containerstore.NewStore(labels, statsCollector),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
-		statsCollector:     statsCollector,
+	}
+	if config.EnableStatsCollector {
+		// Create the stats collector first so it can be passed to the stores
+		statsCollector := NewStatsCollector(config)
+		c.sandboxStore = sandboxstore.NewStore(labels, statsCollector)
+		c.containerStore = containerstore.NewStore(labels, statsCollector)
+		c.statsCollector = statsCollector
+	} else {
+		c.sandboxStore = sandboxstore.NewStore(labels, nil)
+		c.containerStore = containerstore.NewStore(labels, nil)
+		c.statsCollector = nil
 	}
 
 	// TODO: Make discard time configurable
@@ -283,9 +287,9 @@ func (c *criService) Run(ready func()) error {
 	// then you have to manually filter namespace foo
 	c.eventMonitor.Subscribe(c.client, []string{`topic=="/tasks/oom"`, `topic~="/images/"`})
 
-	// Start the background stats collector for UsageNanoCores calculation
-	log.L.Info("Start stats collector")
 	if c.statsCollector != nil {
+		// Start the background stats collector for UsageNanoCores calculation
+		log.L.Info("Start stats collector")
 		c.statsCollector.SetDependencies(
 			c.client.TaskService(),
 			c.containerStore.List,
