@@ -48,11 +48,11 @@ import (
 	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var
 	"github.com/containerd/containerd/v2/integration/remote"
-	dialer "github.com/containerd/containerd/v2/integration/remote/util"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/types"
 	"github.com/containerd/containerd/v2/internal/cri/util"
+	dialer "k8s.io/cri-client/pkg/util"
 )
 
 const (

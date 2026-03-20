@@ -37,4 +37,14 @@ const (
 	ContainerMetadataExtension = criContainerdPrefix + ".container.metadata"
 	// SandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
 	SandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
+	// KubernetesPodNameLabel is the pod name label used by Kubernetes.
+	KubernetesPodNameLabel = "io.kubernetes.pod.name"
+	// KubernetesPodNamespaceLabel is the pod namespace label used by Kubernetes.
+	KubernetesPodNamespaceLabel = "io.kubernetes.pod.namespace"
+	// KubernetesPodUIDLabel is the pod UID label used by Kubernetes.
+	KubernetesPodUIDLabel = "io.kubernetes.pod.uid"
+	// KubernetesContainerNameLabel is the container name label used by Kubernetes.
+	KubernetesContainerNameLabel = "io.kubernetes.container.name"
+	// PodInfraContainerName is the Kubernetes container name used for infra containers.
+	PodInfraContainerName = "POD"
 )

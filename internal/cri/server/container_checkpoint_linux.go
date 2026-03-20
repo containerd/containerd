@@ -39,10 +39,10 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
+	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
-	critypes "github.com/containerd/containerd/v2/internal/cri/types"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -261,11 +261,11 @@ func (c *criService) CRImportCheckpoint(
 	sandboxUID := sandboxConfig.GetMetadata().GetUid()
 
 	if sandboxUID != "" {
-		if _, ok := originalLabels[critypes.KubernetesPodUIDLabel]; ok {
-			originalLabels[critypes.KubernetesPodUIDLabel] = sandboxUID
+		if _, ok := originalLabels[crilabels.KubernetesPodUIDLabel]; ok {
+			originalLabels[crilabels.KubernetesPodUIDLabel] = sandboxUID
 		}
-		if _, ok := originalAnnotations[critypes.KubernetesPodUIDLabel]; ok {
-			originalAnnotations[critypes.KubernetesPodUIDLabel] = sandboxUID
+		if _, ok := originalAnnotations[crilabels.KubernetesPodUIDLabel]; ok {
+			originalAnnotations[crilabels.KubernetesPodUIDLabel] = sandboxUID
 		}
 	}
 
@@ -273,11 +273,11 @@ func (c *criService) CRImportCheckpoint(
 		fixupLabels := []string{
 			// Update the container name. It has already been update in metadata.Name.
 			// It also needs to be updated in the container labels.
-			critypes.KubernetesContainerNameLabel,
+			crilabels.KubernetesContainerNameLabel,
 			// Update pod name in the labels.
-			critypes.KubernetesPodNameLabel,
+			crilabels.KubernetesPodNameLabel,
 			// Also update namespace.
-			critypes.KubernetesPodNamespaceLabel,
+			crilabels.KubernetesPodNamespaceLabel,
 		}
 
 		for _, annotation := range fixupLabels {

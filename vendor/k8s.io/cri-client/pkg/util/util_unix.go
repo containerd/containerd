@@ -1,20 +1,4 @@
-//go:build unix
-
-/*
-   Copyright The containerd Authors.
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-*/
+//go:build freebsd || linux || darwin
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -36,7 +20,6 @@ package util
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -64,21 +47,21 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	// Unlink to cleanup the previous socket file.
 	err = unix.Unlink(addr)
 	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed to unlink socket file %q: %v", addr, err)
+		return nil, fmt.Errorf("failed to unlink socket file %q: %w", addr, err)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(addr), 0750); err != nil {
-		return nil, fmt.Errorf("error creating socket directory %q: %v", filepath.Dir(addr), err)
+		return nil, fmt.Errorf("error creating socket directory %q: %w", filepath.Dir(addr), err)
 	}
 
-	// Create the socket on a tempfile and move it to the destination socket to handle improprer cleanup
+	// Create the socket on a tempfile and move it to the destination socket to handle improper cleanup
 	file, err := os.CreateTemp(filepath.Dir(addr), "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary file: %v", err)
+		return nil, fmt.Errorf("failed to create temporary file: %w", err)
 	}
 
 	if err := os.Remove(file.Name()); err != nil {
-		return nil, fmt.Errorf("failed to remove temporary file: %v", err)
+		return nil, fmt.Errorf("failed to remove temporary file: %w", err)
 	}
 
 	l, err := net.Listen(protocol, file.Name())
@@ -87,7 +70,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	}
 
 	if err = os.Rename(file.Name(), addr); err != nil {
-		return nil, fmt.Errorf("failed to move temporary file to addr %q: %v", addr, err)
+		return nil, fmt.Errorf("failed to move temporary file to addr %q: %w", addr, err)
 	}
 
 	return l, nil
@@ -100,16 +83,10 @@ func GetAddressAndDialer(endpoint string) (string, func(ctx context.Context, add
 		return "", nil, err
 	}
 	if protocol != unixProtocol {
-		return "", nil, errors.New("only support unix socket endpoint")
+		return "", nil, fmt.Errorf("only support unix socket endpoint")
 	}
 
-	// Use passthrough as the scheme so it allows us to use our custom dialer:
-	//
-	// "grpc.Dial uses "passthrough" as the default name resolver for backward compatibility while grpc.NewClient
-	// uses "dns" as its default name resolver. This subtle difference is important to legacy systems that also
-	// specified a custom dialer and expected it to receive the target string directly."
-	// https://github.com/grpc/grpc-go/blob/master/Documentation/anti-patterns.md#the-wrong-way-grpcdial
-	return fmt.Sprintf("passthrough:///%s", addr), dial, nil
+	return addr, dial, nil
 }
 
 func dial(ctx context.Context, addr string) (net.Conn, error) {
@@ -143,21 +120,4 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	default:
 		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 	}
-}
-
-// IsUnixDomainSocket returns whether a given file is a AF_UNIX socket file
-func IsUnixDomainSocket(filePath string) (bool, error) {
-	fi, err := os.Stat(filePath)
-	if err != nil {
-		return false, fmt.Errorf("stat file %s failed: %v", filePath, err)
-	}
-	if fi.Mode()&os.ModeSocket == 0 {
-		return false, nil
-	}
-	return true, nil
-}
-
-// NormalizePath is a no-op for Linux for now
-func NormalizePath(path string) string {
-	return path
 }
