@@ -102,6 +102,9 @@ func init() {
 
 				sn := ms.Snapshotter(uc.Snapshotter)
 				if sn == nil {
+					if uc.Skippable {
+						continue
+					}
 					return nil, fmt.Errorf("snapshotter %q not found: %w", uc.Snapshotter, errdefs.ErrNotFound)
 				}
 				var (
@@ -165,11 +168,15 @@ func init() {
 					}
 				}
 				if applier == nil {
+					if uc.Skippable {
+						continue
+					}
 					return nil, fmt.Errorf("no matching diff plugins: %w", errdefs.ErrNotFound)
 				}
 
-				// If CheckPlatformSupported is false, we will match all platforms
-				if !config.CheckPlatformSupported {
+				// If CheckPlatformSupported is false and no OSFeatures
+				// in the UnpackConfiguration, we will match all platforms
+				if !config.CheckPlatformSupported && len(p.OSFeatures) == 0 {
 					target = platforms.All
 				}
 
@@ -235,6 +242,9 @@ type unpackConfiguration struct {
 
 	// LayerTypes are the allowed layer types for this unpack configuration
 	LayerTypes []string `toml:"layer_types"`
+
+	// Skippable skips the configuration when initialization fails
+	Skippable bool `toml:"skippable"`
 }
 
 func defaultConfig() *transferConfig {

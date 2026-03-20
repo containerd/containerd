@@ -64,6 +64,9 @@ func init() {
 			p := platforms.DefaultSpec()
 			p.OS = "linux"
 			ic.Meta.Platforms = append(ic.Meta.Platforms, p)
+			// Select this differ for EROFS native images by default
+			p.OSFeatures = []string{"erofs"}
+			ic.Meta.Platforms = append(ic.Meta.Platforms, p)
 			cs := md.(*metadata.DB).ContentStore()
 			config := ic.Config.(*Config)
 
