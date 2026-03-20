@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	upstreamapi "k8s.io/cri-api/pkg/apis"
@@ -39,10 +38,9 @@ type RuntimeService struct {
 	runtimeConn    *grpc.ClientConn
 }
 
-var _ internalapi.RuntimeService = (*RuntimeService)(nil)
-
-// NewRuntimeService creates a new internalapi.RuntimeService.
-func NewRuntimeService(endpoint string, connectionTimeout time.Duration) (internalapi.RuntimeService, error) {
+// NewRuntimeService creates a legacy-style CRI runtime client backed by the
+// upstream Kubernetes CRI client.
+func NewRuntimeService(endpoint string, connectionTimeout time.Duration) (*RuntimeService, error) {
 	runtimeService, err := upstreamcri.NewRemoteRuntimeService(context.Background(), endpoint, connectionTimeout, nil, false)
 	if err != nil {
 		return nil, err

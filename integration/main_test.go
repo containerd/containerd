@@ -45,12 +45,11 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var
 	"github.com/containerd/containerd/v2/integration/remote"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
-	"github.com/containerd/containerd/v2/internal/cri/types"
+	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	dialer "k8s.io/cri-client/pkg/util"
 )
@@ -62,9 +61,9 @@ const (
 )
 
 var (
-	runtimeService     cri.RuntimeService
-	runtimeService2    cri.RuntimeService // to test GetContainerEvents broadcast
-	imageService       cri.ImageManagerService
+	runtimeService     *remote.RuntimeService
+	runtimeService2    *remote.RuntimeService // to test GetContainerEvents broadcast
+	imageService       *remote.ImageService
 	containerdClient   *containerd.Client
 	containerdEndpoint string
 )
@@ -769,7 +768,7 @@ func CRIConfig() (*criconfig.Config, error) {
 }
 
 // SandboxInfo gets sandbox info.
-func SandboxInfo(id string) (*runtime.PodSandboxStatus, *types.SandboxInfo, error) {
+func SandboxInfo(id string) (*runtime.PodSandboxStatus, *podsandboxtypes.SandboxInfo, error) {
 	client, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
@@ -782,7 +781,7 @@ func SandboxInfo(id string) (*runtime.PodSandboxStatus, *types.SandboxInfo, erro
 		return nil, nil, fmt.Errorf("failed to get sandbox status: %w", err)
 	}
 	status := resp.GetStatus()
-	var info types.SandboxInfo
+	var info podsandboxtypes.SandboxInfo
 	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal sandbox info: %w", err)
 	}

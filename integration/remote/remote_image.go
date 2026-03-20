@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	"google.golang.org/grpc"
 	upstreamapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -33,10 +32,9 @@ type ImageService struct {
 	imageService upstreamapi.ImageManagerService
 }
 
-var _ internalapi.ImageManagerService = (*ImageService)(nil)
-
-// NewImageService creates a new internalapi.ImageManagerService.
-func NewImageService(endpoint string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
+// NewImageService creates a legacy-style CRI image client backed by the
+// upstream Kubernetes CRI client.
+func NewImageService(endpoint string, connectionTimeout time.Duration) (*ImageService, error) {
 	imageService, err := upstreamcri.NewRemoteImageService(context.Background(), endpoint, connectionTimeout, nil, false)
 	if err != nil {
 		return nil, err

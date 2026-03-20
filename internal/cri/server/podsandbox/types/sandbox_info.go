@@ -21,7 +21,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
 // SandboxInfo is extra information for sandbox.
@@ -39,7 +39,7 @@ type SandboxInfo struct {
 	// Note: RuntimeSpec may not be populated if the sandbox has not been fully created.
 	RuntimeSpec *specs.Spec                 `json:"runtimeSpec"`
 	CNIResult   *cni.Result                 `json:"cniResult"`
-	Metadata    *sandbox.Metadata           `json:"sandboxMetadata"`
+	Metadata    *sandboxstore.Metadata      `json:"sandboxMetadata"`
 	Overhead    *runtime.ContainerResources `json:"overhead,omitempty"`
 	Resources   *runtime.ContainerResources `json:"resources,omitempty"`
 }
