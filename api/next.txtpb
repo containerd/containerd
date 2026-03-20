@@ -25187,6 +25187,13 @@ file: {
       type: TYPE_STRING
       json_name: "osVersion"
     }
+    field: {
+      name: "os_features"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "osFeatures"
+    }
   }
   options: {
     go_package: "github.com/containerd/containerd/api/types;types"
@@ -25195,7 +25202,7 @@ file: {
     location: {
       span: 16
       span: 0
-      span: 29
+      span: 30
       span: 1
     }
     location: {
@@ -25229,7 +25236,7 @@ file: {
       path: 0
       span: 24
       span: 0
-      span: 29
+      span: 30
       span: 1
       leading_comments: " Platform follows the structure of the OCI platform specification, from\n descriptors.\n"
     }
@@ -25396,6 +25403,55 @@ file: {
       span: 28
       span: 22
       span: 23
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      span: 29
+      span: 2
+      span: 34
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 4
+      span: 29
+      span: 2
+      span: 10
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 5
+      span: 29
+      span: 11
+      span: 17
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 1
+      span: 29
+      span: 18
+      span: 29
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 4
+      path: 3
+      span: 29
+      span: 32
+      span: 33
     }
   }
   syntax: "proto3"
