@@ -128,8 +128,14 @@ func init() {
 							continue
 						}
 						var matched bool
-						for _, p := range plugin.Meta.Platforms {
-							if target.Match(p) {
+						for _, pd := range plugin.Meta.Platforms {
+							// Note that we must use the platforms supported by the differ to
+							// match the platform in `UnpackConfiguration`.
+							//
+							// For example, a differ might only support "linux/amd64", while
+							// the platform in `UnpackConfiguration` is "linux(+erofs)/amd64".
+							// If we reverse this logic, this wrong differ will be applied.
+							if platforms.Only(pd).Match(p) {
 								matched = true
 							}
 						}
