@@ -18,6 +18,7 @@ package remote
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc"
@@ -65,12 +66,21 @@ func newRuntimeClientConn(endpoint string) (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	return grpc.DialContext(context.Background(), addr,
+	return grpc.NewClient(clientTargetForAddress(addr),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithAuthority("localhost"),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 	)
+}
+
+func clientTargetForAddress(addr string) string {
+	// grpc.NewClient defaults to the DNS resolver. Use the passthrough resolver
+	// for socket paths so the custom dialer receives the raw endpoint string.
+	if strings.HasPrefix(addr, "/") {
+		return "passthrough:///" + addr
+	}
+	return addr
 }
 
 func (r *RuntimeService) Version(apiVersion string, _ ...grpc.CallOption) (*runtimeapi.VersionResponse, error) {
