@@ -25,6 +25,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -1503,8 +1504,39 @@ func WithPidsLimit(limit int64) SpecOpts {
 		if s.Linux.Resources.Pids == nil {
 			s.Linux.Resources.Pids = &specs.LinuxPids{}
 		}
-		s.Linux.Resources.Pids.Limit = limit
+		if err := setLinuxPidsLimit(s.Linux.Resources.Pids, limit); err != nil {
+			return err
+		}
 		return nil
+	}
+}
+
+// setLinuxPidsLimit supports runtime-spec layouts where LinuxPids.Limit is
+// either int64 (older versions) or *int64 (newer versions).
+func setLinuxPidsLimit(pids *specs.LinuxPids, limit int64) error {
+	v := reflect.ValueOf(pids)
+	if !v.IsValid() || v.Kind() != reflect.Ptr || v.IsNil() {
+		return errors.New("linux pids is nil")
+	}
+
+	limitField := v.Elem().FieldByName("Limit")
+	if !limitField.IsValid() || !limitField.CanSet() {
+		return errors.New("linux pids limit field is not settable")
+	}
+
+	switch limitField.Kind() {
+	case reflect.Int64:
+		limitField.SetInt(limit)
+		return nil
+	case reflect.Ptr:
+		if limitField.Type().Elem().Kind() != reflect.Int64 {
+			return fmt.Errorf("unsupported linux pids limit pointer type: %s", limitField.Type())
+		}
+		l := limit
+		limitField.Set(reflect.ValueOf(&l))
+		return nil
+	default:
+		return fmt.Errorf("unsupported linux pids limit kind: %s", limitField.Kind())
 	}
 }
 

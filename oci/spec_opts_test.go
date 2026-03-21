@@ -700,6 +700,35 @@ func TestWithoutMounts(t *testing.T) {
 	}
 }
 
+func TestWithPidsLimit(t *testing.T) {
+	spec := Spec{
+		Version: specs.Version,
+		Root:    &specs.Root{},
+		Linux:   &specs.Linux{},
+	}
+
+	const expected int64 = 1234
+	err := WithPidsLimit(expected)(nil, nil, nil, &spec)
+	require.NoError(t, err)
+	require.NotNil(t, spec.Linux)
+	require.NotNil(t, spec.Linux.Resources)
+	require.NotNil(t, spec.Linux.Resources.Pids)
+
+	limitField := reflect.ValueOf(spec.Linux.Resources.Pids).Elem().FieldByName("Limit")
+	require.True(t, limitField.IsValid())
+
+	switch limitField.Kind() {
+	case reflect.Int64:
+		assert.Equal(t, expected, limitField.Int())
+	case reflect.Ptr:
+		require.False(t, limitField.IsNil())
+		require.Equal(t, reflect.Int64, limitField.Elem().Kind())
+		assert.Equal(t, expected, limitField.Elem().Int())
+	default:
+		t.Fatalf("unexpected LinuxPids.Limit kind: %s", limitField.Kind())
+	}
+}
+
 func TestWithWindowsDevice(t *testing.T) {
 	testcases := []struct {
 		name   string
