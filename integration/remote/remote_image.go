@@ -58,12 +58,28 @@ func (r *ImageService) ImageStatus(image *runtimeapi.ImageSpec, _ ...grpc.CallOp
 func (r *ImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, runtimeHandler string, _ ...grpc.CallOption) (string, error) {
 	requestImage := image
 	if image != nil && runtimeHandler != "" {
-		copied := *image
-		copied.RuntimeHandler = runtimeHandler
-		requestImage = &copied
+		requestImage = &runtimeapi.ImageSpec{
+			Image:              image.Image,
+			Annotations:        copyStringMap(image.Annotations),
+			UserSpecifiedImage: image.UserSpecifiedImage,
+			RuntimeHandler:     runtimeHandler,
+			ImageRef:           image.ImageRef,
+		}
 	}
 
 	return r.imageService.PullImage(context.Background(), requestImage, auth, podSandboxConfig)
+}
+
+func copyStringMap(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return nil
+	}
+
+	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
 }
 
 func (r *ImageService) RemoveImage(image *runtimeapi.ImageSpec, _ ...grpc.CallOption) error {
