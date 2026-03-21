@@ -78,3 +78,20 @@ func (e *OversizedMessageErr) RejectedLength() int {
 func (*OversizedMessageErr) MaximumLength() int {
 	return messageLengthMax
 }
+
+type DiscardErr struct {
+	err error
+}
+
+func (d *DiscardErr) Error() string {
+	return d.err.Error()
+}
+
+func DiscardError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &DiscardErr{
+		err: err,
+	}
+}
