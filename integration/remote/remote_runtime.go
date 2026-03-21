@@ -65,7 +65,7 @@ func newRuntimeClientConn(endpoint string) (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	return grpc.NewClient(addr,
+	return grpc.DialContext(context.Background(), addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithAuthority("localhost"),
 		grpc.WithContextDialer(dialer),
