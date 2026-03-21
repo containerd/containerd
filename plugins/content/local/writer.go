@@ -145,7 +145,7 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	// Enable content blob integrity verification if supported
 
 	if w.s.integritySupported {
-		if err := fsverity.Enable(target); err != nil {
+		if err := fsverity.Enable(target); err != nil { //nolint:staticcheck // #12279: non-linux fsverity stub always returns unsupported error
 			log.G(ctx).Warnf("failed to enable integrity for blob %v: %s", target, err.Error())
 		}
 	}

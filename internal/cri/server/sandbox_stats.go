@@ -36,7 +36,7 @@ func (c *criService) PodSandboxStats(
 	}
 
 	podSandboxStats, err := c.podSandboxStats(ctx, sandbox)
-	if err != nil {
+	if err != nil { //nolint:staticcheck // #12279: non-linux/non-windows stub always returns not-implemented
 		return nil, fmt.Errorf("failed to decode pod sandbox metrics %s: %w", r.GetPodSandboxId(), err)
 	}
 
