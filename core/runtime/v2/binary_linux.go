@@ -21,39 +21,54 @@ import (
 	"errors"
 	"io"
 	"os"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
 
-func copyShimlog(_ context.Context, path string, _ io.ReadCloser, done chan struct{}) error {
-	fifo, err := os.OpenFile(path, os.O_RDONLY, 0700)
-	if err != nil {
-		return err
+func copyShimlog(ctx context.Context, _ string, f io.ReadCloser, done chan struct{}) error {
+	defer f.Close()
+
+	fdProvider, ok := f.(interface{ Fd() uintptr })
+	if !ok {
+		_, err := io.Copy(os.Stderr, f)
+		return checkCopyShimLogError(ctx, err)
 	}
-	defer fifo.Close()
+
+	const backoff = 10 * time.Millisecond
 	for {
 		select {
 		case <-done:
 			return nil
 		default:
 			n, err := unix.Splice(
-				int(fifo.Fd()),
+				int(fdProvider.Fd()),
 				nil,
 				int(os.Stderr.Fd()),
 				nil,
 				1024*4,
-				0,
+				unix.SPLICE_F_NONBLOCK,
 			)
 			if err != nil {
 				if err == unix.EAGAIN {
+					select {
+					case <-done:
+						return nil
+					case <-time.After(backoff):
+					}
 					continue
 				}
 				if errors.Is(err, unix.EPIPE) || errors.Is(err, os.ErrClosed) {
 					return nil
 				}
-				return err
+				return checkCopyShimLogError(ctx, err)
 			}
 			if n == 0 {
+				select {
+				case <-done:
+					return nil
+				case <-time.After(backoff):
+				}
 				continue
 			}
 		}
