@@ -388,7 +388,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	if status.Status != Running {
-		t.Fatalf("expected status %q but received %q", Running, status)
+		t.Fatalf("expected status %q but received %q", Running, status.Status)
 	}
 
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
