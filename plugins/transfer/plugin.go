@@ -152,7 +152,7 @@ func init() {
 						}
 						inst, err := plugin.Instance()
 						if err != nil {
-							return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", name, err)
+							return nil, fmt.Errorf("failed to get instance for diff plugin %d: %w", name, err)
 						}
 						applier = inst.(diff.Applier)
 						applierID = plugin.Registration.ID
