@@ -740,7 +740,7 @@ func RawRuntimeClient() (runtime.RuntimeServiceClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dialer: %w", err)
 	}
-	conn, err := grpc.NewClient(addr,
+	conn, err := grpc.NewClient(clientTargetForAddress(addr),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 	)
@@ -748,6 +748,13 @@ func RawRuntimeClient() (runtime.RuntimeServiceClient, error) {
 		return nil, fmt.Errorf("failed to connect cri endpoint: %w", err)
 	}
 	return runtime.NewRuntimeServiceClient(conn), nil
+}
+
+func clientTargetForAddress(addr string) string {
+	if strings.HasPrefix(addr, "/") {
+		return "passthrough:///" + addr
+	}
+	return addr
 }
 
 // CRIConfig gets current cri config from containerd.

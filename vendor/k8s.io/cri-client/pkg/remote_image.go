@@ -97,7 +97,7 @@ func NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeo
 		grpc.WithConnectParams(connParams),
 	)
 
-	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
+	conn, err := grpc.NewClient(clientTargetForAddress(addr), dialOpts...)
 	if err != nil {
 		logger.Error(err, "Connect remote image service failed", "address", addr)
 		return nil, err
