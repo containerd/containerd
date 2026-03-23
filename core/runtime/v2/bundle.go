@@ -103,12 +103,14 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	if err := os.Symlink(work, filepath.Join(b.Path, "work")); err != nil {
 		return nil, err
 	}
-	if spec := spec.GetValue(); spec != nil {
-		// write the spec to the bundle
-		specPath := filepath.Join(b.Path, oci.ConfigFilename)
-		err = os.WriteFile(specPath, spec, 0666)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write bundle spec: %w", err)
+	if spec != nil {
+		if value := spec.GetValue(); value != nil {
+			// write the spec to the bundle
+			specPath := filepath.Join(b.Path, oci.ConfigFilename)
+			err = os.WriteFile(specPath, value, 0666)
+			if err != nil {
+				return nil, fmt.Errorf("failed to write bundle spec: %w", err)
+			}
 		}
 	}
 	return b, nil
