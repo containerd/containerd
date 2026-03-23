@@ -18,10 +18,13 @@ package config
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	criruntime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/opts"
@@ -530,4 +533,151 @@ func TestCheckLocalImagePullConfigs(t *testing.T) {
 			assert.Equal(t, tc.expectLocalPull, imageConfig.UseLocalImagePull)
 		})
 	}
+}
+
+func TestLoadRuntimesFromDir(t *testing.T) {
+	t.Run("empty dir setting", func(t *testing.T) {
+		c := &ContainerdConfig{
+			RuntimeConfigDir: "",
+			Runtimes:         map[string]Runtime{},
+		}
+		err := c.loadRuntimesFromDir(context.Background())
+		require.NoError(t, err)
+		assert.Empty(t, c.Runtimes)
+	})
+
+	t.Run("nonexistent directory", func(t *testing.T) {
+		c := &ContainerdConfig{
+			RuntimeConfigDir: filepath.Join(t.TempDir(), "does-not-exist"),
+			Runtimes:         map[string]Runtime{},
+		}
+		err := c.loadRuntimesFromDir(context.Background())
+		require.NoError(t, err)
+		assert.Empty(t, c.Runtimes)
+	})
+
+	t.Run("loads runtime from directory", func(t *testing.T) {
+		dir := t.TempDir()
+		runtimeDir := filepath.Join(dir, "my-runtime")
+		require.NoError(t, os.MkdirAll(runtimeDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, "runtime.toml"), []byte(`
+runtime_type = "io.containerd.runc.v2"
+runtime_path = "/usr/bin/my-shim"
+`), 0o644))
+
+		c := &ContainerdConfig{
+			RuntimeConfigDir: dir,
+			Runtimes:         map[string]Runtime{},
+		}
+		err := c.loadRuntimesFromDir(context.Background())
+		require.NoError(t, err)
+		require.Contains(t, c.Runtimes, "my-runtime")
+		assert.Equal(t, "io.containerd.runc.v2", c.Runtimes["my-runtime"].Type)
+		assert.Equal(t, "/usr/bin/my-shim", c.Runtimes["my-runtime"].Path)
+		assert.Equal(t, string(ModePodSandbox), c.Runtimes["my-runtime"].Sandboxer)
+	})
+
+	t.Run("config runtime takes precedence", func(t *testing.T) {
+		dir := t.TempDir()
+		runtimeDir := filepath.Join(dir, "existing")
+		require.NoError(t, os.MkdirAll(runtimeDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, "runtime.toml"), []byte(`
+runtime_type = "io.containerd.runc.v2"
+runtime_path = "/usr/bin/from-dir"
+`), 0o644))
+
+		c := &ContainerdConfig{
+			RuntimeConfigDir: dir,
+			Runtimes: map[string]Runtime{
+				"existing": {
+					Type: "io.containerd.runc.v2",
+					Path: "/usr/bin/from-config",
+				},
+			},
+		}
+		err := c.loadRuntimesFromDir(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, "/usr/bin/from-config", c.Runtimes["existing"].Path)
+	})
+
+	t.Run("skips non-directory entries", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "not-a-dir.toml"), []byte("foo"), 0o644))
+
+		c := &ContainerdConfig{
+			RuntimeConfigDir: dir,
+			Runtimes:         map[string]Runtime{},
+		}
+		err := c.loadRuntimesFromDir(context.Background())
+		require.NoError(t, err)
+		assert.Empty(t, c.Runtimes)
+	})
+
+	t.Run("skips directory without runtime.toml", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "empty-runtime"), 0o755))
+
+		c := &ContainerdConfig{
+			RuntimeConfigDir: dir,
+			Runtimes:         map[string]Runtime{},
+		}
+		err := c.loadRuntimesFromDir(context.Background())
+		require.NoError(t, err)
+		assert.Empty(t, c.Runtimes)
+	})
+
+	t.Run("invalid toml returns error", func(t *testing.T) {
+		dir := t.TempDir()
+		runtimeDir := filepath.Join(dir, "bad-runtime")
+		require.NoError(t, os.MkdirAll(runtimeDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, "runtime.toml"), []byte(`{{{not toml`), 0o644))
+
+		c := &ContainerdConfig{
+			RuntimeConfigDir: dir,
+			Runtimes:         map[string]Runtime{},
+		}
+		err := c.loadRuntimesFromDir(context.Background())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unmarshal runtime config")
+	})
+
+	t.Run("multiple runtimes loaded", func(t *testing.T) {
+		dir := t.TempDir()
+		for _, name := range []string{"runtime-a", "runtime-b"} {
+			runtimeDir := filepath.Join(dir, name)
+			require.NoError(t, os.MkdirAll(runtimeDir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, "runtime.toml"), []byte(`
+runtime_type = "io.containerd.runc.v2"
+`), 0o644))
+		}
+
+		c := &ContainerdConfig{
+			RuntimeConfigDir: dir,
+			Runtimes:         map[string]Runtime{},
+		}
+		err := c.loadRuntimesFromDir(context.Background())
+		require.NoError(t, err)
+		assert.Len(t, c.Runtimes, 2)
+		assert.Contains(t, c.Runtimes, "runtime-a")
+		assert.Contains(t, c.Runtimes, "runtime-b")
+	})
+
+	t.Run("default runtime from directory via validation", func(t *testing.T) {
+		dir := t.TempDir()
+		runtimeDir := filepath.Join(dir, "custom-default")
+		require.NoError(t, os.MkdirAll(runtimeDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, "runtime.toml"), []byte(`
+runtime_type = "io.containerd.runc.v2"
+`), 0o644))
+
+		cfg := &RuntimeConfig{
+			ContainerdConfig: ContainerdConfig{
+				DefaultRuntimeName: "custom-default",
+				RuntimeConfigDir:   dir,
+			},
+		}
+		_, err := ValidateRuntimeConfig(context.Background(), cfg)
+		require.NoError(t, err)
+		assert.Contains(t, cfg.ContainerdConfig.Runtimes, "custom-default")
+	})
 }
