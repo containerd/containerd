@@ -23,7 +23,7 @@ require (
 	github.com/containerd/log v0.1.0
 	github.com/containerd/nri v0.11.0
 	github.com/containerd/otelttrpc v0.1.0
-	github.com/containerd/platforms v1.0.0-rc.2
+	github.com/containerd/platforms v1.0.0-rc.2.0.20260314032712-54c1ef4f418b
 	github.com/containerd/plugin v1.0.0
 	github.com/containerd/ttrpc v1.2.8
 	github.com/containerd/typeurl/v2 v2.2.3

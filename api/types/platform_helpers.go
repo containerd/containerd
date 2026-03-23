@@ -26,6 +26,7 @@ func OCIPlatformToProto(platforms []oci.Platform) []*Platform {
 		ap[i] = &Platform{
 			OS:           platforms[i].OS,
 			OSVersion:    platforms[i].OSVersion,
+			OSFeatures:   append([]string(nil), platforms[i].OSFeatures...),
 			Architecture: platforms[i].Architecture,
 			Variant:      platforms[i].Variant,
 		}
@@ -41,6 +42,7 @@ func OCIPlatformFromProto(platforms []*Platform) []oci.Platform {
 		op[i] = oci.Platform{
 			OS:           platforms[i].OS,
 			OSVersion:    platforms[i].OSVersion,
+			OSFeatures:   append([]string(nil), platforms[i].OSFeatures...),
 			Architecture: platforms[i].Architecture,
 			Variant:      platforms[i].Variant,
 		}

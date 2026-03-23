@@ -98,7 +98,7 @@ func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string
 	platform := resp.GetPlatform()
 	return imagespec.Platform{
 		Architecture: platform.GetArchitecture(),
-		OS:           platform.GetOS(),
+		OS:           platform.GetOs(),
 		Variant:      platform.GetVariant(),
 	}, nil
 }

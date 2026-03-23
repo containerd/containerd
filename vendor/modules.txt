@@ -197,8 +197,8 @@ github.com/containerd/nri/types/v1
 ## explicit; go 1.21
 github.com/containerd/otelttrpc
 github.com/containerd/otelttrpc/internal
-# github.com/containerd/platforms v1.0.0-rc.2
-## explicit; go 1.20
+# github.com/containerd/platforms v1.0.0-rc.2.0.20260314032712-54c1ef4f418b
+## explicit; go 1.21
 github.com/containerd/platforms
 # github.com/containerd/plugin v1.0.0
 ## explicit; go 1.20
