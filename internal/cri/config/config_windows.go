@@ -55,6 +55,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		},
 		ContainerdConfig: ContainerdConfig{
 			DefaultRuntimeName: "runhcs-wcow-process",
+			RuntimeConfigDir:   filepath.Join(defaults.DefaultConfigDir, "runtimes"),
 			Runtimes: map[string]Runtime{
 				"runhcs-wcow-process": {
 					Type:                 "io.containerd.runhcs.v1",
