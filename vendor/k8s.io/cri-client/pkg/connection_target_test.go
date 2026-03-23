@@ -30,6 +30,11 @@ func TestClientTargetForAddress(t *testing.T) {
 			want: "passthrough:////run/containerd/containerd.sock",
 		},
 		{
+			name: "unix socket endpoint",
+			addr: "unix:///run/containerd/containerd.sock",
+			want: "passthrough:////run/containerd/containerd.sock",
+		},
+		{
 			name: "windows pipe path",
 			addr: "//./pipe/containerd-containerd",
 			want: "passthrough://///./pipe/containerd-containerd",

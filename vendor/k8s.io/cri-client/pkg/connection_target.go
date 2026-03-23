@@ -19,6 +19,12 @@ package cri
 import "strings"
 
 func clientTargetForAddress(addr string) string {
+	// Defensive: normalize callers that pass a unix endpoint instead of the
+	// parsed socket path.
+	if strings.HasPrefix(addr, "unix:///") {
+		addr = strings.TrimPrefix(addr, "unix://")
+	}
+
 	// grpc defaults to the DNS resolver for bare targets. Use the passthrough
 	// resolver for socket-style addresses so the custom dialer gets the raw path.
 	if strings.HasPrefix(addr, "/") {
