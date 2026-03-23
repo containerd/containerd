@@ -238,7 +238,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	}
 	pid, err := pidFile.Read()
 	if err != nil {
-		return fmt.Errorf("failed to retrieve OCI runtime exec pi: %wd", err)
+		return fmt.Errorf("failed to retrieve OCI runtime exec pid: %w", err)
 	}
 	e.pid.pid = pid
 	return nil
