@@ -22,11 +22,11 @@ import (
 	"io"
 	"math"
 
-	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/remotecommand"
+	streaming "k8s.io/cri-streaming/pkg/streaming"
+	streamingremote "k8s.io/cri-streaming/pkg/streaming/remotecommand"
+	streamingruntime "k8s.io/streaming/pkg/runtime"
+	executil "k8s.io/utils/exec"
 
-	executil "github.com/containerd/containerd/v2/internal/cri/executil"
-	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
 
@@ -41,7 +41,7 @@ func newStreamRuntime(c *criService) streaming.Runtime {
 // Exec executes a command inside the container. executil.ExitError is returned if the command
 // returns non-zero exit code.
 func (s *streamRuntime) Exec(ctx context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser,
-	tty bool, resize <-chan remotecommand.TerminalSize) error {
+	tty bool, resize <-chan streamingremote.TerminalSize) error {
 	exitCode, err := s.c.execInContainer(ctrdutil.WithNamespace(ctx), containerID, execOptions{
 		cmd:    cmd,
 		stdin:  stdin,
@@ -63,7 +63,7 @@ func (s *streamRuntime) Exec(ctx context.Context, containerID string, cmd []stri
 }
 
 func (s *streamRuntime) Attach(ctx context.Context, containerID string, in io.Reader, out, err io.WriteCloser, tty bool,
-	resize <-chan remotecommand.TerminalSize) error {
+	resize <-chan streamingremote.TerminalSize) error {
 	return s.c.attachContainer(ctrdutil.WithNamespace(ctx), containerID, in, out, err, tty, resize)
 }
 
@@ -76,14 +76,14 @@ func (s *streamRuntime) PortForward(ctx context.Context, podSandboxID string, po
 }
 
 // handleResizing spawns a goroutine that processes the resize channel, calling resizeFunc for each
-// remotecommand.TerminalSize received from the channel.
-func handleResizing(ctx context.Context, resize <-chan remotecommand.TerminalSize, resizeFunc func(size remotecommand.TerminalSize)) {
+// streamingremote.TerminalSize received from the channel.
+func handleResizing(ctx context.Context, resize <-chan streamingremote.TerminalSize, resizeFunc func(size streamingremote.TerminalSize)) {
 	if resize == nil {
 		return
 	}
 
 	go func() {
-		defer runtime.HandleCrash()
+		defer streamingruntime.HandleCrash()
 
 		for {
 			select {

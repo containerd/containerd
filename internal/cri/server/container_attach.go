@@ -24,8 +24,8 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/log"
-	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	streamingremote "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 )
@@ -46,7 +46,7 @@ func (c *criService) Attach(ctx context.Context, r *runtime.AttachRequest) (*run
 }
 
 func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Reader, stdout, stderr io.WriteCloser,
-	tty bool, resize <-chan remotecommand.TerminalSize) error {
+	tty bool, resize <-chan streamingremote.TerminalSize) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// Get container from our container store.
@@ -65,7 +65,7 @@ func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Re
 	if err != nil {
 		return fmt.Errorf("failed to load task: %w", err)
 	}
-	handleResizing(ctx, resize, func(size remotecommand.TerminalSize) {
+	handleResizing(ctx, resize, func(size streamingremote.TerminalSize) {
 		if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
 			log.G(ctx).WithError(err).Errorf("Failed to resize task %q console", id)
 		}

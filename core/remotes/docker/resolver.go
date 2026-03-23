@@ -614,7 +614,8 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 			return nil, err
 		}
 		req.Body = body
-		req.GetBody = r.body
+		// Retries create a fresh request via r.body. Leaving GetBody unset keeps
+		// transports from eagerly cloning io.Pipe-backed upload bodies.
 		if r.size > 0 {
 			req.ContentLength = r.size
 		}

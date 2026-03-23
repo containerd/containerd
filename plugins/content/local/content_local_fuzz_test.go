@@ -30,8 +30,16 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 )
 
+const maxFuzzContentStoreWriterBytes = 256 << 10
+
 func FuzzContentStoreWriter(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
+		// Keep the lightweight CI fuzz run from spending its whole deadline in a
+		// single large filesystem-backed iteration.
+		if len(data) > maxFuzzContentStoreWriterBytes {
+			data = data[:maxFuzzContentStoreWriterBytes]
+		}
+
 		cs, err := NewStore(t.TempDir())
 		if err != nil {
 			t.Fatal(err)

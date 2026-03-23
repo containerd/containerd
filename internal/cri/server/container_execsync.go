@@ -28,8 +28,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	streamingremote "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/internal/cri/config"
@@ -105,7 +105,7 @@ type execOptions struct {
 	stdout  io.WriteCloser
 	stderr  io.WriteCloser
 	tty     bool
-	resize  <-chan remotecommand.TerminalSize
+	resize  <-chan streamingremote.TerminalSize
 	timeout time.Duration
 }
 
@@ -202,7 +202,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		return nil, fmt.Errorf("failed to start exec %q: %w", execID, err)
 	}
 
-	handleResizing(ctx, opts.resize, func(size remotecommand.TerminalSize) {
+	handleResizing(ctx, opts.resize, func(size streamingremote.TerminalSize) {
 		if err := process.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
 			log.G(ctx).WithError(err).Errorf("Failed to resize process %q console for container %q", execID, id)
 		}
