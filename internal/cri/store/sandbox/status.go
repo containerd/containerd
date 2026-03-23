@@ -76,6 +76,8 @@ const (
 	// StateUnknown is unknown state. Sandbox only goes
 	// into unknown state when its status fails to be loaded.
 	StateUnknown
+	// StateStopped means the Sandbox has been stopped successfully
+	StateStopped
 )
 
 // String returns the string representation of the state
@@ -88,6 +90,9 @@ func (s State) String() string {
 	case StateUnknown:
 		// PodSandboxState doesn't have an unknown state, but State does, so return a string using the same convention
 		return "SANDBOX_UNKNOWN"
+	case StateStopped:
+		// PodSandboxState doesn't have a stopped state, but State does, so return a string using the same convention
+		return "SANDBOX_STOPPED"
 	default:
 		return "invalid sandbox state value: " + strconv.Itoa(int(s))
 	}
