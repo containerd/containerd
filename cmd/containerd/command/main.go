@@ -35,11 +35,13 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/sys"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc/grpclog"
 )
@@ -204,6 +206,10 @@ can be used and modified as necessary as a custom configuration.`
 		for _, w := range warnings {
 			log.G(ctx).WithError(w).Warn("cleanup temp mount")
 		}
+
+		// Register logging hook for tracing
+		tracingHook := tracing.NewLogrusHook(tracing.WithTraceIDField(config.Debug.LogTraceID))
+		logrus.StandardLogger().AddHook(tracingHook)
 
 		log.G(ctx).WithFields(log.Fields{
 			"version":  version.Version,
