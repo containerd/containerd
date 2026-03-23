@@ -79,6 +79,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		}
 	}
 
+	if !sandbox.Status.Get().ExitedAt.IsZero() {
+		log.G(ctx).Warnf("sandbox %q is already stopped", id)
+		return nil
+	}
+
 	// Only stop sandbox container when it's running or unknown.
 	state := sandbox.Status.Get().State
 	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
