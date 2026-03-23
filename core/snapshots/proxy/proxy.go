@@ -191,3 +191,38 @@ func (p *proxySnapshotter) Cleanup(ctx context.Context) error {
 	})
 	return errgrpc.ToNative(err)
 }
+
+func (p *proxySnapshotter) Snapshot(ctx context.Context, key, activeKey string, opts ...snapshots.Opt) error {
+	var local snapshots.Info
+	for _, opt := range opts {
+		if err := opt(&local); err != nil {
+			return err
+		}
+	}
+	_, err := p.client.Snapshot(ctx, &snapshotsapi.SnapshotRequest{
+		Snapshotter: p.snapshotterName,
+		Key:         key,
+		ActiveKey:   activeKey,
+		Labels:      local.Labels,
+	})
+	return errgrpc.ToNative(err)
+}
+
+func (p *proxySnapshotter) Restore(ctx context.Context, key, snapshotKey string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	var local snapshots.Info
+	for _, opt := range opts {
+		if err := opt(&local); err != nil {
+			return nil, err
+		}
+	}
+	resp, err := p.client.Restore(ctx, &snapshotsapi.RestoreRequest{
+		Snapshotter: p.snapshotterName,
+		Key:         key,
+		SnapshotKey: snapshotKey,
+		Labels:      local.Labels,
+	})
+	if err != nil {
+		return nil, errgrpc.ToNative(err)
+	}
+	return mount.FromProto(resp.Mounts), nil
+}

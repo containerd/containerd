@@ -59,6 +59,15 @@ func MetaStoreSuite(t *testing.T, name string, meta func(root string) (*MetaStor
 	t.Run("RemoveWithChildren", makeTest(t, name, meta, inWriteTransaction(testRemoveWithChildren)))
 	t.Run("ParentIDs", makeTest(t, name, meta, inWriteTransaction(testParents)))
 	t.Run("Rebase", makeTest(t, name, meta, inWriteTransaction(testRebase)))
+	t.Run("CreateSnapshotFromActive", makeTest(t, name, meta, inWriteTransaction(testCreateSnapshotFromActive)))
+	t.Run("CreateSnapshotFromActiveNotExist", makeTest(t, name, meta, inWriteTransaction(testCreateSnapshotFromActiveNotExist)))
+	t.Run("CreateSnapshotFromCommitted", makeTest(t, name, meta, inWriteTransaction(testCreateSnapshotFromCommitted)))
+	t.Run("CreateActiveFromSnapshot", makeTest(t, name, meta, inWriteTransaction(testCreateActiveFromSnapshot)))
+	t.Run("CreateActiveFromSnapshotNotExist", makeTest(t, name, meta, inWriteTransaction(testCreateActiveFromSnapshotNotExist)))
+	t.Run("CreateActiveFromNonSnapshot", makeTest(t, name, meta, inWriteTransaction(testCreateActiveFromNonSnapshot)))
+	t.Run("GetSnapshotKindSnapshot", makeTest(t, name, meta, inWriteTransaction(testGetSnapshotKindSnapshot)))
+	t.Run("RemoveSnapshot", makeTest(t, name, meta, inWriteTransaction(testRemoveSnapshot)))
+	t.Run("WalkWithSnapshot", makeTest(t, name, meta, inWriteTransaction(testWalkWithSnapshot)))
 }
 
 // makeTest creates a testsuite with a writable transaction
@@ -640,6 +649,188 @@ func testParents(ctx context.Context, t *testing.T, ms *MetaStore) {
 
 		}
 	}
+}
+
+func testCreateSnapshotFromActive(ctx context.Context, t *testing.T, ms *MetaStore) {
+	if err := basePopulate(ctx, ms); err != nil {
+		t.Fatalf("Populate failed: %+v", err)
+	}
+
+	// Create snapshot from active-2 which has parent "committed-1"
+	snap, err := CreateSnapshotFromActive(ctx, "snapshot-1", "active-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.Kind != snapshots.KindSnapshot {
+		t.Fatalf("Expected KindSnapshot, got %v", snap.Kind)
+	}
+
+	// Verify the snapshot has the same parent chain as the active
+	active, err := GetSnapshot(ctx, "active-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, active.ParentIDs, snap.ParentIDs)
+
+	// Verify info shows correct kind and parent
+	_, info, _, err := GetInfo(ctx, "snapshot-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, snapshots.KindSnapshot, info.Kind)
+	assert.Equal(t, "committed-1", info.Parent)
+
+	// Create snapshot from active-1 which has no parent
+	snap2, err := CreateSnapshotFromActive(ctx, "snapshot-2", "active-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap2.Kind != snapshots.KindSnapshot {
+		t.Fatalf("Expected KindSnapshot, got %v", snap2.Kind)
+	}
+	if len(snap2.ParentIDs) != 0 {
+		t.Fatalf("Expected no parents, got %d", len(snap2.ParentIDs))
+	}
+}
+
+func testCreateSnapshotFromActiveNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
+	_, err := CreateSnapshotFromActive(ctx, "snapshot-1", "does-not-exist")
+	assertNotExist(t, err)
+}
+
+func testCreateSnapshotFromCommitted(ctx context.Context, t *testing.T, ms *MetaStore) {
+	if err := basePopulate(ctx, ms); err != nil {
+		t.Fatalf("Populate failed: %+v", err)
+	}
+	// Trying to snapshot a committed snapshot should fail
+	_, err := CreateSnapshotFromActive(ctx, "snapshot-1", "committed-1")
+	assertNotActive(t, err)
+}
+
+func testCreateActiveFromSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
+	if err := basePopulate(ctx, ms); err != nil {
+		t.Fatalf("Populate failed: %+v", err)
+	}
+
+	// Create a KindSnapshot from active-3 (parent: committed-2)
+	snap, err := CreateSnapshotFromActive(ctx, "snapshot-1", "active-3")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Restore from that snapshot
+	restored, err := CreateActiveFromSnapshot(ctx, "restored-1", "snapshot-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restored.Kind != snapshots.KindActive {
+		t.Fatalf("Expected KindActive, got %v", restored.Kind)
+	}
+
+	// Verify the restored snapshot has the same parent chain
+	assert.Equal(t, snap.ParentIDs, restored.ParentIDs)
+
+	// Verify info shows correct kind and parent
+	_, info, _, err := GetInfo(ctx, "restored-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, snapshots.KindActive, info.Kind)
+	assert.Equal(t, "committed-2", info.Parent)
+}
+
+func testCreateActiveFromSnapshotNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
+	_, err := CreateActiveFromSnapshot(ctx, "restored-1", "does-not-exist")
+	assertNotExist(t, err)
+}
+
+func testCreateActiveFromNonSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
+	if err := basePopulate(ctx, ms); err != nil {
+		t.Fatalf("Populate failed: %+v", err)
+	}
+	// Trying to restore from an active snapshot should fail
+	_, err := CreateActiveFromSnapshot(ctx, "restored-1", "active-1")
+	assertNotActive(t, err)
+
+	// Trying to restore from a committed snapshot should fail
+	_, err = CreateActiveFromSnapshot(ctx, "restored-2", "committed-1")
+	assertNotActive(t, err)
+}
+
+func testGetSnapshotKindSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
+	if err := basePopulate(ctx, ms); err != nil {
+		t.Fatalf("Populate failed: %+v", err)
+	}
+
+	// Create a KindSnapshot
+	_, err := CreateSnapshotFromActive(ctx, "snapshot-1", "active-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// GetSnapshot should work for KindSnapshot
+	s, err := GetSnapshot(ctx, "snapshot-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, snapshots.KindSnapshot, s.Kind)
+}
+
+func testRemoveSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
+	if err := basePopulate(ctx, ms); err != nil {
+		t.Fatalf("Populate failed: %+v", err)
+	}
+
+	snap, err := CreateSnapshotFromActive(ctx, "snapshot-1", "active-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id, kind, err := Remove(ctx, "snapshot-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, snap.ID, id)
+	assert.Equal(t, snapshots.KindSnapshot, kind)
+
+	// Should no longer exist
+	_, _, _, err = GetInfo(ctx, "snapshot-1")
+	assertNotExist(t, err)
+}
+
+func testWalkWithSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
+	if err := basePopulate(ctx, ms); err != nil {
+		t.Fatalf("Populate failed: %+v", err)
+	}
+
+	_, err := CreateSnapshotFromActive(ctx, "snapshot-1", "active-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := map[string]snapshots.Info{}
+	err = WalkInfo(ctx, func(ctx context.Context, info snapshots.Info) error {
+		found[info.Name] = info
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// Verify snapshot-1 appears in walk results
+	si, ok := found["snapshot-1"]
+	assert.True(t, ok, "snapshot-1 should appear in walk results")
+	assert.Equal(t, snapshots.KindSnapshot, si.Kind)
+	assert.Equal(t, "committed-1", si.Parent)
+
+	// Verify filter by kind works
+	filtered := map[string]snapshots.Info{}
+	err = WalkInfo(ctx, func(ctx context.Context, info snapshots.Info) error {
+		filtered[info.Name] = info
+		return nil
+	}, "kind==snapshot")
+	assert.NoError(t, err)
+	assert.Len(t, filtered, 1)
+	_, ok = filtered["snapshot-1"]
+	assert.True(t, ok, "snapshot-1 should be only result when filtering by kind==snapshot")
 }
 
 func testRebase(ctx context.Context, t *testing.T, ms *MetaStore) {

@@ -189,8 +189,8 @@ func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
 		s.ID = strconv.FormatUint(readID(sbkt), 10)
 		s.Kind = readKind(sbkt)
 
-		if s.Kind != snapshots.KindActive && s.Kind != snapshots.KindView {
-			return fmt.Errorf("requested snapshot %v not active or view: %w", key, errdefs.ErrFailedPrecondition)
+		if s.Kind != snapshots.KindActive && s.Kind != snapshots.KindView && s.Kind != snapshots.KindSnapshot {
+			return fmt.Errorf("requested snapshot %v not active, view, or snapshot: %w", key, errdefs.ErrFailedPrecondition)
 		}
 
 		if parentKey := sbkt.Get(bucketKeyParent); len(parentKey) > 0 {
@@ -283,6 +283,158 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 
 		s.ID = strconv.FormatUint(id, 10)
 		s.Kind = kind
+		return nil
+	})
+	if err != nil {
+		return Snapshot{}, err
+	}
+
+	return
+}
+
+// CreateSnapshotFromActive creates a new KindSnapshot entry from an existing
+// active snapshot. The new snapshot shares the same committed parent as the
+// active snapshot. The provided context must contain a writable transaction.
+func CreateSnapshotFromActive(ctx context.Context, key, activeKey string, opts ...snapshots.Opt) (s Snapshot, err error) {
+	var base snapshots.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return Snapshot{}, err
+		}
+	}
+
+	err = createBucketIfNotExists(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+		abkt := bkt.Bucket([]byte(activeKey))
+		if abkt == nil {
+			return fmt.Errorf("active snapshot %q does not exist: %w", activeKey, errdefs.ErrNotFound)
+		}
+
+		if readKind(abkt) != snapshots.KindActive {
+			return fmt.Errorf("snapshot %q is not active: %w", activeKey, errdefs.ErrFailedPrecondition)
+		}
+
+		parent := string(abkt.Get(bucketKeyParent))
+
+		sbkt, err := bkt.CreateBucket([]byte(key))
+		if err != nil {
+			if err == errbolt.ErrBucketExists {
+				err = fmt.Errorf("snapshot %v: %w", key, errdefs.ErrAlreadyExists)
+			}
+			return err
+		}
+
+		id, err := bkt.NextSequence()
+		if err != nil {
+			return fmt.Errorf("unable to get identifier for snapshot %q: %w", key, err)
+		}
+
+		t := time.Now().UTC()
+		si := snapshots.Info{
+			Parent:  parent,
+			Kind:    snapshots.KindSnapshot,
+			Labels:  base.Labels,
+			Created: t,
+			Updated: t,
+		}
+		if err := putSnapshot(sbkt, id, si); err != nil {
+			return err
+		}
+
+		if parent != "" {
+			spbkt := bkt.Bucket([]byte(parent))
+			if spbkt == nil {
+				return fmt.Errorf("missing parent %q bucket: %w", parent, errdefs.ErrNotFound)
+			}
+			pid := readID(spbkt)
+
+			if err := pbkt.Put(parentKey(pid, id), []byte(key)); err != nil {
+				return fmt.Errorf("failed to write parent link for snapshot %q: %w", key, err)
+			}
+
+			s.ParentIDs, err = parents(bkt, spbkt, pid)
+			if err != nil {
+				return fmt.Errorf("failed to get parent chain for snapshot %q: %w", key, err)
+			}
+		}
+
+		s.ID = strconv.FormatUint(id, 10)
+		s.Kind = snapshots.KindSnapshot
+		return nil
+	})
+	if err != nil {
+		return Snapshot{}, err
+	}
+
+	return
+}
+
+// CreateActiveFromSnapshot creates a new KindActive entry from an existing
+// KindSnapshot. The new active snapshot shares the same committed parent as
+// the source snapshot. The provided context must contain a writable transaction.
+func CreateActiveFromSnapshot(ctx context.Context, key, snapshotKey string, opts ...snapshots.Opt) (s Snapshot, err error) {
+	var base snapshots.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return Snapshot{}, err
+		}
+	}
+
+	err = createBucketIfNotExists(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+		snapBkt := bkt.Bucket([]byte(snapshotKey))
+		if snapBkt == nil {
+			return fmt.Errorf("snapshot %q does not exist: %w", snapshotKey, errdefs.ErrNotFound)
+		}
+
+		if readKind(snapBkt) != snapshots.KindSnapshot {
+			return fmt.Errorf("snapshot %q is not a snapshot kind: %w", snapshotKey, errdefs.ErrFailedPrecondition)
+		}
+
+		parent := string(snapBkt.Get(bucketKeyParent))
+
+		sbkt, err := bkt.CreateBucket([]byte(key))
+		if err != nil {
+			if err == errbolt.ErrBucketExists {
+				err = fmt.Errorf("snapshot %v: %w", key, errdefs.ErrAlreadyExists)
+			}
+			return err
+		}
+
+		id, err := bkt.NextSequence()
+		if err != nil {
+			return fmt.Errorf("unable to get identifier for snapshot %q: %w", key, err)
+		}
+
+		t := time.Now().UTC()
+		si := snapshots.Info{
+			Parent:  parent,
+			Kind:    snapshots.KindActive,
+			Labels:  base.Labels,
+			Created: t,
+			Updated: t,
+		}
+		if err := putSnapshot(sbkt, id, si); err != nil {
+			return err
+		}
+
+		if parent != "" {
+			spbkt := bkt.Bucket([]byte(parent))
+			if spbkt == nil {
+				return fmt.Errorf("missing parent %q bucket: %w", parent, errdefs.ErrNotFound)
+			}
+			pid := readID(spbkt)
+
+			if err := pbkt.Put(parentKey(pid, id), []byte(key)); err != nil {
+				return fmt.Errorf("failed to write parent link for snapshot %q: %w", key, err)
+			}
+
+			s.ParentIDs, err = parents(bkt, spbkt, pid)
+			if err != nil {
+				return fmt.Errorf("failed to get parent chain for snapshot %q: %w", key, err)
+			}
+		}
+
+		s.ID = strconv.FormatUint(id, 10)
+		s.Kind = snapshots.KindActive
 		return nil
 	})
 	if err != nil {
@@ -645,6 +797,8 @@ func adaptSnapshot(info snapshots.Info) filters.Adaptor {
 				return "view", true
 			case snapshots.KindCommitted:
 				return "committed", true
+			case snapshots.KindSnapshot:
+				return "snapshot", true
 			}
 		case "name":
 			return info.Name, true

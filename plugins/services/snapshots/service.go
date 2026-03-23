@@ -253,6 +253,55 @@ func (s *service) Usage(ctx context.Context, ur *snapshotsapi.UsageRequest) (*sn
 	return proxy.UsageToProto(usage), nil
 }
 
+func (s *service) Snapshot(ctx context.Context, req *snapshotsapi.SnapshotRequest) (*ptypes.Empty, error) {
+	log.G(ctx).WithFields(log.Fields{"key": req.Key, "activeKey": req.ActiveKey, "snapshotter": req.Snapshotter}).Debugf("snapshot from active")
+	sn, err := s.getSnapshotter(req.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
+
+	sr, ok := sn.(snapshots.SnapshotRestorer)
+	if !ok {
+		return nil, errgrpc.ToGRPCf(errdefs.ErrNotImplemented, "snapshotter does not implement Snapshot method")
+	}
+
+	var opts []snapshots.Opt
+	if req.Labels != nil {
+		opts = append(opts, snapshots.WithLabels(req.Labels))
+	}
+	if err := sr.Snapshot(ctx, req.Key, req.ActiveKey, opts...); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	return empty, nil
+}
+
+func (s *service) Restore(ctx context.Context, req *snapshotsapi.RestoreRequest) (*snapshotsapi.RestoreResponse, error) {
+	log.G(ctx).WithFields(log.Fields{"key": req.Key, "snapshotKey": req.SnapshotKey, "snapshotter": req.Snapshotter}).Debugf("restore from snapshot")
+	sn, err := s.getSnapshotter(req.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
+
+	sr, ok := sn.(snapshots.SnapshotRestorer)
+	if !ok {
+		return nil, errgrpc.ToGRPCf(errdefs.ErrNotImplemented, "snapshotter does not implement Restore method")
+	}
+
+	var opts []snapshots.Opt
+	if req.Labels != nil {
+		opts = append(opts, snapshots.WithLabels(req.Labels))
+	}
+	mounts, err := sr.Restore(ctx, req.Key, req.SnapshotKey, opts...)
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+
+	return &snapshotsapi.RestoreResponse{
+		Mounts: mount.ToProto(mounts),
+	}, nil
+}
+
 func (s *service) Cleanup(ctx context.Context, cr *snapshotsapi.CleanupRequest) (*ptypes.Empty, error) {
 	sn, err := s.getSnapshotter(cr.Snapshotter)
 	if err != nil {
