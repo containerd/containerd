@@ -9,6 +9,9 @@ on:
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
+env:
+  GOTOOLCHAIN: local
+
 jobs:
   #
   # golangci-lint
