@@ -37,6 +37,8 @@ service Snapshots {
   rpc List(ListSnapshotsRequest) returns (stream ListSnapshotsResponse);
   rpc Usage(UsageRequest) returns (UsageResponse);
   rpc Cleanup(CleanupRequest) returns (google.protobuf.Empty);
+  rpc Snapshot(SnapshotRequest) returns (google.protobuf.Empty);
+  rpc Restore(RestoreRequest) returns (RestoreResponse);
 }
 
 message PrepareSnapshotRequest {
@@ -106,6 +108,7 @@ enum Kind {
   VIEW = 1;
   ACTIVE = 2;
   COMMITTED = 3;
+  SNAPSHOT = 4;
 }
 
 message Info {
@@ -178,4 +181,22 @@ message UsageResponse {
 
 message CleanupRequest {
   string snapshotter = 1;
+}
+
+message SnapshotRequest {
+  string snapshotter = 1;
+  string key = 2;
+  string active_key = 3;
+  map<string, string> labels = 4;
+}
+
+message RestoreRequest {
+  string snapshotter = 1;
+  string key = 2;
+  string snapshot_key = 3;
+  map<string, string> labels = 4;
+}
+
+message RestoreResponse {
+  repeated containerd.types.Mount mounts = 1;
 }
