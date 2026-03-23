@@ -555,6 +555,7 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 		Backoff: backoffConfig,
 	}
 	gopts := []grpc.DialOption{
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithConnectParams(connParams),
 		grpc.WithContextDialer(dialer.ContextDialer),
