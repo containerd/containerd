@@ -487,6 +487,52 @@ func TestPrivilegedBindMount(t *testing.T) {
 	}
 }
 
+func TestCgroupNamespace(t *testing.T) {
+	testPid := uint32(1234)
+	c := newTestCRIService()
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
+
+	tests := []struct {
+		desc                  string
+		privileged            bool
+		expectCgroupNamespace bool
+	}{
+		{
+			desc:                  "non-privileged container should get cgroup namespace",
+			privileged:            false,
+			expectCgroupNamespace: true,
+		},
+		{
+			desc:                  "privileged container should not get cgroup namespace",
+			privileged:            true,
+			expectCgroupNamespace: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			containerConfig.Linux.SecurityContext.Privileged = tt.privileged
+			sandboxConfig.Linux.SecurityContext.Privileged = tt.privileged
+
+			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			assert.NoError(t, err)
+
+			hasCgroupNS := false
+			for _, ns := range spec.Linux.Namespaces {
+				if ns.Type == runtimespec.CgroupNamespace {
+					hasCgroupNS = true
+					break
+				}
+			}
+
+			assert.Equal(t, tt.expectCgroupNamespace, hasCgroupNS)
+		})
+	}
+}
+
 func TestMountPropagation(t *testing.T) {
 
 	sharedLookupMountFn := func(string) (mount.Info, error) {
