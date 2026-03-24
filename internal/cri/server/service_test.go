@@ -47,6 +47,10 @@ func (f *fakeSandboxService) StartSandbox(ctx context.Context, sandboxer string,
 	return sandbox.ControllerInstance{}, errdefs.ErrNotImplemented
 }
 
+func (f *fakeSandboxService) UpdateSandbox(ctx context.Context, sandboxer string, sandboxID string, sandbox sandbox.Sandbox, fields ...string) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (f *fakeSandboxService) StopSandbox(ctx context.Context, sandboxer, sandboxID string, opts ...sandbox.StopOpt) error {
 	return errdefs.ErrNotImplemented
 }

@@ -53,6 +53,17 @@ func (f *fakeSandboxStore) Update(_ context.Context, sb sandbox.Sandbox, _ ...st
 	return sb, nil
 }
 
+type recordSandboxService struct {
+	fakeSandboxService
+	calledID  string
+	returnErr error
+}
+
+func (s *recordSandboxService) UpdateSandbox(_ context.Context, _ string, sandboxID string, _ sandbox.Sandbox, _ ...string) error {
+	s.calledID = sandboxID
+	return s.returnErr
+}
+
 func TestUpdatePodSandboxResources(t *testing.T) {
 	mySandbox := sstore.Metadata{
 		ID: "test-sandbox-id",
@@ -149,5 +160,64 @@ func TestUpdatePodSandboxResources(t *testing.T) {
 		require.NotNil(t, updatedRes.Resources)
 		assert.Equal(t, int64(100), updatedRes.Overhead.MemoryLimitInBytes)
 		assert.Equal(t, int64(200), updatedRes.Resources.CpuQuota)
+	})
+
+	t.Run("success fallback when sandbox controller does not implement update", func(t *testing.T) {
+		recordService := &recordSandboxService{returnErr: errdefs.ErrNotImplemented}
+		c := newTestCRIService(func(service *criService) {
+			service.sandboxService = recordService
+			client, _ := containerd.New("", containerd.WithServices(containerd.WithSandboxStore(&fakeSandboxStore{})))
+			service.client = client
+		})
+		s := sstore.NewSandbox(mySandbox, sstore.Status{})
+		c.sandboxStore.Add(s)
+
+		req := &runtime.UpdatePodSandboxResourcesRequest{
+			PodSandboxId: "test-sandbox-id",
+		}
+
+		_, err := c.UpdatePodSandboxResources(context.Background(), req)
+		require.NoError(t, err)
+
+		assert.Equal(t, "test-sandbox-id", recordService.calledID)
+	})
+
+	t.Run("success when sandbox controller implements update", func(t *testing.T) {
+		recordService := &recordSandboxService{returnErr: nil}
+		c := newTestCRIService(func(service *criService) {
+			service.sandboxService = recordService
+			client, _ := containerd.New("", containerd.WithServices(containerd.WithSandboxStore(&fakeSandboxStore{})))
+			service.client = client
+		})
+		s := sstore.NewSandbox(mySandbox, sstore.Status{})
+		c.sandboxStore.Add(s)
+
+		req := &runtime.UpdatePodSandboxResourcesRequest{
+			PodSandboxId: "test-sandbox-id",
+		}
+
+		_, err := c.UpdatePodSandboxResources(context.Background(), req)
+		require.NoError(t, err)
+
+		assert.Equal(t, "test-sandbox-id", recordService.calledID)
+	})
+
+	t.Run("fails when sandbox controller update fails", func(t *testing.T) {
+		recordService := &recordSandboxService{returnErr: errdefs.ErrInvalidArgument}
+		c := newTestCRIService(func(service *criService) {
+			service.sandboxService = recordService
+			client, _ := containerd.New("", containerd.WithServices(containerd.WithSandboxStore(&fakeSandboxStore{})))
+			service.client = client
+		})
+		s := sstore.NewSandbox(mySandbox, sstore.Status{})
+		c.sandboxStore.Add(s)
+
+		req := &runtime.UpdatePodSandboxResourcesRequest{
+			PodSandboxId: "test-sandbox-id",
+		}
+
+		_, err := c.UpdatePodSandboxResources(context.Background(), req)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), errdefs.ErrInvalidArgument.Error())
 	})
 }
