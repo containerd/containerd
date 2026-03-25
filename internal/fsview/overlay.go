@@ -84,15 +84,16 @@ func (o *overlayFS) Open(name string) (fs.File, error) {
 
 		f, err := layer.Open(name)
 		if err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				if firstErr == nil {
-					firstErr = err
-				}
+			// Path errors (not found, not a directory, etc.) are expected
+			// when a path doesn't resolve in a given layer. Only record
+			// non-path errors (e.g., I/O failures) for later reporting.
+			var pe *fs.PathError
+			if !errors.As(err, &pe) && firstErr == nil {
+				firstErr = err
 			}
 			continue
 		}
 
-		// Check if whiteout
 		fi, errStat := f.Stat()
 		if errStat != nil {
 			f.Close()
@@ -104,37 +105,15 @@ func (o *overlayFS) Open(name string) (fs.File, error) {
 
 		if isWhiteout(fi) {
 			f.Close()
-			// If we have accumulated directories, this whiteout hides lower layers for this path.
-			// Since we are at the same path, if we found a directory above, we wouldn't see a whiteout here?
-			// Actually, if upper is dir, we look for lower. Lower could be a whiteout?
-			// No, whiteout 0,0 is a character device file.
-			// If Upper is Dir, Lower is CharDev(0,0).
-			// Dir covers CharDev. So we shouldn't care if lower is whiteout if we already found a dir?
-			// Standard overlay: Whiteout hides things in *lower* layers.
-			// If we found a file/dir in Upper, we stop and return it.
-			// If we found a Dir in Upper, we want to merge with Lower Dir.
-			// If Lower is Whiteout, then Upper Dir "replaces" it? Or is it an opaque dir?
-			// "A whiteout marks a file or directory as deleted in lower layers."
-			// If I have Dir A in Upper, and Whiteout A in Lower1.
-			// Does A exist? Yes, as a directory. Does it merge with Lower2?
-			// Logic: Whiteout at Layer N hides Layer N+1...
-			// So if we found Dir at Layer N-1, does Whiteout at Layer N stop us looking at N+1?
-			// Yes.
+			// A whiteout hides this path in all lower layers.
+			// If we already found directories above, stop merging.
 			if len(dirLayers) > 0 {
 				break
 			}
 			return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 		}
 
-		if fi.IsDir() {
-			dirLayers = append(dirLayers, layer)
-			// Check opaque
-			if !opaque && isOpaque(f) {
-				opaque = true
-			}
-			f.Close()
-		} else {
-			// File found
+		if !fi.IsDir() {
 			if len(dirLayers) > 0 {
 				// Directory on upper covers file on lower
 				f.Close()
@@ -142,6 +121,13 @@ func (o *overlayFS) Open(name string) (fs.File, error) {
 			}
 			return f, nil
 		}
+
+		// Directory — accumulate for merging
+		dirLayers = append(dirLayers, layer)
+		if !opaque && isOpaque(f) {
+			opaque = true
+		}
+		f.Close()
 	}
 
 	if len(dirLayers) > 0 {
