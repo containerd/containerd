@@ -792,6 +792,14 @@ func (c *criService) buildLinuxSpec(
 		}
 	}()
 
+	// cgroupns is used for hiding /sys/fs/cgroup from containers.
+	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
+	// https://github.com/containers/libpod/issues/4363
+	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
+	if isUnifiedCgroupsMode() && !securityContext.GetPrivileged() {
+		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
+	}
+
 	var ociSpecOpts oci.SpecOpts
 	if ociRuntime.CgroupWritable {
 		ociSpecOpts = customopts.WithMountsCgroupWritable(c.os, config, extraMounts, mountLabel, runtimeHandler)
@@ -929,14 +937,6 @@ func (c *criService) buildLinuxSpec(
 		specOpts,
 		annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)...,
 	)
-
-	// cgroupns is used for hiding /sys/fs/cgroup from containers.
-	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
-	// https://github.com/containers/libpod/issues/4363
-	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
-	if isUnifiedCgroupsMode() && !securityContext.GetPrivileged() {
-		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
-	}
 
 	return specOpts, nil
 }
