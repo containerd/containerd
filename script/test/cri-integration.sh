@@ -46,6 +46,10 @@ CMD=""
 if [ -n "${sudo}" ]; then
   CMD+="${sudo} "
 fi
+CMD+="env "
+if [ -n "${RUNC_FLAVOR:-}" ]; then
+  CMD+="RUNC_FLAVOR=${RUNC_FLAVOR} "
+fi
 CMD+="${PWD}/bin/cri-integration.test"
 
 ${CMD} --test.run="${FOCUS}" --test.v \

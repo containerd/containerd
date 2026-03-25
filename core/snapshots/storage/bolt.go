@@ -418,7 +418,7 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 
 			// Updates parent back link to use new key
 			if err := pbkt.Put(parentKey(pid, id), []byte(name)); err != nil {
-				return fmt.Errorf("failed to update parent link %q from %q to %q: %w", pid, key, name, err)
+				return fmt.Errorf("failed to update parent link %v from %q to %q: %w", pid, key, name, err)
 			}
 		}
 
