@@ -19,9 +19,15 @@ package fsview
 import (
 	"errors"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"testing/fstest"
+
+	"github.com/containerd/containerd/v2/core/mount"
+	"golang.org/x/sys/unix"
 )
 
 func TestOverlayFS(t *testing.T) {
@@ -114,5 +120,71 @@ func TestOverlayFS(t *testing.T) {
 	}
 	if string(data) != "upper-file4" {
 		t.Errorf("expected upper-file4, got %s", data)
+	}
+}
+
+// TestOverlayFSDirReplacedByFile tests that when an upper layer replaces a
+// directory with a regular file, child paths return ErrNotExist rather than
+// a confusing "not a directory" error.
+func TestOverlayFSDirReplacedByFile(t *testing.T) {
+	base := t.TempDir()
+	layer1 := filepath.Join(base, "layer1")
+	layer2 := filepath.Join(base, "layer2")
+	layer3 := filepath.Join(base, "layer3")
+
+	// Layer 1: mkdir -p /dir1/dir2
+	if err := os.MkdirAll(filepath.Join(layer1, "dir1", "dir2"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Layer 2: touch /dir1/dir2/foo
+	if err := os.MkdirAll(filepath.Join(layer2, "dir1", "dir2"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(layer2, "dir1", "dir2", "foo"), []byte("foo"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Layer 3: rm -r /dir1 && mkdir -p /dir1 && touch /dir1/dir2
+	// (dir1 is opaque, dir2 is now a file instead of a directory)
+	if err := os.MkdirAll(filepath.Join(layer3, "dir1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := unix.Setxattr(filepath.Join(layer3, "dir1"), "user.overlay.opaque", []byte{'y'}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(layer3, "dir1", "dir2"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	lowerdir := strings.Join([]string{layer3, layer2, layer1}, ":")
+	v, err := FSMounts([]mount.Mount{
+		{
+			Type:   "overlay",
+			Source: "overlay",
+			Options: []string{
+				"lowerdir=" + lowerdir,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FSMounts failed: %v", err)
+	}
+	defer v.Close()
+
+	// dir1/dir2 should be a regular file (from layer3)
+	fi, err := fs.Stat(v, "dir1/dir2")
+	if err != nil {
+		t.Fatalf("stat dir1/dir2: %v", err)
+	}
+	if fi.IsDir() {
+		t.Fatal("expected dir1/dir2 to be a file, got directory")
+	}
+
+	// dir1/dir2/foo should not exist — and the error should be ErrNotExist,
+	// not a confusing "not a directory" error.
+	_, err = v.Open("dir1/dir2/foo")
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("expected dir1/dir2/foo to be ErrNotExist, got %v", err)
 	}
 }
