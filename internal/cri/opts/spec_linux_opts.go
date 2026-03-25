@@ -23,6 +23,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -71,11 +72,35 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 		if cgroupWritable {
 			mode = "rw"
 		}
+
+		cgroupOptions := []string{"nosuid", "noexec", "nodev", "relatime", mode}
+
+		hasCgroupNS := false
+		if s.Linux != nil {
+			hasCgroupNS = slices.ContainsFunc(s.Linux.Namespaces, func(ns runtimespec.LinuxNamespace) bool {
+				return ns.Type == runtimespec.CgroupNamespace
+			})
+		}
+
+		// If a container shares the host's cgroup namespace, mounting cgroup2
+		// inside the container applies the new mount options to the single shared
+		// cgroup2 VFS superblock. Therefore, explicitly copy these options from
+		// the host's /sys/fs/cgroup to avoid being stripped.
+		if !hasCgroupNS {
+			if mountInfo, err := osi.LookupMount("/sys/fs/cgroup"); err == nil {
+				for opt := range strings.SplitSeq(mountInfo.VFSOptions, ",") {
+					if opt == "nsdelegate" || opt == "memory_recursiveprot" {
+						cgroupOptions = append(cgroupOptions, opt)
+					}
+				}
+			}
+		}
+
 		s.Mounts = append(s.Mounts, runtimespec.Mount{
 			Source:      "cgroup",
 			Destination: "/sys/fs/cgroup",
 			Type:        "cgroup",
-			Options:     []string{"nosuid", "noexec", "nodev", "relatime", mode},
+			Options:     cgroupOptions,
 		})
 
 		// Copy all mounts from default mounts, except for

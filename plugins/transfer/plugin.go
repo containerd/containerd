@@ -123,13 +123,19 @@ func init() {
 					applier = inst.(diff.Applier)
 				} else {
 					var applierID string
-					for name, plugin := range ic.GetAll() {
+					for _, plugin := range ic.GetAll() {
 						if plugin.Registration.Type != plugins.DiffPlugin {
 							continue
 						}
 						var matched bool
-						for _, p := range plugin.Meta.Platforms {
-							if target.Match(p) {
+						for _, pd := range plugin.Meta.Platforms {
+							// Note that we must use the platforms supported by the differ to
+							// match the platform in `UnpackConfiguration`.
+							//
+							// For example, a differ might only support "linux/amd64", while
+							// the platform in `UnpackConfiguration` is "linux(+erofs)/amd64".
+							// If we reverse this logic, this wrong differ will be applied.
+							if platforms.Only(pd).Match(p) {
 								matched = true
 							}
 						}
@@ -152,7 +158,7 @@ func init() {
 						}
 						inst, err := plugin.Instance()
 						if err != nil {
-							return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", name, err)
+							return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", plugin.Registration.ID, err)
 						}
 						applier = inst.(diff.Applier)
 						applierID = plugin.Registration.ID
