@@ -347,6 +347,10 @@ type ImageConfig struct {
 	// When transfer service is used to pull images, pull related configs, like max_concurrent_downloads
 	// and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
 	UseLocalImagePull bool `toml:"use_local_image_pull" json:"useLocalImagePull"`
+
+	// ImageAutoImportNamespaces are additional namespaces that CRI should
+	// look into for images if they are not found in the CRI namespace.
+	ImageAutoImportNamespaces []string `toml:"image_auto_import_namespaces" json:"imageAutoImportNamespaces"`
 }
 
 // RuntimeConfig contains toml config related to CRI plugin,
