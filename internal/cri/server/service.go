@@ -78,6 +78,7 @@ type sandboxService interface {
 	CreateSandbox(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error
 	StartSandbox(ctx context.Context, sandboxer string, sandboxID string) (sandbox.ControllerInstance, error)
 	WaitSandbox(ctx context.Context, sandboxer string, sandboxID string) (<-chan containerd.ExitStatus, error)
+	UpdateSandbox(ctx context.Context, sandboxer string, sandboxID string, sandbox sandbox.Sandbox, fields ...string) error
 	StopSandbox(ctx context.Context, sandboxer, sandboxID string, opts ...sandbox.StopOpt) error
 	ShutdownSandbox(ctx context.Context, sandboxer string, sandboxID string) error
 	SandboxStatus(ctx context.Context, sandboxer string, sandboxID string, verbose bool) (sandbox.ControllerStatus, error)
