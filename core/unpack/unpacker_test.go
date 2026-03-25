@@ -19,8 +19,10 @@ package unpack
 import (
 	"crypto/rand"
 	"fmt"
+	"reflect"
 	"testing"
 
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 )
@@ -87,6 +89,90 @@ func BenchmarkUnpackWithChainIDs(b *testing.B) {
 			diffIDs := generateRandomDiffIDs(b, sz)
 			for i := 0; i < b.N; i++ {
 				unpackWithChainIDs(diffIDs)
+			}
+		})
+	}
+}
+
+func TestBindToOverlay(t *testing.T) {
+	testCases := []struct {
+		name   string
+		mounts []mount.Mount
+		expect []mount.Mount
+	}{
+		{
+			name: "single bind mount",
+			mounts: []mount.Mount{
+				{
+					Type:    "bind",
+					Source:  "/path/to/source",
+					Options: []string{"ro", "rbind"},
+				},
+			},
+			expect: []mount.Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"ro",
+						"upperdir=/path/to/source",
+					},
+				},
+			},
+		},
+		{
+			name: "overlay mount",
+			mounts: []mount.Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"lowerdir=/path/to/lower",
+						"upperdir=/path/to/upper",
+					},
+				},
+			},
+			expect: []mount.Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"lowerdir=/path/to/lower",
+						"upperdir=/path/to/upper",
+					},
+				},
+			},
+		},
+		{
+			name: "multiple mounts",
+			mounts: []mount.Mount{
+				{
+					Type:   "bind",
+					Source: "/path/to/source1",
+				},
+				{
+					Type:   "bind",
+					Source: "/path/to/source2",
+				},
+			},
+			expect: []mount.Mount{
+				{
+					Type:   "bind",
+					Source: "/path/to/source1",
+				},
+				{
+					Type:   "bind",
+					Source: "/path/to/source2",
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := bindToOverlay(tc.mounts)
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("unexpected result: got %v, want %v", result, tc.expect)
 			}
 		})
 	}
