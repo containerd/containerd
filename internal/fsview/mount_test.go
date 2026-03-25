@@ -19,6 +19,7 @@ package fsview
 import (
 	"context"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,6 +29,8 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/pkg/archive/tartest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFSMountsLast(t *testing.T) {
@@ -168,8 +171,8 @@ func TestFSMountsEROFSWithDevices(t *testing.T) {
 
 	v, err := FSMounts([]mount.Mount{
 		{
-			Type:   "erofs",
-			Source: metaPath,
+			Type:    "erofs",
+			Source:  metaPath,
 			Options: []string{"ro", "device=" + layer1Path, "device=" + layer2Path},
 		},
 	})
@@ -296,8 +299,8 @@ func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
 
 	v, err := FSMounts([]mount.Mount{
 		{
-			Type:   "erofs",
-			Source: metaPath,
+			Type:    "erofs",
+			Source:  metaPath,
 			Options: []string{"ro", "device=" + layer1Path, "device=" + layer2Path},
 		},
 		{
@@ -319,11 +322,11 @@ func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
 		path    string
 		content string
 	}{
-		{"dir/file1.txt", "file1 override"},     // upper overrides lower
-		{"dir/file2.txt", "file2 content"},       // from erofs layer 1
-		{"dir/file3.txt", "file3 content"},       // from erofs layer 2
-		{"dir/file4.txt", "file4 content"},       // from upper only
-		{"opaquedir/new.txt", "new content"},     // from erofs layer 2 (survives opaque)
+		{"dir/file1.txt", "file1 override"},  // upper overrides lower
+		{"dir/file2.txt", "file2 content"},   // from erofs layer 1
+		{"dir/file3.txt", "file3 content"},   // from erofs layer 2
+		{"dir/file4.txt", "file4 content"},   // from upper only
+		{"opaquedir/new.txt", "new content"}, // from erofs layer 2 (survives opaque)
 	} {
 		f, err := v.Open(tt.path)
 		if err != nil {
@@ -350,4 +353,35 @@ func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
 	if _, err := v.Open("opaquedir/old.txt"); err == nil {
 		t.Error("opaquedir/old.txt should not exist (opaque directory)")
 	}
+}
+
+// TestFormatMountIndexWithSuffix tests {{ mount }} templates that include a path suffix.
+func TestFormatMountIndexWithSuffix(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "root")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "etc"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "sub", "etc"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "etc", "passwd"), []byte("root\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "sub", "etc", "passwd"), []byte("guest\n"), 0644))
+
+	mounts := []mount.Mount{
+		{
+			Source: root,
+			Type:   "bind",
+		},
+		{
+			Type:   "format/overlay",
+			Source: "overlay",
+			Options: []string{
+				"lowerdir={{ mount 0 }}/sub",
+			},
+		},
+	}
+
+	viewFS, err := FSMounts(mounts)
+	require.NoError(t, err)
+	defer viewFS.Close()
+
+	data, err := fs.ReadFile(viewFS, "etc/passwd")
+	require.NoError(t, err)
+	assert.Equal(t, "guest\n", string(data))
 }

@@ -242,7 +242,10 @@ func openFormatMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 	}, nil
 }
 
-// handleOverlayFormat resolves formatted overlay values
+// handleOverlayFormat resolves formatted overlay values.
+// A value may be a plain path or contain Go template expressions
+// (e.g. "{{ mount 0 }}" or "{{ mount 0 }}/sub"). Any path suffix after the
+// closing "}}" is separated before execution and applied via fs.Sub.
 func handleOverlayFormat(s string, preceding []mount.Mount) ([]View, error) {
 	if !strings.Contains(s, "{{") {
 		// Only directories may be used for overlay
@@ -256,43 +259,59 @@ func handleOverlayFormat(s string, preceding []mount.Mount) ([]View, error) {
 		}}, nil
 	}
 
+	// Split "{{ ... }}/optional/suffix" into the template and suffix parts
+	// so that the suffix can be applied with fs.Sub after execution.
+	tmplExpr, suffix := splitTemplateSuffix(s)
+
 	var layers []View
+	addLayer := func(v View) {
+		layers = append(layers, v)
+	}
+	boundsCheck := func(i int) error {
+		if i < 0 || i >= len(preceding) {
+			return fmt.Errorf("index out of bounds: %d, has %d preceding mounts", i, len(preceding))
+		}
+		return nil
+	}
+
 	fm := template.FuncMap{
+		// source opens the raw Source path of the preceding mount,
+		// matching the real mount manager's a[i].Source behavior.
 		"source": func(i int) (string, error) {
-			if i < 0 || i >= len(preceding) {
-				return "", fmt.Errorf("index out of bounds: %d, has %d preceding mounts", i, len(preceding))
+			if err := boundsCheck(i); err != nil {
+				return "", err
 			}
-			v, err := mountToView(preceding[i], preceding[:i])
+			v, err := openPath(preceding[i].Source)
 			if err != nil {
 				return "", fmt.Errorf("failed to open source of mount %d: %w", i, err)
 			}
-			layers = append(layers, v)
+			addLayer(v)
 			return "", nil
 		},
+		// mount resolves the preceding mount into a full filesystem view,
+		// matching the real mount manager's a[i].MountPoint behavior.
 		"mount": func(i int) (string, error) {
-			if i < 0 || i >= len(preceding) {
-				return "", fmt.Errorf("index out of bounds: %d, has %d preceding mounts", i, len(preceding))
+			if err := boundsCheck(i); err != nil {
+				return "", err
 			}
 			v, err := mountToView(preceding[i], preceding[:i])
 			if err != nil {
-				return "", fmt.Errorf("failed to open source of mount %d: %w", i, err)
+				return "", fmt.Errorf("failed to resolve mount %d: %w", i, err)
 			}
-			layers = append(layers, v)
-
+			addLayer(v)
 			return "", nil
 		},
 		"overlay": func(start, end int) (string, error) {
 			i := start
 			for {
-				if i < 0 || i >= len(preceding) {
-					return "", fmt.Errorf("index out of bounds: %d, has %d preceding mounts", i, len(preceding))
+				if err := boundsCheck(i); err != nil {
+					return "", err
 				}
 				v, err := mountToView(preceding[i], preceding[:i])
 				if err != nil {
-					return "", fmt.Errorf("failed to open source of mount %d: %w", i, err)
+					return "", fmt.Errorf("failed to resolve mount %d: %w", i, err)
 				}
-				layers = append(layers, v)
-
+				addLayer(v)
 				if i == end {
 					break
 				}
@@ -306,7 +325,7 @@ func handleOverlayFormat(s string, preceding []mount.Mount) ([]View, error) {
 		},
 	}
 
-	t, err := template.New("").Funcs(fm).Parse(s)
+	t, err := template.New("").Funcs(fm).Parse(tmplExpr)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +336,33 @@ func handleOverlayFormat(s string, preceding []mount.Mount) ([]View, error) {
 		}
 		return nil, err
 	}
+
+	if suffix != "" {
+		for i, l := range layers {
+			subFS, err := fs.Sub(l, suffix)
+			if err != nil {
+				for _, l := range layers {
+					l.Close()
+				}
+				return nil, fmt.Errorf("failed to create sub view for path %q: %w", suffix, err)
+			}
+			layers[i] = view{FS: subFS, cleanup: l.Close}
+		}
+	}
+
 	return layers, nil
+}
+
+// splitTemplateSuffix splits a template string like "{{ mount 0 }}/sub/path"
+// into the template expression and the trailing path suffix.
+func splitTemplateSuffix(s string) (string, string) {
+	i := strings.LastIndex(s, "}}")
+	if i < 0 {
+		return s, ""
+	}
+	tmpl := s[:i+2]
+	suffix := strings.TrimPrefix(s[i+2:], "/")
+	return tmpl, suffix
 }
 
 func getOverlayFSLayers(options []string) ([]View, error) {
