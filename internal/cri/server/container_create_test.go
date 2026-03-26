@@ -19,7 +19,6 @@ package server
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	goruntime "runtime"
 	"testing"
@@ -70,7 +69,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
-	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+	spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -145,7 +144,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			ociRuntime := config.Runtime{
 				PodAnnotations: test.podAnnotations,
 			}
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -507,7 +506,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations:       test.podAnnotations,
 				ContainerAnnotations: test.containerAnnotations,
 			}
-			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.buildContainerSpec(t.Context(), currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -530,6 +529,7 @@ func TestBaseRuntimeSpec(t *testing.T) {
 	}))
 
 	out, err := c.runtimeSpec(
+		t.Context(),
 		"id1",
 		platforms.DefaultSpec(),
 		"/etc/containerd/cri-base.json",
@@ -563,7 +563,7 @@ func TestLinuxContainerMounts(t *testing.T) {
 
 	for _, test := range []struct {
 		desc            string
-		statFn          func(string) (os.FileInfo, error)
+		statFn          func(context.Context, string) error
 		criMounts       []*runtime.Mount
 		securityContext *runtime.LinuxContainerSecurityContext
 		expectedMounts  []*runtime.Mount
@@ -730,17 +730,17 @@ func TestLinuxContainerMounts(t *testing.T) {
 		},
 		{
 			desc: "should skip sandbox mounts if the old sandbox doesn't have sandbox file",
-			statFn: func(path string) (os.FileInfo, error) {
+			statFn: func(ctx context.Context, path string) error {
 				sandboxRootDir := filepath.Join(testRootDir, sandboxesDir, testSandboxID)
 				sandboxStateDir := filepath.Join(testStateDir, sandboxesDir, testSandboxID)
 				switch path {
 				case filepath.Join(sandboxRootDir, "hostname"), filepath.Join(sandboxRootDir, "hosts"),
 					filepath.Join(sandboxRootDir, "resolv.conf"), filepath.Join(sandboxStateDir, "shm"):
-					return nil, errors.New("random error")
+					return errors.New("random error")
 				default:
 					t.Fatalf("expected sandbox files, got: %s", path)
 				}
-				return nil, nil
+				return nil
 			},
 			securityContext: &runtime.LinuxContainerSecurityContext{},
 			expectedMounts:  nil,
@@ -759,7 +759,7 @@ func TestLinuxContainerMounts(t *testing.T) {
 			}
 			c := newTestCRIService()
 			c.os.(*ostesting.FakeOS).StatFn = test.statFn
-			mounts := c.linuxContainerMounts(testSandboxID, config)
+			mounts := c.linuxContainerMounts(t.Context(), testSandboxID, config)
 			assert.Equal(t, test.expectedMounts, mounts, test.desc)
 		})
 	}
