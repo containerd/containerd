@@ -233,7 +233,8 @@ type Debug struct {
 	GID     int    `toml:"gid"`
 	Level   string `toml:"level"`
 	// Format represents the logging format. Supported values are 'text' and 'json'.
-	Format string `toml:"format"`
+	Format     string `toml:"format"`
+	LogTraceID bool   `toml:"log_trace_id"`
 }
 
 // MetricsConfig provides metrics configuration
