@@ -178,6 +178,13 @@ func setGLogLevel() error {
 	l := log.GetLevel()
 	fs := flag.NewFlagSet("klog", flag.PanicOnError)
 	klog.InitFlags(fs)
+	// Opt into fixed stderrthreshold behavior (kubernetes/klog#212).
+	if err := fs.Set("legacy_stderr_threshold_behavior", "false"); err != nil {
+		return err
+	}
+	if err := fs.Set("stderrthreshold", "INFO"); err != nil {
+		return err
+	}
 	if err := fs.Set("logtostderr", "true"); err != nil {
 		return err
 	}
