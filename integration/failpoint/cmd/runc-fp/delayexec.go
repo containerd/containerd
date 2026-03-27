@@ -26,6 +26,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -49,6 +50,29 @@ func delayExec(ctx context.Context, method invoker) error {
 	if err := delay(); err != nil {
 		return err
 	}
+	if err := method(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func delayUpdate(ctx context.Context, method invoker) error {
+	isUpdate := strings.Contains(strings.Join(os.Args, ","), ",update,")
+	if !isUpdate {
+		if err := method(ctx); err != nil {
+			return err
+		}
+		return nil
+	}
+	logrus.Debug("UPDATE!")
+	time.Sleep(time.Second * 3)
+	if err := method(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func doNothing(ctx context.Context, method invoker) error {
 	if err := method(ctx); err != nil {
 		return err
 	}
