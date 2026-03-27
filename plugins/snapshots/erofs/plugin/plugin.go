@@ -42,6 +42,9 @@ type Config struct {
 	// MountOptions are options used for the EROFS overlayfs mount
 	OvlOptions []string `toml:"ovl_mount_options"`
 
+	// RwlOptions are options used for the rwlayer mount
+	RwlOptions []string `toml:"rwl_mount_options"`
+
 	// EnableFsverity enables fsverity for EROFS layers
 	// Linux only
 	EnableFsverity bool `toml:"enable_fsverity"`
@@ -77,6 +80,10 @@ func init() {
 
 			if len(config.OvlOptions) > 0 {
 				opts = append(opts, erofs.WithOvlOptions(config.OvlOptions))
+			}
+
+			if len(config.RwlOptions) > 0 {
+				opts = append(opts, erofs.WithRwlOptions(config.RwlOptions))
 			}
 
 			if config.EnableFsverity {
