@@ -614,6 +614,38 @@ func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*pt
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if r.ID == shim.ID {
+		for id, container := range s.containers {
+			if id != shim.ID && runc.ShouldKillAllOnExit(ctx, container.Bundle) {
+				if p, err := container.Process(""); err == nil {
+					if err = p.(*process.Init).KillAll(ctx); err != nil {
+						log.G(ctx).WithError(err).Errorf("failed to kill container id is %s", p.ID())
+					}
+					if err = p.(*process.Init).Runtime().Delete(ctx, id, &runcC.DeleteOpts{
+						Force: true,
+					}); err != nil {
+						log.G(ctx).WithError(err).Errorf("failed to delete container id is %s", p.ID())
+						continue
+					}
+				}
+				delete(s.containers, id)
+			}
+		}
+		if podContainer := s.containers[shim.ID]; podContainer != nil {
+			if p, err := podContainer.Process(""); err == nil {
+				if err = p.(*process.Init).KillAll(ctx); err != nil {
+					log.G(ctx).WithError(err).Errorf("failed to kill container id is %s", p.ID())
+				}
+				if err = p.(*process.Init).Runtime().Delete(ctx, shim.ID, &runcC.DeleteOpts{
+					Force: true,
+				}); err != nil {
+					log.G(ctx).WithError(err).Errorf("failed to delete container id is %s", p.ID())
+				}
+			}
+			delete(s.containers, shim.ID)
+		}
+	}
+
 	// return out if the shim is still servicing containers
 	if len(s.containers) > 0 {
 		return empty, nil
