@@ -410,7 +410,7 @@ func (c *criService) ensurePauseImageExists(ctx context.Context, config *runtime
 		return fmt.Errorf("failed to get image %q: %w", ref, err)
 	}
 
-	_, err = c.ImageService.PullImage(ctx, ref, nil, config, runtimeHandler)
+	_, err = c.ImageService.PullImage(ctx, ref, nil, "", config, runtimeHandler)
 	if err != nil {
 		return fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
