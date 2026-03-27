@@ -355,3 +355,40 @@ func Load(set *FIFOSet) (IO, error) {
 func (p *pipes) closers() []io.Closer {
 	return []io.Closer{p.Stdin, p.Stdout, p.Stderr}
 }
+
+type StdinCloser struct {
+	stdin  *os.File
+	mutex  *sync.Mutex
+	closed bool
+	closer func()
+}
+
+func NewStdinCloser(stdin *os.File) *StdinCloser {
+	return &StdinCloser{
+		stdin: stdin,
+		mutex: &sync.Mutex{},
+	}
+}
+
+func (s *StdinCloser) SetCloser(closer func()) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.closer = closer
+	if s.closed {
+		s.closer()
+	}
+}
+
+func (s *StdinCloser) Read(p []byte) (int, error) {
+	n, err := s.stdin.Read(p)
+	if err == io.EOF {
+		s.mutex.Lock()
+		defer s.mutex.Unlock()
+		s.closed = true
+		if s.closer != nil {
+			s.closer()
+		}
+	}
+	return n, err
+}
