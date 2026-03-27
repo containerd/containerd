@@ -18,22 +18,26 @@ package images
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/transfer"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"golang.org/x/sync/semaphore"
 
-	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -58,6 +62,8 @@ type CRIImageService struct {
 	// images is the lower level image store used for raw storage,
 	// no event publishing should currently be assumed
 	images images.Store
+	// content is the lower level content store used for raw storage.
+	content content.Store
 	// client is a subset of the containerd client
 	// and will be replaced by image store and transfer service
 	client imageClient
@@ -69,6 +75,8 @@ type CRIImageService struct {
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
 	snapshotStore *snapshotstore.Store
+	// leases is the lease manager.
+	leases leases.Manager
 	// transferrer is used to pull image with transfer service
 	transferrer transfer.Transferrer
 	// unpackDuplicationSuppressor is used to make sure that there is only
@@ -95,6 +103,8 @@ type CRIImageServiceOptions struct {
 
 	Snapshotters map[string]snapshots.Snapshotter
 
+	Leases leases.Manager
+
 	Client imageClient
 
 	Transferrer transfer.Transferrer
@@ -118,11 +128,13 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	svc := CRIImageService{
 		config:                      config,
 		images:                      options.Images,
+		content:                     options.Content,
 		client:                      options.Client,
 		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
 		snapshotStore:               snapshotstore.NewStore(),
+		leases:                      options.Leases,
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
 		downloadLimiter:             downloadLimiter,
@@ -158,31 +170,147 @@ func (c *CRIImageService) UpdateRuntimeSnapshotter(runtimeName string, imagePlat
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It
 // returns errdefs.ErrNotFound if the reference doesn't exist.
 func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
-	getImageID := func(refOrId string) string {
-		if _, err := imagedigest.Parse(refOrID); err == nil {
-			return refOrID
+	var imageID string
+	if _, err := imagedigest.Parse(refOrID); err == nil {
+		imageID = refOrID
+	} else {
+		// ref is not image id, try to resolve it locally.
+		// We use Resolve method of image store which handles normalization.
+		id, err := c.imageStore.Resolve(refOrID)
+		if err != nil {
+			// Not found as name, try to treat ref as imageID
+			imageID = refOrID
+		} else {
+			imageID = id
 		}
-		return func(ref string) string {
-			// ref is not image id, try to resolve it locally.
-			// TODO(random-liu): Handle this error better for debugging.
-			normalized, err := docker.ParseDockerRef(ref)
-			if err != nil {
-				return ""
-			}
-			id, err := c.imageStore.Resolve(normalized.String())
-			if err != nil {
-				return ""
-			}
-			return id
-		}(refOrID)
 	}
 
-	imageID := getImageID(refOrID)
-	if imageID == "" {
-		// Try to treat ref as imageID
-		imageID = refOrID
+	img, err := c.imageStore.Get(imageID)
+	if err == nil {
+		return img, nil
 	}
-	return c.imageStore.Get(imageID)
+	if !errdefs.IsNotFound(err) {
+		return imagestore.Image{}, err
+	}
+
+	// Not found in default namespace, search additional namespaces.
+	// This "auto-import" logic allows CRI to discover images from other namespaces and
+	// "own" them by copying their metadata to the CRI namespace.
+	if len(c.config.ImageAutoImportNamespaces) > 0 {
+		log.L.Debugf("Image %q not found in CRI namespace, searching additional namespaces: %v", refOrID, c.config.ImageAutoImportNamespaces)
+		for _, ns := range c.config.ImageAutoImportNamespaces {
+			ctx := namespaces.WithNamespace(context.Background(), ns)
+			var otherImg images.Image
+			if _, err := imagedigest.Parse(refOrID); err == nil {
+				// Search by digest in the source namespace.
+				imageList, err := c.images.List(ctx, fmt.Sprintf("target.digest==%s", refOrID))
+				if err != nil || len(imageList) == 0 {
+					continue
+				}
+				otherImg = imageList[0]
+			} else {
+				otherImg, err = c.images.Get(ctx, refOrID)
+				if err != nil {
+					log.L.Debugf("Image %q not found in namespace %q: %v", refOrID, ns, err)
+					continue
+				}
+			}
+
+			log.L.Infof("Found image %q in additional namespace %q, importing to CRI", refOrID, ns)
+			// Found image in another namespace, import it.
+			//
+			// CONCURRENCY & RACE CONDITION SAFETY:
+			// We need to protect against the image's content (blobs/layers) being garbage collected
+			// between us finding the image in the source namespace and successfully creating the
+			// metadata record in the CRI namespace.
+			//
+			// 1. WHY WE LEASE:
+			//    In containerd, content is kept alive by references (like image records) or leases.
+			//    If the image is deleted from the source namespace (`ns`) right after we find it,
+			//    and no other references exist, the Garbage Collector (GC) would be free to delete
+			//    the blobs.
+			//
+			// 2. HOW IT INTERACTS WITH OTHER OPERATIONS:
+			//    - DELETE: A typical `images.Delete` operation just removes the metadata reference.
+			//      It doesn't check for leases on the content it's "releasing". The GC is what
+			//      eventually checks all references and leases before deleting content.
+			//    - CREATE/UPDATE: These operations add/modify references. `images.Create` in
+			//      BoltDB is atomic.
+			//    - GC: By creating a lease in the CRI namespace and adding the content digest to it,
+			//      we ensure that even if all references in the source namespace are deleted,
+			//      the GC will see our active lease and skip these blobs.
+			//
+			// 3. LIFECYCLE:
+			//    Once `c.images.Create` succeeds and the transaction is committed, a permanent
+			//    metadata reference now exists in the CRI namespace.
+			log.L.Infof("Found image %q in additional namespace %q, importing to CRI", refOrID, ns)
+			criCtx := util.NamespacedContext()
+
+			// 1. Create a temporary lease to protect the content from GC during import.
+			// This ensures that even if the image is deleted from the source namespace
+			// while we are working, the blobs remain available.
+			lease, err := c.leases.Create(criCtx, leases.WithRandomID(), leases.WithExpiration(1*time.Minute))
+			if err != nil {
+				log.L.WithError(err).Warn("failed to create temporary lease for image auto-import, skipping this namespace")
+				continue
+			}
+			defer func() {
+				if err := c.leases.Delete(criCtx, lease); err != nil {
+					log.L.WithError(err).Warn("failed to delete temporary lease")
+				}
+			}()
+
+			// 2. Add the image manifest to the lease.
+			// This protects the manifest and all its children (layers, config) from GC.
+			if err := c.leases.AddResource(criCtx, lease, leases.Resource{
+				ID:   otherImg.Target.Digest.String(),
+				Type: "content",
+			}); err != nil {
+				log.L.WithError(err).Warn("failed to add resource to temporary lease, skipping this namespace")
+				continue
+			}
+
+			// Add metadata indicating the source of the image auto-import.
+			if otherImg.Labels == nil {
+				otherImg.Labels = make(map[string]string)
+			}
+			otherImg.Labels["io.containerd.cri.image-auto-import/source-namespace"] = ns
+			otherImg.Labels["io.containerd.cri.image-auto-import/imported-at"] = time.Now().UTC().Format(time.RFC3339)
+
+			// 3. Concurrent Imports: If multiple requests try to import the same image simultaneously,
+			//    containerd's metadata store (BoltDB) ensures atomicity. One `images.Create` will
+			//    succeed, and others will receive `errdefs.ErrAlreadyExists`. We handle this by
+			//    falling back to `images.Get`.
+			imported, err := c.images.Create(criCtx, otherImg)
+			if err != nil {
+				if !errdefs.IsAlreadyExists(err) {
+					log.L.WithError(err).Warnf("failed to import image %q from namespace %q", otherImg.Name, ns)
+					continue
+				}
+				// If it already exists (e.g., due to a race), just get the existing record.
+				imported, err = c.images.Get(criCtx, otherImg.Name)
+				if err != nil {
+					continue
+				}
+			}
+
+			// Update the internal in-memory CRI image store to reflect the new local metadata.
+			if err := c.imageStore.Update(criCtx, imported.Name); err != nil {
+				log.L.WithError(err).Warnf("failed to update image store for imported image %q", imported.Name)
+				continue
+			}
+
+			id, err := c.imageStore.Resolve(imported.Name)
+			if err != nil {
+				log.L.WithError(err).Warnf("failed to resolve image id for imported image %q", imported.Name)
+				continue
+			}
+
+			return c.imageStore.Get(id)
+		}
+	}
+
+	return imagestore.Image{}, errdefs.ErrNotFound
 }
 
 // RuntimeSnapshotter overrides the default snapshotter if Snapshotter is set for this runtime.
@@ -224,3 +352,4 @@ func (c *CRIImageService) Config() criconfig.ImageConfig {
 func (c *CRIImageService) GRPCService() runtime.ImageServiceServer {
 	return &GRPCCRIImageService{c}
 }
+

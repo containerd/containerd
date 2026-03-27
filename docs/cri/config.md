@@ -85,6 +85,16 @@ version = 2
 
 See [here](https://github.com/containerd/containerd/blob/main/docs/snapshotters) for other supported snapshotters.
 
+### Image auto-import namespaces
+
+The `image_auto_import_namespaces` setting allows CRI to discover and "auto-import" images from other containerd namespaces. When an image is not found in the primary CRI namespace (usually `k8s.io`), CRI will look into these additional namespaces. If found, the image metadata is copied to the CRI namespace, ensuring it remains available even if deleted from the source namespace.
+
+```toml
+version = 3
+[plugins.'io.containerd.cri.v1.images']
+  image_auto_import_namespaces = ["moby"]
+```
+
 ### Runtime classes
 
 The following example registers custom runtimes into containerd:
@@ -200,6 +210,7 @@ There are some differences in how image pull configurations are specified betwee
 | MaxConcurrentDownloads | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
 | ImagePullWithSyncFs | ✅ Supported | ❌ Not Supported |
 | StatsCollectPeriod | ✅ Supported | ✅ Supported |
+| ImageAutoImportNamespaces | ✅ Supported | ✅ Supported |
 
 To ensure compatibility, ***containerd 2.1 automatically detects configuration conflicts and falls back to local image pull mode when necessary***.
 
@@ -242,6 +253,7 @@ version = 3
     image_pull_with_sync_fs = false
     stats_collect_period = 10
     use_local_image_pull = false
+    image_auto_import_namespaces = []
 
     [plugins.'io.containerd.cri.v1.images'.pinned_images]
       sandbox = 'registry.k8s.io/pause:3.10.1'

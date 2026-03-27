@@ -33,13 +33,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/log/logtest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
+	coreimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/defaults"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -67,6 +71,79 @@ func TestCRIImagePullTimeout(t *testing.T) {
 	t.Run("NoDataTransferredWithTransferService", testCRIImagePullTimeoutByNoDataTransferredWithTransfer)
 	t.Run("SlowCommitWriterWithLocalPull", testCRIImagePullTimeoutBySlowCommitWriterWithLocal)
 	t.Run("SlowCommitWriterWithTransferService", testCRIImagePullTimeoutBySlowCommitWriterWithTransfer)
+}
+
+func TestCRIImageAutoImport(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip()
+	}
+
+	const (
+		sourceNamespace = "auto-import-source"
+		testImage       = "ghcr.io/containerd/volume-ownership:2.1"
+	)
+
+	tmpDir := t.TempDir()
+	// Use a clean client without default namespace to ensure we can pull into any namespace.
+	cli, err := containerd.New(containerdEndpoint)
+	require.NoError(t, err)
+	defer cli.Close()
+
+	// 1. Pull image into a non-CRI namespace.
+	sourceCtx := namespaces.WithNamespace(context.Background(), sourceNamespace)
+	_, err = cli.Pull(sourceCtx, testImage, containerd.WithPullUnpack)
+	require.NoError(t, err)
+	defer func() {
+		_ = cli.ImageService().Delete(sourceCtx, testImage, coreimages.SynchronousDelete())
+	}()
+
+	// Verify it exists in source namespace
+	_, err = cli.ImageService().Get(sourceCtx, testImage)
+	require.NoError(t, err)
+
+	// 2. Initialize CRI image service with auto-import namespaces.
+	cfg := criconfig.ImageConfig{
+		Snapshotter:               defaults.DefaultSnapshotter,
+		ImageAutoImportNamespaces: []string{sourceNamespace},
+		StatsCollectPeriod:        10,
+		ImagePullProgressTimeout:  defaultImagePullProgressTimeout.String(),
+	}
+	criService, err := images.NewService(cfg, &images.CRIImageServiceOptions{
+		ImageFSPaths: map[string]string{
+			defaults.DefaultSnapshotter: filepath.Join(tmpDir, "root"),
+		},
+		RuntimePlatforms: map[string]images.ImagePlatform{},
+		Content:          cli.ContentStore(),
+		Images:           cli.ImageService(),
+		Leases:           cli.LeasesService(),
+		Client:           cli,
+		Transferrer:      cli.TransferService(),
+	})
+	require.NoError(t, err)
+
+	// 3. Verify it's not yet in CRI namespace.
+	criCtx := namespaces.WithNamespace(context.Background(), k8sNamespace)
+	_, err = cli.ImageService().Get(criCtx, testImage)
+	require.Error(t, err)
+	assert.True(t, errdefs.IsNotFound(err))
+
+	// 4. Resolve image in CRI namespace (this should trigger auto-import).
+	// ImageStatus calls LocalResolve which has the auto-import logic.
+	_, err = criService.ImageStatus(criCtx, &runtimeapi.ImageStatusRequest{
+		Image: &runtimeapi.ImageSpec{Image: testImage},
+	})
+	require.NoError(t, err)
+
+	// 5. Verify it now exists in CRI namespace.
+	img, err := cli.ImageService().Get(criCtx, testImage)
+	require.NoError(t, err)
+	assert.Equal(t, testImage, img.Name)
+	assert.Equal(t, sourceNamespace, img.Labels["io.containerd.cri.image-auto-import/source-namespace"])
+	assert.NotEmpty(t, img.Labels["io.containerd.cri.image-auto-import/imported-at"])
+
+	// Cleanup
+	err = cli.ImageService().Delete(criCtx, testImage, coreimages.SynchronousDelete())
+	assert.NoError(t, err)
 }
 
 // testCRIImagePullTimeoutBySlowCommitWriter tests that
@@ -523,6 +600,7 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 		RuntimePlatforms: map[string]images.ImagePlatform{},
 		Content:          client.ContentStore(),
 		Images:           client.ImageService(),
+		Leases:           client.LeasesService(),
 		Client:           client,
 		Transferrer:      client.TransferService(),
 	})

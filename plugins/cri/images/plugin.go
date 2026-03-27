@@ -24,6 +24,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/transfer"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -88,6 +89,11 @@ func init() {
 				criconfig.CheckLocalImagePullConfigs(ic.Context, &config)
 			}
 
+			ls, err := ic.GetSingle(plugins.LeasePlugin)
+			if err != nil {
+				return nil, err
+			}
+
 			ts, err := ic.GetSingle(plugins.TransferPlugin)
 			if err != nil {
 				return nil, err
@@ -98,6 +104,7 @@ func init() {
 				RuntimePlatforms: map[string]images.ImagePlatform{},
 				Snapshotters:     map[string]snapshots.Snapshotter{},
 				ImageFSPaths:     map[string]string{},
+				Leases:           ls.(leases.Manager),
 				Transferrer:      ts.(transfer.Transferrer),
 			}
 
