@@ -378,12 +378,14 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		log.G(r.ctx).Infof("Logging will be disabled due to empty log paths for sandbox (%q) or container (%q)",
 			r.podSandboxConfig.GetLogDirectory(), r.containerConfig.GetLogPath())
 	}
-
+	r.meta.IOType = ociRuntime.IOType
 	var containerIO *cio.ContainerIO
 	switch ociRuntime.IOType {
 	case criconfig.IOTypeStreaming:
 		containerIO, err = cio.NewContainerIO(r.containerID,
 			cio.WithStreams(r.sandbox.Endpoint.Address, r.containerConfig.GetTty(), r.containerConfig.GetStdin()))
+	case criconfig.IOTypeFile:
+		break
 	default:
 		containerIO, err = cio.NewContainerIO(r.containerID,
 			cio.WithNewFIFOs(volatileContainerRootDir, r.containerConfig.GetTty(), r.containerConfig.GetStdin()))
@@ -393,8 +395,10 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	}
 	defer func() {
 		if retErr != nil {
-			if err := containerIO.Close(); err != nil {
-				log.G(r.ctx).WithError(err).Errorf("Failed to close container io %q", r.containerID)
+			if containerIO != nil {
+				if err := containerIO.Close(); err != nil {
+					log.G(r.ctx).WithError(err).Errorf("Failed to close container io %q", r.containerID)
+				}
 			}
 		}
 	}()
@@ -448,11 +452,19 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 
 	status := containerstore.Status{CreatedAt: time.Now().UnixNano(), Restore: r.restore}
 	status = copyResourcesToStatus(spec, status)
-	container, err := containerstore.NewContainer(*r.meta,
-		containerstore.WithStatus(status, containerRootDir),
-		containerstore.WithContainer(cntr),
-		containerstore.WithContainerIO(containerIO),
-	)
+	var container containerstore.Container
+	if ociRuntime.IOType == criconfig.IOTypeFile {
+		container, err = containerstore.NewContainer(*r.meta,
+			containerstore.WithStatus(status, containerRootDir),
+			containerstore.WithContainer(cntr),
+		)
+	} else {
+		container, err = containerstore.NewContainer(*r.meta,
+			containerstore.WithStatus(status, containerRootDir),
+			containerstore.WithContainer(cntr),
+			containerstore.WithContainerIO(containerIO),
+		)
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to create internal container object for %q: %w", r.containerID, err)
 	}

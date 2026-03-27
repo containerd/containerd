@@ -48,6 +48,7 @@ service Task {
   rpc Stats(StatsRequest) returns (StatsResponse);
   rpc Connect(ConnectRequest) returns (ConnectResponse);
   rpc Shutdown(ShutdownRequest) returns (google.protobuf.Empty);
+  rpc ReOpenLog(ReOpenLogRequest) returns (google.protobuf.Empty);
 }
 
 message CreateTaskRequest {
@@ -196,5 +197,9 @@ message PauseRequest {
 }
 
 message ResumeRequest {
+  string id = 1;
+}
+
+message ReOpenLogRequest {  
   string id = 1;
 }

@@ -409,6 +409,13 @@ func (c *Container) ResizePty(ctx context.Context, r *task.ResizePtyRequest) err
 	return p.Resize(ws)
 }
 
+func (c *Container) ReOpenLog(ctx context.Context, r *task.ReOpenLogRequest) error {
+	if c.process.(*process.Init).IO().File() == nil {
+		return fmt.Errorf("process reopen log file is nil")
+	}
+	return c.process.(*process.Init).IO().File().Reopen()
+}
+
 // Kill a process
 func (c *Container) Kill(ctx context.Context, r *task.KillRequest) error {
 	p, err := c.Process(r.ExecID)
