@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -164,7 +165,9 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	// task from containerd after it handles the Exited event.
 	if timeout > 0 {
 		stopSignal := "SIGTERM"
-		if container.StopSignal != "" {
+		if signal := container.Config.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
+			stopSignal = convertFromCRISignal(signal.String())
+		} else if container.StopSignal != "" {
 			stopSignal = container.StopSignal
 		} else {
 			// The image may have been deleted, and the `StopSignal` field is
@@ -264,4 +267,10 @@ func (c *criService) cleanupUnknownContainer(ctx context.Context, id string, cnt
 		ExitStatus:  unknownExitCode,
 		ExitedAt:    protobuf.ToTimestamp(time.Now()),
 	}, cntr, sandboxID)
+}
+
+func convertFromCRISignal(criSignal string) string {
+	normalized := strings.Replace(criSignal, "PLUS", "+", 1)
+	normalized = strings.Replace(normalized, "MINUS", "-", 1)
+	return normalized
 }
