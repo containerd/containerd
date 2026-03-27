@@ -35,6 +35,7 @@ import (
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
 	eventstypes "github.com/containerd/containerd/api/events"
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
@@ -52,6 +53,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -128,7 +130,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		bundle:  bundle,
 		client:  conn,
 		address: address,
-		version: params.Version,
+		version: int(params.Version),
 	}
 
 	return shim, nil
@@ -219,9 +221,16 @@ type clientVersionDowngrader interface {
 	Downgrade() error
 }
 
-func parseStartResponse(response []byte) (client.BootstrapParams, error) {
-	var params client.BootstrapParams
+func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
+	var result bootapi.BootstrapResult
 
+	if err := proto.Unmarshal(response, &result); err == nil {
+		return &result, nil
+	}
+
+	// Fallback to legacy parsing for backward compatibility with legacy shims that return the address as a plain string or JSON.
+
+	var params client.BootstrapParams //nolint:staticcheck // Used for backward compatibility with legacy shims
 	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
 		// Use TTRPC for legacy shims
 		params.Address = string(response)
@@ -230,14 +239,18 @@ func parseStartResponse(response []byte) (client.BootstrapParams, error) {
 	}
 
 	if params.Version > CurrentShimVersion {
-		return client.BootstrapParams{}, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
+		return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
 	}
 
-	return params, nil
+	return &bootapi.BootstrapResult{
+		Version:  int32(params.Version),
+		Address:  params.Address,
+		Protocol: params.Protocol,
+	}, nil
 }
 
 // writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
-func writeBootstrapParams(path string, params client.BootstrapParams) error {
+func writeBootstrapParams(path string, params *bootapi.BootstrapResult) error {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -262,15 +275,15 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 	return f.Close()
 }
 
-func readBootstrapParams(path string) (client.BootstrapParams, error) {
+func readBootstrapParams(path string) (*bootapi.BootstrapResult, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	return parseStartResponse(data)
@@ -278,7 +291,7 @@ func readBootstrapParams(path string) (client.BootstrapParams, error) {
 
 // makeConnection creates a new TTRPC or GRPC connection object from address.
 // address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
-func makeConnection(ctx context.Context, id string, params client.BootstrapParams, onClose func()) (_ io.Closer, retErr error) {
+func makeConnection(ctx context.Context, id string, params *bootapi.BootstrapResult, onClose func()) (_ io.Closer, retErr error) {
 	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
