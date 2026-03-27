@@ -94,6 +94,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 					Type:      "io.containerd.runc.v2",
 					Options:   m,
 					Sandboxer: string(ModePodSandbox),
+					IOType:    "file",
 				},
 			},
 		},

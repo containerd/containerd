@@ -484,6 +484,10 @@ func (p *Init) Stdio() stdio.Stdio {
 	return p.stdio
 }
 
+func (p *Init) IO() *processIO {
+	return p.io
+}
+
 func (p *Init) runtimeError(rErr error, msg string) error {
 	if rErr == nil {
 		return nil

@@ -79,6 +79,8 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		}
 	}
 
+	log.G(ctx).Infof("nmx stdin is %s", r.Stdin)
+
 	config := &process.CreateConfig{
 		ID:               r.ID,
 		Bundle:           r.Bundle,
@@ -407,6 +409,13 @@ func (c *Container) ResizePty(ctx context.Context, r *task.ResizePtyRequest) err
 		Height: uint16(r.Height),
 	}
 	return p.Resize(ws)
+}
+
+func (c *Container) ReOpenLog(ctx context.Context, r *task.ReOpenLogRequest) error {
+	if c.process.(*process.Init).IO().File() == nil {
+		return fmt.Errorf("process reopen log file is nil")
+	}
+	return c.process.(*process.Init).IO().File().Reopen()
 }
 
 // Kill a process
