@@ -60,7 +60,7 @@ type setupUpgradeVerifyCase func(*testing.T, int, cri.RuntimeService, cri.ImageM
 
 // TODO: Support Windows
 func TestUpgrade(t *testing.T) {
-	for _, version := range []string{"1.7", "2.0"} {
+	for _, version := range []string{"1.7", "2.2"} {
 		t.Run(version, func(t *testing.T) {
 			previousReleaseBinDir := t.TempDir()
 			downloadPreviousLatestReleaseBinary(t, version, previousReleaseBinDir)
