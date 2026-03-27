@@ -22,8 +22,29 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+// This structure provides `application/vnd.containerd.image-verifier.input.v1+json` mediatype
+// when marshalled to JSON.
+type PodMetadataInput struct {
+	RuntimeConfig *RuntimeConfig      `json:"runtime_config,omitempty"`
+	Descriptor    *ocispec.Descriptor `json:"descriptor,omitempty"`
+}
+
+// RuntimeConfig is the simplified sandbox information passed to verifier binaries.
+type RuntimeConfig struct {
+	Metadata    *Metadata         `json:"metadata,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// Metadata contains the pod metadata information.
+type Metadata struct {
+	Name      string `json:"name,omitempty"`
+	UID       string `json:"uid,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
 type ImageVerifier interface {
-	VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor) (*Judgement, error)
+	VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor, runtimeConfig *RuntimeConfig) (*Judgement, error)
 }
 
 type Judgement struct {
