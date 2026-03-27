@@ -757,6 +757,16 @@ func (s *shimTask) ResizePty(ctx context.Context, size runtime.ConsoleSize) erro
 	return nil
 }
 
+func (s *shimTask) ReOpenLog(ctx context.Context) error {
+	_, err := s.task.ReOpenLog(ctx, &task.ReOpenLogRequest{
+		ID: s.ID(),
+	})
+	if err != nil {
+		return errgrpc.ToNative(err)
+	}
+	return nil
+}
+
 func (s *shimTask) CloseIO(ctx context.Context) error {
 	_, err := s.task.CloseIO(ctx, &task.CloseIORequest{
 		ID:    s.ID(),
