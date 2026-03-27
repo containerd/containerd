@@ -247,6 +247,26 @@ EOF
   # SELinux is Enforcing by default (via provisioning) in this VM. To re-run with SELinux disabled:
   #   SELINUX=Disabled vagrant up --provision-with=selinux,test-integration
   #
+
+    config.vm.provision "unit-test", type: "shell", run: "never" do |sh|
+    sh.upload_path = "/tmp/unit-test"
+    sh.env = {
+        'RUNC_FLAVOR': ENV['RUNC_FLAVOR'] || "runc",
+        'GOTEST': ENV['GOTEST'] || "go test",
+        'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
+        'GOTESTSUM_JSONFILE': ENV['GOTESTSUM_JSONFILE'],
+    }
+    sh.inline = <<~SHELL
+        #!/usr/bin/env bash
+        source /etc/environment
+        source /etc/profile.d/sh.local
+        set -eux -o pipefail
+        cd ${GOPATH}/src/github.com/containerd/containerd
+        make test
+        make root-test
+    SHELL
+  end
+
   config.vm.provision "test-integration", type: "shell", run: "never" do |sh|
     sh.upload_path = "/tmp/test-integration"
     sh.env = {
