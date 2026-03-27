@@ -280,7 +280,8 @@ func TestContainerStatus(t *testing.T) {
 }
 
 type fakeImageService struct {
-	imageStore *imagestore.Store
+	imageStore       *imagestore.Store
+	localResolveFunc func(string) (imagestore.Image, error)
 }
 
 func (s *fakeImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string {
@@ -298,6 +299,9 @@ func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.S
 }
 
 func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
+	if s.localResolveFunc != nil {
+		return s.localResolveFunc(refOrID)
+	}
 	return imagestore.Image{}, errors.New("not implemented")
 }
 
