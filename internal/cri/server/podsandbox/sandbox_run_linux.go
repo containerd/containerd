@@ -76,7 +76,6 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	)
 	if nsOptions.GetNetwork() == runtime.NamespaceMode_NODE {
 		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.NetworkNamespace))
-		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UTSNamespace))
 	} else {
 		specOpts = append(specOpts, oci.WithLinuxNamespace(
 			runtimespec.LinuxNamespace{
