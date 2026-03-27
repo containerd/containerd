@@ -74,6 +74,12 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn SnapshotterFunc) 
 	// Different snapshotters behave slightly differently in the tests below.
 	t.Run("Rename", makeTest(name, snapshotterFn, checkRename(name)))
 	t.Run("128LayersMount", makeTest(name, snapshotterFn, check128LayersMount(name)))
+
+	// SnapshotRestorer tests (optional interface)
+	t.Run("SnapshotRestore", makeTest(name, snapshotterFn, checkSnapshotRestore))
+	t.Run("SnapshotRestoreWithData", makeTest(name, snapshotterFn, checkSnapshotRestoreWithData))
+	t.Run("SnapshotFromNonActive", makeTest(name, snapshotterFn, checkSnapshotFromNonActive))
+	t.Run("RestoreFromNonSnapshot", makeTest(name, snapshotterFn, checkRestoreFromNonSnapshot))
 }
 
 func makeTest(
@@ -1122,4 +1128,178 @@ func checkWalk(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshot
 			}
 		}
 	}
+}
+
+func getSnapshotRestorer(t *testing.T, sn snapshots.Snapshotter) snapshots.SnapshotRestorer {
+	t.Helper()
+	sr, ok := sn.(snapshots.SnapshotRestorer)
+	if !ok {
+		t.Skip("snapshotter does not implement SnapshotRestorer")
+	}
+	return sr
+}
+
+// checkSnapshotRestore tests the basic Snapshot/Restore workflow:
+// Prepare -> Snapshot -> Stat -> Restore -> Stat -> Remove
+func checkSnapshotRestore(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
+	sr := getSnapshotRestorer(t, sn)
+
+	// Create a committed parent
+	if _, err := sn.Prepare(ctx, "c1-a", "", opt); err != nil {
+		t.Fatal(err)
+	}
+	if err := sn.Commit(ctx, "c1", "c1-a", opt); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create an active snapshot with parent
+	if _, err := sn.Prepare(ctx, "active-1", "c1", opt); err != nil {
+		t.Fatal(err)
+	}
+
+	// Snapshot the active
+	if err := sr.Snapshot(ctx, "snap-1", "active-1", opt); err != nil {
+		if errdefs.IsNotImplemented(err) {
+			t.Skip("snapshotter does not implement Snapshot")
+		}
+		t.Fatal(err)
+	}
+
+	// Verify the snapshot kind via Stat
+	si, err := sn.Stat(ctx, "snap-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, snapshots.KindSnapshot, si.Kind)
+	assert.Equal(t, "c1", si.Parent)
+
+	// Original active should still be accessible
+	origInfo, err := sn.Stat(ctx, "active-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, snapshots.KindActive, origInfo.Kind)
+
+	// Restore from the snapshot
+	_, err = sr.Restore(ctx, "restored-1", "snap-1", opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the restored snapshot is active with same parent
+	ri, err := sn.Stat(ctx, "restored-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, snapshots.KindActive, ri.Kind)
+	assert.Equal(t, "c1", ri.Parent)
+
+	// Cleanup
+	assert.Nil(t, sn.Remove(ctx, "restored-1"))
+	assert.Nil(t, sn.Remove(ctx, "snap-1"))
+	assert.Nil(t, sn.Remove(ctx, "active-1"))
+	assert.Nil(t, sn.Remove(ctx, "c1"))
+}
+
+// checkSnapshotRestoreWithData verifies that data written to an active snapshot
+// is preserved through the Snapshot -> Restore cycle.
+func checkSnapshotRestoreWithData(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
+	sr := getSnapshotRestorer(t, sn)
+
+	// Create an active snapshot
+	mounts, err := sn.Prepare(ctx, "active-data", "", opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mount and write data
+	target := filepath.Join(work, "active-data")
+	if err := os.MkdirAll(target, 0777); err != nil {
+		t.Fatal(err)
+	}
+	if err := mountAll(ctx, mounts, target); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "testfile"), []byte("snapshot data"), 0644); err != nil {
+		unmountAll(ctx, t, target)
+		t.Fatal(err)
+	}
+	unmountAll(ctx, t, target)
+
+	// Snapshot the active
+	if err := sr.Snapshot(ctx, "snap-data", "active-data", opt); err != nil {
+		if errdefs.IsNotImplemented(err) {
+			t.Skip("snapshotter does not implement Snapshot")
+		}
+		t.Fatal(err)
+	}
+
+	// Restore from the snapshot
+	restoreMounts, err := sr.Restore(ctx, "restored-data", "snap-data", opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mount and verify data
+	restoreTarget := filepath.Join(work, "restored-data")
+	if err := os.MkdirAll(restoreTarget, 0777); err != nil {
+		t.Fatal(err)
+	}
+	if err := mountAll(ctx, restoreMounts, restoreTarget); err != nil {
+		t.Fatal(err)
+	}
+	defer unmountAll(ctx, t, restoreTarget)
+
+	data, err := os.ReadFile(filepath.Join(restoreTarget, "testfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "snapshot data", string(data))
+}
+
+// checkSnapshotFromNonActive verifies that Snapshot fails when the source
+// is not an active snapshot.
+func checkSnapshotFromNonActive(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
+	sr := getSnapshotRestorer(t, sn)
+
+	// Create a committed snapshot
+	if _, err := sn.Prepare(ctx, "c1-a", "", opt); err != nil {
+		t.Fatal(err)
+	}
+	if err := sn.Commit(ctx, "c1", "c1-a", opt); err != nil {
+		t.Fatal(err)
+	}
+
+	// Snapshot from committed should fail
+	err := sr.Snapshot(ctx, "snap-fail", "c1", opt)
+	if errdefs.IsNotImplemented(err) {
+		t.Skip("snapshotter does not implement Snapshot")
+	}
+	assert.NotNil(t, err, "snapshot from committed should fail")
+
+	// Snapshot from non-existent should fail
+	err = sr.Snapshot(ctx, "snap-fail2", "does-not-exist", opt)
+	assert.NotNil(t, err, "snapshot from non-existent should fail")
+}
+
+// checkRestoreFromNonSnapshot verifies that Restore fails when the source
+// is not a KindSnapshot.
+func checkRestoreFromNonSnapshot(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
+	sr := getSnapshotRestorer(t, sn)
+
+	// Create an active snapshot
+	if _, err := sn.Prepare(ctx, "active-1", "", opt); err != nil {
+		t.Fatal(err)
+	}
+
+	// Restore from active should fail
+	_, err := sr.Restore(ctx, "restored-fail", "active-1", opt)
+	if errdefs.IsNotImplemented(err) {
+		t.Skip("snapshotter does not implement Restore")
+	}
+	assert.NotNil(t, err, "restore from active should fail")
+
+	// Restore from non-existent should fail
+	_, err = sr.Restore(ctx, "restored-fail2", "does-not-exist", opt)
+	assert.NotNil(t, err, "restore from non-existent should fail")
 }

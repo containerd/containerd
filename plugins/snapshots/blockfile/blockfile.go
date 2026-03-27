@@ -448,6 +448,53 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 	}
 }
 
+func (o *snapshotter) Snapshot(ctx context.Context, key, activeKey string, opts ...snapshots.Opt) error {
+	return o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		snap, err := storage.CreateSnapshotFromActive(ctx, key, activeKey, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create snapshot from active: %w", err)
+		}
+
+		activeSnap, err := storage.GetSnapshot(ctx, activeKey)
+		if err != nil {
+			return fmt.Errorf("failed to get active snapshot: %w", err)
+		}
+
+		if err := copyFileWithSync(o.getBlockFile(snap.ID), o.getBlockFile(activeSnap.ID)); err != nil {
+			return fmt.Errorf("failed to copy block file: %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (o *snapshotter) Restore(ctx context.Context, key, snapshotKey string, opts ...snapshots.Opt) (_ []mount.Mount, err error) {
+	var snap storage.Snapshot
+
+	err = o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		srcSnap, err := storage.GetSnapshot(ctx, snapshotKey)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot: %w", err)
+		}
+
+		snap, err = storage.CreateActiveFromSnapshot(ctx, key, snapshotKey, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create active from snapshot: %w", err)
+		}
+
+		if err := copyFileWithSync(o.getBlockFile(snap.ID), o.getBlockFile(srcSnap.ID)); err != nil {
+			return fmt.Errorf("failed to copy block file: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return o.mounts(snap), nil
+}
+
 // Close closes the snapshotter
 func (o *snapshotter) Close() error {
 	return o.ms.Close()

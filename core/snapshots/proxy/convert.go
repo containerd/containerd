@@ -29,6 +29,8 @@ func KindToProto(kind snapshots.Kind) snapshotsapi.Kind {
 		return snapshotsapi.Kind_ACTIVE
 	case snapshots.KindView:
 		return snapshotsapi.Kind_VIEW
+	case snapshots.KindSnapshot:
+		return snapshotsapi.Kind_SNAPSHOT
 	default:
 		return snapshotsapi.Kind_COMMITTED
 	}
@@ -42,6 +44,8 @@ func KindFromProto(kind snapshotsapi.Kind) snapshots.Kind {
 		return snapshots.KindActive
 	case snapshotsapi.Kind_VIEW:
 		return snapshots.KindView
+	case snapshotsapi.Kind_SNAPSHOT:
+		return snapshots.KindSnapshot
 	default:
 		return snapshots.KindCommitted
 	}

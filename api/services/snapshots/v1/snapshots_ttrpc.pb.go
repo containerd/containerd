@@ -19,6 +19,8 @@ type TTRPCSnapshotsService interface {
 	List(context.Context, *ListSnapshotsRequest, TTRPCSnapshots_ListServer) error
 	Usage(context.Context, *UsageRequest) (*UsageResponse, error)
 	Cleanup(context.Context, *CleanupRequest) (*emptypb.Empty, error)
+	Snapshot(context.Context, *SnapshotRequest) (*emptypb.Empty, error)
+	Restore(context.Context, *RestoreRequest) (*RestoreResponse, error)
 }
 
 type TTRPCSnapshots_ListServer interface {
@@ -100,6 +102,20 @@ func RegisterTTRPCSnapshotsService(srv *ttrpc.Server, svc TTRPCSnapshotsService)
 				}
 				return svc.Cleanup(ctx, &req)
 			},
+			"Snapshot": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req SnapshotRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.Snapshot(ctx, &req)
+			},
+			"Restore": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req RestoreRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.Restore(ctx, &req)
+			},
 		},
 		Streams: map[string]ttrpc.Stream{
 			"List": {
@@ -128,6 +144,8 @@ type TTRPCSnapshotsClient interface {
 	List(context.Context, *ListSnapshotsRequest) (TTRPCSnapshots_ListClient, error)
 	Usage(context.Context, *UsageRequest) (*UsageResponse, error)
 	Cleanup(context.Context, *CleanupRequest) (*emptypb.Empty, error)
+	Snapshot(context.Context, *SnapshotRequest) (*emptypb.Empty, error)
+	Restore(context.Context, *RestoreRequest) (*RestoreResponse, error)
 }
 
 type ttrpcsnapshotsClient struct {
@@ -236,6 +254,22 @@ func (c *ttrpcsnapshotsClient) Usage(ctx context.Context, req *UsageRequest) (*U
 func (c *ttrpcsnapshotsClient) Cleanup(ctx context.Context, req *CleanupRequest) (*emptypb.Empty, error) {
 	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.services.snapshots.v1.Snapshots", "Cleanup", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpcsnapshotsClient) Snapshot(ctx context.Context, req *SnapshotRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
+	if err := c.client.Call(ctx, "containerd.services.snapshots.v1.Snapshots", "Snapshot", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpcsnapshotsClient) Restore(ctx context.Context, req *RestoreRequest) (*RestoreResponse, error) {
+	var resp RestoreResponse
+	if err := c.client.Call(ctx, "containerd.services.snapshots.v1.Snapshots", "Restore", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
