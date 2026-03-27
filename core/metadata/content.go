@@ -657,6 +657,18 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 			return "", 0, err
 		}
 	}
+
+	// Automatically set the media type label from the ingest descriptor
+	// if the caller has not explicitly provided one.
+	if nw.desc.MediaType != "" {
+		if base.Labels == nil {
+			base.Labels = map[string]string{}
+		}
+		if _, exists := base.Labels[labels.LabelMediaType]; !exists {
+			base.Labels[labels.LabelMediaType] = nw.desc.MediaType
+		}
+	}
+
 	if err := validateInfo(&base); err != nil {
 		if nw.w != nil {
 			nw.w.Close()

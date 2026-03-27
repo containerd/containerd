@@ -211,6 +211,156 @@ func checkContentLeased(ctx context.Context, db *DB, dgst digest.Digest) error {
 	})
 }
 
+func TestContentMediaTypeLabel(t *testing.T) {
+	ctx, db := testDB(t)
+	cs := db.ContentStore()
+
+	t.Run("AutoSet", func(t *testing.T) {
+		blob := []byte("manifest content")
+		desc := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageManifest,
+			Size:      int64(len(blob)),
+			Digest:    digest.FromBytes(blob),
+		}
+
+		lctx, _, err := createLease(ctx, db, "media-type-auto")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		w, err := cs.Writer(lctx,
+			content.WithRef("test-mt-auto"),
+			content.WithDescriptor(desc))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(blob); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Commit(lctx, desc.Size, desc.Digest); err != nil {
+			t.Fatal(err)
+		}
+
+		info, err := cs.Info(lctx, desc.Digest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Labels[labels.LabelMediaType] != ocispec.MediaTypeImageManifest {
+			t.Fatalf("expected media type label %q, got %q",
+				ocispec.MediaTypeImageManifest, info.Labels[labels.LabelMediaType])
+		}
+	})
+
+	t.Run("NoOverrideExplicit", func(t *testing.T) {
+		blob := []byte("custom content")
+		customType := "application/vnd.custom.type"
+		desc := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageManifest,
+			Size:      int64(len(blob)),
+			Digest:    digest.FromBytes(blob),
+		}
+
+		lctx, _, err := createLease(ctx, db, "media-type-explicit")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		w, err := cs.Writer(lctx,
+			content.WithRef("test-mt-explicit"),
+			content.WithDescriptor(desc))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(blob); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Commit(lctx, desc.Size, desc.Digest,
+			content.WithLabels(map[string]string{
+				labels.LabelMediaType: customType,
+			})); err != nil {
+			t.Fatal(err)
+		}
+
+		info, err := cs.Info(lctx, desc.Digest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Labels[labels.LabelMediaType] != customType {
+			t.Fatalf("expected explicit media type %q, got %q",
+				customType, info.Labels[labels.LabelMediaType])
+		}
+	})
+
+	t.Run("EmptyMediaType", func(t *testing.T) {
+		blob := []byte("no media type content")
+		desc := ocispec.Descriptor{
+			Size:   int64(len(blob)),
+			Digest: digest.FromBytes(blob),
+		}
+
+		lctx, _, err := createLease(ctx, db, "media-type-empty")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := content.WriteBlob(lctx, cs, "test-mt-empty",
+			bytes.NewReader(blob), desc); err != nil {
+			t.Fatal(err)
+		}
+
+		info, err := cs.Info(lctx, desc.Digest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, exists := info.Labels[labels.LabelMediaType]; exists {
+			t.Fatal("expected no media type label for empty descriptor media type")
+		}
+	})
+
+	t.Run("PreservesOtherLabels", func(t *testing.T) {
+		blob := []byte("content with other labels")
+		desc := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Size:      int64(len(blob)),
+			Digest:    digest.FromBytes(blob),
+		}
+
+		lctx, _, err := createLease(ctx, db, "media-type-other-labels")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		w, err := cs.Writer(lctx,
+			content.WithRef("test-mt-other"),
+			content.WithDescriptor(desc))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(blob); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Commit(lctx, desc.Size, desc.Digest,
+			content.WithLabels(map[string]string{
+				labels.LabelUncompressed: "sha256:deadbeef",
+			})); err != nil {
+			t.Fatal(err)
+		}
+
+		info, err := cs.Info(lctx, desc.Digest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Labels[labels.LabelMediaType] != ocispec.MediaTypeImageLayer {
+			t.Fatalf("expected media type label %q, got %q",
+				ocispec.MediaTypeImageLayer, info.Labels[labels.LabelMediaType])
+		}
+		if info.Labels[labels.LabelUncompressed] != "sha256:deadbeef" {
+			t.Fatalf("expected uncompressed label preserved, got %q",
+				info.Labels[labels.LabelUncompressed])
+		}
+	})
+}
+
 func checkIngestLeased(ctx context.Context, db *DB, ref string) error {
 	ns, ok := namespaces.Namespace(ctx)
 	if !ok {
