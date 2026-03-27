@@ -117,6 +117,9 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	}
 
 	req := p.request(host, http.MethodHead, existCheck...)
+	if err := req.addNamespace(p.refspec.Hostname()); err != nil {
+		return nil, err
+	}
 	req.header.Set("Accept", strings.Join([]string{desc.MediaType, `*/*`}, ", "))
 
 	log.G(ctx).WithField("url", req.sanitizedURL()).Debugf("checking and pushing to")
@@ -165,10 +168,16 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	if isManifest {
 		putPath := getManifestPath(p.object, desc.Digest)
 		req = p.request(host, http.MethodPut, putPath...)
+		if err := req.addNamespace(p.refspec.Hostname()); err != nil {
+			return nil, err
+		}
 		req.header.Add("Content-Type", desc.MediaType)
 	} else {
 		// Start upload request
 		req = p.request(host, http.MethodPost, "blobs", "uploads/")
+		if err := req.addNamespace(p.refspec.Hostname()); err != nil {
+			return nil, err
+		}
 
 		mountedFrom := ""
 		var resp *http.Response
@@ -273,6 +282,9 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		req = p.request(lhost, http.MethodPut)
 		req.header.Set("Content-Type", "application/octet-stream")
 		req.path = lurl.Path + "?" + q.Encode()
+		if err := req.addNamespace(p.refspec.Hostname()); err != nil {
+			return nil, err
+		}
 	}
 	p.tracker.SetStatus(ref, Status{
 		Status: content.Status{
