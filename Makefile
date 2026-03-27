@@ -249,7 +249,7 @@ bin/loopback-v2: integration/failpoint/cmd/loopback-v2 FORCE
 
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"
-	@$(GO) test ${TESTFLAGS} -bench . -run Benchmark -test.root
+	@$(GO) test ${TESTFLAGS} -bench . -run ^$$ ${PACKAGES}
 
 FORCE:
 
