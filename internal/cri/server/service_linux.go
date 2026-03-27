@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/moby/sys/userns"
@@ -59,7 +60,8 @@ func (c *criService) initPlatform() (err error) {
 	pluginDirs := map[string]string{
 		defaultNetworkPlugin: c.config.NetworkPluginConfDir,
 	}
-	for name, conf := range c.config.Runtimes {
+	runtimes := c.config.LoadRuntimes(context.TODO())
+	for name, conf := range runtimes {
 		if conf.NetworkPluginConfDir != "" {
 			pluginDirs[name] = conf.NetworkPluginConfDir
 		}
@@ -75,7 +77,7 @@ func (c *criService) initPlatform() (err error) {
 	for name, dir := range pluginDirs {
 		max := c.config.NetworkPluginMaxConfNum
 		if name != defaultNetworkPlugin {
-			if m := c.config.Runtimes[name].NetworkPluginMaxConfNum; m != 0 {
+			if m := runtimes[name].NetworkPluginMaxConfNum; m != 0 {
 				max = m
 			}
 		}
