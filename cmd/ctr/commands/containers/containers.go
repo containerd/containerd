@@ -194,16 +194,21 @@ func deleteContainer(ctx context.Context, client *containerd.Client, id string, 
 	}
 	status, err := task.Status(ctx)
 	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return container.Delete(ctx, opts...)
+		}
 		return err
 	}
 	if status.Status == containerd.Stopped || status.Status == containerd.Created {
 		if _, err := task.Delete(ctx); err != nil {
+			if errdefs.IsNotFound(err) {
+				return container.Delete(ctx, opts...)
+			}
 			return err
 		}
 		return container.Delete(ctx, opts...)
 	}
 	return fmt.Errorf("cannot delete a non stopped container: %v", status)
-
 }
 
 var setLabelsCommand = &cli.Command{
