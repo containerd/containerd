@@ -196,8 +196,10 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	labels := label.NewStore()
 	config := options.RuntimeService.Config()
 
-	// Create the stats collector first so it can be passed to the stores
-	statsCollector := NewStatsCollector(config)
+	var statsCollector *StatsCollector
+	if config.EnableStatsCollec {
+		statsCollector = NewStatsCollector(config)
+	}
 
 	c := &criService{
 		RuntimeService:     options.RuntimeService,
@@ -283,9 +285,9 @@ func (c *criService) Run(ready func()) error {
 	// then you have to manually filter namespace foo
 	c.eventMonitor.Subscribe(c.client, []string{`topic=="/tasks/oom"`, `topic~="/images/"`})
 
-	// Start the background stats collector for UsageNanoCores calculation
-	log.L.Info("Start stats collector")
 	if c.statsCollector != nil {
+		// Start the background stats collector for UsageNanoCores calculation
+		log.L.Info("Start stats collector")
 		c.statsCollector.SetDependencies(
 			c.client.TaskService(),
 			c.containerStore.List,
