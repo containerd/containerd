@@ -26,6 +26,7 @@ type TTRPCTaskService interface {
 	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
 	Connect(context.Context, *ConnectRequest) (*ConnectResponse, error)
 	Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error)
+	ReOpenLog(context.Context, *ReOpenLogRequest) (*emptypb.Empty, error)
 }
 
 func RegisterTTRPCTaskService(srv *ttrpc.Server, svc TTRPCTaskService) {
@@ -149,6 +150,13 @@ func RegisterTTRPCTaskService(srv *ttrpc.Server, svc TTRPCTaskService) {
 					return nil, err
 				}
 				return svc.Shutdown(ctx, &req)
+			},
+			"ReOpenLog": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req ReOpenLogRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.ReOpenLog(ctx, &req)
 			},
 		},
 	})
@@ -295,6 +303,14 @@ func (c *ttrpctaskClient) Connect(ctx context.Context, req *ConnectRequest) (*Co
 func (c *ttrpctaskClient) Shutdown(ctx context.Context, req *ShutdownRequest) (*emptypb.Empty, error) {
 	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v3.Task", "Shutdown", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpctaskClient) ReOpenLog(ctx context.Context, req *ReOpenLogRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
+	if err := c.client.Call(ctx, "containerd.task.v3.Task", "ReOpenLog", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

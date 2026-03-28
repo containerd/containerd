@@ -51,6 +51,8 @@ service Tasks {
 
   rpc ResizePty(ResizePtyRequest) returns (google.protobuf.Empty);
 
+  rpc ReOpenLog(ReOpenLogRequest) returns (google.protobuf.Empty);
+
   rpc CloseIO(CloseIORequest) returns (google.protobuf.Empty);
 
   rpc Pause(PauseTaskRequest) returns (google.protobuf.Empty);
@@ -166,6 +168,10 @@ message ResizePtyRequest {
   string exec_id = 2;
   uint32 width = 3;
   uint32 height = 4;
+}
+
+message ReOpenLogRequest {
+  string container_id = 1;
 }
 
 message CloseIORequest {

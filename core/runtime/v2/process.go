@@ -105,6 +105,16 @@ func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error
 	return nil
 }
 
+func (p *process) ReOpenLog(ctx context.Context) error {
+	_, err := p.shim.task.ReOpenLog(ctx, &task.ReOpenLogRequest{
+		ID: p.shim.ID(),
+	})
+	if err != nil {
+		return errgrpc.ToNative(err)
+	}
+	return nil
+}
+
 // CloseIO closes the provided IO pipe for the process
 func (p *process) CloseIO(ctx context.Context) error {
 	_, err := p.shim.task.CloseIO(ctx, &task.CloseIORequest{
