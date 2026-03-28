@@ -49,24 +49,24 @@ func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
 		desc                        string
 		firstCPUValue               uint64
 		secondCPUValue              uint64
-		expectedNanoCoreUsageFirst  uint64
-		expectedNanoCoreUsageSecond uint64
+		expectedNanoCoreUsageFirst  *uint64
+		expectedNanoCoreUsageSecond *uint64
 	}{
 		{
 			id:                          "id1",
-			desc:                        "metrics",
+			desc:                        "normal increase",
 			firstCPUValue:               50,
 			secondCPUValue:              500,
-			expectedNanoCoreUsageFirst:  0,
-			expectedNanoCoreUsageSecond: 45,
+			expectedNanoCoreUsageFirst:  nil,
+			expectedNanoCoreUsageSecond: uint64Ptr(45),
 		},
 		{
 			id:                          "id2",
-			desc:                        "metrics",
+			desc:                        "counter goes backwards",
 			firstCPUValue:               234235,
 			secondCPUValue:              0,
-			expectedNanoCoreUsageFirst:  0,
-			expectedNanoCoreUsageSecond: 0,
+			expectedNanoCoreUsageFirst:  nil,
+			expectedNanoCoreUsageSecond: nil,
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
@@ -97,6 +97,8 @@ func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
 		})
 	}
 }
+
+func uint64Ptr(v uint64) *uint64 { return &v }
 
 func TestGetWorkingSet(t *testing.T) {
 	for _, test := range []struct {
