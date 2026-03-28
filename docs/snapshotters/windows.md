@@ -67,6 +67,13 @@ snapshotter.
   `cimfs.IsCimFSSupported()` and skips registration if the host doesn't support
   it.
 
+> **Note:** CimFS support is relatively new and may have stability issues on
+> some Windows versions. There have been reports of kernel crashes (`cimfs.sys`)
+> under concurrent container workloads
+> (see [microsoft/hcsshim#2625](https://github.com/microsoft/hcsshim/issues/2625)).
+> If you experience stability problems, use the legacy `windows` snapshotter
+> instead.
+
 ### `blockcim`
 
 The Block CIM snapshotter is the newest Windows snapshotter. It extends CimFS
@@ -79,6 +86,9 @@ single merged CIM for faster access.
 - A Windows version that supports block CIMs. The snapshotter checks at startup
   via `cimfs.IsBlockCimSupported()` and skips registration if the host doesn't
   support it.
+
+> **Note:** The block CIM snapshotter builds on CimFS and is subject to the
+> same stability considerations. See the note under [cimfs](#cimfs) above.
 
 **Configuration:**
 
