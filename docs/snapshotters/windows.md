@@ -48,7 +48,7 @@ VHDs.
 **Scratch sharing:** LCOW supports sharing a single scratch disk across
 multiple containers using the labels
 `containerd.io/snapshot/io.microsoft.container.storage.reuse-scratch` and
-`containerd.io/snapshot/io.microsoft.container.storage.reuse-scratch.owner-key`.
+`containerd.io/snapshot/io.microsoft.owner.key`.
 
 ### `cimfs`
 
