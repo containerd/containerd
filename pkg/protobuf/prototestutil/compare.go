@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package protobuf
+package prototestutil
 
 import (
 	"github.com/google/go-cmp/cmp"
