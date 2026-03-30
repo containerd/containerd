@@ -68,7 +68,9 @@ func (c *criService) podSandboxStats(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get usage nano cores: %w", err)
 		}
-		cpuStats.UsageNanoCores = &runtime.UInt64Value{Value: nanoUsage}
+		if nanoUsage != nil {
+			cpuStats.UsageNanoCores = &runtime.UInt64Value{Value: *nanoUsage}
+		}
 	}
 	podSandboxStats.Linux.Cpu = cpuStats
 
