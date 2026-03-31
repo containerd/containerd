@@ -953,20 +953,8 @@ func (c *Client) GetSnapshotterSupportedPlatforms(ctx context.Context, snapshott
 	}
 
 	sn := resp.Plugins[0]
-	snPlatforms := toPlatforms(sn.Platforms)
+	snPlatforms := apitypes.OCIPlatformFromProto(sn.Platforms)
 	return platforms.Any(snPlatforms...), nil
-}
-
-func toPlatforms(pt []*apitypes.Platform) []ocispec.Platform {
-	platforms := make([]ocispec.Platform, len(pt))
-	for i, p := range pt {
-		platforms[i] = ocispec.Platform{
-			Architecture: p.Architecture,
-			OS:           p.OS,
-			Variant:      p.Variant,
-		}
-	}
-	return platforms
 }
 
 // GetSnapshotterCapabilities returns the capabilities of a snapshotter.
