@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	bolt "go.etcd.io/bbolt"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -53,6 +54,7 @@ type SnapshotterConfig struct {
 	remapIDs         bool
 	// dmverityMode controls dm-verity behavior: "auto" (use if .dmverity exists), "on" (require .dmverity), "off" (disable)
 	dmverityMode string
+	noSync       bool
 }
 
 // Opt is an option to configure the erofs snapshotter
@@ -104,6 +106,14 @@ func WithFsMergeThreshold(v uint) Opt {
 func WithRemapIDs() Opt {
 	return func(config *SnapshotterConfig) {
 		config.remapIDs = true
+	}
+}
+
+// WithNoSync disables fsync on the snapshotter's metadata bolt database,
+// improving write throughput at the cost of durability.
+func WithNoSync() Opt {
+	return func(config *SnapshotterConfig) {
+		config.noSync = true
 	}
 }
 
@@ -181,7 +191,15 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		return nil, fmt.Errorf("setting IMMUTABLE_FL is only supported on Linux")
 	}
 
-	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
+	var msOpts []storage.Opt
+	if config.noSync {
+		msOpts = append(msOpts, func(o *bolt.Options) error {
+			o.NoSync = true
+			o.NoGrowSync = true
+			return nil
+		})
+	}
+	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"), msOpts...)
 	if err != nil {
 		return nil, err
 	}
