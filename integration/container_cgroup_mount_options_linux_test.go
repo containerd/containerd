@@ -17,7 +17,6 @@
 package integration
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -29,9 +28,6 @@ import (
 )
 
 func TestPrivilegedContainerCgroupMountOptions(t *testing.T) {
-	if f := os.Getenv("RUNC_FLAVOR"); f == "crun" {
-		t.Skip("Skipping until crun supports cgroup v2 mount options (https://github.com/containers/crun/pull/2040)")
-	}
 	if cgroups.Mode() != cgroups.Unified {
 		t.Skip("Requires cgroup v2")
 	}
