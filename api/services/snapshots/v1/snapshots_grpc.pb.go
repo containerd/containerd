@@ -35,6 +35,8 @@ type SnapshotsClient interface {
 	List(ctx context.Context, in *ListSnapshotsRequest, opts ...grpc.CallOption) (Snapshots_ListClient, error)
 	Usage(ctx context.Context, in *UsageRequest, opts ...grpc.CallOption) (*UsageResponse, error)
 	Cleanup(ctx context.Context, in *CleanupRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Snapshot(ctx context.Context, in *SnapshotRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Restore(ctx context.Context, in *RestoreRequest, opts ...grpc.CallOption) (*RestoreResponse, error)
 }
 
 type snapshotsClient struct {
@@ -158,6 +160,24 @@ func (c *snapshotsClient) Cleanup(ctx context.Context, in *CleanupRequest, opts 
 	return out, nil
 }
 
+func (c *snapshotsClient) Snapshot(ctx context.Context, in *SnapshotRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/containerd.services.snapshots.v1.Snapshots/Snapshot", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *snapshotsClient) Restore(ctx context.Context, in *RestoreRequest, opts ...grpc.CallOption) (*RestoreResponse, error) {
+	out := new(RestoreResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.snapshots.v1.Snapshots/Restore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SnapshotsServer is the server API for Snapshots service.
 // All implementations must embed UnimplementedSnapshotsServer
 // for forward compatibility
@@ -172,6 +192,8 @@ type SnapshotsServer interface {
 	List(*ListSnapshotsRequest, Snapshots_ListServer) error
 	Usage(context.Context, *UsageRequest) (*UsageResponse, error)
 	Cleanup(context.Context, *CleanupRequest) (*emptypb.Empty, error)
+	Snapshot(context.Context, *SnapshotRequest) (*emptypb.Empty, error)
+	Restore(context.Context, *RestoreRequest) (*RestoreResponse, error)
 	mustEmbedUnimplementedSnapshotsServer()
 }
 
@@ -208,6 +230,12 @@ func (UnimplementedSnapshotsServer) Usage(context.Context, *UsageRequest) (*Usag
 }
 func (UnimplementedSnapshotsServer) Cleanup(context.Context, *CleanupRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Cleanup not implemented")
+}
+func (UnimplementedSnapshotsServer) Snapshot(context.Context, *SnapshotRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Snapshot not implemented")
+}
+func (UnimplementedSnapshotsServer) Restore(context.Context, *RestoreRequest) (*RestoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Restore not implemented")
 }
 func (UnimplementedSnapshotsServer) mustEmbedUnimplementedSnapshotsServer() {}
 
@@ -405,6 +433,42 @@ func _Snapshots_Cleanup_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Snapshots_Snapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SnapshotsServer).Snapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.snapshots.v1.Snapshots/Snapshot",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SnapshotsServer).Snapshot(ctx, req.(*SnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Snapshots_Restore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SnapshotsServer).Restore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.snapshots.v1.Snapshots/Restore",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SnapshotsServer).Restore(ctx, req.(*RestoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Snapshots_ServiceDesc is the grpc.ServiceDesc for Snapshots service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -447,6 +511,14 @@ var Snapshots_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Cleanup",
 			Handler:    _Snapshots_Cleanup_Handler,
+		},
+		{
+			MethodName: "Snapshot",
+			Handler:    _Snapshots_Snapshot_Handler,
+		},
+		{
+			MethodName: "Restore",
+			Handler:    _Snapshots_Restore_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

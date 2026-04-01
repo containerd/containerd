@@ -897,6 +897,103 @@ func (s *snapshotter) Usage(ctx context.Context, key string) (_ snapshots.Usage,
 	return usage, nil
 }
 
+func (s *snapshotter) Snapshot(ctx context.Context, key, activeKey string, opts ...snapshots.Opt) error {
+	if !s.blockMode {
+		return fmt.Errorf("snapshot only supported in block mode: %w", errdefs.ErrNotImplemented)
+	}
+
+	return s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		snap, err := storage.CreateSnapshotFromActive(ctx, key, activeKey, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create snapshot from active: %w", err)
+		}
+
+		// Look up the active snapshot's ID to find its rwlayer.img
+		activeSnap, err := storage.GetSnapshot(ctx, activeKey)
+		if err != nil {
+			return fmt.Errorf("failed to get active snapshot: %w", err)
+		}
+
+		snapshotDir := filepath.Join(s.root, "snapshots", snap.ID)
+		if err := os.MkdirAll(snapshotDir, 0700); err != nil {
+			return fmt.Errorf("failed to create snapshot directory: %w", err)
+		}
+
+		src := s.writablePath(activeSnap.ID)
+		dst := s.writablePath(snap.ID)
+		if err := copyFile(src, dst); err != nil {
+			return fmt.Errorf("failed to copy rwlayer.img: %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (s *snapshotter) Restore(ctx context.Context, key, snapshotKey string, opts ...snapshots.Opt) (_ []mount.Mount, err error) {
+	if !s.blockMode {
+		return nil, fmt.Errorf("restore only supported in block mode: %w", errdefs.ErrNotImplemented)
+	}
+
+	var (
+		snap storage.Snapshot
+		info snapshots.Info
+	)
+
+	if err := s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		// Look up the source snapshot's ID
+		srcSnap, err := storage.GetSnapshot(ctx, snapshotKey)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot: %w", err)
+		}
+
+		snap, err = storage.CreateActiveFromSnapshot(ctx, key, snapshotKey, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create active from snapshot: %w", err)
+		}
+
+		_, info, _, err = storage.GetInfo(ctx, key)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot info: %w", err)
+		}
+
+		snapshotDir := filepath.Join(s.root, "snapshots", snap.ID)
+		if err := os.MkdirAll(snapshotDir, 0700); err != nil {
+			return fmt.Errorf("failed to create snapshot directory: %w", err)
+		}
+
+		src := s.writablePath(srcSnap.ID)
+		dst := s.writablePath(snap.ID)
+		if err := copyFile(src, dst); err != nil {
+			return fmt.Errorf("failed to copy rwlayer.img: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return s.mounts(snap, info)
+}
+
+func copyFile(src, dst string) error {
+	s, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+
+	d, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	if _, err := d.ReadFrom(s); err != nil {
+		return err
+	}
+	return d.Sync()
+}
+
 // Add a method to verify fsverity
 func (s *snapshotter) verifyFsverity(path string) error {
 	if !s.enableFsverity {

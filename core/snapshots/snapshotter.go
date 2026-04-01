@@ -50,6 +50,7 @@ const (
 	KindView
 	KindActive
 	KindCommitted
+	KindSnapshot // read-only, non-content-addressed point-in-time capture
 )
 
 // ParseKind parses the provided string into a Kind
@@ -64,6 +65,8 @@ func ParseKind(s string) Kind {
 		return KindActive
 	case "committed":
 		return KindCommitted
+	case "snapshot":
+		return KindSnapshot
 	default:
 		return KindUnknown
 	}
@@ -78,6 +81,8 @@ func (k Kind) String() string {
 		return "Active"
 	case KindCommitted:
 		return "Committed"
+	case KindSnapshot:
+		return "Snapshot"
 	default:
 		return "Unknown"
 	}
@@ -401,4 +406,19 @@ func WithParent(parent string) Opt {
 		info.Parent = parent
 		return nil
 	}
+}
+
+// SnapshotRestorer is an optional interface for snapshotters that support
+// creating read-only snapshots from active snapshots and restoring them.
+type SnapshotRestorer interface {
+	// Snapshot creates a read-only copy of the active snapshot identified
+	// by activeKey. The new snapshot is identified by key. The original
+	// active snapshot remains active and writable.
+	Snapshot(ctx context.Context, key, activeKey string, opts ...Opt) error
+
+	// Restore creates a new active snapshot initialized from a read-only
+	// snapshot previously created by Snapshot. The new active snapshot is
+	// identified by key and descends from the same committed parent as
+	// the original snapshot.
+	Restore(ctx context.Context, key, snapshotKey string, opts ...Opt) ([]mount.Mount, error)
 }
