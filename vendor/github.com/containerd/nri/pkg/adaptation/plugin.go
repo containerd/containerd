@@ -435,9 +435,9 @@ func (p *plugin) qualifiedName() string {
 // RegisterPlugin handles the plugin's registration request.
 func (p *plugin) RegisterPlugin(ctx context.Context, req *RegisterPluginRequest) (*RegisterPluginResponse, error) {
 	if p.isExternal() {
-		if req.PluginName == "" {
-			p.regC <- fmt.Errorf("plugin %q registered with an empty name", p.qualifiedName())
-			return &RegisterPluginResponse{}, errors.New("invalid (empty) plugin name")
+		if err := api.CheckPluginName(req.PluginName); err != nil {
+			p.regC <- fmt.Errorf("plugin registered with an invalid name: %w", err)
+			return &RegisterPluginResponse{}, fmt.Errorf("invalid plugin name: %w", err)
 		}
 		if err := api.CheckPluginIndex(req.PluginIdx); err != nil {
 			p.regC <- fmt.Errorf("plugin %q registered with an invalid index: %w", req.PluginName, err)
@@ -521,8 +521,14 @@ func (p *plugin) synchronize(ctx context.Context, pods []*PodSandbox, containers
 		log.Debugf(ctx, "sending sync message, %d/%d, %d/%d (more: %v)",
 			len(req.Pods), len(podsToSend), len(req.Containers), len(ctrsToSend), req.More)
 
+		start := time.Now()
 		rpl, err = p.impl.Synchronize(ctx, req)
+		p.r.metrics.RecordPluginLatency(p.name(), "Synchronize", time.Since(start))
+		p.r.metrics.RecordPluginInvocation(p.name(), "Synchronize", err)
 		if err == nil {
+			if rpl != nil {
+				p.r.metrics.RecordPluginAdjustments(p.name(), "Synchronize", nil, len(rpl.Update), 0)
+			}
 			if !req.More {
 				break
 			}
@@ -605,7 +611,10 @@ func (p *plugin) createContainer(ctx context.Context, req *CreateContainerReques
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
+	start := time.Now()
 	rpl, err := p.impl.CreateContainer(ctx, req)
+	p.r.metrics.RecordPluginLatency(p.name(), "CreateContainer", time.Since(start))
+	p.r.metrics.RecordPluginInvocation(p.name(), "CreateContainer", err)
 	if err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to handle CreateContainer request: %v",
@@ -614,6 +623,9 @@ func (p *plugin) createContainer(ctx context.Context, req *CreateContainerReques
 			return nil, nil
 		}
 		return nil, err
+	}
+	if rpl != nil {
+		p.r.metrics.RecordPluginAdjustments(p.name(), "CreateContainer", rpl.Adjust, len(rpl.Update), len(rpl.Evict))
 	}
 
 	return rpl, nil
@@ -628,7 +640,10 @@ func (p *plugin) updateContainer(ctx context.Context, req *UpdateContainerReques
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
+	start := time.Now()
 	rpl, err := p.impl.UpdateContainer(ctx, req)
+	p.r.metrics.RecordPluginLatency(p.name(), "UpdateContainer", time.Since(start))
+	p.r.metrics.RecordPluginInvocation(p.name(), "UpdateContainer", err)
 	if err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to handle UpdateContainer request: %v",
@@ -637,6 +652,9 @@ func (p *plugin) updateContainer(ctx context.Context, req *UpdateContainerReques
 			return nil, nil
 		}
 		return nil, err
+	}
+	if rpl != nil {
+		p.r.metrics.RecordPluginAdjustments(p.name(), "UpdateContainer", nil, len(rpl.Update), len(rpl.Evict))
 	}
 
 	return rpl, nil
@@ -651,7 +669,10 @@ func (p *plugin) stopContainer(ctx context.Context, req *StopContainerRequest) (
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
+	start := time.Now()
 	rpl, err = p.impl.StopContainer(ctx, req)
+	p.r.metrics.RecordPluginLatency(p.name(), "StopContainer", time.Since(start))
+	p.r.metrics.RecordPluginInvocation(p.name(), "StopContainer", err)
 	if err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to handle StopContainer request: %v",
@@ -660,6 +681,9 @@ func (p *plugin) stopContainer(ctx context.Context, req *StopContainerRequest) (
 			return nil, nil
 		}
 		return nil, err
+	}
+	if rpl != nil {
+		p.r.metrics.RecordPluginAdjustments(p.name(), "StopContainer", nil, len(rpl.Update), 0)
 	}
 
 	return rpl, nil
@@ -673,7 +697,11 @@ func (p *plugin) updatePodSandbox(ctx context.Context, req *UpdatePodSandboxRequ
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
-	if _, err := p.impl.UpdatePodSandbox(ctx, req); err != nil {
+	start := time.Now()
+	_, err := p.impl.UpdatePodSandbox(ctx, req)
+	p.r.metrics.RecordPluginLatency(p.name(), "UpdatePodSandbox", time.Since(start))
+	p.r.metrics.RecordPluginInvocation(p.name(), "UpdatePodSandbox", err)
+	if err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to handle event %d: %v",
 				p.name(), Event_UPDATE_POD_SANDBOX, err)
@@ -695,7 +723,16 @@ func (p *plugin) StateChange(ctx context.Context, evt *StateChangeEvent) (err er
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
-	if err = p.impl.StateChange(ctx, evt); err != nil {
+	start := time.Now()
+	err = p.impl.StateChange(ctx, evt)
+
+	var mask api.EventMask
+	mask.Set(evt.Event)
+	operation := fmt.Sprintf("StateChange/%s", mask.PrettyString())
+	p.r.metrics.RecordPluginLatency(p.name(), operation, time.Since(start))
+	p.r.metrics.RecordPluginInvocation(p.name(), operation, err)
+
+	if err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to handle event %d: %v",
 				p.name(), evt.Event, err)
@@ -716,7 +753,10 @@ func (p *plugin) ValidateContainerAdjustment(ctx context.Context, req *ValidateC
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
+	start := time.Now()
 	rpl, err := p.impl.ValidateContainerAdjustment(ctx, req)
+	p.r.metrics.RecordPluginLatency(p.name(), "ValidateContainerAdjustment", time.Since(start))
+	p.r.metrics.RecordPluginInvocation(p.name(), "ValidateContainerAdjustment", err)
 	if err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to validate request: %v", p.name(), err)

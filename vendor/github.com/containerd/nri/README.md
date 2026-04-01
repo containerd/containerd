@@ -134,16 +134,23 @@ NRI plugins can subscribe to the following pod lifecycle events:
   - stopping
   - removal
 
-The following pieces of pod metadata are available to plugins in NRI:
+The following table lists the pod sandbox properties exposed to NRI plugins, together with
+the first NRI, containerd and CRI-O versions each was available in.
 
-  - ID
-  - name
-  - UID
-  - namespace
-  - labels
-  - annotations
-  - cgroup parent directory
-  - runtime handler name
+| property                | since NRI | containerd | CRI-O   |
+|-------------------------|-----------|------------|---------|
+| ID                      | v0.2.0    | v1.7.0     | v1.26.0 |
+| name                    | v0.2.0    | v1.7.0     | v1.26.0 |
+| UID                     | v0.2.0    | v1.7.0     | v1.26.0 |
+| namespace               | v0.2.0    | v1.7.0     | v1.26.0 |
+| labels                  | v0.2.0    | v1.7.0     | v1.26.0 |
+| annotations             | v0.2.0    | v1.7.0     | v1.26.0 |
+| cgroup parent directory | v0.2.0    | v1.7.0     | v1.26.0 |
+| cgroups path            | v0.2.0    | v1.7.0     | v1.26.0 |
+| runtime handler name    | v0.2.0    | v1.7.0     | v1.26.0 |
+| process ID              | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux namespaces        | v0.2.0    | v1.7.0     | v1.26.0 |
+| IP addresses            | v0.8.0    | v2.1.0     | v1.32.0 |
 
 ### Container Data and Available Lifecycle Events
 
@@ -168,100 +175,107 @@ NRI plugins can subscribe to the following container lifecycle events:
 *) Plugins can request adjustment or updates to containers in response to
 these events.
 
-The following pieces of container metadata are available to plugins in NRI:
+The following table lists the container properties exposed to NRI plugins, together with the
+NRI, containerd and CRI-O versions each property was first available in.
 
-  - ID
-  - pod ID
-  - name
-  - state
-  - labels
-  - annotations
-  - command line arguments
-  - environment variables
-  - mounts
-  - user, group and supplemental group IDs
-  - OCI hooks
-  - rlimits
-  - I/O priority
-  - linux
-    - namespace IDs
-    - devices
-    - resources
-      - memory
-        - limit
-        - reservation
-        - swap limit
-        - kernel limit
-        - kernel TCP limit
-        - swappiness
-        - OOM disabled flag
-        - hierarchical accounting flag
-        - hugepage limits
-      - CPU
-        - shares
-        - quota
-        - period
-        - realtime runtime
-        - realtime period
-        - cpuset CPUs
-        - cpuset memory
-      - Block I/O class
-      - RDT class
-      - Unified cgroup v2 parameter map
-    - Linux seccomp profile and policy
-    - Linux network devices
-    - scheduling policy parameters
-  - container (init) process ID
-  - container (init process) exit status
-  - timestamp of container creation
-  - timestamp of starting the container
-  - timestamp of stopping the container/container exit
-  - container exit status reason (camelCase)
-  - container exit status message (human readable)
+| property                               | since NRI | containerd    | CRI-O         |
+|----------------------------------------|-----------|---------------|---------------|
+| ID                                     | v0.2.0    | v1.7.0        | v1.26.0       |
+| pod ID                                 | v0.2.0    | v1.7.0        | v1.26.0       |
+| name                                   | v0.2.0    | v1.7.0        | v1.26.0       |
+| state                                  | v0.2.0    | v1.7.0        | v1.26.0       |
+| labels                                 | v0.2.0    | v1.7.0        | v1.26.0       |
+| annotations                            | v0.2.0    | v1.7.0        | v1.26.0       |
+| command line arguments                 | v0.2.0    | v1.7.0        | v1.26.0       |
+| environment variables                  | v0.2.0    | v1.7.0        | v1.26.0       |
+| mounts                                 | v0.2.0    | v1.7.0        | v1.26.0       |
+| user, group and supplemental group IDs | v0.2.0    | v1.7.0        | v1.26.0       |
+| OCI hooks                              | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux namespaces                       | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux devices                          | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux memory limit                     | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux memory reservation               | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux swap limit                       | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux kernel limit                     | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux kernel TCP limit                 | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux swappiness                       | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux OOM killer disabling flag        | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux hierarchical accounting flag     | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux hugepage limits                  | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux CPU shares                       | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux CPU quota                        | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux CPU period                       | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux CPU realtime runtime             | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux CPU realtime period              | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux cpuset CPUs                      | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux cpuset memory                    | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux Block I/O class                  | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux RDT class                        | v0.2.0    | v1.7.0        | v1.26.0       |
+| Linux unified cgroup v2 parameter map  | v0.2.0    | v1.7.0        | v1.26.0       |
+| container (init) process ID            | v0.2.0    | v1.7.0        | v1.26.0       |
+| POSIX rlimits                          | v0.4.0    | unimplemented | unimplemented |
+| Linux PID limit                        | v0.7.0    | v2.0.0        | v1.32.0       |
+| Linux OOM score adjustment             | v0.7.0    | v2.0.0        | v1.32.0       |
+| CDI devices                            | v0.10.0   | unimplemented | unimplemented |
+| Linux security profile                 | v0.10.0   | v2.2.0        | unimplemented |
+| Linux seccomp policy                   | v0.10.0   | unimplemented | unimplemented |
+| Linux I/O priority                     | v0.10.0   | v2.2.1        | v1.35.0       |
+| Linux security profile                 | v0.10.0   | v2.2.1        | unimplemented |
+| Linux scheduling policy                | v0.11.0   | v2.2.1        | v1.35.0       |
+| Linux network devices                  | v0.11.0   | v2.2.1        | v1.35.0       |
+| Linux RDT CLOS                         | v0.11.0   | v2.2.1        | v1.35.0       |
+| Linux sysctl                           | v0.11.0   | unimplemented | unimplemented |
+| container user, groups                 | v0.11.0   | unimplemented | unimplemented |
+| container extra status                 | v0.10.0   | unimplemented | unimplemented |
 
 Apart from data identifying the container, these pieces of information
 represent the corresponding data in the container's [OCI Spec](https://github.com/opencontainers/runtime-spec/blob/main/spec.md).
 
 ### Container Adjustment
 
-During container creation plugins can request changes to the following
-container parameters:
+The following table lists the container properties a plugin can request changes to
+during container reation, together with the NRI, containerd and CRI-O versions each
+property was first available in.
 
-  - annotations
-  - mounts
-  - command line arguments
-  - environment variables
-  - OCI hooks
-  - rlimits
-  - I/O priority
-  - linux
-    - devices
-    - resources
-      - memory
-        - limit
-        - reservation
-        - swap limit
-        - kernel limit
-        - kernel TCP limit
-        - swappiness
-        - OOM disabled flag
-        - hierarchical accounting flag
-        - hugepage limits
-      - CPU
-        - shares
-        - quota
-        - period
-        - realtime runtime
-        - realtime period
-        - cpuset CPUs
-        - cpuset memory
-      - Block I/O class
-      - RDT class
-      - Unified cgroup v2 parameter map
-      - Linux seccomp policy
-      - Linux network devices
-    - Linux namespaces
-    - scheduling policy parameters
+
+| property                              | since NRI | containerd | CRI-O   |
+|---------------------------------------|-----------|------------|---------|
+| annotations                           | v0.2.0    | v1.7.0     | v1.26.0 |
+| mounts                                | v0.2.0    | v1.7.0     | v1.26.0 |
+| environment variables                 | v0.2.0    | v1.7.0     | v1.26.0 |
+| OCI hooks                             | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux devices                         | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux memory limit                    | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux memory reservation              | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux swap limit                      | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux kernel limit                    | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux kernel TCP limit                | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux swappiness                      | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux OOM killer disabling flag       | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux hierarchical accounting flag    | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux hugepage limits                 | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU shares                      | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU quota                       | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU period                      | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU realtime runtime            | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU realtime period             | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux cpuset CPUs                     | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux cpuset memory                   | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux Block I/O class                 | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux RDT class                       | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux unified cgroup v2 parameter map | v0.2.0    | v1.7.0     | v1.26.0 |
+| POSIX rlimits                         | v0.4.0    | v1.7.7     | v1.29.0 |
+| Linux PID limits                      | v0.7.0    | v2.0.0     | v1.32.0 |
+| Linux OOM score adjustment            | v0.7.0    | v2.0.0     | v1.32.0 |
+| CDI device injection                  | v0.7.0    | v2.0.0     | v1.32.0 |
+| Linux namespaces                      | v0.10.0   | v2.2.0     | v1.34.0 |
+| Linux seccomp policy                  | v0.10.0   | v2.2.0     | v1.34.0 |
+| Linux I/O priority                    | v0.10.0   | v2.2.0     | v1.34.0 |
+| Linux command line arguments          | v0.10.0   | v2.2.0     | v1.34.0 |
+| Linux scheduling policy               | v0.11.0   | v2.2.1     | v1.35.0 |
+| Linux network devices                 | v0.11.0   | v2.2.1     | v1.35.0 |
+| Linux RDT CLOS adjustment             | v0.11.0   | v2.2.1     | v1.35.0 |
+| Linux sysctl                          | v0.11.0   | v2.2.1     | v1.35.0 |
 
 ### Container Updates
 
@@ -269,31 +283,31 @@ Once a container has been created plugins can request updates to them.
 These updates can be requested in response to another containers creation
 request, in response to any containers update request, in response to any
 containers stop request, or they can be requested as part of a separate
-unsolicited container update request. The following container parameters
-can be updated this way:
+unsolicited container update request. The table lists the container properties
+which can be updated this way, together with the NRI, containerd and CRI-O
+versions each property was first available in for update.
 
-  - resources
-    - memory
-      - limit
-      - reservation
-      - swap limit
-      - kernel limit
-      - kernel TCP limit
-      - swappiness
-      - OOM disabled flag
-      - hierarchical accounting flag
-      - hugepage limits
-    - CPU
-      - shares
-      - quota
-      - period
-      - realtime runtime
-      - realtime period
-      - cpuset CPUs
-      - cpuset memory
-    - Block I/O class
-    - RDT class
-    - Unified cgroup v2 parameter map
+| property                              | since NRI | containerd | CRI-O   |
+|---------------------------------------|-----------|------------|---------|
+| Linux memory limit                    | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux memory reservation              | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux swap limit                      | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux kernel limit                    | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux kernel TCP limit                | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux swappiness                      | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux OOM disabled flag               | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux hierarchical accounting flag    | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux hugepage limits                 | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU shares                      | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU quota                       | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU period                      | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU realtime runtime            | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux CPU realtime period             | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux cpuset CPUs                     | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux cpuset memory                   | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux Block I/O class                 | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux RDT class                       | v0.2.0    | v1.7.0     | v1.26.0 |
+| Linux Unified cgroup v2 parameter map | v0.2.0    | v1.7.0     | v1.26.0 |
 
 ### Container Adjustment Validation
 
@@ -361,11 +375,14 @@ policy profile, a custom policy profile, and unconfined security profiles.
 3. Reject Linux Namespace adjustment: Reject any adjustment which tries to
 alter Linux namespaces of a container.
 
-4. Verify global mandatory plugins: Verify that all configured mandatory
+4. Reject Linux sysctl adjustment: Reject any adjustment which tries to
+alter Linux sysctl settings of a container.
+
+5. Verify global mandatory plugins: Verify that all configured mandatory
 plugins are present and have processed a container. Otherwise reject the
 creation of the container.
 
-5. Verify annotated mandatory plugins: Verify that an annotated set of
+6. Verify annotated mandatory plugins: Verify that an annotated set of
 container-specific mandatory plugins are present and have processed a
 container. Otherwise reject the creation of the container.
 
@@ -374,11 +391,12 @@ allows one to deploy mandatory plugins as containers themselves.
 
 #### Default Validation Scope
 
-Currently only OCI hook injection, Linux seccomp policy and Linux namespace
-adjustment can be restricted using the default validator. However, this probably
-will change in the future. Especially when NRI is extended with control over more
-container parameters. If newly added controls will have security implications,
-expect corresponding configurable restrictions in the default validator.
+Currently only OCI hook injection, Linux seccomp policy, Linux namespace and
+Linux sysctl adjustment can be restricted using the default validator. However,
+this probably will change in the future. Especially when NRI is extended with
+control over more container properties. If newly added controls will have
+security implications, expect corresponding configurable restrictions in the
+default validator.
 
 ## Runtime Adaptation
 
