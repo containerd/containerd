@@ -156,6 +156,11 @@ func NewMatcher(platform specs.Platform) Matcher {
 		m.osvM = &windowsVersionMatcher{
 			windowsOSVersion: getWindowsOSVersion(platform.OSVersion),
 		}
+
+		// In prior versions, the win32k os feature was not considered for matching,
+		// strip out the win32k feature for comparison
+		var stripped Matcher = windowsStripFeaturesMatcher{m}
+
 		// In prior versions, on windows, the returned matcher implements a
 		// MatchComprarer interface.
 		// This preserves that behavior for backwards compatibility.
@@ -165,8 +170,9 @@ func NewMatcher(platform specs.Platform) Matcher {
 		// It was likely intended to be used in `Ordered` but it is not since
 		// `Less` that is implemented here ends up getting masked due to wrapping.
 		if runtime.GOOS == "windows" {
-			return &windowsMatchComparer{m}
+			return &windowsMatchComparer{stripped}
 		}
+		return stripped
 	}
 	return m
 }
@@ -280,13 +286,9 @@ func Parse(specifier string) (specs.Platform, error) {
 			}
 			p.OSVersion = osVersion
 			if osOptions[3] != "" {
-				rawFeatures := strings.Split(osOptions[3][1:], "+")
-				p.OSFeatures = make([]string, len(rawFeatures))
-				for i, f := range rawFeatures {
-					p.OSFeatures[i], err = decodeOSOption(f)
-					if err != nil {
-						return specs.Platform{}, fmt.Errorf("%q has an invalid OS feature %q: %w", specifier, f, err)
-					}
+				p.OSFeatures, err = parseOSFeatures(osOptions[3][1:])
+				if err != nil {
+					return specs.Platform{}, fmt.Errorf("%q has invalid OS features: %w", specifier, err)
 				}
 			}
 		} else {
@@ -346,6 +348,30 @@ func Parse(specifier string) (specs.Platform, error) {
 	return specs.Platform{}, fmt.Errorf("%q: cannot parse platform specifier: %w", specifier, errInvalidArgument)
 }
 
+func parseOSFeatures(s string) ([]string, error) {
+	if s == "" {
+		return nil, nil
+	}
+
+	var features []string
+	for raw := range strings.SplitSeq(s, "+") {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return nil, fmt.Errorf("empty os feature: %w", errInvalidArgument)
+		}
+		feature, err := decodeOSOption(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid os feature %q: %w", raw, err)
+		}
+		if feature == "" {
+			continue
+		}
+		features = append(features, feature)
+	}
+
+	return features, nil
+}
+
 // MustParse is like Parses but panics if the specifier cannot be parsed.
 // Simplifies initialization of global variables.
 func MustParse(specifier string) specs.Platform {
@@ -371,21 +397,55 @@ func FormatAll(platform specs.Platform) string {
 	if platform.OS == "" {
 		return "unknown"
 	}
+	if platform.OSVersion == "" && len(platform.OSFeatures) == 0 {
+		return path.Join(platform.OS, platform.Architecture, platform.Variant)
+	}
 
-	osOptions := encodeOSOption(platform.OSVersion)
-	features := platform.OSFeatures
+	var b strings.Builder
+	b.WriteString(platform.OS)
+	osv := encodeOSOption(platform.OSVersion)
+	formatted := formatOSFeatures(platform.OSFeatures)
+	if osv != "" || formatted != "" {
+		b.Grow(len(osv) + len(formatted) + 3) // parens + maybe '+'
+		b.WriteByte('(')
+		if osv != "" {
+			b.WriteString(osv)
+		}
+		if formatted != "" {
+			b.WriteByte('+')
+			b.WriteString(formatted)
+		}
+		b.WriteByte(')')
+	}
+
+	return path.Join(b.String(), platform.Architecture, platform.Variant)
+}
+
+func formatOSFeatures(features []string) string {
+	if len(features) == 0 {
+		return ""
+	}
+
 	if !slices.IsSorted(features) {
 		features = slices.Clone(features)
 		slices.Sort(features)
 	}
+	var b strings.Builder
+	var wrote bool
+	var prev string
 	for _, f := range features {
-		osOptions += "+" + encodeOSOption(f)
+		if f == "" || f == prev {
+			// skip empty and duplicate values
+			continue
+		}
+		prev = f
+		if wrote {
+			b.WriteByte('+')
+		}
+		b.WriteString(encodeOSOption(f))
+		wrote = true
 	}
-	if osOptions != "" {
-		OSAndVersion := fmt.Sprintf("%s(%s)", platform.OS, osOptions)
-		return path.Join(OSAndVersion, platform.Architecture, platform.Variant)
-	}
-	return path.Join(platform.OS, platform.Architecture, platform.Variant)
+	return b.String()
 }
 
 // osOptionReplacer encodes characters in OS option values (version and

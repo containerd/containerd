@@ -24,7 +24,6 @@ import (
 )
 
 func getCPUVariant() (string, error) {
-
 	var variant string
 
 	switch runtime.GOOS {
