@@ -128,6 +128,182 @@ func TestOverlayFS(t *testing.T) {
 // TestOverlayFSDirReplacedByFile tests that when an upper layer replaces a
 // directory with a regular file, child paths return ErrNotExist rather than
 // a confusing "not a directory" error.
+// TestOverlayFSCrossLayerSymlink tests that a symlink in a lower layer
+// correctly resolves to a file in an upper layer when the symlink target
+// has been replaced by the upper layer.
+func TestOverlayFSCrossLayerSymlink(t *testing.T) {
+	base := t.TempDir()
+	upper := filepath.Join(base, "upper")
+	lower := filepath.Join(base, "lower")
+
+	// Lower layer: has a symlink etc/config -> ../opt/config
+	// and the original target file
+	if err := os.MkdirAll(filepath.Join(lower, "etc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(lower, "opt"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../opt/config", filepath.Join(lower, "etc", "config")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(lower, "opt", "config"), []byte("old-config"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Upper layer: replaces opt/config with new content
+	if err := os.MkdirAll(filepath.Join(upper, "opt"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(upper, "opt", "config"), []byte("new-config"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	lowerdir := strings.Join([]string{upper, lower}, ":")
+	v, err := fsview.FSMounts([]mount.Mount{
+		{
+			Type:   "overlay",
+			Source: "overlay",
+			Options: []string{
+				"lowerdir=" + lowerdir,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FSMounts failed: %v", err)
+	}
+	defer v.Close()
+
+	// Opening etc/config should follow the symlink through the overlay
+	// and find opt/config from the upper layer (new-config), not the lower.
+	data, err := fs.ReadFile(v, "etc/config")
+	if err != nil {
+		t.Fatalf("ReadFile etc/config: %v", err)
+	}
+	if string(data) != "new-config" {
+		t.Errorf("expected new-config, got %s", data)
+	}
+
+	// Direct open of opt/config should also return upper layer content
+	data, err = fs.ReadFile(v, "opt/config")
+	if err != nil {
+		t.Fatalf("ReadFile opt/config: %v", err)
+	}
+	if string(data) != "new-config" {
+		t.Errorf("expected new-config, got %s", data)
+	}
+}
+
+// TestOverlayFSAbsoluteSymlinkCrossLayer tests absolute symlinks that
+// resolve across layers.
+func TestOverlayFSAbsoluteSymlinkCrossLayer(t *testing.T) {
+	base := t.TempDir()
+	upper := filepath.Join(base, "upper")
+	lower := filepath.Join(base, "lower")
+
+	// Lower layer: has /etc/group -> /nix/store/abcd/group
+	// and the original target file
+	if err := os.MkdirAll(filepath.Join(lower, "etc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(lower, "nix", "store", "abcd"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/nix/store/abcd/group", filepath.Join(lower, "etc", "group")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(lower, "nix", "store", "abcd", "group"), []byte("old-group"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Upper layer: replaces nix/store/abcd/group with new content
+	if err := os.MkdirAll(filepath.Join(upper, "nix", "store", "abcd"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(upper, "nix", "store", "abcd", "group"), []byte("new-group"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	lowerdir := strings.Join([]string{upper, lower}, ":")
+	v, err := fsview.FSMounts([]mount.Mount{
+		{
+			Type:   "overlay",
+			Source: "overlay",
+			Options: []string{
+				"lowerdir=" + lowerdir,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FSMounts failed: %v", err)
+	}
+	defer v.Close()
+
+	// Opening etc/group should follow the absolute symlink through the overlay
+	// and find nix/store/abcd/group from the upper layer.
+	data, err := fs.ReadFile(v, "etc/group")
+	if err != nil {
+		t.Fatalf("ReadFile etc/group: %v", err)
+	}
+	if string(data) != "new-group" {
+		t.Errorf("expected new-group, got %s", data)
+	}
+}
+
+// TestOverlayFSSymlinkChain tests chained symlinks across layers.
+func TestOverlayFSSymlinkChain(t *testing.T) {
+	base := t.TempDir()
+	upper := filepath.Join(base, "upper")
+	lower := filepath.Join(base, "lower")
+
+	// Lower layer: a -> b (symlink), b -> c (symlink), c is a file
+	if err := os.MkdirAll(lower, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(upper, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("b", filepath.Join(lower, "a")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("c", filepath.Join(lower, "b")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(lower, "c"), []byte("lower-c"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Upper layer: replaces c
+	if err := os.WriteFile(filepath.Join(upper, "c"), []byte("upper-c"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	lowerdir := strings.Join([]string{upper, lower}, ":")
+	v, err := fsview.FSMounts([]mount.Mount{
+		{
+			Type:   "overlay",
+			Source: "overlay",
+			Options: []string{
+				"lowerdir=" + lowerdir,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FSMounts failed: %v", err)
+	}
+	defer v.Close()
+
+	// Opening a should follow a -> b -> c through the overlay,
+	// finding c from the upper layer.
+	data, err := fs.ReadFile(v, "a")
+	if err != nil {
+		t.Fatalf("ReadFile a: %v", err)
+	}
+	if string(data) != "upper-c" {
+		t.Errorf("expected upper-c, got %s", data)
+	}
+}
+
 func TestOverlayFSDirReplacedByFile(t *testing.T) {
 	base := t.TempDir()
 	layer1 := filepath.Join(base, "layer1")

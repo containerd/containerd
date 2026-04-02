@@ -18,6 +18,7 @@ package erofs
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -81,14 +82,22 @@ func handleMount(m mount.Mount) (fsview.View, error) {
 		return nil, err
 	}
 
+	rlfs, ok := efs.(fs.ReadLinkFS)
+	if !ok {
+		for _, c := range closers {
+			c.Close()
+		}
+		return nil, fmt.Errorf("erofs: filesystem does not implement fs.ReadLinkFS: %w", errdefs.ErrNotImplemented)
+	}
+
 	return &erofsView{
-		FS:      efs,
-		closers: closers,
+		ReadLinkFS: rlfs,
+		closers:    closers,
 	}, nil
 }
 
 type erofsView struct {
-	fs.FS
+	fs.ReadLinkFS
 	closers []io.Closer
 }
 
