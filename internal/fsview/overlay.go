@@ -22,6 +22,8 @@ import (
 	"io/fs"
 	"path"
 	"sort"
+	"strings"
+	"syscall"
 )
 
 // OverlayOpaqueXattrs are the xattr names used to indicate an opaque directory.
@@ -32,6 +34,10 @@ var OverlayOpaqueXattrs = []string{
 	"trusted.overlay.opaque",
 	"user.overlay.opaque",
 }
+
+// maxSymlinks is the maximum number of symlinks that will be followed
+// when resolving a path, to prevent infinite loops.
+const maxSymlinks = 255
 
 // NewOverlayFS returns a new fs.FS that overlays the provided layers.
 // The layers should be provided in order from upper to lower.
@@ -63,7 +69,236 @@ func hasOpaqueParent(layer fs.FS, name string) bool {
 	return false
 }
 
+// lstatLayer returns the FileInfo for name in the layer without following
+// the final symlink component. If the layer implements fs.ReadLinkFS, it
+// uses Lstat directly. Otherwise it falls back to Open+Stat which follows
+// symlinks (degraded behavior).
+func lstatLayer(layer fs.FS, name string) (fs.FileInfo, error) {
+	if rl, ok := layer.(fs.ReadLinkFS); ok {
+		return rl.Lstat(name)
+	}
+	f, err := layer.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return f.Stat()
+}
+
+// readlinkLayer returns the symlink target for name in the layer.
+// The layer must implement fs.ReadLinkFS.
+func readlinkLayer(layer fs.FS, name string) (string, error) {
+	if rl, ok := layer.(fs.ReadLinkFS); ok {
+		return rl.ReadLink(name)
+	}
+	return "", &fs.PathError{Op: "readlink", Path: name, Err: syscall.EINVAL}
+}
+
 func (o *overlayFS) Open(name string) (fs.File, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
+	}
+	return o.openFollow(name, 0)
+}
+
+// Lstat returns a FileInfo describing the named file without following
+// the final symlink component. Intermediate symlinks are resolved through
+// the overlay so that cross-layer symlink targets are found correctly.
+func (o *overlayFS) Lstat(name string) (fs.FileInfo, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "lstat", Path: name, Err: fs.ErrInvalid}
+	}
+	resolved, err := o.resolve(name, false, 0)
+	if err != nil {
+		return nil, err
+	}
+	return o.lstatDirect(resolved)
+}
+
+// ReadLink returns the destination of the named symbolic link.
+// Intermediate path components are resolved through the overlay.
+func (o *overlayFS) ReadLink(name string) (string, error) {
+	if !fs.ValidPath(name) {
+		return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
+	}
+	resolved, err := o.resolve(name, false, 0)
+	if err != nil {
+		return "", err
+	}
+	return o.readlinkDirect(resolved)
+}
+
+// openFollow opens a file, resolving symlinks at the overlay level.
+// depth tracks the number of symlinks followed to detect loops.
+func (o *overlayFS) openFollow(name string, depth int) (fs.File, error) {
+	resolved, err := o.resolve(name, true, depth)
+	if err != nil {
+		return nil, err
+	}
+	return o.openDirect(resolved)
+}
+
+// resolve walks the path component by component, resolving symlinks at the
+// overlay level. When follow is true, symlinks in the final component are
+// also resolved. Returns the fully resolved path with no symlinks.
+func (o *overlayFS) resolve(name string, follow bool, depth int) (string, error) {
+	if name == "." {
+		return ".", nil
+	}
+	parts := strings.Split(name, "/")
+	resolved := ""
+
+	for i, part := range parts {
+		isLast := i == len(parts)-1
+
+		var candidate string
+		if resolved == "" {
+			candidate = part
+		} else {
+			candidate = resolved + "/" + part
+		}
+
+		// Lstat this component across the overlay layers
+		fi, err := o.lstatDirect(candidate)
+		if err != nil {
+			return "", err
+		}
+
+		if fi.Mode()&fs.ModeSymlink != 0 {
+			if isLast && !follow {
+				// Don't follow the final component for Lstat/ReadLink
+				resolved = candidate
+				continue
+			}
+
+			depth++
+			if depth > maxSymlinks {
+				return "", &fs.PathError{Op: "open", Path: name, Err: syscall.ELOOP}
+			}
+
+			target, err := o.readlinkDirect(candidate)
+			if err != nil {
+				return "", err
+			}
+
+			// Build the new path: target + remaining components
+			remaining := ""
+			if !isLast {
+				remaining = strings.Join(parts[i+1:], "/")
+			}
+
+			var newPath string
+			if path.IsAbs(target) {
+				// Absolute symlink: resolve from root
+				target = strings.TrimPrefix(target, "/")
+				if remaining != "" {
+					newPath = target + "/" + remaining
+				} else {
+					newPath = target
+				}
+			} else {
+				// Relative symlink: resolve from parent of current component
+				parent := path.Dir(candidate)
+				joined := path.Join(parent, target)
+				if remaining != "" {
+					newPath = joined + "/" + remaining
+				} else {
+					newPath = joined
+				}
+			}
+			newPath = path.Clean(newPath)
+			if newPath == "." {
+				return ".", nil
+			}
+
+			// Restart resolution from the root of the overlay
+			return o.resolve(newPath, follow, depth)
+		}
+
+		if !fi.IsDir() && !isLast {
+			// Non-directory, non-symlink in an intermediate position
+			return "", &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+		}
+
+		resolved = candidate
+	}
+
+	return resolved, nil
+}
+
+// lstatDirect does an Lstat across overlay layers, respecting whiteouts
+// and opaque directories. It does NOT resolve symlinks - the path must
+// already have intermediate symlinks resolved.
+func (o *overlayFS) lstatDirect(name string) (fs.FileInfo, error) {
+	var firstErr error
+	var opaque bool
+
+	for _, layer := range o.layers {
+		if opaque {
+			break
+		}
+		if hasOpaqueParent(layer, name) {
+			opaque = true
+		}
+
+		fi, err := lstatLayer(layer, name)
+		if err != nil {
+			var pe *fs.PathError
+			if !errors.As(err, &pe) && firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+
+		if isWhiteout(fi) {
+			return nil, &fs.PathError{Op: "lstat", Path: name, Err: fs.ErrNotExist}
+		}
+
+		return fi, nil
+	}
+
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return nil, &fs.PathError{Op: "lstat", Path: name, Err: fs.ErrNotExist}
+}
+
+// readlinkDirect reads the symlink target from the first matching layer,
+// respecting whiteouts and opaque directories. The path must already have
+// intermediate symlinks resolved.
+func (o *overlayFS) readlinkDirect(name string) (string, error) {
+	var opaque bool
+
+	for _, layer := range o.layers {
+		if opaque {
+			break
+		}
+		if hasOpaqueParent(layer, name) {
+			opaque = true
+		}
+
+		fi, err := lstatLayer(layer, name)
+		if err != nil {
+			continue
+		}
+
+		if isWhiteout(fi) {
+			return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrNotExist}
+		}
+
+		if fi.Mode()&fs.ModeSymlink == 0 {
+			return "", &fs.PathError{Op: "readlink", Path: name, Err: syscall.EINVAL}
+		}
+
+		return readlinkLayer(layer, name)
+	}
+
+	return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrNotExist}
+}
+
+// openDirect opens a fully-resolved path (no symlinks) using the
+// original layer-by-layer logic with directory merging.
+func (o *overlayFS) openDirect(name string) (fs.File, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
@@ -197,12 +432,6 @@ func (d *overlayDir) ReadDir(n int) ([]fs.DirEntry, error) {
 					d.entries = append(d.entries, e)
 				}
 			}
-			// Opaque check is done during Open to filter layers, so we don't need to check here?
-			// Wait, Open filters layers for *this* directory.
-			// But subdirectories?
-			// No, d.layers are the layers for *this* directory.
-			// The opaque check in Open ensured that if a layer was opaque, we stopped adding lower layers to d.layers.
-			// So we can safely merge all d.layers.
 		}
 		sort.Slice(d.entries, func(i, j int) bool { return d.entries[i].Name() < d.entries[j].Name() })
 		d.read = true

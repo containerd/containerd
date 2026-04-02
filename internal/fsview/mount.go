@@ -48,6 +48,29 @@ func (v view) Close() error {
 	return nil
 }
 
+// readLinkView wraps an fs.ReadLinkFS with a cleanup function,
+// implementing both View and fs.ReadLinkFS.
+type readLinkView struct {
+	fs.ReadLinkFS
+	cleanup func() error
+}
+
+func (v readLinkView) Close() error {
+	if v.cleanup != nil {
+		return v.cleanup()
+	}
+	return nil
+}
+
+// newView creates a View that preserves fs.ReadLinkFS if the underlying
+// fs.FS implements it.
+func newView(fsys fs.FS, cleanup func() error) View {
+	if rl, ok := fsys.(fs.ReadLinkFS); ok {
+		return readLinkView{ReadLinkFS: rl, cleanup: cleanup}
+	}
+	return view{FS: fsys, cleanup: cleanup}
+}
+
 // FSMounts returns a View for the provided mounts if possible to open
 // the mounts directly without mounting.
 //
@@ -89,7 +112,7 @@ func openBind(m mount.Mount) (View, error) {
 	if err != nil {
 		return nil, err
 	}
-	return view{FS: r.FS(), cleanup: r.Close}, nil
+	return newView(r.FS(), r.Close), nil
 }
 
 func openOverlay(m mount.Mount) (View, error) {
@@ -157,16 +180,13 @@ func newOverlayView(layers []View) (View, error) {
 		return nil, err
 	}
 
-	return view{
-		FS: ofs,
-		cleanup: func() error {
-			var errs []error
-			for _, layer := range layers {
-				errs = append(errs, layer.Close())
-			}
-			return errors.Join(errs...)
-		},
-	}, nil
+	return newView(ofs, func() error {
+		var errs []error
+		for _, layer := range layers {
+			errs = append(errs, layer.Close())
+		}
+		return errors.Join(errs...)
+	}), nil
 }
 
 // resolveOverlayValue resolves a single overlay option value, which may be
@@ -177,7 +197,7 @@ func resolveOverlayValue(s string, preceding []mount.Mount) ([]View, error) {
 		if err != nil {
 			return nil, err
 		}
-		return []View{view{FS: r.FS(), cleanup: r.Close}}, nil
+		return []View{newView(r.FS(), r.Close)}, nil
 	}
 
 	tmplExpr, suffix := splitTemplateSuffix(s)
@@ -200,7 +220,7 @@ func resolveOverlayValue(s string, preceding []mount.Mount) ([]View, error) {
 			if err != nil {
 				return "", fmt.Errorf("failed to open source of mount %d: %w", i, err)
 			}
-			addLayer(view{FS: r.FS(), cleanup: r.Close})
+			addLayer(newView(r.FS(), r.Close))
 			return "", nil
 		},
 		"mount": func(i int) (string, error) {
@@ -259,7 +279,7 @@ func resolveOverlayValue(s string, preceding []mount.Mount) ([]View, error) {
 				}
 				return nil, fmt.Errorf("failed to create sub view for path %q: %w", suffix, err)
 			}
-			layers[i] = view{FS: subFS, cleanup: l.Close}
+			layers[i] = newView(subFS, l.Close)
 		}
 	}
 
@@ -301,7 +321,7 @@ func openOverlayPaths(options []string) ([]View, error) {
 			}
 			return nil, err
 		}
-		layers = append(layers, view{FS: r.FS(), cleanup: r.Close})
+		layers = append(layers, newView(r.FS(), r.Close))
 	}
 	return layers, nil
 }
