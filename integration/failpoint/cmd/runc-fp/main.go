@@ -20,14 +20,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -40,8 +40,10 @@ type invokerInterceptor func(context.Context, invoker) error
 
 var (
 	failpointProfiles = map[string]invokerInterceptor{
-		"issue9103": issue9103KillInitAfterCreate,
-		"delayExec": delayExec,
+		"issue9103":   issue9103KillInitAfterCreate,
+		"delayExec":   delayExec,
+		"delayUpdate": delayUpdate,
+		"doNothing":   doNothing,
 	}
 )
 
@@ -71,12 +73,29 @@ func setupLog() {
 
 func main() {
 	setupLog()
-
-	fpProfile, err := failpointProfileFromOCIAnnotation()
+	var fpProfile invokerInterceptor
+	fpProfileFromOci, err := failpointProfileFromOCIAnnotation()
 	if err != nil {
-		logrus.WithError(err).Fatal("failed to get failpoint profile")
+		logrus.WithError(err).Warnf("failed to get failpoint profile")
+	}
+	fpProfileFromfile, err := failpointFromFile()
+	if err != nil {
+		logrus.WithError(err).Warnf("failed to get failpoint profile")
+	}
+	if fpProfileFromOci != nil && fpProfileFromfile != nil {
+		logrus.WithError(err).Fatal("fpProfileFromOci and  fpProfileFromfile is not nill")
 	}
 
+	if fpProfileFromOci != nil {
+		fpProfile = fpProfileFromOci
+	}
+
+	if fpProfileFromfile != nil {
+		fpProfile = fpProfileFromfile
+	}
+	if fpProfile == nil {
+		fpProfile = doNothing
+	}
 	ctx := context.Background()
 	if err := fpProfile(ctx, defaultRuncInvoker); err != nil {
 		logrus.WithError(err).Fatal("failed to exec failpoint profile")
@@ -90,6 +109,26 @@ func defaultRuncInvoker(ctx context.Context) error {
 	return cmd.Run()
 }
 
+func failpointFromFile() (invokerInterceptor, error) {
+	data, err := os.ReadFile("/tmp/failpoint_profile.json")
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]string
+	err = json.Unmarshal(data, &result)
+	if err != nil {
+		return nil, err
+	}
+	if failpoint, ok := result["failpoint"]; ok {
+		fp, ok := failpointProfiles[failpoint]
+		if !ok {
+			return nil, fmt.Errorf("no such failpoint profile %s", failpoint)
+		}
+		return fp, nil
+	}
+	return nil, fmt.Errorf("can't get failpoint from file /tmp/failpoint_profile.json")
+}
+
 // failpointProfileFromOCIAnnotation gets the profile from OCI annotations.
 func failpointProfileFromOCIAnnotation() (invokerInterceptor, error) {
 	spec, err := oci.ReadSpec(oci.ConfigFilename)
@@ -101,7 +140,6 @@ func failpointProfileFromOCIAnnotation() (invokerInterceptor, error) {
 	if !ok {
 		return nil, fmt.Errorf("failpoint profile is required")
 	}
-
 	fp, ok := failpointProfiles[profileName]
 	if !ok {
 		return nil, fmt.Errorf("no such failpoint profile %s", profileName)
