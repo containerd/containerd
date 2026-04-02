@@ -66,6 +66,10 @@ func (p *BootstrapParams) AddExtension(msg proto.Message) error {
 
 // FindExtension finds an extension matching the type of dst and unmarshals it.
 func (p *BootstrapParams) FindExtension(dst proto.Message) (bool, error) {
+	if p == nil {
+		return false, nil
+	}
+
 	name := dst.ProtoReflect().Descriptor().FullName()
 
 	for _, ext := range p.Extensions {
