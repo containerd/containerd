@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package fsview
+package fsview_test
 
 import (
 	"context"
@@ -28,6 +28,9 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
+	"github.com/containerd/containerd/v2/internal/fsview"
+	_ "github.com/containerd/containerd/v2/plugins/mount/fsview/erofs"
+
 	"github.com/containerd/containerd/v2/pkg/archive/tartest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,7 +59,7 @@ func TestFSMountsLast(t *testing.T) {
 	}
 
 	// Should pick the last one (dir2)
-	fs, err := FSMounts(mounts)
+	fs, err := fsview.FSMounts(mounts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +172,7 @@ func TestFSMountsEROFSWithDevices(t *testing.T) {
 
 	metaPath := mergeEROFSLayers(t, layer1Path, layer2Path)
 
-	v, err := FSMounts([]mount.Mount{
+	v, err := fsview.FSMounts([]mount.Mount{
 		{
 			Type:    "erofs",
 			Source:  metaPath,
@@ -220,7 +223,7 @@ func TestFSMountsOverlayAbsoluteSymlinkEtcGroup(t *testing.T) {
 		tc.Symlink("/nix/store/abcd/group", "etc/group"),
 	))
 
-	v, err := FSMounts([]mount.Mount{
+	v, err := fsview.FSMounts([]mount.Mount{
 		{
 			Type:   "erofs",
 			Source: layerPath,
@@ -297,7 +300,7 @@ func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, err := FSMounts([]mount.Mount{
+	v, err := fsview.FSMounts([]mount.Mount{
 		{
 			Type:    "erofs",
 			Source:  metaPath,
@@ -377,7 +380,7 @@ func TestFormatMountIndexWithSuffix(t *testing.T) {
 		},
 	}
 
-	viewFS, err := FSMounts(mounts)
+	viewFS, err := fsview.FSMounts(mounts)
 	require.NoError(t, err)
 	defer viewFS.Close()
 

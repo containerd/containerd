@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package fsview
+package fsview_test
 
 import (
 	"errors"
@@ -27,6 +27,8 @@ import (
 	"testing/fstest"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/fsview"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -47,7 +49,7 @@ func TestOverlayFS(t *testing.T) {
 		"dir3/file4":  &fstest.MapFile{Data: []byte("upper-file4")},
 	}
 
-	ofs, err := NewOverlayFS([]fs.FS{upper, lower})
+	ofs, err := fsview.NewOverlayFS([]fs.FS{upper, lower})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +160,7 @@ func TestOverlayFSDirReplacedByFile(t *testing.T) {
 	}
 
 	lowerdir := strings.Join([]string{layer3, layer2, layer1}, ":")
-	v, err := FSMounts([]mount.Mount{
+	v, err := fsview.FSMounts([]mount.Mount{
 		{
 			Type:   "overlay",
 			Source: "overlay",

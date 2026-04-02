@@ -14,13 +14,14 @@
    limitations under the License.
 */
 
-package fsview
+package fsview_test
 
 import (
 	"io/fs"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/fsview"
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,7 +54,7 @@ func TestFormatMountTemplates(t *testing.T) {
 		},
 	}
 
-	viewFS, err := FSMounts(mounts)
+	viewFS, err := fsview.FSMounts(mounts)
 	require.NoError(t, err)
 	defer viewFS.Close()
 
@@ -102,7 +103,7 @@ func TestFormatMountReversedRange(t *testing.T) {
 		},
 	}
 
-	viewFS, err := FSMounts(mounts)
+	viewFS, err := fsview.FSMounts(mounts)
 	require.NoError(t, err)
 	defer viewFS.Close()
 
@@ -135,7 +136,7 @@ func TestFormatMountIndexes(t *testing.T) {
 		},
 	}
 
-	viewFS, err := FSMounts(mounts)
+	viewFS, err := fsview.FSMounts(mounts)
 	require.NoError(t, err)
 	defer viewFS.Close()
 
@@ -161,7 +162,7 @@ func TestFormatMountUnsupportedType(t *testing.T) {
 		},
 	}
 
-	_, err := FSMounts(mounts)
+	_, err := fsview.FSMounts(mounts)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errdefs.ErrNotImplemented)
 }

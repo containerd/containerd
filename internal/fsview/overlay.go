@@ -24,11 +24,11 @@ import (
 	"sort"
 )
 
-// overlayOpaqueXattrs are the xattr names used to indicate an opaque directory.
+// OverlayOpaqueXattrs are the xattr names used to indicate an opaque directory.
 // "trusted.overlay.opaque" is the traditional xattr used by overlay.
 // "user.overlay.opaque" is available since Linux 5.11.
 // See https://github.com/torvalds/linux/commit/2d2f2d7322ff43e0fe92bf8cccdc0b09449bf2e1
-var overlayOpaqueXattrs = []string{
+var OverlayOpaqueXattrs = []string{
 	"trusted.overlay.opaque",
 	"user.overlay.opaque",
 }

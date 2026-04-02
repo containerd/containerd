@@ -27,7 +27,6 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"
-	"github.com/erofs/go-erofs"
 )
 
 // View is an interface for temporarily viewing a filesystem,
@@ -49,137 +48,58 @@ func (v view) Close() error {
 	return nil
 }
 
-// FSMounts will return a fs.FS for the provided mounts if possible to open
-// the mounts directly without mounting. Possible mounts for direct open..
-// - Bind mounts: Able to just open the source path directly
-// - Overlay mounts: Able to open the merged path directly if all lower/upper work dirs are accessible
-// - erofs mounts: Able to open the source paths directory using go-erofs library and overlay the results
-// - format/* mounts: Apply template formatting using previous mount sources, then process the result
+// FSMounts returns a View for the provided mounts if possible to open
+// the mounts directly without mounting.
 //
-// If not supported, a nil fs.FS and an error will be returned.
+// If not supported, a nil View and an error will be returned.
 func FSMounts(m []mount.Mount) (View, error) {
 	if len(m) == 0 {
 		return nil, nil
 	}
-
-	return mountToView(m[len(m)-1], m[:len(m)-1])
+	return resolveMount(m[len(m)-1], m[:len(m)-1])
 }
 
-// mountToView converts a mount to a View, using preceding mounts for resolution if needed.
-func mountToView(m mount.Mount, preceding []mount.Mount) (View, error) {
-	switch m.Type {
-	case "bind", "rbind":
-		r, err := os.OpenRoot(m.Source)
-		if err != nil {
-			return nil, err
+// resolveMount tries registered handlers first, then built-in handlers.
+func resolveMount(m mount.Mount, preceding []mount.Mount) (View, error) {
+	for _, h := range registered {
+		if h.HandleMount == nil {
+			continue
 		}
-		return view{
-			FS:      r.FS(),
-			cleanup: r.Close,
-		}, nil
-	case "erofs":
-		return openEROFS(m)
-	case "overlay":
+		v, err := h.HandleMount(m)
+		if errors.Is(err, errdefs.ErrNotImplemented) {
+			continue
+		}
+		return v, err
+	}
+
+	switch {
+	case m.Type == "bind" || m.Type == "rbind":
+		return openBind(m)
+	case m.Type == "overlay":
 		return openOverlay(m)
-	default:
-		// Check if this is a format/* mount
-		if strings.HasPrefix(m.Type, "format/") {
-			return openFormatMount(m, preceding)
-		}
+	case strings.HasPrefix(m.Type, "format/"):
+		return openFormatMount(m, preceding)
 	}
 
 	return nil, fmt.Errorf("mount type %s cannot be directly viewed: %w", m.Type, errdefs.ErrNotImplemented)
 }
 
-// openEROFS opens an EROFS mount as a View.
-func openEROFS(m mount.Mount) (View, error) {
-	f, err := os.Open(m.Source)
+func openBind(m mount.Mount) (View, error) {
+	r, err := os.OpenRoot(m.Source)
 	if err != nil {
 		return nil, err
 	}
-
-	// Check for additional devices in mount options
-	var extraDevices []io.ReaderAt
-	var closers []io.Closer
-	closers = append(closers, f)
-
-	for _, opt := range m.Options {
-		if devPath, ok := strings.CutPrefix(opt, "device="); ok {
-			if devPath == "" {
-				continue
-			}
-			df, err := os.Open(devPath)
-			if err != nil {
-				for _, c := range closers {
-					c.Close()
-				}
-				return nil, err
-			}
-			closers = append(closers, df)
-			extraDevices = append(extraDevices, df)
-		}
-	}
-
-	var opts []erofs.Opt
-	if len(extraDevices) > 0 {
-		opts = append(opts, erofs.WithExtraDevices(extraDevices...))
-	}
-
-	efs, err := erofs.EroFS(f, opts...)
-	if err != nil {
-		for _, c := range closers {
-			c.Close()
-		}
-		return nil, err
-	}
-
-	return view{
-		FS: efs,
-		cleanup: func() error {
-			var errs []error
-			for _, c := range closers {
-				errs = append(errs, c.Close())
-			}
-			return errors.Join(errs...)
-		},
-	}, nil
+	return view{FS: r.FS(), cleanup: r.Close}, nil
 }
 
-// openOverlay opens an overlay mount as a View.
 func openOverlay(m mount.Mount) (View, error) {
-	layers, err := getOverlayFSLayers(m.Options)
+	layers, err := openOverlayPaths(m.Options)
 	if err != nil {
 		return nil, err
 	}
-
-	// Extract fs.FS from each View
-	var fsList []fs.FS
-	for _, layer := range layers {
-		fsList = append(fsList, layer)
-	}
-
-	ofs, err := NewOverlayFS(fsList)
-	if err != nil {
-		// Cleanup all layer views
-		for _, layer := range layers {
-			layer.Close()
-		}
-		return nil, err
-	}
-
-	return view{
-		FS: ofs,
-		cleanup: func() error {
-			var errs []error
-			for _, layer := range layers {
-				errs = append(errs, layer.Close())
-			}
-			return errors.Join(errs...)
-		},
-	}, nil
+	return newOverlayView(layers)
 }
 
-// openFormatMount opens a format/* mount by resolving templates and creating an overlay.
 func openFormatMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 	types := strings.Split(m.Type, "/")
 	if len(types) < 2 || types[0] != "format" || types[len(types)-1] != "overlay" {
@@ -187,17 +107,21 @@ func openFormatMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 	}
 
 	var layers []View
+	closeLayers := func() {
+		for _, l := range layers {
+			l.Close()
+		}
+	}
 	for _, opt := range m.Options {
 		if val, ok := strings.CutPrefix(opt, "upperdir="); ok {
-			upper, err := handleOverlayFormat(val, preceding)
+			upper, err := resolveOverlayValue(val, preceding)
 			if err != nil {
 				if errors.Is(err, errdefs.ErrNotImplemented) {
-					// Do no include upper if not locally viewable, likely ephemeral and empty
 					continue
 				}
+				closeLayers()
 				return nil, fmt.Errorf("failed to handle upperdir option: %w", err)
 			}
-			// Extract the upperdir value and format it
 			if len(layers) > 0 {
 				layers = append(upper, layers...)
 			} else {
@@ -206,8 +130,9 @@ func openFormatMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 		}
 		if val, ok := strings.CutPrefix(opt, "lowerdir="); ok {
 			for l := range strings.SplitSeq(val, ":") {
-				lowers, err := handleOverlayFormat(l, preceding)
+				lowers, err := resolveOverlayValue(l, preceding)
 				if err != nil {
+					closeLayers()
 					return nil, fmt.Errorf("failed to handle lowerdir option: %w", err)
 				}
 				layers = append(layers, lowers...)
@@ -215,7 +140,10 @@ func openFormatMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 		}
 	}
 
-	// Extract fs.FS from each View
+	return newOverlayView(layers)
+}
+
+func newOverlayView(layers []View) (View, error) {
 	var fsList []fs.FS
 	for _, layer := range layers {
 		fsList = append(fsList, layer)
@@ -223,7 +151,6 @@ func openFormatMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 
 	ofs, err := NewOverlayFS(fsList)
 	if err != nil {
-		// Cleanup all layer views
 		for _, layer := range layers {
 			layer.Close()
 		}
@@ -242,31 +169,21 @@ func openFormatMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 	}, nil
 }
 
-// handleOverlayFormat resolves formatted overlay values.
-// A value may be a plain path or contain Go template expressions
-// (e.g. "{{ mount 0 }}" or "{{ mount 0 }}/sub"). Any path suffix after the
-// closing "}}" is separated before execution and applied via fs.Sub.
-func handleOverlayFormat(s string, preceding []mount.Mount) ([]View, error) {
+// resolveOverlayValue resolves a single overlay option value, which may be
+// a plain directory path or a Go template expression like "{{ mount 0 }}".
+func resolveOverlayValue(s string, preceding []mount.Mount) ([]View, error) {
 	if !strings.Contains(s, "{{") {
-		// Only directories may be used for overlay
 		r, err := os.OpenRoot(s)
 		if err != nil {
 			return nil, err
 		}
-		return []View{view{
-			FS:      r.FS(),
-			cleanup: r.Close,
-		}}, nil
+		return []View{view{FS: r.FS(), cleanup: r.Close}}, nil
 	}
 
-	// Split "{{ ... }}/optional/suffix" into the template and suffix parts
-	// so that the suffix can be applied with fs.Sub after execution.
 	tmplExpr, suffix := splitTemplateSuffix(s)
 
 	var layers []View
-	addLayer := func(v View) {
-		layers = append(layers, v)
-	}
+	addLayer := func(v View) { layers = append(layers, v) }
 	boundsCheck := func(i int) error {
 		if i < 0 || i >= len(preceding) {
 			return fmt.Errorf("index out of bounds: %d, has %d preceding mounts", i, len(preceding))
@@ -275,26 +192,22 @@ func handleOverlayFormat(s string, preceding []mount.Mount) ([]View, error) {
 	}
 
 	fm := template.FuncMap{
-		// source opens the raw Source path of the preceding mount,
-		// matching the real mount manager's a[i].Source behavior.
 		"source": func(i int) (string, error) {
 			if err := boundsCheck(i); err != nil {
 				return "", err
 			}
-			v, err := openPath(preceding[i].Source)
+			r, err := os.OpenRoot(preceding[i].Source)
 			if err != nil {
 				return "", fmt.Errorf("failed to open source of mount %d: %w", i, err)
 			}
-			addLayer(v)
+			addLayer(view{FS: r.FS(), cleanup: r.Close})
 			return "", nil
 		},
-		// mount resolves the preceding mount into a full filesystem view,
-		// matching the real mount manager's a[i].MountPoint behavior.
 		"mount": func(i int) (string, error) {
 			if err := boundsCheck(i); err != nil {
 				return "", err
 			}
-			v, err := mountToView(preceding[i], preceding[:i])
+			v, err := resolveMount(preceding[i], preceding[:i])
 			if err != nil {
 				return "", fmt.Errorf("failed to resolve mount %d: %w", i, err)
 			}
@@ -307,7 +220,7 @@ func handleOverlayFormat(s string, preceding []mount.Mount) ([]View, error) {
 				if err := boundsCheck(i); err != nil {
 					return "", err
 				}
-				v, err := mountToView(preceding[i], preceding[:i])
+				v, err := resolveMount(preceding[i], preceding[:i])
 				if err != nil {
 					return "", fmt.Errorf("failed to resolve mount %d: %w", i, err)
 				}
@@ -353,8 +266,6 @@ func handleOverlayFormat(s string, preceding []mount.Mount) ([]View, error) {
 	return layers, nil
 }
 
-// splitTemplateSuffix splits a template string like "{{ mount 0 }}/sub/path"
-// into the template expression and the trailing path suffix.
 func splitTemplateSuffix(s string) (string, string) {
 	i := strings.LastIndex(s, "}}")
 	if i < 0 {
@@ -365,7 +276,7 @@ func splitTemplateSuffix(s string) (string, string) {
 	return tmpl, suffix
 }
 
-func getOverlayFSLayers(options []string) ([]View, error) {
+func openOverlayPaths(options []string) ([]View, error) {
 	var (
 		lower string
 		paths []string
@@ -377,63 +288,20 @@ func getOverlayFSLayers(options []string) ([]View, error) {
 			paths = append(paths, val)
 		}
 	}
-
 	if lower != "" {
-		lowers := strings.Split(lower, ":")
-		paths = append(paths, lowers...)
+		paths = append(paths, strings.Split(lower, ":")...)
 	}
 
 	var layers []View
 	for _, p := range paths {
-		layer, err := openPath(p)
+		r, err := os.OpenRoot(p)
 		if err != nil {
-			// Cleanup already opened layers
 			for _, l := range layers {
 				l.Close()
 			}
 			return nil, err
 		}
-		layers = append(layers, layer)
+		layers = append(layers, view{FS: r.FS(), cleanup: r.Close})
 	}
-
 	return layers, nil
-}
-
-// openPath opens a filesystem path and returns a View.
-// It tries to detect if the path is an EROFS file or a directory.
-func openPath(path string) (View, error) {
-	// Check if path is a file or directory
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-
-	if info.IsDir() {
-		// Open as directory
-		root, err := os.OpenRoot(path)
-		if err != nil {
-			return nil, err
-		}
-		return view{
-			FS:      root.FS(),
-			cleanup: root.Close,
-		}, nil
-	}
-
-	// Try to open as EROFS file
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-
-	efs, err := erofs.EroFS(f)
-	if err != nil {
-		f.Close()
-		return nil, fmt.Errorf("failed to open %s as EROFS: %w", path, err)
-	}
-
-	return view{
-		FS:      efs,
-		cleanup: f.Close,
-	}, nil
 }

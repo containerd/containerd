@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package fsview
+package fsview_test
 
 import (
 	"io/fs"
@@ -22,6 +22,9 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/fsview"
+	_ "github.com/containerd/containerd/v2/plugins/mount/fsview/erofs"
+
 	"github.com/erofs/go-erofs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +38,7 @@ func TestEROFSBaseLayer(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	efs, err := erofs.EroFS(f)
+	efs, err := erofs.Open(f)
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -95,12 +98,12 @@ func TestEROFSOverlayWithWhiteout(t *testing.T) {
 		},
 	}
 
-	viewFS, err := FSMounts(mounts)
+	viewFS, err := fsview.FSMounts(mounts)
 	require.NoError(t, err)
 	defer viewFS.Close()
 
 	layers := []fs.FS{viewFS}
-	overlayFS, err := NewOverlayFS(layers)
+	overlayFS, err := fsview.NewOverlayFS(layers)
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -146,7 +149,7 @@ func TestEROFSWithFSMounts(t *testing.T) {
 		},
 	}
 
-	viewFS, err := FSMounts(mounts)
+	viewFS, err := fsview.FSMounts(mounts)
 	require.NoError(t, err)
 	defer viewFS.Close()
 
@@ -187,7 +190,7 @@ func TestEROFSMultipleLayersOverlay(t *testing.T) {
 	require.NoError(t, err)
 	defer baseFile.Close()
 
-	baseFS, err := erofs.EroFS(baseFile)
+	baseFS, err := erofs.Open(baseFile)
 	require.NoError(t, err)
 
 	// Open upper layer
@@ -195,12 +198,12 @@ func TestEROFSMultipleLayersOverlay(t *testing.T) {
 	require.NoError(t, err)
 	defer upperFile.Close()
 
-	upperFS, err := erofs.EroFS(upperFile)
+	upperFS, err := erofs.Open(upperFile)
 	require.NoError(t, err)
 
 	// Create overlay with upper layer first (highest priority)
 	layers := []fs.FS{upperFS, baseFS}
-	overlayFS, err := NewOverlayFS(layers)
+	overlayFS, err := fsview.NewOverlayFS(layers)
 	require.NoError(t, err)
 
 	t.Run("file from upper layer", func(t *testing.T) {
@@ -245,7 +248,7 @@ func TestEROFSWhiteoutDetection(t *testing.T) {
 	require.NoError(t, err)
 	defer upperFile.Close()
 
-	upperFS, err := erofs.EroFS(upperFile)
+	upperFS, err := erofs.Open(upperFile)
 	require.NoError(t, err)
 
 	// Check the whiteout file
@@ -253,6 +256,8 @@ func TestEROFSWhiteoutDetection(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify it's detected as a whiteout
-	assert.True(t, isWhiteout(fi), "should detect file1.txt as whiteout")
 	assert.Equal(t, fs.ModeCharDevice, fi.Mode()&fs.ModeCharDevice, "should be char device")
+	estatfi, ok := fi.Sys().(*erofs.Stat)
+	assert.True(t, ok, "should be erofs stat")
+	assert.Equal(t, uint32(0), estatfi.Rdev, "file1.txt should be a whiteout")
 }
