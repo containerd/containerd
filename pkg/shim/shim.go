@@ -282,7 +282,7 @@ func run(ctx context.Context, manager Shim, config Config) error {
 		var params bootapi.BootstrapParams
 		if len(input) == 0 || proto.Unmarshal(input, &params) != nil {
 			// TODO: Return error once the new API is stable
-			if err := readBootstrapParamsFromDeprecatedFields(input, &params); err != nil {
+			if err := readBootstrapParamsFromDeprecatedFields(input, &params, id, namespaceFlag, containerdBinaryFlag, debugFlag); err != nil {
 				return err
 			}
 		}
