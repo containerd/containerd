@@ -67,23 +67,20 @@ func (c *criService) ListPodSandboxStats(
 }
 
 func (c *criService) sandboxesForListPodSandboxStatsRequest(r *runtime.ListPodSandboxStatsRequest) []sandboxstore.Sandbox {
-	sandboxesInStore := c.sandboxStore.List()
-
-	if r.GetFilter() == nil {
-		return sandboxesInStore
+	if r.GetFilter() != nil {
+		c.normalizePodSandboxStatsFilter(r.GetFilter())
 	}
-
-	c.normalizePodSandboxStatsFilter(r.GetFilter())
-
 	var sandboxes []sandboxstore.Sandbox
-	for _, sandbox := range sandboxesInStore {
-		if r.GetFilter().GetId() != "" && sandbox.ID != r.GetFilter().GetId() {
-			continue
-		}
+	for _, sandbox := range c.sandboxStore.List() {
+		if r.GetFilter() != nil {
+			if r.GetFilter().GetId() != "" && sandbox.ID != r.GetFilter().GetId() {
+				continue
+			}
 
-		if r.GetFilter().GetLabelSelector() != nil &&
-			!matchLabelSelector(r.GetFilter().GetLabelSelector(), sandbox.Config.GetLabels()) {
-			continue
+			if r.GetFilter().GetLabelSelector() != nil &&
+				!matchLabelSelector(r.GetFilter().GetLabelSelector(), sandbox.Config.GetLabels()) {
+				continue
+			}
 		}
 
 		// We can't obtain metrics for sandboxes that aren't in ready state

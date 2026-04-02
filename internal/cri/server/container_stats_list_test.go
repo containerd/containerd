@@ -486,6 +486,52 @@ func TestListContainerStats(t *testing.T) {
 
 }
 
+func TestBuildTaskMetricsRequest(t *testing.T) {
+	c := newTestCRIService()
+	root := t.TempDir()
+
+	// Create a running container
+	c1, err := containerstore.NewContainer(
+		containerstore.Metadata{ID: "c1", SandboxID: "s1"},
+		containerstore.WithStatus(containerstore.Status{
+			StartedAt: time.Now().UnixNano(),
+		}, root),
+	)
+	assert.NoError(t, err)
+	assert.NoError(t, c.containerStore.Add(c1))
+
+	// Create an exited container
+	c2, err := containerstore.NewContainer(
+		containerstore.Metadata{ID: "c2", SandboxID: "s1"},
+		containerstore.WithStatus(containerstore.Status{
+			StartedAt:  time.Now().UnixNano(),
+			FinishedAt: time.Now().UnixNano(),
+		}, root),
+	)
+	assert.NoError(t, err)
+	assert.NoError(t, c.containerStore.Add(c2))
+
+	t.Run("no filter should only return running containers", func(t *testing.T) {
+		req, containers, err := c.buildTaskMetricsRequest(&runtime.ListContainerStatsRequest{})
+		assert.NoError(t, err)
+		assert.Len(t, containers, 1)
+		assert.Equal(t, "c1", containers[0].ID)
+		assert.Len(t, req.Filters, 1)
+		assert.Equal(t, "id==c1", req.Filters[0])
+	})
+
+	t.Run("filter by ID should return container even if exited", func(t *testing.T) {
+		req, containers, err := c.buildTaskMetricsRequest(&runtime.ListContainerStatsRequest{
+			Filter: &runtime.ContainerStatsFilter{Id: "c2"},
+		})
+		assert.NoError(t, err)
+		assert.Len(t, containers, 1)
+		assert.Equal(t, "c2", containers[0].ID)
+		assert.Len(t, req.Filters, 1)
+		assert.Equal(t, "id==c2", req.Filters[0])
+	})
+}
+
 func platformBasedMetricsData(t *testing.T) *anypb.Any {
 	var data *anypb.Any
 	var err error
