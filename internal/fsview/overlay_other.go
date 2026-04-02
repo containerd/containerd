@@ -18,27 +18,25 @@
 
 package fsview
 
-import (
-	"io/fs"
+import "io/fs"
 
-	"github.com/erofs/go-erofs"
-)
-
-func isOpaque(f fs.File) bool {
-	// Check for EROFS file by getting Stat and checking xattrs
-	fi, err := f.Stat()
-	if err != nil {
-		return false
-	}
-
-	if estatfi, ok := fi.Sys().(*erofs.Stat); ok {
-		for _, xattr := range overlayOpaqueXattrs {
-			if estatfi.Xattrs[xattr] == "y" {
-				return true
+func getxattr(f fs.File, name string) (string, bool) {
+	for _, h := range registered {
+		if h.Getxattr != nil {
+			if val, ok := h.Getxattr(f, name); ok {
+				return val, true
 			}
 		}
 	}
+	return "", false
+}
 
+func isOpaque(f fs.File) bool {
+	for _, xattr := range OverlayOpaqueXattrs {
+		if val, ok := getxattr(f, xattr); ok && val == "y" {
+			return true
+		}
+	}
 	return false
 }
 
@@ -46,11 +44,10 @@ func isWhiteout(fi fs.FileInfo) bool {
 	if (fi.Mode() & fs.ModeCharDevice) == 0 {
 		return false
 	}
-
-	// Check for EROFS Stat
-	if estatfi, ok := fi.Sys().(*erofs.Stat); ok {
-		return estatfi.Rdev == 0
+	for _, h := range registered {
+		if h.IsWhiteout != nil && h.IsWhiteout(fi) {
+			return true
+		}
 	}
-
 	return false
 }

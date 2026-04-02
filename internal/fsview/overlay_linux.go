@@ -21,40 +21,35 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/erofs/go-erofs"
 	"golang.org/x/sys/unix"
 )
 
-func isOpaque(f fs.File) bool {
-	// Attempt to get underlying *os.File
+func getxattr(f fs.File, name string) (string, bool) {
 	if osf, ok := f.(*os.File); ok {
-		var dest [1]byte
-		for _, xattr := range overlayOpaqueXattrs {
-			sz, err := unix.Fgetxattr(int(osf.Fd()), xattr, dest[:])
-			if err != nil {
-				continue
-			}
-			if sz == 1 && len(dest) == 1 && dest[0] == 'y' {
-				return true
-			}
+		var dest [256]byte
+		sz, err := unix.Fgetxattr(int(osf.Fd()), name, dest[:])
+		if err != nil || sz <= 0 {
+			return "", false
 		}
-		return false
+		return string(dest[:sz]), true //nolint:gosec // G602: sz is bounded by dest size
 	}
 
-	// Check for EROFS file by getting Stat and checking xattrs
-	fi, err := f.Stat()
-	if err != nil {
-		return false
-	}
-
-	if estatfi, ok := fi.Sys().(*erofs.Stat); ok {
-		for _, xattr := range overlayOpaqueXattrs {
-			if estatfi.Xattrs[xattr] == "y" {
-				return true
+	for _, h := range registered {
+		if h.Getxattr != nil {
+			if val, ok := h.Getxattr(f, name); ok {
+				return val, true
 			}
 		}
 	}
+	return "", false
+}
 
+func isOpaque(f fs.File) bool {
+	for _, xattr := range OverlayOpaqueXattrs {
+		if val, ok := getxattr(f, xattr); ok && val == "y" {
+			return true
+		}
+	}
 	return false
 }
 
@@ -62,16 +57,13 @@ func isWhiteout(fi fs.FileInfo) bool {
 	if (fi.Mode() & fs.ModeCharDevice) == 0 {
 		return false
 	}
-
-	// Check for regular syscall.Stat_t (from os.File)
 	if sys, ok := fi.Sys().(*syscall.Stat_t); ok {
 		return sys.Rdev == 0
 	}
-
-	// Check for EROFS Stat
-	if estatfi, ok := fi.Sys().(*erofs.Stat); ok {
-		return estatfi.Rdev == 0
+	for _, h := range registered {
+		if h.IsWhiteout != nil && h.IsWhiteout(fi) {
+			return true
+		}
 	}
-
 	return false
 }
