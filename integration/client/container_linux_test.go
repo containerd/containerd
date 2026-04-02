@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -1104,6 +1105,11 @@ func TestContainerKillInitPidHost(t *testing.T) {
 }
 
 func TestUserNamespaces(t *testing.T) {
+	// ghcr.io/containerd/volume-ownership:2.1 is not available on s390x
+	if runtime.GOARCH == "s390x" {
+		t.Skip("test image not available on s390x")
+	}
+
 	for name, test := range map[string]struct {
 		testCmd  oci.SpecOpts
 		roRootFS bool
