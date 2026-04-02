@@ -30,14 +30,14 @@ import (
 	"github.com/containerd/containerd/api/types/runc/options"
 )
 
-func readBootstrapParamsFromDeprecatedFields(input []byte, params *bootapi.BootstrapParams) error {
-	params.InstanceID = id
-	params.Namespace = namespaceFlag
+func readBootstrapParamsFromDeprecatedFields(input []byte, params *bootapi.BootstrapParams, parsedID string, parsedNamespace string, parsedBinary string, parsedDebug bool) error {
+	params.InstanceID = parsedID
+	params.Namespace = parsedNamespace
 	params.ContainerdTtrpcAddress = os.Getenv(ttrpcAddressEnv)
 	params.ContainerdGrpcAddress = os.Getenv(grpcAddressEnv)
-	params.ContainerdBinary = containerdBinaryFlag
+	params.ContainerdBinary = parsedBinary
 
-	if debugFlag {
+	if parsedDebug {
 		params.LogLevel = bootapi.LogLevel_LOG_LEVEL_DEBUG
 	}
 

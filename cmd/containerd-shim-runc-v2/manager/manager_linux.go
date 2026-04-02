@@ -189,7 +189,8 @@ func (manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *boo
 
 	id := opts.GetInstanceID()
 
-	debugLog := opts.LogLevel == bootapi.LogLevel_LOG_LEVEL_DEBUG || opts.LogLevel == bootapi.LogLevel_LOG_LEVEL_TRACE
+	logLevel := opts.GetLogLevel()
+	debugLog := logLevel == bootapi.LogLevel_LOG_LEVEL_DEBUG || logLevel == bootapi.LogLevel_LOG_LEVEL_TRACE
 
 	cmd, err := newCommand(ctx, id, opts.GetContainerdGrpcAddress(), opts.GetContainerdTtrpcAddress(), debugLog)
 	if err != nil {
