@@ -103,6 +103,9 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 			}
 
 			for _, container := range sandboxContainerMap[sandbox.ID] {
+				if container.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {
+					continue
+				}
 				containerMetrics, err := c.collectContainerMetrics(ctx, container, baseLabels)
 				if err != nil {
 					switch {

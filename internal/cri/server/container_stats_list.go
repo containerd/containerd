@@ -59,6 +59,11 @@ func (c *criService) listContainerStats(
 	if err != nil {
 		return nil, fmt.Errorf("failed to build metrics request: %w", err)
 	}
+	// Short-circuit: if there are no containers to collect stats for, return early
+	// to avoid an unnecessary and potentially expensive gRPC call
+	if len(containers) == 0 {
+		return []containerStats{}, nil
+	}
 	resp, err := c.client.TaskService().Metrics(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch metrics for tasks: %w", err)
@@ -278,21 +283,29 @@ func (c *criService) buildTaskMetricsRequest(
 	r *runtime.ListContainerStatsRequest,
 ) (*tasks.MetricsRequest, []containerstore.Container, error) {
 	req := &tasks.MetricsRequest{}
-	if r.GetFilter() == nil {
-		return req, c.containerStore.List(), nil
+	if r.GetFilter() != nil {
+		c.normalizeContainerStatsFilter(r.GetFilter())
 	}
-	c.normalizeContainerStatsFilter(r.GetFilter())
 	var containers []containerstore.Container
 	for _, cntr := range c.containerStore.List() {
-		if r.GetFilter().GetId() != "" && cntr.ID != r.GetFilter().GetId() {
-			continue
-		}
-		if r.GetFilter().GetPodSandboxId() != "" && cntr.SandboxID != r.GetFilter().GetPodSandboxId() {
-			continue
-		}
-		if r.GetFilter().GetLabelSelector() != nil &&
-			!matchLabelSelector(r.GetFilter().GetLabelSelector(), cntr.Config.GetLabels()) {
-			continue
+		// Treat empty filter same as nil filter
+		if r.GetFilter() != nil {
+			if r.GetFilter().GetId() != "" && cntr.ID != r.GetFilter().GetId() {
+				continue
+			}
+			if r.GetFilter().GetPodSandboxId() != "" && cntr.SandboxID != r.GetFilter().GetPodSandboxId() {
+				continue
+			}
+			if r.GetFilter().GetLabelSelector() != nil &&
+				!matchLabelSelector(r.GetFilter().GetLabelSelector(), cntr.Config.GetLabels()) {
+				continue
+			}
+		} else {
+			// Default: only include running containers when no filter is provided.
+			// This reduces overhead by avoiding unnecessary gRPC calls for stopped containers.
+			if cntr.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {
+				continue
+			}
 		}
 		containers = append(containers, cntr)
 		req.Filters = append(req.Filters, "id=="+cntr.ID)
