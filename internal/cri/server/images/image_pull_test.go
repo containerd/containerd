@@ -470,8 +470,8 @@ func TestImageGetLabels(t *testing.T) {
 		{
 			name:          "pinned image labels should get added on sandbox image",
 			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			pinnedImages:  map[string]string{"sandbox": "registry.k8s.io/pause:3.10.1"},
-			pullImageName: "registry.k8s.io/pause:3.10.1",
+			pinnedImages:  map[string]string{"sandbox": "registry.k8s.io/pause:3.10.2"},
+			pullImageName: "registry.k8s.io/pause:3.10.2",
 		},
 		{
 			name:          "pinned image labels should get added on sandbox image without tag",
