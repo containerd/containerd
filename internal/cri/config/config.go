@@ -34,9 +34,9 @@ import (
 	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
-	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/plugins"
+	streaming "k8s.io/cri-streaming/pkg/streaming"
 )
 
 const (
