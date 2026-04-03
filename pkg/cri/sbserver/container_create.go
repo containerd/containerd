@@ -173,6 +173,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
+	imageName := containerdImage.Name()
+	if name := config.GetImage().GetUserSpecifiedImage(); name != "" {
+		imageName = name
+	}
 	spec, err := c.buildContainerSpec(
 		platform,
 		id,
@@ -180,7 +184,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		sandboxPid,
 		sandbox.NetNSPath,
 		containerName,
-		containerdImage.Name(),
+		imageName,
 		config,
 		sandboxConfig,
 		&image.ImageSpec.Config,
