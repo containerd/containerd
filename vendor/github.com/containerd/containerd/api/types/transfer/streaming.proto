@@ -27,3 +27,19 @@ message Data {
 message WindowUpdate {
   int32 update = 1;
 }
+
+// ReadStream carries data from the client to the server (import
+// direction). The client sends data through the stream and the
+// server reads it.
+message ReadStream {
+	string stream = 1;
+	string media_type = 2;
+}
+
+// WriteStream carries data from the server to the client (export
+// direction). The server writes data into the stream and the
+// client receives it.
+message WriteStream {
+	string stream = 1;
+	string media_type = 2;
+}
