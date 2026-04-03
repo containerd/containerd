@@ -22,7 +22,7 @@ import (
 	"io"
 	"math"
 
-	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/streaming/pkg/runtime"
 	remotecommand "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 
 	executil "github.com/containerd/containerd/v2/internal/cri/executil"
