@@ -385,6 +385,13 @@ func (b *binaryIO) cancel() error {
 
 	select {
 	case err := <-done:
+		// If the process exited due to the SIGTERM we just sent,
+		// that is expected and should not be treated as an error.
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok && status.Signal() == syscall.SIGTERM {
+				return nil
+			}
+		}
 		return err
 	case <-time.After(binaryIOProcTermTimeout):
 		log.L.Warn("failed to wait for shim logger process to exit, killing")
