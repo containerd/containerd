@@ -566,8 +566,8 @@ k8s.io/apimachinery v0.36.0-beta.0 h1:FioYxKfnvZuo0EUX/W9X0FhH3omaG7dEdtDk2IsfEt
 k8s.io/apimachinery v0.36.0-beta.0/go.mod h1:AEUkaeqhot34WXPkRiWxszI4nUd8m40AAYi28N33hqc=
 k8s.io/client-go v0.36.0-beta.0 h1:CDz8BZT2uCXmntLHdt9Iuaid3EC1937CGDnuqdwvFYg=
 k8s.io/client-go v0.36.0-beta.0/go.mod h1:R1e5akWC7jvvO1lXCrku6u7dcOdCw+Iz+mg2GahRuro=
-k8s.io/cri-api v0.36.0-beta.0 h1:WVBvlfj+y19xUEdvsWErQJHWqtWQ37gUAT3emqz1isw=
-k8s.io/cri-api v0.36.0-beta.0/go.mod h1:0pB0LCI98OZ8oXa4FLukaereSw6wK+Oyb2vt9eubr/g=
+k8s.io/cri-api v0.36.0-beta.0.0.20260326115202-861ac7bf9e55 h1:2Q+ftRPzpI7DDwbu0VvZrVXA1W7wJ+xuaNAmZC334nM=
+k8s.io/cri-api v0.36.0-beta.0.0.20260326115202-861ac7bf9e55/go.mod h1:0pB0LCI98OZ8oXa4FLukaereSw6wK+Oyb2vt9eubr/g=
 k8s.io/cri-streaming v0.36.0-beta.0 h1:n+eQbTBzcVvPTg8X4bnvkPN0nDK7Vehe1MbxNLc9T4o=
 k8s.io/cri-streaming v0.36.0-beta.0/go.mod h1:Rg8ZPxgniddGxUACqel3HUnpaVcW8NpdPTCFZT486PU=
 k8s.io/klog/v2 v2.140.0 h1:Tf+J3AH7xnUzZyVVXhTgGhEKnFqye14aadWv7bzXdzc=
