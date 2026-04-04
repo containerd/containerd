@@ -36,15 +36,29 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 )
 
+// Config defines the bolt database configuration for the mount manager plugin.
+type Config struct {
+	// NoSync enables optimizations that improve database write performance by:
+	// 1. Disabling fsync calls after every write, which prevents ensuring that data is immediately flushed
+	//    to disk but significantly improves write throughput (NoSync).
+	// 2. Preventing automatic growth of the memory-mapped file during writes, further improving performance
+	//    in environments where the database size is stable (NoGrowSync).
+	//
+	// These settings can improve performance, but introduce a risk of data loss during crashes. Use with care!
+	NoSync bool `toml:"no_sync"`
+}
+
 func init() {
 	registry.Register(&plugin.Registration{
-		Type: plugins.MountManagerPlugin,
-		ID:   "bolt",
+		Type:   plugins.MountManagerPlugin,
+		ID:     "bolt",
+		Config: &Config{},
 		Requires: []plugin.Type{
 			plugins.MetadataPlugin,
 			plugins.MountHandlerPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
+			cfg := ic.Config.(*Config)
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
@@ -81,7 +95,13 @@ func init() {
 
 			metadb := filepath.Join(root, "mounts.db")
 
-			db, err := bolt.Open(metadb, 0600, nil)
+			boltOpts := *bolt.DefaultOptions
+			if cfg.NoSync {
+				boltOpts.NoSync = true
+				boltOpts.NoGrowSync = true
+				log.G(ic.Context).Warn("mount manager: using async mode for boltdb")
+			}
+			db, err := bolt.Open(metadb, 0600, &boltOpts)
 			if err != nil {
 				return nil, fmt.Errorf("failed to open database file: %w", err)
 			}
