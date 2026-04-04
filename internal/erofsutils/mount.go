@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/containerd/errdefs"
@@ -31,6 +32,16 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 )
+
+func mkfsEnv(layerPath string) []string {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+	env := os.Environ()
+	tmpdir := filepath.Dir(layerPath)
+	env = append(env, "TMPDIR="+tmpdir)
+	return env
+}
 
 func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {
 	args := append([]string{"--tar=f", "--aufs", "--quiet", "-Enoinline_data"}, mkfsExtraOpts...)
@@ -40,6 +51,7 @@ func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, m
 	args = append(args, layerPath)
 	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
 	cmd.Stdin = r
+	cmd.Env = mkfsEnv(layerPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("erofs apply failed: %s: %w", out, err)
@@ -74,6 +86,7 @@ func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath, u
 	args = append(args, layerPath)
 	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
 	cmd.Stdin = teeReader
+	cmd.Env = mkfsEnv(layerPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("tar index generation failed with command 'mkfs.erofs %s': %s: %w",
@@ -107,6 +120,7 @@ func ConvertErofs(ctx context.Context, layerPath string, srcDir string, mkfsExtr
 	args := append([]string{"--quiet", "-Enoinline_data"}, mkfsExtraOpts...)
 	args = append(args, layerPath, srcDir)
 	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
+	cmd.Env = mkfsEnv(layerPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("erofs apply failed: %s: %w", out, err)
