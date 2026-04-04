@@ -50,7 +50,7 @@ func TestInitSelinuxOpts(t *testing.T) {
 				Type:  "",
 				Level: "s0:c1,c2",
 			},
-			processLabel: "system_u:user_r:(container_file_t|svirt_lxc_net_t):s0:c1,c2",
+			processLabel: "system_u:user_r:container_t:s0:c1,c2",
 			mountLabel:   "system_u:object_r:(container_file_t|svirt_sandbox_file_t):s0:c1,c2",
 		},
 		{
