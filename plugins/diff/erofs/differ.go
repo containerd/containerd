@@ -18,6 +18,8 @@ package erofs
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -218,6 +220,14 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		Size:      rc.c,
 		Digest:    digester.Digest(),
 	}, nil
+}
+
+func uniqueRef() string {
+	t := time.Now()
+	var b [3]byte
+	// Ignore read failures, just decreases uniqueness
+	rand.Read(b[:])
+	return fmt.Sprintf("%d-%s", t.UnixNano(), base64.URLEncoding.EncodeToString(b[:]))
 }
 
 type readCounter struct {
