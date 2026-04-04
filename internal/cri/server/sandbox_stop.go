@@ -81,6 +81,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 
 	// Only stop sandbox container when it's running or unknown.
 	state := sandbox.Status.Get().State
+	if state == sandboxstore.StateStopped {
+		log.G(ctx).Warnf("sandbox %q is already stopped", id)
+		return nil
+	}
+
 	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
 		if err := c.sandboxService.StopSandbox(ctx, sandbox.Sandboxer, id); err != nil {
 			// Log and ignore the error if controller already removed the sandbox
@@ -135,6 +140,12 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 	err = c.cleanupImageMounts(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup image mounts for sandbox %q: %w", id, err)
+	}
+	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		status.State = sandboxstore.StateStopped
+		return status, nil
+	}); err != nil {
+		return err
 	}
 	return nil
 }
