@@ -315,6 +315,18 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken st
 		// TODO: Allow setting client_id
 		resp, err := auth.FetchTokenWithOAuth(ctx, ah.client, ah.header, "containerd-client", to)
 		if err != nil {
+			var invalidResp *auth.ErrInvalidTokenResponse
+			if errors.As(err, &invalidResp) {
+				// Some auth services return HTML (or otherwise invalid JSON) for OAuth POST requests.
+				// Fall back to the token auth spec's GET flow in that case.
+				resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
+				if err != nil {
+					return "", "", err
+				}
+				expirationTime = getExpirationTime(resp.ExpiresInSeconds)
+				return resp.Token, resp.RefreshToken, nil
+			}
+
 			var errStatus remoteerrors.ErrUnexpectedStatus
 			if errors.As(err, &errStatus) {
 				// Registries without support for POST may return 404 for POST /v2/token.
