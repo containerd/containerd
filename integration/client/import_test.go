@@ -826,3 +826,111 @@ func hash64(s string) int64 {
 	h.Write([]byte(s))
 	return int64(h.Sum64())
 }
+
+func TestImportDistributionSourceLabels(t *testing.T) {
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	tc := tartest.TarContext{}
+
+	bb, _ := createContent(128, 42)
+	cb, _ := createConfig("linux", "amd64", "dist-source-test")
+	mb, mDigest, _ := createManifest(cb, [][]byte{bb})
+
+	distSourceLabel := "containerd.io/distribution.source.docker.io"
+	distSourceLabel2 := "containerd.io/distribution.source.registry.other.io"
+
+	idx := ocispec.Index{
+		Versioned: specs.Versioned{
+			SchemaVersion: 2,
+		},
+		Manifests: []ocispec.Descriptor{
+			{
+				MediaType: ocispec.MediaTypeImageManifest,
+				Digest:    mDigest,
+				Size:      int64(len(mb)),
+				Annotations: map[string]string{
+					images.AnnotationImageName: "docker.io/library/ubuntu:latest",
+					ocispec.AnnotationRefName:  "latest",
+					distSourceLabel:            "library/ubuntu",
+					distSourceLabel2:           "other/repo",
+				},
+			},
+		},
+	}
+	ib, _ := json.Marshal(idx)
+
+	files := tartest.TarAll(
+		tc.Dir(ocispec.ImageBlobsDir, 0755),
+		tc.Dir(ocispec.ImageBlobsDir+"/sha256", 0755),
+		tc.File(ocispec.ImageBlobsDir+"/sha256/"+digest.FromBytes(bb).Encoded(), bb, 0644),
+		tc.File(ocispec.ImageBlobsDir+"/sha256/"+digest.FromBytes(cb).Encoded(), cb, 0644),
+		tc.File(ocispec.ImageBlobsDir+"/sha256/"+mDigest.Encoded(), mb, 0644),
+		tc.File(ocispec.ImageBlobsDir+"/sha256/"+digest.FromBytes(ib).Encoded(), ib, 0644),
+		tc.File(ocispec.ImageIndexFile, ib, 0644),
+		tc.File(ocispec.ImageLayoutFile, []byte(`{"imageLayoutVersion":"`+ocispec.ImageLayoutVersion+`"}`), 0644),
+	)
+
+	expectedLabels := map[string]string{
+		distSourceLabel:  "library/ubuntu",
+		distSourceLabel2: "other/repo",
+	}
+
+	t.Run("ClientImport", func(t *testing.T) {
+		ctx := namespaces.WithNamespace(ctx, uuid.New().String())
+
+		imgs, err := client.Import(ctx, tartest.TarFromWriterTo(files))
+		require.NoError(t, err)
+		require.NotEmpty(t, imgs)
+
+		checkDistributionSourceLabels(ctx, t, client.ContentStore(), imgs[0].Target, expectedLabels)
+	})
+
+	t.Run("TransferImport", func(t *testing.T) {
+		ctx := namespaces.WithNamespace(ctx, uuid.New().String())
+
+		r := tartest.TarFromWriterTo(files)
+		defer r.Close()
+
+		is := image.NewStore("docker.io/library/ubuntu", image.WithNamedPrefix("docker.io/library/ubuntu", true))
+		iis := tarchive.NewImageImportStream(r, "")
+
+		err := client.Transfer(ctx, iis, is)
+		require.NoError(t, err)
+
+		img, err := client.ImageService().Get(ctx, "docker.io/library/ubuntu:latest")
+		require.NoError(t, err)
+
+		checkDistributionSourceLabels(ctx, t, client.ContentStore(), img.Target, expectedLabels)
+	})
+}
+
+func checkDistributionSourceLabels(ctx context.Context, t *testing.T, cs content.Store, target ocispec.Descriptor, expectedLabels map[string]string) {
+	t.Helper()
+
+	var checked int
+	err := images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		info, err := cs.Info(ctx, desc.Digest)
+		if err != nil {
+			return nil, err
+		}
+		for key, want := range expectedLabels {
+			val, ok := info.Labels[key]
+			if !ok {
+				t.Errorf("content %s missing label %s", desc.Digest, key)
+			} else if val != want {
+				t.Errorf("content %s: %s = %q, want %q", desc.Digest, key, val, want)
+			}
+		}
+		checked++
+		return images.Children(ctx, cs, desc)
+	}), target)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, checked, 3, "expected manifest + config + layer")
+}
