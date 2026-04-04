@@ -545,8 +545,13 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 
 	path, refp, data := s.ingestPaths(ref)
 
+	// if we get passed an expected digest, we need to use the same algorithm (sha512, etc)
+	digestAlg := digest.Canonical
+	if expected != "" && expected.Algorithm().Available() {
+		digestAlg = expected.Algorithm()
+	}
 	var (
-		digester  = digest.Canonical.Digester()
+		digester  = digestAlg.Digester()
 		offset    int64
 		startedAt time.Time
 		updatedAt time.Time
