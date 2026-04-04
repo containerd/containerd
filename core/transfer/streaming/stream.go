@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
@@ -43,9 +44,31 @@ var bufPool = &sync.Pool{
 }
 
 func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
-	window := make(chan int32)
+	ctx, cancel := context.WithCancelCause(ctx)
+	var remaining atomic.Int32
+	windowUpdated := make(chan struct{}, 1)
+	var closeOnce sync.Once
+	var closeReaderOnce sync.Once
+	closeStream := func() {
+		closeOnce.Do(func() {
+			_ = stream.Close()
+		})
+	}
+	closeReader := func() {
+		rc, ok := r.(io.Closer)
+		if !ok {
+			return
+		}
+		closeReaderOnce.Do(func() {
+			_ = rc.Close()
+		})
+	}
+	context.AfterFunc(ctx, func() {
+		closeReader()
+		closeStream()
+	})
 	go func() {
-		defer close(window)
+		defer cancel(nil)
 		for {
 			select {
 			case <-ctx.Done():
@@ -56,7 +79,7 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 			anyType, err := stream.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
-					log.G(ctx).WithError(err).Error("send stream ended without EOF")
+					cancel(err)
 				}
 				return
 			}
@@ -67,10 +90,12 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 			}
 			switch v := i.(type) {
 			case *transferapi.WindowUpdate:
+				remaining.Add(v.Update)
 				select {
 				case <-ctx.Done():
 					return
-				case window <- v.Update:
+				case windowUpdated <- struct{}{}:
+				default:
 				}
 			default:
 				log.G(ctx).Errorf("unexpected stream object of type %T", i)
@@ -78,42 +103,45 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 		}
 	}()
 	go func() {
-		defer stream.Close()
+		defer closeStream()
 
 		buf := bufPool.Get().(*[]byte)
 		defer bufPool.Put(buf)
 
-		var remaining int32
-
 		for {
-			if remaining > 0 {
+			rem := remaining.Load()
+			if rem > 0 {
 				// Don't wait for window update since there are remaining
 				select {
 				case <-ctx.Done():
 					// TODO: Send error message on stream before close to allow remote side to return error
 					return
-				case update := <-window:
-					remaining += update
+				case <-windowUpdated:
 				default:
 				}
 			} else {
-				// Block until window updated
+				// Wait for window update
 				select {
 				case <-ctx.Done():
 					// TODO: Send error message on stream before close to allow remote side to return error
 					return
-				case update := <-window:
-					remaining = update
+				case <-windowUpdated:
+					rem = remaining.Load()
 				}
 			}
+
+			if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+				return
+			}
+
 			var max int32 = maxRead
-			if max > remaining {
-				max = remaining
+			if max > rem {
+				max = rem
 			}
 			b := (*buf)[:max]
 			n, readErr := r.Read(b)
 			if n > 0 {
-				remaining = remaining - int32(n)
+				remaining.Add(-int32(n))
 
 				data := &transferapi.Data{
 					Data: b[:n],
@@ -125,14 +153,16 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 					return
 				}
 				if err := stream.Send(anyType); err != nil {
+					if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+						return
+					}
 					log.G(ctx).WithError(err).Errorf("send failed")
 					return
 				}
 			}
 			if readErr != nil {
 				if !errors.Is(readErr, io.EOF) {
-					log.G(ctx).WithError(readErr).Errorf("failed to read stream source")
-					// TODO: Send error message on stream before close to allow remote side to return error
+					log.G(ctx).WithError(readErr).Errorf("read failed")
 				}
 				return
 			}

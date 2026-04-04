@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
@@ -29,23 +30,26 @@ import (
 )
 
 func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteCloser {
+	ctx, cancel := context.WithCancelCause(ctx)
 	wbs := &writeByteStream{
 		ctx:     ctx,
+		cancel:  cancel,
 		stream:  stream,
 		updated: make(chan struct{}, 1),
 	}
+	context.AfterFunc(wbs.ctx, func() { _ = wbs.closeStream() })
 	go func() {
+		defer cancel(nil)
 		for {
 			select {
-			case <-ctx.Done():
+			case <-wbs.ctx.Done():
 				return
 			default:
 			}
-
 			anyType, err := stream.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
-					log.G(ctx).WithError(err).Error("send byte stream ended without EOF")
+					wbs.cancel(err)
 				}
 				return
 			}
@@ -58,7 +62,7 @@ func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteClose
 			case *transferapi.WindowUpdate:
 				wbs.remaining.Add(v.Update)
 				select {
-				case <-ctx.Done():
+				case <-wbs.ctx.Done():
 					return
 				case wbs.updated <- struct{}{}:
 				default:
@@ -75,18 +79,27 @@ func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteClose
 
 type writeByteStream struct {
 	ctx       context.Context
+	cancel    context.CancelCauseFunc
 	stream    streaming.Stream
+	closeOnce sync.Once
 	remaining atomic.Int32
 	updated   chan struct{}
 }
 
 func (wbs *writeByteStream) Write(p []byte) (n int, err error) {
 	for len(p) > 0 {
+		if cause := context.Cause(wbs.ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+			return n, cause
+		}
+
 		remaining := wbs.remaining.Load()
 		if remaining == 0 {
-			// Don't wait for window update since there are remaining
+			// Wait for window update
 			select {
 			case <-wbs.ctx.Done():
+				if cause := context.Cause(wbs.ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+					return n, cause
+				}
 				// TODO: Send error message on stream before close to allow remote side to return error
 				err = io.ErrShortWrite
 				return
@@ -101,8 +114,6 @@ func (wbs *writeByteStream) Write(p []byte) (n int, err error) {
 		if max > remaining {
 			max = remaining
 		}
-		// TODO: continue
-		// remaining = remaining - int32(n)
 
 		data := &transferapi.Data{
 			Data: p[:max],
@@ -115,16 +126,30 @@ func (wbs *writeByteStream) Write(p []byte) (n int, err error) {
 			return
 		}
 		if err = wbs.stream.Send(anyType); err != nil {
+			if cause := context.Cause(wbs.ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+				return n, cause
+			}
 			log.G(wbs.ctx).WithError(err).Errorf("send failed")
 			return
 		}
 		n += int(max)
 		p = p[max:]
-		wbs.remaining.Add(-1 * max)
+		wbs.remaining.Add(-max)
 	}
 	return
 }
 
 func (wbs *writeByteStream) Close() error {
-	return wbs.stream.Close()
+	if wbs.cancel != nil {
+		wbs.cancel(nil)
+	}
+	return wbs.closeStream()
+}
+
+func (wbs *writeByteStream) closeStream() error {
+	var err error
+	wbs.closeOnce.Do(func() {
+		err = wbs.stream.Close()
+	})
+	return err
 }

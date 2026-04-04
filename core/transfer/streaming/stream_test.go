@@ -21,9 +21,12 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
+	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/typeurl/v2"
+	"go.uber.org/goleak"
 )
 
 func FuzzSendAndReceive(f *testing.F) {
@@ -126,6 +129,48 @@ func TestSendReceiveEOFWithData(t *testing.T) {
 	}
 }
 
+func TestSendStreamRemoteCloseClosesBlockedReader(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	rs, ws := pipeStream()
+	reader := &blockedReadCloser{
+		entered: make(chan struct{}),
+		closed:  make(chan struct{}),
+	}
+	done := make(chan struct{})
+	go func() {
+		SendStream(ctx, reader, ws)
+		close(done)
+	}()
+
+	update, err := typeurl.MarshalAny(&transferapi.WindowUpdate{Update: 1})
+	if err != nil {
+		t.Fatalf("marshal window update: %v", err)
+	}
+	if err := rs.Send(update); err != nil {
+		t.Fatalf("send window update: %v", err)
+	}
+
+	select {
+	case <-reader.entered:
+	case <-time.After(time.Second):
+		t.Fatal("SendStream never started reading source")
+	}
+
+	if err := rs.Close(); err != nil {
+		t.Fatalf("close recv side: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("SendStream did not stop after remote close")
+	}
+}
+
 // eofReader returns all remaining data together with io.EOF on the final Read,
 // exercising the io.Reader contract where n > 0 && err == io.EOF.
 type eofReader struct {
@@ -142,6 +187,30 @@ func (r *eofReader) Read(p []byte) (int, error) {
 		return n, io.EOF
 	}
 	return n, nil
+}
+
+type blockedReadCloser struct {
+	entered chan struct{}
+	closed  chan struct{}
+}
+
+func (r *blockedReadCloser) Read(p []byte) (int, error) {
+	select {
+	case <-r.entered:
+	default:
+		close(r.entered)
+	}
+	<-r.closed
+	return 0, io.EOF
+}
+
+func (r *blockedReadCloser) Close() error {
+	select {
+	case <-r.closed:
+	default:
+		close(r.closed)
+	}
+	return nil
 }
 
 func chainStreams(ctx context.Context, r io.Reader) io.Reader {
@@ -180,6 +249,8 @@ type testStream struct {
 
 func (ts *testStream) Send(a typeurl.Any) error {
 	select {
+	case <-ts.closer:
+		return io.ErrClosedPipe
 	case <-ts.remote:
 		return io.ErrClosedPipe
 	case ts.send <- a:
@@ -188,6 +259,8 @@ func (ts *testStream) Send(a typeurl.Any) error {
 }
 func (ts *testStream) Recv() (typeurl.Any, error) {
 	select {
+	case <-ts.closer:
+		return nil, io.EOF
 	case <-ts.remote:
 		return nil, io.EOF
 	case a := <-ts.recv:
