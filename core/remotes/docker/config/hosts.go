@@ -20,6 +20,7 @@ package config
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -245,7 +246,7 @@ func updateTLSConfigFromHost(tlsConfig *tls.Config, host *hostConfig) error {
 
 	if host.caCerts != nil {
 		if tlsConfig.RootCAs == nil {
-			rootPool, err := rootSystemPool()
+			rootPool, err := x509.SystemCertPool()
 			if err != nil {
 				return fmt.Errorf("unable to initialize cert pool: %w", err)
 			}
