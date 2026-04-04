@@ -159,8 +159,19 @@ command. As part of this process, we do the following:
 
 			opts := []registry.Opt{
 				registry.WithCredentials(ch),
-				registry.WithHostDir(cliContext.String("hosts-dir")),
 			}
+
+			// If --hosts-dir is explicitly set, use it.
+			// Otherwise, try to get config_path from daemon's transfer plugin configuration.
+			// If that's not available either, fallback to CLI flag default.
+			if cliContext.IsSet("hosts-dir") {
+				opts = append(opts, registry.WithConfigPath(cliContext.String("hosts-dir")))
+			} else if daemonConfigPath := commands.GetRegistryConfigPath(ctx, client); daemonConfigPath != "" {
+				opts = append(opts, registry.WithConfigPath(daemonConfigPath))
+			} else {
+				opts = append(opts, registry.WithConfigPath(cliContext.String("hosts-dir")))
+			}
+
 			if cliContext.Bool("plain-http") {
 				opts = append(opts, registry.WithDefaultScheme("http"))
 			}
