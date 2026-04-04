@@ -29,15 +29,19 @@ import (
 )
 
 func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteCloser {
+	ctx, cancel := context.WithCancel(ctx)
 	wbs := &writeByteStream{
 		ctx:     ctx,
+		cancel:  cancel,
 		stream:  stream,
 		updated: make(chan struct{}, 1),
+		errCh:   make(chan error, 1),
 	}
 	go func() {
+		defer cancel()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-wbs.ctx.Done():
 				return
 			default:
 			}
@@ -45,7 +49,11 @@ func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteClose
 			anyType, err := stream.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
-					log.G(ctx).WithError(err).Error("send byte stream ended without EOF")
+					select {
+					case wbs.errCh <- err:
+					case <-wbs.ctx.Done():
+					default:
+					}
 				}
 				return
 			}
@@ -58,7 +66,7 @@ func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteClose
 			case *transferapi.WindowUpdate:
 				wbs.remaining.Add(v.Update)
 				select {
-				case <-ctx.Done():
+				case <-wbs.ctx.Done():
 					return
 				case wbs.updated <- struct{}{}:
 				default:
@@ -75,9 +83,11 @@ func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteClose
 
 type writeByteStream struct {
 	ctx       context.Context
+	cancel    context.CancelFunc
 	stream    streaming.Stream
 	remaining atomic.Int32
 	updated   chan struct{}
+	errCh     chan error
 }
 
 func (wbs *writeByteStream) Write(p []byte) (n int, err error) {
@@ -89,6 +99,8 @@ func (wbs *writeByteStream) Write(p []byte) (n int, err error) {
 			case <-wbs.ctx.Done():
 				// TODO: Send error message on stream before close to allow remote side to return error
 				err = io.ErrShortWrite
+				return
+			case err = <-wbs.errCh:
 				return
 			case <-wbs.updated:
 				continue
@@ -126,5 +138,8 @@ func (wbs *writeByteStream) Write(p []byte) (n int, err error) {
 }
 
 func (wbs *writeByteStream) Close() error {
+	if wbs.cancel != nil {
+		wbs.cancel()
+	}
 	return wbs.stream.Close()
 }

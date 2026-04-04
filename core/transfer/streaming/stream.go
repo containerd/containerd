@@ -43,7 +43,8 @@ var bufPool = &sync.Pool{
 }
 
 func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
-	window := make(chan int32)
+	window := make(chan int32, 8)
+	errCh := make(chan error, 1)
 	go func() {
 		defer close(window)
 		for {
@@ -56,7 +57,11 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 			anyType, err := stream.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
-					log.G(ctx).WithError(err).Error("send stream ended without EOF")
+					select {
+					case errCh <- err:
+					case <-ctx.Done():
+					default:
+					}
 				}
 				return
 			}
@@ -71,6 +76,7 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 				case <-ctx.Done():
 					return
 				case window <- v.Update:
+				default:
 				}
 			default:
 				log.G(ctx).Errorf("unexpected stream object of type %T", i)
@@ -92,6 +98,8 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 				case <-ctx.Done():
 					// TODO: Send error message on stream before close to allow remote side to return error
 					return
+				case <-errCh:
+					return
 				case update := <-window:
 					remaining += update
 				default:
@@ -102,7 +110,12 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 				case <-ctx.Done():
 					// TODO: Send error message on stream before close to allow remote side to return error
 					return
-				case update := <-window:
+				case <-errCh:
+					return
+				case update, ok := <-window:
+					if !ok {
+						return
+					}
 					remaining = update
 				}
 			}

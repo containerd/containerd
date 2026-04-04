@@ -29,6 +29,7 @@ import (
 
 type readByteStream struct {
 	ctx       context.Context
+	cancel    context.CancelFunc
 	stream    streaming.Stream
 	window    int32
 	updated   chan struct{}
@@ -37,18 +38,25 @@ type readByteStream struct {
 }
 
 func ReadByteStream(ctx context.Context, stream streaming.Stream) io.ReadCloser {
+	ctx, cancel := context.WithCancel(ctx)
 	rbs := &readByteStream{
 		ctx:     ctx,
+		cancel:  cancel,
 		stream:  stream,
 		window:  0,
-		errCh:   make(chan error),
+		errCh:   make(chan error, 1),
 		updated: make(chan struct{}, 1),
 	}
 	go func() {
 		for {
+			select {
+			case <-rbs.ctx.Done():
+				return
+			default:
+			}
 			if rbs.window >= windowSize {
 				select {
-				case <-ctx.Done():
+				case <-rbs.ctx.Done():
 					return
 				case <-rbs.updated:
 					continue
@@ -59,13 +67,24 @@ func ReadByteStream(ctx context.Context, stream streaming.Stream) io.ReadCloser 
 			}
 			anyType, err := typeurl.MarshalAny(update)
 			if err != nil {
-				rbs.errCh <- err
+				select {
+				case rbs.errCh <- err:
+				case <-rbs.ctx.Done():
+				default:
+				}
 				return
 			}
 			if err := stream.Send(anyType); err == nil {
 				rbs.window += windowSize
-			} else if !errors.Is(err, io.EOF) {
-				rbs.errCh <- err
+			} else {
+				if !errors.Is(err, io.EOF) {
+					select {
+					case rbs.errCh <- err:
+					case <-rbs.ctx.Done():
+					default:
+					}
+				}
+				return
 			}
 		}
 
@@ -107,7 +126,10 @@ func (r *readByteStream) Read(p []byte) (n int, err error) {
 		}
 		r.window = r.window - int32(n)
 		if r.window < windowSize {
-			r.updated <- struct{}{}
+			select {
+			case r.updated <- struct{}{}:
+			default:
+			}
 		}
 		return n, nil
 	default:
@@ -117,5 +139,8 @@ func (r *readByteStream) Read(p []byte) (n int, err error) {
 }
 
 func (r *readByteStream) Close() error {
+	if r.cancel != nil {
+		r.cancel()
+	}
 	return r.stream.Close()
 }
