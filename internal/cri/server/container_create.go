@@ -722,6 +722,33 @@ func (c *criService) buildLinuxSpec(
 	specOpts := []oci.SpecOpts{
 		oci.WithoutRunMount,
 	}
+
+	if config.GetTty() {
+		var mountDev bool
+		for _, mount := range config.GetMounts() {
+			if mount.ContainerPath == "/dev" && mount.HostPath == "/dev" {
+				mountDev = true
+			}
+		}
+
+		if mountDev {
+			var addDevConsole bool
+			for _, device := range config.GetDevices() {
+				if device.GetContainerPath() == "/dev/console" && device.GetHostPath() != "" {
+					addDevConsole = true
+				}
+			}
+			// add device /dev/console if tty is enabled
+			if !addDevConsole {
+				consoleDevice := &runtime.Device{
+					HostPath:      "/dev/console",
+					ContainerPath: "/dev/console",
+					Permissions:   "rwm",
+				}
+				config.Devices = append(config.Devices, consoleDevice)
+			}
+		}
+	}
 	// only clear the default security settings if the runtime does not have a custom
 	// base runtime spec spec.  Admins can use this functionality to define
 	// default ulimits, seccomp, or other default settings.
