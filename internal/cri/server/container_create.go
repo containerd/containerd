@@ -722,6 +722,14 @@ func (c *criService) buildLinuxSpec(
 	specOpts := []oci.SpecOpts{
 		oci.WithoutRunMount,
 	}
+	if config.GetTty() {
+		for _, mount := range config.GetMounts() {
+			if mount.ContainerPath == "/dev" {
+				specOpts = append(specOpts, oci.WithDevConsole)
+			}
+		}
+	}
+
 	// only clear the default security settings if the runtime does not have a custom
 	// base runtime spec spec.  Admins can use this functionality to define
 	// default ulimits, seccomp, or other default settings.
