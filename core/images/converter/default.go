@@ -263,6 +263,12 @@ func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 			}
 			mu.Lock()
 			if newMani != nil {
+				if updated, err := c.updateManifestPlatform(ctx2, cs, mani, *newMani); err != nil {
+					mu.Unlock()
+					return err
+				} else if updated != nil {
+					newMani = updated
+				}
 				ClearGCLabels(labels, mani.Digest)
 				labels[labelKey] = newMani.Digest.String()
 				// NOTE: for keeping manifest order, we specify `i` index explicitly
@@ -270,6 +276,13 @@ func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 				modified = true
 			} else {
 				newManifests[i] = mani
+				if updated, err := c.updateManifestPlatform(ctx2, cs, mani, mani); err != nil {
+					mu.Unlock()
+					return err
+				} else if updated != nil {
+					newManifests[i] = *updated
+					modified = true
+				}
 			}
 			mu.Unlock()
 			return nil
@@ -447,4 +460,72 @@ func ClearGCLabels(labels map[string]string, dgst digest.Digest) {
 			delete(labels, k)
 		}
 	}
+}
+
+func (c *defaultConverter) updateManifestPlatform(ctx context.Context, cs content.Store, originalDesc, convertedDesc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+	if !images.IsManifestType(convertedDesc.MediaType) {
+		return nil, nil
+	}
+
+	var manifest ocispec.Manifest
+	manifestLabels, err := readJSON(ctx, cs, &manifest, convertedDesc)
+	if err != nil {
+		return nil, err
+	}
+	hasErofsLayer := false
+	for _, layer := range manifest.Layers {
+		if layer.MediaType == images.MediaTypeErofsLayer {
+			hasErofsLayer = true
+			break
+		}
+	}
+	if !hasErofsLayer {
+		return nil, nil
+	}
+
+	var platform ocispec.Platform
+	if originalDesc.Platform != nil {
+		platform = *originalDesc.Platform
+	} else {
+		configPlatform, err := images.ConfigPlatform(ctx, cs, manifest.Config)
+		if err != nil {
+			return nil, err
+		}
+		platform = configPlatform
+	}
+
+	normalized := platforms.Normalize(platform)
+	normalized.OSFeatures = append(normalized.OSFeatures, "erofs")
+	normalized = platforms.Normalize(normalized)
+
+	// Stamp os.features into the image config so that the unpacker's
+	// config-based platform matching can distinguish EROFS images.
+	var cfg DualConfig
+	configLabels, err := readJSON(ctx, cs, &cfg, manifest.Config)
+	if err != nil {
+		return nil, err
+	}
+	b, err := json.Marshal(normalized.OSFeatures)
+	if err != nil {
+		return nil, err
+	}
+	cfg["os.features"] = (*json.RawMessage)(&b)
+	newConfig, err := writeJSON(ctx, cs, &cfg, manifest.Config, configLabels)
+	if err != nil {
+		return nil, err
+	}
+
+	if manifestLabels == nil {
+		manifestLabels = make(map[string]string)
+	}
+	ClearGCLabels(manifestLabels, manifest.Config.Digest)
+	manifestLabels["containerd.io/gc.ref.content.config"] = newConfig.Digest.String()
+	manifest.Config = *newConfig
+
+	newManifestDesc, err := writeJSON(ctx, cs, &manifest, convertedDesc, manifestLabels)
+	if err != nil {
+		return nil, err
+	}
+	newManifestDesc.Platform = &normalized
+	return newManifestDesc, nil
 }

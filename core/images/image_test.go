@@ -17,9 +17,15 @@
 package images
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"testing"
 
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/containerd/platforms"
+	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -124,4 +130,77 @@ func TestValidateMediaType(t *testing.T) {
 		err = validateMediaType(b, "")
 		assert.Error(t, err, "document should not be valid")
 	})
+}
+
+func TestManifestPrefersOSFeatures(t *testing.T) {
+	ctx := context.Background()
+	cs, err := local.NewStore(t.TempDir())
+	require.NoError(t, err)
+
+	plainConfig := writeJSONObject(t, ctx, cs, ocispec.MediaTypeImageConfig, ocispec.Image{})
+	plainManifestDesc := writeJSONObject(t, ctx, cs, ocispec.MediaTypeImageManifest, ocispec.Manifest{
+		Config: plainConfig,
+		Layers: []ocispec.Descriptor{
+			writeBlob(t, ctx, cs, ocispec.MediaTypeImageLayer, []byte("plain")),
+		},
+	})
+	plainManifestDesc.Platform = &ocispec.Platform{
+		OS:           "linux",
+		Architecture: "amd64",
+	}
+
+	erofsConfig := writeJSONObject(t, ctx, cs, ocispec.MediaTypeImageConfig, ocispec.Image{})
+	erofsManifestDesc := writeJSONObject(t, ctx, cs, ocispec.MediaTypeImageManifest, ocispec.Manifest{
+		Config: erofsConfig,
+		Layers: []ocispec.Descriptor{
+			writeBlob(t, ctx, cs, MediaTypeErofsLayer, []byte("erofs")),
+		},
+	})
+	erofsManifestDesc.Platform = &ocispec.Platform{
+		OS:           "linux",
+		Architecture: "amd64",
+		OSFeatures:   []string{"erofs"},
+	}
+
+	indexDesc := writeJSONObject(t, ctx, cs, ocispec.MediaTypeImageIndex, ocispec.Index{
+		Manifests: []ocispec.Descriptor{plainManifestDesc, erofsManifestDesc},
+	})
+
+	selected, err := Manifest(ctx, cs, indexDesc, platforms.OnlyStrict(ocispec.Platform{
+		OS:           "linux",
+		Architecture: "amd64",
+		OSFeatures:   []string{"erofs"},
+	}))
+	require.NoError(t, err)
+	require.Len(t, selected.Layers, 1)
+	assert.Equal(t, MediaTypeErofsLayer, selected.Layers[0].MediaType)
+
+	selected, err = Manifest(ctx, cs, indexDesc, platforms.OnlyStrict(ocispec.Platform{
+		OS:           "linux",
+		Architecture: "amd64",
+	}))
+	require.NoError(t, err)
+	require.Len(t, selected.Layers, 1)
+	assert.Equal(t, ocispec.MediaTypeImageLayer, selected.Layers[0].MediaType)
+}
+
+func writeJSONObject(t *testing.T, ctx context.Context, cs content.Store, mediaType string, obj any) ocispec.Descriptor {
+	t.Helper()
+
+	data, err := json.Marshal(obj)
+	require.NoError(t, err)
+	return writeBlob(t, ctx, cs, mediaType, data)
+}
+
+func writeBlob(t *testing.T, ctx context.Context, cs content.Store, mediaType string, data []byte) ocispec.Descriptor {
+	t.Helper()
+
+	desc := ocispec.Descriptor{
+		MediaType: mediaType,
+		Digest:    digest.FromBytes(data),
+		Size:      int64(len(data)),
+	}
+	err := content.WriteBlob(ctx, cs, desc.Digest.String(), bytes.NewReader(data), desc)
+	require.NoError(t, err)
+	return desc
 }
