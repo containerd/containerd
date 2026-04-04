@@ -102,6 +102,14 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 
 	imageRef := r.GetImage().GetImage()
 
+	// Extract RegistryToken before setting up credentials. RegistryToken is a
+	// pre-obtained bearer token that should be sent directly to the registry
+	// without going through the challenge-response token exchange flow.
+	var registryToken string
+	if authConfig := r.GetAuth(); authConfig != nil {
+		registryToken = authConfig.GetRegistryToken()
+	}
+
 	credentials := func(host string) (string, string, error) {
 		hostauth := r.GetAuth()
 		if hostauth == nil {
@@ -113,14 +121,14 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 		return ParseAuth(hostauth, host)
 	}
 
-	ref, err := c.CRIImageService.PullImage(ctx, imageRef, credentials, r.SandboxConfig, r.GetImage().GetRuntimeHandler())
+	ref, err := c.CRIImageService.PullImage(ctx, imageRef, credentials, registryToken, r.SandboxConfig, r.GetImage().GetRuntimeHandler())
 	if err != nil {
 		return nil, err
 	}
 	return &runtime.PullImageResponse{ImageRef: ref}, nil
 }
 
-func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (_ string, err error) {
+func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), registryToken string, sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (_ string, err error) {
 	span := tracing.SpanFromContext(ctx)
 	defer func() {
 		// TODO: add domain label for imagePulls metrics, and we may need to provide a mechanism
@@ -182,9 +190,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	// TODO: Add support for DisableSnapshotAnnotations, DiscardUnpackedLayers, ImagePullWithSyncFs and unpackDuplicationSuppressor
 	var image containerd.Image
 	if c.config.UseLocalImagePull {
-		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, registryToken, snapshotter, labels, imagePullProgressTimeout)
 	} else {
-		image, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, err = c.pullImageWithTransferService(ctx, ref, credentials, registryToken, snapshotter, labels, imagePullProgressTimeout)
 	}
 
 	if err != nil {
@@ -236,6 +244,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	ctx context.Context,
 	ref string,
 	credentials func(string) (string, string, error),
+	registryToken string,
 	snapshotter string,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
@@ -245,7 +254,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Headers: c.config.Registry.Headers,
-		Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
+		Hosts:   c.registryHosts(ctx, credentials, registryToken, pullReporter.optionUpdateClient),
 	})
 
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, snapshotter)
@@ -289,6 +298,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	ctx context.Context,
 	ref string,
 	credentials func(string) (string, string, error),
+	registryToken string,
 	snapshotter string,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
@@ -309,11 +319,14 @@ func (c *CRIImageService) pullImageWithTransferService(
 
 	log.G(ctx).Debugf("Getting new CRI credentials")
 
-	ch := newCRICredentials(ref, credentials)
+	ch := newCRICredentials(ref, credentials, registryToken)
 	opts := []registry.Opt{
 		registry.WithCredentials(ch),
 		registry.WithHeaders(c.config.Registry.Headers),
 		registry.WithHostDir(c.config.Registry.ConfigPath),
+	}
+	if registryToken != "" {
+		opts = append(opts, registry.WithAuthorizerOpts(docker.WithRegistryToken(registryToken)))
 	}
 
 	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
@@ -371,7 +384,10 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 		}
 		return user, strings.Trim(passwd, "\x00"), nil
 	}
-	// TODO(random-liu): Support RegistryToken.
+	// RegistryToken is handled separately at the PullImage level where it
+	// is passed directly to the authorizer via WithRegistryToken, bypassing
+	// the credentials-based token exchange flow. See GRPCCRIImageService.PullImage.
+
 	// An empty auth config is valid for anonymous registry
 	return "", "", nil
 }
@@ -493,7 +509,7 @@ func hostDirFromRoots(roots []string) func(string) (string, error) {
 }
 
 // registryHosts is the registry hosts to be used by the resolver.
-func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(host string) (string, string, error), updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
+func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(host string) (string, string, error), registryToken string, updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
 	paths := filepath.SplitList(c.config.Registry.ConfigPath)
 	if len(paths) > 0 {
 		hostOptions := config.HostOptions{
@@ -504,6 +520,10 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 		// need to pass cri global headers to per-host authorizers
 		hostOptions.AuthorizerOpts = []docker.AuthorizerOpt{
 			docker.WithAuthHeader(c.config.Registry.Headers),
+		}
+		if registryToken != "" {
+			hostOptions.AuthorizerOpts = append(hostOptions.AuthorizerOpts,
+				docker.WithRegistryToken(registryToken))
 		}
 
 		return config.ConfigureHosts(ctx, hostOptions)
@@ -551,11 +571,15 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 				}
 			}
 
-			authorizer := docker.NewDockerAuthorizer(
+			authOpts := []docker.AuthorizerOpt{
 				docker.WithAuthClient(client),
 				docker.WithAuthCreds(credentials),
 				docker.WithAuthHeader(c.config.Registry.Headers),
-			)
+			}
+			if registryToken != "" {
+				authOpts = append(authOpts, docker.WithRegistryToken(registryToken))
+			}
+			authorizer := docker.NewDockerAuthorizer(authOpts...)
 
 			if u.Path == "" {
 				u.Path = "/v2"
@@ -874,25 +898,36 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 }
 
 type criCredentials struct {
-	ref         string
-	credentials func(string) (string, string, error)
+	ref           string
+	credentials   func(string) (string, string, error)
+	registryToken string
 }
 
-func newCRICredentials(ref string, credentials func(string) (string, string, error)) registry.CredentialHelper {
+func newCRICredentials(ref string, credentials func(string) (string, string, error), registryToken string) registry.CredentialHelper {
 	return &criCredentials{
-		ref:         ref,
-		credentials: credentials,
+		ref:           ref,
+		credentials:   credentials,
+		registryToken: registryToken,
 	}
 }
 
 // GetCredentials gets credential from criCredentials makes criCredentials a registry.CredentialHelper
 func (cc *criCredentials) GetCredentials(ctx context.Context, ref string, host string) (registry.Credentials, error) {
-	if cc.credentials == nil {
-		return registry.Credentials{}, fmt.Errorf("credential handler not initialized for ref %q", ref)
-	}
-
 	if ref != cc.ref {
 		return registry.Credentials{}, fmt.Errorf("invalid ref %q, expected %q", ref, cc.ref)
+	}
+
+	// If a pre-obtained registry token is available, return it via the
+	// Header field so the transfer service uses it as a direct bearer token.
+	if cc.registryToken != "" {
+		return registry.Credentials{
+			Host:   host,
+			Header: "Bearer " + cc.registryToken,
+		}, nil
+	}
+
+	if cc.credentials == nil {
+		return registry.Credentials{}, fmt.Errorf("credential handler not initialized for ref %q", ref)
 	}
 
 	username, secret, err := cc.credentials(host)

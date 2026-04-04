@@ -35,6 +35,11 @@ import (
 type dockerAuthorizer struct {
 	credentials func(string) (string, string, error)
 
+	// registryToken is a pre-obtained bearer token to be sent directly
+	// to the registry without token exchange. Corresponds to the
+	// RegistryToken field in the CRI AuthConfig.
+	registryToken string
+
 	client *http.Client
 	header http.Header
 	mu     sync.RWMutex
@@ -47,6 +52,7 @@ type dockerAuthorizer struct {
 
 type authorizerConfig struct {
 	credentials         func(string) (string, string, error)
+	registryToken       string
 	client              *http.Client
 	header              http.Header
 	onFetchRefreshToken OnFetchRefreshToken
@@ -88,6 +94,17 @@ func WithAuthHeader(hdr http.Header) AuthorizerOpt {
 // OnFetchRefreshToken is called on fetching request token.
 type OnFetchRefreshToken func(ctx context.Context, refreshToken string, req *http.Request)
 
+// WithRegistryToken sets a pre-obtained bearer token that will be sent
+// directly to the registry as "Authorization: Bearer <token>" without
+// going through the token exchange flow. This corresponds to the
+// RegistryToken field in the CRI AuthConfig and the "registrytoken"
+// field in Docker's config.json auth entries.
+func WithRegistryToken(token string) AuthorizerOpt {
+	return func(opt *authorizerConfig) {
+		opt.registryToken = token
+	}
+}
+
 // WithFetchRefreshToken enables fetching "refresh token" (aka "identity token", "offline token").
 func WithFetchRefreshToken(f OnFetchRefreshToken) AuthorizerOpt {
 	return func(opt *authorizerConfig) {
@@ -110,6 +127,7 @@ func NewDockerAuthorizer(opts ...AuthorizerOpt) Authorizer {
 
 	return &dockerAuthorizer{
 		credentials:         ao.credentials,
+		registryToken:       ao.registryToken,
 		client:              ao.client,
 		header:              ao.header,
 		handlers:            make(map[string]*authHandler),
@@ -119,6 +137,13 @@ func NewDockerAuthorizer(opts ...AuthorizerOpt) Authorizer {
 
 // Authorize handles auth request.
 func (a *dockerAuthorizer) Authorize(ctx context.Context, req *http.Request) error {
+	// If a pre-obtained registry token is set, use it directly without
+	// going through the challenge-response token exchange flow.
+	if a.registryToken != "" {
+		req.Header.Set("Authorization", "Bearer "+a.registryToken)
+		return nil
+	}
+
 	// skip if there is no auth handler
 	ah := a.getAuthHandler(req.URL.Host)
 	if ah == nil {
@@ -153,6 +178,12 @@ func (a *dockerAuthorizer) getAuthHandler(host string) *authHandler {
 func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.Response) error {
 	last := responses[len(responses)-1]
 	host := last.Request.URL.Host
+
+	// If a pre-obtained registry token was used and the server still
+	// returned 401, the token is invalid or insufficient.
+	if a.registryToken != "" {
+		return fmt.Errorf("pre-obtained registry token was rejected by %s: %w", host, ErrInvalidAuthorization)
+	}
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
