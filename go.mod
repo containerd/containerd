@@ -84,7 +84,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/apimachinery v0.36.0-beta.0
 	k8s.io/client-go v0.36.0-beta.0
-	k8s.io/cri-api v0.36.0-beta.0
+	k8s.io/cri-api v0.36.0-beta.0.0.20260326115202-861ac7bf9e55
 	k8s.io/cri-streaming v0.36.0-beta.0
 	k8s.io/klog/v2 v2.140.0
 	tags.cncf.io/container-device-interface v1.1.0
