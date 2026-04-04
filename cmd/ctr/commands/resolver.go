@@ -130,6 +130,14 @@ func resolverDefaultTLS(cliContext *cli.Context) (*tls.Config, error) {
 		}
 	}
 
+	if sslKeyLogFile := cliContext.String("sslkeylogfile"); sslKeyLogFile != "" {
+		f, err := os.OpenFile(sslKeyLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open SSL key log file %q: %w", sslKeyLogFile, err)
+		}
+		tlsConfig.KeyLogWriter = f
+	}
+
 	tlsCertPath := cliContext.String("tlscert")
 	tlsKeyPath := cliContext.String("tlskey")
 	if tlsCertPath != "" || tlsKeyPath != "" {
@@ -144,7 +152,7 @@ func resolverDefaultTLS(cliContext *cli.Context) (*tls.Config, error) {
 	}
 
 	// If nothing was set, return nil rather than empty config
-	if !tlsConfig.InsecureSkipVerify && tlsConfig.RootCAs == nil && tlsConfig.Certificates == nil {
+	if !tlsConfig.InsecureSkipVerify && tlsConfig.RootCAs == nil && tlsConfig.Certificates == nil && tlsConfig.KeyLogWriter == nil {
 		return nil, nil
 	}
 
