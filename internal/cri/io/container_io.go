@@ -17,15 +17,19 @@
 package io
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containerd/log"
 
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
@@ -66,6 +70,16 @@ func WithFIFOs(fifos *cio.FIFOSet) ContainerIOOpts {
 func WithNewFIFOs(root string, tty, stdin bool) ContainerIOOpts {
 	return func(c *ContainerIO) error {
 		fifos, err := newFifos(root, c.id, tty, stdin)
+		if err != nil {
+			return err
+		}
+		return WithFIFOs(fifos)(c)
+	}
+}
+
+func WithNewStinFIFO(root string, tty, stdin bool) ContainerIOOpts {
+	return func(c *ContainerIO) error {
+		fifos, err := newStdinFifo(root, c.id, tty, stdin)
 		if err != nil {
 			return err
 		}
@@ -161,7 +175,7 @@ func (c *ContainerIO) Pipe() {
 
 // Attach attaches container stdio.
 // TODO(random-liu): Use pools.Copy in docker to reduce memory usage?
-func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
+func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions, logPath, ioType string) {
 	var wg sync.WaitGroup
 	key := util.GenerateID()
 	stdinKey := streamKey(c.id, "attach-"+key, Stdin)
@@ -175,8 +189,15 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 		// The actual stdin will be closed by stream server.
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
 		wg.Go(func() {
-			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
-				log.L.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
+			if ioType == criconfig.IOTypeFile {
+				dest := io.MultiWriter(c.stdin, opts.Stdout)
+				if _, err := io.Copy(dest, stdinStreamRC); err != nil {
+					log.L.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
+				}
+			} else {
+				if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
+					log.L.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
+				}
 			}
 			log.L.Infof("Attach stream %q closed", stdinKey)
 			if opts.StdinOnce && !opts.Tty {
@@ -189,10 +210,10 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 					log.L.WithError(err).Errorf("Failed to close stdin for container %q", c.id)
 				}
 			} else {
-				if opts.Stdout != nil {
+				if opts.Stdout != nil && ioType != criconfig.IOTypeFile {
 					c.stdoutGroup.Remove(stdoutKey)
 				}
-				if opts.Stderr != nil {
+				if opts.Stderr != nil && ioType != criconfig.IOTypeFile {
 					c.stderrGroup.Remove(stderrKey)
 				}
 			}
@@ -216,17 +237,21 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 		wg.Done()
 	}
 
-	if opts.Stdout != nil {
+	if opts.Stdout != nil && ioType != criconfig.IOTypeFile {
 		wg.Add(1)
 		wc, close := cioutil.NewWriteCloseInformer(opts.Stdout)
 		c.stdoutGroup.Add(stdoutKey, wc)
 		go attachStream(stdoutKey, close)
 	}
-	if !opts.Tty && opts.Stderr != nil {
+	if !opts.Tty && opts.Stderr != nil && ioType != criconfig.IOTypeFile {
 		wg.Add(1)
 		wc, close := cioutil.NewWriteCloseInformer(opts.Stderr)
 		c.stderrGroup.Add(stderrKey, wc)
 		go attachStream(stderrKey, close)
+	}
+
+	if ioType == criconfig.IOTypeFile {
+		go copyContainerLog(ctx, logPath, opts.Stdout, opts.Stderr, opts.Tty)
 	}
 	wg.Wait()
 }
@@ -265,4 +290,65 @@ func (c *ContainerIO) Close() error {
 		return c.fifos.Close()
 	}
 	return nil
+}
+
+func copyContainerLog(ctx context.Context, path string, stdout, stderr io.WriteCloser, tty bool) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Seek(0, io.SeekEnd)
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(file)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		if !scanner.Scan() {
+			time.Sleep(500 * time.Millisecond)
+			scanner = bufio.NewScanner(file)
+			continue
+		}
+
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, " ", 4)
+		if len(parts) < 4 {
+			continue
+		}
+		stream := parts[1]
+		content := parts[3]
+		var writeErr error
+		var newline string
+		if tty {
+			newline = "\r\n"
+		} else {
+			newline = "\n"
+		}
+		switch stream {
+		case "stdout":
+			if stdout != nil {
+				_, writeErr = stdout.Write([]byte(content + newline))
+			}
+		case "stderr":
+			if !tty && stderr != nil {
+				_, writeErr = stderr.Write([]byte(content + newline))
+			}
+		}
+		if writeErr != nil {
+			if errors.Is(writeErr, io.ErrClosedPipe) {
+				return nil
+			}
+			return err
+		}
+	}
 }

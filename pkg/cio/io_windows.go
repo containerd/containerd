@@ -42,6 +42,13 @@ func NewFIFOSetInDir(_, id string, terminal bool) (*FIFOSet, error) {
 	}, nil), nil
 }
 
+func NewStdinFIFOSetInDir(_, id string, terminal bool) (*FIFOSet, error) {
+	return NewFIFOSet(Config{
+		Terminal: terminal,
+		Stdin:    fmt.Sprintf(`%s\ctr-%s-stdin`, pipeRoot, id),
+	}, nil), nil
+}
+
 func copyIO(fifos *FIFOSet, ioset *Streams) (_ *cio, retErr error) {
 	cios := &cio{config: fifos.Config}
 
@@ -159,6 +166,22 @@ func NewDirectIOFromFIFOSet(ctx context.Context, stdin io.WriteCloser, stdout, s
 
 // TerminalLogURI provides the raw logging URI
 // as well as sets the terminal option to true.
+func TerminalLogURIWithStin(uri *url.URL, stdin string) Creator {
+	return func(_ string) (IO, error) {
+		return &logURI{
+			config: Config{
+				Terminal: true,
+				Stdin:    stdin,
+				Stdout:   uri.String(),
+
+				// Windows HCSShim requires that stderr is an empty string when using terminal.
+				// https://github.com/microsoft/hcsshim/blob/200feabd854da69f615a598ed6a1263ce9531676/cmd/containerd-shim-runhcs-v1/service_internal.go#L127
+				Stderr: "",
+			},
+		}, nil
+	}
+}
+
 func TerminalLogURI(uri *url.URL) Creator {
 	return func(_ string) (IO, error) {
 		return &logURI{

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -509,8 +510,17 @@ func (c *container) get(ctx context.Context) (containers.Container, error) {
 
 // get the existing fifo paths from the task information stored by the daemon
 func attachExistingIO(response *tasks.GetResponse, ioAttach cio.Attach) (cio.IO, error) {
-	fifoSet := loadFifos(response)
-	return ioAttach(fifoSet)
+	u, err := url.Parse(response.Process.Stdout)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme == "file" {
+		fifoSet := loadStin(response)
+		return ioAttach(fifoSet)
+	} else {
+		fifoSet := loadFifos(response)
+		return ioAttach(fifoSet)
+	}
 }
 
 // loadFifos loads the containers fifos
@@ -546,6 +556,38 @@ func loadFifos(response *tasks.GetResponse) *cio.FIFOSet {
 		Stdin:    response.Process.Stdin,
 		Stdout:   response.Process.Stdout,
 		Stderr:   response.Process.Stderr,
+		Terminal: response.Process.Terminal,
+	}, closer)
+}
+
+func loadStin(response *tasks.GetResponse) *cio.FIFOSet {
+	fifos := []string{
+		response.Process.Stdin,
+	}
+	closer := func() error {
+		var (
+			err  error
+			dirs = map[string]struct{}{}
+		)
+		for _, f := range fifos {
+			if isFifo, _ := fifo.IsFifo(f); isFifo {
+				if rerr := os.Remove(f); err == nil {
+					err = rerr
+				}
+				dirs[filepath.Dir(f)] = struct{}{}
+			}
+		}
+		for dir := range dirs {
+			// we ignore errors here because we don't
+			// want to remove the directory if it isn't
+			// empty
+			_ = os.Remove(dir)
+		}
+		return err
+	}
+
+	return cio.NewFIFOSet(cio.Config{
+		Stdin:    response.Process.Stdin,
 		Terminal: response.Process.Terminal,
 	}, closer)
 }

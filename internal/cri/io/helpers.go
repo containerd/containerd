@@ -91,6 +91,21 @@ func newFifos(root, id string, tty, stdin bool) (*cio.FIFOSet, error) {
 	return fifos, nil
 }
 
+func newStdinFifo(root, id string, tty, stdin bool) (*cio.FIFOSet, error) {
+	root = filepath.Join(root, "io")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return nil, err
+	}
+	fifos, err := cio.NewStdinFIFOSetInDir(root, id, tty)
+	if err != nil {
+		return nil, err
+	}
+	if !stdin {
+		fifos.Stdin = ""
+	}
+	return fifos, nil
+}
+
 // newStreams init streams for io of container.
 func newStreams(address, id string, tty, stdin bool) (*cio.FIFOSet, error) {
 	fifos := cio.NewFIFOSet(cio.Config{}, func() error { return nil })

@@ -42,6 +42,7 @@ type TaskClient interface {
 	Stats(ctx context.Context, in *StatsRequest, opts ...grpc.CallOption) (*StatsResponse, error)
 	Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectResponse, error)
 	Shutdown(ctx context.Context, in *ShutdownRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ReOpenLog(ctx context.Context, in *ReOpenLogRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type taskClient struct {
@@ -205,6 +206,15 @@ func (c *taskClient) Shutdown(ctx context.Context, in *ShutdownRequest, opts ...
 	return out, nil
 }
 
+func (c *taskClient) ReOpenLog(ctx context.Context, in *ReOpenLogRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/containerd.task.v3.Task/ReOpenLog", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServer is the server API for Task service.
 // All implementations must embed UnimplementedTaskServer
 // for forward compatibility
@@ -226,6 +236,7 @@ type TaskServer interface {
 	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
 	Connect(context.Context, *ConnectRequest) (*ConnectResponse, error)
 	Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error)
+	ReOpenLog(context.Context, *ReOpenLogRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTaskServer()
 }
 
@@ -283,6 +294,9 @@ func (UnimplementedTaskServer) Connect(context.Context, *ConnectRequest) (*Conne
 }
 func (UnimplementedTaskServer) Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
+}
+func (UnimplementedTaskServer) ReOpenLog(context.Context, *ReOpenLogRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReOpenLog not implemented")
 }
 func (UnimplementedTaskServer) mustEmbedUnimplementedTaskServer() {}
 
@@ -603,6 +617,24 @@ func _Task_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Task_ReOpenLog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReOpenLogRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServer).ReOpenLog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.task.v3.Task/ReOpenLog",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServer).ReOpenLog(ctx, req.(*ReOpenLogRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Task_ServiceDesc is the grpc.ServiceDesc for Task service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -677,6 +709,10 @@ var Task_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Shutdown",
 			Handler:    _Task_Shutdown_Handler,
+		},
+		{
+			MethodName: "ReOpenLog",
+			Handler:    _Task_ReOpenLog_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
