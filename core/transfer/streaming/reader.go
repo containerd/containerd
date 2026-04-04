@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
+	"sync/atomic"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/streaming"
@@ -29,26 +31,33 @@ import (
 
 type readByteStream struct {
 	ctx       context.Context
+	cancel    context.CancelCauseFunc
 	stream    streaming.Stream
-	window    int32
+	closeOnce sync.Once
+	window    atomic.Int32
 	updated   chan struct{}
-	errCh     chan error
 	remaining []byte
 }
 
 func ReadByteStream(ctx context.Context, stream streaming.Stream) io.ReadCloser {
+	ctx, cancel := context.WithCancelCause(ctx)
 	rbs := &readByteStream{
 		ctx:     ctx,
+		cancel:  cancel,
 		stream:  stream,
-		window:  0,
-		errCh:   make(chan error),
 		updated: make(chan struct{}, 1),
 	}
+	context.AfterFunc(rbs.ctx, func() { _ = rbs.closeStream() })
 	go func() {
 		for {
-			if rbs.window >= windowSize {
+			select {
+			case <-rbs.ctx.Done():
+				return
+			default:
+			}
+			if rbs.window.Load() >= windowSize {
 				select {
-				case <-ctx.Done():
+				case <-rbs.ctx.Done():
 					return
 				case <-rbs.updated:
 					continue
@@ -59,14 +68,17 @@ func ReadByteStream(ctx context.Context, stream streaming.Stream) io.ReadCloser 
 			}
 			anyType, err := typeurl.MarshalAny(update)
 			if err != nil {
-				rbs.errCh <- err
+				rbs.cancel(err)
 				return
 			}
-			if err := stream.Send(anyType); err == nil {
-				rbs.window += windowSize
-			} else if !errors.Is(err, io.EOF) {
-				rbs.errCh <- err
+			if err := stream.Send(anyType); err != nil {
+				if !errors.Is(err, io.EOF) {
+					rbs.cancel(err)
+					return
+				}
+				return
 			}
+			rbs.window.Add(windowSize)
 		}
 
 	}()
@@ -84,38 +96,56 @@ func (r *readByteStream) Read(p []byte) (n int, err error) {
 		}
 		return copied, nil
 	}
+
 	select {
 	case <-r.ctx.Done():
+		if err := context.Cause(r.ctx); err != nil {
+			return 0, err
+		}
 		return 0, r.ctx.Err()
-	case err := <-r.errCh:
-		return 0, err
 	default:
 	}
 	anyType, err := r.stream.Recv()
 	if err != nil {
+		if cause := context.Cause(r.ctx); cause != nil && (errors.Is(err, context.Canceled) || errors.Is(err, io.EOF)) {
+			return 0, cause
+		}
 		return 0, err
 	}
 	i, err := typeurl.UnmarshalAny(anyType)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to unmarshal received object: %w", err)
 	}
 	switch v := i.(type) {
 	case *transferapi.Data:
-		n := copy(p, v.Data)
+		n = copy(p, v.Data)
 		if len(v.Data) > plen {
 			r.remaining = v.Data[plen:]
 		}
-		r.window = r.window - int32(n)
-		if r.window < windowSize {
-			r.updated <- struct{}{}
+
+		if r.window.Add(-int32(n)) < windowSize {
+			select {
+			case r.updated <- struct{}{}:
+			default:
+			}
 		}
 		return n, nil
 	default:
 		return 0, fmt.Errorf("stream received error type %v", v)
 	}
-
 }
 
 func (r *readByteStream) Close() error {
-	return r.stream.Close()
+	if r.cancel != nil {
+		r.cancel(nil)
+	}
+	return r.closeStream()
+}
+
+func (r *readByteStream) closeStream() error {
+	var err error
+	r.closeOnce.Do(func() {
+		err = r.stream.Close()
+	})
+	return err
 }

@@ -180,6 +180,8 @@ type testStream struct {
 
 func (ts *testStream) Send(a typeurl.Any) error {
 	select {
+	case <-ts.closer:
+		return io.ErrClosedPipe
 	case <-ts.remote:
 		return io.ErrClosedPipe
 	case ts.send <- a:
@@ -188,6 +190,8 @@ func (ts *testStream) Send(a typeurl.Any) error {
 }
 func (ts *testStream) Recv() (typeurl.Any, error) {
 	select {
+	case <-ts.closer:
+		return nil, io.EOF
 	case <-ts.remote:
 		return nil, io.EOF
 	case a := <-ts.recv:
