@@ -7,7 +7,7 @@ import (
 	"archive/tar"
 	"bufio"
 	"context"
-	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -96,28 +96,33 @@ func WithParentLayers(parentLayers []*cimfs.BlockCIM) BlockCIMLayerImportOpt {
 	}
 }
 
-func writeIntegrityChecksumInfoFile(ctx context.Context, blockPath string) error {
+func GetIntegrityChecksum(ctx context.Context, blockPath string, pathName string) (string, error) {
 	log.G(ctx).Debugf("writing integrity checksum file for block CIM `%s`", blockPath)
-	// for convenience write a file that has the base64 encoded root digest of the generated verified CIM.
-	// this same base64 string can be used in the confidential policy.
+	// for convenience write a file that has the hex encoded root digest of the generated verified CIM.
+	// this same hex string can be used in the confidential policy.
+	// also return the integrity checksum as a string for integrity-vhd tooling.
 	digest, err := cimfs.GetVerificationInfo(blockPath)
 	if err != nil {
-		return fmt.Errorf("failed to query verified info of the CIM layer: %w", err)
+		return "", fmt.Errorf("failed to query verified info of the CIM layer: %w", err)
 	}
 
-	digestFile, err := os.Create(filepath.Join(filepath.Dir(blockPath), "integrity_checksum"))
-	if err != nil {
-		return fmt.Errorf("failed to create verification info file: %w", err)
-	}
-	defer digestFile.Close()
+	digestStr := hex.EncodeToString(digest)
 
-	digestStr := base64.URLEncoding.EncodeToString(digest)
-	if wn, err := digestFile.WriteString(digestStr); err != nil {
-		return fmt.Errorf("failed to write verification info: %w", err)
-	} else if wn != len(digestStr) {
-		return fmt.Errorf("incomplete write of verification info: %w", err)
+	// only create a file if a path name is provided
+	if pathName != "" {
+		digestFile, err := os.Create(filepath.Join(filepath.Dir(blockPath), pathName))
+		if err != nil {
+			return "", fmt.Errorf("failed to create verification info file: %w", err)
+		}
+		defer digestFile.Close()
+
+		if wn, err := digestFile.WriteString(digestStr); err != nil {
+			return "", fmt.Errorf("failed to write verification info: %w", err)
+		} else if wn != len(digestStr) {
+			return "", fmt.Errorf("incomplete write of verification info: %w", err)
+		}
 	}
-	return nil
+	return digestStr, nil
 }
 
 func ImportBlockCIMLayerWithOpts(ctx context.Context, r io.Reader, layer *cimfs.BlockCIM, opts ...BlockCIMLayerImportOpt) (_ int64, err error) {
@@ -164,7 +169,7 @@ func ImportBlockCIMLayerWithOpts(ctx context.Context, r io.Reader, layer *cimfs.
 	}
 
 	if config.dataIntegrity {
-		if err = writeIntegrityChecksumInfoFile(ctx, layer.BlockPath); err != nil {
+		if _, err = GetIntegrityChecksum(ctx, layer.BlockPath, "integrity_checksum"); err != nil {
 			return 0, err
 		}
 	}
@@ -356,6 +361,11 @@ func MergeBlockCIMLayersWithOpts(ctx context.Context, sourceCIMs []*cimfs.BlockC
 		log.G(ctx).Debugf("appending VHD footer to block CIM at `%s`", mergedCIM.BlockPath)
 		if err = tar2ext4.ConvertFileToVhd(mergedCIM.BlockPath); err != nil {
 			return fmt.Errorf("append VHD footer to block CIM: %w", err)
+		}
+	}
+	if config.dataIntegrity {
+		if _, err = GetIntegrityChecksum(ctx, mergedCIM.BlockPath, "merged_integrity_checksum"); err != nil {
+			return err
 		}
 	}
 	return nil
