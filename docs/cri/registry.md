@@ -67,38 +67,21 @@ After modifying this config, you need to restart the `containerd` service.
 
 ### Configure Registry Credentials Example - GCR with Service Account Key Authentication
 
-If you don't already have Google Container Registry (GCR) set up then you need to do the following steps:
+If you don't already have Google Artifact Registry set up then you need to do the following steps:
 
 * Create a Google Cloud Platform (GCP) account and project if not already created (see [GCP getting started](https://cloud.google.com/gcp/getting-started))
-* Enable GCR for your project (see [Quickstart for Container Registry](https://cloud.google.com/container-registry/docs/quickstart))
-* For authentication to GCR: Create [service account and JSON key](https://cloud.google.com/container-registry/docs/advanced-authentication#json-key)
-* The JSON key file needs to be downloaded to your system from the GCP console
-* For access to the GCR storage: Add service account to the GCR storage bucket with storage admin access rights (see [Granting permissions](https://cloud.google.com/container-registry/docs/access-control#grant-bucket))
+* Enable Artifact Registry for your project (see [Guide for Artifact Registry](https://docs.cloud.google.com/artifact-registry/docs/enable-service))
+* For authentication to Artifact Registry: Choose an [authentication method](https://docs.cloud.google.com/artifact-registry/docs/docker/authentication)
 
-Refer to [Pushing and pulling images](https://cloud.google.com/container-registry/docs/pushing-and-pulling) for detailed information on the above steps.
+Refer to [Pushing and pulling images](https://docs.cloud.google.com/artifact-registry/docs/docker/pushing-and-pulling) for detailed information on the above steps.
 
-> Note: The JSON key file is a multi-line file and it can be cumbersome to use the contents as a key outside of the file. It is worthwhile generating a single line format output of the file. One way of doing this is using the `jq` tool as follows: `jq -c . key.json`
+Confirm using the steps on the above documentation page for Artifact Registry that from your terminal you can authenticate and interact with images in your registry.
 
-It is beneficial to first confirm that from your terminal you can authenticate with your GCR and have access to the storage before hooking it into containerd. This can be verified by performing a login to your GCR and
-pushing an image to it as follows:
-
-```console
-docker login -u _json_key -p "$(cat key.json)" gcr.io
-
-docker pull busybox
-
-docker tag busybox gcr.io/your-gcp-project-id/busybox
-
-docker push gcr.io/your-gcp-project-id/busybox
-
-docker logout gcr.io
-```
-
-Now that you know you can access your GCR from your terminal, it is now time to try out containerd.
+Now that you know you can access your Artifact Registry from your terminal, it is now time to try out containerd. Use the authentication guide above to create a service account key and download the JSON locally.
 
 Edit the containerd config (default location is at `/etc/containerd/config.toml`)
-to add your JSON key for `gcr.io` domain image pull
-requests:
+to add your service account key for `gcr.io` domain image pull requests:
+
 + In containerd 2.x
 ```toml
 version = 3
@@ -111,7 +94,7 @@ version = 3
       endpoint = ["https://gcr.io"]
   [plugins."io.containerd.cri.v1.images".registry.configs]
     [plugins."io.containerd.cri.v1.images".registry.configs."gcr.io".auth]
-      username = "_json_key"
+      username = "_json_key_base64"
       password = 'paste output from jq'
 ```
 + In containerd 1.x
@@ -126,11 +109,11 @@ version = 2
       endpoint = ["https://gcr.io"]
   [plugins."io.containerd.grpc.v1.cri".registry.configs]
     [plugins."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
-      username = "_json_key"
+      username = "_json_key_base64"
       password = 'paste output from jq'
 ```
 
-> Note: `username` of `_json_key` signifies that JSON key authentication will be used.
+> Note: `username` of `_json_key_base64` signifies that JSON key authentication will be used.
 
 Restart containerd:
 
