@@ -476,6 +476,11 @@ func TestImagePullWithTracing(t *testing.T) {
 }
 
 func TestImagePullWithConcurrentUnpacks(t *testing.T) {
+	// ghcr.io/containerd/volume-copy-up:2.2 is not available on s390x
+	if runtime.GOARCH == "s390x" {
+		t.Skip("test image not available on s390x")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)

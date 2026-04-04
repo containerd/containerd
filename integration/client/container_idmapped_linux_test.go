@@ -18,6 +18,7 @@ package client
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -33,6 +34,11 @@ import (
 )
 
 func TestIDMappedOverlay(t *testing.T) {
+	// ghcr.io/containerd/volume-copy-up:2.2 is not available on s390x
+	if runtime.GOARCH == "s390x" {
+		t.Skip("test image not available on s390x")
+	}
+
 	if ok, err := overlayutils.SupportsIDMappedMounts(); err != nil || !ok {
 		t.Skip("overlayfs doesn't support idmapped mounts")
 	}
