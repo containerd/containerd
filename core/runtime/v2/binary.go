@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	gruntime "runtime"
@@ -102,16 +101,9 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	// open the log pipe and block until the writer is ready
 	// this helps with synchronization of the shim
 	// copy the shim's logs to containerd's output
+	done := make(chan struct{})
 	go func() {
-		defer f.Close()
-		_, err := io.Copy(os.Stderr, f)
-		// To prevent flood of error messages, the expected error
-		// should be reset, like os.ErrClosed or os.ErrNotExist, which
-		// depends on platform.
-		err = checkCopyShimLogError(ctx, err)
-		if err != nil {
-			log.G(ctx).WithError(err).Error("copy shim log")
-		}
+		copyShimlog(ctx, filepath.Join(b.bundle.Path, "log"), f, done)
 	}()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -123,6 +115,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		onClose()
 		cancelShimLog()
 		f.Close()
+		close(done)
 	}
 	// Save runtime binary path for restore.
 	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0600); err != nil {
