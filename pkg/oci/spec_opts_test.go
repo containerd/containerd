@@ -18,6 +18,7 @@ package oci
 
 import (
 	"context"
+	_ "crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,7 +77,7 @@ func newFakeImage(config ocispec.Image) (Image, error) {
 	}
 	configDescriptor := ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageConfig,
-		Digest:    digest.NewDigestFromBytes(digest.SHA256, configBlob),
+		Digest:    digest.Canonical.FromBytes(configBlob),
 	}
 
 	return fakeImage{
