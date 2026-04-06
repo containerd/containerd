@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -247,13 +248,14 @@ func TestExportAllCases(t *testing.T) {
 				return img
 			},
 			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, img images.Image) {
-				err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImageByDigest), archive.WithPlatform(platforms.All))
-				if err != nil {
+				if err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImageByDigest), archive.WithPlatform(platforms.All)); err != nil {
 					t.Fatal(err)
 				}
 
-				dstFile.Seek(0, 0)
-				assertOCIIndexAnnotationRefName(t, dstFile, img.Name)
+				if _, err := dstFile.Seek(0, io.SeekStart); err != nil {
+					t.Fatal(err)
+				}
+				assertOCIIndexAnnotationRefName(t, dstFile)
 			},
 		},
 	} {
@@ -381,7 +383,12 @@ func assertOCITar(t *testing.T, r io.Reader, docker bool) {
 	}
 }
 
-func assertOCIIndexAnnotationRefName(t *testing.T, r io.Reader, imageName string) {
+func assertOCIIndexAnnotationRefName(t *testing.T, r io.Reader) {
+
+	// The required grammar of the well-known org.opencontainer.image.ref.name annotation as specified at
+	// https://github.com/opencontainers/image-spec/blob/v1.1.1/annotations.md#pre-defined-annotation-keys
+	var ociImageRefNameRegex = regexp.MustCompile(`^[A-Za-z0-9]+(?:(?:[-._:@+]|--)[A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:(?:[-._:@+]|--)[A-Za-z0-9]+)*)*$`)
+
 	t.Helper()
 	tr := tar.NewReader(r)
 	foundIndexJSON := false
@@ -399,12 +406,13 @@ func assertOCIIndexAnnotationRefName(t *testing.T, r io.Reader, imageName string
 			if err := json.NewDecoder(tr).Decode(&idx); err != nil {
 				t.Fatal(err)
 			}
+			if len(idx.Manifests) == 0 {
+				t.Error("index contains no manifests to verify")
+			}
 			for _, m := range idx.Manifests {
-				if m.Annotations == nil {
+				if ref, ok := m.Annotations[ocispec.AnnotationRefName]; !ok {
 					t.Errorf("manifest does not have %s annotation", ocispec.AnnotationRefName)
-				} else if ref, ok := m.Annotations[ocispec.AnnotationRefName]; !ok {
-					t.Errorf("manifest does not have %s annotation", ocispec.AnnotationRefName)
-				} else if !OCIAnnotationRegex.MatchString(ref) {
+				} else if !ociImageRefNameRegex.MatchString(ref) {
 					t.Errorf("manifest annotation %s=%q does not match required grammar", ocispec.AnnotationRefName, ref)
 				}
 			}

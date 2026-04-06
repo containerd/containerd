@@ -42,7 +42,7 @@ import (
 var (
 	testImage             = images.Get(images.BusyBox)
 	testMultiLayeredImage = images.Get(images.VolumeCopyUp)
-	testImageByDigest = images.Get(images.BusyBoxByDigest)
+	testImageByDigest     = images.Get(images.BusyBoxByDigest)
 	shortCommand          = withProcessArgs("true")
 	// NOTE: The TestContainerPids needs two running processes in one
 	// container. But busybox:1.36 sh shell, the `sleep` is a builtin.

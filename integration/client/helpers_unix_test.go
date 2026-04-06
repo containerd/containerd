@@ -21,7 +21,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"regexp"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/cio"
@@ -30,8 +29,6 @@ import (
 )
 
 const newLine = "\n"
-
-var OCIAnnotationRegex = regexp.MustCompile(`^[A-Za-z0-9]+(?:(?:[-._:@+]|--)[A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:(?:[-._:@+]|--)[A-Za-z0-9]+)*)*$`)
 
 func withExitStatus(es int) oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
