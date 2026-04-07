@@ -747,7 +747,7 @@ func WithUserID(uid uint32) SpecOpts {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
-				if os.IsNotExist(err) || errors.Is(err, ErrNoUsersFound) {
+				if errors.Is(err, fs.ErrNotExist) || errors.Is(err, ErrNoUsersFound) {
 					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
@@ -866,7 +866,7 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 					return u.Uid == uid
 				})
 				if err != nil {
-					if os.IsNotExist(err) || errors.Is(err, ErrNoUsersFound) {
+					if errors.Is(err, fs.ErrNotExist) || errors.Is(err, ErrNoUsersFound) {
 						return nil
 					}
 					return err
@@ -883,7 +883,7 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 				return slices.Contains(g.List, username)
 			})
 			if err != nil {
-				if os.IsNotExist(err) {
+				if errors.Is(err, fs.ErrNotExist) {
 					return nil
 				}
 				return err
@@ -983,7 +983,7 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 				if groupErr != nil {
 					return groupErr
 				}
-			} else if !os.IsNotExist(groupErr) {
+			} else if !errors.Is(groupErr, fs.ErrNotExist) {
 				return groupErr
 			}
 
