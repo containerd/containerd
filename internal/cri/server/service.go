@@ -351,6 +351,10 @@ func (c *criService) Run(ready func()) error {
 // TODO(random-liu): Make close synchronous.
 func (c *criService) Close() error {
 	log.L.Info("Stop CRI service")
+
+	//stop nri
+	c.nri.Stop()
+
 	for name, h := range c.cniNetConfMonitor {
 		if err := h.stop(); err != nil {
 			log.L.WithError(err).Errorf("failed to stop cni network conf monitor for %s", name)

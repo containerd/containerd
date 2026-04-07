@@ -70,6 +70,14 @@ func (a *API) Register() error {
 	return a.nri.Start()
 }
 
+func (a *API) Stop() {
+	if a.IsDisabled() {
+		return
+	}
+
+	a.nri.Stop()
+}
+
 //
 // CRI-NRI lifecycle hook interface
 //

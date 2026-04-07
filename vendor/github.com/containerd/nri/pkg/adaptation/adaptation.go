@@ -175,6 +175,7 @@ func (r *Adaptation) Stop() {
 	r.Lock()
 	defer r.Unlock()
 
+	r.shutdownPlugins()
 	r.stopListener()
 	r.stopPlugins()
 }
@@ -381,6 +382,15 @@ func (r *Adaptation) startPlugins() (retErr error) {
 	r.plugins = plugins
 	r.sortPlugins()
 	return nil
+}
+
+// Shutdown plugins
+func (r *Adaptation) shutdownPlugins() {
+	log.Infof(noCtx, "shutdowning plugins...")
+
+	for _, p := range r.plugins {
+		p.stub.Shutdown(context.Background(), &api.Empty{})
+	}
 }
 
 // Stop plugins.

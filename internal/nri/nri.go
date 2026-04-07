@@ -163,8 +163,10 @@ func (l *local) Stop() {
 	l.Lock()
 	defer l.Unlock()
 
-	l.nri.Stop()
-	l.nri = nil
+	if l.nri != nil {
+		l.nri.Stop()
+		l.nri = nil
+	}
 }
 
 func (l *local) RunPodSandbox(ctx context.Context, pod PodSandbox) error {
