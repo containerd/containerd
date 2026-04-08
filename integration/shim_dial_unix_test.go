@@ -131,6 +131,9 @@ func testFailFastWhenConnectShim(abstract bool, dialFn dialFunc) func(*testing.T
 		listener.Close()
 		ttrpcSrv.Shutdown(ctx)
 
+		// Wait for server to fully shutdown before testing connection failure
+		time.Sleep(20 * time.Millisecond)
+
 		checkDialErr(addr, errCh, syscall.ECONNREFUSED)
 
 		// remove the socket file
