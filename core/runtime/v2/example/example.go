@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
 	apitypes "github.com/containerd/containerd/api/types"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -55,7 +56,7 @@ func init() {
 	})
 }
 
-func NewManager(name string) shim.Manager {
+func NewManager(name string) shim.Shim {
 	return manager{name: name}
 }
 
@@ -67,8 +68,8 @@ func (m manager) Name() string {
 	return m.name
 }
 
-func (m manager) Start(ctx context.Context, id string, opts shim.StartOpts) (shim.BootstrapParams, error) {
-	return shim.BootstrapParams{}, errdefs.ErrNotImplemented
+func (m manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (*bootapi.BootstrapResult, error) {
+	return nil, errdefs.ErrNotImplemented
 }
 
 func (m manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {

@@ -206,6 +206,7 @@ build: ## build the go packages
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
+	@$(GO) -C api test ${TESTFLAGS} ${API_PACKAGES}
 	@$(GOTEST) ${TESTFLAGS} ${PACKAGES}
 
 root-test: ## run tests, except integration tests

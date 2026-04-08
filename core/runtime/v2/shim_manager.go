@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
 
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -169,7 +170,7 @@ func (m *ShimManager) ID() string {
 func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
 	shouldInvokeShimBinary := false
 
-	var params shimbinary.BootstrapParams
+	var params = &bootapi.BootstrapResult{}
 	if opts.SandboxID != "" {
 		_, sbErr := m.sandboxStore.Get(ctx, opts.SandboxID)
 		if sbErr != nil {
@@ -193,8 +194,8 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 					return nil, fmt.Errorf("the scheme of sandbox address should be in " +
 						" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
 				}
-				params = shimbinary.BootstrapParams{
-					Version:  int(opts.Version),
+				params = &bootapi.BootstrapResult{
+					Version:  int32(opts.Version),
 					Protocol: protocol,
 					Address:  address,
 				}
@@ -310,34 +311,34 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 // restoreBootstrapParams reads bootstrap.json to restore shim configuration.
 // If its an old shim, this will perform migration - read address file and write default bootstrap
 // configuration (version = 2, protocol = ttrpc, and address).
-func restoreBootstrapParams(bundlePath string) (shimbinary.BootstrapParams, error) {
+func restoreBootstrapParams(bundlePath string) (*bootapi.BootstrapResult, error) {
 	filePath := filepath.Join(bundlePath, "bootstrap.json")
 
 	// Read bootstrap.json if exists
 	if _, err := os.Stat(filePath); err == nil {
 		return readBootstrapParams(filePath)
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("failed to stat %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to stat %s: %w", filePath, err)
 	}
 
 	// File not found, likely its an older shim. Try migrate.
 
 	address, err := shimbinary.ReadAddress(filepath.Join(bundlePath, "address"))
 	if err != nil {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("unable to migrate shim: failed to get socket address for bundle %s: %w", bundlePath, err)
+		return nil, fmt.Errorf("unable to migrate shim: failed to get socket address for bundle %s: %w", bundlePath, err)
 	}
 
-	params := shimbinary.BootstrapParams{
+	params := bootapi.BootstrapResult{
 		Version:  2,
 		Address:  address,
 		Protocol: "ttrpc",
 	}
 
-	if err := writeBootstrapParams(filePath, params); err != nil {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("unable to migrate: failed to write bootstrap.json file: %w", err)
+	if err := writeBootstrapParams(filePath, &params); err != nil {
+		return nil, fmt.Errorf("unable to migrate: failed to write bootstrap.json file: %w", err)
 	}
 
-	return params, nil
+	return &params, nil
 }
 
 func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
