@@ -192,14 +192,47 @@ The OCI Runtime Bundle and on the `Create` rpc request.
 
 Each shim MUST implement a `start` subcommand.
 This command will launch new shims.
+The start command, as well as all binary calls to the shim, has the bundle for the container set as the `cwd`.
+
+##### Bootstrap protocol (2.3+)
+
+Starting with containerd 2.3, the `start` command receives all configuration from containerd via a single
+protobuf-serialized [`BootstrapParams`](../api/runtime/bootstrap/v1/bootstrap.proto) message on stdin.
+This replaces the previous scattered mechanisms (CLI flags, environment variables, stdin protobuf options)
+with a single, versioned, extensible protocol.
+
+The shim MUST read a `BootstrapParams` message from stdin and write a `BootstrapResult` message to stdout.
+Both messages are defined in [`bootstrap.proto`](../api/runtime/bootstrap/v1/bootstrap.proto) and serialized
+using protobuf binary encoding.
+
+`BootstrapParams` carries all the information the shim needs to initialize: the container/sandbox ID, namespace,
+log level, containerd version and API addresses, etc.
+
+containerd can pass additional, shim-specific configuration via the `extensions` field — a list of
+`google.protobuf.Any` messages. This allows new configuration types (e.g. runtime options, CRI config,
+sandbox config) to be introduced without changing the core protocol.
+
+`BootstrapResult` carries the shim's listening address and protocol (`ttrpc` or `grpc`), along with
+an optional `capabilities` field. The capabilities field is reserved for future use to allow containerd
+and shims to negotiate supported behaviors — for example, containerd could tailor its interactions
+with a shim based on the capabilities the shim advertises.
+
+The `pkg/shim` package handles the bootstrap protocol automatically — it tries the new protocol first and
+falls back to the legacy mechanism (described below) to ease migration. containerd 2.3 still provides the
+legacy CLI flags and environment variables alongside the new protocol for backward compatibility, but the
+legacy mechanism is deprecated and will be removed in a future releases.
+
+##### Legacy protocol (up to 2.2)
+
+In containerd versions up to 2.2, the start command receives configuration via CLI flags, environment variables,
+and protobuf-serialized runtime options on stdin.
+
 The start command MUST accept the following flags:
 
 * `-namespace` the namespace for the container
 * `-address` the address of the containerd's main grpc socket
 * `-publish-binary` the binary path to publish events back to containerd
 * `-id` the id of the container
-
-The start command, as well as all binary calls to the shim, has the bundle for the container set as the `cwd`.
 
 The start command may have the following containerd specific environment variables set:
 
@@ -209,7 +242,7 @@ The start command may have the following containerd specific environment variabl
 * `SCHED_CORE` enable core scheduling if available (1.6+)
 * `NAMESPACE` an optional namespace the shim is operating in or inheriting (1.7+)
 
-The start command MUST write to stdout either the ttrpc address that the shim is serving its API on, or _(experimental)_
+The start command MUST write to stdout either the ttrpc address that the shim is serving its API on, or
 a JSON structure in the following format (where protocol can be either "ttrpc" or "grpc"):
 
 ```json
