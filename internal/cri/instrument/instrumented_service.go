@@ -359,6 +359,10 @@ func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullIma
 		span.RecordError(err)
 	}()
 	res, err = in.c.PullImage(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -376,6 +380,10 @@ func (in *instrumentedService) ListImages(ctx context.Context, r *runtime.ListIm
 		}
 	}()
 	res, err = in.c.ListImages(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -393,6 +401,10 @@ func (in *instrumentedService) ImageStatus(ctx context.Context, r *runtime.Image
 		}
 	}()
 	res, err = in.c.ImageStatus(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -411,6 +423,10 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 		span.RecordError(err)
 	}()
 	res, err := in.c.RemoveImage(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
