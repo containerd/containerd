@@ -220,6 +220,72 @@ func TestWithDevices(t *testing.T) {
 	}
 }
 
+func TestWithWindowsResources(t *testing.T) {
+	tests := []struct {
+		name         string
+		resources    *runtime.WindowsContainerResources
+		wantAffinity []specs.WindowsCPUGroupAffinity
+	}{
+		{
+			name: "AffinityCpus written to OCI spec",
+			resources: &runtime.WindowsContainerResources{
+				AffinityCpus: []*runtime.WindowsCpuGroupAffinity{
+					{CpuMask: 0x3, CpuGroup: 0},
+					{CpuMask: 0xf, CpuGroup: 1},
+				},
+			},
+			wantAffinity: []specs.WindowsCPUGroupAffinity{
+				{Mask: 0x3, Group: 0},
+				{Mask: 0xf, Group: 1},
+			},
+		},
+		{
+			name:         "no AffinityCpus leaves CPU affinity nil",
+			resources:    &runtime.WindowsContainerResources{},
+			wantAffinity: nil,
+		},
+		{
+			name: "nil entries in AffinityCpus are skipped",
+			resources: &runtime.WindowsContainerResources{
+				AffinityCpus: []*runtime.WindowsCpuGroupAffinity{
+					{CpuMask: 0x3, CpuGroup: 0},
+					nil,
+					{CpuMask: 0xf, CpuGroup: 1},
+				},
+			},
+			wantAffinity: []specs.WindowsCPUGroupAffinity{
+				{Mask: 0x3, Group: 0},
+				{Mask: 0xf, Group: 1},
+			},
+		},
+		{
+			name:      "nil resources is a no-op",
+			resources: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &specs.Spec{}
+			err := WithWindowsResources(tt.resources)(context.Background(), nil, nil, s)
+			require.NoError(t, err)
+			if tt.resources == nil {
+				assert.Nil(t, s.Windows)
+				return
+			}
+			if tt.wantAffinity == nil {
+				if s.Windows != nil && s.Windows.Resources != nil && s.Windows.Resources.CPU != nil {
+					assert.Nil(t, s.Windows.Resources.CPU.Affinity)
+				}
+				return
+			}
+			require.NotNil(t, s.Windows)
+			require.NotNil(t, s.Windows.Resources)
+			require.NotNil(t, s.Windows.Resources.CPU)
+			assert.Equal(t, tt.wantAffinity, s.Windows.Resources.CPU.Affinity)
+		})
+	}
+}
+
 func TestDriveMounts(t *testing.T) {
 	tests := []struct {
 		mnt                   *runtime.Mount
