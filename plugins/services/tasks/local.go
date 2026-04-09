@@ -158,7 +158,13 @@ type local struct {
 	v2Runtime runtime.PlatformRuntime
 }
 
-func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
+func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (_ *api.CreateTaskResponse, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to create task for container %s", r.ContainerID)
+		}
+	}()
+
 	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
@@ -271,7 +277,12 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	}, nil
 }
 
-func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOption) (*api.StartResponse, error) {
+func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOption) (_ *api.StartResponse, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to start task for container %s", r.ContainerID)
+		}
+	}()
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -294,7 +305,12 @@ func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOp
 	}, nil
 }
 
-func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.CallOption) (*api.DeleteResponse, error) {
+func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.CallOption) (_ *api.DeleteResponse, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to delete task for container %s", r.ContainerID)
+		}
+	}()
 	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -322,7 +338,12 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 	}, nil
 }
 
-func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, _ ...grpc.CallOption) (*api.DeleteResponse, error) {
+func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, _ ...grpc.CallOption) (_ *api.DeleteResponse, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to deleteProcess for container %s", r.ContainerID)
+		}
+	}()
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -425,7 +446,12 @@ func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Tas
 	}
 }
 
-func (l *local) Pause(ctx context.Context, r *api.PauseTaskRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
+func (l *local) Pause(ctx context.Context, r *api.PauseTaskRequest, _ ...grpc.CallOption) (_ *ptypes.Empty, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to pause task for container %s", r.ContainerID)
+		}
+	}()
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -437,7 +463,12 @@ func (l *local) Pause(ctx context.Context, r *api.PauseTaskRequest, _ ...grpc.Ca
 	return empty, nil
 }
 
-func (l *local) Resume(ctx context.Context, r *api.ResumeTaskRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
+func (l *local) Resume(ctx context.Context, r *api.ResumeTaskRequest, _ ...grpc.CallOption) (_ *ptypes.Empty, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to resume task for container %s", r.ContainerID)
+		}
+	}()
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -449,7 +480,12 @@ func (l *local) Resume(ctx context.Context, r *api.ResumeTaskRequest, _ ...grpc.
 	return empty, nil
 }
 
-func (l *local) Kill(ctx context.Context, r *api.KillRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
+func (l *local) Kill(ctx context.Context, r *api.KillRequest, _ ...grpc.CallOption) (_ *ptypes.Empty, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to kill task for container %s", r.ContainerID)
+		}
+	}()
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -494,7 +530,12 @@ func (l *local) ListPids(ctx context.Context, r *api.ListPidsRequest, _ ...grpc.
 	}, nil
 }
 
-func (l *local) Exec(ctx context.Context, r *api.ExecProcessRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
+func (l *local) Exec(ctx context.Context, r *api.ExecProcessRequest, _ ...grpc.CallOption) (_ *ptypes.Empty, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to exec for container %s", r.ContainerID)
+		}
+	}()
 	if r.ExecID == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "exec id cannot be empty")
 	}
@@ -555,7 +596,12 @@ func (l *local) CloseIO(ctx context.Context, r *api.CloseIORequest, _ ...grpc.Ca
 	return empty, nil
 }
 
-func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ ...grpc.CallOption) (*api.CheckpointTaskResponse, error) {
+func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ ...grpc.CallOption) (_ *api.CheckpointTaskResponse, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to Checkpoint task for container %s", r.ContainerID)
+		}
+	}()
 	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -614,7 +660,12 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	}, nil
 }
 
-func (l *local) Update(ctx context.Context, r *api.UpdateTaskRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
+func (l *local) Update(ctx context.Context, r *api.UpdateTaskRequest, _ ...grpc.CallOption) (_ *ptypes.Empty, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to update task for container %s", r.ContainerID)
+		}
+	}()
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err

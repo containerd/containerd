@@ -23,6 +23,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	bolt "go.etcd.io/bbolt"
@@ -119,9 +120,13 @@ func (l *local) ListStream(ctx context.Context, req *api.ListContainersRequest, 
 	}))
 }
 
-func (l *local) Create(ctx context.Context, req *api.CreateContainerRequest, _ ...grpc.CallOption) (*api.CreateContainerResponse, error) {
+func (l *local) Create(ctx context.Context, req *api.CreateContainerRequest, _ ...grpc.CallOption) (_ *api.CreateContainerResponse, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to create container %s", req.Container.ID)
+		}
+	}()
 	var resp api.CreateContainerResponse
-
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context) error {
 		container := containerFromProto(req.Container)
 
@@ -150,7 +155,12 @@ func (l *local) Create(ctx context.Context, req *api.CreateContainerRequest, _ .
 	return &resp, nil
 }
 
-func (l *local) Update(ctx context.Context, req *api.UpdateContainerRequest, _ ...grpc.CallOption) (*api.UpdateContainerResponse, error) {
+func (l *local) Update(ctx context.Context, req *api.UpdateContainerRequest, _ ...grpc.CallOption) (_ *api.UpdateContainerResponse, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to update container %s", req.Container.ID)
+		}
+	}()
 	if req.Container.ID == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "Container.ID required")
 	}
@@ -188,7 +198,12 @@ func (l *local) Update(ctx context.Context, req *api.UpdateContainerRequest, _ .
 	return &resp, nil
 }
 
-func (l *local) Delete(ctx context.Context, req *api.DeleteContainerRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
+func (l *local) Delete(ctx context.Context, req *api.DeleteContainerRequest, _ ...grpc.CallOption) (_ *ptypes.Empty, retErr error) {
+	defer func() {
+		if retErr != nil {
+			log.G(ctx).Errorf("failed to delete container %s", req.ID)
+		}
+	}()
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context) error {
 		return l.Store.Delete(ctx, req.ID)
 	}); err != nil {
