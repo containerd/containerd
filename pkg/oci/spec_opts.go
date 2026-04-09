@@ -45,6 +45,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/fsview"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
@@ -619,9 +620,7 @@ func WithUser(userstr string) SpecOpts {
 		// The `Username` field on the runtime spec is marked by Platform as only for Windows, and in this case it
 		// *is* being set on a Windows host at least, but will be used as a temporary holding spot until the guest
 		// can use the string to perform these same operations to grab the uid:gid inside.
-		//
-		// Mounts are not supported on Darwin, so using the same workaround.
-		if (s.Windows != nil && s.Linux != nil) || runtime.GOOS == "darwin" {
+		if s.Windows != nil && s.Linux != nil {
 			s.Process.User.Username = userstr
 			return nil
 		}
@@ -748,7 +747,7 @@ func WithUserID(uid uint32) SpecOpts {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
-				if os.IsNotExist(err) || errors.Is(err, ErrNoUsersFound) {
+				if errors.Is(err, fs.ErrNotExist) || errors.Is(err, ErrNoUsersFound) {
 					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
@@ -852,8 +851,8 @@ func WithUsername(username string) SpecOpts {
 // The passed in user can be either a uid or a username.
 func WithAdditionalGIDs(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
-		// For LCOW or on Darwin additional GID's not supported
-		if s.Windows != nil || runtime.GOOS == "darwin" {
+		// For LCOW additional GID's not supported
+		if s.Windows != nil {
 			return nil
 		}
 		setProcess(s)
@@ -867,7 +866,7 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 					return u.Uid == uid
 				})
 				if err != nil {
-					if os.IsNotExist(err) || errors.Is(err, ErrNoUsersFound) {
+					if errors.Is(err, fs.ErrNotExist) || errors.Is(err, ErrNoUsersFound) {
 						return nil
 					}
 					return err
@@ -884,7 +883,7 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 				return slices.Contains(g.List, username)
 			})
 			if err != nil {
-				if os.IsNotExist(err) {
+				if errors.Is(err, fs.ErrNotExist) {
 					return nil
 				}
 				return err
@@ -924,6 +923,15 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 }
 
 func withReadonlyFS(ctx context.Context, client Client, mounts []mount.Mount, fn func(fs.FS) error) error {
+	// Try to avoid mount if possible by using fsview to directly open
+	// overlay/erofs/bind mounts without actually mounting them
+	if viewFS, err := fsview.FSMounts(mounts); err == nil && viewFS != nil {
+		defer viewFS.Close()
+		return fn(viewFS)
+	} else if !errors.Is(err, errdefs.ErrNotImplemented) || runtime.GOOS == "darwin" {
+		return err
+	}
+
 	var mm mount.Manager
 	if cwm, ok := client.(interface{ MountManager() mount.Manager }); ok {
 		mm = cwm.MountManager()
@@ -959,8 +967,8 @@ func withReadonlyFS(ctx context.Context, client Client, mounts []mount.Mount, fn
 // The passed in groups can be either a gid or a groupname.
 func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
-		// For LCOW or on Darwin additional GID's are not supported
-		if s.Windows != nil || runtime.GOOS == "darwin" {
+		// For LCOW additional GID's are not supported
+		if s.Windows != nil {
 			return nil
 		}
 		setProcess(s)
@@ -975,7 +983,7 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 				if groupErr != nil {
 					return groupErr
 				}
-			} else if !os.IsNotExist(groupErr) {
+			} else if !errors.Is(groupErr, fs.ErrNotExist) {
 				return groupErr
 			}
 

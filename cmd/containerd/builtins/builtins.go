@@ -18,6 +18,8 @@ package builtins
 
 // register containerd builtins here
 import (
+	_ "github.com/containerd/containerd/v2/plugins/mount/fsview/erofs"
+
 	_ "github.com/containerd/containerd/v2/core/runtime/v2"
 	_ "github.com/containerd/containerd/v2/plugins/content/local/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/events"
