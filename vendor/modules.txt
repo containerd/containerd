@@ -10,8 +10,8 @@ dario.cat/mergo
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
 ## explicit; go 1.20
 github.com/AdaLogics/go-fuzz-headers
-# github.com/Microsoft/go-winio v0.6.2
-## explicit; go 1.21
+# github.com/Microsoft/go-winio v0.6.3-0.20251027160822-ad3df93bed29
+## explicit; go 1.23.0
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/backuptar
 github.com/Microsoft/go-winio/internal/fs
@@ -24,8 +24,8 @@ github.com/Microsoft/go-winio/pkg/fs
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.14.0-rc.1
-## explicit; go 1.23.0
+# github.com/Microsoft/hcsshim v0.15.0-rc.1
+## explicit; go 1.24.0
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats
@@ -61,6 +61,9 @@ github.com/Microsoft/hcsshim/internal/vmcompute
 github.com/Microsoft/hcsshim/internal/wclayer
 github.com/Microsoft/hcsshim/internal/wclayer/cim
 github.com/Microsoft/hcsshim/internal/winapi
+github.com/Microsoft/hcsshim/internal/winapi/cimfs
+github.com/Microsoft/hcsshim/internal/winapi/cimwriter
+github.com/Microsoft/hcsshim/internal/winapi/types
 github.com/Microsoft/hcsshim/osversion
 github.com/Microsoft/hcsshim/pkg/cimfs
 github.com/Microsoft/hcsshim/pkg/cimfs/format
