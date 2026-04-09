@@ -71,7 +71,10 @@ func awaitPipeReady(address string) error {
 	if address == "" {
 		return nil
 	}
-	deadline := time.After(5 * time.Second)
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+
+	var lastErr error
 	for {
 		// Use a 1s per-attempt timeout to avoid blocking indefinitely if
 		// the pipe exists but all instances are busy.
@@ -81,12 +84,15 @@ func awaitPipeReady(address string) error {
 			conn.Close()
 			return nil
 		}
-		if !os.IsNotExist(err) {
+		lastErr = err
+		// Retry on both "pipe not found" and "pipe busy / deadline exceeded"
+		// — the pipe may still be starting up or temporarily at capacity.
+		if !os.IsNotExist(err) && err != context.DeadlineExceeded {
 			return err
 		}
 		select {
-		case <-deadline:
-			return fmt.Errorf("pipe %s not found after 5s: %w", address, os.ErrNotExist)
+		case <-timer.C:
+			return fmt.Errorf("pipe %s not ready after 5s: %w", address, lastErr)
 		default:
 			time.Sleep(10 * time.Millisecond)
 		}

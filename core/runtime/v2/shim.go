@@ -289,8 +289,9 @@ func readBootstrapParams(path string) (*bootapi.BootstrapResult, error) {
 	return parseStartResponse(data)
 }
 
-// makeConnection creates a new TTRPC or GRPC connection object from address.
-// address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
+// makeConnection creates a new TTRPC or GRPC connection using the address and
+// protocol from params. Legacy plain-string or JSON bootstrap responses are
+// normalized by parseStartResponse before calling this function.
 // The dialer parameter controls connection behavior: use AnonDialer for newly
 // started shims (retries if pipe doesn't exist yet) or AnonReconnectDialer for
 // reconnecting to already-running shims (fails fast if pipe is missing).
