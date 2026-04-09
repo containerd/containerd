@@ -33,7 +33,20 @@ func getSysProcAttr() *syscall.SysProcAttr {
 	return nil
 }
 
-// AnonReconnectDialer returns a dialer for an existing npipe on containerd reconnection
+// AnonReconnectDialer connects to a named pipe that should already exist.
+// It fails immediately if the pipe is not found, rather than retrying.
+//
+// Use this when reconnecting to a shim that is expected to be running
+// (e.g. after a containerd restart). If the pipe doesn't exist, the shim
+// is dead and there's no point waiting.
+//
+// This fail-fast behavior is critical on Windows: the Service Control Manager
+// enforces a ~30s startup deadline on containerd. If reconnecting to many dead
+// shims, a 5s retry per shim (as in AnonDialer) could exceed that budget and
+// cause the SCM to kill containerd. See #3659.
+//
+// On Unix, this function simply calls AnonDialer since Unix domain sockets
+// appear atomically and the distinction is unnecessary.
 func AnonReconnectDialer(address string, timeout time.Duration) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -49,7 +62,17 @@ func AnonReconnectDialer(address string, timeout time.Duration) (net.Conn, error
 	return c, nil
 }
 
-// AnonDialer returns a dialer for a npipe
+// AnonDialer connects to a named pipe, retrying for up to 5 seconds if the
+// pipe does not yet exist.
+//
+// Use this when connecting to a newly started shim. The shim's "start" helper
+// returns the pipe address before the long-lived shim daemon has created the
+// pipe, so a brief retry window is expected. 5 seconds is generous enough for
+// any healthy shim to begin serving.
+//
+// Unlike Unix domain sockets (which appear atomically on Listen), Windows named
+// pipes may take measurable time to appear — especially under load on CI
+// runners. See #2519, #2692.
 func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

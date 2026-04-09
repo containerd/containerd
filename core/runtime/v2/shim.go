@@ -112,7 +112,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		return nil, fmt.Errorf("failed to read bootstrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
-	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog)
+	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog, client.AnonReconnectDialer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to make connection: %w", err)
 	}
@@ -291,7 +291,10 @@ func readBootstrapParams(path string) (*bootapi.BootstrapResult, error) {
 
 // makeConnection creates a new TTRPC or GRPC connection object from address.
 // address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
-func makeConnection(ctx context.Context, id string, params *bootapi.BootstrapResult, onClose func()) (_ io.Closer, retErr error) {
+// The dialer parameter controls connection behavior: use AnonDialer for newly
+// started shims (retries if pipe doesn't exist yet) or AnonReconnectDialer for
+// reconnecting to already-running shims (fails fast if pipe is missing).
+func makeConnection(ctx context.Context, id string, params *bootapi.BootstrapResult, onClose func(), dialer func(string, time.Duration) (net.Conn, error)) (_ io.Closer, retErr error) {
 	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
@@ -300,7 +303,7 @@ func makeConnection(ctx context.Context, id string, params *bootapi.BootstrapRes
 
 	switch strings.ToLower(params.Protocol) {
 	case "ttrpc":
-		conn, err := client.Connect(params.Address, client.AnonReconnectDialer)
+		conn, err := client.Connect(params.Address, dialer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TTRPC connection: %w", err)
 		}
