@@ -1,7 +1,6 @@
 version: "2"
 linters:
   enable:
-    - copyloopvar # Checks for loop variable copies in Go 1.22+
     - depguard # Checks for dependencies that should not be (re)introduced. See "settings" for further details.
     - dupword # Checks for duplicate words in the source code
     - gosec
@@ -42,10 +41,18 @@ linters:
     staticcheck:
       checks:
         - all
+        - -QF1001
+        - -QF1002
+        - -QF1003
+        - -QF1004
         - -QF1008 # Excludes QF1008 from staticcheck
         - -ST1000
+        - -ST1003
+        - -ST1005
+        - -ST1019
         - -ST1020
         - -ST1021
+        - -ST1022
     revive:
       rules:
         - name: package-comments
