@@ -48418,7 +48418,7 @@ file: {
         owner: "googleapis"
         repository: "googleapis"
       }
-      commit: "004180b77378443887d3b55cabc00384"
+      commit: "536964a08a534d51b8f30f2d6751f1f9"
     }
     is_syntax_unspecified: false
   }
@@ -68683,6 +68683,265 @@ file: {
   }
 }
 file: {
+  name: "types/transfer/container.proto"
+  package: "containerd.types.transfer"
+  message_type: {
+    name: "ContainerPath"
+    field: {
+      name: "container_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+    field: {
+      name: "path"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "path"
+    }
+    field: {
+      name: "no_walk"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "noWalk"
+    }
+    field: {
+      name: "preserve_ownership"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "preserveOwnership"
+    }
+  }
+  options: {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  source_code_info: {
+    location: {
+      span: 15
+      span: 0
+      span: 38
+      span: 1
+    }
+    location: {
+      path: 12
+      span: 15
+      span: 0
+      span: 18
+      leading_comments: "\nCopyright The containerd Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\nhttp://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n"
+    }
+    location: {
+      path: 2
+      span: 18
+      span: 0
+      span: 34
+    }
+    location: {
+      path: 8
+      span: 20
+      span: 0
+      span: 74
+    }
+    location: {
+      path: 8
+      path: 11
+      span: 20
+      span: 0
+      span: 74
+    }
+    location: {
+      path: 4
+      path: 0
+      span: 25
+      span: 0
+      span: 38
+      span: 1
+      leading_comments: " ContainerPath represents a path within an active container's\n filesystem. It acts as either a source or destination in a transfer\n operation, identifying the container and path for archive operations.\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 1
+      span: 25
+      span: 8
+      span: 21
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      span: 26
+      span: 8
+      span: 32
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      path: 5
+      span: 26
+      span: 8
+      span: 14
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      path: 1
+      span: 26
+      span: 15
+      span: 27
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      path: 3
+      span: 26
+      span: 30
+      span: 31
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      span: 27
+      span: 8
+      span: 24
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      path: 5
+      span: 27
+      span: 8
+      span: 14
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      path: 1
+      span: 27
+      span: 15
+      span: 19
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      path: 3
+      span: 27
+      span: 22
+      span: 23
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 2
+      span: 32
+      span: 8
+      span: 25
+      leading_comments: " When true and path is a directory, return only the directory entry\n itself without walking into its contents. This is useful for\n stat-like operations where only the directory's metadata is needed.\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 2
+      path: 5
+      span: 32
+      span: 8
+      span: 12
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 2
+      path: 1
+      span: 32
+      span: 13
+      span: 20
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 2
+      path: 3
+      span: 32
+      span: 23
+      span: 24
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 3
+      span: 37
+      span: 8
+      span: 36
+      leading_comments: " When true, preserve the UID/GID from tar headers when extracting\n files. When false, extracted files are owned by the extracting\n process.\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 3
+      path: 5
+      span: 37
+      span: 8
+      span: 12
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 3
+      path: 1
+      span: 37
+      span: 13
+      span: 31
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 3
+      path: 3
+      span: 37
+      span: 34
+      span: 35
+    }
+  }
+  syntax: "proto3"
+  buf_extension: {
+    is_import: false
+    module_info: {
+      name: {
+        remote: "buf.build"
+        owner: "containerd"
+        repository: "api-dev"
+      }
+    }
+    is_syntax_unspecified: false
+  }
+}
+file: {
   name: "types/transfer/imagestore.proto"
   package: "containerd.types.transfer"
   dependency: "types/platform.proto"
@@ -71610,6 +71869,40 @@ file: {
       json_name: "update"
     }
   }
+  message_type: {
+    name: "ReadStream"
+    field: {
+      name: "stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stream"
+    }
+    field: {
+      name: "media_type"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "mediaType"
+    }
+  }
+  message_type: {
+    name: "WriteStream"
+    field: {
+      name: "stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stream"
+    }
+    field: {
+      name: "media_type"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "mediaType"
+    }
+  }
   options: {
     go_package: "github.com/containerd/containerd/api/types/transfer"
   }
@@ -71617,7 +71910,7 @@ file: {
     location: {
       span: 16
       span: 0
-      span: 28
+      span: 44
       span: 1
     }
     location: {
@@ -71755,6 +72048,196 @@ file: {
       span: 27
       span: 17
       span: 18
+    }
+    location: {
+      path: 4
+      path: 2
+      span: 33
+      span: 0
+      span: 36
+      span: 1
+      leading_comments: " ReadStream carries data from the client to the server (import\n direction). The client sends data through the stream and the\n server reads it.\n"
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 1
+      span: 33
+      span: 8
+      span: 18
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 0
+      span: 34
+      span: 8
+      span: 26
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 0
+      path: 5
+      span: 34
+      span: 8
+      span: 14
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 0
+      path: 1
+      span: 34
+      span: 15
+      span: 21
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 0
+      path: 3
+      span: 34
+      span: 24
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 1
+      span: 35
+      span: 8
+      span: 30
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 1
+      path: 5
+      span: 35
+      span: 8
+      span: 14
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 1
+      path: 1
+      span: 35
+      span: 15
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 1
+      path: 3
+      span: 35
+      span: 28
+      span: 29
+    }
+    location: {
+      path: 4
+      path: 3
+      span: 41
+      span: 0
+      span: 44
+      span: 1
+      leading_comments: " WriteStream carries data from the server to the client (export\n direction). The server writes data into the stream and the\n client receives it.\n"
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 1
+      span: 41
+      span: 8
+      span: 19
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 2
+      path: 0
+      span: 42
+      span: 8
+      span: 26
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 2
+      path: 0
+      path: 5
+      span: 42
+      span: 8
+      span: 14
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 2
+      path: 0
+      path: 1
+      span: 42
+      span: 15
+      span: 21
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 2
+      path: 0
+      path: 3
+      span: 42
+      span: 24
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 2
+      path: 1
+      span: 43
+      span: 8
+      span: 30
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 2
+      path: 1
+      path: 5
+      span: 43
+      span: 8
+      span: 14
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 2
+      path: 1
+      path: 1
+      span: 43
+      span: 15
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 2
+      path: 1
+      path: 3
+      span: 43
+      span: 28
+      span: 29
     }
   }
   syntax: "proto3"
