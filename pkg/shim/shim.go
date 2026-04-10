@@ -292,6 +292,15 @@ func run(ctx context.Context, manager Shim, config Config) error {
 			return err
 		}
 
+		// On Windows, the shim daemon may not have created its named pipe
+		// yet when this start helper returns. Wait for it to be connectable
+		// before writing the bootstrap result to stdout.
+		// Similar to hcsshim's readiness pattern (microsoft/hcsshim notifyReady).
+		// On Unix this is a no-op: domain sockets appear atomically.
+		if err := awaitPipeReady(result.Address); err != nil {
+			return fmt.Errorf("shim pipe not ready: %w", err)
+		}
+
 		data, err := proto.Marshal(result)
 		if err != nil {
 			return fmt.Errorf("failed to marshal bootstrap params: %w", err)

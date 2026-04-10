@@ -129,7 +129,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		return nil, err
 	}
 
-	conn, err := makeConnection(ctx, b.bundle.ID, params, onCloseWithShimLog)
+	conn, err := makeConnection(ctx, b.bundle.ID, params, onCloseWithShimLog, client.AnonDialer)
 	if err != nil {
 		return nil, err
 	}
