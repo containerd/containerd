@@ -163,7 +163,7 @@ fi
 # To allow the cri-integration test to run via CLI without explicitly setting CGROUP_DRIVER
 if [ $IS_WINDOWS -eq 0 ] && [ ! -v CGROUP_DRIVER ]; then
   echo "CGROUP_DRIVER is unset"
-elif [ "$CGROUP_DRIVER" = "systemd" ]; then
+elif [ "${CGROUP_DRIVER:-}" = "systemd" ]; then
   cat >> ${CONTAINERD_CONFIG_FILE} << EOF
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
    SystemdCgroup = true
