@@ -43,7 +43,7 @@ type Config struct {
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.InternalPlugin,
-		ID: "watchdog",
+		ID:   "watchdog",
 		Requires: []plugin.Type{
 			plugins.MetadataPlugin,
 			plugins.ContentPlugin,
@@ -128,7 +128,6 @@ func(w *watchdog) healthCheck(ctx context.Context) error {
 		return fmt.Errorf("content store: %w",err)
 	}
 	return nil
-	// return fmt.Errorf("forced failure")
 }
 
 func(w *watchdog) checkMetadataDB(_ context.Context) error {
