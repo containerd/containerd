@@ -18,14 +18,15 @@ package bootstrap
 
 import (
 	"fmt"
+	"strconv"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// LogLevelFromLogrus converts a logrus log level string (e.g. "debug", "info")
-// to a LogLevel enum value. Returns LOG_LEVEL_UNSPECIFIED for unrecognized strings.
-func LogLevelFromLogrus(s string) LogLevel {
+// LogLevelFromString converts a log level string (e.g. "debug", "info") to a
+// LogLevel enum value. The accepted strings are compatible with logrus level names.
+func LogLevelFromString(s string) LogLevel {
 	switch s {
 	case "trace":
 		return LogLevel_LOG_LEVEL_TRACE
@@ -39,8 +40,13 @@ func LogLevelFromLogrus(s string) LogLevel {
 		return LogLevel_LOG_LEVEL_ERROR
 	case "fatal":
 		return LogLevel_LOG_LEVEL_FATAL
+	case "panic":
+		return LogLevel_LOG_LEVEL_PANIC
 	default:
-		return LogLevel_LOG_LEVEL_UNSPECIFIED
+		if v, err := strconv.ParseInt(s, 10, 32); err == nil {
+			return LogLevel(v)
+		}
+		return LogLevel_LOG_LEVEL_INFO
 	}
 }
 
