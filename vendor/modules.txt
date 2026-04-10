@@ -868,10 +868,10 @@ gopkg.in/inf.v0
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.36.0-beta.0
+# k8s.io/api v0.36.0-rc.0
 ## explicit; go 1.26.0
 k8s.io/api/core/v1
-# k8s.io/apimachinery v0.36.0-beta.0
+# k8s.io/apimachinery v0.36.0-rc.0
 ## explicit; go 1.26.0
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta
@@ -917,7 +917,7 @@ k8s.io/apimachinery/pkg/util/yaml
 k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/client-go v0.36.0-beta.0
+# k8s.io/client-go v0.36.0-rc.0
 ## explicit; go 1.26.0
 k8s.io/client-go/features
 k8s.io/client-go/pkg/apis/clientauthentication
@@ -940,11 +940,11 @@ k8s.io/client-go/util/exec
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
-# k8s.io/cri-api v0.36.0-beta.0
+# k8s.io/cri-api v0.36.0-rc.0
 ## explicit; go 1.26.0
 k8s.io/cri-api/pkg/apis/runtime/v1
 k8s.io/cri-api/pkg/errors
-# k8s.io/cri-streaming v0.36.0-beta.0
+# k8s.io/cri-streaming v0.36.0-rc.0
 ## explicit; go 1.26.0
 k8s.io/cri-streaming/pkg/streaming
 k8s.io/cri-streaming/pkg/streaming/internal/httpresponse
@@ -964,7 +964,7 @@ k8s.io/klog/v2/textlogger
 # k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9
 ## explicit; go 1.23.0
 k8s.io/kube-openapi/pkg/util
-# k8s.io/streaming v0.36.0-beta.0
+# k8s.io/streaming v0.36.0-rc.0
 ## explicit; go 1.26.0
 k8s.io/streaming/pkg/httpstream
 k8s.io/streaming/pkg/httpstream/spdy
