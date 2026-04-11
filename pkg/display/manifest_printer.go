@@ -19,12 +19,14 @@ package display
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/containerd/errdefs"
@@ -35,6 +37,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/internal/erofsutils/seekable"
 )
 
 // TreeFormat is used to format tree based output using 4 values.
@@ -214,6 +217,10 @@ func (p *ImageTreePrinter) showContent(ctx context.Context, store content.InfoRe
 			fmt.Fprintf(p.w, "%s┌────────Content────────\n", prefix)
 			fmt.Fprintf(p.w, "%s│%s\n", prefix, strings.TrimSpace(dst.String()))
 			fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
+		} else if images.IsSeekableErofsMediaType(desc.MediaType) {
+			if err := p.showSeekableErofs(ctx, store, desc, prefix); err != nil {
+				return err
+			}
 		} else if strings.HasPrefix(desc.MediaType, images.MediaTypeErofsLayer) {
 			fmt.Fprintf(p.w, "%s┌──────EROFS Layer──────\n", prefix)
 
@@ -228,7 +235,7 @@ func (p *ImageTreePrinter) showContent(ctx context.Context, store content.InfoRe
 			}
 
 			fmt.Fprintf(p.w, "%s│ /\n", prefix)
-			PrintDirectory(p.w, img, "/", prefix+"│ ")
+			PrintDirectory(p.w, img, "/", prefix+"│ ", maxDirectoryDepth)
 
 			fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
 
@@ -237,9 +244,149 @@ func (p *ImageTreePrinter) showContent(ctx context.Context, store content.InfoRe
 	return nil
 }
 
-// but if root itself is a symbolic link, its target will be walked.
-// func WalkDir(fsys FS, root string, fn WalkDirFunc) error {
-func PrintDirectory(f io.Writer, fsys fs.FS, dir string, prefix string) {
+const (
+	maxChunkPreview    = 3         // chunk entries to show before truncating
+	maxDecompressBytes = 256 << 20 // skip directory tree if EROFS > 256 MiB
+	maxDirectoryDepth  = 3         // directory tree recursion limit
+)
+
+func (p *ImageTreePrinter) showSeekableErofs(ctx context.Context, store content.InfoReaderProvider, desc ocispec.Descriptor, prefix string) error {
+	fmt.Fprintf(p.w, "%s┌──Seekable EROFS Layer─\n", prefix)
+
+	ann := desc.Annotations
+
+	// Display annotations.
+	if v, ok := ann[seekable.AnnotationChunkTableOffset]; ok {
+		fmt.Fprintf(p.w, "%s│ Chunk table offset: %s\n", prefix, v)
+	}
+	if v, ok := ann[seekable.AnnotationChunkDigest]; ok {
+		fmt.Fprintf(p.w, "%s│ Chunk digest:       %s\n", prefix, v)
+	}
+	if v, ok := ann[seekable.AnnotationDMVerityOffset]; ok {
+		fmt.Fprintf(p.w, "%s│ DM-verity offset:   %s\n", prefix, v)
+	}
+	if v, ok := ann[seekable.AnnotationDMVerityRootDigest]; ok {
+		fmt.Fprintf(p.w, "%s│ DM-verity root:     %s\n", prefix, v)
+	}
+
+	blob, err := store.ReaderAt(ctx, desc)
+	if err != nil {
+		fmt.Fprintf(p.w, "%s│ (unable to read blob: %v)\n", prefix, err)
+		fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
+		return nil
+	}
+	defer blob.Close()
+
+	// Parse and display chunk table (required for valid seekable EROFS).
+	chunkTableOffsetStr := ann[seekable.AnnotationChunkTableOffset]
+	if chunkTableOffsetStr == "" {
+		fmt.Fprintf(p.w, "%s│ (missing chunk table offset annotation)\n", prefix)
+		fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
+		return fmt.Errorf("seekable EROFS layer %s missing required annotation %s", desc.Digest, seekable.AnnotationChunkTableOffset)
+	}
+	chunkTableOffset, err := strconv.ParseInt(chunkTableOffsetStr, 10, 64)
+	if err != nil {
+		fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
+		return fmt.Errorf("invalid chunk table offset %q for %s: %w", chunkTableOffsetStr, desc.Digest, err)
+	}
+	chunkDigest := ann[seekable.AnnotationChunkDigest]
+	tbl, err := seekable.ReadChunkTable(ctx, blob, chunkTableOffset, chunkDigest)
+	if err != nil {
+		fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
+		return fmt.Errorf("failed to read chunk table for %s: %w", desc.Digest, err)
+	}
+	p.printChunkTable(tbl, chunkTableOffset, prefix)
+
+	fmt.Fprintf(p.w, "%s│\n", prefix)
+
+	// Decompress and show EROFS directory tree, unless the image is too large.
+	if tbl.Header.UncompressedSizeBytes > maxDecompressBytes {
+		fmt.Fprintf(p.w, "%s│ (EROFS image is %.1f MiB, too large to display directory tree)\n",
+			prefix, float64(tbl.Header.UncompressedSizeBytes)/(1024*1024))
+	} else {
+		blobReader := io.NewSectionReader(blob, 0, blob.Size())
+		var decompBuf bytes.Buffer
+		if _, decErr := seekable.DecodeErofsAll(ctx, blobReader, &decompBuf); decErr != nil {
+			fmt.Fprintf(p.w, "%s│ (decompression error: %v)\n", prefix, decErr)
+		} else {
+			erofsImg, erofsErr := erofs.Open(bytes.NewReader(decompBuf.Bytes()))
+			if erofsErr != nil {
+				fmt.Fprintf(p.w, "%s│ (EROFS parse error: %v)\n", prefix, erofsErr)
+			} else {
+				fmt.Fprintf(p.w, "%s│ /\n", prefix)
+				PrintDirectory(p.w, erofsImg, "/", prefix+"│ ", maxDirectoryDepth)
+			}
+		}
+	}
+
+	fmt.Fprintf(p.w, "%s└───────────────────────\n", prefix)
+	return nil
+}
+
+func (p *ImageTreePrinter) printChunkTable(tbl *seekable.ChunkTable, chunkTableOffset int64, prefix string) {
+	hdr := tbl.Header
+
+	var hashName string
+	switch hdr.HashAlgo {
+	case seekable.ChunkHashAlgoNone:
+		hashName = "none"
+	case seekable.ChunkHashAlgoSHA512:
+		hashName = "SHA-512"
+	default:
+		hashName = fmt.Sprintf("unknown(%d)", hdr.HashAlgo)
+	}
+
+	fmt.Fprintf(p.w, "%s│\n", prefix)
+	fmt.Fprintf(p.w, "%s│ Chunk Table:\n", prefix)
+	fmt.Fprintf(p.w, "%s│   Uncompressed size: %d bytes (%.2f MiB)\n", prefix,
+		hdr.UncompressedSizeBytes, float64(hdr.UncompressedSizeBytes)/(1024*1024))
+	fmt.Fprintf(p.w, "%s│   Chunk size:        %d bytes (%.2f MiB)\n", prefix,
+		hdr.ChunkSizeBytes, float64(hdr.ChunkSizeBytes)/(1024*1024))
+	fmt.Fprintf(p.w, "%s│   Hash algorithm:    %s\n", prefix, hashName)
+	fmt.Fprintf(p.w, "%s│   Chunks:            %d\n", prefix, len(tbl.Entries))
+
+	n := len(tbl.Entries)
+	if n <= maxChunkPreview+2 {
+		for i := range tbl.Entries {
+			p.printChunkEntry(tbl, i, chunkTableOffset, hashName, prefix)
+		}
+	} else {
+		for i := range maxChunkPreview {
+			p.printChunkEntry(tbl, i, chunkTableOffset, hashName, prefix)
+		}
+		fmt.Fprintf(p.w, "%s│   ... (%d more chunks)\n", prefix, n-maxChunkPreview-1)
+		p.printChunkEntry(tbl, n-1, chunkTableOffset, hashName, prefix)
+	}
+}
+
+func (p *ImageTreePrinter) printChunkEntry(tbl *seekable.ChunkTable, i int, chunkTableOffset int64, hashName, prefix string) {
+	entry := tbl.Entries[i]
+	var frameEnd int64
+	if i+1 < len(tbl.Entries) {
+		frameEnd = tbl.Entries[i+1].BlockOffset
+	} else {
+		frameEnd = chunkTableOffset
+	}
+	compSize := frameEnd - entry.BlockOffset
+
+	checksumStr := ""
+	if len(entry.Checksum) > 0 {
+		full := hex.EncodeToString(entry.Checksum)
+		if len(full) > 16 {
+			checksumStr = full[:16] + "..."
+		} else {
+			checksumStr = full
+		}
+	}
+
+	fmt.Fprintf(p.w, "%s│   chunk[%d]: offset=%-10d compressed=%-10d bytes", prefix, i, entry.BlockOffset, compSize)
+	if checksumStr != "" {
+		fmt.Fprintf(p.w, "  %s=%s", hashName, checksumStr)
+	}
+	fmt.Fprintln(p.w)
+}
+
+func PrintDirectory(f io.Writer, fsys fs.FS, dir string, prefix string, maxDepth int) {
 	dirEnts, err := fs.ReadDir(fsys, dir)
 	if err != nil {
 		fmt.Fprintf(f, "%sError reading directory %q: %v\n", prefix, dir, err)
@@ -284,6 +431,12 @@ func PrintDirectory(f io.Writer, fsys fs.FS, dir string, prefix string) {
 			}
 		}
 	}
+	if maxDepth <= 0 {
+		if len(dirs) > 0 {
+			fmt.Fprintf(f, "%s... (%d subdirectories)\n", prefix, len(dirs))
+		}
+		return
+	}
 	for i, d := range dirs {
 		isLast := i == len(dirs)-1
 		var newPrefix string
@@ -294,7 +447,7 @@ func PrintDirectory(f io.Writer, fsys fs.FS, dir string, prefix string) {
 			fmt.Fprintf(f, "%s├─ %s/\n", prefix, d)
 			newPrefix = prefix + "│  "
 		}
-		PrintDirectory(f, fsys, path.Join(dir, d), newPrefix)
+		PrintDirectory(f, fsys, path.Join(dir, d), newPrefix, maxDepth-1)
 	}
 
 }
