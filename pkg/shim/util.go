@@ -128,7 +128,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 		params := bootapi.BootstrapParams{
 			InstanceID:             config.ID,
 			Namespace:              ns,
-			LogLevel:               bootapi.LogLevelFromLogrus(config.LogLevel.String()),
+			LogLevel:               bootapi.LogLevelFromString(config.LogLevel.String()),
 			ContainerdVersion:      version.Version,
 			ContainerdGrpcAddress:  config.GRPCAddress,
 			ContainerdTtrpcAddress: config.TTRPCAddress,
