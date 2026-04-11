@@ -141,6 +141,8 @@ GO_GCFLAGS=$(shell				\
 	)
 
 BINARIES=$(addprefix bin/,$(COMMANDS))
+GOEXE := $(shell $(GO) env GOEXE)
+CRI_INTEGRATION_TEST_BINARY := bin/cri-integration.test$(GOEXE)
 
 #include platform specific makefile
 -include Makefile.$(GOOS)
@@ -156,7 +158,7 @@ OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -219,14 +221,14 @@ integration: ## run integration tests
 	@cd "${ROOTDIR}/integration/client" && \
 		$(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
-bin/cri-integration.test:
+$(CRI_INTEGRATION_TEST_BINARY):
 	@echo "$(WHALE) $@"
-	@$(GO) test -c ./integration -o bin/cri-integration.test
+	@$(GO) test -c ./integration -o $(CRI_INTEGRATION_TEST_BINARY)
 
-cri-integration: binaries bin/cri-integration.test ## run cri integration tests (example: FOCUS=TestContainerListStats make cri-integration)
+cri-integration: binaries $(CRI_INTEGRATION_TEST_BINARY) ## run cri integration tests (example: FOCUS=TestContainerListStats make cri-integration)
 	@echo "$(WHALE) $@"
 	@bash ./script/test/cri-integration.sh
-	@rm -rf bin/cri-integration.test
+	@rm -rf $(CRI_INTEGRATION_TEST_BINARY)
 
 # build runc shimv2 with failpoint control, only used by integration test
 bin/containerd-shim-runc-fp-v1: integration/failpoint/cmd/containerd-shim-runc-fp-v1 FORCE
@@ -405,7 +407,7 @@ clean: ## clean up binaries
 	@rm -f $(BINARIES)
 	@rm -f releases/*.tar.gz*
 	@rm -rf $(OUTPUTDIR)
-	@rm -rf bin/cri-integration.test
+	@rm -rf $(CRI_INTEGRATION_TEST_BINARY)
 
 clean-test: ## clean up debris from previously failed tests
 	@echo "$(WHALE) $@"
@@ -420,7 +422,7 @@ clean-test: ## clean up debris from previously failed tests
 	@rm -rf /run/containerd/runc/*
 	@rm -rf /run/containerd/fifo/*
 	@rm -rf /run/containerd-test/*
-	@rm -rf bin/cri-integration.test
+	@rm -rf $(CRI_INTEGRATION_TEST_BINARY)
 	@rm -rf bin/cni-bridge-fp
 	@rm -rf bin/containerd-shim-runc-fp-v1
 
@@ -477,10 +479,10 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 cri-integration-coverage: binaries  ## generate coverage profile for cri integration tests
 	@echo "$(WHALE) $@"
 	@rm -f cri-integration-coverage.txt
-	@$(GO) test -c -coverpkg=./... -covermode=atomic ./integration -o bin/cri-integration.test
+	@$(GO) test -c -coverpkg=./... -covermode=atomic ./integration -o $(CRI_INTEGRATION_TEST_BINARY)
 	@bash ./script/test/cri-integration.sh -test.coverprofile=cri-integration-coverage.txt
 	@echo "Coverage profile generated at cri-integration-coverage.txt"
-	@rm -rf bin/cri-integration.test
+	@rm -rf $(CRI_INTEGRATION_TEST_BINARY)
 
 remove-replace:
 	@echo "$(WHALE) $@"

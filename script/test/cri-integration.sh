@@ -50,7 +50,7 @@ CMD+="env "
 if [ -n "${RUNC_FLAVOR:-}" ]; then
   CMD+="RUNC_FLAVOR=${RUNC_FLAVOR} "
 fi
-CMD+="${PWD}/bin/cri-integration.test"
+CMD+="${PWD}/bin/cri-integration.test${EXE_SUFFIX}"
 
 ${CMD} --test.run="${FOCUS}" --test.v \
   --cri-endpoint="${CONTAINERD_SOCK}" \
@@ -60,7 +60,7 @@ ${CMD} --test.run="${FOCUS}" --test.v \
   --image-list="${TEST_IMAGE_LIST:-}" "@" && test_exit_code=$? || test_exit_code=$?
 
 if [[ "$test_exit_code" -ne 0 ]]; then
-  if [[ -e "$GITHUB_WORKSPACE" ]]; then
+  if [[ -n "${GITHUB_WORKSPACE:-}" && -e "$GITHUB_WORKSPACE" ]]; then
     mkdir -p "$GITHUB_WORKSPACE/report"
     mv "$REPORT_DIR/containerd.log" "$GITHUB_WORKSPACE/report"
 
