@@ -20,7 +20,6 @@ package erofs
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -116,12 +115,8 @@ func (s *erofsDiff) formatDmverityLayer(ctx context.Context, layerBlobPath strin
 		RootHash:   rootHash,
 		HashOffset: hashOffset,
 	}
-	metadataBytes, err := json.MarshalIndent(metadata, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal dm-verity metadata: %w", err)
-	}
-	if err := os.WriteFile(metadataPath, metadataBytes, 0644); err != nil {
-		return fmt.Errorf("failed to write dm-verity metadata: %w", err)
+	if err := dmverity.WriteMetadata(layerBlobPath, &metadata); err != nil {
+		return err
 	}
 
 	log.G(ctx).WithFields(log.Fields{

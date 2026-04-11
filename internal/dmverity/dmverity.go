@@ -22,6 +22,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/containerd/containerd/v2/pkg/atomicfile"
 )
 
 type DmverityOptions struct {
@@ -67,6 +69,30 @@ func DevicePath(name string) string {
 type DmverityMetadata struct {
 	RootHash   string `json:"roothash"`
 	HashOffset uint64 `json:"hashoffset"`
+}
+
+// WriteMetadata atomically writes dm-verity metadata alongside the layer blob.
+func WriteMetadata(layerBlobPath string, metadata *DmverityMetadata) error {
+	if metadata.RootHash == "" {
+		return fmt.Errorf("missing root hash in dm-verity metadata")
+	}
+	metaPath := MetadataPath(layerBlobPath)
+	metaJSON, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal dm-verity metadata: %w", err)
+	}
+	metaJSON = append(metaJSON, '\n')
+
+	f, err := atomicfile.New(metaPath, 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to create dm-verity metadata file: %w", err)
+	}
+	defer f.Cancel()
+
+	if _, err := f.Write(metaJSON); err != nil {
+		return fmt.Errorf("failed to write dm-verity metadata: %w", err)
+	}
+	return f.Close()
 }
 
 func ReadMetadata(layerBlobPath string) (*DmverityMetadata, error) {
