@@ -141,8 +141,8 @@ GO_GCFLAGS=$(shell				\
 	)
 
 BINARIES=$(addprefix bin/,$(COMMANDS))
-GOEXE=$(shell $(GO) env GOEXE)
-CRI_INTEGRATION_TEST_BINARY=bin/cri-integration.test$(GOEXE)
+GOEXE := $(shell $(GO) env GOEXE)
+CRI_INTEGRATION_TEST_BINARY := bin/cri-integration.test$(GOEXE)
 
 #include platform specific makefile
 -include Makefile.$(GOOS)
