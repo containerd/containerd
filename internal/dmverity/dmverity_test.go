@@ -260,6 +260,30 @@ func TestDevicePath(t *testing.T) {
 	assert.Equal(t, "/dev/mapper/containerd-erofs-abc123", DevicePath("containerd-erofs-abc123"))
 }
 
+func TestWriteMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	layerBlob := tmpDir + "/layer.erofs"
+	os.WriteFile(layerBlob, []byte("fake"), 0644)
+
+	original := &DmverityMetadata{
+		RootHash:   "abc123def456789012345678901234567890123456789012345678901234",
+		HashOffset: 8192,
+	}
+	err := WriteMetadata(layerBlob, original)
+	assert.NoError(t, err)
+
+	got, err := ReadMetadata(layerBlob)
+	assert.NoError(t, err)
+	assert.Equal(t, original.RootHash, got.RootHash)
+	assert.Equal(t, original.HashOffset, got.HashOffset)
+
+	// Verify the file contains valid JSON with a trailing newline
+	data, err := os.ReadFile(MetadataPath(layerBlob))
+	assert.NoError(t, err)
+	assert.True(t, len(data) > 0)
+	assert.Equal(t, byte('\n'), data[len(data)-1])
+}
+
 func TestReadMetadata(t *testing.T) {
 	tmpDir := t.TempDir()
 
