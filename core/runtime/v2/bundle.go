@@ -126,6 +126,11 @@ type Bundle struct {
 	Path string
 	// Namespace of the bundle
 	Namespace string
+	// Cleanup is an optional platform-specific cleanup function called
+	// before deleting the bundle directory. On Windows, this closes the
+	// Job Object that contains the shim process tree, ensuring all
+	// processes are terminated and file handles are released.
+	Cleanup func()
 }
 
 // Delete a bundle atomically

@@ -108,7 +108,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 			log.G(ctx).WithError(err).Error("copy shim log")
 		}
 	}()
-	out, err := cmd.CombinedOutput()
+	out, err := b.runShimStart(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", out, err)
 	}
