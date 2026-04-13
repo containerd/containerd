@@ -865,19 +865,20 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (any,
 
 // sendLabelRefs sends all snapshot and content references referred to by the labels in the bkt
 func (c *gcContext) sendLabelRefs(ns string, bkt *bolt.Bucket, fn func(gc.Node), bref func(gc.Node), root func()) error {
-	lbkt := bkt.Bucket(bucketKeyObjectLabels)
-	if lbkt != nil {
+	if lbkt := bkt.Bucket(bucketKeyObjectLabels); lbkt != nil {
 		lc := lbkt.Cursor()
-		for i := range c.labelHandlers {
-			if (bref == nil && c.labelHandlers[i].bref != nil) || (fn == nil && c.labelHandlers[i].fn != nil) {
+		for _, h := range c.labelHandlers {
+			if (bref == nil && h.bref != nil) || (fn == nil && h.fn != nil) {
 				continue
 			}
-			for k, v := lc.Seek(c.labelHandlers[i].key); k != nil && bytes.HasPrefix(k, c.labelHandlers[i].key); k, v = lc.Next() {
-				if c.labelHandlers[i].fn != nil {
-					c.labelHandlers[i].fn(ns, k, v, fn)
-				} else if c.labelHandlers[i].bref != nil {
-					c.labelHandlers[i].bref(ns, k, v, bref)
-				} else if root != nil {
+
+			for k, v := lc.Seek(h.key); k != nil && bytes.HasPrefix(k, h.key); k, v = lc.Next() {
+				switch {
+				case h.fn != nil:
+					h.fn(ns, k, v, fn)
+				case h.bref != nil:
+					h.bref(ns, k, v, bref)
+				case root != nil:
 					root()
 				}
 			}
