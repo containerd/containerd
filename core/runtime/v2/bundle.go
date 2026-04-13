@@ -135,6 +135,13 @@ type Bundle struct {
 
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
+	// Run platform-specific cleanup before deleting bundle files.
+	// On Windows, this closes the Job Object containing the shim process
+	// tree, which terminates all processes and releases file handles.
+	if b.Cleanup != nil {
+		b.Cleanup()
+	}
+
 	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
 	rootfs := filepath.Join(b.Path, "rootfs")
 	if err := mount.UnmountRecursive(rootfs, 0); err != nil {
