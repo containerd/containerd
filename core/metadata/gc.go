@@ -201,11 +201,12 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 		{
 			key: labelGCSnapBackRef,
 			bref: func(ns string, k, v []byte, fn func(gc.Node)) {
-				snapshotter := k[len(labelGCSnapBackRef):]
-				if i := bytes.IndexByte(snapshotter, '/'); i >= 0 {
-					snapshotter = snapshotter[:i]
+				if rest, ok := bytes.CutPrefix(k, labelGCSnapBackRef); ok {
+					if i := bytes.IndexByte(rest, '/'); i > 0 {
+						rest = rest[:i]
+					}
+					fn(gcnode(ResourceSnapshot, ns, string(rest)+"/"+string(v)))
 				}
-				fn(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", snapshotter, v)))
 			},
 		},
 		{
@@ -237,11 +238,12 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 		{
 			key: labelGCSnapRef,
 			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
-				snapshotter := k[len(labelGCSnapRef):]
-				if i := bytes.IndexByte(snapshotter, '/'); i >= 0 {
-					snapshotter = snapshotter[:i]
+				if rest, ok := bytes.CutPrefix(k, labelGCSnapRef); ok {
+					if i := bytes.IndexByte(rest, '/'); i > 0 {
+						rest = rest[:i]
+					}
+					fn(gcnode(ResourceSnapshot, ns, string(rest)+"/"+string(v)))
 				}
-				fn(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", snapshotter, v)))
 			},
 		},
 		{
