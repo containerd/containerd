@@ -318,7 +318,7 @@ func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.Del
 			}
 		}
 
-		if err = bkt.DeleteBucket([]byte(name)); err != nil {
+		if err := bkt.DeleteBucket([]byte(name)); err != nil {
 			if err == errbolt.ErrBucketNotFound {
 				err = fmt.Errorf("image %q: %w", name, errdefs.ErrNotFound)
 			}
@@ -381,11 +381,11 @@ func readImage(image *images.Image, bkt *bolt.Bucket) error {
 		return err
 	}
 
-	labels, err := boltutil.ReadLabels(bkt)
+	lbls, err := boltutil.ReadLabels(bkt)
 	if err != nil {
 		return err
 	}
-	image.Labels = labels
+	image.Labels = lbls
 
 	image.Target.Annotations, err = boltutil.ReadAnnotations(bkt)
 	if err != nil {

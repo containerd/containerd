@@ -700,21 +700,18 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 			return fmt.Errorf("snapshot %v does not exist: %w", key, errdefs.ErrNotFound)
 		}
 
-		cbkt := sbkt.Bucket(bucketKeyChildren)
-		if cbkt != nil {
+		if cbkt := sbkt.Bucket(bucketKeyChildren); cbkt != nil {
 			if child, _ := cbkt.Cursor().First(); child != nil {
 				return fmt.Errorf("cannot remove snapshot with child: %w", errdefs.ErrFailedPrecondition)
 			}
 		}
 
-		parent := sbkt.Get(bucketKeyParent)
-		if len(parent) > 0 {
+		if parent := sbkt.Get(bucketKeyParent); len(parent) > 0 {
 			pbkt := bkt.Bucket(parent)
 			if pbkt == nil {
 				return fmt.Errorf("parent snapshot %v does not exist: %w", string(parent), errdefs.ErrNotFound)
 			}
-			cbkt := pbkt.Bucket(bucketKeyChildren)
-			if cbkt != nil {
+			if cbkt := pbkt.Bucket(bucketKeyChildren); cbkt != nil {
 				if err := cbkt.Delete([]byte(key)); err != nil {
 					return fmt.Errorf("failed to remove child link: %w", err)
 				}
@@ -799,8 +796,7 @@ func (s *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...str
 						},
 					}
 
-					err := boltutil.ReadTimestamps(sbkt, &pair.info.Created, &pair.info.Updated)
-					if err != nil {
+					if err := boltutil.ReadTimestamps(sbkt, &pair.info.Created, &pair.info.Updated); err != nil {
 						return err
 					}
 					pair.info.Labels, err = boltutil.ReadLabels(sbkt)
@@ -860,20 +856,20 @@ func validateSnapshot(info *snapshots.Info) error {
 }
 
 // garbageCollect removes all snapshots that are no longer used.
-func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err error) {
+func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, retErr error) {
 	s.l.Lock()
 	t1 := time.Now()
 	defer func() {
 		s.l.Unlock()
-		if err == nil {
+		if retErr == nil {
 			if c, ok := s.Snapshotter.(snapshots.Cleaner); ok {
-				err = c.Cleanup(ctx)
-				if errdefs.IsNotImplemented(err) {
-					err = nil
+				retErr = c.Cleanup(ctx)
+				if errdefs.IsNotImplemented(retErr) {
+					retErr = nil
 				}
 			}
 		}
-		if err == nil {
+		if retErr == nil {
 			d = time.Since(t1)
 		}
 	}()
@@ -887,7 +883,6 @@ func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err 
 
 		// iterate through each namespace
 		v1c := v1bkt.Cursor()
-
 		for k, v := v1c.First(); k != nil; k, v = v1c.Next() {
 			if v != nil {
 				continue
@@ -938,7 +933,7 @@ func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err 
 		}
 	}
 
-	return
+	return 0, nil
 }
 
 type treeNode struct {
