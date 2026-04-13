@@ -320,14 +320,12 @@ func (c *gcContext) cancel(ctx context.Context) {
 }
 
 func (c *gcContext) finish(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(len(c.contexts))
-	for t, gctx := range c.contexts {
-		go func() {
-			if err := gctx.Finish(); err != nil {
-				log.G(ctx).WithField("type", t).WithError(err).Error("failed to finish collection context")
+	for resourceType, gcCtx := range c.contexts {
+		wg.Go(func() {
+			if err := gcCtx.Finish(); err != nil {
+				log.G(ctx).WithFields(log.Fields{"type": resourceType, "error": err}).Error("failed to finish collection context")
 			}
-			wg.Done()
-		}()
+		})
 	}
 }
 
