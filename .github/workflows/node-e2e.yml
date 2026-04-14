@@ -1,7 +1,12 @@
 name: E2E
 on:
   workflow_call:
-
+    inputs:
+      k8s_version:
+        description: 'Kubernetes branch or tag to test against'
+        required: false
+        default: 'master'
+        type: string
 permissions:
   contents: read
 
@@ -41,6 +46,7 @@ jobs:
         with:
           repository: kubernetes/kubernetes
           path: src/k8s.io/kubernetes
+          ref: ${{ inputs.k8s_version }}
           fetch-depth: 0
 
       - name: Install Go
