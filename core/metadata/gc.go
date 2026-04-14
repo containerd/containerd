@@ -162,11 +162,10 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 		{
 			key: labelGCContainerBackRef,
 			bref: func(ns string, k, v []byte, fn func(gc.Node)) {
-				if ks := string(k); ks != string(labelGCContainerBackRef) {
-					// Allow reference naming separated by . or /, ignore names
-					if ks[len(labelGCContainerBackRef)] != '.' && ks[len(labelGCContainerBackRef)] != '/' {
-						return
-					}
+				// Allow reference naming separated by . or /, ignore names
+				rest, ok := bytes.CutPrefix(k, labelGCContainerBackRef)
+				if !ok || (len(rest) > 0 && rest[0] != '.' && rest[0] != '/') {
+					return
 				}
 
 				fn(gcnode(ResourceContainer, ns, string(v)))
@@ -175,11 +174,10 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 		{
 			key: labelGCContentBackRef,
 			bref: func(ns string, k, v []byte, fn func(gc.Node)) {
-				if ks := string(k); ks != string(labelGCContentBackRef) {
-					// Allow reference naming separated by . or /, ignore names
-					if ks[len(labelGCContentBackRef)] != '.' && ks[len(labelGCContentBackRef)] != '/' {
-						return
-					}
+				// Allow reference naming separated by . or /, ignore names
+				rest, ok := bytes.CutPrefix(k, labelGCContentBackRef)
+				if !ok || (len(rest) > 0 && rest[0] != '.' && rest[0] != '/') {
+					return
 				}
 
 				fn(gcnode(ResourceContent, ns, string(v)))
@@ -188,11 +186,10 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 		{
 			key: labelGCImageBackRef,
 			bref: func(ns string, k, v []byte, fn func(gc.Node)) {
-				if ks := string(k); ks != string(labelGCImageBackRef) {
-					// Allow reference naming separated by . or /, ignore names
-					if ks[len(labelGCImageBackRef)] != '.' && ks[len(labelGCImageBackRef)] != '/' {
-						return
-					}
+				// Allow reference naming separated by . or /, ignore names
+				rest, ok := bytes.CutPrefix(k, labelGCImageBackRef)
+				if !ok || (len(rest) > 0 && rest[0] != '.' && rest[0] != '/') {
+					return
 				}
 
 				fn(gcnode(ResourceImage, ns, string(v)))
@@ -212,11 +209,10 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 		{
 			key: labelGCContentRef,
 			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
-				if ks := string(k); ks != string(labelGCContentRef) {
-					// Allow reference naming separated by . or /, ignore names
-					if ks[len(labelGCContentRef)] != '.' && ks[len(labelGCContentRef)] != '/' {
-						return
-					}
+				// Allow reference naming separated by . or /, ignore names
+				rest, ok := bytes.CutPrefix(k, labelGCContentRef)
+				if !ok || (len(rest) > 0 && rest[0] != '.' && rest[0] != '/') {
+					return
 				}
 
 				fn(gcnode(ResourceContent, ns, string(v)))
@@ -225,11 +221,10 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 		{
 			key: labelGCImageRef,
 			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
-				if ks := string(k); ks != string(labelGCImageRef) {
-					// Allow reference naming separated by . or /, ignore names
-					if ks[len(labelGCImageRef)] != '.' && ks[len(labelGCImageRef)] != '/' {
-						return
-					}
+				// Allow reference naming separated by . or /, ignore names
+				rest, ok := bytes.CutPrefix(k, labelGCImageRef)
+				if !ok || (len(rest) > 0 && rest[0] != '.' && rest[0] != '/') {
+					return
 				}
 
 				fn(gcnode(ResourceImage, ns, string(v)))
@@ -239,10 +234,8 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 			key: labelGCSnapRef,
 			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
 				if rest, ok := bytes.CutPrefix(k, labelGCSnapRef); ok {
-					if i := bytes.IndexByte(rest, '/'); i > 0 {
-						rest = rest[:i]
-					}
-					fn(gcnode(ResourceSnapshot, ns, string(rest)+"/"+string(v)))
+					snapshotterName, _, _ := bytes.Cut(rest, []byte("/"))
+					fn(gcnode(ResourceSnapshot, ns, string(snapshotterName)+"/"+string(v)))
 				}
 			},
 		},
@@ -264,11 +257,10 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 				labelHandlers = append(labelHandlers, referenceLabelHandler{
 					key: key,
 					fn: func(ns string, k, v []byte, fn func(gc.Node)) {
-						if ks := string(k); ks != string(key) {
-							// Allow reference naming separated by . or /, ignore names
-							if ks[len(key)] != '.' && ks[len(key)] != '/' {
-								return
-							}
+						// Allow reference naming separated by . or /, ignore names
+						rest, ok := bytes.CutPrefix(k, key)
+						if !ok || (len(rest) > 0 && rest[0] != '.' && rest[0] != '/') {
+							return
 						}
 
 						fn(gcnode(rt, ns, string(v)))
