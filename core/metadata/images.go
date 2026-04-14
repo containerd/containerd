@@ -398,11 +398,9 @@ func readImage(image *images.Image, bkt *bolt.Bucket) error {
 	}
 	return tbkt.ForEach(func(k, v []byte) error {
 		if v == nil {
-			return nil // skip it? a bkt maybe?
+			return nil // skip nested buckets
 		}
 
-		// TODO(stevvooe): This is why we need to use byte values for
-		// keys, rather than full arrays.
 		switch string(k) {
 		case string(bucketKeyDigest):
 			image.Target.Digest = digest.Digest(v)
