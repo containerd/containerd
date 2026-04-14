@@ -435,32 +435,27 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	if len(m.dirtySS) > 0 {
 		var sl sync.Mutex
 		stats.SnapshotD = map[string]time.Duration{}
-		wg.Add(len(m.dirtySS))
 		for snapshotterName := range m.dirtySS {
 			log.G(ctx).WithField("snapshotter", snapshotterName).Debug("schedule snapshotter cleanup")
-			go func(snapshotterName string) {
+			wg.Go(func() {
 				st1 := time.Now()
 				m.cleanupSnapshotter(ctx, snapshotterName)
 
 				sl.Lock()
 				stats.SnapshotD[snapshotterName] = time.Since(st1)
 				sl.Unlock()
-
-				wg.Done()
-			}(snapshotterName)
+			})
 		}
 		m.dirtySS = map[string]struct{}{}
 	}
 
 	if m.dirtyCS {
-		wg.Add(1)
 		log.G(ctx).Debug("schedule content cleanup")
-		go func() {
+		wg.Go(func() {
 			ct1 := time.Now()
 			m.cleanupContent(ctx)
 			stats.ContentD = time.Since(ct1)
-			wg.Done()
-		}()
+		})
 		m.dirtyCS = false
 	}
 
