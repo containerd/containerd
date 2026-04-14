@@ -2,6 +2,7 @@ package erofs
 
 import (
 	"bufio"
+	"bytes"
 	"cmp"
 	"encoding/binary"
 	"errors"
@@ -32,6 +33,17 @@ var (
 	// ErrNotImplemented is returned when a feature is known but not implemented
 	// yet by this library
 	ErrNotImplemented = errors.New("not implemented")
+
+	// ErrNotDirectory is returned when a path component is not a directory.
+	ErrNotDirectory = errors.New("not a directory")
+
+	// ErrIsDirectory is returned when an operation expected a file but found
+	// a directory.
+	ErrIsDirectory = errors.New("is a directory")
+
+	// ErrLoop is returned when too many symlinks are encountered during
+	// path resolution.
+	ErrLoop = fmt.Errorf("too many symlinks: %w", ErrInvalid)
 )
 
 // Stat is the erofs specific stat data returned by Stat and FileInfo requests
@@ -192,6 +204,13 @@ type image struct {
 func (img *image) metaStartPos() int64 {
 	return int64(img.sb.MetaBlkAddr) << int64(img.sb.BlkSizeBits)
 }
+
+// maxReadFileSize is the maximum file size that ReadFile will allocate.
+// ReadFile is intended for small files; for larger files, callers should
+// use Open and io.Copy. 128 MiB is generous for typical use (configs,
+// manifests, symlink targets, etc.) while guarding against
+// unexpectedly large files.
+const maxReadFileSize = 128 << 20 // 128 MiB
 
 // mapDev resolves map->m_bdev and map->m_pa mapping for go-erofs.
 // It works similarly to erofs_map_dev in the linux kernel.
@@ -528,12 +547,19 @@ func (img *image) putBlock(b *block) {
 
 const maxSymlinks = 255
 
+// maxSymlinkSize is the maximum size of a symlink target.
+// Linux PATH_MAX is 4096; we use the same limit.
+const maxSymlinkSize = 4096
+
 // readLink reads the symlink target for the given nid.
 func (i *image) readLink(nid uint64, name string) (string, error) {
 	f := &file{img: i, name: name, nid: nid, ftype: fs.ModeSymlink}
 	fi, err := f.readInfo(false)
 	if err != nil {
 		return "", err
+	}
+	if fi.size < 0 || fi.size > maxSymlinkSize {
+		return "", fmt.Errorf("symlink target size %d out of range: %w", fi.size, ErrInvalid)
 	}
 	buf := make([]byte, fi.size)
 	if fi.size > 0 {
@@ -581,7 +607,7 @@ func (i *image) resolve(op, name string, follow bool) (nid uint64, ftype fs.File
 		}
 
 		if ftype != fs.ModeDir {
-			return 0, 0, "", &fs.PathError{Op: op, Path: original, Err: errors.New("not a directory")}
+			return 0, 0, "", &fs.PathError{Op: op, Path: original, Err: ErrNotDirectory}
 		}
 		d := &dir{
 			file: file{
@@ -591,22 +617,12 @@ func (i *image) resolve(op, name string, follow bool) (nid uint64, ftype fs.File
 				ftype: ftype,
 			},
 		}
-		// TODO: Lookup in directory instead of reading all
-		entries, err := d.ReadDir(-1)
+		entNid, entFtype, err := d.lookup(basename)
 		if err != nil {
-			return 0, 0, "", fmt.Errorf("failed to read dir: %w", err)
+			return 0, 0, "", &fs.PathError{Op: op, Path: original, Err: err}
 		}
-		var found bool
-		for _, e := range entries {
-			if e.Name() == basename {
-				nid = e.(*direntry).nid
-				ftype = e.(*direntry).ftype & fs.ModeType
-				found = true
-			}
-		}
-		if !found {
-			return 0, 0, "", &fs.PathError{Op: op, Path: original, Err: fs.ErrNotExist}
-		}
+		nid = entNid
+		ftype = entFtype & fs.ModeType
 
 		// Follow symlinks for intermediate components always,
 		// and for the final component only when follow is true.
@@ -614,7 +630,7 @@ func (i *image) resolve(op, name string, follow bool) (nid uint64, ftype fs.File
 		if ftype&fs.ModeSymlink != 0 && (follow || !isFinal) {
 			linksFollowed++
 			if linksFollowed > maxSymlinks {
-				return 0, 0, "", &fs.PathError{Op: op, Path: original, Err: errors.New("too many symlinks")}
+				return 0, 0, "", &fs.PathError{Op: op, Path: original, Err: ErrLoop}
 			}
 			target, err := i.readLink(nid, basename)
 			if err != nil {
@@ -679,18 +695,24 @@ func (i *image) Stat(name string) (fs.FileInfo, error) {
 	return f.readInfo(true)
 }
 
+// ReadFile reads the named file and returns its contents.
+// Files larger than maxReadFileSize (128 MiB) are rejected;
+// use Open and io.Copy for larger files.
 func (i *image) ReadFile(name string) ([]byte, error) {
 	nid, ftype, basename, err := i.resolve("readfile", name, true)
 	if err != nil {
 		return nil, err
 	}
 	if ftype.IsDir() {
-		return nil, &fs.PathError{Op: "read", Path: name, Err: errors.New("is a directory")}
+		return nil, &fs.PathError{Op: "read", Path: name, Err: ErrIsDirectory}
 	}
 	f := &file{img: i, name: basename, nid: nid, ftype: ftype}
 	fi, err := f.readInfo(false)
 	if err != nil {
 		return nil, err
+	}
+	if fi.size < 0 || fi.size > maxReadFileSize {
+		return nil, fmt.Errorf("file size %d exceeds ReadFile limit %d; use Open and io.Copy for large files: %w", fi.size, int64(maxReadFileSize), ErrInvalid)
 	}
 	buf := make([]byte, fi.size)
 	if fi.size > 0 {
@@ -707,7 +729,7 @@ func (i *image) ReadDir(name string) ([]fs.DirEntry, error) {
 		return nil, err
 	}
 	if !ftype.IsDir() {
-		return nil, &fs.PathError{Op: "readdir", Path: name, Err: errors.New("not a directory")}
+		return nil, &fs.PathError{Op: "readdir", Path: name, Err: ErrNotDirectory}
 	}
 	d := &dir{file: file{img: i, name: basename, nid: nid, ftype: ftype}}
 	entries, err := d.ReadDir(-1)
@@ -726,7 +748,7 @@ func (i *image) ReadLink(name string) (string, error) {
 		return "", err
 	}
 	if ftype&fs.ModeSymlink == 0 {
-		return "", &fs.PathError{Op: "readlink", Path: name, Err: errors.New("not a symlink")}
+		return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
 	}
 	return i.readLink(nid, basename)
 }
@@ -908,7 +930,10 @@ func (b *file) Read(p []byte) (int, error) {
 }
 
 func (b *file) Close() error {
-	b.info.cached = nil
+	if b.info != nil && b.info.cached != nil {
+		b.img.putBlock(b.info.cached)
+		b.info.cached = nil
+	}
 	return nil
 }
 
@@ -954,51 +979,76 @@ func (d *dir) ReadDir(n int) ([]fs.DirEntry, error) {
 		b, err := d.img.loadBlock(fi, pos)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return ents, nil
+				break
 			}
 			return nil, err
 		}
 		buf := b.bytes()
 		if len(buf) < 12 {
-			return ents, nil
+			d.img.putBlock(b)
+			break
 		}
 
 		var dirents [2]disk.Dirent
 
 		readN, err := binary.Decode(buf[:12], binary.LittleEndian, &dirents[0])
 		if err != nil {
+			d.img.putBlock(b)
 			return nil, fmt.Errorf("decode failed: %w", err)
 		}
 		if readN != 12 {
+			d.img.putBlock(b)
 			return nil, errors.New("invalid dirent: not fully decoded")
 		}
 
 		entryN := dirents[0].NameOff / disk.SizeDirent
+		bufLen := len(buf)
+
+		// Validate that NameOff is within bounds and dirent entries fit.
+		if int(dirents[0].NameOff) > bufLen || entryN == 0 {
+			d.img.putBlock(b)
+			return ents, fmt.Errorf("invalid dirent name offset %d (buf size %d): %w", dirents[0].NameOff, bufLen, ErrInvalid)
+		}
 
 		for i := uint16(0); i < entryN; i++ {
 			var name string
 			if i < entryN-1 {
-				start := 12 * (i + 1)
-				readN, err := binary.Decode(buf[start:start+12], binary.LittleEndian, &dirents[1])
+				start := int(disk.SizeDirent) * (int(i) + 1)
+				if start+int(disk.SizeDirent) > bufLen {
+					d.img.putBlock(b)
+					return ents, fmt.Errorf("dirent entry %d exceeds block: %w", i+1, ErrInvalid)
+				}
+				readN, err := binary.Decode(buf[start:start+int(disk.SizeDirent)], binary.LittleEndian, &dirents[1])
 				if err != nil {
+					d.img.putBlock(b)
 					return nil, fmt.Errorf("decode failed: %w", err)
 				}
 				if readN != 12 {
+					d.img.putBlock(b)
 					return nil, errors.New("invalid dirent: not fully decoded")
+				}
+				if int(dirents[0].NameOff) > bufLen || int(dirents[1].NameOff) > bufLen || dirents[1].NameOff < dirents[0].NameOff {
+					d.img.putBlock(b)
+					return ents, fmt.Errorf("invalid dirent name offset range [%d:%d] (buf size %d): %w",
+						dirents[0].NameOff, dirents[1].NameOff, bufLen, ErrInvalid)
 				}
 				name = string(buf[dirents[0].NameOff:dirents[1].NameOff])
 			} else {
+				if int(dirents[0].NameOff) > bufLen {
+					d.img.putBlock(b)
+					return ents, fmt.Errorf("invalid dirent name offset %d (buf size %d): %w", dirents[0].NameOff, bufLen, ErrInvalid)
+				}
 				name = string(buf[dirents[0].NameOff:])
 			}
 
 			if i >= d.consumed && name != "." && name != ".." {
-				b := file{
+				f := file{
 					img:   d.img,
 					name:  name,
 					nid:   dirents[0].Nid,
 					ftype: disk.EroFSFtypeToFileMode(dirents[0].FileType),
 				}
-				ents = append(ents, &direntry{b})
+				ents = append(ents, &direntry{f})
 				d.consumed = i + 1
 
 				if n > 0 && len(ents) == n {
@@ -1006,6 +1056,7 @@ func (d *dir) ReadDir(n int) ([]fs.DirEntry, error) {
 						d.consumed = 0
 						d.bn++
 					}
+					d.img.putBlock(b)
 					return ents, nil
 				}
 			}
@@ -1014,12 +1065,196 @@ func (d *dir) ReadDir(n int) ([]fs.DirEntry, error) {
 			dirents[0] = dirents[1]
 		}
 
+		d.img.putBlock(b)
 		d.consumed = 0
 		d.bn++
 		pos = int64(d.bn << d.img.sb.BlkSizeBits)
 	}
 
+	// Per fs.ReadDirFile contract: when n > 0 and we've reached the end
+	// of the directory, return io.EOF. When n <= 0, return all entries
+	// without io.EOF.
+	if n > 0 {
+		return ents, io.EOF
+	}
 	return ents, nil
+}
+
+// lookup searches for a directory entry by name using binary search.
+// EROFS directories are sorted by name both within and across blocks.
+// A cross-block binary search locates the correct block, then an
+// intra-block binary search finds the entry.
+// Returns the nid and file type if found, or fs.ErrNotExist if not.
+func (d *dir) lookup(target string) (uint64, fs.FileMode, error) {
+	fi, err := d.readInfo(false)
+	if err != nil {
+		return 0, 0, fmt.Errorf("readInfo failed: %w", err)
+	}
+
+	targetBytes := []byte(target)
+	blkSize := int64(1 << d.img.sb.BlkSizeBits)
+	nblocks := int((fi.size + blkSize - 1) / blkSize)
+
+	// Binary search across blocks: compare target against the first
+	// entry of each block to find which block may contain the target.
+	// The last loaded block is retained to avoid reloading it for the
+	// intra-block search.
+	var lastBlk *block
+	lastIdx := -1
+	lo, hi := 0, nblocks
+	for lo < hi {
+		mid := lo + (hi-lo)/2
+		pos := int64(mid) * blkSize
+		b, err := d.img.loadBlock(fi, pos)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				hi = mid
+				continue
+			}
+			if lastBlk != nil {
+				d.img.putBlock(lastBlk)
+			}
+			return 0, 0, err
+		}
+		buf := b.bytes()
+		firstName, err := blockFirstName(buf)
+		if err != nil {
+			d.img.putBlock(b)
+			if lastBlk != nil {
+				d.img.putBlock(lastBlk)
+			}
+			return 0, 0, err
+		}
+
+		if bytes.Compare(firstName, targetBytes) <= 0 {
+			// This block's first entry <= target; keep it as candidate.
+			if lastBlk != nil {
+				d.img.putBlock(lastBlk)
+			}
+			lastBlk = b
+			lastIdx = mid
+			lo = mid + 1
+		} else {
+			d.img.putBlock(b)
+			hi = mid
+		}
+	}
+
+	// lastIdx is the last block whose first entry <= target.
+	// The target must be in that block if it exists.
+	if lastIdx < 0 {
+		return 0, 0, fs.ErrNotExist
+	}
+
+	buf := lastBlk.bytes()
+	nid, ftype, err := lookupBlock(buf, targetBytes)
+	d.img.putBlock(lastBlk)
+	return nid, ftype, err
+}
+
+// blockFirstName returns the name of the first entry in a directory block.
+func blockFirstName(buf []byte) ([]byte, error) {
+	if len(buf) < disk.SizeDirent {
+		return nil, fmt.Errorf("directory block too small: %w", ErrInvalid)
+	}
+	var first disk.Dirent
+	if _, err := binary.Decode(buf[:disk.SizeDirent], binary.LittleEndian, &first); err != nil {
+		return nil, fmt.Errorf("decode failed: %w", err)
+	}
+	entryN := first.NameOff / disk.SizeDirent
+	if entryN == 0 || int(first.NameOff) > len(buf) {
+		return nil, fmt.Errorf("invalid name offset %d: %w", first.NameOff, ErrInvalid)
+	}
+	var nameEnd uint16
+	if entryN > 1 {
+		nextOff := int(disk.SizeDirent) + 8
+		if nextOff+2 > len(buf) {
+			return nil, fmt.Errorf("next dirent name offset out of range: %w", ErrInvalid)
+		}
+		nameEnd = binary.LittleEndian.Uint16(buf[nextOff:])
+	} else {
+		nameEnd = uint16(len(buf))
+	}
+	if first.NameOff > nameEnd || int(nameEnd) > len(buf) {
+		return nil, fmt.Errorf("name range [%d:%d] out of bounds: %w", first.NameOff, nameEnd, ErrInvalid)
+	}
+	name := buf[first.NameOff:nameEnd]
+	// Trim NUL terminator if present
+	if i := bytes.IndexByte(name, 0); i >= 0 {
+		name = name[:i]
+	}
+	return name, nil
+}
+
+// blockDirent decodes the dirent at index i from buf and returns the
+// name bytes for that entry. entryN is the total number of entries.
+func blockDirent(buf []byte, i, entryN uint16) (disk.Dirent, []byte, error) {
+	var de disk.Dirent
+	off := int(disk.SizeDirent * i)
+	if off+disk.SizeDirent > len(buf) {
+		return de, nil, fmt.Errorf("dirent %d offset %d out of range: %w", i, off, ErrInvalid)
+	}
+	if _, err := binary.Decode(buf[off:off+disk.SizeDirent], binary.LittleEndian, &de); err != nil {
+		return de, nil, fmt.Errorf("decode dirent %d failed: %w", i, err)
+	}
+	var nameEnd uint16
+	if i < entryN-1 {
+		nextOff := int(disk.SizeDirent*(i+1)) + 8
+		if nextOff+2 > len(buf) {
+			return de, nil, fmt.Errorf("dirent %d next name offset out of range: %w", i, ErrInvalid)
+		}
+		nameEnd = binary.LittleEndian.Uint16(buf[nextOff:])
+	} else {
+		nameEnd = uint16(len(buf))
+	}
+	if de.NameOff > nameEnd || int(nameEnd) > len(buf) {
+		return de, nil, fmt.Errorf("dirent %d name range [%d:%d] out of bounds: %w", i, de.NameOff, nameEnd, ErrInvalid)
+	}
+	name := buf[de.NameOff:nameEnd]
+	// The last entry name may be NUL-terminated before the end of the block.
+	if i == entryN-1 {
+		if j := bytes.IndexByte(name, 0); j >= 0 {
+			name = name[:j]
+		}
+	}
+	return de, name, nil
+}
+
+// lookupBlock searches a single directory block for the target name
+// using binary search.
+func lookupBlock(buf, target []byte) (uint64, fs.FileMode, error) {
+	if len(buf) < disk.SizeDirent {
+		return 0, 0, fmt.Errorf("directory block too small: %w", ErrInvalid)
+	}
+	var first disk.Dirent
+	if _, err := binary.Decode(buf[:disk.SizeDirent], binary.LittleEndian, &first); err != nil {
+		return 0, 0, fmt.Errorf("decode failed: %w", err)
+	}
+	if first.NameOff%disk.SizeDirent != 0 {
+		return 0, 0, fmt.Errorf("invalid name offset %d not aligned to dirent size: %w", first.NameOff, ErrInvalid)
+	}
+	entryN := first.NameOff / disk.SizeDirent
+	if int(first.NameOff) > len(buf) {
+		return 0, 0, fmt.Errorf("name offset %d exceeds block size %d: %w", first.NameOff, len(buf), ErrInvalid)
+	}
+
+	lo, hi := uint16(0), entryN
+	for lo < hi {
+		mid := lo + (hi-lo)/2
+		de, name, err := blockDirent(buf, mid, entryN)
+		if err != nil {
+			return 0, 0, err
+		}
+		switch bytes.Compare(name, target) {
+		case 0:
+			return de.Nid, disk.EroFSFtypeToFileMode(de.FileType), nil
+		case -1:
+			lo = mid + 1
+		default:
+			hi = mid
+		}
+	}
+	return 0, 0, fs.ErrNotExist
 }
 
 type fileInfo struct {

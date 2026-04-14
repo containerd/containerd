@@ -296,7 +296,7 @@ github.com/docker/go-units
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
 github.com/emicklei/go-restful/v3/log
-# github.com/erofs/go-erofs v0.2.0
+# github.com/erofs/go-erofs v0.2.1
 ## explicit; go 1.23
 github.com/erofs/go-erofs
 github.com/erofs/go-erofs/internal/disk
