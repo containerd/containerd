@@ -400,6 +400,10 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 				// queue event to publish after successful commit
 			case ResourceContent, ResourceIngest:
 				m.dirtyCS = true
+			case ResourceUnknown, ResourceContainer, ResourceTask, ResourceImage,
+				ResourceLease, ResourceStream, ResourceMount,
+				resourceContentFlat, resourceSnapshotFlat, resourceImageFlat, resourceEnd:
+				// nop.
 			}
 
 			if event, err := c.remove(ctx, tx, n); event != nil && err == nil {

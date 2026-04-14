@@ -57,10 +57,12 @@ const (
 	ResourceMount
 )
 
+const resourceFlat = 0x20
+
 const (
-	resourceContentFlat  = ResourceContent | 0x20
-	resourceSnapshotFlat = ResourceSnapshot | 0x20
-	resourceImageFlat    = ResourceImage | 0x20
+	resourceContentFlat  gc.ResourceType = ResourceContent | resourceFlat
+	resourceSnapshotFlat gc.ResourceType = ResourceSnapshot | resourceFlat
+	resourceImageFlat    gc.ResourceType = ResourceImage | resourceFlat
 )
 
 var (
