@@ -389,7 +389,10 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 		}
 	}
 
-	var mounts []mount.Mount
+	var (
+		mounts   []mount.Mount
+		writable bool
+	)
 	if snap.Kind == snapshots.KindActive {
 		if s.blockMode {
 			mounts = append(mounts, mount.Mount{
@@ -416,6 +419,7 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 				fmt.Sprintf("upperdir=%s", s.upperPath(snap.ID)),
 			)
 		}
+		writable = true
 	} else if len(snap.ParentIDs) == 1 {
 		layerBlob, err := s.lowerPath(snap.ParentIDs[0])
 		if err != nil {
@@ -452,11 +456,6 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 
 		mounts = append(mounts, m)
 	}
-	if (len(mounts) - first) == 1 {
-		options = append(options, fmt.Sprintf("lowerdir={{ mount %d }}", first))
-	} else {
-		options = append(options, fmt.Sprintf("lowerdir={{ overlay %d %d }}", first, len(mounts)-1))
-	}
 
 	if s.remapIDs {
 		if v, ok := info.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
@@ -467,6 +466,20 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 		}
 	}
 
+	if (len(mounts) - first) == 1 {
+		// End up with one single lowerdir (e.g. fsmerge on):
+		// it's unsupported by overlayfs
+		if !writable {
+			return append(mounts, mount.Mount{
+				Type:    "format/bind",
+				Source:  fmt.Sprintf("{{ mount %d }}", first),
+				Options: append(options, "ro", "rbind"),
+			}), nil
+		}
+		options = append(options, fmt.Sprintf("lowerdir={{ mount %d }}", first))
+	} else {
+		options = append(options, fmt.Sprintf("lowerdir={{ overlay %d %d }}", first, len(mounts)-1))
+	}
 	options = append(options, s.ovlOptions...)
 
 	return append(mounts, mount.Mount{
