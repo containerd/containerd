@@ -69,6 +69,13 @@ message BootstrapParams {
   // Each section can contain arbitrary structured data identified by type URL
   // Examples: CRI config, NRI config, sandbox config, etc.
   repeated Extension extensions = 8;
+
+  // Optional directory for the shim to place its unix socket.
+  // If empty, the shim defaults to a short, well-known path
+  // (e.g., /run/containerd/s). The path must be kept short because
+  // the socket filename is a 64-character SHA256 hash and unix
+  // socket paths are limited to 104-108 bytes depending on platform.
+  optional string socket_dir = 9;
 }
 
 // Extension provides extensibility for new configuration types

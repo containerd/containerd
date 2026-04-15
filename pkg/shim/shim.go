@@ -287,6 +287,14 @@ func run(ctx context.Context, manager Shim, config Config) error {
 			}
 		}
 
+		// Persist the socket directory so the long-running server process
+		// (which doesn't receive bootstrap params) can read it for cleanup.
+		if dir := params.GetSocketDir(); dir != "" {
+			if err := writeSocketDir(dir); err != nil {
+				return fmt.Errorf("failed to write socket-dir: %w", err)
+			}
+		}
+
 		result, err := manager.Start(ctx, &params)
 		if err != nil {
 			return err

@@ -109,6 +109,10 @@ func RemoveSocket(address string) error {
 	return nil
 }
 
+func writeSocketDir(string) error {
+	return nil
+}
+
 func cleanupSockets(context.Context) {
 	if address, err := ReadAddress("address"); err == nil {
 		_ = RemoveSocket(address)
