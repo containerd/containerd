@@ -588,6 +588,9 @@ func testDmverityEndToEndWithMode(t *testing.T, useTarIndex bool) {
 // TestDmverityModeValidation tests dm-verity mode validation during snapshotter creation
 func TestDmverityModeValidation(t *testing.T) {
 	testutil.RequiresRoot(t)
+	if !FindErofs() {
+		t.Skip("erofs not supported")
+	}
 	tmpDir := t.TempDir()
 
 	t.Run("rejects invalid dmverity mode", func(t *testing.T) {

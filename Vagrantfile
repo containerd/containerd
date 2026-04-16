@@ -344,4 +344,27 @@ EOF
     SHELL
   end
 
+  # Usage:
+  #   # First provision the VM and install test dependencies:
+  #   vagrant up
+  #   # Then re-run only the unit-test provisioner:
+  #   vagrant up --provision-with=test-unit
+  #   SELINUX=Disabled vagrant up --provision-with=selinux,test-unit
+  #
+  config.vm.provision "test-unit", type: "shell", run: "never" do |sh|
+    sh.upload_path = "/tmp/test-unit"
+    sh.env = {
+        'GOTEST': ENV['GOTEST'] || "gotestsum --",
+    }
+    sh.inline = <<~SHELL
+        #!/usr/bin/env bash
+        source /etc/environment
+        source /etc/profile.d/sh.local
+        set -eux -o pipefail
+        cd ${GOPATH}/src/github.com/containerd/containerd
+        make BUILDTAGS="no_btrfs no_devmapper no_zfs" test
+        make BUILDTAGS="no_btrfs no_devmapper no_zfs" root-test
+    SHELL
+  end
+
 end
