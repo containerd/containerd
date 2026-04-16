@@ -205,6 +205,10 @@ func (c *CRIImageService) PinnedImage(name string) string {
 	return c.config.PinnedImages[name]
 }
 
+func (c *CRIImageService) DisableSnapshotAnnotations() bool {
+	return c.config.DisableSnapshotAnnotations
+}
+
 // GRPCService returns a new CRI Image Service grpc server.
 func (c *CRIImageService) GRPCService() runtime.ImageServiceServer {
 	return &GRPCCRIImageService{c}

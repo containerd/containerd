@@ -67,8 +67,15 @@ func TestImageLoad(t *testing.T) {
 	require.NoError(t, err, "ctr should be installed, make sure you've run `make install-deps`")
 	// Add --local=true option since currently the transfer service
 	// does not provide enough progress to avoid timeout
+	// and --platform to only check for manifests for this platform. The "ctr image import"
+	// command otherwise might fail, if the the above docker commands use the containerd image
+	// store, as in that case `docker save` produces OCI artifacts referencing manifests for
+	// other platforms that are not included in what we downloaded. By specifying a platform, we
+	// just ignore the references to other platforms.
+	platform := "--platform=" + goruntime.GOOS + "/" + goruntime.GOARCH
 	output, err = exec.Command(ctr, "-address="+containerdEndpoint,
-		"-n=k8s.io", "images", "import", "--local=true", tar).CombinedOutput()
+		"-n=k8s.io", "images", "import", "--local=true",
+		platform, tar).CombinedOutput()
 	require.NoError(t, err, "output: %q", output)
 
 	t.Logf("make sure image is loaded")

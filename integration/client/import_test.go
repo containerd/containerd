@@ -65,6 +65,10 @@ func TestExportAndImport(t *testing.T) {
 // images remain sane, and that the Garbage Collector won't delete part of its
 // content.
 func TestExportAndImportMultiLayer(t *testing.T) {
+	// ghcr.io/containerd/volume-copy-up:2.1 is not available on s390x
+	if runtime.GOARCH == "s390x" {
+		t.Skip("test image not available on s390x")
+	}
 	testExportImport(t, testMultiLayeredImage)
 }
 
