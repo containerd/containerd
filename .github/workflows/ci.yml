@@ -654,6 +654,8 @@ jobs:
             rm -f /tmp/fedora43.box
           fi
           sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --no-tty
+      - name: test-unit
+        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-gotestsum,test-unit
       - name: test-integration
         run: sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
       - name: test-cri-integration
