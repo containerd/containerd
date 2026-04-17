@@ -378,12 +378,15 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		log.G(r.ctx).Infof("Logging will be disabled due to empty log paths for sandbox (%q) or container (%q)",
 			r.podSandboxConfig.GetLogDirectory(), r.containerConfig.GetLogPath())
 	}
-
+	r.meta.IOType = ociRuntime.IOType
 	var containerIO *cio.ContainerIO
 	switch ociRuntime.IOType {
 	case criconfig.IOTypeStreaming:
 		containerIO, err = cio.NewContainerIO(r.containerID,
 			cio.WithStreams(r.sandbox.Endpoint.Address, r.containerConfig.GetTty(), r.containerConfig.GetStdin()))
+	case criconfig.IOTypeFile:
+		containerIO, err = cio.NewContainerIO(r.containerID,
+			cio.WithNewStinFIFO(volatileContainerRootDir, r.containerConfig.GetTty(), r.containerConfig.GetStdin()))
 	default:
 		containerIO, err = cio.NewContainerIO(r.containerID,
 			cio.WithNewFIFOs(volatileContainerRootDir, r.containerConfig.GetTty(), r.containerConfig.GetStdin()))

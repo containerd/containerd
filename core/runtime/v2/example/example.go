@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func init() {
@@ -97,6 +98,11 @@ var (
 )
 
 type exampleTaskService struct {
+}
+
+// ReOpenLog implements [task.TTRPCTaskService].
+func (s *exampleTaskService) ReOpenLog(context.Context, *taskAPI.ReOpenLogRequest) (*emptypb.Empty, error) {
+	return nil, errdefs.ErrNotImplemented
 }
 
 // RegisterTTRPC allows TTRPC services to be registered with the underlying server

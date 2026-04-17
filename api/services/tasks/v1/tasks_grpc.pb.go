@@ -38,6 +38,7 @@ type TasksClient interface {
 	Kill(ctx context.Context, in *KillRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Exec(ctx context.Context, in *ExecProcessRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ResizePty(ctx context.Context, in *ResizePtyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ReOpenLog(ctx context.Context, in *ReOpenLogRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CloseIO(ctx context.Context, in *CloseIORequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Pause(ctx context.Context, in *PauseTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Resume(ctx context.Context, in *ResumeTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -137,6 +138,15 @@ func (c *tasksClient) ResizePty(ctx context.Context, in *ResizePtyRequest, opts 
 	return out, nil
 }
 
+func (c *tasksClient) ReOpenLog(ctx context.Context, in *ReOpenLogRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/ReOpenLog", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *tasksClient) CloseIO(ctx context.Context, in *CloseIORequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/CloseIO", in, out, opts...)
@@ -226,6 +236,7 @@ type TasksServer interface {
 	Kill(context.Context, *KillRequest) (*emptypb.Empty, error)
 	Exec(context.Context, *ExecProcessRequest) (*emptypb.Empty, error)
 	ResizePty(context.Context, *ResizePtyRequest) (*emptypb.Empty, error)
+	ReOpenLog(context.Context, *ReOpenLogRequest) (*emptypb.Empty, error)
 	CloseIO(context.Context, *CloseIORequest) (*emptypb.Empty, error)
 	Pause(context.Context, *PauseTaskRequest) (*emptypb.Empty, error)
 	Resume(context.Context, *ResumeTaskRequest) (*emptypb.Empty, error)
@@ -267,6 +278,9 @@ func (UnimplementedTasksServer) Exec(context.Context, *ExecProcessRequest) (*emp
 }
 func (UnimplementedTasksServer) ResizePty(context.Context, *ResizePtyRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResizePty not implemented")
+}
+func (UnimplementedTasksServer) ReOpenLog(context.Context, *ReOpenLogRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReOpenLog not implemented")
 }
 func (UnimplementedTasksServer) CloseIO(context.Context, *CloseIORequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CloseIO not implemented")
@@ -467,6 +481,24 @@ func _Tasks_ResizePty_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Tasks_ReOpenLog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReOpenLogRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).ReOpenLog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.tasks.v1.Tasks/ReOpenLog",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).ReOpenLog(ctx, req.(*ReOpenLogRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Tasks_CloseIO_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CloseIORequest)
 	if err := dec(in); err != nil {
@@ -653,6 +685,10 @@ var Tasks_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResizePty",
 			Handler:    _Tasks_ResizePty_Handler,
+		},
+		{
+			MethodName: "ReOpenLog",
+			Handler:    _Tasks_ReOpenLog_Handler,
 		},
 		{
 			MethodName: "CloseIO",
