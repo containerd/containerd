@@ -148,6 +148,31 @@ func TestBasicAuthTokenResolver(t *testing.T) {
 	runBasicTest(t, "testname", withTokenServer(th, creds))
 }
 
+func TestRegistryTokenResolver(t *testing.T) {
+	registryTokenAuth := func(h http.Handler) (string, ResolverOptions, func()) {
+		wrapped := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if got := r.Header.Get("Authorization"); got != "Bearer perfectlyvalidopaquetoken" {
+				rw.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			h.ServeHTTP(rw, r)
+		})
+
+		base, options, close := tlsServer(wrapped)
+		authorizer := NewDockerAuthorizer(
+			WithAuthClient(options.Client),
+			WithRegistryToken("perfectlyvalidopaquetoken"),
+		)
+		options.Hosts = ConfigureDefaultRegistries(
+			WithClient(options.Client),
+			WithAuthorizer(authorizer),
+		)
+		return base, options, close
+	}
+
+	runBasicTest(t, "testname", registryTokenAuth)
+}
+
 func TestRefreshTokenResolver(t *testing.T) {
 	th := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
