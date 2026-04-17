@@ -17,14 +17,20 @@
 package images
 
 import (
+	"time"
+
 	"github.com/docker/go-metrics"
 	prom "github.com/prometheus/client_golang/prometheus"
 )
 
+const mbToByte = 1024 * 1024
+
 var (
 	imagePulls           metrics.LabeledCounter
 	inProgressImagePulls metrics.Gauge
-	// image size in MB / image pull duration in seconds
+	// imagePullThroughput observes one MB/s sample per image pull (not per
+	// layer): fetched bytes over end-to-end pull duration (includes
+	// extraction). Fully-cached pulls are skipped.
 	imagePullThroughput prom.Histogram
 )
 
@@ -44,10 +50,24 @@ func init() {
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "image_pulling_throughput",
-			Help:      "image pull throughput",
+			Help:      "image pull throughput in MB/s (fetched bytes / pull duration; cached layers excluded)",
 			Buckets:   prom.DefBuckets,
 		},
 	)
 	ns.Add(imagePullThroughput)
 	metrics.Register(ns)
+}
+
+// recordImagePullThroughput observes a single pull throughput sample in MB/s.
+// bytesPulled is the bytes actually fetched from the registry — cached layers
+// never trigger a fetch, so they're naturally excluded. duration is the
+// end-to-end pull duration (includes extraction, not just network transfer).
+//
+// Pulls that fetched nothing (fully cached) are skipped rather than recorded
+// as zero or near-infinite samples, which would pollute the histogram.
+func recordImagePullThroughput(obs prom.Observer, bytesPulled uint64, duration time.Duration) {
+	if bytesPulled == 0 || duration <= 0 {
+		return
+	}
+	obs.Observe(float64(bytesPulled) / mbToByte / duration.Seconds())
 }
