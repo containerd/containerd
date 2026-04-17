@@ -376,10 +376,11 @@ jobs:
         runtime:
           - io.containerd.runc.v2
         runc: [runc]  # crun can be added here to debug crun issues
-        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm]
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm, ubuntu-24.04-riscv]
         cgroup_driver: [cgroupfs, systemd]
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
+          - os: ${{ github.event.repository.private && 'ubuntu-24.04-riscv' || '' }}
 
     env:
       GOTEST: gotestsum --
@@ -400,7 +401,7 @@ jobs:
           script/setup/install-failpoint-binaries
 
       # Disable criu testing on arm64 until we can solve the consistent failures of restore testing
-      - if: matrix.os != 'ubuntu-24.04-arm'
+      - if: matrix.os != 'ubuntu-24.04-arm' && matrix.os != 'ubuntu-24.04-riscv'
         name: Install criu
         run: |
           sudo add-apt-repository -y ppa:criu/ppa
@@ -410,6 +411,7 @@ jobs:
       # "apt-get install erofs-utils" installs an older version (1.7.1 as of 2025-09-18)
       # Build and install erofs-utils 1.8.10 from source to get a newer version
       - name: Build and install erofs-utils from source
+        if: matrix.os != 'ubuntu-24.04-riscv'
         run: |
           # Install dependencies
           sudo apt-get update
@@ -438,6 +440,7 @@ jobs:
           mkfs.erofs --version
 
       - name: Load EROFS kernel module
+        if: matrix.os != 'ubuntu-24.04-riscv'
         run: |
           sudo modprobe erofs
 
@@ -528,10 +531,10 @@ jobs:
         # ubuntu-24.04-arm images. buildah and podman  is needed to convert the
         # Kubernetes checkpoint archive to an OCI image.
         # See contrib/checkpoint/checkpoint-restore-cri-test.sh
-        if: matrix.os == 'ubuntu-24.04-arm'
+        if: matrix.os == 'ubuntu-24.04-arm' || matrix.os == 'ubuntu-24.04-riscv'
         run: sudo apt-get install -y buildah podman
 
-      - if: matrix.os != 'ubuntu-24.04-arm'
+      - if: matrix.os != 'ubuntu-24.04-arm' && matrix.os != 'ubuntu-24.04-riscv'
         name: Checkpoint/Restore via CRI
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
