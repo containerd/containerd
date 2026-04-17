@@ -38,11 +38,13 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/pkg/reference"
 )
 
 type writeFunc func(p []byte) (int, error)
@@ -393,6 +395,60 @@ func TestFetcherOpenParallel_CloseAfterCopyError(t *testing.T) {
 		t.Errorf("close blocked after write error")
 		unblockAll()
 		<-closeDone
+	}
+}
+
+func TestFetcherDescURLsDoesNotForwardResolverHeaders(t *testing.T) {
+	body := []byte("ok")
+
+	headersCh := make(chan http.Header, 10)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		select {
+		case headersCh <- r.Header.Clone():
+		default:
+		}
+		rw.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = rw.Write(body)
+	}))
+	defer s.Close()
+
+	refspec, err := reference.Parse("example.com/library/test:latest")
+	require.NoError(t, err)
+
+	f := dockerFetcher{&dockerBase{
+		refspec:    refspec,
+		repository: "library/test",
+		header: http.Header{
+			"Authorization":       {"Bearer should-strip"},
+			"Proxy-Authorization": {"Basic should-strip"},
+			"Cookie":              {"a=b"},
+			"X-Test":              {"should-stay"},
+		},
+		hosts: []RegistryHost{{
+			Host:         "example.com",
+			Scheme:       "https",
+			Capabilities: HostCapabilityPull,
+		}},
+	}}
+
+	desc := ocispec.Descriptor{
+		MediaType: "application/octet-stream",
+		Size:      int64(len(body)),
+		URLs:      []string{s.URL},
+	}
+
+	rc, err := f.Fetch(context.Background(), desc)
+	require.NoError(t, err)
+	_, err = io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+
+	close(headersCh)
+	for hdr := range headersCh {
+		assert.Empty(t, hdr.Get("Authorization"))
+		assert.Empty(t, hdr.Get("Proxy-Authorization"))
+		assert.Empty(t, hdr.Get("Cookie"))
+		assert.Equal(t, "should-stay", hdr.Get("X-Test"))
 	}
 }
 
