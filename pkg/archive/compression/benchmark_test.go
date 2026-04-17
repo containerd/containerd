@@ -78,3 +78,54 @@ func BenchmarkDecompression(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkCompression(b *testing.B) {
+	resp, err := http.Get(benchmarkTestDataURL)
+	require.NoError(b, err)
+
+	data, err := io.ReadAll(resp.Body)
+	require.NoError(b, err)
+	resp.Body.Close()
+
+	const mib = 1024 * 1024
+	sizes := []int{32, 64, 128, 256}
+
+	for _, sizeInMiB := range sizes {
+		size := sizeInMiB * mib
+		for len(data) < size {
+			data = append(data, data...)
+		}
+		data = data[0:size]
+
+		gz := testCompress(b, data, Gzip)
+		zstd := testCompress(b, data, Zstd)
+
+		b.Run(fmt.Sprintf("size=%dMiB", sizeInMiB), func(b *testing.B) {
+			original := gzipPath
+			defer func() {
+				gzipPath = original
+			}()
+
+			b.Run("zstd", func(b *testing.B) {
+				testCompress(b, zstd, Zstd)
+			})
+
+			gzipPath = ""
+			b.Run("gzipPureGo", func(b *testing.B) {
+				testCompress(b, gz, Gzip)
+			})
+			gzipPath, err = exec.LookPath("igzip")
+			if err == nil {
+				b.Run("igzip", func(b *testing.B) {
+					testCompress(b, gz, Gzip)
+				})
+			}
+			gzipPath, err = exec.LookPath("pigz")
+			if err == nil {
+				b.Run("pigz", func(b *testing.B) {
+					testCompress(b, gz, Gzip)
+				})
+			}
+		})
+	}
+}
