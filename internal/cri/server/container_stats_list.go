@@ -278,21 +278,26 @@ func (c *criService) buildTaskMetricsRequest(
 	r *runtime.ListContainerStatsRequest,
 ) (*tasks.MetricsRequest, []containerstore.Container, error) {
 	req := &tasks.MetricsRequest{}
-	if r.GetFilter() == nil {
-		return req, c.containerStore.List(), nil
+	if r.GetFilter() != nil {
+		c.normalizeContainerStatsFilter(r.GetFilter())
 	}
-	c.normalizeContainerStatsFilter(r.GetFilter())
 	var containers []containerstore.Container
 	for _, cntr := range c.containerStore.List() {
-		if r.GetFilter().GetId() != "" && cntr.ID != r.GetFilter().GetId() {
-			continue
-		}
-		if r.GetFilter().GetPodSandboxId() != "" && cntr.SandboxID != r.GetFilter().GetPodSandboxId() {
-			continue
-		}
-		if r.GetFilter().GetLabelSelector() != nil &&
-			!matchLabelSelector(r.GetFilter().GetLabelSelector(), cntr.Config.GetLabels()) {
-			continue
+		if r.GetFilter() != nil {
+			if r.GetFilter().GetId() != "" && cntr.ID != r.GetFilter().GetId() {
+				continue
+			}
+			if r.GetFilter().GetPodSandboxId() != "" && cntr.SandboxID != r.GetFilter().GetPodSandboxId() {
+				continue
+			}
+			if r.GetFilter().GetLabelSelector() != nil &&
+				!matchLabelSelector(r.GetFilter().GetLabelSelector(), cntr.Config.GetLabels()) {
+				continue
+			}
+		} else {
+			if cntr.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {
+				continue
+			}
 		}
 		containers = append(containers, cntr)
 		req.Filters = append(req.Filters, "id=="+cntr.ID)

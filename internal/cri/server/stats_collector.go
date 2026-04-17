@@ -30,6 +30,7 @@ import (
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -171,10 +172,18 @@ func (c *StatsCollector) collectContainerStats(ctx context.Context) {
 		return
 	}
 
-	// Build request for all containers
+	// Build request for all running containers
 	req := &tasks.MetricsRequest{}
 	for _, cntr := range containers {
+		if cntr.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {
+			c.RemoveContainer(cntr.ID)
+			continue
+		}
 		req.Filters = append(req.Filters, "id=="+cntr.ID)
+	}
+
+	if len(req.Filters) == 0 {
+		return
 	}
 
 	resp, err := c.taskService.Metrics(ctx, req)
@@ -205,6 +214,10 @@ func (c *StatsCollector) collectSandboxStats(ctx context.Context) {
 
 	timestamp := time.Now()
 	for _, sb := range sandboxes {
+		if sb.Status.Get().State != sandboxstore.StateReady {
+			c.RemoveContainer(sb.ID)
+			continue
+		}
 		// Get the parent cgroup path for the pod
 		cgroupPath := sb.Config.GetLinux().GetCgroupParent()
 		if cgroupPath == "" {
