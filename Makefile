@@ -87,6 +87,9 @@ PKG=github.com/containerd/containerd/v2
 COMMANDS=ctr containerd containerd-stress
 MANPAGES=ctr.8 containerd.8 containerd-config.8 containerd-config.toml.5
 
+# Optional override for the User-Agent. Leave empty to use the default ("containerd/<Version>").
+CONTAINERD_USER_AGENT ?=
+
 ifdef BUILDTAGS
 	GO_BUILDTAGS = ${BUILDTAGS}
 endif
@@ -102,13 +105,22 @@ SHIM_GO_BUILDTAGS := $(GO_BUILDTAGS) no_grpc
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
 SHIM_GO_TAGS=$(if $(SHIM_GO_BUILDTAGS),-tags "$(strip $(SHIM_GO_BUILDTAGS))",)
 
-GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
+GO_LD_X = \
+	-X $(PKG)/version.Version=$(VERSION) \
+	-X $(PKG)/version.Revision=$(REVISION) \
+	-X $(PKG)/version.Package=$(PACKAGE)
+
+ifneq ($(strip $(CONTAINERD_USER_AGENT)),)
+GO_LD_X += -X "$(PKG)/version.UserAgentOverride=$(CONTAINERD_USER_AGENT)"
+endif
+
+GO_LDFLAGS=-ldflags '$(GO_LD_X) $(EXTRA_LDFLAGS)
 ifneq ($(STATIC),)
 	GO_LDFLAGS += -extldflags "-static"
 endif
 GO_LDFLAGS+='
 
-SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
+SHIM_GO_LDFLAGS=-ldflags '$(GO_LD_X) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 # Project packages.
 PACKAGES := $(shell $(GO) list ${GO_TAGS} ./... | grep -v /integration)
