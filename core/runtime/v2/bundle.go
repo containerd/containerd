@@ -71,8 +71,16 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	if err := os.MkdirAll(filepath.Dir(b.Path), 0711); err != nil {
 		return nil, err
 	}
+	// On Windows, a crashed shim or failed atomicDelete may leave the bundle
+	// path behind; mirror the work-dir handling below to self-heal.
 	if err := os.Mkdir(b.Path, 0700); err != nil {
-		return nil, err
+		if !os.IsExist(err) {
+			return nil, err
+		}
+		os.RemoveAll(b.Path)
+		if err := os.Mkdir(b.Path, 0700); err != nil {
+			return nil, err
+		}
 	}
 	if typeurl.Is(spec, &specs.Spec{}) {
 		if err := prepareBundleDirectoryPermissions(b.Path, spec.GetValue()); err != nil {
