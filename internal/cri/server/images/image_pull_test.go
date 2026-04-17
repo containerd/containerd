@@ -757,3 +757,66 @@ func TestTransferProgressReporter(t *testing.T) {
 		})
 	}
 }
+
+// fakeObserver records every Observe call so tests can assert both the
+// presence and the value of observations without touching the real histogram.
+type fakeObserver struct {
+	samples []float64
+}
+
+func (f *fakeObserver) Observe(v float64) {
+	f.samples = append(f.samples, v)
+}
+
+func TestRecordImagePullThroughput(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		bytesPulled uint64
+		duration    time.Duration
+		wantSamples int
+		wantValue   float64 // only checked when wantSamples == 1
+	}{
+		{
+			name:        "fully cached pull is not observed",
+			bytesPulled: 0,
+			duration:    2 * time.Second,
+			wantSamples: 0,
+		},
+		{
+			name:        "zero duration is not observed",
+			bytesPulled: 10 * mbToByte,
+			duration:    0,
+			wantSamples: 0,
+		},
+		{
+			name:        "cold pull observes MB/s from fetched bytes",
+			bytesPulled: 10 * mbToByte,
+			duration:    2 * time.Second,
+			wantSamples: 1,
+			wantValue:   5.0,
+		},
+		{
+			name:        "partial cache hit observes only fetched bytes",
+			// 200 MB image, 150 MB cached, 50 MB actually fetched over 1s.
+			bytesPulled: 50 * mbToByte,
+			duration:    1 * time.Second,
+			wantSamples: 1,
+			wantValue:   50.0,
+		},
+		{
+			name:        "sub-second pull observes correctly",
+			bytesPulled: 25 * mbToByte,
+			duration:    500 * time.Millisecond,
+			wantSamples: 1,
+			wantValue:   50.0,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			obs := &fakeObserver{}
+			recordImagePullThroughput(obs, tc.bytesPulled, tc.duration)
+			if assert.Len(t, obs.samples, tc.wantSamples) && tc.wantSamples == 1 {
+				assert.InDelta(t, tc.wantValue, obs.samples[0], 0.001)
+			}
+		})
+	}
+}
