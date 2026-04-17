@@ -180,11 +180,14 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	//
 	// Transfer service does not currently support all the CRI image config options.
 	// TODO: Add support for DisableSnapshotAnnotations, DiscardUnpackedLayers, ImagePullWithSyncFs and unpackDuplicationSuppressor
-	var image containerd.Image
+	var (
+		image       containerd.Image
+		bytesPulled uint64
+	)
 	if c.config.UseLocalImagePull {
-		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
 	} else {
-		image, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
 	}
 
 	if err != nil {
@@ -216,11 +219,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		}
 	}
 
-	const mbToByte = 1024 * 1024
-	size, _ := image.Size(ctx)
-	imagePullingSpeed := float64(size) / mbToByte / time.Since(startTime).Seconds()
-	imagePullThroughput.Observe(imagePullingSpeed)
+	recordImagePullThroughput(imagePullThroughput, bytesPulled, time.Since(startTime))
 
+	size, _ := image.Size(ctx)
 	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", name, imageID,
 		repoTag, repoDigest, strconv.FormatInt(size, 10), time.Since(startTime))
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
@@ -232,6 +233,10 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 }
 
 // pullImageWithLocalPull handles image pulling using the local client.
+//
+// The returned bytesPulled is the number of bytes actually fetched from the
+// registry — cached layers are not counted because they never trigger an
+// HTTP request.
 func (c *CRIImageService) pullImageWithLocalPull(
 	ctx context.Context,
 	ref string,
@@ -239,7 +244,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	snapshotter string,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
-) (containerd.Image, error) {
+) (containerd.Image, uint64, error) {
 	pctx, pcancel := context.WithCancel(ctx)
 	defer pcancel()
 	pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
@@ -279,12 +284,17 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	image, err := c.client.Pull(pctx, ref, pullOpts...)
 	pcancel()
 	if err != nil {
-		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		return nil, 0, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
-	return image, nil
+	_, bytesPulled := pullReporter.reqReporter.status()
+	return image, bytesPulled, nil
 }
 
 // pullImageWithTransferService handles image pulling using the transfer service.
+//
+// The returned bytesPulled is the number of bytes actually fetched from the
+// registry, accumulated from transfer progress events; cached layers emit an
+// "already exists" event that does not increment the counter.
 func (c *CRIImageService) pullImageWithTransferService(
 	ctx context.Context,
 	ref string,
@@ -292,7 +302,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	snapshotter string,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
-) (containerd.Image, error) {
+) (containerd.Image, uint64, error) {
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
 	rctx, rcancel := context.WithCancel(ctx)
 	defer rcancel()
@@ -318,7 +328,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 
 	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create OCI registry: %w", err)
+		return nil, 0, fmt.Errorf("failed to create OCI registry: %w", err)
 	}
 
 	transferProgressReporter.start(rctx)
@@ -326,15 +336,16 @@ func (c *CRIImageService) pullImageWithTransferService(
 	err = c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx)))
 	rcancel()
 	if err != nil {
-		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		return nil, 0, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
 
 	// Image should be pulled, unpacked and present in containerd image store at this moment
 	image, err := c.client.GetImage(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
+		return nil, 0, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
 	}
-	return image, nil
+	_, bytesPulled := transferProgressReporter.reqReporter.status()
+	return image, bytesPulled, nil
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
