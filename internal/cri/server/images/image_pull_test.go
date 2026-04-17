@@ -757,3 +757,47 @@ func TestTransferProgressReporter(t *testing.T) {
 		})
 	}
 }
+
+func TestTransferProgressReporterProgressEventRefreshesTimeout(t *testing.T) {
+	t.Helper()
+
+	ctx := context.Background()
+	cancelCalled := make(chan struct{}, 1)
+	reporter := &transferProgressReporter{
+		reqReporter: pullRequestReporter{},
+		statuses:    make(map[string]*transfer.Progress),
+		ref:         "test-image:latest",
+		timeout:     50 * time.Millisecond,
+		cancel: func() {
+			select {
+			case cancelCalled <- struct{}{}:
+			default:
+			}
+		},
+		lastSeenBytesRead: 123,
+		lastSeenTimestamp: time.Now().Add(-time.Second),
+	}
+
+	reporter.reqReporter.activeReqs.Store(1)
+	reporter.reqReporter.totalBytesRead.Store(123)
+
+	reporter.handleProgress(transfer.Progress{
+		Name: "layer1",
+		Desc: &ocispec.Descriptor{
+			MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+			Digest:    "sha256:abcdef",
+			Size:      1000,
+		},
+		Total:    1000,
+		Progress: 123,
+		Event:    "waiting",
+	})
+
+	reporter.checkProgress(ctx, 10*time.Millisecond)
+
+	select {
+	case <-cancelCalled:
+		t.Fatal("cancel should not be called when recent progress events are received")
+	default:
+	}
+}
