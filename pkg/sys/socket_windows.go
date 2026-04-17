@@ -22,9 +22,13 @@ import (
 	"github.com/Microsoft/go-winio"
 )
 
-// GetLocalListener returns a Listernet out of a named pipe.
+// GetLocalListener returns a Listener out of a named pipe.
 // `path` must be of the form of `\\.\pipe\<pipename>`
 // (see https://msdn.microsoft.com/en-us/library/windows/desktop/aa365150)
+//
+// MessageMode is enabled so that accepted connections support CloseWrite,
+// matching the behavior of Unix. This is important for protocols like HTTP
+// that rely on receiving data after a half-close.
 func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
-	return winio.ListenPipe(path, nil)
+	return winio.ListenPipe(path, &winio.PipeConfig{MessageMode: true})
 }
