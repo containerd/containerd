@@ -32,6 +32,7 @@ var imageListFile = flag.String("image-list", "", "The TOML file containing the 
 type ImageList struct {
 	Alpine           string
 	BusyBox          string
+	BusyBoxByDigest  string
 	Pause            string
 	ResourceConsumer string
 	VolumeCopyUp     string
@@ -52,6 +53,7 @@ func initImages(imageListFile string) {
 	imageList = ImageList{
 		Alpine:           "ghcr.io/containerd/alpine:3.14.0",
 		BusyBox:          "ghcr.io/containerd/busybox:1.36",
+		BusyBoxByDigest:  "ghcr.io/containerd/busybox@sha256:7b3ccabffc97de872a30dfd234fd972a66d247c8cfc69b0550f276481852627c",
 		Pause:            "registry.k8s.io/pause:3.10.2",
 		ResourceConsumer: "registry.k8s.io/e2e-test-images/resource-consumer:1.10",
 		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.2",
@@ -86,6 +88,8 @@ const (
 	Alpine
 	// BusyBox image
 	BusyBox
+	// BusyBox by digest
+	BusyBoxByDigest
 	// Pause image
 	Pause
 	// ResourceConsumer image
@@ -106,6 +110,7 @@ func initImageMap(imageList ImageList) map[int]string {
 	images := map[int]string{}
 	images[Alpine] = imageList.Alpine
 	images[BusyBox] = imageList.BusyBox
+	images[BusyBoxByDigest] = imageList.BusyBoxByDigest
 	images[Pause] = imageList.Pause
 	images[ResourceConsumer] = imageList.ResourceConsumer
 	images[VolumeCopyUp] = imageList.VolumeCopyUp
