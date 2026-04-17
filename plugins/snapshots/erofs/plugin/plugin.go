@@ -58,6 +58,15 @@ type Config struct {
 	// DmverityMode controls dm-verity behavior: "auto" (use if available), "on" (require), "off" (disable)
 	// Linux only
 	DmverityMode string `toml:"dmverity_mode"`
+
+	// NoSync enables optimizations that improve database write performance by:
+	// 1. Disabling fsync calls after every write, which prevents ensuring that data is immediately flushed
+	//    to disk but significantly improves write throughput (NoSync).
+	// 2. Preventing automatic growth of the memory-mapped file during writes, further improving performance
+	//    in environments where the database size is stable (NoGrowSync).
+	//
+	// These settings can improve performance, but introduce a risk of data loss during crashes. Use with care!
+	NoSync bool `toml:"no_sync"`
 }
 
 func init() {
@@ -112,6 +121,10 @@ func init() {
 			if ok, err := supportsIDMappedMounts(); err == nil && ok {
 				opts = append(opts, erofs.WithRemapIDs())
 				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaRemapIDs)
+			}
+
+			if config.NoSync {
+				opts = append(opts, erofs.WithNoSync())
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
