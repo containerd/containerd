@@ -336,6 +336,12 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 			if spec.Windows.Resources.CPU.Maximum != nil {
 				status.Resources.Windows.CpuMaximum = int64(*spec.Windows.Resources.CPU.Maximum)
 			}
+			for _, a := range spec.Windows.Resources.CPU.Affinity {
+				status.Resources.Windows.AffinityCpus = append(
+					status.Resources.Windows.AffinityCpus,
+					&runtime.WindowsCpuGroupAffinity{CpuMask: a.Mask, CpuGroup: a.Group},
+				)
+			}
 		}
 
 		if spec.Windows.Resources.Memory != nil {
