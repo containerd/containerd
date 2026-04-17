@@ -18,6 +18,7 @@ package containers
 
 import (
 	"context"
+	"iter"
 	"time"
 
 	"github.com/containerd/typeurl/v2"
@@ -114,4 +115,10 @@ type Store interface {
 	// nil will be returned on success. If the container is not known to the
 	// store, ErrNotFound will be returned.
 	Delete(ctx context.Context, id string) error
+}
+
+type IterStore interface {
+	// ListIter streams containers from the server.
+	// It yields (Container{}, errStreamNotAvailable) if the server does not implement streaming.
+	ListIter(context.Context, ...string) iter.Seq2[Container, error]
 }
