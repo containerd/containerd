@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/util"
@@ -124,6 +125,19 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 		runtimeUser = &runtime.ContainerUser{}
 	}
 
+	var statusStopSignal runtime.Signal
+	stopsignal := container.Config.GetStopSignal()
+
+	if stopsignal == runtime.Signal_RUNTIME_DEFAULT {
+		if container.Metadata.StopSignal != "" {
+			statusStopSignal = toCRISignal(container.Metadata.StopSignal)
+		} else {
+			statusStopSignal = runtime.Signal_SIGTERM
+		}
+	} else {
+		statusStopSignal = stopsignal
+	}
+
 	return &runtime.ContainerStatus{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
@@ -143,6 +157,7 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 		LogPath:     meta.LogPath,
 		Resources:   status.Resources,
 		User:        runtimeUser,
+		StopSignal:  statusStopSignal,
 	}, nil
 }
 
@@ -204,4 +219,15 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 	return map[string]string{
 		"info": string(infoBytes),
 	}, nil
+}
+
+func toCRISignal(stopsignal string) runtime.Signal {
+	stopsignal = strings.Replace(stopsignal, "+", "PLUS", 1)
+	stopsignal = strings.Replace(stopsignal, "-", "MINUS", 1)
+
+	signalValue, ok := runtime.Signal_value[stopsignal]
+	if !ok {
+		return runtime.Signal_RUNTIME_DEFAULT
+	}
+	return runtime.Signal(signalValue)
 }
