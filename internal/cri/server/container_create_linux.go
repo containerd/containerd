@@ -17,6 +17,8 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -25,7 +27,9 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/pkg/apparmordelivery"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/seccompdelivery"
 
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/internal/cri/sputil"
@@ -70,6 +74,15 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 			return nil, fmt.Errorf("failed to generate apparmor spec opts: %w", err)
 		}
 	}
+	if c.apparmorDelivery != nil && asp != nil && asp.ProfileType == runtime.SecurityProfile_Localhost && !securityContext.GetPrivileged() {
+		var labels map[string]string
+		if imageConfig != nil {
+			labels = imageConfig.Labels
+		}
+		if _, err := c.apparmorDelivery.EnsureProfile(context.TODO(), asp.LocalhostRef, labels); err != nil && !errors.Is(err, apparmordelivery.ErrProfileNotFound) {
+			return nil, fmt.Errorf("ensure apparmor profile %q: %w", asp.LocalhostRef, err)
+		}
+	}
 	apparmorSpecOpts, err := sputil.GenerateApparmorSpecOpts(
 		asp,
 		securityContext.GetPrivileged(),
@@ -88,6 +101,19 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 			c.config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
+		}
+	}
+	if c.seccompDelivery != nil && ssp != nil && ssp.ProfileType == runtime.SecurityProfile_Localhost && !securityContext.GetPrivileged() {
+		var labels map[string]string
+		if imageConfig != nil {
+			labels = imageConfig.Labels
+		}
+		path, err := c.seccompDelivery.EnsureProfile(context.TODO(), ssp.LocalhostRef, labels)
+		if err != nil && !errors.Is(err, seccompdelivery.ErrProfileNotFound) {
+			return nil, fmt.Errorf("ensure seccomp profile %q: %w", ssp.LocalhostRef, err)
+		}
+		if err == nil {
+			ssp.LocalhostRef = path
 		}
 	}
 	seccompSpecOpts, err := sputil.GenerateSeccompSpecOpts(

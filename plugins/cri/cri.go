@@ -18,6 +18,7 @@ package cri
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -35,6 +36,8 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server"
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
+	"github.com/containerd/containerd/v2/pkg/apparmordelivery"
+	"github.com/containerd/containerd/v2/pkg/seccompdelivery"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
@@ -79,6 +82,32 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	criImagePlugin, err := ic.GetByID(plugins.CRIServicePlugin, "images")
 	if err != nil {
 		return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
+	}
+
+	var seccompSvc seccompdelivery.Service
+	if svc, err := ic.GetByID(plugins.ServicePlugin, "seccompdelivery"); err != nil {
+		if !errors.Is(err, plugin.ErrPluginNotFound) {
+			return nil, fmt.Errorf("unable to load seccomp delivery service plugin dependency: %w", err)
+		}
+	} else {
+		converted, ok := svc.(seccompdelivery.Service)
+		if !ok {
+			return nil, fmt.Errorf("seccomp delivery plugin has unexpected type %T", svc)
+		}
+		seccompSvc = converted
+	}
+
+	var apparmorSvc apparmordelivery.Service
+	if svc, err := ic.GetByID(plugins.ServicePlugin, "apparmordelivery"); err != nil {
+		if !errors.Is(err, plugin.ErrPluginNotFound) {
+			return nil, fmt.Errorf("unable to load apparmor delivery service plugin dependency: %w", err)
+		}
+	} else {
+		converted, ok := svc.(apparmordelivery.Service)
+		if !ok {
+			return nil, fmt.Errorf("apparmor delivery plugin has unexpected type %T", svc)
+		}
+		apparmorSvc = converted
 	}
 
 	// Propagate runtime-specific snapshotters from runtime config to image service.
@@ -138,6 +167,8 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 		NRI:                getNRIAPI(ic),
 		Client:             client,
 		SandboxControllers: sbControllers,
+		SeccompDelivery:    seccompSvc,
+		AppArmorDelivery:   apparmorSvc,
 	}
 	is := criImagePlugin.(imageService).GRPCService()
 

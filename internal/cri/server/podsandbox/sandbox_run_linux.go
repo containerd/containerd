@@ -17,12 +17,15 @@
 package podsandbox
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/seccompdelivery"
 	"github.com/moby/sys/userns"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -229,6 +232,19 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 			c.config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
+		}
+	}
+	if c.seccompDelivery != nil && ssp != nil && ssp.ProfileType == runtime.SecurityProfile_Localhost && !securityContext.GetPrivileged() {
+		var labels map[string]string
+		if imageConfig != nil {
+			labels = imageConfig.Labels
+		}
+		path, err := c.seccompDelivery.EnsureProfile(context.TODO(), ssp.LocalhostRef, labels)
+		if err != nil && !errors.Is(err, seccompdelivery.ErrProfileNotFound) {
+			return nil, fmt.Errorf("ensure seccomp profile %q: %w", ssp.LocalhostRef, err)
+		}
+		if err == nil {
+			ssp.LocalhostRef = path
 		}
 	}
 	seccompSpecOpts, err := sputil.GenerateSeccompSpecOpts(
