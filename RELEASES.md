@@ -402,7 +402,7 @@ As of containerd 2.0, the Go client API documented in
 [godoc](https://godoc.org/github.com/containerd/containerd/v2/client) is stable.
 Note that because the Go client interfaces with the GRPC API, clients building on top
 of the Go client should remain compatible with future server releases implementing the
-same major GRPC API series. For backwards compatability and as a general rule of thumb,
+same major GRPC API series. For backwards compatibility and as a general rule of thumb,
 it is the client's responsibility to handle not implemented errors returned by the containerd daemon.
 
 Any changes to the Go client API should be detectable at compile time, so upgrading will
