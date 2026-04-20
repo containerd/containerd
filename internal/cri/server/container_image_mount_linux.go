@@ -58,7 +58,7 @@ func addVolatileOptionOnImageVolumeMount(mounts []mount.Mount) []mount.Mount {
 
 		need := true
 		for _, opt := range m.Options {
-			if opt == "volatile" {
+			if opt == "volatile" || opt == "fsync=volatile" {
 				need = false
 				break
 			}
