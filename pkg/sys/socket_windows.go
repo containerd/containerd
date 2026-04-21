@@ -17,7 +17,11 @@
 package sys
 
 import (
+	"fmt"
 	"net"
+	osuser "os/user"
+
+	"github.com/containerd/errdefs"
 
 	"github.com/Microsoft/go-winio"
 )
@@ -25,6 +29,34 @@ import (
 // GetLocalListener returns a Listernet out of a named pipe.
 // `path` must be of the form of `\\.\pipe\<pipename>`
 // (see https://msdn.microsoft.com/en-us/library/windows/desktop/aa365150)
-func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
-	return winio.ListenPipe(path, nil)
+func GetLocalListener(path string, uid, gid int, user, group string) (net.Listener, error) {
+	if uid != 0 {
+		return nil, fmt.Errorf("cannot specify numeric uid: %w", errdefs.ErrInvalidArgument)
+	}
+
+	if gid != 0 {
+		return nil, fmt.Errorf("cannot specify numeric gid: %w", errdefs.ErrInvalidArgument)
+	}
+
+	pc := winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;BA)(A;;GA;;;SY)"}
+
+	if user != "" {
+		userinfo, err := osuser.Lookup(user)
+		if err != nil {
+			return nil, err
+		}
+
+		pc.SecurityDescriptor += fmt.Sprintf("(A;;GRGW;;;%s)", userinfo.Uid)
+	}
+
+	if group != "" {
+		groupinfo, err := osuser.LookupGroup(group)
+		if err != nil {
+			return nil, err
+		}
+
+		pc.SecurityDescriptor += fmt.Sprintf("(A;;GRGW;;;%s)", groupinfo.Gid)
+	}
+
+	return winio.ListenPipe(path, &pc)
 }

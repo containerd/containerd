@@ -44,6 +44,7 @@ GLOBAL OPTIONS:
    --config value, -c value     Path to the configuration file (default: "/etc/containerd/config.toml")
    --log-level value, -l value  Set the logging level [trace, debug, info, warn, error, fatal, panic]
    --address value, -a value    Address for containerd's GRPC server
+   --group value, -g value      Group for containerd's GRPC server
    --root value                 containerd root directory
    --state value                containerd state directory
    --help, -h                   Show help
