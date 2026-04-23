@@ -29,7 +29,7 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-// WithProfile sets the provided apparmor profile to the spec
+// WithProfile sets the provided AppArmor profile to the spec
 func WithProfile(profile string) oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		s.Process.ApparmorProfile = profile
@@ -37,7 +37,7 @@ func WithProfile(profile string) oci.SpecOpts {
 	}
 }
 
-// WithDefaultProfile will generate a default apparmor profile under the provided name
+// WithDefaultProfile will generate a default AppArmor profile under the provided name
 // for the container.  It is only generated if a profile under that name does not exist.
 func WithDefaultProfile(name string) oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
