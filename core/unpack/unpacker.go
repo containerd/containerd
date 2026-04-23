@@ -48,12 +48,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
-const (
-	labelSnapshotRef    = "containerd.io/snapshot.ref"
-	labelSnapshotParent = "containerd.io/snapshot/parent-chain-id"
-	labelSnapshotDiffID = "containerd.io/snapshot/diff-id"
-	unpackSpanPrefix    = "pkg.unpack.unpacker"
-)
+const unpackSpanPrefix = "pkg.unpack.unpacker"
 
 // Result returns information about the unpacks which were completed.
 type Result struct {
@@ -397,10 +392,10 @@ func (u *Unpacker) unpack(
 		if snapshotLabels == nil {
 			snapshotLabels = make(map[string]string)
 		}
-		snapshotLabels[labelSnapshotRef] = chainID
-		snapshotLabels[labelSnapshotDiffID] = diffIDs[i].String()
+		snapshotLabels[snapshots.LabelSnapshotRef] = chainID
+		snapshotLabels[snapshots.LabelSnapshotDiffID] = diffIDs[i].String()
 		if i > 0 {
-			snapshotLabels[labelSnapshotParent] = chainIDs[i-1].String()
+			snapshotLabels[snapshots.LabelSnapshotParentChainID] = chainIDs[i-1].String()
 		}
 
 		var (
