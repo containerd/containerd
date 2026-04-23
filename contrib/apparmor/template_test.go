@@ -24,8 +24,18 @@ func TestCleanProfileName(t *testing.T) {
 			want:    "unconfined",
 		},
 		{
+			doc:     "unconfined newline",
+			profile: "unconfined\n",
+			want:    "unconfined",
+		},
+		{
 			doc:     "unconfined enforce",
 			profile: "unconfined (enforce)",
+			want:    "unconfined",
+		},
+		{
+			doc:     "unconfined enforce newline",
+			profile: "unconfined (enforce)\n",
 			want:    "unconfined",
 		},
 		{
@@ -37,6 +47,21 @@ func TestCleanProfileName(t *testing.T) {
 			doc:     "simple enforce",
 			profile: "docker-default (enforce)",
 			want:    "docker-default",
+		},
+		{
+			doc:     "spaces",
+			profile: "with spaces (enforce)",
+			want:    "with spaces",
+		},
+		{
+			doc:     "parentheses in name",
+			profile: "foo (bar) (enforce)",
+			want:    "foo (bar)",
+		},
+		{
+			doc:     "unknown mode",
+			profile: "foo (anything)",
+			want:    "foo",
 		},
 	}
 
