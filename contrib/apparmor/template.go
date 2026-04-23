@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/log"
 )
 
-// NOTE: This code is copied from <github.com/docker/docker/profiles/apparmor>.
+// NOTE: This code is copied from <github.com/moby/profiles/apparmor>.
 //       If you plan to make any changes, please make sure they are also sent
 //       upstream.
 
