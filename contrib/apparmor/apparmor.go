@@ -63,7 +63,7 @@ func LoadDefaultProfile(name string) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.CreateTemp(os.Getenv("XDG_RUNTIME_DIR"), p.Name)
+	f, err := os.CreateTemp(os.Getenv("XDG_RUNTIME_DIR"), p.name)
 	if err != nil {
 		return err
 	}
