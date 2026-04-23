@@ -59,7 +59,7 @@ func LoadDefaultProfile(name string) error {
 	if yes {
 		return nil
 	}
-	p, err := loadData(name)
+	p, err := loadData(name, macroExists)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func LoadDefaultProfile(name string) error {
 
 // DumpDefaultProfile dumps the default profile with the given name.
 func DumpDefaultProfile(name string) (string, error) {
-	p, err := loadData(name)
+	p, err := loadData(name, macroExists)
 	if err != nil {
 		return "", err
 	}
