@@ -50,25 +50,25 @@ func init() {
 		},
 		//Default configuration for Timeout
 		Config: &Config{
-			HealthCheckTimeout:tomlext.FromStdTime(5 * time.Second),
+			HealthCheckTimeout: tomlext.FromStdTime(5 * time.Second),
 		},
-		InitFn: func(ic *plugin.InitContext) (any,error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			mdRaw, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
-				return nil, fmt.Errorf("watchdog: failed to get metadata plugin: %w",err)
+				return nil, fmt.Errorf("watchdog: failed to get metadata plugin: %w", err)
 			}
 			mdb := mdRaw.(*metadata.DB)
 
 			csRaw, err := ic.GetSingle(plugins.ContentPlugin)
 			if err != nil {
-				return nil, fmt.Errorf("watchdog: failed to get content plugin: %w",err)
+				return nil, fmt.Errorf("watchdog: failed to get content plugin: %w", err)
 			}
 			cs := csRaw.(content.Store)
 
 			cfg := ic.Config.(*Config)
 			w := &watchdog{
-				mdb: mdb,
-				cs: cs,
+				mdb:     mdb,
+				cs:      cs,
 				timeout: tomlext.ToStdTime(cfg.HealthCheckTimeout),
 			}
 			go w.run(ic.Context)
@@ -78,8 +78,8 @@ func init() {
 }
 
 type watchdog struct {
-	mdb *metadata.DB
-	cs content.Store
+	mdb     *metadata.DB
+	cs      content.Store
 	timeout time.Duration
 }
 
@@ -93,10 +93,10 @@ func (w *watchdog) run(ctx context.Context) {
 		log.G(ctx).Debug("watchdog: systemd watchdog not enabled")
 		return
 	}
-	pingInterval := interval/2;
+	pingInterval := interval / 2
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			log.G(ctx).Debug("watchdog: context cancelled, stopping watchdog loop")
 			return
@@ -113,34 +113,34 @@ func (w *watchdog) run(ctx context.Context) {
 		notified, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
 		if err != nil {
 			log.G(ctx).WithError(err).Warn("watchdog: failed to watchdog notifiaction to systemd")
-		}else{
-			log.G(ctx).WithField("notified",notified).Infof("watchdog: sent WATCHDOG=1 ping")
+		} else {
+			log.G(ctx).WithField("notified", notified).Infof("watchdog: sent WATCHDOG=1 ping")
 
 		}
 	}
 }
 
-func(w *watchdog) healthCheck(ctx context.Context) error {
+func (w *watchdog) healthCheck(ctx context.Context) error {
 	if err := w.checkMetadataDB(ctx); err != nil {
-		return fmt.Errorf("metadata store: %w",err)
+		return fmt.Errorf("metadata store: %w", err)
 	}
 	if err := w.checkContentStore(ctx); err != nil {
-		return fmt.Errorf("content store: %w",err)
+		return fmt.Errorf("content store: %w", err)
 	}
 	return nil
 }
 
-func(w *watchdog) checkMetadataDB(_ context.Context) error {
-	return w.mdb.View(func(_ *bolt.Tx)error{
-		return nil;
+func (w *watchdog) checkMetadataDB(_ context.Context) error {
+	return w.mdb.View(func(_ *bolt.Tx) error {
+		return nil
 	})
 }
 
-func(w *watchdog) checkContentStore(ctx context.Context) error {
-	err := w.cs.Walk(ctx, func(_ content.Info)error{
+func (w *watchdog) checkContentStore(ctx context.Context) error {
+	err := w.cs.Walk(ctx, func(_ content.Info) error {
 		return errWatchdogHealthCheckDone
 	})
-	if errors.Is(err, errWatchdogHealthCheckDone){
+	if errors.Is(err, errWatchdogHealthCheckDone) {
 		return nil
 	}
 	return err
