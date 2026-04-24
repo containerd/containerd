@@ -39,6 +39,15 @@ const (
 	LabelSnapshotUIDMapping = "containerd.io/snapshot/uidmapping"
 	// LabelSnapshotGIDMapping is the label used for GID mappings
 	LabelSnapshotGIDMapping = "containerd.io/snapshot/gidmapping"
+
+	// LabelSnapshotMaxSize is a hint to the snapshotter that the active
+	// snapshot's filesystem should be limited to the given size, in bytes
+	// (decimal int64 as a string). Snapshotters that back an active
+	// snapshot with a block image or support filesystem quotas should
+	// honor this value; those that cannot enforce a size may ignore it.
+	// Ignoring is not a failure — callers that require enforcement must
+	// pick a snapshotter that supports it.
+	LabelSnapshotMaxSize = "containerd.io/snapshot/max-size"
 )
 
 // Kind identifies the kind of snapshot.
