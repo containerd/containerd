@@ -21,8 +21,6 @@
 package apparmor
 
 import (
-	"bufio"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -202,44 +200,8 @@ func generate(p *data, o io.Writer) error {
 	return t.Execute(o, p)
 }
 
-func load(path string) error {
-	out, err := aaParser("-Kr", path)
-	if err != nil {
-		return fmt.Errorf("parser error(%q): %w", strings.TrimSpace(out), err)
-	}
-	return nil
-}
-
 // macroExists checks if the passed macro exists.
 func macroExists(m string) bool {
 	_, err := os.Stat(path.Join(dir, m))
 	return err == nil
-}
-
-func aaParser(args ...string) (string, error) {
-	out, err := exec.Command("apparmor_parser", args...).CombinedOutput()
-	return string(out), err
-}
-
-func isLoaded(name string) (bool, error) {
-	f, err := os.Open("/sys/kernel/security/apparmor/profiles")
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = f.Close() }()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		// Entries are of the form "<profile> (<mode>)", e.g. "foo (enforce)".
-		// Profile names may contain spaces (quoted names are supported in AppArmor);
-		// use splitCon to correctly handle profile names containing spaces and/or parentheses.
-		label, _ := splitCon(scanner.Text())
-		if label == name {
-			return true, nil
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return false, err
-	}
-	return false, nil
 }

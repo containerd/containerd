@@ -19,10 +19,12 @@
 package apparmor
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -74,7 +76,7 @@ func LoadDefaultProfile(name string) error {
 	if err := generate(p, f); err != nil {
 		return err
 	}
-	if err := load(path); err != nil {
+	if err := loadProfile(path); err != nil {
 		return fmt.Errorf("load apparmor profile %s: %w", path, err)
 	}
 	return nil
@@ -92,4 +94,41 @@ func DumpDefaultProfile(name string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func isLoaded(name string) (bool, error) {
+	f, err := os.Open("/sys/kernel/security/apparmor/profiles")
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		// Entries are of the form "<profile> (<mode>)", e.g. "foo (enforce)".
+		// Profile names may contain spaces (quoted names are supported in AppArmor);
+		// use splitCon to correctly handle profile names containing spaces and/or parentheses.
+		label, _ := splitCon(scanner.Text())
+		if label == name {
+			return true, nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+// loadProfile runs "apparmor_parser -Kr" on a specified AppArmor profile to
+// replace the profile. The "-K" is necessary to make sure that apparmor_parser
+// doesn't try to write to a read-only filesystem.
+func loadProfile(profilePath string) error {
+	c := exec.Command("apparmor_parser", "-Kr", profilePath) // #nosec G204 G702 -- Ignore "Subprocess launched with variable (gosec)"
+	c.Dir = ""
+
+	if out, err := c.CombinedOutput(); err != nil {
+		return fmt.Errorf("parser error(%q): %w", string(bytes.TrimSpace(out)), err)
+	}
+
+	return nil
 }
