@@ -57,6 +57,8 @@ type hostConfig struct {
 
 	header http.Header
 
+	proxy string
+
 	// TODO: Add credential configuration (domain alias, username)
 }
 
@@ -171,9 +173,9 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
 			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
+			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 || host.proxy != "" {
 				c := *client
-				if explicitTLSFromHost || host.dialTimeout != nil {
+				if explicitTLSFromHost || host.dialTimeout != nil || host.proxy != "" {
 					tr := defaultTransport.Clone()
 
 					if explicitTLSFromHost {
@@ -188,6 +190,22 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 							KeepAlive:     30 * time.Second,
 							FallbackDelay: 300 * time.Millisecond,
 						}).DialContext
+					}
+
+					if host.proxy != "" {
+						proxyURL, err := url.Parse(host.proxy)
+						if err != nil {
+							return nil, fmt.Errorf("unable to parse configured proxy URL: %w", err)
+						}
+						if !proxyURL.IsAbs() || proxyURL.Host == "" {
+							return nil, fmt.Errorf("invalid proxy URL %q: must be an absolute URL with a non-empty host", proxyURL.Redacted())
+						}
+						switch strings.ToLower(proxyURL.Scheme) {
+						case "http", "https":
+						default:
+							return nil, fmt.Errorf("invalid proxy URL %q: unsupported scheme %q", proxyURL.Redacted(), proxyURL.Scheme)
+						}
+						tr.Proxy = http.ProxyURL(proxyURL)
 					}
 
 					c.Transport = tr
@@ -374,6 +392,9 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
+	// Proxy is the address of the proxy server to use for this host.
+	Proxy string `toml:"proxy"`
+
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -449,6 +470,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 	}
 
 	result.skipVerify = config.SkipVerify
+	result.proxy = config.Proxy
 
 	if len(config.Capabilities) > 0 {
 		for _, c := range config.Capabilities {

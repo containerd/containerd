@@ -30,6 +30,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1409,5 +1410,94 @@ func TestResolverErrorStatusCodeOnFetch(t *testing.T) {
 				t.Fatalf("expected status code %d, got %d", tc.statusCode, rerr.StatusCode)
 			}
 		})
+	}
+}
+
+func TestResolverWithConfiguredProxy(t *testing.T) {
+	ctx := context.Background()
+
+	// Start a mock proxy server at a random port that can do basic forwarding of an http/https request
+	var proxyCalled atomic.Bool
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyCalled.Store(true)
+		if r.Method == http.MethodConnect {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		req, err := http.NewRequest(r.Method, r.RequestURI, r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for k, vv := range r.Header {
+			for _, v := range vv {
+				req.Header.Add(k, v)
+			}
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+		for k, vv := range resp.Header {
+			for _, v := range vv {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		io.Copy(w, resp.Body)
+	}))
+	defer proxy.Close()
+
+	// Start a target server at a different random port
+	var targetCalled atomic.Bool
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		targetCalled.Store(true)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer target.Close()
+
+	targetHost := target.URL[len("http://"):]
+
+	proxyURL, err := url.Parse(proxy.URL)
+	if err != nil {
+		t.Fatalf("failed to parse proxy URL: %v", err)
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+		},
+	}
+
+	options := ResolverOptions{
+		Hosts: func(host string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				{
+					Client:       client,
+					Host:         targetHost,
+					Scheme:       "http",
+					Path:         "/v2",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve,
+				},
+			}, nil
+		},
+	}
+
+	resolver := NewResolver(options)
+	image := fmt.Sprintf("%s/library/hello-world:latest", targetHost)
+
+	_, _, err = resolver.Resolve(ctx, image)
+
+	if err != nil {
+		t.Fatalf("Resolve failed: %v", err)
+	}
+
+	if !proxyCalled.Load() {
+		t.Fatalf("Expected request to go through the configured proxy")
+	}
+
+	if !targetCalled.Load() {
+		t.Fatalf("Expected request to reach target server through proxy")
 	}
 }
