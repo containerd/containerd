@@ -51,6 +51,21 @@ type Config struct {
 
 	// MountOptions are options used for the overlay mount (not used on bind mounts)
 	MountOptions []string `toml:"mount_options"`
+
+	// LayerContentCache enables layer content caching and deduplication.
+	// When true, identical layers shared across images are stored once in a
+	// cache directory and referenced via symlinks from each snapshot.
+	//
+	// Disabling this option while remaining on a version that supports it
+	// is safe: cache directories are still cleaned up during GC as
+	// snapshots that reference them are removed.
+	//
+	// However, cache directories will not be cleaned up during GC when
+	// downgrading to a version of containerd that does not support this feature
+	// (since the older version has no knowledge of them). Cache directories
+	// can be manually deleted in this case, but only after ensuring no
+	// snapshot fs/ directory holds a symlink into them.
+	LayerContentCache bool `toml:"layer_content_cache"`
 }
 
 func init() {
@@ -81,6 +96,9 @@ func init() {
 
 			if len(config.MountOptions) > 0 {
 				oOpts = append(oOpts, overlay.WithMountOptions(config.MountOptions))
+			}
+			if config.LayerContentCache {
+				oOpts = append(oOpts, overlay.WithLayerContentCache)
 			}
 			if ok, err := overlayutils.SupportsIDMappedMounts(); err == nil && ok {
 				oOpts = append(oOpts, overlay.WithRemapIDs)

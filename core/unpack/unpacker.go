@@ -494,8 +494,10 @@ func (u *Unpacker) unpack(
 						return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
 					}
 
-					// Set the uncompressed label after the uncompressed
-					// digest has been verified through apply.
+					// Set the uncompressed label to record the mapping from
+					// compressed digest to diff ID. When extraction ran, the diff
+					// ID was verified at apply time; when LabelSkipApply was set,
+					// the cache content was verified when it was first committed.
 					cinfo := content.Info{
 						Digest: desc.Digest,
 						Labels: map[string]string{
@@ -532,6 +534,24 @@ func (u *Unpacker) unpack(
 			// See: https://github.com/containerd/containerd/issues/13030
 			if i > 0 && parallel && unpack.SnapshotterKey == "overlayfs" {
 				mounts = bindToOverlay(mounts)
+			}
+
+			snInfo, err := sn.Stat(ctx, key)
+			if err != nil {
+				cleanup.Do(ctx, abort)
+				status.err = fmt.Errorf("failed to stat snapshot %q: %w", key, err)
+				resCh <- status
+				return
+			}
+
+			// LabelSkipApply lets the snapshotter signal that extraction is
+			// unnecessary (e.g. content is already present on disk).
+			// NOTE: skipping Apply also skips the diff.Digest verification
+			// below; layer content correctness must be verified externally
+			// (e.g. at the time the content is first committed to the store).
+			if snInfo.Labels[snapshots.LabelSkipApply] == "true" {
+				resCh <- status
+				return
 			}
 
 			diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)

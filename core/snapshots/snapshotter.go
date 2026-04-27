@@ -63,6 +63,11 @@ const (
 	// LabelSnapshotParentChainID is set by the unpacker on active snapshots that
 	// have a parent, recording the chainID of the preceding layer.
 	LabelSnapshotParentChainID = "containerd.io/snapshot/parent-chain-id"
+
+	// LabelSkipApply instructs the unpacker to skip calling Apply for this
+	// active snapshot. Set by the snapshotter when the layer content is already
+	// present (e.g. via CAS deduplication) and extraction is unnecessary.
+	LabelSkipApply = "containerd.io/snapshot.skip-apply"
 )
 
 // Kind identifies the kind of snapshot.
