@@ -39,6 +39,9 @@ func IsErofsMediaType(mt string) bool {
 }
 
 func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {
+	if err := ensureSparseLayerFile(layerPath); err != nil {
+		log.G(ctx).WithError(err).WithField("path", layerPath).Debug("failed to mark layer file sparse (non-fatal)")
+	}
 	args := append([]string{"--tar=f", "--aufs", "--quiet", "-Enoinline_data"}, mkfsExtraOpts...)
 	if uuid != "" {
 		args = append(args, []string{"-U", uuid}...)
@@ -72,6 +75,9 @@ func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath, u
 	// Use TeeReader to process the input once while saving it to disk
 	teeReader := io.TeeReader(r, tarFile)
 
+	if err := ensureSparseLayerFile(layerPath); err != nil {
+		log.G(ctx).WithError(err).WithField("path", layerPath).Debug("failed to mark layer file sparse (non-fatal)")
+	}
 	// Generate tar index directly to layerPath using --tar=i option
 	args := append([]string{"--tar=i", "--aufs", "--quiet"}, mkfsExtraOpts...)
 	if uuid != "" {
@@ -128,6 +134,9 @@ func AddDefaultMkfsOpts(mkfsExtraOpts []string) []string {
 }
 
 func ConvertErofs(ctx context.Context, layerPath string, srcDir string, mkfsExtraOpts []string) error {
+	if err := ensureSparseLayerFile(layerPath); err != nil {
+		log.G(ctx).WithError(err).WithField("path", layerPath).Debug("failed to mark layer file sparse (non-fatal)")
+	}
 	args := append([]string{"--quiet", "-Enoinline_data"}, mkfsExtraOpts...)
 	args = append(args, layerPath, srcDir)
 	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
