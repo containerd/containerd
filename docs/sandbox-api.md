@@ -143,6 +143,10 @@ in-memory implementation tightly coupled to the CRI layer. It lives there due to
 it out cleanly is a large incremental effort that has been ongoing since the Sandbox API was first introduced in
 containerd 1.7, and improves with every release.
 
+Minimal Teaching Example:
+
+- [Minimal in-memory Runtime v2 shim that also implements the Sandbox API](../core/runtime/v2/example/sandbox/)
+
 ## Status
 
 The Sandbox API was first introduced in containerd 1.7 as an experimental API and was promoted to stable in 2.0.
