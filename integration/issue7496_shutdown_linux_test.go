@@ -117,6 +117,58 @@ func TestKillShimPublishesTaskExitAndDeleteEvents(t *testing.T) {
 	waitForTaskExitDeleteEvents(t, sbID, eventCh, eventErrCh, 10*time.Second)
 }
 
+// Regression test for https://github.com/containerd/containerd/issues/13293 (orphaned shim state after shim SIGKILL).
+// This test asserts that containerd publishes task exit and delete events for a container when the shim disconnects.
+func TestKillShimPublishesTaskExitAndDeleteEventsForContainer(t *testing.T) {
+	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
+
+	sbConfig := PodSandboxConfig("sandbox", t.Name(), WithHostNetwork)
+	sbID, err := runtimeService.RunPodSandbox(sbConfig, "")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, runtimeService.StopPodSandbox(sbID))
+		require.NoError(t, runtimeService.RemovePodSandbox(sbID))
+	})
+	testImage := images.Get(images.BusyBox)
+	EnsureImageExists(t, testImage)
+	t.Log("Create a container - sleep 1d")
+	containerName := "test-container"
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		WithCommand("sh", "-c", "sleep 1d"),
+		WithPidNamespace(runtime.NamespaceMode_CONTAINER),
+	)
+	cnID, err := runtimeService.CreateContainer(sbID, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cnID))
+
+	shimCli := connectToShim(ctx, t, containerdEndpoint, 3, sbID)
+	shimPID := shimPid(ctx, t, shimCli)
+
+	eventCh, eventErrCh := containerdClient.EventService().Subscribe(ctx,
+		fmt.Sprintf(`topic=="%s",event.container_id=="%s"`, ctrdruntime.TaskExitEventTopic, cnID),
+		fmt.Sprintf(`topic=="%s",event.container_id=="%s"`, ctrdruntime.TaskDeleteEventTopic, cnID),
+	)
+
+	require.NoError(t, syscall.Kill(int(shimPID), syscall.SIGKILL))
+	waitForTaskExitDeleteEvents(t, cnID, eventCh, eventErrCh, 10*time.Second)
+
+	// Wait for the container to exit and ensure it is fully cleaned up.
+	require.NoError(t, Eventually(func() (bool, error) {
+		s, err := runtimeService.ContainerStatus(cnID)
+		if err != nil {
+			return false, err
+		}
+		if s.State == runtime.ContainerState_CONTAINER_EXITED {
+			return true, nil
+		}
+		return false, nil
+	}, 1000*time.Millisecond, 30*time.Second))
+}
+
 func waitForTaskExitDeleteEvents(t *testing.T, id string,
 	ch <-chan *events.Envelope, errCh <-chan error, timeout time.Duration,
 ) {
