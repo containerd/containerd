@@ -428,13 +428,13 @@ func (c *criService) linuxContainerMetrics(
 		return containerStats{}, fmt.Errorf("unexpected metrics type: %T from %s", taskMetricsAny, reflect.TypeOf(taskMetricsAny).Elem().PkgPath())
 	}
 
-	cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, metrics, protobuf.FromTimestamp(stats.Timestamp))
+	cpuStats, err := c.cpuContainerStats(metrics, protobuf.FromTimestamp(stats.Timestamp))
 	if err != nil {
 		return containerStats{}, fmt.Errorf("failed to obtain cpu stats: %w", err)
 	}
 	cs.Cpu = cpuStats
 
-	memoryStats, err := c.memoryContainerStats(meta.ID, metrics, protobuf.FromTimestamp(stats.Timestamp))
+	memoryStats, err := c.memoryContainerStats(metrics, protobuf.FromTimestamp(stats.Timestamp))
 	if err != nil {
 		return containerStats{}, fmt.Errorf("failed to obtain memory stats: %w", err)
 	}
@@ -527,7 +527,7 @@ func convertCg2PSIToCRI(psi *cg2.PSIStats) *runtime.PsiStats {
 	return result
 }
 
-func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats cgroupMetrics, timestamp time.Time) (*runtime.CpuUsage, error) {
+func (c *criService) cpuContainerStats(stats cgroupMetrics, timestamp time.Time) (*runtime.CpuUsage, error) {
 	switch {
 	case stats.v1 != nil:
 		metrics := stats.v1
@@ -553,7 +553,7 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats cgroupMe
 	return nil, nil
 }
 
-func (c *criService) memoryContainerStats(ID string, stats cgroupMetrics, timestamp time.Time) (*runtime.MemoryUsage, error) {
+func (c *criService) memoryContainerStats(stats cgroupMetrics, timestamp time.Time) (*runtime.MemoryUsage, error) {
 	switch {
 	case stats.v1 != nil:
 		metrics := stats.v1

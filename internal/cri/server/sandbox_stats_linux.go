@@ -21,15 +21,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/cgroups/v3"
-	"github.com/containerd/cgroups/v3/cgroup1"
-	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
+	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
+	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/api/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
@@ -42,9 +43,17 @@ func (c *criService) podSandboxStats(
 		return nil, fmt.Errorf("failed to get pod sandbox stats since sandbox container %q is not in ready state: %w", meta.ID, errdefs.ErrUnavailable)
 	}
 
-	stats, err := cgroupMetricsForSandbox(sandbox)
+	ctrl, err := c.sandboxService.SandboxController(sandbox.Sandboxer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get controller for sandbox %s: %w", sandbox.ID, err)
+	}
+	metric, err := ctrl.Metrics(ctx, sandbox.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed getting metrics for sandbox %s: %w", sandbox.ID, err)
+	}
+	stats, err := decodeSandboxCgroupMetrics(metric)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding metrics for sandbox %s: %w", sandbox.ID, err)
 	}
 
 	podSandboxStats := &runtime.PodSandboxStats{
@@ -59,7 +68,7 @@ func (c *criService) podSandboxStats(
 
 	timestamp := time.Now()
 
-	cpuStats, err := c.cpuContainerStats(meta.ID, true /* isSandbox */, *stats, timestamp)
+	cpuStats, err := c.cpuContainerStats(*stats, timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
 	}
@@ -74,7 +83,7 @@ func (c *criService) podSandboxStats(
 	}
 	podSandboxStats.Linux.Cpu = cpuStats
 
-	memoryStats, err := c.memoryContainerStats(meta.ID, *stats, timestamp)
+	memoryStats, err := c.memoryContainerStats(*stats, timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to obtain memory stats: %w", err)
 	}
@@ -191,32 +200,20 @@ func getAllContainerNetIO(ctx context.Context, netNsPath string) ([]interfaceSta
 	return allStats, err
 }
 
-func cgroupMetricsForSandbox(sandbox sandboxstore.Sandbox) (*cgroupMetrics, error) {
-	cgroupPath := sandbox.Config.GetLinux().GetCgroupParent()
-	if cgroupPath == "" {
-		return nil, fmt.Errorf("failed to get cgroup metrics for sandbox %v because cgroupPath is empty", sandbox.ID)
+func decodeSandboxCgroupMetrics(m *types.Metric) (*cgroupMetrics, error) {
+	if m == nil || m.Data == nil {
+		return nil, fmt.Errorf("sandbox metric is empty")
 	}
-
-	switch cgroups.Mode() {
-	case cgroups.Unified:
-		cg, err := cgroupsv2.Load(cgroupPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load sandbox cgroup: %v: %w", cgroupPath, err)
-		}
-		stats, err := cg.StatFiltered(cgroupsv2.StatCPU | cgroupsv2.StatMemory)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get stats for cgroup: %v: %w", cgroupPath, err)
-		}
-		return &cgroupMetrics{v2: stats}, nil
+	a, err := typeurl.UnmarshalAny(m.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract sandbox metric: %w", err)
+	}
+	switch v := a.(type) {
+	case *cg1.Metrics:
+		return &cgroupMetrics{v1: v}, nil
+	case *cg2.Metrics:
+		return &cgroupMetrics{v2: v}, nil
 	default:
-		control, err := cgroup1.Load(cgroup1.StaticPath(cgroupPath))
-		if err != nil {
-			return nil, fmt.Errorf("failed to load sandbox cgroup %v: %w", cgroupPath, err)
-		}
-		stats, err := control.Stat(cgroup1.IgnoreNotExist)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get stats for cgroup %v: %w", cgroupPath, err)
-		}
-		return &cgroupMetrics{v1: stats}, nil
+		return nil, fmt.Errorf("unexpected sandbox metric type %T", v)
 	}
 }
