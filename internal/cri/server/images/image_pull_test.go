@@ -757,3 +757,80 @@ func TestTransferProgressReporter(t *testing.T) {
 		})
 	}
 }
+
+// TestPullProgressReporter covers the core no-progress cancellation
+// behavior of pullProgressReporter: a stuck request (active, no bytes)
+// is eventually cancelled, while a progressing request is not.
+//
+// The flaky failure in TestCRIImagePullTimeout/HoldingContentOpenWriterWithLocalPull
+// — which this fix addresses — is a timing race that's not cleanly
+// expressible as a unit test: the boundary between the buggy and fixed
+// cancel times coincides at 1.5*timeout, so any check near that
+// threshold is scheduler-jitter prone. The semantic regression is
+// covered by the existing integration test.
+func TestPullProgressReporter(t *testing.T) {
+	t.Run("StuckRequestStillGetsCancelled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		cancelCalled := make(chan struct{})
+		reporter := newPullProgressReporter("test-image:latest", func() {
+			select {
+			case <-cancelCalled:
+			default:
+				close(cancelCalled)
+			}
+		}, 200*time.Millisecond)
+
+		// Start a request immediately (no idle period) and never produce
+		// bytes. The reporter must cancel after timeout elapses.
+		reporter.reqReporter.incRequest()
+		reporter.start(ctx)
+
+		select {
+		case <-cancelCalled:
+		case <-time.After(2 * time.Second):
+			t.Fatal("stuck request was not cancelled")
+		}
+	})
+
+	t.Run("ProgressingRequestIsNotCancelled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		cancelCalled := make(chan struct{})
+		reporter := newPullProgressReporter("test-image:latest", func() {
+			select {
+			case <-cancelCalled:
+			default:
+				close(cancelCalled)
+			}
+		}, 200*time.Millisecond)
+
+		reporter.reqReporter.incRequest()
+		reporter.start(ctx)
+
+		// Advance bytes faster than timeout so the reporter keeps
+		// refreshing lastSeenBytesRead.
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			ticker := time.NewTicker(50 * time.Millisecond)
+			defer ticker.Stop()
+			for i := 0; i < 10; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					reporter.reqReporter.incByteRead(1024)
+				}
+			}
+		}()
+
+		select {
+		case <-cancelCalled:
+			t.Fatal("pull was cancelled despite making byte progress")
+		case <-done:
+		}
+	})
+}

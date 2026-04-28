@@ -695,6 +695,7 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 
 			lastSeenBytesRead = uint64(0)
 			lastSeenTimestamp = time.Now()
+			prevActiveReqs    = int32(0)
 		)
 
 		// check progress more frequently if timeout < default internal
@@ -718,11 +719,19 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 					WithField("reportInterval", reportInterval).
 					Debugf("progress for image pull")
 
-				if activeReqs == 0 || bytesRead > lastSeenBytesRead {
+				// Reset the no-progress timer when idle, when bytes were
+				// read, or when a request has just started after an idle
+				// period. Without the idle→active reset, a request can be
+				// cancelled less than `timeout` after it was issued,
+				// because lastSeenTimestamp was captured on an earlier
+				// tick while activeReqs was still 0.
+				if activeReqs == 0 || bytesRead > lastSeenBytesRead || prevActiveReqs == 0 {
 					lastSeenBytesRead = bytesRead
 					lastSeenTimestamp = time.Now()
+					prevActiveReqs = activeReqs
 					continue
 				}
+				prevActiveReqs = activeReqs
 
 				if time.Since(lastSeenTimestamp) > reporter.timeout {
 					log.G(ctx).Errorf("cancel pulling image %s because of no progress in %v", reporter.ref, reporter.timeout)
