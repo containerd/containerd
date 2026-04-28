@@ -127,7 +127,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Check if image is a file. If it is a file it might be a checkpoint archive.
 	checkpointImage, err := func() (bool, error) {
-		if _, err := c.os.Stat(config.GetImage().GetImage()); err == nil {
+		if err := c.os.Stat(ctx, config.GetImage().GetImage()); err == nil {
 			log.G(ctx).Infof(
 				"%q is a file. Assuming it is a checkpoint archive",
 				config.GetImage().GetImage(),
@@ -308,6 +308,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	}
 
 	spec, err := c.buildContainerSpec(
+		r.ctx,
 		platform,
 		r.containerID,
 		r.sandboxID,
@@ -548,9 +549,9 @@ func (c *criService) volumeMounts(platform imagespec.Platform, containerRootDir 
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func (c *criService) runtimeSpec(id string, platform imagespec.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *criService) runtimeSpec(ctx context.Context, id string, platform imagespec.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
-	ctx := util.NamespacedContext()
+	ctx = util.WithNamespace(ctx)
 	container := &containers.Container{ID: id}
 
 	if baseSpecFile != "" {
@@ -640,6 +641,7 @@ func (c *criService) platformSpecOpts(
 
 // buildContainerSpec build container's OCI spec depending on controller's target platform OS.
 func (c *criService) buildContainerSpec(
+	ctx context.Context,
 	platform imagespec.Platform,
 	id string,
 	sandboxID string,
@@ -668,7 +670,7 @@ func (c *criService) buildContainerSpec(
 	case isLinux:
 		// Generate container mounts.
 		// No mounts are passed for other platforms.
-		linuxMounts := c.linuxContainerMounts(sandboxID, config)
+		linuxMounts := c.linuxContainerMounts(ctx, sandboxID, config)
 
 		specOpts, err = c.buildLinuxSpec(
 			id,
@@ -714,7 +716,7 @@ func (c *criService) buildContainerSpec(
 		return nil, fmt.Errorf("failed to generate spec opts: %w", err)
 	}
 
-	return c.runtimeSpec(id, platform, ociRuntime.BaseRuntimeSpec, specOpts...)
+	return c.runtimeSpec(ctx, id, platform, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 func (c *criService) buildLinuxSpec(
@@ -1127,7 +1129,7 @@ func (c *criService) buildDarwinSpec(
 
 // linuxContainerMounts sets up necessary container system file mounts
 // including /dev/shm, /etc/hosts and /etc/resolv.conf.
-func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
+func (c *criService) linuxContainerMounts(ctx context.Context, sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
 	var uidMappings, gidMappings []*runtime.IDMapping
@@ -1143,7 +1145,7 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		// TODO(random-liu): Remove the check and always mount this when
 		// containerd 1.1 and 1.2 are deprecated.
 		hostpath := c.getSandboxHostname(sandboxID)
-		if _, err := c.os.Stat(hostpath); err == nil {
+		if err := c.os.Stat(ctx, hostpath); err == nil {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  etcHostname,
 				HostPath:       hostpath,
@@ -1159,7 +1161,7 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		hostpath := c.getSandboxHosts(sandboxID)
 		// /etc/hosts could be delegated to remote sandbox controller. That file isn't required to be existed
 		// in host side for some sandbox runtimes. Skip it if we don't need it.
-		if _, err := c.os.Stat(hostpath); err == nil {
+		if err := c.os.Stat(ctx, hostpath); err == nil {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  etcHosts,
 				HostPath:       hostpath,
@@ -1177,7 +1179,7 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		hostpath := c.getResolvPath(sandboxID)
 		// The ownership of /etc/resolv.conf could be delegated to remote sandbox controller. That file isn't
 		// required to be existed in host side for some sandbox runtimes. Skip it if we don't need it.
-		if _, err := c.os.Stat(hostpath); err == nil {
+		if err := c.os.Stat(ctx, hostpath); err == nil {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  resolvConfPath,
 				HostPath:       hostpath,
@@ -1196,7 +1198,7 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		}
 		// The ownership of /dev/shm could be delegated to remote sandbox controller. That file isn't required
 		// to be existed in host side for some sandbox runtimes. Skip it if we don't need it.
-		if _, err := c.os.Stat(sandboxDevShm); err == nil {
+		if err := c.os.Stat(ctx, sandboxDevShm); err == nil {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  devShm,
 				HostPath:       sandboxDevShm,
