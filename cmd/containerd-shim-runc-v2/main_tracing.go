@@ -19,6 +19,12 @@
 package main
 
 import (
+	"os"
+
 	_ "github.com/containerd/containerd/v2/internal/pprof"
 	_ "github.com/containerd/containerd/v2/pkg/tracing/plugin"
 )
+
+func init() {
+	os.Setenv("OTEL_SERVICE_NAME", "containerd-shim-runc-v2")
+}
