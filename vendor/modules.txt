@@ -507,8 +507,8 @@ github.com/russross/blackfriday/v2
 # github.com/sasha-s/go-deadlock v0.3.5
 ## explicit
 github.com/sasha-s/go-deadlock
-# github.com/sirupsen/logrus v1.9.4
-## explicit; go 1.17
+# github.com/sirupsen/logrus v1.9.5-0.20260426203557-6878cb36b029
+## explicit; go 1.23
 github.com/sirupsen/logrus
 # github.com/smallstep/pkcs7 v0.1.1
 ## explicit; go 1.14

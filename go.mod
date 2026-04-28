@@ -60,7 +60,7 @@ require (
 	github.com/opencontainers/selinux v1.13.1
 	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/sirupsen/logrus v1.9.4
+	github.com/sirupsen/logrus v1.9.5-0.20260426203557-6878cb36b029
 	github.com/stretchr/testify v1.11.1
 	github.com/tchap/go-patricia/v2 v2.3.3
 	github.com/urfave/cli/v2 v2.27.7
