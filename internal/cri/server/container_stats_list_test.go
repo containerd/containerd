@@ -341,7 +341,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
-			got, err := c.memoryContainerStats("ID", test.metrics, timestamp)
+			got, err := c.memoryContainerStats(test.metrics, timestamp)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expected, got)
 		})
