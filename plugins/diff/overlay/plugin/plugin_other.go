@@ -1,3 +1,5 @@
+//go:build !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -14,15 +16,6 @@
    limitations under the License.
 */
 
-package diff
-
-import "context"
-
-var defaultDifferConfig = &config{
-	Order:  []string{"erofs", "walking"},
-	SyncFs: false,
-}
-
-func configMigration(context.Context, int, map[string]any) error {
-	return nil
-}
+// Package plugin is a no-op on non-Linux platforms as the overlay filesystem
+// is a Linux kernel feature.
+package plugin

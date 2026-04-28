@@ -35,23 +35,70 @@ import (
 
 // NewFileSystemApplier returns an applier which simply mounts
 // and applies diff onto the mounted filesystem.
-func NewFileSystemApplier(cs content.Provider) diff.Applier {
-	return NewFileSystemApplierWithMountManager(cs, nil)
+func NewFileSystemApplier(cs content.Provider, opts ...FileSystemApplierOpt) diff.Applier {
+	var config fsApplierConfig
+	for _, o := range opts {
+		if err := o(&config); err != nil {
+			log.L.WithError(err).Errorf("failed to apply applier option")
+			return nil
+		}
+	}
+	if config.applyFunc == nil {
+		config.applyFunc = apply
+	}
+	return &fsApplier{
+		store:    cs,
+		mount:    config.mount,
+		apply:    config.applyFunc,
+		parallel: config.parallel,
+	}
 }
 
-// NewFileSystemApplierWithMountManager returns an applier which simply mounts and
-// applies diff onto the mounted filesystem.
-// An optional mount manager can be specified and it will take effect when applying.
-func NewFileSystemApplierWithMountManager(cs content.Provider, mm mount.Manager) diff.Applier {
-	return &fsApplier{
-		store: cs,
-		mount: mm,
+// FileSystemApplierOpt is used to configure filesystem applier.
+type FileSystemApplierOpt func(*fsApplierConfig) error
+
+// FileSystemApply is a function type that defines the signature for
+// applying a reader content to a set of filesystem mounts. It allows
+// for customized mount/apply logic for different filesystems.
+type FileSystemApply func(context.Context, []mount.Mount, io.Reader, bool) error
+
+// WithCustomApplyFunc allows callers to customize the apply function
+func WithCustomApplyFunc(f FileSystemApply) FileSystemApplierOpt {
+	return func(c *fsApplierConfig) error {
+		c.applyFunc = f
+		return nil
+	}
+}
+
+// WithParallelSupport signifies that the applier supports parallel application of diffs
+// fsApplier will return ErrNotImplemented error if this option is not set, but
+// the caller requires parallel application of diffs.
+func WithParallelSupport(parallel bool) FileSystemApplierOpt {
+	return func(c *fsApplierConfig) error {
+		c.parallel = parallel
+		return nil
+	}
+}
+
+// WithMountManager allows callers to provide a custom mount manager for activating mounts.
+func WithMountManager(m mount.Manager) FileSystemApplierOpt {
+	return func(c *fsApplierConfig) error {
+		c.mount = m
+		return nil
 	}
 }
 
 type fsApplier struct {
-	store content.Provider
-	mount mount.Manager
+	store    content.Provider
+	mount    mount.Manager
+	apply    FileSystemApply
+	parallel bool
+}
+
+type fsApplierConfig struct {
+	mount     mount.Manager
+	applyFunc FileSystemApply
+	parallel  bool
 }
 
 var emptyDesc = ocispec.Descriptor{}
@@ -77,6 +124,12 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		if err := o(ctx, desc, &config); err != nil {
 			return emptyDesc, fmt.Errorf("failed to apply config opt: %w", err)
 		}
+	}
+
+	// ErrNotImplemented must be returned if the applier does not support parallel apply.
+	// This error tells the diff service to call the next applier in the ordered list.
+	if config.Parallel && !s.parallel {
+		return emptyDesc, fmt.Errorf("parallel application of diffs is not supported by this applier: %w", errdefs.ErrNotImplemented)
 	}
 
 	ra, err := s.store.ReaderAt(ctx, desc)
@@ -127,7 +180,7 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		}
 	}
 
-	if err := apply(ctx, mounts, rc, config.SyncFs); err != nil {
+	if err := s.apply(ctx, mounts, rc, config.SyncFs); err != nil {
 		return emptyDesc, err
 	}
 

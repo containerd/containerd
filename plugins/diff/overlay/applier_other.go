@@ -1,3 +1,5 @@
+//go:build !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -14,15 +16,19 @@
    limitations under the License.
 */
 
-package diff
+// Package overlay is a no-op on non-Linux platforms as the overlay filesystem
+// is a Linux kernel feature.
+package overlay
 
-import "context"
+import (
+	"context"
+	"io"
 
-var defaultDifferConfig = &config{
-	Order:  []string{"erofs", "walking"},
-	SyncFs: false,
-}
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/errdefs"
+)
 
-func configMigration(context.Context, int, map[string]any) error {
-	return nil
+// Apply for non-Linux platforms returns an NotImplemented error.
+func Apply(context.Context, []mount.Mount, io.Reader, bool) error {
+	return errdefs.ErrNotImplemented
 }

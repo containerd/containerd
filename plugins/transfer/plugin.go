@@ -116,7 +116,10 @@ func init() {
 					snCapabilities = p.Meta.Capabilities
 				}
 
-				var applier diff.Applier
+				var (
+					applier   diff.Applier
+					applierID string
+				)
 				target := platforms.Only(p)
 				if uc.Differ != "" {
 					inst, err := ic.GetByID(plugins.DiffPlugin, uc.Differ)
@@ -124,8 +127,8 @@ func init() {
 						return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", uc.Differ, err)
 					}
 					applier = inst.(diff.Applier)
+					applierID = uc.Differ
 				} else {
-					var applierID string
 					for _, plugin := range ic.GetAll() {
 						if plugin.Registration.Type != plugins.DiffPlugin {
 							continue
@@ -186,6 +189,7 @@ func init() {
 					SnapshotterExports:      snExports,
 					SnapshotterCapabilities: snCapabilities,
 					Applier:                 applier,
+					ApplierID:               applierID,
 					ConfigType:              uc.ConfigType,
 					LayerTypes:              uc.LayerTypes,
 				}

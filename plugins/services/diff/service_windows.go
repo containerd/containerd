@@ -16,7 +16,13 @@
 
 package diff
 
+import "context"
+
 var defaultDifferConfig = &config{
 	Order:  []string{"windows", "windows-lcow"},
 	SyncFs: false,
+}
+
+func configMigration(context.Context, int, map[string]any) error {
+	return nil
 }

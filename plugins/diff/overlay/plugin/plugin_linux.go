@@ -14,26 +14,30 @@
    limitations under the License.
 */
 
+// Package plugin registers the overlay differ as a containerd DiffPlugin.
+// It is Linux-only as the overlay filesystem is a Linux kernel feature.
 package plugin
 
 import (
 	"errors"
+
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/diff/apply"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/diff/overlay"
 	"github.com/containerd/containerd/v2/plugins/diff/walking"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.DiffPlugin,
-		ID:   "walking",
+		ID:   "overlay",
 		Requires: []plugin.Type{
 			plugins.MetadataPlugin,
 			plugins.MountManagerPlugin,
@@ -56,7 +60,11 @@ func init() {
 
 			return diffPlugin{
 				Comparer: walking.NewWalkingDiff(cs),
-				Applier:  apply.NewFileSystemApplier(cs, apply.WithMountManager(mm)),
+				Applier: apply.NewFileSystemApplier(cs,
+					apply.WithMountManager(mm),
+					apply.WithCustomApplyFunc(overlay.Apply),
+					apply.WithParallelSupport(true),
+				),
 			}, nil
 		},
 	})

@@ -502,6 +502,7 @@ The deprecated features are shown in the following table:
 - Pulling Schema 1 images has been disabled in containerd v2.0, but it still can be enabled by setting an environment variable `CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1`
   until containerd v2.1. `ctr` users have to specify `--local` too (e.g., `ctr images pull --local`). Users of CRI clients (such as Kubernetes and `crictl`) have to specify this environment variable on the containerd daemon (usually in the systemd unit).
 - The latest release in May 2029 may not necessarily support cgroup v1, but there will be at least one maintained branch with the support for cgroup v1.
+- The `walking` differ will ignore `max_concurrent_unpacks` configuration and always perform sequential layer unpacks from containerd v2.3. To use parallel unpack feature, use the new `overlay` differ.
 
 ### Deprecated config properties
 The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in the following table:

@@ -82,6 +82,7 @@ type Platform struct {
 	SnapshotterCapabilities []string
 
 	Applier   diff.Applier
+	ApplierID string
 	ApplyOpts []diff.ApplyOpt
 
 	// ConfigType is the supported config type to be considered for unpacking
@@ -530,16 +531,12 @@ func (u *Unpacker) unpack(
 			case <-fetchC[i-fetchOffset]:
 			}
 
-			// In case of parallel unpack, the parent snapshot isn't provided to the snapshotter.
-			// The overlayfs will return bind mounts for all layers, we need to convert them
-			// to overlay mounts for the applier to perform whiteout conversion correctly.
-			// TODO: this is a temporary workaround until #13053 lands.
-			// See: https://github.com/containerd/containerd/issues/13030
-			if i > 0 && parallel && unpack.SnapshotterKey == "overlayfs" {
-				mounts = bindToOverlay(mounts)
+			aopts := unpack.ApplyOpts
+			if parallel {
+				aopts = slices.Clone(unpack.ApplyOpts)
+				aopts = append(aopts, diff.WithParallel(true))
 			}
-
-			diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
+			diff, err := a.Apply(ctx, desc, mounts, aopts...)
 			if err != nil {
 				cleanup.Do(ctx, abort)
 				status.err = fmt.Errorf("failed to extract layer (%s %s) to %s as %q: %w", desc.MediaType, desc.Digest, unpack.SnapshotterKey, key, err)
@@ -752,6 +749,16 @@ func (u *Unpacker) supportParallel(unpack *Platform) bool {
 		log.L.Infof("snapshotter does not support rebase capability, unpacking will be sequential")
 		return false
 	}
+	// denylist contains appliers which are known to not support parallel unpacking
+	// The ApplierID can be empty if the unpack is performed on the client side,
+	// where the applier is just a proxy. In that case the diff service will try each
+	// applier in a configured order.
+	var denylist = []string{"walking"}
+	if slices.Contains(denylist, unpack.ApplierID) {
+		log.L.Infof("applier %q does not support parallel unpacking, unpacking will be sequential", unpack.ApplierID)
+		return false
+	}
+
 	return true
 }
 
@@ -761,24 +768,4 @@ func uniquePart() string {
 	// Ignore read failures, just decreases uniqueness
 	rand.Read(b[:])
 	return fmt.Sprintf("%d-%s", t.Nanosecond(), base64.URLEncoding.EncodeToString(b[:]))
-}
-
-// TODO: this is a temporary workaround until #13053 lands.
-func bindToOverlay(mounts []mount.Mount) []mount.Mount {
-	if len(mounts) != 1 || mounts[0].Type != "bind" {
-		return mounts
-	}
-
-	m := mount.Mount{
-		Type:   "overlay",
-		Source: "overlay",
-	}
-	for _, o := range mounts[0].Options {
-		if o != "rbind" {
-			m.Options = append(m.Options, o)
-		}
-	}
-	m.Options = append(m.Options, "upperdir="+mounts[0].Source)
-
-	return []mount.Mount{m}
 }
