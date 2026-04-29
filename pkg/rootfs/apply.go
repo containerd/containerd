@@ -121,11 +121,16 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		err     error
 	)
 
+	// Inject the diff ID so snapshotters can act on it (e.g. layer content caching).
+	prepareOpts := append(opts, snapshots.WithLabels(map[string]string{
+		snapshots.LabelSnapshotDiffID: layer.Diff.Digest.String(),
+	}))
+
 	for {
 		key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
 
 		// Prepare snapshot with from parent, label as root
-		mounts, err = sn.Prepare(ctx, key, parent.String(), opts...)
+		mounts, err = sn.Prepare(ctx, key, parent.String(), prepareOpts...)
 		if err != nil {
 			if errdefs.IsNotFound(err) && len(layers) > 1 {
 				if err := applyLayers(ctx, layers[:len(layers)-1], chain[:len(chain)-1], sn, a, opts, applyOpts); err != nil {
@@ -159,14 +164,23 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		}
 	}()
 
-	diff, err = a.Apply(ctx, layer.Blob, mounts, applyOpts...)
+	// LabelSkipApply lets the snapshotter signal that extraction is unnecessary;
+	// note that this also skips the diff.Digest verification below.
+	snInfo, err := sn.Stat(ctx, key)
 	if err != nil {
-		err = fmt.Errorf("failed to extract layer %s: %w", layer.Diff.Digest, err)
+		err = fmt.Errorf("failed to stat snapshot %q: %w", key, err)
 		return err
 	}
-	if diff.Digest != layer.Diff.Digest {
-		err = fmt.Errorf("wrong diff id calculated on extraction %q", diff.Digest)
-		return err
+	if snInfo.Labels[snapshots.LabelSkipApply] != "true" {
+		diff, err = a.Apply(ctx, layer.Blob, mounts, applyOpts...)
+		if err != nil {
+			err = fmt.Errorf("failed to extract layer %s: %w", layer.Diff.Digest, err)
+			return err
+		}
+		if diff.Digest != layer.Diff.Digest {
+			err = fmt.Errorf("wrong diff id calculated on extraction %q", diff.Digest)
+			return err
+		}
 	}
 
 	if err = sn.Commit(ctx, chainID.String(), key, opts...); err != nil {
