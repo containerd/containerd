@@ -592,6 +592,21 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		}
 
 		path = filepath.Join(snapshotDir, snap.ID)
+		// On Windows, os.Rename cannot replace an existing directory, and
+		// orphaned snapshot directories may exist if a previous Remove
+		// failed to delete them (e.g. due to antivirus holding file
+		// handles). Rather than trying to delete the orphan (which would
+		// fail for the same reason), rename it aside so cleanup can
+		// happen later when handles are released.
+		if runtime.GOOS == "windows" {
+			if _, serr := os.Stat(path); serr == nil {
+				orphan := filepath.Join(snapshotDir, fmt.Sprintf(".orphan-%s-%d", snap.ID, time.Now().UnixNano()))
+				log.G(ctx).WithField("path", path).WithField("orphan", orphan).Warn("moving orphaned snapshot directory aside")
+				if rerr := os.Rename(path, orphan); rerr != nil {
+					return fmt.Errorf("failed to move orphaned snapshot directory: %w", rerr)
+				}
+			}
+		}
 		if err = os.Rename(td, path); err != nil {
 			return fmt.Errorf("failed to rename: %w", err)
 		}
@@ -664,10 +679,27 @@ func (s *snapshotter) generateFsMeta(ctx context.Context, snapIDs []string) {
 
 	t1 := time.Now()
 	mergedMeta := s.fsMetaPath(snapIDs[0])
-	// If the empty placeholder cannot be created (mainly due to os.IsExist), just return
-	if _, err := os.OpenFile(mergedMeta, os.O_CREATE|os.O_EXCL, 0644); err != nil {
+	// The empty placeholder doubles as a lock against concurrent generation:
+	// if another goroutine (or a previous successful run) already owns it,
+	// O_EXCL returns EEXIST and we bail.
+	f, err := os.OpenFile(mergedMeta, os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
 		return
 	}
+	f.Close()
+
+	// Any failure after this point must remove the placeholder so a future
+	// Prepare can retry; otherwise the O_EXCL check above would permanently
+	// block fsmeta generation for this snapshot chain after a transient error.
+	success := false
+	defer func() {
+		if success {
+			return
+		}
+		if rerr := os.Remove(mergedMeta); rerr != nil && !os.IsNotExist(rerr) {
+			log.G(ctx).WithError(rerr).Warnf("failed to remove fsmeta placeholder for %v", snapIDs[0])
+		}
+	}()
 
 	for i := len(snapIDs) - 1; i >= 0; i-- {
 		blob := s.layerBlobPath(snapIDs[i])
@@ -690,6 +722,7 @@ func (s *snapshotter) generateFsMeta(ctx context.Context, snapIDs []string) {
 		log.G(ctx).Errorf("failed to rename fsmeta: %v", err)
 		return
 	}
+	success = true
 	log.G(ctx).WithFields(log.Fields{
 		"d": time.Since(t1),
 	}).Infof("merged fsmeta for %v generated", snapIDs[0])
@@ -775,6 +808,29 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 		return nil, err
 	}
 	return s.mounts(snap, info)
+}
+
+// Cleanup removes any orphaned snapshot directories that are not tracked in
+// the metadata store, including any .orphan-* directories left by
+// createSnapshot when it moved locked directories aside on Windows
+// (.orphan-* names can never be tracked IDs so getCleanupDirectories already
+// returns them).
+func (s *snapshotter) Cleanup(ctx context.Context) error {
+	var cleanup []string
+	if err := s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		var err error
+		cleanup, err = s.getCleanupDirectories(ctx)
+		return err
+	}); err != nil {
+		return err
+	}
+
+	for _, dir := range cleanup {
+		if err := os.RemoveAll(dir); err != nil {
+			log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove orphaned snapshot directory")
+		}
+	}
+	return nil
 }
 
 func (s *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, error) {
