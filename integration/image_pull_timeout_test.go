@@ -18,12 +18,14 @@ package integration
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -92,6 +94,7 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T, useLocal bool) {
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
+	ctx = withPullHTTPTrace(ctx)
 
 	_, err = criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
 	assert.NoError(t, err)
@@ -123,6 +126,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bo
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
+	ctx = withPullHTTPTrace(ctx)
 	contentStore := cli.ContentStore()
 
 	// imageIndexJSON is the manifest of ghcr.io/containerd/volume-ownership:2.1.
@@ -525,5 +529,85 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 		Images:           client.ImageService(),
 		Client:           client,
 		Transferrer:      client.TransferService(),
+	})
+}
+
+func withPullHTTPTrace(ctx context.Context) context.Context {
+	start := time.Now()
+
+	logTrace := func(event string, fields log.Fields) {
+		entry := log.G(ctx).WithField("event", event).WithField("elapsed", time.Since(start))
+		for k, v := range fields {
+			entry = entry.WithField(k, v)
+		}
+		entry.Debug("pull http trace")
+	}
+	withErr := func(fields log.Fields, err error) log.Fields {
+		if fields == nil {
+			fields = log.Fields{}
+		}
+		if err != nil {
+			fields["error"] = err
+		}
+		return fields
+	}
+
+	return httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		DNSStart: func(info httptrace.DNSStartInfo) {
+			logTrace("dns_start", log.Fields{
+				"host": info.Host,
+			})
+		},
+		DNSDone: func(info httptrace.DNSDoneInfo) {
+			fields := log.Fields{
+				"coalesced": info.Coalesced,
+			}
+			if len(info.Addrs) > 0 {
+				fields["addrs"] = info.Addrs
+			}
+			logTrace("dns_done", withErr(fields, info.Err))
+		},
+		ConnectStart: func(network, addr string) {
+			logTrace("connect_start", log.Fields{
+				"network": network,
+				"addr":    addr,
+			})
+		},
+		ConnectDone: func(network, addr string, err error) {
+			logTrace("connect_done", withErr(log.Fields{
+				"network": network,
+				"addr":    addr,
+			}, err))
+		},
+		TLSHandshakeStart: func() {
+			logTrace("tls_handshake_start", nil)
+		},
+		TLSHandshakeDone: func(_ tls.ConnectionState, err error) {
+			logTrace("tls_handshake_done", withErr(nil, err))
+		},
+		GetConn: func(hostPort string) {
+			logTrace("get_conn", log.Fields{
+				"hostPort": hostPort,
+			})
+		},
+		GotConn: func(info httptrace.GotConnInfo) {
+			fields := log.Fields{
+				"reused":   info.Reused,
+				"wasIdle":  info.WasIdle,
+				"idleTime": info.IdleTime,
+			}
+			if info.Conn != nil {
+				if local := info.Conn.LocalAddr(); local != nil {
+					fields["localAddr"] = local.String()
+				}
+				if remote := info.Conn.RemoteAddr(); remote != nil {
+					fields["remoteAddr"] = remote.String()
+				}
+			}
+			logTrace("got_conn", fields)
+		},
+		GotFirstResponseByte: func() {
+			logTrace("got_first_response_byte", nil)
+		},
 	})
 }
