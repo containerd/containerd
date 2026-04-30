@@ -426,10 +426,45 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
 		},
-		// Allow socket(2) for all address families except AF_VSOCK.
-		// NOTE: on 32-bit x86, socket() goes through socketcall(2) which is
-		// allowed unconditionally above; these arg filters only apply to the
-		// direct socket syscall.
+		// Allow socket(2) for all address families except AF_VSOCK and AF_ALG.
+		// NOTE: on socketcall(2)-based ABIs (for example 32-bit x86), socket()
+		// goes through socketcall(2), which is allowed unconditionally above.
+		// These arg filters only apply to the direct socket syscall.
+		//
+		// Do not use one rule with both "arg0 != AF_VSOCK" and "arg0 != AF_ALG".
+		// runc splits repeated argument-index conditions into separate
+		// libseccomp rules, so they behave like OR and allow both blocked
+		// domains.
+		//
+		// Do not combine explicit ERRNO rules with a broad socket ALLOW.
+		// libseccomp can make the ERRNO branch unreachable, collapse an
+		// unconditional ALLOW into a bare syscall allow, or silently reject
+		// repeated not-equal checks.
+		//
+		// These three single-condition ranges make AF_ALG and AF_VSOCK match
+		// none and fall through to the default errno action.
+		{
+			Names:  []string{"socket"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
+					Value: unix.AF_ALG,
+					Op:    specs.OpLessThan,
+				},
+			},
+		},
+		{
+			Names:  []string{"socket"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
+					Value: unix.AF_ALG + 1,
+					Op:    specs.OpEqualTo,
+				},
+			},
+		},
 		{
 			Names:  []string{"socket"},
 			Action: specs.ActAllow,
@@ -437,7 +472,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				{
 					Index: 0,
 					Value: unix.AF_VSOCK,
-					Op:    specs.OpNotEqual,
+					Op:    specs.OpGreaterThan,
 				},
 			},
 		},
