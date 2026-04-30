@@ -455,7 +455,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			}
 
 			// Report any warnings with the warning source
-			reportWarningsWithSource(respHeaders, r.warningHandler, WarningSource{
+			reportWarningsWithSource(ctx, respHeaders, r.warningHandler, WarningSource{
 				Ref:    refspec,
 				Desc:   &desc,
 				Digest: &dgst,

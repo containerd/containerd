@@ -17,6 +17,7 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -140,7 +141,7 @@ func TestWarningHandler(t *testing.T) {
 			// sequential, so the handler is never called concurrently here.
 			var warnings []capturedWarning
 			resolver := NewResolver(ResolverOptions{
-				WarningHandler: warningHandlerFunc(func(src WarningSource, warning string) {
+				WarningHandler: warningHandlerFunc(func(ctx context.Context, src WarningSource, warning string) {
 					warnings = append(warnings, capturedWarning{src: src, warning: warning})
 				}),
 			})
@@ -379,7 +380,7 @@ func TestReportWarningsWithNilHandler(t *testing.T) {
 	header := http.Header{}
 	header.Add("Warning", `299 - "warning message"`)
 
-	reportWarningsWithSource(header, nil, WarningSource{})
+	reportWarningsWithSource(t.Context(), header, nil, WarningSource{})
 }
 
 func mustParseRef(t *testing.T, ref string) reference.Spec {

@@ -49,13 +49,13 @@ type WarningSource struct {
 // for. If the warning is for specific content, its descriptor is available via
 // src.Desc. src.Desc is nil if the warning is not for a specific content.
 type WarningHandler interface {
-	Warn(src WarningSource, warning string)
+	Warn(ctx context.Context, src WarningSource, warning string)
 }
 
-type warningHandlerFunc func(src WarningSource, warning string)
+type warningHandlerFunc func(ctx context.Context, src WarningSource, warning string)
 
-func (f warningHandlerFunc) Warn(src WarningSource, warning string) {
-	f(src, warning)
+func (f warningHandlerFunc) Warn(ctx context.Context, src WarningSource, warning string) {
+	f(ctx, src, warning)
 }
 
 type warningSourceKey struct{}
@@ -73,10 +73,10 @@ func reportWarnings(ctx context.Context, header http.Header, handler WarningHand
 		warnSrc = v
 	}
 
-	reportWarningsWithSource(header, handler, warnSrc)
+	reportWarningsWithSource(ctx, header, handler, warnSrc)
 }
 
-func reportWarningsWithSource(header http.Header, handler WarningHandler, warnSrc WarningSource) {
+func reportWarningsWithSource(ctx context.Context, header http.Header, handler WarningHandler, warnSrc WarningSource) {
 	if handler == nil {
 		return
 	}
@@ -85,7 +85,7 @@ func reportWarningsWithSource(header http.Header, handler WarningHandler, warnSr
 		// Parse RFC 7234 warning format: warn-code warn-agent "warn-text"
 		// Expected format for OCI: 299 - "message"
 		if text := parseWarningText(warning); text != "" {
-			handler.Warn(warnSrc, text)
+			handler.Warn(ctx, warnSrc, text)
 		}
 	}
 }
@@ -211,7 +211,7 @@ func isQuotedPairChar(c byte) bool {
 type LogWarningHandler struct{}
 
 // Warn logs the warning message with source information.
-func (LogWarningHandler) Warn(src WarningSource, warning string) {
+func (LogWarningHandler) Warn(ctx context.Context, src WarningSource, warning string) {
 	fields := log.Fields{}
 	if ref := src.Ref.String(); ref != "" {
 		fields["ref"] = ref
@@ -219,5 +219,5 @@ func (LogWarningHandler) Warn(src WarningSource, warning string) {
 	if src.Digest != nil {
 		fields["digest"] = src.Digest.String()
 	}
-	log.L.WithFields(fields).Warn("registry warning: " + warning)
+	log.G(ctx).WithFields(fields).Warn("registry warning: " + warning)
 }
