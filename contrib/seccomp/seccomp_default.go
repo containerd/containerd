@@ -426,10 +426,32 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
 		},
-		// Allow socket(2) for all address families except AF_VSOCK.
-		// NOTE: on 32-bit x86, socket() goes through socketcall(2) which is
-		// allowed unconditionally above; these arg filters only apply to the
-		// direct socket syscall.
+		// Allow socket(2) for all address families except AF_VSOCK and AF_ALG.
+		// NOTE: on socketcall(2)-based ABIs (for example 32-bit x86), socket()
+		// goes through socketcall(2), which is allowed unconditionally above;
+		// these arg filters only apply to the direct socket syscall.
+		{
+			Names:  []string{"socket"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
+					Value: unix.AF_ALG,
+					Op:    specs.OpLessThan,
+				},
+			},
+		},
+		{
+			Names:  []string{"socket"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
+					Value: unix.AF_ALG + 1,
+					Op:    specs.OpEqualTo,
+				},
+			},
+		},
 		{
 			Names:  []string{"socket"},
 			Action: specs.ActAllow,
@@ -437,7 +459,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				{
 					Index: 0,
 					Value: unix.AF_VSOCK,
-					Op:    specs.OpNotEqual,
+					Op:    specs.OpGreaterThan,
 				},
 			},
 		},
