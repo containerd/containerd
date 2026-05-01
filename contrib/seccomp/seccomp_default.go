@@ -380,7 +380,6 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"signalfd4",
 				"sigprocmask",
 				"sigreturn",
-				"socketcall",
 				"socketpair",
 				"splice",
 				"stat",
@@ -435,10 +434,25 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
 		},
+		// socketcall(2) is explicitly denied to prevent bypassing the socket
+		// address family filters below on architectures where socketcall is
+		// supported (i386, s390, MIPS o32).
+		// Seccomp cannot inspect socketcall's pointer argument, so allowing it
+		// would let an attacker open AF_ALG sockets via socketcall(SYS_SOCKET,
+		// ...). Since Linux 4.3 all affected architectures provide direct
+		// socket syscalls, so modern userspace is not impacted.
+		//
+		// ENOSYS (not EPERM) is used because the errno must differ from
+		// DefaultErrnoRet; otherwise both runc and libseccomp treat the rule
+		// as identical to the default action and silently omit it from the
+		// generated BPF, which lets libseccomp's auto-generated
+		// socketcall(SYS_SOCKET) -> ALLOW path survive unchallenged.
+		{
+			Names:    []string{"socketcall"},
+			Action:   specs.ActErrno,
+			ErrnoRet: &nosys,
+		},
 		// Allow socket(2) for all address families except AF_VSOCK and AF_ALG.
-		// NOTE: on socketcall(2)-based ABIs (for example 32-bit x86), socket()
-		// goes through socketcall(2), which is allowed unconditionally above;
-		// these arg filters only apply to the direct socket syscall.
 		{
 			Names:  []string{"socket"},
 			Action: specs.ActAllow,
