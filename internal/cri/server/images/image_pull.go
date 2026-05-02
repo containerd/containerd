@@ -419,25 +419,19 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
+	named, err := distribution.ParseDockerRef(name)
+	if err != nil {
+		return labels
+	}
+	nameNorm := distribution.TagNameOnly(named).String()
 	for _, pinned := range c.config.PinnedImages {
-		if pinned == name {
-			labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
-			continue
-		}
 		pinnedNamed, err := distribution.ParseDockerRef(pinned)
 		if err != nil {
 			continue
 		}
-		_, hasTag := pinnedNamed.(distribution.NamedTagged)
-		_, hasDigest := pinnedNamed.(distribution.Canonical)
-		if !hasTag && !hasDigest {
-			named, err := distribution.ParseDockerRef(name)
-			if err == nil {
-				pinnedTagged := distribution.TagNameOnly(pinnedNamed)
-				if pinnedTagged != nil && pinnedTagged.String() == name {
-					labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
-				}
-			}
+		pinnedNorm := distribution.TagNameOnly(pinnedNamed).String()
+		if pinnedNorm == nameNorm {
+			labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
 		}
 	}
 	return labels
