@@ -32,6 +32,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	streaming "k8s.io/cri-streaming/pkg/streaming"
 
 	apitypes "github.com/containerd/containerd/api/types"
 
@@ -56,7 +57,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
-	streaming "k8s.io/cri-streaming/pkg/streaming"
 )
 
 var kernelSupportsRRO bool

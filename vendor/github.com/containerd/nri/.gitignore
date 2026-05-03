@@ -2,3 +2,4 @@
 # [global .gitignore](https://help.github.com/articles/ignoring-files).
 
 build/
+pkg/version/info/*

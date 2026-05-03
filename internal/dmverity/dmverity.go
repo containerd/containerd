@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type DmverityOptions struct {
@@ -57,6 +58,9 @@ func DefaultDmverityOptions() *DmverityOptions {
 }
 
 func MetadataPath(layerBlobPath string) string {
+	if strings.HasSuffix(layerBlobPath, ".dmverity") {
+		return layerBlobPath
+	}
 	return layerBlobPath + ".dmverity"
 }
 

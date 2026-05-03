@@ -17,6 +17,7 @@
 package integration
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -81,6 +82,7 @@ func TestContainerCgroupWritable(t *testing.T) {
 
 			t.Cleanup(func() {
 				cleanupPods(t, runtimeService)
+				assert.NoError(t, runtimeService.Close(context.Background()))
 				t.Log("Stopping containerd process")
 				require.NoError(t, currentProc.kill(syscall.SIGTERM))
 				require.NoError(t, currentProc.wait(5*time.Minute))

@@ -3,8 +3,6 @@ package erofs
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
-	"strings"
 
 	"github.com/erofs/go-erofs/internal/disk"
 )
@@ -39,22 +37,30 @@ func (idx xattrIndex) String() string {
 	}
 }
 
-func setXattrs(b *file, addr int64, blk *block) (err error) {
-	b.info.stat.Xattrs = map[string]string{}
-	blkSize := int32(1 << b.img.sb.BlkSizeBits)
+// loadXattrs reads the extended attributes for the file's inode and
+// populates the given Stat's Xattrs map.
+func loadXattrs(b *file, stat *Stat) (err error) {
+	ino := b.info
+	addr := b.img.metaStartPos() + int64(ino.nid*disk.SizeInodeCompact) + int64(ino.icsize)
+	xsize := ino.xsize
 
-	blk.offset = int32(addr & int64(blkSize-1))
-	if blk.end != blkSize || blk.end-blk.offset < disk.SizeXattrBodyHeader {
-		b.img.putBlock(blk)
-		blk, err = b.img.loadAt(addr, int64(b.info.xsize))
-		if err != nil {
-			return fmt.Errorf("failed to read xattr body for nid %d: %w", b.nid, err)
-		}
+	stat.Xattrs = map[string]string{}
+
+	blk, err := b.img.loadAt(addr, int64(xsize))
+	if err != nil {
+		return fmt.Errorf("failed to read xattr body for nid %d: %w", b.nid, err)
 	}
-	var (
-		xb = blk.bytes()
-		xh disk.XattrHeader
-	)
+	defer func() {
+		if blk != nil {
+			b.img.putBlock(blk)
+		}
+	}()
+
+	xb := blk.bytes()
+	if len(xb) < disk.SizeXattrBodyHeader {
+		return fmt.Errorf("xattr body too small for nid %d: %w", b.nid, ErrInvalid)
+	}
+	var xh disk.XattrHeader
 	if _, err := binary.Decode(xb[:disk.SizeXattrBodyHeader], binary.LittleEndian, &xh); err != nil {
 		return err
 	}
@@ -64,7 +70,7 @@ func setXattrs(b *file, addr int64, blk *block) (err error) {
 		if len(xb) < 4 {
 			pos := disk.SizeXattrBodyHeader + int64(i)*4
 			b.img.putBlock(blk)
-			blk, err = b.img.loadAt(addr+pos, int64(b.info.xsize)-pos)
+			blk, err = b.img.loadAt(addr+pos, int64(xsize)-pos)
 			if err != nil {
 				return fmt.Errorf("failed to read xattr body for nid %d: %w", b.nid, err)
 			}
@@ -79,13 +85,18 @@ func setXattrs(b *file, addr int64, blk *block) (err error) {
 		}
 
 		// TODO: Cache shared xattr blocks
-		blk, err := b.img.loadAt(int64(b.img.sb.XattrBlkAddr)<<b.img.sb.BlkSizeBits+int64(xattrAddr*4), int64(blkSize))
+		sblk, err := b.img.loadAt(int64(b.img.sb.XattrBlkAddr)<<b.img.sb.BlkSizeBits+int64(xattrAddr*4), int64(1<<b.img.sb.BlkSizeBits))
 		if err != nil {
 			return fmt.Errorf("failed to read shared xattr body for nid %d: %w", b.nid, err)
 		}
-		sb := blk.bytes()
+		sb := sblk.bytes()
+		if len(sb) < disk.SizeXattrEntry {
+			b.img.putBlock(sblk)
+			return fmt.Errorf("shared xattr block too small for nid %d: %w", b.nid, ErrInvalid)
+		}
 		var xattrEntry disk.XattrEntry
 		if _, err := binary.Decode(sb[:disk.SizeXattrEntry], binary.LittleEndian, &xattrEntry); err != nil {
+			b.img.putBlock(sblk)
 			return err
 		}
 		sb = sb[disk.SizeXattrEntry:]
@@ -93,9 +104,9 @@ func setXattrs(b *file, addr int64, blk *block) (err error) {
 		if xattrEntry.NameIndex&0x80 == 0x80 {
 			// Long prefix: highest bit set
 			longPrefixIndex := xattrEntry.NameIndex & 0x7F
-			var err error
 			prefix, err = b.img.getLongPrefix(longPrefixIndex)
 			if err != nil {
+				b.img.putBlock(sblk)
 				return fmt.Errorf("failed to get long prefix for shared xattr nid %d: %w", b.nid, err)
 			}
 		} else if xattrEntry.NameIndex != 0 {
@@ -103,11 +114,13 @@ func setXattrs(b *file, addr int64, blk *block) (err error) {
 		}
 
 		if len(sb) < int(xattrEntry.NameLen)+int(xattrEntry.ValueLen) {
-			return fmt.Errorf("shared xattr too long for nid %d", b.nid)
+			b.img.putBlock(sblk)
+			return fmt.Errorf("shared xattr too long for nid %d: %w", b.nid, ErrInvalid)
 		}
 		name := prefix + string(sb[:xattrEntry.NameLen])
 		sb = sb[xattrEntry.NameLen:]
-		b.info.stat.Xattrs[name] = string(sb[:xattrEntry.ValueLen])
+		stat.Xattrs[name] = string(sb[:xattrEntry.ValueLen])
+		b.img.putBlock(sblk)
 
 		xb = xb[4:]
 	}
@@ -115,14 +128,14 @@ func setXattrs(b *file, addr int64, blk *block) (err error) {
 	pos := disk.SizeXattrBodyHeader + int(xh.SharedCount)*4
 	reload := func() error {
 		b.img.putBlock(blk)
-		blk, err = b.img.loadAt(addr+int64(pos), int64(b.info.xsize-pos))
+		blk, err = b.img.loadAt(addr+int64(pos), int64(xsize-pos))
 		if err != nil {
 			return fmt.Errorf("failed to read xattr body for nid %d: %w", b.nid, err)
 		}
 		xb = blk.bytes()
 		return nil
 	}
-	for pos < b.info.xsize {
+	for pos < xsize {
 		if len(xb) < disk.SizeXattrEntry {
 			if err := reload(); err != nil {
 				return err
@@ -166,7 +179,7 @@ func setXattrs(b *file, addr int64, blk *block) (err error) {
 		var value string
 		if len(xb) < int(xattrEntry.ValueLen) {
 			remaining := int(xattrEntry.ValueLen)
-			var b strings.Builder
+			buf := make([]byte, 0, remaining)
 			for remaining > 0 {
 				copySize := len(xb)
 				if copySize == 0 {
@@ -181,23 +194,18 @@ func setXattrs(b *file, addr int64, blk *block) (err error) {
 				if remaining < copySize {
 					copySize = remaining
 				}
-				n, err := b.Write(xb[:copySize])
-				if err != nil {
-					return err
-				} else if n != copySize {
-					return io.ErrShortWrite
-				}
-				remaining -= n
-				pos += n
+				buf = append(buf, xb[:copySize]...)
+				remaining -= copySize
+				pos += copySize
 				xb = xb[copySize:]
 			}
-			value = b.String()
+			value = string(buf)
 		} else {
 			value = string(xb[:xattrEntry.ValueLen])
 			pos += int(xattrEntry.ValueLen)
 			xb = xb[xattrEntry.ValueLen:]
 		}
-		b.info.stat.Xattrs[name] = value
+		stat.Xattrs[name] = value
 
 		// Round up to next 4 byte boundary
 		if rem := pos % 4; rem != 0 {

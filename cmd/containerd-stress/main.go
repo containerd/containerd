@@ -298,6 +298,11 @@ func criTest(c config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create runtime service: %w", err)
 	}
+	defer func() {
+		if err := client.Close(context.Background()); err != nil {
+			log.L.WithError(err).Warn("failed to close CRI runtime client")
+		}
+	}()
 
 	if err := criCleanup(ctx, client); err != nil {
 		return err

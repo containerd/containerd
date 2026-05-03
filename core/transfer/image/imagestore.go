@@ -19,6 +19,8 @@ package image
 import (
 	"context"
 	"fmt"
+	"maps"
+	"time"
 
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -215,6 +217,21 @@ func (is *Store) ImageFilter(h images.HandlerFunc, cs content.Store) images.Hand
 func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store images.Store) ([]images.Image, error) {
 	var imgs []images.Image
 
+	// extraRefLabels returns image labels for extra references, adding
+	// GC back-reference and expire labels when a primary image name exists.
+	extraRefLabels := func() map[string]string {
+		if is.imageName == "" {
+			return is.imageLabels
+		}
+		labels := make(map[string]string, len(is.imageLabels)+2)
+		maps.Copy(labels, is.imageLabels)
+		// Delete this image when the parent is deleted
+		labels["containerd.io/gc.bref.image"] = is.imageName
+		// Immediately expire to allow collection
+		labels["containerd.io/gc.expire"] = time.Now().Format(time.RFC3339)
+		return labels
+	}
+
 	// If import ref type, store references from annotation or prefix
 	if refSource, ok := desc.Annotations["io.containerd.import.ref-source"]; ok {
 		switch refSource {
@@ -239,7 +256,7 @@ func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store image
 						imgs = append(imgs, images.Image{
 							Name:   fmt.Sprintf("%s@%s", ref.Name, desc.Digest),
 							Target: desc,
-							Labels: is.imageLabels,
+							Labels: extraRefLabels(),
 						})
 					}
 					continue
@@ -248,7 +265,7 @@ func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store image
 				imgs = append(imgs, images.Image{
 					Name:   name,
 					Target: desc,
-					Labels: is.imageLabels,
+					Labels: extraRefLabels(),
 				})
 
 				// If a named reference was found and SkipNamedDigest is true, do
@@ -257,7 +274,7 @@ func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store image
 					imgs = append(imgs, images.Image{
 						Name:   fmt.Sprintf("%s@%s", ref.Name, desc.Digest),
 						Target: desc,
-						Labels: is.imageLabels,
+						Labels: extraRefLabels(),
 					})
 				}
 			}
@@ -274,19 +291,30 @@ func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store image
 			})
 		}
 
-		// If extra references, store all complete references (skip prefixes)
+		// If extra references, store all complete references and prefix
+		// references which add a digest (prefixes without a digest are skipped
+		// since they have no concrete name to store).
+		//
+		// Note: SkipNamedDigest is intentionally not honored here. It applies
+		// to the annotation branch where a named reference is resolved from a
+		// descriptor's own annotations via the prefix — in that case a name
+		// ref is "found from the prefix" and the digest ref can be suppressed.
+		// In the NoAnnotation branch the only named reference is the top-level
+		// imageName (typically the index), which is not matched against the
+		// prefix, so the digest reference should still be recorded.
 		for _, ref := range is.extraReferences {
-			if ref.IsPrefix {
+			if ref.IsPrefix && !ref.AddDigest {
 				continue
 			}
 			name := ref.Name
 			if ref.AddDigest {
 				name = fmt.Sprintf("%s@%s", name, desc.Digest)
 			}
+
 			imgs = append(imgs, images.Image{
 				Name:   name,
 				Target: desc,
-				Labels: is.imageLabels,
+				Labels: extraRefLabels(),
 			})
 		}
 	}

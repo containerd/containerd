@@ -20,6 +20,7 @@ const (
 	SizeXattrBodyHeader = 12
 	SizeXattrEntry      = 4
 	SizeDeviceSlot      = 128
+	SizeChunkIndex      = 8
 
 	LayoutFlatPlain         = 0
 	LayoutCompressedFull    = 1

@@ -14,6 +14,22 @@
    limitations under the License.
 */
 
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package labels
 
 const (
@@ -37,4 +53,14 @@ const (
 	ContainerMetadataExtension = criContainerdPrefix + ".container.metadata"
 	// SandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
 	SandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
+	// KubernetesPodNameLabel is the pod name label used by Kubernetes.
+	KubernetesPodNameLabel = "io.kubernetes.pod.name"
+	// KubernetesPodNamespaceLabel is the pod namespace label used by Kubernetes.
+	KubernetesPodNamespaceLabel = "io.kubernetes.pod.namespace"
+	// KubernetesPodUIDLabel is the pod UID label used by Kubernetes.
+	KubernetesPodUIDLabel = "io.kubernetes.pod.uid"
+	// KubernetesContainerNameLabel is the container name label used by Kubernetes.
+	KubernetesContainerNameLabel = "io.kubernetes.container.name"
+	// PodInfraContainerName is the Kubernetes container name used for infra containers.
+	PodInfraContainerName = "POD"
 )

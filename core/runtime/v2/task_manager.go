@@ -186,8 +186,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	}
 
 	// Add options based on runtime
-	ai, err := m.mounts.Activate(ctx, taskID, opts.Rootfs, activateOpts...)
-	if err == nil {
+	if ai, err := m.mounts.Activate(ctx, taskID, opts.Rootfs, activateOpts...); err == nil {
 		opts.Rootfs = ai.System
 		defer func() {
 			if retErr != nil {
@@ -198,6 +197,15 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 				}
 			}
 		}()
+	} else if errdefs.IsAlreadyExists(err) {
+		// If creation of task with same identifier, use existing mount rather than forcing
+		// deactivation of the old one. The back reference will prevent racing between
+		// deactivation and re-use, as the container with the same ID would still exist.
+		ai, err = m.mounts.Info(ctx, taskID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get info on already active mount: %w", err)
+		}
+		opts.Rootfs = ai.System
 	} else if !errdefs.IsNotImplemented(err) {
 		return nil, err
 	}

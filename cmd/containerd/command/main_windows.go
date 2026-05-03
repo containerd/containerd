@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"unsafe"
 
 	"github.com/Microsoft/go-winio/pkg/etw"
@@ -114,8 +113,4 @@ func init() {
 			log.L.Error(err)
 		}
 	}
-}
-
-func isLocalAddress(path string) bool {
-	return strings.HasPrefix(path, `\\.\pipe\`)
 }

@@ -216,7 +216,7 @@ func (c *context) verifyMetadata(resource, target Resource) error {
 	}
 
 	if target.GID() != resource.GID() {
-		return fmt.Errorf("unexpected gid for %q: %v != %v", target.Path(), target.GID(), target.GID())
+		return fmt.Errorf("unexpected gid for %q: %v != %v", target.Path(), target.GID(), resource.GID())
 	}
 
 	if xattrer, ok := resource.(XAttrer); ok {

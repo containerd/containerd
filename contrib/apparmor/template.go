@@ -40,8 +40,8 @@ import (
 const dir = "/etc/apparmor.d"
 
 const defaultTemplate = `
-abi <abi/3.0>,
-
+{{if .Abi}}abi <{{.Abi}}>,
+{{end}}
 {{range $value := .Imports}}
 {{$value}}
 {{end}}
@@ -96,6 +96,7 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 `
 
 type data struct {
+	Abi           string
 	Name          string
 	Imports       []string
 	InnerImports  []string
@@ -116,6 +117,11 @@ func cleanProfileName(profile string) string {
 func loadData(name string) (*data, error) {
 	p := data{
 		Name: name,
+	}
+
+	const abi = "abi/3.0"
+	if macroExists(abi) {
+		p.Abi = abi
 	}
 
 	if macroExists("tunables/global") {

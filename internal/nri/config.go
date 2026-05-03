@@ -77,6 +77,7 @@ func (c *Config) toOptions() []nri.Option {
 	if c.DefaultValidator != nil {
 		opts = append(opts, nri.WithDefaultValidator(c.DefaultValidator))
 	}
+	opts = append(opts, nri.WithMetrics(newNRIMetrics()))
 	opts = append(opts,
 		nri.WithTTRPCOptions(
 			[]ttrpc.ClientOpts{

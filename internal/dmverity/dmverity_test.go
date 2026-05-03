@@ -253,6 +253,7 @@ func createTempFile(t *testing.T, data []byte) string {
 
 func TestMetadataPath(t *testing.T) {
 	assert.Equal(t, "/path/to/layer.erofs.dmverity", MetadataPath("/path/to/layer.erofs"))
+	assert.Equal(t, "/path/to/layer.erofs.dmverity", MetadataPath("/path/to/layer.erofs.dmverity"))
 }
 
 func TestDevicePath(t *testing.T) {

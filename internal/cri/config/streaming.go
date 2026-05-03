@@ -26,7 +26,6 @@ import (
 
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	k8scert "k8s.io/client-go/util/cert"
-
 	streaming "k8s.io/cri-streaming/pkg/streaming"
 )
 

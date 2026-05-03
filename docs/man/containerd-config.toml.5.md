@@ -26,8 +26,8 @@ settings.
 **version**
 : The version field in the config file specifies the config’s version. If no
 version number is specified inside the config file then it is assumed to be a
-version 1 config and parsed as such. Please use version = 2 to enable version 2
-config as version 1 has been deprecated.
+version 1 config and parsed as such. Version 4 is the latest config version.
+Older configs are automatically migrated on startup.
 
 **root**
 : The root directory for containerd metadata. (Default: "/var/lib/containerd")
@@ -38,8 +38,11 @@ config as version 1 has been deprecated.
 **plugin_dir**
 : The directory for dynamic plugins to be stored
 
-**[grpc]**
-: Section for gRPC socket listener settings. Contains the following properties:
+**[grpc]** *(deprecated in version 4)*
+: Section for gRPC socket listener settings. In version 4, use the server
+plugins **io.containerd.server.v1.grpc** and **io.containerd.server.v1.grpc-tcp**
+instead. Existing configs are migrated automatically. Contains the following
+properties:
 
 - **address** (Default: "/run/containerd/containerd.sock")
 - **tcp_address**
@@ -50,15 +53,21 @@ config as version 1 has been deprecated.
 - **max_recv_message_size**
 - **max_send_message_size**
 
-**[ttrpc]**
-: Section for TTRPC settings. Contains properties:
+**[ttrpc]** *(deprecated in version 4)*
+: Section for TTRPC settings. In version 4, use the server plugin
+**io.containerd.server.v1.ttrpc** instead. In prior versions, when the TTRPC
+address was not explicitly set it was derived from the GRPC address
+(grpcAddress + ".ttrpc") and inherited GRPC’s UID/GID. In version 4, each
+server plugin is independently configured; the TTRPC plugin uses its own
+defaults when its configuration block is omitted. Contains properties:
 
 - **address** (Default: "")
 - **uid** (Default: 0)
 - **gid** (Default: 0)
 
-**[debug]**
-: Section to enable and configure a debug socket listener. Contains four properties:
+**[debug]** *(deprecated in version 4)*
+: Section to enable and configure a debug socket listener. In version 4, use the
+server plugin **io.containerd.server.v1.debug** instead. Contains properties:
 
 - **address** (Default: "/run/containerd/debug.sock")
 - **uid** (Default: 0)
@@ -67,8 +76,9 @@ config as version 1 has been deprecated.
   "trace", "debug", "info", "warn", "error", "fatal", "panic"
 - **format** (Default: "text") sets log format. Supported formats are "text" and "json"
 
-**[metrics]**
-: Section to enable and configure a metrics listener. Contains two properties:
+**[metrics]** *(deprecated in version 4)*
+: Section to enable and configure a metrics listener. In version 4, use the
+server plugin **io.containerd.server.v1.metrics** instead. Contains properties:
 
 - **address** (Default: "") Metrics endpoint does not listen by default
 - **grpc_histogram** (Default: false) Turn on or off gRPC histogram metrics
@@ -87,6 +97,33 @@ The following plugins are enabled by default and their settings are shown below.
 Plugins that are not enabled by default will provide their own configuration values
 documentation.
 
+- **[plugins."io.containerd.server.v1.grpc"]** configures the main gRPC server listener (version 4):
+  - **address** (Default: "/run/containerd/containerd.sock")
+  - **uid** (Default: effective UID)
+  - **gid** (Default: effective GID)
+  - **max_recv_message_size** (Default: 16777216)
+  - **max_send_message_size** (Default: 16777216)
+- **[plugins."io.containerd.server.v1.grpc-tcp"]** configures the TCP gRPC server listener (version 4).
+  Skipped if address is empty:
+  - **address** (Default: "")
+  - **tls_cert**, **tls_key**, **tls_ca**, **tls_common_name**
+  - **max_recv_message_size** (Default: 16777216)
+  - **max_send_message_size** (Default: 16777216)
+- **[plugins."io.containerd.server.v1.ttrpc"]** configures the TTRPC server listener (version 4).
+  In version 4, this plugin is configured independently from the gRPC plugin.
+  If the plugin block is omitted, the TTRPC server binds to its own default
+  address rather than deriving one from the gRPC address:
+  - **address** (Default: "/run/containerd/containerd.sock.ttrpc")
+  - **uid** (Default: effective UID)
+  - **gid** (Default: effective GID)
+- **[plugins."io.containerd.server.v1.debug"]** configures the debug server listener (version 4).
+  Skipped if address is empty:
+  - **address** (Default: "")
+  - **uid** (Default: 0)
+  - **gid** (Default: 0)
+- **[plugins."io.containerd.server.v1.metrics"]** configures the metrics HTTP listener (version 4).
+  Skipped if address is empty:
+  - **address** (Default: "")
 - **[plugins."io.containerd.monitor.v1.cgroups"]** has one option __no_prometheus__ (Default: **false**)
 - **[plugins."io.containerd.service.v1.diff-service"]** has one option __default__, a list by default set to **["walking"]**
 - **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
@@ -162,32 +199,28 @@ the main config.
 
 ## EXAMPLES
 
-### Complete Configuration
+### Version 4 Configuration
 
-The following is a complete **config.toml** default configuration example:
+The following is a **config.toml** example using version 4, where server
+settings are configured as plugins:
 
 ```toml
-version = 2
+version = 4
 
 root = "/var/lib/containerd"
 state = "/run/containerd"
 oom_score = 0
 imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
 
-[grpc]
+[plugins."io.containerd.server.v1.grpc"]
   address = "/run/containerd/containerd.sock"
-  uid = 0
-  gid = 0
 
-[debug]
+[plugins."io.containerd.server.v1.ttrpc"]
+  address = "/run/containerd/containerd.sock.ttrpc"
+
+[plugins."io.containerd.server.v1.debug"]
   address = "/run/containerd/debug.sock"
-  uid = 0
-  gid = 0
   level = "info"
-
-[metrics]
-  address = ""
-  grpc_histogram = false
 
 [cgroup]
   path = ""

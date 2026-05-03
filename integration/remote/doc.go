@@ -30,6 +30,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package remote contains gRPC implementation of internalapi.RuntimeService
-// and internalapi.ImageManagerService.
+// Package remote contains legacy-style CRI client adapters for the integration
+// tests and stress tooling.
 package remote

@@ -22,12 +22,11 @@ import (
 	"io"
 	"math"
 
-	remotecommand "k8s.io/cri-streaming/pkg/streaming/remotecommand"
-	"k8s.io/streaming/pkg/runtime"
-
-	executil "github.com/containerd/containerd/v2/internal/cri/executil"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	streaming "k8s.io/cri-streaming/pkg/streaming"
+	remotecommand "k8s.io/cri-streaming/pkg/streaming/remotecommand"
+	"k8s.io/streaming/pkg/runtime"
+	executil "k8s.io/utils/exec"
 )
 
 type streamRuntime struct {

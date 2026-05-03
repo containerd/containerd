@@ -95,6 +95,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	containerName := metadata.Name
 	name := makeContainerName(metadata, sandboxMetadata)
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
+	if _, err := criSignalToOCIStopSignal(config.GetStopSignal()); err != nil {
+		return nil, err
+	}
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		var resErr *registrar.ReservedErr
 		if errors.As(err, &resErr) {
@@ -367,7 +370,15 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		opts = append(opts, customopts.WithVolumes(mountMap, platform))
 	}
 	r.meta.ImageRef = r.imageID
-	r.meta.StopSignal = r.imageConfig.StopSignal
+	if signal := r.containerConfig.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
+		stopSignal, err := criSignalToOCIStopSignal(signal)
+		if err != nil {
+			return "", err
+		}
+		r.meta.StopSignal = stopSignal
+	} else if r.imageConfig.StopSignal != "" {
+		r.meta.StopSignal = r.imageConfig.StopSignal
+	}
 
 	// Validate log paths and compose full container log path.
 	if r.podSandboxConfig.GetLogDirectory() != "" && r.containerConfig.GetLogPath() != "" {

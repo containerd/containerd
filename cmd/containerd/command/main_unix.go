@@ -21,7 +21,6 @@ package command
 import (
 	"context"
 	"os"
-	"path/filepath"
 
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/log"
@@ -71,8 +70,4 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 		}
 	}()
 	return done
-}
-
-func isLocalAddress(path string) bool {
-	return filepath.IsAbs(path)
 }

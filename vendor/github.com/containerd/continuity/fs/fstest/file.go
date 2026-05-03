@@ -111,9 +111,9 @@ func CreateDir(name string, perm os.FileMode) Applier {
 }
 
 // Rename returns a file applier which renames a file
-func Rename(old, new string) Applier {
+func Rename(oldpath, newpath string) Applier {
 	return applyFn(func(root string) error {
-		return os.Rename(filepath.Join(root, old), filepath.Join(root, new))
+		return os.Rename(filepath.Join(root, oldpath), filepath.Join(root, newpath))
 	})
 }
 

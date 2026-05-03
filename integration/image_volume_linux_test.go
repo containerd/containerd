@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -247,7 +248,8 @@ func TestImageVolumeCheckVolatileOption(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, mpInfo.Mountpoint, imageVolumeMount)
 	require.Equal(t, "overlay", mpInfo.FSType)
-	require.Contains(t, strings.Split(mpInfo.VFSOptions, ","), "volatile")
+	vfsOpts := strings.Split(mpInfo.VFSOptions, ",")
+	require.True(t, slices.Contains(vfsOpts, "volatile") || slices.Contains(vfsOpts, "fsync=volatile"), "VFSOptions should contain either 'volatile' or 'fsync=volatile'")
 }
 
 func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {

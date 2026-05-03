@@ -64,7 +64,9 @@ type binary struct {
 }
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
-	cmd, err := client.Command(
+	// containerd daemon is the intended caller of client.Command; the deprecation
+	// targets external callers.
+	cmd, err := client.Command( //nolint:staticcheck // SA1019
 		ctx,
 		&client.CommandConfig{
 			ID:           b.bundle.ID,
@@ -165,7 +167,9 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 		bundlePath = b.bundle.Path
 	}
 
-	cmd, err := client.Command(ctx,
+	// containerd daemon is the intended caller of client.Command; the deprecation
+	// targets external callers.
+	cmd, err := client.Command(ctx, //nolint:staticcheck // SA1019
 		&client.CommandConfig{
 			ID:           b.bundle.ID,
 			RuntimePath:  b.runtime,

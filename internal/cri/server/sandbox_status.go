@@ -24,8 +24,8 @@ import (
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
-	"github.com/containerd/containerd/v2/internal/cri/types"
 	"github.com/containerd/errdefs"
 )
 
@@ -115,7 +115,7 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 
 // setUpdatedResources sets updated pod sandbox resources in the sandbox info.
 func setUpdatedResources(ctx context.Context, sandbox sandboxstore.Sandbox, info map[string]string) error {
-	var sbInfo types.SandboxInfo
+	var sbInfo podsandboxtypes.SandboxInfo
 	if info == nil {
 		return nil
 	}
@@ -178,7 +178,7 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status string, createdAt tim
 // but if controller.Status() returns a NotFound error,
 // we should fallback to get SandboxInfo from cached sandbox itself.
 func toDeletedCRISandboxInfo(sandbox sandboxstore.Sandbox) (map[string]string, error) {
-	si := &types.SandboxInfo{
+	si := &podsandboxtypes.SandboxInfo{
 		Pid:       sandbox.Status.Get().Pid,
 		Config:    sandbox.Config,
 		CNIResult: sandbox.CNIResult,

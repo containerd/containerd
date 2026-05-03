@@ -197,6 +197,23 @@ func WithWindowsResources(resources *runtime.WindowsContainerResources) oci.Spec
 		if limit != 0 {
 			s.Windows.Resources.Memory.Limit = &limit
 		}
+		if len(resources.GetAffinityCpus()) > 0 {
+			affinities := make([]runtimespec.WindowsCPUGroupAffinity, 0, len(resources.GetAffinityCpus()))
+			for _, a := range resources.GetAffinityCpus() {
+				if a != nil {
+					affinities = append(affinities, runtimespec.WindowsCPUGroupAffinity{
+						Mask:  a.CpuMask,
+						Group: a.CpuGroup,
+					})
+				}
+			}
+			if len(affinities) > 0 {
+				if s.Windows.Resources.CPU == nil {
+					s.Windows.Resources.CPU = &runtimespec.WindowsCPUResources{}
+				}
+				s.Windows.Resources.CPU.Affinity = affinities
+			}
+		}
 		return nil
 	}
 }

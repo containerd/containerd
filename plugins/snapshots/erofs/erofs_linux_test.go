@@ -426,8 +426,10 @@ func TestCreateErofsMount(t *testing.T) {
 
 		assert.Equal(t, "erofs", m.Type)
 		assert.Equal(t, layerBlob, m.Source)
-		// X-containerd.dmverity=off overrides auto-detection when metadata exists
-		assert.Contains(t, m.Options, "X-containerd.dmverity=off")
+		// mode "off" skips dm-verity entirely - no dm-verity option in mount options
+		for _, opt := range m.Options {
+			assert.NotContains(t, opt, "X-containerd.dmverity=")
+		}
 	})
 }
 
@@ -663,7 +665,7 @@ func TestApplyDmverityPolicy(t *testing.T) {
 		assert.Empty(t, opt)
 	})
 
-	t.Run("mode off returns dmverity=off when metadata exists", func(t *testing.T) {
+	t.Run("mode off returns empty string when metadata exists", func(t *testing.T) {
 		createDmverityMetadata(t, layerBlob)
 
 		s := &snapshotter{
@@ -672,10 +674,10 @@ func TestApplyDmverityPolicy(t *testing.T) {
 
 		opt, err := s.applyDmverityPolicy(layerBlob)
 		require.NoError(t, err)
-		assert.Equal(t, "X-containerd.dmverity=off", opt)
+		assert.Empty(t, opt)
 	})
 
-	t.Run("mode on returns dmverity=on when metadata exists", func(t *testing.T) {
+	t.Run("mode on returns metadata path when metadata exists", func(t *testing.T) {
 		createDmverityMetadata(t, layerBlob)
 
 		s := &snapshotter{
@@ -684,10 +686,11 @@ func TestApplyDmverityPolicy(t *testing.T) {
 
 		opt, err := s.applyDmverityPolicy(layerBlob)
 		require.NoError(t, err)
-		assert.Equal(t, "X-containerd.dmverity=on", opt)
+		expectedPath := layerBlob + ".dmverity"
+		assert.Equal(t, "X-containerd.dmverity="+expectedPath, opt)
 	})
 
-	t.Run("mode auto returns empty string when metadata exists", func(t *testing.T) {
+	t.Run("mode auto returns metadata path when metadata exists", func(t *testing.T) {
 		createDmverityMetadata(t, layerBlob)
 
 		s := &snapshotter{
@@ -696,6 +699,78 @@ func TestApplyDmverityPolicy(t *testing.T) {
 
 		opt, err := s.applyDmverityPolicy(layerBlob)
 		require.NoError(t, err)
-		assert.Empty(t, opt) // auto mode doesn't add explicit option
+		expectedPath := layerBlob + ".dmverity"
+		assert.Equal(t, "X-containerd.dmverity="+expectedPath, opt)
+	})
+}
+
+func TestMountFsMeta(t *testing.T) {
+	root := t.TempDir()
+	s := &snapshotter{root: root}
+
+	parents := []string{"p0", "p1", "p2"}
+	for _, id := range parents {
+		require.NoError(t, os.MkdirAll(filepath.Join(root, "snapshots", id), 0755))
+	}
+
+	writeMeta := func(t *testing.T, id string, contents []byte) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(s.fsMetaPath(id), contents, 0644))
+	}
+	removeMeta := func(t *testing.T, id string) {
+		t.Helper()
+		err := os.Remove(s.fsMetaPath(id))
+		if err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+
+	snap := storage.Snapshot{ParentIDs: parents}
+
+	t.Run("missing fsmeta returns false", func(t *testing.T) {
+		for _, id := range parents {
+			removeMeta(t, id)
+		}
+		_, ok := s.mountFsMeta(snap, 0)
+		assert.False(t, ok)
+	})
+
+	t.Run("empty fsmeta returns false", func(t *testing.T) {
+		writeMeta(t, "p0", nil)
+		t.Cleanup(func() { removeMeta(t, "p0") })
+
+		_, ok := s.mountFsMeta(snap, 0)
+		assert.False(t, ok)
+	})
+
+	t.Run("non-empty fsmeta on top parent returns mount with all device options", func(t *testing.T) {
+		writeMeta(t, "p0", []byte("merged"))
+		t.Cleanup(func() { removeMeta(t, "p0") })
+
+		m, ok := s.mountFsMeta(snap, 0)
+		require.True(t, ok)
+		assert.Equal(t, "erofs", m.Type)
+		assert.Equal(t, s.fsMetaPath("p0"), m.Source)
+		// Devices appended in reverse parent order from len-1 down to id.
+		assert.Equal(t, []string{
+			"ro", "loop",
+			"device=" + s.layerBlobPath("p2"),
+			"device=" + s.layerBlobPath("p1"),
+			"device=" + s.layerBlobPath("p0"),
+		}, m.Options)
+	})
+
+	t.Run("non-empty fsmeta on intermediate parent only references parents at or below id", func(t *testing.T) {
+		writeMeta(t, "p1", []byte("merged"))
+		t.Cleanup(func() { removeMeta(t, "p1") })
+
+		m, ok := s.mountFsMeta(snap, 1)
+		require.True(t, ok)
+		assert.Equal(t, s.fsMetaPath("p1"), m.Source)
+		assert.Equal(t, []string{
+			"ro", "loop",
+			"device=" + s.layerBlobPath("p2"),
+			"device=" + s.layerBlobPath("p1"),
+		}, m.Options)
 	})
 }

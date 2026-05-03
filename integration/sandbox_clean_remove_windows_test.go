@@ -240,8 +240,9 @@ func TestCreateContainer(t *testing.T) {
 	if err != nil {
 		t.Skip("skipping test, error: ", err)
 	}
-	client, err := RawRuntimeClient()
+	client, conn, err := RawRuntimeClient()
 	require.NoError(t, err, "failed to get raw grpc runtime service client")
+	t.Cleanup(func() { _ = conn.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 

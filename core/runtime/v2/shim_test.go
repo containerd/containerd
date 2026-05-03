@@ -28,7 +28,7 @@ import (
 )
 
 func TestParseStartResponse(t *testing.T) {
-	for _, tc := range []struct {
+	testCases := []struct {
 		Name     string
 		Response string
 		Expected bootapi.BootstrapResult
@@ -76,7 +76,10 @@ func TestParseStartResponse(t *testing.T) {
 			Expected: bootapi.BootstrapResult{},
 			Err:      errdefs.ErrNotImplemented,
 		},
-	} {
+	}
+
+	for i := range testCases {
+		tc := &testCases[i]
 		t.Run(tc.Name, func(t *testing.T) {
 			params, err := parseStartResponse([]byte(tc.Response))
 			if err != nil {

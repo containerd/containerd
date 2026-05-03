@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 )
@@ -86,6 +87,47 @@ func TestWaitContainerStop(t *testing.T) {
 			}
 			err = c.waitContainerStop(ctx, container)
 			assert.Equal(t, test.expectErr, err != nil, test.desc)
+		})
+	}
+}
+
+func TestCRISignalToOCIStopSignal(t *testing.T) {
+	tests := []struct {
+		name           string
+		signal         runtime.Signal
+		expectedSignal string
+		expectErr      bool
+	}{
+		{name: "runtime default", signal: runtime.Signal_RUNTIME_DEFAULT, expectedSignal: ""},
+		{name: "standard signal", signal: runtime.Signal_SIGTERM, expectedSignal: "SIGTERM"},
+		{name: "rtmin plus", signal: runtime.Signal_SIGRTMINPLUS1, expectedSignal: "SIGRTMIN+1"},
+		{name: "rtmax minus", signal: runtime.Signal_SIGRTMAXMINUS1, expectedSignal: "SIGRTMAX-1"},
+		{name: "unknown signal", signal: runtime.Signal(999), expectErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			stopSignal, err := criSignalToOCIStopSignal(test.signal)
+			assert.Equal(t, test.expectErr, err != nil)
+			assert.Equal(t, test.expectedSignal, stopSignal)
+		})
+	}
+}
+
+func TestConvertFromCRISignal(t *testing.T) {
+	tests := []struct {
+		name           string
+		signal         string
+		expectedSignal string
+	}{
+		{name: "standard signal", signal: "SIGTERM", expectedSignal: "SIGTERM"},
+		{name: "rtmin plus", signal: "SIGRTMINPLUS1", expectedSignal: "SIGRTMIN+1"},
+		{name: "rtmax minus", signal: "SIGRTMAXMINUS1", expectedSignal: "SIGRTMAX-1"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expectedSignal, convertFromCRISignal(test.signal))
 		})
 	}
 }

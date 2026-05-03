@@ -57,11 +57,13 @@ type CommandConfig struct {
 	SocketDir    string
 }
 
-// Command returns the shim command with the provided args and configuration
+// Command returns the shim command with the provided args and configuration.
 //
-// TODO(refactor): move this function to core containerd runtime. This function is only used
-// by the containerd daemon for the initial shim launches (e.g. shim -start) and makes
-// no sense for shim implementations.
+// Deprecated: this function is internal to the containerd daemon, which uses it to
+// invoke the shim binary for "start" and "delete" actions during the shim lifecycle.
+// It encodes daemon-specific launch internals — backwards compatibility with older shim
+// models and the new Bootstrap protocol used by 2.3+ shims — and is not intended for use
+// by external callers. It will be moved into the core containerd runtime package in the future.
 func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {

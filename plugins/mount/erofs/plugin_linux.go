@@ -62,19 +62,26 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 		dmverity.Close(dmverityDevice)
 	}()
 
-	// Check for dmverity mode in mount options
-	dmverityMode := "auto" // default
+	// Parse dm-verity metadata path from mount options
+	metadataPath := ""
 	for _, opt := range m.Options {
-		if mode, ok := strings.CutPrefix(opt, "X-containerd.dmverity="); ok {
-			dmverityMode = mode
+		if path, ok := strings.CutPrefix(opt, "X-containerd.dmverity="); ok {
+			metadataPath = path
 			break
 		}
 	}
 
-	// Check if this layer has dm-verity metadata
-	metadata, err := dmverity.ReadMetadata(m.Source)
-	if err == nil && dmverityMode != "off" {
-		log.G(ctx).WithField("source", m.Source).Debug("detected dm-verity metadata, setting up dm-verity device")
+	// Set up dm-verity device if metadata path is provided
+	if metadataPath != "" {
+		log.G(ctx).WithFields(log.Fields{
+			"source":        m.Source,
+			"metadata-path": metadataPath,
+		}).Debug("setting up dm-verity device from mount option")
+
+		metadata, err := dmverity.ReadMetadata(metadataPath)
+		if err != nil {
+			return mount.ActiveMount{}, fmt.Errorf("failed to read dm-verity metadata from %s: %w", metadataPath, err)
+		}
 
 		devicePath, cleanupName, err := setupDmVerityDevice(ctx, m.Source, metadata)
 		dmverityDevice = cleanupName
@@ -86,7 +93,7 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 
 	filteredOptions := make([]string, 0, len(m.Options))
 	for _, v := range m.Options {
-		// Skip loop option (handled by loop device setup) and dmverity mode option (already processed)
+		// Skip loop option (handled by loop device setup) and dmverity options (already processed)
 		if v == "loop" || strings.HasPrefix(v, "X-containerd.dmverity=") {
 			continue
 		}
@@ -98,7 +105,7 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 		return mount.ActiveMount{}, err
 	}
 
-	err = unix.ENOTBLK
+	err := error(unix.ENOTBLK)
 	if !forceloop {
 		// Try to use file-backed mount feature if available (Linux 6.12+) first
 		err = doMount(m, mp)

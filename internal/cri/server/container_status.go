@@ -124,6 +124,19 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 		runtimeUser = &runtime.ContainerUser{}
 	}
 
+	var statusStopSignal runtime.Signal
+	stopsignal := container.Config.GetStopSignal()
+
+	if stopsignal == runtime.Signal_RUNTIME_DEFAULT {
+		if container.Metadata.StopSignal != "" {
+			statusStopSignal = toCRISignal(container.Metadata.StopSignal)
+		} else {
+			statusStopSignal = runtime.Signal_SIGTERM
+		}
+	} else {
+		statusStopSignal = stopsignal
+	}
+
 	return &runtime.ContainerStatus{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
@@ -143,6 +156,7 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 		LogPath:     meta.LogPath,
 		Resources:   status.Resources,
 		User:        runtimeUser,
+		StopSignal:  statusStopSignal,
 	}, nil
 }
 

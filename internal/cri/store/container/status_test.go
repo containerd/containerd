@@ -29,6 +29,30 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
+func TestDeepCopyOfWindowsAffinityCpus(t *testing.T) {
+	orig := Status{
+		Resources: &runtime.ContainerResources{
+			Windows: &runtime.WindowsContainerResources{
+				AffinityCpus: []*runtime.WindowsCpuGroupAffinity{
+					{CpuMask: 0x3, CpuGroup: 0},
+					nil, // test nil handling
+					{CpuMask: 0xf, CpuGroup: 1},
+				},
+			},
+		},
+	}
+	cp := deepCopyOf(orig)
+
+	// Nil entries should be skipped, not copied.
+	assertlib.Equal(t, 2, len(cp.Resources.Windows.AffinityCpus))
+	assertlib.Equal(t, uint64(0x3), cp.Resources.Windows.AffinityCpus[0].CpuMask)
+	assertlib.Equal(t, uint64(0xf), cp.Resources.Windows.AffinityCpus[1].CpuMask)
+
+	// Mutating the copy must not affect the original.
+	cp.Resources.Windows.AffinityCpus[0].CpuMask = 0xff
+	assertlib.Equal(t, uint64(0x3), orig.Resources.Windows.AffinityCpus[0].CpuMask)
+}
+
 func TestContainerState(t *testing.T) {
 	for c, test := range map[string]struct {
 		status Status

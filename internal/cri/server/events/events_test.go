@@ -21,11 +21,11 @@ import (
 	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
-	testingclock "github.com/containerd/containerd/v2/internal/cri/clock/testing"
 	"github.com/containerd/containerd/v2/pkg/protobuf/prototestutil"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type noopEventHandler struct {

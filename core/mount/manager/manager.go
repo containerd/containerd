@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
@@ -103,6 +104,7 @@ func NewManager(db *bolt.DB, targetDir string, opts ...Opt) (mount.Manager, erro
 		targets:  tr,
 		handlers: options.handlers,
 		rootMap:  rootMap,
+		activate: kmutex.New(),
 	}, nil
 }
 
@@ -112,7 +114,8 @@ type mountManager struct {
 	handlers map[string]mount.Handler
 	rootMap  map[string]*os.Root
 
-	rwlock sync.RWMutex
+	rwlock   sync.RWMutex
+	activate kmutex.KeyedLocker
 }
 
 func (mm *mountManager) Close() error {
@@ -130,6 +133,14 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	if err != nil {
 		return mount.ActivationInfo{}, err
 	}
+
+	// Serialize concurrent activations of the same name to prevent a
+	// racing Activate from misidentifying an in-progress activation as
+	// a stale record and destroying it.
+	if err := mm.activate.Lock(ctx, name); err != nil {
+		return mount.ActivationInfo{}, err
+	}
+	defer mm.activate.Unlock(name)
 
 	log.G(ctx).WithField("name", name).WithField("mounts", mounts).Debugf("activating mount")
 
@@ -229,6 +240,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	defer mm.rwlock.RUnlock()
 
 	var mid uint64
+	var staleMID uint64
 
 	if err := mm.db.Update(func(tx *bolt.Tx) error {
 		v1bkt, err := tx.CreateBucketIfNotExists([]byte("v1"))
@@ -246,8 +258,38 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		}
 		bkt, err := mbkt.CreateBucket([]byte(name))
 		if err != nil {
-			// If already exists, return already exists
-			return err
+			existing := mbkt.Bucket([]byte(name))
+			if existing == nil {
+				return err
+			}
+			// If the mount is fully activated, return already exists
+			// so the caller can reuse the existing mount.
+			if existing.Bucket(bucketKeyActive) != nil {
+				return fmt.Errorf("mount %q: %w", name, errdefs.ErrAlreadyExists)
+			}
+			// The mount bucket exists but was never fully activated
+			// (e.g., process crashed between creating the bucket and
+			// completing activation). Clean up the stale entry and
+			// proceed with a fresh activation. Save the old mount ID
+			// so the target directory can be cleaned up after the
+			// transaction commits.
+			staleMID = readID(existing)
+			if lid := existing.Get(bucketKeyLease); len(lid) > 0 {
+				if lsbkt := nsbkt.Bucket(bucketKeyLeases); lsbkt != nil {
+					if lbkt := lsbkt.Bucket(lid); lbkt != nil {
+						if err := lbkt.Delete([]byte(name)); err != nil {
+							return err
+						}
+					}
+				}
+			}
+			if err := mbkt.DeleteBucket([]byte(name)); err != nil {
+				return err
+			}
+			bkt, err = mbkt.CreateBucket([]byte(name))
+			if err != nil {
+				return err
+			}
 		}
 
 		mid, err = v1bkt.NextSequence()
@@ -295,6 +337,19 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		return nil
 	}); err != nil {
 		return mount.ActivationInfo{}, err
+	}
+
+	// If a stale incomplete activation was found, clean up its target
+	// directory which may contain leftover mounts from before a crash.
+	if staleMID != 0 {
+		staleTarget := filepath.Join(mm.targets.Name(), strconv.FormatUint(staleMID, 10))
+		if err := unmountAll(ctx, staleTarget, mm.handlers); err != nil {
+			if os.IsNotExist(err) {
+				log.G(ctx).WithError(err).WithField("mountid", staleMID).Debug("stale activation target does not exist, skipping cleanup")
+			} else {
+				log.G(ctx).WithError(err).WithField("mountid", staleMID).Warn("failed to unmount stale activation target")
+			}
+		}
 	}
 
 	defer func() {
@@ -483,7 +538,24 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			return err
 		}
 
-		// TODO: Save all system mounts
+		if len(info.System) > 0 {
+			if len(info.System) > 255 {
+				return fmt.Errorf("too many system mounts (%d): maximum 255", len(info.System))
+			}
+			sbkt, err := bkt.CreateBucket(bucketKeySystem)
+			if err != nil {
+				return err
+			}
+			for i, sm := range info.System {
+				cur, err := sbkt.CreateBucket([]byte{byte(i)})
+				if err != nil {
+					return err
+				}
+				if err = putSystemMount(cur, sm); err != nil {
+					return err
+				}
+			}
+		}
 
 		return nil
 	}); err != nil {
@@ -552,6 +624,36 @@ func readActiveMount(bkt *bolt.Bucket) (mount.ActiveMount, error) {
 	return active, nil
 }
 
+func putSystemMount(bkt *bolt.Bucket, m mount.Mount) error {
+	if err := bkt.Put(bucketKeyType, []byte(m.Type)); err != nil {
+		return err
+	}
+	if err := bkt.Put(bucketKeySource, []byte(m.Source)); err != nil {
+		return err
+	}
+	if err := bkt.Put(bucketKeyTarget, []byte(m.Target)); err != nil {
+		return err
+	}
+	if len(m.Options) > 0 {
+		if err := bkt.Put(bucketKeyOptions, []byte(strings.Join(m.Options, "\x00"))); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func readSystemMount(bkt *bolt.Bucket) mount.Mount {
+	m := mount.Mount{
+		Type:   string(bkt.Get(bucketKeyType)),
+		Source: string(bkt.Get(bucketKeySource)),
+		Target: string(bkt.Get(bucketKeyTarget)),
+	}
+	if v := bkt.Get(bucketKeyOptions); len(v) > 0 {
+		m.Options = strings.Split(string(v), "\x00")
+	}
+	return m
+}
+
 func readActivationInfo(name string, bkt *bolt.Bucket) (mount.ActivationInfo, error) {
 	info := mount.ActivationInfo{
 		Name: name,
@@ -563,6 +665,14 @@ func readActivationInfo(name string, bkt *bolt.Bucket) (mount.ActivationInfo, er
 				return err
 			}
 			info.Active = append(info.Active, active)
+			return nil
+		}); err != nil {
+			return mount.ActivationInfo{}, err
+		}
+	}
+	if sbkt := bkt.Bucket(bucketKeySystem); sbkt != nil {
+		if err := sbkt.ForEachBucket(func(k []byte) error {
+			info.System = append(info.System, readSystemMount(sbkt.Bucket(k)))
 			return nil
 		}); err != nil {
 			return mount.ActivationInfo{}, err

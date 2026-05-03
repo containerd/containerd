@@ -37,7 +37,7 @@ func Lchtimes(name string, atime, mtime time.Time) Applier {
 }
 
 // CreateDeviceFile provides creates devices Applier.
-func CreateDeviceFile(name string, mode os.FileMode, maj, min int) Applier {
+func CreateDeviceFile(name string, mode os.FileMode, major, minor int) Applier {
 	return applyFn(func(root string) error {
 		return errors.New("Not implemented")
 	})

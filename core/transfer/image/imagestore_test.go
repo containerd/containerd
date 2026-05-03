@@ -22,6 +22,7 @@ import (
 	"sort"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/errdefs"
@@ -197,6 +198,58 @@ func TestStore(t *testing.T) {
 			Annotations: []string{"NoAnnotation"},
 			Images:      []string{"registry.test/index:latest"},
 		},
+		{
+			Name: "ImageNameWithPrefixAddDigest",
+			ImageStore: &Store{
+				imageName: "registry.test/index:latest",
+				extraReferences: []Reference{
+					{
+						Name:      "registry.test/base",
+						IsPrefix:  true,
+						AddDigest: true,
+					},
+				},
+			},
+			Annotations: []string{"NoAnnotation"},
+			Images:      []string{"registry.test/index:latest", "registry.test/base@"},
+		},
+		{
+			Name: "ImageNameWithExtraRef",
+			ImageStore: &Store{
+				imageName: "registry.test/index:latest",
+				extraReferences: []Reference{
+					{
+						Name: "registry.test/extra:v1",
+					},
+				},
+			},
+			Annotations: []string{"NoAnnotation"},
+			Images:      []string{"registry.test/index:latest", "registry.test/extra:v1"},
+		},
+		{
+			// SkipNamedDigest only suppresses digest refs in the annotation
+			// branch, where a named reference has been resolved from the
+			// descriptor's own annotations via the prefix. In the
+			// NoAnnotation branch the top-level imageName is not a
+			// prefix-matched name, so the digest ref must still be stored.
+			// This matches the integration test DigestRefsSkipNamed where
+			// the index digest reference is expected alongside the primary
+			// image name.
+			Name: "ImageNameWithPrefixAddDigestSkipNamed",
+			ImageStore: &Store{
+				imageName: "registry.test/index:latest",
+				extraReferences: []Reference{
+					{
+						Name:            "registry.test/base",
+						IsPrefix:        true,
+						AddDigest:       true,
+						SkipNamedDigest: true,
+					},
+				},
+			},
+			Annotations: []string{"NoAnnotation"},
+			Images:      []string{"registry.test/index:latest", "registry.test/base@"},
+		},
 	} {
 		for _, a := range testCase.Annotations {
 			name := testCase.Name + "_" + a
@@ -239,12 +292,41 @@ func TestStore(t *testing.T) {
 				if len(imgs) != len(expected) {
 					t.Fatalf("mismatched array length\nexpected:\n\t%v\nactual\n\t%v", expected, imgs)
 				}
+				primaryName := testCase.ImageStore.imageName
 				for i, name := range expected {
 					if imgs[i].Name != name {
 						t.Fatalf("wrong image name %q, expected %q", imgs[i].Name, name)
 					}
 					if imgs[i].Target.Digest != dgst {
 						t.Fatalf("wrong image digest %s, expected %s", imgs[i].Target.Digest, dgst)
+					}
+
+					// The primary image is never collectible via back-reference;
+					// extra references are tied to the primary via gc.bref.image
+					// with an immediate gc.expire so they are collected alongside
+					// it. When no primary image is set, extra references are
+					// standalone and receive no GC labels.
+					bref := imgs[i].Labels["containerd.io/gc.bref.image"]
+					expire := imgs[i].Labels["containerd.io/gc.expire"]
+					switch {
+					case imgs[i].Name == primaryName:
+						if bref != "" || expire != "" {
+							t.Fatalf("primary image %q unexpectedly has GC labels: bref=%q expire=%q", imgs[i].Name, bref, expire)
+						}
+					case primaryName == "":
+						if bref != "" || expire != "" {
+							t.Fatalf("extra ref %q unexpectedly has GC labels when no primary image: bref=%q expire=%q", imgs[i].Name, bref, expire)
+						}
+					default:
+						if bref != primaryName {
+							t.Fatalf("extra ref %q has gc.bref.image=%q, expected %q", imgs[i].Name, bref, primaryName)
+						}
+						if expire == "" {
+							t.Fatalf("extra ref %q missing gc.expire label", imgs[i].Name)
+						}
+						if _, err := time.Parse(time.RFC3339, expire); err != nil {
+							t.Fatalf("extra ref %q has invalid gc.expire %q: %v", imgs[i].Name, expire, err)
+						}
 					}
 				}
 			})

@@ -12,20 +12,20 @@ require (
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.1.3
 	github.com/containerd/console v1.0.5
-	github.com/containerd/containerd/api v1.11.0-beta.2
-	github.com/containerd/continuity v0.4.5
+	github.com/containerd/containerd/api v1.11.0
+	github.com/containerd/continuity v0.5.0
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/errdefs/pkg v0.3.0
 	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.13
-	github.com/containerd/go-dmverity v0.0.0-20260106143538-e097b6cc4a33
+	github.com/containerd/go-dmverity v0.1.0
 	github.com/containerd/go-runc v1.1.0
 	github.com/containerd/imgcrypt/v2 v2.0.2
 	github.com/containerd/log v0.1.0
-	github.com/containerd/nri v0.11.0
+	github.com/containerd/nri v0.12.0
 	github.com/containerd/otelttrpc v0.1.0
 	github.com/containerd/platforms v1.0.0-rc.4
-	github.com/containerd/plugin v1.0.0
+	github.com/containerd/plugin v1.1.0
 	github.com/containerd/ttrpc v1.2.8
 	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/containerd/zfs/v2 v2.0.0
@@ -37,7 +37,7 @@ require (
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 	github.com/docker/go-metrics v0.0.1
 	github.com/docker/go-units v0.5.0
-	github.com/erofs/go-erofs v0.2.1
+	github.com/erofs/go-erofs v0.3.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/certtostore v1.0.6
 	github.com/google/go-cmp v0.7.0
@@ -60,6 +60,7 @@ require (
 	github.com/opencontainers/selinux v1.13.1
 	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_model v0.6.2
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	github.com/tchap/go-patricia/v2 v2.3.3
@@ -67,8 +68,8 @@ require (
 	github.com/vishvananda/netlink v1.3.1
 	github.com/vishvananda/netns v0.0.5
 	go.etcd.io/bbolt v1.4.3
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.67.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.67.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
@@ -79,16 +80,17 @@ require (
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.43.0
 	golang.org/x/time v0.15.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
-	gopkg.in/inf.v0 v0.9.1
-	k8s.io/apimachinery v0.36.0-rc.0
-	k8s.io/client-go v0.36.0-rc.0
-	k8s.io/cri-api v0.36.0-rc.0
-	k8s.io/cri-streaming v0.36.0-rc.0
+	k8s.io/apimachinery v0.36.0
+	k8s.io/client-go v0.36.0
+	k8s.io/cri-api v0.36.0
+	k8s.io/cri-client v0.36.0
+	k8s.io/cri-streaming v0.36.0
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/streaming v0.36.0-rc.0
+	k8s.io/streaming v0.36.0
+	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 	tags.cncf.io/container-device-interface v1.1.0
 )
 
@@ -105,7 +107,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -131,14 +133,13 @@ require (
 	github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.66.1 // indirect
-	github.com/prometheus/procfs v0.17.0 // indirect
+	github.com/prometheus/common v0.67.5 // indirect
+	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
 	github.com/smallstep/pkcs7 v0.1.1 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20230803200340-78284954bff6 // indirect
-	github.com/tetratelabs/wazero v1.10.1 // indirect
+	github.com/tetratelabs/wazero v1.11.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.opencensus.io v0.24.0 // indirect
@@ -153,10 +154,11 @@ require (
 	golang.org/x/term v0.41.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
+	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.36.0-rc.0 // indirect
+	k8s.io/api v0.36.0 // indirect
+	k8s.io/component-base v0.36.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9 // indirect
-	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect

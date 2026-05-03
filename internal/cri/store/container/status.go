@@ -255,6 +255,15 @@ func deepCopyOf(s Status) Status {
 				CpuMaximum:         s.Resources.Windows.CpuMaximum,
 				MemoryLimitInBytes: s.Resources.Windows.MemoryLimitInBytes,
 				RootfsSizeInBytes:  s.Resources.Windows.RootfsSizeInBytes,
+				AffinityCpus: func() []*runtime.WindowsCpuGroupAffinity {
+					cp := make([]*runtime.WindowsCpuGroupAffinity, 0, len(s.Resources.Windows.AffinityCpus))
+					for _, a := range s.Resources.Windows.AffinityCpus {
+						if a != nil {
+							cp = append(cp, &runtime.WindowsCpuGroupAffinity{CpuMask: a.CpuMask, CpuGroup: a.CpuGroup})
+						}
+					}
+					return cp
+				}(),
 			},
 		}
 	}

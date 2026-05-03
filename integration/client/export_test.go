@@ -19,9 +19,11 @@ package client
 import (
 	"archive/tar"
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -236,6 +238,26 @@ func TestExportAllCases(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "export image setting ocispec.AnnotationRefName",
+			prepare: func(ctx context.Context, t *testing.T, client *Client) images.Image {
+				img, err := client.Fetch(ctx, testImageByDigest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return img
+			},
+			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, img images.Image) {
+				if err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImageByDigest), archive.WithPlatform(platforms.All)); err != nil {
+					t.Fatal(err)
+				}
+
+				if _, err := dstFile.Seek(0, io.SeekStart); err != nil {
+					t.Fatal(err)
+				}
+				assertOCIIndexAnnotationRefName(t, dstFile)
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -358,5 +380,47 @@ func assertOCITar(t *testing.T, r io.Reader, docker bool) {
 		t.Error("manifest.json not found")
 	} else if !docker && foundManifestJSON {
 		t.Error("manifest.json found")
+	}
+}
+
+func assertOCIIndexAnnotationRefName(t *testing.T, r io.Reader) {
+
+	// The required grammar of the well-known org.opencontainer.image.ref.name annotation as specified at
+	// https://github.com/opencontainers/image-spec/blob/v1.1.1/annotations.md#pre-defined-annotation-keys
+	var ociImageRefNameRegex = regexp.MustCompile(`^[A-Za-z0-9]+(?:(?:[-._:@+]|--)[A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:(?:[-._:@+]|--)[A-Za-z0-9]+)*)*$`)
+
+	t.Helper()
+	tr := tar.NewReader(r)
+	foundIndexJSON := false
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Name == ocispec.ImageIndexFile {
+			foundIndexJSON = true
+			var idx ocispec.Index
+			if err := json.NewDecoder(tr).Decode(&idx); err != nil {
+				t.Fatal(err)
+			}
+			if len(idx.Manifests) == 0 {
+				t.Error("index contains no manifests to verify")
+			}
+			for _, m := range idx.Manifests {
+				if ref, ok := m.Annotations[ocispec.AnnotationRefName]; !ok {
+					t.Errorf("manifest does not have %s annotation", ocispec.AnnotationRefName)
+				} else if !ociImageRefNameRegex.MatchString(ref) {
+					t.Errorf("manifest annotation %s=%q does not match required grammar", ocispec.AnnotationRefName, ref)
+				}
+			}
+
+			break
+		}
+	}
+	if !foundIndexJSON {
+		t.Error("index.json not found")
 	}
 }

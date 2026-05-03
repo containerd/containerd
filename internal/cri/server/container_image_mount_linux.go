@@ -53,7 +53,7 @@ func addVolatileOptionOnImageVolumeMount(mounts []mount.Mount) []mount.Mount {
 	}
 
 	for i, m := range mounts {
-		if m.Type != "overlay" || slices.Contains(m.Options, "volatile") {
+		if m.Type != "overlay" || slices.Contains(m.Options, "volatile") || slices.Contains(m.Options, "fsync=volatile") {
 			continue
 		}
 		mounts[i].Options = append(mounts[i].Options, "volatile")
