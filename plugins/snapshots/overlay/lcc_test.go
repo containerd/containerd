@@ -94,6 +94,15 @@ func TestOverlayLCC(t *testing.T) {
 			t.Run("OrphanedStagingPreventsStaleHit", func(t *testing.T) {
 				testLCCOrphanedStagingPreventsStaleHit(t, newSnapshotter)
 			})
+			t.Run("DuplicateLayer", func(t *testing.T) {
+				testLCCDuplicateLayer(t, newSnapshotter)
+			})
+			t.Run("DuplicateLayer_CacheHit", func(t *testing.T) {
+				testLCCDuplicateLayerCacheHit(t, newSnapshotter)
+			})
+			t.Run("CountDiffIDInChain", func(t *testing.T) {
+				testLCCCountDiffIDInChain(t, newSnapshotter)
+			})
 		})
 	}
 }
@@ -134,7 +143,7 @@ func getCommittedBasePath(ctx context.Context, sn *testSnapshotter, root, key st
 }
 
 // testLCCContentPath verifies the cache path layout:
-// <root>/cache/<algo>.<hex>.<uid>.<gid>
+// <root>/cache/<algo>.<hex>.<uid>.<gid>.<seq>
 func testLCCContentPath(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	ctx := context.TODO()
 	root := t.TempDir()
@@ -148,12 +157,13 @@ func testLCCContentPath(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) 
 		snapshots.LabelSnapshotDiffID: "sha256:abcdef1234abcdef1234abcdef1234abcdef1234abcdef1234abcdef12345678",
 		labelSnapshotUID:              "0",
 		labelSnapshotGID:              "0",
+		labelSnapshotDiffIDSeq:        "0",
 	}}
 	got, err := sn.lcc.contentPath(info)
 	if err != nil {
 		t.Fatalf("lcc.contentPath: %v", err)
 	}
-	want := filepath.Join(root, "cache", "sha256.abcdef1234abcdef1234abcdef1234abcdef1234abcdef1234abcdef12345678.0.0")
+	want := filepath.Join(root, "cache", "sha256.abcdef1234abcdef1234abcdef1234abcdef1234abcdef1234abcdef12345678.0.0.0")
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -240,7 +250,7 @@ func testLCCCacheMiss(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 		t.Fatal(err)
 	}
 
-	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0")
+	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0.0")
 
 	// The extracted file must be accessible from the cache directory.
 	if _, err := os.Stat(filepath.Join(cacheDir, "file")); err != nil {
@@ -310,7 +320,7 @@ func testLCCCacheHit_Commit(t *testing.T, newSnapshotter testsuite.SnapshotterFu
 	const diffID = "sha256:0000000000000000000000000000000000000000000000000000000000000001"
 
 	prepareAndCommitLCC(t, ctx, sn, root, "active-miss", "committed-miss", "", diffID)
-	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0")
+	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0.0")
 
 	// Cache-hit Prepare: fs/ is already a symlink.
 	labels := snapshots.WithLabels(map[string]string{snapshots.LabelSnapshotDiffID: diffID})
@@ -354,7 +364,7 @@ func testLCCConcurrentExtraction(t *testing.T, newSnapshotter testsuite.Snapshot
 
 	// Simulate the winning extractor: pre-populate the cache entry so that
 	// os.Rename inside Commit fails with ENOTEMPTY.
-	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000002.0.0")
+	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000002.0.0.0")
 	if err := os.Mkdir(cacheDir, 0755); err != nil {
 		t.Fatalf("Mkdir cache: %v", err)
 	}
@@ -396,8 +406,8 @@ func testLCCCleanup(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	prepareAndCommitLCC(t, ctx, sn, root, "active-1", "snap-1", "", diffID1)
 	prepareAndCommitLCC(t, ctx, sn, root, "active-2", "snap-2", "", diffID2)
 
-	cache1 := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0")
-	cache2 := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000002.0.0")
+	cache1 := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0.0")
+	cache2 := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000002.0.0.0")
 
 	for _, p := range []string{cache1, cache2} {
 		if _, err := os.Stat(p); err != nil {
@@ -458,7 +468,7 @@ func testLCCCleanup_SharedEntry(t *testing.T, newSnapshotter testsuite.Snapshott
 		t.Fatalf("Commit snap-b: %v", err)
 	}
 
-	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0")
+	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0.0")
 
 	// Remove snap-a: snap-b still references the cache entry, so it must survive.
 	if err := sn.Remove(ctx, "snap-a"); err != nil {
@@ -499,7 +509,7 @@ func testLCCOwnershipIsolation(t *testing.T, newSnapshotter testsuite.Snapshotte
 	// Snapshot with root ownership (uid=0, gid=0) — no remap labels.
 	prepareAndCommitLCC(t, ctx, sn, root, "active-root", "snap-root", "", diffID)
 
-	cache0 := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0")
+	cache0 := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0.0")
 	if _, err := os.Stat(cache0); err != nil {
 		t.Fatalf("root-owned cache dir missing: %v", err)
 	}
@@ -512,6 +522,7 @@ func testLCCOwnershipIsolation(t *testing.T, newSnapshotter testsuite.Snapshotte
 		snapshots.LabelSnapshotDiffID: diffID,
 		labelSnapshotUID:              "1000",
 		labelSnapshotGID:              "1000",
+		labelSnapshotDiffIDSeq:        "0",
 	}}
 	pathRemapped, err := sn.lcc.contentPath(infoRemapped)
 	if err != nil {
@@ -668,7 +679,7 @@ func testLCCOrphanedStagingPreventsStaleHit(t *testing.T, newSnapshotter testsui
 
 	prepareAndCommitLCC(t, ctx, sn, root, "active-1", "snap-1", "", diffID)
 
-	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0")
+	cacheDir := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0.0")
 	if _, err := os.Stat(cacheDir); err != nil {
 		t.Fatalf("cache dir missing before test: %v", err)
 	}
@@ -721,6 +732,149 @@ func testLCCOrphanedStagingPreventsStaleHit(t *testing.T, newSnapshotter testsui
 	}
 	if err := sn.Remove(ctx, "active-race"); err != nil {
 		t.Fatalf("Remove active-race: %v", err)
+	}
+}
+
+// testLCCDuplicateLayer verifies that when the same diffID appears more than
+// once in a snapshot's parent chain, each occurrence gets a distinct seq number
+// and therefore a distinct cache directory. This is required because OverlayFS
+// rejects lower_dir sequences containing duplicate paths.
+//
+// The test builds the chain: root → X(seq=0) → Y(seq=0) → X(seq=1).
+// Both X snapshots must succeed, and their fs/ symlinks must point to distinct
+// cache directories.
+func testLCCDuplicateLayer(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
+	ctx := context.TODO()
+	root := t.TempDir()
+	o, _, err := newSnapshotter(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sn := o.(*testSnapshotter)
+
+	const diffIDX = "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+	const diffIDY = "sha256:0000000000000000000000000000000000000000000000000000000000000002"
+
+	// First occurrence of X: seq=0.
+	prepareAndCommitLCC(t, ctx, sn, root, "active-x0", "snap-x0", "", diffIDX)
+	// Y in between: seq=0 for Y.
+	prepareAndCommitLCC(t, ctx, sn, root, "active-y", "snap-y", "snap-x0", diffIDY)
+	// Second occurrence of X, parent chain contains one prior X → seq=1.
+	prepareAndCommitLCC(t, ctx, sn, root, "active-x1", "snap-x1", "snap-y", diffIDX)
+
+	cacheX0 := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0.0")
+	cacheX1 := filepath.Join(root, "cache", "sha256.0000000000000000000000000000000000000000000000000000000000000001.0.0.1")
+
+	if _, err := os.Stat(cacheX0); err != nil {
+		t.Errorf("cache dir for X seq=0 missing: %v", err)
+	}
+	if _, err := os.Stat(cacheX1); err != nil {
+		t.Errorf("cache dir for X seq=1 missing: %v", err)
+	}
+	if cacheX0 == cacheX1 {
+		t.Error("both X occurrences share a cache path — OverlayFS would reject duplicate lower_dir entries")
+	}
+
+	// snap-x0's fs/ must point to the seq=0 cache dir.
+	fsX0 := filepath.Join(getCommittedBasePath(ctx, sn, root, "snap-x0"), "fs")
+	checkSymlink(t, fsX0, cacheX0)
+
+	// snap-x1's fs/ must point to the seq=1 cache dir.
+	fsX1 := filepath.Join(getCommittedBasePath(ctx, sn, root, "snap-x1"), "fs")
+	checkSymlink(t, fsX1, cacheX1)
+}
+
+// testLCCDuplicateLayerCacheHit verifies that a snapshot whose parent chain
+// contains exactly one prior occurrence of the same diffID (seq=1) gets a cache
+// hit when the seq=1 directory already exists — i.e. seq is included in the
+// cache key for skip-apply decisions.
+func testLCCDuplicateLayerCacheHit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
+	ctx := context.TODO()
+	root := t.TempDir()
+	o, _, err := newSnapshotter(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sn := o.(*testSnapshotter)
+
+	const diffIDX = "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+	const diffIDY = "sha256:0000000000000000000000000000000000000000000000000000000000000002"
+
+	// Build chain root → X(seq=0) → Y(seq=0) → X(seq=1), seeding both cache dirs.
+	prepareAndCommitLCC(t, ctx, sn, root, "active-x0", "snap-x0", "", diffIDX)
+	prepareAndCommitLCC(t, ctx, sn, root, "active-y", "snap-y", "snap-x0", diffIDY)
+	prepareAndCommitLCC(t, ctx, sn, root, "active-x1", "snap-x1", "snap-y", diffIDX)
+
+	// Now prepare another snapshot whose parent chain also contains exactly one
+	// prior X (snap-x0 via snap-y) → seq=1. The seq=1 cache dir already exists
+	// from snap-x1, so this must be a cache hit.
+	labels := snapshots.WithLabels(map[string]string{snapshots.LabelSnapshotDiffID: diffIDX})
+	if _, err := sn.Prepare(ctx, "active-x1-hit", "snap-y", labels); err != nil {
+		t.Fatalf("Prepare (seq=1 hit): %v", err)
+	}
+
+	info, err := sn.Stat(ctx, "active-x1-hit")
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if info.Labels[snapshots.LabelSkipApply] != "true" {
+		t.Errorf("LabelSkipApply: got %q, want %q — seq=1 cache dir should trigger skip-apply", info.Labels[snapshots.LabelSkipApply], "true")
+	}
+
+	fsPath := filepath.Join(getBasePath(ctx, sn, root, "active-x1-hit"), "fs")
+	fi, err := os.Lstat(fsPath)
+	if err != nil {
+		t.Fatalf("Lstat fs: %v", err)
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("fs/ should be a symlink on seq=1 cache hit, got real dir")
+	}
+}
+
+// testLCCCountDiffIDInChain directly tests lccState.diffIDSeqInChain by building
+// committed snapshots and verifying the count at each point in the chain.
+func testLCCCountDiffIDInChain(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
+	ctx := context.TODO()
+	root := t.TempDir()
+	o, _, err := newSnapshotter(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sn := o.(*testSnapshotter)
+
+	const diffIDX = "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+	const diffIDY = "sha256:0000000000000000000000000000000000000000000000000000000000000002"
+
+	// Build chain: root → X → Y → X.
+	prepareAndCommitLCC(t, ctx, sn, root, "a-x0", "snap-x0", "", diffIDX)
+	prepareAndCommitLCC(t, ctx, sn, root, "a-y", "snap-y", "snap-x0", diffIDY)
+	prepareAndCommitLCC(t, ctx, sn, root, "a-x1", "snap-x1", "snap-y", diffIDX)
+
+	for _, tc := range []struct {
+		name   string
+		diffID string
+		parent string
+		want   int
+	}{
+		// No parent: count is always 0.
+		{"X at root", diffIDX, "", 0},
+		{"Y at root", diffIDY, "", 0},
+		// After snap-x0 (one X): X count is 1, Y count is 0.
+		{"X after snap-x0", diffIDX, "snap-x0", 1},
+		{"Y after snap-x0", diffIDY, "snap-x0", 0},
+		// After snap-y (one X, one Y): X count is still 1, Y count is 1.
+		{"X after snap-y", diffIDX, "snap-y", 1},
+		{"Y after snap-y", diffIDY, "snap-y", 1},
+		// After snap-x1 (two X, one Y): X count is 2, Y count is 1.
+		{"X after snap-x1", diffIDX, "snap-x1", 2},
+		{"Y after snap-x1", diffIDY, "snap-x1", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sn.lcc.diffIDSeqInChain(tc.parent, tc.diffID)
+			if got != tc.want {
+				t.Errorf("got %d, want %d", got, tc.want)
+			}
+		})
 	}
 }
 

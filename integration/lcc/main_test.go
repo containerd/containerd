@@ -350,7 +350,7 @@ func waitForSocket(t *testing.T, path string, timeout time.Duration) {
 }
 
 // blobDirInodes returns a map from LCC cache directory path to its inode
-// number. The layout is cache/<algorithm>.<hex>.<uid>.<gid>/; this reads the flat cache dir.
+// number. The layout is cache/<algorithm>.<hex>.<uid>.<gid>.<seq>/; this reads the flat cache dir.
 // ENOENT returns an empty map.
 //
 // Used by TestLCCLayerCacheIndependence to distinguish cache hits (same inode)
@@ -380,7 +380,7 @@ func blobDirInodes(t *testing.T, cacheDir string) map[string]uint64 {
 }
 
 // countCachedBlobs returns the number of LCC cache directories under cacheDir.
-// The layout is cache/<algorithm>.<hex>.<uid>.<gid>/; each direct child directory is one blob.
+// The layout is cache/<algorithm>.<hex>.<uid>.<gid>.<seq>/; each direct child directory is one blob.
 // ENOENT is treated as zero.
 func countCachedBlobs(t *testing.T, cacheDir string) int {
 	t.Helper()

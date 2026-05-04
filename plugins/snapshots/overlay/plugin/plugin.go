@@ -121,7 +121,7 @@ func init() {
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
-			return overlay.NewSnapshotter(root, oOpts...)
+			return overlay.NewSnapshotter(ic.Context, root, oOpts...)
 		},
 	})
 }

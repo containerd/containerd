@@ -26,26 +26,70 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 )
 
 const (
-	// When LCC is enabled, labelSnapshotUID and labelSnapshotGID record the uid/gid used to
-	// select the per-ownership cache content directory for this snapshot.
-	labelSnapshotUID = "containerd.io/snapshot.uid"
-	labelSnapshotGID = "containerd.io/snapshot.gid"
+	// When LCC is enabled, these labels are set on every LCC snapshot to fully
+	// identify its cache content directory without requiring a chain walk.
+	labelSnapshotUID       = "containerd.io/snapshot.uid"
+	labelSnapshotGID       = "containerd.io/snapshot.gid"
+	labelSnapshotDiffIDSeq = "containerd.io/snapshot.diffID.seq"
 )
 
 // layerContentCache holds per-snapshotter LCC configuration and runtime state.
 type layerContentCache struct {
-	root    string
-	enabled bool
+	sync.RWMutex
+	root     string
+	enabled  bool
+	snapInfo map[string]lccSnapshotInfo
+}
+
+type lccSnapshotInfo struct {
+	name   string
+	parent string
+	diffID string
+}
+
+// newLayerContentCache constructs a layerContentCache and, when enabled, pre-populates
+// snapInfo by walking all committed snapshots so that diffIDSeqInChain is ready before
+// the first Prepare call.
+func newLayerContentCache(ctx context.Context, ms MetaStore, root string, enabled bool) (*layerContentCache, error) {
+	lcc := &layerContentCache{
+		root:    root,
+		enabled: enabled,
+	}
+	if !enabled {
+		return lcc, nil
+	}
+
+	// IsNotFound means the storage bucket doesn't exist yet (fresh database) — treat as empty.
+	lcc.snapInfo = make(map[string]lccSnapshotInfo)
+	if err := ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		return storage.WalkInfo(ctx, func(_ context.Context, info snapshots.Info) error {
+			if info.Kind != snapshots.KindCommitted {
+				return nil
+			}
+			lcc.snapInfo[info.Name] = lccSnapshotInfo{
+				info.Name,
+				info.Parent,
+				info.Labels[snapshots.LabelSnapshotDiffID],
+			}
+			return nil
+		})
+	}); err != nil && !errdefs.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to walk snapshots for lcc cache: %w", err)
+	}
+
+	return lcc, nil
 }
 
 // WithLayerContentCache enables layer content caching on the snapshotter.
@@ -73,26 +117,28 @@ func hasCacheDir(info snapshots.Info) bool {
 }
 
 // contentPathFromParts computes the shared content directory path from the
-// raw diffID string and string-form uid/gid. The layout is:
-// <root>/cache/<algorithm>.<hex>.<uid>.<gid>/
-func (lcc *layerContentCache) contentPathFromParts(diffID string, uid, gid int) (string, error) {
+// raw diffID string, uid/gid, and sequence number. The layout is:
+// <root>/cache/<algorithm>.<hex>.<uid>.<gid>.<seq>/
+func (lcc *layerContentCache) contentPathFromParts(diffID string, uid, gid, seq int) (string, error) {
 	d, err := digest.Parse(diffID)
 	if err != nil {
 		return "", fmt.Errorf("invalid lcc diffID %q: %w", diffID, err)
 	}
-	name := fmt.Sprintf("%s.%s.%d.%d", d.Algorithm(), d.Encoded(), uid, gid)
+	name := fmt.Sprintf("%s.%s.%d.%d.%d", d.Algorithm(), d.Encoded(), uid, gid, seq)
 	return filepath.Join(lcc.root, "cache", name), nil
 }
 
 // contentPath returns the shared content directory for the snapshot. The
-// layout is: <root>/cache/<algorithm>.<hex>.<uid>.<gid>/, e.g.
-// <root>/cache/sha256.abc123....0.0 for diffID "sha256:abc123..." owned by root.
+// layout is: <root>/cache/<algorithm>.<hex>.<uid>.<gid>.<seq>/, e.g.
+// <root>/cache/sha256.abc123....0.0.0 for diffID "sha256:abc123..." owned by
+// root appearing for the first time in the layer chain.
 func (lcc *layerContentCache) contentPath(info snapshots.Info) (string, error) {
 	diffID := info.Labels[snapshots.LabelSnapshotDiffID]
 	uidStr := info.Labels[labelSnapshotUID]
 	gidStr := info.Labels[labelSnapshotGID]
-	if diffID == "" || uidStr == "" || gidStr == "" {
-		return "", fmt.Errorf("missing lcc labels for snapshot %q", info.Name)
+	seqStr := info.Labels[labelSnapshotDiffIDSeq]
+	if diffID == "" || uidStr == "" || gidStr == "" || seqStr == "" {
+		return "", fmt.Errorf("snapshot %q missing lcc labels (got %v)", info.Name, info.Labels)
 	}
 	uid, err := strconv.Atoi(uidStr)
 	if err != nil {
@@ -102,7 +148,64 @@ func (lcc *layerContentCache) contentPath(info snapshots.Info) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid lcc gid label %q: %w", gidStr, err)
 	}
-	return lcc.contentPathFromParts(diffID, uid, gid)
+	seq, err := strconv.Atoi(seqStr)
+	if err != nil {
+		return "", fmt.Errorf("invalid lcc seq label %q: %w", seqStr, err)
+	}
+	return lcc.contentPathFromParts(diffID, uid, gid, seq)
+}
+
+// diffIDSeqInChain returns the number of times diffID appears in the snapshot
+// chain leading up to and including parent. For a new snapshot being prepared on
+// top of parent, this is the sequence number that makes its cache path unique when
+// the same diffID recurs in the layer chain. Returns 0 for an empty parent.
+func (lcc *layerContentCache) diffIDSeqInChain(parent, diffID string) int {
+	lcc.RLock()
+	defer lcc.RUnlock()
+	count := 0
+	for cur := parent; cur != ""; cur = lcc.snapInfo[cur].parent {
+		if lcc.snapInfo[cur].diffID == diffID {
+			count++
+		}
+	}
+	return count
+}
+
+// addSnapInfo adds a newly committed snapshot to snapInfo so that future
+// diffIDSeqInChain calls using name as parent return correct results. It
+// returns a rollback closure that restores the prior state of snapInfo[name];
+// the caller uses this in a deferred error handler so that a failed Commit
+// undoes the in-memory write. When name already had an entry (e.g. a parallel
+// committer raced to commit the same chainID first, causing CommitActive to
+// return AlreadyExists), rollback restores that prior entry instead of deleting
+// it.
+func (lcc *layerContentCache) addSnapInfo(name, parent, diffID string) func() {
+	lcc.Lock()
+	defer lcc.Unlock()
+	prev, existed := lcc.snapInfo[name]
+	si := lccSnapshotInfo{
+		name:   name,
+		parent: parent,
+		diffID: diffID,
+	}
+	lcc.snapInfo[name] = si
+	return func() {
+		lcc.Lock()
+		defer lcc.Unlock()
+		if existed {
+			lcc.snapInfo[name] = prev
+		} else {
+			delete(lcc.snapInfo, name)
+		}
+	}
+}
+
+// deleteSnapInfo removes a snapshot from snapInfo when it is removed from the
+// snapshotter so that stale entries do not accumulate.
+func (lcc *layerContentCache) deleteSnapInfo(name string) {
+	lcc.Lock()
+	defer lcc.Unlock()
+	delete(lcc.snapInfo, name)
 }
 
 // orphanedContentPath returns a staging path derived from the given cache
@@ -118,19 +221,22 @@ func (lcc *layerContentCache) orphanedContentPath(path string) string {
 // LabelSkipApply. Labels are returned as a map so the caller can fold them into
 // the opts passed to storage.CreateSnapshot, preserving the Created == Updated
 // invariant (no storage.UpdateInfo call needed after creation).
-func (lcc *layerContentCache) computeLabels(diffID string, uid, gid int) (map[string]string, error) {
+func (lcc *layerContentCache) computeLabels(parent, diffID string, uid, gid int) (map[string]string, error) {
+	seq := lcc.diffIDSeqInChain(parent, diffID)
+
 	if uid == -1 || gid == -1 {
 		uid, gid = os.Getuid(), os.Getgid()
 	}
 
-	contentPath, err := lcc.contentPathFromParts(diffID, uid, gid)
+	contentPath, err := lcc.contentPathFromParts(diffID, uid, gid, seq)
 	if err != nil {
 		return nil, err
 	}
 
 	labels := map[string]string{
-		labelSnapshotUID: strconv.Itoa(uid),
-		labelSnapshotGID: strconv.Itoa(gid),
+		labelSnapshotUID:       strconv.Itoa(uid),
+		labelSnapshotGID:       strconv.Itoa(gid),
+		labelSnapshotDiffIDSeq: strconv.Itoa(seq),
 	}
 
 	f, err := os.Stat(contentPath)
@@ -148,7 +254,7 @@ func (lcc *layerContentCache) computeLabels(diffID string, uid, gid int) (map[st
 }
 
 // commitOpts returns opts that carry the labels needed by lcc.contentPath
-// into CommitActive. Both the diff-ID and the uid/gid ownership labels are
+// into CommitActive. The diff-ID, uid/gid ownership, and sequence number are all
 // re-injected from the active snapshot's info because CommitActive replaces
 // labels entirely with whatever opts supply; callers (e.g. pkg/rootfs/apply.go)
 // may not forward the diff-ID to Commit, so we preserve it here explicitly.
@@ -157,6 +263,7 @@ func (lcc *layerContentCache) commitOpts(info snapshots.Info) []snapshots.Opt {
 		snapshots.LabelSnapshotDiffID: info.Labels[snapshots.LabelSnapshotDiffID],
 		labelSnapshotUID:              info.Labels[labelSnapshotUID],
 		labelSnapshotGID:              info.Labels[labelSnapshotGID],
+		labelSnapshotDiffIDSeq:        info.Labels[labelSnapshotDiffIDSeq],
 	})}
 }
 

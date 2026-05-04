@@ -151,6 +151,74 @@ func TestLCCMultiPackageImage(t *testing.T) {
 	pruneAll(t, env, ref)
 }
 
+// TestLCCDuplicateLayer verifies that an image whose layer list contains the
+// same blob at two positions can be imported and run correctly. The sequence
+// number ensures each occurrence of the repeated diffID maps to a distinct cache
+// directory, satisfying the OverlayFS constraint that all lower_dir entries must
+// be distinct.
+//
+// Image layout: [pkgA, pkgB, pkgA] — pkgA appears at positions 0 and 2.
+// Expected outcome: three cache directories (pkgA.seq0, pkgB.seq0, pkgA.seq1),
+// all accessible and distinct, and the container can run both binaries.
+func TestLCCDuplicateLayer(t *testing.T) {
+	if os.Getuid() != 0 {
+		t.Skip("requires root (overlayfs + containerd)")
+	}
+	checkBinaries(t, "containerd", "ctr", "pkg2oci")
+
+	env := setupEnv(t)
+	const ref = "localhost/test/dup:v1"
+	tarPath := filepath.Join(env.tmp, "dup.tar")
+
+	blobA := makePrintBlob(t, env.tmp, "pkgA.tar.zst", "usr/bin/pkgA", "pkgA\n")
+	blobB := makePrintBlob(t, env.tmp, "pkgB.tar.zst", "usr/bin/pkgB", "pkgB\n")
+
+	// Pass blobA twice so the image has layers [A, B, A].
+	runCmd(t, env.ctx, "pkg2oci",
+		"--output", tarPath,
+		"--package", blobA,
+		"--package", blobB,
+		"--package", blobA,
+		ref,
+	)
+
+	ctrImport(t, env, tarPath)
+
+	// Three layers → three cache dirs: pkgA.seq=0, pkgB.seq=0, pkgA.seq=1.
+	cacheDir := env.cacheDir
+	blobCount := countCachedBlobs(t, cacheDir)
+	if blobCount != 3 {
+		t.Errorf("want 3 LCC cache dirs (pkgA.seq0, pkgB.seq0, pkgA.seq1), got %d", blobCount)
+	}
+
+	// Verify all three cache dirs are distinct (OverlayFS correctness).
+	entries, err := os.ReadDir(cacheDir)
+	if err != nil {
+		t.Fatalf("ReadDir cache: %v", err)
+	}
+	seen := map[string]struct{}{}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if _, dup := seen[e.Name()]; dup {
+			t.Errorf("duplicate cache dir name: %s", e.Name())
+		}
+		seen[e.Name()] = struct{}{}
+	}
+
+	outA := ctrRun(t, env, ref, "dup-run-a", "/usr/bin/pkgA")
+	if strings.TrimSpace(outA) != "pkgA" {
+		t.Errorf("pkgA: want %q, got %q", "pkgA", strings.TrimSpace(outA))
+	}
+	outB := ctrRun(t, env, ref, "dup-run-b", "/usr/bin/pkgB")
+	if strings.TrimSpace(outB) != "pkgB" {
+		t.Errorf("pkgB: want %q, got %q", "pkgB", strings.TrimSpace(outB))
+	}
+
+	pruneAll(t, env, ref)
+}
+
 // TestLCCLayerCacheIndependence demonstrates the core CAS property: each layer
 // blob is cached independently by content digest. Evicting a single blob does
 // not invalidate cache entries for any other layer. On the next import, only the

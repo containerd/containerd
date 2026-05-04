@@ -120,7 +120,7 @@ type snapshotter struct {
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
 // diffs are stored under the provided root. A metadata file is stored under
 // the root.
-func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
+func NewSnapshotter(ctx context.Context, root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	var config SnapshotterConfig
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
@@ -154,11 +154,6 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		}
 	}
 
-	lcc := &layerContentCache{
-		root:    root,
-		enabled: config.lccEnabled,
-	}
-
 	if !hasOption(config.mountOptions, "userxattr", false) {
 		// figure out whether "userxattr" option is recognized by the kernel && needed
 		userxattr, err := overlayutils.NeedsUserXAttr(root)
@@ -172,6 +167,11 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 
 	if !hasOption(config.mountOptions, "index", false) && supportsIndex() {
 		config.mountOptions = append(config.mountOptions, "index=off")
+	}
+
+	lcc, err := newLayerContentCache(ctx, config.ms, root, config.lccEnabled)
+	if err != nil {
+		return nil, err
 	}
 
 	return &snapshotter{
@@ -307,7 +307,19 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 	return o.mounts(s, info), nil
 }
 
-func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (err error) {
+	// addSnapInfo is called optimistically inside the transaction so that bolt's
+	// write serialisation prevents any concurrent Prepare from observing a missing
+	// entry. If the transaction or its disk commit fails, the defer rolls it back
+	// via the closure returned by addSnapInfo, which restores any prior entry
+	// rather than blindly deleting (CommitActive can fail with AlreadyExists when
+	// a parallel committer wins the race for the same chainID).
+	var rollbackSnapInfo func()
+	defer func() {
+		if err != nil && rollbackSnapInfo != nil {
+			rollbackSnapInfo()
+		}
+	}()
 	return o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
 		id, info, _, err := storage.GetInfo(ctx, key)
 		if err != nil {
@@ -319,6 +331,9 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			if err := o.lcc.commitFSDir(id, info); err != nil {
 				return err
 			}
+			parent := info.Parent
+			diffID := info.Labels[snapshots.LabelSnapshotDiffID]
+			rollbackSnapInfo = o.lcc.addSnapInfo(name, parent, diffID)
 		}
 
 		// TODO(klueska): Reevaluate disk usage for LCC layers; all snapshots
@@ -332,6 +347,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
 			return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
 		}
+
 		return nil
 	})
 }
@@ -350,6 +366,9 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 				if err := os.RemoveAll(dir); err != nil {
 					log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
 				}
+			}
+			if o.lcc.enabled {
+				o.lcc.deleteSnapInfo(key)
 			}
 		}
 	}()
@@ -483,7 +502,6 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	if err != nil {
 		return nil, err
 	}
-
 	if err := o.ms.WithTransaction(ctx, true, func(ctx context.Context) (err error) {
 		// Resolve the uid/gid that will own the snapshot's fs/ directory. This
 		// must happen before the LCC cache path is computed so that snapshots
@@ -541,13 +559,14 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		// directory between the stat and the prepareFSDir symlink that follows.
 		diffID := optLabels[snapshots.LabelSnapshotDiffID]
 		if o.lcc.enabled && diffID != "" {
-			lccLabels, err := o.lcc.computeLabels(diffID, mappedUID, mappedGID)
+			lccLabels, err := o.lcc.computeLabels(parent, diffID, mappedUID, mappedGID)
 			if err != nil {
 				return err
 			}
 			opts = append(opts, snapshots.WithLabels(lccLabels))
 		}
 
+		// All opts are assembled; create the snapshot.
 		s, err = storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 		if err != nil {
 			return fmt.Errorf("failed to create snapshot: %w", err)

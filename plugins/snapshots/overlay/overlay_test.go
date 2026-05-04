@@ -60,7 +60,7 @@ func (s *testSnapshotter) Prepare(ctx context.Context, key, parent string, opts 
 
 func newSnapshotterWithOpts(opts ...Opt) testsuite.SnapshotterFunc {
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-		s, err := NewSnapshotter(root, opts...)
+		s, err := NewSnapshotter(ctx, root, opts...)
 		if err != nil {
 			return nil, nil, err
 		}
