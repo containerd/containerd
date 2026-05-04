@@ -219,11 +219,13 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		}
 	}
 
-	recordImagePullThroughput(imagePullThroughput, bytesPulled, time.Since(startTime))
+	elapsed := time.Since(startTime)
+	recordImagePullThroughput(imagePullThroughput, bytesPulled, elapsed)
+	recordImagePullThroughput(imagePullThroughputMiBps, bytesPulled, elapsed)
 
 	size, _ := image.Size(ctx)
 	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", name, imageID,
-		repoTag, repoDigest, strconv.FormatInt(size, 10), time.Since(startTime))
+		repoTag, repoDigest, strconv.FormatInt(size, 10), elapsed)
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
 	// by someone else anytime, before/during/after we create the metadata. We should always
