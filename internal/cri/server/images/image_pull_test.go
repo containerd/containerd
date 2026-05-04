@@ -861,28 +861,28 @@ func TestRecordImagePullThroughput(t *testing.T) {
 		},
 		{
 			name:        "zero duration is not observed",
-			bytesPulled: 10 * mbToByte,
+			bytesPulled: 10 * mibToByte,
 			duration:    0,
 			wantSamples: 0,
 		},
 		{
-			name:        "cold pull observes MB/s from fetched bytes",
-			bytesPulled: 10 * mbToByte,
+			name:        "cold pull observes MiB/s from fetched bytes",
+			bytesPulled: 10 * mibToByte,
 			duration:    2 * time.Second,
 			wantSamples: 1,
 			wantValue:   5.0,
 		},
 		{
-			name:        "partial cache hit observes only fetched bytes",
-			// 200 MB image, 150 MB cached, 50 MB actually fetched over 1s.
-			bytesPulled: 50 * mbToByte,
+			name: "partial cache hit observes only fetched bytes",
+			// 200 MiB image, 150 MiB cached, 50 MiB actually fetched over 1s.
+			bytesPulled: 50 * mibToByte,
 			duration:    1 * time.Second,
 			wantSamples: 1,
 			wantValue:   50.0,
 		},
 		{
 			name:        "sub-second pull observes correctly",
-			bytesPulled: 25 * mbToByte,
+			bytesPulled: 25 * mibToByte,
 			duration:    500 * time.Millisecond,
 			wantSamples: 1,
 			wantValue:   50.0,
