@@ -121,17 +121,20 @@ func init() {
 				if uc.Differ != "" {
 					inst, err := ic.GetByID(plugins.DiffPlugin, uc.Differ)
 					if err != nil {
+						if uc.Optional {
+							continue
+						}
 						return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", uc.Differ, err)
 					}
 					applier = inst.(diff.Applier)
 				} else {
 					var applierID string
-					for _, plugin := range ic.GetAll() {
-						if plugin.Registration.Type != plugins.DiffPlugin {
+					for _, diffPlugin := range ic.GetAll() {
+						if diffPlugin.Registration.Type != plugins.DiffPlugin {
 							continue
 						}
 						var matched bool
-						for _, pd := range plugin.Meta.Platforms {
+						for _, pd := range diffPlugin.Meta.Platforms {
 							// Note that we must use the platforms supported by the differ to
 							// match the platform in `UnpackConfiguration`.
 							//
@@ -146,7 +149,7 @@ func init() {
 							continue
 						}
 						if applier != nil {
-							skippedApplier := plugin.Registration.ID
+							skippedApplier := diffPlugin.Registration.ID
 
 							// Prefer the default when multiple plugins match
 							if skippedApplier == defaults.DefaultDiffer {
@@ -155,16 +158,19 @@ func init() {
 
 							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", skippedApplier)
 
-							if plugin.Registration.ID == skippedApplier {
+							if diffPlugin.Registration.ID == skippedApplier {
 								continue
 							}
 						}
-						inst, err := plugin.Instance()
+						inst, err := diffPlugin.Instance()
 						if err != nil {
-							return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", plugin.Registration.ID, err)
+							if plugin.IsSkipPlugin(err) {
+								continue
+							}
+							return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", diffPlugin.Registration.ID, err)
 						}
 						applier = inst.(diff.Applier)
-						applierID = plugin.Registration.ID
+						applierID = diffPlugin.Registration.ID
 					}
 				}
 				if applier == nil {
