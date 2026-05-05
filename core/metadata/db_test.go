@@ -36,6 +36,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
+	bolterr "go.etcd.io/bbolt/errors"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
@@ -103,7 +104,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB) {
 	require.NoError(t, db.Init(ctx))
 
 	t.Cleanup(func() {
-		assert.NoError(t, bdb.Close())
+		assert.NoError(t, db.Close())
 	})
 
 	return ctx, db
@@ -904,6 +905,19 @@ func newStores(t testing.TB) (*DB, content.Store, snapshots.Snapshotter, func())
 
 	return mdb, mdb.ContentStore(), mdb.Snapshotter("native"), func() {
 		nsn.Close()
-		db.Close()
+		mdb.Close()
 	}
+}
+
+func TestClose(t *testing.T) {
+	td := t.TempDir()
+	bdb, err := bolt.Open(filepath.Join(td, "metadata.db"), 0644, nil)
+	require.NoError(t, err)
+
+	db := NewDB(bdb, nil, nil)
+	require.NoError(t, db.Close())
+
+	// Verify the underlying bolt DB is closed: a new transaction should fail.
+	_, err = bdb.Begin(false)
+	assert.ErrorIs(t, err, bolterr.ErrDatabaseNotOpen)
 }
