@@ -228,7 +228,7 @@ can be used and modified as necessary as a custom configuration.`
 			}
 
 			// Launch as a Windows Service if necessary
-			if err := launchService(server, done); err != nil {
+			if err := launchService(server, done, cancel); err != nil {
 				log.L.Fatal(err)
 			}
 			select {
