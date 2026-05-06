@@ -147,7 +147,7 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 		desiredStatus := containerd.ProcessStatus(labels[restart.StatusLabel])
 		if task, err = c.Task(ctx, nil); err == nil {
 			if status, err = task.Status(ctx); err == nil {
-				if desiredStatus == status.Status {
+				if desiredStatus == status.Status || status.Status == containerd.Created {
 					continue
 				}
 			}
