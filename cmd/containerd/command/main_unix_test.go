@@ -30,6 +30,17 @@ import (
 )
 
 func TestHandleSignalsIgnoreSIGHUP(t *testing.T) {
+	var handlesSIGHUP bool
+	for _, signal := range handledSignals {
+		if signal == unix.SIGHUP {
+			handlesSIGHUP = true
+			break
+		}
+	}
+	if !handlesSIGHUP {
+		t.Fatal("handledSignals should include SIGHUP")
+	}
+
 	signals := make(chan os.Signal, 2)
 	serverC := make(chan *server.Server, 1)
 	var cancelCalled atomic.Bool
