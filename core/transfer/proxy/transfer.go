@@ -91,6 +91,7 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src any, dst any, opts 
 		opt(o)
 	}
 	apiOpts := &transferapi.TransferOptions{}
+	done := make(chan struct{})
 	if o.Progress != nil {
 		sid := tstreaming.GenerateID("progress")
 		stream, err := p.streamCreator.Create(ctx, sid)
@@ -105,6 +106,7 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src any, dst any, opts 
 					if !errors.Is(err, io.EOF) {
 						log.G(ctx).WithError(err).Error("progress stream failed to recv")
 					}
+					close(done)
 					return
 				}
 				i, err := typeurl.UnmarshalAny(a)
@@ -152,6 +154,9 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src any, dst any, opts 
 		Options: apiOpts,
 	}
 	_, err = p.client.Transfer(ctx, req)
+	if o.Progress != nil {
+		<-done
+	}
 	return errgrpc.ToNative(err)
 }
 func (p *proxyTransferrer) marshalAny(ctx context.Context, i any) (typeurl.Any, error) {
