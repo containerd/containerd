@@ -25119,7 +25119,7 @@ file: {
     location: {
       span: 33
       span: 0
-      span: 128
+      span: 129
       span: 1
     }
     location: {
@@ -25161,7 +25161,7 @@ file: {
       path: 0
       span: 42
       span: 0
-      span: 77
+      span: 78
       span: 1
       leading_comments: " BootstrapParams contains all configuration passed from containerd to shim at startup.\n"
     }
@@ -25508,7 +25508,7 @@ file: {
       path: 0
       path: 2
       path: 8
-      span: 76
+      span: 77
       span: 2
       span: 33
       leading_comments: " Optional directory for the shim to place its unix socket.\n If empty, the shim defaults to a short, well-known path\n (e.g., /run/containerd/s). The path must be kept short because\n the socket filename is a 64-character SHA256 hash and unix\n socket paths are limited to 104-108 bytes depending on platform.\n"
@@ -25519,7 +25519,7 @@ file: {
       path: 2
       path: 8
       path: 4
-      span: 76
+      span: 77
       span: 2
       span: 10
     }
@@ -25529,7 +25529,7 @@ file: {
       path: 2
       path: 8
       path: 5
-      span: 76
+      span: 77
       span: 11
       span: 17
     }
@@ -25539,7 +25539,7 @@ file: {
       path: 2
       path: 8
       path: 1
-      span: 76
+      span: 77
       span: 18
       span: 28
     }
@@ -25549,16 +25549,16 @@ file: {
       path: 2
       path: 8
       path: 3
-      span: 76
+      span: 77
       span: 31
       span: 32
     }
     location: {
       path: 4
       path: 1
-      span: 81
+      span: 82
       span: 0
-      span: 88
+      span: 89
       span: 1
       leading_comments: " Extension provides extensibility for new configuration types\n without changing the core BootstrapParams protocol\n"
     }
@@ -25566,7 +25566,7 @@ file: {
       path: 4
       path: 1
       path: 1
-      span: 81
+      span: 82
       span: 8
       span: 17
     }
@@ -25575,7 +25575,7 @@ file: {
       path: 1
       path: 2
       path: 0
-      span: 87
+      span: 88
       span: 2
       span: 32
       leading_comments: " Configuration data with embedded type URL\n Examples of type URLs:\n   - \"containerd.io/cri.v1.PodSandboxConfig\"\n   - \"containerd.io/nri.v1.PluginConfig\"\n   - \"containerd.io/sandbox.v1.SandboxConfig\"\n"
@@ -25586,7 +25586,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 87
+      span: 88
       span: 2
       span: 21
     }
@@ -25596,7 +25596,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 87
+      span: 88
       span: 22
       span: 27
     }
@@ -25606,16 +25606,16 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 87
+      span: 88
       span: 30
       span: 31
     }
     location: {
       path: 4
       path: 2
-      span: 91
+      span: 92
       span: 0
-      span: 109
+      span: 110
       span: 1
       leading_comments: " BootstrapResult is returned by shim via stdout after successful startup\n"
     }
@@ -25623,7 +25623,7 @@ file: {
       path: 4
       path: 2
       path: 1
-      span: 91
+      span: 92
       span: 8
       span: 23
     }
@@ -25632,7 +25632,7 @@ file: {
       path: 2
       path: 2
       path: 0
-      span: 93
+      span: 94
       span: 2
       span: 20
       leading_comments: " Version of shim parameters (expected 2 for shim v2)\n"
@@ -25643,7 +25643,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 93
+      span: 94
       span: 2
       span: 7
     }
@@ -25653,7 +25653,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 93
+      span: 94
       span: 8
       span: 15
     }
@@ -25663,7 +25663,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 93
+      span: 94
       span: 18
       span: 19
     }
@@ -25672,7 +25672,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 97
+      span: 98
       span: 2
       span: 21
       leading_comments: " Address where shim is listening (e.g., \"unix:///run/containerd/shim.sock\")\n Containerd will connect to this address for task operations\n"
@@ -25683,7 +25683,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 97
+      span: 98
       span: 2
       span: 8
     }
@@ -25693,7 +25693,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 97
+      span: 98
       span: 9
       span: 16
     }
@@ -25703,7 +25703,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 97
+      span: 98
       span: 19
       span: 20
     }
@@ -25712,7 +25712,7 @@ file: {
       path: 2
       path: 2
       path: 2
-      span: 100
+      span: 101
       span: 2
       span: 22
       leading_comments: " Protocol used by shim: \"ttrpc\" or \"grpc\"\n"
@@ -25723,7 +25723,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 100
+      span: 101
       span: 2
       span: 8
     }
@@ -25733,7 +25733,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 100
+      span: 101
       span: 9
       span: 17
     }
@@ -25743,7 +25743,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 100
+      span: 101
       span: 20
       span: 21
     }
@@ -25752,7 +25752,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 105
+      span: 106
       span: 2
       span: 39
       leading_comments: " Optional: Capabilities supported by this shim instance.\n Reserved for future use to allow optional capability negotiation\n between the daemon and shim.\n"
@@ -25763,7 +25763,7 @@ file: {
       path: 2
       path: 3
       path: 4
-      span: 105
+      span: 106
       span: 2
       span: 10
     }
@@ -25773,7 +25773,7 @@ file: {
       path: 2
       path: 3
       path: 6
-      span: 105
+      span: 106
       span: 11
       span: 21
     }
@@ -25783,7 +25783,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 105
+      span: 106
       span: 22
       span: 34
     }
@@ -25793,7 +25793,7 @@ file: {
       path: 2
       path: 3
       path: 3
-      span: 105
+      span: 106
       span: 37
       span: 38
     }
@@ -25802,7 +25802,7 @@ file: {
       path: 2
       path: 2
       path: 4
-      span: 108
+      span: 109
       span: 2
       span: 35
       leading_comments: " Optional: Additional metadata from shim\n"
@@ -25813,7 +25813,7 @@ file: {
       path: 2
       path: 4
       path: 6
-      span: 108
+      span: 109
       span: 2
       span: 21
     }
@@ -25823,7 +25823,7 @@ file: {
       path: 2
       path: 4
       path: 1
-      span: 108
+      span: 109
       span: 22
       span: 30
     }
@@ -25833,16 +25833,16 @@ file: {
       path: 2
       path: 4
       path: 3
-      span: 108
+      span: 109
       span: 33
       span: 34
     }
     location: {
       path: 5
       path: 0
-      span: 114
+      span: 115
       span: 0
-      span: 122
+      span: 123
       span: 1
       leading_comments: " LogLevel defines log verbosity. INFO = 0, more critical levels are\n positive, and more verbose levels are negative. This is an open enum;\n unknown numeric values are preserved on the wire.\n"
     }
@@ -25850,7 +25850,7 @@ file: {
       path: 5
       path: 0
       path: 1
-      span: 114
+      span: 115
       span: 5
       span: 13
     }
@@ -25859,7 +25859,7 @@ file: {
       path: 0
       path: 2
       path: 0
-      span: 115
+      span: 116
       span: 2
       span: 22
     }
@@ -25869,7 +25869,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 115
+      span: 116
       span: 2
       span: 16
     }
@@ -25879,7 +25879,7 @@ file: {
       path: 2
       path: 0
       path: 2
-      span: 115
+      span: 116
       span: 20
       span: 21
     }
@@ -25888,7 +25888,7 @@ file: {
       path: 0
       path: 2
       path: 1
-      span: 116
+      span: 117
       span: 2
       span: 23
     }
@@ -25898,7 +25898,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 116
+      span: 117
       span: 2
       span: 17
     }
@@ -25908,7 +25908,7 @@ file: {
       path: 2
       path: 1
       path: 2
-      span: 116
+      span: 117
       span: 20
       span: 22
     }
@@ -25917,7 +25917,7 @@ file: {
       path: 0
       path: 2
       path: 2
-      span: 117
+      span: 118
       span: 2
       span: 23
     }
@@ -25927,7 +25927,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 117
+      span: 118
       span: 2
       span: 17
     }
@@ -25937,7 +25937,7 @@ file: {
       path: 2
       path: 2
       path: 2
-      span: 117
+      span: 118
       span: 20
       span: 22
     }
@@ -25946,7 +25946,7 @@ file: {
       path: 0
       path: 2
       path: 3
-      span: 118
+      span: 119
       span: 2
       span: 22
     }
@@ -25956,7 +25956,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 118
+      span: 119
       span: 2
       span: 16
     }
@@ -25966,7 +25966,7 @@ file: {
       path: 2
       path: 3
       path: 2
-      span: 118
+      span: 119
       span: 20
       span: 21
     }
@@ -25975,7 +25975,7 @@ file: {
       path: 0
       path: 2
       path: 4
-      span: 119
+      span: 120
       span: 2
       span: 22
     }
@@ -25985,7 +25985,7 @@ file: {
       path: 2
       path: 4
       path: 1
-      span: 119
+      span: 120
       span: 2
       span: 17
     }
@@ -25995,7 +25995,7 @@ file: {
       path: 2
       path: 4
       path: 2
-      span: 119
+      span: 120
       span: 20
       span: 21
     }
@@ -26004,7 +26004,7 @@ file: {
       path: 0
       path: 2
       path: 5
-      span: 120
+      span: 121
       span: 2
       span: 23
     }
@@ -26014,7 +26014,7 @@ file: {
       path: 2
       path: 5
       path: 1
-      span: 120
+      span: 121
       span: 2
       span: 17
     }
@@ -26024,7 +26024,7 @@ file: {
       path: 2
       path: 5
       path: 2
-      span: 120
+      span: 121
       span: 20
       span: 22
     }
@@ -26033,7 +26033,7 @@ file: {
       path: 0
       path: 2
       path: 6
-      span: 121
+      span: 122
       span: 2
       span: 23
     }
@@ -26043,7 +26043,7 @@ file: {
       path: 2
       path: 6
       path: 1
-      span: 121
+      span: 122
       span: 2
       span: 17
     }
@@ -26053,16 +26053,16 @@ file: {
       path: 2
       path: 6
       path: 2
-      span: 121
+      span: 122
       span: 20
       span: 22
     }
     location: {
       path: 5
       path: 1
-      span: 126
+      span: 127
       span: 0
-      span: 128
+      span: 129
       span: 1
       leading_comments: " Capability defines optional features that can be negotiated between\n containerd and shims.\n"
     }
@@ -26070,7 +26070,7 @@ file: {
       path: 5
       path: 1
       path: 1
-      span: 126
+      span: 127
       span: 5
       span: 15
     }
@@ -26079,7 +26079,7 @@ file: {
       path: 1
       path: 2
       path: 0
-      span: 127
+      span: 128
       span: 2
       span: 29
     }
@@ -26089,7 +26089,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 127
+      span: 128
       span: 2
       span: 24
     }
@@ -26099,7 +26099,7 @@ file: {
       path: 2
       path: 0
       path: 2
-      span: 127
+      span: 128
       span: 27
       span: 28
     }
@@ -48215,14 +48215,13 @@ file: {
     java_outer_classname: "StatusProto"
     java_multiple_files: true
     go_package: "google.golang.org/genproto/googleapis/rpc/status;status"
-    cc_enable_arenas: true
     objc_class_prefix: "RPC"
   }
   source_code_info: {
     location: {
       span: 14
       span: 0
-      span: 48
+      span: 47
       span: 1
     }
     location: {
@@ -48230,7 +48229,7 @@ file: {
       span: 14
       span: 0
       span: 18
-      leading_detached_comments: " Copyright 2025 Google LLC\n\n Licensed under the Apache License, Version 2.0 (the \"License\");\n you may not use this file except in compliance with the License.\n You may obtain a copy of the License at\n\n     http://www.apache.org/licenses/LICENSE-2.0\n\n Unless required by applicable law or agreed to in writing, software\n distributed under the License is distributed on an \"AS IS\" BASIS,\n WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n See the License for the specific language governing permissions and\n limitations under the License.\n"
+      leading_detached_comments: " Copyright 2026 Google LLC\n\n Licensed under the Apache License, Version 2.0 (the \"License\");\n you may not use this file except in compliance with the License.\n You may obtain a copy of the License at\n\n     http://www.apache.org/licenses/LICENSE-2.0\n\n Unless required by applicable law or agreed to in writing, software\n distributed under the License is distributed on an \"AS IS\" BASIS,\n WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n See the License for the specific language governing permissions and\n limitations under the License.\n"
     }
     location: {
       path: 2
@@ -48249,86 +48248,73 @@ file: {
       path: 8
       span: 20
       span: 0
-      span: 31
-    }
-    location: {
-      path: 8
-      path: 31
-      span: 20
-      span: 0
-      span: 31
-    }
-    location: {
-      path: 8
-      span: 21
-      span: 0
       span: 78
     }
     location: {
       path: 8
       path: 11
-      span: 21
+      span: 20
       span: 0
       span: 78
     }
     location: {
       path: 8
-      span: 22
+      span: 21
       span: 0
       span: 34
     }
     location: {
       path: 8
       path: 10
-      span: 22
+      span: 21
       span: 0
       span: 34
     }
     location: {
       path: 8
-      span: 23
+      span: 22
       span: 0
       span: 44
     }
     location: {
       path: 8
       path: 8
-      span: 23
+      span: 22
       span: 0
       span: 44
     }
     location: {
       path: 8
-      span: 24
+      span: 23
       span: 0
       span: 39
     }
     location: {
       path: 8
       path: 1
-      span: 24
+      span: 23
       span: 0
       span: 39
     }
     location: {
       path: 8
-      span: 25
+      span: 24
       span: 0
       span: 33
     }
     location: {
       path: 8
       path: 36
-      span: 25
+      span: 24
       span: 0
       span: 33
     }
     location: {
       path: 4
       path: 0
-      span: 34
+      span: 33
       span: 0
-      span: 48
+      span: 47
       span: 1
       leading_comments: " The `Status` type defines a logical error model that is suitable for\n different programming environments, including REST APIs and RPC APIs. It is\n used by [gRPC](https://github.com/grpc). Each `Status` message contains\n three pieces of data: error code, error message, and error details.\n\n You can find out more about this error model and how to work with it in the\n [API Design Guide](https://cloud.google.com/apis/design/errors).\n"
     }
@@ -48336,7 +48322,7 @@ file: {
       path: 4
       path: 0
       path: 1
-      span: 34
+      span: 33
       span: 8
       span: 14
     }
@@ -48345,7 +48331,7 @@ file: {
       path: 0
       path: 2
       path: 0
-      span: 37
+      span: 36
       span: 2
       span: 17
       leading_comments: " The status code, which should be an enum value of\n [google.rpc.Code][google.rpc.Code].\n"
@@ -48356,7 +48342,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 37
+      span: 36
       span: 2
       span: 7
     }
@@ -48366,7 +48352,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 37
+      span: 36
       span: 8
       span: 12
     }
@@ -48376,7 +48362,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 37
+      span: 36
       span: 15
       span: 16
     }
@@ -48385,7 +48371,7 @@ file: {
       path: 0
       path: 2
       path: 1
-      span: 43
+      span: 42
       span: 2
       span: 21
       leading_comments: " A developer-facing error message, which should be in English. Any\n user-facing error message should be localized and sent in the\n [google.rpc.Status.details][google.rpc.Status.details] field, or localized\n by the client.\n"
@@ -48396,7 +48382,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 43
+      span: 42
       span: 2
       span: 8
     }
@@ -48406,7 +48392,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 43
+      span: 42
       span: 9
       span: 16
     }
@@ -48416,7 +48402,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 43
+      span: 42
       span: 19
       span: 20
     }
@@ -48425,7 +48411,7 @@ file: {
       path: 0
       path: 2
       path: 2
-      span: 47
+      span: 46
       span: 2
       span: 43
       leading_comments: " A list of messages that carry the error details.  There is a common set of\n message types for APIs to use.\n"
@@ -48436,7 +48422,7 @@ file: {
       path: 2
       path: 2
       path: 4
-      span: 47
+      span: 46
       span: 2
       span: 10
     }
@@ -48446,7 +48432,7 @@ file: {
       path: 2
       path: 2
       path: 6
-      span: 47
+      span: 46
       span: 11
       span: 30
     }
@@ -48456,7 +48442,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 47
+      span: 46
       span: 31
       span: 38
     }
@@ -48466,7 +48452,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 47
+      span: 46
       span: 41
       span: 42
     }
@@ -48480,7 +48466,7 @@ file: {
         owner: "googleapis"
         repository: "googleapis"
       }
-      commit: "536964a08a534d51b8f30f2d6751f1f9"
+      commit: "c17df5b2beca46928cc87d5656bd5343"
     }
     is_syntax_unspecified: false
   }
@@ -62325,6 +62311,20 @@ file: {
       type: TYPE_STRING
       json_name: "runtimePath"
     }
+    field: {
+      name: "task_api_address"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "taskApiAddress"
+    }
+    field: {
+      name: "task_api_version"
+      number: 12
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "taskApiVersion"
+    }
   }
   message_type: {
     name: "CreateTaskResponse"
@@ -62894,7 +62894,7 @@ file: {
     location: {
       span: 16
       span: 0
-      span: 225
+      span: 235
       span: 1
     }
     location: {
@@ -63660,7 +63660,7 @@ file: {
       path: 0
       span: 70
       span: 0
-      span: 91
+      span: 101
       span: 1
     }
     location: {
@@ -64035,17 +64035,97 @@ file: {
     }
     location: {
       path: 4
+      path: 0
+      path: 2
+      path: 9
+      span: 97
+      span: 2
+      span: 31
+      leading_comments: " TaskApiAddress optionally specifies the address of an existing task API\n endpoint (e.g. an in-VM agent for sandbox runtimes such as Kata).\n When set, containerd connects to this address for task operations instead\n of bootstrapping a new shim.  The format is <protocol>+<scheme>://...,\n e.g. \"ttrpc+unix:///path/to/uds\" or \"grpc+vsock://<cid>:<port>\".\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 9
+      path: 5
+      span: 97
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 9
       path: 1
-      span: 93
+      span: 97
+      span: 9
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 9
+      path: 3
+      span: 97
+      span: 28
+      span: 30
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 10
+      span: 100
+      span: 2
+      span: 31
+      leading_comments: " TaskApiVersion is the shim API version served at TaskApiAddress.\n Currently supported values are 2 and 3.\n"
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 10
+      path: 5
+      span: 100
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 10
+      path: 1
+      span: 100
+      span: 9
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 10
+      path: 3
+      span: 100
+      span: 28
+      span: 30
+    }
+    location: {
+      path: 4
+      path: 1
+      span: 103
       span: 0
-      span: 96
+      span: 106
       span: 1
     }
     location: {
       path: 4
       path: 1
       path: 1
-      span: 93
+      span: 103
       span: 8
       span: 26
     }
@@ -64054,7 +64134,7 @@ file: {
       path: 1
       path: 2
       path: 0
-      span: 94
+      span: 104
       span: 2
       span: 26
     }
@@ -64064,7 +64144,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 94
+      span: 104
       span: 2
       span: 8
     }
@@ -64074,7 +64154,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 94
+      span: 104
       span: 9
       span: 21
     }
@@ -64084,7 +64164,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 94
+      span: 104
       span: 24
       span: 25
     }
@@ -64093,7 +64173,7 @@ file: {
       path: 1
       path: 2
       path: 1
-      span: 95
+      span: 105
       span: 2
       span: 17
     }
@@ -64103,7 +64183,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 95
+      span: 105
       span: 2
       span: 8
     }
@@ -64113,7 +64193,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 95
+      span: 105
       span: 9
       span: 12
     }
@@ -64123,23 +64203,23 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 95
+      span: 105
       span: 15
       span: 16
     }
     location: {
       path: 4
       path: 2
-      span: 98
+      span: 108
       span: 0
-      span: 101
+      span: 111
       span: 1
     }
     location: {
       path: 4
       path: 2
       path: 1
-      span: 98
+      span: 108
       span: 8
       span: 20
     }
@@ -64148,7 +64228,7 @@ file: {
       path: 2
       path: 2
       path: 0
-      span: 99
+      span: 109
       span: 2
       span: 26
     }
@@ -64158,7 +64238,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 99
+      span: 109
       span: 2
       span: 8
     }
@@ -64168,7 +64248,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 99
+      span: 109
       span: 9
       span: 21
     }
@@ -64178,7 +64258,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 99
+      span: 109
       span: 24
       span: 25
     }
@@ -64187,7 +64267,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 100
+      span: 110
       span: 2
       span: 21
     }
@@ -64197,7 +64277,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 100
+      span: 110
       span: 2
       span: 8
     }
@@ -64207,7 +64287,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 100
+      span: 110
       span: 9
       span: 16
     }
@@ -64217,23 +64297,23 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 100
+      span: 110
       span: 19
       span: 20
     }
     location: {
       path: 4
       path: 3
-      span: 103
+      span: 113
       span: 0
-      span: 105
+      span: 115
       span: 1
     }
     location: {
       path: 4
       path: 3
       path: 1
-      span: 103
+      span: 113
       span: 8
       span: 21
     }
@@ -64242,7 +64322,7 @@ file: {
       path: 3
       path: 2
       path: 0
-      span: 104
+      span: 114
       span: 2
       span: 17
     }
@@ -64252,7 +64332,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 104
+      span: 114
       span: 2
       span: 8
     }
@@ -64262,7 +64342,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 104
+      span: 114
       span: 9
       span: 12
     }
@@ -64272,23 +64352,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 104
+      span: 114
       span: 15
       span: 16
     }
     location: {
       path: 4
       path: 4
-      span: 107
+      span: 117
       span: 0
-      span: 109
+      span: 119
       span: 1
     }
     location: {
       path: 4
       path: 4
       path: 1
-      span: 107
+      span: 117
       span: 8
       span: 25
     }
@@ -64297,7 +64377,7 @@ file: {
       path: 4
       path: 2
       path: 0
-      span: 108
+      span: 118
       span: 2
       span: 26
     }
@@ -64307,7 +64387,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 108
+      span: 118
       span: 2
       span: 8
     }
@@ -64317,7 +64397,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 108
+      span: 118
       span: 9
       span: 21
     }
@@ -64327,23 +64407,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 108
+      span: 118
       span: 24
       span: 25
     }
     location: {
       path: 4
       path: 5
-      span: 111
+      span: 121
       span: 0
-      span: 116
+      span: 126
       span: 1
     }
     location: {
       path: 4
       path: 5
       path: 1
-      span: 111
+      span: 121
       span: 8
       span: 22
     }
@@ -64352,7 +64432,7 @@ file: {
       path: 5
       path: 2
       path: 0
-      span: 112
+      span: 122
       span: 2
       span: 16
     }
@@ -64362,7 +64442,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 112
+      span: 122
       span: 2
       span: 8
     }
@@ -64372,7 +64452,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 112
+      span: 122
       span: 9
       span: 11
     }
@@ -64382,7 +64462,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 112
+      span: 122
       span: 14
       span: 15
     }
@@ -64391,7 +64471,7 @@ file: {
       path: 5
       path: 2
       path: 1
-      span: 113
+      span: 123
       span: 2
       span: 17
     }
@@ -64401,7 +64481,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 113
+      span: 123
       span: 2
       span: 8
     }
@@ -64411,7 +64491,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 113
+      span: 123
       span: 9
       span: 12
     }
@@ -64421,7 +64501,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 113
+      span: 123
       span: 15
       span: 16
     }
@@ -64430,7 +64510,7 @@ file: {
       path: 5
       path: 2
       path: 2
-      span: 114
+      span: 124
       span: 2
       span: 25
     }
@@ -64440,7 +64520,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 114
+      span: 124
       span: 2
       span: 8
     }
@@ -64450,7 +64530,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 114
+      span: 124
       span: 9
       span: 20
     }
@@ -64460,7 +64540,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 114
+      span: 124
       span: 23
       span: 24
     }
@@ -64469,7 +64549,7 @@ file: {
       path: 5
       path: 2
       path: 3
-      span: 115
+      span: 125
       span: 2
       span: 42
     }
@@ -64479,7 +64559,7 @@ file: {
       path: 2
       path: 3
       path: 6
-      span: 115
+      span: 125
       span: 2
       span: 27
     }
@@ -64489,7 +64569,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 115
+      span: 125
       span: 28
       span: 37
     }
@@ -64499,23 +64579,23 @@ file: {
       path: 2
       path: 3
       path: 3
-      span: 115
+      span: 125
       span: 40
       span: 41
     }
     location: {
       path: 4
       path: 6
-      span: 118
+      span: 128
       span: 0
-      span: 121
+      span: 131
       span: 1
     }
     location: {
       path: 4
       path: 6
       path: 1
-      span: 118
+      span: 128
       span: 8
       span: 28
     }
@@ -64524,7 +64604,7 @@ file: {
       path: 6
       path: 2
       path: 0
-      span: 119
+      span: 129
       span: 2
       span: 26
     }
@@ -64534,7 +64614,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 119
+      span: 129
       span: 2
       span: 8
     }
@@ -64544,7 +64624,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 119
+      span: 129
       span: 9
       span: 21
     }
@@ -64554,7 +64634,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 119
+      span: 129
       span: 24
       span: 25
     }
@@ -64563,7 +64643,7 @@ file: {
       path: 6
       path: 2
       path: 1
-      span: 120
+      span: 130
       span: 2
       span: 21
     }
@@ -64573,7 +64653,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 120
+      span: 130
       span: 2
       span: 8
     }
@@ -64583,7 +64663,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 120
+      span: 130
       span: 9
       span: 16
     }
@@ -64593,23 +64673,23 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 120
+      span: 130
       span: 19
       span: 20
     }
     location: {
       path: 4
       path: 7
-      span: 123
+      span: 133
       span: 0
-      span: 126
+      span: 136
       span: 1
     }
     location: {
       path: 4
       path: 7
       path: 1
-      span: 123
+      span: 133
       span: 8
       span: 18
     }
@@ -64618,7 +64698,7 @@ file: {
       path: 7
       path: 2
       path: 0
-      span: 124
+      span: 134
       span: 2
       span: 26
     }
@@ -64628,7 +64708,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 124
+      span: 134
       span: 2
       span: 8
     }
@@ -64638,7 +64718,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 124
+      span: 134
       span: 9
       span: 21
     }
@@ -64648,7 +64728,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 124
+      span: 134
       span: 24
       span: 25
     }
@@ -64657,7 +64737,7 @@ file: {
       path: 7
       path: 2
       path: 1
-      span: 125
+      span: 135
       span: 2
       span: 21
     }
@@ -64667,7 +64747,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 125
+      span: 135
       span: 2
       span: 8
     }
@@ -64677,7 +64757,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 125
+      span: 135
       span: 9
       span: 16
     }
@@ -64687,23 +64767,23 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 125
+      span: 135
       span: 19
       span: 20
     }
     location: {
       path: 4
       path: 8
-      span: 128
+      span: 138
       span: 0
-      span: 130
+      span: 140
       span: 1
     }
     location: {
       path: 4
       path: 8
       path: 1
-      span: 128
+      span: 138
       span: 8
       span: 19
     }
@@ -64712,7 +64792,7 @@ file: {
       path: 8
       path: 2
       path: 0
-      span: 129
+      span: 139
       span: 2
       span: 42
     }
@@ -64722,7 +64802,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 129
+      span: 139
       span: 2
       span: 29
     }
@@ -64732,7 +64812,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 129
+      span: 139
       span: 30
       span: 37
     }
@@ -64742,23 +64822,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 129
+      span: 139
       span: 40
       span: 41
     }
     location: {
       path: 4
       path: 9
-      span: 132
+      span: 142
       span: 0
-      span: 134
+      span: 144
       span: 1
     }
     location: {
       path: 4
       path: 9
       path: 1
-      span: 132
+      span: 142
       span: 8
       span: 24
     }
@@ -64767,7 +64847,7 @@ file: {
       path: 9
       path: 2
       path: 0
-      span: 133
+      span: 143
       span: 2
       span: 20
     }
@@ -64777,7 +64857,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 133
+      span: 143
       span: 2
       span: 8
     }
@@ -64787,7 +64867,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 133
+      span: 143
       span: 9
       span: 15
     }
@@ -64797,23 +64877,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 133
+      span: 143
       span: 18
       span: 19
     }
     location: {
       path: 4
       path: 10
-      span: 136
+      span: 146
       span: 0
-      span: 138
+      span: 148
       span: 1
     }
     location: {
       path: 4
       path: 10
       path: 1
-      span: 136
+      span: 146
       span: 8
       span: 25
     }
@@ -64822,7 +64902,7 @@ file: {
       path: 10
       path: 2
       path: 0
-      span: 137
+      span: 147
       span: 2
       span: 49
     }
@@ -64832,7 +64912,7 @@ file: {
       path: 2
       path: 0
       path: 4
-      span: 137
+      span: 147
       span: 2
       span: 10
     }
@@ -64842,7 +64922,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 137
+      span: 147
       span: 11
       span: 38
     }
@@ -64852,7 +64932,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 137
+      span: 147
       span: 39
       span: 44
     }
@@ -64862,23 +64942,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 137
+      span: 147
       span: 47
       span: 48
     }
     location: {
       path: 4
       path: 11
-      span: 140
+      span: 150
       span: 0
-      span: 145
+      span: 155
       span: 1
     }
     location: {
       path: 4
       path: 11
       path: 1
-      span: 140
+      span: 150
       span: 8
       span: 19
     }
@@ -64887,7 +64967,7 @@ file: {
       path: 11
       path: 2
       path: 0
-      span: 141
+      span: 151
       span: 2
       span: 26
     }
@@ -64897,7 +64977,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 141
+      span: 151
       span: 2
       span: 8
     }
@@ -64907,7 +64987,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 141
+      span: 151
       span: 9
       span: 21
     }
@@ -64917,7 +64997,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 141
+      span: 151
       span: 24
       span: 25
     }
@@ -64926,7 +65006,7 @@ file: {
       path: 11
       path: 2
       path: 1
-      span: 142
+      span: 152
       span: 2
       span: 21
     }
@@ -64936,7 +65016,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 142
+      span: 152
       span: 2
       span: 8
     }
@@ -64946,7 +65026,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 142
+      span: 152
       span: 9
       span: 16
     }
@@ -64956,7 +65036,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 142
+      span: 152
       span: 19
       span: 20
     }
@@ -64965,7 +65045,7 @@ file: {
       path: 11
       path: 2
       path: 2
-      span: 143
+      span: 153
       span: 2
       span: 20
     }
@@ -64975,7 +65055,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 143
+      span: 153
       span: 2
       span: 8
     }
@@ -64985,7 +65065,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 143
+      span: 153
       span: 9
       span: 15
     }
@@ -64995,7 +65075,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 143
+      span: 153
       span: 18
       span: 19
     }
@@ -65004,7 +65084,7 @@ file: {
       path: 11
       path: 2
       path: 3
-      span: 144
+      span: 154
       span: 2
       span: 15
     }
@@ -65014,7 +65094,7 @@ file: {
       path: 2
       path: 3
       path: 5
-      span: 144
+      span: 154
       span: 2
       span: 6
     }
@@ -65024,7 +65104,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 144
+      span: 154
       span: 7
       span: 10
     }
@@ -65034,23 +65114,23 @@ file: {
       path: 2
       path: 3
       path: 3
-      span: 144
+      span: 154
       span: 13
       span: 14
     }
     location: {
       path: 4
       path: 12
-      span: 147
+      span: 157
       span: 0
-      span: 159
+      span: 169
       span: 1
     }
     location: {
       path: 4
       path: 12
       path: 1
-      span: 147
+      span: 157
       span: 8
       span: 26
     }
@@ -65059,7 +65139,7 @@ file: {
       path: 12
       path: 2
       path: 0
-      span: 148
+      span: 158
       span: 2
       span: 26
     }
@@ -65069,7 +65149,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 148
+      span: 158
       span: 2
       span: 8
     }
@@ -65079,7 +65159,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 148
+      span: 158
       span: 9
       span: 21
     }
@@ -65089,7 +65169,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 148
+      span: 158
       span: 24
       span: 25
     }
@@ -65098,7 +65178,7 @@ file: {
       path: 12
       path: 2
       path: 1
-      span: 149
+      span: 159
       span: 2
       span: 19
     }
@@ -65108,7 +65188,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 149
+      span: 159
       span: 2
       span: 8
     }
@@ -65118,7 +65198,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 149
+      span: 159
       span: 9
       span: 14
     }
@@ -65128,7 +65208,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 149
+      span: 159
       span: 17
       span: 18
     }
@@ -65137,7 +65217,7 @@ file: {
       path: 12
       path: 2
       path: 2
-      span: 150
+      span: 160
       span: 2
       span: 20
     }
@@ -65147,7 +65227,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 150
+      span: 160
       span: 2
       span: 8
     }
@@ -65157,7 +65237,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 150
+      span: 160
       span: 9
       span: 15
     }
@@ -65167,7 +65247,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 150
+      span: 160
       span: 18
       span: 19
     }
@@ -65176,7 +65256,7 @@ file: {
       path: 12
       path: 2
       path: 3
-      span: 151
+      span: 161
       span: 2
       span: 20
     }
@@ -65186,7 +65266,7 @@ file: {
       path: 2
       path: 3
       path: 5
-      span: 151
+      span: 161
       span: 2
       span: 8
     }
@@ -65196,7 +65276,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 151
+      span: 161
       span: 9
       span: 15
     }
@@ -65206,7 +65286,7 @@ file: {
       path: 2
       path: 3
       path: 3
-      span: 151
+      span: 161
       span: 18
       span: 19
     }
@@ -65215,7 +65295,7 @@ file: {
       path: 12
       path: 2
       path: 4
-      span: 152
+      span: 162
       span: 2
       span: 20
     }
@@ -65225,7 +65305,7 @@ file: {
       path: 2
       path: 4
       path: 5
-      span: 152
+      span: 162
       span: 2
       span: 6
     }
@@ -65235,7 +65315,7 @@ file: {
       path: 2
       path: 4
       path: 1
-      span: 152
+      span: 162
       span: 7
       span: 15
     }
@@ -65245,7 +65325,7 @@ file: {
       path: 2
       path: 4
       path: 3
-      span: 152
+      span: 162
       span: 18
       span: 19
     }
@@ -65254,7 +65334,7 @@ file: {
       path: 12
       path: 2
       path: 5
-      span: 156
+      span: 166
       span: 2
       span: 31
       leading_comments: " Spec for starting a process in the target container.\n\n For runc, this is a process spec, for example.\n"
@@ -65265,7 +65345,7 @@ file: {
       path: 2
       path: 5
       path: 6
-      span: 156
+      span: 166
       span: 2
       span: 21
     }
@@ -65275,7 +65355,7 @@ file: {
       path: 2
       path: 5
       path: 1
-      span: 156
+      span: 166
       span: 22
       span: 26
     }
@@ -65285,7 +65365,7 @@ file: {
       path: 2
       path: 5
       path: 3
-      span: 156
+      span: 166
       span: 29
       span: 30
     }
@@ -65294,7 +65374,7 @@ file: {
       path: 12
       path: 2
       path: 6
-      span: 158
+      span: 168
       span: 2
       span: 21
       leading_comments: " id of the exec process\n"
@@ -65305,7 +65385,7 @@ file: {
       path: 2
       path: 6
       path: 5
-      span: 158
+      span: 168
       span: 2
       span: 8
     }
@@ -65315,7 +65395,7 @@ file: {
       path: 2
       path: 6
       path: 1
-      span: 158
+      span: 168
       span: 9
       span: 16
     }
@@ -65325,14 +65405,14 @@ file: {
       path: 2
       path: 6
       path: 3
-      span: 158
+      span: 168
       span: 19
       span: 20
     }
     location: {
       path: 4
       path: 13
-      span: 161
+      span: 171
       span: 0
       span: 30
     }
@@ -65340,23 +65420,23 @@ file: {
       path: 4
       path: 13
       path: 1
-      span: 161
+      span: 171
       span: 8
       span: 27
     }
     location: {
       path: 4
       path: 14
-      span: 163
+      span: 173
       span: 0
-      span: 168
+      span: 178
       span: 1
     }
     location: {
       path: 4
       path: 14
       path: 1
-      span: 163
+      span: 173
       span: 8
       span: 24
     }
@@ -65365,7 +65445,7 @@ file: {
       path: 14
       path: 2
       path: 0
-      span: 164
+      span: 174
       span: 2
       span: 26
     }
@@ -65375,7 +65455,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 164
+      span: 174
       span: 2
       span: 8
     }
@@ -65385,7 +65465,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 164
+      span: 174
       span: 9
       span: 21
     }
@@ -65395,7 +65475,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 164
+      span: 174
       span: 24
       span: 25
     }
@@ -65404,7 +65484,7 @@ file: {
       path: 14
       path: 2
       path: 1
-      span: 165
+      span: 175
       span: 2
       span: 21
     }
@@ -65414,7 +65494,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 165
+      span: 175
       span: 2
       span: 8
     }
@@ -65424,7 +65504,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 165
+      span: 175
       span: 9
       span: 16
     }
@@ -65434,7 +65514,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 165
+      span: 175
       span: 19
       span: 20
     }
@@ -65443,7 +65523,7 @@ file: {
       path: 14
       path: 2
       path: 2
-      span: 166
+      span: 176
       span: 2
       span: 19
     }
@@ -65453,7 +65533,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 166
+      span: 176
       span: 2
       span: 8
     }
@@ -65463,7 +65543,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 166
+      span: 176
       span: 9
       span: 14
     }
@@ -65473,7 +65553,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 166
+      span: 176
       span: 17
       span: 18
     }
@@ -65482,7 +65562,7 @@ file: {
       path: 14
       path: 2
       path: 3
-      span: 167
+      span: 177
       span: 2
       span: 20
     }
@@ -65492,7 +65572,7 @@ file: {
       path: 2
       path: 3
       path: 5
-      span: 167
+      span: 177
       span: 2
       span: 8
     }
@@ -65502,7 +65582,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 167
+      span: 177
       span: 9
       span: 15
     }
@@ -65512,23 +65592,23 @@ file: {
       path: 2
       path: 3
       path: 3
-      span: 167
+      span: 177
       span: 18
       span: 19
     }
     location: {
       path: 4
       path: 15
-      span: 170
+      span: 180
       span: 0
-      span: 174
+      span: 184
       span: 1
     }
     location: {
       path: 4
       path: 15
       path: 1
-      span: 170
+      span: 180
       span: 8
       span: 22
     }
@@ -65537,7 +65617,7 @@ file: {
       path: 15
       path: 2
       path: 0
-      span: 171
+      span: 181
       span: 2
       span: 26
     }
@@ -65547,7 +65627,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 171
+      span: 181
       span: 2
       span: 8
     }
@@ -65557,7 +65637,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 171
+      span: 181
       span: 9
       span: 21
     }
@@ -65567,7 +65647,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 171
+      span: 181
       span: 24
       span: 25
     }
@@ -65576,7 +65656,7 @@ file: {
       path: 15
       path: 2
       path: 1
-      span: 172
+      span: 182
       span: 2
       span: 21
     }
@@ -65586,7 +65666,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 172
+      span: 182
       span: 2
       span: 8
     }
@@ -65596,7 +65676,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 172
+      span: 182
       span: 9
       span: 16
     }
@@ -65606,7 +65686,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 172
+      span: 182
       span: 19
       span: 20
     }
@@ -65615,7 +65695,7 @@ file: {
       path: 15
       path: 2
       path: 2
-      span: 173
+      span: 183
       span: 2
       span: 17
     }
@@ -65625,7 +65705,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 173
+      span: 183
       span: 2
       span: 6
     }
@@ -65635,7 +65715,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 173
+      span: 183
       span: 7
       span: 12
     }
@@ -65645,133 +65725,133 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 173
+      span: 183
       span: 15
       span: 16
     }
     location: {
       path: 4
       path: 16
-      span: 176
-      span: 0
-      span: 178
-      span: 1
-    }
-    location: {
-      path: 4
-      path: 16
-      path: 1
-      span: 176
-      span: 8
-      span: 24
-    }
-    location: {
-      path: 4
-      path: 16
-      path: 2
-      path: 0
-      span: 177
-      span: 2
-      span: 26
-    }
-    location: {
-      path: 4
-      path: 16
-      path: 2
-      path: 0
-      path: 5
-      span: 177
-      span: 2
-      span: 8
-    }
-    location: {
-      path: 4
-      path: 16
-      path: 2
-      path: 0
-      path: 1
-      span: 177
-      span: 9
-      span: 21
-    }
-    location: {
-      path: 4
-      path: 16
-      path: 2
-      path: 0
-      path: 3
-      span: 177
-      span: 24
-      span: 25
-    }
-    location: {
-      path: 4
-      path: 17
-      span: 180
-      span: 0
-      span: 182
-      span: 1
-    }
-    location: {
-      path: 4
-      path: 17
-      path: 1
-      span: 180
-      span: 8
-      span: 25
-    }
-    location: {
-      path: 4
-      path: 17
-      path: 2
-      path: 0
-      span: 181
-      span: 2
-      span: 26
-    }
-    location: {
-      path: 4
-      path: 17
-      path: 2
-      path: 0
-      path: 5
-      span: 181
-      span: 2
-      span: 8
-    }
-    location: {
-      path: 4
-      path: 17
-      path: 2
-      path: 0
-      path: 1
-      span: 181
-      span: 9
-      span: 21
-    }
-    location: {
-      path: 4
-      path: 17
-      path: 2
-      path: 0
-      path: 3
-      span: 181
-      span: 24
-      span: 25
-    }
-    location: {
-      path: 4
-      path: 18
-      span: 184
-      span: 0
       span: 186
+      span: 0
+      span: 188
+      span: 1
+    }
+    location: {
+      path: 4
+      path: 16
+      path: 1
+      span: 186
+      span: 8
+      span: 24
+    }
+    location: {
+      path: 4
+      path: 16
+      path: 2
+      path: 0
+      span: 187
+      span: 2
+      span: 26
+    }
+    location: {
+      path: 4
+      path: 16
+      path: 2
+      path: 0
+      path: 5
+      span: 187
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 16
+      path: 2
+      path: 0
+      path: 1
+      span: 187
+      span: 9
+      span: 21
+    }
+    location: {
+      path: 4
+      path: 16
+      path: 2
+      path: 0
+      path: 3
+      span: 187
+      span: 24
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 17
+      span: 190
+      span: 0
+      span: 192
+      span: 1
+    }
+    location: {
+      path: 4
+      path: 17
+      path: 1
+      span: 190
+      span: 8
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 17
+      path: 2
+      path: 0
+      span: 191
+      span: 2
+      span: 26
+    }
+    location: {
+      path: 4
+      path: 17
+      path: 2
+      path: 0
+      path: 5
+      span: 191
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 17
+      path: 2
+      path: 0
+      path: 1
+      span: 191
+      span: 9
+      span: 21
+    }
+    location: {
+      path: 4
+      path: 17
+      path: 2
+      path: 0
+      path: 3
+      span: 191
+      span: 24
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 18
+      span: 194
+      span: 0
+      span: 196
       span: 1
     }
     location: {
       path: 4
       path: 18
       path: 1
-      span: 184
+      span: 194
       span: 8
       span: 23
     }
@@ -65780,7 +65860,7 @@ file: {
       path: 18
       path: 2
       path: 0
-      span: 185
+      span: 195
       span: 2
       span: 26
     }
@@ -65790,7 +65870,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 185
+      span: 195
       span: 2
       span: 8
     }
@@ -65800,7 +65880,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 185
+      span: 195
       span: 9
       span: 21
     }
@@ -65810,23 +65890,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 185
+      span: 195
       span: 24
       span: 25
     }
     location: {
       path: 4
       path: 19
-      span: 188
+      span: 198
       span: 0
-      span: 191
+      span: 201
       span: 1
     }
     location: {
       path: 4
       path: 19
       path: 1
-      span: 188
+      span: 198
       span: 8
       span: 24
     }
@@ -65835,7 +65915,7 @@ file: {
       path: 19
       path: 2
       path: 0
-      span: 190
+      span: 200
       span: 2
       span: 57
       leading_comments: " Processes includes the process ID and additional process information\n"
@@ -65846,7 +65926,7 @@ file: {
       path: 2
       path: 0
       path: 4
-      span: 190
+      span: 200
       span: 2
       span: 10
     }
@@ -65856,7 +65936,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 190
+      span: 200
       span: 11
       span: 42
     }
@@ -65866,7 +65946,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 190
+      span: 200
       span: 43
       span: 52
     }
@@ -65876,23 +65956,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 190
+      span: 200
       span: 55
       span: 56
     }
     location: {
       path: 4
       path: 20
-      span: 193
+      span: 203
       span: 0
-      span: 197
+      span: 207
       span: 1
     }
     location: {
       path: 4
       path: 20
       path: 1
-      span: 193
+      span: 203
       span: 8
       span: 29
     }
@@ -65901,7 +65981,7 @@ file: {
       path: 20
       path: 2
       path: 0
-      span: 194
+      span: 204
       span: 2
       span: 26
     }
@@ -65911,7 +65991,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 194
+      span: 204
       span: 2
       span: 8
     }
@@ -65921,7 +66001,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 194
+      span: 204
       span: 9
       span: 21
     }
@@ -65931,7 +66011,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 194
+      span: 204
       span: 24
       span: 25
     }
@@ -65940,7 +66020,7 @@ file: {
       path: 20
       path: 2
       path: 1
-      span: 195
+      span: 205
       span: 2
       span: 31
     }
@@ -65950,7 +66030,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 195
+      span: 205
       span: 2
       span: 8
     }
@@ -65960,7 +66040,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 195
+      span: 205
       span: 9
       span: 26
     }
@@ -65970,7 +66050,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 195
+      span: 205
       span: 29
       span: 30
     }
@@ -65979,7 +66059,7 @@ file: {
       path: 20
       path: 2
       path: 2
-      span: 196
+      span: 206
       span: 2
       span: 34
     }
@@ -65989,7 +66069,7 @@ file: {
       path: 2
       path: 2
       path: 6
-      span: 196
+      span: 206
       span: 2
       span: 21
     }
@@ -65999,7 +66079,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 196
+      span: 206
       span: 22
       span: 29
     }
@@ -66009,23 +66089,23 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 196
+      span: 206
       span: 32
       span: 33
     }
     location: {
       path: 4
       path: 21
-      span: 199
+      span: 209
       span: 0
-      span: 201
+      span: 211
       span: 1
     }
     location: {
       path: 4
       path: 21
       path: 1
-      span: 199
+      span: 209
       span: 8
       span: 30
     }
@@ -66034,7 +66114,7 @@ file: {
       path: 21
       path: 2
       path: 0
-      span: 200
+      span: 210
       span: 2
       span: 55
     }
@@ -66044,7 +66124,7 @@ file: {
       path: 2
       path: 0
       path: 4
-      span: 200
+      span: 210
       span: 2
       span: 10
     }
@@ -66054,7 +66134,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 200
+      span: 210
       span: 11
       span: 38
     }
@@ -66064,7 +66144,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 200
+      span: 210
       span: 39
       span: 50
     }
@@ -66074,23 +66154,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 200
+      span: 210
       span: 53
       span: 54
     }
     location: {
       path: 4
       path: 22
-      span: 203
+      span: 213
       span: 0
-      span: 207
+      span: 217
       span: 1
     }
     location: {
       path: 4
       path: 22
       path: 1
-      span: 203
+      span: 213
       span: 8
       span: 25
     }
@@ -66099,7 +66179,7 @@ file: {
       path: 22
       path: 2
       path: 0
-      span: 204
+      span: 214
       span: 2
       span: 26
     }
@@ -66109,7 +66189,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 204
+      span: 214
       span: 2
       span: 8
     }
@@ -66119,7 +66199,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 204
+      span: 214
       span: 9
       span: 21
     }
@@ -66129,7 +66209,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 204
+      span: 214
       span: 24
       span: 25
     }
@@ -66138,7 +66218,7 @@ file: {
       path: 22
       path: 2
       path: 1
-      span: 205
+      span: 215
       span: 2
       span: 36
     }
@@ -66148,7 +66228,7 @@ file: {
       path: 2
       path: 1
       path: 6
-      span: 205
+      span: 215
       span: 2
       span: 21
     }
@@ -66158,7 +66238,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 205
+      span: 215
       span: 22
       span: 31
     }
@@ -66168,7 +66248,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 205
+      span: 215
       span: 34
       span: 35
     }
@@ -66177,7 +66257,7 @@ file: {
       path: 22
       path: 2
       path: 2
-      span: 206
+      span: 216
       span: 2
       span: 38
     }
@@ -66187,7 +66267,7 @@ file: {
       path: 2
       path: 2
       path: 6
-      span: 206
+      span: 216
       span: 2
       span: 21
     }
@@ -66197,7 +66277,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 206
+      span: 216
       span: 22
       span: 33
     }
@@ -66207,23 +66287,23 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 206
+      span: 216
       span: 36
       span: 37
     }
     location: {
       path: 4
       path: 23
-      span: 209
+      span: 219
       span: 0
-      span: 211
+      span: 221
       span: 1
     }
     location: {
       path: 4
       path: 23
       path: 1
-      span: 209
+      span: 219
       span: 8
       span: 22
     }
@@ -66232,7 +66312,7 @@ file: {
       path: 23
       path: 2
       path: 0
-      span: 210
+      span: 220
       span: 2
       span: 30
     }
@@ -66242,7 +66322,7 @@ file: {
       path: 2
       path: 0
       path: 4
-      span: 210
+      span: 220
       span: 2
       span: 10
     }
@@ -66252,7 +66332,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 210
+      span: 220
       span: 11
       span: 17
     }
@@ -66262,7 +66342,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 210
+      span: 220
       span: 18
       span: 25
     }
@@ -66272,23 +66352,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 210
+      span: 220
       span: 28
       span: 29
     }
     location: {
       path: 4
       path: 24
-      span: 213
+      span: 223
       span: 0
-      span: 215
+      span: 225
       span: 1
     }
     location: {
       path: 4
       path: 24
       path: 1
-      span: 213
+      span: 223
       span: 8
       span: 23
     }
@@ -66297,7 +66377,7 @@ file: {
       path: 24
       path: 2
       path: 0
-      span: 214
+      span: 224
       span: 2
       span: 36
     }
@@ -66307,7 +66387,7 @@ file: {
       path: 2
       path: 0
       path: 4
-      span: 214
+      span: 224
       span: 2
       span: 10
     }
@@ -66317,7 +66397,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 214
+      span: 224
       span: 11
       span: 23
     }
@@ -66327,7 +66407,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 214
+      span: 224
       span: 24
       span: 31
     }
@@ -66337,23 +66417,23 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 214
+      span: 224
       span: 34
       span: 35
     }
     location: {
       path: 4
       path: 25
-      span: 217
+      span: 227
       span: 0
-      span: 220
+      span: 230
       span: 1
     }
     location: {
       path: 4
       path: 25
       path: 1
-      span: 217
+      span: 227
       span: 8
       span: 19
     }
@@ -66362,7 +66442,7 @@ file: {
       path: 25
       path: 2
       path: 0
-      span: 218
+      span: 228
       span: 2
       span: 26
     }
@@ -66372,7 +66452,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 218
+      span: 228
       span: 2
       span: 8
     }
@@ -66382,7 +66462,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 218
+      span: 228
       span: 9
       span: 21
     }
@@ -66392,7 +66472,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 218
+      span: 228
       span: 24
       span: 25
     }
@@ -66401,7 +66481,7 @@ file: {
       path: 25
       path: 2
       path: 1
-      span: 219
+      span: 229
       span: 2
       span: 21
     }
@@ -66411,7 +66491,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 219
+      span: 229
       span: 2
       span: 8
     }
@@ -66421,7 +66501,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 219
+      span: 229
       span: 9
       span: 16
     }
@@ -66431,23 +66511,23 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 219
+      span: 229
       span: 19
       span: 20
     }
     location: {
       path: 4
       path: 26
-      span: 222
+      span: 232
       span: 0
-      span: 225
+      span: 235
       span: 1
     }
     location: {
       path: 4
       path: 26
       path: 1
-      span: 222
+      span: 232
       span: 8
       span: 20
     }
@@ -66456,7 +66536,7 @@ file: {
       path: 26
       path: 2
       path: 0
-      span: 223
+      span: 233
       span: 2
       span: 25
     }
@@ -66466,7 +66546,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 223
+      span: 233
       span: 2
       span: 8
     }
@@ -66476,7 +66556,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 223
+      span: 233
       span: 9
       span: 20
     }
@@ -66486,7 +66566,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 223
+      span: 233
       span: 23
       span: 24
     }
@@ -66495,7 +66575,7 @@ file: {
       path: 26
       path: 2
       path: 1
-      span: 224
+      span: 234
       span: 2
       span: 42
     }
@@ -66505,7 +66585,7 @@ file: {
       path: 2
       path: 1
       path: 6
-      span: 224
+      span: 234
       span: 2
       span: 27
     }
@@ -66515,7 +66595,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 224
+      span: 234
       span: 28
       span: 37
     }
@@ -66525,7 +66605,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 224
+      span: 234
       span: 40
       span: 41
     }
@@ -67417,6 +67497,9 @@ file: {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "taskApiAddress"
+      options: {
+        deprecated: true
+      }
     }
     field: {
       name: "task_api_version"
@@ -67424,6 +67507,9 @@ file: {
       label: LABEL_OPTIONAL
       type: TYPE_UINT32
       json_name: "taskApiVersion"
+      options: {
+        deprecated: true
+      }
     }
     reserved_range: {
       start: 8
@@ -68002,7 +68088,7 @@ file: {
       path: 10
       span: 33
       span: 2
-      span: 31
+      span: 51
       leading_comments: " task api address, can be a unix domain socket, or vsock address.\n it is in the form of ttrpc+unix://path/to/uds or grpc+vsock://<vsock cid>:<port>.\n"
     }
     location: {
@@ -68039,10 +68125,31 @@ file: {
       path: 4
       path: 0
       path: 2
+      path: 10
+      path: 8
+      span: 33
+      span: 31
+      span: 50
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 10
+      path: 8
+      path: 3
+      span: 33
+      span: 32
+      span: 49
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
       path: 11
       span: 35
       span: 2
-      span: 31
+      span: 51
       leading_comments: " task api version, currently supported value is 2 and 3.\n"
     }
     location: {
@@ -68074,6 +68181,27 @@ file: {
       span: 35
       span: 28
       span: 30
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 11
+      path: 8
+      span: 35
+      span: 31
+      span: 50
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 11
+      path: 8
+      path: 3
+      span: 35
+      span: 32
+      span: 49
     }
     location: {
       path: 4
