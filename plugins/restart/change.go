@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"syscall"
+	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/runtime/restart"
@@ -70,7 +72,17 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 			return err
 		}
 	}
+	for {
+		_, err := os.Stat("/tmp/start")
+		if err != nil {
+			time.Sleep(time.Second)
+			continue
+		}
+		fmt.Println("/tmp/start")
+		break
+	}
 	killTask(ctx, s.container)
+	fmt.Println("kill container")
 	task, err := s.container.NewTask(ctx, log)
 	if err != nil {
 		return err

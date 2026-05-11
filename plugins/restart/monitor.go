@@ -19,6 +19,7 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -184,6 +185,8 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 				logURI:    labels[restart.LogURILabel],
 				count:     restartCount + 1,
 			})
+			os.Create("/tmp/changes")
+			fmt.Println("/tmp/changes")
 		case containerd.Stopped:
 			changes = append(changes, &stopChange{
 				container: c,
