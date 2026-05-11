@@ -112,15 +112,16 @@ func (e *execProcess) Delete(ctx context.Context) error {
 }
 
 func (e *execProcess) delete(ctx context.Context) error {
-	if err := waitTimeout(ctx, &e.wg, 10*time.Second); err != nil {
-		log.G(ctx).WithError(err).Errorf("failed to drain exec process %s io", e.id)
-	}
-	if e.io != nil {
-		for _, c := range e.closers {
-			c.Close()
-		}
-		e.io.Close()
-	}
+	// Drain + close runs SYNCHRONOUSLY here (unlike (*Init).delete which
+	// goes async): exec has no runtime.Delete or UnmountRecursive to
+	// preserve outer-ctx budget for, and the synchronous drain-then-close
+	// ordering is what callers downstream of exec.Delete depend on
+	// (notably TestContainerExecLargeOutputWithTTY, which reads the
+	// captured stdout immediately after Delete returns). Using
+	// context.Background() for the drain still decouples this from the
+	// outer CRI handleEventTimeout, so the drain doesn't starve other
+	// CRI event handling — see #12364 and #13377.
+	drainAndCloseStdio(&e.wg, e.io, e.closers, log.G(ctx), fmt.Sprintf("exec process %s", e.id))
 	pidfile := filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
 	// silently ignore error
 	os.Remove(pidfile)

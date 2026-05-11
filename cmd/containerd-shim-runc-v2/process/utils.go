@@ -31,6 +31,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )
 
@@ -166,6 +167,35 @@ func waitTimeout(ctx context.Context, wg *sync.WaitGroup, timeout time.Duration)
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+// drainAndCloseStdio waits up to 10s for the stdio io.CopyBuffer goroutines
+// tracked by wg to finish (i.e., for buffered output to be copied to the
+// downstream consumer), then closes the registered closers and the
+// processIO. The drain step uses a context derived from context.Background()
+// so it does NOT consume any caller-supplied ctx budget.
+//
+// This is intended to be invoked as `go drainAndCloseStdio(...)` from
+// (*Init).delete and (*execProcess).delete: the synchronous portion of
+// delete() returns immediately, runtime.Delete and mount.UnmountRecursive
+// run with the full outer ctx, and the stdio close runs after the drain so
+// the io.CopyBuffer goroutines are not forcibly terminated before they
+// finish copying buffered output (the contract that #12364 was preserving).
+//
+// The close steps always run, even if the drain times out, so a wedged
+// drain does not prevent cleanup. The 10s budget exists only as a backstop
+// for the pathological case where the underlying read goroutines are not
+// otherwise released. See #12364 and #13377.
+func drainAndCloseStdio(wg *sync.WaitGroup, pio *processIO, closers []io.Closer, logger *log.Entry, what string) {
+	if err := waitTimeout(context.Background(), wg, 10*time.Second); err != nil {
+		logger.WithError(err).Errorf("failed to drain %s io", what)
+	}
+	for _, c := range closers {
+		_ = c.Close()
+	}
+	if pio != nil {
+		pio.Close()
 	}
 }
 

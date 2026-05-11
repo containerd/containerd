@@ -298,9 +298,14 @@ func (p *Init) Delete(ctx context.Context) error {
 }
 
 func (p *Init) delete(ctx context.Context) error {
-	if err := waitTimeout(ctx, &p.wg, 10*time.Second); err != nil {
-		log.G(ctx).WithError(err).Errorf("failed to drain init process %s io", p.id)
-	}
+	// Drain stdio + close the pipes in a background goroutine so the
+	// outer ctx (bounded by the CRI handleEventTimeout) is preserved for
+	// runtime.Delete and mount.UnmountRecursive below. The close step
+	// runs INSIDE the goroutine, after the drain — so #12364's contract
+	// (give the io.CopyBuffer goroutines time to copy buffered output
+	// before the pipe read FDs are forcibly closed) is preserved.
+	// See #12364 and #13377.
+	go drainAndCloseStdio(&p.wg, p.io, p.closers, log.G(ctx), fmt.Sprintf("init process %s", p.id))
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes
@@ -313,12 +318,6 @@ func (p *Init) delete(ctx context.Context) error {
 		} else {
 			err = p.runtimeError(err, "failed to delete task")
 		}
-	}
-	if p.io != nil {
-		for _, c := range p.closers {
-			c.Close()
-		}
-		p.io.Close()
 	}
 	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
 		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
