@@ -298,13 +298,8 @@ func (p *Init) Delete(ctx context.Context) error {
 }
 
 func (p *Init) delete(ctx context.Context) error {
-	// Drain stdio + close the pipes in a background goroutine so the
-	// outer ctx (bounded by the CRI handleEventTimeout) is preserved for
-	// runtime.Delete and mount.UnmountRecursive below. The close step
-	// runs INSIDE the goroutine, after the drain — so #12364's contract
-	// (give the io.CopyBuffer goroutines time to copy buffered output
-	// before the pipe read FDs are forcibly closed) is preserved.
-	// See #12364 and #13377.
+	// Drain async so ctx budget is preserved for runtime.Delete and
+	// mount.UnmountRecursive below. See #13377.
 	go drainAndCloseStdio(&p.wg, p.io, p.closers, log.G(ctx), fmt.Sprintf("init process %s", p.id), drainStdioTimeout)
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process

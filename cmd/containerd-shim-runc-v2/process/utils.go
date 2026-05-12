@@ -170,33 +170,14 @@ func waitTimeout(ctx context.Context, wg *sync.WaitGroup, timeout time.Duration)
 	}
 }
 
-// drainStdioTimeout is the default budget for stdio drain in production.
-// It is a package-level var (rather than a const) so tests that exercise
-// the real (*Init).delete / (*execProcess).delete code paths can swap in
-// a short budget to actually exercise the timeout branch. Tests must
-// restore the previous value via t.Cleanup. See #12364 and #13377.
+// drainStdioTimeout bounds the stdio drain. Package-level var so tests
+// can shorten it; production should not mutate it.
 var drainStdioTimeout = 10 * time.Second
 
 // drainAndCloseStdio waits up to `timeout` for the stdio io.CopyBuffer
-// goroutines tracked by wg to finish (i.e., for buffered output to be
-// copied to the downstream consumer), then closes the registered closers
-// and the processIO. The drain step uses a context derived from
-// context.Background() so it does NOT consume any caller-supplied ctx
-// budget.
-//
-// This is intended to be invoked as `go drainAndCloseStdio(...)` from
-// (*Init).delete and (*execProcess).delete: the synchronous portion of
-// delete() returns immediately, runtime.Delete and mount.UnmountRecursive
-// run with the full outer ctx, and the stdio close runs after the drain so
-// the io.CopyBuffer goroutines are not forcibly terminated before they
-// finish copying buffered output (the contract that #12364 was preserving).
-//
-// The close steps always run, even if the drain times out, so a wedged
-// drain does not prevent cleanup. The timeout exists only as a backstop
-// for the pathological case where the underlying read goroutines are not
-// otherwise released. Production callers pass drainStdioTimeout (10s);
-// tests pass a short value to actually exercise the timeout branch.
-// See #12364 and #13377.
+// goroutines tracked by wg to finish, then closes closers and pio. The
+// drain uses context.Background() so it does not consume any caller ctx.
+// Closers always run, even if the drain times out. See #12364 and #13377.
 func drainAndCloseStdio(wg *sync.WaitGroup, pio *processIO, closers []io.Closer, logger *log.Entry, what string, timeout time.Duration) {
 	if err := waitTimeout(context.Background(), wg, timeout); err != nil {
 		logger.WithError(err).Errorf("failed to drain %s io", what)
