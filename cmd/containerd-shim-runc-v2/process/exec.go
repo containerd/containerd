@@ -121,7 +121,7 @@ func (e *execProcess) delete(ctx context.Context) error {
 	// context.Background() for the drain still decouples this from the
 	// outer CRI handleEventTimeout, so the drain doesn't starve other
 	// CRI event handling — see #12364 and #13377.
-	drainAndCloseStdio(&e.wg, e.io, e.closers, log.G(ctx), fmt.Sprintf("exec process %s", e.id))
+	drainAndCloseStdio(&e.wg, e.io, e.closers, log.G(ctx), fmt.Sprintf("exec process %s", e.id), drainStdioTimeout)
 	pidfile := filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
 	// silently ignore error
 	os.Remove(pidfile)

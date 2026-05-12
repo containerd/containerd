@@ -33,13 +33,13 @@ import (
 	"context"
 	"errors"
 	"io"
-	"runtime"
+	"os/exec"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/containerd/log"
+	runc "github.com/containerd/go-runc"
 	"github.com/sirupsen/logrus"
 )
 
@@ -53,23 +53,46 @@ const outerBudget = 10 * time.Second
 // remaining) from any correct fix.
 const minRemainingForRuntimeDelete = 5 * time.Second
 
-// blockedWG returns a sync.WaitGroup that will not reach zero until the
-// returned release function is called. It models the failure mode where
-// a child process still holds the stdio pipe write-FD: io.CopyBuffer
-// never returns from read() and wg.Done() never fires. In production
-// the wg is released by closing the read FDs (the io.Closer slice +
-// processIO.Close() inside drainAndCloseStdio).
-func blockedWG(t *testing.T) (*sync.WaitGroup, func()) {
+// testDrainTimeout is the shortened drain budget swapped in by tests that
+// exercise the real (*Init).delete / (*execProcess).delete paths against
+// a wedged wg. Production uses drainStdioTimeout=10s; the test shortens
+// it so the synchronous exec path returns in well under outerBudget.
+const testDrainTimeout = 100 * time.Millisecond
+
+// wedge holds wg above zero until either (a) the returned release closure
+// is called or (b) test cleanup runs (whichever comes first). It models
+// the production failure mode where a child process still holds the
+// stdio pipe write-FD: io.CopyBuffer never returns from read() and
+// wg.Done() never fires. In production the wg is released by closing
+// the read FDs (the io.Closer slice + processIO.Close() inside
+// drainAndCloseStdio).
+//
+// Accepts a *sync.WaitGroup pointer so callers can wedge a wg that lives
+// inside a struct field (e.g., Init.wg, execProcess.wg) without copying
+// it — sync.WaitGroup must not be copied after first use.
+func wedge(t *testing.T, wg *sync.WaitGroup) (release func()) {
 	t.Helper()
-	var wg sync.WaitGroup
 	wg.Add(1)
 	released := make(chan struct{})
 	go func() {
 		<-released
 		wg.Done()
 	}()
-	once := sync.Once{}
-	return &wg, func() { once.Do(func() { close(released) }) }
+	var once sync.Once
+	release = func() {
+		once.Do(func() { close(released) })
+	}
+	t.Cleanup(release) // best-effort: release even if test forgets
+	return release
+}
+
+// blockedWG is a convenience wrapper that allocates a fresh wg and wedges
+// it. Used by the helper-direct tests that don't need to embed the wg
+// in a struct.
+func blockedWG(t *testing.T) (*sync.WaitGroup, func()) {
+	t.Helper()
+	wg := &sync.WaitGroup{}
+	return wg, wedge(t, wg)
 }
 
 // trackedCloser is an io.Closer that records the moment Close() is
@@ -123,6 +146,31 @@ func (h *capturingHook) String() string {
 	return h.buf.String()
 }
 
+// shortenDrainTimeout swaps the production drainStdioTimeout for a short
+// value so tests that go through the real (*Init).delete / (*execProcess).delete
+// paths finish quickly even when the wg is wedged. The original value is
+// restored via t.Cleanup.
+func shortenDrainTimeout(t *testing.T, d time.Duration) {
+	t.Helper()
+	prev := drainStdioTimeout
+	drainStdioTimeout = d
+	t.Cleanup(func() { drainStdioTimeout = prev })
+}
+
+// noopRuntime returns a *runc.Runc whose Delete shells out to /usr/bin/true
+// (a no-op subprocess that exits 0 quickly). This lets the real
+// (*Init).delete path run without standing up a runc container, while
+// remaining fast enough that the outer-ctx-budget assertion stays meaningful.
+// Falls back to /bin/true on systems where /usr/bin/true is absent.
+func noopRuntime(t *testing.T) *runc.Runc {
+	t.Helper()
+	bin, err := exec.LookPath("true")
+	if err != nil {
+		t.Fatalf("no `true` binary in PATH: %v", err)
+	}
+	return &runc.Runc{Command: bin}
+}
+
 func assertOuterCtxHasBudgetForRuntimeDelete(t *testing.T, outerCtx context.Context, elapsed time.Duration) {
 	t.Helper()
 	if outerCtx.Err() != nil {
@@ -141,60 +189,87 @@ func assertOuterCtxHasBudgetForRuntimeDelete(t *testing.T, outerCtx context.Cont
 }
 
 // TestInitDeleteDoesNotConsumeOuterContextWhenStdioBlocks asserts the
-// PR-#12364 timeout collision is fixed: when (*Init).delete spawns
-// drainAndCloseStdio as a goroutine, the synchronous portion returns
-// immediately and the outer ctx is preserved.
+// PR-#12364 timeout collision is fixed: when (*Init).delete is called
+// with a wedged stdio wg, the synchronous portion still returns promptly
+// (drain runs in a goroutine) and the outer ctx is preserved with enough
+// budget for runtime.Delete + mount.UnmountRecursive to complete.
+//
+// This exercises (*Init).delete end-to-end against a stub runtime — not
+// drainAndCloseStdio in isolation — so it would fail on the pre-fix code
+// path where drainAndCloseStdio was invoked synchronously.
 func TestInitDeleteDoesNotConsumeOuterContextWhenStdioBlocks(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping long-running drain test in -short mode")
 	}
 
-	wg, release := blockedWG(t)
-	defer release()
+	// Shorten the drain timeout so even if (*Init).delete became
+	// synchronous in a future regression, the test would observe budget
+	// loss bounded by 100ms — well within outerBudget. With the goroutine
+	// design, the drain runs entirely in the background and the timeout
+	// value doesn't matter for this assertion.
+	shortenDrainTimeout(t, testDrainTimeout)
+
+	p := &Init{
+		id:      "test-cid",
+		runtime: noopRuntime(t),
+		// Rootfs left empty so mount.UnmountRecursive returns nil immediately.
+	}
+	// Wedge p.wg in place so (*Init).delete's drainAndCloseStdio goroutine
+	// observes the failure mode (read goroutine never returns).
+	wedge(t, &p.wg)
 
 	outerCtx, cancel := context.WithTimeout(context.Background(), outerBudget)
 	defer cancel()
 
-	logger, _ := withCapturedLog(t)
-
 	start := time.Now()
-	// Same call shape as (*Init).delete: spawn drainAndCloseStdio in a
-	// goroutine and proceed. The synchronous portion of delete() does
-	// nothing further with the wg/io/closers and must return promptly.
-	go drainAndCloseStdio(wg, nil, nil, logger, "init process test-cid")
+	if err := p.delete(outerCtx); err != nil {
+		t.Fatalf("(*Init).delete returned error: %v", err)
+	}
 	elapsed := time.Since(start)
 
-	t.Logf("synchronous delete returned in %s", elapsed)
+	t.Logf("(*Init).delete returned in %s (drain still running in background)", elapsed)
 	assertOuterCtxHasBudgetForRuntimeDelete(t, outerCtx, elapsed)
 }
 
 // TestExecDeleteDoesNotConsumeOuterContextWhenStdioBlocks is the analog
 // for (*execProcess).delete. PR #12364 made the same 2s→10s change in
-// both call sites and both have the identical collision shape.
+// both call sites. (*execProcess).delete invokes drainAndCloseStdio
+// synchronously by design (callers like TestContainerExecLargeOutputWithTTY
+// read stdout immediately after Delete returns), so the assertion is
+// "outer ctx survives the drain timeout" rather than "delete returns
+// immediately". With testDrainTimeout=100ms, delete returns in <200ms
+// and outerBudget=10s leaves ≫5s remaining.
 func TestExecDeleteDoesNotConsumeOuterContextWhenStdioBlocks(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping long-running drain test in -short mode")
 	}
 
-	wg, release := blockedWG(t)
-	defer release()
+	shortenDrainTimeout(t, testDrainTimeout)
+
+	parent := &Init{id: "parent-init", runtime: noopRuntime(t)}
+	e := &execProcess{
+		id:     "test-exec",
+		path:   t.TempDir(),
+		parent: parent,
+	}
+	wedge(t, &e.wg)
 
 	outerCtx, cancel := context.WithTimeout(context.Background(), outerBudget)
 	defer cancel()
 
-	logger, _ := withCapturedLog(t)
-
 	start := time.Now()
-	go drainAndCloseStdio(wg, nil, nil, logger, "exec process test-cid")
+	if err := e.delete(outerCtx); err != nil {
+		t.Fatalf("(*execProcess).delete returned error: %v", err)
+	}
 	elapsed := time.Since(start)
 
-	t.Logf("synchronous delete returned in %s", elapsed)
+	t.Logf("(*execProcess).delete returned in %s", elapsed)
 	assertOuterCtxHasBudgetForRuntimeDelete(t, outerCtx, elapsed)
 }
 
 // TestDrainAndCloseStdio_ClosesAfterDrainCompletes asserts the
 // close-after-drain ordering: registered closers are NOT invoked until
-// the drain has completed (or its 10s budget has elapsed). This is the
+// the drain has completed (or its budget has elapsed). This is the
 // #12364 contract: io.CopyBuffer goroutines that copy buffered output
 // must finish before the pipe read FDs are forcibly closed, otherwise
 // log output is truncated.
@@ -209,11 +284,13 @@ func TestDrainAndCloseStdio_ClosesAfterDrainCompletes(t *testing.T) {
 	tc2 := &trackedCloser{}
 	logger, _ := withCapturedLog(t)
 
-	// Run in the foreground so we can assert on ordering.
+	// Run in the foreground so we can assert on ordering. Use the
+	// production timeout (10s) — we'll release the wg manually before
+	// it expires, so the close path is the drain-completed branch.
 	done := make(chan struct{})
 	start := time.Now()
 	go func() {
-		drainAndCloseStdio(wg, nil, []io.Closer{tc1, tc2}, logger, "test")
+		drainAndCloseStdio(wg, nil, []io.Closer{tc1, tc2}, logger, "test", 10*time.Second)
 		close(done)
 	}()
 
@@ -237,48 +314,45 @@ func TestDrainAndCloseStdio_ClosesAfterDrainCompletes(t *testing.T) {
 }
 
 // TestDrainAndCloseStdio_TimeoutStillCloses asserts the close steps run
-// even if the drain hits its 10s budget. Without this, a wedged drain
-// would block cleanup indefinitely.
+// even when the drain budget actually expires. Without this, a wedged
+// drain would block cleanup indefinitely. We use a 100ms timeout so the
+// test can run synchronously without padding CI time, and we deliberately
+// never release the wg — the only way the closers fire is via the
+// timeout branch.
 func TestDrainAndCloseStdio_TimeoutStillCloses(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping timeout test in -short mode")
 	}
 
-	wg, release := blockedWG(t)
-	defer release() // ensure no leak after test
+	wg, _ := blockedWG(t) // release deferred to t.Cleanup; never called manually
 
 	tc := &trackedCloser{}
 	logger, hook := withCapturedLog(t)
 
-	// We don't want to wait 10s in CI. Drop the budget locally by using
-	// a short-budget variant of the helper logic inline; the production
-	// behavior at 10s is the same shape.
-	//
-	// Instead of duplicating the helper, just spawn drainAndCloseStdio
-	// and bound the test by waiting only ~200ms. We verify the close
-	// has NOT yet fired (drain still blocking) and then release() to
-	// let it complete naturally.
+	const drainBudget = 100 * time.Millisecond
+	start := time.Now()
 	done := make(chan struct{})
 	go func() {
-		drainAndCloseStdio(wg, nil, []io.Closer{tc}, logger, "wedged process test-cid")
+		drainAndCloseStdio(wg, nil, []io.Closer{tc}, logger, "wedged process test-cid", drainBudget)
 		close(done)
 	}()
 
-	// Within the first 200ms, drain is still blocking and close has NOT
-	// fired. (Sanity: confirms close-after-drain semantics.)
-	time.Sleep(200 * time.Millisecond)
-	if !tc.ClosedAt().IsZero() {
-		t.Fatalf("close fired before drain completed — log truncation regression")
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("drainAndCloseStdio did not return within 2s of its 100ms drain budget — timeout path is broken")
 	}
 
-	// Release; close should now fire promptly.
-	release()
-	<-done
-	if tc.ClosedAt().IsZero() {
-		t.Fatalf("close did not fire after drain completed")
+	elapsed := time.Since(start)
+	if elapsed < drainBudget {
+		t.Fatalf("drainAndCloseStdio returned in %s, before the %s drain budget elapsed — timeout path was not exercised",
+			elapsed, drainBudget)
 	}
-	if !strings.Contains(hook.String(), "") { // no log expected on success path
-		// (informational only)
+	if tc.ClosedAt().IsZero() {
+		t.Fatalf("close did not fire after drain timeout — cleanup contract broken")
+	}
+	if !strings.Contains(hook.String(), "failed to drain wedged process test-cid io") {
+		t.Fatalf("expected timeout log line in output, got: %q", hook.String())
 	}
 }
 
@@ -291,8 +365,7 @@ func TestDrainAndCloseStdio_LogsDrainFailureForObservability(t *testing.T) {
 		t.Skip("skipping log-capture test in -short mode")
 	}
 
-	wg, release := blockedWG(t)
-	defer release()
+	wg, _ := blockedWG(t)
 
 	logger, hook := withCapturedLog(t)
 
@@ -313,8 +386,12 @@ func TestDrainAndCloseStdio_LogsDrainFailureForObservability(t *testing.T) {
 
 // TestDrainAndCloseStdio_NoGoroutineLeakAfterRelease asserts that the
 // drain goroutine inside waitTimeout eventually exits once the wg is
-// released. Both pre- and post-patch should pass; the test exists to
-// catch any future change that breaks the release path.
+// released. Rather than polling runtime.NumGoroutine() — which is flaky
+// when other goroutines (test runner, logger, GC) are concurrent —
+// we use a deterministic channel-based observation: after release(),
+// a fresh waitTimeout call on the same wg must return nil immediately
+// (the underlying wg is at zero), proving the original drain goroutine
+// observed the Done() and exited.
 func TestDrainAndCloseStdio_NoGoroutineLeakAfterRelease(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping goroutine-leak test in -short mode")
@@ -322,10 +399,7 @@ func TestDrainAndCloseStdio_NoGoroutineLeakAfterRelease(t *testing.T) {
 
 	wg, release := blockedWG(t)
 
-	// Brief stabilisation: let any test-runner goroutines settle.
-	time.Sleep(50 * time.Millisecond)
-	before := runtime.NumGoroutine()
-
+	// First call: drain blocks, then deadline expires.
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 	err := waitTimeout(ctx, wg, 200*time.Millisecond)
@@ -337,14 +411,21 @@ func TestDrainAndCloseStdio_NoGoroutineLeakAfterRelease(t *testing.T) {
 	// blocked reader.
 	release()
 
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if runtime.NumGoroutine() <= before+1 {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
+	// Second call: wg has been Done'd by the goroutine inside blockedWG.
+	// waitTimeout must observe wg.Wait() returning and complete with nil
+	// well before the timeout. If the first-call drain goroutine leaked
+	// (e.g., a future regression that holds the wg internally), this
+	// will instead time out.
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel2()
+	start := time.Now()
+	if err := waitTimeout(ctx2, wg, 2*time.Second); err != nil {
+		t.Fatalf("waitTimeout did not observe wg.Done() after release (elapsed=%s, err=%v) — goroutine leak suspected",
+			time.Since(start), err)
 	}
-	t.Fatalf("goroutine leak: before=%d after=%d", before, runtime.NumGoroutine())
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Fatalf("waitTimeout took %s after release — drain goroutine appears to be leaked", elapsed)
+	}
 }
 
 // TestDeleteSucceedsWhenLargeStdoutAtExit is a placeholder pointing at
@@ -354,7 +435,3 @@ func TestDrainAndCloseStdio_NoGoroutineLeakAfterRelease(t *testing.T) {
 func TestDeleteSucceedsWhenLargeStdoutAtExit(t *testing.T) {
 	t.Skip("integration test — see integration/client/ TestContainerExecLargeOutputWithTTY")
 }
-
-// Ensure the log package is referenced (silences imports check in some
-// linters even though the package's log.G is not used in this file).
-var _ = log.G

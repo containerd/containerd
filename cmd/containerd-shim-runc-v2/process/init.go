@@ -305,7 +305,7 @@ func (p *Init) delete(ctx context.Context) error {
 	// (give the io.CopyBuffer goroutines time to copy buffered output
 	// before the pipe read FDs are forcibly closed) is preserved.
 	// See #12364 and #13377.
-	go drainAndCloseStdio(&p.wg, p.io, p.closers, log.G(ctx), fmt.Sprintf("init process %s", p.id))
+	go drainAndCloseStdio(&p.wg, p.io, p.closers, log.G(ctx), fmt.Sprintf("init process %s", p.id), drainStdioTimeout)
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes
