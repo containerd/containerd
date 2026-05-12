@@ -300,7 +300,7 @@ func (p *Init) Delete(ctx context.Context) error {
 func (p *Init) delete(ctx context.Context) error {
 	// Drain async so ctx budget is preserved for runtime.Delete and
 	// mount.UnmountRecursive below. See #13377.
-	go drainAndCloseStdio(&p.wg, p.io, p.closers, log.G(ctx), fmt.Sprintf("init process %s", p.id), drainStdioTimeout)
+	go drainAndCloseStdio(ctx, &p.wg, p.io, p.closers, log.G(ctx), fmt.Sprintf("init process %s", p.id), drainStdioTimeout)
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes

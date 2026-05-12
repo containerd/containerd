@@ -113,7 +113,7 @@ func (e *execProcess) Delete(ctx context.Context) error {
 
 func (e *execProcess) delete(ctx context.Context) error {
 	// Drain sync: callers read captured stdout immediately after Delete returns.
-	drainAndCloseStdio(&e.wg, e.io, e.closers, log.G(ctx), fmt.Sprintf("exec process %s", e.id), drainStdioTimeout)
+	drainAndCloseStdio(ctx, &e.wg, e.io, e.closers, log.G(ctx), fmt.Sprintf("exec process %s", e.id), drainStdioTimeout)
 	pidfile := filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
 	// silently ignore error
 	os.Remove(pidfile)

@@ -290,7 +290,7 @@ func TestDrainAndCloseStdio_ClosesAfterDrainCompletes(t *testing.T) {
 	done := make(chan struct{})
 	start := time.Now()
 	go func() {
-		drainAndCloseStdio(wg, nil, []io.Closer{tc1, tc2}, logger, "test", 10*time.Second)
+		drainAndCloseStdio(context.Background(), wg, nil, []io.Closer{tc1, tc2}, logger, "test", 10*time.Second)
 		close(done)
 	}()
 
@@ -333,7 +333,7 @@ func TestDrainAndCloseStdio_TimeoutStillCloses(t *testing.T) {
 	start := time.Now()
 	done := make(chan struct{})
 	go func() {
-		drainAndCloseStdio(wg, nil, []io.Closer{tc}, logger, "wedged process test-cid", drainBudget)
+		drainAndCloseStdio(context.Background(), wg, nil, []io.Closer{tc}, logger, "wedged process test-cid", drainBudget)
 		close(done)
 	}()
 
