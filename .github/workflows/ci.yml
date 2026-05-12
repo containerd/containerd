@@ -448,6 +448,11 @@ jobs:
         run: |
           sudo modprobe dm_verity || lsmod | grep -q dm_verity
 
+      - name: Reset OOM score adjustment (RISE runner workaround)
+        if: matrix.os == 'ubuntu-24.04-riscv'
+        run: |
+          echo 0 | sudo tee /proc/1/oom_score_adj || true
+
       - name: Install containerd
         env:
           CGO_ENABLED: 1
