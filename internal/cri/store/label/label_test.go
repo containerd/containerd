@@ -37,10 +37,11 @@ func TestAddThenRemove(t *testing.T) {
 		releaseCount++
 		assert.Equal(1, releaseCount)
 	}
-	store.Reserver = func(label string) {
+	store.Reserver = func(label string) error {
 		assert.Contains(label, ":c1,c2")
 		reserveCount++
 		assert.Equal(1, reserveCount)
+		return nil
 	}
 
 	t.Log("should count to two level")
@@ -78,8 +79,9 @@ func TestJunkData(t *testing.T) {
 		releaseCount++
 	}
 	reserveCount := 0
-	store.Reserver = func(label string) {
+	store.Reserver = func(label string) error {
 		reserveCount++
+		return nil
 	}
 
 	t.Log("should ignore empty label")
