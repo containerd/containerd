@@ -25,7 +25,10 @@ func ChangeToKVM(l string) (string, error) {
 	if l == "" || !selinux.GetEnabled() {
 		return "", nil
 	}
-	proc, _ := selinux.KVMContainerLabels()
+	proc, err := selinux.KVMContainerLabel()
+	if err != nil {
+		return "", err
+	}
 	selinux.ReleaseLabel(proc)
 
 	current, err := selinux.NewContext(l)
