@@ -446,7 +446,7 @@ jobs:
 
       - name: Load dm-verity kernel module
         run: |
-          sudo modprobe dm_verity
+          sudo modprobe dm_verity || lsmod | grep -q dm_verity
 
       - name: Install containerd
         env:
