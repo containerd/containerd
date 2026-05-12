@@ -165,8 +165,9 @@ func TestContainerStore(t *testing.T) {
 
 	s := NewStore(label.NewStore(), nil)
 	reserved := map[string]bool{}
-	s.labels.Reserver = func(label string) {
+	s.labels.Reserver = func(label string) error {
 		reserved[strings.SplitN(label, ":", 4)[3]] = true
+		return nil
 	}
 	s.labels.Releaser = func(label string) {
 		reserved[strings.SplitN(label, ":", 4)[3]] = false
