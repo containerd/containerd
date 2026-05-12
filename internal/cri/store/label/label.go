@@ -27,7 +27,7 @@ type Store struct {
 	sync.Mutex
 	levels   map[string]int
 	Releaser func(string)
-	Reserver func(string)
+	Reserver func(string) error
 }
 
 // NewStore creates a new SELinux process label store
@@ -35,7 +35,7 @@ func NewStore() *Store {
 	return &Store{
 		levels:   map[string]int{},
 		Releaser: selinux.ReleaseLabel,
-		Reserver: selinux.ReserveLabel,
+		Reserver: selinux.ReserveLabelV2,
 	}
 }
 
@@ -57,7 +57,9 @@ func (s *Store) Reserve(label string) error {
 	}
 
 	if _, ok := s.levels[level]; !ok {
-		s.Reserver(label)
+		if err := s.Reserver(label); err != nil {
+			return err
+		}
 	}
 
 	s.levels[level]++
