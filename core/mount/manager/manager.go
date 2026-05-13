@@ -125,6 +125,7 @@ func (mm *mountManager) Close() error {
 			errs = append(errs, err)
 		}
 	}
+	errs = append(errs, mm.db.Close())
 	return errors.Join(errs...)
 }
 

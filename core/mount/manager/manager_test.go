@@ -37,18 +37,12 @@ import (
 	"github.com/containerd/containerd/v2/pkg/testutil"
 
 	bolt "go.etcd.io/bbolt"
+	bolterr "go.etcd.io/bbolt/errors"
 )
 
 func TestManager(t *testing.T) {
 	testutil.RequiresRoot(t)
 	td := t.TempDir()
-	metadb := filepath.Join(td, "mounts.db")
-	targetdir := filepath.Join(td, "m")
-	db, err := bolt.Open(metadb, 0600, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
 	sourcedir := filepath.Join(td, "source")
@@ -63,26 +57,35 @@ func TestManager(t *testing.T) {
 		},
 	}
 
-	t.Run("ActivateNoMounts", func(t *testing.T) {
-		m, err := NewManager(db, targetdir)
+	// newManager creates a fresh bolt DB and mount manager for each subtest so
+	// that closing the manager (which now closes the DB) does not affect sibling
+	// subtests.  It returns the manager and the target directory it was given.
+	newManager := func(t *testing.T, opts ...Opt) (mount.Manager, string) {
+		t.Helper()
+		subtd := t.TempDir()
+		db, err := bolt.Open(filepath.Join(subtd, "mounts.db"), 0600, nil)
 		require.NoError(t, err)
-		t.Cleanup(func() { m.(io.Closer).Close() })
-		_, err = m.Activate(ctx, "id1", []mount.Mount{})
+		targetdir := filepath.Join(subtd, "m")
+		m, err := NewManager(db, targetdir, opts...)
+		require.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
+		return m, targetdir
+	}
+
+	t.Run("ActivateNoMounts", func(t *testing.T) {
+		m, _ := newManager(t)
+		_, err := m.Activate(ctx, "id1", []mount.Mount{})
 		assert.ErrorIs(t, err, errdefs.ErrNotImplemented)
 	})
 
 	t.Run("SystemOnly", func(t *testing.T) {
-		m, err := NewManager(db, targetdir)
-		require.NoError(t, err)
-		t.Cleanup(func() { m.(io.Closer).Close() })
-		_, err = m.Activate(ctx, "id1", mounts)
+		m, _ := newManager(t)
+		_, err := m.Activate(ctx, "id1", mounts)
 		assert.ErrorIs(t, err, errdefs.ErrNotImplemented)
 	})
 
 	t.Run("SystemOverride", func(t *testing.T) {
-		m, err := NewManager(db, targetdir, WithMountHandler("bind", &noopHandler{mounts: &atomic.Int32{}}))
-		require.NoError(t, err)
-		t.Cleanup(func() { m.(io.Closer).Close() })
+		m, targetdir := newManager(t, WithMountHandler("bind", &noopHandler{mounts: &atomic.Int32{}}))
 		ainfo, err := m.Activate(ctx, "id1", mounts)
 		require.NoError(t, err)
 		defer assert.NoError(t, m.Deactivate(ctx, "id1"))
@@ -245,7 +248,6 @@ func TestGC(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer db.Close()
 			ctx := namespaces.WithNamespace(context.Background(), "test")
 
 			sourcedir := filepath.Join(td, "source")
@@ -255,7 +257,9 @@ func TestGC(t *testing.T) {
 			mountC := new(atomic.Int32)
 			m, err := NewManager(db, targetdir, WithMountHandler("noop", &noopHandler{mounts: mountC}), WithMountHandler("error", &errOnceHandler{mounts: mountC, mounted: make(map[string]struct{})}))
 			require.NoError(t, err)
-			t.Cleanup(func() { m.(io.Closer).Close() })
+			t.Cleanup(func() {
+				assert.NoError(t, m.(io.Closer).Close())
+			})
 
 			for i, run := range tc.gcruns {
 				for j, mnt := range run.a {
@@ -340,13 +344,12 @@ func TestActivateAlreadyExists(t *testing.T) {
 	targetdir := filepath.Join(td, "m")
 	db, err := bolt.Open(metadb, 0600, nil)
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
 	mountC := new(atomic.Int32)
 	m, err := NewManager(db, targetdir, WithMountHandler("noop", &noopHandler{mounts: mountC}))
 	require.NoError(t, err)
-	t.Cleanup(func() { m.(io.Closer).Close() })
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
 
 	mounts := []mount.Mount{{Type: "noop"}}
 
@@ -374,7 +377,6 @@ func TestActivateStaleIncomplete(t *testing.T) {
 	targetdir := filepath.Join(td, "m")
 	db, err := bolt.Open(metadb, 0600, nil)
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
 	// Simulate a stale incomplete activation by directly writing a bucket
@@ -415,7 +417,7 @@ func TestActivateStaleIncomplete(t *testing.T) {
 	mountC := new(atomic.Int32)
 	m, err := NewManager(db, targetdir, WithMountHandler("noop", &noopHandler{mounts: mountC}))
 	require.NoError(t, err)
-	t.Cleanup(func() { m.(io.Closer).Close() })
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
 
 	mounts := []mount.Mount{{Type: "noop"}}
 
@@ -439,13 +441,12 @@ func TestInfo(t *testing.T) {
 	targetdir := filepath.Join(td, "m")
 	db, err := bolt.Open(metadb, 0600, nil)
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
 	mountC := new(atomic.Int32)
 	m, err := NewManager(db, targetdir, WithMountHandler("noop", &noopHandler{mounts: mountC}))
 	require.NoError(t, err)
-	t.Cleanup(func() { m.(io.Closer).Close() })
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
 
 	// Info on non-existent mount should return ErrNotFound
 	_, err = m.Info(ctx, "nonexistent")
@@ -506,14 +507,13 @@ func TestInfoSystemMounts(t *testing.T) {
 	targetdir := filepath.Join(td, "m")
 	db, err := bolt.Open(metadb, 0600, nil)
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
 	mountC := new(atomic.Int32)
 	// Only register a handler for "noop"; "bind" will pass through as a system mount
 	m, err := NewManager(db, targetdir, WithMountHandler("noop", &noopHandler{mounts: mountC}))
 	require.NoError(t, err)
-	t.Cleanup(func() { m.(io.Closer).Close() })
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
 
 	sourcedir := filepath.Join(td, "source")
 	require.NoError(t, os.Mkdir(sourcedir, 0700))
@@ -565,13 +565,12 @@ func TestActivateConcurrentSameName(t *testing.T) {
 	targetdir := filepath.Join(td, "m")
 	db, err := bolt.Open(metadb, 0600, nil)
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
 	mountC := new(atomic.Int32)
 	m, err := NewManager(db, targetdir, WithMountHandler("noop", &noopHandler{mounts: mountC}))
 	require.NoError(t, err)
-	t.Cleanup(func() { m.(io.Closer).Close() })
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
 
 	mounts := []mount.Mount{{Type: "noop"}}
 
@@ -603,3 +602,18 @@ func TestActivateConcurrentSameName(t *testing.T) {
 
 // TODO: Test deactivate
 // TODO: Test Sync
+
+func TestClose(t *testing.T) {
+	td := t.TempDir()
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+
+	m, err := NewManager(db, filepath.Join(td, "m"))
+	require.NoError(t, err)
+
+	require.NoError(t, m.(io.Closer).Close())
+
+	// Verify the underlying bolt DB is closed: a new transaction should fail.
+	_, err = db.Begin(false)
+	assert.ErrorIs(t, err, bolterr.ErrDatabaseNotOpen)
+}

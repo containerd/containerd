@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -137,6 +138,17 @@ func NewDB(db Transactor, cs content.Store, ss map[string]snapshots.Snapshotter,
 	}
 
 	return m
+}
+
+// Close closes the underlying bolt database.
+// Acquires wlock so no GC cycle is in progress when bolt is closed.
+func (m *DB) Close() error {
+	m.wlock.Lock()
+	defer m.wlock.Unlock()
+	if c, ok := m.db.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
 }
 
 // Init ensures the database is at the correct version
