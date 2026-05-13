@@ -18,7 +18,6 @@ package ttrpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -75,25 +74,20 @@ func init() {
 			type ttrpcService interface {
 				RegisterTTRPC(*ttrpc.Server) error
 			}
+			// Iterate plugins directly rather than using GetByType, which
+			// short-circuits on the first plugin that failed to initialize.
+			// Plugins that failed (e.g. CRI under rootless) have already been
+			// logged and should not prevent the TTRPC server from starting.
 			var hasService bool
-			ps, err := ic.GetByType(plugins.TTRPCPlugin) // ensure grpc plugin is initialized
-			if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
-				return nil, err
-			}
-			for _, p := range ps {
-				if gs, ok := p.(ttrpcService); ok {
-					if err := gs.RegisterTTRPC(s); err != nil {
-						return nil, fmt.Errorf("failed to register ttrpc service: %w", err)
-					}
-					hasService = true
+			for _, p := range ic.Plugins().GetAll() {
+				if p.Registration.Type != plugins.TTRPCPlugin && p.Registration.Type != plugins.GRPCPlugin {
+					continue
 				}
-			}
-			ps, err = ic.GetByType(plugins.GRPCPlugin) // ensure grpc plugin is initialized
-			if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
-				return nil, err
-			}
-			for _, p := range ps {
-				if gs, ok := p.(ttrpcService); ok {
+				instance, err := p.Instance()
+				if err != nil {
+					continue
+				}
+				if gs, ok := instance.(ttrpcService); ok {
 					if err := gs.RegisterTTRPC(s); err != nil {
 						return nil, fmt.Errorf("failed to register ttrpc service: %w", err)
 					}

@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -112,12 +111,19 @@ func init() {
 			}
 
 			s := grpc.NewServer(serverOpts...)
-			ps, err := ic.GetByType(plugins.GRPCPlugin) // ensure grpc plugin is initialized
-			if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
-				return nil, err
-			}
-			for _, p := range ps {
-				if gs, ok := p.(grpcService); ok {
+			// Iterate plugins directly rather than using GetByType, which
+			// short-circuits on the first plugin that failed to initialize.
+			// Plugins that failed (e.g. CRI under rootless) have already been
+			// logged and should not prevent the GRPC server from starting.
+			for _, p := range ic.Plugins().GetAll() {
+				if p.Registration.Type != plugins.GRPCPlugin {
+					continue
+				}
+				instance, err := p.Instance()
+				if err != nil {
+					continue
+				}
+				if gs, ok := instance.(grpcService); ok {
 					if err := gs.Register(s); err != nil {
 						return nil, fmt.Errorf("failed to register grpc service: %w", err)
 					}
@@ -218,13 +224,18 @@ func init() {
 			}
 
 			s := grpc.NewServer(serverOpts...)
-			ps, err := ic.GetByType(plugins.GRPCPlugin) // ensure grpc plugin is initialized
-			if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
-				return nil, err
-			}
+			// Iterate plugins directly rather than using GetByType, which
+			// short-circuits on the first plugin that failed to initialize.
 			var hasService bool
-			for _, p := range ps {
-				if gs, ok := p.(tcpService); ok {
+			for _, p := range ic.Plugins().GetAll() {
+				if p.Registration.Type != plugins.GRPCPlugin {
+					continue
+				}
+				instance, err := p.Instance()
+				if err != nil {
+					continue
+				}
+				if gs, ok := instance.(tcpService); ok {
 					if err := gs.RegisterTCP(s); err != nil {
 						return nil, fmt.Errorf("failed to register grpc service: %w", err)
 					}
