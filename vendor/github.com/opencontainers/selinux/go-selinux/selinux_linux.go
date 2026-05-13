@@ -890,8 +890,10 @@ func defaultEnforceMode() int {
 	return Disabled
 }
 
+// mcsAdd reserves a level. If the argument is empty or does not contain
+// MCS/MLS category component (no ":c"), it is ignored.
 func mcsAdd(mcs string) error {
-	if mcs == "" {
+	if !strings.Contains(mcs, ":c") {
 		return nil
 	}
 	state.Lock()
@@ -1512,4 +1514,47 @@ func getDefaultContextWithLevel(user, level, scon string) (string, error) {
 	}
 
 	return getDefaultContextFromReaders(&c)
+}
+
+func (k ProcessKind) keys() (primary, fallback string, ok bool) {
+	switch k {
+	case ProcessKindRegular:
+		return "process", "", true
+	case ProcessKindInit:
+		return "init_process", "process", true
+	case ProcessKindKVM:
+		return "kvm_process", "process", true
+	}
+	return "", "", false
+}
+
+func setProcessKind(cLabel string, k ProcessKind) (string, error) {
+	if cLabel == "" {
+		return "", nil
+	}
+	primary, fallback, ok := k.keys()
+	if !ok {
+		return "", fmt.Errorf("selinux.SetProcessKind: invalid ProcessKind %d", k)
+	}
+
+	src := label(primary)
+	if src == "" && fallback != "" {
+		src = label(fallback)
+	}
+	if src == "" {
+		return cLabel, nil
+	}
+
+	// Replace cLabel type with one from src.
+	srcCtx, err := newContext(src)
+	if err != nil {
+		return "", fmt.Errorf("selinux.SetProcessKind: invalid %s label %s: %w", primary, src, err)
+	}
+	dstCtx, err := newContext(cLabel)
+	if err != nil {
+		return "", fmt.Errorf("selinux.SetProcessKind: invalid label %s: %w", cLabel, err)
+	}
+
+	dstCtx["type"] = srcCtx["type"]
+	return dstCtx.get(), nil
 }
