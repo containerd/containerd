@@ -96,6 +96,15 @@ const (
 
 	// WindowsHostProcess is used by hcsshim to identify windows pods that are running HostProcesses
 	WindowsHostProcess = "microsoft.com/hostprocess-container"
+
+	// PersistEnabled enables a reusable writable rootfs snapshot for containers in a pod.
+	PersistEnabled = "persist.containerd.dev/enabled"
+
+	// PersistID is the stable identifier used to derive the persistent snapshot key.
+	PersistID = "persist.containerd.dev/id"
+
+	// PersistImageDigest records the image digest expected for a persistent snapshot.
+	PersistImageDigest = "persist.containerd.dev/image-digest"
 )
 
 // DefaultCRIAnnotations are the default set of CRI annotations to

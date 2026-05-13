@@ -37,6 +37,11 @@ func TestMetadataMarshalUnmarshal(t *testing.T) {
 		},
 		ImageRef: "test-image-ref",
 		LogPath:  "/test/log/path",
+		PersistentSnapshot: &PersistentSnapshotMetadata{
+			ID:          "test-persist-id",
+			SnapshotKey: "persist/test-persist-id",
+			ImageRef:    "sha256:test",
+		},
 	}
 
 	assert := assertlib.New(t)

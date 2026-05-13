@@ -104,7 +104,11 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	// so we don't need the "Dead" state for now.
 
 	// Delete containerd container.
-	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+	var deleteOpts []containerd.DeleteOpts
+	if container.PersistentSnapshot == nil {
+		deleteOpts = append(deleteOpts, containerd.WithSnapshotCleanup)
+	}
+	if err := container.Container.Delete(ctx, deleteOpts...); err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to delete containerd container %q: %w", id, err)
 		}

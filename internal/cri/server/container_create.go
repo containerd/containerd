@@ -181,6 +181,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
+	persistentSnapshot, err := persistentSnapshotFromPodAnnotations(sandboxConfig, containerName, image.ID)
+	if err != nil {
+		return nil, err
+	}
+	meta.PersistentSnapshot = persistentSnapshot
 
 	span.SetAttributes(
 		tracing.Attribute("container.image.ref", containerdImage.Name()),
@@ -360,7 +365,21 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		// the runtime (runc) a chance to modify (e.g. to create mount
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(r.containerID, *r.containerdImage, !c.ImageService.Config().DisableSnapshotAnnotations, sOpts...),
+	}
+	if r.meta.PersistentSnapshot != nil {
+		if err := c.validatePersistentSnapshotAvailable(r.containerID, r.meta.PersistentSnapshot.SnapshotKey); err != nil {
+			return "", err
+		}
+		opts = append(opts, customopts.WithPersistentSnapshot(
+			r.meta.PersistentSnapshot.SnapshotKey,
+			*r.containerdImage,
+			r.meta.PersistentSnapshot.ImageRef,
+			persistentSnapshotLabels(r.meta.PersistentSnapshot),
+			!c.ImageService.Config().DisableSnapshotAnnotations,
+			sOpts...,
+		))
+	} else {
+		opts = append(opts, customopts.WithNewSnapshot(r.containerID, *r.containerdImage, !c.ImageService.Config().DisableSnapshotAnnotations, sOpts...))
 	}
 	if len(volumeMounts) > 0 {
 		mountMap := make(map[string]string)
@@ -451,7 +470,11 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		if retErr != nil {
 			deferCtx, deferCancel := util.DeferContext()
 			defer deferCancel()
-			if err := cntr.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
+			var deleteOpts []containerd.DeleteOpts
+			if r.meta.PersistentSnapshot == nil {
+				deleteOpts = append(deleteOpts, containerd.WithSnapshotCleanup)
+			}
+			if err := cntr.Delete(deferCtx, deleteOpts...); err != nil {
 				log.G(r.ctx).WithError(err).Errorf("Failed to delete containerd container %q", r.containerID)
 			}
 		}

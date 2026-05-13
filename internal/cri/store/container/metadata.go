@@ -62,6 +62,18 @@ type Metadata struct {
 	StopSignal string
 	// ProcessLabel is the SELinux process label for the container
 	ProcessLabel string
+	// PersistentSnapshot stores the reusable writable rootfs snapshot metadata.
+	PersistentSnapshot *PersistentSnapshotMetadata `json:",omitempty"`
+}
+
+// PersistentSnapshotMetadata identifies a persistent writable rootfs snapshot.
+type PersistentSnapshotMetadata struct {
+	// ID is the user or platform supplied persistent layer identifier.
+	ID string
+	// SnapshotKey is the containerd snapshot key used for the writable rootfs.
+	SnapshotKey string
+	// ImageRef is the image reference or digest this persistent snapshot was created for.
+	ImageRef string
 }
 
 // MarshalJSON encodes Metadata into bytes in json format.
