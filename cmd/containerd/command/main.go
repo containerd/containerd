@@ -163,6 +163,12 @@ can be used and modified as necessary as a custom configuration.`
 			return err
 		}
 
+		// Register the tracing hook as soon as config is available. Later startup
+		// steps may start goroutines that log, so avoid mutating hooks after hook
+		// reads may have begun.
+		tracingHook := tracing.NewLogrusHook(tracing.WithTraceIDField(config.Debug.LogTraceID))
+		logrus.StandardLogger().AddHook(tracingHook)
+
 		// Make sure top-level directories are created early.
 		if err := server.CreateTopLevelDirectories(config); err != nil {
 			return err
@@ -194,10 +200,6 @@ can be used and modified as necessary as a custom configuration.`
 		for _, w := range warnings {
 			log.G(ctx).WithError(w).Warn("cleanup temp mount")
 		}
-
-		// Register logging hook for tracing
-		tracingHook := tracing.NewLogrusHook(tracing.WithTraceIDField(config.Debug.LogTraceID))
-		logrus.StandardLogger().AddHook(tracingHook)
 
 		log.G(ctx).WithFields(log.Fields{
 			"version":  version.Version,
