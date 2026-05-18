@@ -421,7 +421,8 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
 	for _, pinned := range c.config.PinnedImages {
-		if pinned == name {
+		normalizedPinned, err := distribution.ParseDockerRef(pinned)
+		if err == nil && normalizedPinned.String() == name {
 			labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
 		}
 	}
