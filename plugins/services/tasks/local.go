@@ -51,6 +51,7 @@ import (
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/blockio"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
@@ -59,6 +60,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 )
 
 var (
@@ -69,6 +71,7 @@ var (
 		plugins.RuntimePluginV2,
 		plugins.MetadataPlugin,
 		plugins.TaskMonitorPlugin,
+		plugins.WarningPlugin,
 	}
 )
 
@@ -122,6 +125,11 @@ func initFunc(ic *plugin.InitContext) (any, error) {
 		monitor = runtime.NewNoopMonitor()
 	}
 
+	warnings, err := ic.GetSingle(plugins.WarningPlugin)
+	if err != nil {
+		return nil, err
+	}
+
 	db := m.(*metadata.DB)
 	l := &local{
 		containers: metadata.NewContainerStore(db),
@@ -129,6 +137,7 @@ func initFunc(ic *plugin.InitContext) (any, error) {
 		publisher:  ep.(events.Publisher),
 		monitor:    monitor.(runtime.TaskMonitor),
 		v2Runtime:  v2r.(runtime.PlatformRuntime),
+		warnings:   warnings.(warning.Service),
 	}
 
 	v2Tasks, err := l.v2Runtime.Tasks(ic.Context, true)
@@ -156,6 +165,7 @@ type local struct {
 
 	monitor   runtime.TaskMonitor
 	v2Runtime runtime.PlatformRuntime
+	warnings  warning.Service
 }
 
 func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
@@ -166,8 +176,8 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 
 	var (
 		checkpointPath string
-		taskAPIAddress string
-		taskAPIVersion uint32
+		taskAPIAddress = r.TaskApiAddress
+		taskAPIVersion = r.TaskApiVersion
 	)
 
 	if r.Options != nil {
@@ -176,8 +186,19 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 			return nil, err
 		}
 		checkpointPath = taskOptions.CriuImagePath
-		taskAPIAddress = taskOptions.TaskApiAddress
-		taskAPIVersion = taskOptions.TaskApiVersion
+
+		// This path is deprecated and here for backward compatibility,
+		// task address and version should not be passed via runc options,
+		// this is sandbox API specific and has nothing to do with runc.
+		deprecatedAddr, deprecatedVer := taskOptions.GetTaskApiAddress(), taskOptions.GetTaskApiVersion() //nolint:staticcheck // deprecated, kept for backward compatibility
+		if taskAPIAddress == "" && deprecatedAddr != "" {
+			l.warnings.Emit(ctx, deprecation.RuncOptionsTaskAPIAddress)
+			taskAPIAddress = deprecatedAddr
+		}
+		if taskAPIVersion == 0 && deprecatedVer != 0 {
+			l.warnings.Emit(ctx, deprecation.RuncOptionsTaskAPIVersion)
+			taskAPIVersion = deprecatedVer
+		}
 	}
 
 	restoreFromPath := false

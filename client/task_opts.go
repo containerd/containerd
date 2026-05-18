@@ -54,12 +54,16 @@ func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 // usually it is served inside a sandbox, and we can get it from sandbox status.
 func WithTaskAPIEndpoint(address string, version uint32) NewTaskOpts {
 	return func(ctx context.Context, client *Client, info *TaskInfo) error {
-		opts, err := info.getRuncOptions()
-		if err != nil {
-			return err
+		info.taskAPIAddress = address
+		info.taskAPIVersion = version
+		// Also populate the deprecated runc options fields so this keeps
+		// working against older containerd servers that only read the task
+		// API endpoint from runc options. Non-runc runtimes never supported
+		// these fields, so an error here is ignored.
+		if opts, err := info.getRuncOptions(); err == nil {
+			opts.TaskApiAddress = address //nolint:staticcheck // deprecated, kept for backward compatibility
+			opts.TaskApiVersion = version //nolint:staticcheck // deprecated, kept for backward compatibility
 		}
-		opts.TaskApiAddress = address
-		opts.TaskApiVersion = version
 		return nil
 	}
 }
