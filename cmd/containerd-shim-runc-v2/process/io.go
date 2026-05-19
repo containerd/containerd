@@ -19,6 +19,8 @@
 package process
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -27,6 +29,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -56,6 +59,7 @@ type processIO struct {
 	uri   *url.URL
 	copy  bool
 	stdio stdio.Stdio
+	file  *File
 }
 
 func (p *processIO) Close() error {
@@ -69,12 +73,16 @@ func (p *processIO) IO() runc.IO {
 	return p.io
 }
 
+func (p *processIO) File() *File {
+	return p.file
+}
+
 func (p *processIO) Copy(ctx context.Context, wg *sync.WaitGroup) error {
 	if !p.copy {
 		return nil
 	}
 	var cwg sync.WaitGroup
-	if err := copyPipes(ctx, p.IO(), p.stdio.Stdin, p.stdio.Stdout, p.stdio.Stderr, wg, &cwg); err != nil {
+	if err := p.copyPipes(ctx, p.IO(), p.stdio.Stdin, p.stdio.Stdout, p.stdio.Stderr, wg, &cwg); err != nil {
 		return fmt.Errorf("unable to copy pipes: %w", err)
 	}
 	cwg.Wait()
@@ -131,7 +139,8 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	return pio, nil
 }
 
-func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+func (p *processIO) copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+	var rootDir string
 	var sameFile *countingWriteCloser
 	for _, i := range []struct {
 		name string
@@ -144,10 +153,37 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				cwg.Add(1)
 				go func() {
 					cwg.Done()
-					p := bufPool.Get().(*[]byte)
-					defer bufPool.Put(p)
-					if _, err := io.CopyBuffer(wc, rio.Stdout(), *p); err != nil {
-						log.G(ctx).Warn("error copying stdout")
+					if p.uri.Scheme != "file" {
+						p := bufPool.Get().(*[]byte)
+						defer bufPool.Put(p)
+						if _, err := io.CopyBuffer(wc, rio.Stdout(), *p); err != nil {
+							log.G(ctx).Warn("error copying stdout")
+						}
+					} else {
+						u, err := url.Parse(p.uri.String())
+						if err != nil {
+							log.G(ctx).Warnf("error parse uri %v", err)
+						}
+						values, err := url.ParseQuery(u.RawQuery)
+						if err != nil {
+							log.G(ctx).Warnf("error parse query uri %v", err)
+						}
+						LogType := values.Get("log_type")
+						rootDir = values.Get("container_root_dir")
+						if LogType == "file" {
+							// Format container logs to CRI format
+							maxLineStr := values.Get("max_container_log_line_size")
+							maxLine, err := strconv.Atoi(maxLineStr)
+							if err != nil {
+								log.G(ctx).Warnf("error trans %s to int %v", maxLineStr, err)
+							}
+							if p.uri.Path == "/dev/null" {
+								log.G(ctx).Warnf("log path is empty")
+								io.Copy(io.Discard, rio.Stdout())
+							} else {
+								RedirectLogs(p.uri.Path, rio.Stdout(), wc, "stdout", maxLine)
+							}
+						}
 					}
 					wg.Done()
 					wc.Close()
@@ -163,10 +199,37 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				cwg.Add(1)
 				go func() {
 					cwg.Done()
-					p := bufPool.Get().(*[]byte)
-					defer bufPool.Put(p)
-					if _, err := io.CopyBuffer(wc, rio.Stderr(), *p); err != nil {
-						log.G(ctx).Warn("error copying stderr")
+					if p.uri.Scheme != "file" {
+						p := bufPool.Get().(*[]byte)
+						defer bufPool.Put(p)
+						if _, err := io.CopyBuffer(wc, rio.Stderr(), *p); err != nil {
+							log.G(ctx).Warn("error copying stderr")
+						}
+					} else {
+						u, err := url.Parse(p.uri.String())
+						if err != nil {
+							log.G(ctx).Warnf("error parse uri %v", err)
+						}
+						values, err := url.ParseQuery(u.RawQuery)
+						if err != nil {
+							log.G(ctx).Warnf("error parse query uri %v", err)
+						}
+						LogType := values.Get("log_type")
+						rootDir = values.Get("container_root_dir")
+						if LogType == "file" {
+							// Format container logs to CRI format
+							maxLineStr := values.Get("max_container_log_line_size")
+							maxLine, err := strconv.Atoi(maxLineStr)
+							if err != nil {
+								log.G(ctx).Warnf("error trans %s to int %v", maxLineStr, err)
+							}
+							if p.uri.Path == "/dev/null" {
+								log.G(ctx).Warnf("log path is empty")
+								io.Copy(io.Discard, rio.Stderr())
+							} else {
+								RedirectLogs(p.uri.Path, rio.Stderr(), wc, "stderr", maxLine)
+							}
+						}
 					}
 					wg.Done()
 					wc.Close()
@@ -198,9 +261,12 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				i.dest(sameFile, nil)
 				continue
 			}
-			if fw, err = os.OpenFile(i.name, syscall.O_WRONLY|syscall.O_APPEND, 0); err != nil {
+			file, err := OpenFile(i.name, rootDir)
+			if err != nil {
 				return fmt.Errorf("containerd-shim: opening file %q failed: %w", i.name, err)
 			}
+			p.file = file
+			fw = file
 			if stdout == stderr {
 				sameFile = newCountingWriteCloser(fw, 1)
 			}
@@ -454,4 +520,155 @@ func (p *pipe) Close() error {
 	}
 
 	return errors.Join(result...)
+}
+
+type LogTag string
+type StreamType string
+
+const (
+	// delimiter used in CRI logging format.
+	delimiter = ' '
+	// eof is end-of-line.
+	eol = '\n'
+	// timestampFormat is the timestamp format used in CRI logging format.
+	timestampFormat = time.RFC3339Nano
+	// defaultBufSize is the default size of the read buffer in bytes.
+	defaultBufSize = 4096
+
+	// LogTagPartial means the line is part of multiple lines.
+	LogTagPartial LogTag = "P"
+	// LogTagFull means the line is a single full line or the end of multiple lines.
+	LogTagFull LogTag = "F"
+	// LogTagDelimiter is the delimiter for different log tags.
+	LogTagDelimiter = ":"
+)
+
+func RedirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int) {
+	defer rc.Close()
+	var (
+		stream    = []byte(s)
+		delimiter = []byte{delimiter}
+		partial   = []byte(LogTagPartial)
+		full      = []byte(LogTagFull)
+		buf       [][]byte
+		length    int
+		bufSize   = defaultBufSize
+
+		timeBuffer = make([]byte, len(timestampFormat))
+		lineBuffer = bytes.Buffer{}
+	)
+	// Make sure bufSize <= maxLen
+	if maxLen > 0 && maxLen < bufSize {
+		bufSize = maxLen
+	}
+	r := bufio.NewReaderSize(rc, bufSize)
+	writeLineBuffer := func(tag []byte, lineBytes [][]byte) {
+		timeBuffer = time.Now().AppendFormat(timeBuffer[:0], timestampFormat)
+		headers := [][]byte{timeBuffer, stream, tag}
+
+		lineBuffer.Reset()
+		for _, h := range headers {
+			lineBuffer.Write(h)
+			lineBuffer.Write(delimiter)
+		}
+		for _, l := range lineBytes {
+			lineBuffer.Write(l)
+		}
+		lineBuffer.WriteByte(eol)
+		if _, err := lineBuffer.WriteTo(w); err != nil {
+			log.L.WithError(err).Errorf("Fail to write %q log to log file %q", s, path)
+		}
+	}
+	for {
+		var stop bool
+		newLine, isPrefix, err := readLine(r)
+		// NOTE(random-liu): readLine can return actual content even if there is an error.
+		if len(newLine) > 0 {
+			// Buffer returned by ReadLine will change after
+			// next read, copy it.
+			l := make([]byte, len(newLine))
+			copy(l, newLine)
+			buf = append(buf, l)
+			length += len(l)
+		}
+		if err != nil {
+			if err == io.EOF {
+				log.L.Tracef("Getting EOF from stream %q while redirecting to log file %q", s, path)
+			} else {
+				log.L.WithError(err).Errorf("An error occurred when redirecting stream %q to log file %q", s, path)
+			}
+			if length == 0 {
+				// No content left to write, break.
+				break
+			}
+			// Stop after writing the content left in buffer.
+			stop = true
+		}
+		if maxLen > 0 && length > maxLen {
+			exceedLen := length - maxLen
+			last := buf[len(buf)-1]
+			if exceedLen > len(last) {
+				// exceedLen must <= len(last), or else the buffer
+				// should have be written in the previous iteration.
+				panic("exceed length should <= last buffer size")
+			}
+			buf[len(buf)-1] = last[:len(last)-exceedLen]
+			writeLineBuffer(partial, buf)
+			buf = [][]byte{last[len(last)-exceedLen:]}
+			length = exceedLen
+		}
+		if isPrefix {
+			continue
+		}
+		if stop {
+			// readLine only returns error when the message doesn't
+			// end with a newline, in that case it should be treated
+			// as a partial line.
+			writeLineBuffer(partial, buf)
+		} else {
+			writeLineBuffer(full, buf)
+		}
+		buf = nil
+		length = 0
+		if stop {
+			break
+		}
+	}
+	log.L.Debugf("Finish redirecting stream %q to log file %q", s, path)
+}
+
+func readLine(b *bufio.Reader) (line []byte, isPrefix bool, err error) {
+	line, err = b.ReadSlice('\n')
+	if err == bufio.ErrBufferFull {
+		// Handle the case where "\r\n" straddles the buffer.
+		if len(line) > 0 && line[len(line)-1] == '\r' {
+			// Unread the last '\r'
+			if err := b.UnreadByte(); err != nil {
+				panic(fmt.Sprintf("invalid unread %v", err))
+			}
+			line = line[:len(line)-1]
+		}
+		return line, true, nil
+	}
+
+	if len(line) == 0 {
+		if err != nil {
+			line = nil
+		}
+		return
+	}
+
+	if line[len(line)-1] == '\n' {
+		// "ReadSlice returns err != nil if and only if line does not end in delim"
+		// (See https://golang.org/pkg/bufio/#Reader.ReadSlice).
+		if err != nil {
+			panic(fmt.Sprintf("full read with unexpected error %v", err))
+		}
+		drop := 1
+		if len(line) > 1 && line[len(line)-2] == '\r' {
+			drop = 2
+		}
+		line = line[:len(line)-drop]
+	}
+	return
 }

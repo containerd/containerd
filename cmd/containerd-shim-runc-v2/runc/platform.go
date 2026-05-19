@@ -19,20 +19,25 @@
 package runc
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
+	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
+	"github.com/containerd/log"
 )
 
 var bufPool = sync.Pool{
@@ -165,7 +170,26 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 			return nil, fmt.Errorf("logging binary did not call ready (it may have crashed or exited prematurely)")
 		}
 		cwg.Wait()
-
+	case "file":
+		cwg.Add(1)
+		go func() {
+			cwg.Done()
+			values, err := url.ParseQuery(uri.RawQuery)
+			if err != nil {
+				log.G(ctx).Warnf("error parse query uri %v", err)
+				return
+			}
+			maxLineStr := values.Get("max_container_log_line_size")
+			maxLine, err := strconv.Atoi(maxLineStr)
+			if err != nil {
+				log.G(ctx).Warnf("error trans %s to int %v", maxLineStr, err)
+				return
+			}
+			log.G(ctx).Warnf("maxline is  %d uri.Path is %s", maxLine, uri.Path)
+			copyReaderToLog(uri.Path, epollConsole, "stdout")
+			// process.RedirectLogs(uri.Path, data, epollConsole, "stdout", maxLine)
+		}()
+		cwg.Wait()
 	default:
 		outw, err := fifo.OpenFifo(ctx, stdout, syscall.O_WRONLY, 0)
 		if err != nil {
@@ -191,6 +215,30 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 	}
 
 	return epollConsole, nil
+}
+
+func copyReaderToLog(logPath string, reader io.Reader, ioType string) error {
+	timeBuffer := make([]byte, len(time.RFC3339Nano))
+	logFile, err := os.OpenFile(logPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer logFile.Close()
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		timeBuffer = time.Now().AppendFormat(timeBuffer[:0], time.RFC3339Nano)
+		headers := [][]byte{timeBuffer, []byte(ioType), []byte("F")}
+		logFile.Write(bytes.Join(headers, []byte(" ")))
+		logFile.Write([]byte(" "))
+		logFile.Write(line)
+		logFile.Write([]byte("\n"))
+	}
+	return scanner.Err()
 }
 
 func (p *linuxPlatform) ShutdownConsole(ctx context.Context, cons console.Console) error {

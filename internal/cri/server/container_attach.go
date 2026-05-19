@@ -82,6 +82,6 @@ func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Re
 		},
 	}
 	// TODO(random-liu): Figure out whether we need to support historical output.
-	cntr.IO.Attach(ctx, opts)
+	cntr.IO.Attach(ctx, opts, cntr.LogPath, cntr.IOType)
 	return nil
 }

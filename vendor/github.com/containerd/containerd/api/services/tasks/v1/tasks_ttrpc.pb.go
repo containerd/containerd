@@ -18,6 +18,7 @@ type TTRPCTasksService interface {
 	Kill(context.Context, *KillRequest) (*emptypb.Empty, error)
 	Exec(context.Context, *ExecProcessRequest) (*emptypb.Empty, error)
 	ResizePty(context.Context, *ResizePtyRequest) (*emptypb.Empty, error)
+	ReOpenLog(context.Context, *ReOpenLogRequest) (*emptypb.Empty, error)
 	CloseIO(context.Context, *CloseIORequest) (*emptypb.Empty, error)
 	Pause(context.Context, *PauseTaskRequest) (*emptypb.Empty, error)
 	Resume(context.Context, *ResumeTaskRequest) (*emptypb.Empty, error)
@@ -93,6 +94,13 @@ func RegisterTTRPCTasksService(srv *ttrpc.Server, svc TTRPCTasksService) {
 					return nil, err
 				}
 				return svc.ResizePty(ctx, &req)
+			},
+			"ReOpenLog": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req ReOpenLogRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.ReOpenLog(ctx, &req)
 			},
 			"CloseIO": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
 				var req CloseIORequest
@@ -231,6 +239,14 @@ func (c *ttrpctasksClient) Exec(ctx context.Context, req *ExecProcessRequest) (*
 func (c *ttrpctasksClient) ResizePty(ctx context.Context, req *ResizePtyRequest) (*emptypb.Empty, error) {
 	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.services.tasks.v1.Tasks", "ResizePty", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpctasksClient) ReOpenLog(ctx context.Context, req *ReOpenLogRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
+	if err := c.client.Call(ctx, "containerd.services.tasks.v1.Tasks", "ReOpenLog", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

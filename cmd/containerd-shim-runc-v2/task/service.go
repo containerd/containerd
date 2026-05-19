@@ -418,6 +418,18 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 	return empty, nil
 }
 
+func (s *service) ReOpenLog(ctx context.Context, r *taskAPI.ReOpenLogRequest) (*ptypes.Empty, error) {
+	container, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := container.ReOpenLog(ctx, r); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+	log.G(ctx).Infof("reopen container %s log", container.ID)
+	return empty, nil
+}
+
 // State returns runtime state information for a process
 func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.StateResponse, error) {
 	container, err := s.getContainer(r.ID)

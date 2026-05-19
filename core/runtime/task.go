@@ -43,6 +43,7 @@ type Process interface {
 	ResizePty(ctx context.Context, size ConsoleSize) error
 	// CloseIO closes the processes IO
 	CloseIO(ctx context.Context) error
+	ReOpenLog(ctx context.Context) error
 	// Start the container's user defined process
 	Start(ctx context.Context) error
 	// Wait for the process to exit

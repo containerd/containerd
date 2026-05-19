@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/containerd/containerd/v2/pkg/tracing"
@@ -33,6 +34,7 @@ import (
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/checkpoint-restore/go-criu/v7/stats"
 	containerd "github.com/containerd/containerd/v2/client"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -95,14 +97,36 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 	span.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
 
-	ioCreation := func(id string) (_ containerdio.IO, err error) {
-		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create container loggers: %w", err)
+	var ioCreation containerdio.Creator
+	if meta.IOType == criconfig.IOTypeFile {
+		volatileContainerRootDir := c.getVolatileContainerRootDir(cntr.ID)
+
+		args := make(map[string]string)
+		args["log_type"] = "file"
+		args["max_container_log_line_size"] = strconv.Itoa(c.config.MaxContainerLogLineSize)
+		args["container_root_dir"] = volatileContainerRootDir
+		if meta.LogPath == "" {
+			meta.LogPath = "/dev/null"
 		}
-		cntr.IO.AddOutput("log", stdoutWC, stderrWC)
-		cntr.IO.Pipe()
-		return cntr.IO, nil
+		u, err := containerdio.LogURIGenerator("file", meta.LogPath, args)
+		if err != nil {
+			return nil, err
+		}
+		if config.GetTty() {
+			ioCreation = containerdio.TerminalLogURIWithStin(u, cntr.IO.Config().Stdin)
+		} else {
+			ioCreation = containerdio.LogURI(u)
+		}
+	} else {
+		ioCreation = func(id string) (_ containerdio.IO, err error) {
+			stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
+			if err != nil {
+				return nil, fmt.Errorf("failed to create container loggers: %w", err)
+			}
+			cntr.IO.AddOutput("log", stdoutWC, stderrWC)
+			cntr.IO.Pipe()
+			return cntr.IO, nil
+		}
 	}
 
 	if cntr.Status.Get().Restore {

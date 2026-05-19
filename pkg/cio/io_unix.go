@@ -53,6 +53,25 @@ func NewFIFOSetInDir(root, id string, terminal bool) (*FIFOSet, error) {
 	}, closer), nil
 }
 
+func NewStdinFIFOSetInDir(root, id string, terminal bool) (*FIFOSet, error) {
+	if root != "" {
+		if err := os.MkdirAll(root, 0700); err != nil {
+			return nil, err
+		}
+	}
+	dir, err := os.MkdirTemp(root, "")
+	if err != nil {
+		return nil, err
+	}
+	closer := func() error {
+		return os.RemoveAll(dir)
+	}
+	return NewFIFOSet(Config{
+		Stdin:    filepath.Join(dir, id+"-stdin"),
+		Terminal: terminal,
+	}, closer), nil
+}
+
 func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 	var ctx, cancel = context.WithCancel(context.Background())
 	pipes, err := openFifos(ctx, fifos)
@@ -162,6 +181,19 @@ func TerminalLogURI(uri *url.URL) Creator {
 	return func(_ string) (IO, error) {
 		return &logURI{
 			config: Config{
+				Stdout:   uri.String(),
+				Stderr:   uri.String(),
+				Terminal: true,
+			},
+		}, nil
+	}
+}
+
+func TerminalLogURIWithStin(uri *url.URL, stdin string) Creator {
+	return func(_ string) (IO, error) {
+		return &logURI{
+			config: Config{
+				Stdin:    stdin,
 				Stdout:   uri.String(),
 				Stderr:   uri.String(),
 				Terminal: true,

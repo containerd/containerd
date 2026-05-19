@@ -43,6 +43,7 @@ type TaskServiceClient interface {
 	Kill(context.Context, *api.KillRequest) (*emptypb.Empty, error)
 	Exec(context.Context, *api.ExecProcessRequest) (*emptypb.Empty, error)
 	ResizePty(context.Context, *api.ResizePtyRequest) (*emptypb.Empty, error)
+	ReOpenLog(context.Context, *api.ReOpenLogRequest) (*emptypb.Empty, error)
 	CloseIO(context.Context, *api.CloseIORequest) (*emptypb.Empty, error)
 	Update(context.Context, *api.UpdateTaskRequest) (*emptypb.Empty, error)
 	Wait(context.Context, *api.WaitRequest) (*api.WaitResponse, error)
@@ -203,6 +204,12 @@ func (b *ttrpcV2Bridge) ResizePty(ctx context.Context, request *api.ResizePtyReq
 	})
 }
 
+func (b *ttrpcV2Bridge) ReOpenLog(ctx context.Context, request *api.ReOpenLogRequest) (*emptypb.Empty, error) {
+	return b.client.ReOpenLog(ctx, &v2.ReOpenLogRequest{
+		ID: request.GetID(),
+	})
+}
+
 func (b *ttrpcV2Bridge) CloseIO(ctx context.Context, request *api.CloseIORequest) (*emptypb.Empty, error) {
 	return b.client.CloseIO(ctx, &v2.CloseIORequest{
 		ID:     request.GetID(),
@@ -303,6 +310,10 @@ func (g *grpcV3Bridge) Exec(ctx context.Context, request *api.ExecProcessRequest
 
 func (g *grpcV3Bridge) ResizePty(ctx context.Context, request *api.ResizePtyRequest) (*emptypb.Empty, error) {
 	return g.client.ResizePty(ctx, request)
+}
+
+func (g *grpcV3Bridge) ReOpenLog(ctx context.Context, request *api.ReOpenLogRequest) (*emptypb.Empty, error) {
+	return g.client.ReOpenLog(ctx, request)
 }
 
 func (g *grpcV3Bridge) CloseIO(ctx context.Context, request *api.CloseIORequest) (*emptypb.Empty, error) {

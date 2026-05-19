@@ -78,6 +78,7 @@ const (
 	IOTypeFifo = "fifo"
 	// IOTypeStreaming is container io implemented by connecting the streaming api to sandbox endpoint
 	IOTypeStreaming = "streaming"
+	IOTypeFile      = "file"
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
@@ -672,8 +673,8 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		if len(r.IOType) == 0 {
 			r.IOType = IOTypeFifo
 		}
-		if r.IOType != IOTypeStreaming && r.IOType != IOTypeFifo {
-			return warnings, errors.New("`io_type` can only be `streaming` or `named_pipe`")
+		if r.IOType != IOTypeStreaming && r.IOType != IOTypeFifo && r.IOType != IOTypeFile {
+			return warnings, errors.New("`io_type` can only be `streaming` or `named_pipe` and `file`")
 		}
 	}
 

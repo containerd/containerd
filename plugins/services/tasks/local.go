@@ -536,6 +536,18 @@ func (l *local) ResizePty(ctx context.Context, r *api.ResizePtyRequest, _ ...grp
 	return empty, nil
 }
 
+func (l *local) ReOpenLog(ctx context.Context, r *api.ReOpenLogRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
+	t, err := l.getTask(ctx, r.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	p := runtime.Process(t)
+	if err = p.ReOpenLog(ctx); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+	return empty, nil
+}
+
 func (l *local) CloseIO(ctx context.Context, r *api.CloseIORequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
