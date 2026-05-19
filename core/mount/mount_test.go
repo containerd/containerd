@@ -144,8 +144,13 @@ func TestReadonlyMounts(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if !reflect.DeepEqual(readonlyMounts(tc.input), tc.expected) {
-			t.Fatalf("incorrectly modified mounts: %s", tc.desc)
+		original := slices.Clone(tc.input)
+		actual := readonlyMounts(tc.input)
+		if !reflect.DeepEqual(actual, tc.expected) {
+			t.Fatalf("incorrectly modified mounts: %s.\n\n Expected: %v\n\n Actual: %v", tc.desc, tc.expected, actual)
+		}
+		if !reflect.DeepEqual(original, tc.input) {
+			t.Fatalf("modified original mounts: %s.\n\n Expected: %v\n\n Actual: %v", tc.desc, original, tc.input)
 		}
 	}
 }
