@@ -88,14 +88,24 @@ func RemoveVolatileOption(mounts []Mount) []Mount {
 		if m.Type != "overlay" {
 			continue
 		}
+		var newOpts []string
 		for j, opt := range m.Options {
 			if opt == "volatile" || opt == "fsync=volatile" {
 				if out == nil {
 					out = slices.Clone(mounts)
 				}
-				out[i].Options = append(out[i].Options[:j], out[i].Options[j+1:]...)
-				break
+				if newOpts == nil {
+					// Clone up until this opt.
+					newOpts = slices.Clone(m.Options[:j])
+				}
+				continue
 			}
+			if newOpts != nil {
+				newOpts = append(newOpts, opt)
+			}
+		}
+		if newOpts != nil {
+			out[i].Options = newOpts
 		}
 	}
 
@@ -110,13 +120,24 @@ func RemoveVolatileOption(mounts []Mount) []Mount {
 func RemoveIDMapOption(mounts []Mount) []Mount {
 	var out []Mount
 	for i, m := range mounts {
+		var newOpts []string
 		for j, opt := range m.Options {
 			if strings.HasPrefix(opt, "uidmap") || strings.HasPrefix(opt, "gidmap") {
 				if out == nil {
 					out = slices.Clone(mounts)
 				}
-				out[i].Options = append(out[i].Options[:j], out[i].Options[j+1:]...)
+				if newOpts == nil {
+					// Clone up until this opt.
+					newOpts = slices.Clone(m.Options[:j])
+				}
+				continue
 			}
+			if newOpts != nil {
+				newOpts = append(newOpts, opt)
+			}
+		}
+		if newOpts != nil {
+			out[i].Options = newOpts
 		}
 	}
 	if out != nil {
