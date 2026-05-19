@@ -83,51 +83,38 @@ func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) erro
 // TODO: Make this logic conditional once the kernel supports reusing
 // overlayfs volatile mounts.
 func RemoveVolatileOption(mounts []Mount) []Mount {
-	var out []Mount
-	for i, m := range mounts {
-		if m.Type != "overlay" {
-			continue
-		}
-		var newOpts []string
-		for j, opt := range m.Options {
-			if opt == "volatile" || opt == "fsync=volatile" {
-				if out == nil {
-					out = slices.Clone(mounts)
-				}
-				if newOpts == nil {
-					// Clone up until this opt.
-					newOpts = slices.Clone(m.Options[:j])
-				}
-				continue
-			}
-			if newOpts != nil {
-				newOpts = append(newOpts, opt)
+	return filterMountOptions(mounts, func(m Mount, opt string) bool {
+		if m.Type == "overlay" {
+			switch opt {
+			case "volatile", "fsync=volatile":
+				return false
 			}
 		}
-		if newOpts != nil {
-			out[i].Options = newOpts
-		}
-	}
-
-	if out != nil {
-		return out
-	}
-
-	return mounts
+		return true
+	})
 }
 
 // RemoveIDMapOption copies and removes the uidmap/gidmap options on any of the mounts using it.
 func RemoveIDMapOption(mounts []Mount) []Mount {
+	return filterMountOptions(mounts, func(_ Mount, opt string) bool {
+		return !strings.HasPrefix(opt, "uidmap") && !strings.HasPrefix(opt, "gidmap")
+	})
+}
+
+// filterMountOptions returns mounts filtering out options not matching the
+// [keep] predicate.
+// Does not mutate the input and clones only when a removal is needed.
+func filterMountOptions(mounts []Mount, keep func(Mount, string) bool) []Mount {
 	var out []Mount
 	for i, m := range mounts {
 		var newOpts []string
 		for j, opt := range m.Options {
-			if strings.HasPrefix(opt, "uidmap") || strings.HasPrefix(opt, "gidmap") {
+			if !keep(m, opt) {
 				if out == nil {
 					out = slices.Clone(mounts)
 				}
 				if newOpts == nil {
-					// Clone up until this opt.
+					// Clone until this opt.
 					newOpts = slices.Clone(m.Options[:j])
 				}
 				continue
