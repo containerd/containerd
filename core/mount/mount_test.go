@@ -18,6 +18,7 @@ package mount
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	// required for `-test.root` flag not to fail
@@ -295,7 +296,7 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		original := copyMounts(tc.input)
+		original := slices.Clone(tc.input)
 		actual := RemoveVolatileOption(tc.input)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Fatalf("incorrectly modified mounts: %s.\n\n Expected: %v\n\n, Actual: %v", tc.desc, tc.expected, actual)

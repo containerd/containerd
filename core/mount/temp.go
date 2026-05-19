@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/containerd/log"
@@ -90,7 +91,7 @@ func RemoveVolatileOption(mounts []Mount) []Mount {
 		for j, opt := range m.Options {
 			if opt == "volatile" || opt == "fsync=volatile" {
 				if out == nil {
-					out = copyMounts(mounts)
+					out = slices.Clone(mounts)
 				}
 				out[i].Options = append(out[i].Options[:j], out[i].Options[j+1:]...)
 				break
@@ -112,7 +113,7 @@ func RemoveIDMapOption(mounts []Mount) []Mount {
 		for j, opt := range m.Options {
 			if strings.HasPrefix(opt, "uidmap") || strings.HasPrefix(opt, "gidmap") {
 				if out == nil {
-					out = copyMounts(mounts)
+					out = slices.Clone(mounts)
 				}
 				out[i].Options = append(out[i].Options[:j], out[i].Options[j+1:]...)
 			}
@@ -122,13 +123,6 @@ func RemoveIDMapOption(mounts []Mount) []Mount {
 		return out
 	}
 	return mounts
-}
-
-// copyMounts creates a copy of the original slice to allow for modification and not altering the original
-func copyMounts(in []Mount) []Mount {
-	out := make([]Mount, len(in))
-	copy(out, in)
-	return out
 }
 
 // WithReadonlyTempMount mounts the provided mounts to a temp dir as readonly,
