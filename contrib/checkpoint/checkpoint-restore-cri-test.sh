@@ -96,7 +96,7 @@ function test_from_archive() {
 	echo -n "--> Create container from checkpoint: "
 	# This requires a larger timeout as we just deleted the image and
 	# pulling can take some time.
-	ctr_id=$(crictl -t 20s create "$pod_id" "$RESTORE_JSON" "$POD_JSON")
+	ctr_id=$(crictl -t 30s create "$pod_id" "$RESTORE_JSON" "$POD_JSON")
 	echo "$ctr_id"
 	rm -f "$RESTORE_JSON" "$POD_JSON"
 	echo -n "--> Start container from checkpoint: "
@@ -175,7 +175,7 @@ function test_from_oci() {
 	../../bin/ctr -n k8s.io images import "$TESTDIR"/oci.tar 2>&1 | sed 's/^/------> \t/'
 	jq ".image.image=\"localhost/checkpoint-image:latest\"" "$TESTDATA"/container_sleep.json >"$RESTORE_JSON"
 	echo -n "--> Create container from checkpoint: "
-	ctr_id=$(crictl -t 10s create "$pod_id" "$RESTORE_JSON" "$RESTORE_POD_JSON")
+	ctr_id=$(crictl -t 30s create "$pod_id" "$RESTORE_JSON" "$RESTORE_POD_JSON")
 	echo "$ctr_id"
 	rm -f "$RESTORE_JSON" "$RESTORE_POD_JSON"
 	echo -n "--> Start container from checkpoint: "
