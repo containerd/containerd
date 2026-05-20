@@ -151,6 +151,12 @@ type TaskInfo struct {
 	// they will be based on the runtimeOptions.
 	// https://github.com/containerd/containerd/issues/11568
 	runtimeOptions typeurl.Any
+
+	// taskAPIAddress is sandbox API address for this task, can be a unix domain socket, or vsock address.
+	// It is in the form of ttrpc+unix://path/to/uds or grpc+vsock://<vsock cid>:<port>.
+	taskAPIAddress string
+	// taskAPIVersion is task api version, currently supported value is 2 and 3.
+	taskAPIVersion uint32
 }
 
 // Runtime name for the container
