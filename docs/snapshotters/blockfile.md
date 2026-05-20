@@ -67,7 +67,7 @@ configuration.
 
 - `root_path`: The directory where the block files are stored. This directory must be writable by the containerd process.
 - `scratch_file`: The path to the empty file that will be used as the base for the block files. This file should exist before first using the snapshotter.
-- `fs_type`: The filesystem type to use for the block files. Currently supported are `ext4` and `xfs`. Prefer `xfs` formatted with `reflink=1` (the default in modern `xfsprogs`) when the host filesystem holding `root_path` and `scratch_file` also supports reflinks (XFS with `reflink=1`, or btrfs) — see [How It Works](#how-it-works) for the storage implications.
+- `fs_type`: The filesystem type used *inside* each block file (the one the guest will see as its rootfs). Currently supported are `ext4` and `xfs`. This is independent of the per-layer copy efficiency discussed in [How It Works](#how-it-works), which is governed by the host filesystem holding `root_path` and `scratch_file`, not by `fs_type`.
 - `mount_options`: Additional mount options to use when mounting the block files.
 - `recreate_scratch`: If set to `true`, the snapshotter will recreate the scratch file if it is missing. If set to `false`, the snapshotter will fail if the scratch file is missing.
 
@@ -97,24 +97,25 @@ Creating journal (8192 blocks): done
 Writing superblocks and filesystem accounting information: done
 ```
 
-If you instead want to use XFS, format the scratch file with reflink support so
-that subsequent per-layer copies can be cloned by the host filesystem (see
-[How It Works](#how-it-works)):
+If you want to use XFS as the guest-visible filesystem instead, format the
+scratch file accordingly:
 
 ```bash
 $ # make a 500M file
 $ dd if=/dev/zero of=/opt/containerd/blockfile bs=1M count=500
 
-$ # format the file with xfs, enabling reflink
-$ sudo mkfs.xfs -m reflink=1 /opt/containerd/blockfile
+$ # format the file with xfs (optionally pass `-m reflink=1` for reflink
+$ # support inside the guest filesystem)
+$ sudo mkfs.xfs /opt/containerd/blockfile
 ```
 
-For the reflink fast path to actually take effect, the host filesystem that
-contains `root_path` and `scratch_file` must itself support reflinks — XFS
-created with `reflink=1` or btrfs. On such hosts, copying a parent blockfile to
-a new snapshot becomes a copy-on-write clone, so the on-disk cost of each new
-layer is bounded by the size of its delta rather than the size of the full
-image.
+Choosing `xfs` vs `ext4` only affects the filesystem seen by the container.
+It does *not* control whether the snapshotter benefits from reflink-based
+per-layer copies — that depends on the host filesystem holding `root_path`
+and `scratch_file`. To benefit from copy-on-write per-layer copies, that
+host filesystem must itself support reflinks (XFS created with `reflink=1`,
+or btrfs), and `root_path` and `scratch_file` must live on the same
+filesystem instance. See [How It Works](#how-it-works) for details.
 
 ### Running a container
 
@@ -153,8 +154,10 @@ container, err := client.NewContainer(ctx, containerID, cOpts...)
 
 [Kata Containers](https://katacontainers.io/) is a typical consumer of the
 blockfile snapshotter: each snapshot is a self-contained filesystem image that
-Kata can hand to the guest as a virtio-blk device, avoiding bind mounts or
-9p/virtiofs entirely.
+Kata can hand to the guest as a virtio-blk device, removing the need for
+9p/virtiofs on the rootfs attachment path. (Other Kata features such as
+shared volume mounts may still use virtiofs or 9p depending on
+configuration; this section only covers the snapshot/rootfs path.)
 
 Assuming the `io.containerd.kata.v2` runtime is already installed and
 discoverable by containerd, a container can be launched against the blockfile
@@ -243,12 +246,16 @@ btrfs), the per-layer copy step described above is implicitly turned into a
 copy-on-write clone:
 
 - **Linux**: the snapshotter's copy goes through Go's `io.Copy` between two
-  `*os.File` handles, which delegates to the kernel's `copy_file_range(2)`
-  syscall. On a reflink-capable filesystem, `copy_file_range(2)` shares extents
-  rather than duplicating them, so each per-layer copy completes almost
-  instantly and consumes no additional space until either side is written.
+  `*os.File` handles. On Linux this fast path *attempts*
+  `copy_file_range(2)` first, which on a reflink-capable filesystem shares
+  extents rather than duplicating them — so each per-layer copy completes
+  almost instantly and consumes no additional space until either side is
+  written. When `copy_file_range(2)` is not applicable (kernel/filesystem
+  support, cross-device source/target, etc.), it falls back to `splice(2)`
+  or a plain byte copy; the result is correct in all cases, just less
+  space-efficient.
 - **Darwin**: the snapshotter explicitly calls `clonefile(2)`, which provides
-  the equivalent behaviour on APFS.
+  the equivalent behavior on APFS.
 
 The end result is that the actual on-disk usage drops further than the
 sparse-file numbers above: the unchanged extents of the parent blockfile are
