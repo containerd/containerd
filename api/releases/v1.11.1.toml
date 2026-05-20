@@ -1,0 +1,17 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+sub_path = "api"
+ignore_deps = [ "github.com/containerd/containerd" ]
+
+# previous release
+previous = "api/v1.11.0"
+
+pre_release = false
+
+preface = """\
+The first patch release for the containerd 1.11 API includes a fix
+in the task endpoints for non-runc shims.
+"""
