@@ -478,7 +478,7 @@ func (l *ioCopyLimiter) limitedCopy(ctx context.Context, dst io.Writer, src io.R
 			l.hitCircuitBreaker = false
 		}
 
-		nr, er := io.ReadAtLeast(src, buf, len(buf))
+		nr, er := src.Read(buf)
 		if nr > 0 {
 			nw, ew := dst.Write(buf[0:nr])
 			if nw > 0 {
