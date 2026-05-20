@@ -60,10 +60,10 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		Args:       []string{"test", "args"},
 		WorkingDir: "test-cwd",
 		Envs: []*runtime.KeyValue{
-			{Key: "k1", Value: "v1"},
-			{Key: "k2", Value: "v2"},
-			{Key: "k3", Value: "v3=v3bis"},
-			{Key: "k4", Value: "v4=v4bis=foop"},
+			{Key: "k1", Value: []byte("v1")},
+			{Key: "k2", Value: []byte("v2")},
+			{Key: "k3", Value: []byte("v3=v3bis")},
+			{Key: "k4", Value: []byte("v4=v4bis=foop")},
 		},
 		Mounts: []*runtime.Mount{
 			// everything default
