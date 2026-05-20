@@ -675,7 +675,7 @@ go.opentelemetry.io/proto/otlp/trace/v1
 # go.yaml.in/yaml/v2 v2.4.3
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
-# golang.org/x/crypto v0.51.0
+# golang.org/x/crypto v0.52.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/cast5
 golang.org/x/crypto/cryptobyte
