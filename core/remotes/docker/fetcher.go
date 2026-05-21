@@ -226,11 +226,6 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 		return nil, fmt.Errorf("no pull hosts: %w", errdefs.ErrNotFound)
 	}
 
-	ctx, err := ContextWithRepositoryScope(ctx, r.refspec, false)
-	if err != nil {
-		return nil, err
-	}
-
 	return newHTTPReadSeeker(desc.Size, func(offset int64) (io.ReadCloser, error) {
 		// firstly try fetch via external urls
 		for _, us := range desc.URLs {
@@ -243,7 +238,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				log.G(ctx).Debug("non-http(s) alternative url is unsupported")
 				continue
 			}
-			ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
+			ctx := log.WithLogger(ctx, log.G(ctx).WithField("url", u))
 			log.G(ctx).Info("request")
 
 			// Try this first, parse it
@@ -283,7 +278,14 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 					return nil, err
 				}
 
-				rc, _, err := r.open(ctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
+				// Set the repository scope per-host. See
+				// containerd/containerd#9648.
+				hctx, scopeErr := contextWithRepositoryScopeForHost(ctx, host, r.refspec, false)
+				if scopeErr != nil {
+					return nil, scopeErr
+				}
+
+				rc, _, err := r.open(hctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
 				if err != nil {
 					// Store the error for referencing later
 					if firstErr == nil {
@@ -306,7 +308,13 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				return nil, err
 			}
 
-			rc, _, err := r.open(ctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
+			// Set the repository scope per-host. See containerd/containerd#9648.
+			hctx, scopeErr := contextWithRepositoryScopeForHost(ctx, host, r.refspec, false)
+			if scopeErr != nil {
+				return nil, scopeErr
+			}
+
+			rc, _, err := r.open(hctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
 			if err != nil {
 				// Store the error for referencing later
 				if firstErr == nil {
@@ -374,20 +382,27 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 		return nil, desc, fmt.Errorf("no pull hosts: %w", errdefs.ErrNotFound)
 	}
 
-	ctx, err := ContextWithRepositoryScope(ctx, r.refspec, false)
-	if err != nil {
-		return nil, desc, err
-	}
-
 	var (
 		getReq   *request
 		sz       int64
 		firstErr error
+		// hostCtx tracks the per-host scoped context used to build the chosen
+		// request, so subsequent reads (which may issue retries) reuse the
+		// scope appropriate for the host that succeeded. See
+		// containerd/containerd#9648.
+		hostCtx = ctx
 	)
 
 	for i, host := range r.hosts {
-		getReq, sz, err = r.createGetReq(ctx, host, i == len(r.hosts)-1, config.Mediatype, "blobs", dgst.String())
+		// Set the repository scope per-host. See containerd/containerd#9648.
+		hctx, scopeErr := contextWithRepositoryScopeForHost(ctx, host, r.refspec, false)
+		if scopeErr != nil {
+			return nil, desc, scopeErr
+		}
+		var err error
+		getReq, sz, err = r.createGetReq(hctx, host, i == len(r.hosts)-1, config.Mediatype, "blobs", dgst.String())
 		if err == nil {
+			hostCtx = hctx
 			break
 		}
 		// Store the error for referencing later
@@ -399,8 +414,14 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 	if getReq == nil {
 		// Fall back to the "manifests" endpoint
 		for i, host := range r.hosts {
-			getReq, sz, err = r.createGetReq(ctx, host, i == len(r.hosts)-1, config.Mediatype, "manifests", dgst.String())
+			hctx, scopeErr := contextWithRepositoryScopeForHost(ctx, host, r.refspec, false)
+			if scopeErr != nil {
+				return nil, desc, scopeErr
+			}
+			var err error
+			getReq, sz, err = r.createGetReq(hctx, host, i == len(r.hosts)-1, config.Mediatype, "manifests", dgst.String())
 			if err == nil {
+				hostCtx = hctx
 				break
 			}
 			// Store the error for referencing later
@@ -421,7 +442,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 	}
 
 	seeker, err := newHTTPReadSeeker(sz, func(offset int64) (rc io.ReadCloser, err error) {
-		rc, _, err = r.open(ctx, getReq, config.Mediatype, offset, true)
+		rc, _, err = r.open(hostCtx, getReq, config.Mediatype, offset, true)
 		return
 	})
 	if err != nil {

@@ -78,10 +78,6 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		l.Lock(ref)
 		defer l.Unlock(ref)
 	}
-	ctx, err := ContextWithRepositoryScope(ctx, p.refspec, true)
-	if err != nil {
-		return nil, err
-	}
 	status, err := p.tracker.GetStatus(ref)
 	if err == nil {
 		if status.Committed && status.Offset == status.Total {
@@ -108,6 +104,15 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		existCheck []string
 		host       = hosts[0]
 	)
+
+	// Set the repository scope based on the selected push host so that mirrors
+	// configured with a path prefix (override_path) receive a token scope that
+	// matches the registry-side repository path. See
+	// containerd/containerd#9648.
+	ctx, err = contextWithRepositoryScopeForHost(ctx, host, p.refspec, true)
+	if err != nil {
+		return nil, err
+	}
 
 	if images.IsManifestType(desc.MediaType) || images.IsIndexType(desc.MediaType) {
 		isManifest = true
@@ -182,8 +187,16 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		mountedFrom := ""
 		var resp *http.Response
 		if fromRepo := selectRepositoryMountCandidate(p.refspec, desc.Annotations); fromRepo != "" {
-			preq := requestWithMountFrom(req, desc.Digest.String(), fromRepo)
-			pctx := ContextWithAppendPullRepositoryScope(ctx, fromRepo)
+			// For mirrors that namespace upstream repositories under a path
+			// prefix, both the mount-from URL parameter and the pull scope
+			// name the mirror-side repository. RepositoryPrefix is empty for
+			// non-prefixed hosts, leaving the wire-level name unchanged.
+			mountFrom := fromRepo
+			if prefix := strings.Trim(host.RepositoryPrefix, "/"); prefix != "" {
+				mountFrom = prefix + "/" + fromRepo
+			}
+			preq := requestWithMountFrom(req, desc.Digest.String(), mountFrom)
+			pctx := ContextWithAppendPullRepositoryScope(ctx, mountFrom)
 
 			// NOTE: the fromRepo might be private repo and
 			// auth service still can grant token without error.
@@ -194,14 +207,14 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			resp, err = preq.doWithRetries(pctx, true)
 			if err != nil {
 				if !errors.Is(err, ErrInvalidAuthorization) {
-					return nil, fmt.Errorf("pushing with mount from %s: %w", fromRepo, err)
+					return nil, fmt.Errorf("pushing with mount from %s: %w", mountFrom, err)
 				}
-				log.G(ctx).Debugf("failed to push with mount from repository %s: %v", fromRepo, err)
+				log.G(ctx).Debugf("failed to push with mount from repository %s: %v", mountFrom, err)
 			}
 			if resp != nil {
 				switch resp.StatusCode {
 				case http.StatusUnauthorized:
-					log.G(ctx).Debugf("failed to mount from repository %s, not authorized", fromRepo)
+					log.G(ctx).Debugf("failed to mount from repository %s, not authorized", mountFrom)
 
 					resp.Body.Close()
 					resp = nil
@@ -582,7 +595,8 @@ func requestWithMountFrom(req *request, mount, from string) *request {
 		sep = "&"
 	}
 
-	creq.path = creq.path + sep + "mount=" + mount + "&from=" + from
+	q := url.Values{"mount": {mount}, "from": {from}}
+	creq.path = creq.path + sep + q.Encode()
 
 	return &creq
 }

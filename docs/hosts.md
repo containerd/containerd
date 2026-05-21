@@ -363,6 +363,57 @@ non-compliant OCI registries which are missing the `/v2` prefix.
 override_path = true
 ```
 
+## repository_prefix field
+
+`repository_prefix` is used by mirrors that namespace upstream repositories
+under a path prefix such as `<registry-host>/<repository-prefix>/<upstream-repository-name>`.
+Leading and trailing `/` in the configured value are ignored.
+When set, the value is composed into:
+
+- the host's API path, when `override_path` is false: the prefix is
+  appended after the `/v2` API base, so requests land at
+  `<api-base>/<prefix>/<repo>/...`;
+- token request scopes (`repository:<prefix>/<repo>:...`);
+- the `from=` parameter on cross-repository blob mount requests.
+
+(Defaults to empty.)
+
+For example, a mirror at `https://mirror.example` whose repositories are
+stored as `project/<original-repo>` (so a pull of `docker.io/library/alpine`
+resolves on the mirror as `project/library/alpine`):
+
+```toml
+[host."https://mirror.example"]
+  capabilities = ["pull"]
+  repository_prefix = "project"
+```
+
+containerd computes `host.Path = /v2/project` and sends token requests
+scoped to `repository:project/library/alpine:pull`.
+
+When `override_path = true` the operator is in control of `host.Path` and
+must include the prefix in the server URL explicitly:
+
+```toml
+[host."https://mirror.example/v2/project"]
+  capabilities = ["pull"]
+  override_path = true
+  repository_prefix = "project"
+```
+
+Mirrors whose API base merely lives under a vanity path but expose the
+standard upstream repository names underneath should leave
+`repository_prefix` unset; in that case the token scope and
+`from=` parameter stay as the original reference.
+
+The same prefix is also applied to cross-repository blob mounts when
+pushing through such a host: both the `from=` URL parameter and the
+appended pull scope name the mirror-side repository. For example, a
+mount of a layer from `library/foo` on a host with
+`repository_prefix = "project"` is issued as `from=project/library/foo`,
+keeping token-service scope checks consistent and letting the mirror
+locate the source layer in its prefixed namespace.
+
 ## dial_timeout field
 
 `dial_timeout` specifies the maximum time allowed for a connection attempt to complete.
