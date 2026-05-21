@@ -1411,3 +1411,121 @@ func TestResolverErrorStatusCodeOnFetch(t *testing.T) {
 		})
 	}
 }
+
+// TestResolverMirrorScopeWithPathPrefix is a regression test for
+// https://github.com/containerd/containerd/issues/9648.
+//
+// When a registry mirror is configured with a path prefix (typically with
+// override_path), containerd must issue token requests with a scope that
+// matches the mirror-side repository path. Sending an additional scope
+// derived from the original reference causes stricter registries (e.g.
+// ghcr.io, Google Artifact Registry) to reject the entire token request.
+func TestResolverMirrorScopeWithPathPrefix(t *testing.T) {
+	const (
+		// The original reference being resolved is upstream.example/team/app.
+		// The configured host.Path is /v2/mirror, so requests land at
+		// <mirror>/v2/mirror/team/app (the upstream host name is carried
+		// via the ns= query parameter, not in the path). The mirror-side
+		// repository name is therefore mirror/team/app, which is what the
+		// token scope must reflect.
+		mirrorPrefix       = "mirror"
+		originalRepo       = "team/app"
+		expectedMirrorRepo = "mirror/team/app"
+		expectedScope      = "repository:" + expectedMirrorRepo + ":pull"
+	)
+
+	var (
+		tokenScopes  []string
+		manifestSeen bool
+	)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+		// Capture all scope query params, in order.
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		tokenScopes = r.Form["scope"]
+		// Reject if any scope other than the expected mirror-side scope is
+		// present — this is what GAR/ghcr.io do in practice.
+		for _, s := range tokenScopes {
+			if s != expectedScope {
+				http.Error(w, "invalid scope: "+s, http.StatusForbidden)
+				return
+			}
+		}
+		_, _ = io.WriteString(w, `{"token":"perfectlyvalidopaquetoken","access_token":"perfectlyvalidopaquetoken"}`)
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Require bearer auth for everything else; advertise the mirror scope.
+		if r.Header.Get("Authorization") != "Bearer perfectlyvalidopaquetoken" {
+			realm := fmt.Sprintf("http://%s/token", r.Host)
+			w.Header().Set("WWW-Authenticate", fmt.Sprintf("Bearer realm=%q,service=registry,scope=%q", realm, expectedScope))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if !strings.Contains(r.URL.Path, "/manifests/") {
+			http.NotFound(w, r)
+			return
+		}
+		manifestSeen = true
+		// Return a minimal but valid manifest so Resolve can complete.
+		manifest := ocispec.Manifest{
+			Versioned: specs.Versioned{SchemaVersion: 2},
+			MediaType: ocispec.MediaTypeImageManifest,
+			Config: ocispec.Descriptor{
+				MediaType: ocispec.MediaTypeImageConfig,
+				Digest:    digest.FromString("config"),
+				Size:      6,
+			},
+		}
+		body, _ := json.Marshal(manifest)
+		w.Header().Set("Content-Type", ocispec.MediaTypeImageManifest)
+		w.Header().Set("Docker-Content-Digest", digest.FromBytes(body).String())
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = w.Write(body)
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	mirrorHostPort := srv.URL[len("http://"):]
+	mirrorPath := "/v2/" + mirrorPrefix
+
+	resolver := NewResolver(ResolverOptions{
+		Hosts: func(string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				{
+					Client:           srv.Client(),
+					Authorizer:       NewDockerAuthorizer(WithAuthClient(srv.Client())),
+					Host:             mirrorHostPort,
+					Scheme:           "http",
+					Path:             mirrorPath,
+					RepositoryPrefix: mirrorPrefix,
+					Capabilities:     HostCapabilityPull | HostCapabilityResolve,
+				},
+			}, nil
+		},
+	})
+
+	ref := "upstream.example/" + originalRepo + ":latest"
+	_, _, err := resolver.Resolve(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("Resolve failed: %v", err)
+	}
+	if !manifestSeen {
+		t.Fatal("manifest endpoint was not hit; mirror was not exercised")
+	}
+
+	// The token endpoint must have been called with exactly one scope, and
+	// that scope must match the mirror-side repository path. Before the fix,
+	// containerd produced two scopes, including the spurious
+	// original-reference scope "repository:team/app:pull".
+	if len(tokenScopes) != 1 {
+		t.Fatalf("expected exactly one scope, got %d: %v", len(tokenScopes), tokenScopes)
+	}
+	if tokenScopes[0] != expectedScope {
+		t.Fatalf("expected scope %q, got %q", expectedScope, tokenScopes[0])
+	}
+}

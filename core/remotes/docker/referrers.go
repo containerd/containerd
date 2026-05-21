@@ -93,11 +93,6 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, co
 		fallbackHosts = hosts
 	}
 
-	ctx, err := ContextWithRepositoryScope(ctx, r.refspec, false)
-	if err != nil {
-		return nil, 0, err
-	}
-
 	var firstErr error
 	for i, host := range hosts {
 		req := r.request(host, http.MethodGet, "referrers", dgst.String())
@@ -117,10 +112,16 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, co
 			return nil, 0, err
 		}
 
-		rc, cl, err := r.open(ctx, req, mediaType, 0, i == len(hosts)-1)
+		// Set the repository scope per-host. See containerd/containerd#9648.
+		hctx, scopeErr := contextWithRepositoryScopeForHost(ctx, host, r.refspec, false)
+		if scopeErr != nil {
+			return nil, 0, scopeErr
+		}
+
+		rc, cl, err := r.open(hctx, req, mediaType, 0, i == len(hosts)-1)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
-				log.G(ctx).WithError(err).WithField("host", host.Host).Debug("error fetching referrers")
+				log.G(hctx).WithError(err).WithField("host", host.Host).Debug("error fetching referrers")
 				if firstErr == nil {
 					firstErr = err
 				}
@@ -135,14 +136,20 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, co
 		if err := req.addNamespace(r.refspec.Hostname()); err != nil {
 			return nil, 0, err
 		}
-		rc, cl, err := r.open(ctx, req, mediaType, 0, i == len(fallbackHosts)-1)
+
+		// Set the repository scope per-host. See containerd/containerd#9648.
+		hctx, scopeErr := contextWithRepositoryScopeForHost(ctx, host, r.refspec, false)
+		if scopeErr != nil {
+			return nil, 0, scopeErr
+		}
+		rc, cl, err := r.open(hctx, req, mediaType, 0, i == len(fallbackHosts)-1)
 		if err != nil {
 			if errdefs.IsNotFound(err) {
 				// Equivalent to empty referrers list
 				firstErr = err
 				break
 			}
-			log.G(ctx).WithError(err).WithField("host", host.Host).Debug("error fetching referrers via fallback")
+			log.G(hctx).WithError(err).WithField("host", host.Host).Debug("error fetching referrers via fallback")
 			if firstErr == nil {
 				firstErr = err
 			}

@@ -80,6 +80,14 @@ type RegistryHost struct {
 	Path         string
 	Capabilities HostCapabilities
 	Header       http.Header
+
+	// RepositoryPrefix, when non-empty, is prepended to the repository name in
+	// token request scopes and in cross-repository mount requests for this
+	// host. It is intended for mirrors that namespace upstream repositories
+	// under a path prefix. The config loader populates it from the
+	// repository_prefix key in hosts.toml; no value is inferred from host.Path or
+	// other fields.
+	RepositoryPrefix string
 }
 
 func (h RegistryHost) isProxy(refhost string) bool {

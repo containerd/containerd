@@ -271,11 +271,6 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		return "", ocispec.Descriptor{}, fmt.Errorf("no resolve hosts: %w", errdefs.ErrNotFound)
 	}
 
-	ctx, err = ContextWithRepositoryScope(ctx, refspec, false)
-	if err != nil {
-		return "", ocispec.Descriptor{}, err
-	}
-
 	var (
 		// firstErr is the most relevant error encountered during resolution.
 		// We use this to determine the error to return, making sure that the
@@ -310,13 +305,21 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				req.header[key] = append(req.header[key], value...)
 			}
 
-			ctx := log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+			// Set the repository scope per-host so that mirrors configured
+			// with a path prefix (override_path) receive a token scope that
+			// matches the registry-side repository path. See
+			// containerd/containerd#9648.
+			hctx, scopeErr := contextWithRepositoryScopeForHost(ctx, host, refspec, false)
+			if scopeErr != nil {
+				return "", ocispec.Descriptor{}, scopeErr
+			}
+			hctx = log.WithLogger(hctx, log.G(hctx).WithFields(log.Fields{
 				"host":   req.host.Host,
 				"method": req.method,
 				"url":    req.sanitizedURL(),
 			}))
-			log.G(ctx).Debug("resolving")
-			resp, err := req.doWithRetries(ctx, i == len(hosts)-1)
+			log.G(hctx).Debug("resolving")
+			resp, err := req.doWithRetries(hctx, i == len(hosts)-1)
 			if err != nil {
 				if errors.Is(err, ErrInvalidAuthorization) {
 					err = fmt.Errorf("pull access denied, repository does not exist or may require authorization: %w", err)
@@ -325,7 +328,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					firstErr = err
 					firstErrPriority = 1
 				}
-				log.G(ctx).WithError(err).Info(nextHostOrFail(i))
+				log.G(hctx).WithError(err).Info(nextHostOrFail(i))
 				continue // try another host
 			}
 			resp.Body.Close() // don't care about body contents.
@@ -336,7 +339,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 						firstErr = fmt.Errorf("%s: %w", ref, errdefs.ErrNotFound)
 						firstErrPriority = 2
 					}
-					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
+					log.G(hctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
 					continue
 				}
 				if resp.StatusCode > 399 {
@@ -344,7 +347,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 						firstErr = unexpectedResponseErr(resp)
 						firstErrPriority = 3
 					}
-					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
+					log.G(hctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
 					continue // try another host
 				}
 				return "", ocispec.Descriptor{}, unexpectedResponseErr(resp)
@@ -369,7 +372,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				}
 			}
 			if dgst == "" || size == -1 {
-				log.G(ctx).Debug("no Docker-Content-Digest header, fetching manifest instead")
+				log.G(hctx).Debug("no Docker-Content-Digest header, fetching manifest instead")
 
 				req = base.request(host, http.MethodGet, u...)
 				if err := req.addNamespace(base.refspec.Hostname()); err != nil {
@@ -380,7 +383,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					req.header[key] = append(req.header[key], value...)
 				}
 
-				resp, err := req.doWithRetries(ctx, true)
+				resp, err := req.doWithRetries(hctx, true)
 				if err != nil {
 					return "", ocispec.Descriptor{}, err
 				}
@@ -429,7 +432,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				Size:      size,
 			}
 
-			log.G(ctx).WithField("desc.digest", desc.Digest).Debug("resolved")
+			log.G(hctx).WithField("desc.digest", desc.Digest).Debug("resolved")
 			return ref, desc, nil
 		}
 	}

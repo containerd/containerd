@@ -114,8 +114,16 @@ ca = "/etc/path/default"
 [host."https://noncompliantmirror.registry/v2/namespaceprefix"]
   capabilities = ["pull"]
   override_path = true
+  repository_prefix = "namespaceprefix"
 
 [host."https://noprefixnoncompliant.registry"]
+  override_path = true
+
+[host."https://scopeprefix.registry"]
+  repository_prefix = "/project/upstream/"
+
+[host."https://proxy.registry/v2/proxy"]
+  capabilities = ["pull", "resolve"]
   override_path = true
 
 [host."https://onlyheader.registry".header]
@@ -191,15 +199,36 @@ ca = "/etc/path/default"
 			},
 		},
 		{
-			scheme:       "https",
-			host:         "noncompliantmirror.registry",
-			path:         "/v2/namespaceprefix",
-			capabilities: docker.HostCapabilityPull,
+			scheme:           "https",
+			host:             "noncompliantmirror.registry",
+			path:             "/v2/namespaceprefix",
+			repositoryPrefix: "namespaceprefix",
+			capabilities:     docker.HostCapabilityPull,
 		},
 		{
 			scheme:       "https",
 			host:         "noprefixnoncompliant.registry",
 			capabilities: allCaps,
+		},
+		{
+			// With override_path = false (default), the configured
+			// repository_prefix is also appended to host.Path so requests
+			// land at <api-base>/<prefix>/<repo>.
+			scheme:           "https",
+			host:             "scopeprefix.registry",
+			path:             "/v2/project/upstream",
+			repositoryPrefix: "project/upstream",
+			capabilities:     allCaps,
+		},
+		{
+			// A "/v2/<prefix>" server path with override_path = true does
+			// not, on its own, imply a mirror-side repository prefix; the
+			// mirror may serve unprefixed repositories at that API base.
+			// Absent an explicit repository_prefix, the loader leaves it empty.
+			scheme:       "https",
+			host:         "proxy.registry",
+			path:         "/v2/proxy",
+			capabilities: docker.HostCapabilityPull | docker.HostCapabilityResolve,
 		},
 		{
 			scheme:       "https",
@@ -537,6 +566,9 @@ func compareHostConfig(j, k hostConfig) bool {
 	if j.path != k.path {
 		return false
 	}
+	if j.repositoryPrefix != k.repositoryPrefix {
+		return false
+	}
 	if j.capabilities != k.capabilities {
 		return false
 	}
@@ -599,6 +631,7 @@ func printHostConfig(hc []hostConfig) string {
 		fmt.Fprintf(b, "\t[%d]\tscheme: %q\n", i, hc[i].scheme)
 		fmt.Fprintf(b, "\t\thost: %q\n", hc[i].host)
 		fmt.Fprintf(b, "\t\tpath: %q\n", hc[i].path)
+		fmt.Fprintf(b, "\t\trepositoryPrefix: %q\n", hc[i].repositoryPrefix)
 		fmt.Fprintf(b, "\t\tcaps: %03b\n", hc[i].capabilities)
 		fmt.Fprintf(b, "\t\tca: %#v\n", hc[i].caCerts)
 		fmt.Fprintf(b, "\t\tclients: %#v\n", hc[i].clientPairs)

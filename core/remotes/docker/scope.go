@@ -26,15 +26,45 @@ import (
 	"github.com/containerd/containerd/v2/pkg/reference"
 )
 
-// RepositoryScope returns a repository scope string such as "repository:foo/bar:pull"
-// for "host/foo/bar:baz".
-// When push is true, both pull and push are added to the scope.
-func RepositoryScope(refspec reference.Spec, push bool) (string, error) {
+// repositoryFromRefspec returns the repository name portion of a reference
+// (e.g. "foo/bar" for "host/foo/bar:baz").
+func repositoryFromRefspec(refspec reference.Spec) (string, error) {
 	u, err := url.Parse("dummy://" + refspec.Locator)
 	if err != nil {
 		return "", err
 	}
-	s := "repository:" + strings.TrimPrefix(u.Path, "/") + ":pull"
+	return strings.TrimPrefix(u.Path, "/"), nil
+}
+
+// RepositoryScope returns a repository scope string such as "repository:foo/bar:pull"
+// for "host/foo/bar:baz".
+// When push is true, both pull and push are added to the scope.
+func RepositoryScope(refspec reference.Spec, push bool) (string, error) {
+	repo, err := repositoryFromRefspec(refspec)
+	if err != nil {
+		return "", err
+	}
+	s := "repository:" + repo + ":pull"
+	if push {
+		s += ",push"
+	}
+	return s, nil
+}
+
+// repositoryScopeForHost returns the repository scope appropriate for a
+// token request to a specific host. When host.RepositoryPrefix is non-empty (set
+// by the config loader for mirrors that namespace upstream repositories
+// under a path prefix), the prefix is prepended to the repository name in
+// the scope. Otherwise the result equals RepositoryScope.
+func repositoryScopeForHost(host RegistryHost, refspec reference.Spec, push bool) (string, error) {
+	repo, err := repositoryFromRefspec(refspec)
+	if err != nil {
+		return "", err
+	}
+	if prefix := strings.Trim(host.RepositoryPrefix, "/"); prefix != "" {
+		repo = prefix + "/" + repo
+	}
+	s := "repository:" + repo + ":pull"
 	if push {
 		s += ",push"
 	}
@@ -54,11 +84,24 @@ func ContextWithRepositoryScope(ctx context.Context, refspec reference.Spec, pus
 	return WithScope(ctx, s), nil
 }
 
+// contextWithRepositoryScopeForHost returns a context with tokenScopesKey{}
+// and the repository scope value derived from the given host. See
+// repositoryScopeForHost for details on how mirror path prefixes are handled.
+func contextWithRepositoryScopeForHost(ctx context.Context, host RegistryHost, refspec reference.Spec, push bool) (context.Context, error) {
+	s, err := repositoryScopeForHost(host, refspec, push)
+	if err != nil {
+		return ctx, err
+	}
+	return WithScope(ctx, s), nil
+}
+
 // WithScope appends a custom registry auth scope to the context.
 func WithScope(ctx context.Context, scope string) context.Context {
 	var scopes []string
 	if v := ctx.Value(tokenScopesKey{}); v != nil {
-		scopes = v.([]string)
+		parent := v.([]string)
+		scopes = make([]string, 0, len(parent)+1)
+		scopes = append(scopes, parent...)
 		scopes = append(scopes, scope)
 	} else {
 		scopes = []string{scope}
