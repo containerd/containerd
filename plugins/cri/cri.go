@@ -229,7 +229,6 @@ func getNRIAPI(ic *plugin.InitContext) nriservice.API {
 		return nil
 	}
 
-	log.G(ctx).Info("using experimental NRI integration - disable nri plugin to prevent this")
 	return api
 }
 
