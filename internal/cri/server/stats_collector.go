@@ -183,13 +183,12 @@ func (c *StatsCollector) collectContainerStats(ctx context.Context) {
 		return
 	}
 
-	timestamp := time.Now()
 	for _, metric := range resp.Metrics {
 		usageCoreNanoSeconds, ok := extractCPUUsage(metric.Data)
 		if !ok {
 			continue
 		}
-		c.addSample(metric.ID, timestamp, usageCoreNanoSeconds)
+		c.addSample(metric.ID, metric.GetTimestamp().AsTime(), usageCoreNanoSeconds)
 	}
 }
 
