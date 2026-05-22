@@ -32,8 +32,10 @@ import (
 type StatsCollector struct{}
 
 // NewStatsCollector creates a new StatsCollector (stub on non-Linux).
-func NewStatsCollector(config criconfig.Config) *StatsCollector {
-	return &StatsCollector{}
+// Returns an error if the configuration is invalid.
+// On non-Linux platforms, this always succeeds and returns nil error.
+func NewStatsCollector(config criconfig.Config) (*StatsCollector, error) {
+	return &StatsCollector{}, nil
 }
 
 // SetDependencies sets the dependencies needed for stats collection (no-op on non-Linux).
