@@ -32,6 +32,7 @@ var handledSignals = []os.Signal{
 	unix.SIGINT,
 	unix.SIGUSR1,
 	unix.SIGPIPE,
+	unix.SIGHUP,
 }
 
 func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server, cancel func()) chan struct{} {
@@ -54,6 +55,8 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 				switch s {
 				case unix.SIGUSR1:
 					dumpStacks(true)
+				case unix.SIGHUP:
+					log.G(ctx).Warn("Warning: SIGHUP received, configuration reloading is not supporting")
 				default:
 					if err := notifyStopping(ctx); err != nil {
 						log.G(ctx).WithError(err).Error("notify stopping failed")
