@@ -127,7 +127,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-tars-${{env.PLATFORM_CLEAN}}
-          path: src/github.com/containerd/containerd/releases/*.tar.gz*
+          path: |
+            src/github.com/containerd/containerd/releases/*.tar.gz*
+            src/github.com/containerd/containerd/releases/*.zip*
 
   release:
     name: Create containerd Release
@@ -148,7 +150,9 @@ jobs:
         id: attest
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
-          subject-path: ./builds/release-tars-**/*.tar.gz
+          subject-path: |
+            ./builds/release-tars-**/*.tar.gz
+            ./builds/release-tars-**/*.zip
       - name: Rename attestation artifact
         run: mv ${{ steps.attest.outputs.bundle-path }} containerd-${{ needs.check.outputs.stringver }}-attestation.intoto.jsonl
       - name: Create Release
