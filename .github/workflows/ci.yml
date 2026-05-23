@@ -98,7 +98,6 @@ jobs:
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
-      - run: make proto-fmt
       - run: make check-protos
 
   man:

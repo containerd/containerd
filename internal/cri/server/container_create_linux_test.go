@@ -487,6 +487,8 @@ func TestPrivilegedBindMount(t *testing.T) {
 	}
 }
 
+// TestCgroupNamespace verifies that a cgroup namespace is only assigned to
+// non-privileged containers on cgroupv2 hosts.
 func TestCgroupNamespace(t *testing.T) {
 	testPid := uint32(1234)
 	c := newTestCRIService()
@@ -498,27 +500,50 @@ func TestCgroupNamespace(t *testing.T) {
 	tests := []struct {
 		desc                  string
 		privileged            bool
+		requireCgroupV2       bool
 		expectCgroupNamespace bool
 	}{
 		{
-			desc:                  "non-privileged container should get cgroup namespace",
+			desc:                  "cgroupv2: non-privileged container should get cgroup namespace",
 			privileged:            false,
+			requireCgroupV2:       true,
 			expectCgroupNamespace: true,
 		},
 		{
-			desc:                  "privileged container should not get cgroup namespace",
+			desc:                  "cgroupv2: privileged container should not get cgroup namespace",
 			privileged:            true,
+			requireCgroupV2:       true,
+			expectCgroupNamespace: false,
+		},
+		{
+			desc:                  "cgroupv1: non-privileged container should not get cgroup namespace",
+			privileged:            false,
+			requireCgroupV2:       false,
+			expectCgroupNamespace: false,
+		},
+		{
+			desc:                  "cgroupv1: privileged container should not get cgroup namespace",
+			privileged:            true,
+			requireCgroupV2:       false,
 			expectCgroupNamespace: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
+			// Skip if the host's cgroup mode doesn't match what the test case requires.
+			if tt.requireCgroupV2 && !isUnifiedCgroupsMode() {
+				t.Skip("requires cgroups v2")
+			}
+			if !tt.requireCgroupV2 && isUnifiedCgroupsMode() {
+				t.Skip("requires cgroups v1")
+			}
+
 			containerConfig.Linux.SecurityContext.Privileged = tt.privileged
 			sandboxConfig.Linux.SecurityContext.Privileged = tt.privileged
 
 			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			hasCgroupNS := false
 			for _, ns := range spec.Linux.Namespaces {

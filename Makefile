@@ -166,7 +166,7 @@ CRIDIR=$(OUTPUTDIR)/cri
 
 all: binaries
 
-check: proto-fmt ## run all linters
+check: check-protos ## run all linters
 	@echo "$(WHALE) $@"
 	GOGC=75 golangci-lint run
 
@@ -196,7 +196,7 @@ check-protos: ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
 	@(cd api && buf format --diff --exit-code --exclude-path vendor \
 		$(if $(GITHUB_ACTIONS),--error-format github-actions)) || \
-		(echo "$(ONI) please run 'make protos' when making changes to proto files" && false)
+		(echo "$(ONI) please run 'make proto-fmt' to fix formatting or 'make protos' to regenerate proto files" && false)
 
 proto-fmt: ## format proto files
 	@echo "$(WHALE) $@"
