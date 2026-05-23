@@ -26,8 +26,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/epoch"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 )
@@ -45,6 +47,7 @@ type diffRemote struct {
 }
 
 func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (ocispec.Descriptor, error) {
+	ctx = withProxyHeaders(ctx)
 	var config diff.ApplyConfig
 	for _, opt := range opts {
 		if err := opt(ctx, desc, &config); err != nil {
@@ -76,6 +79,7 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 }
 
 func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
+	ctx = withProxyHeaders(ctx)
 	var config diff.Config
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
@@ -102,4 +106,17 @@ func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...di
 		return ocispec.Descriptor{}, errgrpc.ToNative(err)
 	}
 	return oci.DescriptorFromProto(resp.Diff), nil
+}
+
+// withProxyHeaders re-attaches the caller's namespace and lease to the outgoing
+// gRPC metadata. There is no server-side lease interceptor, so without this the
+// lease is dropped when forwarding to a proxy plugin diff service.
+func withProxyHeaders(ctx context.Context) context.Context {
+	if ns, ok := namespaces.Namespace(ctx); ok {
+		ctx = namespaces.WithNamespace(ctx, ns)
+	}
+	if lid, ok := leases.FromContext(ctx); ok {
+		ctx = leases.WithLease(ctx, lid)
+	}
+	return ctx
 }
