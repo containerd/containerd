@@ -202,7 +202,6 @@ func (c *StatsCollector) collectSandboxStats(ctx context.Context) {
 		return
 	}
 
-	timestamp := time.Now()
 	for _, sb := range sandboxes {
 		// Get the parent cgroup path for the pod
 		cgroupPath := sb.Config.GetLinux().GetCgroupParent()
@@ -214,7 +213,7 @@ func (c *StatsCollector) collectSandboxStats(ctx context.Context) {
 		if !ok {
 			continue
 		}
-		c.addSample(sb.ID, timestamp, usageCoreNanoSeconds)
+		c.addSample(sb.ID, time.Now(), usageCoreNanoSeconds)
 	}
 }
 
