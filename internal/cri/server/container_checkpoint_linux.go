@@ -322,23 +322,6 @@ func (c *criService) CRImportCheckpoint(
 	if _, err := reference.ParseAnyReference(config.RootfsImageName); err != nil {
 		return "", fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", config.RootfsImageName, err)
 	}
-	tagImage, err := c.client.ImageService().Get(ctx, config.RootfsImageRef)
-	if err != nil {
-		return "", fmt.Errorf("failed to get checkpoint base image %s: %w", config.RootfsImageRef, err)
-	}
-	// Second step is to tag the image with the same tag it used to have
-	// during checkpointing. For the error that the image NAME:TAG already
-	// exists is ignored. It could happen that NAME:TAG now belongs to
-	// another NAME@DIGEST than during checkpointing and the restore will
-	// happen on another image.
-	// TODO: handle if NAME:TAG points to a different NAME@DIGEST
-	tagImage.Name = config.RootfsImageName
-	_, err = c.client.ImageService().Create(ctx, tagImage)
-	if err != nil {
-		if !errdefs.IsAlreadyExists(err) {
-			return "", fmt.Errorf("failed to tag checkpoint base image %s with %s: %w", config.RootfsImageRef, config.RootfsImageName, err)
-		}
-	}
 
 	var image imagestore.Image
 	for i := 1; i < 500; i++ {

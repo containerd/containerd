@@ -110,7 +110,7 @@ function test_from_archive() {
 	fi
 	# Cleanup
 	echo "--> Cleanup images: "
-	crictl rmi "${TEST_IMAGE}" | sed 's/^/----> \t/'
+	(crictl rmi "${TEST_IMAGE}" || true) | sed 's/^/----> \t/'
 	echo -n "--> Verifying container rootfs: "
 	crictl exec "$ctr_id" ls -la /root/testfile
 	if crictl exec "$ctr_id" ls -la /etc/motd >/dev/null 2>&1; then
@@ -184,7 +184,7 @@ function test_from_oci() {
 	echo "--> Cleanup images: "
 	../../bin/ctr -n k8s.io images rm localhost/checkpoint-image:latest | sed 's/^/----> \t/'
 	echo "--> Cleanup images: "
-	crictl rmi "${TEST_IMAGE}" | sed 's/^/----> \t/'
+	(crictl rmi "${TEST_IMAGE}" || true) | sed 's/^/----> \t/'
 	echo "--> Deleting all pods: "
 	crictl -t 5s rmp -fa | sed 's/^/----> \t/'
 	SUCCESS=1
