@@ -58,7 +58,7 @@ Vagrant.configure("2") do |config|
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
         set -eux -o pipefail
-        dnf -y upgrade ${UPGRADE_PACKAGES}
+        dnf -y upgrade --refresh ${UPGRADE_PACKAGES}
     SHELL
   end
 
@@ -73,6 +73,7 @@ Vagrant.configure("2") do |config|
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
         set -eux -o pipefail
+        dnf -y makecache --refresh
         dnf -y install \
             container-selinux \
             curl \
