@@ -292,8 +292,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// containers anyway, the CRI layer will pre-pull the pause container to guarantee
 	// it exists (even though it's counter to the purpose of the sandbox API). This may
 	// be removed/deprecated in the distant future, if we decide to remove pause containers.
-	if err := c.ensurePauseImageExists(ctx, r.GetConfig(), r.GetRuntimeHandler()); err != nil {
-		return nil, err
+	//
+	// Runtimes set disable_pause_image_pull = true to tell the CRI layer that they manage
+	// pause image availability on their own (e.g. shim sandboxers).
+	if !ociRuntime.DisablePauseImagePull {
+		if err := c.ensurePauseImageExists(ctx, r.GetConfig(), r.GetRuntimeHandler()); err != nil {
+			return nil, err
+		}
+	} else {
+		log.G(ctx).Debugf("Skipping pause image pull for runtime handler %q (type=%q, sandboxer=%q, disable_pause_image_pull=true)",
+			r.GetRuntimeHandler(), ociRuntime.Type, ociRuntime.Sandboxer)
 	}
 
 	ctrl, err := c.sandboxService.StartSandbox(ctx, sandbox.Sandboxer, id)
