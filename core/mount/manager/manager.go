@@ -753,14 +753,16 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 
 		abkt := bkt.Bucket(bucketKeyActive)
 		if abkt != nil {
-			abkt.ForEachBucket(func(k []byte) error {
+			if err = abkt.ForEachBucket(func(k []byte) error {
 				active, err := readActiveMount(abkt.Bucket(k))
 				if err != nil {
 					return err
 				}
 				allActive = append(allActive, active)
 				return nil
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to read active mounts for %q: %w", name, err)
+			}
 		}
 
 		if err = mbkt.DeleteBucket([]byte(name)); err != nil {

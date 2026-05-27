@@ -102,6 +102,60 @@ func TestManager(t *testing.T) {
 
 }
 
+func TestDeactivateCorruptActiveMountState(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	td := t.TempDir()
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+
+	h := &noopHandler{mounts: &atomic.Int32{}}
+	m, err := NewManager(db, filepath.Join(td, "m"), WithMountHandler("noop", h))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
+
+	_, err = m.Activate(ctx, "task1", []mount.Mount{{Type: "noop"}})
+	require.NoError(t, err)
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		bkt := getBucket(tx, []byte("v1"), []byte("test"), bucketKeyMounts, []byte("task1"), bucketKeyActive, []byte{0})
+		if bkt == nil {
+			return fmt.Errorf("missing active mount bucket")
+		}
+		return bkt.Put(bucketKeyMountedAt, []byte("bad-time"))
+	})
+	require.NoError(t, err)
+
+	err = m.Deactivate(ctx, "task1")
+	require.Error(t, err)
+
+	err = db.View(func(tx *bolt.Tx) error {
+		if bkt := getBucket(tx, []byte("v1"), []byte("test"), bucketKeyMounts, []byte("task1")); bkt == nil {
+			return fmt.Errorf("mount metadata removed after failed deactivate")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, h.mounts.Load())
+	assert.Error(t, m.Deactivate(ctx, "task1"))
+	assert.EqualValues(t, 1, h.mounts.Load())
+	_, err = m.Info(ctx, "task1")
+	assert.Error(t, err)
+	assert.NoError(t, db.Update(func(tx *bolt.Tx) error {
+		bkt := getBucket(tx, []byte("v1"), []byte("test"), bucketKeyMounts, []byte("task1"), bucketKeyActive, []byte{0})
+		if bkt == nil {
+			return fmt.Errorf("missing active mount bucket")
+		}
+		now := time.Now()
+		mountedAt, err := now.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		return bkt.Put(bucketKeyMountedAt, mountedAt)
+	}))
+	assert.NoError(t, m.Deactivate(ctx, "task1"))
+	assert.Zero(t, h.mounts.Load())
+}
+
 type noopHandler struct {
 	mounts *atomic.Int32
 }
