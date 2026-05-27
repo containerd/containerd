@@ -221,9 +221,6 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 
 // Create a new initial process and container with the underlying OCI runtime
 func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *taskAPI.CreateTaskResponse, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.lifecycleMu.Lock()
 	handleStarted, cleanup := s.preStart(nil)
 	s.lifecycleMu.Unlock()
@@ -234,7 +231,9 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		return nil, err
 	}
 
+	s.mu.Lock()
 	s.containers[r.ID] = container
+	s.mu.Unlock()
 
 	s.send(&eventstypes.TaskCreate{
 		ContainerID: r.ID,
