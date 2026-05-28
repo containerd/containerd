@@ -81,7 +81,7 @@ require (
 	golang.org/x/sys v0.45.0
 	golang.org/x/time v0.15.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d
-	google.golang.org/grpc v1.81.0
+	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.1
