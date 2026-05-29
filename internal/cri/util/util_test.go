@@ -141,21 +141,29 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 
 func TestBuildLabels(t *testing.T) {
 	imageConfigLabels := map[string]string{
-		"a":          "z",
-		"d":          "y",
-		"long-label": strings.Repeat("example", 10000),
+		"a":                            "z",
+		"d":                            "y",
+		"long-label":                   strings.Repeat("example", 10000),
+		"containerd.io/restart.policy": "always",
+		"io.cri-containerd.image":      "managed",
 	}
 	configLabels := map[string]string{
 		"a": "b",
 		"c": "d",
+		// reserved namespaces are only filtered for image config labels, not
+		// for labels from the CRI request
+		"containerd.io/restart.status": "stopped",
 	}
 	newLabels := BuildLabels(configLabels, imageConfigLabels, crilabels.ContainerKindSandbox)
-	assert.Len(t, newLabels, 4)
+	assert.Len(t, newLabels, 5)
 	assert.Equal(t, "b", newLabels["a"])
 	assert.Equal(t, "d", newLabels["c"])
 	assert.Equal(t, "y", newLabels["d"])
+	assert.Equal(t, "stopped", newLabels["containerd.io/restart.status"])
 	assert.Equal(t, crilabels.ContainerKindSandbox, newLabels[crilabels.ContainerKindLabel])
 	assert.NotContains(t, newLabels, "long-label")
+	assert.NotContains(t, newLabels, "containerd.io/restart.policy")
+	assert.NotContains(t, newLabels, "io.cri-containerd.image")
 
 	newLabels["a"] = "e"
 	assert.Empty(t, configLabels[crilabels.ContainerKindLabel], "should not add new labels into original label")
