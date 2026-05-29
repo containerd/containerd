@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -1822,6 +1823,9 @@ func TestIssue10589(t *testing.T) {
 //
 // https://github.com/containerd/containerd/issues/13030
 func TestIssue13030(t *testing.T) {
+	if runtime.GOARCH == "ppc64le" {
+		t.Skip("whiteout-test image not available on ppc64le (https://github.com/containerd/containerd/issues/13351)")
+	}
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
