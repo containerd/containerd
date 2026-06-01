@@ -99,6 +99,7 @@ func Enable(path string) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
 	var args = &fsverityEnableArg{}
 	args.version = 1
