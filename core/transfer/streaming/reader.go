@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/streaming"
@@ -28,9 +29,13 @@ import (
 )
 
 type readByteStream struct {
-	ctx       context.Context
-	stream    streaming.Stream
-	window    int32
+	ctx    context.Context
+	stream streaming.Stream
+	// window is the outstanding flow-control credit. It is mutated by both the
+	// advertise goroutine started in ReadByteStream (window += windowSize) and
+	// by Read (window -= n) running on the consumer's goroutine, so it must be
+	// accessed atomically (mirrors writeByteStream.remaining).
+	window    atomic.Int32
 	updated   chan struct{}
 	errCh     chan error
 	remaining []byte
@@ -40,13 +45,12 @@ func ReadByteStream(ctx context.Context, stream streaming.Stream) io.ReadCloser 
 	rbs := &readByteStream{
 		ctx:     ctx,
 		stream:  stream,
-		window:  0,
 		errCh:   make(chan error),
 		updated: make(chan struct{}, 1),
 	}
 	go func() {
 		for {
-			if rbs.window >= windowSize {
+			if rbs.window.Load() >= windowSize {
 				select {
 				case <-ctx.Done():
 					return
@@ -63,7 +67,7 @@ func ReadByteStream(ctx context.Context, stream streaming.Stream) io.ReadCloser 
 				return
 			}
 			if err := stream.Send(anyType); err == nil {
-				rbs.window += windowSize
+				rbs.window.Add(windowSize)
 			} else if !errors.Is(err, io.EOF) {
 				rbs.errCh <- err
 			}
@@ -105,8 +109,7 @@ func (r *readByteStream) Read(p []byte) (n int, err error) {
 		if len(v.Data) > plen {
 			r.remaining = v.Data[plen:]
 		}
-		r.window = r.window - int32(n)
-		if r.window < windowSize {
+		if r.window.Add(-int32(n)) < windowSize {
 			r.updated <- struct{}{}
 		}
 		return n, nil
