@@ -423,7 +423,11 @@ func (o *snapshotter) getBlockFile(id string) string {
 
 func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 	var (
-		mountOptions = o.options
+		// Clone so the per-snapshot ro/rw append below cannot write into
+		// o.options' shared backing array: o.options may carry spare capacity
+		// (NewSnapshotter appends "loop"), and mounts() is called concurrently
+		// for different snapshots via Mounts/Prepare/View with no lock.
+		mountOptions = slices.Clone(o.options)
 		source       string
 	)
 
