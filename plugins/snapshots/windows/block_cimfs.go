@@ -342,14 +342,7 @@ func (s *blockCIMSnapshotter) createSnapshot(ctx context.Context, kind snapshots
 		// the last layer in that merge, which in case of the scratch snapshot is
 		// a direct parent of that scratch snapshot.
 
-		prepareMergedCIMLocked := func() error {
-			// function created to limit the scope of locked code and ensure
-			// that the lock is always released via defer
-			s.mergeLock.Lock(ctx, parent)
-			defer s.mergeLock.Unlock(parent)
-			return s.prepareMergedCIM(ctx, newSnapshot.ParentIDs)
-		}
-		if err = prepareMergedCIMLocked(); err != nil {
+		if err = s.prepareMergedCIMLocked(ctx, parent, newSnapshot.ParentIDs); err != nil {
 			return nil, fmt.Errorf("failed to prepare merged CIM: %w", err)
 		}
 	}
@@ -467,6 +460,24 @@ const (
 	mergedCIMName   = "merged.cim"
 	mergedBlockName = "merged.vhd"
 )
+
+// prepareMergedCIMLocked serializes the parent-CIM merge identified by `parent`
+// under mergeLock and runs prepareMergedCIM while holding it. The merge can take
+// a long time, so concurrent requests for the same parent must serialize here.
+//
+// The lock is released via defer only when it was actually acquired: if Lock
+// fails (e.g. the request ctx is cancelled or its deadline expires while
+// waiting for an in-flight merge) the lock is NOT held, and an unconditional
+// Unlock would panic with "unlock of unlocked key" (see internal/kmutex.Unlock),
+// crashing the daemon. So Lock's error is checked and propagated before the
+// defer is registered.
+func (s *blockCIMSnapshotter) prepareMergedCIMLocked(ctx context.Context, parent string, snapshotIDs []string) error {
+	if err := s.mergeLock.Lock(ctx, parent); err != nil {
+		return err
+	}
+	defer s.mergeLock.Unlock(parent)
+	return s.prepareMergedCIM(ctx, snapshotIDs)
+}
 
 // prepareMergedCIM creates a new merged block CIM from the given snapshots. The order of
 // `snapshotIDs` is important. It is expected that the snapshot ID at the last index is
