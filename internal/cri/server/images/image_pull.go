@@ -976,6 +976,10 @@ func (reporter *transferProgressReporter) handleProgress(p transfer.Progress) {
 	default:
 		return
 	}
+
+	// Any valid transfer progress event should refresh liveness. This avoids
+	// timing out while downloads are still being reported but byte deltas are flat.
+	reporter.lastSeenTimestamp = time.Now()
 }
 
 func (reporter *transferProgressReporter) IncBytesRead(bytes int64) {
