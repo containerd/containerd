@@ -122,7 +122,7 @@ func getRoutes(cidrs []string) ([]string, error) {
 	return routes, nil
 }
 
-func writeCNIConfigFile(ctx context.Context, confDir string, confTemplate string, podCIDR string, podCIDRRanges []string, routes []string) error {
+func writeCNIConfigFile(ctx context.Context, confDir string, confTemplate string, podCIDR string, podCIDRRanges []string, routes []string) (retErr error) {
 	log.G(ctx).Infof("Generating cni config from template %q", confTemplate)
 	// generate cni config file from the template with updated pod cidr.
 	t, err := template.ParseFiles(confTemplate)
@@ -134,8 +134,21 @@ func writeCNIConfigFile(ctx context.Context, confDir string, confTemplate string
 	}
 	confFile := filepath.Join(confDir, cniConfigFileName)
 	f, err := atomicfile.New(confFile, 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to create cni config file %q: %w", confFile, err)
+	}
 	defer func() {
-		err = f.Close()
+		if retErr != nil {
+			// Abandon the temporary file on failure; never commit a
+			// partially-rendered (corrupt) config to confFile.
+			_ = f.Cancel()
+			return
+		}
+		// Close performs the sync+rename that atomically commits the file, so
+		// its error must be reported rather than silently dropped.
+		if err := f.Close(); err != nil {
+			retErr = fmt.Errorf("failed to write cni config file %q: %w", confFile, err)
+		}
 	}()
 	if err := t.Execute(f, cniConfigTemplate{
 		PodCIDR:       podCIDR,
@@ -144,5 +157,5 @@ func writeCNIConfigFile(ctx context.Context, confDir string, confTemplate string
 	}); err != nil {
 		return fmt.Errorf("failed to generate cni config file %q: %w", confFile, err)
 	}
-	return err
+	return nil
 }
