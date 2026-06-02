@@ -23,6 +23,7 @@ import (
 	"maps"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/containerd/log"
 	"github.com/containerd/nri"
@@ -43,6 +44,17 @@ import (
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/errdefs"
+	dockerref "github.com/distribution/reference"
+	spec "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
+var (
+	onceParse        sync.Once
+	onceImageConfig  sync.Once
+	pauseImageConfig spec.ImageConfig
+	pauseImageName   string
+	parseError       error
+	getSpecError     error
 )
 
 func init() {
@@ -77,17 +89,13 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		labels = map[string]string{}
 	)
 
-	sandboxImage := c.getSandboxImageName()
-
-	pauseImage, err := c.client.GetImage(ctx, sandboxImage)
+	pauseImage, err := c.client.GetImage(ctx, pauseImageName)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox image %q: %w", sandboxImage, err)
+		return cin, fmt.Errorf("failed to get sandbox image %q: %w", pauseImageName, err)
 	}
-
-	// Get the image spec from containerd image
-	imageSpec, err := pauseImage.Spec(ctx)
+	pauseImageConfig, err := c.getSandboxImageConfig(ctx)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get image spec: %w", err)
+		return cin, fmt.Errorf("failed to get sandbox image config %q: %w", pauseImageName, err)
 	}
 
 	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
@@ -135,7 +143,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
 	// it safely.
-	spec, err := c.sandboxContainerSpec(id, config, &imageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
+	spec, err := c.sandboxContainerSpec(id, config, &pauseImageConfig, metadata.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
@@ -174,12 +182,12 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	}
 
 	// Generate spec options that will be applied to the spec later.
-	specOpts, err := c.sandboxContainerSpecOpts(config, &imageSpec.Config)
+	specOpts, err := c.sandboxContainerSpecOpts(config, &pauseImageConfig)
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
 	}
 
-	sandboxLabels := ctrdutil.BuildLabels(config.Labels, imageSpec.Config.Labels, crilabels.ContainerKindSandbox)
+	sandboxLabels := ctrdutil.BuildLabels(config.Labels, pauseImageConfig.Labels, crilabels.ContainerKindSandbox)
 
 	snapshotterOpt := []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))}
 	extraSOpts, err := sandboxSnapshotterOpts(config)
@@ -347,4 +355,27 @@ func (c *Controller) getSandboxImageName() string {
 	}
 
 	return criconfig.DefaultSandboxImage
+}
+
+func (c *Controller) getSandboxImageRef() (string, error) {
+	onceParse.Do(func() {
+		sandboxImage := c.getSandboxImageName()
+		var normalized dockerref.Named
+		normalized, parseError = dockerref.ParseDockerRef(sandboxImage)
+		pauseImageName = normalized.String()
+	})
+	return pauseImageName, parseError
+}
+
+func (c *Controller) getSandboxImageConfig(ctx context.Context) (spec.ImageConfig, error) {
+	pauseImage, err := c.client.GetImage(ctx, normalized.String())
+	if err != nil {
+		return spec.ImageConfig{}, fmt.Errorf("failed to get sandbox image %q: %w", normalized.String(), err)
+	}
+	onceImageConfig.Do(func() {
+		var pauseSpec spec.Image
+		pauseSpec, getSpecError = pauseImage.Spec(ctx)
+		pauseImageConfig = pauseSpec.Config
+	})
+	return pauseImageConfig, getSpecError
 }
