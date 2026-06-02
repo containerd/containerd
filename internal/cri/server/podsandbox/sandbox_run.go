@@ -43,6 +43,7 @@ import (
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/errdefs"
+	dockerref "github.com/distribution/reference"
 )
 
 func init() {
@@ -78,10 +79,13 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	)
 
 	sandboxImage := c.getSandboxImageName()
-
-	pauseImage, err := c.client.GetImage(ctx, sandboxImage)
+	normalized, err := dockerref.ParseDockerRef(sandboxImage)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox image %q: %w", sandboxImage, err)
+		return cin, fmt.Errorf("failed to parse image reference %q: %w", sandboxImage, err)
+	}
+	pauseImage, err := c.client.GetImage(ctx, normalized.String())
+	if err != nil {
+		return cin, fmt.Errorf("failed to get sandbox image %q: %w", normalized.String(), err)
 	}
 
 	// Get the image spec from containerd image
