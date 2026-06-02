@@ -23,6 +23,7 @@ import (
 	"maps"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/containerd/log"
 	"github.com/containerd/nri"
@@ -43,6 +44,17 @@ import (
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/errdefs"
+	dockerref "github.com/distribution/reference"
+	spec "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
+var (
+	onceParse      sync.Once
+	onceImageSpec  sync.Once
+	pauseImageName string
+	parseError     error
+	pauseSpec      spec.Image
+	getSpecError   error
 )
 
 func init() {
@@ -77,26 +89,22 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		labels = map[string]string{}
 	)
 
-	sandboxImage := c.getSandboxImageName()
-
-	pauseImage, err := c.client.GetImage(ctx, sandboxImage)
-	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox image %q: %w", sandboxImage, err)
-	}
-
 	// Get the image spec from containerd image
-	imageSpec, err := pauseImage.Spec(ctx)
+	pauseImage, imageSpec, err := c.getSandboxImageConfig(ctx)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get image spec: %w", err)
+		return cin, err
+	}
+	if c.ociRuntime.Type == "" {
+		ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
+		if err != nil {
+			return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
+		}
+		c.ociRuntime = ociRuntime
 	}
 
-	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
-	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
-	}
-	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", ociRuntime)
+	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", c.ociRuntime.Type)
 
-	labels["oci_runtime_type"] = ociRuntime.Type
+	labels["oci_runtime_type"] = c.ociRuntime.Type
 
 	// Create sandbox container root directories.
 	sandboxRootDir := c.getSandboxRootDir(id)
@@ -135,7 +143,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
 	// it safely.
-	spec, err := c.sandboxContainerSpec(id, config, &imageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
+	spec, err := c.sandboxContainerSpec(id, config, &imageSpec.Config, metadata.NetNSPath, c.ociRuntime.PodAnnotations)
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
@@ -151,7 +159,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	labels["selinux_label"] = metadata.ProcessLabel
 
 	// handle any KVM based runtime
-	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {
+	if err := modifyProcessLabel(c.ociRuntime.Type, spec); err != nil {
 		return cin, err
 	}
 
@@ -189,8 +197,8 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	snapshotterOpt = append(snapshotterOpt, extraSOpts...)
 
 	sandboxSnapshotter := c.imageConfig.Snapshotter
-	if ociRuntime.Snapshotter != "" {
-		sandboxSnapshotter = ociRuntime.Snapshotter
+	if c.ociRuntime.Snapshotter != "" {
+		sandboxSnapshotter = c.ociRuntime.Snapshotter
 	}
 
 	opts := []containerd.NewContainerOpts{
@@ -199,7 +207,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(crilabels.SandboxMetadataExtension, &metadata),
-		containerd.WithRuntime(ociRuntime.Type, podSandbox.Runtime.Options),
+		containerd.WithRuntime(c.ociRuntime.Type, podSandbox.Runtime.Options),
 	}
 
 	container, err := c.client.NewContainer(ctx, id, opts...)
@@ -241,8 +249,8 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	log.G(ctx).Tracef("Create sandbox container (id=%q, name=%q).", id, metadata.Name)
 
 	var taskOpts []containerd.NewTaskOpts
-	if ociRuntime.Path != "" {
-		taskOpts = append(taskOpts, containerd.WithRuntimePath(ociRuntime.Path))
+	if c.ociRuntime.Path != "" {
+		taskOpts = append(taskOpts, containerd.WithRuntimePath(c.ociRuntime.Path))
 	}
 
 	// We don't need stdio for sandbox container.
@@ -347,4 +355,29 @@ func (c *Controller) getSandboxImageName() string {
 	}
 
 	return criconfig.DefaultSandboxImage
+}
+
+func (c *Controller) getSandboxImageRef() (string, error) {
+	onceParse.Do(func() {
+		sandboxImage := c.getSandboxImageName()
+		var normalized dockerref.Named
+		normalized, parseError = dockerref.ParseDockerRef(sandboxImage)
+		pauseImageName = normalized.String()
+	})
+	return pauseImageName, parseError
+}
+
+func (c *Controller) getSandboxImageConfig(ctx context.Context) (containerd.Image, spec.Image, error) {
+	name, err := c.getSandboxImageRef()
+	if err != nil {
+		return nil, spec.Image{}, err
+	}
+	pauseImage, err := c.client.GetImage(ctx, name)
+	if err != nil {
+		return nil, spec.Image{}, fmt.Errorf("failed to get sandbox image %q: %w", name, err)
+	}
+	onceImageSpec.Do(func() {
+		pauseSpec, getSpecError = pauseImage.Spec(ctx)
+	})
+	return pauseImage, pauseSpec, getSpecError
 }

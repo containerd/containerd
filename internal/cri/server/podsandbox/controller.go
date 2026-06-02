@@ -29,6 +29,7 @@ import (
 	eventtypes "github.com/containerd/containerd/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/internal/cri/config"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
@@ -119,9 +120,9 @@ type Controller struct {
 	os osinterface.OS
 	// eventMonitor is the event monitor for podsandbox controller to handle sandbox task exit event
 	// actually we only use it's backoff mechanism to make sure pause container is cleaned up.
-	eventMonitor *events.EventMonitor
-
-	store *Store
+	eventMonitor   *events.EventMonitor
+	ociRuntime  config.Runtime
+	store          *Store
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
