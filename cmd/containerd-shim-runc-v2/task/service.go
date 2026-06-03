@@ -659,7 +659,7 @@ func (s *service) processExits() {
 		// for sure which of the processes the exit event corresponds to (until
 		// pidfd support is implemented) there is no way for us to handle the
 		// exit correctly in that case.
-
+		log.L.Infof("testevent pid %d exited e.status %d processExits", e.Pid, e.Status)
 		s.lifecycleMu.Lock()
 		// Inform any concurrent s.Start() calls so they can handle the exit
 		// if the PID belongs to them.
@@ -704,6 +704,7 @@ func (s *service) send(evt interface{}) {
 // - waiting for the container's running exec counter to reach 0.
 // - finally, publishing the init exit.
 func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Init) {
+	log.L.Infof("testevent pid %d exited handleInitExit", e.Pid)
 	// kill all running container processes
 	if runc.ShouldKillAllOnExit(s.context, c.Bundle) {
 		if err := p.KillAll(s.context); err != nil {
@@ -749,6 +750,7 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
 	p.SetExited(e.Status)
+	log.L.Infof("testevent pid %d exited container %s handleProcessExit", e.Pid, c.ID)
 	s.send(&eventstypes.TaskExit{
 		ContainerID: c.ID,
 		ID:          p.ID(),
