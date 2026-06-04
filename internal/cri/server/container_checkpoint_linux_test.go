@@ -24,6 +24,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestCopyNoFollowRegularFile(t *testing.T) {
@@ -314,5 +316,56 @@ func TestResolveCriuPath(t *testing.T) {
 				t.Errorf("expected %s, got %s", tt.expectedPath, path)
 			}
 		})
+	}
+}
+
+func TestCheckCriuDisabled(t *testing.T) {
+	c := newTestCRIService()
+	c.config.EnableCRIU = func() *bool { v := false; return &v }()
+	err := c.checkCriu()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
+		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
+	}
+}
+
+func TestCheckCriuEnabled(t *testing.T) {
+	t.Setenv("PATH", "")
+	c := newTestCRIService()
+	c.config.EnableCRIU = func() *bool { v := true; return &v }()
+	err := c.checkCriu()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if strings.Contains(err.Error(), "criu support is disabled by configuration") {
+		t.Errorf("did not expect error containing 'criu support is disabled by configuration', got: %v", err)
+	}
+}
+
+func TestCheckpointContainerDisabled(t *testing.T) {
+	c := newTestCRIService()
+	c.config.EnableCRIU = func() *bool { v := false; return &v }()
+	_, err := c.CheckpointContainer(context.Background(), &runtime.CheckpointContainerRequest{
+		ContainerId: "test-container",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
+		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
+	}
+}
+
+func TestCRImportCheckpointDisabled(t *testing.T) {
+	c := newTestCRIService()
+	c.config.EnableCRIU = func() *bool { v := false; return &v }()
+	_, err := c.CRImportCheckpoint(context.Background(), nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
+		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
 	}
 }
