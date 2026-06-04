@@ -162,11 +162,11 @@ jobs:
         run: |
           make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up setup-buildx
 
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up build-registry PROJ="$PROJECT" REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up push-manifest PROJ="$PROJECT" REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up build-registry PROJ="$PROJECT" REMOTE_DOCKER_URL="${{ env.PUBLIC_IP }}:2376"
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up push-manifest PROJ="$PROJECT" REMOTE_DOCKER_URL="${{ env.PUBLIC_IP }}:2376"
 
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership build-registry PROJ="$PROJECT" REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership push-manifest PROJ="$PROJECT" REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership build-registry PROJ="$PROJECT" REMOTE_DOCKER_URL="${{ env.PUBLIC_IP }}:2376"
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership push-manifest PROJ="$PROJECT" REMOTE_DOCKER_URL="${{ env.PUBLIC_IP }}:2376"
 
       - name: Cleanup resources
         if: always()
