@@ -73,8 +73,8 @@ jobs:
 
           echo "Mirroring $upstream to $mirror"
 
-          sudo ctr content fetch --all-platforms ${upstream}
+          sudo ctr content fetch --all-platforms "${upstream}"
           sudo ctr images ls
-          sudo ctr --debug images push -u ${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }} ${mirror} ${upstream}
+          sudo ctr --debug images push -u "${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}" "${mirror}" "${upstream}"
 
-          sudo kill $containerd_pid
+          sudo kill "$containerd_pid"
