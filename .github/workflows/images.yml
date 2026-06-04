@@ -54,13 +54,16 @@ jobs:
 
       - name: Pull and push image
         shell: bash
+        env:
+          UPSTREAM_IMAGE: ${{ github.event.inputs.upstream }}
+          TARGET_IMAGE: ${{ github.event.inputs.image }}
         run: |
-          sudo containerd -l debug & > /tmp/containerd.out
+          sudo containerd -l debug > /tmp/containerd.out 2>&1 &
           containerd_pid=$!
           sleep 5
 
-          upstream=${{ github.event.inputs.upstream }}
-          target=${{ github.event.inputs.image }}
+          upstream="$UPSTREAM_IMAGE"
+          target="$TARGET_IMAGE"
           if [[ "$target" == "" ]]; then
             mirror="ghcr.io/containerd/${upstream##*/}"
           else

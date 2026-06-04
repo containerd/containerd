@@ -77,23 +77,29 @@ jobs:
           creds: ${{ secrets.AZURE_CREDS }}
 
       - name: Create Azure Resource Group
+        env:
+          AZURE_LOCATION: ${{github.event.inputs.azure_location }}
         uses: azure/CLI@9eb25b8360668fb0ecbafa808d40e2197b2f5f52 # v3.0.0
         with:
           inlinescript: |
-            az group create -n ${{ env.AZURE_RESOURCE_GROUP }} -l ${{ github.event.inputs.azure_location }} --tags creationTimestamp=$(date +%Y-%m-%dT%T%z)
+            az group create -n ${{ env.AZURE_RESOURCE_GROUP }} -l "$AZURE_LOCATION" --tags creationTimestamp=$(date +%Y-%m-%dT%T%z)
 
       - name: Create Windows Helper VM
+        env:
+          AZURE_WINDOWS_IMAGE_ID: ${{github.event.inputs.azure_windows_image_id}}
+          AZURE_VM_SIZE: ${{github.event.inputs.azure_vm_size}}
         uses: azure/CLI@9eb25b8360668fb0ecbafa808d40e2197b2f5f52 # v3.0.0
         with:
           inlinescript: |
             PASSWORD="$(/usr/bin/tr -dc "a-zA-Z0-9@#$%^&*()_+?><~\`;" < /dev/urandom | /usr/bin/head -c 24; echo '')"
+            echo "::add-mask::$PASSWORD"
             az vm create -n WinDockerHelper \
               --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} \
               --public-ip-sku Basic \
-              --admin-password "::add-mask::$PASSWORD" \
-              --image ${{ github.event.inputs.azure_windows_image_id }} \
+              --admin-password "$PASSWORD" \
+              --image "$AZURE_WINDOWS_IMAGE_ID" \
               -g ${{ env.AZURE_RESOURCE_GROUP }} \
-              --size ${{ github.event.inputs.azure_vm_size }}
+              --size "$AZURE_VM_SIZE"
             az vm open-port --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name WinDockerHelper --port 22 --priority 101
             az vm open-port --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name WinDockerHelper --port 2376 --priority 102
 
@@ -150,14 +156,16 @@ jobs:
 
       - name: Build and push images
         shell: bash
+        env:
+          PROJECT: ${{ github.event.inputs.push_to_project }}
         run: |
           make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up setup-buildx
 
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up build-registry PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up push-manifest PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up build-registry PROJ="$PROJECT" REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up push-manifest PROJ="$PROJECT" REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
 
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership build-registry PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership push-manifest PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership build-registry PROJ="$PROJECT" REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership push-manifest PROJ="$PROJECT" REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
 
       - name: Cleanup resources
         if: always()
