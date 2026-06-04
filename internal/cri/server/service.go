@@ -169,6 +169,11 @@ type criService struct {
 	runtimeFeatures *runtime.RuntimeFeatures
 	// statsCollector collects CPU stats in background for UsageNanoCores calculation
 	statsCollector *StatsCollector
+	// shimPath is the custom PATH environment variable value from the shim manager
+	shimPath string
+
+	checkCriuOnce sync.Once //nolint:nolintlint,unused // Ignore on non-Linux
+	checkCriuErr  error     //nolint:nolintlint,unused // Ignore on non-Linux
 }
 
 type CRIServiceOptions struct {
@@ -187,6 +192,9 @@ type CRIServiceOptions struct {
 	//
 	// TODO: Replace this gradually with directly configured instances
 	Client *containerd.Client
+
+	// ShimPath is the custom PATH environment variable value from the shim manager
+	ShimPath string
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -214,6 +222,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
 		statsCollector:     statsCollector,
+		shimPath:           options.ShimPath,
 	}
 
 	// TODO: Make discard time configurable
