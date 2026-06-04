@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -118,6 +119,7 @@ func init() {
 
 			if config.NoSync {
 				opts = append(opts, erofs.WithNoSync())
+				log.G(ic.Context).WithField("plugin", "erofs").Warn("using async mode for boltdb")
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root

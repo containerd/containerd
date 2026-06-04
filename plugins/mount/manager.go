@@ -99,7 +99,7 @@ func init() {
 			if cfg.NoSync {
 				boltOpts.NoSync = true
 				boltOpts.NoGrowSync = true
-				log.G(ic.Context).Warn("mount manager: using async mode for boltdb")
+				log.G(ic.Context).WithField("plugin", "mount").Warn("using async mode for boltdb")
 			}
 			db, err := bolt.Open(metadb, 0600, &boltOpts)
 			if err != nil {
