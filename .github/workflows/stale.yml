@@ -6,7 +6,8 @@ on:
     paths:
       - '.github/workflows/stale.yml'
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   stale:
