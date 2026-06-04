@@ -145,6 +145,9 @@ func (c *criService) checkCriu() error {
 }
 
 func (c *criService) doCheckCriu() error {
+	if c.config.EnableCRIU != nil && !*c.config.EnableCRIU {
+		return errors.New("criu support is disabled by configuration")
+	}
 	path := resolveCriuPath(c.shimPath)
 	if path == "" {
 		return errors.New("criu binary not found in shim path or system PATH")
