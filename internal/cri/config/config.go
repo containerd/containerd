@@ -427,6 +427,10 @@ type RuntimeConfig struct {
 	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
+
+	// EnableCRIU enables CRIU (Checkpoint/Restore In Userspace) support.
+	// When set to false, checkpoint/restore operations will be disabled.
+	EnableCRIU *bool `toml:"enable_criu" json:"enableCRIU"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
