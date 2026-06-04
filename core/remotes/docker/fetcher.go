@@ -218,6 +218,22 @@ type dockerFetcher struct {
 	*dockerBase
 }
 
+func stripSensitiveHeadersForExternalURLs(h http.Header) {
+	h.Del("Authorization")
+	h.Del("Proxy-Authorization")
+	h.Del("Cookie")
+	h.Del("Cookie2")
+}
+
+func isRegistryOrigin(u *url.URL, hosts []RegistryHost) bool {
+	for _, host := range hosts {
+		if strings.EqualFold(u.Scheme, host.Scheme) && strings.EqualFold(u.Host, host.Host) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", desc.Digest))
 
@@ -255,7 +271,9 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				Capabilities: HostCapabilityPull,
 			}
 			req := r.request(host, http.MethodGet)
-			// Strip namespace from base
+			if !isRegistryOrigin(u, hosts) {
+				stripSensitiveHeadersForExternalURLs(req.header)
+			}
 			req.path = u.Path
 			if u.RawQuery != "" {
 				req.path = req.path + "?" + u.RawQuery
