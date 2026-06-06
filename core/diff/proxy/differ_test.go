@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
@@ -119,20 +120,20 @@ func assertOutgoing(t *testing.T, ctx context.Context, wantNS, wantLease string)
 	t.Helper()
 	md, _ := metadata.FromOutgoingContext(ctx)
 
-	gotNS := firstOrEmpty(md.Get(namespaces.GRPCHeader))
-	if gotNS != wantNS {
-		t.Errorf("namespace header: got %q, want %q", gotNS, wantNS)
+	wantNSValues := wantHeaderValues(wantNS)
+	if gotNS := md.Get(namespaces.GRPCHeader); !reflect.DeepEqual(gotNS, wantNSValues) {
+		t.Errorf("namespace header: got %q, want %q", gotNS, wantNSValues)
 	}
 
-	gotLease := firstOrEmpty(md.Get(leases.GRPCHeader))
-	if gotLease != wantLease {
-		t.Errorf("lease header: got %q, want %q", gotLease, wantLease)
+	wantLeaseValues := wantHeaderValues(wantLease)
+	if gotLease := md.Get(leases.GRPCHeader); !reflect.DeepEqual(gotLease, wantLeaseValues) {
+		t.Errorf("lease header: got %q, want %q", gotLease, wantLeaseValues)
 	}
 }
 
-func firstOrEmpty(v []string) string {
-	if len(v) == 0 {
-		return ""
+func wantHeaderValues(v string) []string {
+	if v == "" {
+		return nil
 	}
-	return v[0]
+	return []string{v}
 }
