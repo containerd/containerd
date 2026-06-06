@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/containerd/containerd/v2/core/diff"
@@ -112,11 +113,20 @@ func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...di
 // gRPC metadata. There is no server-side lease interceptor, so without this the
 // lease is dropped when forwarding to a proxy plugin diff service.
 func withProxyHeaders(ctx context.Context) context.Context {
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		md = metadata.MD{}
+	}
+
 	if ns, ok := namespaces.Namespace(ctx); ok {
-		ctx = namespaces.WithNamespace(ctx, ns)
+		md.Set(namespaces.GRPCHeader, ns)
 	}
 	if lid, ok := leases.FromContext(ctx); ok {
-		ctx = leases.WithLease(ctx, lid)
+		md.Set(leases.GRPCHeader, lid)
 	}
-	return ctx
+
+	if len(md) == 0 {
+		return ctx
+	}
+	return metadata.NewOutgoingContext(ctx, md)
 }
