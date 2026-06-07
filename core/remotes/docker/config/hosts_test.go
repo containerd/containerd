@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,7 +34,10 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 )
 
-const allCaps = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush | docker.HostCapabilityReferrers
+const allCaps = docker.HostCapabilityPull |
+	docker.HostCapabilityResolve |
+	docker.HostCapabilityPush |
+	docker.HostCapabilityReferrers
 
 func TestDefaultHosts(t *testing.T) {
 	ctx := logtest.WithT(context.Background(), t)
@@ -123,10 +128,18 @@ ca = "/etc/path/default"
 
 [host."https://dial-timeout.registry"]
   dial_timeout = "3s"
+
+[host."http://uds-pathname.registry"]
+  dial_addr = "unix:///run/registry-cache.sock"
+
+[host."http://uds-with-timeout.registry"]
+  dial_addr = "unix:///run/r.sock"
+  dial_timeout = "2s"
 `
 
 	var tb, fb = true, false
 	var dialTimeout = 3 * time.Second
+	var dialTimeout2s = 2 * time.Second
 	expected := []hostConfig{
 		{
 			scheme:       "https",
@@ -214,6 +227,21 @@ ca = "/etc/path/default"
 			path:         "/v2",
 			capabilities: allCaps,
 			dialTimeout:  &dialTimeout,
+		},
+		{
+			scheme:       "http",
+			host:         "uds-pathname.registry",
+			path:         "/v2",
+			capabilities: allCaps,
+			dialAddr:     "/run/registry-cache.sock",
+		},
+		{
+			scheme:       "http",
+			host:         "uds-with-timeout.registry",
+			path:         "/v2",
+			capabilities: allCaps,
+			dialAddr:     "/run/r.sock",
+			dialTimeout:  &dialTimeout2s,
 		},
 		{
 			scheme:       "https",
@@ -590,6 +618,10 @@ func compareHostConfig(j, k hostConfig) bool {
 		return false
 	}
 
+	if j.dialAddr != k.dialAddr {
+		return false
+	}
+
 	return true
 }
 
@@ -610,6 +642,9 @@ func printHostConfig(hc []hostConfig) string {
 		fmt.Fprintf(b, "\t\theader: %#v\n", hc[i].header)
 		if hc[i].dialTimeout != nil {
 			fmt.Fprintf(b, "\t\tdial-timeout: %v\n", hc[i].dialTimeout)
+		}
+		if hc[i].dialAddr != "" {
+			fmt.Fprintf(b, "\t\tdial-addr: %q\n", hc[i].dialAddr)
 		}
 	}
 	return b.String()
@@ -646,3 +681,258 @@ var (
 	-----END PRIVATE KEY-----
 	`)
 )
+
+func TestParseHostFileDialAddrInvalid(t *testing.T) {
+	cases := []struct {
+		name    string
+		value   string
+		wantErr string
+	}{
+		{
+			name:    "empty after scheme",
+			value:   `unix://`,
+			wantErr: "no socket path",
+		},
+		{
+			name:    "missing scheme bare path",
+			value:   `/run/registry.sock`,
+			wantErr: "must start with",
+		},
+		{
+			name:    "tcp scheme",
+			value:   `tcp://127.0.0.1:5000`,
+			wantErr: "must start with",
+		},
+		{
+			name:    "http scheme",
+			value:   `http://localhost`,
+			wantErr: "must start with",
+		},
+		{
+			name:    "scheme only no slashes",
+			value:   `unix:`,
+			wantErr: "must start with",
+		},
+		{
+			name:    "malformed URL",
+			value:   `unix://%ZZ`,
+			wantErr: "unable to parse",
+		},
+		{
+			name:    "relative path",
+			value:   `unix://run/r.sock`,
+			wantErr: "must be an absolute path",
+		},
+		{
+			name:    "trailing slash pathname",
+			value:   `unix:///run/r.sock/`,
+			wantErr: "not a directory",
+		},
+		{
+			name:    "query string",
+			value:   `unix:///run/r.sock?foo=bar`,
+			wantErr: "query",
+		},
+		{
+			name:    "fragment",
+			value:   `unix:///run/r.sock#frag`,
+			wantErr: "fragment",
+		},
+		{
+			name:    "empty abstract name",
+			value:   `unix://@`,
+			wantErr: "no abstract socket name",
+		},
+		{
+			name:    "leading space",
+			value:   ` unix:///run/r.sock`,
+			wantErr: "leading or trailing spaces",
+		},
+		{
+			name:    "trailing space",
+			value:   `unix:///run/r.sock `,
+			wantErr: "leading or trailing spaces",
+		},
+		{
+			name:    "path too long",
+			value:   `unix:///` + strings.Repeat("a", 120),
+			wantErr: "too long",
+		},
+		{
+			name:    "newline injection",
+			value:   "unix:///run/r.sock\nfoo",
+			wantErr: "unable to parse",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			toml := fmt.Sprintf(`[host."http://example.registry"]
+  dial_addr = %q
+`, tc.value)
+			_, err := parseHostsFile("", []byte(toml))
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected error containing %q, got %q", tc.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestParseUnixDialAddrValid(t *testing.T) {
+	cases := []struct {
+		name      string
+		value     string
+		want      string
+		linuxOnly bool
+	}{
+		{name: "pathname", value: `unix:///run/r.sock`, want: "/run/r.sock"},
+		{name: "shortest absolute", value: `unix:///a`, want: "/a"},
+		{name: "uppercase scheme", value: `UNIX:///run/r.sock`, want: "/run/r.sock"},
+		// A path at the OS limit is still accepted; one byte over is rejected
+		// by TestParseHostFileDialAddrInvalid/path_too_long.
+		{name: "max length path", value: `unix://` + "/" + strings.Repeat("a", maxUnixSocketPathLen-1), want: "/" + strings.Repeat("a", maxUnixSocketPathLen-1)},
+		{name: "abstract", value: `unix://@registry-cache`, want: "@registry-cache", linuxOnly: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.linuxOnly && runtime.GOOS != "linux" {
+				t.Skipf("abstract sockets are only supported on Linux, runtime is %s", runtime.GOOS)
+			}
+			got, err := parseUnixDialAddr(tc.value)
+			if err != nil {
+				t.Fatalf("parseUnixDialAddr(%q): unexpected error %v", tc.value, err)
+			}
+			if got != tc.want {
+				t.Fatalf("parseUnixDialAddr(%q) = %q, want %q", tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseUnixDialAddrInvalidDirect(t *testing.T) {
+	// Inputs TOML cannot carry (e.g. a raw NUL byte) are tested by calling the
+	// parser directly. These document that url.Parse rejects control characters.
+	cases := []struct {
+		name    string
+		value   string
+		wantErr string
+	}{
+		{name: "null byte in path", value: "unix:///run/r\x00.sock", wantErr: "unable to parse"},
+		{name: "raw newline in path", value: "unix:///run/r.sock\nfoo", wantErr: "unable to parse"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := parseUnixDialAddr(tc.value); err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("parseUnixDialAddr(%q): want error containing %q, got %v", tc.value, tc.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestParseUnixDialAddrAbstractNonLinux(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		t.Skip("abstract socket guard only rejects on non-Linux platforms")
+	}
+	if _, err := parseUnixDialAddr("unix://@registry-cache"); err == nil {
+		t.Fatalf("expected error for abstract socket on %s, got nil", runtime.GOOS)
+	}
+}
+
+func TestConfigureHostsDialAddrWiresTransport(t *testing.T) {
+	ctx := logtest.WithT(context.Background(), t)
+
+	cases := []struct {
+		name                string
+		hostToml            string
+		wantSharedClient    bool
+		wantDialErrContains string
+	}{
+		{
+			name: "only dial_addr set",
+			hostToml: `
+[host."http://uds.registry"]
+  dial_addr = "unix:///nonexistent-uds-test.sock"
+`,
+			wantDialErrContains: "nonexistent-uds-test.sock",
+		},
+		{
+			name: "dial_addr with dial_timeout",
+			hostToml: `
+[host."http://uds.registry"]
+  dial_addr = "unix:///nonexistent-uds-timeout.sock"
+  dial_timeout = "100ms"
+`,
+			wantDialErrContains: "nonexistent-uds-timeout.sock",
+		},
+		{
+			name: "neither set (control)",
+			hostToml: `
+[host."http://plain.registry"]
+`,
+			wantSharedClient: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rhosts := configureFromHostToml(t, ctx, tc.hostToml)
+			if tc.wantSharedClient {
+				assertClientSharedBetweenHosts(t, rhosts)
+				return
+			}
+			assertDialerTargetsUnixSocket(t, ctx, rhosts[0].Client, tc.wantDialErrContains)
+		})
+	}
+}
+
+func configureFromHostToml(t *testing.T, ctx context.Context, hostToml string) []docker.RegistryHost {
+	t.Helper()
+	hostDir := filepath.Join(t.TempDir(), "example.registry")
+	if err := os.MkdirAll(hostDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(hostDir, "hosts.toml"), []byte(hostToml), 0600); err != nil {
+		t.Fatal(err)
+	}
+	opts := HostOptions{HostDir: func(string) (string, error) { return hostDir, nil }}
+	rhosts, err := ConfigureHosts(ctx, opts)("example.registry")
+	if err != nil {
+		t.Fatalf("ConfigureHosts: %v", err)
+	}
+	if len(rhosts) == 0 {
+		t.Fatal("expected at least one host")
+	}
+	return rhosts
+}
+
+func assertClientSharedBetweenHosts(t *testing.T, rhosts []docker.RegistryHost) {
+	t.Helper()
+	if len(rhosts) < 2 {
+		t.Fatalf("expected at least 2 hosts to compare clients, got %d", len(rhosts))
+	}
+	if rhosts[0].Client != rhosts[1].Client {
+		t.Errorf("expected shared *http.Client across hosts without dial_addr, got distinct clients")
+	}
+}
+
+func assertDialerTargetsUnixSocket(t *testing.T, ctx context.Context, client *http.Client, wantErrSubstr string) {
+	t.Helper()
+	tr, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("expected *http.Transport, got %T", client.Transport)
+	}
+	if tr.DialContext == nil {
+		t.Fatal("expected per-host DialContext to be set")
+	}
+	_, derr := tr.DialContext(ctx, "tcp", "ignored:443")
+	if derr == nil {
+		t.Fatal("expected dial to a nonexistent unix socket to fail")
+	}
+	if !strings.Contains(derr.Error(), wantErrSubstr) {
+		t.Errorf("expected dial error to mention %q, got %q", wantErrSubstr, derr.Error())
+	}
+}

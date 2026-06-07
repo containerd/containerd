@@ -373,6 +373,55 @@ A shorter timeout helps reduce delays when falling back to the original registry
 dial_timeout = "1s"
 ```
 
+## dial_addr field
+
+`dial_addr` replaces the transport's dialer for this host so that connections
+are made to a local Unix domain socket instead of over TCP. The request URL
+(scheme, host, path) is unchanged, so the configured host's `Host:` header
+still reaches the local proxy and any existing auth/scope logic continues to
+work. Only the `unix` scheme is accepted.
+
+This lets containerd reach a host-local service over a Unix domain socket — for
+example a co-located local proxy or pull-through cache. It avoids the loopback
+TCP stack for the host-local hop and lets filesystem permissions on the socket
+replace TCP ACLs (no listener needs to be exposed on `lo`).
+
+Accepted forms:
+
+- `unix:///absolute/path/to.sock` — pathname socket. Works on Linux, macOS,
+  the BSDs, and Windows 10 / Server 2019 or newer (older Windows has no
+  `AF_UNIX` support).
+- `unix://@name` — abstract socket. Linux only; rejected at parse time on every
+  other platform (including all versions of Windows).
+
+`dial_addr` composes with `dial_timeout` (the timeout still applies to the
+unix dial).
+
+The host entry may be `http://` or `https://`. `dial_addr` only redirects the
+transport — it does **not** change the scheme — so an `https://` host still
+performs a full TLS handshake over the socket against the configured host name.
+The process listening on the socket must therefore terminate TLS and present a
+certificate valid for that host name (or the host must set `skip_verify = true`).
+An `http://` host does not negotiate TLS; `dial_addr` does not tunnel plain HTTP
+under an `https://` entry.
+
+```toml
+server = "https://registry-1.docker.io"
+
+[host."https://registry-1.docker.io"]
+  capabilities = ["pull", "resolve"]
+  dial_addr = "unix:///run/registry-cache.sock"
+  dial_timeout = "5s"
+```
+
+As with any `hosts.toml` field that redirects traffic, the socket path is
+trusted to the same degree as the `hosts.toml` file itself, so the file
+and the socket should be protected by appropriate filesystem permissions. Note
+that a pathname socket inherits the permissions of its parent directory: an
+unprivileged proxy cannot `bind()` a socket directly in a root-owned directory
+such as `/run` (it returns `EACCES`); place the socket in a directory the proxy
+owns (for example a systemd `RuntimeDirectory`).
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host]."http://namespace"` entries in the

@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -210,6 +211,86 @@ server = "%s"
 		assert.False(t, mirrorTriggered.Load())
 		assert.False(t, serverTriggered.Load())
 	}
+}
+
+// TestResolverDialAddrUnixSocket is an integration test: it serves a registry
+// on a real unix socket and checks that a host with dial_addr resolves over the
+// socket, not over TCP. dial_addr changes only the dial, so the host stays a
+// plain http:// entry.
+func TestResolverDialAddrUnixSocket(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix socket dial_addr integration test is not run on Windows")
+	}
+
+	const (
+		name = "testname"
+		tag  = "latest"
+		base = "dial-addr-uds.registry"
+	)
+
+	m := newManifest(
+		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
+		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+	)
+	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	mux := http.NewServeMux()
+	m.RegisterHandler(mux, name)
+	mux.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
+	mux.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
+
+	var hits atomic.Int64
+	counted := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		mux.ServeHTTP(rw, r)
+	})
+
+	sock := filepath.Join(t.TempDir(), "reg.sock")
+	l, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatalf("listen unix %q: %v", sock, err)
+	}
+	srv := &http.Server{Handler: counted}
+	go srv.Serve(l)
+	defer srv.Close()
+
+	resolveWith := func(t *testing.T, dialAddr string) error {
+		dir := t.TempDir()
+		hostDir := filepath.Join(dir, base)
+		if err := os.MkdirAll(hostDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		hostTOML := fmt.Sprintf(`
+[host."http://%s"]
+  capabilities = ["pull", "resolve"]
+  dial_addr = "unix://%s"
+`, base, dialAddr)
+		if err := os.WriteFile(filepath.Join(hostDir, "hosts.toml"), []byte(hostTOML), 0644); err != nil {
+			t.Fatal(err)
+		}
+		options := docker.ResolverOptions{
+			Hosts: ConfigureHosts(context.TODO(), HostOptions{HostDir: HostDirFromRoot(dir)}),
+		}
+		resolver := docker.NewResolver(options)
+		_, _, err := resolver.Resolve(context.Background(), fmt.Sprintf("%s/%s:%s", base, name, tag))
+		return err
+	}
+
+	t.Run("served over socket", func(t *testing.T) {
+		before := hits.Load()
+		if err := resolveWith(t, sock); err != nil {
+			t.Fatalf("resolve over unix socket: %v", err)
+		}
+		if hits.Load() <= before {
+			t.Fatal("expected the registry handler to be reached over the unix socket")
+		}
+	})
+
+	t.Run("bogus socket fails", func(t *testing.T) {
+		bogus := filepath.Join(t.TempDir(), "nonexistent.sock")
+		if err := resolveWith(t, bogus); err == nil {
+			t.Fatal("expected resolve to fail when dial_addr points at a nonexistent socket")
+		}
+	})
 }
 
 func runBasicTest(t *testing.T, name string, sf func(h http.Handler) (string, docker.ResolverOptions, func())) {

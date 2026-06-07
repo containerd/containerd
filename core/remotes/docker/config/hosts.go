@@ -28,7 +28,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -54,6 +56,7 @@ type hostConfig struct {
 	skipVerify  *bool
 
 	dialTimeout *time.Duration
+	dialAddr    string
 
 	header http.Header
 
@@ -171,9 +174,9 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
 			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
+			if explicitTLSFromHost || host.dialTimeout != nil || host.dialAddr != "" || len(host.header) != 0 {
 				c := *client
-				if explicitTLSFromHost || host.dialTimeout != nil {
+				if explicitTLSFromHost || host.dialTimeout != nil || host.dialAddr != "" {
 					tr := defaultTransport.Clone()
 
 					if explicitTLSFromHost {
@@ -182,7 +185,13 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 						}
 					}
 
-					if host.dialTimeout != nil {
+					if host.dialAddr != "" {
+						timeout := 30 * time.Second
+						if host.dialTimeout != nil {
+							timeout = *host.dialTimeout
+						}
+						tr.DialContext = unixDialContext(host.dialAddr, timeout)
+					} else if host.dialTimeout != nil {
 						tr.DialContext = (&net.Dialer{
 							Timeout:       *host.dialTimeout,
 							KeepAlive:     30 * time.Second,
@@ -374,6 +383,13 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
+	// DialAddr, when non-empty, replaces the transport's dialer so
+	// that connections to this host are made to a Unix domain socket
+	// instead of over TCP. Only the "unix" scheme is accepted, either
+	// "unix:///absolute/path/to.sock" or "unix://@name" for a Linux
+	// abstract socket.
+	DialAddr string `toml:"dial_addr"`
+
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -544,7 +560,87 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		result.dialTimeout = &dialTimeout
 	}
 
+	if config.DialAddr != "" {
+		addr, err := parseUnixDialAddr(config.DialAddr)
+		if err != nil {
+			return hostConfig{}, err
+		}
+		result.dialAddr = addr
+	}
+
 	return result, nil
+}
+
+// maxUnixSocketPathLen is the size of sun_path in struct sockaddr_un. It is
+// taken from the platform's own sockaddr definition (108 on Linux, 104 on the
+// BSDs/macOS), so the limit matches the OS we build for.
+const maxUnixSocketPathLen = len(syscall.RawSockaddrUnix{}.Path)
+
+// parseUnixDialAddr validates a hosts.toml "dial_addr" and returns the unix
+// socket address for net.Dial("unix", ...).
+// Forms: "unix:///path/to.sock" (file path) or "unix://@name" (abstract socket,
+// Linux only). dial_addr is set by the operator, so the checks below aim to
+// catch typos early with a clear message.
+func parseUnixDialAddr(raw string) (string, error) {
+	// Extra spaces are usually a copy-paste slip.
+	if strings.TrimSpace(raw) != raw {
+		return "", fmt.Errorf("dial_addr %q must not have leading or trailing spaces", raw)
+	}
+	// Must begin with "unix://". The scheme is not case-sensitive.
+	const prefix = "unix://"
+	if len(raw) < len(prefix) || !strings.EqualFold(raw[:len(prefix)], prefix) {
+		return "", fmt.Errorf("dial_addr %q must start with \"unix://\"", raw)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("unable to parse dial_addr %q: %w", raw, err)
+	}
+	if u.RawQuery != "" {
+		return "", fmt.Errorf("dial_addr %q must not contain a \"?\" query", raw)
+	}
+	if u.Fragment != "" || u.RawFragment != "" {
+		return "", fmt.Errorf("dial_addr %q must not contain a \"#\" fragment", raw)
+	}
+	// Keep the text after "unix://" as-is: url.Parse drops a leading "@", which
+	// is needed for abstract names like "unix://@name".
+	addr := raw[len(prefix):]
+	if addr == "" {
+		return "", fmt.Errorf("dial_addr %q has no socket path after \"unix://\"", raw)
+	}
+	// The address must fit the OS limit.
+	if len(addr) > maxUnixSocketPathLen {
+		return "", fmt.Errorf("dial_addr socket path is too long: %d bytes, max is %d: %q", len(addr), maxUnixSocketPathLen, raw)
+	}
+	// A leading "@" means an abstract socket (Linux only).
+	if strings.HasPrefix(addr, "@") {
+		if addr == "@" {
+			return "", fmt.Errorf("dial_addr %q has \"@\" but no abstract socket name", raw)
+		}
+		if runtime.GOOS != "linux" {
+			return "", fmt.Errorf("dial_addr %q uses an abstract socket, which only works on Linux (this host is %s)", raw, runtime.GOOS)
+		}
+		return addr, nil
+	}
+	// Otherwise it is a file path and must be absolute.
+	if !strings.HasPrefix(addr, "/") {
+		return "", fmt.Errorf("dial_addr %q must be an absolute path like \"unix:///run/foo.sock\" (note the three slashes)", raw)
+	}
+	if strings.HasSuffix(addr, "/") {
+		return "", fmt.Errorf("dial_addr %q ends with \"/\"; it must point to a socket file, not a directory", raw)
+	}
+	return addr, nil
+}
+
+// unixDialContext returns a DialContext that ignores the requested network
+// and address and instead dials the configured unix socket.
+func unixDialContext(addr string, timeout time.Duration) func(ctx context.Context, network, address string) (net.Conn, error) {
+	d := &net.Dialer{
+		Timeout:   timeout,
+		KeepAlive: 30 * time.Second,
+	}
+	return func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return d.DialContext(ctx, "unix", addr)
+	}
 }
 
 // getSortedHosts returns the list of hosts in the order are they defined in the file.
