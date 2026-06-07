@@ -178,7 +178,7 @@ func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error)
 			// when pulled with a tag+digest reference (the tag is dropped).
 			if _, isTagged := normalized.(docker.Tagged); isTagged {
 				if digested, isDigested := normalized.(docker.Digested); isDigested {
-					digestOnly := normalized.(docker.Named).Name() + "@" + digested.Digest().String()
+					digestOnly := normalized.Name() + "@" + digested.Digest().String()
 					if id, err = c.imageStore.Resolve(digestOnly); err == nil {
 						return id
 					}

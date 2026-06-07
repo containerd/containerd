@@ -361,7 +361,7 @@ func normalizeImageRef(ref string) string {
 	}
 	if _, isTagged := normalized.(docker.Tagged); isTagged {
 		if digested, isDigested := normalized.(docker.Digested); isDigested {
-			return normalized.(docker.Named).Name() + "@" + digested.Digest().String()
+			return normalized.Name() + "@" + digested.Digest().String()
 		}
 	}
 	return normalized.String()
