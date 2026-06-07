@@ -1614,9 +1614,17 @@ func WithMemorySwap(swap int64) SpecOpts {
 }
 
 // WithPidsLimit sets the container's pid limit or maximum. It is a no-op on non-Linux specs.
+// A limit of 0 means "no limit" and will clear any existing pids constraint from the spec,
+// which is the expected behavior for runc >= 1.4 (where 0 is rejected as invalid).
 func WithPidsLimit(limit int64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
 		if s.Linux == nil {
+			return nil
+		}
+		if limit == 0 {
+			if s.Linux.Resources != nil {
+				s.Linux.Resources.Pids = nil
+			}
 			return nil
 		}
 		setResources(s)

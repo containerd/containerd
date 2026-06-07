@@ -392,6 +392,38 @@ func TestWithPidsLimit(t *testing.T) {
 	}
 }
 
+// TestWithPidsLimitZero verifies that WithPidsLimit(0) does not set the Pids
+// field in the spec. runc >= 1.4 rejects limit=0 as invalid, so "no limit"
+// must be represented by omitting the field entirely.
+func TestWithPidsLimitZero(t *testing.T) {
+	t.Run("fresh spec without resources", func(t *testing.T) {
+		spec := Spec{Linux: &specs.Linux{}}
+		err := WithPidsLimit(0)(nil, nil, nil, &spec)
+		assert.NoError(t, err)
+		if spec.Linux.Resources != nil {
+			assert.Nil(t, spec.Linux.Resources.Pids, "pids should not be set when limit is 0")
+		}
+	})
+
+	t.Run("clears pre-existing pids limit", func(t *testing.T) {
+		existing := int64(512)
+		spec := Spec{Linux: &specs.Linux{
+			Resources: &specs.LinuxResources{
+				Pids: &specs.LinuxPids{Limit: &existing},
+			},
+		}}
+		err := WithPidsLimit(0)(nil, nil, nil, &spec)
+		assert.NoError(t, err)
+		assert.Nil(t, spec.Linux.Resources.Pids, "pids should be cleared when limit is 0")
+	})
+
+	t.Run("non-linux spec is no-op", func(t *testing.T) {
+		spec := Spec{}
+		err := WithPidsLimit(0)(nil, nil, nil, &spec)
+		assert.NoError(t, err)
+	})
+}
+
 func TestWithBlockIO(t *testing.T) {
 	for name, spec := range emptySpecs {
 		t.Run(name, func(t *testing.T) {
