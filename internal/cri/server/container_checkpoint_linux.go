@@ -293,23 +293,11 @@ func (c *criService) CRImportCheckpoint(
 		}
 	}
 
-	if createAnnotations != nil {
-		// The hash also needs to be update or Kubernetes thinks the container needs to be restarted
-		_, ok1 := createAnnotations["io.kubernetes.container.hash"]
-		_, ok2 := originalAnnotations["io.kubernetes.container.hash"]
-
-		if ok1 && ok2 {
-			originalAnnotations["io.kubernetes.container.hash"] = createAnnotations["io.kubernetes.container.hash"]
-		}
-
-		// The restart count also needs to be correctly updated
-		_, ok1 = createAnnotations["io.kubernetes.container.restartCount"]
-		_, ok2 = originalAnnotations["io.kubernetes.container.restartCount"]
-
-		if ok1 && ok2 {
-			originalAnnotations["io.kubernetes.container.restartCount"] = createAnnotations["io.kubernetes.container.restartCount"]
-		}
-	}
+	originalAnnotations = filterAndMergeAnnotations(
+		ctx,
+		originalAnnotations,
+		createAnnotations,
+	)
 
 	var containerdImage client.Image
 
@@ -756,4 +744,38 @@ func writeSpecDumpFile(ctx context.Context, store content.Store, desc v1.Descrip
 	}
 
 	return nil
+}
+
+func filterAndMergeAnnotations(
+	ctx context.Context,
+	checkpointAnnotations map[string]string,
+	createAnnotations map[string]string,
+) map[string]string {
+	result := make(map[string]string)
+
+	for k, v := range checkpointAnnotations {
+		if strings.HasPrefix(k, "cdi.k8s.io/") || k == "cdi.k8s.io" {
+			log.G(ctx).Warnf("Denying annotation %q in checkpoint restore", k)
+			continue
+		}
+		result[k] = v
+	}
+
+	// The hash also needs to be update or Kubernetes thinks the container needs to be restarted
+	_, ok1 := createAnnotations["io.kubernetes.container.hash"]
+	_, ok2 := result["io.kubernetes.container.hash"]
+
+	if ok1 && ok2 {
+		result["io.kubernetes.container.hash"] = createAnnotations["io.kubernetes.container.hash"]
+	}
+
+	// The restart count also needs to be correctly updated
+	_, ok1 = createAnnotations["io.kubernetes.container.restartCount"]
+	_, ok2 = result["io.kubernetes.container.restartCount"]
+
+	if ok1 && ok2 {
+		result["io.kubernetes.container.restartCount"] = createAnnotations["io.kubernetes.container.restartCount"]
+	}
+
+	return result
 }
