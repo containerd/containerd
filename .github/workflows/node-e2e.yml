@@ -16,6 +16,25 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
+      - name: Clean up disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet \
+            /usr/local/graalvm \
+            /usr/local/.ghcup \
+            /usr/local/share/powershell \
+            /usr/local/share/chromium \
+            /usr/local/share/firefox \
+            /usr/local/lib/android \
+            /usr/local/lib/node_modules \
+            /usr/local/share/podman \
+            /usr/local/aws-cli/ \
+            /usr/local/lib/heroku \
+            /usr/local/rustup \
+            /usr/local/cargo \
+            /usr/local/google-cloud-sdk
+          df -h
+
       - name: Checkout containerd
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
