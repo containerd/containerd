@@ -320,6 +320,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
 
+	// Shutdown the sandbox if we fail before adding it to store.
+	rollbackSandbox := true
+	defer func() {
+		if retErr != nil && rollbackSandbox {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+			cleanupErr = c.sandboxService.ShutdownSandbox(deferCtx, sandbox.Sandboxer, id)
+		}
+	}()
+
 	if ctrl.Address != "" {
 		sandbox.Endpoint = sandboxstore.Endpoint{
 			Version: ctrl.Version,
@@ -376,6 +386,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
+	// We no longer need to stop sandbox with a cleanup defer since it is in the store.
+	rollbackSandbox = false
 
 	// Send CONTAINER_CREATED event with both ContainerId and SandboxId equal to SandboxId.
 	// Note that this has to be done after sandboxStore.Add() because we need to get
