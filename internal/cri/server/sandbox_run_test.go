@@ -361,6 +361,11 @@ func TestRunPodSandboxRollback(t *testing.T) {
 						},
 					},
 				},
+				Windows: &runtime.WindowsPodSandboxConfig{
+					SecurityContext: &runtime.WindowsSandboxSecurityContext{
+						HostProcess: true,
+					},
+				},
 			},
 		}
 
@@ -425,6 +430,11 @@ func TestRunPodSandboxRollback(t *testing.T) {
 						NamespaceOptions: &runtime.NamespaceOption{
 							Network: runtime.NamespaceMode_NODE, // Use host network to avoid netns setup
 						},
+					},
+				},
+				Windows: &runtime.WindowsPodSandboxConfig{
+					SecurityContext: &runtime.WindowsSandboxSecurityContext{
+						HostProcess: true,
 					},
 				},
 			},
