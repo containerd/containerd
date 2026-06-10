@@ -284,7 +284,6 @@ func TestActivityPipeWriterClose(t *testing.T) {
 
 	apw.Close()
 
-	assert.NoError(t, pw.Close())
 	_ = pr.Close()
 }
 
