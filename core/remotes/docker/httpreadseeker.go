@@ -31,11 +31,11 @@ import (
 const maxRetry = 3
 
 type httpReadSeeker struct {
-	size   int64
-	offset int64
-	rc     io.ReadCloser
-	open   func(offset int64) (io.ReadCloser, error)
-	closed bool
+	size               int64
+	offset             int64
+	rc                 io.ReadCloser
+	open               func(offset int64) (io.ReadCloser, error)
+	closed             bool
 	errsWithNoProgress int
 
 	activity ActivityTrackerInterface
@@ -52,8 +52,8 @@ func newHTTPReadSeeker(size int64, open func(offset int64) (io.ReadCloser, error
 
 func newHTTPReadSeekerWithClock(size int64, open func(offset int64) (io.ReadCloser, error), clock Clock, activity ...ActivityTrackerInterface) (io.ReadCloser, error) {
 	hrs := &httpReadSeeker{
-		size: size,
-		open: open,
+		size:  size,
+		open:  open,
 		clock: clock,
 	}
 	if len(activity) > 0 {
@@ -62,15 +62,11 @@ func newHTTPReadSeekerWithClock(size int64, open func(offset int64) (io.ReadClos
 	return hrs, nil
 }
 
-func newHTTPReadSeekerWithDeadline(size int64, open func(offset int64) (io.ReadCloser, error), deadline time.Time, activity ...ActivityTrackerInterface) (io.ReadCloser, error) {
-	return newHTTPReadSeekerWithClockAndDeadline(size, open, realClock{}, deadline, activity...)
-}
-
 func newHTTPReadSeekerWithClockAndDeadline(size int64, open func(offset int64) (io.ReadCloser, error), clock Clock, deadline time.Time, activity ...ActivityTrackerInterface) (io.ReadCloser, error) {
 	hrs := &httpReadSeeker{
-		size:    size,
-		open:    open,
-		clock:   clock,
+		size:     size,
+		open:     open,
+		clock:    clock,
 		deadline: deadline,
 	}
 	if len(activity) > 0 {

@@ -187,7 +187,7 @@ func TestHTTPReadSeekerSeekAndReadWithActivityTracker(t *testing.T) {
 	data := []byte("0123456789ABCDEFGHIJ")
 
 	hrs := &httpReadSeeker{
-		size:   int64(len(data)),
+		size: int64(len(data)),
 		open: func(offset int64) (io.ReadCloser, error) {
 			return io.NopCloser(bytes.NewReader(data[offset:])), nil
 		},

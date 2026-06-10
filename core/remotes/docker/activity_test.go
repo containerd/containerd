@@ -145,9 +145,9 @@ func TestTimeSinceLastActivityNeverTouched(t *testing.T) {
 func TestConcurrentTouch(t *testing.T) {
 	verifier := NewActivityVerifier()
 	tracker := &mockActivityTrackerWithVerifier{
-		verifier: verifier,
+		verifier:    verifier,
 		stallReturn: false,
-		window: 5 * time.Second,
+		window:      5 * time.Second,
 	}
 	var wg sync.WaitGroup
 	numGoroutines := 100

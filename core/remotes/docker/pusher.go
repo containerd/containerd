@@ -375,13 +375,13 @@ func (apw *activityPipeWriter) CloseWithError(err error) error {
 // noopActivityTracker is an ActivityTrackerInterface implementation that does nothing.
 type noopActivityTracker struct{}
 
-func (n *noopActivityTracker) Touch()                             {}
-func (n *noopActivityTracker) Stalled(window time.Duration) bool { return false }
+func (n *noopActivityTracker) Touch()                               {}
+func (n *noopActivityTracker) Stalled(window time.Duration) bool    { return false }
 func (n *noopActivityTracker) TimeSinceLastActivity() time.Duration { return 0 }
 
 type pushWriter struct {
-	base     *dockerBase
-	ref      string
+	base *dockerBase
+	ref  string
 
 	pipe *activityPipeWriter
 
@@ -394,9 +394,9 @@ type pushWriter struct {
 
 	isManifest bool
 
-	expected digest.Digest
-	tracker      StatusTracker
-	activity     ActivityTrackerInterface
+	expected      digest.Digest
+	tracker       StatusTracker
+	activity      ActivityTrackerInterface
 	deadlineClock Clock
 }
 

@@ -60,7 +60,7 @@ type ActivityTrackerInterface interface {
 
 type ActivityTracker struct {
 	lastActivity atomic.Int64
-	clock       Clock
+	clock        Clock
 }
 
 func NewActivityTracker(window time.Duration) *ActivityTracker {
