@@ -191,6 +191,9 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 							timeout = *host.dialTimeout
 						}
 						tr.DialContext = unixDialContext(host.dialAddr, timeout)
+						// dial_addr connects straight to the socket, so do not
+						// route through HTTP(S)_PROXY from the environment.
+						tr.Proxy = nil
 					} else if host.dialTimeout != nil {
 						tr.DialContext = (&net.Dialer{
 							Timeout:       *host.dialTimeout,

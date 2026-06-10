@@ -928,6 +928,11 @@ func assertDialerTargetsUnixSocket(t *testing.T, ctx context.Context, client *ht
 	if tr.DialContext == nil {
 		t.Fatal("expected per-host DialContext to be set")
 	}
+	// A dial_addr host always connects directly to the socket, so the
+	// transport must not route via HTTP(S)_PROXY (Proxy must be cleared).
+	if tr.Proxy != nil {
+		t.Error("expected Proxy to be nil for a dial_addr host")
+	}
 	_, derr := tr.DialContext(ctx, "tcp", "ignored:443")
 	if derr == nil {
 		t.Fatal("expected dial to a nonexistent unix socket to fail")
