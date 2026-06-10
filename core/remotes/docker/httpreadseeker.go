@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -41,6 +42,8 @@ type httpReadSeeker struct {
 
 	deadline time.Time
 	clock    Clock
+
+	mu sync.Mutex
 }
 
 func newHTTPReadSeeker(size int64, open func(offset int64) (io.ReadCloser, error), activity ...ActivityTrackerInterface) (io.ReadCloser, error) {
@@ -77,30 +80,39 @@ func newHTTPReadSeekerWithClockAndDeadline(size int64, open func(offset int64) (
 }
 
 func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
+	hrs.mu.Lock()
 	if hrs.closed {
+		hrs.mu.Unlock()
 		return 0, io.EOF
 	}
 
 	if !hrs.deadline.IsZero() {
 		if hrs.clock.Now().After(hrs.deadline) {
+			hrs.mu.Unlock()
 			return 0, context.DeadlineExceeded
 		}
 	}
+	hrs.mu.Unlock()
 
 	rd, err := hrs.reader()
 	if err != nil {
 		return 0, err
 	}
 
+	hrs.mu.Lock()
 	if !hrs.deadline.IsZero() {
 		if hrs.clock.Now().After(hrs.deadline) {
+			hrs.mu.Unlock()
 			return 0, context.DeadlineExceeded
 		}
 	}
 
 	n, err = rd.Read(p)
 	if !hrs.deadline.IsZero() && hrs.clock.Now().After(hrs.deadline) {
-		return 0, context.DeadlineExceeded
+		if n == 0 {
+			hrs.mu.Unlock()
+			return 0, context.DeadlineExceeded
+		}
 	}
 	hrs.offset += int64(n)
 	if n > 0 {
@@ -113,11 +125,11 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 	}
 	switch err {
 	case io.ErrUnexpectedEOF:
-		// connection closed unexpectedly. try reconnecting.
 		if n == 0 {
 			hrs.errsWithNoProgress++
 			if hrs.errsWithNoProgress > maxRetry {
-				return // too many retries for this offset with no progress
+				hrs.mu.Unlock()
+				return
 			}
 		}
 		if hrs.rc != nil {
@@ -127,12 +139,10 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 			hrs.rc = nil
 		}
 		if _, err2 := hrs.reader(); err2 == nil {
+			hrs.mu.Unlock()
 			return n, nil
 		}
 	case io.EOF:
-		// The CRI's imagePullProgressTimeout relies on responseBody.Close to
-		// update the process monitor's status. If the err is io.EOF, close
-		// the connection since there is no more available data.
 		if hrs.rc != nil {
 			if clsErr := hrs.rc.Close(); clsErr != nil {
 				log.L.WithError(clsErr).Error("httpReadSeeker: failed to close ReadCloser after io.EOF")
@@ -140,10 +150,13 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 			hrs.rc = nil
 		}
 	}
+	hrs.mu.Unlock()
 	return
 }
 
 func (hrs *httpReadSeeker) Close() error {
+	hrs.mu.Lock()
+	defer hrs.mu.Unlock()
 	if hrs.closed {
 		return nil
 	}
@@ -156,6 +169,8 @@ func (hrs *httpReadSeeker) Close() error {
 }
 
 func (hrs *httpReadSeeker) Seek(offset int64, whence int) (int64, error) {
+	hrs.mu.Lock()
+	defer hrs.mu.Unlock()
 	if hrs.closed {
 		return 0, fmt.Errorf("httpReadSeeker.Seek: closed: %w", errdefs.ErrUnavailable)
 	}
@@ -195,13 +210,17 @@ func (hrs *httpReadSeeker) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (hrs *httpReadSeeker) reader() (io.Reader, error) {
+	hrs.mu.Lock()
+	defer hrs.mu.Unlock()
+	return hrs.readerLocked()
+}
+
+func (hrs *httpReadSeeker) readerLocked() (io.Reader, error) {
 	if hrs.rc != nil {
 		return hrs.rc, nil
 	}
 
 	if hrs.size == -1 || hrs.offset < hrs.size {
-		// only try to reopen the body request if we are seeking to a value
-		// less than the actual size.
 		if hrs.open == nil {
 			return nil, fmt.Errorf("cannot open: %w", errdefs.ErrNotImplemented)
 		}
@@ -218,12 +237,6 @@ func (hrs *httpReadSeeker) reader() (io.Reader, error) {
 		}
 		hrs.rc = rc
 	} else {
-		// There is an edge case here where offset == size of the content. If
-		// we seek, we will probably get an error for content that cannot be
-		// sought (?). In that case, we should err on committing the content,
-		// as the length is already satisfied but we just return the empty
-		// reader instead.
-
 		hrs.rc = io.NopCloser(bytes.NewReader([]byte{}))
 	}
 

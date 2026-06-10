@@ -561,7 +561,7 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 	ticker := time.NewTicker(tickerInterval)
 	defer ticker.Stop()
 
-	deadline := time.Now().Add(totalTimeout)
+	deadline := pw.deadlineClock.Now().Add(totalTimeout)
 
 	var resp *http.Response
 	var err error

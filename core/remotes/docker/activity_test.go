@@ -82,6 +82,13 @@ func TestStalledPastWindow(t *testing.T) {
 	if !tracker.Stalled(50 * time.Millisecond) {
 		t.Error("Stalled() should return true when past window")
 	}
+
+	tracker.Touch()
+	clock.Advance(40 * time.Millisecond)
+
+	if tracker.Stalled(50 * time.Millisecond) {
+		t.Error("Stalled() should return false after Touch resets the window")
+	}
 }
 
 func TestStalledNeverTouched(t *testing.T) {
@@ -109,7 +116,7 @@ func TestStalledZeroWindow(t *testing.T) {
 }
 
 func TestTimeSinceLastActivity(t *testing.T) {
-	clock := &mockClock{now: 0}
+	clock := &mockClock{now: 1}
 	tracker := NewActivityTrackerWithClock(clock)
 
 	if tracker.TimeSinceLastActivity() != 0 {
@@ -241,7 +248,16 @@ func TestTimeSinceLastActivityAccuracy(t *testing.T) {
 	clock.Advance(time.Nanosecond)
 
 	duration := tracker.TimeSinceLastActivity()
-	if duration <= 0 {
-		t.Errorf("TimeSinceLastActivity() returned %v, expected > 0", duration)
+	if duration != time.Nanosecond {
+		t.Errorf("TimeSinceLastActivity() returned %v, expected exactly 1ns", duration)
+	}
+}
+
+func TestTimeSinceLastActivityNeverTouchedRealClock(t *testing.T) {
+	tracker := NewActivityTracker(time.Second)
+
+	duration := tracker.TimeSinceLastActivity()
+	if duration != 0 {
+		t.Errorf("TimeSinceLastActivity() should be 0 when never touched with real clock, got %v", duration)
 	}
 }

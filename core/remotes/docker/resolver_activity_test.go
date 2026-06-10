@@ -88,6 +88,49 @@ func TestRequestDoUsesActivityTrackerWhenPresent(t *testing.T) {
 		"Original transport's ResponseHeaderTimeout should remain unchanged (30s) after fix")
 }
 
+func TestRequestDoUsesActivityTrackerWithFallback(t *testing.T) {
+	tracker := NewActivityTracker(time.Second)
+	ctx := WithActivityTracker(context.Background(), tracker)
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	req := &request{
+		method: http.MethodGet,
+		path:   "/test",
+		header: http.Header{},
+		host: RegistryHost{
+			Host:   server.URL[7:], // strip "http://"
+			Scheme: "http",
+			Path:   "/v2",
+		},
+		size: 100, // size > 0 to trigger activity tracker logic
+	}
+
+	// Create a custom client with *httpFallback transport wrapping an *http.Transport
+	originalTransport := &http.Transport{
+		ResponseHeaderTimeout: 30 * time.Second,
+	}
+	fallbackTransport := NewHTTPFallback(originalTransport)
+	req.host.Client = &http.Client{
+		Transport: fallbackTransport,
+	}
+
+	resp, err := req.do(ctx)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	// When activity tracker is in context and size > 0, the cloned transport used by the
+	// request should have ResponseHeaderTimeout disabled (0), but the original transport
+	// should remain unchanged to avoid race conditions with concurrent requests.
+	// The fix ensures that when the transport is *httpFallback, we create a new fallback
+	// wrapper instead of modifying the shared one.
+	assert.Equal(t, 30*time.Second, originalTransport.ResponseHeaderTimeout,
+		"Original transport's ResponseHeaderTimeout should remain unchanged (30s) after fix")
+}
+
 func TestRequestDoUsesDefaultTimeoutWhenNoActivityTracker(t *testing.T) {
 	ctx := context.Background() // no activity tracker
 

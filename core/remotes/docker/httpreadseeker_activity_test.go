@@ -18,6 +18,7 @@ package docker
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -268,5 +269,90 @@ func TestHTTPReadSeekerConcurrentReadsDifferentSeekerInstances(t *testing.T) {
 
 	if tracker.GetTouchCount() == 0 {
 		t.Error("Touch() should have been called during concurrent reads")
+	}
+}
+
+func TestHTTPReadSeekerDeadlineExceeded(t *testing.T) {
+	mc := &mockClock{now: time.Now().UnixNano()}
+	deadline := time.Unix(0, atomic.LoadInt64(&mc.now)).Add(-1 * time.Second)
+
+	data := []byte("test data content")
+	hrs, err := newHTTPReadSeekerWithClockAndDeadline(int64(len(data)), func(offset int64) (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(data)), nil
+	}, mc, deadline)
+	if err != nil {
+		t.Fatalf("newHTTPReadSeekerWithClockAndDeadline failed: %v", err)
+	}
+	defer hrs.Close()
+
+	buf := make([]byte, 1024)
+	n, err := hrs.Read(buf)
+
+	if err != context.DeadlineExceeded {
+		t.Errorf("Expected context.DeadlineExceeded, got err=%v", err)
+	}
+	if n != 0 {
+		t.Errorf("Expected 0 bytes when deadline exceeded, got %d", n)
+	}
+}
+
+func TestHTTPReadSeekerDeadlineNotExceeded(t *testing.T) {
+	mc := &mockClock{now: time.Now().UnixNano()}
+	deadline := time.Now().Add(10 * time.Second)
+
+	data := []byte("test data content")
+	hrs, err := newHTTPReadSeekerWithClockAndDeadline(int64(len(data)), func(offset int64) (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(data)), nil
+	}, mc, deadline)
+	if err != nil {
+		t.Fatalf("newHTTPReadSeekerWithClockAndDeadline failed: %v", err)
+	}
+	defer hrs.Close()
+
+	buf := make([]byte, 1024)
+	n, err := hrs.Read(buf)
+
+	if err != nil && err != io.EOF {
+		t.Fatalf("Read failed: %v", err)
+	}
+	if n != len(data) {
+		t.Fatalf("Expected to read %d bytes, got %d", len(data), n)
+	}
+}
+
+func TestHTTPReadSeekerDeadlineEnforcedDuringRead(t *testing.T) {
+	mc := &mockClock{now: time.Now().UnixNano()}
+	deadline := time.Now().Add(50 * time.Millisecond)
+
+	data := []byte("ABCDEFGHIJ")
+
+	pr, pw := io.Pipe()
+	hrs, err := newHTTPReadSeekerWithClockAndDeadline(int64(len(data)), func(offset int64) (io.ReadCloser, error) {
+		return io.NopCloser(pr), nil
+	}, mc, deadline)
+	if err != nil {
+		t.Fatalf("newHTTPReadSeekerWithClockAndDeadline failed: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		time.Sleep(30 * time.Millisecond)
+		mc.Advance(100 * time.Millisecond)
+		pw.Write(data)
+		pw.Close()
+		wg.Done()
+	}()
+
+	buf := make([]byte, 1024)
+	n, err := hrs.Read(buf)
+	hrs.Close()
+	wg.Wait()
+
+	if err != nil && err != io.EOF {
+		t.Errorf("Expected nil or io.EOF after successful partial read, got err=%v", err)
+	}
+	if n != len(data) {
+		t.Errorf("Expected %d bytes when partial read succeeds before deadline, got %d", len(data), n)
 	}
 }

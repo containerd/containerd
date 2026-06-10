@@ -658,13 +658,15 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 
 	if _, ok := ActivityTrackerFromContext(ctx); ok {
 		if tr := unwrapTransport(client.Transport); tr != nil {
-			newTr := *tr
-			if hfb, ok := client.Transport.(*httpFallback); ok {
-				hfb.super = &newTr
+			newTr := tr.Clone()
+			if _, ok := client.Transport.(*httpFallback); ok {
+				client.Transport = &httpFallback{super: newTr}
 			} else {
-				client.Transport = &newTr
+				client.Transport = newTr
 			}
 			newTr.ResponseHeaderTimeout = 0
+		} else {
+			log.G(ctx).WithField("transport", fmt.Sprintf("%T", client.Transport)).Warn("ActivityTracker set but transport type not supported for timeout disable")
 		}
 	}
 

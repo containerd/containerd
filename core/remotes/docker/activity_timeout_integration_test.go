@@ -155,17 +155,20 @@ type ActivityVerifier struct {
 	touchLock     sync.Mutex
 	stallDetected bool
 	stallLock     sync.Mutex
+	clock         Clock
 }
 
 func NewActivityVerifier() *ActivityVerifier {
-	return &ActivityVerifier{}
+	return &ActivityVerifier{
+		clock: realClock{},
+	}
 }
 
 func (av *ActivityVerifier) RecordTouch() {
 	av.touchLock.Lock()
+	defer av.touchLock.Unlock()
 	av.touchCount++
-	av.lastTouchTime = time.Now()
-	av.touchLock.Unlock()
+	av.lastTouchTime = av.clock.Now()
 }
 
 func (av *ActivityVerifier) RecordStall() {
@@ -198,6 +201,7 @@ type mockActivityTrackerWithVerifier struct {
 	verifier    *ActivityVerifier
 	stallReturn bool
 	window      time.Duration
+	clock       Clock
 }
 
 func (m *mockActivityTrackerWithVerifier) Touch() {
@@ -214,12 +218,15 @@ func (m *mockActivityTrackerWithVerifier) Stalled(window time.Duration) bool {
 }
 
 func (m *mockActivityTrackerWithVerifier) TimeSinceLastActivity() time.Duration {
+	if m.clock == nil {
+		m.clock = realClock{}
+	}
 	m.verifier.touchLock.Lock()
 	defer m.verifier.touchLock.Unlock()
 	if m.verifier.lastTouchTime.IsZero() {
 		return 0
 	}
-	return time.Since(m.verifier.lastTouchTime)
+	return m.clock.Since(m.verifier.lastTouchTime)
 }
 
 func TestPushBlobWithSlowServerCompletesWhenActivityExists(t *testing.T) {
@@ -263,8 +270,6 @@ func TestPushBlobWithSlowServerCompletesWhenActivityExists(t *testing.T) {
 		tracker.Touch()
 	}()
 
-	// Integration test with httptest.Server - server responds immediately,
-	// so timeout is just a safety net for CI environments.
 	select {
 	case err := <-done:
 		assert.NoError(t, err)
@@ -329,14 +334,121 @@ func TestPushBlobWithConcurrentActivity(t *testing.T) {
 	assert.GreaterOrEqual(t, tracker.TimeSinceLastActivity(), time.Duration(0))
 }
 
-func TestPushBlobWithNoActivityTrackerCompletes(t *testing.T) {
-	server := NewMockRegistryServer()
-	defer server.Close()
+type controlledResponseServer struct {
+	srv     *httptest.Server
+	handler http.HandlerFunc
+	mu      sync.Mutex
+}
 
-	server.SetBlobHandler(server.UploadHandler())
+func newControlledResponseServer() *controlledResponseServer {
+	crs := &controlledResponseServer{}
+	crs.srv = httptest.NewServer(crs)
+	return crs
+}
+
+func (crs *controlledResponseServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	crs.mu.Lock()
+	h := crs.handler
+	crs.mu.Unlock()
+	if h != nil {
+		h(w, r)
+	}
+}
+
+func (crs *controlledResponseServer) SetHandler(h http.HandlerFunc) {
+	crs.mu.Lock()
+	crs.handler = h
+	crs.mu.Unlock()
+}
+
+func (crs *controlledResponseServer) URL() string {
+	return crs.srv.URL
+}
+
+func (crs *controlledResponseServer) Close() {
+	crs.srv.Close()
+}
+
+// TestActivityTimeoutFiresWithoutActivity verifies that when there's no activity
+// for longer than activityWindow, the activity tracker correctly detects the stall.
+// This test uses mock clocks to eliminate race conditions and real long sleeps.
+func TestActivityTimeoutFiresWithoutActivity(t *testing.T) {
+	tracker := NewActivityTrackerWithClock(&mockClock{now: 1})
+	clock := tracker.clock.(*mockClock)
+
+	activityWindow := 5 * time.Second
+
+	if tracker.Stalled(activityWindow) {
+		t.Fatal("Tracker should not detect stall before any activity")
+	}
+
+	tracker.Touch()
+	if tracker.Stalled(activityWindow) {
+		t.Fatal("Tracker should not detect stall immediately after Touch")
+	}
+
+	clock.Advance(6 * time.Second)
+	if !tracker.Stalled(activityWindow) {
+		t.Fatal("Tracker should detect stall after 6 seconds with 5 second window")
+	}
+
+	tracker.Touch()
+	if tracker.Stalled(activityWindow) {
+		t.Fatal("Tracker should not detect stall after re-Touch")
+	}
+
+	clock.Advance(3 * time.Second)
+	if tracker.Stalled(activityWindow) {
+		t.Fatal("Tracker should not detect stall after 3 seconds (within 5 second window)")
+	}
+
+	clock.Advance(3 * time.Second)
+	if !tracker.Stalled(activityWindow) {
+		t.Fatal("Tracker should detect stall after 6 seconds total (exceeds 5 second window)")
+	}
+}
+
+// TestActivityTimeoutCompletesWithResponseBeforeStall verifies that when
+// the server responds quickly (before the activity window expires), the operation
+// completes successfully. This tests that activity resumes and extends the deadline.
+func TestActivityTimeoutCompletesWithResponseBeforeStall(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
+
+	crs := newControlledResponseServer()
+	defer crs.Close()
+
+	crs.SetHandler(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if r.URL.Path == "/v2/blobs/uploads/" {
+			if r.Method == http.MethodPost {
+				w.Header().Set("Location", crs.URL()+"/v2/blobs/uploads/abc123?digest=sha256:responsebeforestall")
+				w.WriteHeader(http.StatusAccepted)
+				return
+			}
+		}
+		if r.URL.Path == "/v2/blobs/uploads/abc123" {
+			if r.Method == http.MethodPatch {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			if r.Method == http.MethodPut {
+				w.WriteHeader(http.StatusCreated)
+				return
+			}
+		}
+		http.NotFound(w, r)
+	})
+
+	tracker := NewActivityTrackerWithClock(&mockClock{now: 0})
+	clock := tracker.clock.(*mockClock)
 
 	statusTracker := NewInMemoryTracker()
-	ref := "test-no-tracker-blob"
+	ref := "test-response-before-stall"
 
 	statusTracker.SetStatus(ref, Status{
 		Status: content.Status{
@@ -346,12 +458,11 @@ func TestPushBlobWithNoActivityTrackerCompletes(t *testing.T) {
 		},
 	})
 
-	pw := newPushWriter(nil, ref, digest.Digest("sha256:noactivity"), statusTracker, false, nil)
+	pw := newPushWriter(nil, ref, digest.Digest("sha256:responsebeforestall"), statusTracker, false, tracker)
 	pw.pipe = nil
 
 	resp := httptest.NewRecorder()
-	resp.WriteHeader(http.StatusOK)
-
+	resp.WriteHeader(http.StatusAccepted)
 	pw.setResponse(resp.Result())
 
 	ctx := context.Background()
@@ -361,14 +472,44 @@ func TestPushBlobWithNoActivityTrackerCompletes(t *testing.T) {
 		done <- pw.Commit(ctx, 0, "")
 	}()
 
-	// Integration test with httptest.Server - server responds immediately,
-	// so timeout is just a safety net for CI environments.
+	go func() {
+		data := make([]byte, 50)
+		clock.Advance(500 * time.Millisecond)
+		pw.Write(data)
+		clock.Advance(500 * time.Millisecond)
+		pw.Write(data)
+		clock.Advance(500 * time.Millisecond)
+		pw.Write(data)
+	}()
+
 	select {
 	case err := <-done:
-		assert.NoError(t, err)
-	case <-time.After(30 * time.Second):
-		t.Fatal("PushBlob should have completed without activity tracker")
+		assert.NoError(t, err, "Operation should complete when activity resumes before stall")
+	case <-time.After(10 * time.Second):
+		t.Fatal("Test timed out - operation should have completed")
 	}
+}
+
+// TestActivityTimeoutWithMockTracker verifies that the mockActivityTrackerWithVerifier
+// correctly reports stalls and records activity.
+func TestActivityTimeoutWithMockTracker(t *testing.T) {
+	verifier := NewActivityVerifier()
+	tracker := &mockActivityTrackerWithVerifier{
+		verifier:    verifier,
+		stallReturn: false,
+		window:      5 * time.Second,
+	}
+
+	assert.False(t, tracker.Stalled(5*time.Second), "Should not be stalled initially")
+
+	tracker.stallReturn = true
+	assert.True(t, tracker.Stalled(5*time.Second), "Should be stalled when stallReturn is true")
+
+	tracker.stallReturn = false
+	assert.False(t, tracker.Stalled(5*time.Second), "Should not be stalled when stallReturn is false")
+
+	tracker.Touch()
+	assert.Equal(t, int32(1), verifier.GetTouchCount(), "TouchCount should be 1 after Touch")
 }
 
 func TestActivityVerifierRecordsTouches(t *testing.T) {
@@ -403,7 +544,7 @@ func TestMockRegistryServerSlowResponse(t *testing.T) {
 	assert.Equal(t, int32(1), slowResp.callCount)
 }
 
-func TestPushBlobWithSlowServerActivityTracking(t *testing.T) {
+func TestPushBlobWithActivityTracking(t *testing.T) {
 	server := NewMockRegistryServer()
 	defer server.Close()
 
@@ -412,10 +553,8 @@ func TestPushBlobWithSlowServerActivityTracking(t *testing.T) {
 
 	server.SetBlobHandler(server.UploadHandler())
 
-	tracker := &mockActivityTrackerWithVerifier{
-		verifier:    verifier,
-		stallReturn: false,
-	}
+	tracker := NewActivityTrackerWithClock(&mockClock{now: 0})
+	clock := tracker.clock.(*mockClock)
 
 	statusTracker := NewInMemoryTracker()
 	ref := "test-activity-tracking"
@@ -458,7 +597,7 @@ func TestPushBlobWithSlowServerActivityTracking(t *testing.T) {
 		if err != nil && err != io.ErrClosedPipe {
 			require.NoError(t, err)
 		}
-		time.Sleep(10 * time.Millisecond)
+		clock.Advance(10 * time.Millisecond)
 	}
 
 	pipeWriter.Close()

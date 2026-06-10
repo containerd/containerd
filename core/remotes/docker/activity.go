@@ -60,14 +60,12 @@ type ActivityTrackerInterface interface {
 
 type ActivityTracker struct {
 	lastActivity atomic.Int64
-	window      time.Duration
 	clock       Clock
 }
 
 func NewActivityTracker(window time.Duration) *ActivityTracker {
 	return &ActivityTracker{
-		window: window,
-		clock:  realClock{},
+		clock: realClock{},
 	}
 }
 
@@ -96,7 +94,7 @@ func (t *ActivityTracker) Stalled(window time.Duration) bool {
 
 func (t *ActivityTracker) TimeSinceLastActivity() time.Duration {
 	last := t.lastActivity.Load()
-	if last < 0 {
+	if last <= 0 {
 		return 0
 	}
 	lastTime := time.Unix(0, last)
