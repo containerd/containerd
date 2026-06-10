@@ -297,11 +297,15 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 
 	// TODO: Support chunked upload
 
-	pushw := newPushWriter(p.dockerBase, ref, desc.Digest, p.tracker, isManifest)
+	activity := NewActivityTracker(5 * time.Second)
+	ctx = WithActivityTracker(ctx, activity)
+
+	pushw := newPushWriter(p.dockerBase, ref, desc.Digest, p.tracker, isManifest, activity)
 
 	req.body = func() (io.ReadCloser, error) {
 		pr, pw := io.Pipe()
-		pushw.setPipe(pw)
+		pwWrapper := &activityPipeWriter{pw: pw, tracker: pushw.activity}
+		pushw.setPipe(pwWrapper)
 		return pr, nil
 	}
 	req.size = desc.Size
@@ -346,41 +350,78 @@ func getManifestPath(object string, dgst digest.Digest) []string {
 	return []string{"manifests", object}
 }
 
-type pushWriter struct {
-	base *dockerBase
-	ref  string
+// activityPipeWriter wraps an io.PipeWriter and calls Touch() on an ActivityTrackerInterface
+// before each write operation.
+type activityPipeWriter struct {
+	pw      *io.PipeWriter
+	tracker ActivityTrackerInterface
+}
 
-	pipe *io.PipeWriter
+func (apw *activityPipeWriter) Write(p []byte) (n int, err error) {
+	if apw.tracker != nil {
+		apw.tracker.Touch()
+	}
+	return apw.pw.Write(p)
+}
+
+func (apw *activityPipeWriter) Close() error {
+	return apw.pw.Close()
+}
+
+func (apw *activityPipeWriter) CloseWithError(err error) error {
+	return apw.pw.CloseWithError(err)
+}
+
+// noopActivityTracker is an ActivityTrackerInterface implementation that does nothing.
+type noopActivityTracker struct{}
+
+func (n *noopActivityTracker) Touch()                             {}
+func (n *noopActivityTracker) Stalled(window time.Duration) bool { return false }
+func (n *noopActivityTracker) TimeSinceLastActivity() time.Duration { return 0 }
+
+type pushWriter struct {
+	base     *dockerBase
+	ref      string
+
+	pipe *activityPipeWriter
 
 	done      chan struct{}
 	closeOnce sync.Once
 
-	pipeC chan *io.PipeWriter
+	pipeC chan *activityPipeWriter
 	respC chan *http.Response
 	errC  chan error
 
 	isManifest bool
 
 	expected digest.Digest
-	tracker  StatusTracker
+	tracker      StatusTracker
+	activity     ActivityTrackerInterface
+	deadlineClock Clock
 }
 
-func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker StatusTracker, isManifest bool) *pushWriter {
-	// Initialize and create response
+func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker StatusTracker, isManifest bool, activity ActivityTrackerInterface) *pushWriter {
+	var deadlineClock Clock = realClock{}
+	if at, ok := activity.(*ActivityTracker); ok {
+		deadlineClock = at.clock
+	}
+
 	return &pushWriter{
-		base:       db,
-		ref:        ref,
-		expected:   expected,
-		tracker:    tracker,
-		pipeC:      make(chan *io.PipeWriter, 1),
-		respC:      make(chan *http.Response, 1),
-		errC:       make(chan error, 1),
-		done:       make(chan struct{}),
-		isManifest: isManifest,
+		base:          db,
+		ref:           ref,
+		expected:      expected,
+		tracker:       tracker,
+		activity:      activity,
+		deadlineClock: deadlineClock,
+		pipeC:         make(chan *activityPipeWriter, 1),
+		respC:         make(chan *http.Response, 1),
+		errC:          make(chan error, 1),
+		done:          make(chan struct{}),
+		isManifest:    isManifest,
 	}
 }
 
-func (pw *pushWriter) setPipe(p *io.PipeWriter) {
+func (pw *pushWriter) setPipe(p *activityPipeWriter) {
 	select {
 	case <-pw.done:
 	case pw.pipeC <- p:
@@ -401,7 +442,7 @@ func (pw *pushWriter) setResponse(resp *http.Response) {
 	}
 }
 
-func (pw *pushWriter) replacePipe(p *io.PipeWriter) error {
+func (pw *pushWriter) replacePipe(p *activityPipeWriter) error {
 	if pw.pipe == nil {
 		pw.pipe = p
 		return nil
@@ -423,6 +464,10 @@ func (pw *pushWriter) replacePipe(p *io.PipeWriter) error {
 }
 
 func (pw *pushWriter) Write(p []byte) (n int, err error) {
+	if pw.activity != nil {
+		pw.activity.Touch()
+	}
+
 	status, err := pw.tracker.GetStatus(pw.ref)
 	if err != nil {
 		return n, err
@@ -508,22 +553,49 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 		}
 	}
 
-	// TODO: timeout waiting for response
+	// Activity-aware timeout: wait up to 5 minutes with activity check every second
+	const totalTimeout = 5 * time.Minute
+	const activityWindow = 5 * time.Second
+	const tickerInterval = 1 * time.Second
+
+	ticker := time.NewTicker(tickerInterval)
+	defer ticker.Stop()
+
+	deadline := time.Now().Add(totalTimeout)
+
 	var resp *http.Response
-	select {
-	case <-pw.done:
-		return io.ErrClosedPipe
-	case err := <-pw.errC:
-		pw.Close()
-		return err
-	case resp = <-pw.respC:
-		defer resp.Body.Close()
-	case p := <-pw.pipeC:
-		// check whether the pipe has changed in the commit, because sometimes Write
-		// can complete successfully, but the pipe may have changed. In that case, the
-		// content needs to be reset.
-		return pw.replacePipe(p)
+	var err error
+
+	for {
+		select {
+		case <-pw.done:
+			return io.ErrClosedPipe
+		case e := <-pw.errC:
+			pw.Close()
+			return e
+		case r := <-pw.respC:
+			resp = r
+			goto gotResponse
+		case p := <-pw.pipeC:
+			if err := pw.replacePipe(p); err != nil {
+				return err
+			}
+			// Continue waiting for response - don't return!
+		case <-ticker.C:
+			if pw.activity != nil {
+				if pw.activity.Stalled(activityWindow) {
+					if pw.deadlineClock.Now().After(deadline) {
+						return fmt.Errorf("commit stalled for %v: %w", totalTimeout, context.DeadlineExceeded)
+					}
+				} else {
+					deadline = pw.deadlineClock.Now().Add(activityWindow)
+				}
+			}
+		}
 	}
+
+gotResponse:
+	defer resp.Body.Close()
 
 	// 201 is specified return status, some registries return
 	// 200, 202 or 204.

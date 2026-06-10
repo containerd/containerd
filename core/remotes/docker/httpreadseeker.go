@@ -18,8 +18,10 @@ package docker
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -33,15 +35,45 @@ type httpReadSeeker struct {
 	rc     io.ReadCloser
 	open   func(offset int64) (io.ReadCloser, error)
 	closed bool
-
 	errsWithNoProgress int
+
+	activity ActivityTrackerInterface
+
+	deadline time.Time
+	clock    Clock
 }
 
-func newHTTPReadSeeker(size int64, open func(offset int64) (io.ReadCloser, error)) (io.ReadCloser, error) {
-	return &httpReadSeeker{
+func newHTTPReadSeeker(size int64, open func(offset int64) (io.ReadCloser, error), activity ...ActivityTrackerInterface) (io.ReadCloser, error) {
+	return newHTTPReadSeekerWithClock(size, open, realClock{}, activity...)
+}
+
+func newHTTPReadSeekerWithClock(size int64, open func(offset int64) (io.ReadCloser, error), clock Clock, activity ...ActivityTrackerInterface) (io.ReadCloser, error) {
+	hrs := &httpReadSeeker{
 		size: size,
 		open: open,
-	}, nil
+		clock: clock,
+	}
+	if len(activity) > 0 {
+		hrs.activity = activity[0]
+	}
+	return hrs, nil
+}
+
+func newHTTPReadSeekerWithDeadline(size int64, open func(offset int64) (io.ReadCloser, error), deadline time.Time, activity ...ActivityTrackerInterface) (io.ReadCloser, error) {
+	return newHTTPReadSeekerWithClockAndDeadline(size, open, realClock{}, deadline, activity...)
+}
+
+func newHTTPReadSeekerWithClockAndDeadline(size int64, open func(offset int64) (io.ReadCloser, error), clock Clock, deadline time.Time, activity ...ActivityTrackerInterface) (io.ReadCloser, error) {
+	hrs := &httpReadSeeker{
+		size:    size,
+		open:    open,
+		clock:   clock,
+		deadline: deadline,
+	}
+	if len(activity) > 0 {
+		hrs.activity = activity[0]
+	}
+	return hrs, nil
 }
 
 func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
@@ -49,13 +81,33 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 
+	if !hrs.deadline.IsZero() {
+		if hrs.clock.Now().After(hrs.deadline) {
+			return 0, context.DeadlineExceeded
+		}
+	}
+
 	rd, err := hrs.reader()
 	if err != nil {
 		return 0, err
 	}
 
+	if !hrs.deadline.IsZero() {
+		if hrs.clock.Now().After(hrs.deadline) {
+			return 0, context.DeadlineExceeded
+		}
+	}
+
 	n, err = rd.Read(p)
+	if !hrs.deadline.IsZero() && hrs.clock.Now().After(hrs.deadline) {
+		return 0, context.DeadlineExceeded
+	}
 	hrs.offset += int64(n)
+	if n > 0 {
+		if hrs.activity != nil {
+			hrs.activity.Touch()
+		}
+	}
 	if n > 0 || err == nil {
 		hrs.errsWithNoProgress = 0
 	}
