@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -249,9 +250,16 @@ func TestResolverDialAddrUnixSocket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen unix %q: %v", sock, err)
 	}
+	defer l.Close()
 	srv := &http.Server{Handler: counted}
-	go srv.Serve(l)
-	defer srv.Close()
+	errCh := make(chan error, 1)
+	go func() { errCh <- srv.Serve(l) }()
+	defer func() {
+		srv.Close()
+		if err := <-errCh; err != nil && !errors.Is(err, http.ErrServerClosed) {
+			t.Errorf("unix socket server: %v", err)
+		}
+	}()
 
 	resolveWith := func(t *testing.T, dialAddr string) error {
 		dir := t.TempDir()
