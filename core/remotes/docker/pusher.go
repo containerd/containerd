@@ -383,7 +383,8 @@ type pushWriter struct {
 	base *dockerBase
 	ref  string
 
-	pipe *activityPipeWriter
+	pipe   *activityPipeWriter
+	pipeMu sync.Mutex
 
 	done      chan struct{}
 	closeOnce sync.Once
@@ -443,6 +444,8 @@ func (pw *pushWriter) setResponse(resp *http.Response) {
 }
 
 func (pw *pushWriter) replacePipe(p *activityPipeWriter) error {
+	pw.pipeMu.Lock()
+	defer pw.pipeMu.Unlock()
 	if pw.pipe == nil {
 		pw.pipe = p
 		return nil
@@ -468,12 +471,15 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 		pw.activity.Touch()
 	}
 
+	pw.pipeMu.Lock()
 	status, err := pw.tracker.GetStatus(pw.ref)
 	if err != nil {
+		pw.pipeMu.Unlock()
 		return n, err
 	}
 
 	if pw.pipe == nil {
+		pw.pipeMu.Unlock()
 		select {
 		case <-pw.done:
 			return 0, io.ErrClosedPipe
@@ -481,6 +487,7 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 			pw.replacePipe(p)
 		}
 	} else {
+		pw.pipeMu.Unlock()
 		select {
 		case <-pw.done:
 			return 0, io.ErrClosedPipe
@@ -490,7 +497,9 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 		}
 	}
 
+	pw.pipeMu.Lock()
 	n, err = pw.pipe.Write(p)
+	pw.pipeMu.Unlock()
 	if errors.Is(err, io.ErrClosedPipe) {
 		// if the pipe is closed, we might have the original error on the error
 		// channel - so we should try and get it
@@ -564,7 +573,6 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 	deadline := pw.deadlineClock.Now().Add(totalTimeout)
 
 	var resp *http.Response
-	var err error
 
 	for {
 		select {
@@ -587,8 +595,6 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 					if pw.deadlineClock.Now().After(deadline) {
 						return fmt.Errorf("commit stalled for %v: %w", totalTimeout, context.DeadlineExceeded)
 					}
-				} else {
-					deadline = pw.deadlineClock.Now().Add(activityWindow)
 				}
 			}
 		}

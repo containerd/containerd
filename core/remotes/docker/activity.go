@@ -60,12 +60,14 @@ type ActivityTrackerInterface interface {
 
 type ActivityTracker struct {
 	lastActivity atomic.Int64
+	window       time.Duration
 	clock        Clock
 }
 
 func NewActivityTracker(window time.Duration) *ActivityTracker {
 	return &ActivityTracker{
-		clock: realClock{},
+		window: window,
+		clock:  realClock{},
 	}
 }
 
@@ -81,6 +83,9 @@ func (t *ActivityTracker) Touch() {
 }
 
 func (t *ActivityTracker) Stalled(window time.Duration) bool {
+	if window <= 0 {
+		window = t.window
+	}
 	if window <= 0 {
 		return false
 	}

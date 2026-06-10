@@ -75,79 +75,92 @@ func newHTTPReadSeekerWithClockAndDeadline(size int64, open func(offset int64) (
 	return hrs, nil
 }
 
-func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
-	hrs.mu.Lock()
-	if hrs.closed {
-		hrs.mu.Unlock()
-		return 0, io.EOF
-	}
-
-	if !hrs.deadline.IsZero() {
-		if hrs.clock.Now().After(hrs.deadline) {
+func (hrs *httpReadSeeker) Read(p []byte) (int, error) {
+	for attempt := 0; ; attempt++ {
+		hrs.mu.Lock()
+		if hrs.closed {
 			hrs.mu.Unlock()
-			return 0, context.DeadlineExceeded
+			return 0, io.EOF
 		}
-	}
-	hrs.mu.Unlock()
 
-	rd, err := hrs.reader()
-	if err != nil {
-		return 0, err
-	}
-
-	hrs.mu.Lock()
-	if !hrs.deadline.IsZero() {
-		if hrs.clock.Now().After(hrs.deadline) {
-			hrs.mu.Unlock()
-			return 0, context.DeadlineExceeded
-		}
-	}
-
-	n, err = rd.Read(p)
-	if !hrs.deadline.IsZero() && hrs.clock.Now().After(hrs.deadline) {
-		if n == 0 {
-			hrs.mu.Unlock()
-			return 0, context.DeadlineExceeded
-		}
-	}
-	hrs.offset += int64(n)
-	if n > 0 {
-		if hrs.activity != nil {
-			hrs.activity.Touch()
-		}
-	}
-	if n > 0 || err == nil {
-		hrs.errsWithNoProgress = 0
-	}
-	switch err {
-	case io.ErrUnexpectedEOF:
-		if n == 0 {
-			hrs.errsWithNoProgress++
-			if hrs.errsWithNoProgress > maxRetry {
+		if !hrs.deadline.IsZero() {
+			if hrs.clock.Now().After(hrs.deadline) {
 				hrs.mu.Unlock()
-				return
+				return 0, context.DeadlineExceeded
 			}
 		}
-		if hrs.rc != nil {
-			if clsErr := hrs.rc.Close(); clsErr != nil {
-				log.L.WithError(clsErr).Error("httpReadSeeker: failed to close ReadCloser")
+		hrs.mu.Unlock()
+
+		rd, readerErr := hrs.reader()
+		if readerErr != nil {
+			return 0, readerErr
+		}
+
+		hrs.mu.Lock()
+		if !hrs.deadline.IsZero() {
+			if hrs.clock.Now().After(hrs.deadline) {
+				hrs.mu.Unlock()
+				return 0, context.DeadlineExceeded
 			}
-			hrs.rc = nil
 		}
-		if _, err2 := hrs.reader(); err2 == nil {
-			hrs.mu.Unlock()
-			return n, nil
-		}
-	case io.EOF:
-		if hrs.rc != nil {
-			if clsErr := hrs.rc.Close(); clsErr != nil {
-				log.L.WithError(clsErr).Error("httpReadSeeker: failed to close ReadCloser after io.EOF")
+		expectedRc := hrs.rc
+		hrs.mu.Unlock()
+
+		var n int
+		var readErr error
+		n, readErr = rd.Read(p)
+
+		hrs.mu.Lock()
+		defer hrs.mu.Unlock()
+
+		if expectedRc != hrs.rc {
+			if readErr != nil {
+				continue
 			}
-			hrs.rc = nil
+			continue
 		}
+
+		if !hrs.deadline.IsZero() && hrs.clock.Now().After(hrs.deadline) {
+			if n == 0 {
+				return 0, context.DeadlineExceeded
+			}
+		}
+		hrs.offset += int64(n)
+		if n > 0 {
+			if hrs.activity != nil {
+				hrs.activity.Touch()
+			}
+		}
+		if n > 0 || readErr == nil {
+			hrs.errsWithNoProgress = 0
+		}
+		switch readErr {
+		case io.ErrUnexpectedEOF:
+			if n == 0 {
+				hrs.errsWithNoProgress++
+				if hrs.errsWithNoProgress > maxRetry {
+					return n, readErr
+				}
+			}
+			if hrs.rc != nil {
+				if clsErr := hrs.rc.Close(); clsErr != nil {
+					log.L.WithError(clsErr).Error("httpReadSeeker: failed to close ReadCloser")
+				}
+				hrs.rc = nil
+			}
+			if _, err2 := hrs.readerLocked(); err2 == nil {
+				return n, nil
+			}
+		case io.EOF:
+			if hrs.rc != nil {
+				if clsErr := hrs.rc.Close(); clsErr != nil {
+					log.L.WithError(clsErr).Error("httpReadSeeker: failed to close ReadCloser after io.EOF")
+				}
+				hrs.rc = nil
+			}
+		}
+		return n, readErr
 	}
-	hrs.mu.Unlock()
-	return
 }
 
 func (hrs *httpReadSeeker) Close() error {

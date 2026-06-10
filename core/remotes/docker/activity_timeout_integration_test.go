@@ -166,9 +166,9 @@ func NewActivityVerifier() *ActivityVerifier {
 
 func (av *ActivityVerifier) RecordTouch() {
 	av.touchLock.Lock()
-	defer av.touchLock.Unlock()
-	av.touchCount++
+	atomic.AddInt32(&av.touchCount, 1)
 	av.lastTouchTime = av.clock.Now()
+	av.touchLock.Unlock()
 }
 
 func (av *ActivityVerifier) RecordStall() {
@@ -189,7 +189,7 @@ func (av *ActivityVerifier) IsStallDetected() bool {
 
 func (av *ActivityVerifier) Reset() {
 	av.touchLock.Lock()
-	av.touchCount = 0
+	atomic.StoreInt32(&av.touchCount, 0)
 	av.lastTouchTime = time.Time{}
 	av.touchLock.Unlock()
 	av.stallLock.Lock()

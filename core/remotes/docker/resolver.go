@@ -666,7 +666,7 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 			}
 			newTr.ResponseHeaderTimeout = 0
 		} else {
-			log.G(ctx).WithField("transport", fmt.Sprintf("%T", client.Transport)).Warn("ActivityTracker set but transport type not supported for timeout disable")
+			log.G(ctx).WithField("transport", fmt.Sprintf("%T", client.Transport)).Warn("ActivityTracker set but no custom transport configured (using default) - ResponseHeaderTimeout will not be disabled")
 		}
 	}
 
