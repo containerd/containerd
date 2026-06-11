@@ -101,7 +101,7 @@ func TestNoopActivityTrackerNoPanic(t *testing.T) {
 }
 
 func TestCommitWithActivityNoTimeout(t *testing.T) {
-	clock := &mockClock{now: 0}
+	clock := &mockClock{now: time.Now().UnixNano()}
 	tracker := NewActivityTrackerWithClock(clock)
 	statusTracker := NewInMemoryTracker()
 

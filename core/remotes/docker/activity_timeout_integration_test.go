@@ -235,7 +235,7 @@ func TestPushBlobWithSlowServerCompletesWhenActivityExists(t *testing.T) {
 
 	server.SetBlobHandler(server.UploadHandler())
 
-	tracker := NewActivityTrackerWithClock(&mockClock{now: 0})
+	tracker := NewActivityTrackerWithClock(&mockClock{now: time.Now().UnixNano()})
 	clock := tracker.clock.(*mockClock)
 	statusTracker := NewInMemoryTracker()
 
@@ -284,7 +284,7 @@ func TestPushBlobWithConcurrentActivity(t *testing.T) {
 
 	server.SetBlobHandler(server.UploadHandler())
 
-	tracker := NewActivityTrackerWithClock(&mockClock{now: 0})
+	tracker := NewActivityTrackerWithClock(&mockClock{now: time.Now().UnixNano()})
 	statusTracker := NewInMemoryTracker()
 
 	ref := "test-concurrent-blob"
@@ -300,7 +300,10 @@ func TestPushBlobWithConcurrentActivity(t *testing.T) {
 	pw := newPushWriter(nil, ref, digest.Digest("sha256:concurrent"), statusTracker, false, tracker)
 
 	pr, pipeWriter := io.Pipe()
-	pw.pipeC <- &activityPipeWriter{pw: pipeWriter, tracker: tracker}
+	// Pre-set pipe to avoid race where multiple writers all block on pipeC.
+	pw.pipeMu.Lock()
+	pw.pipe = &activityPipeWriter{pw: pipeWriter, tracker: tracker}
+	pw.pipeMu.Unlock()
 
 	done := make(chan struct{})
 	go func() {
@@ -444,7 +447,7 @@ func TestActivityTimeoutCompletesWithResponseBeforeStall(t *testing.T) {
 		http.NotFound(w, r)
 	})
 
-	tracker := NewActivityTrackerWithClock(&mockClock{now: 0})
+	tracker := NewActivityTrackerWithClock(&mockClock{now: time.Now().UnixNano()})
 	clock := tracker.clock.(*mockClock)
 
 	statusTracker := NewInMemoryTracker()
@@ -553,7 +556,7 @@ func TestPushBlobWithActivityTracking(t *testing.T) {
 
 	server.SetBlobHandler(server.UploadHandler())
 
-	tracker := NewActivityTrackerWithClock(&mockClock{now: 0})
+	tracker := NewActivityTrackerWithClock(&mockClock{now: time.Now().UnixNano()})
 	clock := tracker.clock.(*mockClock)
 
 	statusTracker := NewInMemoryTracker()
@@ -570,7 +573,9 @@ func TestPushBlobWithActivityTracking(t *testing.T) {
 	pw := newPushWriter(nil, ref, digest.Digest("sha256:activitytracking"), statusTracker, false, tracker)
 
 	pr, pipeWriter := io.Pipe()
-	pw.pipeC <- &activityPipeWriter{pw: pipeWriter, tracker: tracker}
+	pw.pipeMu.Lock()
+	pw.pipe = &activityPipeWriter{pw: pipeWriter, tracker: tracker}
+	pw.pipeMu.Unlock()
 
 	done := make(chan struct{})
 	go func() {
