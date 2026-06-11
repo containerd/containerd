@@ -46,10 +46,16 @@ import (
 
 type activityTrackerContextKey struct{}
 
+// WithActivityTracker stores an ActivityTrackerInterface in the context for
+// use by the resolver's request pipeline. When present, the resolver disables
+// ResponseHeaderTimeout on uploads to avoid premature timeouts during slow pushes.
 func WithActivityTracker(ctx context.Context, tracker ActivityTrackerInterface) context.Context {
 	return context.WithValue(ctx, activityTrackerContextKey{}, tracker)
 }
 
+// ActivityTrackerFromContext retrieves an ActivityTrackerInterface previously
+// stored via WithActivityTracker. Returns the tracker and true if found, or
+// nil and false otherwise.
 func ActivityTrackerFromContext(ctx context.Context) (ActivityTrackerInterface, bool) {
 	tracker, ok := ctx.Value(activityTrackerContextKey{}).(ActivityTrackerInterface)
 	return tracker, ok
@@ -666,7 +672,7 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 			}
 			newTr.ResponseHeaderTimeout = 0
 		} else {
-			log.G(ctx).WithField("transport", fmt.Sprintf("%T", client.Transport)).Warn("ActivityTracker set but no custom transport configured (using default) - ResponseHeaderTimeout will not be disabled")
+			log.G(ctx).WithField("transport", fmt.Sprintf("%T", client.Transport)).Debug("ActivityTracker set but no custom transport configured (using default) - ResponseHeaderTimeout will not be disabled")
 		}
 	}
 

@@ -111,17 +111,15 @@ func (hrs *httpReadSeeker) Read(p []byte) (int, error) {
 		n, readErr = rd.Read(p)
 
 		hrs.mu.Lock()
-		defer hrs.mu.Unlock()
 
 		if expectedRc != hrs.rc {
-			if readErr != nil {
-				continue
-			}
+			hrs.mu.Unlock()
 			continue
 		}
 
 		if !hrs.deadline.IsZero() && hrs.clock.Now().After(hrs.deadline) {
 			if n == 0 {
+				hrs.mu.Unlock()
 				return 0, context.DeadlineExceeded
 			}
 		}
@@ -139,6 +137,7 @@ func (hrs *httpReadSeeker) Read(p []byte) (int, error) {
 			if n == 0 {
 				hrs.errsWithNoProgress++
 				if hrs.errsWithNoProgress > maxRetry {
+					hrs.mu.Unlock()
 					return n, readErr
 				}
 			}
@@ -149,6 +148,7 @@ func (hrs *httpReadSeeker) Read(p []byte) (int, error) {
 				hrs.rc = nil
 			}
 			if _, err2 := hrs.readerLocked(); err2 == nil {
+				hrs.mu.Unlock()
 				return n, nil
 			}
 		case io.EOF:
@@ -159,6 +159,7 @@ func (hrs *httpReadSeeker) Read(p []byte) (int, error) {
 				hrs.rc = nil
 			}
 		}
+		hrs.mu.Unlock()
 		return n, readErr
 	}
 }

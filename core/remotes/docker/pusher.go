@@ -467,17 +467,12 @@ func (pw *pushWriter) replacePipe(p *activityPipeWriter) error {
 }
 
 func (pw *pushWriter) Write(p []byte) (n int, err error) {
-	if pw.activity != nil {
-		pw.activity.Touch()
-	}
-
-	pw.pipeMu.Lock()
 	status, err := pw.tracker.GetStatus(pw.ref)
 	if err != nil {
-		pw.pipeMu.Unlock()
 		return n, err
 	}
 
+	pw.pipeMu.Lock()
 	if pw.pipe == nil {
 		pw.pipeMu.Unlock()
 		select {

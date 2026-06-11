@@ -31,7 +31,7 @@ import (
 )
 
 func TestActivityPipeWriterWriteCallsTouch(t *testing.T) {
-	tracker := NewActivityTracker(5 * time.Second)
+	tracker := &mockActivityTracker{}
 
 	pr, pw := io.Pipe()
 	apw := &activityPipeWriter{pw: pw, tracker: tracker}
@@ -51,6 +51,7 @@ func TestActivityPipeWriterWriteCallsTouch(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, len(data), n)
+	assert.Equal(t, int32(1), tracker.touchCount, "Touch() should be called once on write")
 }
 
 func TestPushWriterWriteWithoutActivity(t *testing.T) {

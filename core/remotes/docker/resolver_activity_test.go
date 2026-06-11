@@ -20,6 +20,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -46,6 +47,13 @@ func TestActivityTrackerFromContextReturnsFalseWhenNotSet(t *testing.T) {
 	assert.Nil(t, retrieved, "Retrieved tracker should be nil when not set")
 }
 
+func mustParseHost(t *testing.T, rawURL string) string {
+	t.Helper()
+	u, err := url.Parse(rawURL)
+	require.NoError(t, err)
+	return u.Host
+}
+
 func TestRequestDoUsesActivityTrackerWhenPresent(t *testing.T) {
 	tracker := NewActivityTracker(time.Second)
 	ctx := WithActivityTracker(context.Background(), tracker)
@@ -60,14 +68,12 @@ func TestRequestDoUsesActivityTrackerWhenPresent(t *testing.T) {
 		path:   "/test",
 		header: http.Header{},
 		host: RegistryHost{
-			Host:   server.URL[7:], // strip "http://"
+			Host:   mustParseHost(t, server.URL),
 			Scheme: "http",
 			Path:   "/v2",
 		},
-		size: 100, // size > 0 to trigger activity tracker logic
 	}
 
-	// Create a custom client with a transport that has ResponseHeaderTimeout set
 	originalTransport := &http.Transport{
 		ResponseHeaderTimeout: 30 * time.Second,
 	}
@@ -79,13 +85,11 @@ func TestRequestDoUsesActivityTrackerWhenPresent(t *testing.T) {
 	require.NoError(t, err)
 	resp.Body.Close()
 
-	// When activity tracker is in context and size > 0, the cloned transport used by the
-	// request should have ResponseHeaderTimeout disabled (0), but the original transport
-	// should remain unchanged to avoid race conditions with concurrent requests.
-	// Before the fix, originalTransport would have been modified directly (race condition).
-	// After the fix, originalTransport remains unchanged.
+	// When activity tracker is in context, the cloned transport used by the
+	// request should have ResponseHeaderTimeout disabled (0), but the original
+	// transport should remain unchanged to avoid race conditions with concurrent requests.
 	assert.Equal(t, 30*time.Second, originalTransport.ResponseHeaderTimeout,
-		"Original transport's ResponseHeaderTimeout should remain unchanged (30s) after fix")
+		"Original transport's ResponseHeaderTimeout should remain unchanged (30s)")
 }
 
 func TestRequestDoUsesActivityTrackerWithFallback(t *testing.T) {
@@ -102,14 +106,12 @@ func TestRequestDoUsesActivityTrackerWithFallback(t *testing.T) {
 		path:   "/test",
 		header: http.Header{},
 		host: RegistryHost{
-			Host:   server.URL[7:], // strip "http://"
+			Host:   mustParseHost(t, server.URL),
 			Scheme: "http",
 			Path:   "/v2",
 		},
-		size: 100, // size > 0 to trigger activity tracker logic
 	}
 
-	// Create a custom client with *httpFallback transport wrapping an *http.Transport
 	originalTransport := &http.Transport{
 		ResponseHeaderTimeout: 30 * time.Second,
 	}
@@ -122,17 +124,14 @@ func TestRequestDoUsesActivityTrackerWithFallback(t *testing.T) {
 	require.NoError(t, err)
 	resp.Body.Close()
 
-	// When activity tracker is in context and size > 0, the cloned transport used by the
-	// request should have ResponseHeaderTimeout disabled (0), but the original transport
-	// should remain unchanged to avoid race conditions with concurrent requests.
 	// The fix ensures that when the transport is *httpFallback, we create a new fallback
 	// wrapper instead of modifying the shared one.
 	assert.Equal(t, 30*time.Second, originalTransport.ResponseHeaderTimeout,
-		"Original transport's ResponseHeaderTimeout should remain unchanged (30s) after fix")
+		"Original transport's ResponseHeaderTimeout should remain unchanged (30s)")
 }
 
 func TestRequestDoUsesDefaultTimeoutWhenNoActivityTracker(t *testing.T) {
-	ctx := context.Background() // no activity tracker
+	ctx := context.Background()
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusOK)
@@ -144,14 +143,12 @@ func TestRequestDoUsesDefaultTimeoutWhenNoActivityTracker(t *testing.T) {
 		path:   "/test",
 		header: http.Header{},
 		host: RegistryHost{
-			Host:   server.URL[7:], // strip "http://"
+			Host:   mustParseHost(t, server.URL),
 			Scheme: "http",
 			Path:   "/v2",
 		},
-		size: 100, // size > 0
 	}
 
-	// Create a custom client with a transport that has a ResponseHeaderTimeout
 	req.host.Client = &http.Client{
 		Transport: &http.Transport{
 			ResponseHeaderTimeout: 30 * time.Second,
@@ -162,36 +159,31 @@ func TestRequestDoUsesDefaultTimeoutWhenNoActivityTracker(t *testing.T) {
 	require.NoError(t, err)
 	resp.Body.Close()
 
-	// When no activity tracker, ResponseHeaderTimeout should remain unchanged
 	transport, ok := req.host.Client.Transport.(*http.Transport)
 	require.True(t, ok)
 	assert.Equal(t, 30*time.Second, transport.ResponseHeaderTimeout,
 		"ResponseHeaderTimeout should remain unchanged when no activity tracker is present")
 }
 
-func TestActivityTrackerContextKeyDoesNotCollide(t *testing.T) {
-	// Set a tracker
+func TestActivityTrackerFromContextReturnsFalseForWrongType(t *testing.T) {
 	tracker1 := NewActivityTracker(time.Second)
 	ctx1 := WithActivityTracker(context.Background(), tracker1)
 
-	// Set a different value with the same context key type
 	type mockValue struct {
 		value string
 	}
 	ctx2 := context.WithValue(ctx1, activityTrackerContextKey{}, &mockValue{value: "test"})
 
-	// ctx1 should still have the tracker
 	retrieved1, ok1 := ActivityTrackerFromContext(ctx1)
 	assert.True(t, ok1)
 	assert.Same(t, tracker1, retrieved1)
 
-	// ctx2 should have the mockValue, but ActivityTrackerFromContext should return ok=false
-	// because mockValue doesn't implement ActivityTrackerInterface
+	// ctx2 has the mockValue at the same key; ActivityTrackerFromContext returns ok=false
+	// because the type assertion to ActivityTrackerInterface fails.
 	retrieved2, ok2 := ActivityTrackerFromContext(ctx2)
 	assert.False(t, ok2, "Should return false when value is not ActivityTrackerInterface")
 	assert.Nil(t, retrieved2)
 
-	// But we can still retrieve the mockValue directly using the context key
 	mock, ok := ctx2.Value(activityTrackerContextKey{}).(*mockValue)
 	assert.True(t, ok)
 	assert.Equal(t, "test", mock.value)
@@ -211,21 +203,17 @@ func TestRequestDoWithNilTransport(t *testing.T) {
 		path:   "/test",
 		header: http.Header{},
 		host: RegistryHost{
-			Host:   server.URL[7:],
+			Host:   mustParseHost(t, server.URL),
 			Scheme: "http",
 			Path:   "/v2",
 		},
-		size: 100,
 	}
 
-	// Create a client with nil transport (uses default)
 	req.host.Client = &http.Client{}
 
 	resp, err := req.do(ctx)
 	require.NoError(t, err)
 	resp.Body.Close()
-
-	// Should not panic and should work fine
 }
 
 func TestRequestDoWithActivityTrackerAndNoHostClient(t *testing.T) {
@@ -242,14 +230,12 @@ func TestRequestDoWithActivityTrackerAndNoHostClient(t *testing.T) {
 		path:   "/test",
 		header: http.Header{},
 		host: RegistryHost{
-			Host:   server.URL[7:],
+			Host:   mustParseHost(t, server.URL),
 			Scheme: "http",
 			Path:   "/v2",
 		},
-		size: 100,
 	}
 
-	// No host.Client set - should use default http.Client
 	resp, err := req.do(ctx)
 	require.NoError(t, err)
 	resp.Body.Close()
