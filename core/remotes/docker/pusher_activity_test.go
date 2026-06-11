@@ -245,7 +245,12 @@ func TestConcurrentWriteWithActivityTracking(t *testing.T) {
 	pw := newPushWriter(nil, "test-ref", "", statusTracker, false, tracker)
 
 	pr, pipeWriter := io.Pipe()
-	pw.pipeC <- &activityPipeWriter{pw: pipeWriter, tracker: tracker}
+	// Pre-set the pipe so all writers see pw.pipe != nil immediately.
+	// Sending only via pipeC would cause a race: multiple writers could
+	// see pw.pipe == nil and all block on pipeC, but only one item exists.
+	pw.pipeMu.Lock()
+	pw.pipe = &activityPipeWriter{pw: pipeWriter, tracker: tracker}
+	pw.pipeMu.Unlock()
 
 	done := make(chan struct{})
 	go func() {
