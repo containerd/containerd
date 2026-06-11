@@ -479,7 +479,9 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 		case <-pw.done:
 			return 0, io.ErrClosedPipe
 		case p := <-pw.pipeC:
-			pw.replacePipe(p)
+			if err := pw.replacePipe(p); err != nil {
+				return 0, err
+			}
 		}
 	} else {
 		pw.pipeMu.Unlock()

@@ -76,7 +76,7 @@ func newHTTPReadSeekerWithClockAndDeadline(size int64, open func(offset int64) (
 }
 
 func (hrs *httpReadSeeker) Read(p []byte) (int, error) {
-	for attempt := 0; ; attempt++ {
+	for {
 		hrs.mu.Lock()
 		if hrs.closed {
 			hrs.mu.Unlock()
