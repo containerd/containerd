@@ -68,7 +68,7 @@ func TestPushWriterWriteWithoutActivity(t *testing.T) {
 	pw := newPushWriter(nil, "test-ref", "", statusTracker, false, nil)
 
 	pr, pipeWriter := io.Pipe()
-	pw.pipeC <- &activityPipeWriter{pw: pipeWriter, tracker: nil}
+	pw.setPipe(&activityPipeWriter{pw: pipeWriter, tracker: nil})
 
 	done := make(chan struct{})
 	go func() {

@@ -299,7 +299,9 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 
 	activity := NewActivityTracker(5 * time.Second)
 	if existing, ok := ActivityTrackerFromContext(ctx); ok {
-		activity = existing.(*ActivityTracker)
+		if t, ok := existing.(*ActivityTracker); ok {
+			activity = t
+		}
 	}
 	ctx = WithActivityTracker(ctx, activity)
 
@@ -386,8 +388,9 @@ type pushWriter struct {
 	base *dockerBase
 	ref  string
 
-	pipe   *activityPipeWriter
-	pipeMu sync.Mutex
+	pipe      *activityPipeWriter
+	pipeMu    sync.Mutex
+	pipeReady *sync.Cond
 
 	done      chan struct{}
 	closeOnce sync.Once
@@ -410,7 +413,7 @@ func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker S
 		clock = at.clock
 	}
 
-	return &pushWriter{
+	pw := &pushWriter{
 		base:       db,
 		ref:        ref,
 		expected:   expected,
@@ -423,9 +426,21 @@ func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker S
 		done:       make(chan struct{}),
 		isManifest: isManifest,
 	}
+	pw.pipeReady = sync.NewCond(&pw.pipeMu)
+	return pw
 }
 
 func (pw *pushWriter) setPipe(p *activityPipeWriter) {
+	pw.pipeMu.Lock()
+	if pw.pipe == nil {
+		// First pipe — set directly and wake all waiters.
+		pw.pipe = p
+		pw.pipeReady.Broadcast()
+		pw.pipeMu.Unlock()
+		return
+	}
+	pw.pipeMu.Unlock()
+	// Replacement pipe — deliver via channel for Write/Commit replacement paths.
 	select {
 	case <-pw.done:
 	case pw.pipeC <- p:
@@ -477,15 +492,16 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 
 	pw.pipeMu.Lock()
 	if pw.pipe == nil {
-		pw.pipeMu.Unlock()
-		select {
-		case <-pw.done:
-			return 0, io.ErrClosedPipe
-		case p := <-pw.pipeC:
-			if err := pw.replacePipe(p); err != nil {
-				return 0, err
+		for pw.pipe == nil {
+			select {
+			case <-pw.done:
+				pw.pipeMu.Unlock()
+				return 0, io.ErrClosedPipe
+			default:
 			}
+			pw.pipeReady.Wait()
 		}
+		pw.pipeMu.Unlock()
 	} else {
 		pw.pipeMu.Unlock()
 		select {
@@ -520,10 +536,11 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 }
 
 func (pw *pushWriter) Close() error {
-	// Ensure pipeC is closed but handle `Close()` being
-	// called multiple times without panicking
 	pw.closeOnce.Do(func() {
 		close(pw.done)
+		pw.pipeMu.Lock()
+		pw.pipeReady.Broadcast()
+		pw.pipeMu.Unlock()
 	})
 	if pw.pipe != nil {
 		status, err := pw.tracker.GetStatus(pw.ref)
