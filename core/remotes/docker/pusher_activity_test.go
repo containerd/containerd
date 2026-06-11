@@ -402,13 +402,12 @@ func TestCommitStallTimeoutWithMockClock(t *testing.T) {
 	require.NotNil(t, tick)
 
 	commitErr := func() error {
-		for {
+		for i := 0; i < 5000; i++ {
 			select {
 			case err := <-commitDone:
 				return err
 			default:
 			}
-			// Drain and re-tick.
 			select {
 			case <-tick.C():
 			default:
@@ -416,6 +415,7 @@ func TestCommitStallTimeoutWithMockClock(t *testing.T) {
 			tick.Tick()
 			time.Sleep(time.Millisecond)
 		}
+		return ctx.Err()
 	}()
 
 	require.Error(t, commitErr)

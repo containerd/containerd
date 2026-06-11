@@ -298,6 +298,9 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	// TODO: Support chunked upload
 
 	activity := NewActivityTracker(5 * time.Second)
+	if existing, ok := ActivityTrackerFromContext(ctx); ok {
+		activity = existing.(*ActivityTracker)
+	}
 	ctx = WithActivityTracker(ctx, activity)
 
 	pushw := newPushWriter(p.dockerBase, ref, desc.Digest, p.tracker, isManifest, activity)
@@ -588,6 +591,7 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 			}
 		case <-ticker.C():
 			if pw.activity != nil && pw.activity.Stalled(stallWindow) {
+				pw.Close()
 				return fmt.Errorf("no activity for %v during commit: %w", stallWindow, context.DeadlineExceeded)
 			}
 		}

@@ -17,7 +17,6 @@
 package docker
 
 import (
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -42,40 +41,6 @@ func (realClock) NewTicker(d time.Duration) Ticker { return &realTicker{time.New
 func (t *realTicker) C() <-chan time.Time          { return t.Ticker.C }
 func (t *realTicker) Stop()                        { t.Ticker.Stop() }
 
-type mockClock struct {
-	now        int64
-	mu         sync.Mutex
-	lastTicker *mockTicker
-}
-
-func (mc *mockClock) Now() time.Time {
-	return time.Unix(0, atomic.LoadInt64(&mc.now))
-}
-
-func (mc *mockClock) Since(t time.Time) time.Duration {
-	return time.Unix(0, atomic.LoadInt64(&mc.now)).Sub(t)
-}
-
-func (mc *mockClock) Advance(d time.Duration) {
-	atomic.AddInt64(&mc.now, int64(d))
-}
-
-func (mc *mockClock) NewTicker(d time.Duration) Ticker {
-	t := &mockTicker{ch: make(chan time.Time, 1)}
-	mc.mu.Lock()
-	mc.lastTicker = t
-	mc.mu.Unlock()
-	return t
-}
-
-type mockTicker struct {
-	ch chan time.Time
-}
-
-func (t *mockTicker) C() <-chan time.Time { return t.ch }
-func (t *mockTicker) Stop()               {}
-func (t *mockTicker) Tick()               { t.ch <- time.Time{} }
-
 type ActivityTrackerInterface interface {
 	Touch()
 	Stalled(window time.Duration) bool
@@ -92,12 +57,6 @@ func NewActivityTracker(window time.Duration) *ActivityTracker {
 	return &ActivityTracker{
 		window: window,
 		clock:  realClock{},
-	}
-}
-
-func NewActivityTrackerWithClock(clock Clock) *ActivityTracker {
-	return &ActivityTracker{
-		clock: clock,
 	}
 }
 
