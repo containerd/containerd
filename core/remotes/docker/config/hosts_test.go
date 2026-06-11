@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -782,26 +781,68 @@ func TestParseHostFileDialAddrInvalid(t *testing.T) {
 }
 
 func TestParseUnixDialAddrValid(t *testing.T) {
+	// A path at the OS limit is still accepted; one byte over is rejected
+	// by TestParseHostFileDialAddrInvalid/path_too_long.
+	maxPath := "/" + strings.Repeat("a", maxUnixSocketPathLen-1)
+
 	cases := []struct {
-		name      string
-		value     string
-		want      string
-		linuxOnly bool
+		name  string
+		value string
+		want  string
 	}{
-		{name: "pathname", value: `unix:///run/r.sock`, want: "/run/r.sock"},
-		{name: "shortest absolute", value: `unix:///a`, want: "/a"},
-		{name: "uppercase scheme", value: `UNIX:///run/r.sock`, want: "/run/r.sock"},
-		// A path at the OS limit is still accepted; one byte over is rejected
-		// by TestParseHostFileDialAddrInvalid/path_too_long.
-		{name: "max length path", value: `unix://` + "/" + strings.Repeat("a", maxUnixSocketPathLen-1), want: "/" + strings.Repeat("a", maxUnixSocketPathLen-1)},
-		{name: "abstract", value: `unix://@registry-cache`, want: "@registry-cache", linuxOnly: true},
+		{
+			name:  "pathname",
+			value: `unix:///run/r.sock`,
+			want:  "/run/r.sock",
+		},
+		{
+			name:  "shortest absolute",
+			value: `unix:///a`,
+			want:  "/a",
+		},
+		{
+			name:  "uppercase scheme",
+			value: `UNIX:///run/r.sock`,
+			want:  "/run/r.sock",
+		},
+		{
+			name:  "max length path",
+			value: "unix://" + maxPath,
+			want:  maxPath,
+		},
+		// Abstract names: stdlib translates "@" -> NUL identically on Linux
+		// and Windows, so the parser accepts them on every platform. Whether
+		// the kernel services the address is a runtime concern, not a parse
+		// error.
+		{
+			name:  "abstract",
+			value: `unix://@registry-cache`,
+			want:  "@registry-cache",
+		},
+		// Windows URL form (matches file:// convention): forward slashes,
+		// leading "/" before the drive letter. nativeUnixAddr translates
+		// this to a native Windows path before net.Dial; the parser stores
+		// it as-is, so these cases pass on every platform.
+		{
+			name:  "windows path",
+			value: `unix:///C:/ProgramData/registry-cache/reg.sock`,
+			want:  "/C:/ProgramData/registry-cache/reg.sock",
+		},
+		{
+			// Drive letters are case-insensitive on Windows; accept lowercase.
+			name:  "windows lowercase drive",
+			value: `unix:///c:/foo/bar.sock`,
+			want:  "/c:/foo/bar.sock",
+		},
+		{
+			name:  "windows non-C drive",
+			value: `unix:///D:/data/reg.sock`,
+			want:  "/D:/data/reg.sock",
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.linuxOnly && runtime.GOOS != "linux" {
-				t.Skipf("abstract sockets are only supported on Linux, runtime is %s", runtime.GOOS)
-			}
 			got, err := parseUnixDialAddr(tc.value)
 			if err != nil {
 				t.Fatalf("parseUnixDialAddr(%q): unexpected error %v", tc.value, err)
@@ -830,15 +871,6 @@ func TestParseUnixDialAddrInvalidDirect(t *testing.T) {
 				t.Fatalf("parseUnixDialAddr(%q): want error containing %q, got %v", tc.value, tc.wantErr, err)
 			}
 		})
-	}
-}
-
-func TestParseUnixDialAddrAbstractNonLinux(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		t.Skip("abstract socket guard only rejects on non-Linux platforms")
-	}
-	if _, err := parseUnixDialAddr("unix://@registry-cache"); err == nil {
-		t.Fatalf("expected error for abstract socket on %s, got nil", runtime.GOOS)
 	}
 }
 

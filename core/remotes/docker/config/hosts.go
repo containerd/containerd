@@ -28,7 +28,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -574,16 +573,29 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 	return result, nil
 }
 
-// maxUnixSocketPathLen is the size of sun_path in struct sockaddr_un. It is
-// taken from the platform's own sockaddr definition (108 on Linux, 104 on the
-// BSDs/macOS), so the limit matches the OS we build for.
+// maxUnixSocketPathLen is the size of sun_path in struct sockaddr_un, taken
+// from the platform's own sockaddr definition: 108 on Linux and Windows
+// (UNIX_PATH_MAX in afunix.h), 104 on the BSDs/macOS. The limit matches the
+// OS we build for.
 const maxUnixSocketPathLen = len(syscall.RawSockaddrUnix{}.Path)
 
 // parseUnixDialAddr validates a hosts.toml "dial_addr" and returns the unix
 // socket address for net.Dial("unix", ...).
-// Forms: "unix:///path/to.sock" (file path) or "unix://@name" (abstract socket,
-// Linux only). dial_addr is set by the operator, so the checks below aim to
-// catch typos early with a clear message.
+//
+// Accepted forms:
+//   - "unix:///absolute/path.sock" — pathname socket. Works on Linux, macOS,
+//     the BSDs, and modern Windows. On Windows the URL form is
+//     "unix:///C:/path/to.sock" (forward slashes, leading "/" before the
+//     drive letter, matching the file:// URI convention); the dialer
+//     converts to a native path before net.Dial.
+//   - "unix://@name" — abstract socket. The "@" syntax is accepted on every
+//     platform (Go's stdlib translates "@" to a leading NUL byte identically
+//     on Linux and Windows), but the abstract address family is a Linux
+//     kernel feature; on other platforms the connection attempt surfaces as
+//     a dial-time error from net.Dial rather than a parse error here.
+//
+// dial_addr is set by the operator, so the checks below aim to catch typos
+// early with a clear message.
 func parseUnixDialAddr(raw string) (string, error) {
 	// Extra spaces are usually a copy-paste slip.
 	if strings.TrimSpace(raw) != raw {
@@ -612,37 +624,52 @@ func parseUnixDialAddr(raw string) (string, error) {
 	}
 	// The address must fit the OS limit.
 	if len(addr) > maxUnixSocketPathLen {
-		return "", fmt.Errorf("dial_addr socket path is too long: %d bytes, max is %d: %q", len(addr), maxUnixSocketPathLen, raw)
+		return "", fmt.Errorf(
+			"dial_addr socket path is too long: %d bytes, max is %d: %q",
+			len(addr), maxUnixSocketPathLen, raw,
+		)
 	}
-	// A leading "@" means an abstract socket (Linux only).
+	// A leading "@" means an abstract socket. The parser accepts it on every
+	// platform; whether the kernel services it is a runtime concern.
 	if strings.HasPrefix(addr, "@") {
 		if addr == "@" {
 			return "", fmt.Errorf("dial_addr %q has \"@\" but no abstract socket name", raw)
-		}
-		if runtime.GOOS != "linux" {
-			return "", fmt.Errorf("dial_addr %q uses an abstract socket, which only works on Linux (this host is %s)", raw, runtime.GOOS)
 		}
 		return addr, nil
 	}
 	// Otherwise it is a file path and must be absolute.
 	if !strings.HasPrefix(addr, "/") {
-		return "", fmt.Errorf("dial_addr %q must be an absolute path like \"unix:///run/foo.sock\" (note the three slashes)", raw)
+		return "", fmt.Errorf(
+			"dial_addr %q must be an absolute path like \"unix:///run/foo.sock\" (note the three slashes)",
+			raw,
+		)
 	}
 	if strings.HasSuffix(addr, "/") {
-		return "", fmt.Errorf("dial_addr %q ends with \"/\"; it must point to a socket file, not a directory", raw)
+		return "", fmt.Errorf(
+			"dial_addr %q ends with \"/\"; it must point to a socket file, not a directory",
+			raw,
+		)
 	}
 	return addr, nil
 }
 
+// dialContextFunc is the http.Transport.DialContext signature. Named so the
+// unixDialContext signature stays readable.
+type dialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
+
 // unixDialContext returns a DialContext that ignores the requested network
-// and address and instead dials the configured unix socket.
-func unixDialContext(addr string, timeout time.Duration) func(ctx context.Context, network, address string) (net.Conn, error) {
+// and address and instead dials the configured unix socket. The URL-form
+// path stored by parseUnixDialAddr is translated to a native filesystem
+// path via nativeUnixAddr, which is a no-op on POSIX and strips the leading
+// "/" before a drive letter (plus filepath.FromSlash) on Windows.
+func unixDialContext(addr string, timeout time.Duration) dialContextFunc {
 	d := &net.Dialer{
 		Timeout:   timeout,
 		KeepAlive: 30 * time.Second,
 	}
+	native := nativeUnixAddr(addr)
 	return func(ctx context.Context, _, _ string) (net.Conn, error) {
-		return d.DialContext(ctx, "unix", addr)
+		return d.DialContext(ctx, "unix", native)
 	}
 }
 

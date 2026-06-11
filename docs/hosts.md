@@ -390,9 +390,20 @@ Accepted forms:
 
 - `unix:///absolute/path/to.sock` — pathname socket. Works on Linux, macOS,
   the BSDs, and Windows 10 / Server 2019 or newer (older Windows has no
-  `AF_UNIX` support).
-- `unix://@name` — abstract socket. Linux only; rejected at parse time on every
-  other platform (including all versions of Windows).
+  `AF_UNIX` support). On Windows the URL form is
+  `unix:///C:/path/to.sock` — forward slashes, with a leading `/` before
+  the drive letter — matching the convention `file://` URIs use for
+  Windows paths. The dialer converts this to a native filesystem path
+  (`C:\path\to.sock`) before connecting, so the listener should be bound
+  to the native form. Backslashes are also accepted inside the URL but
+  forward slashes are recommended because TOML basic strings (`"..."`)
+  interpret backslashes as escape characters (`\f`, `\r`, `\t`, etc.).
+- `unix://@name` — abstract socket. A Linux kernel feature. Go's standard
+  library translates the `@` prefix to a leading NUL byte identically on
+  Linux and Windows, so the parser accepts this form on every platform;
+  on platforms whose kernel does not service abstract addresses the
+  connection attempt surfaces as a dial-time error rather than a parse
+  error.
 
 `dial_addr` composes with `dial_timeout` (the timeout still applies to the
 unix dial).
@@ -411,6 +422,17 @@ server = "https://registry-1.docker.io"
 [host."https://registry-1.docker.io"]
   capabilities = ["pull", "resolve"]
   dial_addr = "unix:///run/registry-cache.sock"
+  dial_timeout = "5s"
+```
+
+On Windows the same configuration uses the drive-letter URL form:
+
+```toml
+server = "https://registry-1.docker.io"
+
+[host."https://registry-1.docker.io"]
+  capabilities = ["pull", "resolve"]
+  dial_addr = "unix:///C:/ProgramData/registry-cache/reg.sock"
   dial_timeout = "5s"
 ```
 

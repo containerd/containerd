@@ -217,12 +217,9 @@ server = "%s"
 // TestResolverDialAddrUnixSocket is an integration test: it serves a registry
 // on a real unix socket and checks that a host with dial_addr resolves over the
 // socket, not over TCP. dial_addr changes only the dial, so the host stays a
-// plain http:// entry.
+// plain http:// entry. Runs on Linux, macOS, the BSDs, and modern Windows
+// (where AF_UNIX is supported since Windows 10 1803 / Server 2019).
 func TestResolverDialAddrUnixSocket(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("unix socket dial_addr integration test is not run on Windows")
-	}
-
 	const (
 		name = "testname"
 		tag  = "latest"
@@ -261,7 +258,19 @@ func TestResolverDialAddrUnixSocket(t *testing.T) {
 		}
 	}()
 
-	resolveWith := func(t *testing.T, dialAddr string) error {
+	// dialAddrFor turns a native filesystem socket path into the URL-form path
+	// that goes after "unix://" in hosts.toml. On POSIX the two are identical;
+	// on Windows the native path is e.g. "C:\Users\…\reg.sock" and the URL form
+	// is "/C:/Users/…/reg.sock" (forward slashes, leading "/" before the drive
+	// letter — same form file:// URIs use for Windows paths).
+	dialAddrFor := func(sock string) string {
+		if runtime.GOOS == "windows" {
+			return "/" + filepath.ToSlash(sock)
+		}
+		return sock
+	}
+
+	resolveWith := func(t *testing.T, sock string) error {
 		dir := t.TempDir()
 		hostDir := filepath.Join(dir, base)
 		if err := os.MkdirAll(hostDir, 0755); err != nil {
@@ -271,7 +280,7 @@ func TestResolverDialAddrUnixSocket(t *testing.T) {
 [host."http://%s"]
   capabilities = ["pull", "resolve"]
   dial_addr = "unix://%s"
-`, base, dialAddr)
+`, base, dialAddrFor(sock))
 		if err := os.WriteFile(filepath.Join(hostDir, "hosts.toml"), []byte(hostTOML), 0644); err != nil {
 			t.Fatal(err)
 		}
