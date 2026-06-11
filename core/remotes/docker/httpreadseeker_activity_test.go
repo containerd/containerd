@@ -223,8 +223,8 @@ func TestHTTPReadSeekerActivityTrackerWithRealActivityTracker(t *testing.T) {
 	buf := make([]byte, 1024)
 	_, _ = hrs.Read(buf)
 
-	if activity.TimeSinceLastActivity() == 0 {
-		t.Error("TimeSinceLastActivity() should not be 0 after Read with activity tracker")
+	if activity.Stalled(5 * time.Second) {
+		t.Error("Stalled() should return false after Read with activity tracker")
 	}
 }
 
