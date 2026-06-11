@@ -17,6 +17,7 @@
 package docker
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -24,20 +25,27 @@ import (
 type Clock interface {
 	Now() time.Time
 	Since(time.Time) time.Duration
+	NewTicker(d time.Duration) Ticker
+}
+
+type Ticker interface {
+	C() <-chan time.Time
+	Stop()
 }
 
 type realClock struct{}
+type realTicker struct{ *time.Ticker }
 
-func (realClock) Now() time.Time {
-	return time.Now()
-}
-
-func (realClock) Since(t time.Time) time.Duration {
-	return time.Since(t)
-}
+func (realClock) Now() time.Time                   { return time.Now() }
+func (realClock) Since(t time.Time) time.Duration  { return time.Since(t) }
+func (realClock) NewTicker(d time.Duration) Ticker { return &realTicker{time.NewTicker(d)} }
+func (t *realTicker) C() <-chan time.Time          { return t.Ticker.C }
+func (t *realTicker) Stop()                        { t.Ticker.Stop() }
 
 type mockClock struct {
-	now int64
+	now        int64
+	mu         sync.Mutex
+	lastTicker *mockTicker
 }
 
 func (mc *mockClock) Now() time.Time {
@@ -51,6 +59,22 @@ func (mc *mockClock) Since(t time.Time) time.Duration {
 func (mc *mockClock) Advance(d time.Duration) {
 	atomic.AddInt64(&mc.now, int64(d))
 }
+
+func (mc *mockClock) NewTicker(d time.Duration) Ticker {
+	t := &mockTicker{ch: make(chan time.Time, 1)}
+	mc.mu.Lock()
+	mc.lastTicker = t
+	mc.mu.Unlock()
+	return t
+}
+
+type mockTicker struct {
+	ch chan time.Time
+}
+
+func (t *mockTicker) C() <-chan time.Time { return t.ch }
+func (t *mockTicker) Stop()               {}
+func (t *mockTicker) Tick()               { t.ch <- time.Time{} }
 
 type ActivityTrackerInterface interface {
 	Touch()

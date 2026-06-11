@@ -395,30 +395,30 @@ type pushWriter struct {
 
 	isManifest bool
 
-	expected      digest.Digest
-	tracker       StatusTracker
-	activity      ActivityTrackerInterface
-	deadlineClock Clock
+	expected digest.Digest
+	tracker  StatusTracker
+	activity ActivityTrackerInterface
+	clock    Clock
 }
 
 func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker StatusTracker, isManifest bool, activity ActivityTrackerInterface) *pushWriter {
-	var deadlineClock Clock = realClock{}
+	clock := Clock(realClock{})
 	if at, ok := activity.(*ActivityTracker); ok {
-		deadlineClock = at.clock
+		clock = at.clock
 	}
 
 	return &pushWriter{
-		base:          db,
-		ref:           ref,
-		expected:      expected,
-		tracker:       tracker,
-		activity:      activity,
-		deadlineClock: deadlineClock,
-		pipeC:         make(chan *activityPipeWriter, 1),
-		respC:         make(chan *http.Response, 1),
-		errC:          make(chan error, 1),
-		done:          make(chan struct{}),
-		isManifest:    isManifest,
+		base:       db,
+		ref:        ref,
+		expected:   expected,
+		tracker:    tracker,
+		activity:   activity,
+		clock:      clock,
+		pipeC:      make(chan *activityPipeWriter, 1),
+		respC:      make(chan *http.Response, 1),
+		errC:       make(chan error, 1),
+		done:       make(chan struct{}),
+		isManifest: isManifest,
 	}
 }
 
@@ -559,20 +559,21 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 		}
 	}
 
-	// Activity-aware timeout: wait up to 5 minutes with activity check every second
-	const totalTimeout = 5 * time.Minute
-	const activityWindow = 5 * time.Second
+	// Wait for server response. Use activity-based stall detection: if no
+	// data has flowed through the stream for 30s (matching the original
+	// ResponseHeaderTimeout), abort. Also respect ctx cancellation.
+	const stallWindow = 30 * time.Second
 	const tickerInterval = 1 * time.Second
 
-	ticker := time.NewTicker(tickerInterval)
+	ticker := pw.clock.NewTicker(tickerInterval)
 	defer ticker.Stop()
-
-	deadline := pw.deadlineClock.Now().Add(totalTimeout)
 
 	var resp *http.Response
 
 	for {
 		select {
+		case <-ctx.Done():
+			return ctx.Err()
 		case <-pw.done:
 			return io.ErrClosedPipe
 		case e := <-pw.errC:
@@ -585,14 +586,9 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 			if err := pw.replacePipe(p); err != nil {
 				return err
 			}
-			// Continue waiting for response - don't return!
-		case <-ticker.C:
-			if pw.activity != nil {
-				if pw.activity.Stalled(activityWindow) {
-					if pw.deadlineClock.Now().After(deadline) {
-						return fmt.Errorf("commit stalled for %v: %w", totalTimeout, context.DeadlineExceeded)
-					}
-				}
+		case <-ticker.C():
+			if pw.activity != nil && pw.activity.Stalled(stallWindow) {
+				return fmt.Errorf("no activity for %v during commit: %w", stallWindow, context.DeadlineExceeded)
 			}
 		}
 	}

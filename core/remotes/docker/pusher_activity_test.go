@@ -157,7 +157,7 @@ func TestCommitStalledTimeout(t *testing.T) {
 	}
 }
 
-func TestCommitCompletesBefore5Minutes(t *testing.T) {
+func TestCommitCompletesWhenResponseReceived(t *testing.T) {
 	tracker := NewActivityTracker(5 * time.Second)
 	statusTracker := NewInMemoryTracker()
 
@@ -190,7 +190,7 @@ func TestCommitCompletesBefore5Minutes(t *testing.T) {
 	case err := <-done:
 		assert.NoError(t, err)
 	case <-time.After(30 * time.Second):
-		t.Fatal("Commit should have completed within 5 minutes")
+		t.Fatal("Commit should have completed")
 	}
 }
 
@@ -356,6 +356,93 @@ func TestPushWriterCommitWithResponseBeforeStalled(t *testing.T) {
 	err := pw.Commit(ctx, 0, "")
 
 	assert.NoError(t, err)
+}
+
+func TestCommitStallTimeoutWithMockClock(t *testing.T) {
+	clk := &mockClock{now: time.Now().UnixNano()}
+	tracker := NewActivityTrackerWithClock(clk)
+	statusTracker := NewInMemoryTracker()
+
+	statusTracker.SetStatus("test-ref", Status{
+		Status: content.Status{
+			Ref:   "test-ref",
+			Total: 100,
+		},
+	})
+
+	pw := newPushWriter(nil, "test-ref", "", statusTracker, false, tracker)
+	pw.pipe = nil
+
+	tracker.Touch()
+
+	commitDone := make(chan error, 1)
+	started := make(chan struct{})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		close(started)
+		commitDone <- pw.Commit(ctx, 0, "")
+	}()
+
+	<-started
+	// Give Commit time to enter its select loop.
+	time.Sleep(50 * time.Millisecond)
+
+	// Advance mock clock past 30s stall window.
+	clk.Advance(31 * time.Second)
+
+	// Verify the tracker sees the stall.
+	require.True(t, tracker.Stalled(30*time.Second), "tracker should be stalled after 31s advance")
+
+	// Repeatedly tick until Commit responds or ctx expires.
+	clk.mu.Lock()
+	tick := clk.lastTicker
+	clk.mu.Unlock()
+	require.NotNil(t, tick)
+
+	commitErr := func() error {
+		for {
+			select {
+			case err := <-commitDone:
+				return err
+			default:
+			}
+			// Drain and re-tick.
+			select {
+			case <-tick.C():
+			default:
+			}
+			tick.Tick()
+			time.Sleep(time.Millisecond)
+		}
+	}()
+
+	require.Error(t, commitErr)
+	assert.Contains(t, commitErr.Error(), "no activity for 30s")
+}
+
+func TestCommitRespectsContextCancellation(t *testing.T) {
+	statusTracker := NewInMemoryTracker()
+
+	statusTracker.SetStatus("test-ref", Status{
+		Status: content.Status{
+			Ref:   "test-ref",
+			Total: 100,
+		},
+	})
+
+	// nil activity — no stall detection, only ctx cancellation.
+	pw := newPushWriter(nil, "test-ref", "", statusTracker, false, nil)
+	pw.pipe = nil
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	err := pw.Commit(ctx, 0, "")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
 func TestNewPushWriterWithActivity(t *testing.T) {
