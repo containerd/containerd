@@ -157,8 +157,29 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 				return nil, fmt.Errorf("content %v on remote: %w", desc.Digest, errdefs.ErrAlreadyExists)
 			}
 		} else if resp.StatusCode != http.StatusNotFound {
-			err := unexpectedResponseErr(resp)
+			// On 403, HEAD has no body — issue a follow-up GET to
+			// retrieve the registry's error details for diagnostics.
+			errResp := resp
+			if resp.StatusCode == http.StatusForbidden && req.method == http.MethodHead {
+				getReq := p.request(host, http.MethodGet, existCheck...)
+				getReq.header.Set("Accept", strings.Join([]string{desc.MediaType, `*/*`}, ", "))
+				if addErr := getReq.addNamespace(p.refspec.Hostname()); addErr == nil {
+					if getResp, getErr := getReq.doWithRetries(ctx, false); getErr == nil {
+						if getResp.StatusCode >= 400 {
+							errResp = getResp
+						} else {
+							getResp.Body.Close()
+						}
+					} else if getResp != nil {
+						getResp.Body.Close()
+					}
+				}
+			}
+			err := unexpectedResponseErr(errResp)
 			log.G(ctx).WithError(err).Debug("unexpected response")
+			if errResp != resp && errResp.Body != nil {
+				errResp.Body.Close()
+			}
 			resp.Body.Close()
 			return nil, err
 		}

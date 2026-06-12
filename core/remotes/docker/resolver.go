@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -340,11 +341,35 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					continue
 				}
 				if resp.StatusCode > 399 {
+					// On 403 Forbidden, HEAD responses carry no body so
+					// the error only shows the status code. Issue a
+					// follow-up GET to retrieve the registry's error body
+					// (e.g., "key vault access denied", IP restriction
+					// details) so users can diagnose the root cause.
+					errResp := resp
+					if resp.StatusCode == http.StatusForbidden && req.method == http.MethodHead {
+						getReq := base.request(host, http.MethodGet, u...)
+						if addErr := getReq.addNamespace(base.refspec.Hostname()); addErr == nil {
+							maps.Copy(getReq.header, r.resolveHeader)
+							if getResp, getErr := getReq.doWithRetries(ctx, false); getErr == nil {
+								if getResp.StatusCode >= 400 {
+									errResp = getResp
+								} else {
+									getResp.Body.Close()
+								}
+							} else if getResp != nil {
+								getResp.Body.Close()
+							}
+						}
+					}
 					if firstErrPriority < 3 {
-						firstErr = unexpectedResponseErr(resp)
+						firstErr = unexpectedResponseErr(errResp)
 						firstErrPriority = 3
 					}
-					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
+					if errResp != resp && errResp.Body != nil {
+						errResp.Body.Close()
+					}
+					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), errResp.Status)
 					continue // try another host
 				}
 				return "", ocispec.Descriptor{}, unexpectedResponseErr(resp)
