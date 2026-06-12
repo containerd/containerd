@@ -563,6 +563,17 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 
 			checkImagesEqual(t, &created, &testcase.original, "unexpected image on creation")
 
+			// Wait for the wall clock to advance past the creation timestamp
+			// before updating. Create and Update both stamp time.Now().UTC()
+			// (which strips the monotonic reading), and on platforms with a
+			// coarse timer resolution (e.g. Windows) two back-to-back stamps
+			// can be identical, making updatedat == createdat. Spinning here
+			// keeps the strict "updatedat after createdat" assertion below
+			// meaningful without depending on clock resolution.
+			for !time.Now().After(created.UpdatedAt) {
+				time.Sleep(time.Millisecond)
+			}
+
 			// Update
 			now = time.Now()
 			updated, err := store.Update(ctx, testcase.input, testcase.fieldpaths...)
