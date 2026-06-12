@@ -739,3 +739,78 @@ func Test_dockerPusher_push(t *testing.T) {
 		})
 	}
 }
+
+func TestPusherForbiddenGETFallbackForErrorBody(t *testing.T) {
+	// When the existence-check HEAD returns 403, the pusher should issue
+	// a follow-up GET to retrieve the registry's error body for diagnostics.
+	const errorMessage = "encryption key is disabled"
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			// HEAD: no body
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage,
+		"expected registry error body from GET fallback")
+	assert.Contains(t, err.Error(), "403")
+}
+
+func TestPusherForbiddenGETFallbackProxy(t *testing.T) {
+	// When the pusher is configured as a proxy (Host != image hostname),
+	// the GET fallback must include the ?ns= query parameter so the proxy
+	// can route the request to the correct upstream registry.
+	const errorMessage = "encryption key is disabled"
+
+	var gotNsParam string
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			if r.Method == http.MethodGet {
+				gotNsParam = r.URL.Query().Get("ns")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage)
+	assert.Equal(t, samplePusherHostname, gotNsParam,
+		"GET fallback on proxy must include ?ns= query parameter")
+}
