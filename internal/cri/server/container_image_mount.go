@@ -151,8 +151,20 @@ func (c *criService) mutateImageMount(
 			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 		}
 
+		mm := c.client.MountManager()
+		id := fmt.Sprintf("cri-image-mount-%s", target)
+		info, err := mm.Activate(ctx, id, mounts)
+		if err == nil {
+			mounts = info.System
+		} else if !errdefs.IsNotImplemented(err) {
+			return fmt.Errorf("failed to activate mounts %q: %w", target, err)
+		}
+
 		mounts = addVolatileOptionOnImageVolumeMount(mounts)
 		if err := mount.All(mounts, target); err != nil {
+			if err := mm.Deactivate(ctx, id); err != nil && !errdefs.IsNotImplemented(err) {
+				log.G(ctx).WithError(err).Errorf("failed to deactivate mounts %q", target)
+			}
 			return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
 		}
 	}
@@ -209,6 +221,13 @@ func (c *criService) cleanupImageMounts(
 		if err != nil {
 			return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
 		}
+
+		mm := c.client.MountManager()
+		id := fmt.Sprintf("cri-image-mount-%s", target)
+		if err := mm.Deactivate(ctx, id); err != nil && !errdefs.IsNotImplemented(err) {
+			log.G(ctx).WithError(err).Errorf("failed to deactivate mounts %q", target)
+		}
+
 		err = s.Remove(ctx, target)
 		if err != nil && !errdefs.IsNotFound(err) {
 			return fmt.Errorf("failed to removing snapshot: %w", err)
