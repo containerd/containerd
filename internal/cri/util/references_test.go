@@ -30,6 +30,7 @@ func TestParseImageReferences(t *testing.T) {
 		"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		"gcr.io/library/busybox:1.2",
 		"sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		"busybox:fixed",
 		"arbitrary-ref",
 	}
 	expectedTags := []string{

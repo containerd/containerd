@@ -17,15 +17,42 @@
 package util
 
 import (
+	"strings"
+
 	reference "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 )
 
+// hasExplicitRegistry checks if the reference has an explicit registry domain.
+func hasExplicitRegistry(ref string) bool {
+	parsed, err := reference.ParseAnyReference(ref)
+	if err != nil {
+		return false
+	}
+	if named, ok := parsed.(reference.Named); ok {
+		domain := reference.Domain(named)
+		if domain == "" {
+			return false
+		}
+		// If the extracted domain is not present in the original reference,
+		// it means the library auto-filled it (e.g., "busybox" -> "docker.io/...").
+		return strings.Contains(ref, domain)
+	}
+	return false
+}
+
 // ParseImageReferences parses a list of arbitrary image references and returns
-// the repotags and repodigests
+// the repotags and repodigests. It filters out references without an explicit registry.
 func ParseImageReferences(refs []string) ([]string, []string) {
 	var tags, digests []string
 	for _, ref := range refs {
+		// CRI should only see images with fully-qualified registries.
+		// We intercept the raw string here before any normalization happens,
+		// to prevent "short tags" (like busybox:fixed) from being shown with
+		// an automatic "docker.io" prefix.
+		if !hasExplicitRegistry(ref) {
+			continue
+		}
 		parsed, err := reference.ParseAnyReference(ref)
 		if err != nil {
 			continue
