@@ -51,9 +51,9 @@ func (w *erofsWriter) planLayout(root *erofsEntry) {
 		e.xattrSize = calcXattrSize(e)
 
 		// Decide compact (32B) vs extended (64B) inode.
+		_, mtimeOK := w.compactMtime(e)
 		e.compact = e.uid <= 0xFFFF && e.gid <= 0xFFFF &&
-			e.nlink <= 0xFFFF && e.size <= 0xFFFFFFFF &&
-			e.mtime == w.buildTime && e.mtimeNs == 0
+			e.nlink <= 0xFFFF && e.size <= 0xFFFFFFFF && mtimeOK
 
 		inodeSize := disk.SizeInodeExtended
 		if e.compact {
