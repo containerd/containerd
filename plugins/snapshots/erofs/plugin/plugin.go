@@ -64,6 +64,12 @@ func init() {
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
+			// Also advertise support for the EROFS-featured platform so that
+			// image.Unpack with a converted EROFS image (os.features=["erofs"])
+			// passes the snapshotter platform support check.
+			erofsSpec := platforms.DefaultSpec()
+			erofsSpec.OSFeatures = []string{"erofs"}
+			ic.Meta.Platforms = append(ic.Meta.Platforms, erofsSpec)
 
 			config, ok := ic.Config.(*Config)
 			if !ok {

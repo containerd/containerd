@@ -14,152 +14,50 @@
    limitations under the License.
 */
 
+// This file contains the public erofsutils API. All conversion paths now use
+// pure-Go implementations via go-erofs + continuity/tarconv; no external
+// process is spawned.
 package erofsutils
 
 import (
-	"bytes"
-	"context"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/mount"
 )
 
 // IsErofsMediaType returns true if the media type is an EROFS layer type.
+// Recognises both the canonical application/vnd.erofs[+zstd] types and the
+// legacy application/vnd.erofs.layer.v1[+zstd] aliases.
 func IsErofsMediaType(mt string) bool {
-	return strings.HasPrefix(mt, "application/vnd.erofs.layer")
+	return strings.HasPrefix(mt, "application/vnd.erofs")
 }
 
-func mkfsEnv(layerPath string) []string {
-	if runtime.GOOS != "windows" {
-		return nil
-	}
-	env := os.Environ()
-	tmpdir := filepath.Dir(layerPath)
-	env = append(env, "TMPDIR="+tmpdir)
-	return env
-}
-
-func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {
-	args := append([]string{"--tar=f", "--aufs", "--quiet", "-Enoinline_data"}, mkfsExtraOpts...)
-	if uuid != "" {
-		args = append(args, []string{"-U", uuid}...)
-	}
-	args = append(args, layerPath)
-	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
-	cmd.Stdin = r
-	cmd.Env = mkfsEnv(layerPath)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("erofs apply failed: %s: %w", out, err)
-	}
-	log.G(ctx).Debugf("running %s %s %v", cmd.Path, cmd.Args, string(out))
-	return nil
-}
-
-// GenerateTarIndexAndAppendTar calculates tar index using --tar=i option
-// and appends the original tar content to create a combined EROFS layer.
-//
-// The `--tar=i` option instructs mkfs.erofs to only generate the tar index
-// for the tar content. The resulting file structure is:
-// [Tar index][Original tar content]
-func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {
-	// Create a temporary file for storing the tar content
-	tarFile, err := os.CreateTemp("", "erofs-tar-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary tar file: %w", err)
-	}
-	defer os.Remove(tarFile.Name())
-	defer tarFile.Close()
-
-	// Use TeeReader to process the input once while saving it to disk
-	teeReader := io.TeeReader(r, tarFile)
-
-	// Generate tar index directly to layerPath using --tar=i option
-	args := append([]string{"--tar=i", "--aufs", "--quiet"}, mkfsExtraOpts...)
-	if uuid != "" {
-		args = append(args, []string{"-U", uuid}...)
-	}
-	args = append(args, layerPath)
-	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
-	cmd.Stdin = teeReader
-	cmd.Env = mkfsEnv(layerPath)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("tar index generation failed with command 'mkfs.erofs %s': %s: %w",
-			strings.Join(args, " "), out, err)
-	}
-	log.G(ctx).Debugf("running %s %v %s", cmd.Path, cmd.Args, string(out))
-
-	// Open layerPath for appending
-	f, err := os.OpenFile(layerPath, os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open layer file for appending: %w", err)
-	}
-	defer f.Close()
-
-	// Rewind the temporary file
-	if _, err := tarFile.Seek(0, 0); err != nil {
-		return fmt.Errorf("failed to seek to the beginning of tar file: %w", err)
-	}
-
-	// Append tar content
-	if _, err := io.Copy(f, tarFile); err != nil {
-		return fmt.Errorf("failed to append tar to layer: %w", err)
-	}
-
-	log.G(ctx).Infof("Successfully generated EROFS layer with tar index and tar content: %s", layerPath)
-
-	return nil
-}
-
-// AddDefaultMkfsOpts adds default options for mkfs.erofs
-func AddDefaultMkfsOpts(mkfsExtraOpts []string) []string {
-	// Check if -b argument is already present
-	for _, opt := range mkfsExtraOpts {
-		if strings.HasPrefix(opt, "-b") {
-			return mkfsExtraOpts
-		}
-	}
-
-	// Default to a 4K block size so images mount on any page size.
-	return append([]string{"-b4096"}, mkfsExtraOpts...)
-}
-
-func ConvertErofs(ctx context.Context, layerPath string, srcDir string, mkfsExtraOpts []string) error {
-	args := append([]string{"--quiet", "-Enoinline_data"}, mkfsExtraOpts...)
-	args = append(args, layerPath, srcDir)
-	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
-	cmd.Env = mkfsEnv(layerPath)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("erofs apply failed: %s: %w", out, err)
-	}
-	log.G(ctx).Infof("running %s %s %v", cmd.Path, cmd.Args, string(out))
-	return nil
+// SupportGenerateFromTar reports whether the tar-index conversion mode is
+// available. The pure-Go implementation is always available, so this always
+// returns (true, nil).
+func SupportGenerateFromTar() (bool, error) {
+	return true, nil
 }
 
 // MountsToLayer returns the snapshot layer directory in order to generate
-// EROFS-formatted blobs;
+// EROFS-formatted blobs.
 //
-// The candidate will be checked with ".erofslayer" to make sure this active
-// snapshot is really generated by the EROFS snapshotter instead of others.
+// The candidate directory is checked for ".erofslayer" to confirm that this
+// active snapshot was created by the EROFS snapshotter rather than another
+// snapshotter.
 func MountsToLayer(mounts []mount.Mount) (string, error) {
 	var layer string
 
-	// If mount[0].Type is prefixed with "mkfs/", it should be always the snapshot layer
+	// If mount[0].Type is prefixed with "mkfs/", it is always the snapshot layer.
 	if strings.HasPrefix(mounts[0].Type, "mkfs/") {
 		layer = filepath.Dir(mounts[0].Source)
 	} else {
-		// Otherwise, let's check the last mount entry
+		// Otherwise check the last mount entry.
 		mnt := mounts[len(mounts)-1]
 		mt := strings.Split(mnt.Type, "/")
 
@@ -174,7 +72,7 @@ func MountsToLayer(mounts []mount.Mount) (string, error) {
 					case "upperdir":
 						layer = filepath.Dir(v)
 					case "lowerdir":
-						// Use the first mount source for the top lower layer
+						// Use the first mount source for the top lower layer.
 						topLower = filepath.Dir(mounts[0].Source)
 					}
 				}
@@ -189,21 +87,9 @@ func MountsToLayer(mounts []mount.Mount) (string, error) {
 			return "", fmt.Errorf("invalid filesystem type %q for erofs differ: %w", mnt.Type, errdefs.ErrNotImplemented)
 		}
 	}
-	// If the layer is not prepared by the EROFS snapshotter, fall back to the next differ
+	// If the layer is not prepared by the EROFS snapshotter, fall back to the next differ.
 	if _, err := os.Stat(filepath.Join(layer, ".erofslayer")); err != nil {
 		return "", fmt.Errorf("mount layer type must be erofs-layer: %w", errdefs.ErrNotImplemented)
 	}
 	return layer, nil
-}
-
-// SupportGenerateFromTar checks if the installed version of mkfs.erofs supports
-// the tar mode (--tar option).
-func SupportGenerateFromTar() (bool, error) {
-	cmd := exec.Command("mkfs.erofs", "--help")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("failed to run mkfs.erofs --help: %w", err)
-	}
-
-	return bytes.Contains(output, []byte("--tar=")), nil
 }
