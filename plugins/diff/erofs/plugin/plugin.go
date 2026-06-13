@@ -32,7 +32,14 @@ import (
 
 // Config represents configuration for the erofs plugin.
 type Config struct {
-	// MkfsOptions are extra options used for the applier
+	// UseMkfs builds EROFS layers with mkfs.erofs from erofs-utils instead of
+	// the built-in Go converter. The differ is disabled when mkfs.erofs is
+	// missing or does not support tar mode.
+	UseMkfs bool `toml:"use_mkfs"`
+
+	// MkfsOptions are extra options for mkfs.erofs. Setting them also
+	// selects mkfs.erofs, as UseMkfs does, so configurations from releases
+	// that always used mkfs.erofs keep their behavior.
 	MkfsOptions []string `toml:"mkfs_options"`
 
 	// EnableTarIndex enables the tar index mode where the index is generated
@@ -44,6 +51,11 @@ type Config struct {
 	EnableDmverity bool `toml:"enable_dmverity"`
 }
 
+// useMkfs reports whether the differ builds layers with mkfs.erofs.
+func (c *Config) useMkfs() bool {
+	return c.UseMkfs || len(c.MkfsOptions) > 0
+}
+
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.DiffPlugin,
@@ -53,12 +65,16 @@ func init() {
 		},
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
-			tarModeSupported, err := erofsutils.SupportGenerateFromTar()
-			if err != nil {
-				return nil, fmt.Errorf("failed to check mkfs.erofs availability: %v: %w", err, plugin.ErrSkipPlugin)
-			}
-			if !tarModeSupported {
-				return nil, fmt.Errorf("mkfs.erofs does not support tar mode (--tar option), disabling erofs differ: %w", plugin.ErrSkipPlugin)
+			config := ic.Config.(*Config)
+			useMkfs := config.useMkfs()
+			if useMkfs {
+				tarModeSupported, err := erofsutils.MkfsSupportsTar()
+				if err != nil {
+					return nil, fmt.Errorf("failed to check mkfs.erofs availability: %v: %w", err, plugin.ErrSkipPlugin)
+				}
+				if !tarModeSupported {
+					return nil, fmt.Errorf("mkfs.erofs does not support tar mode (--tar option), disabling erofs differ: %w", plugin.ErrSkipPlugin)
+				}
 			}
 
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
@@ -73,12 +89,11 @@ func init() {
 			p.OSFeatures = []string{"erofs"}
 			ic.Meta.Platforms = append(ic.Meta.Platforms, p)
 			cs := md.(*metadata.DB).ContentStore()
-			config := ic.Config.(*Config)
 
 			var opts []erofs.DifferOpt
 
-			if len(config.MkfsOptions) > 0 {
-				opts = append(opts, erofs.WithMkfsOptions(config.MkfsOptions))
+			if useMkfs {
+				opts = append(opts, erofs.WithMkfs(), erofs.WithMkfsOptions(config.MkfsOptions))
 			}
 
 			if config.EnableTarIndex {

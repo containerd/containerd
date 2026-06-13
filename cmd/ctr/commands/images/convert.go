@@ -60,11 +60,11 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		},
 		&cli.StringFlag{
 			Name:  "erofs-compressors",
-			Usage: "Specify compression algorithm list when converting EROFS layers",
+			Usage: "Specify compression algorithm list when converting EROFS layers (uses mkfs.erofs)",
 		},
 		&cli.StringFlag{
 			Name:  "erofs-mkfs-options",
-			Usage: "Extra mkfs options applied when converting EROFS layers. (e.g. '-Efragments,dedupe')",
+			Usage: "Extra mkfs options applied when converting EROFS layers (e.g. '-Efragments,dedupe'); converts with mkfs.erofs",
 		},
 		// platform flags
 		&cli.StringSliceFlag{
