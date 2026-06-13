@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -61,11 +60,6 @@ const (
 )
 
 func newSnapshotter(t *testing.T, opts ...Opt) func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-	_, err := exec.LookPath("mkfs.erofs")
-	if err != nil {
-		t.Skipf("could not find mkfs.erofs: %v", err)
-	}
-
 	if !FindErofs() {
 		t.Skip("check for erofs kernel support failed, skipping test")
 	}
@@ -285,10 +279,9 @@ func TestErofsDifferWithTarIndexMode(t *testing.T) {
 		t.Skip("check for erofs kernel support failed, skipping test")
 	}
 
-	// Check if mkfs.erofs supports tar index mode
 	supported, err := erofsutils.SupportGenerateFromTar()
 	if err != nil || !supported {
-		t.Skip("mkfs.erofs does not support tar mode, skipping tar index test")
+		t.Skip("EROFS tar index mode not available, skipping tar index test")
 	}
 
 	tempDir := t.TempDir()
@@ -394,21 +387,40 @@ func TestErofsDifferWithTarIndexMode(t *testing.T) {
 
 	t.Logf("EROFS layer file created with tar index mode: %s (%d bytes)", layerPath, stat.Size())
 
+	// The file data is in a separate data device next to the layer blob.
+	devicePath := erofsutils.DevicePath(filepath.Dir(layerPath), 0)
+	devices, err := erofsutils.LayerDevices(filepath.Dir(layerPath))
+	require.NoError(t, err)
+	require.Equal(t, []string{devicePath}, devices)
+
 	// Create a view to verify the content
 	viewKey := "test-view"
 	viewMounts, err := s.View(ctx, viewKey, commitKey)
 	if err != nil {
 		t.Fatal(err)
 	}
+	require.Len(t, viewMounts, 1)
+	assert.Equal(t, "erofs", viewMounts[0].Type)
+	assert.Equal(t, layerPath, viewMounts[0].Source)
+	assert.Contains(t, viewMounts[0].Options, "device="+devicePath)
 
-	viewTarget := filepath.Join(tempDir, viewKey)
-	if err := os.MkdirAll(viewTarget, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := mount.All(viewMounts, viewTarget); err != nil {
-		t.Fatal(err)
-	}
-	defer testutil.Unmount(t, viewTarget)
+	// The mount manager's erofs handler picks a file-backed mount where the
+	// kernel supports one and attaches loop devices for the image and its data
+	// device otherwise.
+	db, err := bolt.Open(filepath.Join(tempDir, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	defer db.Close()
+	mgr, err := mountmanager.NewManager(db, filepath.Join(tempDir, "mount-manager"),
+		mountmanager.WithMountHandler("erofs", erofsmount.NewErofsMountHandler()))
+	require.NoError(t, err)
+	mctx := namespaces.WithNamespace(ctx, "test")
+	activeInfo, err := mgr.Activate(mctx, "test-view-mount", viewMounts)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, mgr.Deactivate(mctx, "test-view-mount"))
+	}()
+	require.Len(t, activeInfo.Active, 1)
+	viewTarget := activeInfo.Active[0].MountPoint
 
 	// Verify we can read the original test data
 	testData, err := os.ReadFile(filepath.Join(viewTarget, "test-file.txt"))
@@ -478,7 +490,7 @@ func TestCreateErofsMount(t *testing.T) {
 	}
 
 	t.Run("creates regular erofs mount", func(t *testing.T) {
-		m, err := s.createErofsMount(layerBlob)
+		m, err := s.createErofsMount(layerBlob, nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "erofs", m.Type)
@@ -491,7 +503,7 @@ func TestCreateErofsMount(t *testing.T) {
 		s.dmverityMode = "on"
 		createDmverityMetadata(t, layerBlob)
 
-		m, err := s.createErofsMount(layerBlob)
+		m, err := s.createErofsMount(layerBlob, nil)
 		require.NoError(t, err)
 		// Mount type is always "erofs" - dm-verity detection happens in mount handler
 		assert.Equal(t, "erofs", m.Type)
@@ -510,7 +522,7 @@ func TestCreateErofsMount(t *testing.T) {
 
 		s.dmverityMode = "off"
 
-		m, err := s.createErofsMount(layerBlob)
+		m, err := s.createErofsMount(layerBlob, nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "erofs", m.Type)
@@ -542,7 +554,7 @@ func TestDmverityEndToEnd(t *testing.T) {
 			testDmverityEndToEndWithMode(t, true)
 		})
 	} else {
-		t.Logf("Skipping tar index mode test: mkfs.erofs does not support tar mode")
+		t.Logf("Skipping tar index mode test: EROFS tar index mode not available")
 	}
 }
 

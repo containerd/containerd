@@ -23,7 +23,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,20 +57,33 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 		return mount.ActiveMount{}, errdefs.ErrNotImplemented
 	}
 
-	var dmverityDevice string
+	// dmverityDevices lists the dm-verity devices this call created, closed
+	// again if the mount fails.
+	var dmverityDevices []string
 	defer func() {
-		if retErr == nil || dmverityDevice == "" {
+		if retErr == nil {
 			return
 		}
-		dmverity.Close(dmverityDevice)
+		for _, name := range dmverityDevices {
+			dmverity.Close(name)
+		}
 	}()
 
-	// Parse dm-verity metadata path from mount options
+	// Parse dm-verity metadata paths from mount options
 	metadataPath := ""
+	deviceMetadata := map[int]string{}
 	for _, opt := range m.Options {
-		if path, ok := strings.CutPrefix(opt, "X-containerd.dmverity="); ok {
+		if path, ok := strings.CutPrefix(opt, dmverity.MountOption); ok {
 			metadataPath = path
-			break
+			continue
+		}
+		if rest, ok := strings.CutPrefix(opt, dmverity.DeviceMountOption); ok {
+			index, path, ok := strings.Cut(rest, "=")
+			n, err := strconv.Atoi(index)
+			if !ok || err != nil || n < 0 {
+				return mount.ActiveMount{}, fmt.Errorf("invalid mount option %q: %w", opt, errdefs.ErrInvalidArgument)
+			}
+			deviceMetadata[n] = path
 		}
 	}
 
@@ -84,8 +99,10 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 			return mount.ActiveMount{}, fmt.Errorf("failed to read dm-verity metadata from %s: %w", metadataPath, err)
 		}
 
-		devicePath, cleanupName, err := setupDmVerityDevice(ctx, m.Source, mp, metadata)
-		dmverityDevice = cleanupName
+		devicePath, cleanupName, err := setupDmVerityDevice(ctx, m.Source, dmverityDeviceName(m.Source, mp), metadata)
+		if cleanupName != "" {
+			dmverityDevices = append(dmverityDevices, cleanupName)
+		}
 		if err != nil {
 			return mount.ActiveMount{}, err
 		}
@@ -93,12 +110,36 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 	}
 
 	filteredOptions := make([]string, 0, len(m.Options))
+	deviceIndex := 0
 	for _, v := range m.Options {
 		// Skip loop option (handled by loop device setup) and dmverity options (already processed)
-		if v == "loop" || strings.HasPrefix(v, "X-containerd.dmverity=") {
+		if v == "loop" || strings.HasPrefix(v, dmverity.MountOption) || strings.HasPrefix(v, dmverity.DeviceMountOption) {
 			continue
 		}
+		if source, ok := strings.CutPrefix(v, "device="); ok {
+			if metadataPath, ok := deviceMetadata[deviceIndex]; ok {
+				delete(deviceMetadata, deviceIndex)
+				metadata, err := dmverity.ReadMetadata(metadataPath)
+				if err != nil {
+					return mount.ActiveMount{}, fmt.Errorf("failed to read dm-verity metadata from %s: %w", metadataPath, err)
+				}
+				devicePath, cleanupName, err := setupDmVerityDevice(ctx, source, dataDeviceDmverityName(mp, deviceIndex, source), metadata)
+				if cleanupName != "" {
+					dmverityDevices = append(dmverityDevices, cleanupName)
+				}
+				if err != nil {
+					return mount.ActiveMount{}, err
+				}
+				v = "device=" + devicePath
+			}
+			deviceIndex++
+		}
 		filteredOptions = append(filteredOptions, v)
+	}
+	// Verity requested for a device the mount does not have would otherwise
+	// go unenforced.
+	if len(deviceMetadata) > 0 {
+		return mount.ActiveMount{}, fmt.Errorf("dm-verity metadata given for %d devices the mount does not have (it has %d): %w", len(deviceMetadata), deviceIndex, errdefs.ErrInvalidArgument)
 	}
 	m.Options = filteredOptions
 
@@ -106,27 +147,45 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 		return mount.ActiveMount{}, err
 	}
 
+	// A file-backed mount takes only regular files and a block-backed one only
+	// block devices, for the source and every data device alike. Once
+	// dm-verity has put a block device among them, the remaining files are
+	// attached as loop devices.
+	hasBlockDevice := isBlockDevice(m.Source)
+	for _, v := range m.Options {
+		if after, ok := strings.CutPrefix(v, "device="); ok && isBlockDevice(after) {
+			hasBlockDevice = true
+		}
+	}
+
 	err := error(unix.ENOTBLK)
-	if !forceloop {
+	if !forceloop && !hasBlockDevice {
 		// Try to use file-backed mount feature if available (Linux 6.12+) first
 		err = doMount(m, mp)
+		if err == nil {
+			log.G(ctx).WithField("source", m.Source).Debug("mounted erofs file-backed")
+		}
 	}
 	if errors.Is(err, unix.ENOTBLK) {
 		var loops []*os.File
 
 		// Never try to mount with raw files anymore if tried
-		forceloop = true
+		if !hasBlockDevice {
+			forceloop = true
+		}
 		params := mount.LoopParams{
 			Readonly:  true,
 			Autoclear: true,
 		}
 		// set up all loop devices
-		loop, err := mount.SetupLoop(m.Source, params)
-		if err != nil {
-			return mount.ActiveMount{}, err
+		if !isBlockDevice(m.Source) {
+			loop, err := mount.SetupLoop(m.Source, params)
+			if err != nil {
+				return mount.ActiveMount{}, err
+			}
+			m.Source = loop.Name()
+			loops = append(loops, loop)
 		}
-		m.Source = loop.Name()
-		loops = append(loops, loop)
 		defer func() {
 			for _, loop := range loops {
 				loop.Close()
@@ -134,8 +193,9 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 		}()
 
 		for i, v := range m.Options {
-			// Convert raw files in `device=` into loop devices too
-			if after, ok := strings.CutPrefix(v, "device="); ok {
+			// Convert raw files in `device=` into loop devices too. A
+			// dm-verity device is already a block device.
+			if after, ok := strings.CutPrefix(v, "device="); ok && !isBlockDevice(after) {
 				loop, err := mount.SetupLoop(after, params)
 				if err != nil {
 					return mount.ActiveMount{}, err
@@ -148,6 +208,7 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 		if err != nil {
 			return mount.ActiveMount{}, err
 		}
+		log.G(ctx).WithField("source", m.Source).Debug("mounted erofs through loop devices")
 	} else if err != nil {
 		return mount.ActiveMount{}, err
 	}
@@ -175,16 +236,32 @@ func dmverityDeviceName(source, mountpoint string) string {
 	return "containerd-erofs-" + hex.EncodeToString(sum[:16])
 }
 
-// setupDmVerityDevice creates or reuses a dm-verity device for the given EROFS source.
-// It returns the device path to mount from, and a cleanup name (non-empty only when
-// a new device was created, so the caller can close it on error).
-func setupDmVerityDevice(ctx context.Context, source, mountpoint string, metadata *dmverity.DmverityMetadata) (devicePath string, cleanupName string, err error) {
+// dataDeviceDmverityPrefix is the name prefix shared by the dm-verity devices
+// of every data device of the mount at mountpoint. Unmount finds them by it:
+// unlike the source, a data device does not show in the mount table.
+func dataDeviceDmverityPrefix(mountpoint string) string {
+	sum := sha256.Sum256([]byte(mountpoint))
+	return "containerd-erofs-" + hex.EncodeToString(sum[:16]) + "-d"
+}
+
+// dataDeviceDmverityName names the dm-verity device for the data device at
+// index of the mount at mountpoint. The source is part of the name for the
+// same reason as in dmverityDeviceName.
+func dataDeviceDmverityName(mountpoint string, index int, source string) string {
+	sum := sha256.Sum256([]byte(source))
+	return fmt.Sprintf("%s%d-%s", dataDeviceDmverityPrefix(mountpoint), index, hex.EncodeToString(sum[:8]))
+}
+
+// setupDmVerityDevice creates or reuses the dm-verity device deviceName for the
+// given EROFS source. It returns the device path to mount from, and a cleanup
+// name (non-empty only when a new device was created, so the caller can close
+// it on error).
+func setupDmVerityDevice(ctx context.Context, source, deviceName string, metadata *dmverity.DmverityMetadata) (devicePath string, cleanupName string, err error) {
 	supported, err := dmverity.IsSupported()
 	if err != nil || !supported {
 		return "", "", fmt.Errorf("layer requires dm-verity but system doesn't support it (dm_verity module not loaded): %w", err)
 	}
 
-	deviceName := dmverityDeviceName(source, mountpoint)
 	devicePath = dmverity.DevicePath(deviceName)
 
 	log.G(ctx).WithFields(log.Fields{
@@ -233,6 +310,12 @@ func waitForDevice(devicePath string) error {
 	return nil
 }
 
+// isBlockDevice reports whether path names a block device, following links.
+func isBlockDevice(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode()&os.ModeDevice != 0 && fi.Mode()&os.ModeCharDevice == 0
+}
+
 func doMount(m mount.Mount, target string) error {
 	if err := fsmount.Fsmount(m, target); err != nil {
 		// Fall back to traditional mount() if fsmount syscall not available (Linux < 5.2)
@@ -257,6 +340,16 @@ func (h *erofsMountHandler) Unmount(ctx context.Context, path string) error {
 	}
 
 	err = mount.Unmount(path, 0)
+
+	// The data devices' dm-verity devices are released once the mount is
+	// gone. Closing one still in use fails and leaves it in place.
+	dataDevices, _ := filepath.Glob(dmverity.DevicePath(dataDeviceDmverityPrefix(path) + "*"))
+	for _, p := range dataDevices {
+		name := filepath.Base(p)
+		if closeErr := dmverity.Close(name); closeErr != nil {
+			log.G(ctx).WithError(closeErr).WithField("device", name).Debug("unable to close dm-verity device")
+		}
+	}
 
 	if deviceName != "" {
 		log.G(ctx).WithFields(log.Fields{

@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/images/converter"
@@ -57,14 +56,6 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		&cli.StringFlag{
 			Name:  "erofs",
 			Usage: "Convert layers to EROFS format, must specify 'raw' or 'zstd' (e.g. --erofs raw, --erofs zstd)",
-		},
-		&cli.StringFlag{
-			Name:  "erofs-compressors",
-			Usage: "Specify compression algorithm list when converting EROFS layers",
-		},
-		&cli.StringFlag{
-			Name:  "erofs-mkfs-options",
-			Usage: "Extra mkfs options applied when converting EROFS layers. (e.g. '-Efragments,dedupe')",
 		},
 		// platform flags
 		&cli.StringSliceFlag{
@@ -109,13 +100,6 @@ When '--all-platforms' is given all images in a manifest list must be available.
 				erofsOpts = append(erofsOpts, erofs.WithBlobCompression("zstd"))
 			default:
 				return fmt.Errorf("unsupported erofs format %q, supported: raw, zstd", cmd.String("erofs"))
-			}
-			if compressors := cmd.String("erofs-compressors"); compressors != "" {
-				erofsOpts = append(erofsOpts, erofs.WithCompressors(compressors))
-			}
-			if mkfsOptsStr := cmd.String("erofs-mkfs-options"); mkfsOptsStr != "" {
-				mkfsOpts := strings.Fields(mkfsOptsStr)
-				erofsOpts = append(erofsOpts, erofs.WithMkfsOptions(mkfsOpts))
 			}
 			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(erofs.LayerConvertFunc(erofsOpts...)))
 			convertOpts = append(convertOpts, converter.WithUpdateManifest(erofs.UpdateManifestPlatform))

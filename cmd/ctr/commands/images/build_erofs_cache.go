@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
@@ -46,20 +45,12 @@ diffID-keyed erofs blobs (<cache_dir>/<algorithm>/<xx>/<hex>.erofs, where <xx> i
 the first two characters of <hex>) for the erofs
 snapshotter's layer_content_caches. Layers are read from the content store; no
 converted image is produced. The directory can then be synced to the read-only
-location the fleet mounts. Requires mkfs.erofs.
+location the fleet mounts.
 
 Pass --dmverity to also generate a dm-verity hash tree and .dmverity sidecar for
 each blob (Linux only); this is required when the snapshotter runs with
 dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "compressors",
-			Usage: "EROFS per-block compression algorithm(s), e.g. 'lz4', 'deflate', 'zstd'; empty means uncompressed",
-		},
-		&cli.StringFlag{
-			Name:  "mkfs-options",
-			Usage: "Extra mkfs.erofs options (e.g. '-Efragments,dedupe')",
-		},
 		&cli.StringFlag{
 			Name:  "platform",
 			Usage: "Cache layers for a specific platform (default: host platform)",
@@ -86,14 +77,6 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 			platform = platforms.Only(parsed)
 		}
 
-		var opts []erofs.ConvertOpt
-		if c := cmd.String("compressors"); c != "" {
-			opts = append(opts, erofs.WithCompressors(c))
-		}
-		if m := cmd.String("mkfs-options"); m != "" {
-			opts = append(opts, erofs.WithMkfsOptions(strings.Fields(m)))
-		}
-
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -105,7 +88,7 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 			return err
 		}
 
-		if err := buildCache(ctx, client.ContentStore(), img.Target, platform, cacheDir, cmd.Bool("dmverity"), opts...); err != nil {
+		if err := buildCache(ctx, client.ContentStore(), img.Target, platform, cacheDir, cmd.Bool("dmverity")); err != nil {
 			if errdefs.IsNotFound(err) {
 				return fmt.Errorf("fetch the image content first, e.g. `ctr content fetch %s`: %w", ref, err)
 			}
@@ -124,7 +107,7 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 // diffID, it matches what the runtime looks up when pulling the original image,
 // and layers shared across images converge on one blob. When withDmverity is set
 // a dm-verity hash tree and .dmverity sidecar are also produced per blob.
-func buildCache(ctx context.Context, cs content.Store, image ocispec.Descriptor, platform platforms.MatchComparer, cacheDir string, withDmverity bool, opts ...erofs.ConvertOpt) error {
+func buildCache(ctx context.Context, cs content.Store, image ocispec.Descriptor, platform platforms.MatchComparer, cacheDir string, withDmverity bool) error {
 	manifest, err := images.Manifest(ctx, cs, image, platform)
 	if err != nil {
 		return fmt.Errorf("failed to resolve manifest: %w", err)
@@ -134,7 +117,7 @@ func buildCache(ctx context.Context, cs content.Store, image ocispec.Descriptor,
 		if !images.IsLayerType(layer.MediaType) || erofsutils.IsErofsMediaType(layer.MediaType) || images.IsNonDistributable(layer.MediaType) {
 			continue
 		}
-		if err := buildLayer(ctx, cs, layer, cacheDir, withDmverity, opts...); err != nil {
+		if err := buildLayer(ctx, cs, layer, cacheDir, withDmverity); err != nil {
 			// Preserve errdefs.IsNotFound so callers can add context-appropriate
 			// remediation (e.g. ctr suggesting `ctr content fetch`).
 			if errdefs.IsNotFound(err) {
@@ -151,7 +134,7 @@ func buildCache(ctx context.Context, cs content.Store, image ocispec.Descriptor,
 // copy and no reliance on TMPDIR). An existing entry is overwritten, keeping the
 // operation idempotent across re-runs and shared layers. When withDmverity is
 // set the blob is dm-verity formatted and its sidecar is moved into place too.
-func buildLayer(ctx context.Context, cs content.Store, layer ocispec.Descriptor, cacheDir string, withDmverity bool, opts ...erofs.ConvertOpt) (retErr error) {
+func buildLayer(ctx context.Context, cs content.Store, layer ocispec.Descriptor, cacheDir string, withDmverity bool) (retErr error) {
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return err
 	}
@@ -168,7 +151,7 @@ func buildLayer(ctx context.Context, cs content.Store, layer ocispec.Descriptor,
 		}
 	}()
 
-	diffID, err := erofs.ConvertLayerToErofs(ctx, cs, layer, tmpPath, opts...)
+	diffID, err := erofs.ConvertLayerToErofs(ctx, cs, layer, tmpPath)
 	if err != nil {
 		return err
 	}

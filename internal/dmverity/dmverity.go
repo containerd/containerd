@@ -57,6 +57,17 @@ func DefaultDmverityOptions() *DmverityOptions {
 	}
 }
 
+// MountOption is the prefix of the mount option that names the dm-verity
+// metadata file for the source of an erofs mount:
+// "X-containerd.dmverity=<metadata-path>".
+const MountOption = "X-containerd.dmverity="
+
+// DeviceMountOption is the prefix of the mount option that names the dm-verity
+// metadata file for a data device of an erofs mount. The device is identified
+// by its index among the mount's "device=" options:
+// "X-containerd.dmverity.device.<index>=<metadata-path>".
+const DeviceMountOption = "X-containerd.dmverity.device."
+
 func MetadataPath(layerBlobPath string) string {
 	if strings.HasSuffix(layerBlobPath, ".dmverity") {
 		return layerBlobPath
