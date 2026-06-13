@@ -436,11 +436,13 @@ func (w *erofsWriter) writeInode(buf io.Writer, e *erofsEntry) error {
 	clear(b[:])
 
 	if e.compact {
+		mtimeOff, _ := w.compactMtime(e)
 		binary.LittleEndian.PutUint16(b[0:2], inodeFormat(e.layout, true))
 		binary.LittleEndian.PutUint16(b[2:4], xattrCount(e.xattrSize))
 		binary.LittleEndian.PutUint16(b[4:6], e.mode)
 		binary.LittleEndian.PutUint16(b[6:8], uint16(e.nlink))
 		binary.LittleEndian.PutUint32(b[8:12], uint32(fileSize))
+		binary.LittleEndian.PutUint32(b[12:16], mtimeOff)
 		binary.LittleEndian.PutUint32(b[16:20], inodeData)
 		binary.LittleEndian.PutUint16(b[24:26], uint16(e.uid))
 		binary.LittleEndian.PutUint16(b[26:28], uint16(e.gid))

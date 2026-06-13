@@ -253,7 +253,7 @@ func DiffDirChanges(ctx context.Context, baseDir, diffDir string, source DiffSou
 		if kind == ChangeKindAdd || kind == ChangeKindDelete {
 			parent := filepath.Dir(path)
 
-			if _, ok := changedDirs[parent]; !ok && parent != "/" {
+			if _, ok := changedDirs[parent]; !ok && parent != string(os.PathSeparator) {
 				pi, err := os.Stat(filepath.Join(diffDir, parent))
 				if err := changeFn(ChangeKindModify, parent, pi, err); err != nil {
 					return err

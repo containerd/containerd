@@ -1,22 +1,28 @@
-linters:
-  enable:
-    - gofmt
-    - goimports
-    - govet
-    - ineffassign
-    - misspell
-    - revive
-    - staticcheck
-    - unconvert
-    - unused
-  disable:
-    - errcheck
-
-issues:
-  exclude-rules:
-    - linters:
-        - revive
-      text: "unused-parameter"
+version: "2"
 
 run:
   timeout: 3m
+
+linters:
+  enable:
+    - misspell
+    - revive
+    - unconvert
+  disable:
+    - errcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - revive
+        text: "unused-parameter"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
