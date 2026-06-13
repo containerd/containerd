@@ -410,36 +410,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y criu
 
-      # "apt-get install erofs-utils" installs an older version (1.7.1 as of 2025-09-18)
-      # Build and install erofs-utils 1.8.10 from source to get a newer version
-      - name: Build and install erofs-utils from source
-        run: |
-          # Install dependencies
-          sudo apt-get update
-          sudo apt-get install -y wget make gcc libz-dev liblz4-dev libfuse-dev autoconf libtool pkg-config uuid-dev
-
-          # Create temporary build directory
-          BUILD_DIR="$(mktemp -d)"
-          cd "$BUILD_DIR"
-
-          # get erofs-utils-1.8.10.tar.gz
-          curl -L https://github.com/erofs/erofs-utils/archive/refs/tags/v1.8.10.tar.gz | tar -xzf -
-          cd erofs-utils-1.8.10
-
-          # Build and install erofs-utils
-          ./autogen.sh
-          ./configure --enable-lz4 --enable-fuse --with-uuid
-          make -j"$(nproc)"
-          sudo make install
-          sudo ldconfig
-
-          # Clean up
-          cd -
-          rm -rf "$BUILD_DIR"
-
-          # Verify installation
-          mkfs.erofs --version
-
       - name: Load EROFS kernel module
         run: |
           sudo modprobe erofs
@@ -462,8 +432,6 @@ jobs:
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
         run: |
-          # Prevent udevd worker exhaustion on larger runners caused by parallel loopback creations.
-          sudo udevadm control --children-max=500
           make test
           sudo -E PATH=$PATH make root-test
       - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
@@ -581,16 +549,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - box: fedora/44-cloud-base
+          - box: fedora/43-cloud-base
             cgroup_driver: cgroupfs
             runc: runc
-          - box: fedora/44-cloud-base
+          - box: fedora/43-cloud-base
             cgroup_driver: systemd
             runc: runc
-          - box: fedora/44-cloud-base
+          - box: fedora/43-cloud-base
             cgroup_driver: cgroupfs
             runc: crun
-          - box: fedora/44-cloud-base
+          - box: fedora/43-cloud-base
             cgroup_driver: systemd
             runc: crun
             # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
@@ -649,15 +617,15 @@ jobs:
           sudo env VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1 vagrant plugin install vagrant-libvirt
       - name: Boot VM
         run: |
-          if  [ "$BOX" = "fedora/44-cloud-base" ]; then
+          if  [ "$BOX" = "fedora/43-cloud-base" ]; then
             # fedora/41-cloud-base seems the last version available in https://portal.cloud.hashicorp.com/vagrant/discover/fedora
             # Download the box file with curl (with retry) to handle flaky Fedora mirrors
             curl -fL --retry 5 --retry-delay 5 --retry-all-errors \
               --connect-timeout 30 --max-time 600 \
-              -o /tmp/fedora.box \
-              https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-libvirt-44-1.7.x86_64.vagrant.libvirt.box
-            sudo vagrant box add fedora/44-cloud-base /tmp/fedora.box
-            rm -f /tmp/fedora.box
+              -o /tmp/fedora43.box \
+              https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-libvirt-43-1.6.x86_64.vagrant.libvirt.box
+            sudo vagrant box add fedora/43-cloud-base /tmp/fedora43.box
+            rm -f /tmp/fedora43.box
           fi
           sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --no-tty
       - name: test-integration
