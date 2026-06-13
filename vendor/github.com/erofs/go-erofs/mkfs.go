@@ -1,6 +1,7 @@
 package erofs
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -15,6 +16,10 @@ import (
 	"github.com/erofs/go-erofs/internal/disk"
 )
 
+// errDirNotEmpty is returned by Remove when the named path is a non-empty
+// directory. Mirrors the behavior of os.Remove (which returns ENOTEMPTY).
+var errDirNotEmpty = errors.New("directory not empty")
+
 // --- Exported types ---
 
 // Writer is a writable filesystem that produces an EROFS image on Close.
@@ -27,6 +32,7 @@ type Writer struct {
 	buildTime    uint64 // from WithBuildTime or buildTimer
 	buildTimeNs  uint32
 	hasBuildTime bool
+	wErr         error               // sticky error: once set, all subsequent ops return it
 	root         *fsEntry            // root directory
 	byPath       map[string]*fsEntry // path → entry (all types)
 
@@ -87,6 +93,12 @@ func Create(out io.WriteSeeker, opts ...CreateOpt) *Writer {
 		tempDir:      o.tempDir,
 	}
 
+	if o.blockSize != 0 {
+		if err := fsys.setBlockSize(o.blockSize); err != nil {
+			fsys.wErr = err
+		}
+	}
+
 	if o.dataFile != nil {
 		// Reserve device slot 0 (DeviceID=1) for the data file.
 		// MetadataOnly CopyFrom device IDs will start at slot 1+.
@@ -128,6 +140,17 @@ func Merge() CopyOpt {
 
 // --- CreateOpt functions ---
 
+// WithBlockSize sets the filesystem block size. The value must be a power
+// of two between 512 and 64 KiB. When unset the default is 4096.
+// An invalid size causes subsequent Writer operations to return an error.
+// If CopyFrom is called with a source that declares a different block size,
+// CopyFrom returns an error.
+func WithBlockSize(n int) CreateOpt {
+	return func(o *createOptions) {
+		o.blockSize = n
+	}
+}
+
 // WithBuildTime sets the filesystem build timestamp.
 func WithBuildTime(sec uint64, nsec uint32) CreateOpt {
 	return func(o *createOptions) {
@@ -159,6 +182,9 @@ func WithTempDir(dir string) CreateOpt {
 // Create creates a regular file with default mode 0644. The caller must
 // Close the returned File.
 func (fsys *Writer) Create(name string) (*File, error) {
+	if fsys.wErr != nil {
+		return nil, fsys.wErr
+	}
 	name = cleanPath(name)
 	if name == "/" {
 		return nil, fmt.Errorf("mkfs: cannot create file at root")
@@ -198,6 +224,9 @@ func (fsys *Writer) Create(name string) (*File, error) {
 // Mkdir creates a directory. Only permission bits from perm are used;
 // type bits are forced to directory. Mkdir("/", perm) sets root permissions.
 func (fsys *Writer) Mkdir(name string, perm fs.FileMode) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	name = cleanPath(name)
 	if name == "/" {
 		fsys.root.mode = disk.StatTypeDir | uint16(perm.Perm())
@@ -220,6 +249,9 @@ func (fsys *Writer) Mkdir(name string, perm fs.FileMode) error {
 
 // Symlink creates newname as a symbolic link to oldname (mode 0777).
 func (fsys *Writer) Symlink(oldname, newname string) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	newname = cleanPath(newname)
 	if newname == "/" {
 		return fmt.Errorf("mkfs: cannot create symlink at root")
@@ -243,6 +275,9 @@ func (fsys *Writer) Symlink(oldname, newname string) error {
 // Mknod creates a device, FIFO, or socket. mode must include type bits
 // (e.g. disk.StatTypeChrdev | 0o666).
 func (fsys *Writer) Mknod(name string, mode uint16, rdev uint32) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	name = cleanPath(name)
 	if name == "/" {
 		return fmt.Errorf("mkfs: cannot mknod at root")
@@ -263,10 +298,86 @@ func (fsys *Writer) Mknod(name string, mode uint16, rdev uint32) error {
 	return nil
 }
 
+// Link creates newname as a hard link to oldname. oldname must refer to an
+// existing regular file, character device, block device, FIFO, or socket —
+// directories and symlinks cannot be used as hard-link targets.
+//
+// Both paths may be in different directories; newname's parent directory must
+// already exist. Link returns an error if oldname is not found, if newname
+// already exists, or if the target is a directory or symlink.
+//
+// After Link, both paths share the same inode in the produced EROFS image.
+// The computed nlink on oldname's inode equals 1 + the number of Link calls
+// that targeted it (transitively). SetNlink must not be called on any path
+// participating in a hardlink group.
+func (fsys *Writer) Link(oldname, newname string) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
+	oldname = cleanPath(oldname)
+	newname = cleanPath(newname)
+
+	if oldname == newname {
+		return fmt.Errorf("mkfs: Link: oldname and newname are the same: %q", oldname)
+	}
+	if newname == "/" {
+		return fmt.Errorf("mkfs: Link: cannot create hardlink at root")
+	}
+	if fsys.closed {
+		return fmt.Errorf("mkfs: FS is closed")
+	}
+
+	// Resolve the target. It may itself be a hardlink alias — in that case,
+	// follow to the canonical entry so all aliases share one fsEntry.
+	target, ok := fsys.byPath[oldname]
+	if !ok {
+		return fmt.Errorf("mkfs: Link: %q not found", oldname)
+	}
+	if target.linkedTo != nil {
+		target = target.linkedTo
+	}
+
+	// Validate target type: no directories, no symlinks.
+	typ := target.mode & disk.StatTypeMask
+	if typ == disk.StatTypeDir {
+		return fmt.Errorf("mkfs: Link: %q is a directory", oldname)
+	}
+	if typ == disk.StatTypeSymlink {
+		return fmt.Errorf("mkfs: Link: %q is a symlink", oldname)
+	}
+
+	// newname must not already exist.
+	if _, exists := fsys.byPath[newname]; exists {
+		return fmt.Errorf("mkfs: Link: %q already exists", newname)
+	}
+
+	// Ensure newname's parent directory exists.
+	fsys.ensureParent(newname)
+
+	// Register the alias. The alias fsEntry exists only as a byPath/tree entry;
+	// it does not duplicate data — it points back to the canonical entry.
+	alias := &fsEntry{
+		path:     newname,
+		linkedTo: target,
+	}
+	fsys.addChild(alias)
+
+	// Record the alias path on the canonical entry and bump its nlink.
+	target.hardlinks = append(target.hardlinks, newname)
+	// nlink is recomputed from len(hardlinks)+1 in buildErofsTree; clear any
+	// previously set nlink so it doesn't interfere.
+	target.nlinkSet = false
+
+	return nil
+}
+
 // --- Writer metadata methods ---
 
 // Chmod sets permission bits on the named path, preserving type bits.
 func (fsys *Writer) Chmod(name string, mode fs.FileMode) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
@@ -278,6 +389,9 @@ func (fsys *Writer) Chmod(name string, mode fs.FileMode) error {
 
 // Chown sets the owner UID and GID on the named path.
 func (fsys *Writer) Chown(name string, uid, gid int) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
@@ -290,6 +404,9 @@ func (fsys *Writer) Chown(name string, uid, gid int) error {
 // Chtimes sets the access and modification times on the named path.
 // EROFS only stores mtime; atime is retained for read-back before Close.
 func (fsys *Writer) Chtimes(name string, atime time.Time, mtime time.Time) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
@@ -303,6 +420,9 @@ func (fsys *Writer) Chtimes(name string, atime time.Time, mtime time.Time) error
 
 // Setxattr sets an extended attribute on the named path.
 func (fsys *Writer) Setxattr(name, attr, value string) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
@@ -315,14 +435,124 @@ func (fsys *Writer) Setxattr(name, attr, value string) error {
 }
 
 // SetNlink overrides the computed link count on the named path.
+// SetNlink must not be called on any path that participates in a hardlink
+// group created via Link; use Link to manage link counts in that case.
 func (fsys *Writer) SetNlink(name string, nlink uint32) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
 	}
+	// Resolve alias → canonical so the check applies to the real entry.
+	if e.linkedTo != nil {
+		e = e.linkedTo
+	}
+	if len(e.hardlinks) > 0 {
+		return fmt.Errorf("mkfs: SetNlink: %q is part of a hardlink group; use Link() to manage link counts", name)
+	}
 	e.nlink = nlink
 	e.nlinkSet = true
 	return nil
+}
+
+// Remove removes the named path from the writer's tree. It mirrors the
+// semantics of [os.Root.Remove]: it is non-recursive, returns
+// [fs.ErrNotExist] (wrapped in [fs.PathError]) if the path does not exist,
+// and returns an error if the path is a non-empty directory.
+//
+// Removing a hardlink alias only removes the dirent at that path; the
+// underlying inode and other aliases are preserved. Removing the canonical
+// path of a hardlink group with surviving aliases promotes the first
+// remaining alias to canonical (POSIX unlink semantics).
+//
+// Remove cannot be used to delete the root.
+//
+// Recursive removal can be implemented by the caller by listing the
+// directory with [fs.ReadDir] (via [Writer.Open]) and calling Remove on
+// each descendant before removing the directory itself.
+func (fsys *Writer) Remove(name string) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
+	if fsys.closed {
+		return fmt.Errorf("mkfs: FS is closed")
+	}
+	name = cleanPath(name)
+	if name == "/" {
+		return &fs.PathError{Op: "remove", Path: name, Err: fmt.Errorf("cannot remove root")}
+	}
+	e, ok := fsys.byPath[name]
+	if !ok {
+		return &fs.PathError{Op: "remove", Path: name, Err: fs.ErrNotExist}
+	}
+	// Non-empty directory check.
+	if e.mode&disk.StatTypeMask == disk.StatTypeDir {
+		for _, c := range e.children {
+			if !c.removed {
+				return &fs.PathError{Op: "remove", Path: name, Err: errDirNotEmpty}
+			}
+		}
+	}
+	fsys.unlinkOne(e)
+	return nil
+}
+
+// unlinkOne removes a single entry from the writer's tree, applying POSIX
+// unlink semantics for hardlinks. The entry must already be located in
+// byPath. Callers are responsible for any caller-visible preconditions
+// (e.g. empty-directory check).
+func (fsys *Writer) unlinkOne(e *fsEntry) {
+	switch {
+	case e.linkedTo != nil:
+		// Alias: drop the alias path from the canonical's hardlinks list.
+		canonical := e.linkedTo
+		for i, p := range canonical.hardlinks {
+			if p == e.path {
+				canonical.hardlinks = append(canonical.hardlinks[:i], canonical.hardlinks[i+1:]...)
+				break
+			}
+		}
+	case len(e.hardlinks) > 0:
+		// Canonical with surviving aliases: promote first alias.
+		newCanonicalPath := e.hardlinks[0]
+		remaining := e.hardlinks[1:]
+		newCanonical := fsys.byPath[newCanonicalPath]
+		if newCanonical != nil {
+			// Copy data-bearing fields from old canonical to the alias entry.
+			newCanonical.mode = e.mode
+			newCanonical.uid = e.uid
+			newCanonical.gid = e.gid
+			newCanonical.atime = e.atime
+			newCanonical.atimeNs = e.atimeNs
+			newCanonical.mtime = e.mtime
+			newCanonical.mtimeNs = e.mtimeNs
+			newCanonical.size = e.size
+			newCanonical.rdev = e.rdev
+			newCanonical.xattrs = e.xattrs
+			newCanonical.linkTarget = e.linkTarget
+			newCanonical.chunks = e.chunks
+			newCanonical.contiguous = e.contiguous
+			newCanonical.spoolOff = e.spoolOff
+			newCanonical.dataStartOff = e.dataStartOff
+			newCanonical.fileClosed = e.fileClosed
+			newCanonical.directData = e.directData
+			newCanonical.metadataOnly = e.metadataOnly
+			newCanonical.nlink = e.nlink
+			newCanonical.nlinkSet = e.nlinkSet
+			newCanonical.linkedTo = nil
+			newCanonical.hardlinks = remaining
+			// Repoint remaining aliases at the new canonical.
+			for _, ap := range remaining {
+				if a := fsys.byPath[ap]; a != nil {
+					a.linkedTo = newCanonical
+				}
+			}
+		}
+	}
+	e.removed = true
+	delete(fsys.byPath, e.path)
 }
 
 // --- Writer bulk copy ---
@@ -332,6 +562,9 @@ func (fsys *Writer) SetNlink(name string, nlink uint32) error {
 // Reads symlink targets via readLinker interface when Entry.LinkTarget is empty.
 // If src implements blockSizer, the image block size is set accordingly.
 func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	// Reset per-CopyFrom state.
 	fsys.copyMetadataOnly = false
 	fsys.copyMerge = false
@@ -374,6 +607,13 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 		fsys.buildTime = bt.BuildTime()
 		fsys.hasBuildTime = true
 	}
+
+	// seenIno tracks inode identity across the walk for sources that expose
+	// Stat.Ino (EROFS images) so that hardlinks (multiple paths sharing one
+	// NID with nlink > 1) are preserved via Link() rather than duplicated.
+	// Keyed by Ino; value is the first-seen destination path.
+	var seenIno map[int64]string
+
 	return fs.WalkDir(src, ".", func(fpath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -413,6 +653,20 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 			be = sys
 		case *Stat:
 			// EROFS image source: convert *Stat to *builder.Entry.
+			// Also detect hardlinks via Ino + Nlink.
+			if !info.IsDir() && sys.Nlink > 1 && p != "/" {
+				if seenIno == nil {
+					seenIno = make(map[int64]string)
+				}
+				if firstPath, seen := seenIno[sys.Ino]; seen {
+					// Second (or later) path to this inode: create a hardlink.
+					if err := fsys.Link(firstPath, p); err != nil {
+						return fmt.Errorf("link %s → %s: %w", firstPath, p, err)
+					}
+					return nil
+				}
+				seenIno[sys.Ino] = p
+			}
 			be = &builder.Entry{
 				UID:     sys.UID,
 				GID:     sys.GID,
@@ -433,6 +687,22 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 					be = entryFromSys(info)
 					if be == nil {
 						be = &builder.Entry{}
+					}
+				}
+				// Generate chunks from DataRange if available.
+				if len(be.Chunks) == 0 {
+					if dr, ok := info.(dataRanger); ok {
+						if ranges := dr.DataRange(); len(ranges) > 0 {
+							chunks, err := fsys.chunksFromRanges(ranges, info.Size())
+							if err != nil {
+								return fmt.Errorf("chunksFromRanges %s: %w", p, err)
+							}
+							be.Chunks = chunks
+							// Contiguous: a single non-hole range whose total-size
+							// invariant is satisfied (guaranteed by chunksFromRanges)
+							// means the file is fully covered by one contiguous extent.
+							be.Contiguous = len(ranges) == 1 && ranges[0].Offset != holeOffset
+						}
 					}
 				}
 				return fsys.add(p, &entryFileInfo{info: info, sys: be})
@@ -485,11 +755,13 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 			}
 		}
 
-		// For directories from plain fs.FS, ensure nlink >= 2.
-		if info.Mode().IsDir() && be == nil {
-			be = entryFromSys(info)
+		// For directories, ensure nlink >= 2.
+		if info.Mode().IsDir() {
 			if be == nil {
-				be = &builder.Entry{Nlink: 2}
+				be = entryFromSys(info)
+				if be == nil {
+					be = &builder.Entry{Nlink: 2}
+				}
 			}
 			if be.Nlink < 2 {
 				be.Nlink = 2
@@ -497,6 +769,12 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 			return fsys.add(p, &entryFileInfo{info: info, sys: be})
 		}
 
+		// General case: devices, fifos, sockets, etc.
+		// Wrap in entryFileInfo when be was extracted from Sys()
+		// so that add() sees the metadata.
+		if be != nil {
+			return fsys.add(p, &entryFileInfo{info: info, sys: be})
+		}
 		return fsys.add(p, info)
 	})
 }
@@ -505,6 +783,9 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 
 // Close writes the EROFS image. The FS must not be used after Close.
 func (fsys *Writer) Close() error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	if fsys.closed {
 		return fmt.Errorf("mkfs: FS already closed")
 	}
@@ -668,6 +949,17 @@ func (f *File) Chown(uid, gid int) error {
 	return nil
 }
 
+// Chtimes sets access and modification times on the open file. EROFS only
+// stores mtime on disk; atime is retained on the in-memory entry for
+// read-back before [Writer.Close].
+func (f *File) Chtimes(atime, mtime time.Time) error {
+	f.entry.atime = uint64(atime.Unix())
+	f.entry.atimeNs = uint32(atime.Nanosecond())
+	f.entry.mtime = uint64(mtime.Unix())
+	f.entry.mtimeNs = uint32(mtime.Nanosecond())
+	return nil
+}
+
 // --- Internal types ---
 
 // fsEntry is the in-memory representation of a filesystem entry held by Writer.
@@ -688,6 +980,12 @@ type fsEntry struct {
 	chunks     []builder.Chunk
 	contiguous bool // data blocks are contiguous; flat-plain is sufficient
 
+	// Hardlink support: linkedTo points to the canonical fsEntry this entry
+	// is a hardlink of. hardlinks collects alias paths on the canonical entry.
+	// Only one of these is non-nil/non-empty per entry.
+	linkedTo  *fsEntry // non-nil if this is an alias (hardlink) of another entry
+	hardlinks []string // alias paths on the canonical entry; nil if no hardlinks
+
 	// Tree structure — maintained during add/remove.
 	parent   *fsEntry
 	children []*fsEntry
@@ -707,6 +1005,7 @@ type createOptions struct {
 	buildTime    uint64
 	buildTimeNs  uint32
 	hasBuildTime bool
+	blockSize    int      // 0 = use default
 	dataFile     *os.File // external data file for metadata-only mode
 	tempDir      string   // temp directory for spool file
 }
@@ -736,6 +1035,21 @@ type readLinker interface {
 	ReadLink(name string) (string, error)
 }
 
+// dataRanger may be implemented by fs.FileInfo to provide the physical
+// location of uncompressed file data in backing devices. CopyFrom checks
+// this via type assertion in metadata-only mode to build chunk indexes
+// without requiring the caller to construct internal chunk types.
+//
+// This interface should only be implemented for files whose device data
+// is stored verbatim (uncompressed). For compressed files, return nil or
+// do not implement the interface. In full-image mode CopyFrom then falls
+// back to reading through Open(), which decompresses transparently. In
+// MetadataOnly mode there is no such fallback: the file is stored as a
+// chunk-based inode with no physical mappings (all holes).
+type dataRanger interface {
+	DataRange() []DataRange
+}
+
 // --- Internal types ---
 
 // erofsEntry is the internal representation of a file/dir/symlink used by the builder.
@@ -753,6 +1067,10 @@ type erofsEntry struct {
 	path      string
 	children  []*erofsEntry
 	symTarget string
+
+	// linkTo is non-nil for hardlink alias entries. These entries are only
+	// emitted as dirents pointing at linkTo's NID; no inode is written for them.
+	linkTo *erofsEntry
 
 	// For regular files — metadata-only mode
 	chunks       []builder.Chunk
@@ -1136,23 +1454,31 @@ func (fsys *Writer) removeSubtree(e *fsEntry) {
 
 // buildErofsTree converts the fsEntry tree into an erofsEntry tree via BFS.
 // Children are sorted for deterministic output. The Writer is consumed.
+//
+// Hardlink aliases (fsEntry.linkedTo != nil) do not produce their own inode.
+// Instead they contribute a dirent in their parent directory that points at
+// the canonical entry's erofsEntry (via erofsEntry.linkTo).
 func (fsys *Writer) buildErofsTree() *erofsEntry {
 	type pair struct {
 		fs *fsEntry
 		er *erofsEntry
 	}
 
+	// Map from canonical fsEntry to its erofsEntry, for hardlink alias resolution.
+	canonical := make(map[*fsEntry]*erofsEntry)
+
 	rootEr := fsys.fsToErofs(fsys.root)
+	canonical[fsys.root] = rootEr
 	queue := []pair{{fsys.root, rootEr}}
 
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
 
-		// Count child directories for nlink.
+		// Count child directories for nlink (aliases are never dirs).
 		var childDirs uint32
 		for _, c := range cur.fs.children {
-			if !c.removed && c.mode&disk.StatTypeMask == disk.StatTypeDir {
+			if !c.removed && c.linkedTo == nil && c.mode&disk.StatTypeMask == disk.StatTypeDir {
 				childDirs++
 			}
 		}
@@ -1168,7 +1494,35 @@ func (fsys *Writer) buildErofsTree() *erofsEntry {
 			if c.removed {
 				continue
 			}
+			if c.linkedTo != nil {
+				// Hardlink alias: create a stub erofsEntry that references the
+				// canonical erofsEntry. The canonical entry may not be converted
+				// yet (it lives in a different directory), so we resolve lazily
+				// after the full BFS using the canonical map.
+				alias := &erofsEntry{
+					name: path.Base(c.path),
+					path: c.path,
+				}
+				// Store the canonical fsEntry pointer in a side-channel so we
+				// can patch alias.linkTo after the BFS.
+				// We use a temporary trick: store it in linkTo as *erofsEntry
+				// only after the canonical has been created.
+				// For now, remember (alias, c.linkedTo) to patch later.
+				cur.er.children = append(cur.er.children, alias)
+				// We need the canonical erofsEntry — look it up or defer.
+				if ce, ok := canonical[c.linkedTo]; ok {
+					alias.linkTo = ce
+					alias.erofsFileType = ce.erofsFileType
+				} else {
+					// The canonical entry hasn't been created yet (it's in a
+					// directory later in the BFS). We'll patch it in a second
+					// pass below. Temporarily stash the fsEntry in a map.
+					_ = c // patched below via patchList
+				}
+				continue
+			}
 			ent := fsys.fsToErofs(c)
+			canonical[c] = ent
 			cur.er.children = append(cur.er.children, ent)
 			if c.mode&disk.StatTypeMask == disk.StatTypeDir {
 				queue = append(queue, pair{c, ent})
@@ -1180,7 +1534,40 @@ func (fsys *Writer) buildErofsTree() *erofsEntry {
 			return cur.er.children[i].name < cur.er.children[j].name
 		})
 	}
+
+	// Second pass: patch any alias entries whose canonical erofsEntry was not
+	// yet available during BFS (cross-directory hardlinks where the target
+	// directory appears later in BFS order).
+	fsys.patchHardlinkAliases(rootEr, canonical)
+
+	// Third pass: set nlink on canonical entries that have hardlink aliases.
+	for fs, er := range canonical {
+		if len(fs.hardlinks) > 0 && !fs.nlinkSet {
+			er.nlink = uint32(len(fs.hardlinks) + 1)
+		}
+	}
+
 	return rootEr
+}
+
+// patchHardlinkAliases resolves any alias erofsEntry nodes whose linkTo was
+// not yet known during the BFS (because the canonical entry was in a later
+// directory). It does a DFS over the erofsEntry tree.
+func (fsys *Writer) patchHardlinkAliases(e *erofsEntry, canonical map[*fsEntry]*erofsEntry) {
+	for _, c := range e.children {
+		if c.linkTo == nil && c.mode == 0 && len(c.children) == 0 {
+			// This is an unpatched alias stub: look up via byPath.
+			if fe, ok := fsys.byPath[c.path]; ok && fe.linkedTo != nil {
+				if ce, ok := canonical[fe.linkedTo]; ok {
+					c.linkTo = ce
+					c.erofsFileType = ce.erofsFileType
+				}
+			}
+		}
+		if c.mode&disk.StatTypeMask == disk.StatTypeDir {
+			fsys.patchHardlinkAliases(c, canonical)
+		}
+	}
 }
 
 // fsToErofs converts a single fsEntry to an erofsEntry, resolving data readers.
@@ -1267,6 +1654,95 @@ func (fsys *Writer) zeroPad() []byte {
 		fsys.padBuf = make([]byte, fsys.resolveBlockSize())
 	}
 	return fsys.padBuf
+}
+
+// chunksFromRanges converts DataRange entries into internal chunk entries.
+// fileSize is the logical size of the file; the sum of all range Sizes must
+// equal fileSize exactly, or an error is returned.
+//
+// The block size used is the Writer's resolved block size. DataRange.Device
+// values are offset by 1 to produce chunk DeviceIDs: DataRange Device 0
+// becomes chunk DeviceID 1 (the first extra device), matching the EROFS
+// convention where DeviceID 0 is the primary image.
+//
+// Validation rules:
+//   - sum(Size) == fileSize; a mismatch is rejected.
+//   - r.Size > 0 for every entry.
+//   - Hole entries (Offset == -1) emit [builder.NullPhysicalBlock] chunks.
+//     Hole Size must be block-aligned for non-final entries; the final entry
+//     may end mid-block to match the file tail.
+//   - For data entries: r.Offset >= 0 and block-aligned; r.Device == 0.
+//   - For non-final data entries: r.Size must be a multiple of blockSize.
+//     The final entry may have a partial last block to match the file tail.
+func (fsys *Writer) chunksFromRanges(ranges []DataRange, fileSize int64) ([]builder.Chunk, error) {
+	blockSize := uint64(fsys.resolveBlockSize())
+
+	// Validate total coverage first.
+	var total int64
+	for _, r := range ranges {
+		total += r.Size
+	}
+	if total != fileSize {
+		return nil, fmt.Errorf("DataRange total size %d does not match file size %d", total, fileSize)
+	}
+
+	last := len(ranges) - 1
+	var chunks []builder.Chunk
+	for i, r := range ranges {
+		if r.Size <= 0 {
+			return nil, fmt.Errorf("DataRange[%d]: non-positive Size %d", i, r.Size)
+		}
+		// Non-final entries must be block-aligned in size; the final entry may
+		// end mid-block to match the file tail.
+		if i < last && uint64(r.Size)%blockSize != 0 {
+			return nil, fmt.Errorf("DataRange[%d]: non-final Size %d is not block-aligned (block size %d)", i, r.Size, blockSize)
+		}
+		if r.Offset == holeOffset {
+			// Hole: emit NullPhysicalBlock chunks covering the hole span.
+			totalBlocks := (uint64(r.Size) + blockSize - 1) / blockSize
+			for totalBlocks > 0 {
+				count := totalBlocks
+				if count > 65535 {
+					count = 65535
+				}
+				chunks = append(chunks, builder.Chunk{
+					PhysicalBlock: builder.NullPhysicalBlock,
+					Count:         uint16(count),
+				})
+				totalBlocks -= count
+			}
+			continue
+		}
+		if r.Offset < 0 {
+			return nil, fmt.Errorf("DataRange[%d]: negative Offset %d", i, r.Offset)
+		}
+		if uint64(r.Offset)%blockSize != 0 {
+			return nil, fmt.Errorf("DataRange[%d]: Offset %d is not block-aligned (block size %d)", i, r.Offset, blockSize)
+		}
+		// Non-EROFS sources register exactly one device via DeviceBlocks();
+		// only Device=0 is valid. Device=0xFFFF would also wrap deviceID to 0
+		// (the primary image), producing an invalid mapping.
+		if r.Device != 0 {
+			return nil, fmt.Errorf("DataRange[%d]: Device %d out of range (source declared one device, only Device=0 is valid)", i, r.Device)
+		}
+		deviceID := r.Device + 1
+		startBlock := uint64(r.Offset) / blockSize
+		totalBlocks := (uint64(r.Size) + blockSize - 1) / blockSize
+		for totalBlocks > 0 {
+			count := totalBlocks
+			if count > 65535 {
+				count = 65535
+			}
+			chunks = append(chunks, builder.Chunk{
+				PhysicalBlock: startBlock,
+				Count:         uint16(count),
+				DeviceID:      deviceID,
+			})
+			startBlock += count
+			totalBlocks -= count
+		}
+	}
+	return chunks, nil
 }
 
 // ensureSpool lazily creates the spool temp file.
