@@ -50,7 +50,9 @@ func (c *criService) initPlatform() (err error) {
 			log.L.Warn("Selinux is not supported")
 		}
 		if r := c.config.SelinuxCategoryRange; r > 0 {
-			selinux.CategoryRange = uint32(r)
+			if err := selinux.SetCategoryRange(uint32(r)); err != nil {
+				return fmt.Errorf("failed to set selinux category range: %w", err)
+			}
 		}
 	} else {
 		selinux.SetDisabled()
