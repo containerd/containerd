@@ -77,7 +77,7 @@ You can create a scratch file as follows. This example uses a 500MB scratch file
 
 ```bash
 $ # make a 500M file
-$ dd if=/dev/zero of=/opt/containerd/blockfile bs=1M count=500
+$ sudo dd if=/dev/zero of=/opt/containerd/blockfile bs=1M count=500
 500+0 records in
 500+0 records out
 524288000 bytes (524 MB, 500 MiB) copied, 1.76253 s, 297 MB/s
@@ -102,7 +102,7 @@ scratch file accordingly:
 
 ```bash
 $ # make a 500M file
-$ dd if=/dev/zero of=/opt/containerd/blockfile bs=1M count=500
+$ sudo dd if=/dev/zero of=/opt/containerd/blockfile bs=1M count=500
 
 $ # format the file with xfs (optionally pass `-m reflink=1` for reflink
 $ # support inside the guest filesystem)
@@ -245,14 +245,14 @@ On host filesystems that support reflinks (XFS created with `reflink=1`, or
 btrfs), the per-layer copy step described above is implicitly turned into a
 copy-on-write clone:
 
-- **Linux**: the snapshotter's copy goes through Go's `io.Copy` between two
-  `*os.File` handles. On Linux this fast path *attempts*
-  `copy_file_range(2)` first, which on a reflink-capable filesystem shares
-  extents rather than duplicating them — so each per-layer copy completes
-  almost instantly and consumes no additional space until either side is
-  written. When `copy_file_range(2)` is not applicable (kernel/filesystem
-  support, cross-device source/target, etc.), it falls back to `splice(2)`
-  or a plain byte copy; the result is correct in all cases, just less
+- **Linux**: the per-layer copy is performed via `copy_file_range(2)`,
+  which gives the underlying filesystem an opportunity to implement copy
+  acceleration. On a reflink-capable filesystem this means the new
+  blockfile shares extents with its parent rather than duplicating them, so
+  the copy completes almost instantly and consumes no additional space
+  until either side is written. When the filesystem (or kernel/source
+  combination) cannot accelerate the copy, the call transparently falls
+  back to a plain data copy; the result is correct in all cases, just less
   space-efficient.
 - **Darwin**: the snapshotter explicitly calls `clonefile(2)`, which provides
   the equivalent behavior on APFS.
