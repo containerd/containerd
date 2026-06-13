@@ -1,0 +1,242 @@
+# Dedicated EROFS integration workflow.
+#
+# This workflow runs on four platform combinations independently of the main
+# CI suite:
+#
+#   - ubuntu-latest      (Linux amd64)   — full suite including daemon +
+#                                          in-process pull/load tests
+#   - ubuntu-24.04-arm   (Linux arm64)   — same as amd64 but on ARM
+#   - macos-latest       (macOS arm64)   — short tests + in-process pull/load
+#   - windows-latest     (Windows amd64) — short tests + in-process pull/load
+#
+# The in-process pull/load tests (TestPull*, TestImageLoad) use
+# containerd.WithInMemoryServices and require no daemon binary or root
+# privilege; they run on all four platforms.
+#
+# Trigger paths cover all EROFS-related source and the workflow file itself.
+# Benchmarks are intentionally excluded from CI; run them locally with:
+#
+#   go test ./internal/erofsutils/... -bench=. -benchtime=3x -v
+
+name: EROFS Integration
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'internal/erofsutils/**'
+      - 'plugins/diff/erofs/**'
+      - 'plugins/snapshots/erofs/**'
+      - 'core/images/converter/erofs/**'
+      - 'integration/erofs/**'
+      - 'vendor/github.com/erofs/**'
+      - 'vendor/github.com/containerd/continuity/tarconv/**'
+      - '.github/workflows/erofs-integration.yml'
+
+  pull_request:
+    paths:
+      - 'internal/erofsutils/**'
+      - 'plugins/diff/erofs/**'
+      - 'plugins/snapshots/erofs/**'
+      - 'core/images/converter/erofs/**'
+      - 'integration/erofs/**'
+      - 'vendor/github.com/erofs/**'
+      - 'vendor/github.com/containerd/continuity/tarconv/**'
+      - '.github/workflows/erofs-integration.yml'
+
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Linux amd64 — full suite
+  # ─────────────────────────────────────────────────────────────────────────
+  erofs-linux-amd64:
+    name: EROFS / Linux amd64
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GOTEST: gotestsum --
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: ./.github/actions/install-go
+
+      - name: Load EROFS kernel module
+        run: sudo modprobe erofs
+
+      - run: script/setup/install-gotestsum
+
+      - name: erofsutils unit tests
+        run: |
+          gotestsum \
+            --junitfile test-erofsutils-junit.xml \
+            --jsonfile  test-erofsutils.json \
+            -- ./internal/erofsutils/... -count=1 -v
+
+      - name: EROFS integration tests (short / no daemon)
+        run: |
+          gotestsum \
+            --junitfile test-erofs-short-junit.xml \
+            --jsonfile  test-erofs-short.json \
+            -- ./integration/erofs/... -count=1 -short -v
+
+      - name: Install containerd binary
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
+          sudo -E PATH=$PATH make install
+
+      - name: EROFS integration tests (full / with daemon)
+        run: |
+          gotestsum \
+            --junitfile test-erofs-full-junit.xml \
+            --jsonfile  test-erofs-full.json \
+            -- ./integration/erofs/... -count=1 -v
+        env:
+          SUDO: sudo -E
+
+      - name: EROFS pull/load tests (in-process, no daemon)
+        run: |
+          gotestsum \
+            --junitfile test-erofs-pullload-junit.xml \
+            --jsonfile  test-erofs-pullload.json \
+            -- ./integration/erofs/... -count=1 -v -timeout 20m \
+               -run 'TestPull|TestImageLoad'
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results-linux-amd64
+          path: |
+            test-erofsutils-junit.xml
+            test-erofs-short-junit.xml
+            test-erofs-full-junit.xml
+            test-erofs-pullload-junit.xml
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Linux arm64 — full suite
+  # ─────────────────────────────────────────────────────────────────────────
+  erofs-linux-arm64:
+    name: EROFS / Linux arm64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    # Arm runners are only available in private repositories.
+    if: ${{ github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+    env:
+      GOTEST: gotestsum --
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: ./.github/actions/install-go
+
+      - name: Load EROFS kernel module
+        run: sudo modprobe erofs
+
+      - run: script/setup/install-gotestsum
+
+      - name: erofsutils unit tests
+        run: |
+          gotestsum \
+            --junitfile test-erofsutils-junit.xml \
+            --jsonfile  test-erofsutils.json \
+            -- ./internal/erofsutils/... -count=1 -v
+
+      - name: EROFS integration tests (short / no daemon)
+        run: |
+          gotestsum \
+            --junitfile test-erofs-short-junit.xml \
+            --jsonfile  test-erofs-short.json \
+            -- ./integration/erofs/... -count=1 -short -v
+
+      - name: Install containerd binary
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
+          sudo -E PATH=$PATH make install
+
+      - name: EROFS integration tests (full / with daemon)
+        run: |
+          gotestsum \
+            --junitfile test-erofs-full-junit.xml \
+            --jsonfile  test-erofs-full.json \
+            -- ./integration/erofs/... -count=1 -v
+
+      - name: EROFS pull/load tests (in-process, no daemon)
+        run: |
+          gotestsum \
+            --junitfile test-erofs-pullload-junit.xml \
+            --jsonfile  test-erofs-pullload.json \
+            -- ./integration/erofs/... -count=1 -v -timeout 20m \
+               -run 'TestPull|TestImageLoad'
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results-linux-arm64
+          path: |
+            test-erofsutils-junit.xml
+            test-erofs-short-junit.xml
+            test-erofs-full-junit.xml
+            test-erofs-pullload-junit.xml
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # macOS — short tests + in-process pull/load tests
+  # ─────────────────────────────────────────────────────────────────────────
+  erofs-macos:
+    name: EROFS / macOS
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: ./.github/actions/install-go
+
+      - name: erofsutils unit tests
+        run: go test ./internal/erofsutils/... -count=1 -v
+
+      - name: EROFS integration tests (short / no daemon)
+        run: go test ./integration/erofs/... -count=1 -short -v
+
+      - name: EROFS pull/load tests (in-process, no daemon)
+        run: |
+          go test ./integration/erofs/... -count=1 -v -timeout 20m \
+            -run 'TestPull|TestImageLoad'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Windows — short tests + in-process pull/load tests
+  # ─────────────────────────────────────────────────────────────────────────
+  erofs-windows:
+    name: EROFS / Windows
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: ./.github/actions/install-go
+
+      - name: erofsutils unit tests
+        run: go test ./internal/erofsutils/... -count=1 -v
+
+      - name: EROFS integration tests (short / no daemon)
+        run: go test ./integration/erofs/... -count=1 -short -v
+
+      - name: EROFS pull/load tests (in-process, no daemon)
+        run: |
+          go test ./integration/erofs/... -count=1 -v -timeout 20m \
+            -run 'TestPull|TestImageLoad'
