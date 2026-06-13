@@ -42,11 +42,9 @@ type deferredPipeConnection struct {
 }
 
 func (dpc *deferredPipeConnection) Read(p []byte) (n int, err error) {
+	dpc.wg.Wait()
 	if dpc.c == nil {
-		dpc.wg.Wait()
-		if dpc.c == nil {
-			return 0, dpc.conerr
-		}
+		return 0, dpc.conerr
 	}
 	return dpc.c.Read(p)
 }

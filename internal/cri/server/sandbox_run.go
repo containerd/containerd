@@ -292,8 +292,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// containers anyway, the CRI layer will pre-pull the pause container to guarantee
 	// it exists (even though it's counter to the purpose of the sandbox API). This may
 	// be removed/deprecated in the distant future, if we decide to remove pause containers.
-	if err := c.ensurePauseImageExists(ctx, r.GetConfig(), r.GetRuntimeHandler()); err != nil {
-		return nil, err
+	//
+	// Runtimes set disable_pause_image_pull = true to tell the CRI layer that they manage
+	// pause image availability on their own (e.g. shim sandboxers).
+	if !ociRuntime.DisablePauseImagePull {
+		if err := c.ensurePauseImageExists(ctx, r.GetConfig(), r.GetRuntimeHandler()); err != nil {
+			return nil, err
+		}
+	} else {
+		log.G(ctx).Debugf("Skipping pause image pull for runtime handler %q (type=%q, sandboxer=%q, disable_pause_image_pull=true)",
+			r.GetRuntimeHandler(), ociRuntime.Type, ociRuntime.Sandboxer)
 	}
 
 	ctrl, err := c.sandboxService.StartSandbox(ctx, sandbox.Sandboxer, id)
@@ -311,6 +319,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
+
+	// Shutdown the sandbox if we fail before adding it to store.
+	rollbackSandbox := true
+	defer func() {
+		if retErr != nil && rollbackSandbox {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+			cleanupErr = c.sandboxService.ShutdownSandbox(deferCtx, sandbox.Sandboxer, id)
+		}
+	}()
 
 	if ctrl.Address != "" {
 		sandbox.Endpoint = sandboxstore.Endpoint{
@@ -368,6 +386,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
+	// We no longer need to stop sandbox with a cleanup defer since it is in the store.
+	rollbackSandbox = false
 
 	// Send CONTAINER_CREATED event with both ContainerId and SandboxId equal to SandboxId.
 	// Note that this has to be done after sandboxStore.Add() because we need to get

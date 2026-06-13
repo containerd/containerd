@@ -43,3 +43,10 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/install-go
       - run: script/go-test-fuzz.sh
+      - name: Upload Crash
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: go-test-fuzz-artifacts
+          path: "**/testdata/fuzz/**"
+          if-no-files-found: ignore

@@ -294,6 +294,7 @@ version = 3
           cni_max_conf_num = 0
           snapshotter = ''
           sandboxer = 'podsandbox'
+          disable_pause_image_pull = false
           io_type = ''
 
           [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]

@@ -17,7 +17,7 @@
 
 # Vagrantfile for Fedora and EL
 Vagrant.configure("2") do |config|
-  config.vm.box = ENV["BOX"] ? ENV["BOX"].split("@")[0] : "fedora/43-cloud-base"
+  config.vm.box = ENV["BOX"] ? ENV["BOX"].split("@")[0] : "fedora/44-cloud-base"
   # BOX_VERSION is deprecated. Use "BOX=<BOX>@<BOX_VERSION>".
   config.vm.box_version = ENV["BOX_VERSION"] || (ENV["BOX"].split("@")[1] if ENV["BOX"])
 
@@ -58,7 +58,7 @@ Vagrant.configure("2") do |config|
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
         set -eux -o pipefail
-        dnf -y upgrade ${UPGRADE_PACKAGES}
+        dnf -y upgrade --refresh ${UPGRADE_PACKAGES}
     SHELL
   end
 
@@ -73,6 +73,7 @@ Vagrant.configure("2") do |config|
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
         set -eux -o pipefail
+        dnf -y makecache --refresh
         dnf -y install \
             container-selinux \
             curl \
@@ -109,7 +110,7 @@ EOF
   config.vm.provision "install-golang", type: "shell", run: "once" do |sh|
     sh.upload_path = "/tmp/vagrant-install-golang"
     sh.env = {
-        'GO_VERSION': ENV['GO_VERSION'] || "1.26.3",
+        'GO_VERSION': ENV['GO_VERSION'] || "1.26.4",
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash

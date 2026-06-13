@@ -113,6 +113,50 @@ func TestErofsWithQuota(t *testing.T) {
 	testsuite.SnapshotterSuite(t, "erofs", newSnapshotter(t, WithDefaultSize(16*1024*1024)))
 }
 
+// TestWritableSize exercises the LabelSnapshotMaxSize override that the
+// block-mode mkfs path passes to X-containerd.mkfs.size. Covers the
+// happy path (label overrides default), fallback cases (missing, empty,
+// malformed, non-positive), and that a valid label wins over a non-zero
+// configured default.
+func TestWritableSize(t *testing.T) {
+	const defaultSize = int64(16 * 1024 * 1024)
+	s := &snapshotter{defaultWritable: defaultSize}
+
+	for _, tc := range []struct {
+		name   string
+		labels map[string]string
+		want   int64
+	}{
+		{"unset", nil, defaultSize},
+		{"empty-map", map[string]string{}, defaultSize},
+		{"valid-overrides-default", map[string]string{snapshots.LabelSnapshotMaxSize: "268435456"}, 268435456},
+		{"empty-value-falls-back", map[string]string{snapshots.LabelSnapshotMaxSize: ""}, defaultSize},
+		{"non-numeric-falls-back", map[string]string{snapshots.LabelSnapshotMaxSize: "100MB"}, defaultSize},
+		{"zero-falls-back", map[string]string{snapshots.LabelSnapshotMaxSize: "0"}, defaultSize},
+		{"negative-falls-back", map[string]string{snapshots.LabelSnapshotMaxSize: "-1"}, defaultSize},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := s.writableSize(snapshots.Info{Labels: tc.labels})
+			assert.Equal(t, tc.want, got)
+		})
+	}
+
+	// Also verify behaviour when the snapshotter has no configured default:
+	// an unset/invalid label yields 0 (caller treats as "no size"), a valid
+	// label is respected.
+	t.Run("no-default-unset", func(t *testing.T) {
+		z := &snapshotter{defaultWritable: 0}
+		assert.Equal(t, int64(0), z.writableSize(snapshots.Info{}))
+	})
+	t.Run("no-default-with-label", func(t *testing.T) {
+		z := &snapshotter{defaultWritable: 0}
+		got := z.writableSize(snapshots.Info{Labels: map[string]string{
+			snapshots.LabelSnapshotMaxSize: "1048576",
+		}})
+		assert.Equal(t, int64(1048576), got)
+	})
+}
+
 func TestErofsFsverity(t *testing.T) {
 	testutil.RequiresRoot(t)
 	ctx := context.Background()
