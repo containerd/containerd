@@ -17,14 +17,15 @@
 package erofs
 
 import (
+	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/internal/fsmount"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	snapshotserofs "github.com/containerd/containerd/v2/plugins/snapshots/erofs"
@@ -34,10 +35,6 @@ import (
 // TestFsmountLoopDevice tests fsmount with loop device
 func TestFsmountLoopDevice(t *testing.T) {
 	testutil.RequiresRoot(t)
-
-	if _, err := exec.LookPath("mkfs.erofs"); err != nil {
-		t.Skipf("mkfs.erofs not found: %v", err)
-	}
 
 	if !snapshotserofs.FindErofs() {
 		t.Skip("erofs kernel support not available")
@@ -58,9 +55,8 @@ func TestFsmountLoopDevice(t *testing.T) {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	cmd := exec.Command("mkfs.erofs", layerPath, layerDir)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to create erofs image: %v, output: %s", err, output)
+	if err := erofsutils.ConvertErofs(context.Background(), layerPath, layerDir); err != nil {
+		t.Fatalf("failed to create erofs image: %v", err)
 	}
 
 	loopFile, err := mount.SetupLoop(layerPath, mount.LoopParams{
@@ -108,10 +104,6 @@ func TestFsmountLoopDevice(t *testing.T) {
 func TestMountOptionsPageSizeLimit(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	if _, err := exec.LookPath("mkfs.erofs"); err != nil {
-		t.Skipf("mkfs.erofs not found: %v", err)
-	}
-
 	if !snapshotserofs.FindErofs() {
 		t.Skip("erofs kernel support not available")
 	}
@@ -131,9 +123,8 @@ func TestMountOptionsPageSizeLimit(t *testing.T) {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	cmd := exec.Command("mkfs.erofs", layerPath, layerDir)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to create erofs image: %v, output: %s", err, output)
+	if err := erofsutils.ConvertErofs(context.Background(), layerPath, layerDir); err != nil {
+		t.Fatalf("failed to create erofs image: %v", err)
 	}
 
 	loopFile, err := mount.SetupLoop(layerPath, mount.LoopParams{

@@ -66,6 +66,10 @@ type imgQEntry struct {
 // syscalls), it reads the entire metadata area into memory and parses
 // inodes, directory entries, xattrs, and chunk indexes directly from the
 // buffer. This reduces thousands of syscalls to a single ReadAt.
+//
+// Hardlinks are preserved: when two directory entries share the same NID and
+// the inode is not a directory, the second (and subsequent) paths are
+// registered via Writer.Link rather than as independent inodes.
 func (fsys *Writer) copyFromImage(img *image) error {
 	metaStart := img.metaStartPos()
 	totalBytes := int64(img.sb.Blocks) << img.sb.BlkSizeBits
@@ -97,6 +101,11 @@ func (fsys *Writer) copyFromImage(img *image) error {
 	}
 	queue := make([]imgQEntry, 0, inodeCount)
 	queue = append(queue, imgQEntry{nid: uint64(img.sb.RootNid), path: "/"})
+
+	// seenNID tracks the first destination path for each source NID that has
+	// nlink > 1 and is not a directory. When a NID is seen a second time, we
+	// call Writer.Link instead of creating a new inode, preserving hardlinks.
+	seenNID := make(map[uint64]string)
 
 	for len(queue) > 0 {
 		cur := queue[0]
@@ -197,6 +206,23 @@ func (fsys *Writer) copyFromImage(img *image) error {
 
 		trailingAddr := inodeAddr + int64(icSize) + int64(xattrSize)
 		typ := mode & disk.StatTypeMask
+
+		// Hardlink detection: if this is a non-directory inode with nlink > 1
+		// that we've already registered under a different path, call Link()
+		// to share the inode rather than creating a duplicate.
+		if typ != disk.StatTypeDir && nlink > 1 {
+			if firstPath, seen := seenNID[cur.nid]; seen {
+				// Second (or later) path to this inode: emit a hardlink.
+				if cur.path != "/" {
+					if err := fsys.Link(firstPath, cur.path); err != nil {
+						return fmt.Errorf("link %s → %s: %w", firstPath, cur.path, err)
+					}
+				}
+				continue
+			}
+			// First time we see this NID; record it for future aliases.
+			seenNID[cur.nid] = cur.path
+		}
 
 		// Build fsEntry directly, bypassing builder.Entry + add() overhead.
 		fe := &fsEntry{

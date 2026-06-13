@@ -44,3 +44,15 @@ var registered []FSHandler
 func Register(h FSHandler) {
 	registered = append(registered, h)
 }
+
+// IsWhiteout reports whether fi represents an overlayfs/EROFS whiteout entry
+// (a character device with rdev == 0) by consulting all registered handlers.
+// Returns false if no handler recognises fi as a whiteout.
+func IsWhiteout(fi fs.FileInfo) bool {
+	for _, h := range registered {
+		if h.IsWhiteout != nil && h.IsWhiteout(fi) {
+			return true
+		}
+	}
+	return false
+}

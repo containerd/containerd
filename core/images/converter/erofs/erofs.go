@@ -43,21 +43,7 @@ import (
 type ConvertOpt func(*convertOptions)
 
 type convertOptions struct {
-	compressors     string
-	mkfsExtraOpts   []string
 	blobCompression string
-}
-
-func WithCompressors(compressors string) ConvertOpt {
-	return func(opts *convertOptions) {
-		opts.compressors = compressors
-	}
-}
-
-func WithMkfsOptions(extraOpts []string) ConvertOpt {
-	return func(opts *convertOptions) {
-		opts.mkfsExtraOpts = extraOpts
-	}
 }
 
 func WithBlobCompression(compression string) ConvertOpt {
@@ -125,18 +111,8 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			}
 		}()
 
-		var mkfsArgs []string
-		if convertOpts.compressors != "" {
-			compressionArg := "-z" + convertOpts.compressors
-			mkfsArgs = append(mkfsArgs, compressionArg)
-			mkfsArgs = append(mkfsArgs, []string{"-C", "65536"}...)
-		}
-		mkfsArgs = append(mkfsArgs, convertOpts.mkfsExtraOpts...)
-
-		mkfsArgs = erofsutils.AddDefaultMkfsOpts(mkfsArgs)
-
 		u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+desc.Digest))
-		if err := erofsutils.ConvertTarErofs(ctx, sr, blobPath, u.String(), mkfsArgs); err != nil {
+		if err := erofsutils.ConvertTarErofs(ctx, sr, blobPath, u.String()); err != nil {
 			return nil, fmt.Errorf("failed to convert to EROFS: %w", err)
 		}
 		log.G(ctx).Debugf("converted %s to EROFS", desc.Digest)
