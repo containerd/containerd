@@ -29,6 +29,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -712,8 +713,11 @@ func withOffsetCheck(offset, parallelism int64) doChecks {
 	}
 }
 
+const maxAttempts = 5
+
 func (r *request) doWithRetries(ctx context.Context, lastHost bool, checks ...doChecks) (resp *http.Response, err error) {
-	resp, err = r.doWithRetriesInner(ctx, nil, lastHost)
+	attempts := maxAttempts
+	resp, err = r.doWithRetriesInner(ctx, nil, &attempts, lastHost)
 	if err != nil {
 		return nil, err
 	}
@@ -731,8 +735,8 @@ func (r *request) doWithRetries(ctx context.Context, lastHost bool, checks ...do
 	return resp, nil
 }
 
-func (r *request) doWithRetriesInner(ctx context.Context, responses []*http.Response, lastHost bool) (*http.Response, error) {
-	resp, err := r.do(ctx)
+func (r *request) doWithRetriesInner(ctx context.Context, responses []*http.Response, attempts *int, lastHost bool) (*http.Response, error) {
+	resp, err := r.doWithTransportRetries(ctx, attempts, lastHost)
 	if err != nil {
 		return nil, err
 	}
@@ -743,17 +747,61 @@ func (r *request) doWithRetriesInner(ctx context.Context, responses []*http.Resp
 		resp.Body.Close()
 		return nil, err
 	}
-	if retry {
+	if retry && *attempts > 0 {
 		resp.Body.Close()
-		return r.doWithRetriesInner(ctx, responses, lastHost)
+		return r.doWithRetriesInner(ctx, responses, attempts, lastHost)
 	}
 	return resp, err
 }
 
-func (r *request) retryRequest(ctx context.Context, responses []*http.Response, lastHost bool) (bool, error) {
-	if len(responses) > 5 {
-		return false, nil
+// doWithTransportRetries calls r.do, retrying on transient transport errors
+// (e.g. response header timeouts). Retries are only attempted on the last host
+// to match the response-status retry policy for 5xx errors and preserve mirror
+// fallback semantics. Context cancellation stops retries immediately.
+func (r *request) doWithTransportRetries(ctx context.Context, attempts *int, lastHost bool) (*http.Response, error) {
+	for *attempts > 0 {
+		resp, err := r.do(ctx)
+		*attempts--
+		if err == nil {
+			return resp, nil
+		}
+		if !lastHost || !isTransientTransportErr(err) {
+			return nil, err
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if *attempts == 0 {
+			return nil, err
+		}
+		log.G(ctx).WithError(err).WithField("attempt", maxAttempts-*attempts).Debug("transient transport error, retrying")
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
 	}
+	return nil, nil
+}
+
+// isTransientTransportErr reports whether err is a transport-level error worth
+// retrying. context.Canceled and context.DeadlineExceeded are not considered
+// transient.
+func isTransientTransportErr(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	return false
+}
+
+func (r *request) retryRequest(ctx context.Context, responses []*http.Response, lastHost bool) (bool, error) {
 	last := responses[len(responses)-1]
 	switch last.StatusCode {
 	case http.StatusUnauthorized:
