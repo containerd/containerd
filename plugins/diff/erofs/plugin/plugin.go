@@ -19,6 +19,7 @@ package plugin
 import (
 	"fmt"
 
+	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -32,7 +33,12 @@ import (
 
 // Config represents configuration for the erofs plugin.
 type Config struct {
-	// MkfsOptions are extra options used for the applier
+	// UseMkfs builds EROFS layers with mkfs.erofs from erofs-utils instead of
+	// the built-in Go converter. The differ is disabled when mkfs.erofs is
+	// missing or does not support tar mode.
+	UseMkfs bool `toml:"use_mkfs"`
+
+	// MkfsOptions are extra options for mkfs.erofs, used with UseMkfs
 	MkfsOptions []string `toml:"mkfs_options"`
 
 	// EnableTarIndex enables the tar index mode where the index is generated
@@ -53,12 +59,15 @@ func init() {
 		},
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
-			tarModeSupported, err := erofsutils.SupportGenerateFromTar()
-			if err != nil {
-				return nil, fmt.Errorf("failed to check mkfs.erofs availability: %v: %w", err, plugin.ErrSkipPlugin)
-			}
-			if !tarModeSupported {
-				return nil, fmt.Errorf("mkfs.erofs does not support tar mode (--tar option), disabling erofs differ: %w", plugin.ErrSkipPlugin)
+			config := ic.Config.(*Config)
+			if config.UseMkfs {
+				tarModeSupported, err := erofsutils.MkfsSupportsTar()
+				if err != nil {
+					return nil, fmt.Errorf("failed to check mkfs.erofs availability: %v: %w", err, plugin.ErrSkipPlugin)
+				}
+				if !tarModeSupported {
+					return nil, fmt.Errorf("mkfs.erofs does not support tar mode (--tar option), disabling erofs differ: %w", plugin.ErrSkipPlugin)
+				}
 			}
 
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
@@ -73,12 +82,14 @@ func init() {
 			p.OSFeatures = []string{"erofs"}
 			ic.Meta.Platforms = append(ic.Meta.Platforms, p)
 			cs := md.(*metadata.DB).ContentStore()
-			config := ic.Config.(*Config)
 
 			var opts []erofs.DifferOpt
 
-			if len(config.MkfsOptions) > 0 {
-				opts = append(opts, erofs.WithMkfsOptions(config.MkfsOptions))
+			if config.UseMkfs {
+				opts = append(opts, erofs.WithMkfs(), erofs.WithMkfsOptions(config.MkfsOptions))
+			} else if len(config.MkfsOptions) > 0 {
+				log.G(ic.Context).WithField("mkfs_options", config.MkfsOptions).
+					Warn("mkfs_options is ignored because use_mkfs is not set")
 			}
 
 			if config.EnableTarIndex {
