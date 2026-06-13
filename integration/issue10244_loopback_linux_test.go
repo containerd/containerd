@@ -49,7 +49,12 @@ func TestIssue10244LoopbackV2(t *testing.T) {
 // checkLoopbackResult validates whether the loopback interface status within a container is UP
 func checkLoopbackResult(t *testing.T, useInternalLoopback bool) bool {
 	t.Logf("Create containerd config with 'use_internal_loopback' set to '%t'", useInternalLoopback)
-	workDir := t.TempDir()
+	testDir := "/var/lib/test"
+	errMkdir := os.MkdirAll(testDir, 0755)
+	require.NoError(t, errMkdir)
+	defer os.Remove(testDir)
+	workDir, err := os.MkdirTemp("/var/lib/test", "loopbak")
+	require.NoError(t, err)
 	configPath := filepath.Join(workDir, "config.toml")
 	ctrdConfig := fmt.Sprintf(`
 	version = 3
@@ -60,7 +65,7 @@ func checkLoopbackResult(t *testing.T, useInternalLoopback bool) bool {
 		use_internal_loopback = %t`,
 		useInternalLoopback)
 
-	err := os.WriteFile(configPath, []byte(ctrdConfig), 0600)
+	err = os.WriteFile(configPath, []byte(ctrdConfig), 0600)
 	require.NoError(t, err)
 
 	t.Logf("Start containerd")
