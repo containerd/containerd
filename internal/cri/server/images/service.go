@@ -170,10 +170,21 @@ func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error)
 				return ""
 			}
 			id, err := c.imageStore.Resolve(normalized.String())
-			if err != nil {
-				return ""
+			if err == nil {
+				return id
 			}
-			return id
+			// For tag+digest refs (name:tag@digest), also try the digest-only
+			// canonical form. containerd stores images by their digest-only name
+			// when pulled with a tag+digest reference (the tag is dropped).
+			if _, isTagged := normalized.(docker.Tagged); isTagged {
+				if digested, isDigested := normalized.(docker.Digested); isDigested {
+					digestOnly := normalized.Name() + "@" + digested.Digest().String()
+					if id, err = c.imageStore.Resolve(digestOnly); err == nil {
+						return id
+					}
+				}
+			}
+			return ""
 		}(refOrID)
 	}
 

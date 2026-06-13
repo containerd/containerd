@@ -29,6 +29,7 @@ import (
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
+	docker "github.com/distribution/reference"
 	"github.com/opencontainers/selinux/go-selinux"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -343,8 +344,25 @@ func (c *Controller) getSandboxImageName() string {
 	// returns the name of the sandbox image used to scope pod shared resources used by the pod's containers,
 	// if empty return the default sandbox image.
 	if image, ok := c.imageConfig.PinnedImages["sandbox"]; ok && image != "" {
-		return image
+		return normalizeImageRef(image)
 	}
 
 	return criconfig.DefaultSandboxImage
+}
+
+// normalizeImageRef converts a tag+digest reference (name:tag@digest) to its
+// canonical digest-only form (name@digest). containerd stores images by their
+// digest-only name when they are pulled with a tag+digest reference (tag is
+// dropped), so using the canonical form avoids "image not found" errors.
+func normalizeImageRef(ref string) string {
+	normalized, err := docker.ParseDockerRef(ref)
+	if err != nil {
+		return ref
+	}
+	if _, isTagged := normalized.(docker.Tagged); isTagged {
+		if digested, isDigested := normalized.(docker.Digested); isDigested {
+			return normalized.Name() + "@" + digested.Digest().String()
+		}
+	}
+	return normalized.String()
 }
