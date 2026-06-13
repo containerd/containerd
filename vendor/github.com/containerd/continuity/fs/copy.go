@@ -33,7 +33,9 @@ type XAttrErrorHandler func(dst, src, xattrKey string, err error) error
 type copyDirOpts struct {
 	xeh XAttrErrorHandler
 	// xex contains a set of xattrs to exclude when copying
-	xex map[string]struct{}
+	xex      map[string]struct{}
+	fileSync bool
+	dirSync  bool
 }
 
 type CopyDirOpt func(*copyDirOpts) error
@@ -65,6 +67,34 @@ func WithXAttrExclude(keys ...string) CopyDirOpt {
 		for _, key := range keys {
 			o.xex[key] = struct{}{}
 		}
+		return nil
+	}
+}
+
+// WithCopyFileSync ensures each file copied within CopyDir is fsynced to
+// persistent storage before proceeding to the next file.
+//
+// By default, files are not synced. Versions prior to v0.5.0 never synced;
+// v0.5.0 added unconditional per-file fsync which caused a performance
+// regression.
+func WithCopyFileSync() CopyDirOpt {
+	return func(o *copyDirOpts) error {
+		o.fileSync = true
+		return nil
+	}
+}
+
+// WithCopyDirSync ensures full crash durability during CopyDir.
+// This implies file-level fsync (WithCopyFileSync) and additionally fsyncs
+// each directory after all its entries have been copied.
+//
+// By default, neither files nor directories are synced. Versions prior to
+// v0.5.0 never synced; v0.5.0 added unconditional per-file fsync which
+// caused a performance regression.
+func WithCopyDirSync() CopyDirOpt {
+	return func(o *copyDirOpts) error {
+		o.fileSync = true
+		o.dirSync = true
 		return nil
 	}
 }
@@ -143,7 +173,7 @@ func copyDirectory(dst, src string, inodes map[uint64]string, o *copyDirOpts) er
 				if err := os.Link(link, target); err != nil {
 					return fmt.Errorf("failed to create hard link: %w", err)
 				}
-			} else if err := CopyFile(target, source); err != nil {
+			} else if err := copyFileWithOpts(target, source, o); err != nil {
 				return fmt.Errorf("failed to copy files: %w", err)
 			}
 		case (fileInfo.Mode() & os.ModeSymlink) == os.ModeSymlink:
@@ -185,16 +215,54 @@ func copyDirectory(dst, src string, inodes map[uint64]string, o *copyDirOpts) er
 			return err
 		}
 	}
-	return dr.Err()
+	if err := dr.Err(); err != nil {
+		return err
+	}
+
+	if o.dirSync {
+		if err := syncDirectory(dst); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func copyFileWithOpts(target, source string, o *copyDirOpts) error {
+	if o.fileSync {
+		return CopyFile(target, source, WithFileSync())
+	}
+	return CopyFile(target, source)
+}
+
+type CopyFileOpt func(*copyFileConfig)
+
+type copyFileConfig struct {
+	sync bool
+}
+
+// WithFileSync ensures the copied file is fsynced to persistent
+// storage before returning.
+//
+// By default, files are not synced. Versions prior to v0.5.0 never synced;
+// v0.5.0 added unconditional per-file fsync which caused a performance regression.
+func WithFileSync() CopyFileOpt {
+	return func(c *copyFileConfig) {
+		c.sync = true
+	}
 }
 
 // CopyFile copies the source file to the target.
 // The most efficient means of copying is used for the platform.
-func CopyFile(target, source string) error {
-	return copyFile(target, source)
+func CopyFile(target, source string, opts ...CopyFileOpt) error {
+	var cfg copyFileConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
+	return copyFile(target, source, cfg.sync)
 }
 
-func openAndCopyFile(target, source string) error {
+func openAndCopyFile(target, source string, sync bool) error {
 	src, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("failed to open source %s: %w", source, err)
@@ -206,6 +274,13 @@ func openAndCopyFile(target, source string) error {
 	}
 	defer tgt.Close()
 
-	_, err = io.Copy(tgt, src)
-	return err
+	if _, err = io.Copy(tgt, src); err != nil {
+		return err
+	}
+	if sync {
+		if err := tgt.Sync(); err != nil {
+			return fmt.Errorf("failed to sync target %s: %w", target, err)
+		}
+	}
+	return nil
 }

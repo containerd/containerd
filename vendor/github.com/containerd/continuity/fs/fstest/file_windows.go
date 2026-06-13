@@ -25,21 +25,21 @@ import (
 // SetXAttr sets the xatter for the file
 func SetXAttr(name, key, value string) Applier {
 	return applyFn(func(root string) error {
-		return errors.New("Not implemented")
+		return errors.New("not implemented")
 	})
 }
 
 // Lchtimes changes access and mod time of file without following symlink
 func Lchtimes(name string, atime, mtime time.Time) Applier {
 	return applyFn(func(root string) error {
-		return errors.New("Not implemented")
+		return errors.New("not implemented")
 	})
 }
 
 // CreateDeviceFile provides creates devices Applier.
 func CreateDeviceFile(name string, mode os.FileMode, major, minor int) Applier {
 	return applyFn(func(root string) error {
-		return errors.New("Not implemented")
+		return errors.New("not implemented")
 	})
 }
 
