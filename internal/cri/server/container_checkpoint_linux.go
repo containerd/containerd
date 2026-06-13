@@ -369,7 +369,7 @@ func (c *criService) CRImportCheckpoint(
 	imageConfig := image.ImageSpec.Config
 	env := append([]string{}, imageConfig.Env...)
 	for _, e := range meta.Config.GetEnvs() {
-		env = append(env, e.GetKey()+"="+e.GetValue())
+		env = append(env, e.GetKey()+"="+string(e.GetValue()))
 	}
 	imageConfig.Env = append(imageConfig.Env, env...)
 
