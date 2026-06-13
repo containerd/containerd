@@ -40,7 +40,7 @@ func (s *erofsDiff) getDmverityOptions() *dmverity.DmverityOptions {
 	opts := dmverity.DefaultDmverityOptions()
 
 	// Tar index mode requires 512-byte blocks because:
-	// 1. EROFS tar index mode uses 512-byte metadata blocks (mkfs.erofs --tar=i)
+	// 1. EROFS tar index mode uses 512-byte metadata blocks
 	// 2. dm-verity sets the virtual block device logical_block_size to match the data block size
 	// 3. EROFS requires its block size (512) to be >= the underlying block device's logical_block_size
 	// Using 4096-byte dm-verity blocks would set logical_block_size=4096, causing EROFS sb_set_blocksize(512) to fail
