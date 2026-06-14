@@ -35,3 +35,8 @@ const (
 	// DefaultSandboxer defines the default sandboxer to use for creating sandboxes.
 	DefaultSandboxer = "shim"
 )
+
+var (
+	// DefaultImports is the default imports for config files.
+	DefaultImports = []string{"conf/*.toml"}
+)
