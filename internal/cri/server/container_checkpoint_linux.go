@@ -71,6 +71,11 @@ func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string
 
 	image, err := c.LocalResolve(input)
 	if err != nil {
+		if errdefs.IsNotFound(err) {
+			// Image not yet in the CRI store (e.g. imported via the containerd
+			// client API rather than PullImage). Treat as a non-checkpoint image.
+			return "", nil
+		}
 		return "", fmt.Errorf("failed to resolve image %q: %w", input, err)
 	}
 	containerdImage, err := c.toContainerdImage(ctx, image)
