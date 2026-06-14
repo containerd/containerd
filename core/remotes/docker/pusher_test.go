@@ -319,6 +319,57 @@ func TestPusherInvalidAuthorizationOnMount(t *testing.T) {
 	}
 }
 
+func TestPusherMountFromWithRepositoryPrefix(t *testing.T) {
+	t.Parallel()
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	const prefix = "team"
+	p.hosts[0].RepositoryPrefix = prefix
+	reg.uploadable = true
+
+	var (
+		mu             sync.Mutex
+		mountScopes    []string
+		mountFromQuery string
+	)
+	p.hosts[0].Authorizer = &mockAuthorizer{
+		authorize: func(ctx context.Context, r *http.Request) error {
+			if r.URL.Query().Get("mount") != "" {
+				mu.Lock()
+				mountScopes = GetTokenScopes(ctx, nil)
+				mountFromQuery = r.URL.Query().Get("from")
+				mu.Unlock()
+			}
+			return nil
+		},
+	}
+
+	ct := []byte("layer-bytes")
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes(ct),
+		Size:      int64(len(ct)),
+		Annotations: map[string]string{
+			distributionSourceLabelKey(samplePusherHostname): "always-mount",
+		},
+	}
+
+	w, err := p.push(context.Background(), desc, remotes.MakeRefKey(context.Background(), desc), false)
+	require.NoError(t, err)
+	_, err = w.Write(ct)
+	assert.NoError(t, err)
+	err = w.Commit(context.Background(), desc.Size, desc.Digest)
+	assert.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, prefix+"/always-mount", mountFromQuery, "from= should carry the prefixed repository")
+	assert.Contains(t, mountScopes, "repository:"+prefix+"/always-mount:pull",
+		"mount request scopes should include the prefixed pull scope")
+}
+
 type mockAuthorizer struct {
 	authorize    func(ctx context.Context, r *http.Request) error
 	addResponses func(ctx context.Context, resp []*http.Response) error

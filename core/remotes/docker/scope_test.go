@@ -56,6 +56,72 @@ func TestRepositoryScope(t *testing.T) {
 	}
 }
 
+func TestRepositoryScopeForHost(t *testing.T) {
+	testCases := []struct {
+		name     string
+		host     RegistryHost
+		refspec  reference.Spec
+		push     bool
+		expected string
+	}{
+		{
+			name: "no RepositoryPrefix yields the original repository",
+			host: RegistryHost{Host: "registry-1.docker.io"},
+			refspec: reference.Spec{
+				Locator: "registry-1.docker.io/library/alpine",
+				Object:  "ignored",
+			},
+			expected: "repository:library/alpine:pull",
+		},
+		{
+			// Regression for https://github.com/containerd/containerd/issues/9648.
+			name: "RepositoryPrefix is prepended to the repository name",
+			host: RegistryHost{Host: "ghcr.io", RepositoryPrefix: "stackhpc/docker.io"},
+			refspec: reference.Spec{
+				Locator: "docker.io/calico/node",
+				Object:  "v3.27.0",
+			},
+			expected: "repository:stackhpc/docker.io/calico/node:pull",
+		},
+		{
+			name: "RepositoryPrefix with leading and trailing slashes is normalized",
+			host: RegistryHost{Host: "us-docker.pkg.dev", RepositoryPrefix: "/project/quay-io/"},
+			refspec: reference.Spec{
+				Locator: "quay.io/prometheus/node-exporter",
+				Object:  "v1.7.0",
+			},
+			expected: "repository:project/quay-io/prometheus/node-exporter:pull",
+		},
+		{
+			name: "push action produces pull,push scope",
+			host: RegistryHost{Host: "registry-1.docker.io"},
+			refspec: reference.Spec{
+				Locator: "registry-1.docker.io/library/alpine",
+				Object:  "ignored",
+			},
+			push:     true,
+			expected: "repository:library/alpine:pull,push",
+		},
+		{
+			name: "push action with RepositoryPrefix produces prefixed pull,push scope",
+			host: RegistryHost{Host: "ghcr.io", RepositoryPrefix: "stackhpc/docker.io"},
+			refspec: reference.Spec{
+				Locator: "docker.io/library/alpine",
+				Object:  "ignored",
+			},
+			push:     true,
+			expected: "repository:stackhpc/docker.io/library/alpine:pull,push",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := repositoryScopeForHost(tc.host, tc.refspec, tc.push)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
 func TestGetTokenScopes(t *testing.T) {
 	testCases := []struct {
 		scopesInCtx  []string
