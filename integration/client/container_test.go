@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -398,10 +399,24 @@ func TestContainerWait(t *testing.T) {
 	defer task.Delete(ctx)
 
 	ctx2, cancle2 := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	statusErrC := func() <-chan ExitStatus {
+		defer wg.Done()
+		status, err := task.Wait(ctx2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return status
+	}()
+	wg.Wait()
 	cancle2()
-	statusErrC, _ := task.Wait(ctx2)
-	s := <-statusErrC
-	require.Error(t, s.Error(), "expected wait error, but got nil")
+	select {
+	case s := <-statusErrC:
+		require.Error(t, s.Error(), "expected wait error, but got nil")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Timed out waiting for task to finish.")
+	}
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
