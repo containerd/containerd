@@ -47,7 +47,7 @@ func init() {
 type registryOpts struct {
 	headers       http.Header
 	creds         CredentialHelper
-	hostDir       string
+	hostDirs      []string
 	defaultScheme string
 	httpDebug     bool
 	httpTrace     bool
@@ -73,10 +73,15 @@ func WithCredentials(creds CredentialHelper) Opt {
 	}
 }
 
-// WithHostDir specifies the host configuration directory.
+// WithHostDir appends a host configuration directory.
+//
+// This option may be set multiple times; directories are searched in call order.
 func WithHostDir(hostDir string) Opt {
 	return func(o *registryOpts) error {
-		o.hostDir = hostDir
+		if hostDir == "" {
+			return nil
+		}
+		o.hostDirs = append(o.hostDirs, hostDir)
 		return nil
 	}
 }
@@ -124,8 +129,9 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	}
 
 	hostOptions := config.HostOptions{}
-	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+
+	if len(ropts.hostDirs) > 0 {
+		hostOptions.HostDir = config.HostDirFromRoots(ropts.hostDirs)
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
@@ -157,17 +163,23 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		Headers: ropts.headers,
 	})
 
-	return &OCIRegistry{
+	reg := &OCIRegistry{
 		reference:     ref,
 		headers:       ropts.headers,
 		creds:         ropts.creds,
 		resolver:      resolver,
-		hostDir:       ropts.hostDir,
 		defaultScheme: ropts.defaultScheme,
 		httpDebug:     ropts.httpDebug,
 		httpTrace:     ropts.httpTrace,
 		localStream:   ropts.localStream,
-	}, nil
+	}
+	// RegistryResolver carries a single host_dir field. Preserve the first
+	// configured host directory for transfer marshaling compatibility.
+	if len(ropts.hostDirs) > 0 {
+		reg.hostDir = ropts.hostDirs[0]
+	}
+
+	return reg, nil
 }
 
 // From stream
