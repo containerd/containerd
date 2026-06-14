@@ -118,6 +118,23 @@ func TestCompressDecompressPigz(t *testing.T) {
 		t.Skip("pigz not installed")
 	}
 
+	t.Setenv(enablePigzEnv, "true")
+
+	decompressor := testCompressDecompress(t, 1024*1024, Gzip)
+	wrapper := decompressor.(*readCloserWrapper)
+	_, ok := wrapper.Reader.(*io.PipeReader)
+	if !ok {
+		t.Fatalf("unexpected compressor type: %T", wrapper.Reader)
+	}
+}
+
+func TestCompressDecompressIgzip(t *testing.T) {
+	if _, err := exec.LookPath("igzip"); err != nil {
+		t.Skip("igzip not installed")
+	}
+
+	t.Setenv(enableIgzipEnv, "true")
+
 	decompressor := testCompressDecompress(t, 1024*1024, Gzip)
 	wrapper := decompressor.(*readCloserWrapper)
 	_, ok := wrapper.Reader.(*io.PipeReader)
