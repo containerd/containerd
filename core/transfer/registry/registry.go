@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -125,7 +126,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 
 	hostOptions := config.HostOptions{}
 	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+		hostOptions.HostDir = config.HostDirFromRoots(filepath.SplitList(ropts.hostDir))
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
