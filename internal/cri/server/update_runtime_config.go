@@ -72,7 +72,7 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 		log.G(ctx).Info("No cni config template is specified, wait for other system components to drop the config.")
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
-	netPlugin := c.netPlugin[defaultNetworkPlugin]
+	netPlugin := c.cniNetPlugin.get(defaultNetworkPlugin)
 	if netPlugin == nil {
 		log.G(ctx).Infof("Network plugin is ready, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil

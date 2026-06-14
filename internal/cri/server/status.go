@@ -45,7 +45,7 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		Type:   runtime.NetworkReady,
 		Status: true,
 	}
-	netPlugin := c.netPlugin[defaultNetworkPlugin]
+	netPlugin := c.cniNetPlugin.get(defaultNetworkPlugin)
 	// Check the status of the cni initialization
 	if netPlugin != nil {
 		if err := netPlugin.Status(); err != nil {
@@ -90,21 +90,7 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			resp.Info["cniconfig"] = string(cniConfig)
 		}
 
-		defaultStatus := "OK"
-		for name, h := range c.cniNetConfMonitor {
-			s := "OK"
-			if h == nil {
-				continue
-			}
-			if lerr := h.lastStatus(); lerr != nil {
-				s = lerr.Error()
-			}
-			resp.Info[fmt.Sprintf("lastCNILoadStatus.%s", name)] = s
-			if name == defaultNetworkPlugin {
-				defaultStatus = s
-			}
-		}
-		resp.Info["lastCNILoadStatus"] = defaultStatus
+		maps.Copy(resp.Info, c.cniNetPlugin.status())
 	}
 	intro, err := c.client.IntrospectionService().Server(ctx)
 	if err != nil {
