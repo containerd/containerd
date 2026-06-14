@@ -246,7 +246,7 @@ func CompressStream(dest io.Writer, compression Compression) (io.WriteCloser, er
 	case Uncompressed:
 		return &writeCloserWrapper{dest, nil}, nil
 	case Gzip:
-		return gzip.NewWriter(dest), nil
+		return gzip.NewWriterLevel(dest, 1)
 	case Zstd:
 		return zstd.NewWriter(dest)
 	default:
