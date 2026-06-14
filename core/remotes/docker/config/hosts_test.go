@@ -123,6 +123,9 @@ ca = "/etc/path/default"
 
 [host."https://dial-timeout.registry"]
   dial_timeout = "3s"
+
+[host."https://proxy.registry"]
+  proxy = "http://my-proxy:8080"
 `
 
 	var tb, fb = true, false
@@ -214,6 +217,13 @@ ca = "/etc/path/default"
 			path:         "/v2",
 			capabilities: allCaps,
 			dialTimeout:  &dialTimeout,
+		},
+		{
+			scheme:       "https",
+			host:         "proxy.registry",
+			path:         "/v2",
+			capabilities: allCaps,
+			proxy:        "http://my-proxy:8080",
 		},
 		{
 			scheme:       "https",
@@ -510,6 +520,113 @@ func TestHTTPFallback(t *testing.T) {
 	}
 }
 
+func TestConfigureHostsProxy(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		tomlContent string
+		expectErr   bool
+		expectProxy string
+	}{
+		{
+			name: "valid proxy URL",
+			tomlContent: `
+[host."https://example.com"]
+  proxy = "http://my-proxy:8080"
+`,
+			expectErr:   false,
+			expectProxy: "http://my-proxy:8080",
+		},
+		{
+			name: "invalid proxy URL",
+			tomlContent: `
+[host."https://example.com"]
+  proxy = "http://%"
+`,
+			expectErr: true,
+		},
+		{
+			name: "proxy URL with no scheme",
+			tomlContent: `
+[host."https://example.com"]
+  proxy = "my-proxy:8080"
+`,
+			expectErr: true,
+		},
+		{
+			name: "proxy URL with unsupported scheme",
+			tomlContent: `
+[host."https://example.com"]
+  proxy = "socks5://my-proxy:1080"
+`,
+			expectErr: true,
+		},
+		{
+			name: "proxy URL with empty host",
+			tomlContent: `
+[host."https://example.com"]
+  proxy = "http:///path"
+`,
+			expectErr: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			hostsTomlPath := filepath.Join(dir, "hosts.toml")
+			if err := os.WriteFile(hostsTomlPath, []byte(tc.tomlContent), 0600); err != nil {
+				t.Fatalf("Could not write temporary files needed for test %s: %v", tc.name, err)
+			}
+
+			ctx := logtest.WithT(context.TODO(), t)
+			opts := HostOptions{
+				HostDir: func(host string) (string, error) {
+					return dir, nil
+				},
+			}
+			hosts := ConfigureHosts(ctx, opts)
+			testHosts, err := hosts("example.com")
+
+			if tc.expectErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(testHosts) < 1 {
+				t.Fatalf("expected at least 1 host, got %d", len(testHosts))
+			}
+
+			transport, ok := testHosts[0].Client.Transport.(*http.Transport)
+			if !ok {
+				t.Fatalf("expected *http.Transport, got %T", testHosts[0].Client.Transport)
+			}
+
+			if transport.Proxy == nil {
+				t.Fatal("expected Proxy to be set, but got nil")
+			}
+
+			req, err := http.NewRequest("GET", "https://example.com", nil)
+			if err != nil {
+				t.Fatalf("Unexpected error while creating request: %v", err)
+			}
+			proxyURL, err := transport.Proxy(req)
+			if err != nil {
+				t.Fatalf("failed to derive proxy from transport: %v", err)
+			}
+			if proxyURL == nil {
+				t.Fatal("expected proxy URL, got nil")
+			}
+			if proxyURL.String() != tc.expectProxy {
+				t.Fatalf("expected proxy URL %q, got %q", tc.expectProxy, proxyURL.String())
+			}
+		})
+	}
+}
+
 func compareRegistryHost(j, k docker.RegistryHost) bool {
 	if j.Scheme != k.Scheme {
 		return false
@@ -540,6 +657,10 @@ func compareHostConfig(j, k hostConfig) bool {
 	if j.capabilities != k.capabilities {
 		return false
 	}
+	if j.proxy != k.proxy {
+		return false
+	}
+
 
 	if len(j.caCerts) != len(k.caCerts) {
 		return false
