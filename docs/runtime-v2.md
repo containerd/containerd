@@ -559,7 +559,7 @@ func copy(wg *sync.WaitGroup, r io.Reader, pri journal.Priority, vars map[string
 
 #### Unsupported rpcs
 
-If a shim does not or cannot implement an rpc call, it MUST return a `github.com/containerd/containerd/errdefs.ErrNotImplemented` error.
+If a shim does not or cannot implement an rpc call, it MUST return a `github.com/containerd/errdefs.ErrNotImplemented` error.
 
 #### Debugging and Shim Logs
 
