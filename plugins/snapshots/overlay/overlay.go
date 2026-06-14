@@ -254,8 +254,8 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (_ snapshots.Usage,
 		upperPath := o.upperPath(id)
 		du, err := fs.DiskUsage(ctx, upperPath)
 		if err != nil {
-			// TODO(stevvooe): Consider not reporting an error in this case.
-			return snapshots.Usage{}, err
+			log.G(ctx).Warnf("failed to scan the disk usage of the overlay upper dir %q: %s", upperPath, err.Error())
+			return snapshots.Usage{}, nil
 		}
 		usage = snapshots.Usage(du)
 	}
