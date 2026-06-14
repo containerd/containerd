@@ -1,4 +1,4 @@
-//go:build !windows && !darwin && !linux
+//go:build !linux
 
 /*
    Copyright The containerd Authors.
@@ -16,9 +16,20 @@
    limitations under the License.
 */
 
-package diff
+package overlay
 
-var defaultDifferConfig = &config{
-	Order:  []string{"walking"},
-	SyncFs: false,
+import (
+	"context"
+
+	"github.com/containerd/errdefs"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/mount"
+)
+
+// Compare returns ErrNotImplemented on non-Linux platforms as the overlay
+// filesystem is Linux-specific.
+func (s *overlayDiff) Compare(_ context.Context, _, _ []mount.Mount, _ ...diff.Opt) (ocispec.Descriptor, error) {
+	return emptyDesc, errdefs.ErrNotImplemented
 }
