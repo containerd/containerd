@@ -514,7 +514,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		}
 		return nil, rerr
 	}
-
+	log.G(ctx).WithField("key", key).Debug("create snapshot")
 	return m, nil
 }
 
