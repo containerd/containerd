@@ -79,6 +79,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// If cleanup is not completed for some reason, the CRI-plugin will leave the sandbox
 	// in a not-ready state, which can later be cleaned up by the next execution of the kubelet's syncPod workflow.
 	var cleanupErr error
+	var shutdownErr error
 
 	// Reserve the sandbox name to avoid concurrent `RunPodSandbox` request starting the
 	// same sandbox.
@@ -162,15 +163,19 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
 	}
 	defer func() {
-		if retErr != nil && cleanupErr == nil {
+		if retErr != nil && cleanupErr == nil && shutdownErr == nil {
 			cleanupErr = c.client.SandboxStore().Delete(ctx, id)
 		}
 	}()
 
 	defer func() {
 		// Put the sandbox into sandbox store when some resources fail to be cleaned.
-		if retErr != nil && cleanupErr != nil {
-			log.G(ctx).WithError(cleanupErr).Errorf("encountered an error cleaning up failed sandbox %q, marking sandbox state as SANDBOX_UNKNOWN", id)
+		if retErr != nil && (cleanupErr != nil || shutdownErr != nil) {
+			err := cleanupErr
+			if err == nil {
+				err = shutdownErr
+			}
+			log.G(ctx).WithError(err).Errorf("encountered an error cleaning up failed sandbox %q, marking sandbox state as SANDBOX_UNKNOWN", id)
 			if err := c.sandboxStore.Add(sandbox); err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to add sandbox %+v into store", sandbox)
 			}
@@ -326,7 +331,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		if retErr != nil && rollbackSandbox {
 			deferCtx, deferCancel := util.DeferContext()
 			defer deferCancel()
-			cleanupErr = c.sandboxService.ShutdownSandbox(deferCtx, sandbox.Sandboxer, id)
+			shutdownErr = c.sandboxService.ShutdownSandbox(deferCtx, sandbox.Sandboxer, id)
 		}
 	}()
 
