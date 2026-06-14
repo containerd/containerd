@@ -258,6 +258,32 @@ jobs:
           git checkout "${CRITOOLS_VERSION}"
           make critest
 
+      # GitHub Actions windows-2022 runners sometimes come up without the
+      # "nat" HNS network. install-cni-windows reads its gateway and prefix
+      # length via Get-NetIPAddress and produces a broken CNI config if the
+      # interface is missing, which surfaces later as cascading test failures
+      # ("hcnCreateNetwork failed in Win32: Element not found. (0x490)"
+      # from every RunPodSandbox call). Ensure the nat network exists here,
+      # using Docker (already pre-installed on the runner) since it uses HNS
+      # under the hood for the nat driver. Subnet matches windows-periodic.yml.
+      - name: Ensure nat HNS network
+        shell: powershell
+        run: |
+          if (-not (Get-NetIPAddress -InterfaceAlias 'vEthernet (nat)' -AddressFamily IPv4 -ErrorAction SilentlyContinue)) {
+            Write-Host "vEthernet (nat) missing — creating nat HNS network via docker"
+            try { Start-Service docker -ErrorAction Stop } catch { Write-Host $_ }
+            docker network rm nat 2>$null | Out-Null
+            docker network create -d nat --subnet 172.19.208.0/20 --gateway 172.19.208.1 nat
+            for ($i = 0; $i -lt 30; $i++) {
+              if (Get-NetIPAddress -InterfaceAlias 'vEthernet (nat)' -AddressFamily IPv4 -ErrorAction SilentlyContinue) { break }
+              Start-Sleep -Seconds 1
+            }
+            if (-not (Get-NetIPAddress -InterfaceAlias 'vEthernet (nat)' -AddressFamily IPv4 -ErrorAction SilentlyContinue)) {
+              Write-Error "vEthernet (nat) interface did not appear after creating HNS network"
+              exit 1
+            }
+          }
+
       - run: script/setup/install-cni-windows
 
       - env:
