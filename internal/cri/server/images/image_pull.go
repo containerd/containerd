@@ -421,7 +421,15 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
 	for _, pinned := range c.config.PinnedImages {
-		if pinned == name {
+		// Normalize the config value through ParseDockerRef so that a tagless
+		// entry (e.g. "registry.k8s.io/pause") is treated as equivalent to its
+		// normalized form ("registry.k8s.io/pause:latest"), matching the
+		// normalization already applied to `name` at the call site.
+		normalizedPinned, err := distribution.ParseDockerRef(pinned)
+		if err != nil {
+			continue
+		}
+		if normalizedPinned.String() == name {
 			labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
 		}
 	}

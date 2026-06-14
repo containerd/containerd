@@ -474,9 +474,12 @@ func TestImageGetLabels(t *testing.T) {
 			pullImageName: "registry.k8s.io/pause:3.10.2",
 		},
 		{
+			// Tagless config entry "k8s.gcr.io/pause" must match the normalized
+			// pull ref "k8s.gcr.io/pause:latest". Previously the exact-string
+			// comparison failed and the pinned label was never applied.
 			name:          "pinned image labels should get added on sandbox image without tag",
 			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			pinnedImages:  map[string]string{"sandboxnotag": "k8s.gcr.io/pause", "sandbox": "k8s.gcr.io/pause:latest"},
+			pinnedImages:  map[string]string{"sandboxnotag": "k8s.gcr.io/pause"},
 			pullImageName: "k8s.gcr.io/pause:latest",
 		},
 		{
