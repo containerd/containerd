@@ -231,14 +231,6 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	}); err != nil {
 		return err
 	}
-
-	if publisher := cs.db.Publisher(ctx); publisher != nil {
-		if err := publisher.Publish(ctx, "/content/delete", &eventstypes.ContentDelete{
-			Digest: dgst.String(),
-		}); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -916,6 +908,13 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 		if _, ok := contentSeen[info.Digest.String()]; !ok {
 			if err := cs.Store.Delete(ctx, info.Digest); err != nil {
 				return err
+			}
+			if publisher := cs.db.Publisher(ctx); publisher != nil {
+				if err := publisher.Publish(ctx, "/content/delete", &eventstypes.ContentDelete{
+					Digest: info.Digest.String(),
+				}); err != nil {
+					return err
+				}
 			}
 			log.G(ctx).WithField("digest", info.Digest).Debug("removed content")
 		}
