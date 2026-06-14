@@ -197,7 +197,10 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	config := options.RuntimeService.Config()
 
 	// Create the stats collector first so it can be passed to the stores
-	statsCollector := NewStatsCollector(config)
+	statsCollector, err := NewStatsCollector(config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create stats collector: %w", err)
+	}
 
 	c := &criService{
 		RuntimeService:     options.RuntimeService,
