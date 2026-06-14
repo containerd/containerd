@@ -193,9 +193,9 @@ func TestEnvDeduplication(t *testing.T) {
 				{"k4", "v6"},
 			},
 			expected: []string{
-				"k1=v5",
 				"k2=v2",
 				"k3=v4",
+				"k1=v5",
 				"k4=v6",
 			},
 		},
@@ -213,8 +213,8 @@ func TestEnvDeduplication(t *testing.T) {
 			},
 			expected: []string{
 				"k1=v1",
-				"k2=v5",
 				"k3=v4",
+				"k2=v5",
 				"k4=v6",
 			},
 		},
