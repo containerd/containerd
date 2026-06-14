@@ -164,6 +164,10 @@ func (in *instrumentedService) PortForward(ctx context.Context, r *runtime.PortF
 		}
 	}()
 	res, err = in.c.PortForward(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -290,6 +294,10 @@ func (in *instrumentedService) ExecSync(ctx context.Context, r *runtime.ExecSync
 		span.RecordError(err)
 	}()
 	res, err = in.c.ExecSync(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -309,6 +317,10 @@ func (in *instrumentedService) Exec(ctx context.Context, r *runtime.ExecRequest)
 		span.RecordError(err)
 	}()
 	res, err = in.c.Exec(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -327,6 +339,10 @@ func (in *instrumentedService) Attach(ctx context.Context, r *runtime.AttachRequ
 		span.RecordError(err)
 	}()
 	res, err = in.c.Attach(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -343,6 +359,10 @@ func (in *instrumentedService) UpdateContainerResources(ctx context.Context, r *
 		}
 	}()
 	res, err = in.c.UpdateContainerResources(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -574,6 +594,10 @@ func (in *instrumentedService) ReopenContainerLog(ctx context.Context, r *runtim
 		}
 	}()
 	res, err = in.c.ReopenContainerLog(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
