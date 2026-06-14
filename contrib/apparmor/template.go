@@ -46,7 +46,7 @@ const defaultTemplate = `
 {{$value}}
 {{end}}
 
-profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
+profile "{{.Name}}" flags=(attach_disconnected,mediate_deleted) {
 {{range $value := .InnerImports}}
   {{$value}}
 {{end}}
@@ -62,12 +62,12 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   # crun may send signals to container processes.
   signal (receive) peer=crun,
   # Manager may send signals to container processes.
-  signal (receive) peer={{.DaemonProfile}},
+  signal (receive) peer="{{.DaemonProfile}}",
   # Container processes may send signals amongst themselves.
-  signal (send,receive) peer={{.Name}},
+  signal (send,receive) peer="{{.Name}}",
 {{if .RootlessKit}}
   # https://github.com/containerd/nerdctl/issues/2730
-  signal (receive) peer={{.RootlessKit}},
+  signal (receive) peer="{{.RootlessKit}}",
 {{end}}
 
   deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
@@ -91,7 +91,7 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 
   # allow processes within the container to trace each other,
   # provided all other LSM and yama setting allow it.
-  ptrace (trace,tracedby,read,readby) peer={{.Name}},
+  ptrace (trace,tracedby,read,readby) peer="{{.Name}}",
 }
 `
 
@@ -105,9 +105,14 @@ type data struct {
 }
 
 func cleanProfileName(profile string) string {
-	// Normally profiles are suffixed by " (enforce)". AppArmor profiles cannot
-	// contain spaces so this doesn't restrict daemon profile names.
-	profile, _, _ = strings.Cut(profile, " ")
+	// /proc/self/attr/current returns the current label for the process.
+	// Unlike /sys/kernel/security/apparmor/profiles, this value may not
+	// include a " (<mode>)" suffix (e.g. it can be just "unconfined").
+	// If a suffix is present, it is of the form "<profile> (<mode>)".
+	// Profile names may contain spaces, so split on " (" rather than the
+	// first space. Trim whitespace first because the value includes a
+	// trailing newline.
+	profile, _, _ = strings.Cut(strings.TrimSpace(profile), " (")
 	if profile == "" {
 		profile = "unconfined"
 	}
@@ -187,19 +192,19 @@ func isLoaded(name string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer f.Close()
-	r := bufio.NewReader(f)
-	for {
-		p, err := r.ReadString('\n')
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return false, err
-		}
-		if strings.HasPrefix(p, name+" ") {
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		// Entries are of the form "<profile> (<mode>)", e.g. "foo (enforce)".
+		// Profile names may contain spaces (quoted names are supported in AppArmor),
+		// so split on " (" rather than the first space.
+		if prefix, _, ok := strings.Cut(scanner.Text(), " ("); ok && prefix == name {
 			return true, nil
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return false, err
 	}
 	return false, nil
 }
