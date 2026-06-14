@@ -176,7 +176,7 @@ Please follow the instructions at [containerd/project](https://github.com/contai
 The containerd codebase is released under the [Apache 2.0 license](LICENSE).
 The README.md file and files in the "docs" folder are licensed under the
 Creative Commons Attribution 4.0 International License. You may obtain a
-copy of the license, titled CC-BY-4.0, at http://creativecommons.org/licenses/by/4.0/.
+copy of the license, titled CC-BY-4.0, at https://creativecommons.org/licenses/by/4.0/.
 
 ## Project details
 
