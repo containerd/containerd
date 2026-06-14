@@ -39,6 +39,6 @@ func registerUnregisterService(root string) (bool, error) {
 }
 
 // launchService is only relevant on Windows.
-func launchService(s *server.Server, done chan struct{}) error {
+func launchService(s *server.Server, done chan struct{}, cancel func()) error {
 	return nil
 }
