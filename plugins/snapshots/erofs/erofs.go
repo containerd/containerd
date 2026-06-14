@@ -40,6 +40,8 @@ import (
 type SnapshotterConfig struct {
 	// ovlOptions are the base options added to the overlayfs mount (defaults to [""])
 	ovlOptions []string
+	// rwlOptions are the extra mount options for rwlayer (defaults to [""])
+	rwlOptions []string
 	// enableFsverity enables fsverity for EROFS layers
 	enableFsverity bool
 	// setImmutable enables IMMUTABLE_FL file attribute for EROFS layers
@@ -58,6 +60,13 @@ type Opt func(config *SnapshotterConfig)
 func WithOvlOptions(options []string) Opt {
 	return func(config *SnapshotterConfig) {
 		config.ovlOptions = options
+	}
+}
+
+// WithRwlOptions defines the extra mount options for rwlayer
+func WithRwlOptions(options []string) Opt {
+	return func(config *SnapshotterConfig) {
+		config.rwlOptions = options
 	}
 }
 
@@ -106,6 +115,7 @@ type snapshotter struct {
 	root            string
 	ms              *storage.MetaStore
 	ovlOptions      []string
+	rwlOptions      []string
 	enableFsverity  bool
 	setImmutable    bool
 	defaultWritable int64
@@ -182,6 +192,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		root:            root,
 		ms:              ms,
 		ovlOptions:      config.ovlOptions,
+		rwlOptions:      config.rwlOptions,
 		enableFsverity:  config.enableFsverity,
 		setImmutable:    config.setImmutable,
 		defaultWritable: config.defaultSize,
@@ -415,13 +426,13 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 			mounts = append(mounts, mount.Mount{
 				Source: s.writablePath(snap.ID),
 				Type:   "mkfs/ext4",
-				Options: []string{
+				Options: append([]string{
 					"X-containerd.mkfs.fs=ext4",
 					fmt.Sprintf("X-containerd.mkfs.size=%d", s.writableSize(info)),
 					// TODO: Add UUID
 					"rw",
 					"loop",
-				},
+				}, s.rwlOptions...),
 			})
 			options = append(options,
 				"X-containerd.mkdir.path={{ mount 0 }}/upper:0755",
