@@ -98,7 +98,7 @@ var pushCommand = &cli.Command{
 		if !cliContext.Bool("local") {
 			unsupportedFlags := []string{
 				"manifest", "manifest-type", "max-concurrent-uploaded-layers", "allow-non-distributable-blobs",
-				"skip-verify", "tlscacert", "tlscert", "tlskey", "http-dump", "http-trace", // RegistryFlags
+				"skip-verify", "tlscacert", "tlscert", "tlskey", "http-dump", "http-trace", "sslkeylogfile", // RegistryFlags
 			}
 			for _, s := range unsupportedFlags {
 				if cliContext.IsSet(s) {
