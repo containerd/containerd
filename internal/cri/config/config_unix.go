@@ -109,5 +109,8 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		DrainExecSyncIOTimeout:           "0s",
 		EnableUnprivilegedPorts:          true,
 		EnableUnprivilegedICMP:           true,
+		StatsCollectPeriod:               "1s",
+		StatsRetentionPeriod:             "2m",
+		EnableStatsCollector:             true,
 	}
 }
