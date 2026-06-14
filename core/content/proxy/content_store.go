@@ -193,6 +193,15 @@ func (pcs *proxyContentStore) Writer(ctx context.Context, opts ...content.Writer
 			return nil, err
 		}
 	}
+	// TODO: thread WithBlobDigestAlgorithm through the gRPC write protocol.
+	// The api/services/content/v1 WriteContentRequest does not currently
+	// carry a per-write algorithm hint, so the proxy cannot honour
+	// wOpts.Algorithm. Rather than silently demote to canonical (which
+	// would produce a blob digest in the wrong algorithm), fail so
+	// callers notice that their choice would be ignored.
+	if wOpts.Algorithm != "" {
+		return nil, fmt.Errorf("proxy content store: WithBlobDigestAlgorithm not yet wired through the gRPC write protocol: %w", errdefs.ErrNotImplemented)
+	}
 	wrclient, offset, err := pcs.negotiate(ctx, wOpts.Ref, wOpts.Desc.Size, wOpts.Desc.Digest)
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
