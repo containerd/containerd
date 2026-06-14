@@ -501,11 +501,7 @@ func addImageLease(ctx context.Context, tx *bolt.Tx, ref string, labels map[stri
 		return err
 	}
 
-	if err := bkt.Put([]byte(ref), nil); err != nil {
-		return err
-	}
-
-	return nil
+	return bkt.Put([]byte(ref), nil)
 }
 
 func removeImageLease(ctx context.Context, tx *bolt.Tx, ref string) error {

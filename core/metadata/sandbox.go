@@ -229,7 +229,7 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 			return nil
 		}
 
-		if err := bucket.ForEach(func(k, v []byte) error {
+		return bucket.ForEach(func(k, v []byte) error {
 			info, err := s.read(bucket, k)
 			if err != nil {
 				return fmt.Errorf("failed to read bucket %q: %w", string(k), err)
@@ -240,11 +240,7 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 			}
 
 			return nil
-		}); err != nil {
-			return err
-		}
-
-		return nil
+		})
 	}); err != nil {
 		return nil, err
 	}
@@ -266,7 +262,7 @@ func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
-	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
+	return update(ctx, s.db, func(tx *bbolt.Tx) error {
 		buckets := getSandboxBucket(tx, ns)
 		if buckets == nil {
 			return fmt.Errorf("no sandbox buckets: %w", errdefs.ErrNotFound)
@@ -280,11 +276,7 @@ func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 		}
 
 		return nil
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwrite bool) error {
@@ -342,11 +334,7 @@ func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwr
 		return err
 	}
 
-	if err := boltutil.WriteAny(runtimeBucket, bucketKeyOptions, instance.Runtime.Options); err != nil {
-		return err
-	}
-
-	return nil
+	return boltutil.WriteAny(runtimeBucket, bucketKeyOptions, instance.Runtime.Options)
 }
 
 func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error) {
