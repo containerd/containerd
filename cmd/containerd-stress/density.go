@@ -155,10 +155,7 @@ func getMaps(pid int) (map[string]int, error) {
 		s     = bufio.NewScanner(f)
 	)
 	for s.Scan() {
-		var (
-			fields = strings.Fields(s.Text())
-			name   = fields[0]
-		)
+		fields := strings.Fields(s.Text())
 		if len(fields) < 2 {
 			continue
 		}
@@ -166,7 +163,7 @@ func getMaps(pid int) (map[string]int, error) {
 		if err != nil {
 			continue
 		}
-		smaps[name] += n
+		smaps[fields[0]] += n
 	}
 	if err := s.Err(); err != nil {
 		return nil, err
