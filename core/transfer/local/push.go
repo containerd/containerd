@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
@@ -92,7 +93,12 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 			wrapper = pushCtx.HandlerWrapper
 		}
 	*/
-	if err := remotes.PushContent(ctx, pusher, img.Target, ts.content, ts.limiterU, matcher, wrapper); err != nil {
+
+	appendDistSrcLabelHandler, err := docker.AppendDistributionSourceLabel(ts.content, img.Name)
+	if err != nil {
+		return err
+	}
+	if err := remotes.PushContent(ctx, pusher, img.Target, ts.content, ts.limiterU, matcher, wrapper, appendDistSrcLabelHandler); err != nil {
 		return err
 	}
 	if tops.Progress != nil {
