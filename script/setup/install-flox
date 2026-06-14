@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+set -eu -o pipefail
+
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='sudo'
+fi
+
+: "${FLOX_VERSION:=1.11.4}"
+ARCH="$(uname -m)"
+case "$ARCH" in
+    x86_64|aarch64) ;;
+    *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
+esac
+
+$SUDO apt-get update
+$SUDO apt-get install -y --no-install-recommends curl ca-certificates xz-utils
+$SUDO mkdir -p /nix
+
+curl -fsSLo /tmp/flox.deb \
+    "https://downloads.flox.dev/by-env/stable/deb/flox-${FLOX_VERSION}.${ARCH}-linux.deb"
+curl -fsSLo /tmp/flox.SHA256SUMS \
+    "https://downloads.flox.dev/by-env/stable/flox-${FLOX_VERSION}.SHA256SUMS"
+grep "flox-${FLOX_VERSION}.${ARCH}-linux.deb$" /tmp/flox.SHA256SUMS \
+    | sed "s|flox-${FLOX_VERSION}.${ARCH}-linux.deb|/tmp/flox.deb|" \
+    | sha256sum --check --strict
+$SUDO apt-get install -y --no-install-recommends /tmp/flox.deb
+$SUDO rm -rf /var/lib/apt/lists/*
+rm -f /tmp/flox.deb /tmp/flox.SHA256SUMS

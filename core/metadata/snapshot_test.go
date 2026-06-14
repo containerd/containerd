@@ -70,7 +70,7 @@ func TestSnapshotterWithRef(t *testing.T) {
 	key1 := "test1"
 	test1opt := snapshots.WithLabels(
 		map[string]string{
-			labelSnapshotRef: key1,
+			snapshots.LabelSnapshotRef: key1,
 		},
 	)
 
@@ -113,7 +113,7 @@ func TestSnapshotterWithRef(t *testing.T) {
 	key2 := "test2"
 	test2opt := snapshots.WithLabels(
 		map[string]string{
-			labelSnapshotRef: key2,
+			snapshots.LabelSnapshotRef: key2,
 		},
 	)
 
@@ -244,12 +244,12 @@ func TestFilterInheritedLabels(t *testing.T) {
 			map[string]string{},
 		},
 		{
-			map[string]string{inheritedLabelsPrefix + "foo": "bar"},
-			map[string]string{inheritedLabelsPrefix + "foo": "bar"},
+			map[string]string{snapshots.InheritedLabelsPrefix + "foo": "bar"},
+			map[string]string{snapshots.InheritedLabelsPrefix + "foo": "bar"},
 		},
 		{
-			map[string]string{inheritedLabelsPrefix + "foo": "bar", "qux": "qaz"},
-			map[string]string{inheritedLabelsPrefix + "foo": "bar"},
+			map[string]string{snapshots.InheritedLabelsPrefix + "foo": "bar", "qux": "qaz"},
+			map[string]string{snapshots.InheritedLabelsPrefix + "foo": "bar"},
 		},
 	}
 
@@ -340,7 +340,7 @@ func (s *tmpSnapshotter) create(ctx context.Context, key, parent string, kind sn
 	base.Name = key
 	base.Kind = kind
 
-	target := base.Labels[labelSnapshotRef]
+	target := base.Labels[snapshots.LabelSnapshotRef]
 	if target != "" {
 		for _, name := range s.targets[target] {
 			if s.snapshots[name].Parent == parent {
@@ -399,7 +399,7 @@ func (s *tmpSnapshotter) Commit(ctx context.Context, name, key string, opts ...s
 	s.snapshots[name] = base
 	delete(s.snapshots, key)
 
-	if target := base.Labels[labelSnapshotRef]; target != "" {
+	if target := base.Labels[snapshots.LabelSnapshotRef]; target != "" {
 		s.targets[target] = append(s.targets[target], name)
 	}
 
