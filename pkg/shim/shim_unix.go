@@ -27,6 +27,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/v2/pkg/sys/reaper"
 	"github.com/containerd/fifo"
 	"github.com/containerd/log"
@@ -116,4 +117,10 @@ func openLog(ctx context.Context, _ string) (io.Writer, error) {
 // shim creating its endpoint and the parent connecting to it.
 func awaitPipeReady(_ string) error {
 	return nil
+}
+
+// tryDetach is a no-op on Unix. The classic double-fork is cheap on Unix so
+// Detachable is never invoked.
+func tryDetach(_ context.Context, _ Shim, _ *bootapi.BootstrapParams) (bool, error) {
+	return false, nil
 }

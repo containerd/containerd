@@ -295,6 +295,18 @@ func run(ctx context.Context, manager Shim, config Config) error {
 			}
 		}
 
+		// Platform-specific: on Windows, if the manager implements
+		// Detachable, tryDetach writes the bootstrap result, closes stdout,
+		// detaches the console, and returns true so we fall through to the
+		// daemon serve loop. On Unix it is always a no-op.
+		// See shim_windows.go and shim_unix.go.
+		if started, err := tryDetach(ctx, manager, &params); err != nil {
+			return err
+		} else if started {
+			break
+		}
+
+		// Classic path: manager spawned a separate daemon subprocess.
 		result, err := manager.Start(ctx, &params)
 		if err != nil {
 			return err
