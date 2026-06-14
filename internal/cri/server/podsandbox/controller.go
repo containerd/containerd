@@ -191,6 +191,12 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 
 // handleSandboxTaskExit handles TaskExit event for sandbox.
 func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventtypes.TaskExit) error {
+	// During heavy churn (e.g. many OOM-killed inits) a TaskExit event can be
+	// dispatched after the sandbox container has been torn down, leaving
+	// sb.Container nil. Treat that as already-exited rather than panicking.
+	if sb.Container == nil {
+		return sb.Exit(e.ExitStatus, protobuf.FromTimestamp(e.ExitedAt))
+	}
 	// No stream attached to sandbox container.
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
