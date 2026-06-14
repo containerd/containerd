@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	oci "github.com/opencontainers/runtime-spec/specs-go"
-	ocigen "github.com/opencontainers/runtime-tools/generate"
 	cdi "tags.cncf.io/container-device-interface/specs-go"
 )
 
@@ -42,6 +41,9 @@ const (
 	PoststartHook = "poststart"
 	// PoststopHook is the name of the OCI "poststop" hook.
 	PoststopHook = "poststop"
+
+	// NoPermissions requests empty cgroup permissions for a device.
+	NoPermissions = "none"
 )
 
 var (
@@ -77,9 +79,11 @@ func (e *ContainerEdits) Apply(spec *oci.Spec) error {
 		return nil
 	}
 
-	specgen := ocigen.NewFromSpec(spec)
 	if len(e.Env) > 0 {
-		specgen.AddMultipleProcessEnv(e.Env)
+		if spec.Process == nil {
+			spec.Process = &oci.Process{}
+		}
+		addMultipleProcessEnv(spec.Process, e.Env)
 	}
 
 	for _, d := range e.DeviceNodes {
@@ -101,52 +105,68 @@ func (e *ContainerEdits) Apply(spec *oci.Spec) error {
 			}
 		}
 
-		specgen.RemoveDevice(dev.Path)
-		specgen.AddDevice(dev)
+		if spec.Linux == nil {
+			spec.Linux = &oci.Linux{}
+		}
+		removeDevice(spec, dev.Path)
+		spec.Linux.Devices = append(spec.Linux.Devices, dev)
 
 		if dev.Type == "b" || dev.Type == "c" {
 			access := d.Permissions
-			if access == "" {
+			switch access {
+			case "":
 				access = "rwm"
+			case NoPermissions:
+				access = ""
 			}
-			specgen.AddLinuxResourcesDevice(true, dev.Type, &dev.Major, &dev.Minor, access)
+			if spec.Linux.Resources == nil {
+				spec.Linux.Resources = &oci.LinuxResources{}
+			}
+			spec.Linux.Resources.Devices = append(spec.Linux.Resources.Devices, oci.LinuxDeviceCgroup{
+				Allow:  true,
+				Type:   dev.Type,
+				Major:  &dev.Major,
+				Minor:  &dev.Minor,
+				Access: access,
+			})
 		}
 	}
 
-	if len(e.NetDevices) > 0 {
-		// specgen is currently missing functionality to set Linux NetDevices,
-		// so we use a locally rolled function for now.
-		for _, dev := range e.NetDevices {
-			specgenAddLinuxNetDevice(&specgen, dev.HostInterfaceName, (&LinuxNetDevice{dev}).toOCI())
-		}
+	for _, dev := range e.NetDevices {
+		ensureLinuxNetDevices(spec)
+		spec.Linux.NetDevices[dev.HostInterfaceName] = *(&LinuxNetDevice{dev}).toOCI()
 	}
 
 	if len(e.Mounts) > 0 {
 		for _, m := range e.Mounts {
-			specgen.RemoveMount(m.ContainerPath)
-			specgen.AddMount((&Mount{m}).toOCI())
+			mnt := &Mount{m}
+
+			removeMount(spec, m.ContainerPath)
+
+			if !specHasUserNamespace(spec) {
+				spec.Mounts = append(spec.Mounts, mnt.toOCI())
+			} else {
+				spec.Mounts = append(spec.Mounts, mnt.toOCI(withIDMapForBindMount()))
+			}
 		}
-		sortMounts(&specgen)
+		sort.Stable(orderedMounts(spec.Mounts))
 	}
 
 	for _, h := range e.Hooks {
 		ociHook := (&Hook{h}).toOCI()
+		ensureOCIHooks(spec)
 		switch h.HookName {
 		case PrestartHook:
-			specgen.AddPreStartHook(ociHook)
+			spec.Hooks.Prestart = append(spec.Hooks.Prestart, ociHook) //nolint:staticcheck
 		case PoststartHook:
-			specgen.AddPostStartHook(ociHook)
+			spec.Hooks.Poststart = append(spec.Hooks.Poststart, ociHook)
 		case PoststopHook:
-			specgen.AddPostStopHook(ociHook)
-			// TODO: Maybe runtime-tools/generate should be updated with these...
+			spec.Hooks.Poststop = append(spec.Hooks.Poststop, ociHook)
 		case CreateRuntimeHook:
-			ensureOCIHooks(spec)
 			spec.Hooks.CreateRuntime = append(spec.Hooks.CreateRuntime, ociHook)
 		case CreateContainerHook:
-			ensureOCIHooks(spec)
 			spec.Hooks.CreateContainer = append(spec.Hooks.CreateContainer, ociHook)
 		case StartContainerHook:
-			ensureOCIHooks(spec)
 			spec.Hooks.StartContainer = append(spec.Hooks.StartContainer, ociHook)
 		default:
 			return fmt.Errorf("unknown hook name %q", h.HookName)
@@ -154,9 +174,9 @@ func (e *ContainerEdits) Apply(spec *oci.Spec) error {
 	}
 
 	if e.IntelRdt != nil {
-		// The specgen is missing functionality to set all parameters so we
-		// just piggy-back on it to initialize all structs and the copy over.
-		specgen.SetLinuxIntelRdtClosID(e.IntelRdt.ClosID)
+		if spec.Linux == nil {
+			spec.Linux = &oci.Linux{}
+		}
 		spec.Linux.IntelRdt = (&IntelRdt{e.IntelRdt}).toOCI()
 	}
 
@@ -164,18 +184,69 @@ func (e *ContainerEdits) Apply(spec *oci.Spec) error {
 		if additionalGID == 0 {
 			continue
 		}
-		specgen.AddProcessAdditionalGid(additionalGID)
+		if spec.Process == nil {
+			spec.Process = &oci.Process{}
+		}
+		addProcessAdditionalGid(spec, additionalGID)
 	}
 
 	return nil
 }
 
-func specgenAddLinuxNetDevice(specgen *ocigen.Generator, hostIf string, netDev *oci.LinuxNetDevice) {
-	if specgen == nil || netDev == nil {
+// addMultipleProcessEnv adds or replaces environment variables on the process,
+// deduplicating by key.
+func addMultipleProcessEnv(process *oci.Process, envs []string) {
+	for _, env := range envs {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		prefix := parts[0] + "="
+		replaced := false
+		for i, e := range process.Env {
+			if strings.HasPrefix(e, prefix) {
+				process.Env[i] = env
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			process.Env = append(process.Env, env)
+		}
+	}
+}
+
+// removeDevice removes the device at path from spec.Linux.Devices.
+func removeDevice(spec *oci.Spec, path string) {
+	if spec.Linux == nil {
 		return
 	}
-	ensureLinuxNetDevices(specgen.Config)
-	specgen.Config.Linux.NetDevices[hostIf] = *netDev
+	for i, d := range spec.Linux.Devices {
+		if d.Path == path {
+			spec.Linux.Devices = append(spec.Linux.Devices[:i], spec.Linux.Devices[i+1:]...)
+			return
+		}
+	}
+}
+
+// removeMount removes the mount with the given destination from spec.Mounts.
+func removeMount(spec *oci.Spec, dest string) {
+	for i, m := range spec.Mounts {
+		if m.Destination == dest {
+			spec.Mounts = append(spec.Mounts[:i], spec.Mounts[i+1:]...)
+			return
+		}
+	}
+}
+
+// addProcessAdditionalGid appends gid to spec.Process.User.AdditionalGids if not already present.
+func addProcessAdditionalGid(spec *oci.Spec, gid uint32) {
+	for _, g := range spec.Process.User.AdditionalGids {
+		if g == gid {
+			return
+		}
+	}
+	spec.Process.User.AdditionalGids = append(spec.Process.User.AdditionalGids, gid)
 }
 
 // Ensure OCI Spec Linux NetDevices map is not nil.
@@ -354,12 +425,14 @@ func (d *DeviceNode) Validate() error {
 	if _, ok := validTypes[d.Type]; !ok {
 		return fmt.Errorf("device %q: invalid type %q", d.Path, d.Type)
 	}
-	for _, bit := range d.Permissions {
-		if bit != 'r' && bit != 'w' && bit != 'm' {
-			return fmt.Errorf("device %q: invalid permissions %q",
-				d.Path, d.Permissions)
-		}
+	switch {
+	case d.Permissions == "":
+	case d.Permissions == NoPermissions:
+	case strings.Trim(d.Permissions, "rwm") != "":
+		return fmt.Errorf("device %q: invalid permissions %q",
+			d.Path, d.Permissions)
 	}
+
 	return nil
 }
 
@@ -429,14 +502,6 @@ func ensureOCIHooks(spec *oci.Spec) {
 	}
 }
 
-// sortMounts sorts the mounts in the given OCI Spec.
-func sortMounts(specgen *ocigen.Generator) {
-	mounts := specgen.Mounts()
-	specgen.ClearMounts()
-	sort.Stable(orderedMounts(mounts))
-	specgen.Config.Mounts = mounts
-}
-
 // orderedMounts defines how to sort an OCI Spec Mount slice.
 // This is the almost the same implementation sa used by CRI-O and Docker,
 // with a minor tweak for stable sorting order (easier to test):
@@ -464,4 +529,17 @@ func (m orderedMounts) Swap(i, j int) {
 // parts returns the number of parts in the destination of a mount. Used in sorting.
 func (m orderedMounts) parts(i int) int {
 	return strings.Count(filepath.Clean(m[i].Destination), string(os.PathSeparator))
+}
+
+// specHasUserNamespace returns true if the OCI Spec has a Linux UserNamespace.
+func specHasUserNamespace(spec *oci.Spec) bool {
+	if spec == nil || spec.Linux == nil {
+		return false
+	}
+	for _, ns := range spec.Linux.Namespaces {
+		if ns.Type == oci.UserNamespace {
+			return true
+		}
+	}
+	return false
 }
