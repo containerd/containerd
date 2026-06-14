@@ -39,6 +39,8 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+const labelSnapshotRef = "containerd.io/snapshot.ref"
+
 // Image describes an image used by containers
 type Image interface {
 	// Name of the image
@@ -344,7 +346,16 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	}
 
 	for _, layer := range layers {
-		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
+		chainID := identity.ChainID(append(chain, layer.Diff.Digest)).String()
+		snLabels := snapshots.FilterInheritedLabels(layer.Blob.Annotations)
+		if snLabels == nil {
+			snLabels = make(map[string]string)
+		}
+		snLabels[labelSnapshotRef] = chainID
+
+		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a,
+			append(config.SnapshotOpts, snapshots.WithLabels(snLabels)),
+			config.ApplyOpts)
 		if err != nil {
 			return fmt.Errorf("apply layer error for %q: %w", i.Name(), err)
 		}
