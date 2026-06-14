@@ -23,6 +23,7 @@ import (
 	"net/url"
 	gruntime "runtime"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/containerd/log"
@@ -804,10 +805,10 @@ func GenerateRuntimeOptions(r Runtime) (any, error) {
 
 // getRuntimeOptionsType gets empty runtime options by the runtime type name.
 func getRuntimeOptionsType(t string) any {
-	switch t {
-	case plugins.RuntimeRuncV2:
+	switch {
+	case strings.HasPrefix(t, plugins.RuntimeRuncV2):
 		return &runcoptions.Options{}
-	case plugins.RuntimeRunhcsV1:
+	case t == plugins.RuntimeRunhcsV1:
 		return &runhcsoptions.Options{}
 	default:
 		return &runtimeoptions.Options{}
