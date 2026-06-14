@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"iter"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/errdefs/pkg/errgrpc"
@@ -56,13 +57,22 @@ func (r *remoteContainers) Get(ctx context.Context, id string) (containers.Conta
 	return containerFromProto(resp.Container), nil
 }
 
+// ListIter streams containers from the server.
+// It yields (containers.Container{}, errStreamNotAvailable) if the server does not implement streaming.
+func (r *remoteContainers) ListIter(ctx context.Context, filters ...string) iter.Seq2[containers.Container, error] {
+	return r.stream(ctx, filters...)
+}
+
 func (r *remoteContainers) List(ctx context.Context, filters ...string) ([]containers.Container, error) {
-	containers, err := r.stream(ctx, filters...)
-	if err != nil {
-		if err == errStreamNotAvailable {
-			return r.list(ctx, filters...)
+	var containers []containers.Container
+	for c, err := range r.stream(ctx, filters...) {
+		if err != nil {
+			if err == errStreamNotAvailable {
+				return r.list(ctx, filters...)
+			}
+			return nil, err
 		}
-		return nil, err
+		containers = append(containers, c)
 	}
 	return containers, nil
 }
@@ -79,32 +89,33 @@ func (r *remoteContainers) list(ctx context.Context, filters ...string) ([]conta
 
 var errStreamNotAvailable = errors.New("streaming api not available")
 
-func (r *remoteContainers) stream(ctx context.Context, filters ...string) ([]containers.Container, error) {
-	session, err := r.client.ListStream(ctx, &containersapi.ListContainersRequest{
-		Filters: filters,
-	})
-	if err != nil {
-		return nil, errgrpc.ToNative(err)
-	}
-	var containers []containers.Container
-	for {
-		c, err := session.Recv()
+func (r *remoteContainers) stream(ctx context.Context, filters ...string) iter.Seq2[containers.Container, error] {
+	return func(yield func(containers.Container, error) bool) {
+		session, err := r.client.ListStream(ctx, &containersapi.ListContainersRequest{
+			Filters: filters,
+		})
 		if err != nil {
-			if err == io.EOF {
-				return containers, nil
-			}
-			if s, ok := status.FromError(err); ok {
-				if s.Code() == codes.Unimplemented {
-					return nil, errStreamNotAvailable
-				}
-			}
-			return nil, errgrpc.ToNative(err)
+			_ = yield(containers.Container{}, errgrpc.ToNative(err))
+			return
 		}
-		select {
-		case <-ctx.Done():
-			return containers, ctx.Err()
-		default:
-			containers = append(containers, containerFromProto(c.Container))
+
+		for {
+			c, recvErr := session.Recv()
+			if recvErr != nil {
+				if recvErr == io.EOF {
+					return
+				}
+				if s, ok := status.FromError(recvErr); ok && s.Code() == codes.Unimplemented {
+					_ = yield(containers.Container{}, errStreamNotAvailable)
+					return
+				}
+				_ = yield(containers.Container{}, errgrpc.ToNative(recvErr))
+				return
+			}
+
+			if !yield(containerFromProto(c.Container), nil) {
+				return
+			}
 		}
 	}
 }

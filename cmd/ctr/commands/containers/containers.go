@@ -19,6 +19,7 @@ package containers
 import (
 	"context"
 	"fmt"
+	"iter"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -101,30 +102,54 @@ var listCommand = &cli.Command{
 			Aliases: []string{"q"},
 			Usage:   "Print only the container id",
 		},
+		&cli.BoolFlag{
+			Name:    "stream",
+			Aliases: []string{"s"},
+			Usage:   "Enable streaming output mode",
+		},
 	},
 	Action: func(cliContext *cli.Context) error {
 		var (
 			filters = cliContext.Args().Slice()
 			quiet   = cliContext.Bool("quiet")
+			stream  = cliContext.Bool("stream")
 		)
 		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		containers, err := client.Containers(ctx, filters...)
+		var containers iter.Seq2[containerd.Container, error]
+		if stream {
+			containers, err = client.ContainersIter(ctx, filters...)
+			if err != nil {
+				return err
+			}
+		} else {
+			ctrs, err := client.Containers(ctx, filters...)
+			if err != nil {
+				return err
+			}
+			containers = sliceIter(ctrs)
+		}
 		if err != nil {
 			return err
 		}
 		if quiet {
-			for _, c := range containers {
+			for c, err := range containers {
+				if err != nil {
+					return err
+				}
 				fmt.Printf("%s\n", c.ID())
 			}
 			return nil
 		}
 		w := tabwriter.NewWriter(os.Stdout, 4, 8, 4, ' ', 0)
 		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\t")
-		for _, c := range containers {
+		for c, err := range containers {
+			if err != nil {
+				return err
+			}
 			info, err := c.Info(ctx, containerd.WithoutRefreshedMetadata)
 			if err != nil {
 				return err
@@ -143,6 +168,16 @@ var listCommand = &cli.Command{
 		}
 		return w.Flush()
 	},
+}
+
+func sliceIter(ctrs []containerd.Container) iter.Seq2[containerd.Container, error] {
+	return func(yield func(containerd.Container, error) bool) {
+		for _, c := range ctrs {
+			if !yield(c, nil) {
+				return
+			}
+		}
+	}
 }
 
 var deleteCommand = &cli.Command{
