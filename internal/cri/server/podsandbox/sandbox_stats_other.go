@@ -1,3 +1,5 @@
+//go:build !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -19,11 +21,11 @@ package podsandbox
 import (
 	"context"
 
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
+
+	"github.com/containerd/containerd/api/types"
 )
 
-// TODO(dcantah): Implement metrics to be used for SandboxStats rpc.
 func (c *Controller) Metrics(ctx context.Context, sandboxID string) (*types.Metric, error) {
 	return nil, errdefs.ErrNotImplemented
 }
