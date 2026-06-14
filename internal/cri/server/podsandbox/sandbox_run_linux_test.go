@@ -211,7 +211,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 				assert.NotContains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.NetworkNamespace,
 				})
-				assert.NotContains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.UTSNamespace,
 				})
 				assert.NotContains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
