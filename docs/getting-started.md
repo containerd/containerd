@@ -41,6 +41,14 @@ Users of such distributions may have to install containerd from the source or a 
 
 
 ##### systemd
+
+> **Note:** `/usr/local/lib/systemd/system/` is not created by default.
+> run `mkdir -p /usr/local/lib/systemd/system` before placing the unit file.
+> On older distros running systemd older than v246 (check with `systemd --version`),
+> this path may not be in the unit search path at all. Verify with:
+> `sudo systemctl --no-pager --property UnitPath show`
+> If it's missing, use `/etc/systemd/system/` instead.
+
 If you intend to start containerd via systemd, you should also download the `containerd.service` unit file from
 https://raw.githubusercontent.com/containerd/containerd/main/containerd.service into `/usr/local/lib/systemd/system/containerd.service`,
 and run the following commands:
