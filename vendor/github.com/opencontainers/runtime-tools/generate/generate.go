@@ -318,11 +318,14 @@ func NewFromTemplate(r io.Reader) (Generator, error) {
 	}, nil
 }
 
-// createEnvCacheMap creates a hash map with the ENV variables given by the config
+// createEnvCacheMap creates a hash map with the ENV variables given by the config.
+// The map is keyed by the variable name (the part before the first '=') so that
+// addEnv can look up existing entries by name and replace them in-place.
 func createEnvCacheMap(env []string) map[string]int {
 	envMap := make(map[string]int, len(env))
 	for i, val := range env {
-		envMap[val] = i
+		name, _, _ := strings.Cut(val, "=")
+		envMap[name] = i
 	}
 	return envMap
 }

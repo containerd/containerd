@@ -502,6 +502,13 @@ func WithLogPath(path string) ContainerOpts {
 	}
 }
 
+// WithEnvVar sets an environment variable in the container config.
+func WithEnvVar(key, value string) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		c.Envs = append(c.Envs, &runtime.KeyValue{Key: key, Value: value})
+	}
+}
+
 // WithRunAsUser sets the uid.
 func WithRunAsUser(uid int64) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
