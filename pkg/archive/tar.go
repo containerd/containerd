@@ -37,10 +37,9 @@ import (
 	"github.com/containerd/log"
 )
 
-var bufPool = &sync.Pool{
+var bufPool = sync.Pool{
 	New: func() any {
-		buffer := make([]byte, 32*1024)
-		return &buffer
+		return make([]byte, 32*1024)
 	},
 }
 
@@ -350,12 +349,15 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 			return err
 		}
 
-		_, err = copyBuffered(ctx, file, reader)
+		nWritten, err := copyBuffered(ctx, file, reader)
 		if err1 := file.Close(); err == nil {
 			err = err1
 		}
 		if err != nil {
 			return err
+		}
+		if hdr.Size != nWritten {
+			log.G(ctx).Errorf("file %s incomplete: expect %d bytes wrote %d", file.Name(), hdr.Size, nWritten)
 		}
 
 	case tar.TypeBlock, tar.TypeChar:
@@ -732,20 +734,16 @@ func (cw *ChangeWriter) includeParents(hdr *tar.Header) error {
 }
 
 func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written int64, err error) {
-	buf := bufPool.Get().(*[]byte)
+	buf := bufPool.Get().([]byte)
 	defer bufPool.Put(buf)
 
 	for {
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
-			return
-		default:
+		if err = ctx.Err(); err != nil {
+			return written, err
 		}
-
-		nr, er := src.Read(*buf)
+		nr, er := src.Read(buf[:cap(buf)])
 		if nr > 0 {
-			nw, ew := dst.Write((*buf)[0:nr])
+			nw, ew := dst.Write(buf[0:nr])
 			if nw > 0 {
 				written += int64(nw)
 			}
@@ -766,7 +764,6 @@ func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written in
 		}
 	}
 	return written, err
-
 }
 
 // hardlinkRootPath returns target linkname, evaluating and bounding any
