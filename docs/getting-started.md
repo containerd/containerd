@@ -44,7 +44,7 @@ Users of such distributions may have to install containerd from the source or a 
 
 > **Note:** `/usr/local/lib/systemd/system/` is not created by default.
 > run `mkdir -p /usr/local/lib/systemd/system` before placing the unit file.
-> On older distros running systemd older than v246 (check with `systemd --version`),
+> most distros running systemd < v246 (check with `systemd --version`),
 > this path may not be in the unit search path at all. Verify with:
 > `sudo systemctl --no-pager --property UnitPath show`
 > If it's missing, use `/etc/systemd/system/` instead.
