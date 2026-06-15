@@ -1,6 +1,6 @@
 # Running containerd as a non-root user
 
-A non-root user can execute containerd by using [`user_namespaces(7)`](http://man7.org/linux/man-pages/man7/user_namespaces.7.html).
+A non-root user can execute containerd by using [`user_namespaces(7)`](https://man7.org/linux/man-pages/man7/user_namespaces.7.html).
 
 For example [RootlessKit](https://github.com/rootless-containers/rootlesskit) can be used for setting up a user namespace (along with mount namespace and optionally network namespace). Please refer to RootlessKit documentation for further information.
 

@@ -19,7 +19,7 @@ reach out by [filing an issue](https://github.com/containerd/containerd/issues).
 ## Releases
 
 Releases of containerd will be versioned using dotted triples, similar to
-[Semantic Version](http://semver.org/). For the purposes of this document, we
+[Semantic Version](https://semver.org/). For the purposes of this document, we
 will refer to the respective components of this triple as
 `<major>.<minor>.<patch>`. The version number may have additional information,
 such as alpha, beta and release candidate qualifications. Such releases will be
@@ -203,7 +203,7 @@ one of three ways:
 
 __If you are reporting a security issue:__
 
-Please follow the instructions at [containerd/project](https://github.com/containerd/project/blob/main/SECURITY.md#reporting-a-vulnerability)
+Please follow the instructions at [containerd/.project](https://github.com/containerd/.project/blob/main/SECURITY.md#reporting-a-vulnerability)
 
 Remember that backported PRs must follow the versioning guidelines from this document.
 
@@ -404,7 +404,7 @@ follow that format.
 ### Go client API
 
 As of containerd 2.0, the Go client API documented in
-[godoc](https://godoc.org/github.com/containerd/containerd/v2/client) is stable.
+[godoc](https://pkg.go.dev/github.com/containerd/containerd/v2/client) is stable.
 Note that because the Go client interfaces with the GRPC API, clients building on top
 of the Go client should remain compatible with future server releases implementing the
 same major GRPC API series. For backwards compatability and as a general rule of thumb,

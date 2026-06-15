@@ -6,7 +6,7 @@ This proposal aims to integrate [containerd](https://github.com/containerd/conta
 ## Background
 Containerd is a core container runtime, which provides the minimum set of functionalities to manage the complete container lifecycle of its host system, including container execution and supervision, image distribution and storage, etc.
 
-Containerd was [introduced in Docker 1.11](https://blog.docker.com/2016/04/docker-engine-1-11-runc/), used to manage [runC](https://runc.io/) containers on the node. As shown below, it creates a containerd-shim for each container, and the shim manages the lifecycle of its corresponding container.
+Containerd was [introduced in Docker 1.11](https://web.archive.org/web/20160413234525/https://blog.docker.com/2016/04/docker-engine-1-11-runc/), used to manage [runC](https://github.com/opencontainers/runc) containers on the node. As shown below, it creates a containerd-shim for each container, and the shim manages the lifecycle of its corresponding container.
 ![containerd](./containerd.png)
 
 In Dec. 2016, Docker Inc. spun it out into a standalone component, and donated it to [CNCF](https://www.cncf.io/) in Mar. 2017.

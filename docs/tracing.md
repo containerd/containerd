@@ -199,7 +199,7 @@ if err != nil {
 
 OpenTelemetry maintains a set of recommended [semantic conventions](https://opentelemetry.io/docs/reference/specification/overview/#semantic-conventions) for different types of telemetry data, such as traces and metrics, to help users of the OpenTelemetry libraries and tools to collect and use telemetry data in a consistent and interoperable way.
 
-Manually instrumented spans in Containerd follow the conventions defined for [Spans](https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/) and [Attributes](https://opentelemetry.io/docs/reference/specification/common/attribute-naming/)
+Manually instrumented spans in Containerd follow the conventions defined for [Spans](https://opentelemetry.io/docs/specs/semconv/general/trace/) and [Attributes](https://opentelemetry.io/docs/specs/semconv/general/naming/)
 
 ### Span Names
 * Dot-separated notation.

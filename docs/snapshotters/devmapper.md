@@ -189,14 +189,14 @@ containerd-devpool_tdata    (253:1)
 containerd-devpool_tmeta    (253:0)
 ```
 
-See also [Configure direct-lvm mode for production](https://docs.docker.com/storage/storagedriver/device-mapper-driver/#configure-direct-lvm-mode-for-production) for additional information about production devmapper setups.
+See also [Configure direct-lvm mode for production](https://docs.docker.com/engine/storage/drivers/device-mapper-driver/#configure-direct-lvm-mode-for-production) for additional information about production devmapper setups.
 
 ## Additional Resources
 
 For more information on Device-mapper, thin provisioning, etc., you can refer to the following resources:
 
-* https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/logical_volume_manager_administration/device_mapper
+* https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/6/html/logical_volume_manager_administration/device_mapper
 * https://en.wikipedia.org/wiki/Device_mapper
-* https://docs.docker.com/storage/storagedriver/device-mapper-driver/
+* https://docs.docker.com/engine/storage/drivers/device-mapper-driver/
 * https://www.kernel.org/doc/Documentation/device-mapper/thin-provisioning.txt
 * https://www.kernel.org/doc/Documentation/device-mapper/snapshot.txt

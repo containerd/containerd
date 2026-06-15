@@ -4,8 +4,8 @@
 Due to its dependency on `dmsetup`, executing the snapshotter process in an environment where a udev
 daemon is not accessible (such as a container) may result in unexpected behavior. In this case, try executing the
 snapshotter with the `DM_DISABLE_UDEV=1` environment variable, which tells `dmsetup` to ignore udev and manage devices
-itself. See [lvm(8)](http://man7.org/linux/man-pages/man8/lvm.8.html) and
-[dmsetup(8)](http://man7.org/linux/man-pages/man8/dmsetup.8.html) for more information.
+itself. See [lvm(8)](https://man7.org/linux/man-pages/man8/lvm.8.html) and
+[dmsetup(8)](https://man7.org/linux/man-pages/man8/dmsetup.8.html) for more information.
 
 ## How to run snapshotters benchmark
 

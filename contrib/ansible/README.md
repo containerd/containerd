@@ -8,7 +8,7 @@ This document provides the steps to bring up a Kubernetes cluster using ansible 
 - **Ansible**: 2.4+
 
 ## Step 0:
--  Install Ansible on the host where you will provision the cluster. This host may be one of the nodes you plan to include in your cluster. Installation instructions for Ansible are found [here](http://docs.ansible.com/ansible/latest/intro_installation.html).
+-  Install Ansible on the host where you will provision the cluster. This host may be one of the nodes you plan to include in your cluster. Installation instructions for Ansible are found [here](https://docs.ansible.com/projects/ansible/latest/installation_guide/intro_installation.html).
 -  Create a hosts file and include the IP addresses of the hosts that need to be provisioned by Ansible.
 ```console
 $ cat hosts
@@ -29,7 +29,7 @@ A typical cloud login might have a username and private key file, in which case 
 ```console
 ansible-playbook -i hosts -u <username> --private-key <example.pem> cri-containerd.yaml
  ```
-For more options ansible config file (/etc/ansible/ansible.cfg) can be used to set defaults. Please refer to [Ansible options](http://docs.ansible.com/ansible/latest/intro_configuration.html) for advanced ansible configurations.
+For more options ansible config file (/etc/ansible/ansible.cfg) can be used to set defaults. Please refer to [Ansible options](https://docs.ansible.com/projects/ansible/latest/installation_guide/intro_configuration.html) for advanced ansible configurations.
 
 At the end of this step, you will have the required software installed in the hosts to bringup a kubernetes cluster.
 ```console

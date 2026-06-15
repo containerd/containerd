@@ -33,7 +33,7 @@ To build the `containerd` daemon, and the `ctr` simple test client, the followin
 ## Build the development environment
 
 First you need to setup your Go development environment. You can follow this
-guideline [How to write go code](https://golang.org/doc/code.html) and at the
+guideline [How to write go code](https://go.dev/doc/code) and at the
 end you have `go` command in your `PATH`.
 
 You need `git` to checkout the source code:
@@ -61,7 +61,7 @@ Runc is the default container runtime used by `containerd` and is required to
 run containerd. While it is okay to download a `runc` binary and install that on
 the system, sometimes it is necessary to build runc directly when working with
 container runtime development. Make sure to follow the guidelines for versioning
-in [RUNC.md](/docs/RUNC.md) for the best results.
+in [RUNC.md](./docs/RUNC.md) for the best results.
 
 > *Note*: Runc only supports Linux
 
@@ -110,7 +110,7 @@ make generate
 ```
 
 > *Note*: Several build tags are currently available:
-> * `no_cri`: A build tag disables building Kubernetes [CRI](http://blog.kubernetes.io/2016/12/container-runtime-interface-cri-in-kubernetes.html) support into containerd.
+> * `no_cri`: A build tag disables building Kubernetes [CRI](https://kubernetes.io/blog/2016/12/container-runtime-interface-cri-in-kubernetes/) support into containerd.
 > See [here](https://github.com/containerd/cri-containerd#build-tags) for build tags of CRI plugin.
 > * snapshotters (alphabetical order)
 >   * `no_aufs`: A build tag disables building the aufs snapshot driver. (Ignored since containerd v2.0, as the aufs snapshot driver is no longer supported)
@@ -123,12 +123,12 @@ make generate
 > For example, adding `BUILDTAGS=no_btrfs` to your environment before calling the **binaries**
 > Makefile target will disable the btrfs driver within the containerd Go build.
 
-Vendoring of external imports uses the [Go Modules](https://golang.org/ref/mod#vendoring). You need
+Vendoring of external imports uses the [Go Modules](https://go.dev/ref/mod#vendoring). You need
 to use `go mod` command to modify the dependencies. After modifition, you should run `go mod tidy`
 and `go mod vendor` to ensure the `go.mod`, `go.sum` files and `vendor` directory are up to date.
 Changes to these files should become a single commit for a PR which relies on vendored updates.
 
-Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
+Please refer to [RUNC.md](./docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
 
 > *Note*: On macOS, the containerd daemon can be built and run natively. However, as stated above, runc only supports linux.
 
@@ -177,7 +177,7 @@ git clone --branch <RELEASE_TAG> https://github.com/opencontainers/runc
 ```
 
 In our Docker container we will build `runc` build, which includes
-[seccomp](https://en.wikipedia.org/wiki/seccomp), [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux),
+[seccomp](https://en.wikipedia.org/wiki/Seccomp), [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux),
 and [AppArmor](https://en.wikipedia.org/wiki/AppArmor) support. Seccomp support
 in runc requires `libseccomp-dev` as a dependency (AppArmor and SELinux support
 do not require external libraries at build time). Refer to [RUNC.md](docs/RUNC.md)

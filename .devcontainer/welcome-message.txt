@@ -4,4 +4,4 @@
 
 🔍 To explore VS Code to its fullest, search using the Command Palette (Cmd/Ctrl + Shift + P or F1).
 
-ℹ️  Look at https://github.com/containerd/project/blob/main/CONTRIBUTING.md for contribution guidelines.
+ℹ️  Look at https://github.com/containerd/.project/blob/main/CONTRIBUTING.md for contribution guidelines.

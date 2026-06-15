@@ -5,7 +5,7 @@
 [![Build Status](https://github.com/containerd/containerd/actions/workflows/ci.yml/badge.svg?event=merge_group)](https://github.com/containerd/containerd/actions?query=workflow%3ACI+event%3Amerge_group)
 [![Nightlies](https://github.com/containerd/containerd/workflows/Nightly/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ANightly)
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd/v2)](https://goreportcard.com/report/github.com/containerd/containerd/v2)
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1271/badge)](https://bestpractices.coreinfrastructure.org/projects/1271)
+[![CII Best Practices](https://www.bestpractices.dev/projects/1271/badge)](https://www.bestpractices.dev/en/projects/1271/passing)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/containerd/containerd/badge)](https://scorecard.dev/viewer/?uri=github.com/containerd/containerd)
 [![Check Links](https://github.com/containerd/containerd/actions/workflows/links.yml/badge.svg)](https://github.com/containerd/containerd/actions/workflows/links.yml)
 
@@ -25,7 +25,7 @@ We are a large inclusive OSS project that is welcoming help of any kind shape or
 * Documentation help is needed to make the product easier to consume and extend.
 * We need OSS community outreach/organizing help to get the word out; manage
 and create messaging and educational content; and help with social media, community forums/groups, and google groups.
-* We are actively inviting new [security advisors](https://github.com/containerd/project/blob/main/GOVERNANCE.md#security-advisors) to join the team.
+* We are actively inviting new [security advisors](https://github.com/containerd/.project/blob/main/GOVERNANCE.md#security-advisors) to join the team.
 * New subprojects are being created, core and non-core that could use additional development help.
 * Each of the [containerd projects](https://github.com/containerd) has a list of issues currently being worked on or that need help resolving.
   - If the issue has not already been assigned to someone or has not made recent progress, and you are interested, please inquire.
@@ -137,14 +137,14 @@ loaded for the user's shell environment.
 The `cri` plugin has reached GA status, representing that it is:
 * Feature complete
 * Works with Kubernetes 1.10 and above
-* Passes all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
-* Passes all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
-* Passes all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
+* Passes all [CRI validation tests](https://github.com/kubernetes-sigs/cri-tools/blob/master/docs/validation.md).
+* Passes all [node e2e tests](https://github.com/kubernetes/community/blob/main/contributors/devel/sig-node/e2e-node-tests.md).
+* Passes all [e2e tests](https://github.com/kubernetes/community/blob/main/contributors/devel/sig-testing/e2e-tests.md).
 
 See results on the containerd k8s [test dashboard](https://testgrid.k8s.io/containerd)
 
 #### Validating Your `cri` Setup
-A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/cri-tools), includes programs for exercising CRI implementations. More importantly, cri-tools includes the program `critest` which is used for running [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
+A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/cri-tools), includes programs for exercising CRI implementations. More importantly, cri-tools includes the program `critest` which is used for running [CRI Validation Testing](https://github.com/kubernetes-sigs/cri-tools/blob/master/docs/validation.md).
 
 #### CRI Guides
 * [Installing with Ansible and Kubeadm](contrib/ansible/README.md)
@@ -169,14 +169,14 @@ Security audits for the containerd project are hosted on our website. Please see
 
 ### Reporting security issues
 
-Please follow the instructions at [containerd/project](https://github.com/containerd/project/blob/main/SECURITY.md#reporting-a-vulnerability)
+Please follow the instructions at [containerd/.project](https://github.com/containerd/.project/blob/main/SECURITY.md#reporting-a-vulnerability)
 
 ## Licenses
 
 The containerd codebase is released under the [Apache 2.0 license](LICENSE).
 The README.md file and files in the "docs" folder are licensed under the
 Creative Commons Attribution 4.0 International License. You may obtain a
-copy of the license, titled CC-BY-4.0, at http://creativecommons.org/licenses/by/4.0/.
+copy of the license, titled CC-BY-4.0, at https://creativecommons.org/licenses/by/4.0/.
 
 ## Project details
 
@@ -185,11 +185,11 @@ However, all projects within the repo have common maintainership, governance, an
 guidelines which are stored in a `project` repository commonly for all containerd projects.
 
 Please find all these core project documents, including the:
- * [Project governance](https://github.com/containerd/project/blob/main/GOVERNANCE.md),
- * [Maintainers](https://github.com/containerd/project/blob/main/MAINTAINERS),
- * and [Contributing guidelines](https://github.com/containerd/project/blob/main/CONTRIBUTING.md)
+ * [Project governance](https://github.com/containerd/.project/blob/main/GOVERNANCE.md),
+ * [Maintainers](https://github.com/containerd/.project/blob/main/MAINTAINERS),
+ * and [Contributing guidelines](https://github.com/containerd/.project/blob/main/CONTRIBUTING.md)
 
-information in our [`containerd/project`](https://github.com/containerd/project) repository.
+information in our [`containerd/.project`](https://github.com/containerd/.project) repository.
 
 ## Adoption
 
