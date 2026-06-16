@@ -20,11 +20,15 @@ package server
 
 import (
 	"archive/tar"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
+	"github.com/containerd/log"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -150,6 +154,84 @@ func TestCheckpointArchiveEntryAllowed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := checkpointArchiveEntryAllowed(&tar.Header{Typeflag: tc.typ, Name: tc.name})
 			assert.Equal(t, tc.allowed, got)
+		})
+	}
+}
+
+type testLogHook struct {
+	mu      sync.Mutex
+	entries []string
+}
+
+func (h *testLogHook) Levels() []logrus.Level {
+	return []logrus.Level{logrus.WarnLevel}
+}
+
+func (h *testLogHook) Fire(entry *logrus.Entry) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.entries = append(h.entries, entry.Message)
+	return nil
+}
+
+func TestFilterAndMergeAnnotations(t *testing.T) {
+	for desc, tc := range map[string]struct {
+		checkpointAnnotations map[string]string
+		createAnnotations     map[string]string
+		expectedAnnotations   map[string]string
+		expectedWarnings      []string
+	}{
+		"cdi denied prefix boundaries": {
+			checkpointAnnotations: map[string]string{
+				"cdi.k8s.io/device":   "gpu",
+				"cdi.k8s.io/":         "true",
+				"cdi.k8s.io":          "true",
+				"safe.org/cdi.k8s.io": "ignored",
+				"other":               "val",
+			},
+			expectedAnnotations: map[string]string{
+				"safe.org/cdi.k8s.io": "ignored",
+				"other":               "val",
+			},
+			expectedWarnings: []string{
+				`Denying annotation "cdi.k8s.io/device" in checkpoint restore`,
+				`Denying annotation "cdi.k8s.io/" in checkpoint restore`,
+				`Denying annotation "cdi.k8s.io" in checkpoint restore`,
+			},
+		},
+
+		"createAnnotations update kubernetes metadata if present in both": {
+			checkpointAnnotations: map[string]string{
+				"io.kubernetes.container.hash":         "old-hash",
+				"io.kubernetes.container.restartCount": "1",
+				"safe.annotation":                      "2",
+			},
+			createAnnotations: map[string]string{
+				"io.kubernetes.container.hash":         "new-hash",
+				"io.kubernetes.container.restartCount": "2",
+			},
+			expectedAnnotations: map[string]string{
+				"io.kubernetes.container.hash":         "new-hash",
+				"io.kubernetes.container.restartCount": "2",
+				"safe.annotation":                      "2",
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			logger := logrus.New()
+			logger.SetLevel(logrus.WarnLevel)
+			hook := &testLogHook{}
+			logger.AddHook(hook)
+			ctx := log.WithLogger(context.Background(), logrus.NewEntry(logger))
+
+			res := filterAndMergeAnnotations(
+				ctx,
+				tc.checkpointAnnotations,
+				tc.createAnnotations,
+			)
+
+			assert.Equal(t, tc.expectedAnnotations, res)
+			assert.ElementsMatch(t, tc.expectedWarnings, hook.entries)
 		})
 	}
 }
