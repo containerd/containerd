@@ -85,7 +85,7 @@ require (
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.1
-	k8s.io/cri-api v0.36.1
+	k8s.io/cri-api v0.37.0-alpha.1
 	k8s.io/cri-client v0.36.1
 	k8s.io/cri-streaming v0.36.1
 	k8s.io/klog/v2 v2.140.0
@@ -146,9 +146,9 @@ require (
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
-	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/net v0.55.1-0.20260602153038-42abb857022c // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
