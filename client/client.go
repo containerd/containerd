@@ -73,6 +73,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	transferproxy "github.com/containerd/containerd/v2/core/transfer/proxy"
 	"github.com/containerd/containerd/v2/defaults"
+	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -333,6 +334,19 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 		out[i] = containerFromRecord(c, container)
 	}
 	return out, nil
+}
+
+func (c *Client) GetSandboxcontainer(ctx context.Context, id string) (Container, error) {
+	r, err := c.ContainerService().List(ctx, crilabels.ContainerKindSandbox)
+	if err != nil {
+		return nil, err
+	}
+	for _, container := range r {
+		if container.ID == id {
+			return containerFromRecord(c, container), nil
+		}
+	}
+	return nil, fmt.Errorf("sandbox %s does not exist: %w", id, errdefs.ErrNotFound)
 }
 
 // NewContainer will create a new container with the provided id.

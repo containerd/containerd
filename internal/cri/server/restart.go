@@ -103,7 +103,15 @@ func (c *criService) recover(ctx context.Context) error {
 		if _, err := c.sandboxStore.Get(sbx.ID); err == nil {
 			continue
 		}
-
+		if _, err := c.client.GetSandboxcontainer(ctx, sbx.ID); err != nil {
+			if errors.Is(err, errdefs.ErrNotFound) {
+				log.L.Warnf("delete leak sandbox %q", sbx.ID)
+				err = c.client.SandboxStore().Delete(ctx, sbx.ID)
+				if err != nil {
+					log.G(ctx).WithError(err).Errorf("failed to delete sandbox %q, in response to failure to retrieve metadata for sandbox", sbx.ID)
+				}
+			}
+		}
 		metadata := sandboxstore.Metadata{}
 		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
 		if err != nil {
