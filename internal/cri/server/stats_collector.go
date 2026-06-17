@@ -195,16 +195,15 @@ func (c *StatsCollector) collectContainerStats(ctx context.Context) {
 }
 
 // collectSandboxStats fetches sandbox-level CPU samples via the sandbox
-// controller. The controller is responsible for whatever runtime-specific
-// reading happens (cgroup parent, HCS metrics, remote RPC); the collector
-// only sees the resulting *types.Metric and decodes via extractCPUUsage.
+// controller. The controller reads the pod's parent cgroup (which includes all
+// containers in the pod) and returns the result as a *types.Metric; the
+// collector only decodes it via extractCPUUsage.
 func (c *StatsCollector) collectSandboxStats(ctx context.Context) {
 	sandboxes := c.listSandboxes()
 	if len(sandboxes) == 0 {
 		return
 	}
 
-	timestamp := time.Now()
 	for _, sb := range sandboxes {
 		ctrl, err := c.sandboxController(sb.Sandboxer)
 		if err != nil {
@@ -216,11 +215,17 @@ func (c *StatsCollector) collectSandboxStats(ctx context.Context) {
 			log.G(ctx).WithError(err).Debugf("StatsCollector: failed to fetch sandbox %s metrics", sb.ID)
 			continue
 		}
+		if metric == nil {
+			continue
+		}
 		usageCoreNanoSeconds, ok := extractCPUUsage(metric.Data)
 		if !ok {
 			continue
 		}
-		c.addSample(sb.ID, timestamp, usageCoreNanoSeconds)
+		// Sample at the metric's own timestamp, captured by the controller at
+		// cgroup read time. This keeps the delta-time in the UsageNanoCores
+		// rate accurate and free of per-sandbox collection latency.
+		c.addSample(sb.ID, metric.GetTimestamp().AsTime(), usageCoreNanoSeconds)
 	}
 }
 
