@@ -362,9 +362,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	defer c.nri.BlockPluginSync().Unblock()
 
 	err = c.nri.RunPodSandbox(ctx, &sandbox)
-	if err != nil {
-		return nil, fmt.Errorf("NRI RunPodSandbox failed: %w", err)
-	}
 
 	defer func() {
 		if retErr != nil {
@@ -373,7 +370,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			c.nri.RemovePodSandbox(deferCtx, &sandbox)
 		}
 	}()
-
+	if err != nil {
+		return nil, fmt.Errorf("NRI RunPodSandbox failed: %w", err)
+	}
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		// Set the pod sandbox as ready after successfully start sandbox container.
 		status.State = sandboxstore.StateReady
