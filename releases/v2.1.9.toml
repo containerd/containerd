@@ -1,0 +1,37 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+ignore_deps = [ "github.com/containerd/containerd" ]
+
+# previous release
+previous = "v2.1.8"
+
+pre_release = false
+
+preface = """\
+The ninth patch release for containerd 2.1 contains various fixes
+and updates including security patches.
+
+### Security Updates
+
+* **containerd**
+  * [**CVE-2026-50195**](https://github.com/containerd/containerd/security/advisories/GHSA-cvxm-645q-p574)
+  * [**CVE-2026-53488**](https://github.com/containerd/containerd/security/advisories/GHSA-xhf5-7wjv-pqxp)
+  * [**CVE-2026-53492**](https://github.com/containerd/containerd/security/advisories/GHSA-33vj-92qq-66hc)
+  * [**CVE-2026-53489**](https://github.com/containerd/containerd/security/advisories/GHSA-rgh6-rfwx-v388)
+  * [**CVE-2026-47262**](https://github.com/containerd/containerd/security/advisories/GHSA-jpcc-p29g-p8mq)
+"""
+
+postface = """\
+### Which file should I download?
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.35 (Ubuntu 22.04).
+* `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on Linux distributions that do not use glibc >= 2.35. Not position-independent.
+
+In addition to containerd, typically you will have to install [runc](https://github.com/opencontainers/runc/releases)
+and [CNI plugins](https://github.com/containernetworking/plugins/releases) from their official sites too.
+
+See also the [Getting Started](https://github.com/containerd/containerd/blob/main/docs/getting-started.md) documentation.
+"""
