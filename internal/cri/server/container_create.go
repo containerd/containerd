@@ -43,7 +43,7 @@ import (
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
-	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/blockio"
@@ -65,6 +65,12 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
+	}
+
+	// The CRI spec requires that containers are only created in a running
+	// sandbox. Reject the request otherwise, matching StartContainer.
+	if sandbox.Status.Get().State != sandboxstore.StateReady {
+		return nil, fmt.Errorf("sandbox container %q is not running", sandbox.ID)
 	}
 
 	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, false)
@@ -215,7 +221,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 type createContainerRequest struct {
 	ctx                   context.Context
 	containerID           string
-	sandbox               *sandbox.Sandbox
+	sandbox               *sandboxstore.Sandbox
 	sandboxID             string
 	imageID               string
 	containerConfig       *runtime.ContainerConfig
