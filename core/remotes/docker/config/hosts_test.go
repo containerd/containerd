@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker"
@@ -321,6 +322,86 @@ func TestLoadCertFiles(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHostDirFromRoots(t *testing.T) {
+	const host = "testing.io"
+
+	// mkRoot creates a temp root and, if create is true, the host subdir
+	// under it so HostDirFromRoot resolves a match there.
+	mkRoot := func(t *testing.T, create bool) string {
+		root := t.TempDir()
+		if create {
+			if err := os.MkdirAll(filepath.Join(root, hostDirectory(host)), 0700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return root
+	}
+
+	t.Run("first root matches", func(t *testing.T) {
+		first := mkRoot(t, true)
+		second := mkRoot(t, false)
+		dir, err := HostDirFromRoots([]string{first, second})(host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := filepath.Join(first, hostDirectory(host)); dir != want {
+			t.Fatalf("expected %q, got %q", want, dir)
+		}
+	})
+
+	t.Run("ordered search falls through to second root", func(t *testing.T) {
+		first := mkRoot(t, false)
+		second := mkRoot(t, true)
+		dir, err := HostDirFromRoots([]string{first, second})(host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := filepath.Join(second, hostDirectory(host)); dir != want {
+			t.Fatalf("expected %q, got %q", want, dir)
+		}
+	})
+
+	t.Run("first root takes precedence when both match", func(t *testing.T) {
+		first := mkRoot(t, true)
+		second := mkRoot(t, true)
+		dir, err := HostDirFromRoots([]string{first, second})(host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := filepath.Join(first, hostDirectory(host)); dir != want {
+			t.Fatalf("expected %q, got %q", want, dir)
+		}
+	})
+
+	t.Run("no match returns not found", func(t *testing.T) {
+		first := mkRoot(t, false)
+		second := mkRoot(t, false)
+		_, err := HostDirFromRoots([]string{first, second})(host)
+		if !errdefs.IsNotFound(err) {
+			t.Fatalf("expected ErrNotFound, got %v", err)
+		}
+	})
+
+	t.Run("empty roots are ignored and do not probe relative paths", func(t *testing.T) {
+		root := mkRoot(t, true)
+		dir, err := HostDirFromRoots([]string{"", root, ""})(host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := filepath.Join(root, hostDirectory(host)); dir != want {
+			t.Fatalf("expected %q, got %q", want, dir)
+		}
+	})
+
+	t.Run("all-empty and nil roots return not found", func(t *testing.T) {
+		for _, roots := range [][]string{nil, {}, {"", ""}} {
+			if _, err := HostDirFromRoots(roots)(host); !errdefs.IsNotFound(err) {
+				t.Fatalf("roots %v: expected ErrNotFound, got %v", roots, err)
+			}
+		}
+	})
 }
 
 func TestHTTPFallback(t *testing.T) {
