@@ -123,10 +123,6 @@ func GenerateTarIndexAndAppendTar(ctx context.Context, r io.Reader, layerPath, u
 
 // AddDefaultMkfsOpts adds default options for mkfs.erofs
 func AddDefaultMkfsOpts(mkfsExtraOpts []string) []string {
-	if runtime.GOOS != "darwin" {
-		return mkfsExtraOpts
-	}
-
 	// Check if -b argument is already present
 	for _, opt := range mkfsExtraOpts {
 		if strings.HasPrefix(opt, "-b") {
@@ -134,8 +130,7 @@ func AddDefaultMkfsOpts(mkfsExtraOpts []string) []string {
 		}
 	}
 
-	// Add -b4096 as the first option to prevent unusable block
-	// size from being used on macOS.
+	// Default to a 4K block size so images mount on any page size.
 	return append([]string{"-b4096"}, mkfsExtraOpts...)
 }
 
