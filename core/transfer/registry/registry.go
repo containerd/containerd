@@ -45,13 +45,14 @@ func init() {
 }
 
 type registryOpts struct {
-	headers       http.Header
-	creds         CredentialHelper
-	hostDir       string
-	defaultScheme string
-	httpDebug     bool
-	httpTrace     bool
-	localStream   io.WriteCloser
+	headers        http.Header
+	creds          CredentialHelper
+	hostDir        string
+	defaultScheme  string
+	httpDebug      bool
+	httpTrace      bool
+	localStream    io.WriteCloser
+	authorizerOpts []docker.AuthorizerOpt
 }
 
 // Opt sets registry-related configurations.
@@ -114,6 +115,15 @@ func WithClientStream(writer io.WriteCloser) Opt {
 	}
 }
 
+// WithAuthorizerOpts passes additional options to the docker authorizer
+// used by the registry resolver.
+func WithAuthorizerOpts(opts ...docker.AuthorizerOpt) Opt {
+	return func(o *registryOpts) error {
+		o.authorizerOpts = append(o.authorizerOpts, opts...)
+		return nil
+	}
+}
+
 // NewOCIRegistry initializes with hosts, authorizer callback, and headers
 func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry, error) {
 	var ropts registryOpts
@@ -128,7 +138,6 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
 	}
 	if ropts.creds != nil {
-		// TODO: Support bearer
 		hostOptions.Credentials = func(host string) (string, string, error) {
 			c, err := ropts.creds.GetCredentials(context.Background(), ref, host)
 			if err != nil {
@@ -138,6 +147,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 			return c.Username, c.Secret, nil
 		}
 	}
+	hostOptions.AuthorizerOpts = append(hostOptions.AuthorizerOpts, ropts.authorizerOpts...)
 	if ropts.defaultScheme != "" {
 		hostOptions.DefaultScheme = ropts.defaultScheme
 	}
