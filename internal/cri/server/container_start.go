@@ -31,7 +31,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
-	"github.com/checkpoint-restore/go-criu/v7/stats"
 	containerd "github.com/containerd/containerd/v2/client"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -40,6 +39,12 @@ import (
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 )
+
+// checkpointRestoreDir is the subdirectory under a container's persistent state
+// directory into which checkpoint content (CRIU images, container.log,
+// rootfs-diff.tar, ...) is unpacked during restore. Confining it here keeps
+// checkpoint content from colliding with containerd's own files in the state dir.
+const checkpointRestoreDir = "ctrd-restore"
 
 // StartContainer starts the container.
 func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (retRes *runtime.StartContainerResponse, retErr error) {
@@ -112,7 +117,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		pid, err := container.Restore(
 			ctx,
 			ioCreation,
-			filepath.Join(c.getContainerRootDir(r.GetContainerId()), crmetadata.CheckpointDirectory),
+			filepath.Join(c.getContainerRootDir(r.GetContainerId()), checkpointRestoreDir, crmetadata.CheckpointDirectory),
 		)
 
 		if err != nil {
@@ -155,28 +160,12 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		// It handles the TaskExit event and update container state after this.
 		c.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
 
-		// cleanup checkpoint artifacts after restore
-		cleanup := [...]string{
-			crmetadata.RestoreLogFile,
-			crmetadata.DumpLogFile,
-			stats.StatsDump,
-			stats.StatsRestore,
-			crmetadata.NetworkStatusFile,
-			crmetadata.RootFsDiffTar,
-			crmetadata.DeletedFilesFile,
-			crmetadata.CheckpointDirectory,
-			crmetadata.StatusDumpFile,
-			crmetadata.ConfigDumpFile,
-			crmetadata.SpecDumpFile,
-			"container.log",
+		// cleanup checkpoint artifacts after restore.
+		restoreDir := filepath.Join(c.getContainerRootDir(r.GetContainerId()), checkpointRestoreDir)
+		if err := os.RemoveAll(restoreDir); err != nil {
+			log.G(ctx).Warnf("Non-fatal: removal of checkpoint restore dir (%s) failed: %v", restoreDir, err)
 		}
-		for _, del := range cleanup {
-			file := filepath.Join(c.getContainerRootDir(r.GetContainerId()), del)
-			err = os.RemoveAll(file)
-			if err != nil {
-				log.G(ctx).Infof("Non-fatal: removal of checkpoint file (%s) failed: %v", file, err)
-			}
-		}
+
 		log.G(ctx).Infof("Restored container %s successfully", r.GetContainerId())
 		return &runtime.StartContainerResponse{}, nil
 	}
