@@ -188,12 +188,20 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src any, dst any, opts 
 		// server sent before closing the stream. This runs on both success and
 		// error paths so that progress delivery semantics are consistent. The
 		// timeout guards against a server that fails to close the stream or a
-		// user callback that blocks indefinitely.
+		// user callback that blocking indefinitely.
+		//
+		// A timer (stopped on completion) is used instead of time.After to avoid
+		// retaining it for the full duration when done fires first, and ctx.Done
+		// is selected so a canceled context doesn't needlessly block for the
+		// whole timeout.
+		timer := time.NewTimer(progressDrainTimeout)
 		select {
 		case <-done:
-		case <-time.After(progressDrainTimeout):
+		case <-ctx.Done():
+		case <-timer.C:
 			log.G(ctx).Warn("timed out waiting for transfer progress stream to drain")
 		}
+		timer.Stop()
 	}
 	return errgrpc.ToNative(err)
 }

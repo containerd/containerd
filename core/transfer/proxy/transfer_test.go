@@ -22,6 +22,7 @@ import (
 	"io"
 	"sync"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -33,39 +34,57 @@ import (
 )
 
 // fakeTransferClient implements transferapi.TTRPCTransferService. Its Transfer
-// method simulates the server behavior of sending a batch of progress events
-// on the progress stream, closing the stream, and then returning from the RPC.
+// method simulates the server: it returns the RPC response while (on a separate
+// goroutine) pushing progress events into the stream and then closing it.
 //
-// This ordering (events sent + stream closed before the RPC returns) is exactly
-// what the real server does (see plugins/services/transfer/service.go, which
-// defers stream.Close). It is the worst case for the proxy consumer goroutine:
-// when Transfer returns here, all events are already buffered and the stream is
-// already closed, but the client-side Recv loop has not necessarily drained
-// them yet. Without draining before returning, this reproduces the race that
-// caused TestTransferImport/DigestRefs to be flaky (issue #10786).
+// The real server pushes events synchronously during importStream and closes
+// the stream via `defer stream.Close()` right before the RPC returns. On the
+// wire these are independent multiplexed streams, which is exactly what makes
+// the proxy's missing join a *flaky* (timing-dependent) bug. To make this
+// regression test deterministic, the fake pushes events from a background
+// goroutine with a small delay between them, widening the window so that —
+// without the drain — the caller deterministically observes fewer events than
+// were sent. With the drain, Transfer blocks until the consumer has dispatched
+// every event and the stream is closed, so the assertion always holds.
 type fakeTransferClient struct {
-	// events is the set of progress events the "server" sends before returning.
+	// streams maps progress-stream ids to the streams created by the paired
+	// creator. Scoped to this fake transferrer (not package-level) so tests
+	// don't pollute each other.
+	streams map[string]streaming.Stream
+	mu      sync.Mutex
+	// events is the set of progress events the "server" sends.
 	events []*transfertypes.Progress
 	// returnErr, if non-nil, is returned from Transfer (error path).
 	returnErr error
+	// sendDelay is the delay between sending events, widening the race window
+	// for deterministic reproduction.
+	sendDelay time.Duration
 }
 
 func (f *fakeTransferClient) Transfer(ctx context.Context, req *transferapi.TransferRequest) (*emptypb.Empty, error) {
 	if req.Options != nil && req.Options.ProgressStream != "" {
-		if stream, ok := streamForID(req.Options.ProgressStream); ok {
-			for _, e := range f.events {
-				a, err := typeurl.MarshalAny(e)
-				if err != nil {
-					return nil, err
+		f.mu.Lock()
+		stream, ok := f.streams[req.Options.ProgressStream]
+		f.mu.Unlock()
+		if ok {
+			// Push events and close the stream from a background goroutine so
+			// the RPC can return immediately, mirroring how the real server's
+			// stream activity and RPC response are independent on the wire.
+			go func() {
+				for _, e := range f.events {
+					if f.sendDelay > 0 {
+						time.Sleep(f.sendDelay)
+					}
+					a, err := typeurl.MarshalAny(e)
+					if err != nil {
+						return
+					}
+					if err := stream.Send(a); err != nil {
+						return
+					}
 				}
-				if err := stream.Send(a); err != nil {
-					return nil, err
-				}
-			}
-			// Close the stream before returning, mirroring the server's
-			// `defer stream.Close()`. The client Recv loop will then hit io.EOF
-			// after draining the buffered events.
-			stream.Close()
+				stream.Close()
+			}()
 		}
 	}
 	if f.returnErr != nil {
@@ -77,10 +96,27 @@ func (f *fakeTransferClient) Transfer(ctx context.Context, req *transferapi.Tran
 // fakeStream is a minimal in-memory streaming.Stream used to model a single
 // progress stream. Send enqueues objects that Recv later returns; once Close is
 // called and the queue is drained, Recv returns io.EOF.
+//
+// A notification channel (ready) is signaled by Send/Close and waited on by
+// Recv, so Recv blocks (rather than busy-loops) when there is nothing to do.
 type fakeStream struct {
 	mu     sync.Mutex
 	queue  []typeurl.Any
 	closed bool
+	ready  chan struct{}
+}
+
+func newFakeStream() *fakeStream {
+	return &fakeStream{ready: make(chan struct{}, 1)}
+}
+
+// signal wakes a blocked Recv, if any. Non-blocking: the channel is buffered
+// with capacity 1 so a pending signal is coalesced when Recv isn't waiting.
+func (s *fakeStream) signal() {
+	select {
+	case s.ready <- struct{}{}:
+	default:
+	}
 }
 
 func (s *fakeStream) Send(a typeurl.Any) error {
@@ -90,6 +126,7 @@ func (s *fakeStream) Send(a typeurl.Any) error {
 		return io.ErrClosedPipe
 	}
 	s.queue = append(s.queue, a)
+	s.signal()
 	return nil
 }
 
@@ -107,10 +144,8 @@ func (s *fakeStream) Recv() (typeurl.Any, error) {
 			return nil, io.EOF
 		}
 		s.mu.Unlock()
-		// Spin briefly until an event arrives or the stream is closed. A busy
-		// wait is acceptable here because the test is tiny and the server side
-		// (fakeTransferClient.Transfer) pushes events synchronously before
-		// returning.
+		// Block until Send/Close signals, instead of spinning.
+		<-s.ready
 	}
 }
 
@@ -118,50 +153,37 @@ func (s *fakeStream) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.closed = true
+	s.signal()
 	return nil
 }
 
-// fakeStreamCreator hands out the fake stream registered for a given id.
+// fakeStreamCreator creates fake streams and registers them with the paired
+// fake client so the server side (fakeTransferClient.Transfer) can look them up
+// by progress-stream id.
 type fakeStreamCreator struct {
-	streams map[string]streaming.Stream
-	mu      sync.Mutex
+	client *fakeTransferClient
 }
 
 func (c *fakeStreamCreator) Create(_ context.Context, id string) (streaming.Stream, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.streams == nil {
-		c.streams = map[string]streaming.Stream{}
+	st := newFakeStream()
+	c.client.mu.Lock()
+	if c.client.streams == nil {
+		c.client.streams = map[string]streaming.Stream{}
 	}
-	st := &fakeStream{}
-	c.streams[id] = st
+	c.client.streams[id] = st
+	c.client.mu.Unlock()
 	return st, nil
 }
 
-// streamForID looks up the fake stream created for a given progress-stream id.
-// Streams are registered by the creator and consumed by the fake client, so it
-// must share the same registry. It is package-level to allow both to access it.
-var (
-	registryMu sync.Mutex
-	registry   = map[string]streaming.Stream{}
-)
-
-func streamForID(id string) (streaming.Stream, bool) {
-	registryMu.Lock()
-	defer registryMu.Unlock()
-	s, ok := registry[id]
-	return s, ok
-}
-
 // newFakeTransferrer wires up a proxyTransferrer backed by fakes that share a
-// registry of progress streams.
-func newFakeTransferrer(events []*transfertypes.Progress, returnErr error) *proxyTransferrer {
-	creator := &fakeStreamCreator{}
+// stream registry scoped to this instance only (no package-level state).
+// sendDelay widens the race window between event send and stream close so the
+// missing-drain bug reproduces deterministically.
+func newFakeTransferrer(events []*transfertypes.Progress, returnErr error, sendDelay time.Duration) *proxyTransferrer {
+	client := &fakeTransferClient{events: events, returnErr: returnErr, sendDelay: sendDelay}
 	return &proxyTransferrer{
-		client: &fakeTransferClient{events: events, returnErr: returnErr},
-		// Wrap the creator so each created stream is also registered for the
-		// fake client to find by id.
-		streamCreator: registeredCreator{creator},
+		client:        client,
+		streamCreator: &fakeStreamCreator{client: client},
 	}
 }
 
@@ -184,18 +206,8 @@ type anyStub struct {
 func (a *anyStub) GetTypeUrl() string { return a.typeURL }
 func (a *anyStub) GetValue() []byte   { return a.value }
 
-type registeredCreator struct{ inner streaming.StreamCreator }
-
-func (r registeredCreator) Create(ctx context.Context, id string) (streaming.Stream, error) {
-	st, err := r.inner.Create(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	registryMu.Lock()
-	registry[id] = st
-	registryMu.Unlock()
-	return st, nil
-}
+// progressKey collapses an event to a comparable string for assertions.
+func progressKey(p transfer.Progress) string { return p.Event + "|" + p.Name }
 
 // TestTransferProgressDrainedOnReturn verifies that, after Transfer returns,
 // every progress event the server sent before returning has been delivered to
@@ -213,15 +225,11 @@ func TestTransferProgressDrainedOnReturn(t *testing.T) {
 	}
 
 	var (
-		mu      sync.Mutex
-		got     []string
-		resolve = make(chan struct{})
+		mu  sync.Mutex
+		got []string
 	)
 
-	// progressKey collapses an event to a comparable string for assertions.
-	progressKey := func(p transfer.Progress) string { return p.Event + "|" + p.Name }
-
-	p := newFakeTransferrer(events, nil)
+	p := newFakeTransferrer(events, nil, 5*time.Millisecond)
 	err := p.Transfer(context.Background(), fakeMarshalable{}, fakeMarshalable{}, transfer.WithProgress(func(p transfer.Progress) {
 		mu.Lock()
 		got = append(got, progressKey(p))
@@ -230,8 +238,6 @@ func TestTransferProgressDrainedOnReturn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	close(resolve)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -266,9 +272,8 @@ func TestTransferProgressDrainedOnError(t *testing.T) {
 		mu  sync.Mutex
 		got []string
 	)
-	progressKey := func(p transfer.Progress) string { return p.Event + "|" + p.Name }
 
-	p := newFakeTransferrer(events, wantErr)
+	p := newFakeTransferrer(events, wantErr, 5*time.Millisecond)
 	err := p.Transfer(context.Background(), fakeMarshalable{}, fakeMarshalable{}, transfer.WithProgress(func(p transfer.Progress) {
 		mu.Lock()
 		got = append(got, progressKey(p))
