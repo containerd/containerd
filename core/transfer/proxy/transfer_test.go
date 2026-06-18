@@ -22,7 +22,6 @@ import (
 	"io"
 	"sync"
 	"testing"
-	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -34,31 +33,40 @@ import (
 )
 
 // fakeTransferClient implements transferapi.TTRPCTransferService. Its Transfer
-// method simulates the server: it returns the RPC response while (on a separate
-// goroutine) pushing progress events into the stream and then closing it.
+// method simulates the server: it returns the RPC response immediately while a
+// background goroutine pushes progress events into the stream and closes it.
 //
-// The real server pushes events synchronously during importStream and closes
-// the stream via `defer stream.Close()` right before the RPC returns. On the
-// wire these are independent multiplexed streams, which is exactly what makes
-// the proxy's missing join a *flaky* (timing-dependent) bug. To make this
-// regression test deterministic, the fake pushes events from a background
-// goroutine with a small delay between them, widening the window so that —
-// without the drain — the caller deterministically observes fewer events than
-// were sent. With the drain, Transfer blocks until the consumer has dispatched
-// every event and the stream is closed, so the assertion always holds.
+// The real server's stream activity (progress events) and the RPC response
+// travel over independent multiplexed streams, so the RPC can return before the
+// client has drained the progress stream — that independence is exactly what
+// makes the proxy's missing join a real race.
+//
+// To make the regression test fully deterministic (no sleeps, no timing), the
+// fake exposes two synchronization channels:
+//   - gate: the background sender blocks on <-gate before sending any event, so
+//     the test controls exactly when events start flowing.
+//   - sent: closed after all events have been pushed and the stream closed, so
+//     the test can know the server side is fully done.
+//
+// With the drain (the fix), proxyTransferrer.Transfer cannot return until the
+// stream is closed (which only happens after sent), so the test observes all
+// events. Without the drain, Transfer returns the moment the RPC returns —
+// before gate is even opened — so the test observes zero events.
 type fakeTransferClient struct {
 	// streams maps progress-stream ids to the streams created by the paired
 	// creator. Scoped to this fake transferrer (not package-level) so tests
 	// don't pollute each other.
 	streams map[string]streaming.Stream
 	mu      sync.Mutex
-	// events is the set of progress events the "server" sends.
-	events []*transfertypes.Progress
-	// returnErr, if non-nil, is returned from Transfer (error path).
+
+	events    []*transfertypes.Progress
 	returnErr error
-	// sendDelay is the delay between sending events, widening the race window
-	// for deterministic reproduction.
-	sendDelay time.Duration
+
+	// gate is closed by the test to allow the background sender to start
+	// pushing events. nil when no gating is desired (sender sends eagerly).
+	gate chan struct{}
+	// sent is closed once all events have been pushed and the stream closed.
+	sent chan struct{}
 }
 
 func (f *fakeTransferClient) Transfer(ctx context.Context, req *transferapi.TransferRequest) (*emptypb.Empty, error) {
@@ -67,30 +75,32 @@ func (f *fakeTransferClient) Transfer(ctx context.Context, req *transferapi.Tran
 		stream, ok := f.streams[req.Options.ProgressStream]
 		f.mu.Unlock()
 		if ok {
-			// Push events and close the stream from a background goroutine so
-			// the RPC can return immediately, mirroring how the real server's
-			// stream activity and RPC response are independent on the wire.
-			go func() {
-				for _, e := range f.events {
-					if f.sendDelay > 0 {
-						time.Sleep(f.sendDelay)
-					}
-					a, err := typeurl.MarshalAny(e)
-					if err != nil {
-						return
-					}
-					if err := stream.Send(a); err != nil {
-						return
-					}
-				}
-				stream.Close()
-			}()
+			go f.sendEvents(stream)
 		}
 	}
 	if f.returnErr != nil {
 		return nil, f.returnErr
 	}
 	return &emptypb.Empty{}, nil
+}
+
+// sendEvents pushes all events into the stream and closes it. It blocks on gate
+// first so the test can stage the "RPC returned, events not yet sent" window.
+func (f *fakeTransferClient) sendEvents(stream streaming.Stream) {
+	defer close(f.sent)
+	if f.gate != nil {
+		<-f.gate
+	}
+	for _, e := range f.events {
+		a, err := typeurl.MarshalAny(e)
+		if err != nil {
+			return
+		}
+		if err := stream.Send(a); err != nil {
+			return
+		}
+	}
+	stream.Close()
 }
 
 // fakeStream is a minimal in-memory streaming.Stream used to model a single
@@ -176,15 +186,16 @@ func (c *fakeStreamCreator) Create(_ context.Context, id string) (streaming.Stre
 }
 
 // newFakeTransferrer wires up a proxyTransferrer backed by fakes that share a
-// stream registry scoped to this instance only (no package-level state).
-// sendDelay widens the race window between event send and stream close so the
-// missing-drain bug reproduces deterministically.
-func newFakeTransferrer(events []*transfertypes.Progress, returnErr error, sendDelay time.Duration) *proxyTransferrer {
-	client := &fakeTransferClient{events: events, returnErr: returnErr, sendDelay: sendDelay}
+// stream registry scoped to this instance only (no package-level state). The
+// returned gate/sent channels let the test stage the race window deterministically.
+func newFakeTransferrer(events []*transfertypes.Progress, returnErr error) (transferrer *proxyTransferrer, gate, sent chan struct{}) {
+	gate = make(chan struct{})
+	sent = make(chan struct{})
+	client := &fakeTransferClient{events: events, returnErr: returnErr, gate: gate, sent: sent}
 	return &proxyTransferrer{
 		client:        client,
 		streamCreator: &fakeStreamCreator{client: client},
-	}
+	}, gate, sent
 }
 
 // fakeMarshalable is a stand-in source/destination for Transfer that satisfies
@@ -209,40 +220,12 @@ func (a *anyStub) GetValue() []byte   { return a.value }
 // progressKey collapses an event to a comparable string for assertions.
 func progressKey(p transfer.Progress) string { return p.Event + "|" + p.Name }
 
-// TestTransferProgressDrainedOnReturn verifies that, after Transfer returns,
-// every progress event the server sent before returning has been delivered to
-// the caller's Progress callback. This is the regression test for the flaky
-// TestTransferImport/DigestRefs (issue #10786): without draining the progress
-// stream consumer before returning, the final events could be observed as
-// missing.
-func TestTransferProgressDrainedOnReturn(t *testing.T) {
-	events := []*transfertypes.Progress{
-		{Event: "Importing"},
-		{Event: "saved", Name: "registry.test/all-refs:index"},
-		{Event: "saved", Name: "registry.test/all-refs:1"},
-		{Event: "saved", Name: "registry.test/all-refs@sha256:manifest"},
-		{Event: "Completed import"},
-	}
-
-	var (
-		mu  sync.Mutex
-		got []string
-	)
-
-	p := newFakeTransferrer(events, nil, 5*time.Millisecond)
-	err := p.Transfer(context.Background(), fakeMarshalable{}, fakeMarshalable{}, transfer.WithProgress(func(p transfer.Progress) {
-		mu.Lock()
-		got = append(got, progressKey(p))
-		mu.Unlock()
-	}))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
+// assertProgress asserts that the collected events match the expected set
+// (order-independent). It is a helper used by the tests below.
+func assertProgress(t *testing.T, got []string, events []*transfertypes.Progress) {
+	t.Helper()
 	if len(got) != len(events) {
-		t.Fatalf("expected %d progress events after Transfer returned, got %d: %v\n"+
+		t.Fatalf("expected %d progress events, got %d: %v\n"+
 			"This indicates the proxy returned before the progress stream was drained (see issue #10786).",
 			len(events), len(got), got)
 	}
@@ -258,9 +241,63 @@ func TestTransferProgressDrainedOnReturn(t *testing.T) {
 	}
 }
 
+// TestTransferProgressDrainedOnReturn verifies that proxyTransferrer.Transfer
+// does not return until every progress event has been delivered to the caller's
+// Progress callback. This is the regression test for the flaky
+// TestTransferImport/DigestRefs (issue #10786).
+//
+// Determinism: the fake server's progress sender blocks on `gate` until the
+// test opens it. The fake RPC returns immediately. So with the drain in place,
+// Transfer blocks until the test opens gate (events flow, stream closes); the
+// test only reads `got` after Transfer returns, by which point all events are
+// guaranteed delivered. Run against the pre-fix transfer.go, Transfer returns
+// while events are still gated off, so `got` is empty — the bug reproduces
+// every run, with no sleeps.
+func TestTransferProgressDrainedOnReturn(t *testing.T) {
+	events := []*transfertypes.Progress{
+		{Event: "Importing"},
+		{Event: "saved", Name: "registry.test/all-refs:index"},
+		{Event: "saved", Name: "registry.test/all-refs:1"},
+		{Event: "saved", Name: "registry.test/all-refs@sha256:manifest"},
+		{Event: "Completed import"},
+	}
+
+	var (
+		mu  sync.Mutex
+		got []string
+	)
+
+	p, gate, sent := newFakeTransferrer(events, nil)
+
+	transferDone := make(chan error, 1)
+	go func() {
+		transferDone <- p.Transfer(context.Background(), fakeMarshalable{}, fakeMarshalable{}, transfer.WithProgress(func(p transfer.Progress) {
+			mu.Lock()
+			got = append(got, progressKey(p))
+			mu.Unlock()
+		}))
+	}()
+
+	// Release the server-side progress events now. With the fix, Transfer is
+	// blocked on the drain and will only return after the stream closes (i.e.
+	// after `sent` fires). Without the fix, Transfer may already have returned.
+	close(gate)
+	<-sent
+
+	// Once the server has closed the stream, the drained Transfer must return.
+	if err := <-transferDone; err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	assertProgress(t, got, events)
+}
+
 // TestTransferProgressDrainedOnError verifies that progress events are also
 // drained when the underlying Transfer RPC returns an error, so delivery
-// semantics are consistent across success and failure paths.
+// semantics are consistent across success and failure paths. Same gated
+// determinism as the success test.
 func TestTransferProgressDrainedOnError(t *testing.T) {
 	events := []*transfertypes.Progress{
 		{Event: "Importing"},
@@ -273,20 +310,26 @@ func TestTransferProgressDrainedOnError(t *testing.T) {
 		got []string
 	)
 
-	p := newFakeTransferrer(events, wantErr, 5*time.Millisecond)
-	err := p.Transfer(context.Background(), fakeMarshalable{}, fakeMarshalable{}, transfer.WithProgress(func(p transfer.Progress) {
-		mu.Lock()
-		got = append(got, progressKey(p))
-		mu.Unlock()
-	}))
+	p, gate, sent := newFakeTransferrer(events, wantErr)
+
+	transferDone := make(chan error, 1)
+	go func() {
+		transferDone <- p.Transfer(context.Background(), fakeMarshalable{}, fakeMarshalable{}, transfer.WithProgress(func(p transfer.Progress) {
+			mu.Lock()
+			got = append(got, progressKey(p))
+			mu.Unlock()
+		}))
+	}()
+
+	close(gate)
+	<-sent
+
+	err := <-transferDone
 	if err == nil {
 		t.Fatalf("expected error from Transfer, got nil")
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
-	if len(got) != len(events) {
-		t.Fatalf("expected %d progress events after errored Transfer returned, got %d: %v",
-			len(events), len(got), got)
-	}
+	assertProgress(t, got, events)
 }
