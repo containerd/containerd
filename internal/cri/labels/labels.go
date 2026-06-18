@@ -32,9 +32,13 @@ limitations under the License.
 
 package labels
 
+import (
+	clabels "github.com/containerd/containerd/v2/pkg/labels"
+)
+
 const (
 	// criContainerdPrefix is common prefix for cri-containerd
-	criContainerdPrefix = "io.cri-containerd"
+	criContainerdPrefix = clabels.CRIContainerdPrefix
 	// ImageLabelKey is the label key indicating the image is managed by cri plugin.
 	ImageLabelKey = criContainerdPrefix + ".image"
 	// ImageLabelValue is the label value indicating the image is managed by cri plugin.
