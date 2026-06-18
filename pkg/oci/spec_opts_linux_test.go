@@ -747,7 +747,7 @@ func TestWithAppendAdditionalGroupsNoEtcGroup(t *testing.T) {
 		{
 			name:     "no additional gids, append root group",
 			groups:   []string{"root"},
-			err:      fmt.Sprintf("unable to find group root: open %s: no such file or directory", filepath.Join(td, "etc", "group")),
+			err:      fmt.Sprintf("unable to find group root: stat %s: no such file or directory", filepath.Join(td, "etc", "group")),
 			expected: []uint32{0},
 		},
 		{
