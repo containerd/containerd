@@ -152,6 +152,7 @@ func TestReadonlyMounts(t *testing.T) {
 		if !reflect.DeepEqual(original, tc.input) {
 			t.Fatalf("modified original mounts: %s.\n\n Expected: %v\n\n Actual: %v", tc.desc, original, tc.input)
 		}
+		assertNoMountAlias(t, tc.desc, actual, tc.input, original)
 	}
 }
 
@@ -319,7 +320,7 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 			},
 		},
 		{
-			desc: "return original slice since no volatile options on overlay",
+			desc: "return copy when no volatile options on overlay",
 			input: []Mount{
 				{
 					Type:   "overlay",
@@ -399,40 +400,115 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 		if !reflect.DeepEqual(original, tc.input) {
 			t.Fatalf("modified original mounts: %s.\n\n Expected: %v\n\n, Actual: %v", tc.desc, original, tc.input)
 		}
+		assertNoMountAlias(t, tc.desc, actual, tc.input, original)
 	}
 }
 
 func TestRemoveIDMapOption(t *testing.T) {
-	input := []Mount{
+	testCases := []struct {
+		desc     string
+		input    []Mount
+		expected []Mount
+	}{
 		{
-			Type:   "overlay",
-			Source: "overlay",
-			Options: []string{
-				"index=off",
-				"uidmap=0:1000:1",
-				"gidmap=0:1000:1",
-				"lowerdir=/path/to/snapshots/1/fs",
+			desc: "remove idmap options",
+			input: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"uidmap=0:1000:1",
+						"gidmap=0:1000:1",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
+			},
+			expected: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
 			},
 		},
-	}
-	expected := []Mount{
 		{
-			Type:   "overlay",
-			Source: "overlay",
-			Options: []string{
-				"index=off",
-				"lowerdir=/path/to/snapshots/1/fs",
+			desc: "remove idmapping options",
+			input: []Mount{
+				{
+					Type:   "fuse-overlayfs",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"uidmapping=0:1000:1",
+						"gidmapping=0:1000:1",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
+			},
+			expected: []Mount{
+				{
+					Type:   "fuse-overlayfs",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
+			},
+		},
+		{
+			desc: "return copy when no idmap options",
+			input: []Mount{
+				{
+					Type:   "bind",
+					Source: "/path/to/source",
+					Options: []string{
+						"rbind",
+						"ro",
+					},
+				},
+			},
+			expected: []Mount{
+				{
+					Type:   "bind",
+					Source: "/path/to/source",
+					Options: []string{
+						"rbind",
+						"ro",
+					},
+				},
 			},
 		},
 	}
 
-	original := clone(input)
-	actual := RemoveIDMapOption(input)
-	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("incorrectly modified mounts.\n\n Expected: %v\n\n Actual: %v", expected, actual)
+	for _, tc := range testCases {
+		original := clone(tc.input)
+		actual := RemoveIDMapOption(tc.input)
+		if !reflect.DeepEqual(actual, tc.expected) {
+			t.Fatalf("incorrectly modified mounts: %s.\n\n Expected: %v\n\n Actual: %v", tc.desc, tc.expected, actual)
+		}
+		if !reflect.DeepEqual(original, tc.input) {
+			t.Fatalf("modified original mounts: %s.\n\n Expected: %v\n\n Actual: %v", tc.desc, original, tc.input)
+		}
+		assertNoMountAlias(t, tc.desc, actual, tc.input, original)
+	}
+}
+
+func assertNoMountAlias(t *testing.T, desc string, actual, input, original []Mount) {
+	t.Helper()
+	if len(actual) == 0 {
+		return
+	}
+	actual[0].Source = "changed"
+	if len(actual[0].Options) > 0 {
+		actual[0].Options[0] = "changed"
 	}
 	if !reflect.DeepEqual(original, input) {
-		t.Fatalf("modified original mounts.\n\n Expected: %v\n\n Actual: %v", original, input)
+		t.Fatalf("returned mounts alias original mounts: %s.\n\n Expected: %v\n\n Actual: %v", desc, original, input)
 	}
 }
 
