@@ -103,36 +103,24 @@ func RemoveIDMapOption(mounts []Mount) []Mount {
 	})
 }
 
-// filterMountOptions returns mounts filtering out options not matching the
-// [keep] predicate.
-// Does not mutate the input and clones only when a removal is needed.
+// filterMountOptions returns a copy of mounts filtering out options not
+// matching the [keep] predicate.
+// It does not mutate or alias the input.
 func filterMountOptions(mounts []Mount, keep func(Mount, string) bool) []Mount {
-	var out []Mount
+	out := slices.Clone(mounts)
 	for i, m := range mounts {
-		var newOpts []string
-		for j, opt := range m.Options {
-			if !keep(m, opt) {
-				if out == nil {
-					out = slices.Clone(mounts)
-				}
-				if newOpts == nil {
-					// Clone until this opt.
-					newOpts = slices.Clone(m.Options[:j])
-				}
-				continue
-			}
-			if newOpts != nil {
-				newOpts = append(newOpts, opt)
+		var options []string
+		if m.Options != nil {
+			options = make([]string, 0, len(m.Options))
+		}
+		for _, opt := range m.Options {
+			if keep(m, opt) {
+				options = append(options, opt)
 			}
 		}
-		if newOpts != nil {
-			out[i].Options = newOpts
-		}
+		out[i].Options = options
 	}
-	if out != nil {
-		return out
-	}
-	return mounts
+	return out
 }
 
 // WithReadonlyTempMount mounts the provided mounts to a temp dir as readonly,
