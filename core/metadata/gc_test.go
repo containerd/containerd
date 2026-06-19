@@ -634,6 +634,113 @@ func TestCollectibleResources(t *testing.T) {
 	})
 }
 
+// TestCollectionWithReferences verifies that gcContext.references invokes the
+// collectionWithReferences hook for externally-registered resource types and
+// that built-in core-type references are unaffected.
+func TestCollectionWithReferences(t *testing.T) {
+	db, err := newDatabase(t)
+	require.NoError(t, err)
+
+	testResource := gc.ResourceType(0x20)
+
+	// Set up a content blob that the forward-reference collector will reference.
+	alters := []alterFunc{
+		addContent("ns1", dgst(1), nil),
+		addContent("ns1", dgst(2), labelmap(string(labelGCContentRef), dgst(1).String())),
+	}
+
+	if err := db.Update(func(tx *bolt.Tx) error {
+		v1bkt, err := tx.CreateBucketIfNotExists(bucketKeyVersion)
+		if err != nil {
+			return err
+		}
+		for _, alter := range alters {
+			if err := alter(v1bkt); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("Update failed: %+v", err)
+	}
+
+	// refNode is the node the collector will emit as a forward reference.
+	refNode := gcnode(ResourceContent, "ns1", dgst(1).String())
+	testNode := gcnode(testResource, "ns1", "myresource")
+
+	collector := &testForwardRefCollector{
+		testCollector: testCollector{
+			all: []gc.Node{testNode},
+		},
+		refs: map[gc.Node][]gc.Node{
+			testNode: {refNode},
+		},
+	}
+
+	ctx := context.Background()
+	c := startGCContext(ctx, map[gc.ResourceType]Collector{
+		testResource: collector,
+	})
+
+	// The external resource type should emit forward references via collectionWithReferences.
+	checkNodeC(ctx, t, db, []gc.Node{refNode}, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+		return c.references(ctx, tx, testNode, func(n gc.Node) {
+			select {
+			case nc <- n:
+			case <-ctx.Done():
+			}
+		})
+	})
+
+	// Core type (content blob with a label ref) must still resolve its own
+	// forward references without interference from the collector.
+	content2 := gcnode(ResourceContent, "ns1", dgst(2).String())
+	checkNodeC(ctx, t, db, []gc.Node{gcnode(ResourceContent, "ns1", dgst(1).String())},
+		func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+			return c.references(ctx, tx, content2, func(n gc.Node) {
+				select {
+				case nc <- n:
+				case <-ctx.Done():
+				}
+			})
+		})
+
+	// A node whose type is not registered with a forward-reference collector
+	// should produce no references (other than those from built-in logic).
+	unknownNode := gcnode(testResource, "ns1", "notregistered")
+	unknownCollector := &testCollector{
+		all: []gc.Node{unknownNode},
+	}
+	c2 := startGCContext(ctx, map[gc.ResourceType]Collector{
+		testResource: unknownCollector,
+	})
+	checkNodeC(ctx, t, db, nil, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+		return c2.references(ctx, tx, unknownNode, func(n gc.Node) {
+			select {
+			case nc <- n:
+			case <-ctx.Done():
+			}
+		})
+	})
+}
+
+// testForwardRefCollector extends testCollector with collectionWithReferences
+// support, emitting pre-configured forward edges for each visited node.
+type testForwardRefCollector struct {
+	testCollector
+	refs map[gc.Node][]gc.Node
+}
+
+func (tc *testForwardRefCollector) StartCollection(context.Context) (CollectionContext, error) {
+	return tc, nil
+}
+
+func (tc *testForwardRefCollector) References(_ context.Context, node gc.Node, fn func(gc.Node)) {
+	for _, ref := range tc.refs[node] {
+		fn(ref)
+	}
+}
+
 type testCollector struct {
 	all    []gc.Node
 	active []gc.Node
