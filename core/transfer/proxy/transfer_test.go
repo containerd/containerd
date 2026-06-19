@@ -49,9 +49,9 @@ import (
 //     the test can know the server side is fully done.
 //
 // With the drain (the fix), proxyTransferrer.Transfer cannot return until the
-// stream is closed (which only happens after sent), so the test observes all
-// events. Without the drain, Transfer returns the moment the RPC returns —
-// before gate is even opened — so the test observes zero events.
+// stream is closed (and `sent` is closed right after, in sendEvents), so the
+// test observes all events. Without the drain, Transfer returns the moment the
+// RPC returns — before gate is even opened — so the test observes zero events.
 type fakeTransferClient struct {
 	// streams maps progress-stream ids to the streams created by the paired
 	// creator. Scoped to this fake transferrer (not package-level) so tests
@@ -186,16 +186,20 @@ func (c *fakeStreamCreator) Create(_ context.Context, id string) (streaming.Stre
 }
 
 // newFakeTransferrer wires up a proxyTransferrer backed by fakes that share a
-// stream registry scoped to this instance only (no package-level state). The
-// returned gate/sent channels let the test stage the race window deterministically.
-func newFakeTransferrer(events []*transfertypes.Progress, returnErr error) (transferrer *proxyTransferrer, gate, sent chan struct{}) {
-	gate = make(chan struct{})
+// stream registry scoped to this instance only (no package-level state).
+//
+// If gate is non-nil, the server's progress sender blocks on <-gate before
+// pushing any event, letting the test stage a deterministic "RPC returned,
+// events not yet sent" window (used by the success/error drain tests). If gate
+// is nil, the server sends events eagerly (used by the consumer-ordering test,
+// which synchronizes from the consumer side instead).
+func newFakeTransferrer(events []*transfertypes.Progress, returnErr error, gate chan struct{}) (transferrer *proxyTransferrer, sent chan struct{}) {
 	sent = make(chan struct{})
 	client := &fakeTransferClient{events: events, returnErr: returnErr, gate: gate, sent: sent}
 	return &proxyTransferrer{
 		client:        client,
 		streamCreator: &fakeStreamCreator{client: client},
-	}, gate, sent
+	}, sent
 }
 
 // fakeMarshalable is a stand-in source/destination for Transfer that satisfies
@@ -267,7 +271,8 @@ func TestTransferProgressDrainedOnReturn(t *testing.T) {
 		got []string
 	)
 
-	p, gate, sent := newFakeTransferrer(events, nil)
+	gate := make(chan struct{})
+	p, sent := newFakeTransferrer(events, nil, gate)
 
 	transferDone := make(chan error, 1)
 	go func() {
@@ -310,7 +315,8 @@ func TestTransferProgressDrainedOnError(t *testing.T) {
 		got []string
 	)
 
-	p, gate, sent := newFakeTransferrer(events, wantErr)
+	gate := make(chan struct{})
+	p, sent := newFakeTransferrer(events, wantErr, gate)
 
 	transferDone := make(chan error, 1)
 	go func() {
@@ -327,6 +333,90 @@ func TestTransferProgressDrainedOnError(t *testing.T) {
 	err := <-transferDone
 	if err == nil {
 		t.Fatalf("expected error from Transfer, got nil")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	assertProgress(t, got, events)
+}
+
+// TestTransferWaitsForConsumer verifies the ordering half of the drain
+// contract: Transfer must not return until the progress consumer goroutine has
+// finished dispatching every event. The other two tests prove the "eventual
+// state" (all events are observed after Transfer returns); this one proves the
+// "ordering" (Transfer's return is gated on the consumer completing).
+//
+// It does so by making the Progress callback block on the last event. While the
+// callback is blocked, the consumer goroutine is still alive, so the fix's
+// done-channel cannot be closed and Transfer must still be blocked in its drain
+// wait. The test asserts Transfer is blocked at that point, then releases the
+// callback and observes Transfer returning.
+//
+// This is the closest deterministic encoding of the original flake: the real
+// server had already sent everything, but the client consumer hadn't finished
+// draining when Transfer (incorrectly) returned.
+//
+// Determinism note: no sleep is used. The non-blocking select on transferDone
+// is safe without a grace period because the fake RPC returns immediately, so
+// any non-draining implementation would have written transferDone well before
+// the consumer reaches the blocking callback (which requires multiple channel
+// round-trips through the stream).
+func TestTransferWaitsForConsumer(t *testing.T) {
+	events := []*transfertypes.Progress{
+		{Event: "saved", Name: "registry.test/a:1"},
+		{Event: "Completed import"},
+	}
+
+	var (
+		mu              sync.Mutex
+		got             []string
+		reachedLast     = make(chan struct{})
+		progressRelease = make(chan struct{})
+	)
+
+	p, _ := newFakeTransferrer(events, nil, nil)
+	// No gate here: the server sends events immediately, which is the realistic
+	// case the original bug occurred under. The synchronization comes from the
+	// consumer side (reachedLast / progressRelease), not the server side.
+
+	transferDone := make(chan error, 1)
+	go func() {
+		transferDone <- p.Transfer(context.Background(), fakeMarshalable{}, fakeMarshalable{}, transfer.WithProgress(func(p transfer.Progress) {
+			mu.Lock()
+			got = append(got, progressKey(p))
+			last := len(got) == len(events)
+			mu.Unlock()
+
+			if last {
+				// Tell the test we've reached the final event and are about to
+				// block, then block until the test releases us. While blocked,
+				// the consumer goroutine (and hence the drain's done channel)
+				// cannot complete.
+				close(reachedLast)
+				<-progressRelease
+			}
+		}))
+	}()
+
+	// Wait until the consumer has dispatched the final event and is now blocked
+	// in the callback. At this point a draining Transfer must still be waiting.
+	<-reachedLast
+
+	select {
+	case err := <-transferDone:
+		t.Fatalf("Transfer returned before the progress consumer finished draining (err=%v); "+
+			"this is the #10786 race — Transfer must block until the consumer completes", err)
+	default:
+		// Good: Transfer is still blocked in its drain wait, exactly as the
+		// contract requires.
+	}
+
+	// Release the blocked callback so the consumer can finish and Transfer can
+	// return.
+	close(progressRelease)
+
+	if err := <-transferDone; err != nil {
+		t.Fatalf("unexpected error after releasing consumer: %v", err)
 	}
 
 	mu.Lock()
