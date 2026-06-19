@@ -255,7 +255,7 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 			},
 		},
 		{
-			desc: "return copy when no volatile options on overlay",
+			desc: "return input when no volatile options on overlay",
 			input: []Mount{
 				{
 					Type:   "overlay",
@@ -335,7 +335,9 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 		if !reflect.DeepEqual(original, tc.input) {
 			t.Fatalf("modified original mounts: %s.\n\n Expected: %v\n\n, Actual: %v", tc.desc, original, tc.input)
 		}
-		assertNoMountAlias(t, tc.desc, actual, tc.input, original)
+		if !reflect.DeepEqual(actual, original) {
+			assertNoMountAlias(t, tc.desc, actual, tc.input, original)
+		}
 	}
 }
 
@@ -396,7 +398,7 @@ func TestRemoveIDMapOption(t *testing.T) {
 			},
 		},
 		{
-			desc: "return copy when no idmap options",
+			desc: "return input when no idmap options",
 			input: []Mount{
 				{
 					Type:   "bind",
@@ -429,7 +431,9 @@ func TestRemoveIDMapOption(t *testing.T) {
 		if !reflect.DeepEqual(original, tc.input) {
 			t.Fatalf("modified original mounts: %s.\n\n Expected: %v\n\n Actual: %v", tc.desc, original, tc.input)
 		}
-		assertNoMountAlias(t, tc.desc, actual, tc.input, original)
+		if !reflect.DeepEqual(actual, original) {
+			assertNoMountAlias(t, tc.desc, actual, tc.input, original)
+		}
 	}
 }
 
