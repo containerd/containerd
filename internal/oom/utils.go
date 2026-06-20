@@ -100,11 +100,37 @@ func readMemoryOOMKill(cgroupPath string, buf []byte) (uint64, error) {
 	defer f.Close()
 
 	n, err := io.ReadFull(f, buf)
-	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+	switch {
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		// The whole file fit within buf; this is the expected path for current
+		// kernels, where memory.events is a small, fixed set of counters.
+	case err != nil:
 		return 0, err
+	default:
+		// buf was filled completely, so memory.events may be larger than buf
+		// and the oom_kill counter could lie beyond what we read. Read the
+		// remainder so a truncated buffer can never cause a missed OOM event.
+		// This is not expected for current kernels and keeps the common path
+		// allocation-free.
+		rest, rerr := io.ReadAll(f)
+		if rerr != nil {
+			return 0, rerr
+		}
+		full := make([]byte, 0, n+len(rest))
+		full = append(append(full, buf[:n]...), rest...)
+		v, _ := parseOOMKill(full)
+		return v, nil
 	}
 
-	data := buf[:n]
+	v, _ := parseOOMKill(buf[:n])
+	return v, nil
+}
+
+// parseOOMKill scans memory.events content for the "oom_kill" counter. The
+// boolean return reports whether the counter was found; a missing counter is
+// reported as (0, false) so the caller can distinguish it from oom_kill being
+// genuinely zero.
+func parseOOMKill(data []byte) (uint64, bool) {
 	for len(data) > 0 {
 		line := data
 		if i := bytes.IndexByte(data, '\n'); i >= 0 {
@@ -116,9 +142,13 @@ func readMemoryOOMKill(cgroupPath string, buf []byte) (uint64, error) {
 		if !ok {
 			continue
 		}
-		return parseUint(string(bytes.TrimSpace(rest)), 10, 64)
+		v, err := parseUint(string(bytes.TrimSpace(rest)), 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return v, true
 	}
-	return 0, nil
+	return 0, false
 }
 
 func parseUint(s string, base, bitSize int) (uint64, error) {

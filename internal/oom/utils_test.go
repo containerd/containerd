@@ -78,3 +78,20 @@ func TestReadMemoryOOMKillMissingFile(t *testing.T) {
 	_, err := readMemoryOOMKill(t.TempDir(), buf)
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
+
+// TestReadMemoryOOMKillUndersizedBuffer ensures that a memory.events file
+// larger than the read buffer does not cause the oom_kill counter to be missed:
+// the reader must fall back to reading the whole file instead of silently
+// returning 0 from a truncated buffer.
+func TestReadMemoryOOMKillUndersizedBuffer(t *testing.T) {
+	dir := t.TempDir()
+	content := "low 0\nhigh 0\nmax 0\noom 0\noom_kill 7\noom_group_kill 0\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "memory.events"), []byte(content), 0o644))
+
+	// A buffer far smaller than the file forces io.ReadFull to fill completely
+	// and exercises the full-file fallback.
+	buf := make([]byte, 8)
+	got, err := readMemoryOOMKill(dir, buf)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(7), got)
+}
