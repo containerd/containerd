@@ -19,12 +19,13 @@
 package oom
 
 import (
-	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"golang.org/x/sys/unix"
@@ -71,41 +72,53 @@ func getCgroup2Path(pid int) (string, error) {
 	return filepath.Join(defaultCgroup2Path, g), nil
 }
 
-// readKVStatsFile is copied from cgroupsv2 package
+// memoryEventsBufSize is large enough to hold the whole cgroup v2
+// memory.events file, which is a small, fixed set of counters.
+const memoryEventsBufSize = 512
+
+// oomKillPrefix is the start of the "oom_kill" line in memory.events. Keeping
+// it as a package-level []byte avoids a per-call allocation on the OOM watcher
+// hot path.
+var oomKillPrefix = []byte("oom_kill ")
+
+// readMemoryOOMKill reads the "oom_kill" counter from a cgroup's memory.events
+// file into the caller-provided buffer.
 //
-// TODO(fuweid):
-//
-// we should export some helper functions like MemoryEvents(cgroupPath) directly.
-func readKVStatsFile(path string, file string, out map[string]uint64) error {
-	f, err := os.Open(filepath.Join(path, file))
+// The OOM watcher is woken for every modification of memory.events, which the
+// kernel updates on every low/high/max reclaim event, not only on OOM kills.
+// On long-running nodes with stable workloads those reclaim events dominate, so
+// this is a hot path. Reading the file into a reused buffer and scanning for the
+// single counter we care about avoids allocating a map (and re-parsing every
+// line) on each wakeup, which otherwise accumulates measurable CPU and GC
+// overhead over the lifetime of the shim.
+// See https://github.com/containerd/containerd/issues/13558.
+func readMemoryOOMKill(cgroupPath string, buf []byte) (uint64, error) {
+	f, err := os.Open(filepath.Join(cgroupPath, "memory.events"))
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer f.Close()
 
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		name, value, err := parseKV(s.Text())
-		if err != nil {
-			return fmt.Errorf("error while parsing %s (line=%q): %w", filepath.Join(path, file), s.Text(), err)
-		}
-		out[name] = value
+	n, err := io.ReadFull(f, buf)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return 0, err
 	}
-	return s.Err()
-}
 
-func parseKV(raw string) (string, uint64, error) {
-	parts := strings.Fields(raw)
-	switch len(parts) {
-	case 2:
-		v, err := parseUint(parts[1], 10, 64)
-		if err != nil {
-			return "", 0, err
+	data := buf[:n]
+	for len(data) > 0 {
+		line := data
+		if i := bytes.IndexByte(data, '\n'); i >= 0 {
+			line, data = data[:i], data[i+1:]
+		} else {
+			data = nil
 		}
-		return parts[0], v, nil
-	default:
-		return "", 0, cgroupsv2.ErrInvalidFormat
+		rest, ok := bytes.CutPrefix(line, oomKillPrefix)
+		if !ok {
+			continue
+		}
+		return parseUint(string(bytes.TrimSpace(rest)), 10, 64)
 	}
+	return 0, nil
 }
 
 func parseUint(s string, base, bitSize int) (uint64, error) {
