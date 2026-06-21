@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	assertlib "github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -34,6 +35,12 @@ func TestMetadataMarshalUnmarshal(t *testing.T) {
 				Name:    "test-name",
 				Attempt: 1,
 			},
+			Envs: []*runtime.KeyValue{
+				&runtime.KeyValue{
+					Key:   "foo",
+					Value: []byte("bar"),
+				},
+			},
 		},
 		ImageRef: "test-image-ref",
 		LogPath:  "/test/log/path",
@@ -43,12 +50,12 @@ func TestMetadataMarshalUnmarshal(t *testing.T) {
 	newMeta := &Metadata{}
 	newVerMeta := &versionedMetadata{}
 
-	t.Logf("should be able to do json.marshal")
+	t.Logf("should be able to do json.marshal and produce v2")
 	data, err := json.Marshal(meta)
 	assert.NoError(err)
 	data1, err := json.Marshal(&versionedMetadata{
-		Version:  metadataVersion,
-		Metadata: metadataInternal(*meta),
+		Version:  metadataVersion2,
+		Metadata: metadataToInternal(*meta, metadataVersion2),
 	})
 	assert.NoError(err)
 	assert.Equal(data, data1)
@@ -57,24 +64,28 @@ func TestMetadataMarshalUnmarshal(t *testing.T) {
 	data, err = meta.MarshalJSON()
 	assert.NoError(err)
 	assert.NoError(newMeta.UnmarshalJSON(data))
+	proto.Size(newMeta.Config)
 	assert.Equal(meta, newMeta)
 
 	t.Logf("should be able to do MarshalJSON and json.Unmarshal")
 	data, err = meta.MarshalJSON()
 	assert.NoError(err)
 	assert.NoError(json.Unmarshal(data, newVerMeta))
-	assert.Equal(meta, (*Metadata)(&newVerMeta.Metadata))
+	v2meta := internalToMetadata(newVerMeta.Metadata, metadataVersion2)
+	proto.Size(v2meta.Config)
+	assert.Equal(*meta, v2meta)
 
 	t.Logf("should be able to do json.Marshal and UnmarshalJSON")
 	data, err = json.Marshal(meta)
 	assert.NoError(err)
 	assert.NoError(newMeta.UnmarshalJSON(data))
+	proto.Size(newMeta.Config)
 	assert.Equal(meta, newMeta)
 
 	t.Logf("should json.Unmarshal fail for unsupported version")
 	unsupported, err := json.Marshal(&versionedMetadata{
 		Version:  "random-test-version",
-		Metadata: metadataInternal(*meta),
+		Metadata: metadataToInternal(*meta, "random-test-version"),
 	})
 	assert.NoError(err)
 	assert.Error(json.Unmarshal(unsupported, &newMeta))
