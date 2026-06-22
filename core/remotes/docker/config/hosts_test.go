@@ -687,19 +687,19 @@ func printHostConfig(hc []hostConfig) string {
 		}
 		fmt.Fprintf(b, "\t\theader: %#v\n", hc[i].header)
 		if hc[i].dialTimeout != nil {
-			fmt.Fprintf(b, "\t\tdial-timeout: %v\n", hc[i].dialTimeout)
+			fmt.Fprintf(b, "\t\tdial-timeout: %v\n", *hc[i].dialTimeout)
 		}
 		if hc[i].responseHeaderTimeout != nil {
-			fmt.Fprintf(b, "\t\tresponse-header-timeout: %v\n", hc[i].responseHeaderTimeout)
+			fmt.Fprintf(b, "\t\tresponse-header-timeout: %v\n", *hc[i].responseHeaderTimeout)
 		}
 		if hc[i].idleConnTimeout != nil {
-			fmt.Fprintf(b, "\t\tidle-conn-timeout: %v\n", hc[i].idleConnTimeout)
+			fmt.Fprintf(b, "\t\tidle-conn-timeout: %v\n", *hc[i].idleConnTimeout)
 		}
 		if hc[i].expectContinueTimeout != nil {
-			fmt.Fprintf(b, "\t\texpect-continue-timeout: %v\n", hc[i].expectContinueTimeout)
+			fmt.Fprintf(b, "\t\texpect-continue-timeout: %v\n", *hc[i].expectContinueTimeout)
 		}
 		if hc[i].tlsHandshakeTimeout != nil {
-			fmt.Fprintf(b, "\t\ttls-handshake-timeout: %v\n", hc[i].tlsHandshakeTimeout)
+			fmt.Fprintf(b, "\t\ttls-handshake-timeout: %v\n", *hc[i].tlsHandshakeTimeout)
 		}
 	}
 	return b.String()

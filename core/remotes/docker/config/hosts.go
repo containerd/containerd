@@ -584,11 +584,11 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 	}
 
 	if config.TLSHandshakeTimeout != "" {
-		TLSHandshakeTimeout, err := time.ParseDuration(config.TLSHandshakeTimeout)
+		tlsHandshakeTimeout, err := time.ParseDuration(config.TLSHandshakeTimeout)
 		if err != nil {
 			return hostConfig{}, err
 		}
-		result.tlsHandshakeTimeout = &TLSHandshakeTimeout
+		result.tlsHandshakeTimeout = &tlsHandshakeTimeout
 	}
 
 	if config.ResponseHeaderTimeout != "" {
