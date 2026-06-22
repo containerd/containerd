@@ -1,0 +1,594 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package integration
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+
+	"github.com/containerd/containerd/v2/integration/images"
+	runc "github.com/containerd/go-runc"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+)
+
+const (
+	defaultRoot = "/var/lib/containerd-test"
+)
+
+func supportsUserNS() bool {
+	if _, err := os.Stat("/proc/self/ns/user"); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+func supportsIDMap(path string) bool {
+	treeFD, err := unix.OpenTree(-1, path, uint(unix.OPEN_TREE_CLONE|unix.OPEN_TREE_CLOEXEC))
+	if err != nil {
+		return false
+	}
+	defer unix.Close(treeFD)
+
+	// We want to test if idmap mounts are supported.
+	// So we use just some random mapping, it doesn't really matter which one.
+	// For the helper command, we just need something that is alive while we
+	// test this, a sleep 5 will do it.
+	cmd := exec.Command("sleep", "5")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags:  syscall.CLONE_NEWUSER,
+		UidMappings: []syscall.SysProcIDMap{{ContainerID: 0, HostID: 65536, Size: 65536}},
+		GidMappings: []syscall.SysProcIDMap{{ContainerID: 0, HostID: 65536, Size: 65536}},
+	}
+	if err := cmd.Start(); err != nil {
+		return false
+	}
+	defer func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}()
+
+	usernsFD := fmt.Sprintf("/proc/%d/ns/user", cmd.Process.Pid)
+	var usernsFile *os.File
+	if usernsFile, err = os.Open(usernsFD); err != nil {
+		return false
+	}
+	defer usernsFile.Close()
+
+	attr := unix.MountAttr{
+		Attr_set:  unix.MOUNT_ATTR_IDMAP,
+		Userns_fd: uint64(usernsFile.Fd()),
+	}
+	if err := unix.MountSetattr(treeFD, "", unix.AT_EMPTY_PATH, &attr); err != nil {
+		return false
+	}
+
+	return true
+}
+
+// traversePath gives 755 permissions for all elements in tPath below
+// os.TempDir() and errors out if elements above it don't have read+exec
+// permissions for others.  tPath MUST be a descendant of os.TempDir(). The path
+// returned by testing.TempDir() usually is.
+func traversePath(tPath string) error {
+	// Check the assumption that the argument is under os.TempDir().
+	tempBase := os.TempDir()
+	if !strings.HasPrefix(tPath, tempBase) {
+		return fmt.Errorf("traversePath: %q is not a descendant of %q", tPath, tempBase)
+	}
+
+	var path string
+	for _, p := range strings.SplitAfter(tPath, "/") {
+		path = path + p
+		stats, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+
+		perm := stats.Mode().Perm()
+		if perm&0o5 == 0o5 {
+			continue
+		}
+		if strings.HasPrefix(tempBase, path) {
+			return fmt.Errorf("traversePath: directory %q MUST have read+exec permissions for others", path)
+		}
+
+		if err := os.Chmod(path, perm|0o755); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func TestPodUserNS(t *testing.T) {
+	containerID := uint32(0)
+	hostID := uint32(65536)
+	size := uint32(65536)
+	hostNetNS, err := os.Readlink("/proc/self/ns/net")
+	require.NoError(t, err)
+	idmap := []*runtime.IDMapping{
+		{
+			ContainerId: containerID,
+			HostId:      hostID,
+			Length:      size,
+		},
+	}
+
+	volumeHostPath := t.TempDir()
+	if err := traversePath(volumeHostPath); err != nil {
+		t.Fatalf("failed to setup volume host path: %v", err)
+	}
+
+	for name, test := range map[string]struct {
+		sandboxOpts   []PodSandboxOpts
+		containerOpts []ContainerOpts
+		checkOutput   func(t *testing.T, output string)
+		hostVolumes   bool // whether to config uses host Volumes
+		expectErr     bool
+	}{
+		"userns uid mapping": {
+			sandboxOpts: []PodSandboxOpts{
+				WithPodUserNs(containerID, hostID, size),
+			},
+			containerOpts: []ContainerOpts{
+				WithUserNamespace(containerID, hostID, size),
+				WithCommand("cat", "/proc/self/uid_map"),
+			},
+			checkOutput: func(t *testing.T, output string) {
+				// The output should contain the length of the userns requested.
+				assert.Contains(t, output, fmt.Sprint(size))
+			},
+		},
+		"userns gid mapping": {
+			sandboxOpts: []PodSandboxOpts{
+				WithPodUserNs(containerID, hostID, size),
+			},
+			containerOpts: []ContainerOpts{
+				WithUserNamespace(containerID, hostID, size),
+				WithCommand("cat", "/proc/self/gid_map"),
+			},
+			checkOutput: func(t *testing.T, output string) {
+				// The output should contain the length of the userns requested.
+				assert.Contains(t, output, fmt.Sprint(size))
+			},
+		},
+		"userns with host network": {
+			sandboxOpts: []PodSandboxOpts{
+				WithHostNetwork,
+				WithPodUserNs(containerID, hostID, size),
+			},
+			containerOpts: []ContainerOpts{
+				WithUserNamespace(containerID, hostID, size),
+				WithCommand("sh", "-c", "cat /proc/self/uid_map; echo NETNS=$(readlink /proc/self/ns/net)"),
+			},
+			checkOutput: func(t *testing.T, output string) {
+				// The output should contain the length of the userns requested.
+				assert.Contains(t, output, fmt.Sprint(size))
+				// When host network is requested, container netns should match host netns.
+				assert.Contains(t, output, "NETNS="+hostNetNS)
+			},
+		},
+		"rootfs permissions": {
+			sandboxOpts: []PodSandboxOpts{
+				WithPodUserNs(containerID, hostID, size),
+			},
+			containerOpts: []ContainerOpts{
+				WithUserNamespace(containerID, hostID, size),
+				// Prints numeric UID and GID for path.
+				// For example, if UID and GID is 0 it will print: =0=0=
+				// We add the "=" signs so we use can assert.Contains() and be sure
+				// the UID/GID is 0 and not things like 100 (that contain 0).
+				// We can't use assert.Equal() easily as it contains timestamp, etc.
+				WithCommand("stat", "-c", "'=%u=%g='", "/root/"),
+			},
+			checkOutput: func(t *testing.T, output string) {
+				// The UID and GID should be 0 (root) if the chown/remap is done correctly.
+				assert.Contains(t, output, "=0=0=")
+			},
+		},
+		"volumes permissions": {
+			sandboxOpts: []PodSandboxOpts{
+				WithPodUserNs(containerID, hostID, size),
+			},
+			hostVolumes: true,
+			containerOpts: []ContainerOpts{
+				WithUserNamespace(containerID, hostID, size),
+				WithIDMapVolumeMount(volumeHostPath, "/mnt", idmap, idmap),
+				// Prints numeric UID and GID for path.
+				// For example, if UID and GID is 0 it will print: =0=0=
+				// We add the "=" signs so we use can assert.Contains() and be sure
+				// the UID/GID is 0 and not things like 100 (that contain 0).
+				// We can't use assert.Equal() easily as it contains timestamp, etc.
+				WithCommand("stat", "-c", "'=%u=%g='", "/mnt/"),
+			},
+			checkOutput: func(t *testing.T, output string) {
+				// The UID and GID should be the current user if chown/remap is done correctly.
+				uid := "0"
+				user, err := user.Current()
+				if user != nil && err == nil {
+					uid = user.Uid
+				}
+				assert.Contains(t, output, "="+uid+"="+uid+"=")
+			},
+		},
+		"fails with several mappings": {
+			sandboxOpts: []PodSandboxOpts{
+				WithPodUserNs(containerID, hostID, size),
+				WithPodUserNs(containerID*2, hostID*2, size*2),
+			},
+			expectErr: true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if !supportsUserNS() {
+				t.Skip("User namespaces are not supported")
+			}
+			if !supportsIDMap(defaultRoot) {
+				t.Skipf("ID mappings are not supported on: %v", defaultRoot)
+			}
+			if test.hostVolumes && !supportsIDMap(volumeHostPath) {
+				t.Skipf("ID mappings are not supported host volume filesystem: %v", volumeHostPath)
+			}
+			if err := supportsRuncIDMap(); err != nil {
+				t.Skipf("OCI runtime doesn't support idmap mounts: %v", err)
+			}
+
+			testPodLogDir := t.TempDir()
+			sandboxOpts := append(test.sandboxOpts, WithPodLogDirectory(testPodLogDir))
+			t.Log("Create a sandbox with userns")
+			sbConfig := PodSandboxConfig("sandbox", "userns", sandboxOpts...)
+			sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+			if err != nil {
+				if !test.expectErr {
+					t.Fatalf("Unexpected RunPodSandbox error: %v", err)
+				}
+				return
+			}
+			// Make sure the sandbox is cleaned up.
+			defer func() {
+				assert.NoError(t, runtimeService.StopPodSandbox(sb))
+				assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+			}()
+			if test.expectErr {
+				t.Fatalf("Expected RunPodSandbox to return error")
+			}
+
+			var (
+				testImage     = images.Get(images.BusyBox)
+				containerName = "test-container"
+			)
+
+			EnsureImageExists(t, testImage)
+
+			containerOpts := append(test.containerOpts,
+				WithLogPath(containerName),
+			)
+			t.Log("Create a container for userns")
+			cnConfig := ContainerConfig(
+				containerName,
+				testImage,
+				containerOpts...,
+			)
+			cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+			require.NoError(t, err)
+
+			t.Log("Start the container")
+			require.NoError(t, runtimeService.StartContainer(cn))
+
+			t.Log("Wait for container to finish running")
+			require.NoError(t, Eventually(func() (bool, error) {
+				s, err := runtimeService.ContainerStatus(cn)
+				if err != nil {
+					return false, err
+				}
+				if s.GetState() == runtime.ContainerState_CONTAINER_EXITED {
+					return true, nil
+				}
+				return false, nil
+			}, time.Second, 30*time.Second))
+
+			content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
+			assert.NoError(t, err)
+
+			t.Log("Running check function")
+			test.checkOutput(t, string(content))
+		})
+	}
+}
+
+// TestIssue10598 tests a case[1] that init processes in container should be able
+// to open /dev/stdout or /dev/stderr if init processes are running in their
+// user namespace instead of root user.
+//
+// The shim server creates pipe for init processes' standard output. By default,
+// the owner of pipe is the same to shim server (root user). Let's say, the init
+// process is running with uid=1000/gid=1000 user. Init processes inherits the
+// pipe created by shim server so that it can just write data into that pipe.
+// However, if that init process tries to open /dev/stderr, the kernel will
+// return no permission error.
+//
+// The following output is from retsnoop[2].
+//
+//	→ do_open
+//	         → inode_permission
+//	             → generic_permission
+//	                 ↔ make_vfsuid      [0]                     0.500us
+//	                 ↔ make_vfsuid      [0]                     6.501us
+//	                 ↔ from_kuid        [0xffffffff]            0.700us
+//	             ← generic_permission   [-EACCES]              13.501us
+//
+// Since uid_map/gid_map doesn't cover uid=0/gid=0, the kernel can't convert
+// uid=0 into valid uid in that uid_map. So, `from_kuid` returns invalid uid
+// value and then `do_open` returns EACCES error.
+//
+// [1]: https://github.com/containerd/containerd/issues/10598
+// [2]: https://github.com/anakryiko/retsnoop
+func TestIssue10598(t *testing.T) {
+	if !supportsUserNS() {
+		t.Skip("User namespaces are not supported")
+	}
+	if !supportsIDMap(defaultRoot) {
+		t.Skipf("ID mappings are not supported on: %v", defaultRoot)
+	}
+	if err := supportsRuncIDMap(); err != nil {
+		t.Skipf("OCI runtime doesn't support idmap mounts: %v", err)
+	}
+
+	testPodLogDir := t.TempDir()
+
+	containerID := uint32(0)
+	hostID := uint32(65536)
+	size := uint32(65536)
+
+	t.Log("Create a sandbox with userns")
+	sandboxOpts := []PodSandboxOpts{
+		WithPodUserNs(containerID, hostID, size),
+		WithPodLogDirectory(testPodLogDir),
+	}
+	sbConfig := PodSandboxConfig("issue10598", "userns", sandboxOpts...)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	require.NoError(t, err)
+
+	// Make sure the sandbox is cleaned up.
+	defer func() {
+		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+	}()
+
+	t.Log("Create a container for userns")
+
+	containerName := "nginx-userns"
+	testImage := images.Get(images.Nginx)
+
+	EnsureImageExists(t, testImage)
+
+	containerOpts := []ContainerOpts{
+		WithUserNamespace(containerID, hostID, size),
+		WithLogPath(containerName),
+		// The SELinux policy enforced by container-selinux prevents
+		// NGINX from opening the /proc/self/fd/2 pipe. This scenario
+		// is not intended to verify SELinux behavior in the user namespace
+		// but rather to confirm the ownership of the standard output
+		// file descriptor. The following option demonstrates how to
+		// disable the restrictive SELinux rule for the NGINX process.
+		WithSELinuxOptions(
+			"unconfined_u",
+			"unconfined_r",
+			"container_runtime_t",
+			"s0",
+		),
+	}
+
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		containerOpts...,
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	t.Log("Wait for container to start")
+	require.NoError(t, Eventually(func() (bool, error) {
+		content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
+		if err != nil {
+			return false, err
+		}
+
+		s, err := runtimeService.ContainerStatus(cn)
+		if err != nil {
+			return false, err
+		}
+
+		if state := s.GetState(); state != runtime.ContainerState_CONTAINER_RUNNING {
+			return false, fmt.Errorf("%s is not running\nstate: %s\nlog: %s",
+				containerName, state, string(content))
+		}
+
+		started := strings.Contains(string(content), "start worker processes")
+		if started {
+			t.Log(string(content))
+		}
+		return started, nil
+	}, time.Second, 30*time.Second))
+}
+
+// TestUsernsVolumeCopyUp tests the volume-copy-up feature in user namespaces. It's inspired in
+// TestVolumeCopyUp but adapted to run with user namespaces and check file owners.
+// For more info, see:
+//
+//	https://github.com/containerd/containerd/issues/11852
+func TestUsernsVolumeCopyUp(t *testing.T) {
+	if !supportsUserNS() {
+		t.Skip("User namespaces are not supported")
+	}
+	if !supportsIDMap(defaultRoot) {
+		t.Skipf("ID mappings are not supported on: %v", defaultRoot)
+	}
+	if err := supportsRuncIDMap(); err != nil {
+		t.Skipf("OCI runtime doesn't support idmap mounts: %v", err)
+	}
+
+	var (
+		testImage   = images.Get(images.VolumeCopyUp)
+		execTimeout = time.Minute
+		containerID = uint32(0)
+		hostID      = uint32(65536)
+		size        = uint32(65536)
+	)
+
+	t.Logf("Create a sandbox")
+	sbOpts := []PodSandboxOpts{
+		WithPodUserNs(containerID, hostID, size),
+	}
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "volume-ownership", sbOpts...)
+
+	EnsureImageExists(t, testImage)
+
+	t.Logf("Create a container with volume-copy-up test image")
+	cnConfig := ContainerConfig(
+		"container",
+		testImage,
+		WithCommand("sleep", "150"),
+		WithUserNamespace(containerID, hostID, size),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Logf("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	expectedVolumes := []containerVolume{
+		{
+			containerPath: "/test_dir",
+			files: []volumeFile{
+				{
+					fileName: "test_file",
+					contents: "test_content\n",
+				},
+			},
+		},
+		{
+			containerPath: "/:colon_prefixed",
+			files: []volumeFile{
+				{
+					fileName: "colon_prefixed_file",
+					contents: "test_content\n",
+				},
+			},
+		},
+		{
+			containerPath: "/C:/weird_test_dir",
+			files: []volumeFile{
+				{
+					fileName: "weird_test_file",
+					contents: "test_content\n",
+				},
+			},
+		},
+	}
+
+	volumeMappings, err := getContainerBindVolumes(t, cn)
+	require.NoError(t, err)
+
+	t.Logf("Check host path of the volume")
+	for _, vol := range expectedVolumes {
+		_, ok := volumeMappings[vol.containerPath]
+		assert.Equalf(t, true, ok, "expected to find volume %s", vol.containerPath)
+	}
+
+	// ghcr.io/containerd/volume-copy-up:2.2 contains 3 volumes on Linux and 2 volumes on Windows.
+	// On linux, each of the volumes contains a single file, all with the same content. On Windows,
+	// non C volumes defined in the image start out as empty.
+	for _, vol := range expectedVolumes {
+		files, err := os.ReadDir(volumeMappings[vol.containerPath])
+		require.NoError(t, err)
+		assert.Equal(t, len(vol.files), len(files))
+
+		for _, file := range vol.files {
+			t.Logf("Check whether volume %s contains the test file %s", vol.containerPath, file.fileName)
+			stdout, stderr, err := runtimeService.ExecSync(cn, []string{
+				"cat",
+				filepath.ToSlash(filepath.Join(vol.containerPath, file.fileName)),
+			}, execTimeout)
+			require.NoError(t, err)
+			assert.Empty(t, stderr)
+			assert.Equal(t, file.contents, string(stdout))
+
+			t.Logf("Check whether volume %s contains the test file %s with proper permissions", vol.containerPath, file.fileName)
+			stdout, stderr, err = runtimeService.ExecSync(cn, []string{
+				"stat", "-c", "=%u=%g=",
+				filepath.ToSlash(filepath.Join(vol.containerPath, file.fileName)),
+			}, execTimeout)
+			require.NoError(t, err)
+			assert.Empty(t, stderr)
+			assert.Equal(t, "=0=0=\n", string(stdout))
+		}
+	}
+
+	testFilePath := filepath.Join(volumeMappings[expectedVolumes[0].containerPath], expectedVolumes[0].files[0].fileName)
+	inContainerPath := filepath.Join(expectedVolumes[0].containerPath, expectedVolumes[0].files[0].fileName)
+	contents, err := os.ReadFile(testFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, "test_content\n", string(contents))
+
+	t.Logf("Update volume from inside the container")
+	_, _, err = runtimeService.ExecSync(cn, []string{
+		"sh",
+		"-c",
+		fmt.Sprintf("echo new_content > %s", filepath.ToSlash(inContainerPath)),
+	}, execTimeout)
+	require.NoError(t, err)
+
+	t.Logf("Check whether host path of the volume is updated")
+	contents, err = os.ReadFile(testFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, "new_content\n", string(contents))
+}
+
+func supportsRuncIDMap() error {
+	var r runc.Runc
+	features, err := r.Features(context.Background())
+	if err != nil {
+		// If the features command is not implemented, then runc is too old.
+		return fmt.Errorf("features command failed: %w", err)
+	}
+
+	if features.Linux.MountExtensions == nil || features.Linux.MountExtensions.IDMap == nil {
+		return errors.New("missing `mountExtensions.idmap` entry in `features` command")
+
+	}
+	if enabled := features.Linux.MountExtensions.IDMap.Enabled; enabled == nil || !*enabled {
+		return errors.New("idmap mounts not supported")
+	}
+
+	return nil
+}

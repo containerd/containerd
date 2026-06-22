@@ -1,0 +1,30 @@
+name: Links
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *" # Every day at midnight
+  pull_request:
+    paths:
+      - ".github/workflows/links.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    if: github.repository == 'containerd/containerd'
+    name: lychee
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: lycheeverse/lychee-action@a8c4c7cb88f0c7386610c35eb25108e448569cb0 # v2.7.0
+        with:
+          # Fail action on broken links
+          fail: true
+          args: --exclude-path vendor --exclude-path releases --timeout 30 --no-progress './**/*.md'
+          format: markdown
+          # Write GitHub job summary
+          jobSummary: true

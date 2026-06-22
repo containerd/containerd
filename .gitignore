@@ -1,0 +1,14 @@
+# If you want to ignore files created by your editor/tools, please consider a
+# [global .gitignore](https://help.github.com/articles/ignoring-files).
+
+/bin/
+/man/
+coverage.txt
+cri-integration-coverage.txt
+profile.out
+containerd.test
+_site/
+releases/*.tar.gz
+releases/*.tar.gz.sha256sum
+_output/
+.vagrant/

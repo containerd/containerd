@@ -1,0 +1,1604 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package docker
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/containerd/errdefs"
+	digest "github.com/opencontainers/go-digest"
+	specs "github.com/opencontainers/image-spec/specs-go"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker/auth"
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
+)
+
+func TestHTTPResolver(t *testing.T) {
+	s := func(h http.Handler) (string, ResolverOptions, func()) {
+		s := httptest.NewServer(h)
+
+		options := ResolverOptions{}
+		base := s.URL[len("http://"):]
+		return base, options, s.Close
+	}
+	runBasicTest(t, "testname", s)
+}
+
+func TestHTTPSResolver(t *testing.T) {
+	runBasicTest(t, "testname", tlsServer)
+}
+
+func TestResolverOptionsRace(t *testing.T) {
+	header := http.Header{}
+	header.Set("X-Test", "test")
+
+	s := func(h http.Handler) (string, ResolverOptions, func()) {
+		s := httptest.NewServer(h)
+
+		options := ResolverOptions{
+			Headers: header,
+		}
+		base := s.URL[len("http://"):]
+		return base, options, s.Close
+	}
+
+	for i := range 5 {
+		t.Run(fmt.Sprintf("test ResolverOptions race %d", i), func(t *testing.T) {
+			// parallel sub tests so the race condition (if not handled) can be caught
+			// by race detector
+			t.Parallel()
+			runBasicTest(t, "testname", s)
+		})
+	}
+}
+
+func TestBasicResolver(t *testing.T) {
+	basicAuth := func(h http.Handler) (string, ResolverOptions, func()) {
+		// Wrap with basic auth
+		wrapped := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			username, password, ok := r.BasicAuth()
+			if !ok || username != "user1" || password != "password1" {
+				rw.Header().Set("WWW-Authenticate", "Basic realm=localhost")
+				rw.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			h.ServeHTTP(rw, r)
+		})
+
+		base, options, close := tlsServer(wrapped)
+		authorizer := NewDockerAuthorizer(
+			WithAuthClient(options.Client),
+			WithAuthCreds(func(host string) (string, string, error) {
+				return "user1", "password1", nil
+			}),
+		)
+		options.Hosts = ConfigureDefaultRegistries(
+			WithClient(options.Client),
+			WithAuthorizer(authorizer),
+		)
+		return base, options, close
+	}
+	runBasicTest(t, "testname", basicAuth)
+}
+
+func TestAnonymousTokenResolver(t *testing.T) {
+	th := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"access_token":"perfectlyvalidopaquetoken"}`))
+	})
+
+	runBasicTest(t, "testname", withTokenServer(th, nil))
+}
+
+func TestBasicAuthTokenResolver(t *testing.T) {
+	th := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		username, password, ok := r.BasicAuth()
+		if !ok || username != "user1" || password != "password1" {
+			rw.Write([]byte(`{"access_token":"insufficientscope"}`))
+		} else {
+			rw.Write([]byte(`{"access_token":"perfectlyvalidopaquetoken"}`))
+		}
+	})
+	creds := func(string) (string, string, error) {
+		return "user1", "password1", nil
+	}
+
+	runBasicTest(t, "testname", withTokenServer(th, creds))
+}
+
+func TestRefreshTokenResolver(t *testing.T) {
+	th := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+
+		r.ParseForm()
+		if r.PostForm.Get("grant_type") != "refresh_token" || r.PostForm.Get("refresh_token") != "somerefreshtoken" {
+			rw.Write([]byte(`{"access_token":"insufficientscope"}`))
+		} else {
+			rw.Write([]byte(`{"access_token":"perfectlyvalidopaquetoken"}`))
+		}
+	})
+	creds := func(string) (string, string, error) {
+		return "", "somerefreshtoken", nil
+	}
+
+	runBasicTest(t, "testname", withTokenServer(th, creds))
+}
+
+func TestFetchRefreshToken(t *testing.T) {
+	f := func(t *testing.T, disablePOST bool) {
+		name := "testname"
+		if disablePOST {
+			name += "-disable-post"
+		}
+		var fetchedRefreshToken string
+		onFetchRefreshToken := func(ctx context.Context, refreshToken string, req *http.Request) {
+			fetchedRefreshToken = refreshToken
+		}
+		srv := newRefreshTokenServer(t, name, disablePOST, onFetchRefreshToken)
+		runBasicTest(t, name, srv.BasicTestFunc())
+		if fetchedRefreshToken != srv.RefreshToken {
+			t.Errorf("unexpected refresh token: got %q", fetchedRefreshToken)
+		}
+	}
+
+	t.Run("POST", func(t *testing.T) {
+		f(t, false)
+	})
+	t.Run("GET", func(t *testing.T) {
+		f(t, true)
+	})
+}
+
+func TestPostBasicAuthTokenResolver(t *testing.T) {
+	th := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+
+		r.ParseForm()
+		if r.PostForm.Get("grant_type") != "password" || r.PostForm.Get("username") != "user1" || r.PostForm.Get("password") != "password1" {
+			rw.Write([]byte(`{"access_token":"insufficientscope"}`))
+		} else {
+			rw.Write([]byte(`{"access_token":"perfectlyvalidopaquetoken"}`))
+		}
+	})
+	creds := func(string) (string, string, error) {
+		return "user1", "password1", nil
+	}
+
+	runBasicTest(t, "testname", withTokenServer(th, creds))
+}
+
+func TestBasicAuthResolver(t *testing.T) {
+	creds := func(string) (string, string, error) {
+		return "totallyvaliduser", "totallyvalidpassword", nil
+	}
+
+	runBasicTest(t, "testname", withBasicAuthServer(creds))
+}
+
+func TestBadTokenResolver(t *testing.T) {
+	th := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"access_token":"insufficientscope"}`))
+	})
+	creds := func(string) (string, string, error) {
+		return "", "somerefreshtoken", nil
+	}
+
+	ctx := context.Background()
+	h := newContent(ocispec.MediaTypeImageManifest, []byte("not anything parse-able"))
+
+	base, ro, close := withTokenServer(th, creds)(logHandler{t, h})
+	defer close()
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/doesntmatter:sometag", base)
+
+	_, _, err := resolver.Resolve(ctx, image)
+	if err == nil {
+		t.Fatal("Expected error getting token with inssufficient scope")
+	}
+	if !errors.Is(err, ErrInvalidAuthorization) {
+		t.Fatal(err)
+	}
+}
+
+func TestMissingBasicAuthResolver(t *testing.T) {
+	creds := func(string) (string, string, error) {
+		return "", "", nil
+	}
+
+	ctx := context.Background()
+	h := newContent(ocispec.MediaTypeImageManifest, []byte("not anything parse-able"))
+
+	base, ro, close := withBasicAuthServer(creds)(logHandler{t, h})
+	defer close()
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/doesntmatter:sometag", base)
+
+	_, _, err := resolver.Resolve(ctx, image)
+	if err == nil {
+		t.Fatal("Expected error getting token with inssufficient scope")
+	}
+	if !errors.Is(err, ErrInvalidAuthorization) {
+		t.Fatal(err)
+	}
+	if !strings.Contains(err.Error(), "no basic auth credentials") {
+		t.Fatalf("expected \"no basic auth credentials\" message, got %s", err.Error())
+	}
+}
+
+func TestWrongBasicAuthResolver(t *testing.T) {
+	creds := func(string) (string, string, error) {
+		return "totallyvaliduser", "definitelythewrongpassword", nil
+	}
+
+	ctx := context.Background()
+	h := newContent(ocispec.MediaTypeImageManifest, []byte("not anything parse-able"))
+
+	base, ro, close := withBasicAuthServer(creds)(logHandler{t, h})
+	defer close()
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/doesntmatter:sometag", base)
+
+	_, _, err := resolver.Resolve(ctx, image)
+	if err == nil {
+		t.Fatal("Expected error getting token with inssufficient scope")
+	}
+	var rerr remoteerrors.ErrUnexpectedStatus
+	if !errors.As(err, &rerr) {
+		t.Fatal(err)
+	}
+	if rerr.StatusCode != 403 {
+		t.Fatalf("expected 403 status code, got %d", rerr.StatusCode)
+	}
+}
+
+func TestHostFailureFallbackResolver(t *testing.T) {
+	sf := func(h http.Handler) (string, ResolverOptions, func()) {
+		s := httptest.NewServer(h)
+		base := s.URL[len("http://"):]
+
+		options := ResolverOptions{}
+		createHost := func(host string) RegistryHost {
+			return RegistryHost{
+				Client: &http.Client{
+					// Set the timeout so we timeout waiting for the non-responsive HTTP server
+					Timeout: 500 * time.Millisecond,
+				},
+				Host:         host,
+				Scheme:       "http",
+				Path:         "/v2",
+				Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+			}
+		}
+
+		// Create an unstarted HTTP server. We use this to generate a random port.
+		notRunning := httptest.NewUnstartedServer(nil)
+		notRunningBase := notRunning.Listener.Addr().String()
+
+		// Override hosts with two hosts
+		options.Hosts = func(host string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				createHost(notRunningBase), // This host IS running, but with a non-responsive HTTP server
+				createHost(base),           // This host IS running
+			}, nil
+		}
+
+		return base, options, s.Close
+	}
+
+	runBasicTest(t, "testname", sf)
+}
+
+func TestHostTLSFailureFallbackResolver(t *testing.T) {
+	sf := func(h http.Handler) (string, ResolverOptions, func()) {
+		// Start up two servers
+		server := httptest.NewServer(h)
+		httpBase := server.URL[7:] // strip "http://"
+
+		tlsServer := httptest.NewUnstartedServer(h)
+		tlsServer.StartTLS()
+		httpsBase := tlsServer.URL[8:] // strip "https://"
+
+		capool := x509.NewCertPool()
+		cert, _ := x509.ParseCertificate(tlsServer.TLS.Certificates[0].Certificate[0])
+		capool.AddCert(cert)
+
+		client := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs: capool,
+				},
+			},
+		}
+
+		options := ResolverOptions{}
+		createHost := func(host string) RegistryHost {
+			return RegistryHost{
+				Client:       client,
+				Host:         host,
+				Scheme:       "https",
+				Path:         "/v2",
+				Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+			}
+		}
+
+		// Override hosts with two hosts
+		options.Hosts = func(host string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				createHost(httpBase),  // This host is serving plain HTTP
+				createHost(httpsBase), // This host is serving TLS
+			}, nil
+		}
+
+		return httpBase, options, func() {
+			server.Close()
+			tlsServer.Close()
+		}
+	}
+
+	runBasicTest(t, "testname", sf)
+	runNotFoundTest(t, "testname", sf)
+}
+
+func TestHTTPFallbackResolver(t *testing.T) {
+	sf := func(h http.Handler) (string, ResolverOptions, func()) {
+		s := httptest.NewServer(h)
+		u, err := url.Parse(s.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		client := &http.Client{
+			Transport: NewHTTPFallback(http.DefaultTransport),
+		}
+		options := ResolverOptions{
+			Hosts: func(host string) ([]RegistryHost, error) {
+				return []RegistryHost{
+					{
+						Client:       client,
+						Host:         u.Host,
+						Scheme:       "https",
+						Path:         "/v2",
+						Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+					},
+				}, nil
+			},
+		}
+		return u.Host, options, s.Close
+	}
+
+	runBasicTest(t, "testname", sf)
+}
+
+func TestHTTPFallbackTimeoutResolver(t *testing.T) {
+	sf := func(h http.Handler) (string, ResolverOptions, func()) {
+
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		server := &http.Server{
+			Handler:           h,
+			ReadHeaderTimeout: time.Second,
+		}
+		go func() {
+			// Accept first connection but do not do anything with it
+			// to force TLS handshake to timeout. Subsequent connection
+			// will be HTTP and should work.
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				time.Sleep(time.Second)
+				c.Close()
+			}()
+			server.Serve(l)
+		}()
+		host := l.Addr().String()
+
+		defaultTransport := &http.Transport{
+			TLSHandshakeTimeout: time.Millisecond,
+		}
+		client := &http.Client{
+			Transport: NewHTTPFallback(defaultTransport),
+		}
+
+		options := ResolverOptions{
+			Hosts: func(host string) ([]RegistryHost, error) {
+				return []RegistryHost{
+					{
+						Client:       client,
+						Host:         host,
+						Scheme:       "https",
+						Path:         "/v2",
+						Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+					},
+				}, nil
+			},
+		}
+		return host, options, func() { l.Close() }
+	}
+
+	runBasicTest(t, "testname", sf)
+}
+
+func TestHTTPFallbackPortError(t *testing.T) {
+	// This test only checks the isPortError since testing the whole http fallback would
+	// require listening on 80 and making sure nothing is listening on 443.
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := l.Addr().String()
+	err = l.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = net.Dial("tcp", host)
+	if err == nil {
+		t.Fatal("Dial should fail after close")
+	}
+
+	if isPortError(err, host) {
+		t.Fatalf("Expected no port error for %s with %v", host, err)
+	}
+	if !isPortError(err, "127.0.0.1") {
+		t.Fatalf("Expected port error for 127.0.0.1 with %v", err)
+	}
+
+}
+
+func TestResolveProxy(t *testing.T) {
+	var (
+		ctx  = context.Background()
+		tag  = "latest"
+		r    = http.NewServeMux()
+		name = "testname"
+		ns   = "upstream.example.com"
+	)
+
+	m := newManifest(
+		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
+		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+	)
+	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	m.RegisterHandler(r, name)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
+
+	nr := namespaceRouter{
+		"upstream.example.com": r,
+	}
+
+	base, ro, close := tlsServer(logHandler{t, nr})
+	defer close()
+
+	ro.Hosts = func(host string) ([]RegistryHost, error) {
+		return []RegistryHost{{
+			Client:       ro.Client,
+			Host:         base,
+			Scheme:       "https",
+			Path:         "/v2",
+			Capabilities: HostCapabilityPull | HostCapabilityResolve,
+		}}, nil
+	}
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/%s:%s", ns, name, tag)
+
+	_, d, err := resolver.Resolve(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := resolver.Fetcher(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := testocimanifest(ctx, f, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("Unexpected number of references: %d, expected 2", len(refs))
+	}
+
+	for _, ref := range refs {
+		if err := testFetch(ctx, f, ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestResolveProxyFallback(t *testing.T) {
+	var (
+		ctx  = context.Background()
+		tag  = "latest"
+		r    = http.NewServeMux()
+		name = "testname"
+	)
+
+	m := newManifest(
+		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
+		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+	)
+	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	m.RegisterHandler(r, name)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
+
+	nr := namespaceRouter{
+		"": r,
+	}
+	s := httptest.NewServer(logHandler{t, nr})
+	defer s.Close()
+
+	base := s.URL[len("http://"):]
+
+	ro := ResolverOptions{
+		Hosts: func(host string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				{
+					Host:         flipLocalhost(host),
+					Scheme:       "http",
+					Path:         "/v2",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve,
+				},
+				{
+					Host:         host,
+					Scheme:       "http",
+					Path:         "/v2",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+				},
+			}, nil
+		},
+	}
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, d, err := resolver.Resolve(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := resolver.Fetcher(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := testocimanifest(ctx, f, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("Unexpected number of references: %d, expected 2", len(refs))
+	}
+
+	for _, ref := range refs {
+		if err := testFetch(ctx, f, ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestAddQuery(t *testing.T) {
+	req := &request{path: "/foo"}
+	if err := req.addQuery("bar", "123"); err != nil {
+		t.Fatal(err)
+	}
+	if exp := "/foo?bar=123"; req.path != exp {
+		t.Fatalf("unexpected path %q, expected %q", req.path, exp)
+	}
+	if err := req.addQuery("baz", "456"); err != nil {
+		t.Fatal(err)
+	}
+	if exp := "/foo?bar=123&baz=456"; req.path != exp {
+		t.Fatalf("unexpected path %q, expected %q", req.path, exp)
+	}
+	if err := req.addQuery("baz", "789"); err != nil {
+		t.Fatal(err)
+	}
+	if exp := "/foo?bar=123&baz=456&baz=789"; req.path != exp {
+		t.Fatalf("unexpected path %q, expected %q", req.path, exp)
+	}
+}
+
+func TestRequestSanitize(t *testing.T) {
+	tests := []struct {
+		doc      string
+		request  request
+		expected string
+	}{
+		{
+			doc: "no query",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2",
+		},
+		{
+			doc: "with query",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?zzz=123&aaa=456&aaa=789",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2?aaa=REDACTED&aaa=REDACTED&zzz=REDACTED",
+		},
+		{
+			doc: "with query namespace preserved",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?aaa=123&ns=docker.io",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2?aaa=REDACTED&ns=docker.io",
+		},
+		{
+			doc: "with empty query values",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?aaa=&bbb=&bbb",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2?aaa=&bbb=&bbb=",
+		},
+		{
+			doc: "with fragment",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2#?zzz=123&aaa=456&aaa=789",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://registry.example.test/path/v2#?zzz=123&aaa=456&aaa=789",
+		},
+		{
+			doc: "with auth",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2",
+				host:   RegistryHost{Host: "user:pass@registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://user:xxxxx@registry.example.test/path/v2",
+		},
+		{
+			doc: "with auth and query",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?zzz=123&aaa=456&aaa=789",
+				host:   RegistryHost{Host: "user:pass@registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://user:xxxxx@registry.example.test/path/v2?aaa=REDACTED&aaa=REDACTED&zzz=REDACTED",
+		},
+		{
+			doc: "with auth and fragment",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2#?zzz=123&aaa=456&aaa=789",
+				host:   RegistryHost{Host: "user:pass@registry.example.test", Scheme: "https", Path: "/path/v2"},
+			},
+			expected: "https://user:xxxxx@registry.example.test/path/v2#?zzz=123&aaa=456&aaa=789",
+		},
+		{
+			doc: "malformed missing protocol scheme",
+			request: request{
+				method: http.MethodGet,
+				path:   "/path/v2?aaa=123&bbb=456&bbb=789",
+				host:   RegistryHost{Host: "registry.example.test", Scheme: "", Path: "/path/v2"},
+			},
+			expected: "://registry.example.test/path/v2?aaa=123&bbb=456&bbb=789",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.doc, func(t *testing.T) {
+			assert.Equal(t, tc.expected, tc.request.sanitizedURL())
+		})
+	}
+}
+
+type fakeTimeoutErr struct{}
+
+func (fakeTimeoutErr) Error() string   { return "fake timeout" }
+func (fakeTimeoutErr) Timeout() bool   { return true }
+func (fakeTimeoutErr) Temporary() bool { return true }
+
+func TestIsTransientTransportErr(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "net timeout", err: fakeTimeoutErr{}, want: true},
+		{name: "wrapped net timeout", err: fmt.Errorf("wrapped: %w", fakeTimeoutErr{}), want: true},
+		{name: "io.EOF", err: io.EOF, want: true},
+		{name: "io.ErrUnexpectedEOF", err: io.ErrUnexpectedEOF, want: true},
+		{name: "wrapped io.EOF", err: fmt.Errorf("wrapped: %w", io.EOF), want: true},
+		{name: "generic error not transient", err: errors.New("nope"), want: false},
+		{name: "context canceled not transient", err: context.Canceled, want: false},
+		{name: "context deadline exceeded not transient", err: context.DeadlineExceeded, want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isTransientTransportErr(tc.err)
+			if got != tc.want {
+				t.Errorf("isTransientTransportErr(%v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
+// rtFunc lets a test stub a single RoundTrip per call. The RoundTripper is
+// invoked once per attempt, so the slice length controls how many calls to
+// service before falling off the end.
+type rtFunc func(req *http.Request) (*http.Response, error)
+
+func (f rtFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+func newSequenceRT(t *testing.T, results []error, calls *int) http.RoundTripper {
+	t.Helper()
+	return rtFunc(func(req *http.Request) (*http.Response, error) {
+		i := *calls
+		(*calls)++
+		if i >= len(results) {
+			t.Fatalf("RoundTrip called %d times, only %d results queued", i+1, len(results))
+		}
+		if err := results[i]; err != nil {
+			return nil, err
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("ok")),
+			Header:     http.Header{},
+			Request:    req,
+		}, nil
+	})
+}
+
+func newTransportRetryRequest(rt http.RoundTripper) *request {
+	return &request{
+		method: http.MethodGet,
+		path:   "/v2/",
+		header: http.Header{},
+		host: RegistryHost{
+			Client: &http.Client{Transport: rt},
+			Host:   "example.test",
+			Scheme: "https",
+		},
+	}
+}
+
+func TestDoWithTransportRetries(t *testing.T) {
+	t.Run("success without retry", func(t *testing.T) {
+		var calls int
+		attempts := 3
+		r := newTransportRetryRequest(newSequenceRT(t, []error{nil}, &calls))
+		resp, err := r.doWithTransportRetries(context.Background(), &attempts, true)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		resp.Body.Close()
+		if calls != 1 {
+			t.Errorf("expected 1 call, got %d", calls)
+		}
+		if attempts != 2 {
+			t.Errorf("expected 1 attempt consumed (2 remaining), got %d", attempts)
+		}
+	})
+
+	t.Run("retries transient then succeeds", func(t *testing.T) {
+		var calls int
+		attempts := 3
+		results := []error{fakeTimeoutErr{}, nil}
+		r := newTransportRetryRequest(newSequenceRT(t, results, &calls))
+		resp, err := r.doWithTransportRetries(context.Background(), &attempts, true)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		resp.Body.Close()
+		if calls != 2 {
+			t.Errorf("expected 2 calls, got %d", calls)
+		}
+		if attempts != 1 {
+			t.Errorf("expected 2 attempts consumed (1 remaining), got %d", attempts)
+		}
+	})
+
+	t.Run("gives up when attempts exhausted on transient", func(t *testing.T) {
+		var calls int
+		attempts := 3
+		results := []error{fakeTimeoutErr{}, fakeTimeoutErr{}, fakeTimeoutErr{}}
+		r := newTransportRetryRequest(newSequenceRT(t, results, &calls))
+		_, err := r.doWithTransportRetries(context.Background(), &attempts, true)
+		if err == nil {
+			t.Fatal("expected error after attempts exhausted, got nil")
+		}
+		var netErr net.Error
+		if !errors.As(err, &netErr) || !netErr.Timeout() {
+			t.Errorf("expected timeout error to be returned, got %v", err)
+		}
+		if calls != 3 {
+			t.Errorf("expected 3 calls, got %d", calls)
+		}
+		if attempts != 0 {
+			t.Errorf("expected attempts fully consumed, got %d remaining", attempts)
+		}
+	})
+
+	t.Run("non-transient error is not retried", func(t *testing.T) {
+		var calls int
+		attempts := 3
+		nonTransient := errors.New("connection refused")
+		results := []error{nonTransient}
+		r := newTransportRetryRequest(newSequenceRT(t, results, &calls))
+		_, err := r.doWithTransportRetries(context.Background(), &attempts, true)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !errors.Is(err, nonTransient) {
+			t.Errorf("expected error %v, got %v", nonTransient, err)
+		}
+		if calls != 1 {
+			t.Errorf("expected 1 call, got %d", calls)
+		}
+		if attempts != 2 {
+			t.Errorf("expected 1 attempt consumed (2 remaining), got %d", attempts)
+		}
+	})
+
+	t.Run("non-last host skips retry", func(t *testing.T) {
+		var calls int
+		attempts := 3
+		results := []error{fakeTimeoutErr{}}
+		r := newTransportRetryRequest(newSequenceRT(t, results, &calls))
+		_, err := r.doWithTransportRetries(context.Background(), &attempts, false)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if calls != 1 {
+			t.Errorf("expected 1 call when not last host, got %d", calls)
+		}
+		if attempts != 2 {
+			t.Errorf("expected 1 attempt consumed (2 remaining), got %d", attempts)
+		}
+	})
+
+	t.Run("context cancellation during backoff", func(t *testing.T) {
+		var calls int
+		attempts := 3
+
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+
+		// Cancel the context synchronously from within the RoundTripper so that
+		// ctx.Done() is already closed by the time the backoff select is reached,
+		// making the test deterministic without relying on scheduling or timing.
+		r := newTransportRetryRequest(rtFunc(func(req *http.Request) (*http.Response, error) {
+			calls++
+			cancel()
+			return nil, fakeTimeoutErr{}
+		}))
+		_, err := r.doWithTransportRetries(ctx, &attempts, true)
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("expected context.Canceled, got %v", err)
+		}
+		if calls != 1 {
+			t.Errorf("expected 1 call before cancellation, got %d", calls)
+		}
+	})
+}
+
+func flipLocalhost(host string) string {
+	if strings.HasPrefix(host, "127.0.0.1") {
+		return "localhost" + host[9:]
+
+	} else if strings.HasPrefix(host, "localhost") {
+		return "127.0.0.1" + host[9:]
+	}
+	return host
+}
+
+func withTokenServer(th http.Handler, creds func(string) (string, string, error)) func(h http.Handler) (string, ResolverOptions, func()) {
+	return func(h http.Handler) (string, ResolverOptions, func()) {
+		s := httptest.NewUnstartedServer(th)
+		s.StartTLS()
+
+		cert, _ := x509.ParseCertificate(s.TLS.Certificates[0].Certificate[0])
+		tokenBase := s.URL + "/token"
+
+		// Wrap with token auth
+		wrapped := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			auth := strings.ToLower(r.Header.Get("Authorization"))
+			if auth != "bearer perfectlyvalidopaquetoken" {
+				authHeader := fmt.Sprintf("Bearer realm=%q,service=registry,scope=\"repository:testname:pull,pull\"", tokenBase)
+				if strings.HasPrefix(auth, "bearer ") {
+					authHeader = authHeader + ",error=" + auth[7:]
+				}
+				rw.Header().Set("WWW-Authenticate", authHeader)
+				rw.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			h.ServeHTTP(rw, r)
+		})
+
+		base, options, close := tlsServer(wrapped)
+		options.Hosts = ConfigureDefaultRegistries(
+			WithClient(options.Client),
+			WithAuthorizer(NewDockerAuthorizer(
+				WithAuthClient(options.Client),
+				WithAuthCreds(creds),
+			)),
+		)
+		options.Client.Transport.(*http.Transport).TLSClientConfig.RootCAs.AddCert(cert)
+		return base, options, func() {
+			s.Close()
+			close()
+		}
+	}
+}
+
+func withBasicAuthServer(creds func(string) (string, string, error)) func(h http.Handler) (string, ResolverOptions, func()) {
+	return func(h http.Handler) (string, ResolverOptions, func()) {
+		// Wrap with basic auth
+		wrapped := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			user, password, ok := r.BasicAuth()
+			if ok {
+				if user != "totallyvaliduser" || password != "totallyvalidpassword" {
+					rw.WriteHeader(http.StatusForbidden)
+					rw.Write([]byte(`{"errors":[{"code":"DENIED"}]}`))
+					return
+				}
+			} else {
+				authHeader := "Basic realm=\"testserver\""
+				rw.Header().Set("WWW-Authenticate", authHeader)
+				rw.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			h.ServeHTTP(rw, r)
+		})
+
+		base, options, close := tlsServer(wrapped)
+		options.Hosts = ConfigureDefaultRegistries(
+			WithClient(options.Client),
+			WithAuthorizer(NewDockerAuthorizer(
+				WithAuthCreds(creds),
+			)),
+		)
+		return base, options, close
+	}
+}
+
+func tlsServer(h http.Handler) (string, ResolverOptions, func()) {
+	s := httptest.NewUnstartedServer(h)
+	s.StartTLS()
+
+	capool := x509.NewCertPool()
+	cert, _ := x509.ParseCertificate(s.TLS.Certificates[0].Certificate[0])
+	capool.AddCert(cert)
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: capool,
+			},
+		},
+	}
+
+	options := ResolverOptions{
+		Hosts: ConfigureDefaultRegistries(WithClient(client)),
+		// Set deprecated field for tests to use for configuration
+		Client: client,
+	}
+	base := s.URL[8:] // strip "https://"
+	return base, options, s.Close
+}
+
+type logHandler struct {
+	t       *testing.T
+	handler http.Handler
+}
+
+func (h logHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	h.handler.ServeHTTP(rw, r)
+}
+
+type namespaceRouter map[string]http.Handler
+
+func (nr namespaceRouter) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	h, ok := nr[r.URL.Query().Get(namespaceQueryArg)]
+	if !ok {
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+	h.ServeHTTP(rw, r)
+}
+
+func runBasicTest(t *testing.T, name string, sf func(h http.Handler) (string, ResolverOptions, func())) {
+	var (
+		ctx = context.Background()
+		tag = "latest"
+		r   = http.NewServeMux()
+	)
+
+	m := newManifest(
+		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
+		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+	)
+	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	m.RegisterHandler(r, name)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
+
+	base, ro, close := sf(logHandler{t, r})
+	defer close()
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, d, err := resolver.Resolve(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := resolver.Fetcher(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := testocimanifest(ctx, f, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("Unexpected number of references: %d, expected 2", len(refs))
+	}
+
+	for _, ref := range refs {
+		if err := testFetch(ctx, f, ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func runNotFoundTest(t *testing.T, name string, sf func(h http.Handler) (string, ResolverOptions, func())) {
+	var (
+		ctx = context.Background()
+		tag = "latest"
+		r   = http.NewServeMux()
+	)
+
+	base, ro, close := sf(logHandler{t, r})
+	defer close()
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, _, err := resolver.Resolve(ctx, image)
+	if err == nil {
+		t.Fatalf("Expected error resolving %s, got nil", image)
+	}
+	if !errors.Is(err, errdefs.ErrNotFound) {
+		t.Fatalf("Expected error resolving %s to be ErrNotFound, got %v", image, err)
+	}
+}
+
+func testFetch(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) error {
+	r, err := f.Fetch(ctx, desc)
+	if err != nil {
+		return err
+	}
+	dgstr := desc.Digest.Algorithm().Digester()
+	io.Copy(dgstr.Hash(), r)
+	if dgstr.Digest() != desc.Digest {
+		return fmt.Errorf("content mismatch: %s != %s", dgstr.Digest(), desc.Digest)
+	}
+
+	fByDigest, ok := f.(remotes.FetcherByDigest)
+	if !ok {
+		return fmt.Errorf("fetcher %T does not implement FetcherByDigest", f)
+	}
+	r2, desc2, err := fByDigest.FetchByDigest(ctx, desc.Digest)
+	if err != nil {
+		return fmt.Errorf("FetcherByDigest: failed to fetch %v: %w", desc.Digest, err)
+	}
+	if desc2.Size != desc.Size {
+		r2b, err := io.ReadAll(r2)
+		if err != nil {
+			return fmt.Errorf("FetcherByDigest: size mismatch: %d != %d (content: %v)", desc2.Size, desc.Size, err)
+		}
+		return fmt.Errorf("FetcherByDigest: size mismatch: %d != %d (content: %q)", desc2.Size, desc.Size, string(r2b))
+	}
+	dgstr2 := desc.Digest.Algorithm().Digester()
+	if _, err = io.Copy(dgstr2.Hash(), r2); err != nil {
+		return fmt.Errorf("FetcherByDigest: failed to copy: %w", err)
+	}
+	if dgstr2.Digest() != desc.Digest {
+		return fmt.Errorf("FetcherByDigest: content mismatch: %s != %s", dgstr2.Digest(), desc.Digest)
+	}
+	return nil
+}
+
+func testocimanifest(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	r, err := f.Fetch(ctx, desc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s: %w", desc.Digest, err)
+	}
+	p, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	if dgst := desc.Digest.Algorithm().FromBytes(p); dgst != desc.Digest {
+		return nil, fmt.Errorf("digest mismatch: %s != %s", dgst, desc.Digest)
+	}
+
+	var manifest ocispec.Manifest
+	if err := json.Unmarshal(p, &manifest); err != nil {
+		return nil, err
+	}
+
+	var descs []ocispec.Descriptor
+
+	descs = append(descs, manifest.Config)
+	descs = append(descs, manifest.Layers...)
+
+	return descs, nil
+}
+
+type testContent struct {
+	mediaType    string
+	artifactType string
+	content      []byte
+	skipLength   bool
+}
+
+type contentOpt func(*testContent)
+
+func withArtifactType(artifactType string) contentOpt {
+	return func(tc *testContent) {
+		tc.artifactType = artifactType
+	}
+}
+
+func newContent(mediaType string, b []byte, opts ...contentOpt) testContent {
+	tc := testContent{
+		mediaType: mediaType,
+		content:   b,
+	}
+	for _, opt := range opts {
+		opt(&tc)
+	}
+	return tc
+}
+
+func (tc testContent) Descriptor() ocispec.Descriptor {
+	return ocispec.Descriptor{
+		ArtifactType: tc.artifactType,
+		MediaType:    tc.mediaType,
+		Digest:       digest.FromBytes(tc.content),
+		Size:         int64(len(tc.content)),
+	}
+}
+
+func (tc testContent) Digest() digest.Digest {
+	return digest.FromBytes(tc.content)
+}
+
+func (tc testContent) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", tc.mediaType)
+	if !tc.skipLength {
+		w.Header().Add("Content-Length", strconv.Itoa(len(tc.content)))
+	} else {
+		w.Header().Set("Content-Length", "")
+	}
+	w.Header().Add("Docker-Content-Digest", tc.Digest().String())
+	w.WriteHeader(http.StatusOK)
+	w.Write(tc.content)
+}
+
+type testManifest struct {
+	config     testContent
+	references []testContent
+}
+
+func newManifest(config testContent, refs ...testContent) testManifest {
+	return testManifest{
+		config:     config,
+		references: refs,
+	}
+}
+
+func (m testManifest) OCIManifest() []byte {
+	manifest := ocispec.Manifest{
+		Versioned: specs.Versioned{
+			SchemaVersion: 1,
+		},
+		Config: m.config.Descriptor(),
+		Layers: make([]ocispec.Descriptor, len(m.references)),
+	}
+	for i, c := range m.references {
+		manifest.Layers[i] = c.Descriptor()
+	}
+	b, _ := json.Marshal(manifest)
+	return b
+}
+
+func (m testManifest) RegisterHandler(r *http.ServeMux, name string) {
+	for _, c := range append(m.references, m.config) {
+		r.Handle(fmt.Sprintf("/v2/%s/blobs/%s", name, c.Digest()), c)
+	}
+}
+
+// TestResolveTransientManifestError verifies that a transient server error (5xx)
+// from the /manifests/ endpoint does NOT cause containerd to fall back to the
+// /blobs/ endpoint. Before this fix, a 500 from /manifests/ would cause Resolve()
+// to silently retry via /blobs/, which returns "application/octet-stream" instead
+// of a proper manifest media type — poisoning the descriptor and corrupting the
+// local content store.
+//
+// The correct behavior is: 5xx from /manifests/ → return the server error, do NOT
+// try /blobs/.
+func TestResolveTransientManifestError(t *testing.T) {
+	var (
+		manifestCalled int
+		blobsCalled    bool
+		repo           = "test-repo"
+		dgst           = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" // empty sha
+	)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/manifests/"+dgst) {
+			manifestCalled++
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/blobs/"+dgst) {
+			blobsCalled = true
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Docker-Content-Digest", dgst)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if r.URL.Path == "/v2/" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	resolver := NewResolver(ResolverOptions{
+		Hosts: func(string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				{
+					Host:         ts.URL[len("http://"):],
+					Scheme:       "http",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve,
+				},
+			}, nil
+		},
+	})
+
+	ref := fmt.Sprintf("%s/%s@%s", ts.URL[len("http://"):], repo, dgst)
+	_, _, err := resolver.Resolve(context.Background(), ref)
+
+	if manifestCalled == 0 {
+		t.Fatal("manifests endpoint was not called")
+	}
+	if blobsCalled {
+		t.Error("blobs endpoint was called, but should not have been after a 500 on /manifests/")
+	}
+	if err == nil {
+		t.Fatal("expected error from Resolve, but got nil")
+	}
+
+	// The error should surface the unexpected 500 status, not a generic "not found".
+	var unexpectedStatus remoteerrors.ErrUnexpectedStatus
+	if !errors.As(err, &unexpectedStatus) {
+		t.Errorf("expected ErrUnexpectedStatus (from 500), got %T: %v", err, err)
+	} else if unexpectedStatus.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", unexpectedStatus.StatusCode)
+	}
+}
+
+// TestResolve404ManifestFallback verifies that a 404 from /manifests/ DOES
+// allow fallback to /blobs/. This preserves backward compatibility with
+// non-standard registries that may only serve certain digests via /blobs/.
+func TestResolve404ManifestFallback(t *testing.T) {
+	var (
+		manifestCalled bool
+		blobsCalled    bool
+		repo           = "test-repo"
+		dgst           = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/manifests/"+dgst) {
+			manifestCalled = true
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/blobs/"+dgst) {
+			blobsCalled = true
+			w.Header().Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
+			w.Header().Set("Docker-Content-Digest", dgst)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if r.URL.Path == "/v2/" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+	}))
+	defer ts.Close()
+
+	resolver := NewResolver(ResolverOptions{
+		Hosts: func(string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				{
+					Host:         ts.URL[len("http://"):],
+					Scheme:       "http",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve,
+				},
+			}, nil
+		},
+	})
+
+	ref := fmt.Sprintf("%s/%s@%s", ts.URL[len("http://"):], repo, dgst)
+	_, desc, err := resolver.Resolve(context.Background(), ref)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !manifestCalled {
+		t.Error("manifests endpoint was not called")
+	}
+	if !blobsCalled {
+		t.Error("blobs endpoint was not called on 404")
+	}
+	if desc.MediaType != "application/vnd.docker.distribution.manifest.v2+json" {
+		t.Errorf("unexpected media type: %s", desc.MediaType)
+	}
+}
+
+func newRefreshTokenServer(t testing.TB, name string, disablePOST bool, onFetchRefreshToken OnFetchRefreshToken) *refreshTokenServer {
+	return &refreshTokenServer{
+		T:                   t,
+		Name:                name,
+		DisablePOST:         disablePOST,
+		OnFetchRefreshToken: onFetchRefreshToken,
+		AccessToken:         "testAccessToken-" + name,
+		RefreshToken:        "testRefreshToken-" + name,
+		Username:            "testUser-" + name,
+		Password:            "testPassword-" + name,
+	}
+}
+
+type refreshTokenServer struct {
+	T                   testing.TB
+	Name                string
+	DisablePOST         bool
+	OnFetchRefreshToken OnFetchRefreshToken
+	AccessToken         string
+	RefreshToken        string
+	Username            string
+	Password            string
+}
+
+func (srv *refreshTokenServer) isValidAuthorizationHeader(s string) bool {
+	fields := strings.Fields(s)
+	return len(fields) == 2 && strings.ToLower(fields[0]) == "bearer" && (fields[1] == srv.RefreshToken || fields[1] == srv.AccessToken)
+}
+
+func (srv *refreshTokenServer) BasicTestFunc() func(h http.Handler) (string, ResolverOptions, func()) {
+	t := srv.T
+	return func(h http.Handler) (string, ResolverOptions, func()) {
+		wrapped := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/token" {
+				if !srv.isValidAuthorizationHeader(r.Header.Get("Authorization")) {
+					realm := fmt.Sprintf("https://%s/token", r.Host)
+					wwwAuthenticateHeader := fmt.Sprintf("Bearer realm=%q,service=registry,scope=\"repository:%s:pull\"", realm, srv.Name)
+					rw.Header().Set("WWW-Authenticate", wwwAuthenticateHeader)
+					rw.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				h.ServeHTTP(rw, r)
+				return
+			}
+			switch r.Method {
+			case http.MethodGet: // https://distribution.github.io/distribution/spec/auth/token/#requesting-a-token
+				u, p, ok := r.BasicAuth()
+				if !ok || u != srv.Username || p != srv.Password {
+					rw.WriteHeader(http.StatusForbidden)
+					return
+				}
+				var resp auth.FetchTokenResponse
+				resp.Token = srv.AccessToken
+				resp.AccessToken = srv.AccessToken // alias of Token
+				query := r.URL.Query()
+				switch query.Get("offline_token") {
+				case "true":
+					resp.RefreshToken = srv.RefreshToken
+				case "false", "":
+				default:
+					rw.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				b, err := json.Marshal(resp)
+				if err != nil {
+					rw.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				rw.WriteHeader(http.StatusOK)
+				rw.Header().Set("Content-Type", "application/json")
+				t.Logf("GET mode: returning JSON %q, for query %+v", string(b), query)
+				rw.Write(b)
+			case http.MethodPost: // https://distribution.github.io/distribution/spec/auth/oauth/#getting-a-token
+				if srv.DisablePOST {
+					rw.WriteHeader(http.StatusMethodNotAllowed)
+					return
+				}
+				r.ParseForm()
+				pf := r.PostForm
+				if pf.Get("grant_type") != "password" {
+					rw.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				if pf.Get("username") != srv.Username || pf.Get("password") != srv.Password {
+					rw.WriteHeader(http.StatusForbidden)
+					return
+				}
+				var resp auth.OAuthTokenResponse
+				resp.AccessToken = srv.AccessToken
+				switch pf.Get("access_type") {
+				case "offline":
+					resp.RefreshToken = srv.RefreshToken
+				case "online", "":
+				default:
+					rw.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				b, err := json.Marshal(resp)
+				if err != nil {
+					rw.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				rw.WriteHeader(http.StatusOK)
+				rw.Header().Set("Content-Type", "application/json")
+				t.Logf("POST mode: returning JSON %q, for form %+v", string(b), pf)
+				rw.Write(b)
+			default:
+				rw.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+		})
+
+		base, options, close := tlsServer(wrapped)
+		authorizer := NewDockerAuthorizer(
+			WithAuthClient(options.Client),
+			WithAuthCreds(func(string) (string, string, error) {
+				return srv.Username, srv.Password, nil
+			}),
+			WithFetchRefreshToken(srv.OnFetchRefreshToken),
+		)
+		options.Hosts = ConfigureDefaultRegistries(
+			WithClient(options.Client),
+			WithAuthorizer(authorizer),
+		)
+		return base, options, close
+	}
+}
+
+func TestResolverErrorStatusCodeOnFetch(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name       string
+		statusCode int
+	}{
+		{"BadRequest", http.StatusBadRequest},
+		{"NotFound", http.StatusNotFound},
+		{"InternalServerError", http.StatusInternalServerError},
+		{"BadGateway", http.StatusBadGateway},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/manifests/") {
+					// Return the error status code for the GET request
+					rw.WriteHeader(tc.statusCode)
+					return
+				}
+				rw.WriteHeader(http.StatusOK)
+			}))
+			defer s.Close()
+
+			base := s.URL[len("http://"):]
+			options := ResolverOptions{}
+			resolver := NewResolver(options)
+
+			image := fmt.Sprintf("%s/library/hello-world:latest", base)
+			_, _, err := resolver.Resolve(ctx, image)
+
+			if err == nil {
+				t.Fatalf("expected error for status code %d", tc.statusCode)
+			}
+
+			var rerr remoteerrors.ErrUnexpectedStatus
+			if !errors.As(err, &rerr) {
+				t.Fatalf("expected ErrUnexpectedStatus, got %T: %v", err, err)
+			}
+
+			if rerr.StatusCode != tc.statusCode {
+				t.Fatalf("expected status code %d, got %d", tc.statusCode, rerr.StatusCode)
+			}
+		})
+	}
+}

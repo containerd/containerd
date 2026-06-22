@@ -1,0 +1,39 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+ignore_deps = [ "github.com/containerd/containerd" ]
+
+# previous release
+previous = "v1.7.0"
+
+pre_release = false
+
+preface = """\
+The first major release of containerd 2.x focuses on the continued stability of
+containerd's core feature set with an easy upgrade from containerd 1.x. This
+release includes the stabilization of new features added in the last 1.x release
+as well as the removal of features which were deprecated in 1.x. The goal is to
+support the vast community of containerd users well into the future along with
+their ever increasing deployment footprints and variety of use cases.
+
+See [containerd 2.0](https://github.com/containerd/containerd/blob/main/docs/containerd-2.0.md) documentation for details on what is new and has changed in this release.
+"""
+
+postface = """\
+### Which file should I download?
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.31 (Ubuntu 20.04).
+* `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on non-glibc Linux distributions. Not position-independent.
+
+In addition to containerd, typically you will have to install [runc](https://github.com/opencontainers/runc/releases)
+and [CNI plugins](https://github.com/containernetworking/plugins/releases) from their official sites too.
+
+See also the [Getting Started](https://github.com/containerd/containerd/blob/main/docs/getting-started.md) documentation.
+"""
+
+override_deps."github.com/containerd/log".previous = "cf9777876edf6a4aa230c739bc7eec5ab8349e9c"
+override_deps."github.com/containerd/plugin".previous = "497c49344a4b9894a7e26497420cb7fa817facba"
+override_deps."github.com/containerd/platforms".previous = "f18f3c661f7de73d5569f61ff72d98dae1c1700a"
+override_deps."github.com/containerd/errdefs".previous = "e0d1732a5c38bb3b899832b4e66e7bbb2216559f"

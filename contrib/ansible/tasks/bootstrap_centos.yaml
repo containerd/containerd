@@ -1,0 +1,12 @@
+---
+- name: "Install required packages on CentOS "
+  yum:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+    - unzip
+    - tar
+    - btrfs-progs
+    - libseccomp
+    - util-linux
+    - libselinux-python

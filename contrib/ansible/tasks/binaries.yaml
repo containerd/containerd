@@ -1,0 +1,12 @@
+---
+- name: "Get Containerd"
+  unarchive:
+    src: "https://github.com/containerd/containerd/releases/download/v{{ containerd_release_version }}/cri-containerd-cni-{{ containerd_release_version }}-linux-amd64.tar.gz"
+    dest: "/"
+    remote_src: yes
+
+- name: "Create a directory for cni binary"
+  file: path={{ cni_bin_dir }} state=directory
+
+- name: "Create a directory for cni config files"
+  file: path={{ cni_conf_dir }} state=directory

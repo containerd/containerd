@@ -1,0 +1,163 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.0"
+
+pre_release = false
+
+preface = """\
+The sixth major release of containerd includes many stability improvements
+and code organization changes to make contribution easier and make future
+features cleaner to develop. This includes bringing CRI development into the
+main containerd repository and switching to Go modules. This release also
+brings support for the Node Resource Interface (NRI).
+
+### Highlights
+
+#### Project Organization
+* **Merge containerd/cri codebase into containerd/containerd** [#4593](https://github.com/containerd/containerd/pull/4593)
+* **Move to Go modules** [#4760](https://github.com/containerd/containerd/pull/4760)
+* **Remove `selinux` build tag** [#4849](https://github.com/containerd/containerd/pull/4849)
+* **Add json log format output option for daemon log** [#4803](https://github.com/containerd/containerd/pull/4803)
+
+#### Snapshots
+* **Add configurable overlayfs path** [#4505](https://github.com/containerd/containerd/pull/4505)
+* **Separate overlay implementation from plugin** [#4506](https://github.com/containerd/containerd/pull/4506)
+* **Native snapshotter configuration and plugin separation** [#4517](https://github.com/containerd/containerd/pull/4517)
+* **Devmapper snapshotter configuration and plugin separation** [#4573](https://github.com/containerd/containerd/pull/4573)
+* **AUFS snapshotter configuration and plugin separation** [#4533](https://github.com/containerd/containerd/pull/4533)
+* **ZFS snapshotter configuration and plugin separation** [#4534](https://github.com/containerd/containerd/pull/4534)
+* **Pass custom snapshot labels when creating snapshot** [#4630](https://github.com/containerd/containerd/pull/4630) [#4635](https://github.com/containerd/containerd/pull/4635)
+* **Add platform check for snapshotter support when unpacking** [#3927](https://github.com/containerd/containerd/pull/3927)
+* **Handle loopback mounts** [#4902](https://github.com/containerd/containerd/pull/4902)
+* **Support `userxattr` mount option for overlay in user namespace** [#5076](https://github.com/containerd/containerd/pull/5076)
+* **ZFS snapshotter implementation of usage** [#5243](https://github.com/containerd/containerd/pull/5243)
+
+#### Distribution
+* **Improve registry response errors** [#4523](https://github.com/containerd/containerd/pull/4523)
+* **Improve image pull performance over HTTP 1.1** [#4653](https://github.com/containerd/containerd/pull/4653)
+* **Registry configuration package** [#4138](https://github.com/containerd/containerd/pull/4138)
+* **Add support for layers compressed with zstd** [#4809](https://github.com/containerd/containerd/pull/4809)
+* **Allow arm64 to fallback to arm (v8, v7, v6, v5)** [4932](https://github.com/containerd/containerd/pull/4932)
+
+#### Runtime
+* **Add annotations to containerd task update API** [#4647](https://github.com/containerd/containerd/pull/4647)
+* **Add logging binary support when terminal is true** [#4502](https://github.com/containerd/containerd/pull/4502)
+* **Runtime support on FreeBSD** [#5375](https://github.com/containerd/containerd/pull/5375)
+
+#### Windows
+* **Implement windowsDiff.Compare to allow outputting OCI images** [#4399](https://github.com/containerd/containerd/pull/4399)
+* **Optimize WCOW snapshotter to commit writable layers as read-only parent layers** [#4415](https://github.com/containerd/containerd/pull/4415)
+* **Optimize LCOW snapshotter use of scratch layers** [#4643](https://github.com/containerd/containerd/pull/4643)
+
+#### CRI
+* **Add NRI injection points** [cri#1552](https://github.com/containerd/cri/pull/1552)
+* **Add support for registry host directory configuration** [#4978](https://github.com/containerd/containerd/pull/4978)
+* **Update privileged containers to use current capabilities instead of known capabilities** [#5017](https://github.com/containerd/containerd/pull/5017)
+* **Add pod annotations to CNI call** [#5026](https://github.com/containerd/containerd/pull/5026)
+* **Enable ocicrypt by default** [#5135](https://github.com/containerd/containerd/pull/5135)
+* **Support PID NamespaceMode_TARGET** [#5203](https://github.com/containerd/containerd/pull/5203)
+
+### Impactful Client Updates
+
+This release has changes which may affect projects which import containerd.
+
+#### Switch to Go modules
+
+containerd and all containerd sub-repositories are now using Go modules. This
+should help make importing easier for handling transitive dependencies. As of
+this release, containerd still does not guarantee client library compatibility
+for 1.x versions, although best effort is made to minimize impact from changes
+to exported Go packages.
+
+#### CRI plugin moved to main repository
+
+With the CRI plugin moving into the main repository, imports under `github.com/containerd/cri/`
+can now be found `github.com/containerd/containerd/pkg/cri/`.
+There are no changes required for end users of CRI.
+
+#### Library changes
+
+##### `oci`
+
+The `WithAllCapabilities` has been removed and replaced with `WithAllCurrentCapabilities`
+and `WithAllKnownCapabilities`. `WithAllKnownCapabilities` has similar
+functionality to the previous `WithAllCapabilities` with added support for newer
+capabilities. `WithAllCurrentCapabilities` can be used to give privileged
+containers the same set of permissions as the calling process, preventing errors
+when privileged containers attempt to get more permissions than given to the
+caller.
+
+#### Configuration changes
+
+##### *New* `registry.config_path` for CRI plugin
+
+`registry.config_path` specifies a directory to look for registry hosts
+configuration. When resolving an image name during pull operations, the CRI
+plugin will look in the `<registry.config_path>/<image hostname>/` directory
+for host configuration. An optional `hosts.toml` file in that directory may be
+used to configure which hosts will be used for the pull operation as well
+host-specific configurations. Updates under that directory do not require
+restarting the containerd daemon.
+
+Enable `registry.config_path` in the containerd configuration file.
+
+```toml
+[plugins."io.containerd.grpc.v1.cri".registry]
+   config_path = "/etc/containerd/certs.d"
+```
+
+Configure registry hosts, such as `/etc/containerd/certs.d/docker.io/hosts.toml`
+for any image under the `docker.io` namespace (any image on Docker Hub).
+
+```
+server = "https://registry-1.docker.io"    # Exclude this to not use upstream
+
+[host."https://public-mirror.example.com"]
+  capabilities = ["pull"]                  # Requires less trust, won't resolve tag to digest from this host
+[host."https://docker-mirror.internal"]
+  capabilities = ["pull", "resolve"]
+  ca = "docker-mirror.crt"                 # Or absolute path /etc/containerd/certs.d/docker.io/docker-mirror.crt
+```
+
+If no `hosts.toml` configuration exists in the host directory, it will fallback
+to check certificate files based on Docker's certificate file
+pattern (".crt" files for CA certificates and ".cert"/".key" files for client
+certificates).
+
+##### Deprecation of `registry.mirrors` and `registry.configs` in CRI plugin
+
+Mirroring and TLS can now be configured using the new `registry.config_path`
+option. Existing configurations may be migrated to new host directory
+configuration. These fields are only deprecated with no planned removal,
+however, these configurations cannot be used while `registry.config_path` is
+defined.
+
+##### Version 1 schema is deprecated
+
+Version 2 of the containerd configuration toml is recommended format and the
+default. Starting this version, a deprecation warning will be logged when
+version 1 is used.
+
+To check version, see the version value in the containerd toml configuration.
+
+```toml
+version=2
+```
+
+#### FreeBSD Runtime Support (Experimental)
+
+This release includes changes that allow containerd to run on FreeBSD with a
+compatible runtime, such as [runj](https://github.com/samuelkarp/runj). This
+support should be considered experimental and currently there are no official
+binary releases for FreeBSD. The runtimes used by containerd are maintained
+separately and have their own stability guarantees. The containerd project
+strives to be compatible with any runtime which aims to implement containerd's
+shim API and OCI runtime specification.
+
+See the changelog for complete list of changes"""

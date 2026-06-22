@@ -1,0 +1,99 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.0"
+
+pre_release = false
+
+preface = """\
+The fourth major release of containerd comes 11 months after the previous
+major release and covers a period of both significant project growth and
+further stabilization. Similar to previous releases, the number of API changes
+are small and, as always, backwards compatible. The growing ecosystem of plugins
+and users have driven improvements to make containerd more configurable, usable,
+and pluggable. On Windows, this release brings a new runtime utilizing the shim
+API. For clients, there are many new features and improvements completely
+implemented in the client libraries without requiring daemon upgrade.
+
+### Runtime
+* **New Windows V2 runtime using shim API.** Adds support for the Windows runtime shims in containerd. *NOTE: while containerd's runtime is stable in this release, running Windows containers are not yet fully supported until the [runhcs shim](https://github.com/microsoft/hcsshim/tree/master/cmd/containerd-shim-runhcs-v1) is fully supported.*
+* **Improvements to ttrpc.** For better daemon to shim communication (https://github.com/containerd/containerd/pull/3341)
+* **Removed experimental Windows V1 runtime**
+* **Update runc dependency** Updated runc for CVE-2019-16884
+
+### Snapshots
+* **New Devmapper snapshotter** (https://github.com/containerd/containerd/pull/3022)
+* **Improved label support for plugins.** Allows snapshot plugins to use labels from clients for advanced use cases
+
+### Plugins
+* **Support for plugins registering as a TCP service**
+* **Configurable plugin directory**
+* **Add stream processor plugin.** Allow handling of custom media types during unpack (https://github.com/containerd/containerd/pull/3482)
+
+### Client
+* **Default handling from namespace labels.** Allows defaults to be configured per containerd namespace (https://github.com/containerd/containerd/pull/3403)
+* **Improved Docker resolver with mirroring support**
+* **Support for cross repository push** (https://github.com/containerd/containerd/pull/3218)
+
+### API
+* **Add support for direct resource management in leases** (https://github.com/containerd/containerd/pull/3304)
+* **Add ttrpc service for shim event publishing**
+* **Add annotations to descriptors in API**
+* **Add id to TaskDelete event message to match exec id**
+* **Add payload parameter to apply in diff service API**
+
+### CRI
+This version of containerd is validated against v1.16, but it is also compatible with Kubernetes v1.12+. (See [more details](https://github.com/containerd/cri#support-metrics) about support metrics)
+
+#### Features
+* **Supported per-pod containerd shim.** The `io.containerd.runc.v2` runtime is fully validated and ready to be used in production. This helps minimizing per-pod resource overhead. Note that `io.containerd.runtime.v1.linux` is still the default runtime. (https://github.com/containerd/cri/issues/1075)
+* **Added file-based generic runtime config options.** This will be used by out-of-tree runtimes like gvisor and kata (https://github.com/containerd/cri/pull/1029), e.g.
+```
+[plugins.cri.containerd.runtimes.kata]
+  runtime_type = "io.containerd.kata.v1"
+[plugins.cri.containerd.runtimes.kata.options]
+  TypeUrl = "io.containerd.kata.v1.options"
+  ConfigPath = "/etc/kata/config.toml"
+```
+* **Added the `pod_annotations` runtime option.** Pod annotations specified in the list will be passed to the runtime as OCI annotations. This enables runtimes to support annotation-based experimental features. (https://github.com/containerd/cri/pull/1084)
+* **Added `stream_idle_time` option.** This makes idle connection timeout of the streaming server configurable. (https://github.com/containerd/cri/issues/1057)
+* **Added [traffic shaping pod annotations](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/#support-traffic-shaping) support.** *NOTE: traffic shaping is still an experimental feature in Kubernetes.* (https://github.com/containerd/cri/issues/1150)
+* **Added `max_conf_num` option to `plugins.cri.cni`**. This makes it possible to setup multiple CNI networks in a pod. *NOTE: multi-network is not an officially supported feature in Kubernetes.*(https://github.com/containerd/cri/issues/1154)
+* **Added `plugins.cri.registry.configs` option to support TLS and auth configs of registries.** (https://github.com/containerd/cri/issues/1143) *NOTE: Non-mutual TLS is also supported. (https://github.com/containerd/containerd/issues/3521)* (see [registry.md](https://github.com/containerd/cri/blob/f1d492b0cdd14e76476ee4dd024696ce3634e501/docs/registry.md) for more details)
+* **Added tcp endpoint for CRI service.** The tcp service can be disabled with the `disable_tcp_service` option, and it is disabled by default. (https://github.com/containerd/cri/issues/1181)
+* **Added `max_concurrent_downloads` option to restrict the number of concurrent downloads for each image.** The default concurrency is `3`. (https://github.com/containerd/cri/pull/1211)
+* **Added `privileged_without_host_devices` runtime option to disable host devices for privileged pods for the runtime.** This is especially useful for runtimes like kata. (https://github.com/containerd/cri/issues/1213)
+* **Supported IPv4/IPv6 dualstack.** See Kubernetes [dual-stack doc](https://kubernetes.io/docs/concepts/services-networking/dual-stack) for more information. To enable dual-stack, your CNI plugin needs to support it. If you are using the CNI config template, see [how to configure it to support dual-stack](https://github.com/containerd/cri/blob/release/1.3/docs/config.md#cni-config-template).
+
+#### Enhancements
+* Avoided `Status` lockup when CNI network setup/teardown is slow. (https://github.com/containerd/cri/issues/1078)
+* Added CNI config in `Status` (`crictl info`) output. (https://github.com/containerd/cri/pull/1158)
+* Supported URL path in `plugins.cri.registry.mirrors`, e.g. `https://my.custom.registry/anypath`. (https://github.com/containerd/cri/pull/1227)
+* Added wildcard `*` support in `plugins.cri.registry.mirrors`. (https://github.com/containerd/cri/issues/1196)
+* Removed an unnecessary round-trip to the image registry when pulling image. (https://github.com/containerd/cri/issues/1229)
+* Updated cni library to v0.7.1 which has better context cancellation support. (https://github.com/containerd/cri/issues/1236)
+* Updated cni plugins to v0.7.6 to fix a race condition in the `bridge` plugin. (https://github.com/containerd/containerd/issues/3507)
+
+#### Deprecation
+* `ctr cri load` command is deprecated, use `ctr -n=k8s.io images import` instead.(https://github.com/containerd/cri/issues/909)
+* The `plugins.cri.containerd.default_runtime` option is deprecated, use `plugins."io.containerd.grpc.v1.cri".containerd.default_runtime_name` instead. (https://github.com/containerd/cri/issues/1076)
+* Runtime options including `systemd_cgroups`, `runtime_engine` and `runtime_root` are deprecated, use runtime `options` instead. (https://github.com/containerd/cri/pull/1217)
+* `runtimeHandler` field is moved from the sandbox `info` into `status`. (https://github.com/containerd/cri/pull/1063)
+* `plugins.cri.registry.auths` is deprecated, use `plugins.cri.registry.configs` instead. (https://github.com/containerd/cri/pull/1227)
+
+### Other
+* **Support additional garbage collection labels.** Allows more advanced resource management use cases on the client
+* **Fix garbage collection scheduling on reference removal.** Ensures removal of leases or containers triggers the next scheduled garbage collection
+
+
+And many more improvements and bug fixes in the complete changelog"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]

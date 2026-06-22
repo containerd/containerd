@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  This templates spin ups an EC2 instance with EBS volumes suitable for containerd snapshotters benchmarking.
+  The template will create EBS volumes for benchmarking (/dev/sdb, /dev/sdc, and /dev/sdd) with same performance characteristics.
+  /dev/sde volume will be created and used for device mapper thin-pool device.
+
+Parameters:
+  Key:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: SSH key to use
+
+  AMI:
+    Type: AWS::EC2::Image::Id
+    Description: AMI ID to use for the EC2 instance. Must be Amazon Linux 2.
+    Default: "ami-032509850cf9ee54e"
+
+  SecurityGroups:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Description: List of security groups to add to EC2 instance
+
+  InstanceType:
+    Type: String
+    Default: m4.xlarge
+    Description: EC2 instance type to use
+
+  VolumesIOPS:
+    Type: Number
+    Default: 1000
+    MinValue: 100
+    MaxValue: 20000
+    Description: The number of I/O operations per second (IOPS) to reserve for EBS volumes.
+
+  VolumesSize:
+    Type: Number
+    Default: 20
+    MinValue: 4
+    MaxValue: 16384
+    Description: EBS volumes size, in gibibytes (GiB)
+
+  VolumeType:
+    Type: String
+    Default: io1
+    AllowedValues:
+      - io1
+      - gp2
+      - sc1
+      - st1
+    Description: >
+      Volume type to use for EBS volumes (io1 is recommended).
+      More information on volume types https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html
+
+  ContainerStorageSetup:
+    Type: String
+    Default: https://github.com/projectatomic/container-storage-setup/archive/v0.6.0.tar.gz
+    Description: container-storage-setup tool version to install (more details at https://github.com/projectatomic/container-storage-setup)
+
+Resources:
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      EbsOptimized: true
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref Key
+      ImageId: !Ref AMI
+      SecurityGroupIds: !Ref SecurityGroups
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda" # Root volume
+          Ebs:
+            VolumeSize: 64
+            VolumeType: io1
+            Iops: 1000
+            DeleteOnTermination: true
+        - DeviceName: "/dev/sdb"
+          Ebs:
+            VolumeSize: !Ref VolumesSize
+            VolumeType: !Ref VolumeType
+            Iops: !Ref VolumesIOPS
+            DeleteOnTermination: true
+        - DeviceName: "/dev/sdc"
+          Ebs:
+            VolumeSize: !Ref VolumesSize
+            VolumeType: !Ref VolumeType
+            Iops: !Ref VolumesIOPS
+            DeleteOnTermination: true
+        - DeviceName: "/dev/sdd"
+          Ebs:
+            VolumeSize: !Ref VolumesSize
+            VolumeType: !Ref VolumeType
+            Iops: !Ref VolumesIOPS
+            DeleteOnTermination: true
+        - DeviceName: "/dev/sde"
+          Ebs:
+            VolumeSize: !Ref VolumesSize
+            VolumeType: !Ref VolumeType
+            Iops: !Ref VolumesIOPS
+            DeleteOnTermination: true
+
+      UserData:
+        Fn::Base64:
+          !Sub |
+          #!/bin/bash
+
+          set -ex
+
+          yum install -y \
+            gcc \
+            git \
+            btrfs-progs-devel \
+            libseccomp-devel
+
+          amazon-linux-extras install -y golang1.11
+
+          # Install container-storage-setup
+          mkdir -p /tmp/container-storage-setup/unpacked/
+          cd /tmp/container-storage-setup/
+          curl -sL ${ContainerStorageSetup} -o archive.tar.gz
+          tar -xzf archive.tar.gz -C unpacked --strip 1
+          cd unpacked/
+          make install-core
+          rm -rf /tmp/container-storage-setup/
+
+          # Prepare EBS volumes
+          mkdir -p /mnt/{disk1,disk2,disk3}
+
+          mkfs.ext4 /dev/sdb
+          mount /dev/sdb /mnt/disk1/
+
+          mkfs.ext4 /dev/sdc
+          mount /dev/sdc /mnt/disk2/
+
+          mkfs.ext4 /dev/sdd
+          mount /dev/sdd /mnt/disk3
+
+          chgrp -R wheel /mnt/disk1/ /mnt/disk2/ /mnt/disk3/
+          chmod -R 2775 /mnt/disk1/ /mnt/disk2/ /mnt/disk3/
+
+          # Prepare thin-pool device
+          touch /etc/sysconfig/docker-storage-setup
+          echo DEVS=/dev/sde >> /etc/sysconfig/docker-storage-setup
+          echo VG=bench >> /etc/sysconfig/docker-storage-setup
+          container-storage-setup
+
+          echo "Done"

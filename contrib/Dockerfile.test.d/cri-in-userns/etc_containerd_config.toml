@@ -1,0 +1,10 @@
+version = 2
+
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    disable_apparmor = true
+    restrict_oom_score_adj = true
+    disable_hugetlb_controller = true
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      # Rootless overlayfs requires kernel >= 5.11 && !selinux
+      snapshotter = "overlayfs"

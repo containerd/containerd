@@ -1,0 +1,4 @@
+---
+containerd_release_version: 1.5.5
+cni_bin_dir: /opt/cni/bin/
+cni_conf_dir: /etc/cni/net.d/

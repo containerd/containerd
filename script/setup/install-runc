@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+#
+# Builds and installs runc to /usr/local/go/bin based off
+# the commit defined in go.mod
+#
+set -eu -o pipefail
+
+script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
+
+# e2e and Cirrus will fail with "sudo: command not found"
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='sudo'
+fi
+
+function install_runc() {
+	# When updating runc-version, consider updating the runc module in go.mod as well
+	: "${RUNC_VERSION:=$(cat "${script_dir}/runc-version")}"
+	: "${RUNC_REPO:=https://github.com/opencontainers/runc.git}"
+
+	TMPROOT=$(mktemp -d)
+	trap "rm -fR ${TMPROOT}" EXIT
+	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
+	pushd "${TMPROOT}"/runc
+	git checkout "${RUNC_VERSION}"
+	env -u VERSION make BUILDTAGS='seccomp' runc
+	$SUDO make install
+	popd
+}
+
+function install_crun() {
+	: "${CRUN_VERSION:=$(cat "${script_dir}/crun-version")}"
+	: "${CRUN_REPO:=https://github.com/containers/crun}"
+	$SUDO curl -S -o /usr/local/sbin/runc -L "${CRUN_REPO}"/releases/download/"${CRUN_VERSION}"/crun-"${CRUN_VERSION}"-linux-"$(go env GOARCH)"
+	$SUDO chmod +x /usr/local/sbin/runc
+}
+
+: "${RUNC_FLAVOR:=runc}"
+case ${RUNC_FLAVOR} in
+runc) install_runc ;;
+crun) install_crun ;;
+*)
+	echo >&2 "unknown runc flavor: ${RUNC_FLAVOR}"
+	exit 1
+	;;
+esac

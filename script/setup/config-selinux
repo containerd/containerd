@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+#
+# set the desired SELinux mode via envvar
+#
+set -eux -o pipefail
+
+if ! type -p getenforce setenforce &>/dev/null; then
+  echo SELinux is Disabled
+  exit 0
+fi
+
+case "${SELINUX}" in
+  Disabled)
+    if mountpoint -q /sys/fs/selinux; then
+      setenforce 0
+      umount -v /sys/fs/selinux
+    fi
+    ;;
+  Enforcing)
+    mountpoint -q /sys/fs/selinux || mount -o rw,relatime -t selinuxfs selinuxfs /sys/fs/selinux
+    setenforce 1
+    ;;
+  Permissive)
+    mountpoint -q /sys/fs/selinux || mount -o rw,relatime -t selinuxfs selinuxfs /sys/fs/selinux
+    setenforce 0
+    ;;
+  *)
+    echo "SELinux mode not supported: ${SELINUX}" >&2
+    exit 1
+    ;;
+esac
+
+echo SELinux is "$(getenforce)"

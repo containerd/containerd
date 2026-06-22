@@ -1,0 +1,22 @@
+#! /bin/bash
+## This file is a direct copy of https://github.com/urfave/cli/blob/d04c0883fcc8860836ab30ade0fd29afa194ab23/autocomplete/bash_autocomplete
+
+: ${PROG:=$(basename ${BASH_SOURCE})}
+
+_cli_bash_autocomplete() {
+  if [[ "${COMP_WORDS[0]}" != "source" ]]; then
+    local cur opts base
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ "$cur" == "-"* ]]; then
+      opts=$( ${COMP_WORDS[@]:0:$COMP_CWORD} ${cur} --generate-bash-completion )
+    else
+      opts=$( ${COMP_WORDS[@]:0:$COMP_CWORD} --generate-bash-completion )
+    fi
+    COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+    return 0
+  fi
+}
+
+complete -o bashdefault -o default -o nospace -F _cli_bash_autocomplete $PROG
+unset PROG

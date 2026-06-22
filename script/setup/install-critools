@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+#
+# Builds and installs critools including critest and crictl
+# to /usr/local/bin.
+#
+set -eu -o pipefail
+
+script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
+
+# e2e will fail with "sudo: command not found"
+SUDO=''
+if (( $EUID != 0 )); then
+    # The actuated ARM64 env needs PATH=$PATH to get `go` path. Otherwise
+    # `make install` recipe will fail.
+    SUDO="sudo -E PATH=$PATH"
+fi
+
+cd "$(go env GOPATH)"
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.9.2
+
+: "${CRITEST_COMMIT:=$(cat "${script_dir}/critools-version")}"
+: "${DESTDIR:=""}"
+: "${CRI_TOOLS_REPO:=https://github.com/kubernetes-sigs/cri-tools.git}"
+
+TMPROOT=$(mktemp -d)
+git clone "${CRI_TOOLS_REPO}" "${TMPROOT}/cri-tools"
+pushd "${TMPROOT}"/cri-tools
+git checkout "$CRITEST_COMMIT"
+make
+$SUDO make install -e DESTDIR="${DESTDIR}" BINDIR=/usr/local/bin
+
+mkdir -p "${DESTDIR}/etc/"
+$SUDO cat << EOF | $SUDO tee "${DESTDIR}/etc/crictl.yaml"
+runtime-endpoint: unix:///run/containerd/containerd.sock
+EOF
+
+popd
+rm -fR "${TMPROOT}"

@@ -1,0 +1,96 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.3.0"
+
+pre_release = false
+
+preface = """\
+The fifth major release of containerd includes a mix of new features and
+expanded support, such as support for CGroups v2, expanded SELinux support,
+support for Windows on Kubernetes through CRI, and support for snapshotters
+based on shared remote storage. All significant bug and stability fixes included
+in this release are also available on supported prior releases. Like previous
+major releases, what is not included in this release is also important. There
+are only two small additions to the API with no backwards incompatible changes,
+allowing client and daemon upgrades to be done independently without disruption.
+The incredible increase in usage of containerd over the last year has shown the
+value of our core principles to easily expand support for different use cases
+while driving toward ever increasing stability.
+
+### Runtime
+* **Support cgroups v2** [#3726](https://github.com/containerd/containerd/pull/3726)
+* **Improved SELinux support**
+* **Rework shim logger shutdown process** [#4162](https://github.com/containerd/containerd/pull/4162)
+* **Deprecate `io.containerd.runtime.v1.*` and `io.containerd.runc.v1`** [#4384](https://github.com/containerd/containerd/pull/4384)
+
+### Snapshots
+* **Support target snapshot option on prepare to allow skipping prepare when snapshot reports target already exists** [#3793](https://github.com/containerd/containerd/pull/3793)
+* **Add filters to walk function** [#3709](https://github.com/containerd/containerd/pull/3709)
+* **Support for FUSE mounts** [#3765](https://github.com/containerd/containerd/pull/3765)
+* **Snapshotter options passed to backend** [#4080](https://github.com/containerd/containerd/pull/4080)
+* **Support for lazy-pull snapshotters such as [stargz-snapshotter](https://github.com/containerd/stargz-snapshotter)**
+
+### Plugins
+* **Proxy snapshotter support for cleanup** [#3925](https://github.com/containerd/containerd/pull/3925)
+
+### Client
+* **Add spec options for host device and privileged handling** [#3718](https://github.com/containerd/containerd/pull/3718)
+* **WithLease takes options for more flexibility** [#3719](https://github.com/containerd/containerd/pull/3719)
+* **Add unpack options for pull** [#3826](https://github.com/containerd/containerd/pull/3826)
+* **Improve host fallback behaviour in docker remote** [#3868](https://github.com/containerd/containerd/pull/3868)
+* **Defer layer download until unpack to support skipping download when snapshotter reports already exists** [#3870](https://github.com/containerd/containerd/pull/3870)
+* **Split UID and GID namespace mapping in spec generation** [#3881](https://github.com/containerd/containerd/pull/3881)
+* **Propagate snapshotter layer annotations on unpack** [#3911](https://github.com/containerd/containerd/pull/3911)
+* **Create image record after blob download to fix concurrent download issue** [#3972](https://github.com/containerd/containerd/pull/3972)
+* **Use spec's mountLabel when mounting container rootfs** [#4051](https://github.com/containerd/containerd/pull/4051)
+* **Add Linux resources to spec options** [#4083](https://github.com/containerd/containerd/pull/4083)
+* **New registry configuration tooling for improved mirror and endpoint options** [#4138](https://github.com/containerd/containerd/pull/4138)
+* **Add namespace query parameter when using a registry proxy** [#4413](https://github.com/containerd/containerd/pull/4413)
+
+### API
+* **Add filters to snapshot list** [#3709](https://github.com/containerd/containerd/pull/3709)
+* **Add snapshot cleanup** [#3925](https://github.com/containerd/containerd/pull/3925)
+
+### Daemon
+* **Support NOTIFY_SOCKET for notifying the daemon's readiness to systemd** [#4088](https://github.com/containerd/containerd/pull/4088)
+* **Remove libseccomp requirement, seccomp support is now always built-in** [#4439](https://github.com/containerd/containerd/pull/4439)
+
+### Windows
+* **Disk usage support in snapshotter** [#3785](https://github.com/containerd/containerd/pull/3785)
+* **Add support for custom wcow and lcow sandbox scratch sizes** [#3965](https://github.com/containerd/containerd/pull/3965)
+* **Enable CRI plugin** [#4076](https://github.com/containerd/containerd/pull/4076)
+
+### CRI
+
+* **Support CNI DNS capabilities** [cri#1244](https://github.com/containerd/cri/pull/1244)
+* **Build CRI Plugin on Windows and add presubmit** [cri#1258](https://github.com/containerd/cri/pull/1258)
+* **Use container annotations when creating containers** [cri#1260](https://github.com/containerd/cri/pull/1260)
+* **Add support for Windows containers process isolation** [cri#1264](https://github.com/containerd/cri/pull/1264)
+* **Add windows port forward support** [cri#1284](https://github.com/containerd/cri/pull/1284)
+* **Use `http` for localhost registry connections** [cri#1328](https://github.com/containerd/cri/pull/1328)
+* **Add `resolv.conf` to sandbox container mounts** [cri#1344](https://github.com/containerd/cri/pull/1344)
+* **Use host devices options from oci specs** [cri#1349](https://github.com/containerd/cri/pull/1349)
+* **Fix privileged supported** [cri#1356](https://github.com/containerd/cri/pull/1356)
+* **Update default runtime to `io.containerd.runc.v2`** [cri#1359](https://github.com/containerd/cri/pull/1359)
+* **Add instrospection service** [cri#1364](https://github.com/containerd/cri/pull/1364)
+* **Unshare cgroup namespace for container when using cgroupv2** [cri#1371](https://github.com/containerd/cri/pull/1371)
+* **Add CPU and memory cgroupv2 metrics** [cri#1376](https://github.com/containerd/cri/pull/1376)
+* **Reload CNI network config on fs change events** [cri#1405](https://github.com/containerd/cri/pull/1405)
+* **Add support for stargz remote snapshots** [cri#1431](https://github.com/containerd/cri/pull/1431)
+* **Add support for 'container-name' OCI annotation** [cri#1436](https://github.com/containerd/cri/pull/1436)
+* **Remove socat for port forwarding** [cri#1470](https://github.com/containerd/cri/pull/1470)
+* **Add config flag to default empty seccomp profile** [cri#1472](https://github.com/containerd/cri/pull/1472)
+* **Add SELinux support** [cri#1487](https://github.com/containerd/cri/pull/1487)
+
+And many more improvements and bug fixes in the complete changelog"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]

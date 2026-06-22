@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+#
+# Install developer tools to $GOBIN (or $GOPATH/bin if unset)
+#
+set -eu -o pipefail
+
+go install github.com/containerd/protobuild/cmd/go-fix-acronym@v0.3.0
+go install github.com/cpuguy83/go-md2man/v2@v2.0.7
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0
+go install github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@v1.2.7
+go install github.com/bufbuild/buf/cmd/buf@v1.63.0

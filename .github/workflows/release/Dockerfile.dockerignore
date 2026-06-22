@@ -1,0 +1,19 @@
+# Exclude files that may cause cache-busts. These are generally expected
+# to be in a global .gitignore, but still can cause the build-cache to
+# be invalidated.
+**/.DS_Store
+
+# exclusions below are copied from .gitignore at the root of the repository
+# when updating, consider updating .gitignore accordingly.
+
+/bin/
+/man/
+coverage.txt
+profile.out
+containerd.test
+_site/
+# Allow repeated builds without copying back previous builds
+releases/*.tar.gz
+releases/*.tar.gz.sha256sum
+_output/
+.vagrant/

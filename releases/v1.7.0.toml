@@ -1,0 +1,143 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.0"
+
+pre_release = false
+
+preface = """\
+The eighth major release of containerd includes new functionality alongside many improvements.
+This release is the last major release of containerd 1.x before 2.0.
+Some functionality in this release may be considered experimental or unstable, but will become stable or default in 2.0.
+This release still adheres to our backwards compatibility guarantees and users who do not use or enable new functionality should use this release with the same stability expectations.
+The previous 1.6 release has also become a long term stable release for users who prefer releases with mostly stability improvements and wish to wait a few releases for new functionality.
+
+### Highlights
+
+#### Sandbox API _(experimental)_
+
+The sandbox API provides a new way of managing containerd's shim, providing more flexibility and functionality for multi-container environments such as Pods and VMs.
+This API makes it easier to manage these groups of containers at a higher level and offers new extension points for shim implementations and clients.
+
+* **Sandbox API** ([#6703](https://github.com/containerd/containerd/pull/6703))
+* **CRI Sandbox API Implementation** ([#7228](https://github.com/containerd/containerd/pull/7228))
+
+#### Transfer Service _(experimental)_
+
+* **Transfer Service** ([#7320](https://github.com/containerd/containerd/pull/7320))
+
+The transfer service provides a simple interface to transfer artifact objects between any source and destination. This allows for
+pull and push operations to be done in containerd whether requested from clients or plugins. It is experimental in this release
+to allow for further plugin development and integration into existing plugins.
+
+See the [Transfer Docs](https://github.com/containerd/containerd/blob/main/docs/transfer.md)
+
+#### NRI _(experimental)_
+
+* **Extend NRI scope** ([nri#16](https://github.com/containerd/nri/pull/16))
+* **Support for updated NRI** ([#6019](https://github.com/containerd/containerd/pull/6019))
+
+The Node Resource Interface is a common framework for plugging extensions into OCI-compatible container runtimes. It provides
+basic mechanisms for plugins to track the state of containers and to make limited changes to their configuration.
+
+This release introduces NRI v0.3.0 with an updated plugin interface to cover a wide range of use cases.
+
+See the [NRI Docs](https://github.com/containerd/containerd/blob/main/docs/NRI.md)
+
+#### Platform Support
+
+* **Linux containers on FreeBSD** ([#7000](https://github.com/containerd/containerd/pull/7000))
+
+#### Runtime Features
+
+* **Add support for CDI device injection** ([#6654](https://github.com/containerd/containerd/pull/6654))
+* **Support for cgroups blockio** ([#5490](https://github.com/containerd/containerd/pull/5490))
+* **Add restart policy for enhanced restart manager** ([#6744](https://github.com/containerd/containerd/pull/6744))
+
+#### gRPC Shim Support _(experimental)_
+
+* **Initial gRPC shim support** ([#8052](https://github.com/containerd/containerd/pull/8052))
+
+Adds support for shims to use gRPC in addition to ttrpc. Existing ttrpc shim support is not going
+away and will continue to be recommended for the best performance and lowest shim memory overhead.
+The gRPC support allows implementation of a wider range of shim implementations which may not
+have access to a stable ttrpc library in the implementation language. The shim protocol is also
+updated to allow the shims to specify the protocol which is supported.
+
+#### Road to 2.0
+
+##### Refactoring
+
+There are multiple places in the code today which are being targeted for refactoring to make long term support easier and to provide more extension points.
+
+The CRI plugin is the most complex containerd plugin with a wide range of functionality. A major effort in this release and before 2.0 involves moving functionality
+out of the single CRI plugin into smaller-scoped containerd plugins, such that they can be used and tested independently. The new sandbox and distribution interfaces provide one example of this,
+but it also being done for image and network management.
+
+The version of ttrpc has been updated this release to support streaming, allowing existing grpc services to use ttrpc.
+Services are being refactored to allow ttrpc implementations, which can be served via shim and accessed using the new sandbox management capability.
+
+* **Remove gogoproto.customtype** ([#6699](https://github.com/containerd/containerd/pull/6699))
+* **Remove enumvalue_customname, goproto_enum_prefix and enum_customname** ([#6708](https://github.com/containerd/containerd/pull/6708))
+* **Remove all gogoproto extensions** ([#6829](https://github.com/containerd/containerd/pull/6829))
+* **Migrate off from github.com/gogo/protobuf** ([#6841](https://github.com/containerd/containerd/pull/6841))
+* **ttrpc streaming** ([ttrpc#107](https://github.com/containerd/ttrpc/pull/107))
+* **Add unpack interface for client** ([#6749](https://github.com/containerd/containerd/pull/6749))
+* **Add collectible resources to metadata gc** ([#6804](https://github.com/containerd/containerd/pull/6804))
+* **Add version to shim protocol** ([#8177](https://github.com/containerd/containerd/pull/8177))
+
+##### Configuration
+
+Existing CRI configurations will be supported until 2.0.
+Any functionality split out of CRI will have their configuration migrated to new plugins.
+Deprecated configuration versions and configurations for deprecated features will be removed in 2.0.
+
+##### Deprecation
+
+The 2.0 release will remove any feature deprecated in 1.x. Features deprecated in this release include.
+
+* **Docker Schema 1 Image Deprecation** ([#6884](https://github.com/containerd/containerd/pull/6884))
+
+#### CRI Updates
+
+* **Fix CRI plugin to setup pod network after creating the sandbox container** ([#5904](https://github.com/containerd/containerd/pull/5904))
+* **Support image pull progress timeout** ([#6150](https://github.com/containerd/containerd/pull/6150))
+* **Add experimental support for runtime specific snapshotters** ([#6899](https://github.com/containerd/containerd/pull/6899))
+* **Pass all TOML runtime configuration options from CRI to the runtime** ([#7764](https://github.com/containerd/containerd/pull/7764))
+* **Support for user namespaces in stateless pods ([KEP-127](https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/127-user-namespaces)) _(experimental)_** ([#7679](https://github.com/containerd/containerd/pull/7679))
+* **Add timeout option for drain exec io** ([#7832](https://github.com/containerd/containerd/pull/7832))
+* **Add network plugin metrics** ([#7858](https://github.com/containerd/containerd/pull/7858))
+* **CRI v1alpha2 is deprecated and will be removed from containerd in containerd v2.0; if you are using the CRI API please move up to CRI v1; Kubernetes supports CRI v1 since Kubernetes 1.23** ([#7863](https://github.com/containerd/containerd/pull/7863))
+
+#### Other
+
+* **Support shallow content copy by adding reader option to local content reader at** ([#7414](https://github.com/containerd/containerd/pull/7414))
+* **Add NoSameOwner option when unpacking tars** ([#7386](https://github.com/containerd/containerd/pull/7386))
+* **Add `FetcherByDigest` for fetching blobs without fetching a manifest** ([#7460](https://github.com/containerd/containerd/pull/7460))
+* **Update default seccomp profile to block socket calls to AF_VSOCK** ([#7510](https://github.com/containerd/containerd/pull/7510))
+* **Replace fork on mount logic with CLONE_FS** ([#7513](https://github.com/containerd/containerd/pull/7513))
+* **Add support for default registry host configuration** ([#7607](https://github.com/containerd/containerd/pull/7607))
+* **Use github.com/minio/sha256-simd for more efficient sha256 calculation** ([#7732](https://github.com/containerd/containerd/pull/7732))
+* **Make OCI options cross-platform** ([#7928](https://github.com/containerd/containerd/pull/7928))
+* **Update release builds to build from Ubuntu 20.04 with glibc 2.31** ([#8021](https://github.com/containerd/containerd/pull/8021))
+* **Use data field from OCI descriptor when provided for fetch** ([#8076](https://github.com/containerd/containerd/pull/8076))
+
+See the changelog for complete list of changes"""
+
+postface = """\
+### Which file should I download?
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.31 (Ubuntu 20.04).
+* `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on non-glibc Linux distributions. Not position-independent.
+* `cri-containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:     (Deprecated)
+* `cri-containerd-cni-<VERSION>-<OS>-<ARCH>.tar.gz`: (Deprecated)
+
+In addition to containerd, typically you will have to install [runc](https://github.com/opencontainers/runc/releases)
+and [CNI plugins](https://github.com/containernetworking/plugins/releases) from their official sites too.
+
+See also the [Getting Started](https://github.com/containerd/containerd/blob/main/docs/getting-started.md) documentation.
+"""

@@ -1,0 +1,43 @@
+# Copyright The containerd Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+ARG BASE
+FROM $BASE
+
+ADD https://github.com/kubernetes-sigs/windows-testing/raw/3fea3d48ea8337b2aaca755c1d719e34b45f46b9/images/busybox/busybox.exe /bin/busybox.exe
+
+ENV BUSYBOX_EXES="[ [[ ar arch ash awk base64 basename bash bunzip2 bzcat bzip2 cal cat chmod cksum clear cmp comm cp cpio cut date dc dd df diff dirname dos2unix dpkg-deb du echo ed egrep env expand e xpr factor false fgrep find fold fsync ftpget ftpput getopt grep groups gunzip gzip hd head hexdump id ipcalc kill killall less link ln logname ls lzcat lzma lzop lzopcat man md5sum mkdir mktemp mv nl od paste patch pgrep pidof pipe_progress pkill printenv printf ps pwd rev rm rmdir rpm rpm2cpio sed seq sh sha1sum sha256sum sha3sum sha512sum shred shuf sleep sort split ssl_client stat strings sum ta c tail tar tee test timeout touch tr true truncate ttysize uname uncompress unexpand uniq unix2dos unlink unlzma unlzop unxz unzip usleep uudecode uuencode vi watch wc wget which whoami whois xargs xxd xz xzcat yes zcat"
+
+USER ContainerAdministrator
+WORKDIR C:/bin
+
+RUN cmd.exe /c "@echo off && FOR %i in (%BUSYBOX_EXES%) do (mklink %i.exe busybox.exe)"
+
+USER ContainerUser
+
+# Explicitly set full access rights for "CREATOR OWNER". While
+# this is set by default for Windows Server 2019, it seems that
+# on Windows Server 2022 it is not.
+RUN mkdir C:\test_dir && \
+    icacls C:\test_dir /grant "CREATOR OWNER":(OI)(CI)(IO)F /T && \
+    /bin/sh.exe -c "echo test_content > /test_dir/test_file"
+
+ENV PATH="C:\bin;C:\Windows\System32;C:\Windows;"
+
+# Add an extra volume under D: to test that WithVoumes() doesn't err out when dealing with
+# a non-C volume in WCOW.
+#
+# See:
+# https://github.com/containerd/containerd/issues/8171
+VOLUME ["C:/test_dir", "D:"]

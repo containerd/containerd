@@ -1,0 +1,121 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.1.0"
+
+pre_release = false
+
+preface = """\
+The third major release of containerd brings both a mix of boring and
+exciting changes. While fixing many bugs and continuing support for the
+containerd 1.0 API, new APIs and interfaces have been added to allow
+containerd to be more extensible and cover more use cases.
+
+## New V2 Runtime
+
+A new v2 runtime has been added with a stable gRPC interface for managing
+containers through external shims.
+
+This allows runtime authors to easily integrate with containerd over a stable
+API.
+
+Various runtimes can be selected on a per container basis using the `WithRuntime` opt
+or to test via ctr `ctr run --runtime io.containerd.runc.v1`.
+
+[Documentation](https://github.com/containerd/containerd/blob/main/runtime/v2/README.md)
+
+## Updated CRI Plugin
+
+Containerd 1.2 is validated against Kubernetes v1.11 and v1.12, but it is also compatible with Kubernetes v1.10.
+
+***To use containerd 1.2 with Kubernetes v1.10, be sure to run the stream server on an address accessible to the apiserver. A simple way is to set `stream_server_address=""` in the `[plugins.cri]` section of `containerd.toml`, so that `cri` plugin will automatically select a routable node address.***
+
+### Kubernetes Runtime Class
+[Kubernetes Runtime Class](https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md) introduced in Kubernetes 1.12 is supported.
+
+Users can:
+* Configure alternative runtime handlers with the config option `plugins.cri.containerd.runtimes.runtime_handler_name`, e.g. `plugins.cri.containerd.runtimes.kata`. ([config.md](https://github.com/containerd/cri/blob/release/1.2/docs/config.md))
+* Use the alternative runtime handler in Kubernetes by creating `RuntimeClass` for the runtime handler, and specifying `RuntimeClassName` in the pod spec. ([doc](https://github.com/kubernetes/website/blob/release-1.12/content/en/docs/concepts/containers/runtime-class.md))
+
+***The `plugins.cri.containerd.untrusted_workload_runtime` config option and `io.kubernetes.cri.untrusted-workload` pod annotation are still functional, but start being deprecated. It is recommended to migrate to the `RuntimeClass` api.***
+
+### Other Features
+* Supported [`ProcMount`](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/auth/proc-mount-type.md) option introduced in Kubernetes 1.12.
+* Added a new config option `plugins.cri.registry.auths` for user to config default credentials for specific registries. ([doc](https://github.com/containerd/cri/blob/release/1.2/docs/registry.md#configure-registry-credentials))
+* Added a new config option `plugins.cri.x509_key_pair_streaming` for user to config a valid certificate for the stream server. ([config.md](https://github.com/containerd/cri/blob/release/1.2/docs/config.md))
+* Added a runtime `options` field for shim v2 runtime. Use the `options` field to config runtime specific options, e.g. `NoPivotRoot` and `SystemdCgroup` for runtime type `io.containerd.runc.v1`. (See [config.md](https://github.com/containerd/cri/blob/release/1.2/docs/config.md))
+
+### Notable Changes
+* `cri` plugin can see images pulled/imported into containerd by `ctr images pull` and `ctr images import`.
+* CNI config is now dynamically reloaded when changed.
+* IPv4 address is guaranteed to be selected, when there are both IPv4 and IPv6 addresses for a pod.
+* Privileged untrusted workload is allowed, the workload will get privilege inside the sandbox.
+* `cri` plugin stream server serves on `http://localhost:0` by default. This is to work with the [kubelet streaming proxy](https://github.com/kubernetes/kubernetes/pull/64006) introduced in Kubernetes 1.11.
+* Fixed an issue that a container can't be stopped when container processes are accidentally moved out of the container cgroups.
+* `cluster/health-monitor.sh` in the release tarball will be deprecated next release. Please use Kubernetes [health-monitor.sh](https://github.com/kubernetes/kubernetes/blob/release-1.12/cluster/gce/gci/health-monitor.sh) instead.
+
+## New Proxy Plugins
+
+A new proxy plugin configuration has been added to allow external snapshotters
+be connected to containerd using gRPC.
+
+[Documentation](https://github.com/containerd/containerd/blob/main/PLUGINS.md)
+
+## Managed /opt directory
+
+A new `Install` method on the containerd client allows users to publish host level
+binaries using standard container build tooling and container distribution tooling
+to download containerd related binaries on their systems.
+
+This can be used for v2 runtime authors to get their runtime shims on an existing
+containerd system. It can also be used to install `runc` and other related tools.
+
+```bash
+> ctr content fetch docker.io/crosbymichael/runc:latest
+> ctr install docker.io/crosbymichael/runc:latest
+```
+
+[Documentation](https://github.com/containerd/containerd/blob/main/docs/managed-opt.md)
+
+## Garbage Collection
+
+Add support for cleaning up leases and content ingests to garbage collections.
+
+Add expiration label to clean up temporary resources.
+
+## Image Importer
+
+The image importer has been updated to support output from `docker save`. Users
+of the `ctr` tool should take note of the usage change to `ctr images import`.
+We continue to recommend not building tooling on top of the `ctr` tool.
+
+## API Changes
+
+This release features a couple additions to the API. Clients may make use of
+these new API features but should be able to handle cases when those features
+are not implemented on the server. The Go client handles this automatically.
+
+- Add `ListStream` method to containers API. This allows listing a larger
+number of containers without hitting message size limts.
+- Add `Sync` flag to `Delete` in leases API. Setting this option will ensure
+a garbage collection completes before the removal call is returned. This can
+be used to guarantee unreferenced objects are removed from disk after a lease.
+
+## Other Improvements
+
+Improved multi-arch image support using more precise matching and ranking"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
+
+[rename_deps]
+	[rename_deps.ttrpc]
+	old = "github.com/stevvooe/ttrpc"
+	new = "github.com/containerd/ttrpc"
