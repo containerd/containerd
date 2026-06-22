@@ -37,7 +37,7 @@ version = 3
 
 # The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
-[plugins."io.containerd.cri.v1.images".registry.configs."gcr.io".auth]
+[plugins."io.containerd.cri.v1.images".registry.configs."us-central1-docker.pkg.dev".auth]
   username = ""
   password = ""
   auth = ""
@@ -50,7 +50,7 @@ version = 2
 
 # The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
-[plugins."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
+[plugins."io.containerd.grpc.v1.cri".registry.configs."us-central1-docker.pkg.dev".auth]
   username = ""
   password = ""
   auth = ""
@@ -65,39 +65,38 @@ not specified by Kubernetes via CRI.
 
 After modifying this config, you need to restart the `containerd` service.
 
-### Configure Registry Credentials Example - GCR with Service Account Key Authentication
+### Configure Registry Credentials Example - Google Artifact Registry with Service Account Key Authentication
 
-If you don't already have Google Container Registry (GCR) set up then you need to do the following steps:
+If you don't already have Google Artifact Registry set up then you need to do the following steps:
 
-* Create a Google Cloud Platform (GCP) account and project if not already created (see [GCP getting started](https://cloud.google.com/gcp/getting-started))
-* Enable GCR for your project (see [Quickstart for Container Registry](https://cloud.google.com/container-registry/docs/quickstart))
-* For authentication to GCR: Create [service account and JSON key](https://cloud.google.com/container-registry/docs/advanced-authentication#json-key)
+* Create a Google Cloud Platform (GCP) account and project if not already created (see [GCP getting started](https://docs.cloud.google.com/docs/get-started/))
+* Enable the Artifact Registry API and create a Docker repository (see [Quickstart for Artifact Registry](https://docs.cloud.google.com/artifact-registry/docs/docker/store-docker-container-images))
+* For authentication to Artifact Registry: Create a [service account and JSON key](https://docs.cloud.google.com/artifact-registry/docs/repositories/configure-remote-authentication#json-key)
 * The JSON key file needs to be downloaded to your system from the GCP console
-* For access to the GCR storage: Add service account to the GCR storage bucket with storage admin access rights (see [Granting permissions](https://cloud.google.com/container-registry/docs/access-control#grant-bucket))
+* Grant the service account appropriate permissions to access your Artifact Registry repository (see [Granting permissions](https://docs.cloud.google.com/artifact-registry/docs/access-control))
 
-Refer to [Pushing and pulling images](https://cloud.google.com/container-registry/docs/pushing-and-pulling) for detailed information on the above steps.
+Refer to [Pushing and pulling images](https://docs.cloud.google.com/artifact-registry/docs/docker/pushing-and-pulling) for detailed information on the above steps.
 
-> Note: The JSON key file is a multi-line file and it can be cumbersome to use the contents as a key outside of the file. It is worthwhile generating a single line format output of the file. One way of doing this is using the `jq` tool as follows: `jq -c . key.json`
+> Note: The JSON key file is a multi-line file. When using the key file directly, use `_json_key` as the Docker username. If you base64-encode the key file contents, use `_json_key_base64` instead.
 
-It is beneficial to first confirm that from your terminal you can authenticate with your GCR and have access to the storage before hooking it into containerd. This can be verified by performing a login to your GCR and
-pushing an image to it as follows:
+It is beneficial to first confirm that from your terminal you can authenticate with your Google Artifact Registry repository and have access to it before hooking it into containerd. This can be verified by performing a login to your Google Artifact Registry and pushing an image to it as follows:
 
 ```console
-docker login -u _json_key -p "$(cat key.json)" gcr.io
+cat key.json | docker login -u _json_key --password-stdin us-central1-docker.pkg.dev
 
 docker pull busybox
 
-docker tag busybox gcr.io/your-gcp-project-id/busybox
+docker tag busybox us-central1-docker.pkg.dev/your-gcp-project-id/your-repository/busybox
 
-docker push gcr.io/your-gcp-project-id/busybox
+docker push us-central1-docker.pkg.dev/your-gcp-project-id/your-repository/busybox
 
-docker logout gcr.io
+docker logout us-central1-docker.pkg.dev
 ```
 
-Now that you know you can access your GCR from your terminal, it is now time to try out containerd.
+Now that you know you can access your Artifact Registry repository from your terminal, it is now time to try out containerd.
 
 Edit the containerd config (default location is at `/etc/containerd/config.toml`)
-to add your JSON key for `gcr.io` domain image pull
+to add your JSON key for `us-central1-docker.pkg.dev` domain image pull
 requests:
 + In containerd 2.x
 ```toml
@@ -107,12 +106,12 @@ version = 3
   [plugins."io.containerd.cri.v1.images".registry.mirrors]
     [plugins."io.containerd.cri.v1.images".registry.mirrors."docker.io"]
       endpoint = ["https://registry-1.docker.io"]
-    [plugins."io.containerd.cri.v1.images".registry.mirrors."gcr.io"]
-      endpoint = ["https://gcr.io"]
+    [plugins."io.containerd.cri.v1.images".registry.mirrors."us-central1-docker.pkg.dev"]
+      endpoint = ["https://us-central1-docker.pkg.dev"]
   [plugins."io.containerd.cri.v1.images".registry.configs]
-    [plugins."io.containerd.cri.v1.images".registry.configs."gcr.io".auth]
+    [plugins."io.containerd.cri.v1.images".registry.configs."us-central1-docker.pkg.dev".auth]
       username = "_json_key"
-      password = 'paste output from jq'
+      password = 'paste output from jq -c . key.json'
 ```
 + In containerd 1.x
 ```toml
@@ -122,15 +121,15 @@ version = 2
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
     [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
       endpoint = ["https://registry-1.docker.io"]
-    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."gcr.io"]
-      endpoint = ["https://gcr.io"]
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."us-central1-docker.pkg.dev"]
+      endpoint = ["https://us-central1-docker.pkg.dev"]
   [plugins."io.containerd.grpc.v1.cri".registry.configs]
-    [plugins."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
+    [plugins."io.containerd.grpc.v1.cri".registry.configs."us-central1-docker.pkg.dev".auth]
       username = "_json_key"
-      password = 'paste output from jq'
+      password = 'paste output from jq -c . key.json'
 ```
 
-> Note: `username` of `_json_key` signifies that JSON key authentication will be used.
+> Note: Setting username to `_json_key` signifies that service account JSON key authentication will be used. If using a base64-encoded JSON key instead, use `_json_key_base64`.
 
 Restart containerd:
 
@@ -138,15 +137,15 @@ Restart containerd:
 service containerd restart
 ```
 
-Pull an image from your GCR with `crictl`:
+Pull an image from your Artifact Registry repository with `crictl`:
 
 ```console
-$ sudo crictl pull gcr.io/your-gcp-project-id/busybox
+$ sudo crictl pull us-central1-docker.pkg.dev/your-gcp-project-id/your-repository/busybox
 
 DEBU[0000] get image connection
 DEBU[0000] connect using endpoint 'unix:///run/containerd/containerd.sock' with '3s' timeout
 DEBU[0000] connected successfully using endpoint: unix:///run/containerd/containerd.sock
-DEBU[0000] PullImageRequest: &PullImageRequest{Image:&ImageSpec{Image:gcr.io/your-gcr-instance-id/busybox,},Auth:nil,SandboxConfig:nil,}
+DEBU[0000] PullImageRequest: &PullImageRequest{Image:&ImageSpec{Image:us-central1-docker.pkg.dev/your-gcp-project-id/your-repository/busybox,},Auth:nil,SandboxConfig:nil,}
 DEBU[0001] PullImageResponse: &PullImageResponse{ImageRef:sha256:78096d0a54788961ca68393e5f8038704b97d8af374249dc5c8faec1b8045e42,}
 Image is up to date for sha256:78096d0a54788961ca68393e5f8038704b97d8af374249dc5c8faec1b8045e42
 ```
