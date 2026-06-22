@@ -127,7 +127,7 @@ func (e *Exchange) Publish(ctx context.Context, topic string, event events.Event
 // the standard containerd filters package syntax.
 func (e *Exchange) Subscribe(ctx context.Context, fs ...string) (ch <-chan *events.Envelope, errs <-chan error) {
 	var (
-		evch                  = make(chan *events.Envelope)
+		evch                  = make(chan *events.Envelope, 256)
 		errq                  = make(chan error, 1)
 		channel               = goevents.NewChannel(0)
 		queue                 = goevents.NewQueue(channel)
@@ -180,6 +180,8 @@ func (e *Exchange) Subscribe(ctx context.Context, fs ...string) (ch <-chan *even
 				case evch <- env:
 				case <-ctx.Done():
 					break loop
+				default:
+					log.G(ctx).WithField("channel", evch).Warn("dropping event envelope due to blocked subscriber channel")
 				}
 			case <-ctx.Done():
 				break loop
