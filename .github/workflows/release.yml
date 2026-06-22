@@ -80,6 +80,8 @@ jobs:
           - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/riscv64
           - dockerfile-ubuntu: 22.04
+            dockerfile-platform: linux/loong64
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: windows/amd64
     steps:
       - name: Set RELEASE_VER

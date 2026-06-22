@@ -94,6 +94,15 @@ jobs:
           make binaries
           mv bin bin_riscv64
 
+      - name: Build loong64
+        env:
+          GOOS: linux
+          GOARCH: loong64
+          CGO_ENABLED: 0
+        run: |
+          make binaries
+          mv bin bin_loong64
+
       #
       # Upload
       #
@@ -127,6 +136,12 @@ jobs:
         with:
           name: linux_riscv64
           path: src/github.com/containerd/containerd/bin_riscv64
+
+      - name: Upload artifacts (linux_loong64)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux_loong64
+          path: src/github.com/containerd/containerd/bin_loong64
 
   windows:
     name: Windows
