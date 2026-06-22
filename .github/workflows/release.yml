@@ -79,8 +79,13 @@ jobs:
             dockerfile-platform: linux/s390x
           - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/riscv64
-          - dockerfile-ubuntu: 22.04
-            dockerfile-platform: linux/loong64
+          # TODO: Enable linux/loong64 release builds once the upstream Docker
+          # tonistiigi/xx base image (ubuntu:22.04) provides the loong64 cross-compilation
+          # toolchain. Currently CGO cross-compilation for loong64 is not available in the
+          # Ubuntu 22.04 apt repositories (no crossbuild-essential-loong64 package).
+          # Tracked by: https://github.com/containerd/containerd/issues/13641
+          #- dockerfile-ubuntu: 22.04
+          #  dockerfile-platform: linux/loong64
           - dockerfile-ubuntu: 22.04
             dockerfile-platform: windows/amd64
     steps:
