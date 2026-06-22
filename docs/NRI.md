@@ -117,7 +117,7 @@ make
 ./build/bin/logger -idx 00
 ```
 
-You should see the logger plugin receiving receiving a list of existing pods
+You should see the logger plugin receiving a list of existing pods
 and containers. If you then create or remove further pods and containers
 using crictl or kubectl you should see detailed logs of the corresponding NRI
 events printed by the logger.
