@@ -87,6 +87,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		execCountSubscribers: make(map[*runc.Container]chan<- int),
 		containerInitExit:    make(map[*runc.Container]runcC.Exit),
 		exitSubscribers:      make(map[*map[int][]runcC.Exit]struct{}),
+		eventQueue:           newEventQueue(),
 	}
 	go s.processExits()
 	runcC.Monitor = reaper.Default
@@ -139,6 +140,7 @@ type service struct {
 	exitSubscribers map[*map[int][]runcC.Exit]struct{}
 
 	shutdown shutdown.Service
+	*eventQueue
 }
 
 type containerProcess struct {
@@ -656,42 +658,81 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	}, nil
 }
 
+type eventQueue struct {
+	qmu  sync.Mutex
+	cond *sync.Cond
+	buf  []runcC.Exit
+}
+
+func (s *eventQueue) enqueue(e runcC.Exit) {
+	s.qmu.Lock()
+	defer s.qmu.Unlock()
+	s.buf = append(s.buf, e)
+	s.cond.Signal()
+}
+
+func (s *eventQueue) dequeue() runcC.Exit {
+	s.qmu.Lock()
+	defer s.qmu.Unlock()
+	for len(s.buf) == 0 {
+		s.cond.Wait()
+	}
+	event := s.buf[0]
+	s.buf = s.buf[1:]
+	return event
+}
+
+func newEventQueue() *eventQueue {
+	eq := &eventQueue{buf: make([]runcC.Exit, 0)}
+	eq.cond = sync.NewCond(&eq.qmu)
+	return eq
+}
+
 func (s *service) processExits() {
+	go func() {
+		for {
+			e := s.dequeue()
+			// While unlikely, it is not impossible for a container process to exit
+			// and have its PID be recycled for a new container process before we
+			// have a chance to process the first exit. As we have no way to tell
+			// for sure which of the processes the exit event corresponds to (until
+			// pidfd support is implemented) there is no way for us to handle the
+			// exit correctly in that case.
+
+			s.lifecycleMu.Lock()
+			// Inform any concurrent s.Start() calls so they can handle the exit
+			// if the PID belongs to them.
+			for subscriber := range s.exitSubscribers {
+				(*subscriber)[e.Pid] = append((*subscriber)[e.Pid], e)
+			}
+			// Handle the exit for a created/started process. If there's more than
+			// one, assume they've all exited. One of them will be the correct
+			// process.
+			var cps []containerProcess
+			for _, cp := range s.running[e.Pid] {
+				_, init := cp.Process.(*process.Init)
+				if init {
+					s.containerInitExit[cp.Container] = e
+				}
+				cps = append(cps, cp)
+			}
+			delete(s.running, e.Pid)
+			s.lifecycleMu.Unlock()
+
+			for _, cp := range cps {
+				if ip, ok := cp.Process.(*process.Init); ok {
+					s.handleInitExit(e, cp.Container, ip)
+				} else {
+					s.handleProcessExit(e, cp.Container, cp.Process)
+				}
+			}
+
+		}
+	}()
+
 	for e := range s.ec {
-		// While unlikely, it is not impossible for a container process to exit
-		// and have its PID be recycled for a new container process before we
-		// have a chance to process the first exit. As we have no way to tell
-		// for sure which of the processes the exit event corresponds to (until
-		// pidfd support is implemented) there is no way for us to handle the
-		// exit correctly in that case.
-
-		s.lifecycleMu.Lock()
-		// Inform any concurrent s.Start() calls so they can handle the exit
-		// if the PID belongs to them.
-		for subscriber := range s.exitSubscribers {
-			(*subscriber)[e.Pid] = append((*subscriber)[e.Pid], e)
-		}
-		// Handle the exit for a created/started process. If there's more than
-		// one, assume they've all exited. One of them will be the correct
-		// process.
-		var cps []containerProcess
-		for _, cp := range s.running[e.Pid] {
-			_, init := cp.Process.(*process.Init)
-			if init {
-				s.containerInitExit[cp.Container] = e
-			}
-			cps = append(cps, cp)
-		}
-		delete(s.running, e.Pid)
-		s.lifecycleMu.Unlock()
-
-		for _, cp := range cps {
-			if ip, ok := cp.Process.(*process.Init); ok {
-				s.handleInitExit(e, cp.Container, ip)
-			} else {
-				s.handleProcessExit(e, cp.Container, cp.Process)
-			}
-		}
+		// send events to a queue to prevent event to be dropped because of timeout.
+		s.enqueue(e)
 	}
 }
 
