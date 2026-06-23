@@ -152,6 +152,16 @@ func (c *criService) mutateImageMount(
 		}
 
 		mounts = addVolatileOptionOnImageVolumeMount(mounts)
+
+		// if mutateImageMount() fails, do not leak the new mounts
+		mountTarget := target
+		defer func() {
+			if retErr != nil {
+				if err := mount.UnmountAll(mountTarget, 0); err != nil {
+					log.G(ctx).WithError(err).Errorf("failed to unmount image volume component %q", mountTarget)
+				}
+			}
+		}()
 		if err := mount.All(mounts, target); err != nil {
 			return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
 		}
