@@ -371,6 +371,42 @@ func (u *Unpacker) unpack(
 	copy(chainIDs, diffIDs)
 	chainIDs = identity.ChainIDs(chainIDs)
 
+	// Refill layer blobs whose snapshot for this snapshotter already exists
+	// but whose content has been discarded (e.g. left behind by a prior
+	// discard_unpacked_layers=true run). The snapshot loop below short-circuits
+	// on existing chainIDs and won't fetch, so do it here in parallel — reusing
+	// u.fetch's per-blob lock and concurrency limiter — before the per-chainID
+	// snapshot locks are taken.
+	//
+	// Check the content store first: on a healthy node every blob is present,
+	// so this avoids a snapshotter Stat per layer on every unpack. Only when a
+	// blob is missing do we Stat the snapshot to decide whether it needs
+	// refilling — if the snapshot is also missing, the loop below fetches and
+	// unpacks the layer as usual.
+	var missingBlobs []ocispec.Descriptor
+	for li, ldesc := range layers {
+		if _, err := cs.Info(ctx, ldesc.Digest); err == nil {
+			continue
+		} else if !errdefs.IsNotFound(err) {
+			log.G(ctx).WithError(err).WithField("digest", ldesc.Digest).Warn("content info failed during blob-refill preflight; assuming blob present")
+			continue
+		}
+		chainID := chainIDs[li].String()
+		if _, err := sn.Stat(ctx, chainID); err != nil {
+			if !errdefs.IsNotFound(err) {
+				log.G(ctx).WithError(err).WithField("chainid", chainID).Warn("snapshot stat failed during blob-refill preflight")
+			}
+			continue
+		}
+		missingBlobs = append(missingBlobs, ldesc)
+	}
+	if len(missingBlobs) > 0 {
+		log.G(ctx).WithField("count", len(missingBlobs)).Debug("refilling missing layer blobs whose snapshots already exist")
+		if err := u.fetch(ctx, h, missingBlobs, nil); err != nil {
+			return fmt.Errorf("failed to refill missing layer blobs: %w", err)
+		}
+	}
+
 	topHalf := func(i int, desc ocispec.Descriptor, span *tracing.Span, startAt time.Time) (<-chan *unpackStatus, error) {
 		var (
 			err     error
