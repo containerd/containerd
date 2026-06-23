@@ -98,7 +98,10 @@ Please see [RELEASES.md](RELEASES.md) for details on versioning and stability
 of containerd components.
 
 Downloadable 64-bit Intel/AMD binaries of all official releases are available on
-our [releases page](https://github.com/containerd/containerd/releases).
+our [releases page](https://github.com/containerd/containerd/releases). Binaries
+are published for additional platforms as well; see
+[Platform Support](RELEASES.md#platform-support) for the full list of platforms
+and the level of support for each.
 
 For other architectures and distribution support, you will find that many
 Linux distributions package their own containerd and provide it across several

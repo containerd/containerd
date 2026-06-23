@@ -183,6 +183,118 @@ Deprecated containerd and kubernetes versions
 
 ** Note: containerd v1.6.*, and v1.7.* support CRI v1 and v1alpha2 through EOL as those releases continue to support older versions of k8s, cloud providers, and other clients using CRI v1alpha2. CRI v1alpha2 is deprecated in v1.7 and is not present in containerd v2.0.
 
+### Platform Support
+
+containerd runs on a range of operating systems and CPU architectures, but the
+level of support we can provide varies by platform. Support is limited by what
+we are able to build, test, and maintain. A platform that we can fully test in
+CI can be supported more strongly than one we can only compile.
+
+To make these differences explicit, platforms are organized into tiers. A tier
+describes what the project commits to for a platform. Tiers are forward-looking
+and apply to in-development and future releases. Platforms may be
+[demoted or removed](#demotion-and-removal) if the project is no longer able to
+commit to support at a given tier.
+
+A platform is identified by its `GOOS/GOARCH` pair, optionally with a variant
+(for example `linux/amd64`, `windows/amd64`, or `linux/arm/v7`). For operating
+systems like Linux, we do not designate specific distributions as supported,
+however automated testing primarily covers Ubuntu, Fedora, and AlmaLinux.
+
+#### Tiers
+
+__*Tier 1: Supported.*__ The platform is built, released, and exercised by
+automated tests (integration and/or CRI tests) in CI on every change. Test
+failures on a Tier 1 platform generally block merges and releases. These are the
+platforms we recommend for production use. Release artifacts are published with
+each release and nightly builds are produced.
+
+__*Tier 2: Released, best-effort.*__ The platform is built and release artifacts
+are published, but we run no automated testing for it. While binaries are
+produced with the expectation that they work, the project cannot independently
+validate runtime behavior. Bugs that are specific to a Tier 2 platform are
+addressed on a best-effort basis and may depend on the reporter or interested
+parties to diagnose, fix, and verify. Nightly builds are produced.
+
+__*Tier 3: Build-verified.*__ The platform is compiled in CI so that we do not
+knowingly break it, but no release artifacts are published and no testing is
+performed. This tier exists primarily to support the adoption of containerd on
+platforms that we do not have the resources to support at a stronger level.
+
+__*Unsupported.*__ Any platform not listed below. containerd may still build and
+run on these platforms, but the project makes no commitments and performs no
+verification. Users are free to build from source for their own use.
+
+#### Current platforms
+
+| Platform        | Tier | Release artifacts | Nightly builds | Functional CI testing | Build / compile check |
+|-----------------|:----:|:-----------------:|:--------------:|:---------------------:|:---------------------:|
+| linux/amd64     |  1   | ✅                | ✅             | ✅                    | ✅                    |
+| linux/arm64     |  1   | ✅                | ✅             | ✅                    | ✅                    |
+| windows/amd64   |  1   | ✅                | ✅             | ✅                    | ✅                    |
+| linux/ppc64le   |  2   | ✅                | ✅             | ❌                    | ✅                    |
+| linux/riscv64   |  2   | ✅                | ✅             | ❌                    | ✅                    |
+| linux/s390x     |  2   | ✅                | ✅             | ❌                    | ✅                    |
+| linux/arm/v7    |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| linux/arm/v5    |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| darwin/arm64    |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| freebsd/amd64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| freebsd/arm64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| windows/arm64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
+
+containerd's build, testing, and release infrastructure is primarily defined
+in [GitHub Actions](./.github/workflows). Release artifacts and their platforms
+are defined in `release.yml`, nightly builds in `nightly.yml`, functional
+testing in `ci.yml`, and Tier 3 compile coverage in the `binaries` and
+`crossbuild` jobs of `ci.yml`. This table should be updated if the
+workflows are changed.
+
+#### Requesting a new platform or a tier change
+
+New platforms enter at the lowest tier that the maintainers can sustainably
+commit to, and most begin at Tier 3. To propose a new platform or a change in
+tier, [open an issue](https://github.com/containerd/containerd/issues)
+describing the platform, its `GOOS/GOARCH`, the level of support being
+requested, and what you are able to contribute toward it.
+
+What it takes to reach each tier:
+
+- __Tier 3 (Build-verified):__ Go must support the platform as a port, and the
+  platform must build (at minimum, `make build` and `make binaries`). Because
+  the cost and risk are low, the maintainers will generally accept a new
+  build-verified platform as long as it does not meaningfully complicate the
+  build or slow CI. This is the recommended entry point for a new architecture.
+- __Tier 2 (Released, best-effort):__ In addition to Tier 3, the platform must
+  produce working release artifacts through the existing release tooling. The
+  maintainers decide whether to publish release artifacts for a platform at
+  their discretion, weighing demonstrated demand, the risk of shipping binaries
+  we cannot test, and the ongoing maintenance burden. A vendor or community
+  sponsor who commits to triaging platform-specific issues is not required, but
+  is strongly encouraged and makes promotion more likely.
+- __Tier 1 (Supported):__ In addition to Tier 2, the platform must be covered by
+  automated functional tests in CI that are reliable enough to gate merges. This
+  generally requires either hosted runners for the platform or a sponsor who
+  provides and _maintains_ suitable CI infrastructure (for example, self-hosted
+  runners or hardware). Testing or infrastructure that is too slow or too flaky
+  to reliably gate changes is not sufficient.
+
+#### Demotion and removal
+
+Tiers reflect what the project can sustain, so a platform may move down as well as
+up. The maintainers may demote or remove a platform when, for example:
+
+- automated testing for the platform becomes too unreliable or too slow to gate
+  changes;
+- the infrastructure or sponsorship that a tier depended on is no longer
+  available;
+- supporting the platform meaningfully impedes development of containerd; or
+- the platform is no longer in meaningful use.
+
+When practical, the maintainers will give notice before lowering a platform's
+tier or removing it, and will prefer to make such changes at a minor-release
+boundary. Removing a platform does not retroactively affect artifacts already
+published for prior releases.
+
 ### Backporting
 
 Backports in containerd are community driven. As maintainers, we'll try to
