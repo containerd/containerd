@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/containers"
@@ -252,6 +253,12 @@ func TestPopulateDefaultUnixSpec(t *testing.T) {
 	populateDefaultUnixSpec(ctx, &expected, c.ID)
 	if expected.Linux == nil {
 		t.Error("Cannot populate Unix Spec")
+	}
+
+	// CgroupsPath should never contain backslashes when the spec is generated
+	// on Windows.
+	if strings.Contains(expected.Linux.CgroupsPath, "\\") {
+		t.Errorf("CgroupsPath contains backslashes: %s", expected.Linux.CgroupsPath)
 	}
 }
 
