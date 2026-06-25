@@ -29,9 +29,16 @@ func TestDialAddressScheme(t *testing.T) {
 		address string
 		want    string
 	}{
+		// Bare paths: scheme is inferred from path content.
 		{name: "pipe gets npipe", address: "//./pipe/docker", want: "npipe:////./pipe/docker"},
+		{name: "backslash pipe gets npipe", address: `\\.\pipe\docker`, want: "npipe:////./pipe/docker"},
 		{name: "unix path gets unix", address: "/tmp/docker.sock", want: "unix:///tmp/docker.sock"},
 		{name: "windows path gets unix", address: "C:/Users/test/docker.sock", want: "unix://C:/Users/test/docker.sock"},
+
+		// Already-schemed inputs: must be returned unchanged (idempotent).
+		{name: "npipe scheme idempotent", address: "npipe:////./pipe/docker", want: "npipe:////./pipe/docker"},
+		{name: "npipe scheme with backslash idempotent", address: `npipe://\\.\pipe\docker`, want: `npipe://\\.\pipe\docker`},
+		{name: "unix scheme idempotent", address: "unix:///tmp/docker.sock", want: "unix:///tmp/docker.sock"},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -61,6 +68,32 @@ func TestDialerUnixSocket(t *testing.T) {
 	conn, err := dialer(sockPath, 5*time.Second)
 	if err != nil {
 		t.Fatalf("dialer(%q) failed: %v", sockPath, err)
+	}
+	conn.Close()
+}
+
+// TestDialerUnixSocketWithScheme verifies that a "unix://" prefix is stripped
+// before dialing and that the scheme is authoritative (a unix:// address is
+// always dialed as AF_UNIX, even if the path looks like a named pipe).
+func TestDialerUnixSocketWithScheme(t *testing.T) {
+	sockPath := filepath.Join(t.TempDir(), "test.sock")
+
+	l, err := net.Listen("unix", sockPath)
+	if err != nil {
+		t.Fatalf("Listen failed: %v", err)
+	}
+	defer l.Close()
+
+	go func() {
+		conn, err := l.Accept()
+		if err == nil {
+			conn.Close()
+		}
+	}()
+
+	conn, err := dialer("unix://"+sockPath, 5*time.Second)
+	if err != nil {
+		t.Fatalf("dialer(%q) failed: %v", "unix://"+sockPath, err)
 	}
 	conn.Close()
 }
