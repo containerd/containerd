@@ -424,7 +424,7 @@ func (c *criService) CRImportCheckpoint(
 	for _, e := range meta.Config.GetEnvs() {
 		env = append(env, e.GetKey()+"="+e.GetValue())
 	}
-	imageConfig.Env = append(imageConfig.Env, env...)
+	imageConfig.Env = env
 
 	originalAnnotations["restored"] = "true"
 	originalAnnotations["checkpointedAt"] = config.CheckpointedAt.Format(time.RFC3339Nano)
