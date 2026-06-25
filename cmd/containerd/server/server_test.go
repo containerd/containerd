@@ -20,6 +20,7 @@ import (
 	"context"
 	"iter"
 	"os"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -170,5 +171,27 @@ func TestMigration(t *testing.T) {
 	_, err = New(ctx, config)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSetTempDirEnv(t *testing.T) {
+	const tempDir = "/tmp/path/for/testing/temp"
+
+	var keys []string
+	if runtime.GOOS == "windows" {
+		keys = []string{"TEMP", "TMP", "SystemTemp"}
+	} else {
+		keys = []string{"TMPDIR"}
+	}
+	for _, k := range keys {
+		t.Setenv(k, "")
+	}
+
+	setTempDirEnv(tempDir)
+
+	for _, k := range keys {
+		if got := os.Getenv(k); got != tempDir {
+			t.Errorf("expected %s=%q, got %q", k, tempDir, got)
+		}
 	}
 }
