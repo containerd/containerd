@@ -1838,11 +1838,10 @@ type readLinker interface {
 }
 
 // openUserFile attempts to open a file within the root fs.
-// It handles cases where the file is an absolute symlink (e.g., NixOS /etc/passwd -> /nix/store/...),
-// which triggers "path escapes from parent" errors in Go 1.24+ due to stricter os.DirFS validation.
-//
-// The returned file rejects non-regular sources and returns an error if more
-// than maxUserFileBytes are read from it.
+// It handles cases where the file or any intermediate directory component is
+// an absolute or relative symlink (e.g., NixOS /etc/passwd -> /nix/store/...,
+// Android /etc -> /system/etc), which triggers "path escapes from parent" errors
+// in Go 1.24+ due to stricter os.DirFS sandboxing.
 func openUserFile(root fs.FS, name string) (fs.File, error) {
 	f, err := root.Open(name)
 	if err == nil {
@@ -1852,29 +1851,76 @@ func openUserFile(root fs.FS, name string) (fs.File, error) {
 	// Check if the FS implements our local ReadLink interface.
 	// We use a local interface instead of fs.ReadLinkFS to avoid strict dependency
 	// issues in some build environments.
-	if lfs, ok := root.(readLinker); ok {
-		if target, lerr := lfs.ReadLink(name); lerr == nil {
-			// Use filepath.IsAbs to handle platform-agnostic absolute path checks
-			if filepath.IsAbs(target) {
-				// Re-anchor the absolute path to the root.
-				// e.g. /nix/store/... becomes nix/store/... (relative to root fs)
-				// We use filepath.Rel to safely strip the leading separator.
-				rel, rerr := filepath.Rel(string(filepath.Separator), target)
-				if rerr == nil {
-					// filepath.Rel might return OS-specific separators (backslashes on Windows).
-					// fs.Open strictly expects forward slashes, so we convert it.
-					f, oerr := root.Open(filepath.ToSlash(rel))
-					if oerr != nil {
-						return nil, oerr
-					}
-					return wrapUserFile(f, name)
-				}
-			}
-		}
+	lfs, ok := root.(readLinker)
+	if !ok {
+		return nil, err
 	}
 
-	// Return the original error if we couldn't resolve it
-	return nil, err
+	// Walk the path component by component, resolving symlinks at each level.
+	// This handles both "final file is a symlink" (NixOS) and "intermediate
+	// directory is a symlink" (Android /etc -> /system/etc) cases.
+	resolved, rerr := resolvePathSymlinks(lfs, name, 8)
+	if rerr != nil {
+		return nil, rerr
+	}
+	if resolved == name {
+		return nil, err
+	}
+	return root.Open(resolved)
+}
+
+// resolvePathSymlinks walks each component of name, resolving absolute or
+// relative symlinks at each step. depth limits recursion to prevent loops.
+// Returns the fully resolved path, which equals name when no symlinks are found.
+func resolvePathSymlinks(lfs readLinker, name string, depth int) (string, error) {
+	if depth == 0 {
+		return "", errors.New("openUserFile: too many levels of symbolic links")
+	}
+	parts := strings.Split(name, "/")
+	current := ""
+	for i, part := range parts {
+		if current == "" {
+			current = part
+		} else {
+			current = current + "/" + part
+		}
+
+		target, lerr := lfs.ReadLink(current)
+		if lerr != nil {
+			// Not a symlink or unreadable — continue accumulating path.
+			continue
+		}
+
+		var next string
+		if filepath.IsAbs(target) {
+			// Absolute symlink: re-anchor to root by stripping the leading separator.
+			// e.g. /system/etc becomes system/etc (relative to root fs).
+			rel, rerr := filepath.Rel(string(filepath.Separator), target)
+			if rerr != nil {
+				return "", rerr
+			}
+			next = filepath.ToSlash(rel)
+		} else {
+			// Relative symlink: resolve relative to the parent directory.
+			parent := strings.Join(parts[:i], "/")
+			if parent == "" {
+				next = target
+			} else {
+				next = parent + "/" + target
+			}
+			// Normalise to collapse any "." or ".." components.
+			next = filepath.ToSlash(filepath.Clean(next))
+		}
+
+		// Append remaining path components after the resolved symlink target.
+		if remaining := parts[i+1:]; len(remaining) > 0 {
+			next = next + "/" + strings.Join(remaining, "/")
+		}
+
+		// Recurse to resolve any newly introduced symlinks in the resolved path.
+		return resolvePathSymlinks(lfs, next, depth-1)
+	}
+	return current, nil
 }
 
 // maxUserFileBytes caps how much data is read from any user-database file
