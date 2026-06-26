@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 )
 
@@ -66,30 +67,72 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		return fmt.Errorf("schema 1 image manifests are no longer supported: %w", errdefs.ErrInvalidArgument)
 	}
 
+	fetcher, err := ir.Fetcher(ctx, name)
+	if err != nil {
+		return fmt.Errorf("failed to get fetcher for %q: %w", name, err)
+	}
+
 	// Verify image before pulling.
-	for vfName, vf := range ts.config.Verifiers {
-		logger := log.G(ctx).WithFields(log.Fields{
-			"name":     name,
-			"digest":   desc.Digest.String(),
-			"verifier": vfName,
-		})
-		logger.Debug("Verifying image pull")
+	if len(ts.config.Verifiers) != 0 {
+		// Fetch manifest data before verification so verifiers have access to full manifest
+		if images.IsManifestType(desc.MediaType) || images.IsIndexType(desc.MediaType) {
+			log.G(ctx).WithFields(log.Fields{
+				"digest":    desc.Digest,
+				"mediatype": desc.MediaType,
+				"size":      desc.Size,
+			}).Debug("fetching manifest early for verification")
 
-		jdg, err := vf.VerifyImage(ctx, name, desc)
-		if err != nil {
-			logger.WithError(err).Error("No judgement received from verifier")
-			return fmt.Errorf("blocking pull of %v with digest %v: image verifier %v returned error: %w", name, desc.Digest.String(), vfName, err)
-		}
-		logger = logger.WithFields(log.Fields{
-			"ok":     jdg.OK,
-			"reason": jdg.Reason,
-		})
+			err = remotes.Fetch(ctx, ts.content, fetcher, desc)
+			if err != nil && !errdefs.IsAlreadyExists(err) {
+				return fmt.Errorf("failed to fetch manifest for verification: %w", err)
+			}
 
-		if !jdg.OK {
-			logger.Warn("Image verifier blocked pull")
-			return fmt.Errorf("image verifier %s blocked pull of %v with digest %v for reason: %v", vfName, name, desc.Digest.String(), jdg.Reason)
+			manifestBytes, err := content.ReadBlob(ctx, ts.content, desc)
+			if err != nil {
+				return fmt.Errorf("failed to read manifest from content store: %w", err)
+			}
+			desc.Data = manifestBytes
+		} else {
+			log.G(ctx).Debugf("encountered unknown type %v; skipping early manifest pull for verification", desc.MediaType)
 		}
-		logger.Debug("Image verifier allowed pull")
+
+		var runtimeConfig *imageverifier.RuntimeConfig
+		if tops.SandboxConfig != nil && tops.SandboxConfig.Metadata != nil {
+			runtimeConfig = &imageverifier.RuntimeConfig{
+				Metadata: &imageverifier.Metadata{
+					Name:      tops.SandboxConfig.Metadata.Name,
+					UID:       tops.SandboxConfig.Metadata.Uid,
+					Namespace: tops.SandboxConfig.Metadata.Namespace,
+				},
+				Labels:      tops.SandboxConfig.Labels,
+				Annotations: tops.SandboxConfig.Annotations,
+			}
+		}
+
+		for vfName, vf := range ts.config.Verifiers {
+			logger := log.G(ctx).WithFields(log.Fields{
+				"name":     name,
+				"digest":   desc.Digest.String(),
+				"verifier": vfName,
+			})
+			logger.Debug("Verifying image pull")
+
+			jdg, err := vf.VerifyImage(ctx, name, desc, runtimeConfig)
+			if err != nil {
+				logger.WithError(err).Error("No judgement received from verifier")
+				return fmt.Errorf("blocking pull of %v with digest %v: image verifier %v returned error: %w", name, desc.Digest.String(), vfName, err)
+			}
+			logger = logger.WithFields(log.Fields{
+				"ok":     jdg.OK,
+				"reason": jdg.Reason,
+			})
+
+			if !jdg.OK {
+				logger.Warn("Image verifier blocked pull")
+				return fmt.Errorf("image verifier %s blocked pull of %v with digest %v for reason: %v", vfName, name, desc.Digest.String(), jdg.Reason)
+			}
+			logger.Debug("Image verifier allowed pull")
+		}
 	}
 
 	// TODO: Handle already exists
@@ -102,10 +145,6 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			Name:  name,
 			Desc:  &desc,
 		})
-	}
-	fetcher, err := ir.Fetcher(ctx, name)
-	if err != nil {
-		return fmt.Errorf("failed to get fetcher for %q: %w", name, err)
 	}
 
 	var (
