@@ -43,7 +43,7 @@ import (
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
-	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/blockio"
@@ -76,6 +76,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		sandboxID  = cstatus.SandboxID
 		sandboxPid = cstatus.Pid
 	)
+	if sandbox.Status.Get().State != sandboxstore.StateReady {
+		return nil, fmt.Errorf("sandbox container %q is not running", sandboxID)
+	}
 	span.SetAttributes(
 		tracing.Attribute("sandbox.id", sandboxID),
 		tracing.Attribute("sandbox.pid", sandboxPid),
@@ -215,7 +218,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 type createContainerRequest struct {
 	ctx                   context.Context
 	containerID           string
-	sandbox               *sandbox.Sandbox
+	sandbox               *sandboxstore.Sandbox
 	sandboxID             string
 	imageID               string
 	containerConfig       *runtime.ContainerConfig
