@@ -14,14 +14,14 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# Running Go 1.18's fuzzing for 30 seconds each. While this would be too
+# Running Go 1.18's fuzzing for 60 seconds each. While this would be too
 # short to actually find issues, we want to make sure that these fuzzing
 # tests are not fundamentally broken.
 
 set -euo pipefail
 set -x
 
-fuzztime=30s
+fuzztime=60s
 # keep the filename and Fuzz function name so we can run every fuzz test
 # in a package separately (`go test -fuzz` only supports single fuzz function)
 pkgs=$(git grep 'func Fuzz.*testing\.F' | grep -o '.*testing\.F)' | grep -v -E "vendor" | sort | uniq)
