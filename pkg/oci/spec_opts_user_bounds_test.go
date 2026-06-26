@@ -65,7 +65,13 @@ func TestOpenBoundedUserFileCapsReads(t *testing.T) {
 			if err := os.MkdirAll(filepath.Join(root, "etc"), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			data := append(bytes.Repeat([]byte{0}, tc.padBytes), beyond...)
+			pattern := []byte("# padding\n")
+			pad := bytes.Repeat(pattern, (tc.padBytes+len(pattern)-1)/len(pattern))[:tc.padBytes]
+			if len(pad) > 0 {
+				pad[len(pad)-1] = '\n'
+			}
+
+			data := append(pad, beyond...)
 			if err := os.WriteFile(filepath.Join(root, "etc", "group"), data, 0o644); err != nil {
 				t.Fatal(err)
 			}
