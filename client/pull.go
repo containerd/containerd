@@ -167,6 +167,9 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			unpackSpan.End()
 			return nil, err
 		}
+		unpackSpan.SetAttributes(
+			tracing.Attribute("unpack.count", ur.Unpacks),
+		)
 		unpackSpan.End()
 	}
 
@@ -197,6 +200,12 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	if err != nil {
 		return images.Image{}, fmt.Errorf("failed to resolve reference %q: %w", ref, err)
 	}
+	span.SetAttributes(
+		tracing.Attribute("container.image.ref", ref),
+		tracing.Attribute("image.name", name),
+		tracing.Attribute("target.mediaType", desc.MediaType),
+		tracing.Attribute("image.digest", desc.Digest.String()),
+	)
 
 	fetcher, err := rCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
@@ -268,14 +277,20 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		handler = rCtx.HandlerWrapper(handler)
 	}
 
+	_, dspan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "dispatch"))
+	defer dspan.End()
 	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
+		dspan.RecordError(err)
 		return images.Image{}, err
 	}
 
 	if isConvertible {
+		_, cspan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "convert_manifest"))
+		defer cspan.End()
 		if desc, err = converterFunc(ctx, desc); err != nil {
 			return images.Image{}, err
 		}
+
 	}
 
 	return images.Image{
