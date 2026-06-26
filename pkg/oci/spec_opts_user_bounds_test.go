@@ -30,6 +30,8 @@ import (
 
 // TestOpenUserFileCapsReads asserts the boundary behavior of the read cap:
 // well below, ending exactly at, and past maxUserFileBytes.
+//
+// Regression test for CVE-2026-47262 / GHSA-jpcc-p29g-p8mq
 func TestOpenUserFileCapsReads(t *testing.T) {
 	t.Parallel()
 
@@ -60,7 +62,13 @@ func TestOpenUserFileCapsReads(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			data := append(bytes.Repeat([]byte{0}, tc.padBytes), beyond...)
+			pattern := []byte("# padding\n")
+			pad := bytes.Repeat(pattern, (tc.padBytes+len(pattern)-1)/len(pattern))[:tc.padBytes]
+			if len(pad) > 0 {
+				pad[len(pad)-1] = '\n'
+			}
+
+			data := append(pad, beyond...)
 			fsys := fstest.MapFS{
 				"etc/group": &fstest.MapFile{Data: data, Mode: 0o644},
 			}
