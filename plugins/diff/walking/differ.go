@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -33,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/mount"
+	internaluserns "github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/epoch"
@@ -73,6 +75,28 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 	var writeDiffOpts []archive.WriteDiffOpt
 	if config.SourceDateEpoch != nil {
 		writeDiffOpts = append(writeDiffOpts, archive.WithSourceDateEpoch(config.SourceDateEpoch))
+	}
+
+	var idMap *internaluserns.IDMap
+	for _, m := range upper {
+		var uidmap, gidmap string
+		for _, opt := range m.Options {
+			if after, ok := strings.CutPrefix(opt, "uidmap="); ok {
+				uidmap = after
+			} else if after, ok := strings.CutPrefix(opt, "gidmap="); ok {
+				gidmap = after
+			}
+		}
+		if uidmap != "" || gidmap != "" {
+			idMap = &internaluserns.IDMap{}
+			if err := idMap.Unmarshal(uidmap, gidmap); err != nil {
+				return emptyDesc, fmt.Errorf("failed to unmarshal snapshot ID mapped options: %w", err)
+			}
+			break
+		}
+	}
+	if idMap != nil {
+		writeDiffOpts = append(writeDiffOpts, archive.WithIDMap(idMap))
 	}
 
 	compressionType := compression.Uncompressed

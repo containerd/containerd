@@ -17,6 +17,7 @@
 package archive
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	internaluserns "github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/containerd/continuity/fs"
@@ -169,3 +171,56 @@ func (d overlayDiffApplier) Apply(ctx context.Context, a fstest.Applier) (string
 
 	return oc.merged, nil, nil
 }
+
+func TestWriteDiffIDMap(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	lower := t.TempDir()
+	upper := t.TempDir()
+
+	// Create file in upper directory
+	filePath := filepath.Join(upper, "testfile")
+	if err := os.WriteFile(filePath, []byte("content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change ownership of the file to 524288:524288
+	if err := os.Chown(filePath, 524288, 524288); err != nil {
+		t.Fatal(err)
+	}
+
+	// Setup IDMap: mapping container 0 -> host 524288 with size 65536
+	var idMap internaluserns.IDMap
+	if err := idMap.Unmarshal("0:524288:65536", "0:524288:65536"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Call WriteDiff with WithIDMap option
+	buf := new(bytes.Buffer)
+	if err := WriteDiff(context.Background(), buf, lower, upper, WithIDMap(&idMap)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Read the tar stream and verify the header UID/GID are mapped back to 0:0
+	tr := tar.NewReader(buf)
+	found := false
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hdr.Name == "testfile" {
+			found = true
+			if hdr.Uid != 0 || hdr.Gid != 0 {
+				t.Errorf("expected UID/GID to be mapped to 0:0, got %d:%d", hdr.Uid, hdr.Gid)
+			}
+		}
+	}
+	if !found {
+		t.Error("testfile not found in the tar archive")
+	}
+}
+

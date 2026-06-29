@@ -179,6 +179,112 @@ func TestToHost(t *testing.T) {
 	}
 }
 
+func TestToContainer(t *testing.T) {
+	idmap := IDMap{
+		UidMap: []specs.LinuxIDMapping{
+			{
+				ContainerID: 0,
+				HostID:      1,
+				Size:        2,
+			},
+			{
+				ContainerID: 2,
+				HostID:      4,
+				Size:        1000,
+			},
+		},
+		GidMap: []specs.LinuxIDMapping{
+			{
+				ContainerID: 0,
+				HostID:      2,
+				Size:        4,
+			},
+			{
+				ContainerID: 4,
+				HostID:      8,
+				Size:        1000,
+			},
+		},
+	}
+	for _, test := range []struct {
+		host      User
+		container User
+	}{
+		{
+			host: User{
+				Uid: 1,
+				Gid: 2,
+			},
+			container: User{
+				Uid: 0,
+				Gid: 0,
+			},
+		},
+		{
+			host: User{
+				Uid: 2,
+				Gid: 3,
+			},
+			container: User{
+				Uid: 1,
+				Gid: 1,
+			},
+		},
+		{
+			host: User{
+				Uid: 4,
+				Gid: 8,
+			},
+			container: User{
+				Uid: 2,
+				Gid: 4,
+			},
+		},
+		{
+			host: User{
+				Uid: 102,
+				Gid: 204,
+			},
+			container: User{
+				Uid: 100,
+				Gid: 200,
+			},
+		},
+		{
+			host: User{
+				Uid: 1003,
+				Gid: 1007,
+			},
+			container: User{
+				Uid: 1001,
+				Gid: 1003,
+			},
+		},
+		{
+			host: User{
+				Uid: 1004,
+				Gid: 1008,
+			},
+			container: invalidUser,
+		},
+		{
+			host: User{
+				Uid: 2000,
+				Gid: 2000,
+			},
+			container: invalidUser,
+		},
+	} {
+		r, err := idmap.ToContainer(test.host)
+		assert.Equal(t, test.container, r)
+		if r == invalidUser {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}
+
 func TestToHostOverflow(t *testing.T) {
 	for _, test := range []struct {
 		idmap IDMap

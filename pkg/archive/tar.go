@@ -31,6 +31,7 @@ import (
 
 	"github.com/moby/sys/userns"
 
+	internaluserns "github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/pkg/archive/tarheader"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/continuity/fs"
@@ -107,6 +108,9 @@ func writeDiffNaive(ctx context.Context, w io.Writer, a, b string, o WriteDiffOp
 		opts = append(opts, WithModTimeUpperBound(*o.SourceDateEpoch))
 		// Since containerd v2.0, the whiteout timestamps are set to zero (1970-01-01),
 		// not to the source date epoch
+	}
+	if o.IDMap != nil {
+		opts = append(opts, WithChangeWriterIDMap(o.IDMap))
 	}
 	cw := NewChangeWriter(w, b, opts...)
 	err := fs.Changes(ctx, a, b, cw.HandleChange)
@@ -509,6 +513,7 @@ type ChangeWriter struct {
 	inodeSrc          map[uint64]string
 	inodeRefs         map[uint64][]string
 	addedDirs         map[string]struct{}
+	idMap             *internaluserns.IDMap
 }
 
 // ChangeWriterOpt can be specified in NewChangeWriter.
@@ -518,6 +523,13 @@ type ChangeWriterOpt func(cw *ChangeWriter)
 func WithModTimeUpperBound(tm time.Time) ChangeWriterOpt {
 	return func(cw *ChangeWriter) {
 		cw.modTimeUpperBound = &tm
+	}
+}
+
+// WithChangeWriterIDMap sets the IDMap for user namespace remapping.
+func WithChangeWriterIDMap(idMap *internaluserns.IDMap) ChangeWriterOpt {
+	return func(cw *ChangeWriter) {
+		cw.idMap = idMap
 	}
 }
 
@@ -586,6 +598,17 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 		hdr, err := tarheader.FileInfoHeaderNoLookups(f, link)
 		if err != nil {
 			return err
+		}
+
+		if cw.idMap != nil {
+			pair, err := cw.idMap.ToContainer(internaluserns.User{
+				Uid: uint32(hdr.Uid),
+				Gid: uint32(hdr.Gid),
+			})
+			if err == nil {
+				hdr.Uid = int(pair.Uid)
+				hdr.Gid = int(pair.Gid)
+			}
 		}
 
 		hdr.Mode = int64(chmodTarEntry(os.FileMode(hdr.Mode)))
