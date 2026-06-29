@@ -88,9 +88,12 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			}
 		}
 		if uidmap != "" || gidmap != "" {
+			if uidmap == "" || gidmap == "" {
+				return emptyDesc, fmt.Errorf("invalid snapshot ID mapped options: both uidmap and gidmap must be set (uidmap=%q gidmap=%q)", uidmap, gidmap)
+			}
 			idMap = &internaluserns.IDMap{}
 			if err := idMap.Unmarshal(uidmap, gidmap); err != nil {
-				return emptyDesc, fmt.Errorf("failed to unmarshal snapshot ID mapped options: %w", err)
+				return emptyDesc, fmt.Errorf("failed to unmarshal snapshot ID mapped options (uidmap=%q gidmap=%q): %w", uidmap, gidmap, err)
 			}
 			break
 		}
