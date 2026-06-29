@@ -23,15 +23,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/cgroups/v3"
-	"github.com/containerd/cgroups/v3/cgroup1"
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
-	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -73,6 +71,8 @@ type StatsCollector struct {
 	listContainers func() []containerstore.Container
 	// listSandboxes returns the list of sandboxes
 	listSandboxes func() []sandboxstore.Sandbox
+	// sandboxController resolves a sandbox.Controller for a given sandboxer name
+	sandboxController func(sandboxer string) (sandbox.Controller, error)
 }
 
 // NewStatsCollector creates a new StatsCollector.
@@ -113,10 +113,12 @@ func (c *StatsCollector) SetDependencies(
 	taskService tasks.TasksClient,
 	listContainers func() []containerstore.Container,
 	listSandboxes func() []sandboxstore.Sandbox,
+	sandboxController func(sandboxer string) (sandbox.Controller, error),
 ) {
 	c.taskService = taskService
 	c.listContainers = listContainers
 	c.listSandboxes = listSandboxes
+	c.sandboxController = sandboxController
 }
 
 // Start begins the background stats collection loop.
@@ -192,67 +194,39 @@ func (c *StatsCollector) collectContainerStats(ctx context.Context) {
 	}
 }
 
-// collectSandboxStats fetches metrics for all sandboxes.
-// On Linux, sandbox/pod stats come from the parent cgroup (which includes all
-// containers in the pod), not from the pause container's task metrics.
-// This matches how sandbox_stats_linux.go retrieves pod-level CPU stats.
+// collectSandboxStats fetches sandbox-level CPU samples via the sandbox
+// controller. The controller reads the pod's parent cgroup (which includes all
+// containers in the pod) and returns the result as a *types.Metric; the
+// collector only decodes it via extractCPUUsage.
 func (c *StatsCollector) collectSandboxStats(ctx context.Context) {
 	sandboxes := c.listSandboxes()
 	if len(sandboxes) == 0 {
 		return
 	}
 
-	timestamp := time.Now()
 	for _, sb := range sandboxes {
-		// Get the parent cgroup path for the pod
-		cgroupPath := sb.Config.GetLinux().GetCgroupParent()
-		if cgroupPath == "" {
+		ctrl, err := c.sandboxController(sb.Sandboxer)
+		if err != nil {
+			log.G(ctx).WithError(err).Debugf("StatsCollector: no controller for sandbox %s", sb.ID)
 			continue
 		}
-
-		usageCoreNanoSeconds, ok := c.getCgroupCPUUsage(ctx, cgroupPath)
+		metric, err := ctrl.Metrics(ctx, sb.ID)
+		if err != nil {
+			log.G(ctx).WithError(err).Debugf("StatsCollector: failed to fetch sandbox %s metrics", sb.ID)
+			continue
+		}
+		if metric == nil {
+			continue
+		}
+		usageCoreNanoSeconds, ok := extractCPUUsage(metric.Data)
 		if !ok {
 			continue
 		}
-		c.addSample(sb.ID, timestamp, usageCoreNanoSeconds)
+		// Sample at the metric's own timestamp, captured by the controller at
+		// cgroup read time. This keeps the delta-time in the UsageNanoCores
+		// rate accurate and free of per-sandbox collection latency.
+		c.addSample(sb.ID, metric.GetTimestamp().AsTime(), usageCoreNanoSeconds)
 	}
-}
-
-// getCgroupCPUUsage reads CPU usage from a cgroup path.
-// Supports both cgroupv1 and cgroupv2.
-func (c *StatsCollector) getCgroupCPUUsage(ctx context.Context, cgroupPath string) (uint64, bool) {
-	switch cgroups.Mode() {
-	case cgroups.Unified:
-		cg, err := cgroupsv2.Load(cgroupPath)
-		if err != nil {
-			log.G(ctx).WithError(err).Debugf("StatsCollector: failed to load cgroupv2: %s", cgroupPath)
-			return 0, false
-		}
-		stats, err := cg.StatFiltered(cgroupsv2.StatCPU)
-		if err != nil {
-			log.G(ctx).WithError(err).Debugf("StatsCollector: failed to get cgroupv2 stats: %s", cgroupPath)
-			return 0, false
-		}
-		if stats.CPU != nil {
-			// cgroupv2 reports in microseconds, convert to nanoseconds
-			return stats.CPU.UsageUsec * 1000, true
-		}
-	default:
-		control, err := cgroup1.Load(cgroup1.StaticPath(cgroupPath))
-		if err != nil {
-			log.G(ctx).WithError(err).Debugf("StatsCollector: failed to load cgroupv1: %s", cgroupPath)
-			return 0, false
-		}
-		stats, err := control.Stat(cgroup1.IgnoreNotExist)
-		if err != nil {
-			log.G(ctx).WithError(err).Debugf("StatsCollector: failed to get cgroupv1 stats: %s", cgroupPath)
-			return 0, false
-		}
-		if stats.CPU != nil && stats.CPU.Usage != nil {
-			return stats.CPU.Usage.Total, true
-		}
-	}
-	return 0, false
 }
 
 // addSample adds a CPU sample for the given container/sandbox ID.
