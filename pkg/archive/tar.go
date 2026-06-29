@@ -601,14 +601,15 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 		}
 
 		if cw.idMap != nil {
-			pair, err := cw.idMap.ToContainer(internaluserns.User{
+			pair, mapErr := cw.idMap.ToContainer(internaluserns.User{
 				Uid: uint32(hdr.Uid),
 				Gid: uint32(hdr.Gid),
 			})
-			if err == nil {
-				hdr.Uid = int(pair.Uid)
-				hdr.Gid = int(pair.Gid)
+			if mapErr != nil {
+				return fmt.Errorf("failed to map file ownership for %q (uid=%d gid=%d): %w", p, hdr.Uid, hdr.Gid, mapErr)
 			}
+			hdr.Uid = int(pair.Uid)
+			hdr.Gid = int(pair.Gid)
 		}
 
 		hdr.Mode = int64(chmodTarEntry(os.FileMode(hdr.Mode)))
