@@ -682,7 +682,8 @@ func (p *criPodSandbox) GetPid() uint32 {
 }
 
 func (p *criPodSandbox) GetIPs() []string {
-	if p.IP == "" {
+	// IP and AdditionalIPs are promoted fields from the embedded Sandbox struct.
+	if p.Sandbox == nil || p.IP == "" {
 		return nil
 	}
 	ips := append([]string{p.IP}, p.AdditionalIPs...)
