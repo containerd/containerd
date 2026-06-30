@@ -345,6 +345,8 @@ func WithUnpackApplyOpts(opts ...diff.ApplyOpt) UnpackOpt {
 	}
 }
 
+type DiscardUnpackedLayersKey struct{}
+
 func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
 	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {
@@ -393,7 +395,24 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	for _, layer := range layers {
 		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
 		if err != nil {
-			return err
+			// layer not found in content, try to fetch layer and retry unpack
+			if errdefs.IsNotFound(err) {
+				pullOpts := []RemoteOpt{}
+				if discardUnpackedLayers, ok := ctx.Value(DiscardUnpackedLayersKey{}).(bool); ok && discardUnpackedLayers {
+					pullOpts = append(pullOpts, WithChildLabelMap(images.ChildGCLabelsFilterLayers))
+				}
+
+				if _, err2 := i.client.Pull(ctx, i.Name(), pullOpts...); err2 != nil {
+					return fmt.Errorf("fetch lost layer failed: %w : %w", err2, err)
+				}
+				// retry
+				unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
+				if err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
 		}
 
 		if unpacked {
