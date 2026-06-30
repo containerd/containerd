@@ -92,20 +92,32 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 		if err := os.Chmod(config.TempDir, 0o700); err != nil && !errors.Is(err, os.ErrPermission) {
 			return err
 		}
-		if runtime.GOOS == "windows" {
-			// On Windows, the Host Compute Service (vmcompute) will read the
-			// TEMP/TMP setting from the calling process when creating the
-			// tempdir to extract an image layer to. This allows the
-			// administrator to align the tempdir location with the same volume
-			// as the snapshot dir to avoid a copy operation when moving the
-			// extracted layer to the snapshot dir location.
-			os.Setenv("TEMP", config.TempDir)
-			os.Setenv("TMP", config.TempDir)
-		} else {
-			os.Setenv("TMPDIR", config.TempDir)
-		}
+		setTempDirEnv(config.TempDir)
 	}
 	return nil
+}
+
+// setTempDirEnv points the process' temp-directory environment variables at
+// tempDir so that components (and the OS) honor the configured temp location.
+func setTempDirEnv(tempDir string) {
+	if runtime.GOOS == "windows" {
+		// On Windows, the Host Compute Service (vmcompute) will read the
+		// TEMP/TMP setting from the calling process when creating the
+		// tempdir to extract an image layer to. This allows the
+		// administrator to align the tempdir location with the same volume
+		// as the snapshot dir to avoid a copy operation when moving the
+		// extracted layer to the snapshot dir location.
+		os.Setenv("TEMP", tempDir)
+		os.Setenv("TMP", tempDir)
+		// Since Go 1.21, os.MkdirTemp/os.TempDir resolve the temp dir via
+		// Windows' GetTempPath2W. For processes running as SYSTEM (as
+		// containerd does under the SCM), that API reads SystemTemp rather
+		// than TEMP/TMP, so set it too to keep the override effective.
+		// https://cs.opensource.google/go/go/+/refs/tags/go1.21.0:src/os/file_windows.go
+		os.Setenv("SystemTemp", tempDir)
+	} else {
+		os.Setenv("TMPDIR", tempDir)
+	}
 }
 
 // New creates and initializes a new containerd server
