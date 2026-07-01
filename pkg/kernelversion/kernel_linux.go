@@ -22,7 +22,6 @@
 package kernelversion
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 
@@ -56,8 +55,8 @@ func getKernelVersion() (*KernelVersion, error) {
 		if err := unix.Uname(&uts); err != nil {
 			return
 		}
-		// Remove the \x00 from the release for Atoi to parse correctly
-		currentKernelVersion, kernelVersionError = parseRelease(string(uts.Release[:bytes.IndexByte(uts.Release[:], 0)]))
+		// Convert the NUL-terminated release field before parsing.
+		currentKernelVersion, kernelVersionError = parseRelease(unix.ByteSliceToString(uts.Release[:]))
 	})
 	return currentKernelVersion, kernelVersionError
 }
