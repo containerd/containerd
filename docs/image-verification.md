@@ -10,9 +10,12 @@ To enable image verification, add a stanza like the following to the containerd 
     bin_dir = "/opt/containerd/image-verifier/bin"
     max_verifiers = 10
     per_verifier_timeout = "10s"
+    verify_on_run = false
 ```
 
 All files in `bin_dir`, if it exists, must be verifier executables which conform to the following API.
+
+Verification always runs on image pull. When `verify_on_run` is enabled, verification will also run before the container starts and the verifier binary's standard input will include CRI context (See [Standard Input](#standard-input))
 
 ## Image Verifier Binary API
 
@@ -21,16 +24,21 @@ All files in `bin_dir`, if it exists, must be verifier executables which conform
 - `-name`: The given reference to the image that may be pulled.
 - `-digest`: The resolved digest of the image that may be pulled.
 - `-stdin-media-type`: The media type of the JSON data passed to stdin.
+- `-operation`: The phase invoking verification, `pull` or `run`. Only passed when `verify_on_run` is enabled.
 
 ### Standard Input
 
 A JSON encoded payload is passed to the verifier binary's standard input. The
 media type of this payload is specified by the `-stdin-media-type` CLI
-argument, and may change in future versions of containerd. Currently, the
-payload has a media type of `application/vnd.oci.descriptor.v1+json` and
-represents the OCI Content Descriptor of the image that may be pulled. See
-[the OCI specification](https://github.com/opencontainers/image-spec/blob/main/descriptor.md)
-for more details.
+argument, and may change in future versions of containerd.
+
+Currently, there are two media types:
+
+- If `verify_on_run` is disabled (default), the media type is `application/vnd.oci.descriptor.v1+json`.
+  - This represents the OCI Content Descriptor of the image. See [the OCI specification](https://github.com/opencontainers/image-spec/blob/main/descriptor.md) for more details.
+- If `verify_on_run` is enabled, run-time verification uses `application/vnd.containerd.image-verifier.input.v1+json`.
+  - This wraps the OCI Content Descriptor with the `operation` and the `annotations` containerd assigns to the container, including the [well-known CRI keys](../internal/cri/annotations/annotations.go). All values originate from the runtime caller.
+  - This media type is defined in [the image verifier plugin code](../pkg/imageverifier/image_verifier.go) (see `VerifierInput`).
 
 ### Image Pull Judgement
 

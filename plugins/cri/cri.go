@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server"
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
@@ -58,6 +59,7 @@ func init() {
 			plugins.LeasePlugin,
 			plugins.SandboxStorePlugin,
 			plugins.TransferPlugin,
+			plugins.ImageVerifierPlugin,
 			plugins.WarningPlugin,
 			plugins.ShimPlugin,
 		},
@@ -147,6 +149,9 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 				break
 			}
 		}
+	verifiers, err := getImageVerifiers(ic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image verifiers from plugins: %w", err)
 	}
 
 	options := &server.CRIServiceOptions{
@@ -157,6 +162,7 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 		Client:             client,
 		SandboxControllers: sbControllers,
 		ShimPath:           shimPath,
+		Verifiers:          verifiers,
 	}
 	is := criImagePlugin.(imageService).GRPCService()
 
@@ -270,6 +276,22 @@ func getSandboxControllers(ic *plugin.InitContext) (map[string]sandbox.Controlle
 		sc[name] = p.(sandbox.Controller)
 	}
 	return sc, nil
+}
+
+// getImageVerifiers loads the registered image verifier plugins, keyed by name.
+func getImageVerifiers(ic *plugin.InitContext) (map[string]imageverifier.ImageVerifier, error) {
+	ps, err := ic.GetByType(plugins.ImageVerifierPlugin)
+	if err != nil {
+		return nil, err
+	}
+	if len(ps) == 0 {
+		return nil, nil
+	}
+	verifiers := make(map[string]imageverifier.ImageVerifier, len(ps))
+	for name, p := range ps {
+		verifiers[name] = p.(imageverifier.ImageVerifier)
+	}
+	return verifiers, nil
 }
 
 func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
