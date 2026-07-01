@@ -42,24 +42,15 @@ func (k *KernelVersion) String() string {
 	return ""
 }
 
-var (
-	currentKernelVersion *KernelVersion
-	kernelVersionError   error
-	once                 sync.Once
-)
-
 // getKernelVersion gets the current kernel version.
-func getKernelVersion() (*KernelVersion, error) {
-	once.Do(func() {
-		var uts unix.Utsname
-		if err := unix.Uname(&uts); err != nil {
-			return
-		}
-		// Convert the NUL-terminated release field before parsing.
-		currentKernelVersion, kernelVersionError = parseRelease(unix.ByteSliceToString(uts.Release[:]))
-	})
-	return currentKernelVersion, kernelVersionError
-}
+var getKernelVersion = sync.OnceValues(func() (*KernelVersion, error) {
+	var uts unix.Utsname
+	if err := unix.Uname(&uts); err != nil {
+		return nil, err
+	}
+	// Convert the NUL-terminated release field before parsing.
+	return parseRelease(unix.ByteSliceToString(uts.Release[:]))
+})
 
 // parseRelease parses a string and creates a KernelVersion based on it.
 func parseRelease(release string) (*KernelVersion, error) {
