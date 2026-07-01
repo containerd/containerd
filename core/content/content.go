@@ -18,9 +18,11 @@ package content
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -188,8 +190,9 @@ func WithLabels(labels map[string]string) Opt {
 
 // WriterOpts is internally used by WriterOpt.
 type WriterOpts struct {
-	Ref  string
-	Desc ocispec.Descriptor
+	Ref       string
+	Desc      ocispec.Descriptor
+	Algorithm digest.Algorithm
 }
 
 // WriterOpt is used for passing options to Ingester.Writer.
@@ -212,6 +215,29 @@ func WithDescriptor(desc ocispec.Descriptor) WriterOpt {
 func WithRef(ref string) WriterOpt {
 	return func(opts *WriterOpts) error {
 		opts.Ref = ref
+		return nil
+	}
+}
+
+// WithBlobDigestAlgorithm requests that the writer hash incoming data using
+// the given algorithm when no expected digest has been supplied via
+// WithDescriptor. The algorithm must be registered with go-digest; an
+// unregistered algorithm is rejected with ErrInvalidArgument so callers do
+// not silently get a sha256 blob under a non-sha256 commit verification. An
+// empty algorithm is a no-op; implementations fall back to digest.Canonical.
+//
+// An expected digest carried by the descriptor still takes precedence: the
+// writer must honour the algorithm baked into a known target digest so that
+// resumed ingests and verification remain correct.
+func WithBlobDigestAlgorithm(algo digest.Algorithm) WriterOpt {
+	return func(opts *WriterOpts) error {
+		if algo == "" {
+			return nil
+		}
+		if !algo.Available() {
+			return fmt.Errorf("digest algorithm %q is not available: %w", algo, errdefs.ErrInvalidArgument)
+		}
+		opts.Algorithm = algo
 		return nil
 	}
 }
