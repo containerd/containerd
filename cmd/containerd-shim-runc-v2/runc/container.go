@@ -454,6 +454,7 @@ func (c *Container) Checkpoint(ctx context.Context, r *task.CheckpointTaskReques
 		FileLocks:                opts.FileLocks,
 		EmptyNamespaces:          opts.EmptyNamespaces,
 		WorkDir:                  opts.WorkPath,
+		ParentPath:               opts.ParentPath,
 	})
 }
 

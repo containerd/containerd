@@ -25861,7 +25861,7 @@ file: {
       path: 0
       span: 116
       span: 2
-      span: 22
+      span: 21
     }
     location: {
       path: 5
@@ -25880,8 +25880,8 @@ file: {
       path: 0
       path: 2
       span: 116
+      span: 19
       span: 20
-      span: 21
     }
     location: {
       path: 5
@@ -25948,7 +25948,7 @@ file: {
       path: 3
       span: 119
       span: 2
-      span: 22
+      span: 21
     }
     location: {
       path: 5
@@ -25967,8 +25967,8 @@ file: {
       path: 3
       path: 2
       span: 119
+      span: 19
       span: 20
-      span: 21
     }
     location: {
       path: 5
@@ -67581,6 +67581,13 @@ file: {
       type: TYPE_STRING
       json_name: "workPath"
     }
+    field: {
+      name: "parent_path"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "parentPath"
+    }
   }
   message_type: {
     name: "ProcessDetails"
@@ -67599,7 +67606,7 @@ file: {
     location: {
       span: 0
       span: 0
-      span: 62
+      span: 64
       span: 1
     }
     location: {
@@ -68208,7 +68215,7 @@ file: {
       path: 1
       span: 38
       span: 0
-      span: 57
+      span: 59
       span: 1
     }
     location: {
@@ -68591,17 +68598,57 @@ file: {
     }
     location: {
       path: 4
+      path: 1
       path: 2
-      span: 59
+      path: 9
+      span: 58
+      span: 2
+      span: 26
+      leading_comments: " parent image path\n"
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 9
+      path: 5
+      span: 58
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 9
+      path: 1
+      span: 58
+      span: 9
+      span: 20
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 9
+      path: 3
+      span: 58
+      span: 23
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 2
+      span: 61
       span: 0
-      span: 62
+      span: 64
       span: 1
     }
     location: {
       path: 4
       path: 2
       path: 1
-      span: 59
+      span: 61
       span: 8
       span: 22
     }
@@ -68610,7 +68657,7 @@ file: {
       path: 2
       path: 2
       path: 0
-      span: 61
+      span: 63
       span: 2
       span: 21
       leading_comments: " exec process id if the process is managed by a shim\n"
@@ -68621,7 +68668,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 61
+      span: 63
       span: 2
       span: 8
     }
@@ -68631,7 +68678,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 61
+      span: 63
       span: 9
       span: 16
     }
@@ -68641,7 +68688,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 61
+      span: 63
       span: 19
       span: 20
     }
@@ -68913,7 +68960,7 @@ file: {
     location: {
       span: 15
       span: 0
-      span: 38
+      span: 37
       span: 1
     }
     location: {
@@ -68925,29 +68972,29 @@ file: {
     }
     location: {
       path: 2
-      span: 18
+      span: 17
       span: 0
       span: 34
     }
     location: {
       path: 8
-      span: 20
+      span: 19
       span: 0
       span: 74
     }
     location: {
       path: 8
       path: 11
-      span: 20
+      span: 19
       span: 0
       span: 74
     }
     location: {
       path: 4
       path: 0
-      span: 25
+      span: 24
       span: 0
-      span: 38
+      span: 37
       span: 1
       leading_comments: " ContainerPath represents a path within an active container's\n filesystem. It acts as either a source or destination in a transfer\n operation, identifying the container and path for archive operations.\n"
     }
@@ -68955,7 +69002,7 @@ file: {
       path: 4
       path: 0
       path: 1
-      span: 25
+      span: 24
       span: 8
       span: 21
     }
@@ -68964,87 +69011,87 @@ file: {
       path: 0
       path: 2
       path: 0
-      span: 26
-      span: 8
-      span: 32
-    }
-    location: {
-      path: 4
-      path: 0
-      path: 2
-      path: 0
-      path: 5
-      span: 26
-      span: 8
-      span: 14
-    }
-    location: {
-      path: 4
-      path: 0
-      path: 2
-      path: 0
-      path: 1
-      span: 26
-      span: 15
-      span: 27
-    }
-    location: {
-      path: 4
-      path: 0
-      path: 2
-      path: 0
-      path: 3
-      span: 26
-      span: 30
-      span: 31
-    }
-    location: {
-      path: 4
-      path: 0
-      path: 2
-      path: 1
-      span: 27
-      span: 8
-      span: 24
-    }
-    location: {
-      path: 4
-      path: 0
-      path: 2
-      path: 1
-      path: 5
-      span: 27
-      span: 8
-      span: 14
-    }
-    location: {
-      path: 4
-      path: 0
-      path: 2
-      path: 1
-      path: 1
-      span: 27
-      span: 15
-      span: 19
-    }
-    location: {
-      path: 4
-      path: 0
-      path: 2
-      path: 1
-      path: 3
-      span: 27
-      span: 22
-      span: 23
-    }
-    location: {
-      path: 4
-      path: 0
-      path: 2
-      path: 2
-      span: 32
-      span: 8
       span: 25
+      span: 2
+      span: 26
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      path: 5
+      span: 25
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      path: 1
+      span: 25
+      span: 9
+      span: 21
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 0
+      path: 3
+      span: 25
+      span: 24
+      span: 25
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      span: 26
+      span: 2
+      span: 18
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      path: 5
+      span: 26
+      span: 2
+      span: 8
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      path: 1
+      span: 26
+      span: 9
+      span: 13
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 1
+      path: 3
+      span: 26
+      span: 16
+      span: 17
+    }
+    location: {
+      path: 4
+      path: 0
+      path: 2
+      path: 2
+      span: 31
+      span: 2
+      span: 19
       leading_comments: " When true and path is a directory, return only the directory entry\n itself without walking into its contents. This is useful for\n stat-like operations where only the directory's metadata is needed.\n"
     }
     location: {
@@ -69053,9 +69100,9 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 32
-      span: 8
-      span: 12
+      span: 31
+      span: 2
+      span: 6
     }
     location: {
       path: 4
@@ -69063,9 +69110,9 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 32
-      span: 13
-      span: 20
+      span: 31
+      span: 7
+      span: 14
     }
     location: {
       path: 4
@@ -69073,18 +69120,18 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 32
-      span: 23
-      span: 24
+      span: 31
+      span: 17
+      span: 18
     }
     location: {
       path: 4
       path: 0
       path: 2
       path: 3
-      span: 37
-      span: 8
       span: 36
+      span: 2
+      span: 30
       leading_comments: " When true, preserve the UID/GID from tar headers when extracting\n files. When false, extracted files are owned by the extracting\n process.\n"
     }
     location: {
@@ -69093,9 +69140,9 @@ file: {
       path: 2
       path: 3
       path: 5
-      span: 37
-      span: 8
-      span: 12
+      span: 36
+      span: 2
+      span: 6
     }
     location: {
       path: 4
@@ -69103,9 +69150,9 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 37
-      span: 13
-      span: 31
+      span: 36
+      span: 7
+      span: 25
     }
     location: {
       path: 4
@@ -69113,9 +69160,9 @@ file: {
       path: 2
       path: 3
       path: 3
-      span: 37
-      span: 34
-      span: 35
+      span: 36
+      span: 28
+      span: 29
     }
   }
   syntax: "proto3"
@@ -72262,8 +72309,8 @@ file: {
       path: 2
       path: 0
       span: 34
-      span: 8
-      span: 26
+      span: 2
+      span: 20
     }
     location: {
       path: 4
@@ -72272,8 +72319,8 @@ file: {
       path: 0
       path: 5
       span: 34
+      span: 2
       span: 8
-      span: 14
     }
     location: {
       path: 4
@@ -72282,8 +72329,8 @@ file: {
       path: 0
       path: 1
       span: 34
+      span: 9
       span: 15
-      span: 21
     }
     location: {
       path: 4
@@ -72292,17 +72339,17 @@ file: {
       path: 0
       path: 3
       span: 34
+      span: 18
+      span: 19
+    }
+    location: {
+      path: 4
+      path: 2
+      path: 2
+      path: 1
+      span: 35
+      span: 2
       span: 24
-      span: 25
-    }
-    location: {
-      path: 4
-      path: 2
-      path: 2
-      path: 1
-      span: 35
-      span: 8
-      span: 30
     }
     location: {
       path: 4
@@ -72311,8 +72358,8 @@ file: {
       path: 1
       path: 5
       span: 35
+      span: 2
       span: 8
-      span: 14
     }
     location: {
       path: 4
@@ -72321,8 +72368,8 @@ file: {
       path: 1
       path: 1
       span: 35
-      span: 15
-      span: 25
+      span: 9
+      span: 19
     }
     location: {
       path: 4
@@ -72331,8 +72378,8 @@ file: {
       path: 1
       path: 3
       span: 35
-      span: 28
-      span: 29
+      span: 22
+      span: 23
     }
     location: {
       path: 4
@@ -72357,8 +72404,8 @@ file: {
       path: 2
       path: 0
       span: 42
-      span: 8
-      span: 26
+      span: 2
+      span: 20
     }
     location: {
       path: 4
@@ -72367,8 +72414,8 @@ file: {
       path: 0
       path: 5
       span: 42
+      span: 2
       span: 8
-      span: 14
     }
     location: {
       path: 4
@@ -72377,8 +72424,8 @@ file: {
       path: 0
       path: 1
       span: 42
+      span: 9
       span: 15
-      span: 21
     }
     location: {
       path: 4
@@ -72387,17 +72434,17 @@ file: {
       path: 0
       path: 3
       span: 42
+      span: 18
+      span: 19
+    }
+    location: {
+      path: 4
+      path: 3
+      path: 2
+      path: 1
+      span: 43
+      span: 2
       span: 24
-      span: 25
-    }
-    location: {
-      path: 4
-      path: 3
-      path: 2
-      path: 1
-      span: 43
-      span: 8
-      span: 30
     }
     location: {
       path: 4
@@ -72406,8 +72453,8 @@ file: {
       path: 1
       path: 5
       span: 43
+      span: 2
       span: 8
-      span: 14
     }
     location: {
       path: 4
@@ -72416,8 +72463,8 @@ file: {
       path: 1
       path: 1
       span: 43
-      span: 15
-      span: 25
+      span: 9
+      span: 19
     }
     location: {
       path: 4
@@ -72426,8 +72473,8 @@ file: {
       path: 1
       path: 3
       span: 43
-      span: 28
-      span: 29
+      span: 22
+      span: 23
     }
   }
   syntax: "proto3"
