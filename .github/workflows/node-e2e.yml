@@ -40,6 +40,7 @@ jobs:
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Checkout Kubernetes
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -48,6 +49,7 @@ jobs:
           path: src/k8s.io/kubernetes
           ref: ${{ inputs.k8s_version }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install Go
         uses: ./src/github.com/containerd/containerd/.github/actions/install-go

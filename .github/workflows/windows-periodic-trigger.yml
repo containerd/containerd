@@ -22,7 +22,7 @@ jobs:
     # upstream containerd repository should be replaced with the following to
     # potentially allow contributors to enable periodic Windows tests on forks as well:
     # uses: "${{ github.repository }}/.github/workflows/windows-periodic.yml@${{ github.ref_name }}"
-    uses: containerd/containerd/.github/workflows/windows-periodic.yml@main
+    uses: containerd/containerd/.github/workflows/windows-periodic.yml@main # zizmor: ignore[unpinned-uses] reusable workflow intentionally tracks containerd/main
     secrets:
       AZURE_SUB_ID: "${{ secrets.AZURE_SUB_ID }}"
       AZURE_CREDS: "${{ secrets.AZURE_CREDS }}"

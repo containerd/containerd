@@ -30,15 +30,16 @@ jobs:
         with:
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
+          persist-credentials: false
 
       - name: Check signature
         run: |
           # git tag -v requires an allowedSignersFile to be configured and exist for ssh signature verification
           touch ${{ runner.temp }}/empty-allowedSignersFile
           git config --global gpg.ssh.allowedSignersFile ${{ runner.temp }}/empty-allowedSignersFile
-          releasever=${{ github.ref }}
+          releasever=${GITHUB_REF}
           releasever="${releasever#refs/tags/}"
-          TAGCHECK=$(git tag -v ${releasever} 2>&1 >/dev/null) ||
+          TAGCHECK=$(git tag -v "${releasever}" 2>&1 >/dev/null) ||
           echo "${TAGCHECK}" | grep -q "error" && {
               echo "::error::tag ${releasever} is not a signed tag. Failing release process."
               exit 1
@@ -51,9 +52,9 @@ jobs:
       - name: Release content
         id: contentrel
         run: |
-          RELEASEVER=${{ github.ref }}
+          RELEASEVER=${GITHUB_REF}
           echo "stringver=${RELEASEVER#refs/tags/v}" >> $GITHUB_OUTPUT
-          git tag -l ${RELEASEVER#refs/tags/} -n20000 | tail -n +3 | cut -c 5- >release-notes.md
+          git tag -l "${RELEASEVER#refs/tags/}" -n20000 | tail -n +3 | cut -c 5- >release-notes.md
         working-directory: src/github.com/containerd/containerd
 
       - name: Save release notes
@@ -86,7 +87,7 @@ jobs:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: |
-          releasever=${{ github.ref }}
+          releasever=${GITHUB_REF}
           releasever="${releasever#refs/tags/}"
           echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
       - name: Checkout containerd
@@ -98,6 +99,7 @@ jobs:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
+          persist-credentials: false
 
       - name: Setup buildx instance
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0

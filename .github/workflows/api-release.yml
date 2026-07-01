@@ -26,14 +26,13 @@ jobs:
         with:
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
+          persist-credentials: false
 
       - name: Check signature
-        env:
-          REF: ${{ github.ref }}
         run: |
-          releasever="$REF"
+          releasever=${GITHUB_REF}
           releasever="${releasever#refs/tags/}"
-          TAGCHECK=$(git tag -v ${releasever} 2>&1 >/dev/null) ||
+          TAGCHECK=$(git tag -v "${releasever}" 2>&1 >/dev/null) ||
           echo "${TAGCHECK}" | grep -q "error" && {
               echo "::error::tag ${releasever} is not a signed tag. Failing release process."
               exit 1
@@ -45,12 +44,10 @@ jobs:
 
       - name: Release content
         id: contentrel
-        env:
-          REF: ${{ github.ref }}
         run: |
-          RELEASEVER="$REF"
+          RELEASEVER=${GITHUB_REF}
           echo "stringver=${RELEASEVER#refs/tags/api/v}" >> $GITHUB_OUTPUT
-          git tag -l ${RELEASEVER#refs/tags/} -n20000 | tail -n +3 | cut -c 5- >release-notes.md
+          git tag -l "${RELEASEVER#refs/tags/}" -n20000 | tail -n +3 | cut -c 5- >release-notes.md
         working-directory: src/github.com/containerd/containerd
 
       - name: Save release notes

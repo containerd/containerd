@@ -29,6 +29,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           path: src/github.com/containerd/containerd
+          persist-credentials: false
 
       - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
@@ -72,8 +73,8 @@ jobs:
 
           echo "Mirroring $upstream to $mirror"
 
-          sudo ctr content fetch --all-platforms ${upstream}
+          sudo ctr content fetch --all-platforms "${upstream}"
           sudo ctr images ls
-          sudo ctr --debug images push -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} ${mirror} ${upstream}
+          sudo ctr --debug images push -u "${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}" "${mirror}" "${upstream}"
 
-          sudo kill $containerd_pid
+          sudo kill "$containerd_pid"
