@@ -441,14 +441,8 @@ func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introsp
 }
 
 func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r criconfig.Runtime) (*features.Features, error) {
-	if r.Type != plugins.RuntimeRuncV2 {
-		return nil, fmt.Errorf("introspecting OCI runtime features needs the runtime type to be %q, got %q",
-			plugins.RuntimeRuncV2, r.Type)
-		// For other runtimes, typeurl.MarshalAnyToProto will cause nil panic during typeurl dereference
-	}
-
 	rr := &apitypes.RuntimeRequest{
-		RuntimePath: r.Type, // "io.containerd.runc.v2"
+		RuntimePath: r.Type, // e.g. "io.containerd.runc.v2" or "io.containerd.runsc.v1"
 	}
 	if r.Path != "" {
 		rr.RuntimePath = r.Path // "/usr/local/bin/crun"
@@ -457,6 +451,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if err != nil {
 		return nil, err
 	}
+	// options is nil when the runtime has no config section; marshalling a nil interface panics in typeurl.
 	if options != nil {
 		rr.Options, err = typeurl.MarshalAnyToProto(options)
 		if err != nil {
@@ -468,9 +463,15 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if err != nil {
 		return nil, fmt.Errorf("failed to call PluginInfo: %w", err)
 	}
+	if infoResp.Extra == nil {
+		return nil, fmt.Errorf("runtime plugin info has no extra data")
+	}
 	var info apitypes.RuntimeInfo
 	if err := typeurl.UnmarshalTo(infoResp.Extra, &info); err != nil {
 		return nil, fmt.Errorf("failed to get runtime info from plugin info: %w", err)
+	}
+	if info.Features == nil {
+		return nil, fmt.Errorf("runtime info has no features")
 	}
 	featuresX, err := typeurl.UnmarshalAny(info.Features)
 	if err != nil {
@@ -484,7 +485,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 }
 
 func supportsCRIUserns(f *features.Features) bool {
-	if f == nil {
+	if f == nil || f.Linux == nil {
 		return false
 	}
 	userns := slices.Contains(f.Linux.Namespaces, "user")
