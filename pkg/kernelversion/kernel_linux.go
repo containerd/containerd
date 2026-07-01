@@ -16,7 +16,7 @@
 
 /*
    File copied and customized based on
-   https://github.com/moby/moby/tree/v20.10.14/profiles/seccomp/kernel_linux.go
+   https://github.com/moby/profiles/blob/seccomp/v0.2.3/seccomp/kernel_linux.go
 */
 
 package kernelversion
