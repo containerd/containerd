@@ -20,6 +20,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -75,22 +76,54 @@ type StatsCollector struct {
 	sandboxController func(sandboxer string) (sandbox.Controller, error)
 }
 
+// parsePositiveDuration parses a duration string and validates it is positive.
+// Returns an error if the duration is invalid or not positive.
+func parsePositiveDuration(fieldName, value string) (time.Duration, error) {
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s: %w", fieldName, err)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("%s must be positive, got: %v", fieldName, d)
+	}
+	return d, nil
+}
+
 // NewStatsCollector creates a new StatsCollector.
 // The service must be set via SetService before calling Start.
-func NewStatsCollector(config criconfig.Config) *StatsCollector {
+// Returns an error if the configuration is invalid.
+func NewStatsCollector(config criconfig.Config) (*StatsCollector, error) {
 	interval := defaultCollectionInterval
 	statsAge := defaultStatsAge
 
-	// Use config values if provided
+	// Parse and validate stats_collect_period
 	if config.StatsCollectPeriod != "" {
-		if d, err := time.ParseDuration(config.StatsCollectPeriod); err == nil {
-			interval = d
+		d, err := parsePositiveDuration("stats_collect_period", config.StatsCollectPeriod)
+		if err != nil {
+			return nil, err
 		}
+		interval = d
 	}
+
+	// Parse and validate stats_retention_period
 	if config.StatsRetentionPeriod != "" {
-		if d, err := time.ParseDuration(config.StatsRetentionPeriod); err == nil {
-			statsAge = d
+		d, err := parsePositiveDuration("stats_retention_period", config.StatsRetentionPeriod)
+		if err != nil {
+			return nil, err
 		}
+		statsAge = d
+	}
+
+	// Validate that retention period is at least as long as collection interval.
+	// Auto-adjust statsAge to at least match interval when retention is unspecified
+	if config.StatsRetentionPeriod == "" && statsAge < interval {
+		statsAge = interval
+		log.G(context.Background()).Debugf("Auto-adjusting stats_retention_period to %v to match stats_collect_period", statsAge)
+	}
+
+	// Then validate if user explicitly set retention
+	if config.StatsRetentionPeriod != "" && statsAge < interval {
+		return nil, fmt.Errorf("stats_retention_period (%v) must be >= stats_collect_period (%v)", statsAge, interval)
 	}
 
 	// Calculate maxSamples from statsAge and interval.
@@ -104,7 +137,7 @@ func NewStatsCollector(config criconfig.Config) *StatsCollector {
 		maxSamples: maxSamples,
 		stopCh:     make(chan struct{}),
 		doneCh:     make(chan struct{}),
-	}
+	}, nil
 }
 
 // SetDependencies sets the dependencies needed for stats collection.
