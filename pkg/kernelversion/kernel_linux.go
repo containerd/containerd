@@ -14,10 +14,12 @@
    limitations under the License.
 */
 
-/*
-   File copied and customized based on
-   https://github.com/moby/moby/tree/v20.10.14/profiles/seccomp/kernel_linux.go
-*/
+// SPDX-FileCopyrightText: Copyright The containerd Authors
+// SPDX-FileCopyrightText: Copyright The Moby Authors
+// SPDX-License-Identifier: Apache-2.0
+//
+// File copied and customized based on
+// https://github.com/moby/profiles/blob/seccomp/v0.2.3/seccomp/kernel_linux.go
 
 package kernelversion
 
