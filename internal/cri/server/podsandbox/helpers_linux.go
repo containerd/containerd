@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/moby/sys/mountinfo"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -38,7 +39,6 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/internal/cri/seutil"
 	"github.com/containerd/containerd/v2/pkg/seccomp"
 	"github.com/containerd/containerd/v2/pkg/sys"
 )
@@ -296,10 +296,10 @@ func isVMBasedRuntime(runtimeType string) bool {
 }
 
 func modifyProcessLabel(runtimeType string, spec *runtimespec.Spec) error {
-	if !isVMBasedRuntime(runtimeType) {
+	if !selinux.GetEnabled() || !isVMBasedRuntime(runtimeType) {
 		return nil
 	}
-	l, err := seutil.ChangeToKVM(spec.Process.SelinuxLabel)
+	l, err := selinux.SetProcessKind(spec.Process.SelinuxLabel, selinux.ProcessKindKVM)
 	if err != nil {
 		return fmt.Errorf("failed to get selinux kvm label: %w", err)
 	}
