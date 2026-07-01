@@ -64,6 +64,12 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
+      - name: Install criu
+        run: |
+          sudo add-apt-repository -y ppa:criu/ppa
+          sudo apt-get update
+          sudo apt-get install -y criu
+
       - name: Build and Install containerd
         working-directory: ./src/github.com/containerd/containerd
         run: |

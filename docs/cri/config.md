@@ -274,6 +274,7 @@ version = 3
     ignore_deprecation_warnings = []
     stats_collect_period = '1s'
     stats_retention_period = '2m'
+    enable_criu = true
 
     [plugins.'io.containerd.cri.v1.runtime'.containerd]
       default_runtime_name = 'runc'
