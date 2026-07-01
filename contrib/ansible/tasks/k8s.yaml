@@ -1,21 +1,30 @@
 ---
-- name: "Add gpg key (Ubuntu)"
-  apt_key:
-    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-    state: present
-  when: ansible_distribution == "Ubuntu"
+- name: "Get kubernetes latest stable release version"
+  command: >
+      curl -L -s https://dl.k8s.io/release/stable.txt
+  changed_when: false
+  register: k8s_stable_release
 
-- name: "Add kubernetes source list (Ubuntu)"
+- set_fact: 
+    k8s_stable_release={{ k8s_stable_release.stdout | regex_replace('^v([0-9])+\\.([0-9]+)\\.[0-9]+', 'v\\1.\\2') }}
+
+- name: "Add gpg key ({{ ansible_distribution }})"
+  apt_key:
+    url: "https://pkgs.k8s.io/core:/stable:/{{ k8s_stable_release }}/deb/Release.key"
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: "Add kubernetes source list ({{ ansible_distribution }})"
   apt_repository:
-    repo: "deb http://apt.kubernetes.io/ kubernetes-{{ ansible_distribution_release }} main"
+    repo: "deb https://pkgs.k8s.io/core:/stable:/{{ k8s_stable_release }}/deb/ /"
     state: present
     filename: "kubernetes"
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_os_family == "Debian"
 
-- name: "Update the repository cache (Ubuntu)"
+- name: "Update the repository cache ({{ ansible_distribution }})"
   apt:
     update_cache: yes
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_os_family == "Debian"
 
 - name: "Add Kubernetes repository and install gpg key (CentOS)"
   yum_repository:
@@ -43,10 +52,12 @@
     - kubectl
   when: ansible_distribution == "CentOS"
 
-- name: "Install kubelet, kubeadm, kubectl (Ubuntu)"
-  apt: name={{item}} state=installed
+- name: "Install kubelet, kubeadm, kubectl ({{ ansible_distribution }})"
+  apt:
+    name: "{{item}}"
+    state: present
   with_items:
     - kubelet
     - kubeadm
     - kubectl
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_os_family == "Debian"
