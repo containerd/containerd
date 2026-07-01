@@ -57,6 +57,7 @@ type hostConfig struct {
 
 	header http.Header
 
+	passUpstreamCredentials bool
 	// TODO: Add credential configuration (domain alias, username)
 }
 
@@ -374,6 +375,9 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
+	// PassUpstreamCredentials indicates whether the credentials for
+	// upstream registry should be passed to the mirror registry.
+	PassUpstreamCredentials bool `toml:"pass_upstream_credentials"`
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -543,6 +547,8 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		}
 		result.dialTimeout = &dialTimeout
 	}
+
+	result.passUpstreamCredentials = config.PassUpstreamCredentials
 
 	return result, nil
 }
