@@ -31,8 +31,10 @@ const (
 	// image content unpacked into them.
 	UnpackKeyPrefix = "extract"
 	// UnpackKeyFormat is the format for the snapshotter keys used for extraction
-	UnpackKeyFormat       = UnpackKeyPrefix + "-%s %s"
-	inheritedLabelsPrefix = "containerd.io/snapshot/"
+	UnpackKeyFormat = UnpackKeyPrefix + "-%s %s"
+	// LabelSnapshotPrefix is the prefix used for labels passed to snapshotters.
+	LabelSnapshotPrefix   = "containerd.io/snapshot/"
+	inheritedLabelsPrefix = LabelSnapshotPrefix
 	labelSnapshotRef      = "containerd.io/snapshot.ref"
 
 	// LabelSnapshotUIDMapping is the label used for UID mappings

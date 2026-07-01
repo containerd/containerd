@@ -17,6 +17,9 @@
 package annotations
 
 import (
+	"maps"
+
+	"github.com/containerd/containerd/v2/core/snapshots"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -26,6 +29,9 @@ import (
 // Following OCI annotations are used by katacontainers now.
 // We'll switch to standard secure pod API after it is defined in CRI.
 const (
+	// SnapshotLabelPrefix is the label prefix used to pass labels to snapshotters.
+	SnapshotLabelPrefix = snapshots.LabelSnapshotPrefix
+
 	// ContainerTypeSandbox represents a pod sandbox container
 	ContainerTypeSandbox = "sandbox"
 
@@ -98,6 +104,11 @@ const (
 	WindowsHostProcess = "microsoft.com/hostprocess-container"
 )
 
+// SnapshotLabel returns the snapshot label name for a CRI annotation.
+func SnapshotLabel(name string) string {
+	return SnapshotLabelPrefix + name
+}
+
 // DefaultCRIAnnotations are the default set of CRI annotations to
 // pass to sandboxes and containers.
 func DefaultCRIAnnotations(
@@ -132,4 +143,59 @@ func DefaultCRIAnnotations(
 		)
 	}
 	return append(opts, customopts.WithAnnotation(ContainerType, ctrType))
+}
+
+// DefaultCRISnapshotLabelsForSandbox returns the default set of CRI identity
+// labels to pass to snapshotters for a sandbox.
+func DefaultCRISnapshotLabelsForSandbox(
+	sandboxID string,
+	imageName string,
+	config *runtime.PodSandboxConfig,
+) map[string]string {
+	labels := defaultCRISnapshotLabels(sandboxID, config, ContainerTypeSandbox)
+	labels[SnapshotLabel(SandboxImageName)] = imageName
+	return labels
+}
+
+// DefaultCRISnapshotLabelsForContainer returns the default set of CRI identity
+// labels to pass to snapshotters for a container.
+func DefaultCRISnapshotLabelsForContainer(
+	sandboxID string,
+	containerName string,
+	imageName string,
+	config *runtime.PodSandboxConfig,
+) map[string]string {
+	labels := defaultCRISnapshotLabels(sandboxID, config, ContainerTypeContainer)
+	labels[SnapshotLabel(ContainerName)] = containerName
+	labels[SnapshotLabel(ImageName)] = imageName
+	return labels
+}
+
+func defaultCRISnapshotLabels(
+	sandboxID string,
+	config *runtime.PodSandboxConfig,
+	containerType string,
+) map[string]string {
+	return map[string]string{
+		SnapshotLabel(SandboxID):        sandboxID,
+		SnapshotLabel(SandboxNamespace): config.GetMetadata().GetNamespace(),
+		SnapshotLabel(SandboxUID):       config.GetMetadata().GetUid(),
+		SnapshotLabel(SandboxName):      config.GetMetadata().GetName(),
+		SnapshotLabel(ContainerType):    containerType,
+	}
+}
+
+// MergeSnapshotLabels merges snapshot label maps in order. Later maps override
+// earlier maps, allowing inherited or user-provided labels to take precedence
+// over defaults.
+func MergeSnapshotLabels(labels ...map[string]string) map[string]string {
+	var total int
+	for _, labelSet := range labels {
+		total += len(labelSet)
+	}
+	merged := make(map[string]string, total)
+	for _, labelSet := range labels {
+		maps.Copy(merged, labelSet)
+	}
+	return merged
 }
