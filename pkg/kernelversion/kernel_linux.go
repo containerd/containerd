@@ -63,7 +63,7 @@ func getKernelVersion() (*KernelVersion, error) {
 
 // parseRelease parses a string and creates a KernelVersion based on it.
 func parseRelease(release string) (*KernelVersion, error) {
-	var version = KernelVersion{}
+	var version KernelVersion
 
 	// We're only make sure we get the "kernel" and "major revision". Sometimes we have
 	// 3.12.25-gentoo, but sometimes we just have 3.12-1-amd64.
