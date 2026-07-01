@@ -222,6 +222,27 @@ $ cat /etc/containerd/certs.d/_default/hosts.toml
 server = "https://registry.example.com"
 ```
 
+## Route Registry Traffic Through a Proxy Example
+
+To route traffic for a registry at `my-registry.io` through a proxy at
+`http://my-proxy:8080`, create a path and `hosts.toml` text at the path
+`/etc/containerd/certs.d/my-registry.io/hosts.toml` with the following contents:
+
+```toml
+server = "https://my-registry.io"
+proxy = "http://my-proxy:8080"
+```
+
+If you only want to route requests to a specific host through the proxy, you can configure it under the `host` section:
+
+```toml
+server = "https://my-registry.io"
+
+[host."https://mirror.my-registry.io"]
+  capabilities = ["pull", "resolve"]
+  proxy = "http://my-proxy:8080"
+```
+
 ## Bypass TLS Verification Example
 
 To bypass the TLS verification for a private registry at `192.168.31.250:5000`
@@ -371,6 +392,19 @@ A shorter timeout helps reduce delays when falling back to the original registry
 
 ```
 dial_timeout = "1s"
+```
+
+## proxy field
+
+`proxy` specifies the address of the proxy server to use for the registry host.
+It must be an absolute URL with a scheme of either `http` or `https` and a
+non-empty host, and it must not include a path (other than an optional trailing
+`/`), query string, or fragment. This explicit config will override any
+environmental configuration for that registry host, including `NO_PROXY`,
+`HTTP_PROXY`, and `HTTPS_PROXY`.
+
+```toml
+proxy = "http://my-proxy:8080"
 ```
 
 ## host field(s) (in the toml table format)
