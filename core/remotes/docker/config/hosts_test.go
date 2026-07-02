@@ -123,10 +123,28 @@ ca = "/etc/path/default"
 
 [host."https://dial-timeout.registry"]
   dial_timeout = "3s"
+
+[host."https://response-header-timeout.registry"]
+  response_header_timeout = "3s"
+
+[host."https://idle-conn-timeout.registry"]
+  idle_conn_timeout = "3s"
+
+[host."https://expect-continue-timeout.registry"]
+  expect_continue_timeout = "3s"
+
+[host."https://tls-handshake-timeout.registry"]
+  tls_handshake_timeout = "3s"
 `
 
 	var tb, fb = true, false
-	var dialTimeout = 3 * time.Second
+	var (
+		dialTimeout           = 3 * time.Second
+		responseHeaderTimeout = 3 * time.Second
+		idleConnTimeout       = 3 * time.Second
+		expectContinueTimeout = 3 * time.Second
+		tlsHandshakeTimeout   = 3 * time.Second
+	)
 	expected := []hostConfig{
 		{
 			scheme:       "https",
@@ -214,6 +232,34 @@ ca = "/etc/path/default"
 			path:         "/v2",
 			capabilities: allCaps,
 			dialTimeout:  &dialTimeout,
+		},
+		{
+			scheme:                "https",
+			host:                  "response-header-timeout.registry",
+			path:                  "/v2",
+			capabilities:          allCaps,
+			responseHeaderTimeout: &responseHeaderTimeout,
+		},
+		{
+			scheme:          "https",
+			host:            "idle-conn-timeout.registry",
+			path:            "/v2",
+			capabilities:    allCaps,
+			idleConnTimeout: &idleConnTimeout,
+		},
+		{
+			scheme:                "https",
+			host:                  "expect-continue-timeout.registry",
+			path:                  "/v2",
+			capabilities:          allCaps,
+			expectContinueTimeout: &expectContinueTimeout,
+		},
+		{
+			scheme:              "https",
+			host:                "tls-handshake-timeout.registry",
+			path:                "/v2",
+			capabilities:        allCaps,
+			tlsHandshakeTimeout: &tlsHandshakeTimeout,
 		},
 		{
 			scheme:       "https",
@@ -590,6 +636,38 @@ func compareHostConfig(j, k hostConfig) bool {
 		return false
 	}
 
+	if j.responseHeaderTimeout != nil && k.responseHeaderTimeout != nil {
+		if *j.responseHeaderTimeout != *k.responseHeaderTimeout {
+			return false
+		}
+	} else if j.responseHeaderTimeout != nil || k.responseHeaderTimeout != nil {
+		return false
+	}
+
+	if j.expectContinueTimeout != nil && k.expectContinueTimeout != nil {
+		if *j.expectContinueTimeout != *k.expectContinueTimeout {
+			return false
+		}
+	} else if j.expectContinueTimeout != nil || k.expectContinueTimeout != nil {
+		return false
+	}
+
+	if j.idleConnTimeout != nil && k.idleConnTimeout != nil {
+		if *j.idleConnTimeout != *k.idleConnTimeout {
+			return false
+		}
+	} else if j.idleConnTimeout != nil || k.idleConnTimeout != nil {
+		return false
+	}
+
+	if j.tlsHandshakeTimeout != nil && k.tlsHandshakeTimeout != nil {
+		if *j.tlsHandshakeTimeout != *k.tlsHandshakeTimeout {
+			return false
+		}
+	} else if j.tlsHandshakeTimeout != nil || k.tlsHandshakeTimeout != nil {
+		return false
+	}
+
 	return true
 }
 
@@ -609,7 +687,19 @@ func printHostConfig(hc []hostConfig) string {
 		}
 		fmt.Fprintf(b, "\t\theader: %#v\n", hc[i].header)
 		if hc[i].dialTimeout != nil {
-			fmt.Fprintf(b, "\t\tdial-timeout: %v\n", hc[i].dialTimeout)
+			fmt.Fprintf(b, "\t\tdial-timeout: %v\n", *hc[i].dialTimeout)
+		}
+		if hc[i].responseHeaderTimeout != nil {
+			fmt.Fprintf(b, "\t\tresponse-header-timeout: %v\n", *hc[i].responseHeaderTimeout)
+		}
+		if hc[i].idleConnTimeout != nil {
+			fmt.Fprintf(b, "\t\tidle-conn-timeout: %v\n", *hc[i].idleConnTimeout)
+		}
+		if hc[i].expectContinueTimeout != nil {
+			fmt.Fprintf(b, "\t\texpect-continue-timeout: %v\n", *hc[i].expectContinueTimeout)
+		}
+		if hc[i].tlsHandshakeTimeout != nil {
+			fmt.Fprintf(b, "\t\ttls-handshake-timeout: %v\n", *hc[i].tlsHandshakeTimeout)
 		}
 	}
 	return b.String()
