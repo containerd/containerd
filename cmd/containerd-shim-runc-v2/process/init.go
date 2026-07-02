@@ -41,6 +41,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// unknownExitStatus is used when the process exit status cannot be determined,
+// for example when the exit event was lost due to SIGCHLD coalescing.
+const unknownExitStatus = 255
+
 // Init represents an initial process for a container
 type Init struct {
 	wg        sync.WaitGroup
@@ -52,7 +56,8 @@ type Init struct {
 	// the reaper interface.
 	mu sync.Mutex
 
-	waitBlock chan struct{}
+	waitBlock         chan struct{}
+	liveCheckInterval time.Duration // interval for process liveness fallback check; 0 uses default (30s)
 
 	WorkDir string
 
@@ -215,11 +220,28 @@ func (p *Init) createCheckpointedState(r *CreateConfig, pidFile *pidFile) error 
 
 // Wait for the process to exit
 func (p *Init) Wait(ctx context.Context) error {
-	select {
-	case <-p.waitBlock:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	interval := p.liveCheckInterval
+	if interval == 0 {
+		interval = 30 * time.Second
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-p.waitBlock:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			// Fallback liveness check: if the process no longer exists but
+			// the exit event was lost (e.g. due to SIGCHLD coalescing),
+			// force the exit to unblock waiters.
+			if err := unix.Kill(p.pid, 0); err == unix.ESRCH {
+				log.L.Warnf("process %d no longer exists but exit event was not received, forcing exit", p.pid)
+				p.SetExited(unknownExitStatus)
+				return nil
+			}
+		}
 	}
 }
 
