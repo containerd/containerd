@@ -40,7 +40,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
-	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
@@ -405,17 +404,12 @@ func (c *criService) CRImportCheckpoint(
 		return "", fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", config.RootfsImageName, err)
 	}
 
-	var image imagestore.Image
-	for i := 1; i < 500; i++ {
-		// This is probably wrong. Not sure how to wait for an image to appear in
-		// the image (or content) store.
-		log.G(ctx).Debugf("Trying to resolve %s:%d", containerdImage.Name(), i)
-		image, err = c.LocalResolve(containerdImage.Name())
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Microsecond * time.Duration(i))
+	// Proactively sync the image into the CRI image store cache instead of
+	// waiting for the asynchronous ImageCreate event to be processed.
+	if err := c.UpdateImage(ctx, containerdImage.Name()); err != nil {
+		return "", fmt.Errorf("failed to update image store for %q: %w", containerdImage.Name(), err)
 	}
+	image, err := c.LocalResolve(containerdImage.Name())
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve image %q during checkpoint import: %w", config.RootfsImageName, err)
 	}
