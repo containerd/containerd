@@ -32,12 +32,17 @@ function install_runc() {
 	# When updating runc-version, consider updating the runc module in go.mod as well
 	: "${RUNC_VERSION:=$(cat "${script_dir}/runc-version")}"
 	: "${RUNC_REPO:=https://github.com/opencontainers/runc.git}"
+	# RUNC_SRC: pre-existing runc checkout to build and install (e.g. from CI extra_refs)
+	: "${RUNC_SRC:=}"
 
-	TMPROOT=$(mktemp -d)
-	trap "rm -fR ${TMPROOT}" EXIT
-	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
-	pushd "${TMPROOT}"/runc
-	git checkout "${RUNC_VERSION}"
+	if [ -z "${RUNC_SRC}" ]; then
+		TMPROOT=$(mktemp -d)
+		trap "rm -fR ${TMPROOT}" EXIT
+		RUNC_SRC="${TMPROOT}/runc"
+		git clone "${RUNC_REPO}" "${RUNC_SRC}"
+		git -C "${RUNC_SRC}" checkout "${RUNC_VERSION}"
+	fi
+	pushd "${RUNC_SRC}"
 	env -u VERSION make BUILDTAGS='seccomp' runc
 	$SUDO make install
 	popd
