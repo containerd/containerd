@@ -11,9 +11,14 @@ func (w *erofsWriter) planLayout(root *erofsEntry) {
 	// Collect all entries in a deterministic order (DFS, pre-order).
 	// DFS keeps directory contents close to their parent inode,
 	// improving locality for operations like find and ls -lR.
+	// Hardlink alias entries (linkTo != nil) are skipped — they share the
+	// NID of the canonical entry and do not get their own inode slot.
 	w.entries = nil
 	var walk func(e *erofsEntry)
 	walk = func(e *erofsEntry) {
+		if e.linkTo != nil {
+			return // alias: no inode, NID comes from linkTo
+		}
 		w.entries = append(w.entries, e)
 		if e.mode&disk.StatTypeMask == disk.StatTypeDir {
 			sort.Slice(e.children, func(i, j int) bool {
