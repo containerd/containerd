@@ -61,11 +61,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	span := tracing.SpanFromContext(ctx)
 	config := r.GetConfig()
 	log.G(ctx).Debugf("Container config %+v", config)
-	sandboxConfig := r.GetSandboxConfig()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
+	sandboxConfig := sandbox.Config
 
 	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, false)
 	if err != nil {
