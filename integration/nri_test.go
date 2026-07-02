@@ -223,6 +223,58 @@ func TestNriEnvironmentInjection(t *testing.T) {
 	require.Equal(t, "TEST_ENV_VALUE\n", string(chk), "check result")
 }
 
+// Test that NRI plugins can override environment variables already present in the container.
+func TestNriEnvironmentOverride(t *testing.T) {
+	skipNriTestIfNecessary(t)
+
+	t.Log("Test that NRI plugins can override environment variables already present in the container.")
+
+	var (
+		out = t.TempDir()
+		tc  = &nriTest{
+			t:       t,
+			plugins: []*mockPlugin{{}},
+		}
+		// Override an env var that already exists in the container (set via CRI Envs).
+		// Also remove another pre-existing env var to verify RemoveEnv works on existing vars.
+		overrideEnv = func(p *mockPlugin, pod *api.PodSandbox, ctr *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {
+			adjust := &api.ContainerAdjustment{}
+			adjust.AddMount(&api.Mount{
+				Destination: "/out",
+				Source:      out,
+				Type:        "bind",
+				Options:     []string{"bind"},
+			})
+			// Override the pre-existing value with an NRI-provided value.
+			adjust.RemoveEnv("EXISTING_KEY")
+			adjust.AddEnv("EXISTING_KEY", "nri-overridden-value")
+			// Remove a pre-existing variable entirely.
+			adjust.RemoveEnv("KEY_TO_REMOVE")
+			return adjust, nil, nil
+		}
+	)
+
+	tc.plugins[0].createContainer = overrideEnv
+	tc.setup()
+
+	podID := tc.runPod("pod0")
+	tc.startContainer(podID, "ctr0",
+		WithEnvVar("EXISTING_KEY", "original-value"),
+		WithEnvVar("KEY_TO_REMOVE", "should-be-gone"),
+		WithCommand("/bin/sh", "-c",
+			"echo $EXISTING_KEY > /out/result; "+
+				"if [ -z \"${KEY_TO_REMOVE+x}\" ]; then echo 'KEY_TO_REMOVE=unset' >> /out/result; else echo KEY_TO_REMOVE=$KEY_TO_REMOVE >> /out/result; fi; "+
+				"sleep 3600"),
+	)
+
+	chk, err := waitForFileAndRead(filepath.Join(out, "result"), time.Second)
+	require.NoError(t, err, "read result")
+	lines := strings.Split(strings.TrimRight(string(chk), "\n"), "\n")
+	require.Len(t, lines, 2, "expected two output lines")
+	require.Equal(t, "nri-overridden-value", lines[0], "EXISTING_KEY should be overridden by NRI")
+	require.Equal(t, "KEY_TO_REMOVE=unset", lines[1], "KEY_TO_REMOVE should be removed by NRI")
+}
+
 // Test annotation injection by NRI plugins.
 func TestNriAnnotationInjection(t *testing.T) {
 	skipNriTestIfNecessary(t)

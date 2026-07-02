@@ -368,7 +368,7 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 			return nil
 		}
 
-		sgen := generate.Generator{Config: spec}
+		sgen := generate.NewFromSpec(spec)
 		ngen := nrigen.SpecGenerator(&sgen, generatorOptions...)
 
 		err = ngen.Adjust(adjust)
