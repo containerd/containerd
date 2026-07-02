@@ -56,6 +56,29 @@ func (c *criService) initPlatform() (err error) {
 		selinux.SetDisabled()
 	}
 
+	if err := c.initCNIPlugins(); err != nil {
+		return err
+	}
+
+	if c.allCaps == nil {
+		c.allCaps, err = cap.Current()
+		if err != nil {
+			return fmt.Errorf("failed to get caps: %w", err)
+		}
+	}
+
+	if c.config.EnableCDI == nil || *c.config.EnableCDI {
+		err := cdi.Configure(cdi.WithSpecDirs(c.config.CDISpecDirs...))
+		if err != nil {
+			return fmt.Errorf("failed to configure CDI registry")
+		}
+	}
+
+	return nil
+}
+
+// initCNIPlugins handles linux specific CNI plugin initializations.
+func (c *criService) initCNIPlugins() error {
 	pluginDirs := map[string]string{
 		defaultNetworkPlugin: c.config.NetworkPluginConfDir,
 	}
@@ -71,7 +94,6 @@ func (c *criService) initPlatform() (err error) {
 		networkAttachCount = 1
 	}
 
-	c.netPlugin = make(map[string]cni.CNI)
 	for name, dir := range pluginDirs {
 		max := c.config.NetworkPluginMaxConfNum
 		if name != defaultNetworkPlugin {
@@ -91,23 +113,10 @@ func (c *criService) initPlatform() (err error) {
 		if err != nil {
 			return fmt.Errorf("failed to initialize cni: %w", err)
 		}
-		c.netPlugin[name] = i
-	}
-
-	if c.allCaps == nil {
-		c.allCaps, err = cap.Current()
-		if err != nil {
-			return fmt.Errorf("failed to get caps: %w", err)
+		if err := c.cniNetPlugin.add(name, dir, i, c.cniLoadOptions()); err != nil {
+			return err
 		}
 	}
-
-	if c.config.EnableCDI == nil || *c.config.EnableCDI {
-		err := cdi.Configure(cdi.WithSpecDirs(c.config.CDISpecDirs...))
-		if err != nil {
-			return fmt.Errorf("failed to configure CDI registry")
-		}
-	}
-
 	return nil
 }
 
