@@ -187,3 +187,50 @@ func TestSandboxStore(t *testing.T) {
 		assert.Equal(errdefs.ErrNotFound, err)
 	}
 }
+
+// TestSandboxStoreTruncIndexConsistency tests that TruncIndex remains consistent
+// after deletions (issue #12390). The root cause of the sandbox leak was that
+// TruncIndex.Delete() would delete from the map before verifying trie deletion,
+// causing map/trie desync when trie deletion failed. This test verifies that
+// the fix prevents this desynchronization.
+func TestSandboxStoreTruncIndexConsistency(t *testing.T) {
+	labels := label.NewStore()
+	s := NewStore(labels)
+
+	// Create and add a test sandbox
+	sandbox := NewSandbox(
+		Metadata{
+			ID:   "test-sandbox-12390",
+			Name: "consistency-test",
+			Config: &runtime.PodSandboxConfig{
+				Metadata: &runtime.PodSandboxMetadata{
+					Name:      "TestPod",
+					Uid:       "TestUid",
+					Namespace: "TestNamespace",
+					Attempt:   1,
+				},
+			},
+		},
+		Status{State: StateReady},
+	)
+
+	assert := assertlib.New(t)
+	assert.NoError(s.Add(sandbox))
+	assert.Len(s.List(), 1)
+
+	// Verify idIndex has the ID
+	_, err := s.idIndex.Get(sandbox.ID)
+	assert.NoError(err, "idIndex should have the ID after Add")
+
+	// Delete the sandbox
+	s.Delete(sandbox.ID)
+
+	// Verify sandbox is removed from store
+	assert.Len(s.List(), 0, "sandbox should be removed from store")
+	_, err = s.Get(sandbox.ID)
+	assert.Equal(errdefs.ErrNotFound, err, "Get should return ErrNotFound")
+
+	// Verify sandbox is removed from idIndex
+	_, err = s.idIndex.Get(sandbox.ID)
+	assert.Error(err, "idIndex should not have the ID after Delete")
+}
