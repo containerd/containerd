@@ -90,6 +90,12 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			resp.Info["cniconfig"] = string(cniConfig)
 		}
 
+		imageConfig, err := json.Marshal(c.ImageService.Config())
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("Failed to marshal image config %v", err)
+		}
+		resp.Info["imageconfig"] = string(imageConfig)
+
 		defaultStatus := "OK"
 		for name, h := range c.cniNetConfMonitor {
 			s := "OK"
