@@ -20,11 +20,18 @@ package seccomp
 
 import (
 	"runtime"
+	"sync"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/opencontainers/runtime-spec/specs-go"
+)
+
+var (
+	once            sync.Once
+	clone3Supported bool
 )
 
 func arches() []specs.Arch {
@@ -789,16 +796,38 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				},
 			})
 		}
-		// clone3 is explicitly requested to give ENOSYS instead of the default EPERM, when CAP_SYS_ADMIN is unset
-		// https://github.com/moby/moby/pull/42681
-		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
-			Names: []string{
-				"clone3",
-			},
-			Action:   specs.ActErrno,
-			ErrnoRet: &nosys,
-		})
+		if !isClone3Supported() {
+			// clone3 is explicitly requested to give ENOSYS instead of the default EPERM, when CAP_SYS_ADMIN is unset
+			// https://github.com/moby/moby/pull/42681
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names: []string{
+					"clone3",
+				},
+				Action:   specs.ActErrno,
+				ErrnoRet: &nosys,
+			})
+		} else {
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names: []string{
+					"clone3",
+				},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		}
 	}
 
 	return s
+}
+
+func isClone3Supported() bool {
+	once.Do(func() {
+		var args [80]byte
+		const sysClone3 = unix.SYS_CLONE3
+		// Try to call clone3 with an invalid size (0). On kernels that implement clone3 this should fail with EINVAL;
+		// if the syscall is not implemented it returns ENOSYS.
+		_, _, err := unix.RawSyscall(sysClone3, uintptr(unsafe.Pointer(&args[0])), 0, 0)
+		clone3Supported = err == unix.EINVAL
+	})
+	return clone3Supported
 }
