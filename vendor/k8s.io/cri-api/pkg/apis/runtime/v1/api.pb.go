@@ -7333,7 +7333,11 @@ type ExecRequest struct {
 	// If `tty` is true, `stderr` MUST be false. Multiplexing is not supported
 	// in this case. The output of stdout and stderr will be combined to a
 	// single stream.
-	Stderr        bool `protobuf:"varint,6,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	Stderr bool `protobuf:"varint,6,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	// Environment variables to inject into the exec'd process.
+	// Each entry is a key-value pair that the runtime MUST add to the
+	// process environment. Values are injected literally.
+	Envs          []*KeyValue `protobuf:"bytes,7,rep,name=envs,proto3" json:"envs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7408,6 +7412,13 @@ func (x *ExecRequest) GetStderr() bool {
 		return x.Stderr
 	}
 	return false
+}
+
+func (x *ExecRequest) GetEnvs() []*KeyValue {
+	if x != nil {
+		return x.Envs
+	}
+	return nil
 }
 
 type ExecResponse struct {
