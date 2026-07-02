@@ -205,8 +205,5 @@ func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventty
 			}
 		}
 	}
-	if err := sb.Exit(e.ExitStatus, protobuf.FromTimestamp(e.ExitedAt)); err != nil {
-		return err
-	}
-	return nil
+	return sb.Exit(e.ExitStatus, protobuf.FromTimestamp(e.ExitedAt))
 }
