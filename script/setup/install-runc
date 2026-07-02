@@ -29,6 +29,13 @@ if (( $EUID != 0 )); then
 fi
 
 function install_runc() {
+	# RUNC_DIR: build and install an existing checkout (e.g. from CI extra_refs) instead of cloning
+	if [ -n "${RUNC_DIR:-}" ]; then
+		env -u VERSION make -C "${RUNC_DIR}" BUILDTAGS='seccomp' runc
+		$SUDO make -C "${RUNC_DIR}" install
+		return
+	fi
+
 	# When updating runc-version, consider updating the runc module in go.mod as well
 	: "${RUNC_VERSION:=$(cat "${script_dir}/runc-version")}"
 	: "${RUNC_REPO:=https://github.com/opencontainers/runc.git}"
