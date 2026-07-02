@@ -257,6 +257,26 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 		shouldInvokeShimBinary = true
 	}
 
+	runtimePath, err := m.resolveRuntimePath(opts.Runtime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
+	}
+
+	b := shimBinary(bundle, shimBinaryConfig{
+		runtime:      runtimePath,
+		address:      m.containerdAddress,
+		ttrpcAddress: m.containerdTTRPCAddress,
+		env:          m.env,
+	})
+	closefunc := func() {
+		log.G(ctx).WithField("id", id).Info("shim disconnected")
+		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b)
+		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
+		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
+		// disconnect and there is no chance to remove this dead task from runtime task lists.
+		// Thus it's better to delete it here.
+		m.shims.Delete(ctx, id)
+	}
 	if !shouldInvokeShimBinary {
 		// Write sandbox ID this task belongs to.
 		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
@@ -266,8 +286,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 		if err := writeBootstrapParams(filepath.Join(bundle.Path, "bootstrap.json"), params); err != nil {
 			return nil, fmt.Errorf("failed to write bootstrap.json for bundle %s: %w", bundle.Path, err)
 		}
-
-		shim, err := loadShim(ctx, bundle, func() {})
+		shim, err := loadShim(ctx, bundle, closefunc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load sandbox task %q: %w", opts.SandboxID, err)
 		}
@@ -279,7 +298,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 		return shim, nil
 	}
 
-	shim, err := m.startShim(ctx, bundle, id, opts)
+	shim, err := m.startShim(ctx, opts, b, closefunc)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +315,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 	return shim, nil
 }
 
-func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, opts runtime.CreateOpts) (*shim, error) {
+func (m *ShimManager) startShim(ctx context.Context, opts runtime.CreateOpts, b *binary, onClose func()) (*shim, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -307,29 +326,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	if topts == nil || topts.GetValue() == nil {
 		topts = opts.RuntimeOptions
 	}
-
-	runtimePath, err := m.resolveRuntimePath(opts.Runtime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
-	}
-
-	b := shimBinary(bundle, shimBinaryConfig{
-		runtime:      runtimePath,
-		address:      m.containerdAddress,
-		ttrpcAddress: m.containerdTTRPCAddress,
-		socketDir:    m.socketDir,
-		env:          m.env,
-	})
-	shim, err := b.Start(ctx, typeurl.MarshalProto(topts), func() {
-		log.G(ctx).WithField("id", id).Info("shim disconnected")
-
-		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b)
-		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
-		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
-		// disconnect and there is no chance to remove this dead task from runtime task lists.
-		// Thus it's better to delete it here.
-		m.shims.Delete(ctx, id)
-	})
+	shim, err := b.Start(ctx, typeurl.MarshalProto(topts), onClose)
 	if err != nil {
 		return nil, fmt.Errorf("start failed: %w", err)
 	}
