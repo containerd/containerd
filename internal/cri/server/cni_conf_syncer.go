@@ -91,7 +91,7 @@ func (syncer *cniNetConfSyncer) syncLoop() error {
 			//
 			// TODO(fuweid): Might only reload target cni config
 			// files to prevent no-ops.
-			if event.Has(fsnotify.Chmod) || event.Has(fsnotify.Create) {
+			if event.Has(fsnotify.Chmod) {
 				log.L.Debugf("ignore event from cni conf dir: %s", event)
 				continue
 			}
