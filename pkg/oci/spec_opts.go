@@ -600,20 +600,6 @@ func WithUser(userstr string) SpecOpts {
 		defer ensureAdditionalGids(s)
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
-		// While the Linux kernel allows the max UID to be MaxUint32 - 2,
-		// and the OCI Runtime Spec has no definition about the max UID,
-		// the runc implementation is known to require the UID to be <= MaxInt32.
-		//
-		// containerd follows runc's limitation here.
-		//
-		// In future we may relax this limitation to allow MaxUint32 - 2,
-		// or, amend the OCI Runtime Spec to codify the implementation limitation.
-		const (
-			minUserID  = 0
-			maxUserID  = math.MaxInt32
-			minGroupID = 0
-			maxGroupID = math.MaxInt32
-		)
 
 		// For LCOW it's a bit harder to confirm that the user actually exists on the host as a rootfs isn't
 		// mounted on the host and shared into the guest, but rather the rootfs is constructed entirely in the
@@ -750,12 +736,30 @@ func WithUmask(umask uint32) SpecOpts {
 	}
 }
 
+// While the Linux kernel allows the max UID to be MaxUint32 - 2,
+// and the OCI Runtime Spec has no definition about the max UID,
+// the runc implementation is known to require the UID to be <= MaxInt32.
+//
+// containerd follows runc's limitation here.
+//
+// In future we may relax this limitation to allow MaxUint32 - 2,
+// or, amend the OCI Runtime Spec to codify the implementation limitation.
+const (
+	minUserID  = 0
+	maxUserID  = math.MaxInt32
+	minGroupID = 0
+	maxGroupID = math.MaxInt32
+)
+
 // WithUserID sets the correct UID and GID for the container based
 // on the image's /etc/passwd contents. If /etc/passwd does not exist,
 // or uid is not found in /etc/passwd, it sets the requested uid,
 // additionally sets the gid to 0, and does not return an error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
+		if uid > maxUserID {
+			return fmt.Errorf(`invalid uid value "%d": uid out of range`, uid)
+		}
 		defer ensureAdditionalGids(s)
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
