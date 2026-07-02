@@ -19,12 +19,13 @@
 package oom
 
 import (
-	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"golang.org/x/sys/unix"
@@ -71,41 +72,83 @@ func getCgroup2Path(pid int) (string, error) {
 	return filepath.Join(defaultCgroup2Path, g), nil
 }
 
-// readKVStatsFile is copied from cgroupsv2 package
+// memoryEventsBufSize is large enough to hold the whole cgroup v2
+// memory.events file, which is a small, fixed set of counters.
+const memoryEventsBufSize = 512
+
+// oomKillPrefix is the start of the "oom_kill" line in memory.events. Keeping
+// it as a package-level []byte avoids a per-call allocation on the OOM watcher
+// hot path.
+var oomKillPrefix = []byte("oom_kill ")
+
+// readMemoryOOMKill reads the "oom_kill" counter from a cgroup's memory.events
+// file into the caller-provided buffer.
 //
-// TODO(fuweid):
-//
-// we should export some helper functions like MemoryEvents(cgroupPath) directly.
-func readKVStatsFile(path string, file string, out map[string]uint64) error {
-	f, err := os.Open(filepath.Join(path, file))
+// The OOM watcher is woken for every modification of memory.events, which the
+// kernel updates on every low/high/max reclaim event, not only on OOM kills.
+// On long-running nodes with stable workloads those reclaim events dominate, so
+// this is a hot path. Reading the file into a reused buffer and scanning for the
+// single counter we care about avoids allocating a map (and re-parsing every
+// line) on each wakeup, which otherwise accumulates measurable CPU and GC
+// overhead over the lifetime of the shim.
+// See https://github.com/containerd/containerd/issues/13558.
+func readMemoryOOMKill(cgroupPath string, buf []byte) (uint64, error) {
+	f, err := os.Open(filepath.Join(cgroupPath, "memory.events"))
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer f.Close()
 
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		name, value, err := parseKV(s.Text())
-		if err != nil {
-			return fmt.Errorf("error while parsing %s (line=%q): %w", filepath.Join(path, file), s.Text(), err)
+	n, err := io.ReadFull(f, buf)
+	switch {
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		// The whole file fit within buf; this is the expected path for current
+		// kernels, where memory.events is a small, fixed set of counters.
+	case err != nil:
+		return 0, err
+	default:
+		// buf was filled completely, so memory.events may be larger than buf
+		// and the oom_kill counter could lie beyond what we read. Read the
+		// remainder so a truncated buffer can never cause a missed OOM event.
+		// This is not expected for current kernels and keeps the common path
+		// allocation-free.
+		rest, rerr := io.ReadAll(f)
+		if rerr != nil {
+			return 0, rerr
 		}
-		out[name] = value
+		full := make([]byte, 0, n+len(rest))
+		full = append(append(full, buf[:n]...), rest...)
+		v, _ := parseOOMKill(full)
+		return v, nil
 	}
-	return s.Err()
+
+	v, _ := parseOOMKill(buf[:n])
+	return v, nil
 }
 
-func parseKV(raw string) (string, uint64, error) {
-	parts := strings.Fields(raw)
-	switch len(parts) {
-	case 2:
-		v, err := parseUint(parts[1], 10, 64)
-		if err != nil {
-			return "", 0, err
+// parseOOMKill scans memory.events content for the "oom_kill" counter. The
+// boolean return reports whether the counter was found; a missing counter is
+// reported as (0, false) so the caller can distinguish it from oom_kill being
+// genuinely zero.
+func parseOOMKill(data []byte) (uint64, bool) {
+	for len(data) > 0 {
+		line := data
+		if i := bytes.IndexByte(data, '\n'); i >= 0 {
+			line, data = data[:i], data[i+1:]
+		} else {
+			data = nil
 		}
-		return parts[0], v, nil
-	default:
-		return "", 0, cgroupsv2.ErrInvalidFormat
+		rest, ok := bytes.CutPrefix(line, oomKillPrefix)
+		if !ok {
+			continue
+		}
+		v, err := parseUint(string(bytes.TrimSpace(rest)), 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return v, true
 	}
+	return 0, false
 }
 
 func parseUint(s string, base, bitSize int) (uint64, error) {
