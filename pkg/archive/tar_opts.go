@@ -21,6 +21,8 @@ import (
 	"context"
 	"io"
 	"time"
+
+	internaluserns "github.com/containerd/containerd/v2/internal/userns"
 )
 
 // ApplyOptions provides additional options for an Apply operation
@@ -97,6 +99,9 @@ type WriteDiffOptions struct {
 	//
 	// See also https://reproducible-builds.org/docs/source-date-epoch/ .
 	SourceDateEpoch *time.Time
+
+	// IDMap specifies the ID mapping to translate file ownership back to container namespace
+	IDMap *internaluserns.IDMap
 }
 
 // WriteDiffOpt allows setting mutable archive write properties on creation
@@ -106,6 +111,14 @@ type WriteDiffOpt func(options *WriteDiffOptions) error
 func WithSourceDateEpoch(tm *time.Time) WriteDiffOpt {
 	return func(options *WriteDiffOptions) error {
 		options.SourceDateEpoch = tm
+		return nil
+	}
+}
+
+// WithIDMap specifies the IDMap used to map file owners back to container IDs.
+func WithIDMap(idMap *internaluserns.IDMap) WriteDiffOpt {
+	return func(options *WriteDiffOptions) error {
+		options.IDMap = idMap
 		return nil
 	}
 }

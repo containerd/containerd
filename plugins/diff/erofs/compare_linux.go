@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/containerd/continuity/fs"
@@ -34,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/mount"
+	internaluserns "github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/archive/compression"
@@ -41,8 +43,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/labels"
 )
 
-func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperRoot string) error {
-	var opts []archive.ChangeWriterOpt
+func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperRoot string, opts ...archive.ChangeWriterOpt) error {
 
 	return mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
 		cw := archive.NewChangeWriter(w, upperRoot, opts...)
@@ -70,6 +71,32 @@ func (s erofsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts
 	}
 	if tm := epoch.FromContext(ctx); tm != nil && config.SourceDateEpoch == nil {
 		config.SourceDateEpoch = tm
+	}
+
+	var idMap *internaluserns.IDMap
+	for _, m := range upper {
+		var uidmap, gidmap string
+		for _, opt := range m.Options {
+			if after, ok := strings.CutPrefix(opt, "uidmap="); ok {
+				uidmap = after
+			} else if after, ok := strings.CutPrefix(opt, "gidmap="); ok {
+				gidmap = after
+			}
+		}
+		if uidmap != "" || gidmap != "" {
+			if uidmap == "" || gidmap == "" {
+				return emptyDesc, fmt.Errorf("invalid snapshot ID mapped options: both uidmap and gidmap must be set (uidmap=%q gidmap=%q)", uidmap, gidmap)
+			}
+			idMap = &internaluserns.IDMap{}
+			if err := idMap.Unmarshal(uidmap, gidmap); err != nil {
+				return emptyDesc, fmt.Errorf("failed to unmarshal snapshot ID mapped options (uidmap=%q gidmap=%q): %w", uidmap, gidmap, err)
+			}
+			break
+		}
+	}
+	var writeDiffOpts []archive.ChangeWriterOpt
+	if idMap != nil {
+		writeDiffOpts = append(writeDiffOpts, archive.WithChangeWriterIDMap(idMap))
 	}
 
 	if config.MediaType == "" {
@@ -137,7 +164,7 @@ func (s erofsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts
 				return emptyDesc, fmt.Errorf("failed to get compressed stream: %w", errOpen)
 			}
 		}
-		errOpen = writeDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lower, upperRoot)
+		errOpen = writeDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lower, upperRoot, writeDiffOpts...)
 		compressed.Close()
 		if errOpen != nil {
 			return emptyDesc, fmt.Errorf("failed to write compressed diff: %w", errOpen)
@@ -148,7 +175,7 @@ func (s erofsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts
 		}
 		config.Labels[labels.LabelUncompressed] = dgstr.Digest().String()
 	} else {
-		err := writeDiff(ctx, cw, lower, upperRoot)
+		err := writeDiff(ctx, cw, lower, upperRoot, writeDiffOpts...)
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to create diff tar stream: %w", err)
 		}
