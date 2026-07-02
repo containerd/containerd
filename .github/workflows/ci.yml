@@ -741,6 +741,46 @@ jobs:
             podman run --rm --privileged cri-in-userns
           fi
 
+  test-overlay-lcc:
+    name: Overlay LCC
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: [project, linters, protos, man]
+    env:
+      GOTEST: gotestsum --
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: ./.github/actions/install-go
+      - name: Install containerd dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gperf dmsetup
+          script/setup/install-seccomp
+          script/setup/install-runc
+      - name: Install containerd
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
+          sudo -E PATH=$PATH make install
+      - name: Build and install pkg2oci
+        run: |
+          go build -o /tmp/pkg2oci ./integration/lcc/cmd/pkg2oci/
+          sudo mv /tmp/pkg2oci /usr/local/bin/pkg2oci
+      - name: Install flox
+        run: script/setup/install-flox
+      - run: script/setup/install-gotestsum
+      - run: script/setup/install-teststat
+      - name: Overlay LCC integration tests
+        env:
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-overlay-lcc-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-overlay-lcc-gotest.json
+        run: sudo -E PATH=$PATH make lcc-integration
+      - run: if [ -f *-gotest.json ]; then echo '# Overlay LCC' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh *-gotest.json
+        if: always()
+
   tests-mac-os:
     name: MacOS unit tests
     runs-on: macos-latest

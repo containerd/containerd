@@ -83,7 +83,9 @@ func BenchmarkOverlay(b *testing.B) {
 		b.Skip("overlay root dir must be provided")
 	}
 
-	snapshotter, err := overlay.NewSnapshotter(overlayRootPath)
+	ctx := context.Background()
+
+	snapshotter, err := overlay.NewSnapshotter(ctx, overlayRootPath)
 	assert.Nil(b, err, "failed to create overlay snapshotter")
 
 	defer func() {

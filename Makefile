@@ -158,7 +158,7 @@ OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
+.PHONY: clean all AUTHORS build binaries test integration lcc-integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -224,6 +224,10 @@ integration: ## run integration tests
 $(CRI_INTEGRATION_TEST_BINARY):
 	@echo "$(WHALE) $@"
 	@$(GO) test -c ./integration -o $(CRI_INTEGRATION_TEST_BINARY)
+
+lcc-integration:
+	@echo "$(WHALE) $@"
+	@$(GOTEST) -tags integration -v ${TESTFLAGS} -count=1 ./integration/lcc/
 
 cri-integration: binaries $(CRI_INTEGRATION_TEST_BINARY) ## run cri integration tests (example: FOCUS=TestContainerListStats make cri-integration)
 	@echo "$(WHALE) $@"

@@ -16,6 +16,10 @@
 #   docker build -t containerd-test -f Dockerfile.test --target integration ../
 #   docker run --privileged containerd-test
 #
+# "lcc-integration": for running LCC (layer content cache) integration tests:
+#   docker build -t containerd-test -f Dockerfile.test --target lcc-integration ../
+#   docker run --privileged containerd-test
+#
 # "cri-integration": for running cri-integration tests:
 #   docker build -t containerd-test -f Dockerfile.test --target cri-integration ../
 #   docker run --privileged --sysctl net.ipv6.conf.all.disable_ipv6=0 containerd-test
@@ -86,6 +90,31 @@ VOLUME /var/lib
 # The entrypoint script is needed for nesting cgroup v2.
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["make", "integration"]
+
+# lcc-integration stage is for running LCC integration tests.
+FROM integration AS lcc-integration
+ARG FLOX_VERSION=1.11.4
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates sudo xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /nix \
+    && ARCH="$(uname -m)" \
+    && case "$ARCH" in \
+        x86_64|aarch64) ;; \
+        *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSLo /tmp/flox.deb \
+       "https://downloads.flox.dev/by-env/stable/deb/flox-${FLOX_VERSION}.${ARCH}-linux.deb" \
+    && curl -fsSLo /tmp/flox.SHA256SUMS \
+       "https://downloads.flox.dev/by-env/stable/flox-${FLOX_VERSION}.SHA256SUMS" \
+    && grep "flox-${FLOX_VERSION}.${ARCH}-linux.deb$" /tmp/flox.SHA256SUMS \
+       | sed "s|flox-${FLOX_VERSION}.${ARCH}-linux.deb|/tmp/flox.deb|" \
+       | sha256sum --check --strict \
+    && apt-get install -y /tmp/flox.deb \
+    && rm -f /tmp/flox.deb /tmp/flox.SHA256SUMS \
+    && rm -rf /var/lib/apt/lists/*
+RUN go build -o /usr/local/bin/pkg2oci ./integration/lcc/cmd/pkg2oci/
+CMD ["make", "lcc-integration"]
 
 # cri-integration stage is for running cri-integration tests.
 FROM integration AS cri-integration

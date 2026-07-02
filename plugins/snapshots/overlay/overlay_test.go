@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"syscall"
 	"testing"
 
@@ -34,28 +35,49 @@ import (
 	"github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
+// testSnapshotter embeds a *snapshotter and injects a unique LabelSnapshotDiffID
+// on every Prepare call, simulating the label the unpacker sets during image
+// unpack. Each call receives a distinct diffID derived from a per-instance
+// counter so that the LCC code path is exercised without creating spurious
+// cache hits when the testsuite reuses the same key across separate operations.
+// Cache-hit paths are covered by the dedicated lcc_test.go tests.
+type testSnapshotter struct {
+	*snapshotter
+	seq atomic.Int64
+}
+
+func (s *testSnapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	diffID := digest.FromString(fmt.Sprintf("prepare-%d", s.seq.Add(1))).String()
+	opts = append([]snapshots.Opt{snapshots.WithLabels(map[string]string{
+		snapshots.LabelSnapshotDiffID: diffID,
+	})}, opts...)
+	return s.snapshotter.Prepare(ctx, key, parent, opts...)
+}
+
 func newSnapshotterWithOpts(opts ...Opt) testsuite.SnapshotterFunc {
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-		snapshotter, err := NewSnapshotter(root, opts...)
+		s, err := NewSnapshotter(ctx, root, opts...)
 		if err != nil {
 			return nil, nil, err
 		}
-
-		return snapshotter, func() error { return snapshotter.Close() }, nil
+		return &testSnapshotter{s.(*snapshotter), atomic.Int64{}}, func() error { return s.Close() }, nil
 	}
 }
 
 func TestOverlay(t *testing.T) {
 	testutil.RequiresRoot(t)
 	optTestCases := map[string][]Opt{
-		"no opt": nil,
-		// default in init()
-		"AsynchronousRemove": {AsynchronousRemove},
+		"no opt":                nil,
+		"WithLayerContentCache": {WithLayerContentCache},
+		"AsynchronousRemove":    {AsynchronousRemove},
+		"WithLayerContentCache/AsynchronousRemove": {WithLayerContentCache, AsynchronousRemove},
 		// idmapped mounts enabled
-		"WithRemapIDs": {WithRemapIDs},
+		"WithRemapIDs":                       {WithRemapIDs},
+		"WithLayerContentCache/WithRemapIDs": {WithLayerContentCache, WithRemapIDs},
 	}
 
 	for optsName, opts := range optTestCases {
@@ -344,7 +366,7 @@ func testOverlayRemappedBind(t *testing.T, newSnapshotter testsuite.SnapshotterF
 			t.Fatal(err)
 		}
 
-		if sn, ok := o.(*snapshotter); !ok || !sn.remapIDs {
+		if sn, ok := o.(*testSnapshotter); !ok || !sn.remapIDs {
 			t.Skip("overlayfs doesn't support idmapped mounts")
 		}
 
@@ -500,7 +522,7 @@ func testOverlayRemappedActive(t *testing.T, newSnapshotter testsuite.Snapshotte
 			t.Fatal(err)
 		}
 
-		if sn, ok := o.(*snapshotter); !ok || !sn.remapIDs {
+		if sn, ok := o.(*testSnapshotter); !ok || !sn.remapIDs {
 			t.Skip("overlayfs doesn't support idmapped mounts")
 		}
 
@@ -556,7 +578,7 @@ func testOverlayRemappedInvalidMapping(t *testing.T, newSnapshotter testsuite.Sn
 		t.Fatal(err)
 	}
 
-	if sn, ok := o.(*snapshotter); !ok || !sn.remapIDs {
+	if sn, ok := o.(*testSnapshotter); !ok || !sn.remapIDs {
 		t.Skip("overlayfs doesn't support idmapped mounts")
 	}
 
@@ -636,7 +658,7 @@ func testOverlayRemappedInvalidMapping(t *testing.T, newSnapshotter testsuite.Sn
 }
 
 func getBasePath(ctx context.Context, sn snapshots.Snapshotter, root, key string) string {
-	o := sn.(*snapshotter)
+	o := sn.(*testSnapshotter)
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		panic(err)
@@ -652,7 +674,7 @@ func getBasePath(ctx context.Context, sn snapshots.Snapshotter, root, key string
 }
 
 func getParents(ctx context.Context, sn snapshots.Snapshotter, root, key string) []string {
-	o := sn.(*snapshotter)
+	o := sn.(*testSnapshotter)
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		panic(err)

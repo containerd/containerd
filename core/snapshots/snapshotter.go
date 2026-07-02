@@ -31,9 +31,16 @@ const (
 	// image content unpacked into them.
 	UnpackKeyPrefix = "extract"
 	// UnpackKeyFormat is the format for the snapshotter keys used for extraction
-	UnpackKeyFormat       = UnpackKeyPrefix + "-%s %s"
-	inheritedLabelsPrefix = "containerd.io/snapshot/"
-	labelSnapshotRef      = "containerd.io/snapshot.ref"
+	UnpackKeyFormat = UnpackKeyPrefix + "-%s %s"
+
+	// InheritedLabelsPrefix is the prefix for labels that are propagated from a
+	// descriptor's annotations to a snapshot via Prepare, View, or Commit.
+	InheritedLabelsPrefix = "containerd.io/snapshot/"
+
+	// LabelSnapshotRef is set by the unpacker on every active snapshot to
+	// record the chainID it will be committed under, allowing the metadata
+	// snapshotter to deduplicate already-committed snapshots on re-pull.
+	LabelSnapshotRef = "containerd.io/snapshot.ref"
 
 	// LabelSnapshotUIDMapping is the label used for UID mappings
 	LabelSnapshotUIDMapping = "containerd.io/snapshot/uidmapping"
@@ -48,6 +55,19 @@ const (
 	// Ignoring is not a failure — callers that require enforcement must
 	// pick a snapshotter that supports it.
 	LabelSnapshotMaxSize = "containerd.io/snapshot/max-size"
+
+	// LabelSnapshotDiffID is set by the unpacker on every active snapshot to
+	// record the diffID of the layer being extracted.
+	LabelSnapshotDiffID = "containerd.io/snapshot/diff-id"
+
+	// LabelSnapshotParentChainID is set by the unpacker on active snapshots that
+	// have a parent, recording the chainID of the preceding layer.
+	LabelSnapshotParentChainID = "containerd.io/snapshot/parent-chain-id"
+
+	// LabelSkipApply instructs the unpacker to skip calling Apply for this
+	// active snapshot. Set by the snapshotter when the layer content is already
+	// present (e.g. via CAS deduplication) and extraction is unnecessary.
+	LabelSkipApply = "containerd.io/snapshot.skip-apply"
 )
 
 // Kind identifies the kind of snapshot.
@@ -397,7 +417,7 @@ func FilterInheritedLabels(labels map[string]string) map[string]string {
 
 	filtered := make(map[string]string)
 	for k, v := range labels {
-		if k == labelSnapshotRef || strings.HasPrefix(k, inheritedLabelsPrefix) {
+		if k == LabelSnapshotRef || strings.HasPrefix(k, InheritedLabelsPrefix) {
 			filtered[k] = v
 		}
 	}
