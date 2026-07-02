@@ -151,10 +151,47 @@ func (c *criService) mutateImageMount(
 			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 		}
 
+		mm := c.client.MountManager()
+		id := fmt.Sprintf("cri-image-mount-%s", target)
+		activated := false
+		retried := false
+		for {
+			info, err := mm.Activate(ctx, id, mounts)
+			if err == nil {
+				activated = true
+				mounts = info.System
+			} else if errdefs.IsAlreadyExists(err) {
+				// Reuse an existing activation (e.g. after a restart or a
+				// previous failed attempt that left state behind).
+				info, err = mm.Info(ctx, id)
+				// Activation may have been concurrently deactivated after Activate returned
+				// ErrAlreadyExists; retry activation once in that case.
+				if errdefs.IsNotFound(err) && !retried {
+					retried = true
+					continue
+				} else if err != nil {
+					return fmt.Errorf("failed to get activation info for %q: %w", target, err)
+				}
+				// Do not set activated=true here: this path reuses an existing activation.
+				mounts = info.System
+			} else if !errdefs.IsNotImplemented(err) {
+				return fmt.Errorf("failed to activate mounts %q: %w", target, err)
+			}
+			break
+		}
+		mountTarget := target
+		defer func() {
+			if retErr != nil && activated {
+				if dErr := mm.Deactivate(ctx, id); dErr != nil && !errdefs.IsNotFound(dErr) {
+					log.G(ctx).WithError(dErr).Errorf("failed to deactivate mounts %q", mountTarget)
+				}
+			}
+		}()
+
 		mounts = addVolatileOptionOnImageVolumeMount(mounts)
 
 		// if mutateImageMount() fails, do not leak the new mounts
-		mountTarget := target
+		mountTarget = target
 		defer func() {
 			if retErr != nil {
 				if err := mount.UnmountAll(mountTarget, 0); err != nil {
@@ -219,6 +256,13 @@ func (c *criService) cleanupImageMounts(
 		if err != nil {
 			return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
 		}
+
+		mm := c.client.MountManager()
+		id := fmt.Sprintf("cri-image-mount-%s", target)
+		if err := mm.Deactivate(ctx, id); err != nil && !errdefs.IsNotFound(err) && !errdefs.IsNotImplemented(err) {
+			log.G(ctx).WithError(err).Errorf("failed to deactivate mounts %q", target)
+		}
+
 		err = s.Remove(ctx, target)
 		if err != nil && !errdefs.IsNotFound(err) {
 			return fmt.Errorf("failed to removing snapshot: %w", err)
