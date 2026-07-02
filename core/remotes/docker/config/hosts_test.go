@@ -21,6 +21,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -123,10 +124,18 @@ ca = "/etc/path/default"
 
 [host."https://dial-timeout.registry"]
   dial_timeout = "3s"
+
+[host."https://dns-servers.registry"]
+  dns_servers = ["10.96.0.10", "10.96.0.11"]
+
+[host."https://dns-and-timeout.registry"]
+  dns_servers = ["10.96.0.10"]
+  dial_timeout = "5s"
 `
 
 	var tb, fb = true, false
 	var dialTimeout = 3 * time.Second
+	var dnsAndTimeout = 5 * time.Second
 	expected := []hostConfig{
 		{
 			scheme:       "https",
@@ -214,6 +223,21 @@ ca = "/etc/path/default"
 			path:         "/v2",
 			capabilities: allCaps,
 			dialTimeout:  &dialTimeout,
+		},
+		{
+			scheme:       "https",
+			host:         "dns-servers.registry",
+			path:         "/v2",
+			capabilities: allCaps,
+			dnsServers:   []string{"10.96.0.10", "10.96.0.11"},
+		},
+		{
+			scheme:       "https",
+			host:         "dns-and-timeout.registry",
+			path:         "/v2",
+			capabilities: allCaps,
+			dnsServers:   []string{"10.96.0.10"},
+			dialTimeout:  &dnsAndTimeout,
 		},
 		{
 			scheme:       "https",
@@ -321,6 +345,87 @@ func TestLoadCertFiles(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestDialTimeoutPreservesGlobalDialContext verifies that a per-host dial_timeout
+// does not overwrite the global DialContext set via HostOptions. Without the fix,
+// the else branch in ConfigureHosts would replace tr.DialContext with a plain
+// net.Dialer, silently discarding the global dns_servers configuration.
+func TestDialTimeoutPreservesGlobalDialContext(t *testing.T) {
+	dir := t.TempDir()
+	hostDir := filepath.Join(dir, "timeout.registry")
+	if err := os.MkdirAll(hostDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	hostsToml := `[host."https://timeout.registry"]
+  dial_timeout = "2s"
+`
+	if err := os.WriteFile(filepath.Join(hostDir, "hosts.toml"), []byte(hostsToml), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	dialContextCalled := false
+	globalDialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		dialContextCalled = true
+		return nil, fmt.Errorf("sentinel")
+	}
+
+	ctx := context.Background()
+	resolve := ConfigureHosts(ctx, HostOptions{
+		HostDir:     HostDirFromRoot(dir),
+		DialContext: globalDialContext,
+	})
+
+	hosts, err := resolve("timeout.registry")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hosts) == 0 {
+		t.Fatal("expected at least one host")
+	}
+
+	// Trigger the DialContext so we can verify the global one was preserved.
+	transport, ok := hosts[0].Client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	//nolint:staticcheck // intentional sentinel call to verify which dialer is active
+	transport.DialContext(ctx, "tcp", "timeout.registry:443")
+
+	if !dialContextCalled {
+		t.Error("global DialContext was not called: per-host dial_timeout overwrote the global dns_servers configuration")
+	}
+}
+
+// TestNewDNSDialContextFallback verifies that newDNSDialContext falls back to
+// the system resolver when all configured DNS servers are unreachable.
+func TestNewDNSDialContextFallback(t *testing.T) {
+	// Bind a UDP port and immediately close it. Any query sent to that address
+	// will receive a "port unreachable" response, causing LookupHost to
+	// fail.
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	badServer := pc.LocalAddr().(*net.UDPAddr).IP.String()
+	pc.Close()
+
+	dialFn := newDNSDialContext([]string{badServer}, 10*time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	conn, err := dialFn(ctx, "tcp", "localhost:1")
+	if conn != nil {
+		conn.Close()
+	}
+
+	if ctx.Err() != nil {
+		t.Fatal("DialContext timed out: bad DNS server was not failed over to the system resolver")
+	}
+	// TCP "connection refused" is expected
+	_ = err
 }
 
 func TestHTTPFallback(t *testing.T) {
@@ -590,6 +695,15 @@ func compareHostConfig(j, k hostConfig) bool {
 		return false
 	}
 
+	if len(j.dnsServers) != len(k.dnsServers) {
+		return false
+	}
+	for i := range j.dnsServers {
+		if j.dnsServers[i] != k.dnsServers[i] {
+			return false
+		}
+	}
+
 	return true
 }
 
@@ -610,6 +724,9 @@ func printHostConfig(hc []hostConfig) string {
 		fmt.Fprintf(b, "\t\theader: %#v\n", hc[i].header)
 		if hc[i].dialTimeout != nil {
 			fmt.Fprintf(b, "\t\tdial-timeout: %v\n", hc[i].dialTimeout)
+		}
+		if hc[i].dnsServers != nil {
+			fmt.Fprintf(b, "\t\tdns-servers: %v\n", hc[i].dnsServers)
 		}
 	}
 	return b.String()
