@@ -21,8 +21,6 @@
 package apparmor
 
 import (
-	"bufio"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -105,9 +103,14 @@ type data struct {
 }
 
 func cleanProfileName(profile string) string {
-	// Normally profiles are suffixed by " (enforce)". AppArmor profiles cannot
-	// contain spaces so this doesn't restrict daemon profile names.
-	profile, _, _ = strings.Cut(profile, " ")
+	// /proc/self/attr/current returns the current label for the process.
+	// Unlike /sys/kernel/security/apparmor/profiles, this value may not
+	// include a " (<mode>)" suffix (e.g. it can be just "unconfined").
+	// If a suffix is present, it is of the form "<profile> (<mode>)".
+	// Profile names may contain spaces, so split on " (" rather than the
+	// first space. Trim whitespace first because the value includes a
+	// trailing newline.
+	profile, _, _ = strings.Cut(strings.TrimSpace(profile), " (")
 	if profile == "" {
 		profile = "unconfined"
 	}
@@ -163,43 +166,8 @@ func generate(p *data, o io.Writer) error {
 	return t.Execute(o, p)
 }
 
-func load(path string) error {
-	out, err := aaParser("-Kr", path)
-	if err != nil {
-		return fmt.Errorf("parser error(%q): %w", strings.TrimSpace(out), err)
-	}
-	return nil
-}
-
 // macroExists checks if the passed macro exists.
 func macroExists(m string) bool {
 	_, err := os.Stat(path.Join(dir, m))
 	return err == nil
-}
-
-func aaParser(args ...string) (string, error) {
-	out, err := exec.Command("apparmor_parser", args...).CombinedOutput()
-	return string(out), err
-}
-
-func isLoaded(name string) (bool, error) {
-	f, err := os.Open("/sys/kernel/security/apparmor/profiles")
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-	r := bufio.NewReader(f)
-	for {
-		p, err := r.ReadString('\n')
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return false, err
-		}
-		if strings.HasPrefix(p, name+" ") {
-			return true, nil
-		}
-	}
-	return false, nil
 }
