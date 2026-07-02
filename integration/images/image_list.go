@@ -40,6 +40,10 @@ type ImageList struct {
 	ArgsEscaped      string
 	Nginx            string
 	Whiteout         string
+	ErofsOnlyRaw     string
+	ErofsOnlyZstd    string
+	ErofsOciAndRaw   string
+	ErofsOciAndZstd  string
 }
 
 var (
@@ -61,6 +65,10 @@ func initImages(imageListFile string) {
 		ArgsEscaped:      "cplatpublic.azurecr.io/args-escaped-test-image-ns:1.0",
 		Nginx:            "ghcr.io/containerd/nginx:1.27.0",
 		Whiteout:         "ghcr.io/containerd/whiteout-test:1.0",
+		ErofsOnlyRaw:     "docker.io/zcy1234/alpine-erofs-fixtures:only-raw-3.14.0",
+		ErofsOnlyZstd:    "docker.io/zcy1234/alpine-erofs-fixtures:only-zstd-3.14.0",
+		ErofsOciAndRaw:   "docker.io/zcy1234/alpine-erofs-fixtures:oci-and-erofs-raw-3.14.0",
+		ErofsOciAndZstd:  "docker.io/zcy1234/alpine-erofs-fixtures:oci-and-erofs-zstd-3.14.0",
 	}
 
 	if imageListFile != "" {
@@ -104,6 +112,14 @@ const (
 	Nginx
 	// Whiteout image
 	Whiteout
+	// ErofsOnlyRaw is a multi-manifest image containing only an erofs raw manifest.
+	ErofsOnlyRaw
+	// ErofsOnlyZstd is a multi-manifest image containing only an erofs zstd manifest.
+	ErofsOnlyZstd
+	// ErofsOciAndRaw is an OCI index containing both an OCI manifest and an erofs raw manifest.
+	ErofsOciAndRaw
+	// ErofsOciAndZstd is an OCI index containing both an OCI manifest and an erofs zstd manifest.
+	ErofsOciAndZstd
 )
 
 func initImageMap(imageList ImageList) map[int]string {
@@ -118,6 +134,10 @@ func initImageMap(imageList ImageList) map[int]string {
 	images[ArgsEscaped] = imageList.ArgsEscaped
 	images[Nginx] = imageList.Nginx
 	images[Whiteout] = imageList.Whiteout
+	images[ErofsOnlyRaw] = imageList.ErofsOnlyRaw
+	images[ErofsOnlyZstd] = imageList.ErofsOnlyZstd
+	images[ErofsOciAndRaw] = imageList.ErofsOciAndRaw
+	images[ErofsOciAndZstd] = imageList.ErofsOciAndZstd
 	return images
 }
 
