@@ -1,0 +1,396 @@
+# Workflow intended to run CRI benchmarks on Linux.
+
+name: Linux Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      containersNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of containers to benchmark.
+          Can be set to 0 to skip container benchmarks entirely.
+      containersNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of container benchmarks to be run in parallel.
+      podsNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of pods to benchmark.
+          Can be set to 0 to skip pods benchmarks entirely.
+      podsNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of pod benchmarks to be run in parallel.
+      imagesNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of image operations to benchmark.
+          Can be set to 0 to skip image benchmarks entirely.
+      imagesNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of image benchmarks to be run in parallel.
+
+  workflow_call:
+    inputs:
+      containersNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of containers to benchmark.
+          Can be set to 0 to skip container benchmarks entirely.
+      containersNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of container benchmarks to be run in parallel.
+      podsNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of pods to benchmark.
+          Can be set to 0 to skip pods benchmarks entirely.
+      podsNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of pod benchmarks to be run in parallel.
+      imagesNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of image operations to benchmark.
+          Can be set to 0 to skip image benchmarks entirely.
+      imagesNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of image benchmarks to be run in parallel.
+
+    secrets:
+      AZURE_SUB_ID:
+        required: true
+      AZURE_CREDS:
+        required: true
+      GCP_SERVICE_ACCOUNT:
+        required: true
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: true
+
+env:
+  # Benchmarking-related options:
+  BENCHMARK_TYPE_PODS: "pods"
+  BENCHMARK_TYPE_CONTAINERS: "containers"
+
+  # Test image options:
+  BUSYBOX_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
+  RESOURCE_CONSUMER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
+  WEBSERVER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/nginx:1.14-2"
+
+  # Azure-related options:
+  AZURE_DEFAULT_LOCATION: "westeurope"
+  AZURE_SUBSCRIPTION_ID: "${{ secrets.AZURE_SUB_ID }}"
+  AZURE_DEFAULT_VM_SIZE: "Standard_D2s_v3"
+  AZURE_DEFAULT_PASSWORD: "Passw0rdAdmin"
+
+  # General options:
+  GOLANG_RELEASE_URL: "https://go.dev/dl/go1.17.6.linux-amd64.tar.gz"
+  ADMIN_USERNAME: "azureuser"
+  DEFAULT_ADMIN_PASSWORD: "Passw0rdAdmin"
+  REMOTE_VM_BIN_PATH: "/home/azureuser/containerd/bin"
+  SSH_OPTS: "-o ServerAliveInterval=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  GOOGLE_BUCKET_ROOT: "containerd-benchmarking"
+
+  # Options related to the remote VM:
+  VM_HOME: "/home/azureuser"
+  VM_GOROOT: "/usr/local/go"
+  VM_GOPATH: "/home/azureuser/gopath"
+  VM_CRITOOLS_PATH: "/home/azureuser/cri-tools"
+  VM_CRITEST_BENCHMARK_OPTIONS_FILEPATH: "/home/azureuser/cri-benchmark-settings.yaml"
+  VM_CRITEST_IMAGE_OPTIONS_FILEPATH: "/home/azureuser/cri-test-images.yaml"
+  VM_CRITEST_BENCHMARK_OUTPUT_DIR: "/home/azureuser/benchmarks"
+  VM_CRITEST_REPORT_DIR: "/home/azureuser/critest-logs"
+  VM_CONTAINERD_PATH: "/home/azureuser/containerd"
+  VM_CONTAINERD_LOGFILE: "/home/azureuser/critest-logs/containerd.log"
+
+jobs:
+  linuxBenchmarking:
+    runs-on: ubuntu-latest
+
+    # NOTE: the following permissions are required by `google-github-actions/auth`:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    strategy:
+      matrix:
+        benchmark_params: [
+          {
+            "os_distro": "ubuntu",
+            "os_release": "20.04",
+            "azure_vm_size": "Standard_D32s_v3",
+            "azure_vm_image": "Canonical:0001-com-ubuntu-server-focal:20_04-lts:20.04.202201180",
+          }
+    ]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install required packages
+        run: |
+          sudo apt-get install xmlstarlet -y
+
+      - name: DefineRunVariables
+        run: |
+          WORKFLOW_STARTED_TIME=$(date +%s)
+          echo "WORKFLOW_STARTED_TIME=$WORKFLOW_STARTED_TIME" >> $GITHUB_ENV
+
+          # Azure-related vars:
+          AZURE_RESOURCE_GROUP_NAME="ctrd-benchmarking-${{ matrix.benchmark_params.os_distro }}-${{ matrix.benchmark_params.os_release }}-$WORKFLOW_STARTED_TIME"
+          echo "AZURE_RESOURCE_GROUP_NAME=$AZURE_RESOURCE_GROUP_NAME" >> $GITHUB_ENV
+
+          # Local runner vars:
+          RUNNER_BENCHMARKS_DIR=$HOME/benchmarks/$WORKFLOW_STARTED_TIME
+          mkdir -p "$RUNNER_BENCHMARKS_DIR"
+          echo "RUNNER_BENCHMARKS_DIR=$RUNNER_BENCHMARKS_DIR" >> $GITHUB_ENV
+          jq -n --arg node temp --arg timestamp $WORKFLOW_STARTED_TIME '$timestamp|tonumber|{timestamp:.,$node}' > "$RUNNER_BENCHMARKS_DIR/started.json"
+
+          # Google Cloud-related vars:
+          BENCHMARK_GOOGLE_BUCKET="${{ env.GOOGLE_BUCKET_ROOT }}/${{ matrix.benchmark_params.os_distro }}/${{ matrix.benchmark_params.os_release }}/$WORKFLOW_STARTED_TIME"
+          echo "BENCHMARK_GOOGLE_BUCKET=$BENCHMARK_GOOGLE_BUCKET" >> $GITHUB_ENV
+
+      - name: Generate ssh key pair
+        run: |
+          mkdir -p $HOME/.ssh/
+          ssh-keygen -t rsa -b 4096 -C "ci@containerd.com" -f $HOME/.ssh/id_rsa -q -N ""
+          echo "SSH_PUB_KEY=$(cat $HOME/.ssh/id_rsa.pub)" >> $GITHUB_ENV
+          echo "SSH_PUB_KEY_PATH=$HOME/.ssh/id_rsa.pub" >> $GITHUB_ENV
+
+      - name: AZLogin
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDS }}
+
+      - name: AZResourceGroupCreate
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            az group create -n ${{ env.AZURE_RESOURCE_GROUP_NAME }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+      - name: AZTestVMCreate
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            az vm create -n "${{ matrix.benchmark_params.os_distro }}-${{ matrix.benchmark_params.os_release }}-benchmarks" --admin-username ${{ env.ADMIN_USERNAME }} --admin-password ${{ env.DEFAULT_ADMIN_PASSWORD }} --image ${{ matrix.benchmark_params.azure_vm_image }} -g ${{ env.AZURE_RESOURCE_GROUP_NAME }} --nsg-rule SSH --size ${{ matrix.benchmark_params.azure_vm_size }} --ssh-key-value "${{ env.SSH_PUB_KEY }}"
+
+      - name: GetAZVMPublicIP
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            echo "VM_PUB_IP=$(az network public-ip list -g ${{ env.AZURE_RESOURCE_GROUP_NAME }} | jq '.[0]["ipAddress"]' | tr -d '\"')" >> $GITHUB_ENV
+
+      - name: TestSSHConnection
+        run: |
+          if ! ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "hostname"; then
+            exit 1
+          fi
+
+      - name: CloneContainerDRepo
+        run: |
+          # Create directories:
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "mkdir -p ${{ env.VM_GOPATH }}/bin"
+
+          # Clone containerd:
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "git clone http://github.com/containerd/containerd ${{ env.VM_CONTAINERD_PATH }}"
+          CONTAINERD_COMMIT=`ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'cd ${{ env.VM_CONTAINERD_PATH }} && git log -1 --format=%H'"`
+          echo "CONTAINERD_COMMIT=$CONTAINERD_COMMIT" >> $GITHUB_ENV
+
+      - name: PrepareTestingEnvUbuntu
+        if: ${{ matrix.benchmark_params.os_distro }} == "ubuntu"
+        run: |
+          # Install deps:
+          # - pk-config required by `containerd/script/install-cni`
+          # - unzip: required by `containerd/script/install-protobuf`
+          # - libbtrfs-dev btrfs-progs: containerd
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'sudo apt-get update -y && sudo apt-get install -y gcc make gperf pkg-config unzip libbtrfs-dev btrfs-progs'"
+
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'cat > /tmp/setup-containerd-deps.sh'" <<'EOF'
+              set -x
+              set -e
+
+              # Latest Golang:
+              wget ${{ env.GOLANG_RELEASE_URL }} -O /tmp/go-release.tgz
+              tar -xzvf /tmp/go-release.tgz -C /usr/local
+              echo "export GOROOT=/usr/local/go" >> /tmp/gorc
+              echo "export GOPATH=${{ env.VM_GOPATH }}" >> /tmp/gorc
+              echo "export PATH=/usr/local/go/bin:${{ env.VM_GOPATH }}/bin:${{ env.VM_CONTAINERD_PATH }}/bin:$PATH"  >> /tmp/gorc
+              source /tmp/gorc
+              cat /tmp/gorc >> /root/.bashrc
+              cat /tmp/gorc >> /home/azureuser/.bashrc
+              # chown -R azureuser:azureuser $GOPATH/pkg
+
+              # ContainerD deps:
+              ${{ env.VM_CONTAINERD_PATH }}/script/setup/install-seccomp
+              PATH=$PATH GOPATH=$GOPATH bash ${{ env.VM_CONTAINERD_PATH }}/script/setup/install-runc
+
+              # NOTE(aznashwan): the `install-cni` script expects containerd to have been pulled in `$GOPATH/src`:
+              sed -i.bak -E 's#"\$GOPATH"/src/github.com/containerd/containerd/go.mod#${{ env.VM_CONTAINERD_PATH }}/go.mod#' ${{ env.VM_CONTAINERD_PATH }}/script/setup/install-cni
+              PATH=$PATH GOPATH=$GOPATH bash ${{ env.VM_CONTAINERD_PATH }}/script/setup/install-cni
+
+              # Protobuf:
+              PATH=$PATH GOPATH=$GOPATH bash ${{ env.VM_CONTAINERD_PATH }}/script/setup/install-protobuf
+              chmod +x /usr/local/bin/protoc
+              chmod og+rx /usr/local/include/google /usr/local/include/google/protobuf /usr/local/include/google/protobuf/compiler
+              chmod -R og+r /usr/local/include/google/protobuf/
+              protoc --version
+
+              # Make containerd:
+              PATH=$PATH GOPATH=$GOPATH bash -c 'cd ${{ env.VM_CONTAINERD_PATH }} && make binaries && make install'
+
+              # Add ContainerD config:
+              mkdir -p /etc/containerd
+              printf "[plugins.cri.containerd.default_runtime]\nruntime_type = \"io.containerd.runc.v2\"\n" > /etc/containerd/config.toml
+          EOF
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sudo bash /tmp/setup-containerd-deps.sh"
+
+      - name: PrepareBenchmarkParamFiles
+        run: |
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > ${{ env.VM_CRITEST_IMAGE_OPTIONS_FILEPATH }}'" <<'EOF'
+               defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+               webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
+           EOF
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'cat > ${{ env.VM_CRITEST_BENCHMARK_OPTIONS_FILEPATH }}'" <<'EOF'
+              containersNumber: ${{ inputs.containersNumber }}
+              containersNumberParallel: ${{ inputs.containersNumberParallel }}
+              podsNumber: ${{ inputs.podsNumber }}
+              podsNumberParallel: ${{ inputs.podsNumberParallel }}
+              imagesNumber: ${{ inputs.imagesNumber }}
+              imagesNumberParallel: ${{ inputs.imagesNumberParallel }}
+           EOF
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'mkdir -p ${{ env.VM_CRITEST_REPORT_DIR }}'"
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'mkdir -p ${{ env.VM_CRITEST_BENCHMARK_OUTPUT_DIR }}'"
+
+      - name: GetCritestRepo
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "git clone https://github.com/kubernetes-sigs/cri-tools ${{ env.VM_CRITOOLS_PATH }}"
+
+      - name: BuildCritest
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "bash -c 'source /tmp/gorc && cd ${{ env.VM_CRITOOLS_PATH }} && make install -e BINDIR=\$GOPATH/bin'"
+
+      - name: RunCritestBenchmarks
+        run: |
+          BENCHMARK_STARTED_TIME=$(date +%s)
+          echo "BENCHMARK_STARTED_TIME=$BENCHMARK_STARTED_TIME" >> $GITHUB_ENV
+
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'cat > /tmp/run-containerd-benchmarks.sh'" <<'EOF'
+              set -x
+              set -e
+
+              source /tmp/gorc
+
+              # Start ContainerD:
+              ${{ env.VM_CONTAINERD_PATH }}/bin/containerd -log-level debug &> ${{ env.VM_CONTAINERD_LOGFILE }} &
+              ctr version > ${{ env.VM_CRITEST_REPORT_DIR }}/containerd-version.yaml
+
+              # Run critest:
+              critest --runtime-endpoint="/var/run/containerd/containerd.sock" --test-images-file="${{ env.VM_CRITEST_IMAGE_OPTIONS_FILEPATH }}" --report-dir="${{ env.VM_CRITEST_REPORT_DIR }}" --benchmark --benchmarking-params-file="${{ env.VM_CRITEST_BENCHMARK_OPTIONS_FILEPATH }}" --benchmarking-output-dir="${{ env.VM_CRITEST_BENCHMARK_OUTPUT_DIR }}"
+          EOF
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sudo bash /tmp/run-containerd-benchmarks.sh"
+
+          BENCHMARK_ENDED_TIME=$(date +%s)
+          echo "BENCHMARK_ENDED_TIME=$BENCHMARK_ENDED_TIME" >> $GITHUB_ENV
+
+      - name: PullArtifactsFromVm
+        run: |
+          # Pull all logs:
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} -r ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}:${{ env.VM_CRITEST_REPORT_DIR }} "$RUNNER_BENCHMARKS_DIR/"
+
+          # Pull benchmarks:
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} -r ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}:${{ env.VM_CRITEST_BENCHMARK_OUTPUT_DIR }} "$RUNNER_BENCHMARKS_DIR/"
+
+          # Pull config files for later reference:
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}:${{ env.VM_CRITEST_IMAGE_OPTIONS_FILEPATH }} "$RUNNER_BENCHMARKS_DIR/"
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}:${{ env.VM_CRITEST_BENCHMARK_OPTIONS_FILEPATH }} "$RUNNER_BENCHMARKS_DIR/"
+
+      - name: LogRunParams
+        run: |
+          # Write a file detailing the options used for the job:
+          cat > "$RUNNER_BENCHMARKS_DIR/benchmark-run-params.yaml" <<'EOF'
+            workflowRunId: ${{ env.WORKFLOW_STARTED_TIME }}
+            benchmarkStartedTime: ${{ env.BENCHMARK_STARTED_TIME }}
+            benchmarkEndedTime: ${{ env.BENCHMARK_ENDED_TIME }}
+            osDistro: ${{ matrix.benchmark_params.os_distro }}
+            osRelease: "${{ matrix.benchmark_params.os_release }}"
+            azureImage: ${{ matrix.benchmark_params.azure_vm_image }}
+            azureVmSize: ${{ matrix.benchmark_params.azure_vm_size }}
+            containerdCommit: ${{ env.CONTAINERD_COMMIT }}
+            runtimeTag: "runc-v2"
+          EOF
+
+      - name: SetUpPython
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: ProcessBenchmarkResults
+        continue-on-error: true
+        run: |
+          # Install deps:
+          apt-get update && apt-get install -y libyaml-dev
+          pip install numpy matplotlib pyyaml
+
+          # Prepare output dir:
+          OUTDIR=${{ env.RUNNER_BENCHMARKS_DIR }}/plots
+          mkdir $OUTDIR
+
+          # Run script:
+          python $GITHUB_WORKSPACE/script/benchmark/process_benchmark_results.py --output-dir $OUTDIR ${{ env.RUNNER_BENCHMARKS_DIR }}
+
+      - name: AssignGcpCreds
+        id: AssignGcpCreds
+        run: |
+          echo '::set-output name=GCP_SERVICE_ACCOUNT::${{ secrets.GCP_SERVICE_ACCOUNT }}'
+          echo '::set-output name=GCP_WORKLOAD_IDENTITY_PROVIDER::${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}'
+
+      - name: AuthGcp
+        uses: google-github-actions/auth@v0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
+        with:
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: UploadBenchmarksData
+        uses: google-github-actions/upload-cloud-storage@v0.8.0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
+        with:
+          path: ${{ env.RUNNER_BENCHMARKS_DIR }}
+          destination: ${{ env.BENCHMARK_GOOGLE_BUCKET }}
+          parent: false
+
+      - name: ResourceCleanup
+        uses: azure/CLI@v1
+        if: always()
+        with:
+          inlinescript: |
+            az group delete -g ${{ env.AZURE_RESOURCE_GROUP_NAME }} --yes

@@ -1,0 +1,425 @@
+# Workflow intended to run CRI benchmarks on Windows.
+
+name: Windows Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      hcsshimVersion:
+        type: string
+        default: auto
+        required: true
+        description: |
+          The version of HCSSHIM to build and use for the benchmarks. Set to 'auto' to use the latest commit of HCSSHIM from containerd's .vendor.
+      containersNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of containers to benchmark.
+          Can be set to 0 to skip container benchmarks entirely.
+      containersNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of container benchmarks to be run in parallel.
+      podsNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of pods to benchmark.
+          Can be set to 0 to skip pods benchmarks entirely.
+      podsNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of pod benchmarks to be run in parallel.
+      imagesNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of image operations to benchmark.
+          Can be set to 0 to skip image benchmarks entirely.
+      imagesNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of image benchmarks to be run in parallel.
+
+  workflow_call:
+    inputs:
+      hcsshimVersion:
+        type: string
+        default: auto
+        required: true
+        description: |
+          The version of HCSSHIM to build and use for the benchmarks. Set to 'auto' to use the latest commit of HCSSHIM from containerd's .vendor.
+      containersNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of containers to benchmark.
+          Can be set to 0 to skip container benchmarks entirely.
+      containersNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of container benchmarks to be run in parallel.
+      podsNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of pods to benchmark.
+          Can be set to 0 to skip pods benchmarks entirely.
+      podsNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of pod benchmarks to be run in parallel.
+      imagesNumber:
+        type: string
+        default: 100
+        required: true
+        description: |
+          The total number of image operations to benchmark.
+          Can be set to 0 to skip image benchmarks entirely.
+      imagesNumberParallel:
+        type: string
+        default: 1
+        required: true
+        description: |
+          The maximum number of image benchmarks to be run in parallel.
+
+    secrets:
+      AZURE_SUB_ID:
+        required: true
+      AZURE_CREDS:
+        required: true
+      GCP_SERVICE_ACCOUNT:
+        required: true
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: true
+
+env:
+  # Benchmarking-related options:
+  BENCHMARK_TYPE_PODS: "pods"
+  BENCHMARK_TYPE_CONTAINERS: "containers"
+
+  # NOTE: setting this to 'auto' will have the job auto-detect the version
+  # of hcsshim found in containerd's `go.mod` file.
+  HCSSHIM_VERSION_AUTO: "auto"
+
+  # Test image options:
+  BUSYBOX_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
+  RESOURCE_CONSUMER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
+  WEBSERVER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/nginx:1.14-2"
+
+  # Azure-related options:
+  AZURE_DEFAULT_LOCATION: "westeurope"
+  AZURE_SUBSCRIPTION_ID: "${{ secrets.AZURE_SUB_ID }}"
+  AZURE_DEFAULT_VM_SIZE: "Standard_D8s_v3"
+  AZURE_DEFAULT_2019_IMAGE_ID: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-with-Containers-smalldisk:17763.2565.220202"
+  AZURE_DEFAULT_2022_IMAGE_ID: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:20348.169.2108120020"
+
+  # General options:
+  DEFAULT_ADMIN_USERNAME: "azureuser"
+  DEFAULT_ADMIN_PASSWORD: "Passw0rdAdmin"
+  REMOTE_VM_BIN_PATH: "C:\\containerd\\bin"
+  SSH_OPTS: "-o ServerAliveInterval=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  GOOGLE_BUCKET_ROOT: "containerd-benchmarking"
+
+  # Options related to the remote VM:
+  VM_CRITEST_IMAGE_OPTIONS_FILEPATH: "C:/cri-test-images.yaml"
+  VM_CRITEST_BENCHMARK_OPTIONS_FILEPATH: "C:/cri-benchmark-settings.yaml"
+  VM_CRITEST_BENCHMARK_OUTPUT_DIR: "C:/Benchmarks"
+  VM_CRITEST_REPORT_DIR: "C:/Logs"
+  VM_CONTAINERD_LOGFILE: "C:/Logs/containerd.logs"
+
+jobs:
+  winBenchmarking:
+    runs-on: ubuntu-latest
+
+    # NOTE: the following permissions are required by `google-github-actions/auth`:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    strategy:
+      matrix:
+        benchmark_params: [
+          {
+            "windows_version": "ltsc2019",
+            "azure_vm_size": "Standard_D8s_v3",
+            "azure_vm_image": "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-with-Containers-smalldisk:17763.2565.220202",
+          },
+          {
+            "windows_version": "ltsc2022",
+            "azure_vm_size": "Standard_D8s_v3",
+            "azure_vm_image": "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:20348.169.2108120020",
+          },
+    ]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install required packages
+        run: |
+          sudo apt-get install xmlstarlet -y
+
+      - name: DefineRunVariables
+        run: |
+          WORKFLOW_STARTED_TIME=$(date +%s)
+          echo "WORKFLOW_STARTED_TIME=$WORKFLOW_STARTED_TIME" >> $GITHUB_ENV
+
+          # Azure-related vars:
+          AZURE_RESOURCE_GROUP_NAME="ctrd-benchmarking-${{ matrix.benchmark_params.windows_version }}-$WORKFLOW_STARTED_TIME"
+          echo "AZURE_RESOURCE_GROUP_NAME=$AZURE_RESOURCE_GROUP_NAME" >> $GITHUB_ENV
+
+          # Local runner vars:
+          RUNNER_BENCHMARKS_DIR=$HOME/benchmarks/$WORKFLOW_STARTED_TIME
+          mkdir -p "$RUNNER_BENCHMARKS_DIR"
+          echo "RUNNER_BENCHMARKS_DIR=$RUNNER_BENCHMARKS_DIR" >> $GITHUB_ENV
+          jq -n --arg node temp --arg timestamp $WORKFLOW_STARTED_TIME '$timestamp|tonumber|{timestamp:.,$node}' > "$RUNNER_BENCHMARKS_DIR/started.json"
+
+      - name: Generate ssh key pair
+        run: |
+          mkdir -p $HOME/.ssh/
+          ssh-keygen -t rsa -b 4096 -C "ci@containerd.com" -f $HOME/.ssh/id_rsa -q -N ""
+          echo "SSH_PUB_KEY=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
+
+      - name: AZLogin
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDS }}
+
+      - name: AZResourceGroupCreate
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            az group create -n ${{ env.AZURE_RESOURCE_GROUP_NAME }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+      - name: AZTestVMCreate
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            DETAILS=$(az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.DEFAULT_ADMIN_PASSWORD }} --image ${{ matrix.benchmark_params.azure_vm_image }} -g ${{ env.AZURE_RESOURCE_GROUP_NAME }} --nsg-rule SSH --size ${{ matrix.benchmark_params.azure_vm_size }} --public-ip-sku Standard -o json)
+            PUB_IP=$(echo $DETAILS | jq -r .publicIpAddress)
+            if [ "$PUB_IP" == "null" ]
+            then
+                RETRY=0
+                while [ "$PUB_IP" == "null" ] || [ $RETRY -le 5 ]
+                do
+                    sleep 5
+                    PUB_IP=$(az vm show -d -g ${{ env.AZURE_RESOURCE_GROUP_NAME }} -n winTestVM -o json --query publicIps | jq -r)
+                    RETRY=$(( $RETRY + 1 ))
+                done
+            fi
+
+            if [ "$PUB_IP" == "null" ]
+            then
+                echo "failed to fetch public IP"
+                exit 1
+            fi
+            echo "VM_PUB_IP=$PUB_IP" >> $GITHUB_ENV
+
+      - name: GetAZVMPublicIP
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            echo "VM_PUB_IP=$(az network public-ip list -g ${{ env.AZURE_RESOURCE_GROUP_NAME }} | jq '.[0]["ipAddress"]' | tr -d '\"')" >> $GITHUB_ENV
+
+      - name: EnableAZVMSSH
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            az vm run-command invoke  --command-id RunPowerShellScript -n winTestVM -g ${{ env.AZURE_RESOURCE_GROUP_NAME }} --scripts @$GITHUB_WORKSPACE/script/setup/enable_ssh_windows.ps1 --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
+
+      - name: TestSSHConnection
+        run: |
+          if ! ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}  "hostname";
+          then
+            exit 1
+          fi
+
+      - name: InstallContainerFeatureWS2022
+        if: ${{ matrix.benchmark_params.windows_version == 'ltsc2022' }}
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "powershell.exe -command { Install-WindowsFeature -Name 'Containers' -Restart }"
+
+      - name: WaitForVMToRestart
+        if: ${{ matrix.benchmark_params.windows_version == 'ltsc2022' }}
+        timeout-minutes: 5
+        run: |
+          # give the vm 30 seconds to actually stop. SSH server might actually respond while server is shutting down.
+          sleep 30
+          while [ ! $( ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}  "hostname") ];
+          do
+             echo "Unable to connect to azurevm"
+          done
+          echo "Connection reestablished. VM restarted succesfully."
+
+      - name: CreateNatNetworkWS2022
+        if: ${{ matrix.benchmark_params.windows_version == 'ltsc2022' }}
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "powershell.exe -command { curl.exe -L 'https://raw.githubusercontent.com/microsoft/SDN/master/Kubernetes/windows/hns.psm1' -o hns.psm1 }"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "powershell.exe -command { Import-Module .\hns.psm1 ; New-HnsNetwork -Type NAT -Name nat -AddressPrefix 172.19.208.0/20 -Gateway 172.19.208.1 }"
+
+      - name: PrepareTestingEnv
+        run: |
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }}  $GITHUB_WORKSPACE/script/setup/prepare_env_windows.ps1  ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}:/prepare_env_windows.ps1
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }}  ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "c:\\prepare_env_windows.ps1"
+
+      - name: MakeContainerDBins
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "git clone http://github.com/containerd/containerd c:\\containerd"
+          CONTAINERD_COMMIT=`ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh.exe -c 'cd c:\\containerd && git log -1 --format=%h'"`
+          echo "CONTAINERD_COMMIT=$CONTAINERD_COMMIT" >> $GITHUB_ENV
+
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "cd c:\containerd ; make binaries"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "git clone http://github.com/Microsoft/hcsshim c:\containerd\hcsshim "
+
+      - name: SetupCni
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh.exe -c 'cd c:/containerd && ./script/setup/install-cni-windows'"
+
+      - name: BuildHcsshim
+        run: |
+          if [ "${{ inputs.hcsshimVersion }}" = "${{ env.HCSSHIM_VERSION_AUTO }}" ]; then
+            # Get shim commit from containerd local repo
+            HCSSHIM_TAG=$(grep 'Microsoft/hcsshim' go.mod | awk '{ print $2 }');
+          else
+            HCSSHIM_TAG=${{ inputs.hcsshimVersion }}
+          fi
+          echo "HCSSHIM_TAG=$HCSSHIM_TAG" >> $GITHUB_ENV
+
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "cd c:\containerd\hcsshim; git fetch --tags origin $HCSSHIM_TAG ; \
+                            git checkout $HCSSHIM_TAG ; go build -mod=vendor -o ${{ env.REMOTE_VM_BIN_PATH }}\containerd-shim-runhcs-v1.exe .\cmd\containerd-shim-runhcs-v1"
+
+      - name: PrepareBenchmarkParamFiles
+        run: |
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'cat > ${{ env.VM_CRITEST_IMAGE_OPTIONS_FILEPATH }}'" <<'EOF'
+               defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+               webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
+           EOF
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'cat > ${{ env.VM_CRITEST_BENCHMARK_OPTIONS_FILEPATH }}'" <<'EOF'
+               containersNumber: ${{ inputs.containersNumber }}
+               containersNumberParallel: ${{ inputs.containersNumberParallel }}
+               podsNumber: ${{ inputs.podsNumber }}
+               podsNumberParallel: ${{ inputs.podsNumberParallel }}
+               imagesNumber: ${{ inputs.imagesNumber }}
+               imagesNumberParallel: ${{ inputs.imagesNumberParallel }}
+               imagePullingBenchmarkImage: "${{ env.BUSYBOX_TESTING_IMAGE_REF }}"
+               # NOTE(aznashwan): timeouts on Windows must be slightly more lenient
+               # than the default timeouts used on Linux:
+               podBenchmarkTimeoutSeconds: 120
+               imageBenchmarkTimeoutSeconds: 120
+               containerBenchmarkTimeoutSeconds: 120
+               podContainerStartBenchmarkTimeoutSeconds: 120
+           EOF
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'mkdir -p ${{ env.VM_CRITEST_REPORT_DIR }}'"
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh -c 'mkdir -p ${{ env.VM_CRITEST_BENCHMARK_OUTPUT_DIR }}'"
+
+      - name: GetCritestRepo
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "git clone https://github.com/kubernetes-sigs/cri-tools c:/cri-tools"
+
+      - name: BuildCritest
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "sh.exe -c 'cd /c/cri-tools && make critest'"
+
+      - name: RunCritestBenchmarks
+        run: |
+          BENCHMARK_STARTED_TIME=$(date +%s)
+          echo "BENCHMARK_STARTED_TIME=$BENCHMARK_STARTED_TIME" >> $GITHUB_ENV
+
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }} "powershell.exe -command { Start-Process -FilePath C:\containerd\bin\containerd.exe -NoNewWindow -RedirectStandardError true -PassThru ; get-process | sls containerd ; start-sleep 5 ; c:\cri-tools\build\bin\critest.exe --runtime-endpoint=\"npipe:\\\\.\\pipe\\containerd-containerd\" --test-images-file='${{ env.VM_CRITEST_IMAGE_OPTIONS_FILEPATH }}' --report-dir='${{ env.VM_CRITEST_REPORT_DIR }}' --benchmark --benchmarking-params-file '${{ env.VM_CRITEST_BENCHMARK_OPTIONS_FILEPATH }}' --benchmarking-output-dir '${{ env.VM_CRITEST_BENCHMARK_OUTPUT_DIR }}' }"
+
+          BENCHMARK_ENDED_TIME=$(date +%s)
+          echo "BENCHMARK_ENDED_TIME=$BENCHMARK_ENDED_TIME" >> $GITHUB_ENV
+
+      - name: PullArtifactsFromWindowsVm
+        run: |
+          # Pull all logs:
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} -r ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}:${{ env.VM_CRITEST_REPORT_DIR }} "$RUNNER_BENCHMARKS_DIR/"
+
+          # Pull benchmarks:
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} -r ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}:${{ env.VM_CRITEST_BENCHMARK_OUTPUT_DIR }} "$RUNNER_BENCHMARKS_DIR/"
+
+          # Pull config files for later reference:
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}:${{ env.VM_CRITEST_IMAGE_OPTIONS_FILEPATH }} "$RUNNER_BENCHMARKS_DIR/"
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} ${{ env.DEFAULT_ADMIN_USERNAME }}@${{ env.VM_PUB_IP }}:${{ env.VM_CRITEST_BENCHMARK_OPTIONS_FILEPATH }} "$RUNNER_BENCHMARKS_DIR/"
+
+      - name: LogRunParams
+        run: |
+          # Write a file detailing the options used for the job:
+          cat > "$RUNNER_BENCHMARKS_DIR/benchmark-run-params.yaml" <<'EOF'
+            workflowRunId: ${{ env.WORKFLOW_STARTED_TIME }}
+            benchmarkStartedTime: ${{ env.BENCHMARK_STARTED_TIME }}
+            benchmarkEndedTime: ${{ env.BENCHMARK_ENDED_TIME }}
+            osDistro: "windows"
+            osRelease: ${{ matrix.benchmark_params.windows_version }}
+            azureImage: ${{ matrix.benchmark_params.azure_vm_image }}
+            azureVmSize: ${{ matrix.benchmark_params.azure_vm_size }}
+            containerdCommit: ${{ env.CONTAINERD_COMMIT }}
+            runtimeTag: "hscshim-${{ env.HCSSHIM_TAG }}"
+          EOF
+
+      - name: SetUpPython
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: ProcessBenchmarkResults
+        continue-on-error: true
+        run: |
+          # Install deps:
+          apt-get update && apt-get install -y libyaml-dev
+          pip install numpy matplotlib pyyaml
+
+          # Prepare output dir:
+          OUTDIR=${{ env.RUNNER_BENCHMARKS_DIR }}/plots
+          mkdir $OUTDIR
+
+          # Run script:
+          python $GITHUB_WORKSPACE/script/benchmark/process_benchmark_results.py --output-dir $OUTDIR ${{ env.RUNNER_BENCHMARKS_DIR }}
+
+      - name: AssignGcpCreds
+        id: AssignGcpCreds
+        run: |
+          # Format: $BUCKET_ROOT/containerd_COMMIT/OS_TYPE/OS_RELEASE/runtime_RUNTIME_COMMIT/WORKFLOW_STARTED_TIME
+          BENCHMARK_GOOGLE_BUCKET="${{ env.GOOGLE_BUCKET_ROOT }}/containerd_${{ env.CONTAINERD_COMMIT }}/windows/${{ matrix.benchmark_params.windows_version }}/hcsshim_${{ env.HCSSHIM_TAG }}/$WORKFLOW_STARTED_TIME"
+          echo "BENCHMARK_GOOGLE_BUCKET=$BENCHMARK_GOOGLE_BUCKET" >> $GITHUB_ENV
+
+          echo '::set-output name=GCP_SERVICE_ACCOUNT::${{ secrets.GCP_SERVICE_ACCOUNT }}'
+          echo '::set-output name=GCP_WORKLOAD_IDENTITY_PROVIDER::${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}'
+
+      - name: AuthGcp
+        uses: google-github-actions/auth@v0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
+        with:
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: UploadBenchmarksData
+        uses: google-github-actions/upload-cloud-storage@v0.8.0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
+        with:
+          path: ${{ env.RUNNER_BENCHMARKS_DIR }}
+          destination: ${{ env.BENCHMARK_GOOGLE_BUCKET }}
+          parent: false
+
+      - name: ResourceCleanup
+        uses: azure/CLI@v1
+        if: always()
+        with:
+          inlinescript: |
+            az group delete -g ${{ env.AZURE_RESOURCE_GROUP_NAME }} --yes
