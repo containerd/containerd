@@ -30,6 +30,7 @@ import (
 var handledSignals = []os.Signal{
 	unix.SIGTERM,
 	unix.SIGINT,
+	unix.SIGHUP,
 	unix.SIGUSR1,
 	unix.SIGPIPE,
 }
@@ -52,6 +53,8 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 
 				log.G(ctx).WithField("signal", s).Debug("received signal")
 				switch s {
+				case unix.SIGHUP:
+					log.G(ctx).Warn("received SIGHUP, but config reload is not supported; ignoring signal")
 				case unix.SIGUSR1:
 					dumpStacks(true)
 				default:
