@@ -325,6 +325,31 @@ $ crictl info
     "stateDir": "/run/containerd/io.containerd.grpc.v1.cri"
   },
   "golang": "go1.20.3",
+  "imageconfig": {
+    "concurrentLayerFetchBuffer": 0,
+    "disableSnapshotAnnotations": true,
+    "discardUnpackedLayers": false,
+    "imageDecryption": {
+      "keyModel": "node"
+    },
+    "imagePullProgressTimeout": "5m0s",
+    "imagePullWithSyncFs": false,
+    "maxConcurrentDownloads": 3,
+    "pinned_images": {
+      "sandbox": "registry.k8s.io/pause:3.10.2"
+    },
+    "registry": {
+      "auths": null,
+      "configPath": "/etc/containerd/certs.d:/etc/docker/certs.d",
+      "configs": null,
+      "headers": null,
+      "mirrors": null
+    },
+    "runtimePlatforms": null,
+    "snapshotter": "overlayfs",
+    "statsCollectPeriod": 10,
+    "useLocalImagePull": false
+  },
   "lastCNILoadStatus": "OK",
   "lastCNILoadStatus.default": "OK"
 }
