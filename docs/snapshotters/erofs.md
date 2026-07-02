@@ -1,6 +1,6 @@
 # EROFS Snapshotter
 
-The [EROFS](https://erofs.docs.kernel.org) snapshotter is a native containerd
+The [EROFS](https://erofs.docs.kernel.org/en/latest/) snapshotter is a native containerd
 snapshotter to enable the EROFS filesystem, specifically to keep EROFS‑formatted
 blobs for each committed snapshot and to prepare an OverlayFS mount for each
 active snapshot.

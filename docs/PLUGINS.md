@@ -13,7 +13,7 @@ with an image registry, or loading an image from tar. containerd's Go client
 gives a user access to many points of extensions from creating their own
 options on container creation to resolving image registry names.
 
-See [containerd's Go documentation](https://godoc.org/github.com/containerd/containerd/v2/client)
+See [containerd's Go documentation](https://pkg.go.dev/github.com/containerd/containerd/v2/client)
 
 ## External Plugins
 

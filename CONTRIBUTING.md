@@ -4,7 +4,7 @@ This guide will help familiarize contributors to the `containerd/containerd` rep
 
 ## Prerequisite
 
-First read the containerd project's [general guidelines around contribution](https://github.com/containerd/project/blob/main/CONTRIBUTING.md)
+First read the containerd project's [general guidelines around contribution](https://github.com/containerd/.project/blob/main/CONTRIBUTING.md)
 which apply to all containerd projects.
 
 ## Getting started
