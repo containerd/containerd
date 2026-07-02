@@ -98,7 +98,7 @@ var pushCommand = &cli.Command{
 		if !cliContext.Bool("local") {
 			unsupportedFlags := []string{
 				"manifest", "manifest-type", "max-concurrent-uploaded-layers", "allow-non-distributable-blobs",
-				"skip-verify", "tlscacert", "tlscert", "tlskey", "http-dump", "http-trace", // RegistryFlags
+				"http-dump", "http-trace",
 			}
 			for _, s := range unsupportedFlags {
 				if cliContext.IsSet(s) {
@@ -114,7 +114,29 @@ var pushCommand = &cli.Command{
 			if local == "" {
 				local = ref
 			}
-			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(cliContext.String("hosts-dir"))}
+
+			var tempHostsDir string
+			var cleanup func()
+			hasTLSFlags := cliContext.IsSet("skip-verify") || cliContext.IsSet("tlscacert") ||
+				cliContext.IsSet("tlscert") || cliContext.IsSet("tlskey")
+
+			var hostsDir string
+			if hasTLSFlags {
+				if cliContext.IsSet("hosts-dir") {
+					return fmt.Errorf("cannot use TLS flags (--skip-verify, --tlscacert, --tlscert, --tlskey) together with --hosts-dir; please configure TLS settings in hosts.toml instead")
+				}
+
+				tempHostsDir, cleanup, err = commands.CreateTmpHostConfig(cliContext, ref)
+				if err != nil {
+					return err
+				}
+				defer cleanup()
+				hostsDir = tempHostsDir
+			} else {
+				hostsDir = cliContext.String("hosts-dir")
+			}
+
+			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(hostsDir)}
 			if cliContext.Bool("plain-http") {
 				opts = append(opts, registry.WithDefaultScheme("http"))
 			}
