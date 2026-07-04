@@ -123,6 +123,10 @@ ca = "/etc/path/default"
 
 [host."https://dial-timeout.registry"]
   dial_timeout = "3s"
+
+[host."https://mirror-with-creds.registry"]
+  capabilities = ["pull"]
+  credential_domain = "docker.io"
 `
 
 	var tb, fb = true, false
@@ -216,6 +220,13 @@ ca = "/etc/path/default"
 			dialTimeout:  &dialTimeout,
 		},
 		{
+			scheme:           "https",
+			host:             "mirror-with-creds.registry",
+			path:             "/v2",
+			capabilities:     docker.HostCapabilityPull,
+			credentialDomain: "docker.io",
+		},
+		{
 			scheme:       "https",
 			host:         "test-default.registry",
 			path:         "/v2",
@@ -243,6 +254,34 @@ ca = "/etc/path/default"
 		if !compareHostConfig(hosts[i], expected[i]) {
 			t.Fatalf("Mismatch at host %d", i)
 		}
+	}
+}
+
+func TestParseHostConfigCredentialDomainValidation(t *testing.T) {
+	invalid := []string{
+		"https://docker.io",
+		"http://docker.io",
+		"docker.io/library",
+		"docker.io/library/ubuntu",
+	}
+	for _, domain := range invalid {
+		toml := fmt.Sprintf(`
+[host."https://mirror.registry"]
+  credential_domain = %q
+`, domain)
+		_, err := parseHostsFile("", []byte(toml))
+		if err == nil {
+			t.Errorf("expected error for credential_domain %q, got nil", domain)
+		}
+	}
+
+	valid := `
+[host."https://mirror.registry"]
+  credential_domain = "docker.io"
+`
+	_, err := parseHostsFile("", []byte(valid))
+	if err != nil {
+		t.Errorf("unexpected error for valid credential_domain: %v", err)
 	}
 }
 
