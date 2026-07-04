@@ -57,7 +57,7 @@ type hostConfig struct {
 
 	header http.Header
 
-	// TODO: Add credential configuration (domain alias, username)
+	credentialDomain string
 }
 
 // HostOptions is used to configure registry hosts
@@ -171,7 +171,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
 			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
+			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 || host.credentialDomain != "" {
 				c := *client
 				if explicitTLSFromHost || host.dialTimeout != nil {
 					tr := defaultTransport.Clone()
@@ -201,6 +201,15 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 
 				// redeclare here to allow per-host changes
 				authOpts := authOpts
+				// credentialDomain overrides the host passed to the credentials function,
+				// allowing a mirror to reuse credentials from a different registry (e.g. upstream).
+				// Intentionally appends a second WithAuthCreds to shadow the shared one.
+				if host.credentialDomain != "" && options.Credentials != nil {
+					domain := host.credentialDomain
+					authOpts = append(authOpts, docker.WithAuthCreds(func(_ string) (string, string, error) {
+						return options.Credentials(domain)
+					}))
+				}
 				if len(host.header) != 0 {
 					authOpts = append(authOpts, docker.WithAuthHeader(host.header))
 				}
@@ -374,7 +383,12 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
-	// TODO: Credentials: helper? name? username? alternate domain? token?
+	// CredentialDomain specifies the domain to use for credential lookup
+	// when authenticating with this mirror host. When set, credentials are
+	// fetched using this domain instead of the mirror's actual host,
+	// allowing a trusted mirror to reuse credentials from the upstream registry.
+	// Must be a bare host[:port] without scheme or path (e.g. "docker.io").
+	CredentialDomain string `toml:"credential_domain"`
 }
 
 func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
@@ -542,6 +556,13 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			return hostConfig{}, err
 		}
 		result.dialTimeout = &dialTimeout
+	}
+
+	if config.CredentialDomain != "" {
+		if strings.Contains(config.CredentialDomain, "://") || strings.Contains(config.CredentialDomain, "/") {
+			return hostConfig{}, fmt.Errorf("invalid credential_domain %q: must be a bare host[:port] without scheme or path", config.CredentialDomain)
+		}
+		result.credentialDomain = config.CredentialDomain
 	}
 
 	return result, nil
