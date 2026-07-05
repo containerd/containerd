@@ -156,7 +156,7 @@ func init() {
 						options.NoSync = true
 						options.NoGrowSync = true
 
-						log.G(ic.Context).Warn("using async mode for boltdb")
+						log.G(ic.Context).WithField("plugin", "bolt").Warn("using async mode for boltdb")
 					}
 				}
 			}
