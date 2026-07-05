@@ -180,8 +180,10 @@ func (e *Exchange) Subscribe(ctx context.Context, fs ...string) (ch <-chan *even
 				case evch <- env:
 				case <-ctx.Done():
 					break loop
-				default:
-					log.G(ctx).WithField("channel", evch).Warn("dropping event envelope due to blocked subscriber channel")
+				case <-time.After(5 * time.Second):
+					log.G(ctx).WithField("channel", evch).Warn("evicting slow subscriber due to blocked channel")
+					err = fmt.Errorf("subscriber too slow, event channel blocked for 5s")
+					break loop
 				}
 			case <-ctx.Done():
 				break loop
