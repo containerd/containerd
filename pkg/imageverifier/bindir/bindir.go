@@ -65,11 +65,11 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 	return v.verify(ctx, name, desc, imageverifier.VerifyOptions{Operation: imageverifier.OperationPull}, v.config.VerifyOnRun)
 }
 
-// VerifyImageContext verifies an image with operation-scoped context
+// VerifyImageContext verifies an image with operation-scoped context.
 func (v *ImageVerifier) VerifyImageContext(ctx context.Context, name string, desc ocispec.Descriptor, opts imageverifier.VerifyOptions) (*imageverifier.Judgement, error) {
 	if opts.Operation != imageverifier.OperationRun {
 		// Only run-time verification is gated/contextual here; other operations
-		// fall back to the descriptor-only contract.
+		// fall back to the VerifyImage entrypoint.
 		return v.VerifyImage(ctx, name, desc)
 	}
 	if !v.config.VerifyOnRun {
