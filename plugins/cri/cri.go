@@ -150,6 +150,8 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 				break
 			}
 		}
+	}
+
 	verifiers, err := getImageVerifiers(ic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image verifiers from plugins: %w", err)

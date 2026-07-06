@@ -15,7 +15,7 @@ To enable image verification, add a stanza like the following to the containerd 
 
 All files in `bin_dir`, if it exists, must be verifier executables which conform to the following API.
 
-Verification always runs on image pull. When `verify_on_run` is enabled, verification will also run before the container starts and the verifier binary's standard input will include CRI context (See [Standard Input](#standard-input))
+Verification always runs on image pull. When `verify_on_run` is enabled, verification will also run at container creation (`operation=run`), and the verifier binary's standard input will include CRI request context (see [Standard Input](#standard-input)).
 
 ## Image Verifier Binary API
 
