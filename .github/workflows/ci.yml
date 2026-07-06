@@ -138,6 +138,8 @@ jobs:
             goarch: amd64
           - goos: freebsd
             goarch: arm64
+          - goos: linux
+            goarch: loong64
           - goos: windows
             goarch: arm64
 
@@ -167,6 +169,9 @@ jobs:
             echo "CC=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
             ;;
           windows/arm64)
+            echo "CGO_ENABLED=0" >> $GITHUB_ENV
+            ;;
+          linux/loong64)
             echo "CGO_ENABLED=0" >> $GITHUB_ENV
             ;;
           esac

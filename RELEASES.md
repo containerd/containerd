@@ -237,6 +237,7 @@ verification. Users are free to build from source for their own use.
 | linux/s390x     |  2   | ✅                | ✅             | ❌                    | ✅                    |
 | linux/arm/v7    |  3   | ❌                | ❌             | ❌                    | ✅                    |
 | linux/arm/v5    |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| linux/loong64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
 | darwin/arm64    |  3   | ❌                | ❌             | ❌                    | ✅                    |
 | freebsd/amd64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
 | freebsd/arm64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
