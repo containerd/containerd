@@ -341,8 +341,25 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					continue
 				}
 				if resp.StatusCode > 399 {
+					err := unexpectedResponseErr(resp)
+					// A HEAD 403 carries no body, so issue a follow-up GET to
+					// the same URL to surface the registry's error details
+					// (e.g. "key vault access denied", IP restrictions) for
+					// diagnostics.
+					if resp.StatusCode == http.StatusForbidden && req.method == http.MethodHead {
+						err = withGETErrorBody(ctx, err, resp, func() (*http.Response, error) {
+							getReq := base.request(host, http.MethodGet, u...)
+							if addErr := getReq.addNamespace(base.refspec.Hostname()); addErr != nil {
+								return nil, addErr
+							}
+							for key, value := range r.resolveHeader {
+								getReq.header[key] = append(getReq.header[key], value...)
+							}
+							return getReq.doWithRetries(ctx, false)
+						})
+					}
 					if firstErrPriority < 3 {
-						firstErr = unexpectedResponseErr(resp)
+						firstErr = err
 						firstErrPriority = 3
 					}
 					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
