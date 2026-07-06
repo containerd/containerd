@@ -32,12 +32,13 @@ A JSON encoded payload is passed to the verifier binary's standard input. The
 media type of this payload is specified by the `-stdin-media-type` CLI
 argument, and may change in future versions of containerd.
 
-Currently, there are two media types:
+The media type depends on `verify_on_run` option:
 
-- If `verify_on_run` is disabled (default), the media type is `application/vnd.oci.descriptor.v1+json`.
+- If `verify_on_run` is disabled (default), the media type is `application/vnd.oci.descriptor.v1+json`
   - This represents the OCI Content Descriptor of the image. See [the OCI specification](https://github.com/opencontainers/image-spec/blob/main/descriptor.md) for more details.
-- If `verify_on_run` is enabled, run-time verification uses `application/vnd.containerd.image-verifier.input.v1+json`.
-  - This wraps the OCI Content Descriptor with the `operation` and the `annotations` containerd assigns to the container, including the [well-known CRI keys](../internal/cri/annotations/annotations.go). Some values are supplied by the runtime caller (e.g. request annotations), while others are set authoritatively by containerd (e.g. sandbox ID, container name, image name), so caller-supplied values should not be assumed trustworthy on their own.
+- If `verify_on_run` is enabled, both pull and run verification use `application/vnd.containerd.image-verifier.input.v1+json`
+  - This wraps the OCI Content Descriptor with the `operation` and the `annotations` containerd assigns to the container. Pull verification has no run context, so `annotations` is only populated for `run`.
+  - The annotations include the [well-known CRI keys](../internal/cri/annotations/annotations.go). Some values are supplied by the runtime caller (e.g. request annotations), while others are set authoritatively by containerd (e.g. sandbox ID, container name, image name), so caller-supplied values should not be assumed trustworthy on their own.
   - The media type constant is defined in [core/images/mediatypes.go](../core/images/mediatypes.go), and its payload structure in [pkg/imageverifier/image_verifier.go](../pkg/imageverifier/image_verifier.go) (see `VerifierInput`).
 
 ### Image Pull Judgement

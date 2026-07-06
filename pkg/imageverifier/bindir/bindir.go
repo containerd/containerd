@@ -60,9 +60,9 @@ func NewImageVerifier(c *Config) *ImageVerifier {
 	}
 }
 
-// VerifyImage verifies an image using the bare OCI descriptor
+// VerifyImage verifies an image using the OCI descriptor.
 func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor) (*imageverifier.Judgement, error) {
-	return v.verify(ctx, name, desc, imageverifier.VerifyOptions{Operation: imageverifier.OperationPull}, false)
+	return v.verify(ctx, name, desc, imageverifier.VerifyOptions{Operation: imageverifier.OperationPull}, v.config.VerifyOnRun)
 }
 
 // VerifyImageContext verifies an image with operation-scoped context

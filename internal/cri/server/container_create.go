@@ -237,7 +237,8 @@ func (c *criService) verifyImageForRun(ctx context.Context, name string, desc im
 			continue
 		}
 
-		// Give each verifier its own copy of the annotations so they cannot be modified
+		// Give each verifier its own copy of the annotations so one cannot mutate
+		// what subsequent verifiers see.
 		opts := imageverifier.VerifyOptions{
 			Operation:   imageverifier.OperationRun,
 			Annotations: maps.Clone(verifierAnnotations),

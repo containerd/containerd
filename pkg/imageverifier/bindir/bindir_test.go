@@ -482,6 +482,38 @@ func TestBinDirVerifyImage(t *testing.T) {
 		assert.Equal(t, `{"descriptor":{"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","digest":"sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4","size":2048,"annotations":{"a":"b"}},"operation":"run","annotations":{"io.kubernetes.cri.sandbox-namespace":"test-namespace","x":"y"}}`, strings.TrimSpace(string(b)))
 	})
 
+	t.Run("verify_on_run enabled sends operation on pull", func(t *testing.T) {
+		binDir := newBinDir(t, allBinsDir,
+			"verifier_test_input_output_management",
+		)
+
+		v := NewImageVerifier(&Config{
+			BinDir:             binDir,
+			MaxVerifiers:       -1,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
+			VerifyOnRun:        true,
+		})
+
+		// The pull entrypoint (VerifyImage) with verify_on_run enabled uses the
+		// richer contract and signals the pull operation, without run context.
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{
+			Digest:      "sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4",
+			MediaType:   "application/vnd.docker.distribution.manifest.list.v2+json",
+			Size:        2048,
+			Annotations: map[string]string{"a": "b"},
+		})
+		assert.NoError(t, err)
+		assert.True(t, j.OK)
+
+		b, err := os.ReadFile(data.ArgsFile)
+		require.NoError(t, err)
+		assert.Equal(t, "-name registry.example.com/image:abc -digest sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4 -stdin-media-type application/vnd.containerd.image-verifier.input.v1+json -operation pull", string(b))
+
+		b, err = os.ReadFile(data.StdinFile)
+		require.NoError(t, err)
+		assert.Equal(t, `{"descriptor":{"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","digest":"sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4","size":2048,"annotations":{"a":"b"}},"operation":"pull"}`, strings.TrimSpace(string(b)))
+	})
+
 	t.Run("verify_on_run enabled with rejecting verifier", func(t *testing.T) {
 		binDir := newBinDir(t, allBinsDir, "reject_reason_d")
 
