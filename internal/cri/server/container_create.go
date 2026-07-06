@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -228,15 +229,18 @@ func (c *criService) verifyImageForRun(ctx context.Context, name string, desc im
 		return nil
 	}
 
-	opts := imageverifier.VerifyOptions{
-		Operation:   imageverifier.OperationRun,
-		Annotations: runVerifierAnnotations(sandboxID, containerName, name, containerConfig, sandboxConfig),
-	}
+	verifierAnnotations := runVerifierAnnotations(sandboxID, containerName, name, containerConfig, sandboxConfig)
 
 	for vfName, vf := range c.imageVerifiers {
 		cv, ok := vf.(imageverifier.ContextImageVerifier)
 		if !ok {
 			continue
+		}
+
+		// Give each verifier its own copy of the annotations so they cannot be modified
+		opts := imageverifier.VerifyOptions{
+			Operation:   imageverifier.OperationRun,
+			Annotations: maps.Clone(verifierAnnotations),
 		}
 
 		logger := log.G(ctx).WithFields(log.Fields{
@@ -250,6 +254,10 @@ func (c *criService) verifyImageForRun(ctx context.Context, name string, desc im
 		if err != nil {
 			logger.WithError(err).Error("No judgement received from verifier")
 			return fmt.Errorf("blocking run of %v with digest %v: image verifier %v returned error: %w", name, desc.Digest.String(), vfName, err)
+		}
+		if jdg == nil {
+			logger.Error("No judgement received from verifier")
+			return fmt.Errorf("blocking run of %v with digest %v: image verifier %v returned no judgement", name, desc.Digest.String(), vfName)
 		}
 		logger = logger.WithFields(log.Fields{
 			"ok":     jdg.OK,
@@ -271,15 +279,9 @@ func (c *criService) verifyImageForRun(ctx context.Context, name string, desc im
 // applied last so request annotations cannot spoof identity.
 func runVerifierAnnotations(sandboxID, containerName, imageName string, containerConfig *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig) map[string]string {
 	ann := map[string]string{}
-	for k, v := range sandboxConfig.GetAnnotations() {
-		ann[k] = v
-	}
-	for k, v := range containerConfig.GetAnnotations() {
-		ann[k] = v
-	}
-	for k, v := range annotations.DefaultCRIAnnotationsMap(sandboxID, containerName, imageName, sandboxConfig, false) {
-		ann[k] = v
-	}
+	maps.Copy(ann, sandboxConfig.GetAnnotations())
+	maps.Copy(ann, containerConfig.GetAnnotations())
+	maps.Copy(ann, annotations.DefaultCRIAnnotationsMap(sandboxID, containerName, imageName, sandboxConfig, false))
 	return ann
 }
 

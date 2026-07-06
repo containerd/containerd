@@ -37,8 +37,8 @@ Currently, there are two media types:
 - If `verify_on_run` is disabled (default), the media type is `application/vnd.oci.descriptor.v1+json`.
   - This represents the OCI Content Descriptor of the image. See [the OCI specification](https://github.com/opencontainers/image-spec/blob/main/descriptor.md) for more details.
 - If `verify_on_run` is enabled, run-time verification uses `application/vnd.containerd.image-verifier.input.v1+json`.
-  - This wraps the OCI Content Descriptor with the `operation` and the `annotations` containerd assigns to the container, including the [well-known CRI keys](../internal/cri/annotations/annotations.go). All values originate from the runtime caller.
-  - This media type is defined in [the image verifier plugin code](../pkg/imageverifier/image_verifier.go) (see `VerifierInput`).
+  - This wraps the OCI Content Descriptor with the `operation` and the `annotations` containerd assigns to the container, including the [well-known CRI keys](../internal/cri/annotations/annotations.go). Some values are supplied by the runtime caller (e.g. request annotations), while others are set authoritatively by containerd (e.g. sandbox ID, container name, image name), so caller-supplied values should not be assumed trustworthy on their own.
+  - The media type constant is defined in [core/images/mediatypes.go](../core/images/mediatypes.go), and its payload structure in [pkg/imageverifier/image_verifier.go](../pkg/imageverifier/image_verifier.go) (see `VerifierInput`).
 
 ### Image Pull Judgement
 

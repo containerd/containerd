@@ -18,6 +18,7 @@ package cri
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -281,11 +282,9 @@ func getSandboxControllers(ic *plugin.InitContext) (map[string]sandbox.Controlle
 // getImageVerifiers loads the registered image verifier plugins, keyed by name.
 func getImageVerifiers(ic *plugin.InitContext) (map[string]imageverifier.ImageVerifier, error) {
 	ps, err := ic.GetByType(plugins.ImageVerifierPlugin)
-	if err != nil {
+	// No registered image verifier plugins is a valid configuration.
+	if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
 		return nil, err
-	}
-	if len(ps) == 0 {
-		return nil, nil
 	}
 	verifiers := make(map[string]imageverifier.ImageVerifier, len(ps))
 	for name, p := range ps {
