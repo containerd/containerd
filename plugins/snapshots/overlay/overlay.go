@@ -20,6 +20,7 @@ package overlay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,6 +34,8 @@ import (
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
+	"github.com/moby/sys/mountinfo"
+	"golang.org/x/sys/unix"
 )
 
 // upperdirKey is a key of an optional label to each snapshot.
@@ -325,9 +328,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	defer func() {
 		if err == nil {
 			for _, dir := range removals {
-				if err := os.RemoveAll(dir); err != nil {
-					log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
-				}
+				removeCleanupDir(ctx, dir)
 			}
 		}
 	}()
@@ -375,12 +376,41 @@ func (o *snapshotter) Cleanup(ctx context.Context) error {
 	}
 
 	for _, dir := range cleanup {
-		if err := os.RemoveAll(dir); err != nil {
-			log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
-		}
+		removeCleanupDir(ctx, dir)
 	}
 
 	return nil
+}
+
+func removeCleanupDir(ctx context.Context, dir string) {
+	if err := os.RemoveAll(dir); err == nil {
+		return
+	} else if !errors.Is(err, unix.EBUSY) && !hasMountUnder(dir) {
+		log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
+		return
+	} else {
+		log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory with busy mount, retrying with MNT_DETACH")
+	}
+
+	if err := mount.UnmountRecursive(dir, unix.MNT_DETACH); err != nil {
+		log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to unmount directory with MNT_DETACH")
+		return
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory after MNT_DETACH")
+	}
+}
+
+func hasMountUnder(dir string) bool {
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return false
+	}
+	mounts, err := mountinfo.GetMounts(mountinfo.PrefixFilter(dir))
+	if err != nil {
+		return false
+	}
+	return len(mounts) > 0
 }
 
 func (o *snapshotter) cleanupDirectories(ctx context.Context) (_ []string, err error) {

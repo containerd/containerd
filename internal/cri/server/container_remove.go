@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"syscall"
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -105,10 +107,16 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 
 	// Delete containerd container.
 	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-		if !errdefs.IsNotFound(err) {
+		if errdefs.IsNotFound(err) {
+			log.G(ctx).Tracef("Remove called for containerd container %q that does not exist", id)
+		} else if shouldFallbackSnapshotCleanupError(err) {
+			log.G(ctx).WithError(err).Warnf("Failed to delete containerd container %q with snapshot cleanup because the snapshot is busy, fallback to delete metadata only to avoid blocking pod deletion", id)
+			if fallbackErr := container.Container.Delete(ctx); fallbackErr != nil && !errdefs.IsNotFound(fallbackErr) {
+				return nil, fmt.Errorf("failed to delete containerd container %q during fallback: %w", id, fallbackErr)
+			}
+		} else {
 			return nil, fmt.Errorf("failed to delete containerd container %q: %w", id, err)
 		}
-		log.G(ctx).Tracef("Remove called for containerd container %q that does not exist", id)
 	}
 
 	// Delete container checkpoint.
@@ -172,4 +180,18 @@ func resetContainerRemoving(container containerstore.Container) error {
 		status.Removing = false
 		return status, nil
 	})
+}
+
+func shouldFallbackSnapshotCleanupError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, syscall.EBUSY) {
+		return true
+	}
+	// Fallback to string check for gRPC error serialization
+	errStr := err.Error()
+	return strings.Contains(errStr, syscall.EBUSY.Error()) ||
+		strings.Contains(errStr, "EBUSY") ||
+		strings.Contains(errStr, "resource busy")
 }

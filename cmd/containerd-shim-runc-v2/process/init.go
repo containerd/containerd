@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -293,8 +294,14 @@ func (p *Init) Delete(ctx context.Context) error {
 }
 
 func (p *Init) delete(ctx context.Context) error {
-	if err := waitTimeout(ctx, &p.wg, 10*time.Second); err != nil {
+	if err := waitTimeout(ctx, &p.wg, 2*time.Second); err != nil {
 		log.G(ctx).WithError(err).Errorf("failed to drain init process %s io", p.id)
+	}
+	if p.io != nil {
+		for _, c := range p.closers {
+			c.Close()
+		}
+		p.io.Close()
 	}
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
@@ -309,16 +316,26 @@ func (p *Init) delete(ctx context.Context) error {
 			err = p.runtimeError(err, "failed to delete task")
 		}
 	}
-	if p.io != nil {
-		for _, c := range p.closers {
-			c.Close()
-		}
-		p.io.Close()
-	}
 	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
-		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
-		if err == nil {
-			err = fmt.Errorf("failed rootfs umount: %w", err2)
+		if runtime.GOOS != "linux" {
+			log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
+			if err == nil {
+				err = fmt.Errorf("failed rootfs umount: %w", err2)
+			}
+			return err
+		}
+
+		// MNT_DETACH is Linux-specific. Keep the literal here so this
+		// !windows file still compiles for non-Linux Unix targets.
+		const mntDetach = 2
+		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount, retrying with MNT_DETACH")
+		if err3 := mount.UnmountRecursive(p.Rootfs, mntDetach); err3 != nil {
+			log.G(ctx).WithError(err3).Warn("failed to cleanup rootfs mount with MNT_DETACH")
+			if err == nil {
+				err = fmt.Errorf("failed rootfs umount (MNT_DETACH): %w", err3)
+			}
+		} else {
+			log.G(ctx).Info("cleaned up rootfs mount with MNT_DETACH")
 		}
 	}
 	return err

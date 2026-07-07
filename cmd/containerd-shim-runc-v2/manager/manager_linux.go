@@ -313,7 +313,11 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 		log.G(ctx).WithError(err).Warn("failed to remove runc container")
 	}
 	if err := mount.UnmountRecursive(filepath.Join(path, "rootfs"), 0); err != nil {
-		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
+		const mntDetach = 2
+		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount, retrying with MNT_DETACH")
+		if err3 := mount.UnmountRecursive(filepath.Join(path, "rootfs"), mntDetach); err3 != nil {
+			log.G(ctx).WithError(err3).Warn("failed to cleanup rootfs mount with MNT_DETACH")
+		}
 	}
 	pid, err := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
 	if err != nil {

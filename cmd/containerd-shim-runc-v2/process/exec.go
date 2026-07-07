@@ -107,7 +107,7 @@ func (e *execProcess) Delete(ctx context.Context) error {
 }
 
 func (e *execProcess) delete(ctx context.Context) error {
-	if err := waitTimeout(ctx, &e.wg, 10*time.Second); err != nil {
+	if err := waitTimeout(ctx, &e.wg, 2*time.Second); err != nil {
 		log.G(ctx).WithError(err).Errorf("failed to drain exec process %s io", e.id)
 	}
 	if e.io != nil {

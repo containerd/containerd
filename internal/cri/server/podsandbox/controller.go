@@ -28,6 +28,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	eventtypes "github.com/containerd/containerd/api/events"
+	apitasks "github.com/containerd/containerd/api/services/tasks/v1"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -41,6 +42,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/platforms"
 )
 
@@ -190,7 +192,7 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 		log.G(ctx).WithField("monitor_name", "podsandbox").
 			Infof("received sandbox exit event %+v", event)
 
-		if err := handleSandboxTaskExit(dctx, p, event); err != nil {
+		if err := c.handleSandboxTaskExit(dctx, p, event); err != nil {
 			log.G(ctx).WithError(err).Errorf("failed to handle sandbox exit event %+v", event)
 			c.eventMonitor.Backoff(p.ID, event)
 		}
@@ -201,7 +203,7 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 }
 
 // handleSandboxTaskExit handles TaskExit event for sandbox.
-func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventtypes.TaskExit) error {
+func (c *Controller) handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventtypes.TaskExit) error {
 	// No stream attached to sandbox container.
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
@@ -213,6 +215,15 @@ func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventty
 		if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to stop sandbox: %w", err)
+			}
+		}
+	}
+	if errdefs.IsNotFound(err) {
+		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: sb.Container.ID()})
+		if err != nil {
+			err = errgrpc.ToNative(err)
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to cleanup sandbox %s in task-service: %w", sb.Container.ID(), err)
 			}
 		}
 	}

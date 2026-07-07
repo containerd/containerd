@@ -23,8 +23,10 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/moby/sys/userns"
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
@@ -58,6 +60,12 @@ import (
 var (
 	_     = shim.TTRPCService(&service{})
 	empty = &ptypes.Empty{}
+)
+
+const (
+	unknownExecExitStatus = 255
+	execExitCheckInterval = 5 * time.Second
+	execExitWaitTimeout   = 30 * time.Second
 )
 
 // NewTaskService creates a new instance of a task service
@@ -145,6 +153,12 @@ type service struct {
 type containerProcess struct {
 	Container *runc.Container
 	Process   process.Process
+}
+
+type processExit struct {
+	exit      runcC.Exit
+	container *runc.Container
+	process   process.Process
 }
 
 // preStart prepares for starting a container process and handling its exit.
@@ -701,15 +715,20 @@ func (s *service) send(evt interface{}) {
 // This is achieved by:
 // - killing all running container processes (if the container has a shared pid
 // namespace, otherwise all other processes have been reaped already).
-// - waiting for the container's running exec counter to reach 0.
+// - waiting for the container's running exec counter to reach 0, while
+// reconciling stale exec accounting when tracked exec PIDs no longer exist.
+// - falling back after a bounded wait to avoid blocking task deletion forever
+// when exec accounting cannot be fully reconciled.
 // - finally, publishing the init exit.
 func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Init) {
 	// kill all running container processes
 	if runc.ShouldKillAllOnExit(s.context, c.Bundle) {
-		if err := p.KillAll(s.context); err != nil {
+		killCtx, killCancel := context.WithTimeout(s.context, 5*time.Second)
+		if err := p.KillAll(killCtx); err != nil {
 			log.G(s.context).WithError(err).WithField("id", p.ID()).
 				Error("failed to kill init's children")
 		}
+		killCancel()
 	}
 
 	s.lifecycleMu.Lock()
@@ -734,20 +753,100 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 			delete(s.runningExecs, c)
 		}()
 
-		// wait for running processes to exit
+		// Wait for running processes to exit. The init exit must remain the
+		// last exit event published for this container, so timeout handling
+		// retries SIGKILL instead of forcing the init exit event out of order.
+		ticker := time.NewTicker(execExitCheckInterval)
+		defer ticker.Stop()
+		timeout := time.NewTimer(execExitWaitTimeout)
+		defer timeout.Stop()
+
 		for {
-			if runningExecs := <-events; runningExecs == 0 {
-				break
+			select {
+			case runningExecs := <-events:
+				if runningExecs == 0 {
+					s.handleProcessExit(e, c, p)
+					return
+				}
+			case <-ticker.C:
+				log.G(s.context).WithField("id", c.ID).Warn("still waiting for exec processes to exit after init exit")
+				killCtx, killCancel := context.WithTimeout(s.context, 5*time.Second)
+				if err := p.KillAll(killCtx); err != nil {
+					log.G(s.context).WithError(err).WithField("id", p.ID()).
+						Error("failed to retry killing init's children")
+				}
+				killCancel()
+
+				livePids, err := s.containerPidSet(c)
+				if err != nil {
+					log.G(s.context).WithError(err).WithField("id", c.ID).
+						Debug("failed to list container pids while waiting for exec exits")
+				}
+
+				exits, runningExecs, _ := s.reconcileExitedExecs(c, livePids, false)
+				for _, exit := range exits {
+					log.G(s.context).WithField("id", c.ID).
+						WithField("exec_id", exit.process.ID()).
+						WithField("pid", exit.exit.Pid).
+						Warn("synthesizing exit for exec process after init exit")
+					s.publishProcessExit(exit.exit, exit.container, exit.process)
+				}
+				if runningExecs == 0 {
+					s.handleProcessExit(e, c, p)
+					return
+				}
+			case <-timeout.C:
+				log.G(s.context).WithField("id", c.ID).
+					WithField("timeout", execExitWaitTimeout).
+					Error("timed out waiting for exec processes to exit after init exit")
+				killCtx, killCancel := context.WithTimeout(s.context, execExitCheckInterval)
+				if err := p.KillAll(killCtx); err != nil {
+					log.G(s.context).WithError(err).WithField("id", p.ID()).
+						Error("failed to kill init's children after exec exit wait timeout")
+				}
+				killCancel()
+
+				livePids, err := s.containerPidSet(c)
+				if err != nil {
+					log.G(s.context).WithError(err).WithField("id", c.ID).
+						Debug("failed to list container pids after exec exit wait timeout")
+				}
+
+				exits, _, droppedExecs := s.reconcileExitedExecs(c, livePids, true)
+				for _, exit := range exits {
+					log.G(s.context).WithField("id", c.ID).
+						WithField("exec_id", exit.process.ID()).
+						WithField("pid", exit.exit.Pid).
+						Error("synthesizing exit for exec process after exec exit wait timeout")
+					s.publishProcessExit(exit.exit, exit.container, exit.process)
+				}
+				if droppedExecs > 0 {
+					log.G(s.context).WithField("id", c.ID).
+						WithField("execs", droppedExecs).
+						Error("clearing stale exec accounting without matching process after exec exit wait timeout")
+				}
+				s.handleProcessExit(e, c, p)
+				return
 			}
 		}
-
-		// all running processes have exited now, and no new
-		// ones can start, so we can publish the init exit
-		s.handleProcessExit(e, c, p)
 	}()
 }
 
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
+	s.publishProcessExit(e, c, p)
+	if _, init := p.(*process.Init); !init {
+		s.lifecycleMu.Lock()
+		if s.runningExecs[c] > 0 {
+			s.runningExecs[c]--
+		}
+		if ch, ok := s.execCountSubscribers[c]; ok {
+			ch <- s.runningExecs[c]
+		}
+		s.lifecycleMu.Unlock()
+	}
+}
+
+func (s *service) publishProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
 	p.SetExited(e.Status)
 	s.send(&eventstypes.TaskExit{
 		ContainerID: c.ID,
@@ -756,14 +855,101 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 		ExitStatus:  uint32(e.Status),
 		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 	})
-	if _, init := p.(*process.Init); !init {
-		s.lifecycleMu.Lock()
-		s.runningExecs[c]--
-		if ch, ok := s.execCountSubscribers[c]; ok {
-			ch <- s.runningExecs[c]
-		}
-		s.lifecycleMu.Unlock()
+}
+
+// reconcileExitedExecs reconciles exec accounting after init has exited.
+// Without force it keeps the v1.7+ init-last ordering when a reaper event is
+// delayed or missed: synthesize exits only for exec processes that the shim
+// still tracks but whose container PIDs no longer exist. With force it clears
+// the remaining accounting so the init exit can be published after a bounded
+// wait instead of blocking task deletion forever.
+func (s *service) reconcileExitedExecs(c *runc.Container, livePids map[int]struct{}, force bool) ([]processExit, int, int) {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+
+	runningExecs := s.runningExecs[c]
+	if runningExecs == 0 {
+		return nil, 0, 0
 	}
+
+	var exits []processExit
+	for pid, processes := range s.running {
+		var remaining []containerProcess
+		reaped := false
+		for _, cp := range processes {
+			if cp.Container != c {
+				remaining = append(remaining, cp)
+				continue
+			}
+			if _, init := cp.Process.(*process.Init); init {
+				remaining = append(remaining, cp)
+				continue
+			}
+			if !force && execStillRunning(pid, livePids) {
+				remaining = append(remaining, cp)
+				continue
+			}
+
+			reaped = true
+			if runningExecs > 0 {
+				runningExecs--
+			}
+			exits = append(exits, processExit{
+				exit: runcC.Exit{
+					Pid:    pid,
+					Status: unknownExecExitStatus,
+				},
+				container: c,
+				process:   cp.Process,
+			})
+		}
+		if !reaped {
+			continue
+		}
+		if len(remaining) > 0 {
+			s.running[pid] = remaining
+		} else {
+			delete(s.running, pid)
+		}
+	}
+
+	droppedExecs := 0
+	if force && runningExecs > 0 {
+		droppedExecs = runningExecs
+		runningExecs = 0
+	}
+	s.runningExecs[c] = runningExecs
+	return exits, runningExecs, droppedExecs
+}
+
+func (s *service) containerPidSet(c *runc.Container) (map[int]struct{}, error) {
+	ctx, cancel := context.WithTimeout(s.context, 5*time.Second)
+	defer cancel()
+
+	pids, err := s.getContainerPids(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	pidSet := make(map[int]struct{}, len(pids))
+	for _, pid := range pids {
+		pidSet[int(pid)] = struct{}{}
+	}
+	return pidSet, nil
+}
+
+func execStillRunning(pid int, livePids map[int]struct{}) bool {
+	if livePids != nil {
+		_, ok := livePids[pid]
+		return ok
+	}
+	return pidExists(pid)
+}
+
+func pidExists(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	return unix.Kill(pid, 0) != unix.ESRCH
 }
 
 func (s *service) getContainerPids(ctx context.Context, container *runc.Container) ([]uint32, error) {
