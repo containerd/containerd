@@ -53,7 +53,7 @@ type SyncFn func(context.Context, SyncCB) error
 type SyncCB func(context.Context, []*PodSandbox, []*Container) ([]*ContainerUpdate, error)
 
 // UpdateFn is a container runtime function for unsolicited container updates.
-type UpdateFn func(context.Context, []*ContainerUpdate) ([]*ContainerUpdate, error)
+type UpdateFn func(context.Context, []*ContainerUpdate, *sync.Mutex) ([]*ContainerUpdate, error)
 
 // Adaptation is the NRI abstraction for container runtime NRI adaptation/integration.
 type Adaptation struct {
@@ -479,10 +479,7 @@ func (r *Adaptation) RemoveContainer(ctx context.Context, req *RemoveContainerRe
 
 // Perform a set of unsolicited container updates requested by a plugin.
 func (r *Adaptation) updateContainers(ctx context.Context, req []*ContainerUpdate) ([]*ContainerUpdate, error) {
-	r.Lock()
-	defer r.Unlock()
-
-	return r.updateFn(ctx, req)
+	return r.updateFn(ctx, req, &r.Mutex)
 }
 
 // Validate requested container adjustments.

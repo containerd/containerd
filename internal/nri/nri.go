@@ -521,9 +521,12 @@ func (l *local) syncPlugin(ctx context.Context, syncFn nri.SyncCB) error {
 	return nil
 }
 
-func (l *local) updateFromPlugin(ctx context.Context, req []*nri.ContainerUpdate) ([]*nri.ContainerUpdate, error) {
+func (l *local) updateFromPlugin(ctx context.Context, req []*nri.ContainerUpdate, adaptMu *sync.Mutex) ([]*nri.ContainerUpdate, error) {
 	l.Lock()
 	defer l.Unlock()
+	// Lock ordering: local -> adaptation (matches other local -> l.nri.* call paths).
+	adaptMu.Lock()
+	defer adaptMu.Unlock()
 
 	log.G(ctx).Trace("Unsolicited NRI container updates")
 
