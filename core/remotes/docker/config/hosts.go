@@ -43,9 +43,10 @@ import (
 type UpdateClientFunc func(client *http.Client) error
 
 type hostConfig struct {
-	scheme string
-	host   string
-	path   string
+	scheme           string
+	host             string
+	path             string
+	repositoryPrefix string
 
 	capabilities docker.HostCapabilities
 
@@ -232,6 +233,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			rhosts[i].Path = host.path
 			rhosts[i].Capabilities = host.capabilities
 			rhosts[i].Header = host.header
+			rhosts[i].RepositoryPrefix = host.repositoryPrefix
 		}
 
 		return rhosts, nil
@@ -370,6 +372,17 @@ type hostFileConfig struct {
 	// API root endpoint.
 	OverridePath bool `toml:"override_path"`
 
+	// RepositoryPrefix, when non-empty, names the mirror-side namespace
+	// prefix and is composed into the host's API path (appended after the
+	// /v2 base when OverridePath is false), token request scopes, and the
+	// from= parameter on cross-repository blob mount requests. Operators
+	// using OverridePath = true must include the prefix in their server
+	// URL explicitly. Intended for mirrors that namespace upstream
+	// repositories under a path prefix and therefore expect the mirror-side
+	// repository name (e.g. "<prefix>/<original-repo>") rather than the
+	// original reference.
+	RepositoryPrefix string `toml:"repository_prefix"`
+
 	// DialTimeout is the maximum amount of time a dial will wait for
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
@@ -446,6 +459,15 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			u.Path = "/v2"
 		}
 		result.path = u.Path
+	}
+	result.repositoryPrefix = strings.Trim(config.RepositoryPrefix, "/")
+
+	// When override_path is false, the repository_prefix is also appended
+	// to host.Path so requests land at <api-base>/<prefix>/<repo>. With
+	// override_path = true the operator is in control of host.Path and
+	// repository_prefix only affects the token scope and mount-from name.
+	if !config.OverridePath && result.repositoryPrefix != "" && result.path != "" {
+		result.path = strings.TrimRight(result.path, "/") + "/" + result.repositoryPrefix
 	}
 
 	result.skipVerify = config.SkipVerify
