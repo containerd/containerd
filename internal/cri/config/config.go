@@ -447,6 +447,10 @@ type RuntimeConfig struct {
 	//   https://golang.org/pkg/time/#ParseDuration
 	// Default: "2m"
 	StatsRetentionPeriod string `toml:"stats_retention_period" json:"statsRetentionPeriod"`
+
+	// EnableCRIU enables CRIU (Checkpoint/Restore In Userspace) support.
+	// When set to false, checkpoint/restore operations will be disabled.
+	EnableCRIU *bool `toml:"enable_criu" json:"enableCRIU"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
