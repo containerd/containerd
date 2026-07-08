@@ -19,7 +19,7 @@ The config version 3 was introduced in containerd v2.0.
 The config version 2 used in containerd 1.x is still supported and automatically
 converted to the config version 3.
 
-For the further information, see [`../PLUGINS.md`](../PLUGINS.md).
+For further information, see [`../PLUGINS.md`](../PLUGINS.md).
 
 ## Basic configuration
 ### Cgroup Driver
@@ -382,7 +382,7 @@ version = 2
   stats_collect_period = 10
 
   # enable_tls_streaming enables the TLS streaming support.
-  # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
+  # It generates a self-signed certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false
 
   # tolerate_missing_hugetlb_controller if set to false will error out on create/update
@@ -401,7 +401,7 @@ version = 2
   netns_mounts_under_state_dir = false
 
   # max_container_log_line_size is the maximum log line size in bytes for a container.
-  # Log line longer than the limit will be split into multiple lines. -1 means no
+  # Log lines longer than the limit will be split into multiple lines. -1 means no
   # limit.
   max_container_log_line_size = 16384
 
@@ -429,7 +429,7 @@ version = 2
   # profile requested over CRI is unset (or nil) for a pod/container (otherwise if this field is not set the
   # default unset profile will map to `unconfined`)
     # Note: The default unset seccomp profile should not be confused with the seccomp profile
-    # used in CRI when the runtime default seccomp profile is requested. In the later case, the
+    # used in CRI when the runtime default seccomp profile is requested. In the latter case, the
     # default is set by the following code (https://github.com/containerd/containerd/blob/main/contrib/seccomp/seccomp_default.go).
     # To summarize, there are two different seccomp defaults, the unset default used when the CRI request is
     # set to nil or `unconfined`, and the default used when the runtime default seccomp profile is requested.
@@ -493,7 +493,7 @@ version = 2
     # This only works for runtime type "io.containerd.runtime.v1.linux".
     no_pivot = false
 
-    # disable_snapshot_annotations disables to pass additional annotations (image
+    # disable_snapshot_annotations disables passing additional annotations (image
     # related information) to snapshotters. These annotations are required by
     # stargz snapshotter (https://github.com/containerd/stargz-snapshotter)
     # changed to default true with https://github.com/containerd/containerd/pull/4665 and subsequent service refreshes.
@@ -568,7 +568,7 @@ version = 2
       # privileged_without_host_devices_all_devices_allowed allows the allowlisting of all devices when
       # privileged_without_host_devices is enabled.
       # In plain privileged mode all host device nodes are added to the container's spec and all devices
-      # are put in the container's device allowlist. This flags is for the modification of the privileged_without_host_devices
+      # are put in the container's device allowlist. This flag is for the modification of the privileged_without_host_devices
       # option so that even when no host devices are implicitly added to the container, all devices allowlisting is still enabled.
       # Requires privileged_without_host_devices to be enabled. Defaults to false.
       privileged_without_host_devices_all_devices_allowed = false
@@ -601,12 +601,12 @@ version = 2
       snapshotter = ""
 
       # sandboxer is the sandbox controller for the runtime.
-      # The default sandbox controller is the podsandbox controller, which create a "pause" container as a sandbox.
-      # We can create our own "shim" sandbox controller by implementing the sandbox api defined in runtime/sandbox/v1/sandbox.proto in our shim, and specifiy the sandboxer to "shim" here.
+      # The default sandbox controller is the podsandbox controller, which creates a "pause" container as a sandbox.
+      # We can create our own "shim" sandbox controller by implementing the sandbox api defined in runtime/sandbox/v1/sandbox.proto in our shim, and specify the sandboxer to "shim" here.
       # We can also run a grpc or ttrpc server to serve the sandbox controller API defined in services/sandbox/v1/sandbox.proto, and define a ProxyPlugin of "sandbox" type, and specify the name of the ProxyPlugin here.
       sandboxer = ""
 
-      # io_type is the way containerd get stdin/stdout/stderr from container or the execed process.
+      # io_type is the way containerd gets stdin/stdout/stderr from container or the execed process.
       # The default value is "fifo", in which containerd will create a set of named pipes and transfer io by them.
       # Currently the value of "streaming" is supported, in this way, sandbox should serve streaming api defined in services/streaming/v1/streaming.proto, and containerd will connect to sandbox's endpoint and create a set of streams to it, as channels to transfer io of container or process.
       io_type = ""
@@ -647,7 +647,7 @@ version = 2
 
   # 'plugins."io.containerd.grpc.v1.cri".cni' contains config related to cni
   [plugins."io.containerd.grpc.v1.cri".cni]
-    # bin_dir is the directory in which the binaries for the plugin is kept.
+    # bin_dir is the directory in which the binaries for the plugin are kept.
     bin_dir = "/opt/cni/bin"
 
     # conf_dir is the directory in which the admin places a CNI conf.
@@ -691,7 +691,7 @@ version = 2
     #
     # In order to use the decryption feature, additional configurations must be made.
     # The [decryption document](https://github.com/containerd/containerd/blob/main/docs/cri/decryption.md)
-    # provides information of how to set up stream processors and the containerd imgcrypt decoder
+    # provides information on how to set up stream processors and the containerd imgcrypt decoder
     # with the appropriate key models.
     #
     # Additional information:
@@ -753,14 +753,14 @@ See [`docs/hosts.md`](https://github.com/containerd/containerd/blob/main/docs/ho
 
 ## Untrusted Workload
 
-The recommended way to run untrusted workload is to use
+The recommended way to run untrusted workloads is to use
 [`RuntimeClass`](https://kubernetes.io/docs/concepts/containers/runtime-class/) api
 introduced in Kubernetes 1.12 to select RuntimeHandlers configured to run
 untrusted workload in `plugins."io.containerd.grpc.v1.cri".containerd.runtimes`.
 
-However, if you are using the legacy `io.kubernetes.cri.untrusted-workload`pod annotation
+However, if you are using the legacy `io.kubernetes.cri.untrusted-workload` pod annotation
 to request a pod be run using a runtime for untrusted workloads, the RuntimeHandler
-`plugins."io.containerd.grpc.v1.cri"cri.containerd.runtimes.untrusted` must be defined first.
+`plugins."io.containerd.grpc.v1.cri".containerd.runtimes.untrusted` must be defined first.
 When the annotation `io.kubernetes.cri.untrusted-workload` is set to `true` the `untrusted`
 runtime will be used. For example, see
 [Create an untrusted pod using Kata Containers](https://github.com/kata-containers/kata-containers/blob/main/docs/how-to/containerd-kata.md#kata-containers-as-the-runtime-for-untrusted-workload).
