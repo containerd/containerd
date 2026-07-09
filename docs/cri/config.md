@@ -756,7 +756,7 @@ See [`docs/hosts.md`](https://github.com/containerd/containerd/blob/main/docs/ho
 The recommended way to run untrusted workloads is to use
 [`RuntimeClass`](https://kubernetes.io/docs/concepts/containers/runtime-class/) api
 introduced in Kubernetes 1.12 to select RuntimeHandlers configured to run
-untrusted workload in `plugins."io.containerd.grpc.v1.cri".containerd.runtimes`.
+untrusted workloads in `plugins."io.containerd.grpc.v1.cri".containerd.runtimes`.
 
 However, if you are using the legacy `io.kubernetes.cri.untrusted-workload` pod annotation
 to request a pod be run using a runtime for untrusted workloads, the RuntimeHandler
