@@ -14,16 +14,18 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# Running Go 1.18's fuzzing for 30 seconds each. While this would be too
+# Running Go's fuzzing for 50,000 executions. While this would be too
 # short to actually find issues, we want to make sure that these fuzzing
-# tests are not fundamentally broken.
+# tests are not fundamentally broken. Using an execution limit rather than a
+# duration also avoids spurious failures when a duration expires
+# (https://go.dev/issue/75804).
 
 set -euo pipefail
 
-fuzztime=30s
+fuzzlimit=50000x
 pkgs=$(git grep 'func Fuzz.*testing\.F' | grep -o '.*\/' | sort | uniq)
 
 for pkg in $pkgs
 do
-    go test -fuzz=. ./$pkg -fuzztime=$fuzztime
+    go test -fuzz=. ./$pkg -fuzztime=$fuzzlimit
 done
