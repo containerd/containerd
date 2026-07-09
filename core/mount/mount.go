@@ -43,6 +43,12 @@ type Mount struct {
 	Target string
 	// Options contains zero or more fstab-style mount options. Typically,
 	// these are platform specific.
+	//
+	// These options are formatted as required for passing to mount(8) or
+	// the legacy mount(2) API after joining with ",", so some values may
+	// have option-specific quoting or escaping applied. For example,
+	// SELinux contexts (which can contain commas) are quoted, and
+	// overlayfs uses backslash escaping on paths.
 	Options []string
 }
 

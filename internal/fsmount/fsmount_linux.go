@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -115,6 +116,13 @@ func Fsmount(m mount.Mount, target string) error {
 
 		// Handle key=value options
 		if key, val, ok := strings.Cut(o, "="); ok {
+			switch key {
+			// Remove quoting from selinux parameters.
+			case "context", "fscontext", "defcontext", "rootcontext":
+				if nval, err := strconv.Unquote(val); err == nil {
+					val = nval
+				}
+			}
 			if err := unix.FsconfigSetString(int(fsctx.Fd()), key, val); err != nil {
 				return fmt.Errorf("failed to set string option %s=%s: %w", key, val, err)
 			}
