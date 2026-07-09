@@ -1602,3 +1602,202 @@ func TestResolverErrorStatusCodeOnFetch(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveForbiddenGETFallbackForErrorBody(t *testing.T) {
+	// When HEAD returns 403 with no body, the resolver should issue a
+	// follow-up GET to retrieve the registry's error details.
+	const (
+		name      = "test/repo"
+		tag       = "latest"
+		errorBody = `{"errors":[{"code":"DENIED","message":"encryption key is disabled"}]}`
+	)
+
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/token") {
+			rw.Header().Set("Content-Type", "application/json")
+			rw.Write([]byte(`{"access_token":"test"}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "/manifests/") {
+			rw.Header().Set("Content-Type", "application/json")
+			rw.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				rw.Write([]byte(errorBody))
+			}
+			return
+		}
+		if r.URL.Path == "/v2/" {
+			rw.WriteHeader(http.StatusOK)
+			return
+		}
+		rw.WriteHeader(http.StatusNotFound)
+	})
+
+	base, options, close := tlsServer(handler)
+	defer close()
+
+	options.Hosts = ConfigureDefaultRegistries(WithClient(options.Client))
+	resolver := NewResolver(options)
+	ref := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, _, err := resolver.Resolve(context.Background(), ref)
+	if err == nil {
+		t.Fatal("expected error from resolve, got nil")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "encryption key is disabled") {
+		t.Errorf("expected error to contain registry error body, got: %s", errMsg)
+	}
+	if !strings.Contains(errMsg, "403") {
+		t.Errorf("expected error to contain status code 403, got: %s", errMsg)
+	}
+}
+
+func TestResolveForbiddenNoFallbackOnGET(t *testing.T) {
+	const (
+		name = "test/repo"
+		tag  = "latest"
+	)
+
+	var getCount int
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/token") {
+			rw.Header().Set("Content-Type", "application/json")
+			rw.Write([]byte(`{"access_token":"test"}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "/manifests/") {
+			if r.Method == http.MethodGet {
+				getCount++
+			}
+			rw.Header().Set("Content-Type", "application/json")
+			rw.WriteHeader(http.StatusForbidden)
+			rw.Write([]byte(`{"errors":[{"code":"DENIED","message":"forbidden"}]}`))
+			return
+		}
+		if r.URL.Path == "/v2/" {
+			rw.WriteHeader(http.StatusOK)
+			return
+		}
+		rw.WriteHeader(http.StatusNotFound)
+	})
+
+	base, options, close := tlsServer(handler)
+	defer close()
+
+	options.Hosts = ConfigureDefaultRegistries(WithClient(options.Client))
+	resolver := NewResolver(options)
+	ref := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, _, err := resolver.Resolve(context.Background(), ref)
+	if err == nil {
+		t.Fatal("expected error from resolve, got nil")
+	}
+
+	// The resolver should issue exactly 1 GET (the fallback from HEAD 403).
+	// It must NOT issue a second fallback GET when the first GET also returns 403.
+	if getCount != 1 {
+		t.Errorf("expected exactly 1 GET fallback request for manifests, got %d", getCount)
+	}
+}
+
+func TestResolve404NoFallbackGET(t *testing.T) {
+	const (
+		name = "test/repo"
+		tag  = "latest"
+	)
+
+	var getCount int
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/token") {
+			rw.Header().Set("Content-Type", "application/json")
+			rw.Write([]byte(`{"access_token":"test"}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "/manifests/") {
+			if r.Method == http.MethodGet {
+				getCount++
+			}
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.URL.Path == "/v2/" {
+			rw.WriteHeader(http.StatusOK)
+			return
+		}
+		rw.WriteHeader(http.StatusNotFound)
+	})
+
+	base, options, close := tlsServer(handler)
+	defer close()
+
+	options.Hosts = ConfigureDefaultRegistries(WithClient(options.Client))
+	resolver := NewResolver(options)
+	ref := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, _, err := resolver.Resolve(context.Background(), ref)
+	if err == nil {
+		t.Fatal("expected error from resolve, got nil")
+	}
+
+	if getCount != 0 {
+		t.Errorf("expected 0 GET requests for 404, got %d", getCount)
+	}
+}
+
+func TestResolveForbiddenGETFallbackNetworkError(t *testing.T) {
+	const (
+		name = "test/repo"
+		tag  = "latest"
+	)
+
+	var requestCount int
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/token") {
+			rw.Header().Set("Content-Type", "application/json")
+			rw.Write([]byte(`{"access_token":"test"}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "/manifests/") {
+			requestCount++
+			if r.Method == http.MethodHead {
+				rw.WriteHeader(http.StatusForbidden)
+				return
+			}
+			hj, ok := rw.(http.Hijacker)
+			if !ok {
+				rw.WriteHeader(http.StatusForbidden)
+				return
+			}
+			conn, _, err := hj.Hijack()
+			if err != nil {
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			conn.Close()
+			return
+		}
+		if r.URL.Path == "/v2/" {
+			rw.WriteHeader(http.StatusOK)
+			return
+		}
+		rw.WriteHeader(http.StatusNotFound)
+	})
+
+	base, options, close := tlsServer(handler)
+	defer close()
+
+	options.Hosts = ConfigureDefaultRegistries(WithClient(options.Client))
+	resolver := NewResolver(options)
+	ref := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, _, err := resolver.Resolve(context.Background(), ref)
+	if err == nil {
+		t.Fatal("expected error from resolve, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "403") {
+		t.Errorf("expected 403 in error, got: %s", err.Error())
+	}
+}
