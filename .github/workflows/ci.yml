@@ -598,8 +598,8 @@ jobs:
             ${{github.workspace}}/report/*.xml
             ${{github.workspace}}/report/*.log
 
-  integration-vagrant:
-    name: Vagrant integration
+  integration-vm:
+    name: VM integration
     if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -609,44 +609,42 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - box: fedora/44-cloud-base
+          - template: fedora-44
             cgroup_driver: cgroupfs
             runc: runc
-          - box: fedora/44-cloud-base
+          - template: fedora-44
             cgroup_driver: systemd
             runc: runc
-          - box: fedora/44-cloud-base
+          - template: fedora-44
             cgroup_driver: cgroupfs
             runc: crun
-          - box: fedora/44-cloud-base
+          - template: fedora-44
             cgroup_driver: systemd
             runc: crun
             # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
-            # The image was changed from rockylinux/8 to almalinux/8,
-            # as the former one no longer works:
-            # https://github.com/containerd/containerd/pull/10297
-          - box: almalinux/8
+          - template: almalinux-8
             cgroup_driver: cgroupfs
             runc: runc
-          - box: almalinux/8
+          - template: almalinux-8
             cgroup_driver: systemd
             runc: runc
-          - box: almalinux/9
+          - template: almalinux-9
             cgroup_driver: cgroupfs
             runc: runc
-          - box: almalinux/9
+          - template: almalinux-9
             cgroup_driver: systemd
             runc: runc
-          - box: almalinux/10
+          - template: almalinux-10
             cgroup_driver: cgroupfs
             runc: runc
-          - box: almalinux/10
+          - template: almalinux-10
             cgroup_driver: systemd
             runc: runc
     env:
-      BOX: ${{ matrix.box }}
+      LIMA_TEMPLATE: ${{ matrix.template }}
       CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
       RUNC_FLAVOR: ${{ matrix.runc }}
+      LIMA_WORKDIR: /go/src/github.com/containerd/containerd
     steps:
       - name: Show the host info
         run: |
@@ -658,49 +656,36 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      - uses: lima-vm/lima-actions/setup@55627e31b78637bf254a8b2a14da8ea7d12564e5 # v1.1.0
+        id: lima-actions-setup
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: /root/.vagrant.d
-          key: vagrant-${{ matrix.box }}
-      - name: Set up vagrant
-        run: |
-          # Canonical's Vagrant 2.2.19 dpkg cannot download Fedora 38 image: https://bugs.launchpad.net/vagrant/+bug/2017828
-          # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
-          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
-          sudo apt-get update
-          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant ovmf
-          # https://github.com/vagrant-libvirt/vagrant-libvirt/issues/1725#issuecomment-1454058646
-          sudo cp /usr/share/OVMF/OVMF_VARS_4M.fd /var/lib/libvirt/qemu/nvram/
-          sudo systemctl enable --now libvirtd
-          sudo apt-get build-dep -y ruby-libvirt
-          sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
-          sudo env VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1 vagrant plugin uninstall fog-json || true
-          sudo env VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1 vagrant plugin install fog-json --plugin-version 1.2.0
-          sudo env VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1 vagrant plugin install vagrant-libvirt
+          path: ~/.cache/lima
+          key: lima-${{ steps.lima-actions-setup.outputs.version }}-${{ matrix.template }}
       - name: Boot VM
+        # --plain keeps the guest pristine (no guest agent, no mounts, no port forwards)
+        run: limactl start --plain --name=default --cpus=2 --memory=4 --disk=60 "template:$LIMA_TEMPLATE"
+      - name: Copy the source code to the VM
+        env:
+          # $LIMA_WORKDIR does not exist yet
+          LIMA_WORKDIR: /
         run: |
-          if  [ "$BOX" = "fedora/44-cloud-base" ]; then
-            # fedora/41-cloud-base seems the last version available in https://portal.cloud.hashicorp.com/vagrant/discover/fedora
-            # Download the box file with curl (with retry) to handle flaky Fedora mirrors
-            curl -fL --retry 5 --retry-delay 5 --retry-all-errors \
-              --connect-timeout 30 --max-time 600 \
-              -o /tmp/fedora.box \
-              https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Vagrant-libvirt-44-1.7.x86_64.vagrant.libvirt.box
-            sudo vagrant box add fedora/44-cloud-base /tmp/fedora.box
-            rm -f /tmp/fedora.box
-          fi
-          sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --no-tty
+          limactl cp -r . default:containerd
+          lima bash -c 'sudo mkdir -p /go/src/github.com/containerd && sudo mv ~/containerd /go/src/github.com/containerd/containerd'
+      - name: Provision the VM
+        run: lima sudo RUNC_FLAVOR="$RUNC_FLAVOR" script/vm/provision.sh
       - name: test-integration
-        run: sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
+        run: lima sudo RUNC_FLAVOR="$RUNC_FLAVOR" script/vm/test-integration.sh
       - name: test-cri-integration
-        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+        run: lima sudo CGROUP_DRIVER="$CGROUP_DRIVER" RUNC_FLAVOR="$RUNC_FLAVOR" script/vm/test-cri-integration.sh
       - name: test-cri
-        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+        run: lima sudo CGROUP_DRIVER="$CGROUP_DRIVER" script/vm/test-cri.sh
       - name: dump-dmesg
         if: always()
-        run: sudo BOX=$BOX vagrant ssh -c "sudo dmesg -T -f kern"
+        env:
+          # $LIMA_WORKDIR may not exist if an earlier step failed
+          LIMA_WORKDIR: /
+        run: lima sudo dmesg -T -f kern
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
