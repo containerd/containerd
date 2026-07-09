@@ -47,8 +47,7 @@ type differ interface {
 
 // erofsDiff does erofs comparison and application
 type erofsDiff struct {
-	store         content.Store
-	mkfsExtraOpts []string
+	store content.Store
 	// enableTarIndex enables generating tar index for tar content
 	// instead of fully converting the tar to EROFS format
 	enableTarIndex bool
@@ -58,13 +57,6 @@ type erofsDiff struct {
 
 // DifferOpt is an option for configuring the erofs differ
 type DifferOpt func(d *erofsDiff)
-
-// WithMkfsOptions sets extra options for mkfs.erofs
-func WithMkfsOptions(opts []string) DifferOpt {
-	return func(d *erofsDiff) {
-		d.mkfsExtraOpts = opts
-	}
-}
 
 // WithTarIndexMode enables tar index mode for EROFS layers
 func WithTarIndexMode() DifferOpt {
@@ -90,9 +82,6 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 	for _, opt := range opts {
 		opt(d)
 	}
-
-	// Add default block size on darwin if not already specified
-	d.mkfsExtraOpts = erofsutils.AddDefaultMkfsOpts(d.mkfsExtraOpts)
 
 	return d
 }
@@ -204,14 +193,14 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer with compressed EROFS blob")
 	} else if s.enableTarIndex {
 		// Use the tar index method: generate tar index and append tar
-		err = erofsutils.GenerateTarIndexAndAppendTar(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
+		err = erofsutils.GenerateTarIndexAndAppendTar(ctx, rc, layerBlobPath, u.String())
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to generate tar index: %w", err)
 		}
 		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer using tar index mode")
 	} else {
 		// Use the tar method: fully convert tar to EROFS
-		err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
+		err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, u.String())
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to convert tar to erofs: %w", err)
 		}

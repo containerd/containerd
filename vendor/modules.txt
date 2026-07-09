@@ -147,8 +147,8 @@ github.com/containerd/containerd/api/types/runc/options
 github.com/containerd/containerd/api/types/runtimeoptions/v1
 github.com/containerd/containerd/api/types/task
 github.com/containerd/containerd/api/types/transfer
-# github.com/containerd/continuity v0.5.0
-## explicit; go 1.21
+# github.com/containerd/continuity v0.4.6-0.20260607160345-637bdff8bb38
+## explicit; go 1.23
 github.com/containerd/continuity
 github.com/containerd/continuity/devices
 github.com/containerd/continuity/driver
@@ -157,6 +157,7 @@ github.com/containerd/continuity/fs/fstest
 github.com/containerd/continuity/pathdriver
 github.com/containerd/continuity/proto
 github.com/containerd/continuity/sysx
+github.com/containerd/continuity/tarconv
 github.com/containerd/continuity/testutil
 github.com/containerd/continuity/testutil/loopback
 # github.com/containerd/errdefs v1.0.0
@@ -173,7 +174,7 @@ github.com/containerd/fifo
 # github.com/containerd/go-cni v1.1.13
 ## explicit; go 1.21
 github.com/containerd/go-cni
-# github.com/containerd/go-dmverity v0.1.0
+# github.com/containerd/go-dmverity v0.0.0-20260611211332-9879dd340c85
 ## explicit; go 1.24.3
 github.com/containerd/go-dmverity/pkg/dm
 github.com/containerd/go-dmverity/pkg/keyring
@@ -299,7 +300,7 @@ github.com/docker/go-units
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
 github.com/emicklei/go-restful/v3/log
-# github.com/erofs/go-erofs v0.3.0
+# github.com/erofs/go-erofs v0.3.1-0.20260531080512-069dc32d83e6
 ## explicit; go 1.23
 github.com/erofs/go-erofs
 github.com/erofs/go-erofs/internal/builder
