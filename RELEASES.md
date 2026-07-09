@@ -136,19 +136,17 @@ to all committers.
 | [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life    | September 26, 2019             | March 4, 2021                  |                        |
 | [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life    | August 17, 2020                | March 3, 2022                  |                        |
 | [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life    | May 3, 2021                    | February 28, 2023              |                        |
-| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.39) | End of Life    | February 15, 2022              | August 23, 2025                | @containerd/committers |
-| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS            | March 10, 2023                 | September 2026*                | [@samuelkarp](https://github.com/samuelkarp), [@chrishenzie](https://github.com/chrishenzie) |
-| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.7)  | LTS            | November 5, 2024               | March, 2027**                  | [@samuelkarp](https://github.com/samuelkarp), [@chrishenzie](https://github.com/chrishenzie) |
-| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.7)  | Active         | May 7, 2025                    | July 3, 2026***                | [@cpuguy83](https://github.com/cpuguy83), [@fuweid](https://github.com/fuweid) |
-| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.0)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
-| [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.0)  | LTS            | April 30, 2026                 | April 30, 2028                 | @containerd/committers |
+| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.39) | End of Life    | February 15, 2022              | August 23, 2025                |                        |
+| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.33) | LTS            | March 10, 2023                 | September 2026*                | [@samuelkarp](https://github.com/samuelkarp), [@chrishenzie](https://github.com/chrishenzie) |
+| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.10) | LTS            | November 5, 2024               | March, 2027**                  | [@samuelkarp](https://github.com/samuelkarp), [@chrishenzie](https://github.com/chrishenzie) |
+| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.9)  | End of Life    | May 7, 2025                    | July 3, 2026                   |                        |
+| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.5)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
+| [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.2)  | LTS            | April 30, 2026                 | April 30, 2028                 | @containerd/committers |
 | [2.4](https://github.com/containerd/containerd/milestone/51)         | _Future_       | August 26, 2026 (_tentative_)  | April 26, 2027 (_tentative_)   | @containerd/committers |
 
 \* Support for the 1.7 release branch was provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by [@samuelkarp](https://github.com/samuelkarp) and [@chrishenzie](https://github.com/chrishenzie).  This extended support is focused on usage with Kubernetes 1.32, 1.31, and 1.30 via [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).  Changes may not be accepted if they are not needed for this usage.
 
 \*\* Support for the 2.0 release branch was provided by @containerd/committers until November 7, 2025. Extended support through March 2027 is provided by [@samuelkarp](https://github.com/samuelkarp) and [@chrishenzie](https://github.com/chrishenzie).  This extended support is focused on usage with Kuberentes 1.33 via [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).  Changes may not be accepted if they are not needed for this usage.
-
-\*\*\* Support for the 2.1 release branch was provided by @containerd/committers until May 5, 2026. Extended support through July 3, 2026 is provided by [@cpuguy83](https://github.com/cpuguy83) and [@fuweid](https://github.com/fuweid).  This extended support is focused on usage with Kubernetes 1.33 via [Azure Kubernetes Service](https://azure.microsoft.com/en-us/products/kubernetes-service).  Changes may not be accepted if they are not needed for this usage.
 
 ### Kubernetes Support
 
