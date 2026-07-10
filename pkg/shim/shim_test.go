@@ -20,6 +20,11 @@ import (
 	"context"
 	"runtime"
 	"testing"
+
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
+	googleproto "google.golang.org/protobuf/proto"
 )
 
 func TestRuntimeWithEmptyMaxEnvProcs(t *testing.T) {
@@ -59,4 +64,95 @@ func TestShimOptWithValue(t *testing.T) {
 	if !op.Debug {
 		t.Fatal("opts.Debug should be true")
 	}
+}
+
+func TestParseBootstrapParams(t *testing.T) {
+	const (
+		id        = "container-id"
+		namespace = "moby"
+	)
+
+	t.Run("new bootstrap protocol", func(t *testing.T) {
+		want := &bootapi.BootstrapParams{
+			InstanceID: id,
+			Namespace:  namespace,
+		}
+		input, err := proto.Marshal(want)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		got, usesBootstrapProtocol := parseBootstrapParams(input, id, namespace)
+		if !usesBootstrapProtocol {
+			t.Fatal("new bootstrap params detected as deprecated")
+		}
+		if !googleproto.Equal(got, want) {
+			t.Fatalf("bootstrap params not preserved: got %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("2.2 runtime options Any", func(t *testing.T) {
+		// Containerd 2.2 sends an Any whose fields decode as non-empty
+		// BootstrapParams ID and namespace values.
+		input, err := proto.Marshal(&types.Any{
+			TypeUrl: "types.containerd.io/containerd.runc.v1.Options",
+			Value:   []byte("runc options"),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var collided bootapi.BootstrapParams
+		if err := proto.Unmarshal(input, &collided); err != nil {
+			t.Fatal(err)
+		}
+		if collided.InstanceID == "" || collided.Namespace == "" {
+			t.Fatalf("test payload did not reproduce field collision: %+v", &collided)
+		}
+
+		params, usesBootstrapProtocol := parseBootstrapParams(input, id, namespace)
+		if usesBootstrapProtocol {
+			t.Fatal("containerd 2.2 runtime options detected as new bootstrap params")
+		}
+		if !googleproto.Equal(params, &bootapi.BootstrapParams{}) {
+			t.Fatalf("legacy payload fields preserved: %+v", params)
+		}
+	})
+}
+
+func TestMarshalBootstrapResponse(t *testing.T) {
+	result := &bootapi.BootstrapResult{
+		Version:  3,
+		Address:  "unix:///run/containerd/shim.sock",
+		Protocol: "ttrpc",
+		Metadata: map[string]string{
+			"unsupported": "value",
+		},
+	}
+
+	t.Run("legacy JSON", func(t *testing.T) {
+		data, err := marshalBootstrapResponse(result, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := `{"version":3,"address":"unix:///run/containerd/shim.sock","protocol":"ttrpc"}`
+		if got := string(data); got != want {
+			t.Fatalf("unexpected legacy response: got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("bootstrap protobuf", func(t *testing.T) {
+		data, err := marshalBootstrapResponse(result, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var got bootapi.BootstrapResult
+		if err := proto.Unmarshal(data, &got); err != nil {
+			t.Fatal(err)
+		}
+		if !googleproto.Equal(&got, result) {
+			t.Fatalf("bootstrap result not preserved: got %+v, want %+v", &got, result)
+		}
+	})
 }
