@@ -71,8 +71,8 @@ github.com/containerd/platforms v1.0.0-rc.4 h1:M42JrUT4zfZTqtkUwkr0GzmUWbfyO5VO0
 github.com/containerd/platforms v1.0.0-rc.4/go.mod h1:lKlMXyLybmBedS/JJm11uDofzI8L2v0J2ZbYvNsbq1A=
 github.com/containerd/plugin v1.1.0 h1:O+7lczNJVMy8rz0YNx3xGB8tTf5qY4i5abF041Ew19U=
 github.com/containerd/plugin v1.1.0/go.mod h1:qBTum+A8lJ6lO44A19Eo7y1OlcLj4OWFH1DA/vnHmcc=
-github.com/containerd/ttrpc v1.2.8 h1:xbVu6D4qF2jihdh9rDVOKqUMiFBQk6YctTdo1zk087Y=
-github.com/containerd/ttrpc v1.2.8/go.mod h1:wyZW2K79t4Hfcxl+GUvkZqRBzJlqFFvgEeeWXa42tyE=
+github.com/containerd/ttrpc v1.2.9 h1:ha0ak962T0s3CA/RoZ6S6xiWZQF24GrBaEpiGX1uihg=
+github.com/containerd/ttrpc v1.2.9/go.mod h1:jjtQRwXm4DL3KsHKW8vDiUOV6wO0hi6IPhmJhxU7aEs=
 github.com/containerd/typeurl/v2 v2.3.0 h1:HZHPhRWo5XMy3QGQoPrUzbW/2ckwjfweHmOwlkIrPAQ=
 github.com/containerd/typeurl/v2 v2.3.0/go.mod h1:Qk+PAdUYArVj41TnGi6rJ+48RF0PkcTc4i/taoBcK0w=
 github.com/containerd/zfs/v2 v2.0.0 h1:sI0wKwWNQXR9G4jnPPrXmMSetm6PGAwgqBRTQtFUY/o=

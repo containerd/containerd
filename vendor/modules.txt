@@ -217,8 +217,8 @@ github.com/containerd/platforms
 ## explicit; go 1.22
 github.com/containerd/plugin
 github.com/containerd/plugin/registry
-# github.com/containerd/ttrpc v1.2.8
-## explicit; go 1.22
+# github.com/containerd/ttrpc v1.2.9
+## explicit; go 1.25.0
 github.com/containerd/ttrpc
 # github.com/containerd/typeurl/v2 v2.3.0
 ## explicit; go 1.21
