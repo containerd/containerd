@@ -44,7 +44,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0
 	github.com/intel/goresctrl v0.13.0
-	github.com/klauspost/compress v1.18.6
+	github.com/klauspost/compress v1.19.0
 	github.com/mdlayher/vsock v1.3.0
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.7.2
