@@ -100,15 +100,15 @@ func connect(address string, d func(gocontext.Context, string) (net.Conn, error)
 		Backoff: backoffConfig,
 	}
 	gopts := []grpc.DialOption{
-		grpc.WithBlock(),
+		grpc.WithBlock(), //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(d),
-		grpc.FailOnNonTempDialError(true),
+		grpc.FailOnNonTempDialError(true), //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 		grpc.WithConnectParams(connParams),
 	}
 	ctx, cancel := gocontext.WithTimeout(gocontext.Background(), 2*time.Second)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
+	conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...) //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 	}

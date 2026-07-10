@@ -568,7 +568,7 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)),
 	}
 
-	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
+	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...) //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 	}
