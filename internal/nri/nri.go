@@ -132,6 +132,7 @@ func New(cfg *Config) (API, error) {
 
 	cfg.ConfigureTimeouts()
 
+	opts = append(opts, nri.WithAdaptLock(&l.Mutex))
 	l.nri, err = nri.New(name, version, syncFn, updateFn, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize NRI interface: %w", err)
@@ -522,9 +523,6 @@ func (l *local) syncPlugin(ctx context.Context, syncFn nri.SyncCB) error {
 }
 
 func (l *local) updateFromPlugin(ctx context.Context, req []*nri.ContainerUpdate) ([]*nri.ContainerUpdate, error) {
-	l.Lock()
-	defer l.Unlock()
-
 	log.G(ctx).Trace("Unsolicited NRI container updates")
 
 	failed, err := l.applyUpdates(ctx, req)

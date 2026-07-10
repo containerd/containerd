@@ -58,6 +58,7 @@ type UpdateFn func(context.Context, []*ContainerUpdate) ([]*ContainerUpdate, err
 // Adaptation is the NRI abstraction for container runtime NRI adaptation/integration.
 type Adaptation struct {
 	sync.Mutex
+	adaptMu     *sync.Mutex
 	name        string
 	version     string
 	nriVersion  string
@@ -110,6 +111,13 @@ func WithPluginConfigPath(path string) Option {
 func WithSocketPath(path string) Option {
 	return func(r *Adaptation) error {
 		r.socketPath = path
+		return nil
+	}
+}
+
+func WithAdaptLock(mu *sync.Mutex) Option {
+	return func(r *Adaptation) error {
+		r.adaptMu = mu
 		return nil
 	}
 }
@@ -479,9 +487,13 @@ func (r *Adaptation) RemoveContainer(ctx context.Context, req *RemoveContainerRe
 
 // Perform a set of unsolicited container updates requested by a plugin.
 func (r *Adaptation) updateContainers(ctx context.Context, req []*ContainerUpdate) ([]*ContainerUpdate, error) {
+	if r.adaptMu != nil {
+		// updateFn should hold the lock
+		r.adaptMu.Lock()
+		defer r.adaptMu.Unlock()
+	}
 	r.Lock()
 	defer r.Unlock()
-
 	return r.updateFn(ctx, req)
 }
 
