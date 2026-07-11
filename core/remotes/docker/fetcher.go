@@ -232,8 +232,18 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 	}
 
 	return newHTTPReadSeeker(desc.Size, func(offset int64) (io.ReadCloser, error) {
+		// The urls field carries external download locations for
+		// non-distributable (foreign) layers. Distributable content is always
+		// retrievable from the registry, so only honor urls for
+		// non-distributable descriptors; otherwise a crafted manifest could
+		// point any descriptor at an arbitrary host and make the fetcher
+		// request it.
+		urls := desc.URLs
+		if !images.IsNonDistributable(desc.MediaType) {
+			urls = nil
+		}
 		// firstly try fetch via external urls
-		for _, us := range desc.URLs {
+		for _, us := range urls {
 			u, err := url.Parse(us)
 			if err != nil {
 				log.G(ctx).WithError(err).Debugf("failed to parse %q", us)

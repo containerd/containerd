@@ -38,11 +38,15 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/pkg/reference"
 )
 
 type writeFunc func(p []byte) (int, error)
@@ -785,4 +789,68 @@ func parseRange(s string, size int64) ([]httpRange, error) {
 		return nil, errNoOverlap
 	}
 	return ranges, nil
+}
+
+func TestFetchDescriptorURLsNonDistributableOnly(t *testing.T) {
+	content := []byte("layer content")
+	dgst := digest.FromBytes(content)
+
+	var externalHit, registryHit atomic.Bool
+	serve := func(hit *atomic.Bool) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			hit.Store(true)
+			rw.Header().Set("content-length", strconv.Itoa(len(content)))
+			_, _ = rw.Write(content)
+		}))
+	}
+
+	external := serve(&externalHit)
+	defer external.Close()
+	registry := serve(&registryHit)
+	defer registry.Close()
+
+	ru, err := url.Parse(registry.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fetch := func(mediaType string) error {
+		externalHit.Store(false)
+		registryHit.Store(false)
+
+		f := dockerFetcher{&dockerBase{
+			refspec:    reference.Spec{Locator: "example.com/test"},
+			repository: "test",
+			hosts: []RegistryHost{{
+				Client:       registry.Client(),
+				Host:         ru.Host,
+				Scheme:       ru.Scheme,
+				Path:         ru.Path,
+				Capabilities: HostCapabilityPull | HostCapabilityResolve,
+			}},
+		}}
+
+		rc, err := f.Fetch(context.Background(), ocispec.Descriptor{
+			MediaType: mediaType,
+			Digest:    dgst,
+			Size:      int64(len(content)),
+			URLs:      []string{external.URL},
+		})
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+		_, err = io.ReadAll(rc)
+		return err
+	}
+
+	// A distributable descriptor must never be fetched from its urls; the
+	// content comes from the registry instead.
+	require.NoError(t, fetch(ocispec.MediaTypeImageLayerGzip))
+	assert.False(t, externalHit.Load(), "external url must not be contacted for a distributable descriptor")
+	assert.True(t, registryHit.Load(), "registry must be contacted for a distributable descriptor")
+
+	// A non-distributable (foreign) layer is served from its urls.
+	require.NoError(t, fetch(images.MediaTypeDockerSchema2LayerForeignGzip))
+	assert.True(t, externalHit.Load(), "external url must be used for a non-distributable descriptor")
 }
