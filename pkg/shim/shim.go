@@ -274,7 +274,19 @@ func run(ctx context.Context, manager Shim, config Config) error {
 		// We try reading stdin twice: first for the new boot API, then runc Options.
 		// The stdin pipe is not seekable, so this should be read into memory first.
 		// Protect against unbounded memory consumption with a limit (e.g., 10MB).
+		readDone := make(chan struct{})
+		go func() {
+			select {
+			case <-ctx.Done():
+				// Forcefully break the blocking io.ReadAll if the daemon disconnects
+				os.Stdin.Close()
+			case <-readDone:
+				// Read completed successfully, exit the monitor
+			}
+		}()
+
 		input, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
+		close(readDone)
 		if err != nil {
 			return fmt.Errorf("failed to read stdin: %w", err)
 		}
