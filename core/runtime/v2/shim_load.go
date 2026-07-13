@@ -189,7 +189,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	_, sgetErr := m.sandboxStore.Get(ctx, id)
 	pInfo, pidErr := shim.Pids(ctx)
 	if sgetErr != nil && errors.Is(sgetErr, errdefs.ErrNotFound) && (len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound)) {
-		log.G(ctx).WithField("id", id).Info("cleaning leaked shim process")
+		log.G(ctx).WithField("id", id).WithError(pidErr).Info("cleaning leaked shim process")
 		// We are unable to get Pids from the shim and it's not a sandbox
 		// shim. We should clean it up her.
 		// No need to do anything for removeTask since we never added this shim.
