@@ -157,6 +157,21 @@ func TestReferenceParser(t *testing.T) {
 			Digest:   "sha512:fffffff",
 			Err:      ErrInvalid,
 		},
+		{
+			Name:  "DotDotRewritesHost",
+			Input: "example.com/../other/image:latest",
+			Err:   ErrInvalid,
+		},
+		{
+			Name:  "EncodedDotDotRewritesHost",
+			Input: "example.com/%2e%2e/other/image:latest",
+			Err:   ErrInvalid,
+		},
+		{
+			Name:  "DotDotComponentInPath",
+			Input: "example.com/library/../image:latest",
+			Err:   ErrInvalid,
+		},
 	} {
 		t.Run(testcase.Name, func(t *testing.T) {
 			ref, err := Parse(testcase.Input)
