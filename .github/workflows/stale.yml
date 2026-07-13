@@ -37,6 +37,13 @@ jobs:
           exempt-all-issue-milestones: true
           exempt-all-pr-milestones: true
 
+          # How many items to process per run, default is 30, which is not
+          # enough to process the whole backlog. This number should strike the
+          # right balance: too high value might cause rate limits.
+          operations-per-run: 150
+          # Process the oldest items first.
+          ascending: true
+
           # Messages
           stale-issue-message: >
             This issue has not been updated in 12 months and is now marked as stale.
