@@ -26,11 +26,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
+	criu "github.com/checkpoint-restore/go-criu/v7"
 	"github.com/checkpoint-restore/go-criu/v7/utils"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/client"
@@ -135,6 +137,58 @@ func assertCheckpointDirSafe(root string) error {
 	})
 }
 
+func (c *criService) checkCriu() error {
+	c.checkCriuOnce.Do(func() {
+		c.checkCriuErr = c.doCheckCriu()
+	})
+	return c.checkCriuErr
+}
+
+func (c *criService) doCheckCriu() error {
+	if c.config.EnableCRIU != nil && !*c.config.EnableCRIU {
+		return errors.New("criu support is disabled by configuration")
+	}
+	path := resolveCriuPath(c.shimPath)
+	if path == "" {
+		return errors.New("criu binary not found in shim path or system PATH")
+	}
+	client := criu.MakeCriu()
+	client.SetCriuPath(path)
+	version, err := client.GetCriuVersion()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve criu version: %w", err)
+	}
+	if version < utils.PodCriuVersion {
+		return fmt.Errorf("checkpoint/restore requires at least CRIU %d, current version is %d", utils.PodCriuVersion, version)
+	}
+	return nil
+}
+
+func resolveCriuPath(customPath string) string {
+	if customPath != "" {
+		// This logic is Linux-specific. If CRIU is ever supported on other
+		// operating systems, path lookup will need to respect that OS's
+		// conventions.
+		for _, dir := range filepath.SplitList(customPath) {
+			if !filepath.IsAbs(dir) {
+				continue
+			}
+			criuPath := filepath.Join(dir, "criu")
+			if fi, err := os.Stat(criuPath); err == nil && fi.Mode().IsRegular() && fi.Mode()&0111 != 0 {
+				return criuPath
+			}
+		}
+		return ""
+	}
+	if criuPath, err := exec.LookPath("criu"); err == nil {
+		if absPath, err := filepath.Abs(criuPath); err == nil {
+			return absPath
+		}
+		return criuPath
+	}
+	return ""
+}
+
 // checkIfCheckpointOCIImage returns checks if the input refers to a checkpoint image.
 // It returns the StorageImageID of the image the input resolves to, nil otherwise.
 func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string) (string, error) {
@@ -189,6 +243,10 @@ func (c *criService) CRImportCheckpoint(
 	sandbox *sandbox.Sandbox,
 	sandboxConfig *runtime.PodSandboxConfig,
 ) (ctrID string, retErr error) {
+	if err := c.checkCriu(); err != nil {
+		return "", fmt.Errorf("checkpoint restore is not enabled: %w", err)
+	}
+
 	var mountPoint string
 	start := time.Now()
 	// Ensure that the image to restore the checkpoint from has been provided.
@@ -539,18 +597,9 @@ func (c *criService) CRImportCheckpoint(
 
 func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (*runtime.CheckpointContainerResponse, error) {
 	start := time.Now()
-	if err := utils.CheckForCriu(utils.PodCriuVersion); err != nil {
-		errorMessage := fmt.Sprintf(
-			"CRIU binary not found or too old (<%d). Failed to checkpoint container %q",
-			utils.PodCriuVersion,
-			r.GetContainerId(),
-		)
-		log.G(ctx).WithError(err).Error(errorMessage)
-		return nil, fmt.Errorf(
-			"%s: %w",
-			errorMessage,
-			err,
-		)
+	if err := c.checkCriu(); err != nil {
+		log.G(ctx).WithError(err).Errorf("Failed to checkpoint container %q", r.GetContainerId())
+		return nil, fmt.Errorf("failed to checkpoint container %q: %w", r.GetContainerId(), err)
 	}
 
 	criContainerStatus, err := c.ContainerStatus(ctx, &runtime.ContainerStatusRequest{
