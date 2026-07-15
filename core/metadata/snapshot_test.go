@@ -18,11 +18,14 @@ package metadata
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/leases"
@@ -456,4 +459,95 @@ func (s *tmpSnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...
 
 func (s *tmpSnapshotter) Close() error {
 	return nil
+}
+
+type hangingRemoveSnapshotter struct {
+	snapshots.Snapshotter
+	removes  atomic.Int32
+	cleanups atomic.Int32
+}
+
+func (s *hangingRemoveSnapshotter) Remove(ctx context.Context, key string) error {
+	s.removes.Add(1)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+// Cleanup makes the wrapper a snapshots.Cleaner so the test can assert GC does
+// not call it after abandoning a pass. This stub returns immediately; a real
+// wedged snapshotter would hang here just like it does in Remove.
+func (s *hangingRemoveSnapshotter) Cleanup(ctx context.Context) error {
+	s.cleanups.Add(1)
+	return nil
+}
+
+func TestGarbageCollectHangingRemove(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, bdb := testEnv(t)
+
+		sn := &hangingRemoveSnapshotter{Snapshotter: NewTmpSnapshotter()}
+		db := NewDB(bdb, nil, map[string]snapshots.Snapshotter{"tmp": sn})
+		if err := db.Init(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		// Orphan snapshots: exist in the backend but not in metadata, so GC removes them.
+		for _, key := range []string{"orphan-1", "orphan-2"} {
+			if _, err := sn.Snapshotter.Prepare(ctx, key, ""); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// The fake clock reaches the removal deadline as soon as Remove blocks,
+		// so this runs against the real default instead of a shortened one. An
+		// unbounded Remove would deadlock the bubble rather than pass.
+		msn := db.Snapshotter("tmp").(*snapshotter)
+		_, err := msn.garbageCollect(ctx)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected the bounded Remove to fail with DeadlineExceeded, got %v", err)
+		}
+
+		// The pass is abandoned after the first timed-out removal.
+		if n := sn.removes.Load(); n != 1 {
+			t.Fatalf("expected 1 remove attempt before abandoning the pass, got %d", n)
+		}
+		// Cleanup must be skipped after an abandoned pass: the snapshotter just
+		// failed to answer a bounded Remove, and Cleanup has no bound.
+		if n := sn.cleanups.Load(); n != 0 {
+			t.Fatalf("expected no Cleanup call after abandoned pass, got %d", n)
+		}
+		// Skipped snapshots stay orphaned for the next GC pass.
+		for _, key := range []string{"orphan-1", "orphan-2"} {
+			if _, err := sn.Snapshotter.Stat(ctx, key); err != nil {
+				t.Fatalf("orphan %q should survive for the next GC pass: %v", key, err)
+			}
+		}
+	})
+}
+
+type failingRemoveSnapshotter struct {
+	snapshots.Snapshotter
+}
+
+func (s *failingRemoveSnapshotter) Remove(ctx context.Context, key string) error {
+	return errdefs.ErrFailedPrecondition
+}
+
+func TestGarbageCollectFailedPreconditionRemove(t *testing.T) {
+	ctx, bdb := testEnv(t)
+
+	sn := &failingRemoveSnapshotter{Snapshotter: NewTmpSnapshotter()}
+	db := NewDB(bdb, nil, map[string]snapshots.Snapshotter{"tmp": sn})
+	if err := db.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := sn.Snapshotter.Prepare(ctx, "orphan", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	msn := db.Snapshotter("tmp").(*snapshotter)
+	if _, err := msn.garbageCollect(ctx); err != nil {
+		t.Fatalf("FailedPrecondition on Remove must not fail garbage collection: %v", err)
+	}
 }
