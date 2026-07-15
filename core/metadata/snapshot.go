@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	bolt "go.etcd.io/bbolt"
@@ -41,6 +43,19 @@ const (
 	inheritedLabelsPrefix = "containerd.io/snapshot/"
 	labelSnapshotRef      = "containerd.io/snapshot.ref"
 )
+
+// snapshotRemoveTimeout bounds each Snapshotter.Remove during garbage
+// collection, which holds the snapshotter write lock: an unresponsive
+// snapshotter (e.g. a hung proxy plugin RPC) would otherwise block all
+// snapshot operations forever. On timeout the rest of the pass is abandoned;
+// remaining snapshots stay orphaned and are retried on the next GC pass.
+const snapshotRemoveTimeout = "io.containerd.timeout.snapshot.remove"
+
+func init() {
+	timeout.Set(snapshotRemoveTimeout, 5*time.Minute)
+}
+
+var errGCRemoveTimeout = errors.New("snapshot removal timed out during garbage collection")
 
 type snapshotter struct {
 	snapshots.Snapshotter
@@ -861,11 +876,14 @@ func validateSnapshot(info *snapshots.Info) error {
 
 // garbageCollect removes all snapshots that are no longer used.
 func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err error) {
+	var abandoned bool
 	s.l.Lock()
 	t1 := time.Now()
 	defer func() {
 		s.l.Unlock()
-		if err == nil {
+		// Skip Cleanup after an abandoned pass: the snapshotter just failed to
+		// answer a bounded Remove, so an unbounded Cleanup RPC would hang GC.
+		if err == nil && !abandoned {
 			if c, ok := s.Snapshotter.(snapshots.Cleaner); ok {
 				err = c.Cleanup(ctx)
 				if errdefs.IsNotImplemented(err) {
@@ -934,6 +952,11 @@ func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err 
 
 	for _, node := range roots {
 		if err := s.pruneBranch(ctx, node); err != nil {
+			if errors.Is(err, errGCRemoveTimeout) {
+				// Bounded abandon: skipped snapshots are retried next pass.
+				abandoned = true
+				break
+			}
 			return 0, err
 		}
 	}
@@ -990,7 +1013,15 @@ func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode) error {
 
 	if node.remove {
 		logger := log.G(ctx).WithField("snapshotter", s.name)
-		if err := s.Snapshotter.Remove(ctx, node.info.Name); err != nil {
+		removeCtx, cancel := timeout.WithContext(ctx, snapshotRemoveTimeout)
+		err := s.Snapshotter.Remove(removeCtx, node.info.Name)
+		removeTimedOut := errors.Is(removeCtx.Err(), context.DeadlineExceeded)
+		cancel()
+		if err != nil {
+			if removeTimedOut {
+				logger.WithError(err).WithField("key", node.info.Name).Warn("snapshot removal timed out, abandoning garbage collection pass")
+				return errGCRemoveTimeout
+			}
 			if !errdefs.IsFailedPrecondition(err) {
 				return err
 			}
