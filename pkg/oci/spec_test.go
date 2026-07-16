@@ -425,6 +425,104 @@ func TestGroupLookup_AbsoluteSymlink(t *testing.T) {
 	}
 }
 
+// TestOpenUserFile_IntermediateDirSymlink tests that openUserFile resolves
+// absolute symlinks on intermediate directory components, not just the final
+// file. This covers rootfs layouts like Android emulator images where /etc is
+// an absolute symlink to /system/etc, so etc/passwd is only reachable via
+// the chain etc -> /system/etc -> system/etc/passwd.
+func TestOpenUserFile_IntermediateDirSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevated privileges on Windows")
+	}
+
+	expectedContent := []byte("root:x:0:0:root:/root:/bin/sh\n")
+
+	root := t.TempDir()
+	if err := fstest.Apply(
+		fstest.CreateDir("/system", 0o755),
+		fstest.CreateDir("/system/etc", 0o755),
+		fstest.CreateFile("/system/etc/passwd", expectedContent, 0o644),
+		fstest.CreateFile("/system/etc/group", []byte("root:x:0:\n"), 0o644),
+		// /etc -> /system/etc  (absolute symlink to a directory)
+		fstest.Symlink("/system/etc", "/etc"),
+	).Apply(root); err != nil {
+		t.Fatal(err)
+	}
+
+	wrapFS := func(base string) fs.FS {
+		plain := os.DirFS(base)
+		if _, ok := plain.(readLinker); ok {
+			return plain
+		}
+		return readLinkFS{root: base, fs: plain}
+	}
+
+	t.Run("passwd via absolute dir symlink", func(t *testing.T) {
+		f, err := openUserFile(wrapFS(root), "etc/passwd")
+		if err != nil {
+			t.Fatalf("openUserFile failed for etc/passwd through absolute dir symlink: %v", err)
+		}
+		defer f.Close()
+		got, readErr := io.ReadAll(f)
+		if readErr != nil {
+			t.Fatalf("io.ReadAll failed: %v", readErr)
+		}
+		if string(got) != string(expectedContent) {
+			t.Errorf("content mismatch: got %q, want %q", got, expectedContent)
+		}
+	})
+
+	t.Run("group via absolute dir symlink", func(t *testing.T) {
+		f, err := openUserFile(wrapFS(root), "etc/group")
+		if err != nil {
+			t.Fatalf("openUserFile failed for etc/group through absolute dir symlink: %v", err)
+		}
+		defer f.Close()
+	})
+
+}
+
+// TestOpenUserFile_RelativeDirSymlink tests that openUserFile resolves
+// relative symlinks on intermediate directory components.
+func TestOpenUserFile_RelativeDirSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevated privileges on Windows")
+	}
+
+	expectedContent := []byte("root:x:0:0:root:/root:/bin/sh\n")
+
+	root := t.TempDir()
+	if err := fstest.Apply(
+		fstest.CreateDir("/real_etc", 0o755),
+		fstest.CreateFile("/real_etc/passwd", expectedContent, 0o644),
+		// /etc -> real_etc  (relative symlink to a directory)
+		fstest.Symlink("real_etc", "/etc"),
+	).Apply(root); err != nil {
+		t.Fatal(err)
+	}
+
+	wrapFS := func(base string) fs.FS {
+		plain := os.DirFS(base)
+		if _, ok := plain.(readLinker); ok {
+			return plain
+		}
+		return readLinkFS{root: base, fs: plain}
+	}
+
+	f, err := openUserFile(wrapFS(root), "etc/passwd")
+	if err != nil {
+		t.Fatalf("openUserFile failed for etc/passwd through relative dir symlink: %v", err)
+	}
+	defer f.Close()
+	got, readErr := io.ReadAll(f)
+	if readErr != nil {
+		t.Fatalf("io.ReadAll failed: %v", readErr)
+	}
+	if string(got) != string(expectedContent) {
+		t.Errorf("content mismatch: got %q, want %q", got, expectedContent)
+	}
+}
+
 // Helpers for testing ReadLink support
 type readLinkFS struct {
 	root string
