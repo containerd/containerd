@@ -176,8 +176,8 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 			return nil, err
 		}
 		checkpointPath = taskOptions.CriuImagePath
-		taskAPIAddress = taskOptions.TaskApiAddress
-		taskAPIVersion = taskOptions.TaskApiVersion
+		taskAPIAddress = taskOptions.TaskApiAddress //nolint:staticcheck // Required by the containerd 2.2 task protocol.
+		taskAPIVersion = taskOptions.TaskApiVersion //nolint:staticcheck // Required by the containerd 2.2 task protocol.
 	}
 
 	restoreFromPath := false
