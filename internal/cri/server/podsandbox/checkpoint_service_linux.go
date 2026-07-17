@@ -19,11 +19,14 @@
 package podsandbox
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 
 	"github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/errdefs"
 )
 
 // CheckpointService contains the pause-controller implementation of Pod
@@ -73,4 +76,23 @@ func NewCheckpointService(options CheckpointServiceOptions) (*CheckpointService,
 		return nil, fmt.Errorf("failed to remove stale checkpoint recovery markers: %w", err)
 	}
 	return service, nil
+}
+
+// Restore images carry their sandbox owner before writable-layer preparation.
+// Teardown can therefore find imports even if CRI never received their names.
+const restoreSandboxLabel = "io.containerd.cri.restore.sandbox"
+
+func (c *CheckpointService) cleanupRestoreImages(ctx context.Context, sandboxID string) error {
+	filter := fmt.Sprintf("labels.%q==%q", restoreSandboxLabel, sandboxID)
+	prepared, err := c.client.ImageService().List(ctx, filter)
+	if err != nil {
+		return fmt.Errorf("list restore images for sandbox %q: %w", sandboxID, err)
+	}
+	var cleanupErrors []error
+	for _, image := range prepared {
+		if err := c.client.ImageService().Delete(ctx, image.Name, images.SynchronousDelete()); err != nil && !errdefs.IsNotFound(err) {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("remove restore image %q: %w", image.Name, err))
+		}
+	}
+	return errors.Join(cleanupErrors...)
 }

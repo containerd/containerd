@@ -29,6 +29,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
@@ -325,6 +326,13 @@ func (c *CheckpointService) importContainerCheckpoint(ctx context.Context, sandb
 	if _, err := c.client.ImageService().Create(leaseCtx, images.Image{
 		Name:   imageName,
 		Target: checkpointTarget,
+		// Keep the image until its destination container is removed, even if
+		// CRI never receives or saves the result of this restore operation.
+		Labels: map[string]string{
+			"containerd.io/gc.bref.container": container.id,
+			restoreSandboxLabel:               sandboxID,
+			"containerd.io/gc.expire":         time.Now().Format(time.RFC3339),
+		},
 	}); err != nil {
 		return fmt.Errorf("failed to create deterministic checkpoint image %q: %w", imageName, err)
 	}

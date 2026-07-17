@@ -29,6 +29,12 @@ import (
 )
 
 func (c *Controller) Shutdown(ctx context.Context, sandboxID string) error {
+	if c.checkpoint != nil {
+		if err := c.checkpoint.cleanupRestoreImages(ctx, sandboxID); err != nil {
+			return err
+		}
+	}
+
 	sandbox := c.store.Get(sandboxID)
 	if sandbox == nil {
 		// Do not return error if the id doesn't exist.

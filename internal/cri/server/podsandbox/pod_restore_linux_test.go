@@ -497,25 +497,36 @@ func TestImportContainerCheckpointRetainsContentUntilImageDeletion(t *testing.T)
 	require.ErrorIs(t, err, errdefs.ErrFailedPrecondition, "a container with a task must not be overwritten")
 	taskClient.existingID = ""
 	descriptors := append([]imagespec.Descriptor{target}, index.Manifests...)
-	require.NoError(t, service.importContainerCheckpoint(ctx, "restored-sandbox", input, imageName))
-	leases, err := c.LeasesService().List(ctx)
-	require.NoError(t, err)
-	require.Empty(t, leases, "the import lease must be released before testing image retention")
+	for _, owner := range []string{"image", "container"} {
+		t.Run(owner+" deletion", func(t *testing.T) {
+			require.NoError(t, service.importContainerCheckpoint(ctx, "restored-sandbox", input, imageName))
+			leases, err := c.LeasesService().List(ctx)
+			require.NoError(t, err)
+			require.Empty(t, leases, "the import lease must be released before testing image retention")
 
-	_, err = db.GarbageCollect(ctx)
-	require.NoError(t, err)
-	for _, desc := range descriptors {
-		data, err := content.ReadBlob(ctx, c.ContentStore(), desc)
-		require.NoError(t, err, "%s must survive GC until the checkpoint image is consumed", desc.MediaType)
-		assert.Equal(t, files["blobs/sha256/"+desc.Digest.Encoded()], data)
-	}
+			_, err = db.GarbageCollect(ctx)
+			require.NoError(t, err)
+			for _, desc := range descriptors {
+				data, err := content.ReadBlob(ctx, c.ContentStore(), desc)
+				require.NoError(t, err, "%s must survive GC until the checkpoint image is consumed", desc.MediaType)
+				assert.Equal(t, files["blobs/sha256/"+desc.Digest.Encoded()], data)
+			}
 
-	require.NoError(t, c.ImageService().Delete(ctx, imageName))
-	_, err = db.GarbageCollect(ctx)
-	require.NoError(t, err)
-	for _, desc := range descriptors {
-		_, err := c.ContentStore().Info(ctx, desc.Digest)
-		require.ErrorIs(t, err, errdefs.ErrNotFound, "%s must be collectible after image deletion", desc.MediaType)
+			if owner == "image" {
+				require.NoError(t, c.ImageService().Delete(ctx, imageName))
+			} else {
+				// Simulate removal after a crash before CRI saved the image name.
+				require.NoError(t, containerService.Delete(ctx, containerID))
+			}
+			_, err = db.GarbageCollect(ctx)
+			require.NoError(t, err)
+			_, err = c.ImageService().Get(ctx, imageName)
+			require.ErrorIs(t, err, errdefs.ErrNotFound)
+			for _, desc := range descriptors {
+				_, err := c.ContentStore().Info(ctx, desc.Digest)
+				require.ErrorIs(t, err, errdefs.ErrNotFound, "%s must be collectible after owner deletion", desc.MediaType)
+			}
+		})
 	}
 }
 
