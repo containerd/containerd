@@ -39,9 +39,32 @@ type remoteSandboxController struct {
 
 var _ sandbox.Controller = (*remoteSandboxController)(nil)
 
+type remoteCheckpointSandboxController struct {
+	*remoteSandboxController
+	checkpoint api.CheckpointClient
+}
+
+var _ sandbox.Controller = (*remoteCheckpointSandboxController)(nil)
+var _ sandbox.CheckpointController = (*remoteCheckpointSandboxController)(nil)
+
 // NewSandboxController creates a client for a sandbox controller
 func NewSandboxController(client api.ControllerClient, name string) sandbox.Controller {
 	return &remoteSandboxController{client: client, sandboxerName: name}
+}
+
+// NewCheckpointSandboxController creates a client for a sandbox controller that
+// also implements sandbox.CheckpointController through the Checkpoint service.
+// The remote side may not register that service, in which case Checkpoint and
+// Restore return errdefs.ErrNotImplemented.
+func NewCheckpointSandboxController(client api.ControllerClient, name string, checkpoint api.CheckpointClient) sandbox.Controller {
+	controller := &remoteSandboxController{client: client, sandboxerName: name}
+	if checkpoint == nil {
+		return controller
+	}
+	return &remoteCheckpointSandboxController{
+		remoteSandboxController: controller,
+		checkpoint:              checkpoint,
+	}
 }
 
 func (s *remoteSandboxController) Create(ctx context.Context, sandboxInfo sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
@@ -220,4 +243,63 @@ func (s *remoteSandboxController) Update(
 		return errgrpc.ToNative(err)
 	}
 	return nil
+}
+
+func (s *remoteCheckpointSandboxController) Checkpoint(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) error {
+	containers := make([]*api.ControllerCheckpointContainer, 0, len(opts.Containers))
+	for _, container := range opts.Containers {
+		containers = append(containers, &api.ControllerCheckpointContainer{
+			ID:     container.ID,
+			Name:   container.Name,
+			Config: typeurl.MarshalProto(container.Config),
+			Status: typeurl.MarshalProto(container.Status),
+		})
+	}
+	_, err := s.checkpoint.Checkpoint(ctx, &api.ControllerCheckpointRequest{
+		SandboxID:     sandboxID,
+		OutputPath:    opts.OutputPath,
+		SandboxConfig: typeurl.MarshalProto(opts.SandboxConfig),
+		Containers:    containers,
+		Options:       opts.Options,
+		Sandboxer:     s.sandboxerName,
+	})
+	return errgrpc.ToNative(err)
+}
+
+func (s *remoteCheckpointSandboxController) Restore(ctx context.Context, sandboxID string, opts sandbox.RestoreOptions) (sandbox.RestoreResult, error) {
+	containers := restoreContainersToProto(opts.Containers)
+	resp, err := s.checkpoint.Restore(ctx, &api.ControllerRestoreRequest{
+		SandboxID:      sandboxID,
+		CheckpointPath: opts.CheckpointPath,
+		SandboxConfig:  typeurl.MarshalProto(opts.SandboxConfig),
+		Containers:     containers,
+		Options:        opts.Options,
+		Sandboxer:      s.sandboxerName,
+	})
+	if err != nil {
+		return sandbox.RestoreResult{}, errgrpc.ToNative(err)
+	}
+	result := sandbox.RestoreResult{
+		RestoredContainers: make([]sandbox.RestoredContainer, 0, len(resp.GetContainers())),
+	}
+	for _, container := range resp.GetContainers() {
+		result.RestoredContainers = append(result.RestoredContainers, sandbox.RestoredContainer{
+			ID:                  container.GetID(),
+			Name:                container.GetName(),
+			TaskCheckpointImage: container.GetTaskCheckpointImage(),
+		})
+	}
+	return result, nil
+}
+
+func restoreContainersToProto(containers []sandbox.RestoreContainer) []*api.ControllerRestoreContainer {
+	result := make([]*api.ControllerRestoreContainer, 0, len(containers))
+	for _, container := range containers {
+		result = append(result, &api.ControllerRestoreContainer{
+			ID:     container.ID,
+			Name:   container.Name,
+			Config: typeurl.MarshalProto(container.Config),
+		})
+	}
+	return result
 }
