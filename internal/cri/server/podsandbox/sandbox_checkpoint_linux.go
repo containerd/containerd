@@ -56,6 +56,10 @@ type podCheckpointState struct {
 
 	// podCheckpointsInProgress is keyed by podCheckpointKey.
 	podCheckpointsInProgress sync.Map
+
+	recoveryMu      sync.Mutex
+	recoveryRunning bool
+	recoveryPending bool
 }
 
 const (
@@ -151,21 +155,52 @@ func (c *CheckpointService) Checkpoint(ctx context.Context, sandboxID string, op
 		containerIDs = append(containerIDs, container.id)
 		tasks = append(tasks, container.task)
 	}
+	marker := podCheckpointRecoveryMarker{
+		Version:      podCheckpointMarkerVersion,
+		Namespace:    namespace,
+		SandboxID:    sandboxID,
+		CgroupParent: sandboxConfig.GetLinux().GetCgroupParent(),
+		ContainerIDs: containerIDs,
+		OutputPath:   outputPath,
+	}
+	markerActive, markerErr := c.beginPodCheckpoint(ctx, freezer, marker)
+	var recovery podCheckpointTaskRecovery
+	tasksResumed := false
+	defer func() {
+		if !markerActive {
+			return
+		}
+		cleanupCtx, cancel := podCheckpointCleanupContext(namespace)
+		defer cancel()
+		// A remaining marker is recovered by the next checkpoint of this
+		// sandbox, by the background retry, or after a restart.
+		if err := recovery.recover(cleanupCtx); err != nil {
+			log.G(ctx).WithError(err).Error("failed to recover Pod after checkpoint")
+			c.RecoverInBackground()
+			return
+		}
+		if !tasksResumed {
+			if err := c.markPodCheckpointResumed(marker); err != nil {
+				log.G(ctx).WithError(err).Error("failed to persist resumed Pod checkpoint marker")
+				c.RecoverInBackground()
+				return
+			}
+		}
+		if err := c.finishPodCheckpointCleanup(cleanupCtx, marker); err != nil {
+			log.G(ctx).WithError(err).Error("failed to clean up Pod checkpoint images")
+			c.RecoverInBackground()
+			return
+		}
+		markerActive = false
+	}()
+	if markerErr != nil {
+		return markerErr
+	}
+	// Record cleanup ownership before creating any checkpoint output.
 	if err := writePodCheckpointMetadata(filepath.Join(outputPath, podCheckpointConfigFile), configData); err != nil {
 		return fmt.Errorf("failed to write sandbox config: %w", err)
 	}
 
-	var recovery podCheckpointTaskRecovery
-	defer func() {
-		cleanupCtx, cancel := podCheckpointCleanupContext(namespace)
-		defer cancel()
-		if err := recovery.recover(cleanupCtx); err != nil {
-			log.G(ctx).WithError(err).Error("failed to resume Pod after checkpoint")
-		}
-		if err := c.removeTemporaryCheckpointImages(cleanupCtx, containerIDs); err != nil {
-			log.G(ctx).WithError(err).Error("failed to clean up Pod checkpoint images")
-		}
-	}()
 	recovery, err = pausePodCheckpointTasks(ctx, freezer, tasks)
 	if err != nil {
 		return err
@@ -195,6 +230,10 @@ func (c *CheckpointService) Checkpoint(ctx context.Context, sandboxID string, op
 		return fmt.Errorf("failed to resume pod after checkpoint: %w", err)
 	}
 	cancel()
+	if err := c.markPodCheckpointResumed(marker); err != nil {
+		return err
+	}
+	tasksResumed = true
 
 	// Exporting the content-addressed checkpoint images does not require the
 	// processes to remain paused. Keep this work outside the Pod freeze window.

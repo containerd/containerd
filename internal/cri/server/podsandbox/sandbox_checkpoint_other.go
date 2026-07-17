@@ -48,3 +48,9 @@ func (c *CheckpointService) Checkpoint(context.Context, string, sandbox.Checkpoi
 func (c *CheckpointService) Restore(context.Context, string, sandbox.RestoreOptions) (sandbox.RestoreResult, error) {
 	return sandbox.RestoreResult{}, errdefs.ErrNotImplemented
 }
+
+func (c *CheckpointService) Recover(context.Context) error {
+	return nil
+}
+
+func (c *CheckpointService) RecoverInBackground() {}

@@ -64,9 +64,13 @@ func NewCheckpointService(options CheckpointServiceOptions) (*CheckpointService,
 	if err := os.Chmod(options.RootDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to secure checkpoint service root: %w", err)
 	}
-	return &CheckpointService{
+	service := &CheckpointService{
 		client:   options.Client,
 		rootDir:  options.RootDir,
 		shimPath: options.ShimPath,
-	}, nil
+	}
+	if err := service.removeStaleMarkerTemps(); err != nil {
+		return nil, fmt.Errorf("failed to remove stale checkpoint recovery markers: %w", err)
+	}
+	return service, nil
 }
