@@ -174,6 +174,41 @@ containerd 1.7, and improves with every release.
 
 - [Minimal in-memory Runtime v2 shim that also implements the Sandbox API](../core/runtime/v2/example/sandbox/)
 
+## Pod checkpoint and restore
+
+Checkpoint and restore are optional sandbox-controller capabilities. The CRI
+`CheckpointPod` and `RestorePod` RPCs own the CRI lifecycle sequence: they
+validate CRI resources, select the runtime's sandbox controller, create the
+restored sandbox and containers, and roll those resources back on failure.
+
+Implementation-specific work stays behind `CheckpointController`. For the
+pause-container controller this includes cgroup freezing and thawing, recovery
+markers, checkpoint layout, checkpoint-image import and export, writable-layer
+recovery, and the runtime checkpoint operation. A VM-based controller can
+implement the same capability without inheriting any of those assumptions.
+
+The `enable_criu` setting applies to all controllers. The
+pause-container controller checks host CRIU availability and version; custom
+controllers are responsible for their own runtime requirements.
+
+The boundary is data-only. Sandbox and container configurations, selected
+container status, runtime options, paths, and restored container results are
+carried by `CheckpointOptions`, `RestoreOptions`, `RestoreResult`, and their RPC
+equivalents.
+
+For the pause-container controller, a successful restore can return a
+containerd task checkpoint image for each restored container. The controller
+owns these images until `Restore` succeeds. Ownership then transfers to CRI,
+which consumes each image when starting the container or deletes it if the
+restore is abandoned. A controller that restores through another mechanism can
+leave the task checkpoint image empty.
+
+Separate optional checkpoint services are available next to both the
+sandbox-controller service and the sandbox-shim service, so existing
+controllers remain compatible and implementations do not require CRI stores,
+lifecycle callbacks, or an in-process CRI service. Controllers that do not
+implement the capability return `Unimplemented`.
+
 ## Status
 
 The Sandbox API was first introduced in containerd 1.7 as an experimental API and was promoted to stable in 2.0.

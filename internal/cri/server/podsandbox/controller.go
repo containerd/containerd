@@ -19,6 +19,9 @@ package podsandbox
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/containerd/log"
@@ -53,6 +56,7 @@ func init() {
 			plugins.TransferPlugin,
 			plugins.CRIServicePlugin,
 			plugins.ServicePlugin,
+			plugins.ShimPlugin,
 			plugins.WarningPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
@@ -83,6 +87,31 @@ func init() {
 				return nil, fmt.Errorf("unable to load CRI warning service plugin dependency: %w", err)
 			}
 
+			shimPlugin, err := ic.GetSingle(plugins.ShimPlugin)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load shim plugin dependency: %w", err)
+			}
+			var shimPath string
+			if hasEnv, ok := shimPlugin.(interface{ Env() []string }); ok {
+				for _, value := range slices.Backward(hasEnv.Env()) {
+					if path, ok := strings.CutPrefix(value, "PATH="); ok {
+						shimPath = path
+						break
+					}
+				}
+			}
+			checkpointService, err := NewCheckpointService(CheckpointServiceOptions{
+				Client:   client,
+				RootDir:  filepath.Join(ic.Properties[plugins.PropertyRootDir], "checkpoint"),
+				ShimPath: shimPath,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("unable to initialize Pod checkpoint controller: %w", err)
+			}
+			if err := checkpointService.Recover(ic.Context); err != nil {
+				return nil, fmt.Errorf("unable to recover interrupted Pod checkpoint: %w", err)
+			}
+
 			c := Controller{
 				client:         client,
 				config:         criRuntimePlugin.(interface{ Config() criconfig.Config }).Config(),
@@ -90,6 +119,7 @@ func init() {
 				os:             osinterface.RealOS{},
 				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
+				checkpoint:     checkpointService,
 			}
 
 			// There is no need to subscribe to the exit event for the pause container,
@@ -122,9 +152,29 @@ type Controller struct {
 	eventMonitor *events.EventMonitor
 
 	store *Store
+
+	checkpoint *CheckpointService
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
+var _ sandbox.CheckpointController = (*Controller)(nil)
+
+// Checkpoint delegates a Pod checkpoint to the configured sandbox-owned
+// implementation.
+func (c *Controller) Checkpoint(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) error {
+	if c.checkpoint == nil {
+		return errdefs.ErrNotImplemented
+	}
+	return c.checkpoint.Checkpoint(ctx, sandboxID, opts)
+}
+
+// Restore delegates a Pod restore to the controller-owned implementation.
+func (c *Controller) Restore(ctx context.Context, sandboxID string, opts sandbox.RestoreOptions) (sandbox.RestoreResult, error) {
+	if c.checkpoint == nil {
+		return sandbox.RestoreResult{}, errdefs.ErrNotImplemented
+	}
+	return c.checkpoint.Restore(ctx, sandboxID, opts)
+}
 
 func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (imagespec.Platform, error) {
 	return platforms.DefaultSpec(), nil
