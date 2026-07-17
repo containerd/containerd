@@ -283,8 +283,9 @@ version = 3
     ignore_deprecation_warnings = []
     stats_collect_period = '1s'
     stats_retention_period = '2m'
-    # enable_checkpoint_restore gates CheckpointContainer. When unset, it is
-    # enabled except on Windows. Checkpoint/restore is implemented only on Linux.
+    # enable_checkpoint_restore gates CheckpointContainer and CheckpointPod.
+    # When unset, it is enabled except on Windows.
+    # Checkpoint/restore is implemented only on Linux.
     enable_checkpoint_restore = true
 
     [plugins.'io.containerd.cri.v1.runtime'.containerd]
