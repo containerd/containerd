@@ -733,7 +733,12 @@ func (cw *ChangeWriter) includeParents(hdr *tar.Header) error {
 
 func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written int64, err error) {
 	buf := bufPool.Get().(*[]byte)
-	defer bufPool.Put(buf)
+	defer func() {
+		*buf = (*buf)[:0]
+		bufPool.Put(buf)
+	}()
+
+	fullBuf := (*buf)[:cap(*buf)]
 
 	for {
 		select {
@@ -743,9 +748,9 @@ func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written in
 		default:
 		}
 
-		nr, er := src.Read(*buf)
+		nr, er := src.Read(fullBuf)
 		if nr > 0 {
-			nw, ew := dst.Write((*buf)[0:nr])
+			nw, ew := dst.Write(fullBuf[:nr])
 			if nw > 0 {
 				written += int64(nw)
 			}
