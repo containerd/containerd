@@ -164,3 +164,7 @@ require (
 )
 
 replace github.com/containerd/containerd/api => ./api
+
+replace k8s.io/cri-api => github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260717143731-0771cf9d1a26
+
+replace k8s.io/cri-client => github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260717143731-0771cf9d1a26

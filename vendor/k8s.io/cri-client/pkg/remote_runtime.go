@@ -1181,3 +1181,50 @@ func (r *remoteRuntimeService) RuntimeConfig(ctx context.Context) (*runtimeapi.R
 
 	return resp, nil
 }
+
+// CheckpointPod triggers a checkpoint of the given CheckpointPodRequest
+func (r *remoteRuntimeService) CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	logger := klog.FromContext(ctx)
+	logger.V(10).Info("[RemoteRuntimeService] CheckpointPod", "options", options)
+	if options == nil {
+		return errors.New("CheckpointPod requires non-nil CheckpointPodRequest parameter")
+	}
+	// The caller's deadline bounds long-running checkpoints. Preserve the
+	// client's default timeout only for direct callers that omitted one.
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
+	}
+	if _, err := r.runtimeClient.CheckpointPod(ctx, options); err != nil {
+		logger.Error(err, "CheckpointPod from runtime service failed", "podSandboxID", options.PodSandboxId)
+		return err
+	}
+	logger.V(10).Info("[RemoteRuntimeService] CheckpointPod Response", "podSandboxID", options.PodSandboxId)
+	return nil
+}
+
+// RestorePod restores a pod sandbox from a checkpoint
+func (r *remoteRuntimeService) RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(10).Info("[RemoteRuntimeService] RestorePod", "options", options)
+	if options == nil {
+		return nil, errors.New("RestorePod requires non-nil RestorePodRequest parameter")
+	}
+	// Restore uses the same caller-owned deadline contract as checkpoint.
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
+	}
+	resp, err := r.runtimeClient.RestorePod(ctx, options)
+	if err != nil {
+		logger.Error(err, "RestorePod from runtime service failed", "checkpointPath", options.CheckpointPath)
+		return nil, err
+	}
+	if resp == nil {
+		return nil, errors.New("RestorePod runtime service returned a nil response")
+	}
+	logger.V(10).Info("[RemoteRuntimeService] RestorePod Response", "podSandboxID", resp.PodSandboxId, "restoredContainerCount", len(resp.RestoredContainers))
+	return resp, nil
+}
