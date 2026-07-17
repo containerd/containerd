@@ -177,7 +177,11 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 			"containerd.io/gc.bref.container": taskID,
 		}),
 	}
-	if info, err := m.manager.loadShimInfo(ctx, opts.Runtime); err == nil {
+	topts := opts.TaskOptions
+	if topts == nil || topts.GetValue() == nil {
+		topts = opts.RuntimeOptions
+	}
+	if info, err := m.manager.loadShimInfo(ctx, opts.Runtime, topts); err == nil {
 		for _, t := range info.handledMounts {
 			activateOpts = append(activateOpts, mount.WithAllowMountType(t))
 		}
