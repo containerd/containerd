@@ -28,6 +28,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/cgroups/v3/cgroup1"
 )
 
 const podCgroupTransitionPollInterval = 10 * time.Millisecond
@@ -54,10 +57,55 @@ func (s podCgroupState) String() string {
 	}
 }
 
+type podCgroupFreezer interface {
+	State(context.Context) (podCgroupState, error)
+	// Freeze reports whether a freeze request may have taken effect, even on error.
+	Freeze(context.Context) (bool, error)
+	Thaw(context.Context) error
+}
+
 type directPodCgroupFreezer struct {
 	controlPath string
 	statePath   string
 	version     int
+}
+
+func loadPodCgroupFreezer(cgroupParent string) (podCgroupFreezer, error) {
+	cgroupPath, err := podCgroupFilesystemPath(cgroupParent)
+	if err != nil {
+		return nil, err
+	}
+
+	switch mode := cgroups.Mode(); mode {
+	case cgroups.Unified:
+		root := filepath.Join("/sys/fs/cgroup", cgroupPath)
+		return &directPodCgroupFreezer{
+			controlPath: filepath.Join(root, "cgroup.freeze"),
+			statePath:   filepath.Join(root, "cgroup.events"),
+			version:     2,
+		}, nil
+	case cgroups.Legacy, cgroups.Hybrid:
+		subsystems, err := cgroup1.Default()
+		if err != nil {
+			return nil, fmt.Errorf("failed to discover the cgroup v1 freezer hierarchy: %w", err)
+		}
+		for _, subsystem := range subsystems {
+			if subsystem.Name() != cgroup1.Freezer {
+				continue
+			}
+			pather, ok := subsystem.(interface{ Path(string) string })
+			if !ok {
+				return nil, errors.New("cgroup v1 freezer hierarchy does not expose its filesystem path")
+			}
+			statePath := filepath.Join(pather.Path(cgroupPath), "freezer.state")
+			return &directPodCgroupFreezer{controlPath: statePath, statePath: statePath, version: 1}, nil
+		}
+		return nil, errors.New("pod checkpoint requires the cgroup v1 freezer controller")
+	case cgroups.Unavailable:
+		return nil, errors.New("pod checkpoint requires cgroups, but no cgroup filesystem is available")
+	default:
+		return nil, fmt.Errorf("pod checkpoint does not support cgroup mode %d", mode)
+	}
 }
 
 // podCgroupFilesystemPath returns the path of the Pod cgroup relative to the

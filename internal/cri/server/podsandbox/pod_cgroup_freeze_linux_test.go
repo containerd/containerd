@@ -20,12 +20,16 @@ package podsandbox
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/v2/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -195,4 +199,236 @@ func TestDirectPodCgroupFreezerCanceledBeforeFreeze(t *testing.T) {
 	state, err := freezer.State(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, podCgroupStateThawed, state)
+}
+
+func TestPauseAndRecoverPodCheckpointTasks(t *testing.T) {
+	var events []string
+	freezer := &recordingPodCgroupFreezer{state: podCgroupStateThawed, events: &events}
+	tasks := []podCheckpointRuntimeTask{
+		&recordingPodCheckpointTask{id: "container-a", status: client.Running, events: &events},
+		&recordingPodCheckpointTask{id: "container-b", status: client.Running, events: &events},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	recovery, err := pausePodCheckpointTasks(ctx, freezer, tasks)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"freeze", "pause:container-a", "pause:container-b", "thaw"}, events)
+	require.NoError(t, recovery.recover(ctx))
+	assert.Equal(t, []string{
+		"freeze", "pause:container-a", "pause:container-b", "thaw",
+		"resume:container-a", "resume:container-b",
+	}, events)
+}
+
+func TestPartialPauseCanBeRecovered(t *testing.T) {
+	errPause := errors.New("pause failed")
+	var events []string
+	freezer := &recordingPodCgroupFreezer{state: podCgroupStateThawed, events: &events}
+	tasks := []podCheckpointRuntimeTask{
+		&recordingPodCheckpointTask{id: "container-a", status: client.Running, events: &events},
+		&recordingPodCheckpointTask{id: "container-b", status: client.Running, pauseErr: errPause, events: &events},
+		&recordingPodCheckpointTask{id: "container-c", status: client.Paused, events: &events},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	recovery, err := pausePodCheckpointTasks(ctx, freezer, tasks)
+	require.ErrorIs(t, err, errPause)
+	require.NoError(t, recovery.recover(ctx))
+	assert.Equal(t, []string{
+		"freeze", "pause:container-a", "pause:container-b",
+		"thaw", "resume:container-a",
+	}, events)
+	status, err := tasks[2].Status(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, client.Paused, status.Status, "a task not paused by this checkpoint must stay paused")
+}
+
+func TestRejectedPodCheckpointPreservesPreFrozenPod(t *testing.T) {
+	var events []string
+	freezer := &recordingPodCgroupFreezer{state: podCgroupStateFrozen, events: &events}
+	tasks := []podCheckpointRuntimeTask{
+		&recordingPodCheckpointTask{id: "container-a", status: client.Running, events: &events},
+	}
+	ctx := t.Context()
+
+	recovery, err := pausePodCheckpointTasks(ctx, freezer, tasks)
+	require.ErrorContains(t, err, "cgroup is frozen")
+	require.NoError(t, recovery.recover(ctx))
+	state, err := freezer.State(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, podCgroupStateFrozen, state)
+	assert.Empty(t, events, "a rejected checkpoint must not change freezer or task state")
+}
+
+func TestPodCheckpointRecoveryRetriesFailedThaw(t *testing.T) {
+	errThaw := errors.New("thaw failed")
+	var events []string
+	freezer := &recordingPodCgroupFreezer{
+		state: podCgroupStateThawed, events: &events,
+		freezeErr: context.DeadlineExceeded, thawErr: errThaw,
+	}
+	task := &recordingPodCheckpointTask{id: "container-a", status: client.Running, events: &events}
+	ctx := t.Context()
+
+	recovery, err := pausePodCheckpointTasks(ctx, freezer, []podCheckpointRuntimeTask{task})
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, recovery.recover(ctx), errThaw)
+	freezer.thawErr = nil
+	require.NoError(t, recovery.recover(ctx))
+	require.NoError(t, recovery.recover(ctx))
+	assert.Equal(t, []string{"freeze", "thaw", "thaw"}, events)
+	state, err := freezer.State(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, podCgroupStateThawed, state)
+}
+
+func TestPauseFailureAfterStateChangeCanBeRecovered(t *testing.T) {
+	errPause := errors.New("pause response lost")
+	var events []string
+	freezer := &recordingPodCgroupFreezer{state: podCgroupStateThawed, events: &events}
+	task := &recordingPodCheckpointTask{
+		id: "container-a", status: client.Running, events: &events,
+		pauseErr: errPause, pauseChanged: true,
+	}
+	ctx := t.Context()
+
+	recovery, err := pausePodCheckpointTasks(ctx, freezer, []podCheckpointRuntimeTask{task})
+	require.ErrorIs(t, err, errPause)
+	require.NoError(t, recovery.recover(ctx))
+	assert.Equal(t, []string{"freeze", "pause:container-a", "thaw", "resume:container-a"}, events)
+	status, err := task.Status(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, client.Running, status.Status)
+}
+
+func TestPodCheckpointPreservesPrePausedTask(t *testing.T) {
+	var events []string
+	freezer := &recordingPodCgroupFreezer{state: podCgroupStateThawed, events: &events}
+	task := &recordingPodCheckpointTask{id: "container-a", status: client.Paused, events: &events}
+	ctx := t.Context()
+
+	recovery, err := pausePodCheckpointTasks(ctx, freezer, []podCheckpointRuntimeTask{task})
+	require.ErrorContains(t, err, "state paused before pause")
+	require.NoError(t, recovery.recover(ctx))
+	assert.Equal(t, []string{"freeze", "thaw"}, events)
+	status, err := task.Status(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, client.Paused, status.Status)
+}
+
+func TestPodCheckpointRecoveryRetriesOnlyPendingChanges(t *testing.T) {
+	errResume := errors.New("resume failed")
+	var events []string
+	freezer := &recordingPodCgroupFreezer{state: podCgroupStateThawed, events: &events}
+	taskA := &recordingPodCheckpointTask{id: "container-a", status: client.Running, events: &events}
+	taskB := &recordingPodCheckpointTask{id: "container-b", status: client.Running, events: &events, resumeErr: errResume}
+	ctx := t.Context()
+
+	recovery, err := pausePodCheckpointTasks(ctx, freezer, []podCheckpointRuntimeTask{taskA, taskB})
+	require.NoError(t, err)
+	require.ErrorIs(t, recovery.recover(ctx), errResume)
+
+	// Another operation freezes the Pod and pauses the already recovered task.
+	freezer.state = podCgroupStateFrozen
+	taskA.status = client.Paused
+	taskB.resumeErr = nil
+	events = nil
+	require.NoError(t, recovery.recover(ctx))
+	require.NoError(t, recovery.recover(ctx))
+	assert.Equal(t, []string{"resume:container-b"}, events)
+	state, err := freezer.State(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, podCgroupStateFrozen, state)
+	status, err := taskA.Status(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, client.Paused, status.Status)
+}
+
+type recordingPodCgroupFreezer struct {
+	mu        sync.Mutex
+	state     podCgroupState
+	events    *[]string
+	stateErr  error
+	freezeErr error
+	thawErr   error
+}
+
+func (f *recordingPodCgroupFreezer) State(ctx context.Context) (podCgroupState, error) {
+	if err := ctx.Err(); err != nil {
+		return podCgroupStateUnknown, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.state, f.stateErr
+}
+
+func (f *recordingPodCgroupFreezer) Freeze(ctx context.Context) (bool, error) {
+	state, err := f.State(ctx)
+	if err != nil {
+		return false, err
+	}
+	if state != podCgroupStateThawed {
+		return false, fmt.Errorf("refusing to checkpoint a pod whose cgroup is %s", state)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	*f.events = append(*f.events, "freeze")
+	f.state = podCgroupStateFrozen
+	return true, f.freezeErr
+}
+
+func (f *recordingPodCgroupFreezer) Thaw(context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	*f.events = append(*f.events, "thaw")
+	if f.thawErr != nil {
+		return f.thawErr
+	}
+	f.state = podCgroupStateThawed
+	return nil
+}
+
+type recordingPodCheckpointTask struct {
+	mu           sync.Mutex
+	id           string
+	status       client.ProcessStatus
+	pauseErr     error
+	pauseChanged bool
+	resumeErr    error
+	events       *[]string
+}
+
+func (t *recordingPodCheckpointTask) ID() string { return t.id }
+
+func (t *recordingPodCheckpointTask) Pause(context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	*t.events = append(*t.events, "pause:"+t.id)
+	if t.pauseErr != nil {
+		if t.pauseChanged {
+			t.status = client.Paused
+		}
+		return t.pauseErr
+	}
+	t.status = client.Paused
+	return nil
+}
+
+func (t *recordingPodCheckpointTask) Resume(context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	*t.events = append(*t.events, "resume:"+t.id)
+	if t.resumeErr != nil {
+		return t.resumeErr
+	}
+	t.status = client.Running
+	return nil
+}
+
+func (t *recordingPodCheckpointTask) Status(context.Context) (client.Status, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return client.Status{Status: t.status}, nil
 }
