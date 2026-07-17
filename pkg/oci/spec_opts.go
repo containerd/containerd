@@ -18,6 +18,7 @@ package oci
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -600,19 +601,14 @@ func WithUser(userstr string) SpecOpts {
 		defer ensureAdditionalGids(s)
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
-		// While the Linux kernel allows the max UID to be MaxUint32 - 2,
-		// and the OCI Runtime Spec has no definition about the max UID,
-		// the runc implementation is known to require the UID to be <= MaxInt32.
-		//
-		// containerd follows runc's limitation here.
-		//
-		// In future we may relax this limitation to allow MaxUint32 - 2,
-		// or, amend the OCI Runtime Spec to codify the implementation limitation.
+		// The runtime spec models the UID/GID as uint32, and runc accepts
+		// ids up to MaxUint32-1. pkg/oci accepts whatever OCI accepts, and
+		// rejects anything past that bound.
 		const (
 			minUserID  = 0
-			maxUserID  = math.MaxInt32
+			maxUserID  = math.MaxUint32 - 1
 			minGroupID = 0
-			maxGroupID = math.MaxInt32
+			maxGroupID = math.MaxUint32 - 1
 		)
 
 		// For LCOW it's a bit harder to confirm that the user actually exists on the host as a rootfs isn't
@@ -629,7 +625,9 @@ func WithUser(userstr string) SpecOpts {
 		parts := strings.Split(userstr, ":")
 		switch len(parts) {
 		case 1:
-			v, err := strconv.Atoi(parts[0])
+			// Parse into int64 so that ids above MaxInt32 behave the same
+			// on 32-bit platforms, where Atoi would fail with ErrRange.
+			v, err := strconv.ParseInt(parts[0], 10, 64)
 			if err != nil {
 				if errors.Is(err, strconv.ErrRange) {
 					return fmt.Errorf("invalid USER value %q: uid out of range", userstr)
@@ -647,7 +645,7 @@ func WithUser(userstr string) SpecOpts {
 				groupname string
 			)
 			var uid, gid uint32
-			v, err := strconv.Atoi(parts[0])
+			v, err := strconv.ParseInt(parts[0], 10, 64)
 			if err != nil {
 				if errors.Is(err, strconv.ErrRange) {
 					return fmt.Errorf("invalid USER value %q: uid out of range", userstr)
@@ -658,7 +656,7 @@ func WithUser(userstr string) SpecOpts {
 			} else {
 				uid = uint32(v)
 			}
-			v, err = strconv.Atoi(parts[1])
+			v, err = strconv.ParseInt(parts[1], 10, 64)
 			if err != nil {
 				if errors.Is(err, strconv.ErrRange) {
 					return fmt.Errorf("invalid USER value %q: gid out of range", userstr)
@@ -761,7 +759,9 @@ func WithUserID(uid uint32) SpecOpts {
 		s.Process.User.AdditionalGids = nil
 		setUser := func(root fs.FS) error {
 			usr, err := UserFromFS(root, func(u user.User) bool {
-				return u.Uid == int(uid)
+				// Compare at int64 width: uid may exceed MaxInt32, which
+				// int(uid) would overflow on 32-bit platforms.
+				return int64(u.Uid) == int64(uid)
 			})
 			if err != nil {
 				if errors.Is(err, fs.ErrNotExist) || errors.Is(err, ErrNoUsersFound) {
@@ -992,15 +992,17 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 		setAdditionalGids := func(root fs.FS) error {
 			defer ensureAdditionalGids(s)
 
-			var ugroups []user.Group
-			f, groupErr := openUserFile(root, "etc/group")
-			if groupErr == nil {
-				defer f.Close()
-				ugroups, groupErr = user.ParseGroup(f)
-				if groupErr != nil {
-					return groupErr
-				}
-			} else if !errors.Is(groupErr, fs.ErrNotExist) {
+			wanted := make(map[string]struct{}, len(groups))
+			for _, group := range groups {
+				wanted[group] = struct{}{}
+			}
+			// Parse only the groups that were asked for, so that a malformed
+			// or out-of-range entry elsewhere in the file is not fatal here.
+			ugroups, groupErr := groupsFromFS(root, func(g user.Group) bool {
+				_, ok := wanted[g.Name]
+				return ok
+			})
+			if groupErr != nil && !errors.Is(groupErr, fs.ErrNotExist) {
 				return groupErr
 			}
 
@@ -1010,9 +1012,17 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 			}
 			var gids []uint32
 			for _, group := range groups {
-				gid, err := strconv.ParseUint(group, 10, 32)
+				// Parse at 64-bit width so that a numeric gid past uint32 is
+				// reported as out of range instead of falling through to the
+				// group-name lookup below.
+				gid, err := strconv.ParseUint(group, 10, 64)
 				if err == nil {
+					if gid > math.MaxUint32-1 {
+						return fmt.Errorf("group %q has gid %d out of range", group, gid)
+					}
 					gids = append(gids, uint32(gid))
+				} else if errors.Is(err, strconv.ErrRange) {
+					return fmt.Errorf("group %q has gid out of range", group)
 				} else {
 					g, ok := groupMap[group]
 					if !ok {
@@ -1164,15 +1174,141 @@ func UserFromPath(root string, filter func(user.User) bool) (user.User, error) {
 	return UserFromFS(r.FS(), filter)
 }
 
+// Positions of the id fields in a user database line:
+//
+//	/etc/passwd: name:password:UID:GID:GECOS:directory:shell
+//	/etc/group:  group_name:password:GID:user_list
+const (
+	passwdUIDField = 2
+	passwdGIDField = 3
+	groupGIDField  = 2
+)
+
+// errNotAnID marks a user database line that holds no decimal number where an
+// id is expected, so the line is not an entry a lookup can resolve.
+var errNotAnID = errors.New("not an id")
+
+// checkUserDBID checks the id in field idx of line, a raw /etc/passwd or
+// /etc/group entry.
+//
+// The parser in github.com/moby/sys/user keeps ids in an int and discards
+// conversion errors, so once a line has been parsed a field that is not a
+// number at all has become 0, i.e. root, and one too wide for an int has
+// saturated; neither can be told from a genuine id afterwards. Checking the
+// raw field is what keeps a malformed entry from resolving to root, and once
+// the field is known to hold a number that fits in an int, the value the
+// parser stored for it is exactly that number.
+//
+// A field that is not a decimal number yields errNotAnID, and the caller skips
+// the line the way the parser skips a blank one, so that such a line can
+// neither resolve to root nor shadow a well-formed entry for the same user. A
+// field that is a number but too large is an error the caller reports: the
+// entry is real, and narrowing the id to the uint32 the spec uses would
+// silently change which user the container runs as (1<<32 becomes 0).
+func checkUserDBID(line []byte, idx int, kind string) error {
+	fields := bytes.Split(bytes.TrimSpace(line), []byte(":"))
+	if idx >= len(fields) {
+		return errNotAnID
+	}
+	field := string(fields[idx])
+	id, err := strconv.ParseUint(field, 10, 64)
+	if err != nil {
+		if errors.Is(err, strconv.ErrRange) {
+			return fmt.Errorf("%s %q out of range", kind, field)
+		}
+		return errNotAnID
+	}
+	// pkg/oci accepts whatever OCI accepts, i.e. ids up to MaxUint32-1. The id
+	// also has to fit in the int the parser keeps it in, which is narrower
+	// than the spec's uint32 on 32-bit platforms.
+	if id > math.MaxUint32-1 || id > uint64(math.MaxInt) {
+		return fmt.Errorf("%s %d out of range", kind, id)
+	}
+	return nil
+}
+
+// usersFromFS returns the /etc/passwd entries in root that match filter.
+// Lines are parsed one at a time so that every entry is checked against the
+// raw text it came from; see checkUserDBID.
+func usersFromFS(root fs.FS, filter func(user.User) bool) ([]user.User, error) {
+	f, err := openUserFile(root, "etc/passwd")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var out []user.User
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Bytes()
+		uidErr := checkUserDBID(line, passwdUIDField, "uid")
+		gidErr := checkUserDBID(line, passwdGIDField, "gid")
+		if errors.Is(uidErr, errNotAnID) || errors.Is(gidErr, errNotAnID) {
+			continue
+		}
+		users, err := user.ParsePasswdFilter(bytes.NewReader(line), filter)
+		if err != nil {
+			return nil, err
+		}
+		if len(users) == 0 {
+			continue
+		}
+		// An out-of-range id is reported only for an entry the caller asked for.
+		if uidErr != nil {
+			return nil, fmt.Errorf("user %q has %w", users[0].Name, uidErr)
+		}
+		if gidErr != nil {
+			return nil, fmt.Errorf("user %q has %w", users[0].Name, gidErr)
+		}
+		out = append(out, users[0])
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// groupsFromFS returns the /etc/group entries in root that match filter, with
+// the same per-line checks as usersFromFS.
+func groupsFromFS(root fs.FS, filter func(user.Group) bool) ([]user.Group, error) {
+	f, err := openUserFile(root, "etc/group")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var out []user.Group
+	s := bufio.NewScanner(f)
+	// A group's user list may be arbitrarily long, as in user.ParseGroupFilter.
+	s.Buffer(nil, 1024*1024)
+	for s.Scan() {
+		line := s.Bytes()
+		gidErr := checkUserDBID(line, groupGIDField, "gid")
+		if errors.Is(gidErr, errNotAnID) {
+			continue
+		}
+		groups, err := user.ParseGroupFilter(bytes.NewReader(line), filter)
+		if err != nil {
+			return nil, err
+		}
+		if len(groups) == 0 {
+			continue
+		}
+		if gidErr != nil {
+			return nil, fmt.Errorf("group %q has %w", groups[0].Name, gidErr)
+		}
+		out = append(out, groups[0])
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserFromFS inspects the user object using /etc/passwd in the specified fs.FS.
 // filter can be nil.
 func UserFromFS(root fs.FS, filter func(user.User) bool) (user.User, error) {
-	f, err := openUserFile(root, "etc/passwd")
-	if err != nil {
-		return user.User{}, err
-	}
-	defer f.Close()
-	users, err := user.ParsePasswdFilter(f, filter)
+	users, err := usersFromFS(root, filter)
 	if err != nil {
 		return user.User{}, err
 	}
@@ -1199,36 +1335,22 @@ func GIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err err
 // GIDFromFS inspects the GID using /etc/group in the specified fs.FS.
 // filter can be nil.
 func GIDFromFS(root fs.FS, filter func(user.Group) bool) (gid uint32, err error) {
-	f, err := openUserFile(root, "etc/group")
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-	groups, err := user.ParseGroupFilter(f, filter)
+	groups, err := groupsFromFS(root, filter)
 	if err != nil {
 		return 0, err
 	}
 	if len(groups) == 0 {
 		return 0, ErrNoGroupsFound
 	}
-	g := groups[0]
-	return uint32(g.Gid), nil
+	return uint32(groups[0].Gid), nil
 }
 
 func getSupplementalGroupsFromFS(root fs.FS, filter func(user.Group) bool) ([]uint32, error) {
-	f, err := openUserFile(root, "etc/group")
+	groups, err := groupsFromFS(root, filter)
 	if err != nil {
 		return []uint32{}, err
 	}
-	defer f.Close()
-	groups, err := user.ParseGroupFilter(f, filter)
-	if err != nil {
-		return []uint32{}, err
-	}
-	if len(groups) == 0 {
-		// if there are no additional groups; just return an empty set
-		return []uint32{}, nil
-	}
+	// with no matching groups this is just an empty set
 	addlGids := make([]uint32, len(groups))
 	for i, grp := range groups {
 		addlGids[i] = uint32(grp.Gid)
