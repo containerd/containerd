@@ -22,19 +22,60 @@ import (
 	"archive/tar"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+func TestWriteCheckpointArchiveAtomicReplacesDestination(t *testing.T) {
+	checkpointDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(checkpointDir, "payload"), []byte("checkpoint"), 0o600))
+	destinationDir := t.TempDir()
+	destination := filepath.Join(destinationDir, "checkpoint.tar")
+	require.NoError(t, os.WriteFile(destination, make([]byte, 1<<20), 0o666))
+
+	require.NoError(t, writeCheckpointArchiveAtomic(context.Background(), destination, checkpointDir))
+	info, err := os.Stat(destination)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	temporaryFiles, err := filepath.Glob(filepath.Join(destinationDir, ".checkpoint-tmp-*"))
+	require.NoError(t, err)
+	assert.Empty(t, temporaryFiles)
+
+	archiveFile, err := os.Open(destination)
+	require.NoError(t, err)
+	defer archiveFile.Close()
+	reader := tar.NewReader(archiveFile)
+	foundPayload := false
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err)
+		if filepath.Base(header.Name) != "payload" {
+			continue
+		}
+		data, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.Equal(t, "checkpoint", string(data))
+		foundPayload = true
+	}
+	assert.True(t, foundPayload)
+}
 
 func TestCopyNoFollowRegularFile(t *testing.T) {
 	dir := t.TempDir()
@@ -105,6 +146,60 @@ func TestCopyNoFollowRejectsDirectory(t *testing.T) {
 	err := copyNoFollow(src, dst, 0o600)
 	require.Error(t, err)
 	assert.NoFileExists(t, dst)
+}
+
+func TestCopyCheckpointMetadataIfMissing(t *testing.T) {
+	t.Run("preserves current checkpoint metadata", func(t *testing.T) {
+		dir := t.TempDir()
+		src := filepath.Join(dir, "state", "dump.log")
+		dst := filepath.Join(dir, "checkpoint", "dump.log")
+		require.NoError(t, os.MkdirAll(filepath.Dir(src), 0o700))
+		require.NoError(t, os.MkdirAll(filepath.Dir(dst), 0o700))
+		require.NoError(t, os.WriteFile(src, []byte("stale"), 0o600))
+		require.NoError(t, os.WriteFile(dst, []byte("current"), 0o600))
+
+		require.NoError(t, copyCheckpointMetadataIfMissing(src, dst))
+		data, err := os.ReadFile(dst)
+		require.NoError(t, err)
+		assert.Equal(t, "current", string(data))
+	})
+
+	t.Run("copies runtime fallback", func(t *testing.T) {
+		dir := t.TempDir()
+		src := filepath.Join(dir, "state", "status")
+		dst := filepath.Join(dir, "checkpoint", "status")
+		require.NoError(t, os.MkdirAll(filepath.Dir(src), 0o700))
+		require.NoError(t, os.MkdirAll(filepath.Dir(dst), 0o700))
+		require.NoError(t, os.WriteFile(src, []byte("runtime metadata"), 0o644))
+
+		require.NoError(t, copyCheckpointMetadataIfMissing(src, dst))
+		data, err := os.ReadFile(dst)
+		require.NoError(t, err)
+		assert.Equal(t, "runtime metadata", string(data))
+		info, err := os.Stat(dst)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	})
+
+	t.Run("allows missing optional metadata", func(t *testing.T) {
+		dir := t.TempDir()
+		err := copyCheckpointMetadataIfMissing(
+			filepath.Join(dir, "missing-source"),
+			filepath.Join(dir, "missing-destination"),
+		)
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects non-regular current metadata", func(t *testing.T) {
+		dir := t.TempDir()
+		src := filepath.Join(dir, "state")
+		dst := filepath.Join(dir, "checkpoint")
+		require.NoError(t, os.WriteFile(src, []byte("fallback"), 0o600))
+		require.NoError(t, os.Symlink(src, dst))
+
+		err := copyCheckpointMetadataIfMissing(src, dst)
+		require.ErrorContains(t, err, "is not a regular file")
+	})
 }
 
 func TestAssertCheckpointDirSafe(t *testing.T) {
@@ -202,20 +297,27 @@ func TestFilterAndMergeAnnotations(t *testing.T) {
 			},
 		},
 
-		"createAnnotations update kubernetes metadata if present in both": {
+		"restore request metadata is authoritative": {
 			checkpointAnnotations: map[string]string{
 				"io.kubernetes.container.hash":         "old-hash",
 				"io.kubernetes.container.restartCount": "1",
-				"safe.annotation":                      "2",
+				"safe.annotation":                      "old",
+				"checkpoint.only":                      "preserved",
 			},
 			createAnnotations: map[string]string{
+				"cdi.k8s.io/device":                    "current-gpu",
 				"io.kubernetes.container.hash":         "new-hash",
 				"io.kubernetes.container.restartCount": "2",
+				"safe.annotation":                      "new",
+				"request.only":                         "added",
 			},
 			expectedAnnotations: map[string]string{
+				"cdi.k8s.io/device":                    "current-gpu",
 				"io.kubernetes.container.hash":         "new-hash",
 				"io.kubernetes.container.restartCount": "2",
-				"safe.annotation":                      "2",
+				"safe.annotation":                      "new",
+				"checkpoint.only":                      "preserved",
+				"request.only":                         "added",
 			},
 		},
 	} {
@@ -319,6 +421,114 @@ func TestResolveCriuPath(t *testing.T) {
 	}
 }
 
+func TestMergeStringMaps(t *testing.T) {
+	base := map[string]string{"base": "kept", "shared": "old"}
+	overrides := map[string]string{"request": "added", "shared": "new"}
+
+	result := mergeStringMaps(base, overrides)
+	assert.Equal(t, map[string]string{
+		"base":    "kept",
+		"request": "added",
+		"shared":  "new",
+	}, result)
+
+	result["base"] = "changed"
+	result["request"] = "changed"
+	assert.Equal(t, "kept", base["base"], "result must not alias checkpoint metadata")
+	assert.Equal(t, "added", overrides["request"], "result must not alias request metadata")
+}
+
+func TestRestoreContainerMetadata(t *testing.T) {
+	checkpointLabels := map[string]string{"checkpoint-only": "stale", "shared": "old"}
+	checkpointAnnotations := map[string]string{"checkpoint-only": "stale", "shared": "old"}
+	createLabels := map[string]string{"request-only": "current", "shared": "new"}
+	createAnnotations := map[string]string{"request-only": "current", "shared": "new"}
+
+	labels, annotations := restoreContainerMetadata(
+		withPodRestoreContainerContext(context.Background()),
+		checkpointLabels,
+		checkpointAnnotations,
+		createLabels,
+		createAnnotations,
+		"new-uid",
+	)
+	assert.Equal(t, createLabels, labels)
+	assert.Equal(t, createAnnotations, annotations)
+	assert.NotContains(t, labels, "checkpoint-only")
+	assert.NotContains(t, annotations, "checkpoint-only")
+
+	labels["request-only"] = "mutated"
+	annotations["request-only"] = "mutated"
+	assert.Equal(t, "current", createLabels["request-only"])
+	assert.Equal(t, "current", createAnnotations["request-only"])
+}
+
+func checkpointProcessFixture() (*runtime.ContainerConfig, *v1.ImageConfig, *spec.Spec) {
+	config := &runtime.ContainerConfig{
+		Image:      &runtime.ImageSpec{Image: "sha256:image", UserSpecifiedImage: "busybox"},
+		Args:       []string{"serve"},
+		WorkingDir: "/work",
+		Envs: []*runtime.KeyValue{
+			{Key: "FROM_CONFIG", Value: "current"},
+		},
+		Linux: &runtime.LinuxContainerConfig{
+			SecurityContext: &runtime.LinuxContainerSecurityContext{
+				RunAsUser:          &runtime.Int64Value{Value: 1000},
+				RunAsGroup:         &runtime.Int64Value{Value: 2000},
+				SupplementalGroups: []int64{3000},
+				NoNewPrivs:         true,
+			},
+		},
+	}
+	image := &v1.ImageConfig{
+		Entrypoint: []string{"/bin/app"},
+		Cmd:        []string{"default"},
+		Env:        []string{"FROM_IMAGE=base"},
+		WorkingDir: "/image-work",
+	}
+	dump := &spec.Spec{Process: &spec.Process{
+		Args:            []string{"/bin/app", "serve"},
+		Cwd:             "/work",
+		Env:             []string{"PATH=/usr/bin", "HOSTNAME=pod", "FROM_IMAGE=base", "FROM_CONFIG=current"},
+		NoNewPrivileges: true,
+		User: spec.User{
+			UID:            1000,
+			GID:            2000,
+			AdditionalGids: []uint32{3000},
+		},
+	}}
+	return config, image, dump
+}
+
+func TestValidateRestoreContainerConfig(t *testing.T) {
+	checkpoint, _, _ := checkpointProcessFixture()
+	restore, _, _ := checkpointProcessFixture()
+	restore.Image.UserSpecifiedImage = "docker.io/library/busybox:latest"
+	require.NoError(t, validateRestoreContainerConfig(checkpoint, restore))
+
+	tests := []struct {
+		name    string
+		mutate  func(*runtime.ContainerConfig)
+		wantErr string
+	}{
+		{name: "image", mutate: func(c *runtime.ContainerConfig) { c.Image.UserSpecifiedImage = "alpine" }, wantErr: "restore image"},
+		{name: "command", mutate: func(c *runtime.ContainerConfig) { c.Command = []string{"/bin/other"} }, wantErr: "restore command"},
+		{name: "arguments", mutate: func(c *runtime.ContainerConfig) { c.Args = []string{"other"} }, wantErr: "restore arguments"},
+		{name: "working directory", mutate: func(c *runtime.ContainerConfig) { c.WorkingDir = "/other" }, wantErr: "working directory"},
+		{name: "environment", mutate: func(c *runtime.ContainerConfig) { c.Envs[0].Value = "other" }, wantErr: "restore environment"},
+		{name: "security", mutate: func(c *runtime.ContainerConfig) { c.Linux.SecurityContext.RunAsUser.Value = 42 }, wantErr: "security context"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			restore, _, _ := checkpointProcessFixture()
+			test.mutate(restore)
+			err := validateRestoreContainerConfig(checkpoint, restore)
+			require.ErrorContains(t, err, test.wantErr)
+			require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+		})
+	}
+}
+
 func TestCheckCriuDisabled(t *testing.T) {
 	c := newTestCRIService()
 	c.config.EnableCRIU = func() *bool { v := false; return &v }()
@@ -367,5 +577,63 @@ func TestCRImportCheckpointDisabled(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
 		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
+	}
+}
+
+func TestValidateCheckpointProcess(t *testing.T) {
+	config, image, dump := checkpointProcessFixture()
+	require.NoError(t, validateCheckpointProcess(dump, config, image))
+
+	tests := []struct {
+		name    string
+		mutate  func(*spec.Spec)
+		wantErr string
+	}{
+		{name: "arguments", mutate: func(s *spec.Spec) { s.Process.Args[1] = "other" }, wantErr: "process arguments"},
+		{name: "working directory", mutate: func(s *spec.Spec) { s.Process.Cwd = "/other" }, wantErr: "working directory"},
+		{name: "environment", mutate: func(s *spec.Spec) { s.Process.Env[3] = "FROM_CONFIG=other" }, wantErr: "environment variable"},
+		{name: "uid", mutate: func(s *spec.Spec) { s.Process.User.UID = 42 }, wantErr: "process UID"},
+		{name: "gid", mutate: func(s *spec.Spec) { s.Process.User.GID = 42 }, wantErr: "process GID"},
+		{name: "supplemental group", mutate: func(s *spec.Spec) { s.Process.User.AdditionalGids = nil }, wantErr: "supplemental group"},
+		{name: "no new privileges", mutate: func(s *spec.Spec) { s.Process.NoNewPrivileges = false }, wantErr: "no-new-privileges"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, _, checkpoint := checkpointProcessFixture()
+			test.mutate(checkpoint)
+			err := validateCheckpointProcess(checkpoint, config, image)
+			require.ErrorContains(t, err, test.wantErr)
+			require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+		})
+	}
+}
+
+func TestValidateCheckpointRuntime(t *testing.T) {
+	tests := []struct {
+		name              string
+		checkpointRuntime string
+		restoreRuntime    string
+		wantErr           string
+	}{
+		{name: "matching", checkpointRuntime: "io.containerd.runc.v2", restoreRuntime: "io.containerd.runc.v2"},
+		{name: "legacy checkpoint", restoreRuntime: "io.containerd.runc.v2"},
+		{
+			name:              "mismatch",
+			checkpointRuntime: "io.containerd.runc.v2",
+			restoreRuntime:    "io.containerd.runsc.v1",
+			wantErr:           `checkpoint requires runtime "io.containerd.runc.v2", but restored sandbox uses runtime "io.containerd.runsc.v1": failed precondition`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateCheckpointRuntime(test.checkpointRuntime, test.restoreRuntime)
+			if test.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, test.wantErr)
+			require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+		})
 	}
 }
