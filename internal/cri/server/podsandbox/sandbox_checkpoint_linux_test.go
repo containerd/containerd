@@ -74,8 +74,12 @@ func TestCheckpointServiceRequiresCriu(t *testing.T) {
 	})
 	require.NoError(t, err, "CRIU is checked when a checkpoint or restore is requested")
 
+	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
 	// Checkpoint checks CRIU after it validates the selected containers.
 	err = service.checkCriu()
+	require.ErrorContains(t, err, "criu binary not found")
+	require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+	_, err = service.Restore(ctx, "sandbox", sandbox.RestoreOptions{})
 	require.ErrorContains(t, err, "criu binary not found")
 	require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
 }
@@ -137,14 +141,17 @@ func TestValidateCheckpointOutputPathRejectsUnsafePaths(t *testing.T) {
 func TestPodCheckpointOptionsAreControllerSpecific(t *testing.T) {
 	for _, options := range []map[string]string{nil, {}} {
 		require.NoError(t, validatePodCheckpointOptions(options))
+		require.NoError(t, validatePodRestoreOptions(options))
 	}
 
-	for _, operation := range []string{"checkpoint"} {
+	for _, operation := range []string{"checkpoint", "restore"} {
 		t.Run(operation, func(t *testing.T) {
 			root := t.TempDir()
 			path := t.TempDir()
 			// A nil client makes any attempt to use containerd services fail.
 			service := &CheckpointService{rootDir: root}
+			// Restore checks CRIU before options. Cache success without running CRIU.
+			service.checkCriuOnce.Do(func() {})
 			controller := &Controller{checkpoint: service}
 			enabled := true
 			controller.config.EnableCheckpointRestore = &enabled
@@ -153,7 +160,13 @@ func TestPodCheckpointOptionsAreControllerSpecific(t *testing.T) {
 			options := map[string]string{"future-controller-option": "value"}
 
 			var err error
-			err = controller.Checkpoint(ctx, "sandbox", sandbox.CheckpointOptions{OutputPath: path, Options: options})
+			if operation == "checkpoint" {
+				err = controller.Checkpoint(ctx, "sandbox", sandbox.CheckpointOptions{OutputPath: path, Options: options})
+			} else {
+				result, restoreErr := controller.Restore(ctx, "sandbox", sandbox.RestoreOptions{CheckpointPath: path, Options: options})
+				require.Empty(t, result)
+				err = restoreErr
+			}
 			require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
 			require.ErrorContains(t, err, "pause controller")
 			for _, directory := range []string{root, path} {
@@ -169,6 +182,10 @@ func TestCheckpointNamesAreSafeAndScoped(t *testing.T) {
 	archive := checkpointArchiveName("../../container")
 	assert.Equal(t, filepath.Base(archive), archive)
 	assert.NotContains(t, archive, "..")
+	assert.NotEqual(t,
+		restoreCheckpointImageName("sandbox-a", "container"),
+		restoreCheckpointImageName("sandbox-b", "container"),
+	)
 }
 
 func TestWritePodCheckpointMetadata(t *testing.T) {
