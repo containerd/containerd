@@ -151,6 +151,9 @@ func newTestCRIService(opts ...testOpt) *criService {
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(labels, nil),
 		containerNameIndex: registrar.NewRegistrar(),
+		podCheckpointSupportCheck: func() error {
+			return nil
+		},
 		netPlugin: map[string]cni.CNI{
 			defaultNetworkPlugin: servertesting.NewFakeCNIPlugin(),
 		},
