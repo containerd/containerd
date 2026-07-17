@@ -94,6 +94,20 @@ func WithTaskCheckpoint(im Image) NewTaskOpts {
 	}
 }
 
+// WithTaskCheckpointPath restores a task from checkpoint data already unpacked
+// on the local filesystem. The runtime-v2 service recognizes this annotation
+// and applies the checkpoint's rootfs diff before starting the restored task.
+func WithTaskCheckpointPath(path string) NewTaskOpts {
+	return func(ctx context.Context, c *Client, info *TaskInfo) error {
+		info.Checkpoint = &types.Descriptor{
+			Annotations: map[string]string{
+				"RestoreFromPath": path,
+			},
+		}
+		return nil
+	}
+}
+
 // WithCheckpointName sets the image name for the checkpoint
 func WithCheckpointName(name string) CheckpointTaskOpts {
 	return func(r *CheckpointTaskInfo) error {

@@ -53,6 +53,11 @@ import (
 
 // recover recovers system state from containerd and status checkpoint.
 func (c *criService) recover(ctx context.Context) error {
+	pendingPodCheckpoints, err := c.preparePodCheckpointRecovery(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to prepare interrupted pod checkpoint recovery: %w", err)
+	}
+
 	// Recover all sandboxes.
 	sandboxes, err := c.client.Containers(ctx, filterLabel(crilabels.ContainerKindLabel, crilabels.ContainerKindSandbox))
 	if err != nil {
@@ -204,6 +209,9 @@ func (c *criService) recover(ctx context.Context) error {
 	}
 	if err := eg.Wait(); err != nil {
 		return err
+	}
+	if err := c.finishPodCheckpointRecovery(ctx, pendingPodCheckpoints); err != nil {
+		return fmt.Errorf("failed to finish interrupted pod checkpoint recovery: %w", err)
 	}
 	// Recover all images.
 	if err := c.ImageService.CheckImages(ctx); err != nil {
@@ -373,8 +381,15 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 				if status.State() != runtime.ContainerState_CONTAINER_CREATED {
 					return fmt.Errorf("unexpected container state for created task: %q", status.State())
 				}
+			case containerd.Paused:
+				if _, marked := c.podCheckpointRecoveryContainers.Load(id); !marked {
+					return fmt.Errorf("unexpected paused task without a pod checkpoint recovery marker")
+				}
+				fallthrough
 			case containerd.Running:
-				// Task is running. Container must be in `RUNNING` state, based on our assumption that
+				// A task paused by an interrupted Pod checkpoint is still a live
+				// container and is resumed after all container stores are recovered.
+				// Otherwise, the container must be in `RUNNING` state, based on our assumption that
 				// "task should not be started when containerd is down".
 				switch status.State() {
 				case runtime.ContainerState_CONTAINER_EXITED:

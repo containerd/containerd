@@ -110,65 +110,6 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return cntr.IO, nil
 	}
 
-	if cntr.Status.Get().Restore {
-		// If during start the container is detected as a checkpoint the container
-		// will be marked with Restore() == true. In this case not the normal
-		// start code is needed but this code which does a restore.
-		pid, err := container.Restore(
-			ctx,
-			ioCreation,
-			filepath.Join(c.getContainerRootDir(r.GetContainerId()), checkpointRestoreDir, crmetadata.CheckpointDirectory),
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to restore containerd task: %w", err)
-		}
-		// Update container start timestamp.
-		if err := cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
-			if pid < 0 {
-				return status, fmt.Errorf("restore returned a PID < 0 (%d); that should not happen", pid)
-			}
-			status.Pid = uint32(pid)
-			status.StartedAt = time.Now().UnixNano()
-			return status, nil
-		}); err != nil {
-			return nil, fmt.Errorf("failed to update container %q state: %w", id, err)
-		}
-
-		c.generateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
-
-		task, err := cntr.Container.Task(ctx, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get task for container %q: %w", id, err)
-		}
-		// wait is a long running background request, no timeout needed.
-		exitCh, err := task.Wait(ctrdutil.NamespacedContext())
-		if err != nil {
-			return nil, fmt.Errorf("failed to wait for containerd task: %w", err)
-		}
-
-		defer func() {
-			if retErr != nil {
-				deferCtx, deferCancel := ctrdutil.DeferContext()
-				defer deferCancel()
-				err = c.nri.StopContainer(deferCtx, &sandbox, &cntr)
-				if err != nil {
-					log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
-				}
-			}
-		}()
-		// It handles the TaskExit event and update container state after this.
-		c.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
-
-		// cleanup checkpoint artifacts after restore.
-		restoreDir := filepath.Join(c.getContainerRootDir(r.GetContainerId()), checkpointRestoreDir)
-		if err := os.RemoveAll(restoreDir); err != nil {
-			log.G(ctx).Warnf("Non-fatal: removal of checkpoint restore dir (%s) failed: %v", restoreDir, err)
-		}
-
-		log.G(ctx).Infof("Restored container %s successfully", r.GetContainerId())
-		return &runtime.StartContainerResponse{}, nil
-	}
 	// Recheck target container validity in Linux namespace options.
 	if linux := config.GetLinux(); linux != nil {
 		nsOpts := linux.GetSecurityContext().GetNamespaceOptions()
@@ -202,9 +143,40 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, fmt.Errorf("failed to update container IO owner: %w", err)
 	}
 	taskOpts = append(taskOpts, ioOwnerTaskOpts...)
+	restoring := cntr.Status.Get().Restore
+	if restoring {
+		checkpointPath := filepath.Join(c.getContainerRootDir(id), checkpointRestoreDir, crmetadata.CheckpointDirectory)
+		taskOpts = append(taskOpts, containerd.WithTaskCheckpointPath(checkpointPath))
+	}
+
+	nriStartAttempted := false
+	defer func() {
+		if retErr == nil || !nriStartAttempted {
+			return
+		}
+		deferCtx, deferCancel := ctrdutil.DeferContext()
+		defer deferCancel()
+		if err := c.nri.StopContainer(deferCtx, &sandbox, &cntr); err != nil {
+			log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
+		}
+	}()
+
+	if restoring {
+		defer c.nri.BlockPluginSync().Unblock()
+		// A checkpoint restore starts the process as part of CreateTask, so NRI
+		// must receive its start notification before NewTask crosses that boundary.
+		nriStartAttempted = true
+		if err := c.nri.StartContainer(ctx, &sandbox, &cntr); err != nil {
+			log.G(ctx).WithError(err).Error("NRI container start failed")
+			return nil, fmt.Errorf("NRI container start failed: %w", err)
+		}
+	}
 
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
+		if restoring {
+			return nil, fmt.Errorf("failed to restore containerd task: %w", err)
+		}
 		return nil, fmt.Errorf("failed to create containerd task: %w", err)
 	}
 	defer func() {
@@ -224,28 +196,18 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, fmt.Errorf("failed to wait for containerd task: %w", err)
 	}
 
-	defer c.nri.BlockPluginSync().Unblock()
-
-	defer func() {
-		if retErr != nil {
-			deferCtx, deferCancel := ctrdutil.DeferContext()
-			defer deferCancel()
-			err = c.nri.StopContainer(deferCtx, &sandbox, &cntr)
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
-			}
+	if !restoring {
+		defer c.nri.BlockPluginSync().Unblock()
+		nriStartAttempted = true
+		if err := c.nri.StartContainer(ctx, &sandbox, &cntr); err != nil {
+			log.G(ctx).WithError(err).Error("NRI container start failed")
+			return nil, fmt.Errorf("NRI container start failed: %w", err)
 		}
-	}()
 
-	err = c.nri.StartContainer(ctx, &sandbox, &cntr)
-	if err != nil {
-		log.G(ctx).WithError(err).Errorf("NRI container start failed")
-		return nil, fmt.Errorf("NRI container start failed: %w", err)
-	}
-
-	// Start containerd task.
-	if err := task.Start(ctx); err != nil {
-		return nil, fmt.Errorf("failed to start containerd task %q: %w", id, err)
+		// Start containerd task.
+		if err := task.Start(ctx); err != nil {
+			return nil, fmt.Errorf("failed to start containerd task %q: %w", id, err)
+		}
 	}
 
 	// Update container start timestamp.
@@ -265,6 +227,14 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	err = c.nri.PostStartContainer(ctx, &sandbox, &cntr)
 	if err != nil {
 		log.G(ctx).WithError(err).Errorf("NRI post-start notification failed")
+	}
+
+	if restoring {
+		restoreDir := filepath.Join(c.getContainerRootDir(id), checkpointRestoreDir)
+		if err := os.RemoveAll(restoreDir); err != nil {
+			log.G(ctx).WithError(err).Warnf("failed to remove checkpoint restore directory %q", restoreDir)
+		}
+		log.G(ctx).Infof("Restored container %s successfully", id)
 	}
 
 	containerStartTimer.WithValues(info.Runtime.Name).UpdateSince(start)
