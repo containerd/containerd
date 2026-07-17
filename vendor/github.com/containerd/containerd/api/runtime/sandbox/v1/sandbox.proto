@@ -60,6 +60,14 @@ service Sandbox {
   rpc SandboxMetrics(SandboxMetricsRequest) returns (SandboxMetricsResponse);
 }
 
+// Checkpoint is an optional sandbox-shim capability. It is a separate service
+// so existing Sandbox implementations do not need to implement checkpoint and
+// restore methods.
+service Checkpoint {
+  rpc Checkpoint(CheckpointRequest) returns (CheckpointResponse);
+  rpc Restore(RestoreRequest) returns (RestoreResponse);
+}
+
 message CreateSandboxRequest {
   string sandbox_id = 1;
   string bundle_path = 2;
@@ -146,4 +154,46 @@ message SandboxMetricsRequest {
 
 message SandboxMetricsResponse {
   containerd.types.Metric metrics = 1;
+}
+
+message CheckpointContainer {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Any config = 3;
+  google.protobuf.Any status = 4;
+}
+
+message CheckpointRequest {
+  string sandbox_id = 1;
+  string output_path = 2;
+  google.protobuf.Any sandbox_config = 3;
+  repeated CheckpointContainer containers = 4;
+  map<string, string> options = 5;
+}
+
+message CheckpointResponse {}
+
+message RestoreContainer {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Any config = 3;
+}
+
+message RestoreRequest {
+  string sandbox_id = 1;
+  string checkpoint_path = 2;
+  google.protobuf.Any sandbox_config = 3;
+  repeated RestoreContainer containers = 4;
+  map<string, string> options = 5;
+}
+
+message RestoredContainer {
+  string name = 1;
+  // Ownership transfers from the controller to the caller when Restore
+  // succeeds. Empty when no containerd task checkpoint is required.
+  string task_checkpoint_image = 2;
+}
+
+message RestoreResponse {
+  repeated RestoredContainer containers = 1;
 }

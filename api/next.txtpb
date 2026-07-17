@@ -26246,6 +26246,217 @@ file: {
       json_name: "metrics"
     }
   }
+  message_type: {
+    name: "CheckpointContainer"
+    field: {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field: {
+      name: "name"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field: {
+      name: "config"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "config"
+    }
+    field: {
+      name: "status"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "status"
+    }
+  }
+  message_type: {
+    name: "CheckpointRequest"
+    field: {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field: {
+      name: "output_path"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "outputPath"
+    }
+    field: {
+      name: "sandbox_config"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "sandboxConfig"
+    }
+    field: {
+      name: "containers"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.runtime.sandbox.v1.CheckpointContainer"
+      json_name: "containers"
+    }
+    field: {
+      name: "options"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.runtime.sandbox.v1.CheckpointRequest.OptionsEntry"
+      json_name: "options"
+    }
+    nested_type: {
+      name: "OptionsEntry"
+      field: {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field: {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options: {
+        map_entry: true
+      }
+    }
+  }
+  message_type: {
+    name: "CheckpointResponse"
+  }
+  message_type: {
+    name: "RestoreContainer"
+    field: {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field: {
+      name: "name"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field: {
+      name: "config"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "config"
+    }
+  }
+  message_type: {
+    name: "RestoreRequest"
+    field: {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field: {
+      name: "checkpoint_path"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "checkpointPath"
+    }
+    field: {
+      name: "sandbox_config"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "sandboxConfig"
+    }
+    field: {
+      name: "containers"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.runtime.sandbox.v1.RestoreContainer"
+      json_name: "containers"
+    }
+    field: {
+      name: "options"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.runtime.sandbox.v1.RestoreRequest.OptionsEntry"
+      json_name: "options"
+    }
+    nested_type: {
+      name: "OptionsEntry"
+      field: {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field: {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options: {
+        map_entry: true
+      }
+    }
+  }
+  message_type: {
+    name: "RestoredContainer"
+    field: {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field: {
+      name: "task_checkpoint_image"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "taskCheckpointImage"
+    }
+  }
+  message_type: {
+    name: "RestoreResponse"
+    field: {
+      name: "containers"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.runtime.sandbox.v1.RestoredContainer"
+      json_name: "containers"
+    }
+  }
   service: {
     name: "Sandbox"
     method: {
@@ -26292,6 +26503,19 @@ file: {
       name: "SandboxMetrics"
       input_type: ".containerd.runtime.sandbox.v1.SandboxMetricsRequest"
       output_type: ".containerd.runtime.sandbox.v1.SandboxMetricsResponse"
+    }
+  }
+  service: {
+    name: "Checkpoint"
+    method: {
+      name: "Checkpoint"
+      input_type: ".containerd.runtime.sandbox.v1.CheckpointRequest"
+      output_type: ".containerd.runtime.sandbox.v1.CheckpointResponse"
+    }
+    method: {
+      name: "Restore"
+      input_type: ".containerd.runtime.sandbox.v1.RestoreRequest"
+      output_type: ".containerd.runtime.sandbox.v1.RestoreResponse"
     }
   }
   options: {
@@ -54644,6 +54868,231 @@ file: {
   message_type: {
     name: "ControllerUpdateResponse"
   }
+  message_type: {
+    name: "ControllerCheckpointContainer"
+    field: {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field: {
+      name: "name"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field: {
+      name: "config"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "config"
+    }
+    field: {
+      name: "status"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "status"
+    }
+  }
+  message_type: {
+    name: "ControllerCheckpointRequest"
+    field: {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field: {
+      name: "output_path"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "outputPath"
+    }
+    field: {
+      name: "sandbox_config"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "sandboxConfig"
+    }
+    field: {
+      name: "containers"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.ControllerCheckpointContainer"
+      json_name: "containers"
+    }
+    field: {
+      name: "options"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.ControllerCheckpointRequest.OptionsEntry"
+      json_name: "options"
+    }
+    field: {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
+    nested_type: {
+      name: "OptionsEntry"
+      field: {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field: {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options: {
+        map_entry: true
+      }
+    }
+  }
+  message_type: {
+    name: "ControllerCheckpointResponse"
+  }
+  message_type: {
+    name: "ControllerRestoreContainer"
+    field: {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field: {
+      name: "name"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field: {
+      name: "config"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "config"
+    }
+  }
+  message_type: {
+    name: "ControllerRestoreRequest"
+    field: {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field: {
+      name: "checkpoint_path"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "checkpointPath"
+    }
+    field: {
+      name: "sandbox_config"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "sandboxConfig"
+    }
+    field: {
+      name: "containers"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.ControllerRestoreContainer"
+      json_name: "containers"
+    }
+    field: {
+      name: "options"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.ControllerRestoreRequest.OptionsEntry"
+      json_name: "options"
+    }
+    field: {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
+    nested_type: {
+      name: "OptionsEntry"
+      field: {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field: {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options: {
+        map_entry: true
+      }
+    }
+  }
+  message_type: {
+    name: "ControllerRestoredContainer"
+    field: {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field: {
+      name: "task_checkpoint_image"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "taskCheckpointImage"
+    }
+  }
+  message_type: {
+    name: "ControllerRestoreResponse"
+    field: {
+      name: "containers"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.ControllerRestoredContainer"
+      json_name: "containers"
+    }
+  }
   service: {
     name: "Store"
     method: {
@@ -54718,6 +55167,19 @@ file: {
       name: "Update"
       input_type: ".containerd.services.sandbox.v1.ControllerUpdateRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerUpdateResponse"
+    }
+  }
+  service: {
+    name: "Checkpoint"
+    method: {
+      name: "Checkpoint"
+      input_type: ".containerd.services.sandbox.v1.ControllerCheckpointRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerCheckpointResponse"
+    }
+    method: {
+      name: "Restore"
+      input_type: ".containerd.services.sandbox.v1.ControllerRestoreRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerRestoreResponse"
     }
   }
   options: {
