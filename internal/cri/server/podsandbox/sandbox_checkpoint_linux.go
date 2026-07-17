@@ -68,6 +68,13 @@ const (
 	podCheckpointConfigFile      = "pod-config.json"
 	checkpointArchiveTempPrefix  = ".checkpoint-image-"
 	checkpointMetadataTempPrefix = ".checkpoint-metadata-"
+	checkpointRuntimeNameLabel   = "io.containerd.checkpoint.runtime"
+	checkpointSnapshotterLabel   = "io.containerd.checkpoint.snapshotter"
+
+	maxPodCheckpointManifestSize = 16 << 20
+	maxCheckpointIndexSize       = 4 << 20
+	maxCheckpointArchiveSize     = 1 << 40
+	maxPodCheckpointContainers   = 1024
 )
 
 type podCheckpointManifest struct {
@@ -258,12 +265,6 @@ func (c *CheckpointService) Checkpoint(ctx context.Context, sandboxID string, op
 	return nil
 }
 
-// Restore is not implemented yet. The controller registers the checkpoint
-// capability so that Pod checkpoints can be taken through the sandbox API.
-func (c *CheckpointService) Restore(context.Context, string, sandbox.RestoreOptions) (sandbox.RestoreResult, error) {
-	return sandbox.RestoreResult{}, fmt.Errorf("pod restore is not implemented by the pause controller: %w", errdefs.ErrNotImplemented)
-}
-
 // podCheckpointCleanupContext returns a context for cleanup that must run even
 // when the request context is canceled, in the namespace of the request.
 func podCheckpointCleanupContext(namespace string) (context.Context, context.CancelFunc) {
@@ -290,6 +291,9 @@ func (c *CheckpointService) prepareCheckpointContainers(ctx context.Context, san
 	}
 	if len(opts.Containers) == 0 {
 		return nil, nil, fmt.Errorf("at least one container is required for pod checkpoint: %w", errdefs.ErrInvalidArgument)
+	}
+	if len(opts.Containers) > maxPodCheckpointContainers {
+		return nil, nil, fmt.Errorf("pod checkpoint contains %d containers; maximum is %d: %w", len(opts.Containers), maxPodCheckpointContainers, errdefs.ErrInvalidArgument)
 	}
 	seenIDs := make(map[string]struct{}, len(opts.Containers))
 	seenNames := make(map[string]struct{}, len(opts.Containers))
