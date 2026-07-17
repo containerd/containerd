@@ -72,6 +72,7 @@ const (
 	checkpointSnapshotterLabel   = "io.containerd.checkpoint.snapshotter"
 
 	maxPodCheckpointManifestSize = 16 << 20
+	maxPodCheckpointConfigSize   = 4 << 20
 	maxCheckpointIndexSize       = 4 << 20
 	maxCheckpointArchiveSize     = 1 << 40
 	maxPodCheckpointContainers   = 1024

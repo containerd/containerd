@@ -26,19 +26,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	imagearchive "github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/core/sandbox"
+	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sys/unix"
+	"google.golang.org/protobuf/proto"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -47,6 +53,7 @@ type restoreContainer struct {
 	name     string
 	config   *runtime.ContainerConfig
 	archive  *os.File
+	imageRef digest.Digest
 	manifest podCheckpointManifestContainer
 }
 
@@ -135,6 +142,20 @@ func prepareRestoreContainers(opts sandbox.RestoreOptions) (_ []restoreContainer
 		return nil, err
 	}
 	defer checkpointDir.Close()
+	if opts.SandboxConfig == nil {
+		return nil, errors.New("sandbox config is required for restore")
+	}
+	restoreSandboxConfig := new(runtime.PodSandboxConfig)
+	if err := typeurl.UnmarshalTo(opts.SandboxConfig, restoreSandboxConfig); err != nil {
+		return nil, fmt.Errorf("failed to decode sandbox restore config: %w", err)
+	}
+	checkpointSandboxConfig, err := readPodCheckpointConfigAt(checkpointDir)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateRestoreSandboxConfig(checkpointSandboxConfig, restoreSandboxConfig); err != nil {
+		return nil, err
+	}
 	manifest, err := readPodCheckpointManifestAt(checkpointDir)
 	if err != nil {
 		return nil, err
@@ -212,12 +233,19 @@ func prepareRestoreContainers(opts sandbox.RestoreOptions) (_ []restoreContainer
 		if config.GetMetadata().GetName() != input.Name {
 			return nil, fmt.Errorf("restore container config name %q does not match option name %q", config.GetMetadata().GetName(), input.Name)
 		}
+		if err := validateRestoreContainerConfig(checkpointConfig, config); err != nil {
+			return nil, fmt.Errorf("container %q is incompatible with its checkpoint: %w", input.Name, err)
+		}
 		checkpointStatus := new(runtime.ContainerStatus)
 		if err := decodeCRIJSON(manifestContainer.Status, checkpointStatus); err != nil {
 			return nil, fmt.Errorf("failed to decode checkpoint container %q status: %w", input.Name, err)
 		}
 		if checkpointStatus.GetId() != manifestContainer.ID {
 			return nil, fmt.Errorf("checkpoint container status ID %q does not match manifest ID %q", checkpointStatus.GetId(), manifestContainer.ID)
+		}
+		imageRef := digest.Digest(checkpointStatus.GetImageRef())
+		if err := imageRef.Validate(); err != nil {
+			return nil, fmt.Errorf("checkpoint container %q has invalid image config digest %q: %w", input.Name, imageRef, err)
 		}
 		archive, err := openRegularFileAt(checkpointDir, manifestContainer.Archive, maxCheckpointArchiveSize)
 		if err != nil {
@@ -228,6 +256,7 @@ func prepareRestoreContainers(opts sandbox.RestoreOptions) (_ []restoreContainer
 			name:     input.Name,
 			config:   config,
 			archive:  archive,
+			imageRef: imageRef,
 			manifest: manifestContainer,
 		})
 	}
@@ -256,6 +285,14 @@ func (c *CheckpointService) importContainerCheckpoint(ctx context.Context, sandb
 	} else if !errdefs.IsNotFound(err) {
 		return fmt.Errorf("failed to check task of restored container %q: %w", container.id, err)
 	}
+	restoreImageRef, err := restoreContainerImageConfigDigest(info, container.id)
+	if err != nil {
+		return err
+	}
+	if err := validateRestoreImageConfig(container.imageRef, restoreImageRef); err != nil {
+		return err
+	}
+
 	if _, err := container.archive.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("failed to rewind checkpoint archive: %w", err)
 	}
@@ -317,6 +354,9 @@ func (c *CheckpointService) importContainerCheckpoint(ctx context.Context, sandb
 		if err := validateCheckpointDescriptorContent(ctx, c.client.ContentStore(), desc); err != nil {
 			return err
 		}
+	}
+	if checkpointRuntime := index.Annotations[checkpointRuntimeNameLabel]; checkpointRuntime != "" && checkpointRuntime != info.Runtime.Name {
+		return fmt.Errorf("checkpoint runtime %q does not match restore runtime %q: %w", checkpointRuntime, info.Runtime.Name, errdefs.ErrFailedPrecondition)
 	}
 	// ImportIndex does not set GC references. Keep the validated content reachable
 	// through the checkpoint image after the import lease is released.
@@ -387,6 +427,38 @@ func checkpointTargetFromIndex(index *imagespec.Index) (imagespec.Descriptor, er
 	// only image record under a deterministic, restore-scoped name.
 	target.Annotations = nil
 	return target, nil
+}
+
+func restoreContainerImageConfigDigest(info containers.Container, containerID string) (digest.Digest, error) {
+	extension, ok := info.Extensions[crilabels.ContainerMetadataExtension]
+	if !ok {
+		return "", fmt.Errorf("restored container %q has no CRI metadata extension", containerID)
+	}
+	metadata := new(containerstore.Metadata)
+	if err := json.Unmarshal(extension.GetValue(), metadata); err != nil {
+		return "", fmt.Errorf("failed to decode CRI metadata for restored container %q: %w", containerID, err)
+	}
+	if metadata.ID != containerID {
+		return "", fmt.Errorf("restored container metadata ID %q does not match container ID %q", metadata.ID, containerID)
+	}
+	imageRef := digest.Digest(metadata.ImageRef)
+	if err := imageRef.Validate(); err != nil {
+		return "", fmt.Errorf("restored container %q has invalid image config digest %q: %w", containerID, imageRef, err)
+	}
+	return imageRef, nil
+}
+
+func validateRestoreImageConfig(checkpoint, restore digest.Digest) error {
+	if err := checkpoint.Validate(); err != nil {
+		return fmt.Errorf("checkpoint base image config digest %q is invalid: %w", checkpoint, err)
+	}
+	if err := restore.Validate(); err != nil {
+		return fmt.Errorf("restore base image config digest %q is invalid: %w", restore, err)
+	}
+	if restore != checkpoint {
+		return fmt.Errorf("restore base image config digest %q does not match checkpoint digest %q: %w", restore, checkpoint, errdefs.ErrFailedPrecondition)
+	}
+	return nil
 }
 
 // validateCheckpointIndex returns the writable-layer descriptor.
@@ -531,6 +603,18 @@ func decodeCRIJSON(data []byte, value any) error {
 	return json.Unmarshal(data, value)
 }
 
+func readPodCheckpointConfigAt(checkpointDir *os.File) (*runtime.PodSandboxConfig, error) {
+	data, err := readBoundedRegularFileAt(checkpointDir, podCheckpointConfigFile, maxPodCheckpointConfigSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read checkpoint sandbox config: %w", err)
+	}
+	config := new(runtime.PodSandboxConfig)
+	if err := decodeCRIJSON(data, config); err != nil {
+		return nil, fmt.Errorf("failed to decode checkpoint sandbox config: %w", err)
+	}
+	return config, nil
+}
+
 func openCheckpointDirectory(checkpointDir string) (*os.File, error) {
 	fd, err := unix.Open(checkpointDir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
 	if err != nil {
@@ -591,6 +675,64 @@ func closeRestoreContainers(containers []restoreContainer) error {
 		}
 	}
 	return errors.Join(closeErrors...)
+}
+
+func validateRestoreSandboxConfig(checkpoint, restore *runtime.PodSandboxConfig) error {
+	// The destination Pod may have a new name and therefore a new default
+	// hostname. RunPodSandbox applies it to the destination UTS namespace;
+	// process-owned state, including existing environment variables, stays saved.
+	checkpointSecurity := checkpoint.GetLinux().GetSecurityContext()
+	if checkpointSecurity == nil {
+		checkpointSecurity = new(runtime.LinuxSandboxSecurityContext)
+	}
+	restoreSecurity := restore.GetLinux().GetSecurityContext()
+	if restoreSecurity == nil {
+		restoreSecurity = new(runtime.LinuxSandboxSecurityContext)
+	}
+	if !proto.Equal(checkpointSecurity, restoreSecurity) {
+		return fmt.Errorf("restore sandbox security context does not match checkpoint sandbox security context: %w", errdefs.ErrFailedPrecondition)
+	}
+	if !maps.Equal(checkpoint.GetLinux().GetSysctls(), restore.GetLinux().GetSysctls()) {
+		return fmt.Errorf("restore sandbox sysctls do not match checkpoint sandbox sysctls: %w", errdefs.ErrFailedPrecondition)
+	}
+	checkpointPorts := checkpoint.GetPortMappings()
+	restorePorts := restore.GetPortMappings()
+	if len(checkpointPorts) != len(restorePorts) {
+		return fmt.Errorf("restore sandbox port mappings do not match checkpoint sandbox port mappings: %w", errdefs.ErrFailedPrecondition)
+	}
+	for i := range checkpointPorts {
+		if !proto.Equal(checkpointPorts[i], restorePorts[i]) {
+			return fmt.Errorf("restore sandbox port mappings do not match checkpoint sandbox port mappings: %w", errdefs.ErrFailedPrecondition)
+		}
+	}
+	return nil
+}
+
+func validateRestoreContainerConfig(checkpoint, restore *runtime.ContainerConfig) error {
+	// The kubelet pins tagged source images to repository digests on restore.
+	// Compare the resolved image config digests in importContainerCheckpoint;
+	// the original user-supplied image strings need not be identical.
+	// Downward API values and command/argument expansion describe the new Pod.
+	// CRIU resumes the captured process with its original argv and environment;
+	// these request fields cannot change that state or launch a new entrypoint.
+	if checkpoint.GetWorkingDir() != restore.GetWorkingDir() {
+		return fmt.Errorf("restore working directory %q does not match checkpoint working directory %q: %w", restore.GetWorkingDir(), checkpoint.GetWorkingDir(), errdefs.ErrFailedPrecondition)
+	}
+	if checkpoint.GetTty() != restore.GetTty() {
+		return fmt.Errorf("restore TTY setting does not match the checkpointed container: %w", errdefs.ErrFailedPrecondition)
+	}
+	checkpointSecurity := checkpoint.GetLinux().GetSecurityContext()
+	if checkpointSecurity == nil {
+		checkpointSecurity = new(runtime.LinuxContainerSecurityContext)
+	}
+	restoreSecurity := restore.GetLinux().GetSecurityContext()
+	if restoreSecurity == nil {
+		restoreSecurity = new(runtime.LinuxContainerSecurityContext)
+	}
+	if !proto.Equal(checkpointSecurity, restoreSecurity) {
+		return fmt.Errorf("restore process security context does not match the checkpointed container: %w", errdefs.ErrFailedPrecondition)
+	}
+	return nil
 }
 
 func validatePodRestoreOptions(options map[string]string) error {

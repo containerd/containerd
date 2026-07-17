@@ -60,7 +60,7 @@ import (
 )
 
 func TestPrepareRestoreContainersUsesOnlyOptionDataAndCheckpointFiles(t *testing.T) {
-	options, _, restoreConfig := writeRestoreFixture(t)
+	options, checkpointConfig, restoreConfig := writeRestoreFixture(t)
 
 	containers, err := prepareRestoreContainers(options)
 	require.NoError(t, err)
@@ -69,6 +69,30 @@ func TestPrepareRestoreContainersUsesOnlyOptionDataAndCheckpointFiles(t *testing
 	assert.Equal(t, "new-container-id", containers[0].id)
 	assert.Equal(t, "app", containers[0].name)
 	assert.Equal(t, filepath.Join(options.CheckpointPath, checkpointArchiveName("old-container-id")), containers[0].archive.Name())
+	assert.Equal(t, digest.FromString("base-image"), containers[0].imageRef)
+
+	t.Run("container config mismatch", func(t *testing.T) {
+		bad := proto.Clone(restoreConfig).(*runtime.ContainerConfig)
+		bad.WorkingDir = "/different"
+		badAny, err := typeurl.MarshalAny(bad)
+		require.NoError(t, err)
+		mismatch := options
+		mismatch.Containers = append([]sandbox.RestoreContainer(nil), options.Containers...)
+		mismatch.Containers[0].Config = badAny
+		_, err = prepareRestoreContainers(mismatch)
+		require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+	})
+
+	t.Run("sandbox config mismatch", func(t *testing.T) {
+		bad := proto.Clone(checkpointConfig).(*runtime.PodSandboxConfig)
+		bad.Linux.Sysctls = map[string]string{"net.ipv4.ip_unprivileged_port_start": "1024"}
+		badAny, err := typeurl.MarshalAny(bad)
+		require.NoError(t, err)
+		mismatch := options
+		mismatch.SandboxConfig = badAny
+		_, err = prepareRestoreContainers(mismatch)
+		require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+	})
 
 	t.Run("container identity mismatch", func(t *testing.T) {
 		bad := proto.Clone(restoreConfig).(*runtime.ContainerConfig)
@@ -132,6 +156,7 @@ func TestCheckpointRestoreRejectsFIFOArtifacts(t *testing.T) {
 		name string
 		file string
 	}{
+		{name: "pod config", file: podCheckpointConfigFile},
 		{name: "manifest", file: podCheckpointManifestFile},
 		{name: "container archive", file: checkpointArchiveName("old-container-id")},
 	} {
@@ -188,6 +213,37 @@ func TestReadPodCheckpointMetadataIsBoundedAndNoFollow(t *testing.T) {
 		require.NoError(t, os.Symlink(target, filepath.Join(checkpointDir, podCheckpointManifestFile)))
 
 		_, err := readPodCheckpointManifest(checkpointDir)
+		require.Error(t, err)
+	})
+
+	t.Run("oversized config", func(t *testing.T) {
+		checkpointDir := t.TempDir()
+		config := filepath.Join(checkpointDir, podCheckpointConfigFile)
+		file, err := os.OpenFile(config, os.O_CREATE|os.O_WRONLY, 0o600)
+		require.NoError(t, err)
+		require.NoError(t, file.Truncate(maxPodCheckpointConfigSize+1))
+		require.NoError(t, file.Close())
+
+		_, err = readPodCheckpointConfig(checkpointDir)
+		require.ErrorContains(t, err, "exceeds limit")
+	})
+
+	t.Run("config with a field from a newer CRI API", func(t *testing.T) {
+		checkpointDir := t.TempDir()
+		data := []byte(`{"hostname":"pod","fieldFromNewerCRIAPI":true}`)
+		require.NoError(t, os.WriteFile(filepath.Join(checkpointDir, podCheckpointConfigFile), data, 0o600))
+
+		config, err := readPodCheckpointConfig(checkpointDir)
+		require.NoError(t, err)
+		assert.Equal(t, "pod", config.GetHostname())
+	})
+
+	t.Run("config with trailing data", func(t *testing.T) {
+		checkpointDir := t.TempDir()
+		data := []byte(`{"hostname":"pod"}{}`)
+		require.NoError(t, os.WriteFile(filepath.Join(checkpointDir, podCheckpointConfigFile), data, 0o600))
+
+		_, err := readPodCheckpointConfig(checkpointDir)
 		require.Error(t, err)
 	})
 }
@@ -301,6 +357,36 @@ func TestCheckpointArchiveNamesAreNeverImported(t *testing.T) {
 	})
 }
 
+func TestValidateRestoreImageConfigUsesImmutableDigest(t *testing.T) {
+	checkpoint := digest.FromString("checkpoint-image-config")
+	require.NoError(t, validateRestoreImageConfig(checkpoint, checkpoint))
+
+	err := validateRestoreImageConfig(checkpoint, digest.FromString("different-image-config"))
+	require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+	require.ErrorContains(t, err, "does not match checkpoint digest")
+}
+
+func TestRestoreContainerImageConfigDigestUsesCRIMetadata(t *testing.T) {
+	expected := digest.FromString("resolved-image-config")
+	metadataData, err := json.Marshal(&containerstore.Metadata{
+		ID:       "new-container",
+		ImageRef: expected.String(),
+	})
+	require.NoError(t, err)
+	info := containers.Container{
+		Extensions: map[string]typeurl.Any{
+			crilabels.ContainerMetadataExtension: &anypb.Any{Value: metadataData},
+		},
+	}
+
+	actual, err := restoreContainerImageConfigDigest(info, "new-container")
+	require.NoError(t, err)
+	assert.Equal(t, expected, actual)
+
+	_, err = restoreContainerImageConfigDigest(info, "different-container")
+	require.ErrorContains(t, err, "does not match container ID")
+}
+
 func TestImportContainerCheckpointRetainsContentUntilImageDeletion(t *testing.T) {
 	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
 	root := t.TempDir()
@@ -403,7 +489,7 @@ func TestImportContainerCheckpointRetainsContentUntilImageDeletion(t *testing.T)
 
 	const imageName = "localhost/checkpoint:restore"
 	service := &CheckpointService{client: c, rootDir: root}
-	input := restoreContainer{id: containerID, name: "app", archive: archive}
+	input := restoreContainer{id: containerID, name: "app", archive: archive, imageRef: baseDigest}
 	err = service.importContainerCheckpoint(ctx, "other-sandbox", input, imageName)
 	require.ErrorIs(t, err, errdefs.ErrInvalidArgument, "the container must belong to the restored sandbox")
 	taskClient.existingID = containerID
@@ -534,6 +620,83 @@ func TestInvalidRestoreInput(t *testing.T) {
 	require.Equal(t, notFound, invalidRestoreInput(notFound), "classified errors keep their class")
 }
 
+func TestRestoreAllowsPinnedImageAndNewPodName(t *testing.T) {
+	options, sandboxConfig, containerConfig := writeRestoreFixture(t)
+	// Kubelet records the source tag as a digest in the captured Pod template.
+	// The resolved config digest remains the authoritative image identity.
+	containerConfig.Image = &runtime.ImageSpec{
+		Image:              "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		UserSpecifiedImage: "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	}
+	config, err := typeurl.MarshalAny(containerConfig)
+	require.NoError(t, err)
+	options.Containers[0].Config = config
+	sandboxConfig.Metadata.Name = "restored-pod"
+	sandboxConfig.Metadata.Uid = "restored-uid"
+	sandboxConfig.Hostname = "restored-pod"
+	options.SandboxConfig, err = typeurl.MarshalAny(sandboxConfig)
+	require.NoError(t, err)
+	containers, err := prepareRestoreContainers(options)
+	require.NoError(t, err)
+	defer closeRestoreContainers(containers)
+	require.Len(t, containers, 1)
+	require.Equal(t, digest.FromString("base-image"), containers[0].imageRef)
+}
+
+func TestRestoreStillRequiresProcessCredentials(t *testing.T) {
+	checkpoint := &runtime.ContainerConfig{Linux: &runtime.LinuxContainerConfig{
+		SecurityContext: &runtime.LinuxContainerSecurityContext{RunAsUser: &runtime.Int64Value{Value: 1000}},
+	}}
+	restore := proto.Clone(checkpoint).(*runtime.ContainerConfig)
+	require.NoError(t, validateRestoreContainerConfig(checkpoint, restore))
+	restore.Linux.SecurityContext.RunAsUser = nil
+	require.ErrorIs(t, validateRestoreContainerConfig(checkpoint, restore), errdefs.ErrFailedPrecondition)
+	restore.Linux.SecurityContext.RunAsUser = &runtime.Int64Value{Value: 0}
+	require.ErrorIs(t, validateRestoreContainerConfig(checkpoint, restore), errdefs.ErrFailedPrecondition)
+}
+
+func TestRestoreAllowsDestinationEnvironmentAndExpandedCommand(t *testing.T) {
+	options, _, source := writeRestoreFixture(t)
+	// Kubernetes validates the same Pod spec, but resolves these fields using
+	// the destination identity before passing them to CRI.
+	source.Command = []string{"/app/source-pod"}
+	source.Args = []string{"--pod", "source-pod", "--ip", "10.0.0.1"}
+	source.Envs = []*runtime.KeyValue{
+		{Key: "POD_NAME", Value: []byte("source-pod")},
+		{Key: "POD_UID", Value: []byte("source-uid")},
+		{Key: "POD_IP", Value: []byte("10.0.0.1")},
+	}
+	manifest, err := readPodCheckpointManifest(options.CheckpointPath)
+	require.NoError(t, err)
+	manifest.Containers[0].Config, err = json.Marshal(source)
+	require.NoError(t, err)
+	writeJSONFile(t, filepath.Join(options.CheckpointPath, podCheckpointManifestFile), manifest)
+	before, err := os.ReadFile(filepath.Join(options.CheckpointPath, podCheckpointManifestFile))
+	require.NoError(t, err)
+
+	destination := proto.Clone(source).(*runtime.ContainerConfig)
+	destination.Command = []string{"/app/restored-pod"}
+	destination.Args = []string{"--pod", "restored-pod", "--ip", ""}
+	destination.Envs = []*runtime.KeyValue{
+		{Key: "POD_NAME", Value: []byte("restored-pod")},
+		{Key: "POD_UID", Value: []byte("restored-uid")},
+		{Key: "POD_IP", Value: nil},
+	}
+	options.Containers[0].Config, err = typeurl.MarshalAny(destination)
+	require.NoError(t, err)
+	containers, err := prepareRestoreContainers(options)
+	require.NoError(t, err)
+	defer closeRestoreContainers(containers)
+	require.Len(t, containers, 1)
+	require.True(t, proto.Equal(destination, containers[0].config), "node-local configuration still comes from the caller")
+	captured := new(runtime.ContainerConfig)
+	require.NoError(t, json.Unmarshal(containers[0].manifest.Config, captured))
+	require.True(t, proto.Equal(source, captured), "checkpointed process metadata must remain unchanged")
+	after, err := os.ReadFile(filepath.Join(options.CheckpointPath, podCheckpointManifestFile))
+	require.NoError(t, err)
+	require.Equal(t, before, after, "restore preparation must not rewrite the checkpoint")
+}
+
 func readPodCheckpointManifest(checkpointDir string) (podCheckpointManifest, error) {
 	dir, err := openCheckpointDirectory(checkpointDir)
 	if err != nil {
@@ -541,4 +704,13 @@ func readPodCheckpointManifest(checkpointDir string) (podCheckpointManifest, err
 	}
 	defer dir.Close()
 	return readPodCheckpointManifestAt(dir)
+}
+
+func readPodCheckpointConfig(checkpointDir string) (*runtime.PodSandboxConfig, error) {
+	dir, err := openCheckpointDirectory(checkpointDir)
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+	return readPodCheckpointConfigAt(dir)
 }
