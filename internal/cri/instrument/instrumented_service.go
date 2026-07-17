@@ -595,6 +595,26 @@ func (in *instrumentedService) CheckpointContainer(ctx context.Context, r *runti
 	return res, errgrpc.ToGRPC(err)
 }
 
+func (in *instrumentedService) CheckpointPod(ctx context.Context, r *runtime.CheckpointPodRequest) (res *runtime.CheckpointPodResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+
+	span := tracing.SpanFromContext(ctx)
+	log.G(ctx).Infof("CheckpointPod for %q with containers %q", r.GetPodSandboxId(), r.GetContainerIds())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("CheckpointPod for %q failed, error", r.GetPodSandboxId())
+		} else {
+			log.G(ctx).Infof("CheckpointPod for %q returns successfully", r.GetPodSandboxId())
+		}
+		span.RecordError(err)
+	}()
+
+	res, err = in.c.CheckpointPod(ctrdutil.WithNamespace(ctx), r)
+	return res, errgrpc.ToGRPC(err)
+}
+
 func (in *instrumentedService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) (err error) {
 	if err := in.checkInitialized(); err != nil {
 		return err
