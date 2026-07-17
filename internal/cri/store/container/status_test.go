@@ -97,16 +97,17 @@ func TestContainerState(t *testing.T) {
 
 func TestStatusEncodeDecode(t *testing.T) {
 	s := &Status{
-		Pid:        1234,
-		CreatedAt:  time.Now().UnixNano(),
-		StartedAt:  time.Now().UnixNano(),
-		FinishedAt: time.Now().UnixNano(),
-		ExitCode:   1,
-		Reason:     "test-reason",
-		Message:    "test-message",
-		Removing:   true,
-		Starting:   true,
-		Unknown:    true,
+		Pid:                 1234,
+		CreatedAt:           time.Now().UnixNano(),
+		StartedAt:           time.Now().UnixNano(),
+		FinishedAt:          time.Now().UnixNano(),
+		ExitCode:            1,
+		Reason:              "test-reason",
+		Message:             "test-message",
+		TaskCheckpointImage: "localhost/checkpoint:test",
+		Removing:            true,
+		Starting:            true,
+		Unknown:             true,
 	}
 	assert := assertlib.New(t)
 	data, err := s.encode()

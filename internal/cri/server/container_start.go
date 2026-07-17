@@ -142,6 +142,14 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, fmt.Errorf("failed to update container IO owner: %w", err)
 	}
 	taskOpts = append(taskOpts, ioOwnerTaskOpts...)
+	taskCheckpointImage := cntr.Status.Get().TaskCheckpointImage
+	if taskCheckpointImage != "" {
+		checkpoint, err := c.client.GetImage(ctx, taskCheckpointImage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load task checkpoint image %q for container %q: %w", taskCheckpointImage, id, err)
+		}
+		taskOpts = append(taskOpts, containerd.WithTaskCheckpoint(checkpoint))
+	}
 
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
@@ -196,6 +204,11 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return status, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update container %q state: %w", id, err)
+	}
+	if taskCheckpointImage != "" {
+		if err := c.removeContainerTaskCheckpoint(ctx, cntr); err != nil {
+			log.G(ctx).WithError(err).Warnf("failed to remove consumed task checkpoint image for container %q", id)
+		}
 	}
 
 	// It handles the TaskExit event and update container state after this.

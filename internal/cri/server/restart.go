@@ -429,7 +429,18 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 		opts = append(opts, containerstore.WithContainerIO(containerIO))
 	}
 	container, err = containerstore.NewContainer(*meta, opts...)
-	return container, exitCh, statusPid, err
+	if err != nil {
+		return container, exitCh, statusPid, err
+	}
+	// A started or exited container cannot use its checkpoint image again. Keep
+	// the image until the reconstructed status is saved, then retry cleanup that
+	// may have been interrupted after task start or image deletion.
+	if status.StartedAt != 0 || status.FinishedAt != 0 {
+		if err := c.removeContainerTaskCheckpoint(ctx, container); err != nil {
+			log.G(ctx).WithError(err).Warnf("failed to remove consumed task checkpoint image for container %q", id)
+		}
+	}
+	return container, exitCh, statusPid, nil
 }
 
 // podSandboxRecover is an additional interface implemented by podsandbox/ controller to handle
