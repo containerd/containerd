@@ -170,3 +170,55 @@ func (c *ttrpcsandboxClient) SandboxMetrics(ctx context.Context, req *SandboxMet
 	}
 	return &resp, nil
 }
+
+type TTRPCCheckpointService interface {
+	Checkpoint(context.Context, *CheckpointRequest) (*CheckpointResponse, error)
+	Restore(context.Context, *RestoreRequest) (*RestoreResponse, error)
+}
+
+func RegisterTTRPCCheckpointService(srv *ttrpc.Server, svc TTRPCCheckpointService) {
+	srv.RegisterService("containerd.runtime.sandbox.v1.Checkpoint", &ttrpc.ServiceDesc{
+		Methods: map[string]ttrpc.Method{
+			"Checkpoint": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req CheckpointRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.Checkpoint(ctx, &req)
+			},
+			"Restore": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req RestoreRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.Restore(ctx, &req)
+			},
+		},
+	})
+}
+
+type ttrpccheckpointClient struct {
+	client *ttrpc.Client
+}
+
+func NewTTRPCCheckpointClient(client *ttrpc.Client) TTRPCCheckpointService {
+	return &ttrpccheckpointClient{
+		client: client,
+	}
+}
+
+func (c *ttrpccheckpointClient) Checkpoint(ctx context.Context, req *CheckpointRequest) (*CheckpointResponse, error) {
+	var resp CheckpointResponse
+	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Checkpoint", "Checkpoint", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpccheckpointClient) Restore(ctx context.Context, req *RestoreRequest) (*RestoreResponse, error) {
+	var resp RestoreResponse
+	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Checkpoint", "Restore", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
