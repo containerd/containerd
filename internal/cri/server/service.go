@@ -140,6 +140,9 @@ type criService struct {
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
+	// containerCheckpointsInProgress prevents Pod and standalone container
+	// checkpoint calls from sharing a container's checkpoint scratch state.
+	containerCheckpointsInProgress sync.Map //nolint:nolintlint,unused // Ignore on non-Linux
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin map[string]cni.CNI
 	// client is an instance of the containerd client

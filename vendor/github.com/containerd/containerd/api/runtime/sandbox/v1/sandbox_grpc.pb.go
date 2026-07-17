@@ -415,3 +415,125 @@ var Sandbox_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "runtime/sandbox/v1/sandbox.proto",
 }
+
+// CheckpointClient is the client API for Checkpoint service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type CheckpointClient interface {
+	Checkpoint(ctx context.Context, in *CheckpointRequest, opts ...grpc.CallOption) (*CheckpointResponse, error)
+	Restore(ctx context.Context, in *RestoreRequest, opts ...grpc.CallOption) (*RestoreResponse, error)
+}
+
+type checkpointClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewCheckpointClient(cc grpc.ClientConnInterface) CheckpointClient {
+	return &checkpointClient{cc}
+}
+
+func (c *checkpointClient) Checkpoint(ctx context.Context, in *CheckpointRequest, opts ...grpc.CallOption) (*CheckpointResponse, error) {
+	out := new(CheckpointResponse)
+	err := c.cc.Invoke(ctx, "/containerd.runtime.sandbox.v1.Checkpoint/Checkpoint", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *checkpointClient) Restore(ctx context.Context, in *RestoreRequest, opts ...grpc.CallOption) (*RestoreResponse, error) {
+	out := new(RestoreResponse)
+	err := c.cc.Invoke(ctx, "/containerd.runtime.sandbox.v1.Checkpoint/Restore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CheckpointServer is the server API for Checkpoint service.
+// All implementations must embed UnimplementedCheckpointServer
+// for forward compatibility
+type CheckpointServer interface {
+	Checkpoint(context.Context, *CheckpointRequest) (*CheckpointResponse, error)
+	Restore(context.Context, *RestoreRequest) (*RestoreResponse, error)
+	mustEmbedUnimplementedCheckpointServer()
+}
+
+// UnimplementedCheckpointServer must be embedded to have forward compatible implementations.
+type UnimplementedCheckpointServer struct {
+}
+
+func (UnimplementedCheckpointServer) Checkpoint(context.Context, *CheckpointRequest) (*CheckpointResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Checkpoint not implemented")
+}
+func (UnimplementedCheckpointServer) Restore(context.Context, *RestoreRequest) (*RestoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Restore not implemented")
+}
+func (UnimplementedCheckpointServer) mustEmbedUnimplementedCheckpointServer() {}
+
+// UnsafeCheckpointServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to CheckpointServer will
+// result in compilation errors.
+type UnsafeCheckpointServer interface {
+	mustEmbedUnimplementedCheckpointServer()
+}
+
+func RegisterCheckpointServer(s grpc.ServiceRegistrar, srv CheckpointServer) {
+	s.RegisterService(&Checkpoint_ServiceDesc, srv)
+}
+
+func _Checkpoint_Checkpoint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckpointRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CheckpointServer).Checkpoint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.runtime.sandbox.v1.Checkpoint/Checkpoint",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CheckpointServer).Checkpoint(ctx, req.(*CheckpointRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Checkpoint_Restore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CheckpointServer).Restore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.runtime.sandbox.v1.Checkpoint/Restore",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CheckpointServer).Restore(ctx, req.(*RestoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// Checkpoint_ServiceDesc is the grpc.ServiceDesc for Checkpoint service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var Checkpoint_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "containerd.runtime.sandbox.v1.Checkpoint",
+	HandlerType: (*CheckpointServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Checkpoint",
+			Handler:    _Checkpoint_Checkpoint_Handler,
+		},
+		{
+			MethodName: "Restore",
+			Handler:    _Checkpoint_Restore_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "runtime/sandbox/v1/sandbox.proto",
+}
