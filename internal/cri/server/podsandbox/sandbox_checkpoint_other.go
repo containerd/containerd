@@ -54,3 +54,7 @@ func (c *CheckpointService) Recover(context.Context) error {
 }
 
 func (c *CheckpointService) RecoverInBackground() {}
+
+func (c *CheckpointService) cleanupRestoreImages(context.Context, string) error {
+	return nil
+}
