@@ -65,6 +65,14 @@ type Init struct {
 
 	waitBlock chan struct{}
 
+	// pauseStateUnknown is protected by mu. A failed pause or resume may
+	// have changed the runtime's freezer state before returning an error.
+	pauseStateUnknown bool
+
+	// resumeAfterExit is protected by mu. A failed exit-time thaw must be
+	// retried without changing the stopped process state.
+	resumeAfterExit bool
+
 	WorkDir string
 
 	id       string
@@ -269,7 +277,44 @@ func (p *Init) Status(ctx context.Context) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	// Delete releases mu during cleanup. Keep Status readable then without
+	// issuing a resume or reconciling state alongside the delete operation.
+	if p.deleting != nil {
+		return p.initState.Status(ctx)
+	}
+	if err := p.resumeExited(ctx); err != nil {
+		log.G(ctx).WithError(err).Debug("resuming exited container")
+	}
+	if err := p.reconcilePauseState(ctx); err != nil {
+		return "", err
+	}
 	return p.initState.Status(ctx)
+}
+
+func (p *Init) reconcilePauseState(ctx context.Context) error {
+	if !p.pauseStateUnknown {
+		return nil
+	}
+
+	state, err := p.runtime.State(ctx, p.id)
+	if err != nil {
+		return p.runtimeError(err, "failed to reconcile task pause state")
+	}
+
+	switch state.Status {
+	case "running":
+		p.initState = &runningState{p: p}
+	case "paused":
+		p.initState = &pausedState{p: p}
+	default:
+		// "pausing" means the freezer is still changing state, and "stopped"
+		// means the process exited before SetExited ran. Do not dispatch
+		// operations through the stale shim state; keep reconciling until
+		// the state is known.
+		return fmt.Errorf("cannot reconcile task pause state from OCI runtime status %q", state.Status)
+	}
+	p.pauseStateUnknown = false
+	return nil
 }
 
 // Start the init process
@@ -290,7 +335,30 @@ func (p *Init) SetExited(status int) {
 	p.lock()
 	defer p.mu.Unlock()
 
+	switch p.initState.(type) {
+	case *pausedState:
+		p.resumeAfterExit = true
+	case *runningState:
+		// A failed pause may have frozen the cgroup without changing the
+		// shim state. Thaw it so other processes in the cgroup can exit.
+		p.resumeAfterExit = p.pauseStateUnknown
+	}
+	p.pauseStateUnknown = false
 	p.initState.SetExited(status)
+	if err := p.resumeExited(context.Background()); err != nil {
+		log.L.WithError(err).Error("resuming exited container")
+	}
+}
+
+func (p *Init) resumeExited(ctx context.Context) error {
+	if !p.resumeAfterExit {
+		return nil
+	}
+	if err := p.runtime.Resume(ctx, p.id); err != nil {
+		return p.runtimeError(err, "OCI runtime resume after exit failed")
+	}
+	p.resumeAfterExit = false
+	return nil
 }
 
 func (p *Init) setExited(status int) {
@@ -305,7 +373,16 @@ func (p *Init) Delete(ctx context.Context) error {
 	p.lock()
 	defer p.mu.Unlock()
 
-	return p.initState.Delete(ctx)
+	if err := p.resumeExited(ctx); err != nil {
+		log.G(ctx).WithError(err).Debug("resuming exited container before deletion")
+	}
+	// Let deletion proceed even if thawing failed: the runtime may already
+	// have removed the container. Retain the retry if deletion also fails.
+	if err := p.initState.Delete(ctx); err != nil {
+		return err
+	}
+	p.resumeAfterExit = false
+	return nil
 }
 
 // lock acquires mu, waiting first for a delete that has released it.
@@ -373,6 +450,9 @@ func (p *Init) Pause(ctx context.Context) error {
 	p.lock()
 	defer p.mu.Unlock()
 
+	if err := p.reconcilePauseState(ctx); err != nil {
+		return err
+	}
 	return p.initState.Pause(ctx)
 }
 
@@ -381,6 +461,9 @@ func (p *Init) Resume(ctx context.Context) error {
 	p.lock()
 	defer p.mu.Unlock()
 
+	if err := p.reconcilePauseState(ctx); err != nil {
+		return err
+	}
 	return p.initState.Resume(ctx)
 }
 
@@ -425,6 +508,9 @@ func (p *Init) Exec(ctx context.Context, path string, r *ExecConfig) (Process, e
 	p.lock()
 	defer p.mu.Unlock()
 
+	if err := p.reconcilePauseState(ctx); err != nil {
+		return nil, err
+	}
 	return p.initState.Exec(ctx, path, r)
 }
 
@@ -459,6 +545,9 @@ func (p *Init) Checkpoint(ctx context.Context, r *CheckpointConfig) error {
 	p.lock()
 	defer p.mu.Unlock()
 
+	if err := p.reconcilePauseState(ctx); err != nil {
+		return err
+	}
 	return p.initState.Checkpoint(ctx, r)
 }
 

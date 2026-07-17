@@ -25,7 +25,6 @@ import (
 
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	runc "github.com/containerd/go-runc"
-	"github.com/containerd/log"
 )
 
 type initState interface {
@@ -243,6 +242,7 @@ func (s *runningState) Pause(ctx context.Context) error {
 	defer s.p.pausing.Store(false)
 
 	if err := s.p.runtime.Pause(ctx, s.p.id); err != nil {
+		s.p.pauseStateUnknown = true
 		return s.p.runtimeError(err, "OCI runtime pause failed")
 	}
 
@@ -311,6 +311,7 @@ func (s *pausedState) Pause(ctx context.Context) error {
 
 func (s *pausedState) Resume(ctx context.Context) error {
 	if err := s.p.runtime.Resume(ctx, s.p.id); err != nil {
+		s.p.pauseStateUnknown = true
 		return s.p.runtimeError(err, "OCI runtime resume failed")
 	}
 
@@ -339,10 +340,6 @@ func (s *pausedState) Kill(ctx context.Context, sig uint32, all bool) error {
 
 func (s *pausedState) SetExited(status int) {
 	s.p.setExited(status)
-
-	if err := s.p.runtime.Resume(context.Background(), s.p.id); err != nil {
-		log.L.WithError(err).Error("resuming exited container from paused state")
-	}
 
 	if err := s.transition("stopped"); err != nil {
 		panic(err)
