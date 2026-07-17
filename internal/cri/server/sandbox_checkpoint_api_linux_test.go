@@ -20,11 +20,13 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/sandbox"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/errdefs"
@@ -164,6 +166,18 @@ func TestCheckpointPodDoesNotInterpretControllerOptions(t *testing.T) {
 	require.ErrorIs(t, err, controllerErr)
 }
 
+func TestRestorePodRejectsRelativeCheckpointPath(t *testing.T) {
+	cri := newTestCRIService()
+	for _, path := range []string{"", ".", "checkpoint", "../checkpoint"} {
+		t.Run(fmt.Sprintf("invalid checkpoint path %q", path), func(t *testing.T) {
+			request := restoreTransactionRequest(t)
+			request.CheckpointPath = path
+			_, err := cri.RestorePod(checkpointAPIContext(t), request)
+			require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+		})
+	}
+}
+
 func TestPodCheckpointValidationErrorCodes(t *testing.T) {
 	cri := newTestCRIService()
 
@@ -171,6 +185,24 @@ func TestPodCheckpointValidationErrorCodes(t *testing.T) {
 	require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
 	_, err = cri.CheckpointPod(checkpointAPIContext(t), &runtime.CheckpointPodRequest{})
 	require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+	_, err = cri.RestorePod(checkpointAPIContext(t), nil)
+	require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+	_, err = cri.RestorePod(checkpointAPIContext(t), &runtime.RestorePodRequest{})
+	require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+}
+
+func TestRestorePodSelectsCustomControllerWithoutCRIU(t *testing.T) {
+	cri := newTestCRIService()
+	cri.config.Runtimes = map[string]criconfig.Runtime{
+		"vm-runtime": {Sandboxer: "custom-controller"},
+	}
+	controllerErr := errors.New("selected custom controller")
+	service := &checkpointSandboxService{err: controllerErr}
+	cri.sandboxService = service
+
+	_, err := cri.RestorePod(checkpointAPIContext(t), restoreTransactionRequest(t))
+	require.ErrorIs(t, err, controllerErr)
+	assert.Equal(t, "custom-controller", service.sandboxer)
 }
 
 func TestPodCheckpointAPIsDisabledByConfiguration(t *testing.T) {
@@ -182,4 +214,6 @@ func TestPodCheckpointAPIsDisabledByConfiguration(t *testing.T) {
 	_, err := cri.CheckpointPod(checkpointAPIContext(t), &runtime.CheckpointPodRequest{PodSandboxId: "sandbox"})
 	require.ErrorContains(t, err, "checkpoint/restore support is disabled by configuration")
 	require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+	_, err = cri.RestorePod(checkpointAPIContext(t), restoreTransactionRequest(t))
+	require.ErrorContains(t, err, "checkpoint/restore support is disabled by configuration")
 }
