@@ -600,19 +600,14 @@ func WithUser(userstr string) SpecOpts {
 		defer ensureAdditionalGids(s)
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
-		// While the Linux kernel allows the max UID to be MaxUint32 - 2,
-		// and the OCI Runtime Spec has no definition about the max UID,
-		// the runc implementation is known to require the UID to be <= MaxInt32.
-		//
-		// containerd follows runc's limitation here.
-		//
-		// In future we may relax this limitation to allow MaxUint32 - 2,
-		// or, amend the OCI Runtime Spec to codify the implementation limitation.
+		// The runtime spec models the UID/GID as uint32, and runc accepts
+		// ids up to MaxUint32-1. pkg/oci accepts whatever OCI accepts, and
+		// rejects anything past that bound.
 		const (
 			minUserID  = 0
-			maxUserID  = math.MaxInt32
+			maxUserID  = math.MaxUint32 - 1
 			minGroupID = 0
-			maxGroupID = math.MaxInt32
+			maxGroupID = math.MaxUint32 - 1
 		)
 
 		// For LCOW it's a bit harder to confirm that the user actually exists on the host as a rootfs isn't
@@ -629,7 +624,9 @@ func WithUser(userstr string) SpecOpts {
 		parts := strings.Split(userstr, ":")
 		switch len(parts) {
 		case 1:
-			v, err := strconv.Atoi(parts[0])
+			// Parse into int64 so that ids above MaxInt32 behave the same
+			// on 32-bit platforms, where Atoi would fail with ErrRange.
+			v, err := strconv.ParseInt(parts[0], 10, 64)
 			if err != nil {
 				if errors.Is(err, strconv.ErrRange) {
 					return fmt.Errorf("invalid USER value %q: uid out of range", userstr)
@@ -647,7 +644,7 @@ func WithUser(userstr string) SpecOpts {
 				groupname string
 			)
 			var uid, gid uint32
-			v, err := strconv.Atoi(parts[0])
+			v, err := strconv.ParseInt(parts[0], 10, 64)
 			if err != nil {
 				if errors.Is(err, strconv.ErrRange) {
 					return fmt.Errorf("invalid USER value %q: uid out of range", userstr)
@@ -658,7 +655,7 @@ func WithUser(userstr string) SpecOpts {
 			} else {
 				uid = uint32(v)
 			}
-			v, err = strconv.Atoi(parts[1])
+			v, err = strconv.ParseInt(parts[1], 10, 64)
 			if err != nil {
 				if errors.Is(err, strconv.ErrRange) {
 					return fmt.Errorf("invalid USER value %q: gid out of range", userstr)
@@ -1012,6 +1009,9 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 			for _, group := range groups {
 				gid, err := strconv.ParseUint(group, 10, 32)
 				if err == nil {
+					if gid > math.MaxUint32-1 {
+						return fmt.Errorf("group %q has gid %d out of range", group, gid)
+					}
 					gids = append(gids, uint32(gid))
 				} else {
 					g, ok := groupMap[group]
@@ -1020,6 +1020,9 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 							return fmt.Errorf("unable to find group %s: %w", group, groupErr)
 						}
 						return fmt.Errorf("unable to find group %s", group)
+					}
+					if !validUserID(g.Gid) {
+						return fmt.Errorf("group %q has gid %d out of range", g.Name, g.Gid)
 					}
 					gids = append(gids, uint32(g.Gid))
 				}
@@ -1164,6 +1167,20 @@ func UserFromPath(root string, filter func(user.User) bool) (user.User, error) {
 	return UserFromFS(r.FS(), filter)
 }
 
+// validUserID reports whether id, read from a user database file such as
+// /etc/passwd or /etc/group, fits in a runtime spec UID/GID. pkg/oci accepts
+// whatever OCI accepts, i.e. ids up to MaxUint32-1, so that a larger value
+// read from an image cannot wrap when narrowed to the spec's uint32 field
+// (for example 1<<32 becomes 0, i.e. root).
+//
+// The parser in github.com/moby/sys/user stores ids in an int and discards
+// conversion errors, so on 32-bit platforms an out-of-range id in the file
+// saturates to MaxInt32 before this check runs: it never wraps to 0, but it
+// cannot be detected here either.
+func validUserID(id int) bool {
+	return id >= 0 && int64(id) <= math.MaxUint32-1
+}
+
 // UserFromFS inspects the user object using /etc/passwd in the specified fs.FS.
 // filter can be nil.
 func UserFromFS(root fs.FS, filter func(user.User) bool) (user.User, error) {
@@ -1179,7 +1196,11 @@ func UserFromFS(root fs.FS, filter func(user.User) bool) (user.User, error) {
 	if len(users) == 0 {
 		return user.User{}, ErrNoUsersFound
 	}
-	return users[0], nil
+	u := users[0]
+	if !validUserID(u.Uid) || !validUserID(u.Gid) {
+		return user.User{}, fmt.Errorf("user %q has uid %d / gid %d out of range", u.Name, u.Uid, u.Gid)
+	}
+	return u, nil
 }
 
 // ErrNoGroupsFound can be returned from GIDFromPath
@@ -1212,6 +1233,9 @@ func GIDFromFS(root fs.FS, filter func(user.Group) bool) (gid uint32, err error)
 		return 0, ErrNoGroupsFound
 	}
 	g := groups[0]
+	if !validUserID(g.Gid) {
+		return 0, fmt.Errorf("group %q has gid %d out of range", g.Name, g.Gid)
+	}
 	return uint32(g.Gid), nil
 }
 
@@ -1231,6 +1255,9 @@ func getSupplementalGroupsFromFS(root fs.FS, filter func(user.Group) bool) ([]ui
 	}
 	addlGids := make([]uint32, len(groups))
 	for i, grp := range groups {
+		if !validUserID(grp.Gid) {
+			return []uint32{}, fmt.Errorf("group %q has gid %d out of range", grp.Name, grp.Gid)
+		}
 		addlGids[i] = uint32(grp.Gid)
 	}
 	return addlGids, nil

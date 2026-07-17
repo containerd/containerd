@@ -19,6 +19,7 @@ package oci
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/containerd/continuity/fs/fstest"
@@ -87,16 +88,25 @@ guest:x:100:guest
 			expectedGID: 100,
 		},
 		{
-			user: "405:2147483648",
-			err:  "invalid USER value \"405:2147483648\": gid out of range",
+			user:        "405:4294967294",
+			expectedUID: 405,
+			expectedGID: 4294967294,
+		},
+		{
+			user: "405:4294967295",
+			err:  "invalid USER value \"405:4294967295\": gid out of range",
 		},
 		{
 			user: "-1000",
 			err:  "invalid USER value \"-1000\": uid out of range",
 		},
 		{
-			user: "2147483648",
-			err:  "invalid USER value \"2147483648\": uid out of range",
+			user:        "4294967294",
+			expectedUID: 4294967294,
+		},
+		{
+			user: "4294967295",
+			err:  "invalid USER value \"4294967295\": uid out of range",
 		},
 		{
 			user: "999999999999999999999999999999999999",
@@ -313,6 +323,7 @@ func TestWithAppendAdditionalGroups(t *testing.T) {
 	expectedContent := `root:x:0:root
 bin:x:1:root,bin,daemon
 daemon:x:2:root,bin,daemon
+overgrp:x:4294967295:daemon
 `
 	td := t.TempDir()
 	apply := fstest.Apply(
@@ -330,6 +341,7 @@ daemon:x:2:root,bin,daemon
 		groups         []string
 		expected       []uint32
 		err            string
+		skipOn32Bit    bool
 	}{
 		{
 			name:     "no additional gids",
@@ -363,11 +375,30 @@ daemon:x:2:root,bin,daemon
 			err:      "unable to find group unknown",
 			expected: []uint32{0},
 		},
+		{
+			name:     "numeric gid past the OCI bound",
+			groups:   []string{"4294967295"},
+			err:      `group "4294967295" has gid 4294967295 out of range`,
+			expected: []uint32{0},
+		},
+		{
+			name:     "group name resolving to gid past the OCI bound",
+			groups:   []string{"overgrp"},
+			err:      `group "overgrp" has gid 4294967295 out of range`,
+			expected: []uint32{0},
+			// The /etc/group parser stores gids in an int and discards
+			// conversion errors, so on 32-bit platforms the gid saturates
+			// to MaxInt32 and cannot be rejected.
+			skipOn32Bit: true,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			if testCase.skipOn32Bit && strconv.IntSize == 32 {
+				t.Skip("gids parsed from /etc/group saturate to MaxInt32 on 32-bit platforms")
+			}
 			s := Spec{
 				Version: specs.Version,
 				Root: &specs.Root{
