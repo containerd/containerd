@@ -17,12 +17,21 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/images"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	"github.com/containerd/containerd/v2/internal/eventq"
+	"github.com/containerd/errdefs"
 )
 
 // TestSetContainerRemoving tests setContainerRemoving sets removing
@@ -88,4 +97,236 @@ func TestSetContainerRemoving(t *testing.T) {
 			}
 		})
 	}
+}
+
+type removeCheckpointContainer struct {
+	containerd.Container
+	infoErr   error
+	delete    func()
+	deleteErr error
+}
+
+func (c *removeCheckpointContainer) Info(context.Context, ...containerd.InfoOpts) (containers.Container, error) {
+	return containers.Container{}, c.infoErr
+}
+
+func (c *removeCheckpointContainer) Delete(context.Context, ...containerd.DeleteOpts) error {
+	c.delete()
+	return c.deleteErr
+}
+
+type removeCheckpointImageStore struct {
+	images.Store
+	delete        func(string) error
+	deleteOptions []images.DeleteOptions
+}
+
+func (s *removeCheckpointImageStore) Delete(ctx context.Context, name string, opts ...images.DeleteOpt) error {
+	var options images.DeleteOptions
+	for _, opt := range opts {
+		if err := opt(ctx, &options); err != nil {
+			return err
+		}
+	}
+	s.deleteOptions = append(s.deleteOptions, options)
+	return s.delete(name)
+}
+
+func TestRemoveContainerTaskCheckpoint(t *testing.T) {
+	const (
+		containerID   = "test-container"
+		containerName = "test-container-name"
+		imageName     = "localhost/checkpoint:test"
+	)
+	deleteFailure := errors.New("image deletion failed")
+	for _, test := range []struct {
+		name           string
+		containerGone  bool
+		firstDeleteErr error
+	}{
+		{name: "retry failed image deletion", firstDeleteErr: deleteFailure},
+		{name: "retry after container metadata disappeared", containerGone: true, firstDeleteErr: deleteFailure},
+		{name: "image already deleted", firstDeleteErr: errdefs.ErrNotFound},
+		{name: "container metadata and image already deleted", containerGone: true, firstDeleteErr: errdefs.ErrNotFound},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := newTestCRIService()
+			c.config.RootDir = t.TempDir()
+			c.config.StateDir = t.TempDir()
+			c.containerEventsQ = eventq.New[*runtime.ContainerEventResponse](time.Minute, func(*runtime.ContainerEventResponse) {})
+			t.Cleanup(c.containerEventsQ.Shutdown)
+
+			var calls []string
+			backend := &removeCheckpointContainer{delete: func() {
+				calls = append(calls, "container")
+			}}
+			if test.containerGone {
+				backend.infoErr = errdefs.ErrNotFound
+			}
+			container, err := containerstore.NewContainer(
+				containerstore.Metadata{ID: containerID},
+				containerstore.WithContainer(backend),
+				containerstore.WithFakeStatus(containerstore.Status{
+					CreatedAt:           1,
+					TaskCheckpointImage: imageName,
+				}),
+			)
+			require.NoError(t, err)
+			require.NoError(t, c.containerStore.Add(container))
+			require.NoError(t, c.containerNameIndex.Reserve(containerName, containerID))
+
+			imageStore := &removeCheckpointImageStore{delete: func(name string) error {
+				assert.Equal(t, imageName, name)
+				if !test.containerGone {
+					assert.True(t, container.Status.Get().Removing, "image cleanup must hold the removal lock")
+				}
+				calls = append(calls, "image")
+				if len(calls) == 1 {
+					return test.firstDeleteErr
+				}
+				return nil
+			}}
+			c.client, err = containerd.New("", containerd.WithServices(containerd.WithImageStore(imageStore)))
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, c.client.Close()) })
+
+			request := &runtime.RemoveContainerRequest{ContainerId: containerID}
+			_, err = c.RemoveContainer(t.Context(), request)
+			require.Len(t, imageStore.deleteOptions, 1)
+			assert.True(t, imageStore.deleteOptions[0].Synchronous)
+			if errors.Is(test.firstDeleteErr, deleteFailure) {
+				require.ErrorIs(t, err, deleteFailure)
+				require.Equal(t, []string{"image"}, calls, "container metadata must survive image cleanup failure")
+				_, err := c.containerStore.Get(containerID)
+				require.NoError(t, err, "CRI must retain checkpoint ownership for retry")
+				assert.False(t, container.Status.Get().Removing)
+				require.Error(t, c.containerNameIndex.Reserve(containerName, "other-container"))
+
+				_, err = c.RemoveContainer(t.Context(), request)
+				require.NoError(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			wantCalls := []string{"image"}
+			if errors.Is(test.firstDeleteErr, deleteFailure) {
+				wantCalls = append(wantCalls, "image")
+			}
+			if !test.containerGone {
+				wantCalls = append(wantCalls, "container")
+			}
+			assert.Equal(t, wantCalls, calls)
+			_, err = c.containerStore.Get(containerID)
+			require.ErrorIs(t, err, errdefs.ErrNotFound)
+			require.NoError(t, c.containerNameIndex.Reserve(containerName, "other-container"))
+		})
+	}
+}
+
+func TestRemoveContainerTaskCheckpointStatusFailure(t *testing.T) {
+	const (
+		containerID = "test-container"
+		imageName   = "localhost/checkpoint:test"
+	)
+	for _, containerGone := range []bool{false, true} {
+		name := "container metadata exists"
+		if containerGone {
+			name = "container metadata disappeared"
+		}
+		t.Run(name, func(t *testing.T) {
+			c := newTestCRIService()
+			c.config.RootDir = t.TempDir()
+			c.config.StateDir = t.TempDir()
+			c.containerEventsQ = eventq.New[*runtime.ContainerEventResponse](time.Minute, func(*runtime.ContainerEventResponse) {})
+			t.Cleanup(c.containerEventsQ.Shutdown)
+
+			var calls []string
+			backend := &removeCheckpointContainer{delete: func() { calls = append(calls, "container") }}
+			if containerGone {
+				backend.infoErr = errdefs.ErrNotFound
+			}
+			container, err := containerstore.NewContainer(
+				containerstore.Metadata{ID: containerID},
+				containerstore.WithContainer(backend),
+				containerstore.WithFakeStatus(containerstore.Status{
+					CreatedAt:           1,
+					StartedAt:           2,
+					FinishedAt:          3,
+					TaskCheckpointImage: imageName,
+				}),
+			)
+			require.NoError(t, err)
+			syncFailure := errors.New("status checkpoint failed")
+			status := &checkpointSyncFailureStatus{StatusStorage: container.Status, err: syncFailure}
+			container.Status = status
+			require.NoError(t, c.containerStore.Add(container))
+
+			imageStore := &removeCheckpointImageStore{delete: func(name string) error {
+				assert.Equal(t, imageName, name)
+				calls = append(calls, "image")
+				if len(calls) == 1 {
+					return nil
+				}
+				return errdefs.ErrNotFound
+			}}
+			c.client, err = containerd.New("", containerd.WithServices(containerd.WithImageStore(imageStore)))
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, c.client.Close()) })
+
+			request := &runtime.RemoveContainerRequest{ContainerId: containerID}
+			_, err = c.RemoveContainer(t.Context(), request)
+			require.ErrorIs(t, err, syncFailure)
+			assert.Equal(t, []string{"image"}, calls)
+			_, err = c.containerStore.Get(containerID)
+			require.NoError(t, err, "retain the container when cleanup status cannot be saved")
+			assert.Equal(t, imageName, status.Get().TaskCheckpointImage)
+			assert.False(t, status.Get().Removing)
+
+			status.err = nil
+			_, err = c.RemoveContainer(t.Context(), request)
+			require.NoError(t, err)
+			assert.Empty(t, status.Get().TaskCheckpointImage)
+			wantCalls := []string{"image", "image"}
+			if !containerGone {
+				wantCalls = append(wantCalls, "container")
+			}
+			assert.Equal(t, wantCalls, calls)
+			_, err = c.containerStore.Get(containerID)
+			require.ErrorIs(t, err, errdefs.ErrNotFound)
+		})
+	}
+}
+
+func TestRemoveContainerTaskCheckpointPendingRestore(t *testing.T) {
+	const (
+		containerID = "test-container"
+		imageName   = "localhost/checkpoint:test"
+	)
+	c := newTestCRIService()
+	deleteFailure := errors.New("container deletion failed")
+	backend := &removeCheckpointContainer{delete: func() {}, deleteErr: deleteFailure}
+	container, err := containerstore.NewContainer(
+		containerstore.Metadata{ID: containerID},
+		containerstore.WithContainer(backend),
+		containerstore.WithFakeStatus(containerstore.Status{
+			CreatedAt:           1,
+			TaskCheckpointImage: imageName,
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, c.containerStore.Add(container))
+	imageStore := &removeCheckpointImageStore{delete: func(name string) error {
+		assert.Equal(t, imageName, name)
+		return nil
+	}}
+	c.client, err = containerd.New("", containerd.WithServices(containerd.WithImageStore(imageStore)))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, c.client.Close()) })
+
+	_, err = c.RemoveContainer(t.Context(), &runtime.RemoveContainerRequest{ContainerId: containerID})
+	require.ErrorIs(t, err, deleteFailure)
+	_, err = c.containerStore.Get(containerID)
+	require.NoError(t, err)
+	assert.Equal(t, imageName, container.Status.Get().TaskCheckpointImage, "a failed removal must not turn a restored container into an ordinary container")
+	assert.False(t, container.Status.Get().Removing)
 }
