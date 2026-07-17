@@ -20,6 +20,7 @@ package podsandbox
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -29,6 +30,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"syscall"
 
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/client"
@@ -45,6 +47,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/selinux/go-selinux/label"
+	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -56,6 +59,14 @@ type podCheckpointState struct {
 
 	// podCheckpointsInProgress is keyed by podCheckpointKey.
 	podCheckpointsInProgress sync.Map
+
+	// Task recovery progress is retained under the sandbox reservation so a
+	// failed marker write cannot authorize replay of successful resumes.
+	podCheckpointRecoveries sync.Map
+
+	recoveryMu      sync.Mutex
+	recoveryRunning bool
+	recoveryPending bool
 }
 
 const (
@@ -109,15 +120,24 @@ func (c *CheckpointService) Checkpoint(ctx context.Context, sandboxID string, op
 	if err := validatePodCheckpointOptions(opts.Options); err != nil {
 		return err
 	}
-	outputPath, err := resolvePodCheckpointOutput(opts.OutputPath)
-	if err != nil {
-		return err
-	}
 	key := podCheckpointKey(namespace, sandboxID)
 	if _, loaded := c.podCheckpointsInProgress.LoadOrStore(key, struct{}{}); loaded {
 		return fmt.Errorf("checkpoint for pod sandbox %q is already in progress: %w", sandboxID, errdefs.ErrAlreadyExists)
 	}
 	defer c.podCheckpointsInProgress.Delete(key)
+
+	if err := c.recoverStalePodCheckpointMarker(ctx, namespace, sandboxID); err != nil {
+		return err
+	}
+	output, err := openPodCheckpointOutput(opts.OutputPath, true)
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	if err := c.checkCheckpointOutputReservation(output); err != nil {
+		return err
+	}
+	outputPath := output.path
 
 	sandboxConfig, containers, err := c.prepareCheckpointContainers(ctx, sandboxID, opts)
 	if err != nil {
@@ -133,14 +153,6 @@ func (c *CheckpointService) Checkpoint(ctx context.Context, sandboxID string, op
 		return err
 	}
 
-	completed := false
-	defer func() {
-		if !completed {
-			if err := cleanupPartialCheckpoint(outputPath); err != nil {
-				log.G(ctx).WithError(err).Errorf("failed to clean partial Pod checkpoint %q", outputPath)
-			}
-		}
-	}()
 	configData, err := json.Marshal(sandboxConfig)
 	if err != nil {
 		return fmt.Errorf("failed to marshal sandbox config: %w", err)
@@ -151,21 +163,57 @@ func (c *CheckpointService) Checkpoint(ctx context.Context, sandboxID string, op
 		containerIDs = append(containerIDs, container.id)
 		tasks = append(tasks, container.task)
 	}
-	if err := writePodCheckpointMetadata(filepath.Join(outputPath, podCheckpointConfigFile), configData); err != nil {
+	marker := podCheckpointRecoveryMarker{
+		Version:      podCheckpointMarkerVersion,
+		Namespace:    namespace,
+		SandboxID:    sandboxID,
+		CgroupParent: sandboxConfig.GetLinux().GetCgroupParent(),
+		ContainerIDs: containerIDs,
+		OutputPath:   outputPath,
+		OutputDevice: output.device,
+		OutputInode:  output.inode,
+	}
+	markerActive, markerErr := c.beginPodCheckpoint(ctx, freezer, marker)
+	var recovery podCheckpointTaskRecovery
+	if markerActive {
+		c.podCheckpointRecoveries.Store(key, &recovery)
+	}
+	tasksResumed := false
+	defer func() {
+		if !markerActive {
+			return
+		}
+		cleanupCtx, cancel := podCheckpointCleanupContext(namespace)
+		defer cancel()
+		// A remaining marker is recovered by the next checkpoint of this
+		// sandbox, by the background retry, or after a restart.
+		if err := recovery.recover(cleanupCtx); err != nil {
+			log.G(ctx).WithError(err).Error("failed to recover Pod after checkpoint")
+			c.RecoverInBackground()
+			return
+		}
+		if !tasksResumed {
+			if err := c.markPodCheckpointResumed(marker); err != nil {
+				log.G(ctx).WithError(err).Error("failed to persist resumed Pod checkpoint marker")
+				c.RecoverInBackground()
+				return
+			}
+		}
+		if err := c.finishPodCheckpointCleanupAt(cleanupCtx, marker, output); err != nil {
+			log.G(ctx).WithError(err).Error("failed to clean up Pod checkpoint images")
+			c.RecoverInBackground()
+			return
+		}
+		markerActive = false
+	}()
+	if markerErr != nil {
+		return markerErr
+	}
+	// Record cleanup ownership before creating any checkpoint output.
+	if err := output.writeMetadata(podCheckpointConfigFile, configData); err != nil {
 		return fmt.Errorf("failed to write sandbox config: %w", err)
 	}
 
-	var recovery podCheckpointTaskRecovery
-	defer func() {
-		cleanupCtx, cancel := podCheckpointCleanupContext(namespace)
-		defer cancel()
-		if err := recovery.recover(cleanupCtx); err != nil {
-			log.G(ctx).WithError(err).Error("failed to resume Pod after checkpoint")
-		}
-		if err := c.removeTemporaryCheckpointImages(cleanupCtx, containerIDs); err != nil {
-			log.G(ctx).WithError(err).Error("failed to clean up Pod checkpoint images")
-		}
-	}()
 	recovery, err = pausePodCheckpointTasks(ctx, freezer, tasks)
 	if err != nil {
 		return err
@@ -195,6 +243,10 @@ func (c *CheckpointService) Checkpoint(ctx context.Context, sandboxID string, op
 		return fmt.Errorf("failed to resume pod after checkpoint: %w", err)
 	}
 	cancel()
+	if err := c.markPodCheckpointResumed(marker); err != nil {
+		return err
+	}
+	tasksResumed = true
 
 	// Exporting the content-addressed checkpoint images does not require the
 	// processes to remain paused. Keep this work outside the Pod freeze window.
@@ -202,8 +254,12 @@ func (c *CheckpointService) Checkpoint(ctx context.Context, sandboxID string, op
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("pod checkpoint export aborted: %w", err)
 		}
-		archivePath := filepath.Join(outputPath, container.manifest.Archive)
-		if err := c.exportCheckpointImageAtomic(ctx, checkpointImages[i], archivePath); err != nil {
+		if err := output.writeAtomic(container.manifest.Archive, checkpointArchiveTempPrefix, func(w io.Writer) error {
+			return c.client.Export(ctx, w,
+				imagearchive.WithImage(c.client.ImageService(), checkpointImages[i]),
+				imagearchive.WithSkipDockerManifest(),
+			)
+		}); err != nil {
 			return fmt.Errorf("failed to export checkpoint for container %q: %w", container.name, err)
 		}
 	}
@@ -212,10 +268,12 @@ func (c *CheckpointService) Checkpoint(ctx context.Context, sandboxID string, op
 	if err != nil {
 		return fmt.Errorf("failed to marshal checkpoint manifest: %w", err)
 	}
-	if err := writePodCheckpointMetadata(filepath.Join(outputPath, podCheckpointManifestFile), manifestData); err != nil {
+	if err := output.verifyPath(); err != nil {
+		return err
+	}
+	if err := output.writeMetadata(podCheckpointManifestFile, manifestData); err != nil {
 		return fmt.Errorf("failed to write checkpoint manifest: %w", err)
 	}
-	completed = true
 	return nil
 }
 
@@ -230,15 +288,6 @@ func (c *CheckpointService) Restore(context.Context, string, sandbox.RestoreOpti
 func podCheckpointCleanupContext(namespace string) (context.Context, context.CancelFunc) {
 	ctx, cancel := ctrdutil.DeferContext()
 	return namespaces.WithNamespace(ctx, namespace), cancel
-}
-
-// writePodCheckpointMetadata persists the file contents before publishing the
-// name, then persists the directory entry before reporting success.
-func writePodCheckpointMetadata(path string, data []byte) error {
-	return writeCheckpointFileAtomic(path, checkpointMetadataTempPrefix, func(w io.Writer) error {
-		_, err := w.Write(data)
-		return err
-	})
 }
 
 func (c *CheckpointService) prepareCheckpointContainers(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) (*runtime.PodSandboxConfig, []checkpointContainer, error) {
@@ -428,29 +477,29 @@ func withCheckpointWorkPath(path string) client.CheckpointOpts {
 	}
 }
 
-func (c *CheckpointService) exportCheckpointImageAtomic(ctx context.Context, imageName, destination string) error {
-	return writeCheckpointFileAtomic(destination, checkpointArchiveTempPrefix, func(w io.Writer) error {
-		return c.client.Export(ctx, w,
-			imagearchive.WithImage(c.client.ImageService(), imageName),
-			imagearchive.WithSkipDockerManifest(),
-		)
-	})
-}
-
 // writeCheckpointFileAtomic uses recognizable temporary names so recovery can
 // remove files left by a crash before publication.
-func writeCheckpointFileAtomic(destination, prefix string, write func(io.Writer) error) (retErr error) {
-	temp, err := os.CreateTemp(filepath.Dir(destination), prefix)
+func writeCheckpointFileAtomic(destination, prefix string, write func(io.Writer) error) error {
+	root, err := os.OpenRoot(filepath.Dir(destination))
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return writeCheckpointFileAtomicAt(root, filepath.Base(destination), prefix, write)
+}
+
+func writeCheckpointFileAtomicAt(root *os.Root, destination, prefix string, write func(io.Writer) error) (retErr error) {
+	tempName := prefix + rand.Text()
+	temp, err := root.OpenFile(tempName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary checkpoint file: %w", err)
 	}
-	tempPath := temp.Name()
 	tempClosed := false
 	defer func() {
 		if !tempClosed {
 			retErr = errors.Join(retErr, temp.Close())
 		}
-		if err := os.Remove(tempPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := root.Remove(tempName); err != nil && !errors.Is(err, os.ErrNotExist) {
 			retErr = errors.Join(retErr, err)
 		}
 	}()
@@ -467,68 +516,115 @@ func writeCheckpointFileAtomic(destination, prefix string, write func(io.Writer)
 		return err
 	}
 	tempClosed = true
-	if err := os.Rename(tempPath, destination); err != nil {
+	if err := root.Rename(tempName, destination); err != nil {
 		return fmt.Errorf("failed to publish checkpoint file %q: %w", destination, err)
 	}
-	return syncDirectory(filepath.Dir(destination))
+	dir, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
 }
 
-func validateCheckpointOutputPath(checkpointDir string) error {
-	if checkpointDir == "" {
-		return fmt.Errorf("checkpoint output path is required: %w", errdefs.ErrInvalidArgument)
-	}
-	if !filepath.IsAbs(checkpointDir) {
-		return fmt.Errorf("checkpoint output path %q must be absolute: %w", checkpointDir, errdefs.ErrInvalidArgument)
+// podCheckpointOutput keeps output operations attached to the directory that
+// was validated, even when its pathname is renamed or replaced. The advisory
+// lock also serializes requests for different sandboxes using the same inode.
+type podCheckpointOutput struct {
+	root   *os.Root
+	dir    *os.File
+	path   string
+	device uint64
+	inode  uint64
+}
+
+func openPodCheckpointOutput(checkpointDir string, empty bool) (_ *podCheckpointOutput, retErr error) {
+	if checkpointDir == "" || !filepath.IsAbs(checkpointDir) {
+		return nil, fmt.Errorf("checkpoint output path %q must be absolute: %w", checkpointDir, errdefs.ErrInvalidArgument)
 	}
 	info, err := os.Lstat(checkpointDir)
 	if err != nil {
-		return fmt.Errorf("checkpoint output path %q must be an existing directory: %v: %w", checkpointDir, err, errdefs.ErrInvalidArgument)
+		return nil, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return fmt.Errorf("checkpoint output path %q is not a real directory: %w", checkpointDir, errdefs.ErrInvalidArgument)
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("checkpoint output path %q is not a real directory: %w", checkpointDir, errdefs.ErrInvalidArgument)
 	}
-	entries, err := os.ReadDir(checkpointDir)
+	canonical, err := filepath.EvalSymlinks(checkpointDir)
 	if err != nil {
-		return fmt.Errorf("failed to read checkpoint output directory %q: %w", checkpointDir, err)
+		return nil, err
 	}
-	if len(entries) != 0 {
-		return fmt.Errorf("checkpoint output directory %q must be empty: %w", checkpointDir, errdefs.ErrFailedPrecondition)
+	root, err := os.OpenRoot(canonical)
+	if err != nil {
+		return nil, err
+	}
+	output := &podCheckpointOutput{root: root, path: canonical}
+	defer func() {
+		if retErr != nil {
+			output.Close()
+		}
+	}()
+	pinned, err := root.Stat(".")
+	if err != nil {
+		return nil, err
+	}
+	if !os.SameFile(info, pinned) {
+		return nil, fmt.Errorf("checkpoint output directory %q changed during validation", checkpointDir)
+	}
+	stat := pinned.Sys().(*syscall.Stat_t)
+	output.device, output.inode = stat.Dev, stat.Ino
+	output.dir, err = root.Open(".")
+	if err != nil {
+		return nil, err
+	}
+	if err := unix.Flock(int(output.dir.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		if errors.Is(err, unix.EWOULDBLOCK) {
+			return nil, fmt.Errorf("checkpoint output directory %q is already in use: %w", checkpointDir, errdefs.ErrAlreadyExists)
+		}
+		return nil, err
+	}
+	if empty {
+		entries, err := output.dir.ReadDir(1)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		if len(entries) != 0 {
+			return nil, fmt.Errorf("checkpoint output directory %q must be empty: %w", checkpointDir, errdefs.ErrFailedPrecondition)
+		}
+	}
+	return output, nil
+}
+
+func (o *podCheckpointOutput) Close() {
+	if o.dir != nil {
+		o.dir.Close()
+	}
+	o.root.Close()
+}
+
+func (o *podCheckpointOutput) verifyPath() error {
+	info, err := os.Lstat(o.path)
+	if err != nil {
+		return err
+	}
+	pinned, err := o.root.Stat(".")
+	if err != nil {
+		return err
+	}
+	if !os.SameFile(info, pinned) {
+		return fmt.Errorf("checkpoint output directory %q was replaced", o.path)
 	}
 	return nil
 }
 
-// resolvePodCheckpointOutput validates the output directory and returns its
-// canonical path, which the recovery marker records.
-func resolvePodCheckpointOutput(checkpointDir string) (string, error) {
-	if err := validateCheckpointOutputPath(checkpointDir); err != nil {
-		return "", err
-	}
-	canonicalDir, err := filepath.EvalSymlinks(checkpointDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve checkpoint output path %q: %v: %w", checkpointDir, err, errdefs.ErrInvalidArgument)
-	}
-	return filepath.Clean(canonicalDir), nil
+func (o *podCheckpointOutput) writeAtomic(name, prefix string, write func(io.Writer) error) error {
+	return writeCheckpointFileAtomicAt(o.root, name, prefix, write)
 }
 
-func cleanupPartialCheckpoint(checkpointDir string) error {
-	info, err := os.Lstat(checkpointDir)
-	if err != nil {
+func (o *podCheckpointOutput) writeMetadata(name string, data []byte) error {
+	return o.writeAtomic(name, checkpointMetadataTempPrefix, func(w io.Writer) error {
+		_, err := w.Write(data)
 		return err
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return fmt.Errorf("checkpoint output path %q is no longer a directory", checkpointDir)
-	}
-	entries, err := os.ReadDir(checkpointDir)
-	if err != nil {
-		return err
-	}
-	var cleanupErrors []error
-	for _, entry := range entries {
-		if err := os.RemoveAll(filepath.Join(checkpointDir, entry.Name())); err != nil {
-			cleanupErrors = append(cleanupErrors, fmt.Errorf("remove %q: %w", entry.Name(), err))
-		}
-	}
-	return errors.Join(cleanupErrors...)
+	})
 }
 
 func checkpointArchiveName(containerID string) string {

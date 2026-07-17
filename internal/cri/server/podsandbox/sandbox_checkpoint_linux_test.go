@@ -231,3 +231,65 @@ func TestControllerChecksCheckpointRestoreSetting(t *testing.T) {
 	_, err = c.Restore(t.Context(), "sandbox", sandbox.RestoreOptions{})
 	require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
 }
+
+func TestCheckpointOutputDirectoryOwnership(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "output")
+	require.NoError(t, os.Mkdir(path, 0o700))
+	output, err := openPodCheckpointOutput(path, true)
+	require.NoError(t, err)
+	defer output.Close()
+
+	// Distinct sandboxes and symlinked parent paths must share one lock.
+	_, err = openPodCheckpointOutput(path, true)
+	require.ErrorIs(t, err, errdefs.ErrAlreadyExists)
+	alias := filepath.Join(t.TempDir(), "parent")
+	require.NoError(t, os.Symlink(filepath.Dir(path), alias))
+	_, err = openPodCheckpointOutput(filepath.Join(alias, "output"), true)
+	require.ErrorIs(t, err, errdefs.ErrAlreadyExists)
+
+	moved := path + "-moved"
+	require.NoError(t, os.Rename(path, moved))
+	require.NoError(t, os.Mkdir(path, 0o700))
+	other := filepath.Join(path, podCheckpointConfigFile)
+	require.NoError(t, os.WriteFile(other, []byte("unrelated"), 0o600))
+
+	// Neither atomic publication nor cleanup follows the replaced pathname.
+	require.NoError(t, output.writeMetadata(podCheckpointConfigFile, []byte("owned")))
+	marker := podCheckpointRecoveryMarker{
+		OutputPath: path, OutputDevice: output.device, OutputInode: output.inode,
+	}
+	service := &CheckpointService{}
+	require.NoError(t, service.cleanupInterruptedCheckpointOutputAt(marker, output))
+	require.NoFileExists(t, filepath.Join(moved, podCheckpointConfigFile))
+	data, err := os.ReadFile(other)
+	require.NoError(t, err)
+	require.Equal(t, "unrelated", string(data))
+	require.ErrorContains(t, output.verifyPath(), "replaced")
+}
+
+// writePodCheckpointMetadata persists the file contents before publishing the
+// name, then persists the directory entry before reporting success.
+func writePodCheckpointMetadata(path string, data []byte) error {
+	return writeCheckpointFileAtomic(path, checkpointMetadataTempPrefix, func(w io.Writer) error {
+		_, err := w.Write(data)
+		return err
+	})
+}
+
+func validateCheckpointOutputPath(checkpointDir string) error {
+	output, err := openPodCheckpointOutput(checkpointDir, true)
+	if err != nil {
+		return err
+	}
+	output.Close()
+	return nil
+}
+
+func resolvePodCheckpointOutput(checkpointDir string) (string, error) {
+	output, err := openPodCheckpointOutput(checkpointDir, true)
+	if err != nil {
+		return "", err
+	}
+	defer output.Close()
+	return output.path, nil
+}

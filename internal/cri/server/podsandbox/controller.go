@@ -97,6 +97,12 @@ func init() {
 			if err != nil {
 				return nil, fmt.Errorf("unable to initialize Pod checkpoint controller: %w", err)
 			}
+			// A failed recovery must not keep CRI from starting. Markers that
+			// could not be recovered are retried in the background.
+			if err := checkpointService.Recover(ic.Context); err != nil {
+				log.G(ic.Context).WithError(err).Error("Failed to recover interrupted Pod checkpoints; retrying in the background")
+				checkpointService.RecoverInBackground()
+			}
 
 			c := Controller{
 				client:         client,
