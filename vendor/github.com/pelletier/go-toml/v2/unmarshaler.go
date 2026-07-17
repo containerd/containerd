@@ -512,6 +512,15 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 		}
 	}
 
+	// When the root target itself implements the Unmarshaler interface, the
+	// whole document decodes into it. Open a capture spanning the entire
+	// document up front: the top-level key-values then flow through the
+	// existing capture branch and any tables attach to it via resumeCapture,
+	// so UnmarshalTOML receives the assembled document exactly once.
+	if d.unmarshalerInterface && hasUnmarshaler(root) {
+		d.startRootCapture()
+	}
+
 	for d.p.NextExpression() {
 		err := d.handleRootExpression(d.p.Expression(), root)
 		if err != nil {
@@ -613,17 +622,18 @@ func (d *decoder) wrapError(data []byte, err error) error {
 	return err
 }
 
-// wrapSeenError turns an error returned by SeenTracker.CheckExpression into a
-// ParserError carrying the position and key of the offending expression, so
-// that redefinition and duplicate-key errors are reported as a DecodeError
-// with context (see issue #668).
+// keyedError turns a bare error raised while processing an expression into a
+// ParserError carrying the position and key of that expression, so that it is
+// reported as a DecodeError with context. It is used for the errors returned
+// by SeenTracker.CheckExpression (redefinitions and duplicate keys, see issue
+// #668) and for table placement errors raised by walkTable (see issue #806).
 //
 // The highlight spans the expression's key. Unlike Node.Raw, key nodes always
 // carry a Raw range, so this works for tables and array tables too (whose own
 // Raw range is not set by the parser). For a duplicate detected inside an
 // inline table, node is the enclosing key-value expression, so the error
 // points at that expression's key.
-func (d *decoder) wrapSeenError(node *unstable.Node, err error) error {
+func (d *decoder) keyedError(node *unstable.Node, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -658,7 +668,7 @@ func (d *decoder) wrapSeenError(node *unstable.Node, err error) error {
 func (d *decoder) handleRootExpression(expr *unstable.Node, root reflect.Value) error {
 	first, err := d.seen.CheckExpression(expr)
 	if err != nil {
-		return d.wrapSeenError(expr, err)
+		return d.keyedError(expr, err)
 	}
 
 	switch expr.Kind {
@@ -779,7 +789,7 @@ walk:
 			}
 			// Anything else is replaced by a fresh generic map.
 			if !mapStringInterfaceType.AssignableTo(v.Type()) {
-				return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", v.Type())
+				return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", v.Type()))
 			}
 			fresh := reflect.ValueOf(map[string]interface{}{})
 			d.storeSlot(&pf, fresh)
@@ -807,7 +817,7 @@ walk:
 				d.setArrayCount(key, 1)
 			}
 			if cnt > v.Len() {
-				return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot reach element %d of array of size %d", cnt-1, v.Len())
+				return d.keyedError(expr, fmt.Errorf("cannot reach element %d of array of size %d", cnt-1, v.Len()))
 			}
 			d.segIdx[idx] = cnt - 1
 			elem := v.Index(cnt - 1)
@@ -890,7 +900,7 @@ walk:
 					}
 				default:
 					if !ceIface {
-						return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", ce.Type())
+						return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", ce.Type()))
 					}
 					fresh := reflect.ValueOf(map[string]interface{}{})
 					d.storeSlot(&w, fresh)
@@ -902,7 +912,7 @@ walk:
 				switch et.Kind() {
 				case reflect.Interface:
 					if !mapStringInterfaceType.AssignableTo(et) {
-						return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", et)
+						return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", et))
 					}
 					fresh := reflect.ValueOf(map[string]interface{}{})
 					d.storeSlot(&w, fresh)
@@ -924,7 +934,7 @@ walk:
 					pf = slotWriter{kind: 1, slot: tmp}
 					v = tmp
 				default:
-					return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", et)
+					return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", et))
 				}
 			}
 			idx++
@@ -936,12 +946,15 @@ walk:
 				d.skipUntilTable = true
 				return nil
 			}
-			fv := fieldByIndexAlloc(v, f.index)
+			fv, err := fieldByIndexAlloc(v, f.index)
+			if err != nil {
+				return err
+			}
 			pf = slotWriter{kind: 1, slot: fv}
 			v = fv
 			idx++
 		default:
-			return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", v.Kind())
+			return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", v.Kind()))
 		}
 	}
 
@@ -997,7 +1010,7 @@ walk:
 				cnt = 0
 			}
 			if cnt >= v.Len() {
-				return unstable.NewParserError(d.p.Raw(expr.Raw), "array of size %d is too small to store this array table", v.Len())
+				return d.keyedError(expr, fmt.Errorf("array of size %d is too small to store this array table", v.Len()))
 			}
 			v.Index(cnt).Set(reflect.Zero(v.Type().Elem()))
 			d.setArrayCount(akey, cnt+1)
@@ -1010,7 +1023,7 @@ walk:
 			pf = slotWriter{kind: 1, slot: elem}
 			v = elem
 		default:
-			return fmt.Errorf("toml: cannot store an array table in a %s", v.Kind())
+			return d.keyedError(expr, fmt.Errorf("cannot store an array table in a %s", v.Kind()))
 		}
 	}
 
@@ -1037,7 +1050,7 @@ walk:
 				}
 			}
 			if !mapStringInterfaceType.AssignableTo(v.Type()) {
-				return fmt.Errorf("toml: cannot store a table in a %s", v.Type())
+				return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", v.Type()))
 			}
 			fresh := reflect.ValueOf(map[string]interface{}{})
 			d.storeSlot(&pf, fresh)
@@ -1063,7 +1076,7 @@ walk:
 			d.tableTargetValid = true
 			return nil
 		default:
-			return fmt.Errorf("toml: cannot store a table in a %s", v.Kind())
+			return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", v.Kind()))
 		}
 	}
 }
@@ -1153,6 +1166,18 @@ func (d *decoder) startCapture(pathLen int, expr *unstable.Node) {
 	}
 }
 
+// startRootCapture opens a capture covering the entire document, used when the
+// root target itself implements the Unmarshaler interface. It is opened before
+// reading any expression: top-level key-values are then accumulated through the
+// regular capture branch, and its empty name path matches every table in
+// resumeCapture, so the whole document is handed to UnmarshalTOML once. The
+// single index slot is -1 because the root is never reached through an array
+// table.
+func (d *decoder) startRootCapture() {
+	d.captures = append(d.captures, rawCapture{indexes: []int{-1}})
+	d.captureIdx = len(d.captures) - 1
+}
+
 // resolveCapture walks back to the target of a capture and delivers the
 // accumulated raw bytes to its UnmarshalTOML implementation.
 func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexed bool) (reflect.Value, error) {
@@ -1207,7 +1232,10 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 		if !found {
 			return v, nil
 		}
-		fv := fieldByIndexAlloc(v, f.index)
+		fv, err := fieldByIndexAlloc(v, f.index)
+		if err != nil {
+			return reflect.Value{}, err
+		}
 		nv, err := d.resolveCapture(fv, c, idx+1, false)
 		if err != nil {
 			return reflect.Value{}, err
@@ -1468,9 +1496,11 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 			}
 			return v, nil
 		}
-		fv := fieldByIndexAlloc(v, f.index)
+		fv, err := fieldByIndexAlloc(v, f.index)
+		if err != nil {
+			return reflect.Value{}, err
+		}
 		var nv reflect.Value
-		var err error
 		if idx+1 == len(path) {
 			// Leaf field: assign directly. descend's first action for a
 			// fully-consumed path is exactly this call, so skipping the extra
@@ -1805,13 +1835,23 @@ func (d *decoder) assignDateTime(v reflect.Value, value *unstable.Node) (reflect
 	}
 
 	if v.Type() == timeType {
-		v.Set(reflect.ValueOf(t))
+		setConcrete(v, t)
 		return v, nil
 	}
 	if v.Kind() == reflect.Interface {
 		return boxInto(v, reflect.ValueOf(t))
 	}
 	return reflect.Value{}, d.typeMismatchError("datetime", v.Type(), d.p.Raw(value.Raw))
+}
+
+// setConcrete assigns x to v, which must be a settable value of x's concrete
+// type. Writing through the address avoids the heap allocation that
+// v.Set(reflect.ValueOf(x)) incurs from boxing x into an interface. Settable
+// implies addressable: the decoder assigns to struct fields, slice elements,
+// and reflect.New-allocated temporaries (map elements are decoded into such
+// temporaries), all of which are addressable.
+func setConcrete[T any](v reflect.Value, x T) {
+	*(v.Addr().Interface().(*T)) = x
 }
 
 func (d *decoder) assignLocalDateTime(v reflect.Value, value *unstable.Node) (reflect.Value, error) {
@@ -1825,10 +1865,10 @@ func (d *decoder) assignLocalDateTime(v reflect.Value, value *unstable.Node) (re
 
 	switch v.Type() {
 	case localDateTimeType:
-		v.Set(reflect.ValueOf(dt))
+		setConcrete(v, dt)
 		return v, nil
 	case timeType:
-		v.Set(reflect.ValueOf(dt.AsTime(time.Local)))
+		setConcrete(v, dt.AsTime(time.Local))
 		return v, nil
 	}
 	if v.Kind() == reflect.Interface {
@@ -1845,10 +1885,10 @@ func (d *decoder) assignLocalDate(v reflect.Value, value *unstable.Node) (reflec
 
 	switch v.Type() {
 	case localDateType:
-		v.Set(reflect.ValueOf(date))
+		setConcrete(v, date)
 		return v, nil
 	case timeType:
-		v.Set(reflect.ValueOf(date.AsTime(time.Local)))
+		setConcrete(v, date.AsTime(time.Local))
 		return v, nil
 	}
 	if v.Kind() == reflect.Interface {
@@ -1868,10 +1908,10 @@ func (d *decoder) assignLocalTime(v reflect.Value, value *unstable.Node) (reflec
 
 	switch v.Type() {
 	case localTimeType:
-		v.Set(reflect.ValueOf(t))
+		setConcrete(v, t)
 		return v, nil
 	case timeType:
-		v.Set(reflect.ValueOf(time.Date(0, 1, 1, t.Hour, t.Minute, t.Second, t.Nanosecond, time.Local)))
+		setConcrete(v, time.Date(0, 1, 1, t.Hour, t.Minute, t.Second, t.Nanosecond, time.Local))
 		return v, nil
 	}
 	if v.Kind() == reflect.Interface {
@@ -2228,11 +2268,22 @@ func buildPlan(t reflect.Type) *structPlan {
 		byName: map[string]structField{},
 		byFold: map[string]structField{},
 	}
-	addFields(plan, t, nil)
+	addFields(plan, t, nil, map[reflect.Type]bool{})
 	return plan
 }
 
-func addFields(plan *structPlan, t reflect.Type, prefix []int) {
+// addFields flattens the fields of t into the plan. visited holds the types
+// being flattened on the current branch: a struct type that embeds itself
+// (directly or through other types) is not descended into again, mirroring
+// buildEncPlan. Without this guard a recursive embedding would recurse
+// forever; the repeated fields are unreachable by flattening anyway.
+func addFields(plan *structPlan, t reflect.Type, prefix []int, visited map[reflect.Type]bool) {
+	if visited[t] {
+		return
+	}
+	visited[t] = true
+	defer delete(visited, t)
+
 	var embedded []reflect.StructField
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -2312,22 +2363,28 @@ func addFields(plan *structPlan, t reflect.Type, prefix []int) {
 		index = append(index, prefix...)
 		idx := f.Index[0]
 		index = append(index, idx)
-		addFields(plan, ft, index)
+		addFields(plan, ft, index, visited)
 	}
 }
 
 // fieldByIndexAlloc returns the field of v at the given index path,
 // allocating intermediate embedded pointers as needed.
-func fieldByIndexAlloc(v reflect.Value, index []int) reflect.Value {
+func fieldByIndexAlloc(v reflect.Value, index []int) (reflect.Value, error) {
 	// Fast path for non-embedded fields, which have a single-element index:
 	// no intermediate pointer dereferencing is possible.
 	if len(index) == 1 {
-		return v.Field(index[0])
+		return v.Field(index[0]), nil
 	}
 	for i, x := range index {
 		if i > 0 {
 			for v.Kind() == reflect.Ptr {
 				if v.IsNil() {
+					if !v.CanSet() {
+						// A nil embedded pointer of unexported type cannot be
+						// allocated: reflect forbids setting it. Match
+						// encoding/json and report it instead of panicking.
+						return reflect.Value{}, fmt.Errorf("toml: cannot set embedded pointer to unexported struct: %s", v.Type().Elem())
+					}
 					v.Set(reflect.New(v.Type().Elem()))
 				}
 				v = v.Elem()
@@ -2335,5 +2392,5 @@ func fieldByIndexAlloc(v reflect.Value, index []int) reflect.Value {
 		}
 		v = v.Field(x)
 	}
-	return v
+	return v, nil
 }
