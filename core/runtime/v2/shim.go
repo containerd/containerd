@@ -17,6 +17,7 @@
 package v2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -229,6 +230,7 @@ func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
 	}
 
 	// Fallback to legacy parsing for backward compatibility with legacy shims that return the address as a plain string or JSON.
+	response = bytes.TrimSpace(response)
 
 	var params client.BootstrapParams //nolint:staticcheck // Used for backward compatibility with legacy shims
 	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
