@@ -110,6 +110,11 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		}
 		log.G(ctx).Tracef("Remove called for containerd container %q that does not exist", id)
 	}
+	if taskCheckpointImage := container.Status.Get().TaskCheckpointImage; taskCheckpointImage != "" {
+		if err := c.client.ImageService().Delete(ctx, taskCheckpointImage); err != nil && !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to delete task checkpoint image %q for container %q: %w", taskCheckpointImage, id, err)
+		}
+	}
 
 	// Delete container checkpoint.
 	if err := container.Delete(); err != nil {

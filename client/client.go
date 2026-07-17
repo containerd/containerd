@@ -819,7 +819,11 @@ func (c *Client) SandboxController(name string) sandbox.Controller {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn), name)
+	return sandboxproxy.NewSandboxController(
+		sandboxsapi.NewControllerClient(c.conn),
+		name,
+		sandboxsapi.NewCheckpointClient(c.conn),
+	)
 }
 
 // TranferService returns the underlying transferrer
