@@ -83,7 +83,7 @@ version = 2
   snapshotter = "overlayfs"
 ```
 
-See [here](https://github.com/containerd/containerd/blob/main/docs/snapshotters) for other supported snapshotters.
+See [here](https://github.com/containerd/containerd/tree/main/docs/snapshotters) for other supported snapshotters.
 
 ### Runtime classes
 
@@ -771,7 +771,7 @@ Ideally the cni config should be placed by system admin or cni daemon like calic
 However, this is useful for the cases when there is no cni daemonset to place cni config.
 
 The cni config template uses the [golang
-template](https://golang.org/pkg/text/template/) format. Currently supported
+template](https://pkg.go.dev/text/template) format. Currently supported
 values are:
 * `.PodCIDR` is a string of the first CIDR assigned to the node.
 * `.PodCIDRRanges` is a string array of all CIDRs assigned to the node. It is
@@ -780,7 +780,7 @@ values are:
 * `.Routes` is a string array of all routes needed. It is usually used for
   dualstack support or single stack but IPv4 or IPv6 is decided at runtime.
 
-The [golang template actions](https://golang.org/pkg/text/template/#hdr-Actions)
+The [golang template actions](https://pkg.go.dev/text/template#hdr-Actions)
 can be used to render the cni config. For example, you can use the following
 template to add CIDRs and routes for dualstack in the CNI config:
 ```

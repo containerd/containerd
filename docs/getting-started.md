@@ -103,7 +103,7 @@ The `containerd.io` package contains runc too, but does not contain CNI plugins.
 
 ### Option 3: From source
 
-To install containerd and its dependencies from the source, see [`BUILDING.md`](/BUILDING.md).
+To install containerd and its dependencies from the source, see [`BUILDING.md`](../BUILDING.md).
 
 ## Installing containerd on Windows
 
@@ -183,9 +183,9 @@ nerdctl run --name redis redis:alpine
 containerd has built-in support for Kubernetes Container Runtime Interface (CRI).
 
 To set up containerd nodes for managed Kubernetes services, see the service providers' documentations:
-- [Amazon Elastic Kubernetes Service](https://docs.aws.amazon.com/eks/latest/userguide/dockershim-deprecation.html)
-- [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/aks/cluster-configuration)
-- [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine/docs/concepts/using-containerd)
+- [Amazon Elastic Kubernetes Service](https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html)
+- [Azure Kubernetes Service](https://learn.microsoft.com/en-us/azure/aks/core-aks-concepts)
+- [Google Kubernetes Engine](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/using-containerd)
 
 For non-managed environments, see the following Kubernetes documentations:
 - [Getting started / Production environment / Container runtimes](https://kubernetes.io/docs/setup/production-environment/container-runtimes/)
@@ -198,7 +198,7 @@ For non-managed environments, see the following Kubernetes documentations:
 ## Customizing containerd
 
 containerd uses a configuration file located in `/etc/containerd/config.toml` for specifying daemon level options.
-A sample configuration file can be found [here](/docs/man/containerd-config.toml.5.md).
+A sample configuration file can be found [here](./man/containerd-config.toml.5.md).
 
 The default configuration can be generated via `containerd config default > /etc/containerd/config.toml`.
 

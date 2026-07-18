@@ -21,7 +21,7 @@ If you do not have the correct version of `runc` installed, you can refer to the
 to learn how to build `runc` from source.
 
 runc builds have [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux),
-[AppArmor](https://en.wikipedia.org/wiki/AppArmor), and [seccomp](https://en.wikipedia.org/wiki/seccomp)
+[AppArmor](https://en.wikipedia.org/wiki/AppArmor), and [seccomp](https://en.wikipedia.org/wiki/Seccomp)
 support enabled by default.
 
 Note that "seccomp" can be disabled by passing an empty `BUILDTAGS` make
