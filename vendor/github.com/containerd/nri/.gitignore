@@ -3,3 +3,4 @@
 
 build/
 pkg/version/info/*
+!pkg/version/info/none
