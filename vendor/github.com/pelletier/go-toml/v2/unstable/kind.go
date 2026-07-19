@@ -33,7 +33,7 @@ const (
 	Float
 	// Integer represents an integer value.
 	Integer
-	// LocalDate represents a a local date value.
+	// LocalDate represents a local date value.
 	LocalDate
 	// LocalTime represents a local time value.
 	LocalTime

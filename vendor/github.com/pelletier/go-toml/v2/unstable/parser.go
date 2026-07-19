@@ -55,7 +55,20 @@ type Parser struct {
 	left  []byte
 	nodes []Node
 	err   error
+
+	// nesting is the current depth of nested arrays and inline tables being
+	// parsed. It guards parseVal/parseValArray/parseInlineTable against
+	// unbounded mutual recursion, which would otherwise let a deeply nested
+	// document overflow the goroutine stack (an unrecoverable fatal error).
+	nesting int
 }
+
+// maxValueNesting is the maximum depth of nested arrays and inline tables the
+// parser accepts. Beyond it, parsing fails with a ParserError instead of
+// risking a stack overflow. Real-world TOML documents nest only a handful of
+// levels deep, so this bound is generous; it matches the limit used by the
+// standard library's encoding/json.
+const maxValueNesting = 10000
 
 // Data returns the slice provided to the last call to Reset.
 func (p *Parser) Data() []byte {
@@ -92,6 +105,7 @@ func (p *Parser) Reset(b []byte) {
 	p.left = b
 	p.nodes = p.nodes[:0]
 	p.err = nil
+	p.nesting = 0
 }
 
 // Error returns any error that has occurred during parsing.
@@ -513,10 +527,24 @@ func (p *Parser) parseVal(b []byte) (int32, []byte, error) {
 		return p.parseKeyword(b, "inf", Float)
 	case c == 'n':
 		return p.parseKeyword(b, "nan", Float)
-	case c == '[':
-		return p.parseValArray(b)
-	case c == '{':
-		return p.parseInlineTable(b)
+	case c == '[' || c == '{':
+		// Arrays and inline tables recurse back into parseVal for each of
+		// their elements. Bound that recursion so a document with millions of
+		// nested brackets or braces cannot overflow the goroutine stack.
+		if p.nesting >= maxValueNesting {
+			return 0, nil, NewParserError(b[:1], "arrays and inline tables are nested more than the maximum of %d levels deep", maxValueNesting)
+		}
+		p.nesting++
+		var h int32
+		var rest []byte
+		var err error
+		if c == '[' {
+			h, rest, err = p.parseValArray(b)
+		} else {
+			h, rest, err = p.parseInlineTable(b)
+		}
+		p.nesting--
+		return h, rest, err
 	case c == '+' || c == '-':
 		return p.parseIntOrFloat(b)
 	case c >= '0' && c <= '9':
