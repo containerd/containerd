@@ -53,6 +53,7 @@ var Command = &cli.Command{
 		tagCommand,
 		setLabelsCommand,
 		convertCommand,
+		buildErofsCacheCommand,
 		usageCommand,
 	},
 }
