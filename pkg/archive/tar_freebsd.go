@@ -38,7 +38,7 @@ func lsetxattrCreate(link string, attr string, data []byte) error {
 }
 
 func lchmod(path string, mode os.FileMode) error {
-	err := unix.Fchmodat(unix.AT_FDCWD, path, uint32(mode), unix.AT_SYMLINK_NOFOLLOW)
+	err := unix.Fchmodat(unix.AT_FDCWD, path, syscallMode(mode), unix.AT_SYMLINK_NOFOLLOW)
 	if err != nil {
 		err = &os.PathError{Op: "lchmod", Path: path, Err: err}
 	}
