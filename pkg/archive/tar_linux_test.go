@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -31,6 +32,7 @@ import (
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/containerd/log/logtest"
+	"golang.org/x/sys/unix"
 )
 
 func TestOverlayApply(t *testing.T) {
@@ -168,4 +170,75 @@ func (d overlayDiffApplier) Apply(ctx context.Context, a fstest.Applier) (string
 	oc.mounted = true
 
 	return oc.merged, nil, nil
+}
+
+func TestLchmodRestrictiveParent(t *testing.T) {
+	// The parent handle is opened with O_PATH, so lchmod only needs search
+	// permission on the directory, as the lstat and chmod by name it replaced
+	// did. Only an unprivileged run can tell the difference; root gets
+	// through either way.
+	dir := filepath.Join(t.TempDir(), "dir")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, "file")
+	if err := os.WriteFile(p, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o300); err != nil {
+		t.Fatal(err)
+	}
+	// Restore read permission so the TempDir cleanup can list it.
+	t.Cleanup(func() { os.Chmod(dir, 0o700) })
+
+	if err := lchmod(p, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Lstat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o640 {
+		t.Fatalf("mode = %o, want 0640", got)
+	}
+}
+
+func TestLchmodFallback(t *testing.T) {
+	// Kernels with fchmodat2 only reach the fallback for symlinks, so call it
+	// directly to cover both the symlink and the regular file case.
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	if err := os.WriteFile(target, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	dirfd, err := unix.Open(dir, openParentFlags, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unix.Close(dirfd)
+
+	if err := lchmodFallback(dirfd, "link", 0o777); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Lstat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o600 {
+		t.Fatalf("symlink target mode changed to %o, want 0600", got)
+	}
+
+	want := os.FileMode(0o640) | os.ModeSetuid
+	if err := lchmodFallback(dirfd, "target", want); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err = os.Lstat(target); err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode() & (os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky); got != want {
+		t.Fatalf("mode = %o, want %o", got, want)
+	}
 }
