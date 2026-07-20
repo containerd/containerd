@@ -17,10 +17,16 @@
 package dmverity
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
+	"github.com/containerd/log"
+	"github.com/google/uuid"
+
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/pkg/atomicfile"
 	"github.com/containerd/go-dmverity/pkg/utils"
 	"github.com/containerd/go-dmverity/pkg/verity"
 )
@@ -109,6 +115,111 @@ func Format(dataDevice, hashDevice string, opts *DmverityOptions) (string, error
 	}
 
 	return fmt.Sprintf("%x", rootDigest), nil
+}
+
+// FormatLayer appends a dm-verity hash tree to the erofs layer blob at
+// layerBlobPath (growing the file in place) and writes the "<blob>.dmverity"
+// sidecar holding the resulting root hash and superblock offset. It is a no-op
+// if the sidecar already exists. A nil opts uses DefaultDmverityOptions.
+func FormatLayer(ctx context.Context, layerBlobPath string, opts *DmverityOptions) error {
+	metadataPath := MetadataPath(layerBlobPath)
+	if _, err := os.Stat(metadataPath); err == nil {
+		log.G(ctx).WithField("path", layerBlobPath).Debug("Layer already formatted with dm-verity, skipping")
+		return nil
+	}
+
+	if opts == nil {
+		opts = DefaultDmverityOptions()
+	} else {
+		clone := *opts
+		opts = &clone
+	}
+
+	fileInfo, err := os.Stat(layerBlobPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat layer blob: %w", err)
+	}
+
+	blockSize := int64(opts.DataBlockSize)
+	fileSize := fileInfo.Size()
+
+	// dm-verity requires the hash area to start at a block-aligned offset
+	dataBlocks := (fileSize + blockSize - 1) / blockSize
+	hashOffset := uint64(dataBlocks * blockSize)
+
+	opts.HashOffset = hashOffset
+	opts.DataBlocks = uint64(dataBlocks)
+
+	hashTreeSize, err := verity.GetHashTreeSize(&verity.Params{
+		HashName:      opts.HashAlgorithm,
+		DataBlockSize: opts.DataBlockSize,
+		HashBlockSize: opts.HashBlockSize,
+		DataBlocks:    opts.DataBlocks,
+		HashType:      opts.HashType,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to calculate hash tree size: %w", err)
+	}
+
+	// In superblock mode, Format() stores the superblock at hashOffset and the hash tree after it
+	superblockSize := uint64(0)
+	if !opts.NoSuperblock {
+		superblockSize = utils.AlignUp(uint64(verity.SuperblockSize), uint64(opts.HashBlockSize))
+	}
+	requiredSize := hashOffset + superblockSize + hashTreeSize
+	if err := os.Truncate(layerBlobPath, int64(requiredSize)); err != nil {
+		return fmt.Errorf("failed to pre-allocate space for hash tree: %w", err)
+	}
+
+	// Generate a random UUID for the superblock (required for superblock mode).
+	// The library's ReadSuperblock() validates that UUID is not nil/empty.
+	if opts.UUID == "" {
+		u, err := uuid.NewRandom()
+		if err != nil {
+			return fmt.Errorf("failed to generate superblock UUID: %w", err)
+		}
+		opts.UUID = u.String()
+	}
+
+	rootHash, err := Format(layerBlobPath, layerBlobPath, opts)
+	if err != nil {
+		return fmt.Errorf("failed to format dm-verity: %w", err)
+	}
+
+	// Save the ORIGINAL hashOffset (where the superblock is located), not the
+	// post-Format offset (which points past the superblock). Open() needs the
+	// superblock location to read device parameters.
+	metadata := DmverityMetadata{
+		RootHash:   rootHash,
+		HashOffset: hashOffset,
+	}
+	metadataBytes, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal dm-verity metadata: %w", err)
+	}
+	// Write the sidecar atomically (temp file, synced, renamed) so a reader never
+	// observes a partially written .dmverity.
+	f, err := atomicfile.New(metadataPath, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create dm-verity metadata file: %w", err)
+	}
+	if _, err := f.Write(metadataBytes); err != nil {
+		f.Cancel()
+		return fmt.Errorf("failed to write dm-verity metadata: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("failed to write dm-verity metadata: %w", err)
+	}
+
+	log.G(ctx).WithFields(log.Fields{
+		"path":       layerBlobPath,
+		"size":       fileSize,
+		"blockSize":  opts.DataBlockSize,
+		"hashOffset": hashOffset,
+		"rootHash":   rootHash,
+	}).Debug("Successfully formatted dm-verity layer")
+
+	return nil
 }
 
 // Open creates a read-only device-mapper target for transparent integrity verification.

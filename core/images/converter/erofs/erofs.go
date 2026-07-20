@@ -204,7 +204,10 @@ func ConvertLayerToErofs(ctx context.Context, cs content.Store, desc ocispec.Des
 	mkfsArgs = append(mkfsArgs, copts.mkfsExtraOpts...)
 	mkfsArgs = erofsutils.AddDefaultMkfsOpts(mkfsArgs)
 
-	u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+desc.Digest))
+	// Derive the erofs UUID from the uncompressed digest (diffID) so the blob is a
+	// deterministic function of the layer content, independent of how the source
+	// was compressed. This is also the key the layer content cache uses.
+	u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+uncompressedDesc.Digest))
 	if err := erofsutils.ConvertTarErofs(ctx, sr, outPath, u.String(), mkfsArgs); err != nil {
 		return "", fmt.Errorf("failed to convert to EROFS: %w", err)
 	}

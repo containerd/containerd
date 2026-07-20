@@ -18,7 +18,10 @@
 
 package dmverity
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 var errUnsupported = fmt.Errorf("dmverity is only supported on Linux systems")
 
@@ -28,6 +31,10 @@ func IsSupported() (bool, error) {
 
 func Format(_ string, _ string, _ *DmverityOptions) (string, error) {
 	return "", errUnsupported
+}
+
+func FormatLayer(_ context.Context, _ string, _ *DmverityOptions) error {
+	return errUnsupported
 }
 
 func Open(_ string, _ string, _ string, _ string, _ uint64, _ *DmverityOptions) (string, error) {
