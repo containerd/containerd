@@ -55,6 +55,11 @@ type Config struct {
 	// DmverityMode controls dm-verity behavior: "auto" (use if available), "on" (require), "off" (disable)
 	// Linux only
 	DmverityMode string `toml:"dmverity_mode"`
+
+	// LayerContentCache is a directory of pre-converted, diffID-keyed erofs
+	// layer blobs. When set, layers already present in the cache are committed
+	// without being downloaded or converted. Empty disables the feature.
+	LayerContentCache string `toml:"layer_content_cache"`
 }
 
 func init() {
@@ -100,6 +105,10 @@ func init() {
 				opts = append(opts, erofs.WithDmverityMode(config.DmverityMode))
 			}
 
+			if config.LayerContentCache != "" {
+				opts = append(opts, erofs.WithLayerContentCache(config.LayerContentCache))
+			}
+
 			// Don't bother supporting overlay's slow_chown, only RemapIDs
 			ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaOnlyRemapIDs)
 			if ok, err := supportsIDMappedMounts(); err == nil && ok {
@@ -108,7 +117,19 @@ func init() {
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
-			ic.Meta.Capabilities = append(ic.Meta.Capabilities, "rebase")
+			// The "rebase" capability lets the unpacker unpack layers in parallel
+			// via a deferred commit: Prepare receives no parent and the real parent
+			// is applied at Commit time. The layer content cache is incompatible
+			// with that — it commits the layer during Prepare (returning
+			// ErrAlreadyExists), when the parent is not yet known in parallel mode,
+			// so the committed layer would be parentless and the chain would break.
+			// With the cache enabled we therefore unpack sequentially. Cache hits
+			// skip the download and conversion anyway, but a cache *miss* is then
+			// slower than a cold pull on an uncached node.
+			// TODO: keep "rebase" and defer the cache commit so misses stay parallel.
+			if config.LayerContentCache == "" {
+				ic.Meta.Capabilities = append(ic.Meta.Capabilities, "rebase")
+			}
 			return erofs.NewSnapshotter(root, opts...)
 		},
 	})

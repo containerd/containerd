@@ -29,9 +29,21 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/opencontainers/go-digest"
 
 	"github.com/containerd/containerd/v2/core/mount"
 )
+
+// CacheBlobPath returns the layer content cache path for a diffID, following the
+// <dir>/<algo>/<xx>/<hex>.erofs layout, where <xx> is the first two characters of
+// the encoded digest. The extra prefix directory shards blobs so no single
+// directory grows unwieldy for a large cache. It is the single source of the
+// layout, shared by the cache producer (ctr build-erofs-cache) and the erofs
+// snapshotter that reads it, so the two never drift.
+func CacheBlobPath(dir string, diffID digest.Digest) string {
+	enc := diffID.Encoded()
+	return filepath.Join(dir, diffID.Algorithm().String(), enc[:2], enc+".erofs")
+}
 
 // IsErofsMediaType returns true if the media type is an EROFS layer type.
 func IsErofsMediaType(mt string) bool {

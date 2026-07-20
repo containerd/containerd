@@ -49,9 +49,7 @@ import (
 )
 
 const (
-	labelSnapshotRef    = "containerd.io/snapshot.ref"
 	labelSnapshotParent = "containerd.io/snapshot/parent-chain-id"
-	labelSnapshotDiffID = "containerd.io/snapshot/diff-id"
 	unpackSpanPrefix    = "pkg.unpack.unpacker"
 )
 
@@ -397,8 +395,8 @@ func (u *Unpacker) unpack(
 		if snapshotLabels == nil {
 			snapshotLabels = make(map[string]string)
 		}
-		snapshotLabels[labelSnapshotRef] = chainID
-		snapshotLabels[labelSnapshotDiffID] = diffIDs[i].String()
+		snapshotLabels[snapshots.LabelSnapshotRef] = chainID
+		snapshotLabels[snapshots.LabelSnapshotDiffID] = diffIDs[i].String()
 		if i > 0 {
 			snapshotLabels[labelSnapshotParent] = chainIDs[i-1].String()
 		}
