@@ -30,7 +30,7 @@ func EroFSFtypeToFileMode(ftype uint8) fs.FileMode {
 	case FileTypeDir:
 		return fs.ModeDir
 	case FileTypeChrdev:
-		return fs.ModeCharDevice
+		return fs.ModeDevice | fs.ModeCharDevice
 	case FileTypeBlkdev:
 		return fs.ModeDevice
 	case FileTypeFifo:
@@ -52,7 +52,7 @@ func EroFSModeToGoFileMode(mode uint16) fs.FileMode {
 	case StatTypeDir:
 		m |= fs.ModeDir
 	case StatTypeChrdev:
-		m |= fs.ModeCharDevice
+		m |= fs.ModeDevice | fs.ModeCharDevice
 	case StatTypeBlkdev:
 		m |= fs.ModeDevice
 	case StatTypeFifo:
