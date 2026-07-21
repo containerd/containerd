@@ -33,7 +33,17 @@ const (
 	// UnpackKeyFormat is the format for the snapshotter keys used for extraction
 	UnpackKeyFormat       = UnpackKeyPrefix + "-%s %s"
 	inheritedLabelsPrefix = "containerd.io/snapshot/"
-	labelSnapshotRef      = "containerd.io/snapshot.ref"
+
+	// LabelSnapshotRef is set by the unpacker on the extraction Prepare to
+	// the target chainID. A snapshotter that already has the layer commits a
+	// snapshot named after this value and returns ErrAlreadyExists, which
+	// makes the unpacker skip fetching and applying the layer (the remote
+	// snapshot protocol). It is inherited by FilterInheritedLabels.
+	LabelSnapshotRef = "containerd.io/snapshot.ref"
+
+	// LabelSnapshotDiffID is set by the unpacker on the extraction Prepare to
+	// the uncompressed digest (diffID) of the layer being unpacked.
+	LabelSnapshotDiffID = "containerd.io/snapshot/diff-id"
 
 	// LabelSnapshotUIDMapping is the label used for UID mappings
 	LabelSnapshotUIDMapping = "containerd.io/snapshot/uidmapping"
@@ -397,7 +407,7 @@ func FilterInheritedLabels(labels map[string]string) map[string]string {
 
 	filtered := make(map[string]string)
 	for k, v := range labels {
-		if k == labelSnapshotRef || strings.HasPrefix(k, inheritedLabelsPrefix) {
+		if k == LabelSnapshotRef || strings.HasPrefix(k, inheritedLabelsPrefix) {
 			filtered[k] = v
 		}
 	}

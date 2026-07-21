@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
@@ -816,5 +817,260 @@ func TestMountFsMeta(t *testing.T) {
 			"device=" + s.layerBlobPath("p2"),
 			"device=" + s.layerBlobPath("p1"),
 		}, m.Options)
+	})
+}
+
+// --- layer content cache tests ---
+
+const (
+	cacheTestDiffID  = "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+	cacheTestChainID = "sha256:0000000000000000000000000000000000000000000000000000000000000002"
+)
+
+// requireErofs skips a test unless the erofs kernel filesystem is available,
+// which NewSnapshotter requires. The layer content cache tests don't mount, so
+// they need neither root nor mkfs.erofs.
+func requireErofs(t *testing.T) {
+	t.Helper()
+	if !FindErofs() {
+		t.Skip("check for erofs kernel support failed, skipping test")
+	}
+}
+
+// writeCacheBlob writes a fake erofs blob into cacheDir keyed by diffID and
+// returns its absolute path. The bytes need not be a valid erofs image: the
+// snapshotter only symlinks the blob, so these tests exercise the
+// Prepare/Commit/Remove logic rather than mounting.
+func writeCacheBlob(t *testing.T, cacheDir string, diffID digest.Digest, data []byte) string {
+	t.Helper()
+	blob := erofsutils.CacheBlobPath(cacheDir, diffID)
+	require.NoError(t, os.MkdirAll(filepath.Dir(blob), 0755))
+	require.NoError(t, os.WriteFile(blob, data, 0644))
+	return blob
+}
+
+// extractionOpt builds the snapshot options the unpacker attaches to an
+// image-layer extraction Prepare (the snapshot.ref target and the diffID).
+func extractionOpt(target string, diffID digest.Digest) snapshots.Opt {
+	return snapshots.WithLabels(map[string]string{
+		snapshots.LabelSnapshotRef:    target,
+		snapshots.LabelSnapshotDiffID: diffID.String(),
+	})
+}
+
+// snapshotID returns the backend snapshot ID for key.
+func snapshotID(t *testing.T, ctx context.Context, s *snapshotter, key string) string {
+	t.Helper()
+	var id string
+	require.NoError(t, s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		var err error
+		id, _, _, err = storage.GetInfo(ctx, key)
+		return err
+	}))
+	return id
+}
+
+// newCacheSnapshotter creates an erofs snapshotter rooted in a temp dir with the
+// given options, skipping the test if erofs is unavailable and registering the
+// snapshotter's cleanup.
+func newCacheSnapshotter(t *testing.T, opts ...Opt) *snapshotter {
+	t.Helper()
+	requireErofs(t)
+	sn, err := NewSnapshotter(t.TempDir(), opts...)
+	require.NoError(t, err)
+	t.Cleanup(func() { sn.Close() })
+	return sn.(*snapshotter)
+}
+
+// prepareCacheHit runs an extraction Prepare for target/diffID and asserts it was
+// served from the cache (committed and signaled via ErrAlreadyExists, no mounts).
+func prepareCacheHit(t *testing.T, ctx context.Context, s *snapshotter, target string, diffID digest.Digest) {
+	t.Helper()
+	mounts, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
+	require.ErrorIs(t, err, errdefs.ErrAlreadyExists, "cache hit must signal the remote-snapshot protocol")
+	assert.Nil(t, mounts, "a cache hit returns no mounts")
+}
+
+// TestCacheHit covers the happy path: an extraction Prepare whose diffID blob is
+// in the cache commits the target chainID (right kind, parent, and snapshot.ref
+// label), symlinks the blob, and returns ErrAlreadyExists.
+func TestCacheHit(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	cacheDir := t.TempDir()
+	diffID := digest.Digest(cacheTestDiffID)
+	blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
+
+	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+
+	target := cacheTestChainID
+	prepareCacheHit(t, ctx, s, target, diffID)
+
+	// The target chainID is committed, with the parent and snapshot.ref label the
+	// metadata layer's Walk filter needs to resolve the backend target.
+	info, err := s.Stat(ctx, target)
+	require.NoError(t, err, "committed snapshot must exist under the target chainID")
+	assert.Equal(t, snapshots.KindCommitted, info.Kind)
+	assert.Equal(t, "", info.Parent)
+	assert.Equal(t, target, info.Labels[snapshots.LabelSnapshotRef])
+
+	// layer.erofs is an absolute symlink into the operator-owned cache blob.
+	link := s.layerBlobPath(snapshotID(t, ctx, s, target))
+	fi, err := os.Lstat(link)
+	require.NoError(t, err)
+	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "layer.erofs should be a symlink")
+	dst, err := os.Readlink(link)
+	require.NoError(t, err)
+	assert.True(t, filepath.IsAbs(dst), "symlink target should be absolute")
+	assert.Equal(t, blob, dst)
+}
+
+// TestCacheSidecar covers a hit in the default "auto" dm-verity mode where the
+// cache entry has a sidecar: it must be copied into the snapshot dir as a plain
+// regular file (not symlinked).
+func TestCacheSidecar(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	cacheDir := t.TempDir()
+	diffID := digest.Digest(cacheTestDiffID)
+	blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
+	require.NoError(t, os.WriteFile(dmverity.MetadataPath(blob), []byte(testDmverityMetadata), 0644))
+
+	// dmverity_mode defaults to "auto": use the sidecar if present.
+	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+
+	target := cacheTestChainID
+	prepareCacheHit(t, ctx, s, target, diffID)
+
+	// The sidecar is copied in as a plain regular file (not a symlink) so mount-time
+	// metadata resolution is independent of the cache filesystem.
+	sidecar := dmverity.MetadataPath(s.layerBlobPath(snapshotID(t, ctx, s, target)))
+	fi, err := os.Lstat(sidecar)
+	require.NoError(t, err, "sidecar should be copied into the snapshot dir")
+	assert.Zero(t, fi.Mode()&os.ModeSymlink, "sidecar should be a regular file, not a symlink")
+	data, err := os.ReadFile(sidecar)
+	require.NoError(t, err)
+	assert.Equal(t, testDmverityMetadata, string(data))
+}
+
+// TestCacheMiss covers the cases that must NOT be served from the cache and
+// instead create a normal active snapshot: cache disabled, blob absent, a
+// label-less (container-rootfs) Prepare, and a View (which the KindActive gate
+// excludes even with matching labels and a cached blob).
+func TestCacheMiss(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	diffID := digest.Digest(cacheTestDiffID)
+	target := cacheTestChainID
+
+	// Each case must leave the extraction as a normal active snapshot: mounts are
+	// returned and the target chainID is not committed.
+	assertFellThrough := func(t *testing.T, s *snapshotter, mounts []mount.Mount, err error) {
+		t.Helper()
+		require.NoError(t, err)
+		assert.NotEmpty(t, mounts, "a miss must return normal active-snapshot mounts")
+		_, err = s.Stat(ctx, target)
+		assert.Error(t, err, "target chainID must not be committed on a miss")
+	}
+
+	t.Run("cache disabled", func(t *testing.T) {
+		s := newCacheSnapshotter(t) // no cache configured
+		mounts, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
+		assertFellThrough(t, s, mounts, err)
+	})
+
+	t.Run("blob absent", func(t *testing.T) {
+		s := newCacheSnapshotter(t, WithLayerContentCache(t.TempDir()))
+		mounts, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
+		assertFellThrough(t, s, mounts, err)
+	})
+
+	t.Run("no extraction labels", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		writeCacheBlob(t, cacheDir, diffID, []byte("blob"))
+		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+		// A container-rootfs Prepare carries no snapshot.ref/diff-id labels.
+		mounts, err := s.Prepare(ctx, "container-rootfs", "")
+		require.NoError(t, err)
+		assert.NotEmpty(t, mounts)
+	})
+
+	t.Run("view is never short-circuited", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		writeCacheBlob(t, cacheDir, diffID, []byte("blob"))
+		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+		// Even with matching labels and a cached blob, a View must not commit.
+		mounts, err := s.View(ctx, "view-1", "", extractionOpt(target, diffID))
+		assertFellThrough(t, s, mounts, err)
+	})
+}
+
+// TestCacheRemove covers removal of a cache-hit snapshot: it succeeds (the
+// setImmutable guard skips the symlink), removes the snapshot dir/symlink, and
+// leaves the operator-owned cache blob and sidecar untouched.
+func TestCacheRemove(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	cacheDir := t.TempDir()
+	diffID := digest.Digest(cacheTestDiffID)
+	blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
+	sidecar := dmverity.MetadataPath(blob)
+	require.NoError(t, os.WriteFile(sidecar, []byte(testDmverityMetadata), 0644))
+
+	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+
+	target := cacheTestChainID
+	prepareCacheHit(t, ctx, s, target, diffID)
+
+	snapDir := filepath.Dir(s.layerBlobPath(snapshotID(t, ctx, s, target)))
+
+	// Remove must succeed (the symlinked blob is skipped by the setImmutable guard,
+	// which would otherwise follow the link and ioctl the operator-owned blob).
+	require.NoError(t, s.Remove(ctx, target))
+
+	// The snapshot dir (and its symlink) is gone, but the cache is untouched.
+	_, err := os.Stat(snapDir)
+	assert.True(t, os.IsNotExist(err), "snapshot dir should be removed")
+	_, err = os.Stat(blob)
+	require.NoError(t, err, "cache blob must be untouched by Remove")
+	_, err = os.Stat(sidecar)
+	require.NoError(t, err, "cache sidecar must be untouched by Remove")
+}
+
+// TestCacheDmverity covers dmverity_mode="on": a cache entry with a sidecar is
+// committed (and the sidecar copied), while an entry missing its required
+// sidecar is a hard error (not a hit, nothing committed).
+func TestCacheDmverity(t *testing.T) {
+	if supported, err := dmverity.IsSupported(); err != nil || !supported {
+		t.Skip("dm-verity is not supported on this system")
+	}
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	diffID := digest.Digest(cacheTestDiffID)
+	target := cacheTestChainID
+
+	t.Run("with sidecar commits and copies it", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
+		require.NoError(t, os.WriteFile(dmverity.MetadataPath(blob), []byte(testDmverityMetadata), 0644))
+
+		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir), WithDmverityMode("on"))
+		prepareCacheHit(t, ctx, s, target, diffID)
+
+		_, err := os.Stat(dmverity.MetadataPath(s.layerBlobPath(snapshotID(t, ctx, s, target))))
+		require.NoError(t, err, "sidecar must be present for a dmverity_mode=on hit")
+	})
+
+	t.Run("without sidecar fails the pull", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob")) // no sidecar
+
+		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir), WithDmverityMode("on"))
+
+		// dmverity_mode=on requires a sidecar; a cache entry without one is a hard
+		// error rather than a silent fallback.
+		_, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
+		require.Error(t, err)
+		assert.False(t, errdefs.IsAlreadyExists(err), "missing sidecar must not be treated as a hit")
+		_, err = s.Stat(ctx, target)
+		assert.Error(t, err, "no snapshot should be committed on failure")
 	})
 }

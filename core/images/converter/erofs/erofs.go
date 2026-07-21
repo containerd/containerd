@@ -81,19 +81,6 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			return nil, nil
 		}
 
-		uncompressedDesc := &desc
-		if !uncompress.IsUncompressedType(desc.MediaType) {
-			var err error
-			uncompressedDesc, err = uncompress.LayerConvertFunc(ctx, cs, desc)
-			if err != nil {
-				return nil, err
-			}
-			if uncompressedDesc == nil {
-				return nil, fmt.Errorf("unexpectedly got the same blob after decompression (%s, %q)", desc.Digest, desc.MediaType)
-			}
-			log.G(ctx).Debugf("uncompressed %s into %s", desc.Digest, uncompressedDesc.Digest)
-		}
-
 		info, err := cs.Info(ctx, desc.Digest)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get content info: %w", err)
@@ -103,14 +90,6 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 		if labelz == nil {
 			labelz = make(map[string]string)
 		}
-
-		ra, err := cs.ReaderAt(ctx, *uncompressedDesc)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get reader: %w", err)
-		}
-		defer ra.Close()
-
-		sr := io.NewSectionReader(ra, 0, uncompressedDesc.Size)
 
 		blob, err := os.CreateTemp("", "layer-*.erofs")
 		if err != nil {
@@ -125,21 +104,9 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			}
 		}()
 
-		var mkfsArgs []string
-		if convertOpts.compressors != "" {
-			compressionArg := "-z" + convertOpts.compressors
-			mkfsArgs = append(mkfsArgs, compressionArg)
-			mkfsArgs = append(mkfsArgs, []string{"-C", "65536"}...)
+		if _, err := ConvertLayerToErofs(ctx, cs, desc, blobPath, opts...); err != nil {
+			return nil, err
 		}
-		mkfsArgs = append(mkfsArgs, convertOpts.mkfsExtraOpts...)
-
-		mkfsArgs = erofsutils.AddDefaultMkfsOpts(mkfsArgs)
-
-		u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+desc.Digest))
-		if err := erofsutils.ConvertTarErofs(ctx, sr, blobPath, u.String(), mkfsArgs); err != nil {
-			return nil, fmt.Errorf("failed to convert to EROFS: %w", err)
-		}
-		log.G(ctx).Debugf("converted %s to EROFS", desc.Digest)
 
 		erofsFile, err := os.Open(blobPath)
 		if err != nil {
@@ -197,6 +164,55 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 		newDesc.Size = cInfo.Size
 		return &newDesc, nil
 	}
+}
+
+// ConvertLayerToErofs converts a single OCI layer blob (desc) into a
+// directly-mountable erofs image written to outPath, and returns the layer's
+// uncompressed digest (diffID). It is the shared conversion step behind both
+// LayerConvertFunc (which then stores the blob in the content store) and
+// BuildLayerCache (which stores it in the layer content cache).
+func ConvertLayerToErofs(ctx context.Context, cs content.Store, desc ocispec.Descriptor, outPath string, opts ...ConvertOpt) (digest.Digest, error) {
+	var copts convertOptions
+	for _, opt := range opts {
+		opt(&copts)
+	}
+
+	uncompressedDesc := &desc
+	if !uncompress.IsUncompressedType(desc.MediaType) {
+		var err error
+		uncompressedDesc, err = uncompress.LayerConvertFunc(ctx, cs, desc)
+		if err != nil {
+			return "", err
+		}
+		if uncompressedDesc == nil {
+			return "", fmt.Errorf("unexpectedly got the same blob after decompression (%s, %q)", desc.Digest, desc.MediaType)
+		}
+		log.G(ctx).Debugf("uncompressed %s into %s", desc.Digest, uncompressedDesc.Digest)
+	}
+
+	ra, err := cs.ReaderAt(ctx, *uncompressedDesc)
+	if err != nil {
+		return "", fmt.Errorf("failed to get reader: %w", err)
+	}
+	defer ra.Close()
+	sr := io.NewSectionReader(ra, 0, uncompressedDesc.Size)
+
+	var mkfsArgs []string
+	if copts.compressors != "" {
+		mkfsArgs = append(mkfsArgs, "-z"+copts.compressors, "-C", "65536")
+	}
+	mkfsArgs = append(mkfsArgs, copts.mkfsExtraOpts...)
+	mkfsArgs = erofsutils.AddDefaultMkfsOpts(mkfsArgs)
+
+	// Derive the erofs UUID from the uncompressed digest (diffID) so the blob is a
+	// deterministic function of the layer content, independent of how the source
+	// was compressed. This is also the key the layer content cache uses.
+	u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+uncompressedDesc.Digest))
+	if err := erofsutils.ConvertTarErofs(ctx, sr, outPath, u.String(), mkfsArgs); err != nil {
+		return "", fmt.Errorf("failed to convert to EROFS: %w", err)
+	}
+	log.G(ctx).Debugf("converted %s to EROFS", desc.Digest)
+	return uncompressedDesc.Digest, nil
 }
 
 func UpdateManifestPlatform(ctx context.Context, cs content.Store, originalDesc, convertedDesc ocispec.Descriptor) (*ocispec.Descriptor, error) {
