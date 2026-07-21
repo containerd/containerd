@@ -27,6 +27,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/log"
+
 	runc "github.com/containerd/go-runc"
 	"golang.org/x/sys/unix"
 )
@@ -65,12 +67,12 @@ func Reap() error {
 	now := time.Now()
 	exits, err := reap(false)
 	for _, e := range exits {
+		log.L.Infof("testevent pid %d exited e.status %d reap", e.Pid, e.Status)
 		done := Default.notify(runc.Exit{
 			Timestamp: now,
 			Pid:       e.Pid,
 			Status:    e.Status,
 		})
-
 		select {
 		case <-done:
 		case <-time.After(1 * time.Second):
@@ -220,6 +222,7 @@ func (m *Monitor) notify(e runc.Exit) chan struct{} {
 					recv := true
 					select {
 					case s.c <- e:
+						log.L.Infof("testevent pid %d exited e.status %d notify", e.Pid, e.Status)
 						success[s.c] = struct{}{}
 					case <-timer.C:
 						recv = false
