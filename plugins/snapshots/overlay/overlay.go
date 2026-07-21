@@ -48,6 +48,7 @@ type SnapshotterConfig struct {
 	mountOptions  []string
 	remapIDs      bool
 	slowChown     bool
+	lccEnabled    bool
 }
 
 // Opt is an option to configure the overlay snapshotter
@@ -113,12 +114,13 @@ type snapshotter struct {
 	options       []string
 	remapIDs      bool
 	slowChown     bool
+	lcc           *layerContentCache
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
 // diffs are stored under the provided root. A metadata file is stored under
 // the root.
-func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
+func NewSnapshotter(ctx context.Context, root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	var config SnapshotterConfig
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
@@ -146,6 +148,11 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
+	if config.lccEnabled {
+		if err := os.Mkdir(filepath.Join(root, "cache"), 0700); err != nil && !os.IsExist(err) {
+			return nil, err
+		}
+	}
 
 	if !hasOption(config.mountOptions, "userxattr") {
 		// figure out whether "userxattr" option is recognized by the kernel && needed
@@ -164,6 +171,11 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		config.mountOptions = append(config.mountOptions, "index=off")
 	}
 
+	lcc, err := newLayerContentCache(ctx, config.ms, root, config.lccEnabled)
+	if err != nil {
+		return nil, err
+	}
+
 	return &snapshotter{
 		root:          root,
 		ms:            config.ms,
@@ -172,6 +184,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		options:       config.mountOptions,
 		remapIDs:      config.remapIDs,
 		slowChown:     config.slowChown,
+		lcc:           lcc,
 	}, nil
 }
 
@@ -297,14 +310,38 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 	return o.mounts(s, info), nil
 }
 
-func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (err error) {
+	// addSnapInfo is called optimistically inside the transaction so that bolt's
+	// write serialisation prevents any concurrent Prepare from observing a missing
+	// entry. If the transaction or its disk commit fails, the defer rolls it back
+	// via the closure returned by addSnapInfo, which restores any prior entry
+	// rather than blindly deleting (CommitActive can fail with AlreadyExists when
+	// a parallel committer wins the race for the same chainID).
+	var rollbackSnapInfo func()
+	defer func() {
+		if err != nil && rollbackSnapInfo != nil {
+			rollbackSnapInfo()
+		}
+	}()
 	return o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
-		// grab the existing id
-		id, _, _, err := storage.GetInfo(ctx, key)
+		id, info, _, err := storage.GetInfo(ctx, key)
 		if err != nil {
 			return err
 		}
 
+		if o.lcc.enabled && hasDiffID(info) {
+			opts = append(opts, o.lcc.commitOpts(info)...)
+			if err := o.lcc.commitFSDir(id, info); err != nil {
+				return err
+			}
+			parent := info.Parent
+			diffID := info.Labels[snapshots.LabelSnapshotDiffID]
+			rollbackSnapInfo = o.lcc.addSnapInfo(name, parent, diffID)
+		}
+
+		// TODO(klueska): Reevaluate disk usage for LCC layers; all snapshots
+		// sharing the same diffID point to the same backing content, so the
+		// reported usage will be over-counted across them.
 		usage, err := fs.DiskUsage(ctx, o.upperPath(id))
 		if err != nil {
 			return err
@@ -313,6 +350,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
 			return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
 		}
+
 		return nil
 	})
 }
@@ -331,6 +369,9 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 				if err := os.RemoveAll(dir); err != nil {
 					log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
 				}
+			}
+			if o.lcc.enabled {
+				o.lcc.deleteSnapInfo(key)
 			}
 		}
 	}()
@@ -400,6 +441,14 @@ func (o *snapshotter) cleanupDirectories(ctx context.Context) (_ []string, err e
 }
 
 func (o *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, error) {
+	// Always collect orphaned LCC cache directories regardless of whether LCC
+	// is currently enabled, so that cache entries left behind by a previous
+	// enabled configuration are cleaned up even after the feature is disabled.
+	cleanup, err := o.lcc.orphanedPaths(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ids, err := storage.IDMap(ctx)
 	if err != nil {
 		return nil, err
@@ -417,7 +466,6 @@ func (o *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, erro
 		return nil, err
 	}
 
-	cleanup := []string{}
 	for _, d := range dirs {
 		if _, ok := ids[d]; ok {
 			continue
@@ -451,23 +499,16 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		}
 	}()
 
+	// Extract labels from opts so uid/gid and LCC labels can be computed and
+	// folded into CreateSnapshot, preserving the Created == Updated invariant.
+	optLabels, err := labelsFromOpts(opts)
+	if err != nil {
+		return nil, err
+	}
 	if err := o.ms.WithTransaction(ctx, true, func(ctx context.Context) (err error) {
-		snapshotDir := filepath.Join(o.root, "snapshots")
-		td, err = o.prepareDirectory(ctx, snapshotDir, kind)
-		if err != nil {
-			return fmt.Errorf("failed to create prepare snapshot dir: %w", err)
-		}
-
-		s, err = storage.CreateSnapshot(ctx, kind, key, parent, opts...)
-		if err != nil {
-			return fmt.Errorf("failed to create snapshot: %w", err)
-		}
-
-		_, info, _, err = storage.GetInfo(ctx, key)
-		if err != nil {
-			return fmt.Errorf("failed to get snapshot info: %w", err)
-		}
-
+		// Resolve the uid/gid that will own the snapshot's fs/ directory. This
+		// must happen before the LCC cache path is computed so that snapshots
+		// with different ownership are stored under distinct paths.
 		var (
 			mappedUID, mappedGID     = -1, -1
 			uidmapLabel, gidmapLabel string
@@ -478,11 +519,11 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		// will use bind mount. To be able to create file objects inside the
 		// rootfs -- just chown this only bound directory according to provided
 		// {uid,gid}map. In case of one/multiple parents -- chown upperdir.
-		if v, ok := info.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
+		if v, ok := optLabels[snapshots.LabelSnapshotUIDMapping]; ok {
 			uidmapLabel = v
 			needsRemap = true
 		}
-		if v, ok := info.Labels[snapshots.LabelSnapshotGIDMapping]; ok {
+		if v, ok := optLabels[snapshots.LabelSnapshotGIDMapping]; ok {
 			gidmapLabel = v
 			needsRemap = true
 		}
@@ -499,19 +540,50 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			mappedUID, mappedGID = int(root.Uid), int(root.Gid)
 		}
 
-		if mappedUID == -1 || mappedGID == -1 {
-			if len(s.ParentIDs) > 0 {
-				st, err := os.Stat(o.upperPath(s.ParentIDs[0]))
-				if err != nil {
-					return fmt.Errorf("failed to stat parent: %w", err)
-				}
-				stat, ok := st.Sys().(*syscall.Stat_t)
-				if !ok {
-					return fmt.Errorf("incompatible types after stat call: *syscall.Stat_t expected")
-				}
-				mappedUID = int(stat.Uid)
-				mappedGID = int(stat.Gid)
+		if (mappedUID == -1 || mappedGID == -1) && parent != "" {
+			parentID, _, _, err := storage.GetInfo(ctx, parent)
+			if err != nil {
+				return fmt.Errorf("failed to get parent snapshot info: %w", err)
 			}
+			st, err := os.Stat(o.upperPath(parentID))
+			if err != nil {
+				return fmt.Errorf("failed to stat parent: %w", err)
+			}
+			stat, ok := st.Sys().(*syscall.Stat_t)
+			if !ok {
+				return fmt.Errorf("incompatible types after stat call: *syscall.Stat_t expected")
+			}
+			mappedUID, mappedGID = int(stat.Uid), int(stat.Gid)
+		}
+
+		// With uid/gid resolved, fold in LCC labels if this is a layer-unpack Prepare.
+		// computeLabels stats the cache path to detect a hit; this must stay inside
+		// the write transaction so that a concurrent Cleanup cannot delete the cache
+		// directory between the stat and the prepareFSDir symlink that follows.
+		diffID := optLabels[snapshots.LabelSnapshotDiffID]
+		if o.lcc.enabled && diffID != "" {
+			lccLabels, err := o.lcc.computeLabels(parent, diffID, mappedUID, mappedGID)
+			if err != nil {
+				return err
+			}
+			opts = append(opts, snapshots.WithLabels(lccLabels))
+		}
+
+		// All opts are assembled; create the snapshot.
+		s, err = storage.CreateSnapshot(ctx, kind, key, parent, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create snapshot: %w", err)
+		}
+
+		_, info, _, err = storage.GetInfo(ctx, key)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot info: %w", err)
+		}
+
+		snapshotDir := filepath.Join(o.root, "snapshots")
+		td, err = o.prepareDirectory(ctx, snapshotDir, info)
+		if err != nil {
+			return fmt.Errorf("failed to create prepare snapshot dir: %w", err)
 		}
 
 		if mappedUID != -1 && mappedGID != -1 {
@@ -533,23 +605,37 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	return o.mounts(s, info), nil
 }
 
-func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, kind snapshots.Kind) (string, error) {
+func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, info snapshots.Info) (string, error) {
 	td, err := os.MkdirTemp(snapshotDir, "new-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
-	if err := os.Mkdir(filepath.Join(td, "fs"), 0755); err != nil {
+	if o.lcc.enabled && hasDiffID(info) {
+		if err := o.lcc.prepareFSDir(info, td); err != nil {
+			return td, err
+		}
+	} else if err := os.Mkdir(filepath.Join(td, "fs"), 0755); err != nil {
 		return td, err
 	}
 
-	if kind == snapshots.KindActive {
+	if info.Kind == snapshots.KindActive {
 		if err := os.Mkdir(filepath.Join(td, "work"), 0711); err != nil {
 			return td, err
 		}
 	}
 
 	return td, nil
+}
+
+func labelsFromOpts(opts []snapshots.Opt) (map[string]string, error) {
+	var info snapshots.Info
+	for _, opt := range opts {
+		if err := opt(&info); err != nil {
+			return nil, err
+		}
+	}
+	return info.Labels, nil
 }
 
 func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mount {
