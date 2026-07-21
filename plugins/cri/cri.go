@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
@@ -57,6 +58,7 @@ func init() {
 			plugins.SandboxStorePlugin,
 			plugins.TransferPlugin,
 			plugins.WarningPlugin,
+			plugins.ShimPlugin,
 		},
 		Config:          &defaultConfig,
 		ConfigMigration: configMigration,
@@ -114,6 +116,22 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to get streaming config: %w", err)
 	}
 
+	var shimPath string
+	shimPlugin, err := ic.GetSingle(plugins.ShimPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shim plugin: %w", err)
+	}
+	if hasEnv, ok := shimPlugin.(interface{ Env() []string }); ok {
+		env := hasEnv.Env()
+		for i := len(env) - 1; i >= 0; i-- {
+			// iterate backwards to grab the last PATH=
+			if path, ok := strings.CutPrefix(env[i], "PATH="); ok {
+				shimPath = path
+				break
+			}
+		}
+	}
+
 	options := &server.CRIServiceOptions{
 		RuntimeService:     criRuntimePlugin.(server.RuntimeService),
 		ImageService:       criImagePlugin.(server.ImageService),
@@ -121,6 +139,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		NRI:                getNRIAPI(ic),
 		Client:             client,
 		SandboxControllers: sbControllers,
+		ShimPath:           shimPath,
 	}
 	is := criImagePlugin.(imageService).GRPCService()
 

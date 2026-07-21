@@ -157,6 +157,11 @@ type criService struct {
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
+	// shimPath is the custom PATH environment variable value from the shim manager
+	shimPath string
+
+	checkCriuOnce sync.Once //nolint:nolintlint,unused // Ignore on non-Linux
+	checkCriuErr  error     //nolint:nolintlint,unused // Ignore on non-Linux
 }
 
 type CRIServiceOptions struct {
@@ -175,6 +180,9 @@ type CRIServiceOptions struct {
 	//
 	// TODO: Replace this gradually with directly configured instances
 	Client *containerd.Client
+
+	// ShimPath is the custom PATH environment variable value from the shim manager
+	ShimPath string
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -198,6 +206,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		netPlugin:          make(map[string]cni.CNI),
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
+		shimPath:           options.ShimPath,
 	}
 
 	// TODO: Make discard time configurable
