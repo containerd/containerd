@@ -71,7 +71,7 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types
 		}
 		// Don't return for unknown state, some cleanup needs to be done.
 		if state == sandboxstore.StateUnknown {
-			return cleanupUnknownSandbox(ctx, id, podSandbox)
+			return c.cleanupUnknownSandbox(ctx, id, podSandbox)
 		}
 		return nil
 	}
@@ -87,7 +87,7 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to wait for task: %w", err)
 			}
-			return cleanupUnknownSandbox(ctx, id, podSandbox)
+			return c.cleanupUnknownSandbox(ctx, id, podSandbox)
 		}
 
 		exitCtx, exitCancel := context.WithCancel(context.Background())
@@ -118,7 +118,7 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types
 }
 
 // cleanupUnknownSandbox cleanup stopped sandbox in unknown state.
-func cleanupUnknownSandbox(ctx context.Context, id string, sandbox *types.PodSandbox) error {
+func (c *Controller) cleanupUnknownSandbox(ctx context.Context, id string, sandbox *types.PodSandbox) error {
 	// Reuse handleSandboxTaskExit to do the cleanup.
-	return handleSandboxTaskExit(ctx, sandbox, &eventtypes.TaskExit{ExitStatus: unknownExitCode, ExitedAt: protobuf.ToTimestamp(time.Now())})
+	return c.handleSandboxTaskExit(ctx, sandbox, &eventtypes.TaskExit{ExitStatus: unknownExitCode, ExitedAt: protobuf.ToTimestamp(time.Now())})
 }

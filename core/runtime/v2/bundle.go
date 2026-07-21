@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -129,7 +130,11 @@ func (b *Bundle) Delete() error {
 	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
 	rootfs := filepath.Join(b.Path, "rootfs")
 	if err := mount.UnmountRecursive(rootfs, 0); err != nil {
-		return fmt.Errorf("unmount rootfs %s: %w", rootfs, err)
+		const mntDetach = 2
+		log.G(context.TODO()).WithError(err).Warnf("failed to unmount rootfs %s, retrying with MNT_DETACH", rootfs)
+		if err3 := mount.UnmountRecursive(rootfs, mntDetach); err3 != nil {
+			log.G(context.TODO()).WithError(err3).Errorf("failed to unmount rootfs %s with MNT_DETACH", rootfs)
+		}
 	}
 	if err := os.Remove(rootfs); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove bundle rootfs: %w", err)

@@ -135,7 +135,11 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("loading container %s", id)
 			if err := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
-				log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
+				const mntDetach = 2
+				log.G(ctx).WithError(err).Warnf("failed to unmount rootfs %s, retrying with MNT_DETACH", id)
+				if err3 := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), mntDetach); err3 != nil {
+					log.G(ctx).WithError(err3).Errorf("failed to unmount of rootfs %s with MNT_DETACH", id)
+				}
 			}
 			return err
 		}
