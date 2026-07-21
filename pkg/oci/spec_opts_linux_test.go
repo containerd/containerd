@@ -748,7 +748,7 @@ func TestWithAppendAdditionalGroupsNoEtcGroup(t *testing.T) {
 		{
 			name:     "no additional gids, append root group",
 			groups:   []string{"root"},
-			err:      "unable to find group root: openat etc/group: no such file or directory",
+			err:      "unable to find group root: statat etc: no such file or directory",
 			expected: []uint32{0},
 		},
 		{
