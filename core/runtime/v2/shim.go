@@ -640,42 +640,15 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 	}
 
 	if opts.RestoreFromPath {
-		// Unpack rootfs-diff.tar if it exists.
-		// This needs to happen between the 'Create()' from above and before the 'Start()' from below.
 		rootfsDiff := filepath.Join(opts.Checkpoint, "..", crmetadata.RootFsDiffTar)
-
-		_, err = os.Stat(rootfsDiff)
-		if err == nil {
-			rootfsDiffTar, err := os.Open(rootfsDiff)
-			if err != nil {
-				return nil, fmt.Errorf("failed to open rootfs-diff archive %s for import: %w", rootfsDiffTar.Name(), err)
-			}
-			defer func(f *os.File) {
-				if err := f.Close(); err != nil {
-					log.G(ctx).Errorf("Unable to close file %s: %q", f.Name(), err)
-				}
-			}(rootfsDiffTar)
-
-			decompressed, err := compression.DecompressStream(rootfsDiffTar)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decompress archive %s for import: %w", rootfsDiffTar.Name(), err)
-			}
-
-			rootfs := filepath.Join(s.Bundle(), "rootfs")
-			_, err = archive.Apply(
-				ctx,
-				rootfs,
-				decompressed,
-			)
-
-			if err != nil {
-				return nil, fmt.Errorf("unpacking of rootfs-diff archive %s into %s failed: %w", rootfsDiffTar.Name(), rootfs, err)
-			}
-			log.G(ctx).Debugf("Unpacked checkpoint in %s", rootfs)
+		// The task Create call mounts the fresh snapshot. Apply its checkpointed
+		// writable layer before CRIU starts the restored process below.
+		if err := applyRootfsDiff(ctx, rootfsDiff, filepath.Join(s.Bundle(), "rootfs")); err != nil {
+			return nil, err
 		}
-		// (adrianreber): This is unclear to me. But it works (and it is necessary).
-		// This is probably connected to my misunderstanding why
-		// restoring a container goes through Create().
+		// RestoreFromPath preserves the CRI contract that StartContainer returns
+		// with the restored process running, even though CRIU restores it during
+		// the task Create operation.
 		log.G(ctx).Infof("About to start with opts.Checkpoint %s", opts.Checkpoint)
 		err = s.Start(ctx)
 		if err != nil {
@@ -684,6 +657,36 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 	}
 
 	return s, nil
+}
+
+func applyRootfsDiff(ctx context.Context, diffPath, rootfs string, applyOpts ...archive.ApplyOpt) error {
+	info, err := os.Lstat(diffPath)
+	if errors.Is(err, os.ErrNotExist) {
+		// Some runtimes do not emit a writable-layer diff.
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect rootfs-diff archive %q: %w", diffPath, err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("rootfs-diff archive %q is not a regular file", diffPath)
+	}
+
+	rootfsDiffTar, err := os.Open(diffPath)
+	if err != nil {
+		return fmt.Errorf("open rootfs-diff archive %q: %w", diffPath, err)
+	}
+	defer rootfsDiffTar.Close()
+	decompressed, err := compression.DecompressStream(rootfsDiffTar)
+	if err != nil {
+		return fmt.Errorf("decompress rootfs-diff archive %q: %w", diffPath, err)
+	}
+	defer decompressed.Close()
+	if _, err := archive.Apply(ctx, rootfs, decompressed, applyOpts...); err != nil {
+		return fmt.Errorf("apply rootfs-diff archive %q to %q: %w", diffPath, rootfs, err)
+	}
+	log.G(ctx).Debugf("Applied checkpoint rootfs diff to %s", rootfs)
+	return nil
 }
 
 func (s *shimTask) Pause(ctx context.Context) error {

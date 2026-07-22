@@ -943,12 +943,12 @@ k8s.io/client-go/util/workqueue
 # k8s.io/component-base v0.36.1
 ## explicit; go 1.26.0
 k8s.io/component-base/logs/logreduction
-# k8s.io/cri-api v0.36.1
+# k8s.io/cri-api v0.36.1 => github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260717143731-0771cf9d1a26
 ## explicit; go 1.26.0
 k8s.io/cri-api/pkg/apis
 k8s.io/cri-api/pkg/apis/runtime/v1
 k8s.io/cri-api/pkg/errors
-# k8s.io/cri-client v0.36.1
+# k8s.io/cri-client v0.36.1 => github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260717143731-0771cf9d1a26
 ## explicit; go 1.26.0
 k8s.io/cri-client/pkg
 k8s.io/cri-client/pkg/util
@@ -1011,3 +1011,5 @@ tags.cncf.io/container-device-interface/pkg/parser
 ## explicit; go 1.19
 tags.cncf.io/container-device-interface/specs-go
 # github.com/containerd/containerd/api => ./api
+# k8s.io/cri-api => github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260717143731-0771cf9d1a26
+# k8s.io/cri-client => github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260717143731-0771cf9d1a26

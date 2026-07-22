@@ -17,16 +17,49 @@
 package v2
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
+	ctrdarchive "github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/require"
 )
+
+func TestApplyRootfsDiff(t *testing.T) {
+	rootfs := t.TempDir()
+	diffPath := filepath.Join(t.TempDir(), "rootfs-diff.tar")
+	var compressed bytes.Buffer
+	gzipWriter := gzip.NewWriter(&compressed)
+	tarWriter := tar.NewWriter(gzipWriter)
+	contents := []byte("restored writable layer")
+	require.NoError(t, tarWriter.WriteHeader(&tar.Header{
+		Name: "restored-file",
+		Mode: 0o600,
+		Size: int64(len(contents)),
+	}))
+	_, err := tarWriter.Write(contents)
+	require.NoError(t, err)
+	require.NoError(t, tarWriter.Close())
+	require.NoError(t, gzipWriter.Close())
+	require.NoError(t, os.WriteFile(diffPath, compressed.Bytes(), 0o600))
+
+	require.NoError(t, applyRootfsDiff(context.Background(), diffPath, rootfs, ctrdarchive.WithNoSameOwner()))
+	restored, err := os.ReadFile(filepath.Join(rootfs, "restored-file"))
+	require.NoError(t, err)
+	require.Equal(t, contents, restored)
+
+	require.NoError(t, applyRootfsDiff(context.Background(), filepath.Join(t.TempDir(), "missing"), rootfs))
+	err = applyRootfsDiff(context.Background(), t.TempDir(), rootfs)
+	require.ErrorContains(t, err, "is not a regular file")
+}
 
 func TestParseStartResponse(t *testing.T) {
 	protobufResponse, err := proto.Marshal(&bootapi.BootstrapResult{
