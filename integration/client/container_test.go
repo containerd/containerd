@@ -2773,27 +2773,18 @@ func TestContainerPTY(t *testing.T) {
 
 	<-statusC
 
+	// Wait for all IO copy operations to complete before inspecting buf.
+	// Otherwise there is a race between the IO copy goroutine writing to buf
+	// and the read below, which is flaky on Windows named pipes. Wait must be
+	// called before Delete, which cancels the IO.
+	task.IO().Wait()
+
 	if _, err := task.Delete(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	tries := 1
-	if runtime.GOOS == "windows" {
-		// TODO: Fix flakiness on Window by checking for race in writing to buffer
-		tries += 2
-	}
-
-	for {
-		out := buf.String()
-		if strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
-			break
-
-		}
-		tries--
-		if tries == 0 {
-			t.Fatal(`expected \x00 in output`)
-		}
-		t.Logf("output %#q does not contain \\x00, trying again", out)
-		time.Sleep(time.Millisecond)
+	out := buf.String()
+	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
+		t.Fatalf(`expected \x00 in output, got %#q`, out)
 	}
 }
