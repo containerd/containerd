@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
@@ -882,18 +881,23 @@ func newCacheSnapshotter(t *testing.T, opts ...Opt) *snapshotter {
 	return sn.(*snapshotter)
 }
 
-// prepareCacheHit runs an extraction Prepare for target/diffID and asserts it was
-// served from the cache (committed and signaled via ErrAlreadyExists, no mounts).
-func prepareCacheHit(t *testing.T, ctx context.Context, s *snapshotter, target string, diffID digest.Digest) {
+// stageCacheHit runs an extraction Prepare for target/diffID and asserts the
+// cache staged the blob into the active snapshot: no mounts, and ErrAlreadyStaged
+// (so the unpacker skips fetch+apply but still commits). It returns the extraction
+// key so the caller can Commit it as the target chainID.
+func stageCacheHit(t *testing.T, ctx context.Context, s *snapshotter, target string, diffID digest.Digest) string {
 	t.Helper()
-	mounts, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
-	require.ErrorIs(t, err, errdefs.ErrAlreadyExists, "cache hit must signal the remote-snapshot protocol")
-	assert.Nil(t, mounts, "a cache hit returns no mounts")
+	key := "extract-1 " + target
+	mounts, err := s.Prepare(ctx, key, "", extractionOpt(target, diffID))
+	require.ErrorIs(t, err, snapshots.ErrAlreadyStaged, "cache hit must stage and signal ErrAlreadyStaged")
+	assert.Nil(t, mounts, "a staged cache hit returns no mounts")
+	return key
 }
 
 // TestCacheHit covers the happy path: an extraction Prepare whose diffID blob is
-// in the cache commits the target chainID (right kind, parent, and snapshot.ref
-// label), symlinks the blob, and returns ErrAlreadyExists.
+// in the cache stages the blob into the active snapshot (symlinked) and returns
+// ErrAlreadyStaged without committing; a subsequent Commit finalizes the target
+// chainID without re-converting.
 func TestCacheHit(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
@@ -904,18 +908,15 @@ func TestCacheHit(t *testing.T) {
 	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
 
 	target := cacheTestChainID
-	prepareCacheHit(t, ctx, s, target, diffID)
+	key := stageCacheHit(t, ctx, s, target, diffID)
 
-	// The target chainID is committed, with the parent and snapshot.ref label the
-	// metadata layer's Walk filter needs to resolve the backend target.
-	info, err := s.Stat(ctx, target)
-	require.NoError(t, err, "committed snapshot must exist under the target chainID")
-	assert.Equal(t, snapshots.KindCommitted, info.Kind)
-	assert.Equal(t, "", info.Parent)
-	assert.Equal(t, target, info.Labels[snapshots.LabelSnapshotRef])
+	// The blob is staged into the active snapshot but the target chainID is not
+	// committed yet.
+	_, err := s.Stat(ctx, target)
+	assert.Error(t, err, "target chainID must not be committed before Commit")
 
 	// layer.erofs is an absolute symlink into the operator-owned cache blob.
-	link := s.layerBlobPath(snapshotID(t, ctx, s, target))
+	link := s.layerBlobPath(snapshotID(t, ctx, s, key))
 	fi, err := os.Lstat(link)
 	require.NoError(t, err)
 	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "layer.erofs should be a symlink")
@@ -923,6 +924,14 @@ func TestCacheHit(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, filepath.IsAbs(dst), "symlink target should be absolute")
 	assert.Equal(t, blob, dst)
+
+	// Commit finalizes the staged snapshot as the target chainID, without any
+	// re-conversion (the blob is already present).
+	require.NoError(t, s.Commit(ctx, target, key))
+	info, err := s.Stat(ctx, target)
+	require.NoError(t, err, "committed snapshot must exist under the target chainID")
+	assert.Equal(t, snapshots.KindCommitted, info.Kind)
+	assert.Equal(t, "", info.Parent)
 }
 
 // TestCacheSidecar covers a hit in the default "auto" dm-verity mode where the
@@ -940,11 +949,11 @@ func TestCacheSidecar(t *testing.T) {
 	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
 
 	target := cacheTestChainID
-	prepareCacheHit(t, ctx, s, target, diffID)
+	key := stageCacheHit(t, ctx, s, target, diffID)
 
 	// The sidecar is copied in as a plain regular file (not a symlink) so mount-time
 	// metadata resolution is independent of the cache filesystem.
-	sidecar := dmverity.MetadataPath(s.layerBlobPath(snapshotID(t, ctx, s, target)))
+	sidecar := dmverity.MetadataPath(s.layerBlobPath(snapshotID(t, ctx, s, key)))
 	fi, err := os.Lstat(sidecar)
 	require.NoError(t, err, "sidecar should be copied into the snapshot dir")
 	assert.Zero(t, fi.Mode()&os.ModeSymlink, "sidecar should be a regular file, not a symlink")
@@ -1019,7 +1028,8 @@ func TestCacheRemove(t *testing.T) {
 	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
 
 	target := cacheTestChainID
-	prepareCacheHit(t, ctx, s, target, diffID)
+	key := stageCacheHit(t, ctx, s, target, diffID)
+	require.NoError(t, s.Commit(ctx, target, key))
 
 	snapDir := filepath.Dir(s.layerBlobPath(snapshotID(t, ctx, s, target)))
 
@@ -1037,8 +1047,8 @@ func TestCacheRemove(t *testing.T) {
 }
 
 // TestCacheDmverity covers dmverity_mode="on": a cache entry with a sidecar is
-// committed (and the sidecar copied), while an entry missing its required
-// sidecar is a hard error (not a hit, nothing committed).
+// staged (and the sidecar copied), while an entry missing its required sidecar is
+// a hard error (not staged, nothing committed).
 func TestCacheDmverity(t *testing.T) {
 	if supported, err := dmverity.IsSupported(); err != nil || !supported {
 		t.Skip("dm-verity is not supported on this system")
@@ -1047,15 +1057,15 @@ func TestCacheDmverity(t *testing.T) {
 	diffID := digest.Digest(cacheTestDiffID)
 	target := cacheTestChainID
 
-	t.Run("with sidecar commits and copies it", func(t *testing.T) {
+	t.Run("with sidecar stages and copies it", func(t *testing.T) {
 		cacheDir := t.TempDir()
 		blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
 		require.NoError(t, os.WriteFile(dmverity.MetadataPath(blob), []byte(testDmverityMetadata), 0644))
 
 		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir), WithDmverityMode("on"))
-		prepareCacheHit(t, ctx, s, target, diffID)
+		key := stageCacheHit(t, ctx, s, target, diffID)
 
-		_, err := os.Stat(dmverity.MetadataPath(s.layerBlobPath(snapshotID(t, ctx, s, target))))
+		_, err := os.Stat(dmverity.MetadataPath(s.layerBlobPath(snapshotID(t, ctx, s, key))))
 		require.NoError(t, err, "sidecar must be present for a dmverity_mode=on hit")
 	})
 
@@ -1069,7 +1079,7 @@ func TestCacheDmverity(t *testing.T) {
 		// error rather than a silent fallback.
 		_, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
 		require.Error(t, err)
-		assert.False(t, errdefs.IsAlreadyExists(err), "missing sidecar must not be treated as a hit")
+		assert.NotErrorIs(t, err, snapshots.ErrAlreadyStaged, "missing sidecar must not be treated as a hit")
 		_, err = s.Stat(ctx, target)
 		assert.Error(t, err, "no snapshot should be committed on failure")
 	})

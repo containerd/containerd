@@ -405,6 +405,7 @@ func (u *Unpacker) unpack(
 			key    string
 			mounts []mount.Mount
 			opts   = append(unpack.SnapshotOpts, snapshots.WithLabels(snapshotLabels))
+			staged bool
 		)
 
 		for try := 1; try <= 3; try++ {
@@ -412,6 +413,14 @@ func (u *Unpacker) unpack(
 			key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
 			mounts, err = sn.Prepare(ctx, key, parent, opts...)
 			if err != nil {
+				if errors.Is(err, snapshots.ErrAlreadyStaged) {
+					// The snapshotter staged the layer content into the active
+					// snapshot (e.g. a layer content cache hit). Skip fetch+apply,
+					// but still commit it below (which applies the parent).
+					staged = true
+					err = nil
+					break
+				}
 				if errdefs.IsAlreadyExists(err) {
 					if snInfo, err := sn.Stat(ctx, chainID); err != nil {
 						if !errdefs.IsNotFound(err) {
@@ -440,6 +449,61 @@ func (u *Unpacker) unpack(
 			if err := sn.Remove(ctx, key); err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to cleanup %q", key)
 			}
+		}
+
+		// commitF is the bottom half shared by normal and staged layers: it rebases
+		// in the real parent (parallel mode) and commits the snapshot. Staged layers
+		// have no fetched content, so they skip the post-apply uncompressed label.
+		commitF := func(shouldAbort bool) error {
+			defer unlock()
+			if shouldAbort {
+				cleanup.Do(ctx, abort)
+				return nil
+			}
+
+			if i > 0 && parallel {
+				opts = append(opts, snapshots.WithParent(chainIDs[i-1].String()))
+			}
+			if err := sn.Commit(ctx, chainID, key, opts...); err != nil {
+				cleanup.Do(ctx, abort)
+				if errdefs.IsAlreadyExists(err) {
+					return nil
+				}
+				return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
+			}
+
+			if staged {
+				// No layer was fetched, so there is no content to label.
+				return nil
+			}
+
+			// Set the uncompressed label after the uncompressed
+			// digest has been verified through apply.
+			cinfo := content.Info{
+				Digest: desc.Digest,
+				Labels: map[string]string{
+					labels.LabelUncompressed: diffIDs[i].String(),
+				},
+			}
+			if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
+				return err
+			}
+			return nil
+		}
+
+		if staged {
+			// Content is already staged in the active snapshot; there is nothing to
+			// fetch or apply. Emit a status that runs commitF in the (serialized)
+			// bottom half so the parent is rebased in and the chain is linked.
+			resCh := make(chan *unpackStatus, 1)
+			resCh <- &unpackStatus{
+				desc:    desc,
+				span:    span,
+				startAt: startAt,
+				bottomF: commitF,
+			}
+			close(resCh)
+			return resCh, nil
 		}
 
 		if fetchErr == nil {
@@ -478,38 +542,7 @@ func (u *Unpacker) unpack(
 				desc:    desc,
 				span:    span,
 				startAt: startAt,
-				bottomF: func(shouldAbort bool) error {
-					defer unlock()
-					if shouldAbort {
-						cleanup.Do(ctx, abort)
-						return nil
-					}
-
-					if i > 0 && parallel {
-						parent = chainIDs[i-1].String()
-						opts = append(opts, snapshots.WithParent(parent))
-					}
-					if err = sn.Commit(ctx, chainID, key, opts...); err != nil {
-						cleanup.Do(ctx, abort)
-						if errdefs.IsAlreadyExists(err) {
-							return nil
-						}
-						return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
-					}
-
-					// Set the uncompressed label after the uncompressed
-					// digest has been verified through apply.
-					cinfo := content.Info{
-						Digest: desc.Digest,
-						Labels: map[string]string{
-							labels.LabelUncompressed: diffIDs[i].String(),
-						},
-					}
-					if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
-						return err
-					}
-					return nil
-				},
+				bottomF: commitF,
 			}
 
 			select {
@@ -746,7 +779,7 @@ func (u *Unpacker) supportParallel(unpack *Platform) bool {
 	if u.unpackLimiter == nil {
 		return false
 	}
-	if !slices.Contains(unpack.SnapshotterCapabilities, "rebase") {
+	if !slices.Contains(unpack.SnapshotterCapabilities, snapshots.RebaseCap) {
 		log.L.Infof("snapshotter does not support rebase capability, unpacking will be sequential")
 		return false
 	}

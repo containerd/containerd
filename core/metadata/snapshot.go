@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -321,7 +322,8 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		bopts   = []snapshots.Opt{
 			snapshots.WithLabels(snapshots.FilterInheritedLabels(base.Labels)),
 		}
-		rerr error
+		rerr   error
+		staged bool
 	)
 
 	if err := update(ctx, s.db, func(tx *bolt.Tx) error {
@@ -433,9 +435,15 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 			// to avoid confusing callers handling already exists.
 			return nil, fmt.Errorf("unexpected error from snapshotter: %v: %w", err, errdefs.ErrUnknown)
 		}
-	} else if err != nil {
+	} else if err != nil && !errors.Is(err, snapshots.ErrAlreadyStaged) {
 		return nil, err
 	} else {
+		// A normal Prepare, or a backend that staged content into the active
+		// snapshot without committing (ErrAlreadyStaged, e.g. a layer content cache
+		// hit). Either way record the active snapshot; for the staged case
+		// propagate the sentinel after the txn so the caller skips fetch/apply but
+		// still commits it (applying the parent).
+		staged = errors.Is(err, snapshots.ErrAlreadyStaged)
 		ts := time.Now().UTC()
 		base.Created = ts
 		base.Updated = ts
@@ -512,6 +520,12 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 			}
 		}
 		return nil, rerr
+	}
+
+	// The active snapshot was recorded; propagate the staged signal so the caller
+	// skips fetch/apply but still commits it.
+	if staged {
+		return m, snapshots.ErrAlreadyStaged
 	}
 
 	return m, nil

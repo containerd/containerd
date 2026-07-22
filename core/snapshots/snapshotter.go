@@ -19,12 +19,23 @@ package snapshots
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"maps"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/mount"
 )
+
+// ErrAlreadyStaged is returned from Prepare when the snapshotter has staged a
+// layer's content into the active snapshot (e.g. from a layer content cache) so
+// the caller should skip fetching and applying the layer. Unlike
+// ErrAlreadyExists — which reports an already-committed snapshot and ends the
+// layer's lifecycle — the snapshot is NOT committed: the caller must still Commit
+// it, which is where the parent is applied. This keeps the cache compatible with
+// parallel unpacking (the "rebase" capability), where the parent is only known
+// at Commit time.
+var ErrAlreadyStaged = errors.New("snapshot already staged")
 
 const (
 	// UnpackKeyPrefix is the beginning of the key format used for snapshots that will have
@@ -58,6 +69,12 @@ const (
 	// Ignoring is not a failure — callers that require enforcement must
 	// pick a snapshotter that supports it.
 	LabelSnapshotMaxSize = "containerd.io/snapshot/max-size"
+
+	// RebaseCap is a snapshotter capability (advertised via the plugin's metadata)
+	// indicating that an active snapshot may be committed with a parent supplied at
+	// Commit time (via WithParent). It lets the unpacker prepare and apply layers in
+	// parallel and rebase the chain into place at commit.
+	RebaseCap = "rebase"
 )
 
 // Kind identifies the kind of snapshot.
