@@ -89,6 +89,9 @@ func (c *criService) podSandboxStats(
 	}
 	podSandboxStats.Linux.Memory = memoryStats
 
+	// IO stats (only has PSI for cgroupv2)
+	podSandboxStats.Linux.Io = c.ioContainerStats(*stats, timestamp)
+
 	if sandbox.NetNSPath != "" {
 		allStats, err := getAllContainerNetIO(ctx, sandbox.NetNSPath)
 		if err != nil {
