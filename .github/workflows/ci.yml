@@ -275,6 +275,14 @@ jobs:
           git checkout "${CRITOOLS_VERSION}"
           make critest
 
+      # Docker creates the "nat" HNS network that install-cni-windows needs, but
+      # on windows-2022 it intermittently fails to start. Start it explicitly.
+      # https://github.com/actions/runner-images/issues/13729#issuecomment-4183956802
+      - name: Ensure Docker is running
+        shell: powershell
+        run: |
+          Start-Service -Name "docker"
+
       - run: script/setup/install-cni-windows
 
       - env:
