@@ -198,25 +198,25 @@ func (fsys *Writer) copyFromImage(img *image) error {
 		trailingAddr := inodeAddr + int64(icSize) + int64(xattrSize)
 		typ := mode & disk.StatTypeMask
 
-		// Build fsEntry directly, bypassing builder.Entry + add() overhead.
-		fe := &fsEntry{
-			path:    cur.path,
-			mode:    mode,
-			uid:     uid,
-			gid:     gid,
-			mtime:   mtime,
-			mtimeNs: mtimeNs,
-			size:    size,
-			xattrs:  xattrs,
+		// Build fsInode directly, bypassing builder.Entry + add() overhead.
+		ino := &fsInode{
+			mode:       mode,
+			uid:        uid,
+			gid:        gid,
+			mtime:      mtime,
+			mtimeNs:    mtimeNs,
+			size:       size,
+			xattrs:     xattrs,
+			fileClosed: true,
 		}
 		if nlink > 0 {
-			fe.nlink = nlink
-			fe.nlinkSet = true
+			ino.nlink = nlink
+			ino.nlinkSet = true
 		}
-		fe.fileClosed = true
 		if fsys.copyMetadataOnly {
-			fe.metadataOnly = true
+			ino.metadataOnly = true
 		}
+		fe := &fsEntry{path: cur.path, ino: ino}
 
 		switch typ {
 		case disk.StatTypeDir:
@@ -258,7 +258,7 @@ func (fsys *Writer) copyFromImage(img *image) error {
 					linkData = at(trailingAddr)
 				}
 				if linkData != nil && int(size) <= len(linkData) {
-					fe.linkTarget = string(linkData[:size])
+					ino.linkTarget = string(linkData[:size])
 				}
 			}
 
@@ -270,41 +270,35 @@ func (fsys *Writer) copyFromImage(img *image) error {
 					if chunkAddr%8 != 0 {
 						chunkAddr = (chunkAddr + 7) & ^int64(7)
 					}
-					fe.chunks = fsys.parseChunks(at(chunkAddr), chunkFmt, size, blkBits, img.deviceIDMask)
-					fe.contiguous = true
+					ino.chunks = fsys.parseChunks(at(chunkAddr), chunkFmt, size, blkBits, img.deviceIDMask)
+					ino.contiguous = true
 				}
 			}
 
 		case disk.StatTypeChrdev, disk.StatTypeBlkdev:
-			fe.rdev = disk.RdevFromMode(mode, idata)
+			ino.rdev = disk.RdevFromMode(mode, idata)
 		}
 
 		// Remap chunk DeviceIDs for metadata-only sources.
 		if fsys.copyMetadataOnly && fsys.copyDeviceID > 0 {
 			offset := fsys.copyDeviceID - 1
-			for i := range fe.chunks {
-				fe.chunks[i].DeviceID += offset
+			for i := range ino.chunks {
+				ino.chunks[i].DeviceID += offset
 			}
 		}
 
 		// Register in the tree.
 		if cur.path == "/" {
-			// Update root metadata.
-			fsys.root.mode = fe.mode
-			fsys.root.uid = fe.uid
-			fsys.root.gid = fe.gid
-			fsys.root.mtime = fe.mtime
-			fsys.root.mtimeNs = fe.mtimeNs
-			fsys.root.nlink = fe.nlink
-			fsys.root.nlinkSet = fe.nlinkSet
-			fsys.root.xattrs = fe.xattrs
+			// Update root fsInode.
+			fsys.root.ino = ino
 		} else if existing, ok := fsys.byPath[cur.path]; ok {
-			// Merge overwrites: preserve tree linkage.
-			savedParent := existing.parent
-			savedChildren := existing.children
-			*existing = *fe
-			existing.parent = savedParent
-			existing.children = savedChildren
+			// Merge overwrites: replace fsInode but preserve tree linkage.
+			// Detach the old fsInode so any remaining hard-linked names get a
+			// correct nlink.
+			if existing.ino != ino {
+				unlinkInode(existing.ino)
+			}
+			existing.ino = ino
 		} else {
 			fsys.addChild(fe)
 		}

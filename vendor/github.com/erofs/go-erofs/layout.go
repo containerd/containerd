@@ -26,17 +26,27 @@ func (w *erofsWriter) planLayout(root *erofsEntry) {
 	}
 	walk(root)
 
-	w.totalInodes = uint64(len(w.entries))
+	// Secondary hard-link entries share the primary's inode; count only primaries.
+	var inodeCount uint64
+	for _, e := range w.entries {
+		if e.hardLinkPrimary == nil {
+			inodeCount++
+		}
+	}
+	w.totalInodes = inodeCount
 
 	// Block 0 holds: 1024-byte pad + 128-byte superblock + device slot(s) + padding
 	// MetaBlkAddr is set later by write() depending on the on-disk layout.
 
-	// Assign NIDs sequentially.
-	// NID = byte offset from metaStartPos / 32.
-	// Each extended inode is 64 bytes = 2 NID slots.
-	// Trailing data follows and is padded to 32-byte boundary.
+	// Assign NIDs sequentially. NID = byte offset from metaStartPos / 32.
+	// Secondary hard-link entries are skipped here; a second pass copies the
+	// primary's finalized NID to them.
 	currentOff := 0 // byte offset from metaStartPos
 	for _, e := range w.entries {
+		if e.hardLinkPrimary != nil {
+			continue // skip; NID assigned in second pass below
+		}
+
 		e.nid = uint64(currentOff / 32)
 		e.xattrSize = calcXattrSize(e)
 
@@ -132,6 +142,13 @@ func (w *erofsWriter) planLayout(root *erofsEntry) {
 		currentOff += totalInodeSize
 	}
 
+	// Second pass: copy the primary's finalized NID to secondary entries.
+	for _, e := range w.entries {
+		if e.hardLinkPrimary != nil {
+			e.nid = e.hardLinkPrimary.nid
+		}
+	}
+
 	w.rootNid = root.nid
 }
 
@@ -166,29 +183,25 @@ func (w *erofsWriter) calcTrailingSize(e *erofsEntry) int {
 	}
 }
 
-// direntNames returns the sorted list of dirent names for a directory,
-// including "." and "..". EROFS requires dirents within each block to
-// be sorted alphabetically.
-func direntNames(e *erofsEntry) []string {
+// direntDataSize calculates the serialized EROFS dirent data size for a directory.
+// For multi-block directories, this includes inter-block padding.
+func (w *erofsWriter) direntDataSize(e *erofsEntry) int {
+	if len(e.children) == 0 {
+		// Empty dir still needs "." and ".." entries.
+		return 2*disk.SizeDirent + 1 + 2
+	}
+
+	// Build sorted name lengths matching the order writeDirents produces.
+	// "." and ".." are not guaranteed to sort before all real names (any
+	// name with an ASCII value below '.' such as '-' sorts before them).
 	names := make([]string, 0, len(e.children)+2)
 	names = append(names, ".", "..")
 	for _, c := range e.children {
 		names = append(names, c.name)
 	}
 	sort.Strings(names)
-	return names
-}
 
-// direntDataSize calculates the serialized EROFS dirent data size for a directory.
-// For multi-block directories, this includes inter-block padding.
-func (w *erofsWriter) direntDataSize(e *erofsEntry) int {
-	names := direntNames(e)
 	nEntries := len(names)
-	if len(e.children) == 0 {
-		// Empty dir still needs "." and ".." entries
-		return 2*disk.SizeDirent + 1 + 2
-	}
-
 	totalSize := 0
 	i := 0
 	for i < nEntries {
@@ -209,7 +222,7 @@ func (w *erofsWriter) direntDataSize(e *erofsEntry) int {
 			blockUsed = disk.SizeDirent + len(names[i])
 			i++
 		}
-		// Pad non-final blocks to block boundary
+		// Pad non-final blocks to block boundary.
 		if i < nEntries && blockUsed%w.blockSize != 0 {
 			blockUsed = (blockUsed + w.blockSize - 1) & ^(w.blockSize - 1)
 		}

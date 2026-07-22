@@ -97,6 +97,39 @@ type Stat struct {
 	Xattrs      map[string]string
 }
 
+// holeOffset is the sentinel value for DataRange.Offset that marks a hole
+// (a sparse region of zeros) rather than backed device data.
+const holeOffset int64 = -1
+
+// DataRange describes one entry in the complete logical layout of a file's
+// content. A slice of DataRange values returned by [fileInfo.DataRange]
+// covers the file from logical byte 0 to logical byte [fs.FileInfo.Size]-1
+// in order, with no gaps or overlaps.
+//
+// The sum of all Size values in the slice must equal the file size exactly.
+// A slice whose sizes do not sum to the file size is invalid.
+//
+// Each entry is either a data entry or a hole entry:
+//
+//   - A data entry has Offset >= 0. The bytes at [Offset, Offset+Size) in
+//     Device are the file's content verbatim — uncompressed, unreferenced
+//     by transformation.
+//   - A hole entry has Offset == -1. It represents Size bytes of zeros at the
+//     current logical position. Device is ignored for hole entries.
+//
+// Compressed data should not be represented as a DataRange. When a source
+// FS contains compressed files, it should not provide DataRange() []DataRange
+// for those files (or should return nil). In full-image mode CopyFrom will
+// fall back to reading through Open(), which decompresses transparently, and
+// write the decompressed data into the output image. In MetadataOnly mode
+// there is no such fallback: files without DataRange() (or pre-built chunks)
+// are stored as chunk-based inodes with no physical mappings (all holes).
+type DataRange struct {
+	Device uint16 // device index (0 for the device assigned by CopyFrom); ignored for holes
+	Offset int64  // byte offset in the device, or -1 for a hole entry
+	Size   int64  // byte length of this entry
+}
+
 type options struct {
 	extraDevices []io.ReaderAt
 }
@@ -336,7 +369,10 @@ func (img *image) openDirect(ino *inode) io.Reader {
 		if baseOffset%8 != 0 {
 			baseOffset = (baseOffset + 7) & ^int64(7)
 		}
-		needed := int64(nchunks * disk.SizeChunkIndex)
+		needed := int64(nchunks) * int64(disk.SizeChunkIndex)
+		if needed > maxChunkIndexBytes {
+			return nil
+		}
 		idxBuf := make([]byte, needed)
 		if _, err := img.meta.ReadAt(idxBuf, baseOffset); err != nil {
 			return nil
@@ -1047,12 +1083,146 @@ func (b *file) statInfo() (*fileInfo, error) {
 			return nil, err
 		}
 	}
+	// Build data ranges for regular files.
+	// Flat layouts are cheap (no I/O) — compute eagerly.
+	// Chunk-based layout requires a ReadAt on the image; defer until needed.
+	if ino.mode.IsRegular() && ino.size > 0 {
+		if ino.inodeLayout == disk.LayoutChunkBased {
+			// Capture a snapshot of the fields buildChunkDataRanges needs.
+			// We must not capture ino by pointer: the caller may reuse it,
+			// and cached block is released below.
+			inoCopy := *ino
+			inoCopy.cached = nil
+			img := b.img
+			fi.rangesLoader = func() []DataRange {
+				f := &file{img: img}
+				return f.buildChunkDataRanges(&inoCopy)
+			}
+		} else {
+			fi.dataRanges = b.buildDataRanges(ino)
+		}
+	}
 	// Release cached block - stat callers don't need inline data
 	if ino.cached != nil {
 		b.img.putBlock(ino.cached)
 		ino.cached = nil
 	}
 	return fi, nil
+}
+
+// buildDataRanges computes the physical data ranges for a regular file.
+func (b *file) buildDataRanges(ino *inode) []DataRange {
+	blockSize := int64(1 << b.img.sb.BlkSizeBits)
+	switch ino.inodeLayout {
+	case disk.LayoutFlatPlain:
+		dataOffset := int64(ino.inodeData) << b.img.sb.BlkSizeBits
+		return []DataRange{{Device: 0, Offset: dataOffset, Size: ino.size}}
+	case disk.LayoutFlatInline:
+		inodeAddr := b.img.metaStartPos() + int64(ino.nid)*disk.SizeInodeCompact
+		trailingAddr := inodeAddr + ino.flatDataOffset()
+		if ino.size <= blockSize {
+			return []DataRange{{Device: 0, Offset: trailingAddr, Size: ino.size}}
+		}
+		// Multi-block inline: earlier full blocks at dataBlkAddr, last block inline.
+		// headSize is the number of complete blocks before the inline tail, in bytes.
+		// ino.inodeData is the starting block address, not a block count.
+		headSize := ((ino.size - 1) / blockSize) * blockSize
+		tailSize := ino.size - headSize
+		var ranges []DataRange
+		if headSize > 0 {
+			dataOffset := int64(ino.inodeData) << b.img.sb.BlkSizeBits
+			ranges = append(ranges, DataRange{Device: 0, Offset: dataOffset, Size: headSize})
+		}
+		ranges = append(ranges, DataRange{Device: 0, Offset: trailingAddr, Size: tailSize})
+		return ranges
+	case disk.LayoutChunkBased:
+		return b.buildChunkDataRanges(ino)
+	}
+	return nil
+}
+
+// maxChunkIndexBytes is an upper bound on the chunk-index table we will
+// allocate for a single file. 64 MiB covers ~8 M chunks; no real EROFS image
+// should approach this, and it prevents allocation bombs from corrupt images.
+const maxChunkIndexBytes = 64 << 20 // 64 MiB
+
+// buildChunkDataRanges parses chunk indexes into DataRange entries covering
+// the complete logical layout of the file. The returned slice satisfies the
+// DataRange contract: entries are in logical-file order and their sizes sum
+// to ino.size exactly.
+//
+// Null/hole chunks are emitted as DataRange{Offset: -1, Size: ...} entries.
+// Consecutive null chunks coalesce into a single hole entry.
+// Adjacent data chunks that are physically contiguous on the same device
+// merge into one entry. Data chunks never merge across a hole boundary.
+//
+// The final entry (data or hole) has its Size trimmed to the file-tail length
+// so the invariant sum(Size) == ino.size holds precisely.
+func (b *file) buildChunkDataRanges(ino *inode) []DataRange {
+	chunkFmt := uint16(ino.inodeData)
+	if chunkFmt&disk.LayoutChunkFormatIndexes == 0 {
+		return nil
+	}
+	// 48-bit chunk addressing is not yet implemented; the null-chunk sentinel
+	// (blkLo == 0xFFFFFFFF) is only unambiguous in 32-bit address mode.
+	if chunkFmt&disk.LayoutChunkFormat48Bit != 0 {
+		return nil
+	}
+	chunkBits := b.img.sb.BlkSizeBits + uint8(chunkFmt&disk.LayoutChunkFormatBits)
+	nchunks := int((ino.size-1)>>chunkBits) + 1
+	chunkSize := int64(1) << chunkBits
+
+	inodeStart := b.img.metaStartPos() + int64(ino.nid)*disk.SizeInodeCompact
+	baseOffset := inodeStart + ino.flatDataOffset()
+	if baseOffset%8 != 0 {
+		baseOffset = (baseOffset + 7) & ^int64(7)
+	}
+	needed := int64(nchunks) * int64(disk.SizeChunkIndex)
+	if needed > maxChunkIndexBytes {
+		return nil
+	}
+	idxBuf := make([]byte, needed)
+	if _, err := b.img.meta.ReadAt(idxBuf, baseOffset); err != nil {
+		return nil
+	}
+
+	var ranges []DataRange
+	for i := range nchunks {
+		// Size of this logical chunk: full chunkSize for all but the last.
+		size := chunkSize
+		if i == nchunks-1 {
+			size = ino.size - int64(i)*chunkSize
+		}
+
+		off := i * disk.SizeChunkIndex
+		blkLo := binary.LittleEndian.Uint32(idxBuf[off+4 : off+8])
+		if ^blkLo == 0 {
+			// Null/hole chunk: coalesce with a preceding hole if possible.
+			if len(ranges) > 0 && ranges[len(ranges)-1].Offset == holeOffset {
+				ranges[len(ranges)-1].Size += size
+			} else {
+				ranges = append(ranges, DataRange{Offset: holeOffset, Size: size})
+			}
+			continue
+		}
+
+		blkHi := binary.LittleEndian.Uint16(idxBuf[off : off+2])
+		deviceID := binary.LittleEndian.Uint16(idxBuf[off+2:off+4]) & b.img.deviceIDMask
+		phys := (uint64(blkHi) << 32) | uint64(blkLo)
+		byteOffset := int64(phys) << b.img.sb.BlkSizeBits
+
+		// Merge with the previous entry if it is a data range that is
+		// physically contiguous on the same device.
+		if len(ranges) > 0 {
+			prev := &ranges[len(ranges)-1]
+			if prev.Offset != holeOffset && prev.Device == deviceID && prev.Offset+prev.Size == byteOffset {
+				prev.Size += size
+				continue
+			}
+		}
+		ranges = append(ranges, DataRange{Device: deviceID, Offset: byteOffset, Size: size})
+	}
+	return ranges
 }
 
 func (b *file) Stat() (fs.FileInfo, error) {
@@ -1454,12 +1624,21 @@ func (ino *inode) flatDataOffset() int64 {
 //
 //	if u, ok := fi.(interface{ UID() uint32 }); ok { uid = u.UID() }
 type fileInfo struct {
-	name    string
-	size    int64
-	mode    fs.FileMode
-	mtime   uint64
-	mtimeNs uint32
-	stat    *Stat
+	name       string
+	size       int64
+	mode       fs.FileMode
+	mtime      uint64
+	mtimeNs    uint32
+	stat       *Stat
+	dataRanges []DataRange
+
+	// rangesOnce and rangesLoader support lazy computation of data ranges
+	// for chunk-based files (LayoutChunkBased). The loader performs a ReadAt
+	// to parse the chunk index, so it is deferred until the caller actually
+	// calls DataRange(). For flat layouts (FlatPlain, FlatInline), ranges
+	// are computed eagerly at stat time since they require no I/O.
+	rangesOnce   sync.Once
+	rangesLoader func() []DataRange
 }
 
 func (fi *fileInfo) Name() string       { return fi.name }
@@ -1473,6 +1652,18 @@ func (fi *fileInfo) GID() uint32        { return fi.stat.GID }
 func (fi *fileInfo) Ino() uint64        { return uint64(fi.stat.Ino) }
 func (fi *fileInfo) Nlink() uint64      { return uint64(fi.stat.Nlink) }
 func (fi *fileInfo) Rdev() uint64       { return uint64(fi.stat.Rdev) }
+
+// DataRange returns the physical data ranges for this file's uncompressed
+// content. Returns nil for compressed files, directories, symlinks, and
+// other non-regular entries.
+func (fi *fileInfo) DataRange() []DataRange {
+	if fi.rangesLoader != nil {
+		fi.rangesOnce.Do(func() {
+			fi.dataRanges = fi.rangesLoader()
+		})
+	}
+	return fi.dataRanges
+}
 
 // GetAllXattr returns all extended attributes.
 func (fi *fileInfo) GetAllXattr() map[string]string { return fi.stat.Xattrs }

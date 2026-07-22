@@ -27,6 +27,7 @@ type Writer struct {
 	buildTime    uint64 // from WithBuildTime or buildTimer
 	buildTimeNs  uint32
 	hasBuildTime bool
+	wErr         error               // sticky error: once set, all subsequent ops return it
 	root         *fsEntry            // root directory
 	byPath       map[string]*fsEntry // path → entry (all types)
 
@@ -74,7 +75,7 @@ func Create(out io.WriteSeeker, opts ...CreateOpt) *Writer {
 
 	root := &fsEntry{
 		path: "/",
-		mode: disk.StatTypeDir | 0o755,
+		ino:  &fsInode{mode: disk.StatTypeDir | 0o755},
 	}
 	fsys := &Writer{
 		out:          out,
@@ -85,6 +86,12 @@ func Create(out io.WriteSeeker, opts ...CreateOpt) *Writer {
 		byPath:       map[string]*fsEntry{"/": root},
 		dataFile:     o.dataFile,
 		tempDir:      o.tempDir,
+	}
+
+	if o.blockSize != 0 {
+		if err := fsys.setBlockSize(o.blockSize); err != nil {
+			fsys.wErr = err
+		}
 	}
 
 	if o.dataFile != nil {
@@ -128,6 +135,17 @@ func Merge() CopyOpt {
 
 // --- CreateOpt functions ---
 
+// WithBlockSize sets the filesystem block size. The value must be a power
+// of two between 512 and 64 KiB. When unset the default is 4096.
+// An invalid size causes subsequent Writer operations to return an error.
+// If CopyFrom is called with a source that declares a different block size,
+// CopyFrom returns an error.
+func WithBlockSize(n int) CreateOpt {
+	return func(o *createOptions) {
+		o.blockSize = n
+	}
+}
+
 // WithBuildTime sets the filesystem build timestamp.
 func WithBuildTime(sec uint64, nsec uint32) CreateOpt {
 	return func(o *createOptions) {
@@ -159,6 +177,9 @@ func WithTempDir(dir string) CreateOpt {
 // Create creates a regular file with default mode 0644. The caller must
 // Close the returned File.
 func (fsys *Writer) Create(name string) (*File, error) {
+	if fsys.wErr != nil {
+		return nil, fsys.wErr
+	}
 	name = cleanPath(name)
 	if name == "/" {
 		return nil, fmt.Errorf("mkfs: cannot create file at root")
@@ -169,10 +190,8 @@ func (fsys *Writer) Create(name string) (*File, error) {
 
 	fsys.ensureParent(name)
 
-	e := &fsEntry{
-		path: name,
-		mode: disk.StatTypeReg | 0o644,
-	}
+	ino := &fsInode{mode: disk.StatTypeReg | 0o644}
+	e := &fsEntry{path: name, ino: ino}
 	fsys.addChild(e)
 
 	f := &File{
@@ -182,14 +201,14 @@ func (fsys *Writer) Create(name string) (*File, error) {
 
 	if fsys.dataFile != nil {
 		f.dataStartOff = fsys.dataOff
-		e.dataStartOff = fsys.dataOff
+		ino.dataStartOff = fsys.dataOff
 	} else {
 		if err := fsys.ensureSpool(); err != nil {
 			return nil, err
 		}
 		f.dataStartOff = fsys.spoolOff
-		e.spoolOff = fsys.spoolOff
-		e.dataStartOff = fsys.spoolOff
+		ino.spoolOff = fsys.spoolOff
+		ino.dataStartOff = fsys.spoolOff
 	}
 
 	return f, nil
@@ -198,9 +217,12 @@ func (fsys *Writer) Create(name string) (*File, error) {
 // Mkdir creates a directory. Only permission bits from perm are used;
 // type bits are forced to directory. Mkdir("/", perm) sets root permissions.
 func (fsys *Writer) Mkdir(name string, perm fs.FileMode) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	name = cleanPath(name)
 	if name == "/" {
-		fsys.root.mode = disk.StatTypeDir | uint16(perm.Perm())
+		fsys.root.ino.mode = disk.StatTypeDir | uint16(perm.Perm())
 		return nil
 	}
 	if err := fsys.checkPath(name); err != nil {
@@ -211,7 +233,7 @@ func (fsys *Writer) Mkdir(name string, perm fs.FileMode) error {
 
 	e := &fsEntry{
 		path: name,
-		mode: disk.StatTypeDir | uint16(perm.Perm()),
+		ino:  &fsInode{mode: disk.StatTypeDir | uint16(perm.Perm())},
 	}
 	fsys.addChild(e)
 
@@ -220,6 +242,9 @@ func (fsys *Writer) Mkdir(name string, perm fs.FileMode) error {
 
 // Symlink creates newname as a symbolic link to oldname (mode 0777).
 func (fsys *Writer) Symlink(oldname, newname string) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	newname = cleanPath(newname)
 	if newname == "/" {
 		return fmt.Errorf("mkfs: cannot create symlink at root")
@@ -231,9 +256,8 @@ func (fsys *Writer) Symlink(oldname, newname string) error {
 	fsys.ensureParent(newname)
 
 	e := &fsEntry{
-		path:       newname,
-		mode:       disk.StatTypeSymlink | 0o777,
-		linkTarget: oldname,
+		path: newname,
+		ino:  &fsInode{mode: disk.StatTypeSymlink | 0o777, linkTarget: oldname},
 	}
 	fsys.addChild(e)
 
@@ -243,6 +267,9 @@ func (fsys *Writer) Symlink(oldname, newname string) error {
 // Mknod creates a device, FIFO, or socket. mode must include type bits
 // (e.g. disk.StatTypeChrdev | 0o666).
 func (fsys *Writer) Mknod(name string, mode uint16, rdev uint32) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	name = cleanPath(name)
 	if name == "/" {
 		return fmt.Errorf("mkfs: cannot mknod at root")
@@ -255,8 +282,7 @@ func (fsys *Writer) Mknod(name string, mode uint16, rdev uint32) error {
 
 	e := &fsEntry{
 		path: name,
-		mode: mode,
-		rdev: rdev,
+		ino:  &fsInode{mode: mode, rdev: rdev},
 	}
 	fsys.addChild(e)
 
@@ -267,61 +293,76 @@ func (fsys *Writer) Mknod(name string, mode uint16, rdev uint32) error {
 
 // Chmod sets permission bits on the named path, preserving type bits.
 func (fsys *Writer) Chmod(name string, mode fs.FileMode) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
 	}
 	perm := goModeToUnixMode(mode) & 0o7777
-	e.mode = (e.mode & disk.StatTypeMask) | perm
+	e.ino.mode = (e.ino.mode & disk.StatTypeMask) | perm
 	return nil
 }
 
 // Chown sets the owner UID and GID on the named path.
 func (fsys *Writer) Chown(name string, uid, gid int) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
 	}
-	e.uid = uint32(uid)
-	e.gid = uint32(gid)
+	e.ino.uid = uint32(uid)
+	e.ino.gid = uint32(gid)
 	return nil
 }
 
 // Chtimes sets the access and modification times on the named path.
 // EROFS only stores mtime; atime is retained for read-back before Close.
 func (fsys *Writer) Chtimes(name string, atime time.Time, mtime time.Time) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
 	}
-	e.atime = uint64(atime.Unix())
-	e.atimeNs = uint32(atime.Nanosecond())
-	e.mtime = uint64(mtime.Unix())
-	e.mtimeNs = uint32(mtime.Nanosecond())
+	e.ino.atime = uint64(atime.Unix())
+	e.ino.atimeNs = uint32(atime.Nanosecond())
+	e.ino.mtime = uint64(mtime.Unix())
+	e.ino.mtimeNs = uint32(mtime.Nanosecond())
 	return nil
 }
 
 // Setxattr sets an extended attribute on the named path.
 func (fsys *Writer) Setxattr(name, attr, value string) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
 	}
-	if e.xattrs == nil {
-		e.xattrs = make(map[string]string)
+	if e.ino.xattrs == nil {
+		e.ino.xattrs = make(map[string]string)
 	}
-	e.xattrs[attr] = value
+	e.ino.xattrs[attr] = value
 	return nil
 }
 
 // SetNlink overrides the computed link count on the named path.
 func (fsys *Writer) SetNlink(name string, nlink uint32) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
 	}
-	e.nlink = nlink
-	e.nlinkSet = true
+	e.ino.nlink = nlink
+	e.ino.nlinkSet = true
 	return nil
 }
 
@@ -332,6 +373,9 @@ func (fsys *Writer) SetNlink(name string, nlink uint32) error {
 // Reads symlink targets via readLinker interface when Entry.LinkTarget is empty.
 // If src implements blockSizer, the image block size is set accordingly.
 func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	// Reset per-CopyFrom state.
 	fsys.copyMetadataOnly = false
 	fsys.copyMerge = false
@@ -435,6 +479,22 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 						be = &builder.Entry{}
 					}
 				}
+				// Generate chunks from DataRange if available.
+				if len(be.Chunks) == 0 {
+					if dr, ok := info.(dataRanger); ok {
+						if ranges := dr.DataRange(); len(ranges) > 0 {
+							chunks, err := fsys.chunksFromRanges(ranges, info.Size())
+							if err != nil {
+								return fmt.Errorf("chunksFromRanges %s: %w", p, err)
+							}
+							be.Chunks = chunks
+							// Contiguous: a single non-hole range whose total-size
+							// invariant is satisfied (guaranteed by chunksFromRanges)
+							// means the file is fully covered by one contiguous extent.
+							be.Contiguous = len(ranges) == 1 && ranges[0].Offset != holeOffset
+						}
+					}
+				}
 				return fsys.add(p, &entryFileInfo{info: info, sys: be})
 			}
 			// For EROFS sources, use direct SectionReader (bypasses
@@ -485,11 +545,13 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 			}
 		}
 
-		// For directories from plain fs.FS, ensure nlink >= 2.
-		if info.Mode().IsDir() && be == nil {
-			be = entryFromSys(info)
+		// For directories, ensure nlink >= 2.
+		if info.Mode().IsDir() {
 			if be == nil {
-				be = &builder.Entry{Nlink: 2}
+				be = entryFromSys(info)
+				if be == nil {
+					be = &builder.Entry{Nlink: 2}
+				}
 			}
 			if be.Nlink < 2 {
 				be.Nlink = 2
@@ -497,6 +559,12 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 			return fsys.add(p, &entryFileInfo{info: info, sys: be})
 		}
 
+		// General case: devices, fifos, sockets, etc.
+		// Wrap in entryFileInfo when be was extracted from Sys()
+		// so that add() sees the metadata.
+		if be != nil {
+			return fsys.add(p, &entryFileInfo{info: info, sys: be})
+		}
 		return fsys.add(p, info)
 	})
 }
@@ -505,6 +573,9 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 
 // Close writes the EROFS image. The FS must not be used after Close.
 func (fsys *Writer) Close() error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	if fsys.closed {
 		return fmt.Errorf("mkfs: FS already closed")
 	}
@@ -552,11 +623,13 @@ func (fsys *Writer) Close() error {
 
 // Stat returns file info for the named path. The name is cleaned the same
 // way as other Writer methods (leading slash, no trailing slash).
+//
+// The Writer does not follow symlinks: a path that traverses through a
+// symlink or other non-directory component returns ErrNotDirectory.
 func (fsys *Writer) Stat(name string) (fs.FileInfo, error) {
-	name = cleanPath(name)
-	e, ok := fsys.byPath[name]
-	if !ok {
-		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrNotExist}
+	e, err := fsys.resolveEntry("stat", name)
+	if err != nil {
+		return nil, err
 	}
 	return &writerFileInfo{entry: e}, nil
 }
@@ -564,34 +637,104 @@ func (fsys *Writer) Stat(name string) (fs.FileInfo, error) {
 // Open opens the named file for reading. For regular files, the file must
 // have been closed (data finalized) before it can be opened for reading.
 // For directories, the returned file implements fs.ReadDirFile.
+//
+// The Writer does not follow symlinks: a path that traverses through a
+// symlink or other non-directory component returns ErrNotDirectory.
 func (fsys *Writer) Open(name string) (fs.File, error) {
-	name = cleanPath(name)
-	e, ok := fsys.byPath[name]
-	if !ok {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	entry, err := fsys.resolveEntry("open", name)
+	if err != nil {
+		return nil, err
 	}
+	name = cleanPath(name)
+	ino := entry.ino
 
-	typ := e.mode & disk.StatTypeMask
-	switch typ {
+	switch ino.mode & disk.StatTypeMask {
 	case disk.StatTypeDir:
-		return &readDir{fsys: fsys, entry: e}, nil
+		return &readDir{fsys: fsys, entry: entry}, nil
 
 	case disk.StatTypeReg:
-		if !e.fileClosed {
+		if !ino.fileClosed {
 			return nil, &fs.PathError{Op: "open", Path: name, Err: fmt.Errorf("file not yet closed for writing")}
 		}
 		var sr *io.SectionReader
 		if fsys.dataFile != nil {
-			sr = io.NewSectionReader(fsys.dataFile, e.dataStartOff, int64(e.size))
-		} else if fsys.spool != nil && e.size > 0 {
-			sr = io.NewSectionReader(fsys.spool, e.dataStartOff, int64(e.size))
+			sr = io.NewSectionReader(fsys.dataFile, ino.dataStartOff, int64(ino.size))
+		} else if fsys.spool != nil && ino.size > 0 {
+			sr = io.NewSectionReader(fsys.spool, ino.dataStartOff, int64(ino.size))
 		}
-		return &readFile{entry: e, reader: sr}, nil
+		return &readFile{entry: entry, reader: sr}, nil
 
 	default:
 		// Symlinks, devices, etc.: stat-only, no readable data.
-		return &readFile{entry: e}, nil
+		return &readFile{entry: entry}, nil
 	}
+}
+
+// Lstat returns the FileInfo for the named path. Symlinks are stored as their
+// own entries, so the result describes the link itself, never its target.
+// Together with ReadLink this lets the Writer satisfy fs.ReadLinkFS.
+func (fsys *Writer) Lstat(name string) (fs.FileInfo, error) {
+	return fsys.Stat(name)
+}
+
+// ReadLink returns the target of the symlink at name. It returns ErrInvalid
+// if name is not a symlink, ErrNotDirectory if the path traverses a
+// non-directory, or ErrNotExist if it is absent. Targets are readable before
+// the image is finalised with Close.
+func (fsys *Writer) ReadLink(name string) (string, error) {
+	entry, err := fsys.resolveEntry("readlink", name)
+	if err != nil {
+		return "", err
+	}
+	if entry.ino.mode&disk.StatTypeMask != disk.StatTypeSymlink {
+		return "", &fs.PathError{Op: "readlink", Path: cleanPath(name), Err: fs.ErrInvalid}
+	}
+	return entry.ino.linkTarget, nil
+}
+
+// Link creates newname as a hard link to the existing file at oldname.
+// Both names refer to the same fsInode, so the data and metadata (mode, owner,
+// times, xattrs) are shared: a later change through either name is visible
+// through the other. Directories cannot be linked.
+//
+// The shared nlink count is maintained automatically; do not call SetNlink on
+// a hard-linked entry.
+func (fsys *Writer) Link(oldname, newname string) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
+	oldname = cleanPath(oldname)
+	newname = cleanPath(newname)
+	if newname == "/" {
+		return fmt.Errorf("mkfs: cannot link at root")
+	}
+
+	src, err := fsys.resolveEntry("link", oldname)
+	if err != nil {
+		return err
+	}
+	if src.ino.mode&disk.StatTypeMask == disk.StatTypeDir {
+		return &fs.PathError{Op: "link", Path: oldname, Err: ErrIsDirectory}
+	}
+	if err := fsys.checkPath(newname); err != nil {
+		return err
+	}
+	fsys.ensureParent(newname)
+
+	// Increment nlink before the first link is created so that the count
+	// reflects all names, including the original.
+	if src.ino.nlink == 0 {
+		src.ino.nlink = 1 // first time we add a second name
+	}
+	src.ino.nlink++
+
+	// The new entry shares the source fsInode directly.
+	dst := &fsEntry{
+		path: newname,
+		ino:  src.ino,
+	}
+	fsys.addChild(dst)
+	return nil
 }
 
 // --- File methods ---
@@ -645,8 +788,8 @@ func (f *File) Close() error {
 		return fmt.Errorf("mkfs: file already closed")
 	}
 	f.closed = true
-	f.entry.fileClosed = true
-	f.entry.size = uint64(f.written)
+	f.entry.ino.fileClosed = true
+	f.entry.ino.size = uint64(f.written)
 
 	if f.fs.dataFile != nil {
 		return f.closeDataFile()
@@ -657,49 +800,65 @@ func (f *File) Close() error {
 // Chmod sets permission bits on the file, matching os.File.Chmod.
 func (f *File) Chmod(mode fs.FileMode) error {
 	perm := goModeToUnixMode(mode) & 0o7777
-	f.entry.mode = (f.entry.mode & disk.StatTypeMask) | perm
+	f.entry.ino.mode = (f.entry.ino.mode & disk.StatTypeMask) | perm
 	return nil
 }
 
 // Chown sets the owner UID and GID on the file, matching os.File.Chown.
 func (f *File) Chown(uid, gid int) error {
-	f.entry.uid = uint32(uid)
-	f.entry.gid = uint32(gid)
+	f.entry.ino.uid = uint32(uid)
+	f.entry.ino.gid = uint32(gid)
 	return nil
 }
 
 // --- Internal types ---
 
-// fsEntry is the in-memory representation of a filesystem entry held by Writer.
-type fsEntry struct {
-	path       string
-	mode       uint16
-	uid, gid   uint32
-	atime      uint64
-	atimeNs    uint32
-	mtime      uint64
-	mtimeNs    uint32
-	nlink      uint32
-	nlinkSet   bool // true if SetNlink was called
-	size       uint64
-	rdev       uint32
-	xattrs     map[string]string
+// fsInode holds the shared inode payload for a filesystem entry. Every fsEntry
+// owns exactly one *fsInode; hard links share the same *fsInode across multiple
+// fsEntry values. No fsEntry is "primary" — any surviving name can own the
+// on-disk inode during serialization.
+type fsInode struct {
+	mode     uint16
+	uid      uint32
+	gid      uint32
+	atime    uint64
+	atimeNs  uint32
+	mtime    uint64
+	mtimeNs  uint32
+	nlink    uint32
+	nlinkSet bool // true if SetNlink was called; suppresses auto-computation
+	size     uint64
+	rdev     uint32
+	xattrs   map[string]string
+
+	// Symlink target (empty for non-symlinks).
 	linkTarget string
+
+	// Chunk-based layout (metadata-only mode).
 	chunks     []builder.Chunk
-	contiguous bool // data blocks are contiguous; flat-plain is sufficient
+	contiguous bool
+
+	// Data location in spool or external data file.
+	spoolOff     int64
+	dataStartOff int64
+	fileClosed   bool      // true after File.Close()
+	directData   io.Reader // non-nil when data is referenced directly (no spool copy)
+
+	metadataOnly bool // chunk-based layout even when chunks is nil
+}
+
+// fsEntry is the directory-entry view of a file. It carries only the path
+// and tree linkage; all fsInode data (mode, owner, size, data) lives in ino,
+// which is shared among all hard-linked names.
+type fsEntry struct {
+	path string
+	ino  *fsInode
 
 	// Tree structure — maintained during add/remove.
 	parent   *fsEntry
 	children []*fsEntry
 
-	// data location in spool file
-	spoolOff     int64
-	dataStartOff int64     // byte offset where file data begins (spool or data file)
-	fileClosed   bool      // true after File.Close() is called
-	directData   io.Reader // bypasses spool; set by add() for source-provided data
-
-	removed      bool // true if removed by a whiteout in a merge layer
-	metadataOnly bool // from a metadata-only CopyFrom; use chunk-based layout
+	removed bool // true if removed by a whiteout in a merge layer
 }
 
 // createOptions holds the parsed option values for Create.
@@ -707,6 +866,7 @@ type createOptions struct {
 	buildTime    uint64
 	buildTimeNs  uint32
 	hasBuildTime bool
+	blockSize    int      // 0 = use default
 	dataFile     *os.File // external data file for metadata-only mode
 	tempDir      string   // temp directory for spool file
 }
@@ -734,6 +894,21 @@ type deviceBlocker interface {
 // readLinker is an interface for filesystems that support reading symlink targets.
 type readLinker interface {
 	ReadLink(name string) (string, error)
+}
+
+// dataRanger may be implemented by fs.FileInfo to provide the physical
+// location of uncompressed file data in backing devices. CopyFrom checks
+// this via type assertion in metadata-only mode to build chunk indexes
+// without requiring the caller to construct internal chunk types.
+//
+// This interface should only be implemented for files whose device data
+// is stored verbatim (uncompressed). For compressed files, return nil or
+// do not implement the interface. In full-image mode CopyFrom then falls
+// back to reading through Open(), which decompresses transparently. In
+// MetadataOnly mode there is no such fallback: the file is stored as a
+// chunk-based inode with no physical mappings (all holes).
+type dataRanger interface {
+	DataRange() []DataRange
 }
 
 // --- Internal types ---
@@ -765,6 +940,10 @@ type erofsEntry struct {
 
 	// Extended attributes
 	xattrs map[string]string
+
+	// Hard links: non-nil for secondary entries that share an fsInode with primary.
+	// The primary entry gets an on-disk inode; secondary entries borrow its NID.
+	hardLinkPrimary *erofsEntry
 
 	// EROFS layout (assigned during planning)
 	nid           uint64
@@ -817,19 +996,72 @@ func (fi *entryFileInfo) ModTime() time.Time { return fi.info.ModTime() }
 func (fi *entryFileInfo) IsDir() bool        { return fi.info.IsDir() }
 func (fi *entryFileInfo) Sys() any           { return fi.sys }
 
+// WriterStat is returned by Sys() on [fs.FileInfo] values from a [Writer],
+// exposing fsInode metadata before the image is finalised. After [Writer.Close]
+// the image can be reopened with [Open], whose Sys() returns a [Stat].
+type WriterStat struct {
+	Mode    fs.FileMode
+	Size    int64
+	UID     uint32
+	GID     uint32
+	Rdev    uint32
+	Mtime   uint64
+	MtimeNs uint32
+	Nlink   uint32
+	Xattrs  map[string]string
+}
+
 // writerFileInfo implements fs.FileInfo for an fsEntry.
 type writerFileInfo struct {
 	entry *fsEntry
 }
 
-func (fi *writerFileInfo) Name() string      { return path.Base(fi.entry.path) }
-func (fi *writerFileInfo) Size() int64       { return int64(fi.entry.size) }
-func (fi *writerFileInfo) Mode() fs.FileMode { return disk.EroFSModeToGoFileMode(fi.entry.mode) }
-func (fi *writerFileInfo) ModTime() time.Time {
-	return time.Unix(int64(fi.entry.mtime), int64(fi.entry.mtimeNs))
+func (fi *writerFileInfo) Name() string { return path.Base(fi.entry.path) }
+func (fi *writerFileInfo) Size() int64  { return int64(fi.entry.ino.size) }
+func (fi *writerFileInfo) Mode() fs.FileMode {
+	return disk.EroFSModeToGoFileMode(fi.entry.ino.mode)
 }
-func (fi *writerFileInfo) IsDir() bool { return fi.entry.mode&disk.StatTypeMask == disk.StatTypeDir }
-func (fi *writerFileInfo) Sys() any    { return nil }
+func (fi *writerFileInfo) ModTime() time.Time {
+	return time.Unix(int64(fi.entry.ino.mtime), int64(fi.entry.ino.mtimeNs))
+}
+func (fi *writerFileInfo) IsDir() bool {
+	return fi.entry.ino.mode&disk.StatTypeMask == disk.StatTypeDir
+}
+func (fi *writerFileInfo) Sys() any {
+	ino := fi.entry.ino
+	var xattrs map[string]string
+	if len(ino.xattrs) > 0 {
+		xattrs = make(map[string]string, len(ino.xattrs))
+		for k, v := range ino.xattrs {
+			xattrs[k] = v
+		}
+	}
+	return &WriterStat{
+		Mode:    disk.EroFSModeToGoFileMode(ino.mode),
+		Size:    int64(ino.size),
+		UID:     ino.uid,
+		GID:     ino.gid,
+		Rdev:    ino.rdev,
+		Mtime:   ino.mtime,
+		MtimeNs: ino.mtimeNs,
+		Nlink:   inodeNlink(ino),
+		Xattrs:  xattrs,
+	}
+}
+
+// inodeNlink returns the effective nlink for a shared inode.
+func inodeNlink(ino *fsInode) uint32 {
+	if ino.nlinkSet {
+		return ino.nlink
+	}
+	if ino.nlink > 0 {
+		return ino.nlink
+	}
+	if ino.mode&disk.StatTypeMask == disk.StatTypeDir {
+		return 2
+	}
+	return 1
+}
 
 // readFile implements fs.File for reading back a finalized file's data.
 type readFile struct {
@@ -933,9 +1165,11 @@ type dirEntry struct {
 	entry *fsEntry
 }
 
-func (de *dirEntry) Name() string               { return path.Base(de.entry.path) }
-func (de *dirEntry) IsDir() bool                { return de.entry.mode&disk.StatTypeMask == disk.StatTypeDir }
-func (de *dirEntry) Type() fs.FileMode          { return disk.EroFSModeToGoFileMode(de.entry.mode).Type() }
+func (de *dirEntry) Name() string { return path.Base(de.entry.path) }
+func (de *dirEntry) IsDir() bool  { return de.entry.ino.mode&disk.StatTypeMask == disk.StatTypeDir }
+func (de *dirEntry) Type() fs.FileMode {
+	return disk.EroFSModeToGoFileMode(de.entry.ino.mode).Type()
+}
 func (de *dirEntry) Info() (fs.FileInfo, error) { return &writerFileInfo{entry: de.entry}, nil }
 
 // add adds a single entry. Mode and Size come from info; extended metadata
@@ -953,24 +1187,23 @@ func (fsys *Writer) add(p string, info fs.FileInfo) error {
 	}
 
 	if p == "/" {
-		root := fsys.root
-		root.mode = mode
-		root.uid = be.UID
-		root.gid = be.GID
-		root.mtime = be.Mtime
-		root.mtimeNs = be.MtimeNs
+		ino := fsys.root.ino
+		ino.mode = mode
+		ino.uid = be.UID
+		ino.gid = be.GID
+		ino.mtime = be.Mtime
+		ino.mtimeNs = be.MtimeNs
 		if be.Nlink > 0 {
-			root.nlink = be.Nlink
-			root.nlinkSet = true
+			ino.nlink = be.Nlink
+			ino.nlinkSet = true
 		}
-		root.xattrs = be.Xattrs
+		ino.xattrs = be.Xattrs
 		return nil
 	}
 
 	fsys.ensureParent(p)
 
-	fe := &fsEntry{
-		path:       p,
+	ino := &fsInode{
 		mode:       mode,
 		uid:        be.UID,
 		gid:        be.GID,
@@ -984,25 +1217,26 @@ func (fsys *Writer) add(p string, info fs.FileInfo) error {
 		contiguous: be.Contiguous,
 	}
 	if be.Nlink > 0 {
-		fe.nlink = be.Nlink
-		fe.nlinkSet = true
+		ino.nlink = be.Nlink
+		ino.nlinkSet = true
 	}
+	fe := &fsEntry{path: p, ino: ino}
 
 	// Handle duplicate paths (overwrite semantics).
 	if existing, ok := fsys.byPath[p]; ok {
-		// Preserve tree linkage when overwriting.
-		savedParent := existing.parent
-		savedChildren := existing.children
-		*existing = *fe
-		existing.parent = savedParent
-		existing.children = savedChildren
+		// Detach the old fsInode before replacing it so that any hard-linked
+		// names that still reference it get a correct nlink.
+		if existing.ino != ino {
+			unlinkInode(existing.ino)
+		}
+		existing.ino = ino
 		fe = existing
 	} else {
 		fsys.addChild(fe)
 	}
 
 	if fsys.copyMetadataOnly {
-		fe.metadataOnly = true
+		ino.metadataOnly = true
 		// Remap chunk DeviceIDs from source-relative to absolute.
 		// For single-device sources, all chunks use DeviceID=1
 		// and get mapped to copyDeviceID.
@@ -1010,8 +1244,8 @@ func (fsys *Writer) add(p string, info fs.FileInfo) error {
 		// DeviceIDs 1..N that get offset by copyDeviceID-1.
 		if fsys.copyDeviceID > 0 {
 			offset := fsys.copyDeviceID - 1
-			for i := range fe.chunks {
-				fe.chunks[i].DeviceID += offset
+			for i := range ino.chunks {
+				ino.chunks[i].DeviceID += offset
 			}
 		}
 	}
@@ -1022,13 +1256,13 @@ func (fsys *Writer) add(p string, info fs.FileInfo) error {
 		!fsys.copyMetadataOnly
 	if needData {
 		// Data is stored locally; clear any source chunk mappings.
-		fe.chunks = nil
-		fe.contiguous = false
+		ino.chunks = nil
+		ino.contiguous = false
 		if fsys.dataFile != nil {
 			// Data file mode: copy through File for block-aligned padding and chunk recording.
 			f := &File{fs: fsys, entry: fe}
 			f.dataStartOff = fsys.dataOff
-			fe.dataStartOff = fsys.dataOff
+			ino.dataStartOff = fsys.dataOff
 			if _, err := f.ReadFrom(be.Data); err != nil {
 				return err
 			}
@@ -1037,11 +1271,11 @@ func (fsys *Writer) add(p string, info fs.FileInfo) error {
 			}
 		} else {
 			// Spool mode: keep a direct reference to avoid copying.
-			fe.directData = be.Data
-			fe.fileClosed = true
+			ino.directData = be.Data
+			ino.fileClosed = true
 		}
 	} else {
-		fe.fileClosed = true
+		ino.fileClosed = true
 	}
 
 	return nil
@@ -1077,7 +1311,7 @@ func (fsys *Writer) ensureParent(name string) {
 		d := missing[i]
 		e := &fsEntry{
 			path: d,
-			mode: disk.StatTypeDir | 0o755,
+			ino:  &fsInode{mode: disk.StatTypeDir | 0o755},
 		}
 		fsys.addChild(e)
 	}
@@ -1105,7 +1339,8 @@ func (fsys *Writer) remove(p string) {
 	}
 	e.removed = true
 	delete(fsys.byPath, p)
-	if e.mode&disk.StatTypeMask == disk.StatTypeDir {
+	unlinkInode(e.ino)
+	if e.ino.mode&disk.StatTypeMask == disk.StatTypeDir {
 		fsys.removeSubtree(e)
 	}
 }
@@ -1127,10 +1362,19 @@ func (fsys *Writer) removeSubtree(e *fsEntry) {
 		if !c.removed {
 			c.removed = true
 			delete(fsys.byPath, c.path)
-			if c.mode&disk.StatTypeMask == disk.StatTypeDir {
+			unlinkInode(c.ino)
+			if c.ino.mode&disk.StatTypeMask == disk.StatTypeDir {
 				fsys.removeSubtree(c)
 			}
 		}
+	}
+}
+
+// unlinkInode decrements the nlink counter of a shared inode when one of its
+// names is removed, keeping the count consistent with surviving names.
+func unlinkInode(ino *fsInode) {
+	if ino.nlink > 0 {
+		ino.nlink--
 	}
 }
 
@@ -1142,6 +1386,12 @@ func (fsys *Writer) buildErofsTree() *erofsEntry {
 		er *erofsEntry
 	}
 
+	// seen maps a shared *fsInode to the first erofsEntry built for it.
+	// Entries whose fsInode nlink > 1 are hard-linked; the first erofsEntry
+	// seen for that fsInode owns the on-disk inode slot; later ones point
+	// back via hardLinkPrimary and borrow its NID.
+	seen := make(map[*fsInode]*erofsEntry)
+
 	rootEr := fsys.fsToErofs(fsys.root)
 	queue := []pair{{fsys.root, rootEr}}
 
@@ -1152,11 +1402,11 @@ func (fsys *Writer) buildErofsTree() *erofsEntry {
 		// Count child directories for nlink.
 		var childDirs uint32
 		for _, c := range cur.fs.children {
-			if !c.removed && c.mode&disk.StatTypeMask == disk.StatTypeDir {
+			if !c.removed && c.ino.mode&disk.StatTypeMask == disk.StatTypeDir {
 				childDirs++
 			}
 		}
-		if !cur.fs.nlinkSet && cur.fs.mode&disk.StatTypeMask == disk.StatTypeDir {
+		if !cur.fs.ino.nlinkSet && cur.fs.ino.mode&disk.StatTypeMask == disk.StatTypeDir {
 			cur.er.nlink = 2 + childDirs
 		}
 
@@ -1169,8 +1419,20 @@ func (fsys *Writer) buildErofsTree() *erofsEntry {
 				continue
 			}
 			ent := fsys.fsToErofs(c)
+
+			// Hard link: fsInodes shared by more than one surviving name are
+			// tracked in seen. The first erofsEntry for a given fsInode owns
+			// the on-disk inode slot; subsequent ones point back to it.
+			if inodeNlink(c.ino) > 1 {
+				if owner, ok := seen[c.ino]; ok {
+					ent.hardLinkPrimary = owner
+				} else {
+					seen[c.ino] = ent
+				}
+			}
+
 			cur.er.children = append(cur.er.children, ent)
-			if c.mode&disk.StatTypeMask == disk.StatTypeDir {
+			if c.ino.mode&disk.StatTypeMask == disk.StatTypeDir {
 				queue = append(queue, pair{c, ent})
 			}
 		}
@@ -1183,46 +1445,40 @@ func (fsys *Writer) buildErofsTree() *erofsEntry {
 	return rootEr
 }
 
-// fsToErofs converts a single fsEntry to an erofsEntry, resolving data readers.
-func (fsys *Writer) fsToErofs(e *fsEntry) *erofsEntry {
-	var nlink uint32
-	switch {
-	case e.nlinkSet:
-		nlink = e.nlink
-	case e.mode&disk.StatTypeMask == disk.StatTypeDir:
-		nlink = 2 // adjusted by buildErofsTree
-	default:
-		nlink = 1
-	}
+// fsToErofs converts an fsEntry to an erofsEntry.
+// The name/path come from the directory entry; fsInode data comes from ino.
+func (fsys *Writer) fsToErofs(entry *fsEntry) *erofsEntry {
+	ino := entry.ino
+	nlink := inodeNlink(ino)
 
 	var data io.Reader
-	if fsys.dataFile == nil && len(e.chunks) == 0 && !e.metadataOnly &&
-		e.mode&disk.StatTypeMask == disk.StatTypeReg && e.size > 0 {
-		if e.directData != nil {
-			data = e.directData
+	if fsys.dataFile == nil && len(ino.chunks) == 0 && !ino.metadataOnly &&
+		ino.mode&disk.StatTypeMask == disk.StatTypeReg && ino.size > 0 {
+		if ino.directData != nil {
+			data = ino.directData
 		} else if fsys.spool != nil {
-			data = io.NewSectionReader(fsys.spool, e.spoolOff, int64(e.size))
+			data = io.NewSectionReader(fsys.spool, ino.spoolOff, int64(ino.size))
 		}
 	}
 
 	return &erofsEntry{
-		mode:          e.mode,
-		uid:           e.uid,
-		gid:           e.gid,
-		mtime:         e.mtime,
-		mtimeNs:       e.mtimeNs,
+		mode:          ino.mode,
+		uid:           ino.uid,
+		gid:           ino.gid,
+		mtime:         ino.mtime,
+		mtimeNs:       ino.mtimeNs,
 		nlink:         nlink,
-		size:          e.size,
-		rdev:          e.rdev,
-		name:          path.Base(e.path),
-		path:          e.path,
-		symTarget:     e.linkTarget,
-		chunks:        e.chunks,
-		contiguous:    e.contiguous,
-		metadataOnly:  e.metadataOnly,
+		size:          ino.size,
+		rdev:          ino.rdev,
+		name:          path.Base(entry.path),
+		path:          entry.path,
+		symTarget:     ino.linkTarget,
+		chunks:        ino.chunks,
+		contiguous:    ino.contiguous,
+		metadataOnly:  ino.metadataOnly,
 		data:          data,
-		xattrs:        e.xattrs,
-		erofsFileType: modeToFileType(e.mode),
+		xattrs:        ino.xattrs,
+		erofsFileType: modeToFileType(ino.mode),
 	}
 }
 
@@ -1269,6 +1525,95 @@ func (fsys *Writer) zeroPad() []byte {
 	return fsys.padBuf
 }
 
+// chunksFromRanges converts DataRange entries into internal chunk entries.
+// fileSize is the logical size of the file; the sum of all range Sizes must
+// equal fileSize exactly, or an error is returned.
+//
+// The block size used is the Writer's resolved block size. DataRange.Device
+// values are offset by 1 to produce chunk DeviceIDs: DataRange Device 0
+// becomes chunk DeviceID 1 (the first extra device), matching the EROFS
+// convention where DeviceID 0 is the primary image.
+//
+// Validation rules:
+//   - sum(Size) == fileSize; a mismatch is rejected.
+//   - r.Size > 0 for every entry.
+//   - Hole entries (Offset == -1) emit [builder.NullPhysicalBlock] chunks.
+//     Hole Size must be block-aligned for non-final entries; the final entry
+//     may end mid-block to match the file tail.
+//   - For data entries: r.Offset >= 0 and block-aligned; r.Device == 0.
+//   - For non-final data entries: r.Size must be a multiple of blockSize.
+//     The final entry may have a partial last block to match the file tail.
+func (fsys *Writer) chunksFromRanges(ranges []DataRange, fileSize int64) ([]builder.Chunk, error) {
+	blockSize := uint64(fsys.resolveBlockSize())
+
+	// Validate total coverage first.
+	var total int64
+	for _, r := range ranges {
+		total += r.Size
+	}
+	if total != fileSize {
+		return nil, fmt.Errorf("DataRange total size %d does not match file size %d", total, fileSize)
+	}
+
+	last := len(ranges) - 1
+	var chunks []builder.Chunk
+	for i, r := range ranges {
+		if r.Size <= 0 {
+			return nil, fmt.Errorf("DataRange[%d]: non-positive Size %d", i, r.Size)
+		}
+		// Non-final entries must be block-aligned in size; the final entry may
+		// end mid-block to match the file tail.
+		if i < last && uint64(r.Size)%blockSize != 0 {
+			return nil, fmt.Errorf("DataRange[%d]: non-final Size %d is not block-aligned (block size %d)", i, r.Size, blockSize)
+		}
+		if r.Offset == holeOffset {
+			// Hole: emit NullPhysicalBlock chunks covering the hole span.
+			totalBlocks := (uint64(r.Size) + blockSize - 1) / blockSize
+			for totalBlocks > 0 {
+				count := totalBlocks
+				if count > 65535 {
+					count = 65535
+				}
+				chunks = append(chunks, builder.Chunk{
+					PhysicalBlock: builder.NullPhysicalBlock,
+					Count:         uint16(count),
+				})
+				totalBlocks -= count
+			}
+			continue
+		}
+		if r.Offset < 0 {
+			return nil, fmt.Errorf("DataRange[%d]: negative Offset %d", i, r.Offset)
+		}
+		if uint64(r.Offset)%blockSize != 0 {
+			return nil, fmt.Errorf("DataRange[%d]: Offset %d is not block-aligned (block size %d)", i, r.Offset, blockSize)
+		}
+		// Non-EROFS sources register exactly one device via DeviceBlocks();
+		// only Device=0 is valid. Device=0xFFFF would also wrap deviceID to 0
+		// (the primary image), producing an invalid mapping.
+		if r.Device != 0 {
+			return nil, fmt.Errorf("DataRange[%d]: Device %d out of range (source declared one device, only Device=0 is valid)", i, r.Device)
+		}
+		deviceID := r.Device + 1
+		startBlock := uint64(r.Offset) / blockSize
+		totalBlocks := (uint64(r.Size) + blockSize - 1) / blockSize
+		for totalBlocks > 0 {
+			count := totalBlocks
+			if count > 65535 {
+				count = 65535
+			}
+			chunks = append(chunks, builder.Chunk{
+				PhysicalBlock: startBlock,
+				Count:         uint16(count),
+				DeviceID:      deviceID,
+			})
+			startBlock += count
+			totalBlocks -= count
+		}
+	}
+	return chunks, nil
+}
+
 // ensureSpool lazily creates the spool temp file.
 func (fsys *Writer) ensureSpool() error {
 	if fsys.spool != nil {
@@ -1283,13 +1628,41 @@ func (fsys *Writer) ensureSpool() error {
 	return nil
 }
 
+// lookup resolves name to its fsEntry. Callers mutate e.ino to affect the
+// shared fsInode, so changes are visible through all hard-linked names.
 func (fsys *Writer) lookup(name string) (*fsEntry, error) {
+	return fsys.resolveEntry("lookup", name)
+}
+
+// resolveEntry looks up name in byPath. On a miss it calls classifyMiss to
+// distinguish a genuinely absent path (ErrNotExist) from one that traverses
+// through a non-directory component (ErrNotDirectory).
+func (fsys *Writer) resolveEntry(op, name string) (*fsEntry, error) {
 	name = cleanPath(name)
-	e, ok := fsys.byPath[name]
-	if !ok {
-		return nil, fmt.Errorf("mkfs: path not found %q", name)
+	if e, ok := fsys.byPath[name]; ok {
+		return e, nil
 	}
-	return e, nil
+	if err := fsys.classifyMiss(name); err != nil {
+		return nil, &fs.PathError{Op: op, Path: name, Err: err}
+	}
+	return nil, &fs.PathError{Op: op, Path: name, Err: fs.ErrNotExist}
+}
+
+// classifyMiss returns ErrNotDirectory if an existing ancestor of name is not
+// a directory, or nil if the path is simply absent.
+func (fsys *Writer) classifyMiss(name string) error {
+	for dir := path.Dir(name); dir != "/" && dir != "."; dir = path.Dir(dir) {
+		e, ok := fsys.byPath[dir]
+		if !ok {
+			continue
+		}
+		if e.ino.mode&disk.StatTypeMask != disk.StatTypeDir {
+			return ErrNotDirectory
+		}
+		// Nearest existing ancestor is a directory: the path is just absent.
+		return nil
+	}
+	return nil
 }
 
 // closeDataFile pads the data file to a block boundary and records chunks.
@@ -1319,7 +1692,7 @@ func (f *File) closeDataFile() error {
 		if count > 65535 {
 			count = 65535
 		}
-		f.entry.chunks = append(f.entry.chunks, builder.Chunk{
+		f.entry.ino.chunks = append(f.entry.ino.chunks, builder.Chunk{
 			PhysicalBlock: startBlock,
 			Count:         uint16(count),
 			DeviceID:      1,
