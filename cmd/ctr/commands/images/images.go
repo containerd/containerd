@@ -30,6 +30,8 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
+	"github.com/distribution/reference"
+	"github.com/opencontainers/go-digest"
 	"github.com/urfave/cli/v2"
 )
 
@@ -59,22 +61,35 @@ var Command = &cli.Command{
 }
 
 var listCommand = &cli.Command{
-	Name:        "list",
-	Aliases:     []string{"ls"},
-	Usage:       "List images known to containerd",
-	ArgsUsage:   "[flags] [<filter>, ...]",
-	Description: "list images registered with containerd",
+	Name:      "list",
+	Aliases:   []string{"ls"},
+	Usage:     "List images known to containerd",
+	ArgsUsage: "[flags] [<filter>, ...]",
+	Description: `List images registered with containerd.
+
+By default, when multiple names point at the same image target digest (common
+in the k8s.io namespace after CRI pulls, which store repo:tag, repo@digest, and
+a digest-only image ID), only the tagged name(s) are shown. Use --all to print
+every reference.
+
+This is a display filter only; metadata in the image store is unchanged.`,
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:    "quiet",
 			Aliases: []string{"q"},
 			Usage:   "Print only the image refs",
 		},
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "Show all references, including digest-only and repo@digest aliases (e.g. CRI k8s.io duplicates)",
+		},
 	},
 	Action: func(cliContext *cli.Context) error {
 		var (
 			filters = cliContext.Args().Slice()
 			quiet   = cliContext.Bool("quiet")
+			all     = cliContext.Bool("all")
 		)
 		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
@@ -89,6 +104,7 @@ var listCommand = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("failed to list images: %w", err)
 		}
+		imageList = filterImageListForDisplay(imageList, all)
 		if quiet {
 			for _, image := range imageList {
 				fmt.Println(image.Name)
@@ -141,6 +157,64 @@ var listCommand = &cli.Command{
 
 		return tw.Flush()
 	},
+}
+
+// filterImageListForDisplay reduces CRI-style duplicate refs for list output.
+// When all is false and multiple names share the same target digest, only
+// tagged references (name:tag) are kept for that digest. If a digest group has
+// no tagged name, every reference in the group is kept so digest-only images
+// remain visible. When all is true, the list is returned unchanged.
+func filterImageListForDisplay(imageList []images.Image, all bool) []images.Image {
+	if all || len(imageList) == 0 {
+		return imageList
+	}
+
+	type group struct {
+		images []images.Image
+		// first index in the original list, for stable ordering by first appearance
+		order int
+	}
+	byDigest := make(map[digest.Digest]*group)
+	var order []digest.Digest
+
+	for i, img := range imageList {
+		d := img.Target.Digest
+		g, ok := byDigest[d]
+		if !ok {
+			g = &group{order: i}
+			byDigest[d] = g
+			order = append(order, d)
+		}
+		g.images = append(g.images, img)
+	}
+
+	// Preserve original relative order of digests and of images within a group.
+	out := make([]images.Image, 0, len(imageList))
+	for _, d := range order {
+		g := byDigest[d]
+		var tagged []images.Image
+		for _, img := range g.images {
+			if isTaggedImageName(img.Name) {
+				tagged = append(tagged, img)
+			}
+		}
+		if len(tagged) > 0 {
+			out = append(out, tagged...)
+		} else {
+			out = append(out, g.images...)
+		}
+	}
+	return out
+}
+
+func isTaggedImageName(name string) bool {
+	parsed, err := reference.ParseAnyReference(name)
+	if err != nil {
+		// Keep names we cannot parse so nothing unexpected disappears.
+		return true
+	}
+	_, ok := parsed.(reference.Tagged)
+	return ok
 }
 
 var setLabelsCommand = &cli.Command{
