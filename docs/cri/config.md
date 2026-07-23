@@ -248,6 +248,7 @@ version = 3
 
     [plugins.'io.containerd.cri.v1.images'.registry]
       config_path = ''
+      dns_servers = []
 
     [plugins.'io.containerd.cri.v1.images'.image_decryption]
       key_model = 'node'
