@@ -19,16 +19,13 @@ package blockfile
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
-	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 )
@@ -451,32 +448,4 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 // Close closes the snapshotter
 func (o *snapshotter) Close() error {
 	return o.ms.Close()
-}
-
-func copyFileWithSync(target, source string) error {
-	// The Go stdlib does not seem to have an efficient os.File.ReadFrom
-	// routine for other platforms like it does on Linux with
-	// copy_file_range. For Darwin at least we can use clonefile
-	// in its place, otherwise if we have a sparse file we'd have
-	// a fun surprise waiting below.
-	//
-	// TODO: Enlighten other platforms (windows?)
-	if runtime.GOOS == "darwin" {
-		return fs.CopyFile(target, source)
-	}
-
-	src, err := os.Open(source)
-	if err != nil {
-		return fmt.Errorf("failed to open source %s: %w", source, err)
-	}
-	defer src.Close()
-	tgt, err := os.Create(target)
-	if err != nil {
-		return fmt.Errorf("failed to open target %s: %w", target, err)
-	}
-	defer tgt.Close()
-	defer tgt.Sync()
-
-	_, err = io.Copy(tgt, src)
-	return err
 }
