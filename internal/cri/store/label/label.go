@@ -17,6 +17,7 @@
 package label
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/opencontainers/selinux/go-selinux"
@@ -27,7 +28,7 @@ type Store struct {
 	sync.Mutex
 	levels   map[string]int
 	Releaser func(string)
-	Reserver func(string)
+	Reserver func(string) error
 }
 
 // NewStore creates a new SELinux process label store
@@ -35,7 +36,7 @@ func NewStore() *Store {
 	return &Store{
 		levels:   map[string]int{},
 		Releaser: selinux.ReleaseLabel,
-		Reserver: selinux.ReserveLabel,
+		Reserver: selinux.ReserveLabelV2,
 	}
 }
 
@@ -57,7 +58,12 @@ func (s *Store) Reserve(label string) error {
 	}
 
 	if _, ok := s.levels[level]; !ok {
-		s.Reserver(label)
+		// The label may already be reserved, e.g. because selinux.ContainerLabels()
+		// just generated (and reserved) it, or because another container in the
+		// same pod is reusing the sandbox's label.
+		if err := s.Reserver(label); err != nil && !errors.Is(err, selinux.ErrMCSAlreadyExists) {
+			return err
+		}
 	}
 
 	s.levels[level]++
