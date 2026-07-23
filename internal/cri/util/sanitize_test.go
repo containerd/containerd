@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"testing"
 
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +44,7 @@ func TestSanitizeError_SimpleURLError(t *testing.T) {
 	sanitizedErr, ok := sanitized.(*sanitizedError)
 	require.True(t, ok, "Should return *sanitizedError type")
 	assert.Equal(t, urlErr, sanitizedErr.original)
-	assert.Equal(t, urlErr, sanitizedErr.urlError)
+	assert.Equal(t, originalURL, sanitizedErr.originalURL)
 	assert.Equal(t, "https://storage.blob.core.windows.net/container/blob?sig=%5BREDACTED%5D&sv=%5BREDACTED%5D", sanitizedErr.sanitizedURL)
 
 	// Test Error() method - verifies ReplaceAll functionality
@@ -78,6 +79,80 @@ func TestSanitizeError_WrappedError(t *testing.T) {
 	// Verify url.Error properties are preserved
 	assert.Equal(t, "Get", targetURLErr.Op)
 	assert.Contains(t, targetURLErr.Err.Error(), "timeout")
+}
+
+func TestSanitizeError_UnexpectedStatusError(t *testing.T) {
+	// Registry non-2xx responses (e.g. 503 from an S3-backed blob redirect)
+	// return an ErrUnexpectedStatus, whose message embeds the raw signed URL
+	// but which is not a *url.Error.
+	originalURL := "https://prod-us-east-1-starport-layer-bucket.s3.us-east-1.amazonaws.com/blob?X-Amz-Security-Token=SECRET_TOKEN&X-Amz-Signature=SECRET_SIG&rid=abc123"
+	statusErr := remoteerrors.ErrUnexpectedStatus{
+		Status:        "503 Slow Down",
+		StatusCode:    503,
+		RequestURL:    originalURL,
+		RequestMethod: "GET",
+	}
+
+	sanitized := SanitizeError(statusErr)
+	require.NotNil(t, sanitized)
+
+	// Check it's a sanitizedError with correct properties
+	sanitizedErr, ok := sanitized.(*sanitizedError)
+	require.True(t, ok, "Should return *sanitizedError type")
+	assert.Equal(t, originalURL, sanitizedErr.originalURL)
+
+	// Every query param value must be redacted.
+	msg := sanitized.Error()
+	assert.NotContains(t, msg, "SECRET_TOKEN", "Security token should be sanitized")
+	assert.NotContains(t, msg, "SECRET_SIG", "Signature should be sanitized")
+	assert.NotContains(t, msg, "abc123", "All query params should be sanitized")
+	assert.Contains(t, msg, "%5BREDACTED%5D", "Should contain sanitized marker")
+	assert.Contains(t, msg, "unexpected status from GET request to", "Status message should be preserved")
+	assert.Contains(t, msg, "503 Slow Down", "Status text should be preserved")
+}
+
+func TestSanitizeError_WrappedUnexpectedStatusError(t *testing.T) {
+	// Mirrors the real log path: the fetch error is wrapped by httpReadSeeker
+	// and again by the image-pull layer. errors.As must find the value-type
+	// ErrUnexpectedStatus through the wrappers.
+	originalURL := "https://prod-us-east-1-starport-layer-bucket.s3.us-east-1.amazonaws.com/blob?X-Amz-Signature=SECRET_SIG&X-Amz-Credential=SECRET_CRED"
+	statusErr := remoteerrors.ErrUnexpectedStatus{
+		Status:        "503 Slow Down",
+		StatusCode:    503,
+		RequestURL:    originalURL,
+		RequestMethod: "GET",
+	}
+	wrappedErr := fmt.Errorf("failed to copy: httpReadSeeker: failed open: %w", statusErr)
+
+	sanitized := SanitizeError(wrappedErr)
+
+	msg := sanitized.Error()
+	assert.NotContains(t, msg, "SECRET_SIG", "Signature should be sanitized")
+	assert.NotContains(t, msg, "SECRET_CRED", "Credential should be sanitized")
+	assert.Contains(t, msg, "%5BREDACTED%5D", "Should contain sanitized marker")
+	assert.Contains(t, msg, "httpReadSeeker: failed open", "Wrapper message should be preserved")
+
+	// Should still be able to unwrap to the original ErrUnexpectedStatus.
+	var targetStatusErr remoteerrors.ErrUnexpectedStatus
+	assert.True(t, errors.As(sanitized, &targetStatusErr),
+		"Should be able to find ErrUnexpectedStatus in sanitized error chain")
+	assert.Equal(t, 503, targetStatusErr.StatusCode)
+}
+
+func TestSanitizeError_UnexpectedStatusNoQueryParams(t *testing.T) {
+	// A registry error whose URL has no query params has nothing to redact and
+	// must pass through unchanged.
+	statusErr := remoteerrors.ErrUnexpectedStatus{
+		Status:        "500 Internal Server Error",
+		StatusCode:    500,
+		RequestURL:    "https://registry.example.com/v2/image/blobs/sha256:abc",
+		RequestMethod: "GET",
+	}
+
+	sanitized := SanitizeError(statusErr)
+
+	assert.Equal(t, statusErr, sanitized,
+		"Registry errors without query params should pass through unchanged")
 }
 
 func TestSanitizeError_NonURLError(t *testing.T) {
