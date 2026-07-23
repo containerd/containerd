@@ -1,4 +1,4 @@
-# containerd-config 8 07/22/2026
+# containerd-config 8 07/23/2026
 
 ## NAME
 
@@ -16,8 +16,9 @@ available configuration options depends on the plugins compiled into the
 running binary. The subcommands below are the authoritative way to discover
 the full default configuration for a given build.
 
-See __containerd-config.toml(5)__ for a description of global settings, the
-plugin configuration model, and pointers to per-plugin documentation.
+See __containerd-config.toml(5)__ for a description of global settings and the
+plugin configuration model. Topic guides are published at
+https://containerd.io/docs/.
 
 ## OPTIONS
 
@@ -54,3 +55,5 @@ Phil Estes <estesp@gmail.com>
 ## SEE ALSO
 
 ctr(8), containerd(8), containerd-config.toml(5)
+
+Online documentation: https://containerd.io/docs/
