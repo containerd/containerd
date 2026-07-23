@@ -65,6 +65,10 @@ func (s *subscriber) do(fn func()) {
 func Reap() error {
 	now := time.Now()
 	exits, err := reap(false)
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		<-timer.C
+	}
 	for _, e := range exits {
 		done := Default.notify(runc.Exit{
 			Timestamp: now,
@@ -72,10 +76,42 @@ func Reap() error {
 			Status:    e.Status,
 		})
 
+		timer.Reset(1 * time.Second)
 		select {
 		case <-done:
-		case <-time.After(1 * time.Second):
+			if !timer.Stop() {
+				<-timer.C
+			}
+		case <-timer.C:
 		}
+	}
+	// Perform a second reap scan to catch any processes that exited while
+	// we were processing the first batch. This handles the case where
+	// SIGCHLD signals are coalesced by the kernel during the notify loop
+	// above, causing subsequent exits to be missed.
+	if extra, err2 := reap(false); len(extra) > 0 {
+		now = time.Now()
+		for _, e := range extra {
+			done := Default.notify(runc.Exit{
+				Timestamp: now,
+				Pid:       e.Pid,
+				Status:    e.Status,
+			})
+
+			timer.Reset(1 * time.Second)
+			select {
+			case <-done:
+				if !timer.Stop() {
+					<-timer.C
+				}
+			case <-timer.C:
+			}
+		}
+		if err == nil {
+			err = err2
+		}
+	} else if err == nil {
+		err = err2
 	}
 	return err
 }
