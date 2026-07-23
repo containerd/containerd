@@ -430,11 +430,20 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 	return err
 }
 
-// getLabels get image labels to be added on CRI image
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
+	named, err := distribution.ParseDockerRef(name)
+	if err != nil {
+		return labels
+	}
+	nameNorm := distribution.TagNameOnly(named).String()
 	for _, pinned := range c.config.PinnedImages {
-		if pinned == name {
+		pinnedNamed, err := distribution.ParseDockerRef(pinned)
+		if err != nil {
+			continue
+		}
+		pinnedNorm := distribution.TagNameOnly(pinnedNamed).String()
+		if pinnedNorm == nameNorm {
 			labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
 		}
 	}
