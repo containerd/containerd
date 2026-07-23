@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
@@ -29,6 +30,7 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -104,6 +106,9 @@ func TestListPodSandboxMetrics(t *testing.T) {
 		return internalContainer
 	}
 
+	require.NoError(t, c.containerStore.Add(newContainer("terminated-kubernetes-init-container", &fakeMetricsContainer{
+		taskErr: fmt.Errorf("no running task found: %w", errdefs.ErrNotFound),
+	})))
 	require.NoError(t, c.containerStore.Add(newContainer("running", &fakeMetricsContainer{
 		task: &fakeMetricsTask{metrics: &types.Metric{Data: metricsData}},
 	})))
