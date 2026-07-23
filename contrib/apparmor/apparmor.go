@@ -19,10 +19,14 @@
 package apparmor
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -40,8 +44,8 @@ func WithProfile(profile string) oci.SpecOpts {
 // WithDefaultProfile will generate a default apparmor profile under the provided name
 // for the container.  It is only generated if a profile under that name does not exist.
 func WithDefaultProfile(name string) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-		if err := LoadDefaultProfile(name); err != nil {
+	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		if err := loadDefaultProfile(ctx, name); err != nil {
 			return err
 		}
 		s.Process.ApparmorProfile = name
@@ -52,6 +56,10 @@ func WithDefaultProfile(name string) oci.SpecOpts {
 // LoadDefaultProfile ensures the default profile to be loaded with the given name.
 // Returns nil error if the profile is already loaded.
 func LoadDefaultProfile(name string) error {
+	return loadDefaultProfile(context.Background(), name)
+}
+
+func loadDefaultProfile(ctx context.Context, name string) error {
 	yes, err := isLoaded(name)
 	if err != nil {
 		return err
@@ -63,19 +71,13 @@ func LoadDefaultProfile(name string) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.CreateTemp(os.Getenv("XDG_RUNTIME_DIR"), p.Name)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	path := f.Name()
-	defer os.Remove(path)
 
-	if err := generate(p, f); err != nil {
+	var buf bytes.Buffer
+	if err := generate(p, &buf); err != nil {
 		return err
 	}
-	if err := load(path); err != nil {
-		return fmt.Errorf("load apparmor profile %s: %w", path, err)
+	if err := loadProfile(ctx, &buf); err != nil {
+		return fmt.Errorf("load AppArmor profile: %w", err)
 	}
 	return nil
 }
@@ -92,4 +94,40 @@ func DumpDefaultProfile(name string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func isLoaded(name string) (bool, error) {
+	f, err := os.Open("/sys/kernel/security/apparmor/profiles")
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		// Entries are of the form "<profile> (<mode>)", e.g. "foo (enforce)".
+		// Profile names may contain spaces (quoted names are supported in AppArmor),
+		// so split on " (" rather than the first space.
+		if prefix, _, ok := strings.Cut(scanner.Text(), " ("); ok && prefix == name {
+			return true, nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+// loadProfile runs "apparmor_parser -Kr", providing the AppArmor profile on
+// stdin to replace the profile. The "-K" is necessary to make sure that
+// apparmor_parser doesn't try to write to a read-only filesystem.
+func loadProfile(ctx context.Context, profile io.Reader) error {
+	c := exec.CommandContext(ctx, "apparmor_parser", "-Kr")
+	c.Stdin = profile
+
+	if out, err := c.CombinedOutput(); err != nil {
+		return fmt.Errorf("parser error(%q): %w", strings.TrimSpace(string(out)), err)
+	}
+
+	return nil
 }

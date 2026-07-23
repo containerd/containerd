@@ -19,11 +19,12 @@
 package apparmor
 
 import (
+	"os/exec"
 	"testing"
 )
 
 func TestDumpDefaultProfile(t *testing.T) {
-	if _, err := aaParser("--version"); err != nil {
+	if _, err := exec.LookPath("apparmor_parser"); err != nil {
 		t.Skipf("apparmor_parser not available: %+v", err)
 	}
 	name := "test-dump-default-profile"
