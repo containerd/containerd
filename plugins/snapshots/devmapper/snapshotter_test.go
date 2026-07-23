@@ -23,11 +23,12 @@ import (
 	_ "crypto/sha256"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -38,16 +39,22 @@ import (
 	"github.com/containerd/log"
 )
 
+var poolSeq uint64
+
+func nextPoolName() string {
+	n := atomic.AddUint64(&poolSeq, 1)
+	return fmt.Sprintf("containerd-snapshotter-suite-pool-%d", n)
+}
+
 func TestSnapshotterSuite(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	assert.NoError(t, log.SetLevel("debug"))
 
 	snapshotterFn := func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-		poolName := fmt.Sprintf("containerd-snapshotter-suite-pool-%d", time.Now().Nanosecond())
 		config := &Config{
 			RootPath:      root,
-			PoolName:      poolName,
+			PoolName:      nextPoolName(),
 			BaseImageSize: "16Mb",
 		}
 		return createSnapshotter(ctx, t, config)
@@ -143,7 +150,7 @@ func TestMultipleXfsMounts(t *testing.T) {
 	ctx := context.Background()
 	ctx = namespaces.WithNamespace(ctx, "testsuite")
 
-	poolName := fmt.Sprintf("containerd-snapshotter-suite-pool-%d", time.Now().Nanosecond())
+	poolName := nextPoolName()
 	config := &Config{
 		RootPath: t.TempDir(),
 		PoolName: poolName,
@@ -191,7 +198,7 @@ func createSnapshotter(ctx context.Context, t *testing.T, config *Config) (snaps
 	_, loopMetaDevice := createLoopbackDevice(t, config.RootPath)
 
 	err := dmsetup.CreatePool(config.PoolName, loopDataDevice, loopMetaDevice, 64*1024/dmsetup.SectorSize)
-	assert.Nil(t, err, "failed to create pool %q", config.PoolName)
+	require.NoError(t, err, "failed to create pool %q", config.PoolName)
 
 	snap, err := NewSnapshotter(ctx, config)
 	if err != nil {
