@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"runtime"
 
@@ -115,11 +116,16 @@ func init() {
 
 			allSnapshotters := mdb.Snapshotters()
 			defaultSnapshotter := config.Snapshotter
-			if s, ok := allSnapshotters[defaultSnapshotter]; ok {
-				options.Snapshotters[defaultSnapshotter] = s
-			} else {
+			if _, ok := allSnapshotters[defaultSnapshotter]; !ok {
 				return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
 			}
+			// Register every available snapshotter, not just the default. Runtime
+			// plugins propagate their per-runtime snapshotters (e.g. kata's
+			// containerd.runtimes.<name>.snapshotter) via UpdateRuntimeSnapshotter
+			// *after* this plugin initializes, so any snapshotter referenced later
+			// must already be present here for ImageStatus's snapshot-existence
+			// check to consult the correct snapshotter.
+			maps.Copy(options.Snapshotters, allSnapshotters)
 
 			snapshotRoot := func(snapshotter string) (snapshotRoot string) {
 				if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
