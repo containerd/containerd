@@ -18,6 +18,7 @@ package mount
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	// required for `-test.root` flag not to fail
@@ -143,8 +144,13 @@ func TestReadonlyMounts(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if !reflect.DeepEqual(readonlyMounts(tc.input), tc.expected) {
-			t.Fatalf("incorrectly modified mounts: %s", tc.desc)
+		original := clone(tc.input)
+		actual := readonlyMounts(tc.input)
+		if !reflect.DeepEqual(actual, tc.expected) {
+			t.Fatalf("incorrectly modified mounts: %s.\n\n Expected: %v\n\n Actual: %v", tc.desc, tc.expected, actual)
+		}
+		if !reflect.DeepEqual(original, tc.input) {
+			t.Fatalf("modified original mounts: %s.\n\n Expected: %v\n\n Actual: %v", tc.desc, original, tc.input)
 		}
 	}
 }
@@ -292,10 +298,35 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "remove multiple volatile options from overlay mounts",
+			input: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"volatile",
+						"fsync=volatile",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
+			},
+			expected: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
-		original := copyMounts(tc.input)
+		original := clone(tc.input)
 		actual := RemoveVolatileOption(tc.input)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Fatalf("incorrectly modified mounts: %s.\n\n Expected: %v\n\n, Actual: %v", tc.desc, tc.expected, actual)
@@ -304,4 +335,46 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 			t.Fatalf("modified original mounts: %s.\n\n Expected: %v\n\n, Actual: %v", tc.desc, original, tc.input)
 		}
 	}
+}
+
+func TestRemoveIDMapOption(t *testing.T) {
+	input := []Mount{
+		{
+			Type:   "overlay",
+			Source: "overlay",
+			Options: []string{
+				"index=off",
+				"uidmap=0:1000:1",
+				"gidmap=0:1000:1",
+				"lowerdir=/path/to/snapshots/1/fs",
+			},
+		},
+	}
+	expected := []Mount{
+		{
+			Type:   "overlay",
+			Source: "overlay",
+			Options: []string{
+				"index=off",
+				"lowerdir=/path/to/snapshots/1/fs",
+			},
+		},
+	}
+
+	original := clone(input)
+	actual := RemoveIDMapOption(input)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("incorrectly modified mounts.\n\n Expected: %v\n\n Actual: %v", expected, actual)
+	}
+	if !reflect.DeepEqual(original, input) {
+		t.Fatalf("modified original mounts.\n\n Expected: %v\n\n Actual: %v", original, input)
+	}
+}
+
+func clone(mounts []Mount) []Mount {
+	out := slices.Clone(mounts)
+	for i, m := range mounts {
+		out[i].Options = slices.Clone(m.Options)
+	}
+	return out
 }
