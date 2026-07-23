@@ -372,7 +372,20 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				cdiDeviceIDs = append(cdiDeviceIDs, dev)
 				continue
 			}
-			opts = append(opts, oci.WithDevices(dev, "", "rwm"))
+			parts := strings.Split(dev, ":")
+			if len(parts) > 3 {
+				return nil, errors.New("--device requires the format 'hostpath:containerpath:permission', while containerpath and permission are optional")
+			}
+			dev = parts[0]
+			containerPath := ""
+			if len(parts) > 1 {
+				containerPath = parts[1]
+			}
+			permissions := "rwm"
+			if len(parts) > 2 {
+				permissions = parts[2]
+			}
+			opts = append(opts, oci.WithDevices(dev, containerPath, permissions))
 		}
 
 		if gpuIDs := cliContext.IntSlice("gpus"); len(cdiDeviceIDs) > 0 || len(gpuIDs) > 0 {
