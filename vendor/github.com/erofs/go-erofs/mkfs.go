@@ -27,6 +27,7 @@ type Writer struct {
 	buildTime    uint64 // from WithBuildTime or buildTimer
 	buildTimeNs  uint32
 	hasBuildTime bool
+	wErr         error               // sticky error: once set, all subsequent ops return it
 	root         *fsEntry            // root directory
 	byPath       map[string]*fsEntry // path → entry (all types)
 
@@ -87,6 +88,12 @@ func Create(out io.WriteSeeker, opts ...CreateOpt) *Writer {
 		tempDir:      o.tempDir,
 	}
 
+	if o.blockSize != 0 {
+		if err := fsys.setBlockSize(o.blockSize); err != nil {
+			fsys.wErr = err
+		}
+	}
+
 	if o.dataFile != nil {
 		// Reserve device slot 0 (DeviceID=1) for the data file.
 		// MetadataOnly CopyFrom device IDs will start at slot 1+.
@@ -128,6 +135,17 @@ func Merge() CopyOpt {
 
 // --- CreateOpt functions ---
 
+// WithBlockSize sets the filesystem block size. The value must be a power
+// of two between 512 and 64 KiB. When unset the default is 4096.
+// An invalid size causes subsequent Writer operations to return an error.
+// If CopyFrom is called with a source that declares a different block size,
+// CopyFrom returns an error.
+func WithBlockSize(n int) CreateOpt {
+	return func(o *createOptions) {
+		o.blockSize = n
+	}
+}
+
 // WithBuildTime sets the filesystem build timestamp.
 func WithBuildTime(sec uint64, nsec uint32) CreateOpt {
 	return func(o *createOptions) {
@@ -159,6 +177,9 @@ func WithTempDir(dir string) CreateOpt {
 // Create creates a regular file with default mode 0644. The caller must
 // Close the returned File.
 func (fsys *Writer) Create(name string) (*File, error) {
+	if fsys.wErr != nil {
+		return nil, fsys.wErr
+	}
 	name = cleanPath(name)
 	if name == "/" {
 		return nil, fmt.Errorf("mkfs: cannot create file at root")
@@ -198,6 +219,9 @@ func (fsys *Writer) Create(name string) (*File, error) {
 // Mkdir creates a directory. Only permission bits from perm are used;
 // type bits are forced to directory. Mkdir("/", perm) sets root permissions.
 func (fsys *Writer) Mkdir(name string, perm fs.FileMode) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	name = cleanPath(name)
 	if name == "/" {
 		fsys.root.mode = disk.StatTypeDir | uint16(perm.Perm())
@@ -220,6 +244,9 @@ func (fsys *Writer) Mkdir(name string, perm fs.FileMode) error {
 
 // Symlink creates newname as a symbolic link to oldname (mode 0777).
 func (fsys *Writer) Symlink(oldname, newname string) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	newname = cleanPath(newname)
 	if newname == "/" {
 		return fmt.Errorf("mkfs: cannot create symlink at root")
@@ -243,6 +270,9 @@ func (fsys *Writer) Symlink(oldname, newname string) error {
 // Mknod creates a device, FIFO, or socket. mode must include type bits
 // (e.g. disk.StatTypeChrdev | 0o666).
 func (fsys *Writer) Mknod(name string, mode uint16, rdev uint32) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	name = cleanPath(name)
 	if name == "/" {
 		return fmt.Errorf("mkfs: cannot mknod at root")
@@ -267,6 +297,9 @@ func (fsys *Writer) Mknod(name string, mode uint16, rdev uint32) error {
 
 // Chmod sets permission bits on the named path, preserving type bits.
 func (fsys *Writer) Chmod(name string, mode fs.FileMode) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
@@ -278,6 +311,9 @@ func (fsys *Writer) Chmod(name string, mode fs.FileMode) error {
 
 // Chown sets the owner UID and GID on the named path.
 func (fsys *Writer) Chown(name string, uid, gid int) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
@@ -290,6 +326,9 @@ func (fsys *Writer) Chown(name string, uid, gid int) error {
 // Chtimes sets the access and modification times on the named path.
 // EROFS only stores mtime; atime is retained for read-back before Close.
 func (fsys *Writer) Chtimes(name string, atime time.Time, mtime time.Time) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
@@ -303,6 +342,9 @@ func (fsys *Writer) Chtimes(name string, atime time.Time, mtime time.Time) error
 
 // Setxattr sets an extended attribute on the named path.
 func (fsys *Writer) Setxattr(name, attr, value string) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
@@ -316,6 +358,9 @@ func (fsys *Writer) Setxattr(name, attr, value string) error {
 
 // SetNlink overrides the computed link count on the named path.
 func (fsys *Writer) SetNlink(name string, nlink uint32) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	e, err := fsys.lookup(name)
 	if err != nil {
 		return err
@@ -332,6 +377,9 @@ func (fsys *Writer) SetNlink(name string, nlink uint32) error {
 // Reads symlink targets via readLinker interface when Entry.LinkTarget is empty.
 // If src implements blockSizer, the image block size is set accordingly.
 func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	// Reset per-CopyFrom state.
 	fsys.copyMetadataOnly = false
 	fsys.copyMerge = false
@@ -435,6 +483,22 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 						be = &builder.Entry{}
 					}
 				}
+				// Generate chunks from DataRange if available.
+				if len(be.Chunks) == 0 {
+					if dr, ok := info.(dataRanger); ok {
+						if ranges := dr.DataRange(); len(ranges) > 0 {
+							chunks, err := fsys.chunksFromRanges(ranges, info.Size())
+							if err != nil {
+								return fmt.Errorf("chunksFromRanges %s: %w", p, err)
+							}
+							be.Chunks = chunks
+							// Contiguous: a single non-hole range whose total-size
+							// invariant is satisfied (guaranteed by chunksFromRanges)
+							// means the file is fully covered by one contiguous extent.
+							be.Contiguous = len(ranges) == 1 && ranges[0].Offset != holeOffset
+						}
+					}
+				}
 				return fsys.add(p, &entryFileInfo{info: info, sys: be})
 			}
 			// For EROFS sources, use direct SectionReader (bypasses
@@ -485,11 +549,13 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 			}
 		}
 
-		// For directories from plain fs.FS, ensure nlink >= 2.
-		if info.Mode().IsDir() && be == nil {
-			be = entryFromSys(info)
+		// For directories, ensure nlink >= 2.
+		if info.Mode().IsDir() {
 			if be == nil {
-				be = &builder.Entry{Nlink: 2}
+				be = entryFromSys(info)
+				if be == nil {
+					be = &builder.Entry{Nlink: 2}
+				}
 			}
 			if be.Nlink < 2 {
 				be.Nlink = 2
@@ -497,6 +563,12 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 			return fsys.add(p, &entryFileInfo{info: info, sys: be})
 		}
 
+		// General case: devices, fifos, sockets, etc.
+		// Wrap in entryFileInfo when be was extracted from Sys()
+		// so that add() sees the metadata.
+		if be != nil {
+			return fsys.add(p, &entryFileInfo{info: info, sys: be})
+		}
 		return fsys.add(p, info)
 	})
 }
@@ -505,6 +577,9 @@ func (fsys *Writer) CopyFrom(src fs.FS, opts ...CopyOpt) error {
 
 // Close writes the EROFS image. The FS must not be used after Close.
 func (fsys *Writer) Close() error {
+	if fsys.wErr != nil {
+		return fsys.wErr
+	}
 	if fsys.closed {
 		return fmt.Errorf("mkfs: FS already closed")
 	}
@@ -707,6 +782,7 @@ type createOptions struct {
 	buildTime    uint64
 	buildTimeNs  uint32
 	hasBuildTime bool
+	blockSize    int      // 0 = use default
 	dataFile     *os.File // external data file for metadata-only mode
 	tempDir      string   // temp directory for spool file
 }
@@ -734,6 +810,21 @@ type deviceBlocker interface {
 // readLinker is an interface for filesystems that support reading symlink targets.
 type readLinker interface {
 	ReadLink(name string) (string, error)
+}
+
+// dataRanger may be implemented by fs.FileInfo to provide the physical
+// location of uncompressed file data in backing devices. CopyFrom checks
+// this via type assertion in metadata-only mode to build chunk indexes
+// without requiring the caller to construct internal chunk types.
+//
+// This interface should only be implemented for files whose device data
+// is stored verbatim (uncompressed). For compressed files, return nil or
+// do not implement the interface. In full-image mode CopyFrom then falls
+// back to reading through Open(), which decompresses transparently. In
+// MetadataOnly mode there is no such fallback: the file is stored as a
+// chunk-based inode with no physical mappings (all holes).
+type dataRanger interface {
+	DataRange() []DataRange
 }
 
 // --- Internal types ---
@@ -1267,6 +1358,95 @@ func (fsys *Writer) zeroPad() []byte {
 		fsys.padBuf = make([]byte, fsys.resolveBlockSize())
 	}
 	return fsys.padBuf
+}
+
+// chunksFromRanges converts DataRange entries into internal chunk entries.
+// fileSize is the logical size of the file; the sum of all range Sizes must
+// equal fileSize exactly, or an error is returned.
+//
+// The block size used is the Writer's resolved block size. DataRange.Device
+// values are offset by 1 to produce chunk DeviceIDs: DataRange Device 0
+// becomes chunk DeviceID 1 (the first extra device), matching the EROFS
+// convention where DeviceID 0 is the primary image.
+//
+// Validation rules:
+//   - sum(Size) == fileSize; a mismatch is rejected.
+//   - r.Size > 0 for every entry.
+//   - Hole entries (Offset == -1) emit [builder.NullPhysicalBlock] chunks.
+//     Hole Size must be block-aligned for non-final entries; the final entry
+//     may end mid-block to match the file tail.
+//   - For data entries: r.Offset >= 0 and block-aligned; r.Device == 0.
+//   - For non-final data entries: r.Size must be a multiple of blockSize.
+//     The final entry may have a partial last block to match the file tail.
+func (fsys *Writer) chunksFromRanges(ranges []DataRange, fileSize int64) ([]builder.Chunk, error) {
+	blockSize := uint64(fsys.resolveBlockSize())
+
+	// Validate total coverage first.
+	var total int64
+	for _, r := range ranges {
+		total += r.Size
+	}
+	if total != fileSize {
+		return nil, fmt.Errorf("DataRange total size %d does not match file size %d", total, fileSize)
+	}
+
+	last := len(ranges) - 1
+	var chunks []builder.Chunk
+	for i, r := range ranges {
+		if r.Size <= 0 {
+			return nil, fmt.Errorf("DataRange[%d]: non-positive Size %d", i, r.Size)
+		}
+		// Non-final entries must be block-aligned in size; the final entry may
+		// end mid-block to match the file tail.
+		if i < last && uint64(r.Size)%blockSize != 0 {
+			return nil, fmt.Errorf("DataRange[%d]: non-final Size %d is not block-aligned (block size %d)", i, r.Size, blockSize)
+		}
+		if r.Offset == holeOffset {
+			// Hole: emit NullPhysicalBlock chunks covering the hole span.
+			totalBlocks := (uint64(r.Size) + blockSize - 1) / blockSize
+			for totalBlocks > 0 {
+				count := totalBlocks
+				if count > 65535 {
+					count = 65535
+				}
+				chunks = append(chunks, builder.Chunk{
+					PhysicalBlock: builder.NullPhysicalBlock,
+					Count:         uint16(count),
+				})
+				totalBlocks -= count
+			}
+			continue
+		}
+		if r.Offset < 0 {
+			return nil, fmt.Errorf("DataRange[%d]: negative Offset %d", i, r.Offset)
+		}
+		if uint64(r.Offset)%blockSize != 0 {
+			return nil, fmt.Errorf("DataRange[%d]: Offset %d is not block-aligned (block size %d)", i, r.Offset, blockSize)
+		}
+		// Non-EROFS sources register exactly one device via DeviceBlocks();
+		// only Device=0 is valid. Device=0xFFFF would also wrap deviceID to 0
+		// (the primary image), producing an invalid mapping.
+		if r.Device != 0 {
+			return nil, fmt.Errorf("DataRange[%d]: Device %d out of range (source declared one device, only Device=0 is valid)", i, r.Device)
+		}
+		deviceID := r.Device + 1
+		startBlock := uint64(r.Offset) / blockSize
+		totalBlocks := (uint64(r.Size) + blockSize - 1) / blockSize
+		for totalBlocks > 0 {
+			count := totalBlocks
+			if count > 65535 {
+				count = 65535
+			}
+			chunks = append(chunks, builder.Chunk{
+				PhysicalBlock: startBlock,
+				Count:         uint16(count),
+				DeviceID:      deviceID,
+			})
+			startBlock += count
+			totalBlocks -= count
+		}
+	}
+	return chunks, nil
 }
 
 // ensureSpool lazily creates the spool temp file.
