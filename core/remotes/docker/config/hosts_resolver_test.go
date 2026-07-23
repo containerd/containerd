@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -314,5 +315,95 @@ func (m testManifest) OCIManifest() []byte {
 func (m testManifest) RegisterHandler(r *http.ServeMux, name string) {
 	for _, c := range append(m.references, m.config) {
 		r.Handle(fmt.Sprintf("/v2/%s/blobs/%s", name, c.Digest()), c)
+	}
+}
+
+func TestResolverWithConfiguredProxy(t *testing.T) {
+	ctx := context.Background()
+
+	// Start a mock proxy server at a random port that can do basic forwarding of an HTTP request
+	var proxyCalled atomic.Bool
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyCalled.Store(true)
+		if r.Method == http.MethodConnect {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		req, err := http.NewRequest(r.Method, r.RequestURI, r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for k, vv := range r.Header {
+			for _, v := range vv {
+				req.Header.Add(k, v)
+			}
+		}
+		// avoid any default ProxyFromEnvironment from CI env for mock proxy server
+		tr := http.Transport{Proxy: nil}
+		client := http.Client{Transport: &tr}
+		resp, err := client.Do(req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+		for k, vv := range resp.Header {
+			for _, v := range vv {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		io.Copy(w, resp.Body)
+	}))
+	defer proxy.Close()
+
+	// Start a target server at a different random port
+	var targetCalled atomic.Bool
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		targetCalled.Store(true)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer target.Close()
+
+	targetHost := target.URL[len("http://"):]
+
+	// Write a temporary hosts.toml file with the proxy configuration
+	var testtomlTemplate = `
+server = "http://%s"
+
+[host."http://%s"]
+  capabilities = ["pull", "resolve"]
+  proxy = "%s"
+`
+	testtoml := fmt.Sprintf(testtomlTemplate, targetHost, targetHost, proxy.URL)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "hosts.toml"), []byte(testtoml), 0600); err != nil {
+		t.Fatalf("failed to write hosts.toml: %v", err)
+	}
+
+	hostOptions := HostOptions{
+		HostDir: func(host string) (string, error) {
+			return dir, nil
+		},
+	}
+	options := docker.ResolverOptions{}
+	options.Hosts = ConfigureHosts(ctx, hostOptions)
+
+	resolver := docker.NewResolver(options)
+	image := fmt.Sprintf("%s/library/hello-world:latest", targetHost)
+
+	_, _, err := resolver.Resolve(ctx, image)
+
+	if err != nil {
+		t.Fatalf("Resolve failed: %v", err)
+	}
+
+	if !proxyCalled.Load() {
+		t.Fatalf("Expected request to go through the configured proxy")
+	}
+
+	if !targetCalled.Load() {
+		t.Fatalf("Expected request to reach target server through proxy")
 	}
 }

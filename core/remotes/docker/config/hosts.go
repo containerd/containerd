@@ -57,6 +57,8 @@ type hostConfig struct {
 
 	header http.Header
 
+	proxy *url.URL
+
 	// TODO: Add credential configuration (domain alias, username)
 }
 
@@ -171,9 +173,9 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
 			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
+			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 || host.proxy != nil {
 				c := *client
-				if explicitTLSFromHost || host.dialTimeout != nil {
+				if explicitTLSFromHost || host.dialTimeout != nil || host.proxy != nil {
 					tr := defaultTransport.Clone()
 
 					if explicitTLSFromHost {
@@ -188,6 +190,10 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 							KeepAlive:     30 * time.Second,
 							FallbackDelay: 300 * time.Millisecond,
 						}).DialContext
+					}
+
+					if host.proxy != nil {
+						tr.Proxy = http.ProxyURL(host.proxy)
 					}
 
 					c.Transport = tr
@@ -374,6 +380,9 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
+	// Proxy is the address of the proxy server to use for this host.
+	Proxy string `toml:"proxy"`
+
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -544,6 +553,31 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		result.dialTimeout = &dialTimeout
 	}
 
+	if config.Proxy != "" {
+		proxyURL, err := url.Parse(config.Proxy)
+		if err != nil {
+			return hostConfig{}, fmt.Errorf("unable to parse configured proxy URL: %w", err)
+		}
+		redacted := redactProxyURL(proxyURL)
+		if proxyURL.Host == "" {
+			return hostConfig{}, fmt.Errorf("invalid proxy URL %q: must have a non-empty host", redacted)
+		}
+		switch proxyURL.Scheme {
+		case "http", "https":
+		default:
+			return hostConfig{}, fmt.Errorf("invalid proxy URL %q: unsupported scheme %q", redacted, proxyURL.Scheme)
+		}
+		switch proxyURL.Path {
+		case "", "/":
+		default:
+			return hostConfig{}, fmt.Errorf("invalid proxy URL %q: path is not allowed", redacted)
+		}
+		if rq, f := proxyURL.RawQuery != "", proxyURL.Fragment != ""; rq || f {
+			return hostConfig{}, fmt.Errorf("invalid proxy URL %q: query and fragment are not allowed (query=%t, fragment=%t)", redacted, rq, f)
+		}
+		result.proxy = proxyURL
+	}
+
 	return result, nil
 }
 
@@ -647,4 +681,16 @@ func loadCertFiles(ctx context.Context, certsDir string) ([]hostConfig, error) {
 		}
 	}
 	return hosts, nil
+}
+
+// redactProxyURL removes extra potentially sensitive info not already removed by the std lib.
+// This is used when printing proxy URLs in debug messages.
+func redactProxyURL(proxyURL *url.URL) string {
+	p := *proxyURL
+	p.Opaque = strings.Repeat("*", len(proxyURL.Opaque))
+	p.RawPath = strings.Repeat("*", len(proxyURL.RawPath))
+	p.RawQuery = strings.Repeat("*", len(proxyURL.RawQuery))
+	p.Fragment = strings.Repeat("*", len(proxyURL.Fragment))
+	p.Path = strings.Repeat("*", len(proxyURL.Path))
+	return p.Redacted()
 }
