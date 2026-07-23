@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -113,6 +114,10 @@ func readLine(b *bufio.Reader) (line []byte, isPrefix bool, err error) {
 
 func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int) {
 	defer rc.Close()
+	var bwMu sync.Mutex
+	bw := bufio.NewWriterSize(w, 32*1024)
+	flushDone := make(chan struct{})
+
 	var (
 		stream    = []byte(s)
 		delimiter = []byte{delimiter}
@@ -129,6 +134,34 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 	if maxLen > 0 && maxLen < bufSize {
 		bufSize = maxLen
 	}
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				bwMu.Lock()
+				if bw.Buffered() > 0 {
+					if err := bw.Flush(); err != nil {
+						log.L.WithError(err).Errorf("flush %s log buffer failed", s)
+					}
+				}
+				bwMu.Unlock()
+			case <-flushDone:
+				return
+			}
+		}
+	}()
+
+	defer func() {
+		close(flushDone)
+		bwMu.Lock()
+		if err := bw.Flush(); err != nil {
+			log.L.WithError(err).Errorf("flush %s log buffer failed", s)
+		}
+		bwMu.Unlock()
+	}()
 	r := bufio.NewReaderSize(rc, bufSize)
 	writeLineBuffer := func(tag []byte, lineBytes [][]byte) {
 		timeBuffer = time.Now().AppendFormat(timeBuffer[:0], timestampFormat)
@@ -143,7 +176,7 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 			lineBuffer.Write(l)
 		}
 		lineBuffer.WriteByte(eol)
-		if n, err := lineBuffer.WriteTo(w); err == nil {
+		if n, err := lineBuffer.WriteTo(bw); err == nil {
 			outputEntries.Inc()
 			outputBytes.Inc(float64(n))
 		} else {
