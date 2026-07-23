@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -62,12 +63,6 @@ func toCRISandbox(meta sandboxstore.Metadata, status sandboxstore.Status) *runti
 	}
 }
 
-func (c *criService) normalizePodSandboxFilter(filter *runtime.PodSandboxFilter) {
-	if sb, err := c.sandboxStore.Get(filter.GetId()); err == nil {
-		filter.Id = sb.ID
-	}
-}
-
 func (c *criService) normalizePodSandboxStatsFilter(filter *runtime.PodSandboxStatsFilter) {
 	if sb, err := c.sandboxStore.Get(filter.GetId()); err == nil {
 		filter.Id = sb.ID
@@ -80,11 +75,10 @@ func (c *criService) filterCRISandboxes(sandboxes []*runtime.PodSandbox, filter 
 		return sandboxes
 	}
 
-	c.normalizePodSandboxFilter(filter)
 	filtered := []*runtime.PodSandbox{}
 	for _, s := range sandboxes {
 		// Filter by id
-		if filter.GetId() != "" && filter.GetId() != s.Id {
+		if filter.GetId() != "" && !strings.HasPrefix(s.Id, filter.GetId()) {
 			continue
 		}
 		// Filter by state
