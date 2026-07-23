@@ -103,7 +103,7 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 			}
 
 			for _, container := range sandboxContainerMap[sandbox.ID] {
-				containerMetrics, err := c.collectContainerMetrics(ctx, container, baseLabels)
+				containerMetrics, err := c.collectContainerMetrics(gctx, container, baseLabels)
 				if err != nil {
 					switch {
 					case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
