@@ -574,6 +574,9 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		removeTask(ctx, s.ID())
 	}
 
+	cleanupCtx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+	defer cancel()
+
 	const supportSandboxAPIVersion = 3
 	if _, apiVer := s.ShimInstance.Endpoint(); apiVer < supportSandboxAPIVersion {
 		sandboxed = false
@@ -582,22 +585,18 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	// Don't shutdown sandbox as there may be other containers running.
 	// Let controller decide when to shutdown.
 	if !sandboxed {
-		if err := s.waitShutdown(ctx); err != nil {
-			// FIXME(fuweid):
-			//
-			// If the error is context canceled, should we use context.TODO()
-			// to wait for it?
+		if err := s.waitShutdown(cleanupCtx); err != nil {
 			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
 		}
 	}
 
-	if err := s.ShimInstance.Delete(ctx); err != nil {
+	if err := s.ShimInstance.Delete(cleanupCtx); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete shim")
 	}
 
 	// remove self from the runtime task list
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
-	removeTask(ctx, s.ID())
+	removeTask(cleanupCtx, s.ID())
 
 	if shimErr != nil {
 		return nil, shimErr
