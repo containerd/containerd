@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -327,6 +328,19 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	return size, nil
 }
 
+// validateHeaderIDs rejects owner IDs that do not fit in the uint32 range the
+// chown syscalls accept. Uid and Gid come from the (untrusted) tar header as
+// int, but lchown/chown truncate anything wider than 32 bits, so a header owner
+// at or above 2^32 would land the file on a different owner than declared (for
+// example 0x100000000 becomes 0, i.e. root).
+func validateHeaderIDs(hdr *tar.Header) error {
+	if hdr.Uid < 0 || int64(hdr.Uid) > math.MaxUint32 ||
+		hdr.Gid < 0 || int64(hdr.Gid) > math.MaxUint32 {
+		return fmt.Errorf("owner %d:%d for %q out of range: %w", hdr.Uid, hdr.Gid, hdr.Name, errInvalidArchive)
+	}
+	return nil
+}
+
 func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader, noSameOwner bool) error {
 	// hdr.Mode is in linux format, which we can use for syscalls,
 	// but for os.Foo() calls we need the mode converted to os.FileMode,
@@ -394,6 +408,9 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	}
 
 	if !noSameOwner {
+		if err := validateHeaderIDs(hdr); err != nil {
+			return err
+		}
 		if err := os.Lchown(path, hdr.Uid, hdr.Gid); err != nil {
 			err = fmt.Errorf("failed to Lchown %q for UID %d, GID %d: %w", path, hdr.Uid, hdr.Gid, err)
 			if errors.Is(err, syscall.EINVAL) && userns.RunningInUserNS() {
