@@ -19,6 +19,7 @@ package transfer
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -95,6 +96,9 @@ func init() {
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
 			lc.DuplicationSuppressor = kmutex.New()
+
+			// Export config_path so clients can query it via introspection
+			ic.Meta.Exports["config_path"] = config.RegistryConfigPath
 
 			return local.NewTransferService(ms.ContentStore(), metadata.NewImageStore(ms), lc), nil
 		},
@@ -283,5 +287,6 @@ func defaultConfig() *transferConfig {
 		MaxConcurrentUploadedLayers: 3,
 		MaxConcurrentUnpacks:        1,
 		CheckPlatformSupported:      false,
+		RegistryConfigPath:          filepath.Join(defaults.DefaultConfigDir, "certs.d"),
 	}
 }

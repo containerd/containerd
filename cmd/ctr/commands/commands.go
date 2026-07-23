@@ -17,12 +17,14 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 
@@ -72,8 +74,8 @@ var (
 			Usage: "Refresh token for authorization server",
 		},
 		&cli.StringFlag{
-			Name: "hosts-dir",
-			// compatible with "/etc/docker/certs.d"
+			Name:  "hosts-dir",
+			Value: filepath.Join(defaults.DefaultConfigDir, "certs.d"),
 			Usage: "Custom hosts configuration directory",
 		},
 		&cli.StringFlag{
@@ -293,4 +295,32 @@ func WritePidFile(path string, pid int) error {
 		return err
 	}
 	return f.Close()
+}
+
+// GetRegistryConfigPath queries the transfer plugin's config_path via introspection.
+//
+// This allows CLI commands to respect daemon configuration instead of relying solely on flags.
+//
+// Returns:
+//   - The config_path value (e.g., "/etc/containerd/certs.d") if the plugin exists and exports it
+//   - Empty string in the following cases:
+//   - Introspection query fails (daemon communication error)
+//   - Plugin "io.containerd.transfer.v1.local" is not found
+//   - Multiple plugins match (should never happen with exact ID match)
+//   - Plugin doesn't export "config_path" field
+//
+// The function returns empty string instead of an error to allow graceful fallback
+// to CLI flag defaults when daemon configuration is unavailable.
+func GetRegistryConfigPath(ctx context.Context, client interface{ IntrospectionService() introspection.Service }) string {
+	resp, err := client.IntrospectionService().Plugins(ctx, "id==io.containerd.transfer.v1.local")
+	if err != nil {
+		return ""
+	}
+	if len(resp.Plugins) != 1 {
+		return ""
+	}
+	if configPath, ok := resp.Plugins[0].Exports["config_path"]; ok {
+		return configPath
+	}
+	return ""
 }
