@@ -71,8 +71,18 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	if err := os.MkdirAll(filepath.Dir(b.Path), 0711); err != nil {
 		return nil, err
 	}
+	// On Windows, a crashed shim or failed atomicDelete may leave the bundle
+	// path behind; mirror the work-dir handling below to self-heal.
 	if err := os.Mkdir(b.Path, 0700); err != nil {
-		return nil, err
+		if !os.IsExist(err) {
+			return nil, err
+		}
+		if err := os.RemoveAll(b.Path); err != nil {
+			return nil, fmt.Errorf("failed to remove stale bundle path %q: %w", b.Path, err)
+		}
+		if err := os.Mkdir(b.Path, 0700); err != nil {
+			return nil, err
+		}
 	}
 	if typeurl.Is(spec, &specs.Spec{}) {
 		if err := prepareBundleDirectoryPermissions(b.Path, spec.GetValue()); err != nil {
@@ -93,7 +103,9 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		if !os.IsExist(err) {
 			return nil, err
 		}
-		os.RemoveAll(work)
+		if err := os.RemoveAll(work); err != nil {
+			return nil, fmt.Errorf("failed to remove stale work dir %q: %w", work, err)
+		}
 		if err := os.Mkdir(work, 0711); err != nil {
 			return nil, err
 		}
