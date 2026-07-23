@@ -488,7 +488,7 @@ type shimInfo struct {
 	handledMounts []string
 }
 
-func (m *ShimManager) loadShimInfo(ctx context.Context, shim string) (*shimInfo, error) {
+func (m *ShimManager) loadShimInfo(ctx context.Context, shim string, runtimeOptions typeurl.Any) (*shimInfo, error) {
 	if i, ok := m.shimInfos.Load(shim); ok {
 		return i.(*shimInfo), nil
 	}
@@ -499,7 +499,7 @@ func (m *ShimManager) loadShimInfo(ctx context.Context, shim string) (*shimInfo,
 		return sinfo, nil
 	}
 
-	rinfo, err := getRuntimeInfo(ctx, m, &apitypes.RuntimeRequest{RuntimePath: shim})
+	rinfo, err := getRuntimeInfo(ctx, m, &apitypes.RuntimeRequest{RuntimePath: shim, Options: typeurl.MarshalProto(runtimeOptions)})
 	if err != nil {
 		return nil, err
 	}
