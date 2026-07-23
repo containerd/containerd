@@ -38,7 +38,13 @@ function install_runc() {
 	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
-	env -u VERSION make BUILDTAGS='seccomp' runc
+
+	# runc 1.5+ enables libpathrs by default. Build and install it so runc can
+	# link against it.
+  script/build-libpathrs.sh 0.2.5 /usr/local/lib
+  #export PKG_CONFIG_PATH="${TMPROOT}/libpathrs/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+
+	env -u VERSION make runc
 	$SUDO make install
 	popd
 }
