@@ -19,6 +19,7 @@
 package process
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -183,4 +184,25 @@ func stateName(v any) string {
 		return "stopped"
 	}
 	panic(fmt.Errorf("invalid state %v", v))
+}
+
+// hasIoUring checks if the process with the given pid is using io_uring.
+// CRIU cannot checkpoint processes using io_uring (anon_inode:[io_uring]),
+// so we need to detect this before attempting checkpoint.
+func hasIoUring(pid int) (bool, error) {
+	mapsPath := fmt.Sprintf("/proc/%d/maps", pid)
+	file, err := os.Open(mapsPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to open %s: %w", mapsPath, err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "[io_uring]") {
+			return true, nil
+		}
+	}
+	return false, scanner.Err()
 }
