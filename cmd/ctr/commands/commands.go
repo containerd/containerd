@@ -96,6 +96,10 @@ var (
 			Name:  "http-trace",
 			Usage: "Enable HTTP tracing for registry interactions",
 		},
+		&cli.StringFlag{
+			Name:  "sslkeylogfile",
+			Usage: "Path to write TLS session keys",
+		},
 	}
 
 	// RuntimeFlags are cli flags specifying runtime
