@@ -23,6 +23,12 @@ Since the VM cannot bind-mount directories from the host, the blockfile snapshot
 creates a block device for the snapshot, which can be attached to the VM as a block
 device to facilitate getting the contents into the guest.
 
+This pairs naturally with VM-based container runtimes such as
+[Kata Containers](https://katacontainers.io/), which can attach each snapshot's
+blockfile to the guest as a virtio-blk device. See the
+[Using with Kata Containers](#using-with-kata-containers) section below for a
+minimal example.
+
 ## Alternatives
 
 There are alternatives to the blockfile snapshotter for mounting directories into a
@@ -61,7 +67,7 @@ configuration.
 
 - `root_path`: The directory where the block files are stored. This directory must be writable by the containerd process.
 - `scratch_file`: The path to the empty file that will be used as the base for the block files. This file should exist before first using the snapshotter.
-- `fs_type`: The filesystem type to use for the block files. Currently supported are `ext4` and `xfs`.
+- `fs_type`: The filesystem type used *inside* each block file (the one the guest will see as its rootfs). Currently supported are `ext4` and `xfs`. This is independent of the per-layer copy efficiency discussed in [How It Works](#how-it-works), which is governed by the host filesystem holding `root_path` and `scratch_file`, not by `fs_type`.
 - `mount_options`: Additional mount options to use when mounting the block files.
 - `recreate_scratch`: If set to `true`, the snapshotter will recreate the scratch file if it is missing. If set to `false`, the snapshotter will fail if the scratch file is missing.
 
@@ -71,7 +77,7 @@ You can create a scratch file as follows. This example uses a 500MB scratch file
 
 ```bash
 $ # make a 500M file
-$ dd if=/dev/zero of=/opt/containerd/blockfile bs=1M count=500
+$ sudo dd if=/dev/zero of=/opt/containerd/blockfile bs=1M count=500
 500+0 records in
 500+0 records out
 524288000 bytes (524 MB, 500 MiB) copied, 1.76253 s, 297 MB/s
@@ -90,6 +96,26 @@ Writing inode tables: done
 Creating journal (8192 blocks): done
 Writing superblocks and filesystem accounting information: done
 ```
+
+If you want to use XFS as the guest-visible filesystem instead, format the
+scratch file accordingly:
+
+```bash
+$ # make a 500M file
+$ sudo dd if=/dev/zero of=/opt/containerd/blockfile bs=1M count=500
+
+$ # format the file with xfs (optionally pass `-m reflink=1` for reflink
+$ # support inside the guest filesystem)
+$ sudo mkfs.xfs /opt/containerd/blockfile
+```
+
+Choosing `xfs` vs `ext4` only affects the filesystem seen by the container.
+It does *not* control whether the snapshotter benefits from reflink-based
+per-layer copies — that depends on the host filesystem holding `root_path`
+and `scratch_file`. To benefit from copy-on-write per-layer copies, that
+host filesystem must itself support reflinks (XFS created with `reflink=1`,
+or btrfs), and `root_path` and `scratch_file` must live on the same
+filesystem instance. See [How It Works](#how-it-works) for details.
 
 ### Running a container
 
@@ -123,6 +149,33 @@ cOpts := []containerd.NewContainerOpts{
 }
 container, err := client.NewContainer(ctx, containerID, cOpts...)
 ```
+
+### Using with Kata Containers
+
+[Kata Containers](https://katacontainers.io/) is a typical consumer of the
+blockfile snapshotter: each snapshot is a self-contained filesystem image that
+Kata can hand to the guest as a virtio-blk device, removing the need for
+9p/virtiofs on the rootfs attachment path. (Other Kata features such as
+shared volume mounts may still use virtiofs or 9p depending on
+configuration; this section only covers the snapshot/rootfs path.)
+
+Assuming the `io.containerd.kata.v2` runtime is already installed and
+discoverable by containerd, a container can be launched against the blockfile
+snapshotter with `ctr`:
+
+```bash
+$ ctr run --rm -t \
+    --runtime io.containerd.kata.v2 \
+    --snapshotter blockfile \
+    docker.io/library/busybox:latest hello sh
+```
+
+The same wiring works through the CRI path by selecting both the runtime class
+backed by `io.containerd.kata.v2` and the `blockfile` snapshotter for the
+runtime handler. Refer to the [Kata Containers
+documentation](https://github.com/kata-containers/kata-containers/tree/main/docs)
+for the guest-side configuration (image attachment mode, rootfs type, etc.),
+which is independent of containerd.
 
 ## How It Works
 
@@ -185,3 +238,32 @@ file sizes will be:
 
 Total space usage thus is 25+50+75=150MB. This is a fraction of the amount
 required if each layer's blockfile used the full 500MB, i.e. 1500MB in total.
+
+### Reflink-aware copies
+
+On host filesystems that support reflinks (XFS created with `reflink=1`, or
+btrfs), the per-layer copy step described above is implicitly turned into a
+copy-on-write clone:
+
+- **Linux**: the per-layer copy is performed via `copy_file_range(2)`,
+  which gives the underlying filesystem an opportunity to implement copy
+  acceleration. On a reflink-capable filesystem this means the new
+  blockfile shares extents with its parent rather than duplicating them, so
+  the copy completes almost instantly and consumes no additional space
+  until either side is written. When the filesystem (or kernel/source
+  combination) cannot accelerate the copy, the call transparently falls
+  back to a plain data copy; the result is correct in all cases, just less
+  space-efficient.
+- **Darwin**: the snapshotter explicitly calls `clonefile(2)`, which provides
+  the equivalent behavior on APFS.
+
+The end result is that the actual on-disk usage drops further than the
+sparse-file numbers above: the unchanged extents of the parent blockfile are
+shared with the child, and only blocks modified by the new layer cost real
+space. In other words, when the underlying filesystem supports reflinks, the
+blockfile snapshotter's storage efficiency is comparable to copy-on-write
+snapshotters like overlayfs or btrfs.
+
+If the underlying filesystem does not support reflinks, the snapshotter still
+works correctly — the copy simply falls back to a full data copy (with sparse
+holes preserved where possible).
