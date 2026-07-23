@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/internal/tomlext"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/log"
@@ -41,13 +42,17 @@ type Config struct {
 	BinDir             string           `toml:"bin_dir"`
 	MaxVerifiers       int              `toml:"max_verifiers"`
 	PerVerifierTimeout tomlext.Duration `toml:"per_verifier_timeout"`
+	VerifyOnRun        bool             `toml:"verify_on_run"`
 }
 
 type ImageVerifier struct {
 	config *Config
 }
 
-var _ imageverifier.ImageVerifier = (*ImageVerifier)(nil)
+var (
+	_ imageverifier.ImageVerifier        = (*ImageVerifier)(nil)
+	_ imageverifier.ContextImageVerifier = (*ImageVerifier)(nil)
+)
 
 func NewImageVerifier(c *Config) *ImageVerifier {
 	return &ImageVerifier{
@@ -55,7 +60,31 @@ func NewImageVerifier(c *Config) *ImageVerifier {
 	}
 }
 
+// VerifyImage verifies an image using the OCI descriptor.
 func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor) (*imageverifier.Judgement, error) {
+	return v.verify(ctx, name, desc, imageverifier.VerifyOptions{Operation: imageverifier.OperationPull}, v.config.VerifyOnRun)
+}
+
+// VerifyImageContext verifies an image with operation-scoped context.
+func (v *ImageVerifier) VerifyImageContext(ctx context.Context, name string, desc ocispec.Descriptor, opts imageverifier.VerifyOptions) (*imageverifier.Judgement, error) {
+	if opts.Operation != imageverifier.OperationRun {
+		// Only run-time verification is gated/contextual here; other operations
+		// fall back to the VerifyImage entrypoint.
+		return v.VerifyImage(ctx, name, desc)
+	}
+	if !v.config.VerifyOnRun {
+		return &imageverifier.Judgement{
+			OK:     true,
+			Reason: "run-time image verification is disabled; skipping",
+		}, nil
+	}
+	return v.verify(ctx, name, desc, opts, true)
+}
+
+// verify runs the configured verifier binaries against the image. When
+// includeContext is true, verifiers receive the richer VerifierInput payload and
+// an -operation argument; otherwise the bare OCI descriptor.
+func (v *ImageVerifier) verify(ctx context.Context, name string, desc ocispec.Descriptor, opts imageverifier.VerifyOptions, includeContext bool) (*imageverifier.Judgement, error) {
 	// os.ReadDir sorts entries by name.
 	entries, err := os.ReadDir(v.config.BinDir)
 	if err != nil {
@@ -85,10 +114,10 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 
 		bin := entry.Name()
 		start := time.Now()
-		exitCode, vr, err := v.runVerifier(ctx, bin, name, desc)
-		runtime := time.Since(start)
+		exitCode, vr, err := v.runVerifier(ctx, bin, name, desc, opts, includeContext)
+		elapsed := time.Since(start)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call verifier %v (runtime %v): %w", bin, runtime, err)
+			return nil, fmt.Errorf("failed to call verifier %v (runtime %v): %w", bin, elapsed, err)
 		}
 
 		if exitCode != 0 {
@@ -110,15 +139,23 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 	}, nil
 }
 
-func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc ocispec.Descriptor) (exitCode int, reason string, err error) {
+func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc ocispec.Descriptor, opts imageverifier.VerifyOptions, includeContext bool) (exitCode int, reason string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, tomlext.ToStdTime(v.config.PerVerifierTimeout))
 	defer cancel()
 
 	binPath := filepath.Join(v.config.BinDir, bin)
+
+	stdinMediaType := ocispec.MediaTypeDescriptor
+	if includeContext {
+		stdinMediaType = images.MediaTypeContainerd1ImageVerificationInput
+	}
 	args := []string{
 		"-name", imageName,
 		"-digest", desc.Digest.String(),
-		"-stdin-media-type", ocispec.MediaTypeDescriptor,
+		"-stdin-media-type", stdinMediaType,
+	}
+	if includeContext {
+		args = append(args, "-operation", string(opts.Operation))
 	}
 
 	cmd := exec.CommandContext(ctx, binPath, args...)
@@ -169,7 +206,7 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 	stdoutWrite.Close()
 	stderrWrite.Close()
 
-	// Write the descriptor to stdin.
+	// Write the descriptor (or the richer VerifierInput) to stdin.
 	go func() {
 		// Descriptors are usually small enough to fit in a pipe buffer (which is
 		// often 64 KiB on Linux) so this write usually won't block on the child
@@ -177,7 +214,17 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 		// the parent to block if the descriptor is larger than the pipe buffer and
 		// the child process doesn't read stdin. Therefore, we write to stdin
 		// asynchronously, limited by the stdinWrite deadline set above.
-		err := json.NewEncoder(stdinWrite).Encode(desc)
+		var err error
+		if includeContext {
+			input := imageverifier.VerifierInput{
+				Descriptor:  &desc,
+				Operation:   opts.Operation,
+				Annotations: opts.Annotations,
+			}
+			err = json.NewEncoder(stdinWrite).Encode(input)
+		} else {
+			err = json.NewEncoder(stdinWrite).Encode(desc)
+		}
 		if err != nil {
 			// This may error out with a "broken pipe" error if the descriptor is
 			// larger than the pipe buffer and the child process does not read all

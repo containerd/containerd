@@ -107,29 +107,40 @@ func DefaultCRIAnnotations(
 	config *runtime.PodSandboxConfig,
 	sandbox bool,
 ) []oci.SpecOpts {
-	opts := []oci.SpecOpts{
-		customopts.WithAnnotation(SandboxID, sandboxID),
-		customopts.WithAnnotation(SandboxNamespace, config.GetMetadata().GetNamespace()),
-		customopts.WithAnnotation(SandboxUID, config.GetMetadata().GetUid()),
-		customopts.WithAnnotation(SandboxName, config.GetMetadata().GetName()),
+	m := DefaultCRIAnnotationsMap(sandboxID, containerName, imageName, config, sandbox)
+	opts := make([]oci.SpecOpts, 0, len(m))
+	for k, v := range m {
+		opts = append(opts, customopts.WithAnnotation(k, v))
 	}
-	ctrType := ContainerTypeContainer
+	return opts
+}
+
+// DefaultCRIAnnotationsMap is DefaultCRIAnnotations as a map, for callers that
+// need the assembled annotations rather than spec-mutating options.
+func DefaultCRIAnnotationsMap(
+	sandboxID string,
+	containerName string,
+	imageName string,
+	config *runtime.PodSandboxConfig,
+	sandbox bool,
+) map[string]string {
+	m := map[string]string{
+		SandboxID:        sandboxID,
+		SandboxNamespace: config.GetMetadata().GetNamespace(),
+		SandboxUID:       config.GetMetadata().GetUid(),
+		SandboxName:      config.GetMetadata().GetName(),
+	}
 	if sandbox {
-		ctrType = ContainerTypeSandbox
+		m[ContainerType] = ContainerTypeSandbox
 		// Sandbox log dir and sandbox image name get passed for sandboxes, the other metadata always
 		// gets sent however.
-		opts = append(
-			opts,
-			customopts.WithAnnotation(SandboxLogDir, config.GetLogDirectory()),
-			customopts.WithAnnotation(SandboxImageName, imageName),
-		)
+		m[SandboxLogDir] = config.GetLogDirectory()
+		m[SandboxImageName] = imageName
 	} else {
+		m[ContainerType] = ContainerTypeContainer
 		// Image name and container name get passed for containers.
-		opts = append(
-			opts,
-			customopts.WithAnnotation(ContainerName, containerName),
-			customopts.WithAnnotation(ImageName, imageName),
-		)
+		m[ContainerName] = containerName
+		m[ImageName] = imageName
 	}
-	return append(opts, customopts.WithAnnotation(ContainerType, ctrType))
+	return m
 }

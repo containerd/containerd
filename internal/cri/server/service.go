@@ -54,6 +54,7 @@ import (
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
@@ -161,6 +162,9 @@ type criService struct {
 	containerEventsQ eventq.EventQueue[*runtime.ContainerEventResponse]
 	// nri is used to hook NRI into CRI request processing.
 	nri *nri.API
+	// imageVerifiers are the loaded image verifier plugins, invoked at container
+	// creation for run-time verification.
+	imageVerifiers map[string]imageverifier.ImageVerifier
 	// sandboxService is the sandbox related service for CRI
 	sandboxService sandboxService
 	// runtimeHandlers contains runtime handler info
@@ -187,6 +191,9 @@ type CRIServiceOptions struct {
 
 	// SandboxControllers is a map of all the loaded sandbox controllers
 	SandboxControllers map[string]sandbox.Controller
+
+	// Verifiers are the loaded image verifier plugins, keyed by plugin name.
+	Verifiers map[string]imageverifier.ImageVerifier
 
 	// Client is the base containerd client used for accessing services,
 	//
@@ -223,6 +230,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
 		statsCollector:     statsCollector,
 		shimPath:           options.ShimPath,
+		imageVerifiers:     options.Verifiers,
 	}
 
 	// TODO: Make discard time configurable

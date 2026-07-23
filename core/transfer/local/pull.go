@@ -80,6 +80,10 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			logger.WithError(err).Error("No judgement received from verifier")
 			return fmt.Errorf("blocking pull of %v with digest %v: image verifier %v returned error: %w", name, desc.Digest.String(), vfName, err)
 		}
+		if jdg == nil {
+			logger.Error("No judgement received from verifier")
+			return fmt.Errorf("blocking pull of %v with digest %v: image verifier %v returned no judgement", name, desc.Digest.String(), vfName)
+		}
 		logger = logger.WithFields(log.Fields{
 			"ok":     jdg.OK,
 			"reason": jdg.Reason,
