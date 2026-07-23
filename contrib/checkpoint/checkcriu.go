@@ -22,11 +22,15 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	criu "github.com/checkpoint-restore/go-criu/v7/utils"
 )
 
 func main() {
 	if err := criu.CheckForCriu(criu.PodCriuVersion); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "ERROR: CRIU check failed: %v\n", err)
+		os.Exit(1)
 	}
 }
