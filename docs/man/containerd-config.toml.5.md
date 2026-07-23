@@ -178,6 +178,7 @@ documentation.
   "io.containerd.timeout.shim.cleanup" = "5s"
   "io.containerd.timeout.shim.load" = "5s"
   "io.containerd.timeout.shim.shutdown" = "3s"
+  "io.containerd.timeout.snapshot.remove" = "5m"
   "io.containerd.timeout.task.state" = "2s" -->
 
 **imports**
