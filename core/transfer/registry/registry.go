@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -33,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/containerd/v2/pkg/httpdbg"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -125,7 +127,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 
 	hostOptions := config.HostOptions{}
 	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+		hostOptions.HostDir = hostDirFromRoots(filepath.SplitList(ropts.hostDir))
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
@@ -168,6 +170,23 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		httpTrace:     ropts.httpTrace,
 		localStream:   ropts.localStream,
 	}, nil
+}
+
+func hostDirFromRoots(roots []string) func(string) (string, error) {
+	rootfn := make([]func(string) (string, error), len(roots))
+	for i := range roots {
+		rootfn[i] = config.HostDirFromRoot(roots[i])
+	}
+
+	return func(host string) (dir string, err error) {
+		for _, fn := range rootfn {
+			dir, err = fn(host)
+			if (err != nil && !errdefs.IsNotFound(err)) || (dir != "") {
+				break
+			}
+		}
+		return
+	}
 }
 
 // From stream
