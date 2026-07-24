@@ -32,6 +32,7 @@ import (
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
+	runtimeconfig "github.com/containerd/containerd/v2/core/runtime/config"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
@@ -138,6 +139,13 @@ type Runtime struct {
 	IOType string `toml:"io_type" json:"io_type"`
 }
 
+func (r *Runtime) setDefaults() {
+	// If empty, use default podSandbox mode
+	if len(r.Sandboxer) == 0 {
+		r.Sandboxer = string(ModePodSandbox)
+	}
+}
+
 // ContainerdConfig contains toml config related to containerd
 type ContainerdConfig struct {
 	// DefaultRuntimeName is the default runtime name to use from the runtimes table.
@@ -145,7 +153,15 @@ type ContainerdConfig struct {
 
 	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
 	// configurations, to the matching configurations.
+	// Runtimes specified here that conflict with runtimes in the RuntimeConfigDir will
+	// take precedence.
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
+
+	// RuntimeConfigDir is a directory of runtime configurations.
+	// Runtime configs are loaded from <RuntimeConfigDir>/<runtime_name>/runtime.toml
+	// at startup and merged into the Runtimes map (a containerd restart is required
+	// for changes to take effect).
+	RuntimeConfigDir string `toml:"runtime_config_dir" json:"runtimeConfigDir"`
 
 	// IgnoreBlockIONotEnabledErrors is a boolean flag to ignore
 	// blockio related errors when blockio support has not been
@@ -635,6 +651,13 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
 	}
 
+	// Load runtimes from the runtime config directory and merge them into the
+	// Runtimes map before validation. Runtimes defined in the main config take
+	// precedence over those in the directory.
+	if err := c.ContainerdConfig.loadRuntimesFromDir(ctx); err != nil {
+		return warnings, fmt.Errorf("failed to load runtime configs from directory: %w", err)
+	}
+
 	// Validation for default_runtime_name
 	if c.ContainerdConfig.DefaultRuntimeName == "" {
 		return warnings, errors.New("`default_runtime_name` is empty")
@@ -673,11 +696,9 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
 			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
 		}
-		// If empty, use default podSandbox mode
-		if len(r.Sandboxer) == 0 {
-			r.Sandboxer = string(ModePodSandbox)
-			c.ContainerdConfig.Runtimes[k] = r
-		}
+
+		r.setDefaults()
+		c.ContainerdConfig.Runtimes[k] = r
 
 		if len(r.IOType) == 0 {
 			r.IOType = IOTypeFifo
@@ -727,6 +748,26 @@ func ValidateServerConfig(ctx context.Context, c *ServerConfig) ([]deprecation.W
 		}
 	}
 	return warnings, nil
+}
+
+func (c *ContainerdConfig) loadRuntimesFromDir(ctx context.Context) error {
+	runtimes, err := runtimeconfig.Load[Runtime](c.RuntimeConfigDir)
+	if err != nil {
+		return err
+	}
+
+	for name, runtime := range runtimes {
+		if _, ok := c.Runtimes[name]; ok {
+			log.G(ctx).WithField("handler", name).Warn("Runtime handler already defined in config, skipping config from directory")
+			continue
+		}
+
+		runtime.setDefaults()
+		c.Runtimes[name] = runtime
+		log.G(ctx).WithField("handler", name).Info("Loaded runtime handler from config directory")
+	}
+
+	return nil
 }
 
 func (config *Config) GetSandboxRuntime(podSandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (Runtime, error) {

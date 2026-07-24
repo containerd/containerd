@@ -18,12 +18,16 @@ package config
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	criruntime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	runtimeconfig "github.com/containerd/containerd/v2/core/runtime/config"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 )
@@ -539,4 +543,89 @@ func TestDefaultConfigEnableCRIU(t *testing.T) {
 	cfg := DefaultRuntimeConfig()
 	assert.NotNil(t, cfg.EnableCRIU)
 	assert.True(t, *cfg.EnableCRIU)
+}
+
+func TestLoadRuntimesFromDir(t *testing.T) {
+	t.Run("CRI runtime fields are loaded from the shared directory", func(t *testing.T) {
+		dir := t.TempDir()
+		writeRuntimeConfig(t, dir, "my-runtime", `
+runtime_type = "io.containerd.runc.v2"
+runtime_path = "/usr/bin/my-shim"
+snapshotter = "native"
+pod_annotations = ["example.com/pod"]
+
+[options]
+  BinaryName = "/usr/bin/my-runc"
+`)
+
+		sharedRuntimes, err := runtimeconfig.Load[runtimeconfig.Runtime](dir)
+		require.NoError(t, err)
+		assert.Equal(t, runtimeconfig.Runtime{
+			Type:        "io.containerd.runc.v2",
+			Path:        "/usr/bin/my-shim",
+			Snapshotter: "native",
+			Options: map[string]any{
+				"BinaryName": "/usr/bin/my-runc",
+			},
+		}, sharedRuntimes["my-runtime"])
+
+		c := &ContainerdConfig{
+			RuntimeConfigDir: dir,
+			Runtimes:         map[string]Runtime{},
+		}
+		err = c.loadRuntimesFromDir(context.Background())
+		require.NoError(t, err)
+		require.Contains(t, c.Runtimes, "my-runtime")
+		assert.Equal(t, "io.containerd.runc.v2", c.Runtimes["my-runtime"].Type)
+		assert.Equal(t, "/usr/bin/my-shim", c.Runtimes["my-runtime"].Path)
+		assert.Equal(t, "native", c.Runtimes["my-runtime"].Snapshotter)
+		assert.Equal(t, []string{"example.com/pod"}, c.Runtimes["my-runtime"].PodAnnotations)
+		assert.Equal(t, string(ModePodSandbox), c.Runtimes["my-runtime"].Sandboxer)
+	})
+
+	t.Run("a runtime in the main config takes precedence", func(t *testing.T) {
+		dir := t.TempDir()
+		writeRuntimeConfig(t, dir, "existing", `
+runtime_type = "io.containerd.runc.v2"
+runtime_path = "/usr/bin/from-dir"
+`)
+
+		c := &ContainerdConfig{
+			RuntimeConfigDir: dir,
+			Runtimes: map[string]Runtime{
+				"existing": {
+					Type: "io.containerd.runc.v2",
+					Path: "/usr/bin/from-config",
+				},
+			},
+		}
+		err := c.loadRuntimesFromDir(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, "/usr/bin/from-config", c.Runtimes["existing"].Path)
+	})
+
+	t.Run("a directory runtime may be the default runtime", func(t *testing.T) {
+		dir := t.TempDir()
+		writeRuntimeConfig(t, dir, "custom-default", `
+runtime_type = "io.containerd.runc.v2"
+`)
+
+		cfg := &RuntimeConfig{
+			ContainerdConfig: ContainerdConfig{
+				DefaultRuntimeName: "custom-default",
+				RuntimeConfigDir:   dir,
+			},
+		}
+		_, err := ValidateRuntimeConfig(context.Background(), cfg)
+		require.NoError(t, err)
+		assert.Contains(t, cfg.ContainerdConfig.Runtimes, "custom-default")
+	})
+}
+
+func writeRuntimeConfig(t *testing.T, dir, handler, contents string) {
+	t.Helper()
+
+	runtimeDir := filepath.Join(dir, handler)
+	require.NoError(t, os.Mkdir(runtimeDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, "runtime.toml"), []byte(contents), 0o600))
 }
