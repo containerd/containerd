@@ -19,9 +19,7 @@ package oci
 import (
 	"context"
 	"io"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -32,6 +30,7 @@ import (
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/moby/sys/user"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateSpec(t *testing.T) {
@@ -338,104 +337,145 @@ func TestWithPrivileged(t *testing.T) {
 	}
 }
 
-func TestOpenUserFile_AbsoluteSymlink(t *testing.T) {
+func TestOpenUserFile_Symlink(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("absolute symlink handling is only supported on non-Windows platforms")
+		t.Skip("symlink handling is only supported on non-Windows platforms")
 	}
 
 	expectedContent := []byte("root:x:0:0:root:/root:/bin/bash" + t.Name())
 
-	root := t.TempDir()
-	// Use 'continuity' library to create a directory structure simulating NixOS
-	if err := fstest.Apply(
-		fstest.CreateDir("/etc", 0o755),
-		fstest.CreateDir("/nix/store/abcd", 0o755),
-		fstest.CreateFile("/nix/store/abcd/passwd", expectedContent, 0o644),
-		// /etc/passwd -> /nix/store/abcd/passwd (absolute symlink)
-		fstest.Symlink("/nix/store/abcd/passwd", "/etc/passwd"),
-	).Apply(root); err != nil {
-		t.Fatal(err)
+	for _, tc := range []struct {
+		name    string
+		initOps []fstest.Applier
+	}{
+		{
+			name: "absolute symlink - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/etc", 0o755),
+				fstest.CreateDir("/nix/store/abcd", 0o755),
+				fstest.CreateFile("/nix/store/abcd/passwd", expectedContent, 0o644),
+				// /etc/passwd -> /nix/store/abcd/passwd (absolute symlink)
+				fstest.Symlink("/nix/store/abcd/passwd", "/etc/passwd"),
+			},
+		},
+		{
+			name: "absolute symlink - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/system/etc", 0o755),
+				fstest.CreateFile("/system/etc/passwd", expectedContent, 0o644),
+				// /etc -> /system/etc (absolute symlink)
+				fstest.Symlink("/system/etc", "/etc"),
+			},
+		},
+		{
+			name: "relative symlink - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/system/etc", 0o755),
+				fstest.CreateFile("/system/etc/passwd", expectedContent, 0o644),
+				fstest.Symlink("../system/etc", "/etc"),
+			},
+		},
+		{
+			name: "relative symlink - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateFile("/passwd", expectedContent, 0o644),
+				fstest.Symlink("..", "/etc"),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+
+			err := fstest.Apply(tc.initOps...).Apply(rootDir)
+			require.NoError(t, err)
+
+			rootFS, err := os.OpenRoot(rootDir)
+			require.NoError(t, err)
+			defer rootFS.Close()
+
+			f, err := openUserFile(rootFS.FS(), "etc/passwd")
+			require.NoError(t, err)
+
+			defer f.Close()
+
+			content, err := io.ReadAll(f)
+			require.NoError(t, err)
+
+			require.Equal(t, string(expectedContent), string(content))
+		})
 	}
 
-	rootFS := os.DirFS(root)
-
-	// Ensure the FS implements the ReadLink interface.
-	// If the native os.DirFS doesn't implement it (depending on Go version),
-	// wrap it in our readLinkFS helper.
-	if _, ok := rootFS.(readLinker); !ok {
-		t.Logf("os.DirFS does not implement ReadLink; wrapping to use ReadLink")
-		rootFS = readLinkFS{root: root, fs: rootFS}
-	}
-
-	f, err := openUserFile(rootFS, "etc/passwd")
-	if err != nil {
-		t.Fatalf("openUserFile failed on absolute symlink: %v", err)
-	}
-	defer f.Close()
-
-	content, err := io.ReadAll(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(content) != string(expectedContent) {
-		t.Errorf("expected content %q, got %q", string(expectedContent), string(content))
-	}
 }
 
-func TestGroupLookup_AbsoluteSymlink(t *testing.T) {
+func TestGroupLookup_Symlink(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("absolute symlink handling is only supported on non-Windows platforms")
+		t.Skip("symlink handling is only supported on non-Windows platforms")
 	}
 
 	expectedContent := []byte("dummygroup:x:1001:paulo\n")
 
-	root := t.TempDir()
-	if err := fstest.Apply(
-		fstest.CreateDir("/etc", 0o755),
-		fstest.CreateDir("/nix/store/abcd", 0o755),
-		fstest.CreateFile("/nix/store/abcd/group", expectedContent, 0o644),
-		fstest.Symlink("/nix/store/abcd/group", "/etc/group"),
-	).Apply(root); err != nil {
-		t.Fatal(err)
-	}
+	for _, tc := range []struct {
+		name    string
+		initOps []fstest.Applier
+	}{
+		{
+			name: "absolute symlink - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/etc", 0o755),
+				fstest.CreateDir("/nix/store/abcd", 0o755),
+				fstest.CreateFile("/nix/store/abcd/group", expectedContent, 0o644),
+				fstest.Symlink("/nix/store/abcd/group", "/etc/group"),
+			},
+		},
+		{
+			name: "absolute symlink - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/system/etc", 0o755),
+				fstest.CreateFile("/system/etc/group", expectedContent, 0o644),
+				fstest.Symlink("/system/etc", "/etc"),
+			},
+		},
+		{
+			name: "relative symlink - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/system/etc", 0o755),
+				fstest.CreateFile("/system/etc/group", expectedContent, 0o644),
+				fstest.Symlink("../system/etc", "/etc"),
+			},
+		},
+		{
+			name: "relative symlink - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateFile("group", expectedContent, 0o644),
+				fstest.Symlink("..", "/etc"),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rootDir := t.TempDir()
 
-	rootFS := os.DirFS(root)
-	if _, ok := rootFS.(readLinker); !ok {
-		rootFS = readLinkFS{root: root, fs: rootFS}
-	}
+			err := fstest.Apply(tc.initOps...).Apply(rootDir)
+			require.NoError(t, err)
 
-	gid, err := GIDFromFS(rootFS, func(g user.Group) bool {
-		return g.Name == "dummygroup"
-	})
-	if err != nil {
-		t.Fatalf("GIDFromFS failed on absolute symlink: %v", err)
-	}
-	if gid != 1001 {
-		t.Errorf("expected GID 1001, got %d", gid)
-	}
+			rootFS, err := os.OpenRoot(rootDir)
+			require.NoError(t, err)
+			defer rootFS.Close()
 
-	gids, err := getSupplementalGroupsFromFS(rootFS, func(g user.Group) bool {
-		return g.Name == "dummygroup"
-	})
-	if err != nil {
-		t.Fatalf("getSupplementalGroupsFromFS failed on absolute symlink: %v", err)
+			gid, err := GIDFromFS(rootFS.FS(), func(g user.Group) bool {
+				return g.Name == "dummygroup"
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, uint32(1001), gid)
+
+			gids, err := getSupplementalGroupsFromFS(rootFS.FS(), func(g user.Group) bool {
+				return g.Name == "dummygroup"
+			})
+			require.NoError(t, err)
+
+			if len(gids) != 1 || gids[0] != 1001 {
+				t.Errorf("expected supplemental GIDs [1001], got %v", gids)
+			}
+		})
 	}
-	if len(gids) != 1 || gids[0] != 1001 {
-		t.Errorf("expected supplemental GIDs [1001], got %v", gids)
-	}
-}
-
-// Helpers for testing ReadLink support
-type readLinkFS struct {
-	root string
-	fs   fs.FS
-}
-
-func (r readLinkFS) Open(name string) (fs.File, error) {
-	return r.fs.Open(name)
-}
-
-func (r readLinkFS) ReadLink(name string) (string, error) {
-	// Force link reading using the actual path on disk
-	return os.Readlink(filepath.Join(r.root, filepath.FromSlash(name)))
 }
