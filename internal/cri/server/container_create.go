@@ -47,6 +47,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/blockio"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 )
@@ -152,6 +153,17 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if checkpointImage {
 		// This might be a checkpoint image. Let's pass
 		// it to the checkpoint code.
+
+		if c.warningService != nil {
+			c.warningService.Emit(ctx, deprecation.CRICreateContainerCheckpointRestore)
+			if msg, ok := deprecation.Message(deprecation.CRICreateContainerCheckpointRestore); ok {
+				log.G(ctx).WithFields(log.Fields{
+					"podsandboxid":  sandboxID,
+					"containerid":   id,
+					"containername": name,
+				}).Warn(msg)
+			}
+		}
 
 		if sandboxConfig.GetMetadata() == nil {
 			return nil, fmt.Errorf("sandboxConfig must not be empty")
