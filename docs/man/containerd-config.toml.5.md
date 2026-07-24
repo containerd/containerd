@@ -1,4 +1,4 @@
-# /etc/containerd/config.toml 5 04/05/2022
+# /etc/containerd/config.toml 5 07/25/2026
 
 ## NAME
 
@@ -6,173 +6,136 @@ containerd-config.toml - configuration file for containerd
 
 ## SYNOPSIS
 
-The **config.toml** file is a configuration file for the containerd daemon. The
-file must be placed at **/etc/containerd/config.toml** or specified with the
-**--config** option of **containerd** to be used by the daemon. If the file
-does not exist at the appropriate location or is not provided via the
-**--config** option containerd uses its default configuration settings, which
-can be displayed with the **containerd config(1)** command.
+The **config.toml** file is a configuration file for the containerd daemon.
+The file must be placed at **/etc/containerd/config.toml** or specified with
+the **--config** option of **containerd**. If no file is provided, containerd
+uses its default configuration, shown by **containerd config default**.
 
 ## DESCRIPTION
 
-The TOML file used to configure the containerd daemon settings has a short
-list of global settings followed by a series of sections for specific areas
-of daemon configuration. There is also a section for **plugins** that allows
-each containerd plugin to have an area for plugin-specific configuration and
-settings.
+The TOML file has global settings, optional sections for daemon behaviour,
+and a **[plugins]** table for plugin-specific options.
+
+containerd is plugin-based: each plugin owns its own configuration schema,
+and third-party or proxy plugins may add options that are not listed in this
+man page. Use **containerd config default** to query available options for
+all plugins compiled into the current containerd daemon.
+
+Additional commands (see __containerd-config(8)__):
+
+- **containerd config dump** — print the merged active configuration
+- **containerd config migrate** — alias of **dump** (latest config version)
+
+Topic guides: https://containerd.io/docs/
 
 ## FORMAT
 
 **version**
-: The version field in the config file specifies the config’s version. If no
-version number is specified inside the config file then it is assumed to be a
-version 1 config and parsed as such. Version 4 is the latest config version.
-Older configs are automatically migrated on startup.
+: Config file version. If omitted, the file is parsed as version 1.
+Version **4** is the latest. Older configs are migrated on startup.
 
 **root**
-: The root directory for containerd metadata. (Default: "/var/lib/containerd")
+: Root directory for containerd metadata. (Default: "/var/lib/containerd")
 
 **state**
-: The state directory for containerd (Default: "/run/containerd")
+: State directory. (Default: "/run/containerd")
 
 **plugin_dir**
-: The directory for dynamic plugins to be stored
-
-**[grpc]** *(deprecated in version 4)*
-: Section for gRPC socket listener settings. In version 4, use the server
-plugins **io.containerd.server.v1.grpc** and **io.containerd.server.v1.grpc-tcp**
-instead. Existing configs are migrated automatically. Contains the following
-properties:
-
-- **address** (Default: "/run/containerd/containerd.sock")
-- **tcp_address**
-- **tcp_tls_cert**
-- **tcp_tls_key**
-- **uid** (Default: 0)
-- **gid** (Default: 0)
-- **max_recv_message_size**
-- **max_send_message_size**
-
-**[ttrpc]** *(deprecated in version 4)*
-: Section for TTRPC settings. In version 4, use the server plugin
-**io.containerd.server.v1.ttrpc** instead. In prior versions, when the TTRPC
-address was not explicitly set it was derived from the GRPC address
-(grpcAddress + ".ttrpc") and inherited GRPC’s UID/GID. In version 4, each
-server plugin is independently configured; the TTRPC plugin uses its own
-defaults when its configuration block is omitted. Contains properties:
-
-- **address** (Default: "")
-- **uid** (Default: 0)
-- **gid** (Default: 0)
-
-**[debug]** *(deprecated in version 4)*
-: Section to enable and configure a debug socket listener. In version 4, use the
-server plugin **io.containerd.server.v1.debug** instead. Contains properties:
-
-- **address** (Default: "") Debug endpoint does not listen by default
-- **uid** (Default: 0)
-- **gid** (Default: 0)
-- **level** (Default: "info") sets the debug log level. Supported levels are:
-  "trace", "debug", "info", "warn", "error", "fatal", "panic"
-- **format** (Default: "text") sets log format. Supported formats are "text" and "json"
-
-**[metrics]** *(deprecated in version 4)*
-: Section to enable and configure a metrics listener. In version 4, use the
-server plugin **io.containerd.server.v1.metrics** instead. Contains properties:
-
-- **address** (Default: "") Metrics endpoint does not listen by default
-- **grpc_histogram** (Default: false) Turn on or off gRPC histogram metrics
+: Directory for dynamic plugins.
 
 **disabled_plugins**
-: Disabled plugins are IDs of plugins to disable. Disabled plugins won't be
-initialized and started.
+: List of plugin IDs that must not be initialized or started.
 
 **required_plugins**
-: Required plugins are IDs of required plugins. Containerd exits if any
-required plugin doesn't exist or fails to be initialized or started.
+: List of plugin IDs that must load successfully. containerd exits if any
+listed plugin is missing or fails to start.
+
+**oom_score**
+: OOM score for the containerd process. (Default: 0)
+
+**[cgroup]**
+: Linux cgroup settings.
+
+- **path** (Default: "") custom cgroup path for created containers
 
 **[plugins]**
-: The plugins section contains configuration options exposed from installed plugins.
-The following plugins are enabled by default and their settings are shown below.
-Plugins that are not enabled by default will provide their own configuration values
-documentation.
+: Plugin configuration. Keys are fully qualified plugin IDs of the form
+`io.containerd.<area>.vN.<name>`. List loaded plugins with `ctr plugins ls`.
+A configuration block for a plugin not present in the binary has no effect.
 
-- **[plugins."io.containerd.server.v1.grpc"]** configures the main gRPC server listener (version 4):
+The following plugins are enabled by default; settings below match
+**containerd config default** for a typical build. Other plugins document
+their own options (see https://containerd.io/docs/).
+
+- **[plugins."io.containerd.server.v1.grpc"]** main gRPC listener:
   - **address** (Default: "/run/containerd/containerd.sock")
   - **uid** (Default: effective UID)
   - **gid** (Default: effective GID)
   - **max_recv_message_size** (Default: 16777216)
   - **max_send_message_size** (Default: 16777216)
-- **[plugins."io.containerd.server.v1.grpc-tcp"]** configures the TCP gRPC server listener (version 4).
-  Skipped if address is empty:
+- **[plugins."io.containerd.server.v1.grpc-tcp"]** TCP gRPC listener (skipped
+  if **address** is empty):
   - **address** (Default: "")
   - **tls_cert**, **tls_key**, **tls_ca**, **tls_common_name**
   - **max_recv_message_size** (Default: 16777216)
   - **max_send_message_size** (Default: 16777216)
-- **[plugins."io.containerd.server.v1.ttrpc"]** configures the TTRPC server listener (version 4).
-  In version 4, this plugin is configured independently from the gRPC plugin.
-  If the plugin block is omitted, the TTRPC server binds to its own default
-  address rather than deriving one from the gRPC address:
+- **[plugins."io.containerd.server.v1.ttrpc"]** TTRPC listener (configured
+  independently of gRPC; omitted block uses the plugin defaults):
   - **address** (Default: "/run/containerd/containerd.sock.ttrpc")
   - **uid** (Default: effective UID)
   - **gid** (Default: effective GID)
-- **[plugins."io.containerd.server.v1.debug"]** configures the debug server listener (version 4).
-  Skipped if address is empty:
+- **[plugins."io.containerd.server.v1.debug"]** debug listener (skipped if
+  **address** is empty):
   - **address** (Default: "")
   - **uid** (Default: 0)
   - **gid** (Default: 0)
-- **[plugins."io.containerd.server.v1.metrics"]** configures the metrics HTTP listener (version 4).
-  Skipped if address is empty:
+- **[plugins."io.containerd.server.v1.metrics"]** metrics HTTP listener
+  (skipped if **address** is empty):
   - **address** (Default: "")
-- **[plugins."io.containerd.monitor.v1.cgroups"]** has one option __no_prometheus__ (Default: **false**)
-- **[plugins."io.containerd.service.v1.diff-service"]** has one option __default__, a list by default set to **["walking"]**
-- **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
-  - **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
-  - **deletion_threshold** guarantees GC is scheduled after n number of deletions (Default: **0** [not triggered]),
-  - **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
-  - **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
-  - **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
-- **[plugins."io.containerd.runtime.v2.task"]** specifies options for configuring the runtime shim:
-  - **platforms** specifies the list of supported platforms
-  - **sched_core** Core scheduling is a feature that allows only trusted tasks
-    to run concurrently on cpus sharing compute resources (eg: hyperthreads on
-    a core). (Default: **false**)
-- **[plugins."io.containerd.service.v1.tasks-service"]** has performance options:
-  - **blockio_config_file** (Linux only) specifies path to blockio class definitions
-    (Default: **""**). Controls I/O scheduler priority and bandwidth throttling.
-    See [blockio configuration](https://github.com/intel/goresctrl/blob/main/doc/blockio.md#configuration)
-    for details of the file format.
-  - **rdt_config_file** (Linux only) specifies path to a configuration used for configuring
-    RDT (Default: **""**). Enables support for Intel RDT, a technology
-    for cache and memory bandwidth management.
-    See [RDT configuration](https://github.com/intel/goresctrl/blob/main/doc/rdt.md#configuration)
-    for details of the file format.
-- **[plugins."io.containerd.grpc.v1.cri".containerd]** contains options for the CRI plugin, and child nodes for CRI options:
-  - **default_runtime_name** (Default: **"runc"**) specifies the default runtime name
-- **[plugins."io.containerd.grpc.v1.cri".containerd.runtimes]** one or more container runtimes, each with a unique name
-- **[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.<runtime>]** a runtime named `<runtime>`
-- **[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.<runtime>.options]** options for the named `<runtime>`, most important:
-  -  **BinaryName** specifies the path to the actual runtime to be invoked by the shim, e.g. `"/usr/bin/runc"`
-
-
-
-
-**oom_score**
-: The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
-
-**[cgroup]**
-: Section for Linux cgroup specific settings
-
-- **path** (Default: "") Specify a custom cgroup path for created containers
+- **[plugins."io.containerd.monitor.v1.cgroups"]**
+  - **no_prometheus** (Default: **false**)
+- **[plugins."io.containerd.service.v1.diff-service"]**
+  - **default** (Default: **["walking"]**)
+- **[plugins."io.containerd.gc.v1.scheduler"]**
+  - **pause_threshold** (Default: **0.02**)
+  - **deletion_threshold** (Default: **0**)
+  - **mutation_threshold** (Default: **100**)
+  - **schedule_delay** (Default: **"0ms"**)
+  - **startup_delay** (Default: **"100ms"**)
+- **[plugins."io.containerd.runtime.v2.task"]**
+  - **platforms** — supported platforms
+  - **sched_core** (Default: **false**) core scheduling
+- **[plugins."io.containerd.service.v1.tasks-service"]**
+  - **blockio_config_file** (Linux; Default: **""**)
+  - **rdt_config_file** (Linux; Default: **""**)
+- **[plugins."io.containerd.cri.v1.images"]** CRI image service (kubelet /
+  crictl only; not used by **ctr** / **nerdctl**):
+  - **snapshotter** (Default: **"overlayfs"**)
+  - **[plugins."io.containerd.cri.v1.images".registry]**
+    - **config_path** — directory of per-host **hosts.toml** files (for
+      example `"/etc/containerd/certs.d"`). Format:
+      https://containerd.io/docs/
+- **[plugins."io.containerd.cri.v1.runtime"]** CRI runtime service:
+  - **[plugins."io.containerd.cri.v1.runtime".containerd]**
+    - **default_runtime_name** (Default: **"runc"**)
+  - **[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.\<name\>]**
+    - **runtime_type** — containerd runtime v2 shim type (for example
+      `io.containerd.runc.v2`)
+    - **options** — shim-specific options, commonly:
+      - **BinaryName** — path to the OCI runtime binary
+      - **SystemdCgroup** — use the systemd cgroup driver when true
 
 **[proxy_plugins]**
-: Proxy plugins configures plugins which are communicated to over gRPC
+: External plugins reached over gRPC. Each named entry accepts:
 
-- **type** (Default: "")
-- **address** (Default: "")
+- **type** — `snapshot`, `content`, `diff`, or `sandbox`
+- **address** — local socket path
+- **platform** (optional)
+- **exports** (optional) — string map
+- **capabilities** (optional) — list of capability strings
 
 **timeouts**
-: Timeouts specified as a duration
+: Timeouts specified as durations
 
 <!-- [timeouts]
   "io.containerd.timeout.shim.cleanup" = "5s"
@@ -181,28 +144,56 @@ documentation.
   "io.containerd.timeout.task.state" = "2s" -->
 
 **imports**
-: Imports is a list of additional configuration files to include.
-This allows to split the main configuration file and keep some sections
-separately (for example vendors may keep a custom runtime configuration in a
-separate file without modifying the main `config.toml`).
-Imported files will overwrite simple fields like `int` or
-`string` (if not empty) and will append `array` and `map` fields.
-Imported files are also versioned, and the version can't be higher than
-the main config.
+: List of additional configuration files to include. Imported files overwrite
+non-empty simple fields and append array/map fields. Imported files are
+versioned; their version must not be higher than the main config.
 
 **stream_processors**
 
-- **accepts** (Default: "[]") Accepts specific media-types
-- **returns** (Default: "") Returns the media-type
-- **path** (Default: "") Path or name of the binary
-- **args** (Default: "[]") Args to the binary
+- **accepts** (Default: "[]") media-types accepted
+- **returns** (Default: "") media-type returned
+- **path** (Default: "") binary path or name
+- **args** (Default: "[]") binary arguments
+
+### Deprecated top-level server sections (pre–version 4)
+
+These top-level tables are deprecated in version 4. Prefer the
+**io.containerd.server.v1.*** plugins above. Existing configs are migrated
+automatically.
+
+**[grpc]**
+: Legacy gRPC socket settings. Prefer **plugins."io.containerd.server.v1.grpc"**
+and **plugins."io.containerd.server.v1.grpc-tcp"**.
+
+- **address** (Default: "/run/containerd/containerd.sock")
+- **tcp_address**, **tcp_tls_cert**, **tcp_tls_key**
+- **uid** (Default: 0), **gid** (Default: 0)
+- **max_recv_message_size**, **max_send_message_size**
+
+**[ttrpc]**
+: Legacy TTRPC settings. Prefer **plugins."io.containerd.server.v1.ttrpc"**.
+
+- **address** (Default: "")
+- **uid** (Default: 0), **gid** (Default: 0)
+
+**[debug]**
+: Legacy debug socket. Prefer **plugins."io.containerd.server.v1.debug"**.
+
+- **address** (Default: "")
+- **uid** (Default: 0), **gid** (Default: 0)
+- **level** (Default: "info") — "trace", "debug", "info", "warn", "error",
+  "fatal", "panic"
+- **format** (Default: "text") — "text" or "json"
+
+**[metrics]**
+: Legacy metrics listener. Prefer **plugins."io.containerd.server.v1.metrics"**.
+
+- **address** (Default: "")
+- **grpc_histogram** (Default: false)
 
 ## EXAMPLES
 
-### Version 4 Configuration
-
-The following is a **config.toml** example using version 4, where server
-settings are configured as plugins:
+### Version 4 configuration
 
 ```toml
 version = 4
@@ -244,51 +235,57 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
     rdt_config_file = ""
 ```
 
-### Multiple Runtimes
-
-The following is an example partial configuration with two runtimes:
+### CRI: two runtimes
 
 ```toml
-[plugins]
+version = 4
 
-  [plugins."io.containerd.grpc.v1.cri"]
+[plugins."io.containerd.cri.v1.runtime".containerd]
+  default_runtime_name = "runc"
 
-    [plugins."io.containerd.grpc.v1.cri".containerd]
-      default_runtime_name = "runc"
+  [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc]
+    runtime_type = "io.containerd.runc.v2"
 
-      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
-        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-          privileged_without_host_devices = false
-          runtime_type = "io.containerd.runc.v2"
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc.options]
+      BinaryName = "/usr/bin/runc"
 
-          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
-            BinaryName = "/usr/bin/runc"
+  [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.other]
+    runtime_type = "io.containerd.runc.v2"
 
-        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.other]
-          privileged_without_host_devices = false
-          runtime_type = "io.containerd.runc.v2"
-
-          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.other.options]
-            BinaryName = "/usr/bin/path-to-runtime"
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.other.options]
+      BinaryName = "/usr/bin/path-to-runtime"
 ```
 
-The above creates two named runtime configurations - named `runc` and `other` - and sets the default runtime to `runc`.
-The above are used _solely_ for runtimes invoked via CRI. To use the non-default "other" runtime in this example,
-a spec will include the runtime handler named "other" to specify the desire to use the named runtime config.
+**runtime_type** selects the containerd runtime v2 shim.
+**BinaryName** is a shim option: path to the OCI runtime binary.
+CRI clients select a named runtime via the CRI **runtime_handler** field
+(Kubernetes RuntimeClass). These settings apply only to CRI clients.
 
-The CRI specification includes a [`runtime_handler` field](https://github.com/kubernetes/cri-api/blob/de5f1318aede866435308f39cb432618a15f104e/pkg/apis/runtime/v1/api.proto#L476), which will reference the named runtime.
+### CRI: registry hosts.toml
 
-It is important to note the naming convention. Runtimes are under `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes]`,
-with each runtime given a unique name, e.g. `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]`.
-In addition, each runtime can have shim-specific options under `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.<runtime>.options]`,
-for example, `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]`.
+```toml
+version = 4
 
-The `io.containerd.runc.v2` runtime is used to run OCI-compatible runtimes on Linux, such as runc.  In the example above, the `runtime_type`
-field specifies the shim to use (`io.containerd.runc.v2`) while the `BinaryName` field is a shim-specific option which specifies the path to the
-OCI runtime.
+[plugins."io.containerd.cri.v1.images".registry]
+  config_path = "/etc/containerd/certs.d"
+```
 
-For the example configuration named "runc", the shim will launch `/usr/bin/runc` as the OCI runtime.  For the example configuration named
-"other", the shim will launch `/usr/bin/path-to-runtime` instead.
+Place per-host **hosts.toml** files under that directory. Format:
+https://containerd.io/docs/
+
+### Proxy plugins
+
+```toml
+version = 4
+
+[proxy_plugins.customsnapshot]
+  type = "snapshot"
+  address = "/var/run/mysnapshotter.sock"
+
+[proxy_plugins.mysandbox]
+  type = "sandbox"
+  address = "/var/run/mysandbox.sock"
+```
 
 ## BUGS
 
@@ -302,3 +299,5 @@ Phil Estes <estesp@gmail.com>
 ## SEE ALSO
 
 ctr(8), containerd-config(8), containerd(8)
+
+https://containerd.io/docs/
