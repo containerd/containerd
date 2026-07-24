@@ -1,4 +1,4 @@
-# /etc/containerd/config.toml 5 04/05/2022
+# /etc/containerd/config.toml 5 07/23/2026
 
 ## NAME
 
@@ -11,7 +11,7 @@ file must be placed at **/etc/containerd/config.toml** or specified with the
 **--config** option of **containerd** to be used by the daemon. If the file
 does not exist at the appropriate location or is not provided via the
 **--config** option containerd uses its default configuration settings, which
-can be displayed with the **containerd config(1)** command.
+can be displayed with **containerd config default**.
 
 ## DESCRIPTION
 
@@ -20,6 +20,75 @@ list of global settings followed by a series of sections for specific areas
 of daemon configuration. There is also a section for **plugins** that allows
 each containerd plugin to have an area for plugin-specific configuration and
 settings.
+
+## DISCOVERING CONFIGURATION OPTIONS
+
+containerd is plugin-based: each plugin owns its own configuration schema, and
+third-party or proxy plugins may add options that are not listed in this man
+page. Use **containerd config default** to query available options for all
+plugins compiled into the current containerd daemon.
+
+Additional inspection commands:
+
+1. **containerd config default** — print the full default configuration for
+   every plugin compiled into the current binary.
+2. **containerd config dump** — print the final merged configuration after
+   loading **/etc/containerd/config.toml** (or **--config**) and any
+   **imports**.
+3. **containerd config migrate** — print the active configuration migrated to
+   the latest supported version (see __containerd-config(8)__).
+
+For topic guides (CRI, registry hosts, runtimes, plugins, and more), see
+https://containerd.io/docs/.
+
+## PLUGIN CONFIGURATION MODEL
+
+Plugin options live under the top-level **[plugins]** table. Each plugin uses
+a fully qualified ID as the table key:
+
+```toml
+version = 3
+
+[plugins."io.containerd.monitor.v1.cgroups"]
+  no_prometheus = false
+```
+
+**Plugin IDs** use the form `io.containerd.<area>.vN.<name>`. Large features
+may register more than one plugin ID. CRI, for example, uses:
+
+- `io.containerd.cri.v1.images` — image pull, snapshotter, registry
+  **config_path**, pinned images
+- `io.containerd.cri.v1.runtime` — runtimes, cgroup driver options via runtime
+  **options** (for example **SystemdCgroup**)
+
+The CRI section is only used by CRI clients (`kubelet`, `crictl`). Clients
+such as `ctr` and `nerdctl` do not read CRI plugin settings.
+
+**disabled_plugins**
+: List of plugin IDs that must not be initialized or started.
+
+**required_plugins**
+: List of plugin IDs that must load successfully. containerd exits if any
+listed plugin is missing or fails to start.
+
+**Loaded plugins**
+: Use `ctr plugins ls` to list plugins that actually loaded. A configuration
+block for a plugin that is not compiled into the binary has no effect.
+
+**proxy_plugins**
+: Register external gRPC plugins by name. Each entry has:
+
+- **type** — one of `snapshot`, `content`, `diff`, or `sandbox`
+- **address** — local socket path the daemon connects to
+- **platform** (optional) — platform string for the plugin
+- **exports** (optional) — string map of values exported to other plugins
+- **capabilities** (optional) — list of capability strings advertised by the plugin
+
+```toml
+[proxy_plugins.customsnapshot]
+  type = "snapshot"
+  address = "/var/run/mysnapshotter.sock"
+```
 
 ## FORMAT
 
@@ -95,7 +164,8 @@ required plugin doesn't exist or fails to be initialized or started.
 : The plugins section contains configuration options exposed from installed plugins.
 The following plugins are enabled by default and their settings are shown below.
 Plugins that are not enabled by default will provide their own configuration values
-documentation.
+documentation. Use **containerd config default** for the complete list on the
+installed binary.
 
 - **[plugins."io.containerd.server.v1.grpc"]** configures the main gRPC server listener (version 4):
   - **address** (Default: "/run/containerd/containerd.sock")
@@ -147,15 +217,40 @@ documentation.
     for cache and memory bandwidth management.
     See [RDT configuration](https://github.com/intel/goresctrl/blob/main/doc/rdt.md#configuration)
     for details of the file format.
-- **[plugins."io.containerd.grpc.v1.cri".containerd]** contains options for the CRI plugin, and child nodes for CRI options:
-  - **default_runtime_name** (Default: **"runc"**) specifies the default runtime name
-- **[plugins."io.containerd.grpc.v1.cri".containerd.runtimes]** one or more container runtimes, each with a unique name
-- **[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.<runtime>]** a runtime named `<runtime>`
-- **[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.<runtime>.options]** options for the named `<runtime>`, most important:
-  -  **BinaryName** specifies the path to the actual runtime to be invoked by the shim, e.g. `"/usr/bin/runc"`
+- **[plugins."io.containerd.cri.v1.images"]** CRI image service:
+  - **snapshotter** (Default: **"overlayfs"**) default snapshotter for CRI image unpack
+  - **[plugins."io.containerd.cri.v1.images".registry]** registry configuration
+    - **config_path** — directory of per-host **hosts.toml** files (for example
+      `"/etc/containerd/certs.d"`). See https://containerd.io/docs/ for the
+      hosts.toml format (mirrors, CA certs, and client certificates).
+- **[plugins."io.containerd.cri.v1.runtime"]** CRI runtime service:
+  - **[plugins."io.containerd.cri.v1.runtime".containerd]**
+    - **default_runtime_name** (Default: **"runc"**) specifies the default runtime name
+  - **[plugins."io.containerd.cri.v1.runtime".containerd.runtimes]** one or more
+    container runtimes, each with a unique name
+  - **[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.\<runtime\>]**
+    a runtime named `<runtime>`:
+    - **runtime_type** — containerd runtime v2 shim type (see **runtime_type** below)
+  - **[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.\<runtime\>.options]**
+    shim-specific options:
+    - **BinaryName** — path to the OCI runtime invoked by the shim, e.g. `"/usr/bin/runc"`
+    - **SystemdCgroup** — when true, use the systemd cgroup driver
+- **[plugins."io.containerd.transfer.v1.local"]** transfer service used for image
+  pull and push. See https://containerd.io/docs/.
 
+### runtime_type
 
+Under each named CRI runtime, **runtime_type** selects the containerd runtime
+v2 **shim** implementation (not the OCI runtime binary itself):
 
+- `io.containerd.runc.v2` — standard runc-compatible shim (default)
+- Other shims (for example gVisor `io.containerd.runsc.v1`, Kata) register
+  their own type strings
+
+The OCI runtime binary path is a shim-specific option, commonly **BinaryName**
+(or **BinaryPath**) under the runtime's **options** table. Changing only
+**BinaryName** keeps the runc shim but invokes a different OCI runtime;
+changing **runtime_type** switches to a different shim implementation.
 
 **oom_score**
 : The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
@@ -166,10 +261,14 @@ documentation.
 - **path** (Default: "") Specify a custom cgroup path for created containers
 
 **[proxy_plugins]**
-: Proxy plugins configures plugins which are communicated to over gRPC
+: Proxy plugins configure external plugins reached over gRPC. Each named entry
+under **[proxy_plugins]** accepts:
 
-- **type** (Default: "")
-- **address** (Default: "")
+- **type** — accepted values: `snapshot`, `content`, `diff`, `sandbox`
+- **address** — local socket path
+- **platform** (optional)
+- **exports** (optional)
+- **capabilities** (optional)
 
 **timeouts**
 : Timeouts specified as a duration
@@ -246,49 +345,75 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
 
 ### Multiple Runtimes
 
-The following is an example partial configuration with two runtimes:
+The following is an example partial configuration with two CRI runtimes:
 
 ```toml
-[plugins]
+version = 3
 
-  [plugins."io.containerd.grpc.v1.cri"]
+[plugins."io.containerd.cri.v1.runtime".containerd]
+  default_runtime_name = "runc"
 
-    [plugins."io.containerd.grpc.v1.cri".containerd]
-      default_runtime_name = "runc"
+  [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc]
+    privileged_without_host_devices = false
+    runtime_type = "io.containerd.runc.v2"
 
-      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
-        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-          privileged_without_host_devices = false
-          runtime_type = "io.containerd.runc.v2"
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc.options]
+      BinaryName = "/usr/bin/runc"
 
-          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
-            BinaryName = "/usr/bin/runc"
+  [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.other]
+    privileged_without_host_devices = false
+    runtime_type = "io.containerd.runc.v2"
 
-        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.other]
-          privileged_without_host_devices = false
-          runtime_type = "io.containerd.runc.v2"
-
-          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.other.options]
-            BinaryName = "/usr/bin/path-to-runtime"
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.other.options]
+      BinaryName = "/usr/bin/path-to-runtime"
 ```
 
-The above creates two named runtime configurations - named `runc` and `other` - and sets the default runtime to `runc`.
-The above are used _solely_ for runtimes invoked via CRI. To use the non-default "other" runtime in this example,
-a spec will include the runtime handler named "other" to specify the desire to use the named runtime config.
+The above creates two named runtime configurations — `runc` and `other` — and
+sets the default runtime to `runc`. These entries are used only for runtimes
+invoked via CRI. To use the non-default `other` runtime, a Kubernetes
+RuntimeClass / CRI `runtime_handler` named `other` selects that named config.
 
-The CRI specification includes a [`runtime_handler` field](https://github.com/kubernetes/cri-api/blob/de5f1318aede866435308f39cb432618a15f104e/pkg/apis/runtime/v1/api.proto#L476), which will reference the named runtime.
+The CRI specification includes a
+[`runtime_handler` field](https://github.com/kubernetes/cri-api/blob/de5f1318aede866435308f39cb432618a15f104e/pkg/apis/runtime/v1/api.proto#L476),
+which references the named runtime.
 
-It is important to note the naming convention. Runtimes are under `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes]`,
-with each runtime given a unique name, e.g. `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]`.
-In addition, each runtime can have shim-specific options under `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.<runtime>.options]`,
-for example, `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]`.
+Runtimes are under
+`[plugins."io.containerd.cri.v1.runtime".containerd.runtimes]`, with each
+runtime given a unique name. Shim-specific options live under
+`[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.<runtime>.options]`.
 
-The `io.containerd.runc.v2` runtime is used to run OCI-compatible runtimes on Linux, such as runc.  In the example above, the `runtime_type`
-field specifies the shim to use (`io.containerd.runc.v2`) while the `BinaryName` field is a shim-specific option which specifies the path to the
-OCI runtime.
+**runtime_type** selects the containerd runtime v2 **shim** (here
+`io.containerd.runc.v2`). **BinaryName** is a shim-specific option that points
+at the OCI runtime binary the shim should execute (`/usr/bin/runc` vs
+`/usr/bin/path-to-runtime` in the example).
 
-For the example configuration named "runc", the shim will launch `/usr/bin/runc` as the OCI runtime.  For the example configuration named
-"other", the shim will launch `/usr/bin/path-to-runtime` instead.
+### Registry hosts.toml
+
+Point CRI at a directory of per-host **hosts.toml** files for mirrors, CA
+certs, and client certificates:
+
+```toml
+version = 3
+
+[plugins."io.containerd.cri.v1.images".registry]
+  config_path = "/etc/containerd/certs.d"
+```
+
+See https://containerd.io/docs/ for the hosts.toml format.
+
+### Proxy plugin
+
+```toml
+version = 3
+
+[proxy_plugins.customsnapshot]
+  type = "snapshot"
+  address = "/var/run/mysnapshotter.sock"
+
+[proxy_plugins.mysandbox]
+  type = "sandbox"
+  address = "/var/run/mysandbox.sock"
+```
 
 ## BUGS
 
@@ -302,3 +427,5 @@ Phil Estes <estesp@gmail.com>
 ## SEE ALSO
 
 ctr(8), containerd-config(8), containerd(8)
+
+Online documentation: https://containerd.io/docs/
