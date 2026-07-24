@@ -55,6 +55,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 )
 
 var kernelSupportsRRO bool
@@ -163,6 +164,8 @@ type criService struct {
 	runtimeFeatures *runtime.RuntimeFeatures
 	// shimPath is the custom PATH environment variable value from the shim manager
 	shimPath string
+	// warningService is used to emit deprecation warnings.
+	warningService warning.Service
 
 	checkCriuOnce sync.Once //nolint:nolintlint,unused // Ignore on non-Linux
 	checkCriuErr  error     //nolint:nolintlint,unused // Ignore on non-Linux
@@ -187,6 +190,9 @@ type CRIServiceOptions struct {
 
 	// ShimPath is the custom PATH environment variable value from the shim manager
 	ShimPath string
+
+	// WarningService is used to emit deprecation warnings.
+	WarningService warning.Service
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -211,6 +217,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
 		shimPath:           options.ShimPath,
+		warningService:     options.WarningService,
 	}
 
 	// TODO: Make discard time configurable
