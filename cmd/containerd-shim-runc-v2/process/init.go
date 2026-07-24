@@ -147,7 +147,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) (retError error) {
 	}
 
 	if err := p.runtime.Create(ctx, r.ID, r.Bundle, opts); err != nil {
-		return p.runtimeError(err, "OCI runtime create failed")
+		return p.runtimeError(err, "OCI runtime create failed", p.runtime.Log)
 	}
 	if r.Stdin != "" {
 		if err := p.openStdin(r.Stdin); err != nil {
@@ -271,7 +271,7 @@ func (p *Init) Start(ctx context.Context) error {
 
 func (p *Init) start(ctx context.Context) error {
 	err := p.runtime.Start(ctx, p.id)
-	return p.runtimeError(err, "OCI runtime start failed")
+	return p.runtimeError(err, "OCI runtime start failed", p.runtime.Log)
 }
 
 // SetExited of the init process with the next status
@@ -311,7 +311,7 @@ func (p *Init) delete(ctx context.Context) error {
 		if strings.Contains(err.Error(), "does not exist") {
 			err = nil
 		} else {
-			err = p.runtimeError(err, "failed to delete task")
+			err = p.runtimeError(err, "failed to delete task", p.runtime.Log)
 		}
 	}
 	if p.io != nil {
@@ -379,7 +379,7 @@ func (p *Init) KillAll(ctx context.Context) error {
 	err := p.runtime.Kill(ctx, p.id, int(unix.SIGKILL), &runc.KillOpts{
 		All: true,
 	})
-	return p.runtimeError(err, "OCI runtime killall failed")
+	return p.runtimeError(err, "OCI runtime killall failed", p.runtime.Log)
 }
 
 // Stdin of the process
@@ -485,12 +485,11 @@ func (p *Init) Stdio() stdio.Stdio {
 	return p.stdio
 }
 
-func (p *Init) runtimeError(rErr error, msg string) error {
+func (p *Init) runtimeError(rErr error, msg string, logFile string) error {
 	if rErr == nil {
 		return nil
 	}
-
-	rMsg, err := getLastRuntimeError(p.runtime)
+	rMsg, err := getLastRuntimeError(logFile)
 	switch {
 	case err != nil:
 		return fmt.Errorf("%s: %s (%s): %w", msg, "unable to retrieve OCI runtime error", err.Error(), rErr)

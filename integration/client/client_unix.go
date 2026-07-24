@@ -23,3 +23,7 @@ const (
 	defaultState   = "/run/containerd-test"
 	defaultAddress = "/run/containerd-test/containerd.sock"
 )
+
+func GetDefaultState() string {
+	return defaultState
+}

@@ -25,11 +25,15 @@ import (
 )
 
 func (r *Runc) command(context context.Context, args ...string) *exec.Cmd {
+	return r.commandWithCustomLogFile(context, "", args...)
+}
+
+func (r *Runc) commandWithCustomLogFile(context context.Context, logFile string, args ...string) *exec.Cmd {
 	command := r.Command
 	if command == "" {
 		command = DefaultCommand
 	}
-	cmd := exec.CommandContext(context, command, append(r.args(), args...)...)
+	cmd := exec.CommandContext(context, command, append(r.args(logFile), args...)...)
 	cmd.Env = os.Environ()
 	return cmd
 }

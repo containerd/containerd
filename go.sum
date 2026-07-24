@@ -57,8 +57,8 @@ github.com/containerd/go-cni v1.1.13 h1:eFSGOKlhoYNxpJ51KRIMHZNlg5UgocXEIEBGkY7H
 github.com/containerd/go-cni v1.1.13/go.mod h1:nTieub0XDRmvCZ9VI/SBG6PyqT95N4FIhxsauF1vSBI=
 github.com/containerd/go-dmverity v0.1.0 h1:aqnpBRI6mmscya/XqvknZ4wQNJnXzx6lKxPa7Q71hDo=
 github.com/containerd/go-dmverity v0.1.0/go.mod h1:vYevYgfeVF244IpQCKshXLvyKoRHwoVrFG0HV6GrUrs=
-github.com/containerd/go-runc v1.1.0 h1:OX4f+/i2y5sUT7LhmcJH7GYrjjhHa1QI4e8yO0gGleA=
-github.com/containerd/go-runc v1.1.0/go.mod h1:xJv2hFF7GvHtTJd9JqTS2UVxMkULUYw4JN5XAUZqH5U=
+github.com/containerd/go-runc v1.1.1-0.20260715183706-293a0415929c h1:GqHHwgU9EVzc5YI1SDwpYcv0FkiAzX3MEKtZ655uyF0=
+github.com/containerd/go-runc v1.1.1-0.20260715183706-293a0415929c/go.mod h1:k9FszNnLlc6YFca6upi1h4TEDhfL5yUoUywViMeS+1g=
 github.com/containerd/imgcrypt/v2 v2.0.2 h1:WOEaE33CaSxzuRF8YLfAjHWuu1Xh27aPPQtqtALqfuM=
 github.com/containerd/imgcrypt/v2 v2.0.2/go.mod h1:8r4JW1b83jkDhaioOUZ7idxIYp+Wn1k4E4KXwy2oSNI=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
