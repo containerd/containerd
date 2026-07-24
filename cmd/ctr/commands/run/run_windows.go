@@ -39,6 +39,10 @@ var platformRunFlags = []cli.Flag{
 		Name:  "isolated",
 		Usage: "Run the container with vm isolation",
 	},
+	&cli.BoolFlag{
+		Name:  "scrub-logs",
+		Usage: "Scrub sensitive information from the shim logs (Windows only)",
+	},
 }
 
 // NewContainer creates a new container
@@ -176,9 +180,14 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 	runtime := cliContext.String("runtime")
 	var runtimeOpts any
 	if runtime == "io.containerd.runhcs.v1" {
-		runtimeOpts = &options.Options{
+		opts := &options.Options{
 			Debug: cliContext.Bool("debug"),
 		}
+		if cliContext.IsSet("scrub-logs") {
+			scrubLogs := cliContext.Bool("scrub-logs")
+			opts.ScrubLogs = &scrubLogs
+		}
+		runtimeOpts = opts
 	}
 	cOpts = append(cOpts, containerd.WithRuntime(runtime, runtimeOpts))
 
