@@ -90,6 +90,17 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			resp.Info["cniconfig"] = string(cniConfig)
 		}
 
+		imageSvcConfig := c.ImageService.Config()
+		// Avoid leaking registry credentials or sensitive headers via the CRI Status endpoint.
+		imageSvcConfig.Registry.Auths = nil
+		imageSvcConfig.Registry.Configs = nil
+		imageSvcConfig.Registry.Headers = nil
+		imageConfig, err := json.Marshal(imageSvcConfig)
+		if err != nil {
+			return nil, err
+		}
+		resp.Info["imageconfig"] = string(imageConfig)
+
 		defaultStatus := "OK"
 		for name, h := range c.cniNetConfMonitor {
 			s := "OK"
