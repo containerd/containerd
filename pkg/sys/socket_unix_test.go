@@ -41,3 +41,20 @@ func TestMkdirAsPermissionErrorIncludesHint(t *testing.T) {
 	assert.True(t, errors.Is(err, os.ErrPermission))
 	assert.Contains(t, err.Error(), "non-root user")
 }
+
+func TestMkdirAsStatPermissionErrorIncludesHint(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("test requires a non-root user to observe a permission error")
+	}
+
+	parent := t.TempDir()
+	target := filepath.Join(parent, "child")
+	require.NoError(t, os.Mkdir(target, 0770))
+	require.NoError(t, os.Chmod(parent, 0000))
+	t.Cleanup(func() { _ = os.Chmod(parent, 0700) })
+
+	err := mkdirAs(target, os.Geteuid(), os.Getegid())
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, os.ErrPermission))
+	assert.Contains(t, err.Error(), "non-root user")
+}
