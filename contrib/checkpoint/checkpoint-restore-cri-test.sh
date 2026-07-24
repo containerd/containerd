@@ -126,6 +126,12 @@ function test_from_archive() {
 		echo "error: CDI annotation was not filtered or safe annotation missing: $actual_annots"
 		exit 1
 	fi
+	echo "--> Verifying deprecation warning via API (archive): "
+	archive_ts=$(../../bin/ctr deprecations list --format=json | jq -r '.[] | select(.id == "io.containerd.deprecation/cri-create-container-checkpoint-restore") | .lastOccurrence')
+	if [ -z "$archive_ts" ] || [ "$archive_ts" = "null" ]; then
+		echo "error: CRICreateContainerCheckpointRestore deprecation warning not found in API introspection (archive)"
+		exit 1
+	fi
 	# Cleanup
 	echo "--> Cleanup images: "
 	(crictl rmi "${TEST_IMAGE}" || true) | sed 's/^/----> \t/'
@@ -198,6 +204,16 @@ function test_from_oci() {
 	rm -f "$RESTORE_JSON" "$RESTORE_POD_JSON"
 	echo -n "--> Start container from checkpoint: "
 	crictl start "$ctr_id"
+	echo "--> Verifying deprecation warning via API (oci): "
+	oci_ts=$(../../bin/ctr deprecations list --format=json | jq -r '.[] | select(.id == "io.containerd.deprecation/cri-create-container-checkpoint-restore") | .lastOccurrence')
+	if [ -z "$oci_ts" ] || [ "$oci_ts" = "null" ]; then
+		echo "error: CRICreateContainerCheckpointRestore deprecation warning not found in API introspection (oci)"
+		exit 1
+	fi
+	if [ "$archive_ts" = "$oci_ts" ]; then
+		echo "error: expected lastOccurrence to update after OCI restore (was $archive_ts, now $oci_ts)"
+		exit 1
+	fi
 	# Cleanup
 	echo "--> Cleanup images: "
 	../../bin/ctr -n k8s.io images rm localhost/checkpoint-image:latest | sed 's/^/----> \t/'

@@ -43,6 +43,8 @@ const (
 	RuncOptionsTaskAPIAddress Warning = Prefix + "runc-options-task-api-address"
 	// RuncOptionsTaskAPIVersion is a warning for the use of `task_api_version` in runc options
 	RuncOptionsTaskAPIVersion Warning = Prefix + "runc-options-task-api-version"
+	// CRICreateContainerCheckpointRestore is a warning for restoring checkpoint data from an image or archive during CRI CreateContainer
+	CRICreateContainerCheckpointRestore Warning = Prefix + "cri-create-container-checkpoint-restore"
 )
 
 const (
@@ -69,6 +71,7 @@ var messages = map[Warning]string{
 
 	RuncOptionsTaskAPIAddress: "The `task_api_address` field in runc options is deprecated since containerd v2.3. Set `task_api_address` on CreateTaskRequest instead.",
 	RuncOptionsTaskAPIVersion: "The `task_api_version` field in runc options is deprecated since containerd v2.3. Set `task_api_version` on CreateTaskRequest instead.",
+	CRICreateContainerCheckpointRestore: "Restoring checkpoint data from an image or archive during CRI CreateContainer is deprecated and will be removed in containerd v2.4.",
 }
 
 // Valid checks whether a given Warning is valid
