@@ -19,6 +19,7 @@
 package sys
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -73,6 +74,9 @@ func mkdirAs(path string, uid, gid int) error {
 	}
 
 	if err := os.MkdirAll(path, 0770); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			return fmt.Errorf("%w (the configured socket address points at a directory that requires root, which is the hardcoded default for the grpc and ttrpc plugins; if running containerd as a non-root user, configure a writable address for the grpc, ttrpc, and debug plugins)", err)
+		}
 		return err
 	}
 
