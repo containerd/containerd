@@ -195,7 +195,9 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 			logEntry = logEntry.WithError(pidErr)
 		}
 		logEntry.Info("cleaning leaked shim process")
-		shim.delete(ctx, false, func(ctx context.Context, id string) {})
+		dctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
+		defer cancel()
+		shim.delete(dctx, false, func(ctx context.Context, id string) {})
 	} else {
 		if pidErr != nil {
 			log.G(ctx).WithField("id", id).WithError(pidErr).Warn("failed to query shim pids, keeping shim registered")
