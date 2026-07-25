@@ -188,14 +188,21 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	// containerd/containerd#6860 for further details.
 
 	_, sgetErr := m.sandboxStore.Get(ctx, id)
-	pInfo, pidErr := shim.Pids(ctx)
+	// Bounded for the same reason as the PID call in loadShimTask: this is the
+	// startup path, and an unresponsive shim must not block it. A shim that
+	// misses the deadline is kept registered rather than reaped, see below.
+	pctx, pcancel := timeout.WithContext(ctx, loadTimeout)
+	pInfo, pidErr := shim.Pids(pctx)
+	pcancel()
 	if shouldCleanupShim(sgetErr, pidErr, pInfo) {
 		logEntry := log.G(ctx).WithField("id", id)
 		if pidErr != nil {
 			logEntry = logEntry.WithError(pidErr)
 		}
 		logEntry.Info("cleaning leaked shim process")
-		shim.delete(ctx, false, func(ctx context.Context, id string) {})
+		if err := cleanupLeakedShim(ctx, shim); err != nil {
+			logEntry.WithError(err).Warn("failed to clean leaked shim process")
+		}
 	} else {
 		if pidErr != nil {
 			log.G(ctx).WithField("id", id).WithError(pidErr).Warn("failed to query shim pids, keeping shim registered")
@@ -203,6 +210,37 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		m.shims.Add(ctx, shim.ShimInstance)
 	}
 	return nil
+}
+
+// cleanupLeakedShim reaps a shim which was loaded from disk but has no task
+// left to manage.
+//
+// The Task.Delete call is bounded, because a leftover shim can keep its socket
+// alive and still never answer it. This runs on the startup path, where an
+// unbounded wait holds an errgroup slot until the process is killed and so
+// stops containerd from ever serving its socket.
+//
+// If the shim does not answer in time it is disconnected instead. Closing the
+// connection runs the regular dead shim cleanup from its on-close callback,
+// which reaps the shim out of band via its delete command and removes the
+// bundle, so a shim that stays unresponsive is not met again on the next start.
+func cleanupLeakedShim(ctx context.Context, shim *shimTask) error {
+	dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+	defer cancel()
+
+	_, err := shim.delete(dctx, false, func(ctx context.Context, id string) {})
+	if err == nil {
+		return nil
+	}
+
+	// dctx is likely expired by now, so the shutdown request gets a deadline of
+	// its own rather than an already cancelled context.
+	if serr := shim.waitShutdown(context.WithoutCancel(ctx)); serr != nil {
+		log.G(ctx).WithField("id", shim.ID()).WithError(serr).Warn("failed to shutdown leaked shim")
+	}
+	shim.Close()
+
+	return err
 }
 
 // shouldCleanupShim determines whether or not a shim is in such a state that
