@@ -24,10 +24,24 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"golang.org/x/sys/unix"
 )
+
+// stopTimeout bounds how long stop waits for a watcher goroutine to drain once
+// its event FD has been closed.
+//
+// The wait itself is wanted: it lets a last OOM event be delivered before the
+// caller publishes the task exit. It must not be unbounded, though. stop runs
+// on the shim's only exit-processing goroutine, while the goroutine it waits
+// for can be parked reading the container's cgroup files or forwarding an
+// event, and neither is guaranteed to come back promptly while a device is
+// being torn down. Draining is sub-millisecond on a healthy system, so this
+// only ever trips when something is already wrong, and there losing the last
+// OOM event is far cheaper than never publishing a task exit at all.
+const stopTimeout = 2 * time.Second
 
 func New() Interface {
 	return &oomWatchers{
@@ -145,6 +159,14 @@ func (w *watcher) stop() error {
 	if errors.Is(cerr, os.ErrClosed) {
 		cerr = nil
 	}
-	werr := <-w.errCh
-	return errors.Join(cerr, werr)
+
+	timer := time.NewTimer(stopTimeout)
+	defer timer.Stop()
+
+	select {
+	case werr := <-w.errCh:
+		return errors.Join(cerr, werr)
+	case <-timer.C:
+		return errors.Join(cerr, fmt.Errorf("timed out after %v waiting for the oom watcher of %s to stop", stopTimeout, w.cid))
+	}
 }
