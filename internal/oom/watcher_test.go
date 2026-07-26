@@ -103,6 +103,7 @@ func skipIfBinaryUnavailable(t *testing.T, binaryName string) {
 func TestStopRemovesWatcher(t *testing.T) {
 	testutil.RequiresRoot(t)
 	skipIfCgroupUnavailable(t)
+	skipIfBinaryUnavailable(t, "sleep")
 
 	group := fmt.Sprintf("/%s", t.Name())
 	mgr, err := cgroupsv2.NewManager(defaultCgroup2Path, group, &cgroupsv2.Resources{})

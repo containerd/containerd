@@ -81,15 +81,21 @@ func (ows *oomWatchers) Add(cid string, pid int, fn EventFunc) (retErr error) {
 func (ows *oomWatchers) Stop(cid string) error {
 	ows.mu.Lock()
 	w, exist := ows.watchers[cid]
-	if exist {
-		delete(ows.watchers, cid)
-	}
 	ows.mu.Unlock()
 
 	if !exist {
 		return nil
 	}
-	return w.stop()
+
+	err := w.stop()
+
+	ows.mu.Lock()
+	if ows.watchers[cid] == w {
+		delete(ows.watchers, cid)
+	}
+	ows.mu.Unlock()
+
+	return err
 }
 
 type watcher struct {
