@@ -96,6 +96,42 @@ func skipIfBinaryUnavailable(t *testing.T, binaryName string) {
 	}
 }
 
+// TestStopRemovesWatcher verifies that Stop removes the container ID from the
+// internal map so the same ID can be re-added after a stop. This is the
+// Kubernetes restart scenario: the shim process is reused across container
+// restarts, so the same container ID will be passed to Add again.
+func TestStopRemovesWatcher(t *testing.T) {
+	testutil.RequiresRoot(t)
+	skipIfCgroupUnavailable(t)
+
+	group := fmt.Sprintf("/%s", t.Name())
+	mgr, err := cgroupsv2.NewManager(defaultCgroup2Path, group, &cgroupsv2.Resources{})
+	require.NoError(t, err)
+	defer mgr.Delete()
+
+	sleepCmd := exec.Command("sleep", "infinity")
+	require.NoError(t, sleepCmd.Start())
+	defer func() {
+		sleepCmd.Process.Kill()
+		sleepCmd.Wait()
+	}()
+
+	require.NoError(t, mgr.AddProc(uint64(sleepCmd.Process.Pid)))
+
+	watchers := New()
+	containerID := "restart-test"
+
+	require.NoError(t, watchers.Add(containerID, sleepCmd.Process.Pid, func(string) {}))
+	require.NoError(t, watchers.Stop(containerID))
+
+	// After Stop, the same container ID must be re-addable.
+	// Before the fix this returned errdefs.ErrAlreadyExists.
+	err = watchers.Add(containerID, sleepCmd.Process.Pid, func(string) {})
+	require.NoError(t, err, "re-adding container after Stop should succeed")
+
+	require.NoError(t, watchers.Stop(containerID))
+}
+
 func toPtr[T comparable](v T) *T {
 	return &v
 }
