@@ -109,7 +109,7 @@ func TestStopRemovesWatcher(t *testing.T) {
 	require.NoError(t, err)
 	defer mgr.Delete()
 
-	sleepCmd := exec.Command("sleep", "infinity")
+	sleepCmd := exec.Command("sleep", "3600")
 	require.NoError(t, sleepCmd.Start())
 	defer func() {
 		sleepCmd.Process.Kill()
