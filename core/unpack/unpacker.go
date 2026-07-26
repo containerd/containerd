@@ -298,6 +298,24 @@ type unpackStatus struct {
 	startAt time.Time
 }
 
+// layerSnapshotLabels builds the snapshot labels for a layer's extraction
+// Prepare from the image layer descriptor annotations. Those annotations come
+// from the (untrusted) image manifest, so it drops the id-mapping labels: a
+// snapshotter honors containerd.io/snapshot/uidmapping and .../gidmapping by
+// chowning the extracted layer to the mapped host uid/gid during Prepare, and
+// that ownership must be set by the runtime (client.WithRemapperLabels), not
+// carried in image content. The remaining inherited labels (e.g. the remote
+// snapshotter labels) are left untouched.
+func layerSnapshotLabels(annotations map[string]string) map[string]string {
+	labels := snapshots.FilterInheritedLabels(annotations)
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	delete(labels, snapshots.LabelSnapshotUIDMapping)
+	delete(labels, snapshots.LabelSnapshotGIDMapping)
+	return labels
+}
+
 func (u *Unpacker) unpack(
 	h images.Handler,
 	config ocispec.Descriptor,
@@ -390,11 +408,9 @@ func (u *Unpacker) unpack(
 			}
 		}()
 
-		// inherits annotations which are provided as snapshot labels.
-		snapshotLabels := snapshots.FilterInheritedLabels(desc.Annotations)
-		if snapshotLabels == nil {
-			snapshotLabels = make(map[string]string)
-		}
+		// inherits annotations which are provided as snapshot labels, minus the
+		// id-mapping labels (see layerSnapshotLabels).
+		snapshotLabels := layerSnapshotLabels(desc.Annotations)
 		snapshotLabels[snapshots.LabelSnapshotRef] = chainID
 		snapshotLabels[snapshots.LabelSnapshotDiffID] = diffIDs[i].String()
 		if i > 0 {
