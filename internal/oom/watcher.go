@@ -80,10 +80,11 @@ func (ows *oomWatchers) Add(cid string, pid int, fn EventFunc) (retErr error) {
 
 func (ows *oomWatchers) Stop(cid string) error {
 	ows.mu.Lock()
-	w, exist := ows.watchers[cid]
+	w := ows.watchers[cid]
+	delete(ows.watchers, cid)
 	ows.mu.Unlock()
 
-	if !exist {
+	if w == nil {
 		return nil
 	}
 	return w.stop()
