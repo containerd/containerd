@@ -20,16 +20,20 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 )
 
 func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.Config) error {
@@ -43,6 +47,14 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		tops.Progress(transfer.Progress{
 			Event: fmt.Sprintf("Resolving from %s", ir),
 		})
+	}
+
+	if ir, ok := ir.(transfer.ImageResolverOptionSetter); ok {
+		ir.SetResolverOptions(
+			transfer.WithConcurrentLayerFetchBuffer(ts.config.ConcurrentLayerFetchBuffer),
+			transfer.WithMaxConcurrentDownloads(ts.config.MaxConcurrentDownloads),
+			transfer.WithDownloadLimiter(ts.limiterD),
+		)
 	}
 
 	name, desc, err := ir.Resolve(ctx)
@@ -88,10 +100,9 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		tops.Progress(transfer.Progress{
 			Event: "fetching image content",
 			Name:  name,
-			// Digest: img.Target.Digest.String(),
+			Desc:  &desc,
 		})
 	}
-
 	fetcher, err := ir.Fetcher(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to get fetcher for %q: %w", name, err)
@@ -182,20 +193,36 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		unpacks := iu.UnpackPlatforms()
 		if len(unpacks) > 0 {
 			uopts := []unpack.UnpackerOpt{}
+			enableRemoteSnapshotAnnotations := false
 			// Only unpack if requested unpackconfig matches default/supported unpackconfigs
 			for _, u := range unpacks {
-				matched, mu := getSupportedPlatform(u, ts.config.UnpackPlatforms)
+				matched, mu := getSupportedPlatform(ctx, u, ts.config.UnpackPlatforms)
 				if matched {
+					if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
+						enableRemoteSnapshotAnnotations = true
+					}
+					if progressTracker != nil {
+						mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
+					}
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
+				} else {
+					log.G(ctx).WithFields(log.Fields{
+						"platform":    platforms.FormatAll(u.Platform),
+						"snapshotter": u.Snapshotter,
+					}).Warn("Unpack configuration not supported, skipping")
 				}
-			}
-
-			if ts.limiterD != nil {
-				uopts = append(uopts, unpack.WithLimiter(ts.limiterD))
 			}
 
 			if ts.config.DuplicationSuppressor != nil {
 				uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
+			}
+
+			if ts.limiterP != nil {
+				uopts = append(uopts, unpack.WithUnpackLimiter(ts.limiterP))
+			}
+
+			if enableRemoteSnapshotAnnotations {
+				handler = snpkg.AppendInfoHandlerWrapper(name)(handler)
 			}
 
 			unpacker, err = unpack.NewUnpacker(ctx, ts.content, uopts...)
@@ -206,7 +233,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		}
 	}
 
-	if err := images.Dispatch(ctx, handler, ts.limiterD, desc); err != nil {
+	if err := images.Dispatch(ctx, handler, nil, desc); err != nil {
 		if unpacker != nil {
 			// wait for unpacker to cleanup
 			unpacker.Wait()
@@ -240,11 +267,9 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			tops.Progress(transfer.Progress{
 				Event: "saved",
 				Name:  img.Name,
+				Desc:  &img.Target,
 			})
 		}
-	}
-
-	if tops.Progress != nil {
 		tops.Progress(transfer.Progress{
 			Event: fmt.Sprintf("Completed pull from %s", ir),
 		})
@@ -275,20 +300,33 @@ func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *Progre
 
 // getSupportedPlatform returns a matched platform comparing input UnpackConfiguration to the supported platform/snapshotter combinations
 // If input platform didn't specify snapshotter, default will be used if there is a match on platform.
-func getSupportedPlatform(uc transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) (bool, unpack.Platform) {
-	var u unpack.Platform
+func getSupportedPlatform(ctx context.Context, uc transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) (matched bool, u unpack.Platform) {
 	for _, sp := range supportedPlatforms {
 		// If both platform and snapshotter match, return the supportPlatform
 		// If platform matched and SnapshotterKey is empty, we assume client didn't pass SnapshotterKey
 		// use default Snapshotter
 		if sp.Platform.Match(uc.Platform) {
 			// Assume sp.SnapshotterKey is not empty
+			//nolint:staticcheck // QF1003: could use tagged switch on base (staticcheck)
 			if uc.Snapshotter == sp.SnapshotterKey {
 				return true, sp
-			} else if uc.Snapshotter == "" && sp.SnapshotterKey == defaults.DefaultSnapshotter {
-				return true, sp
+			} else if uc.Snapshotter == "" {
+				if sp.SnapshotterKey == defaults.DefaultSnapshotter {
+					// Return as best match immediately
+					return true, sp
+				} else if !matched {
+					// Match but prefer default if present to prevent configuration
+					// changes from altering default behavior
+					matched = true
+					u = sp
+				}
 			}
+		} else if uc.Snapshotter == sp.SnapshotterKey {
+			log.G(ctx).WithFields(log.Fields{
+				"platform":    platforms.FormatAll(uc.Platform),
+				"snapshotter": uc.Snapshotter,
+			}).Info("Found unpack with matching snapshotter but platform does not match")
 		}
 	}
-	return false, u
+	return
 }

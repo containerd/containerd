@@ -22,10 +22,26 @@ import (
 	"context"
 	"time"
 
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/errdefs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string) (string, error) {
+	return "", nil
+}
+
+func (c *criService) CRImportCheckpoint(
+	ctx context.Context,
+	meta *containerstore.Metadata,
+	sandbox *sandbox.Sandbox,
+	sandboxConfig *runtime.PodSandboxConfig,
+) (ctrID string, retErr error) {
+	return "", errdefs.ErrNotImplemented
+}
 
 func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (res *runtime.CheckpointContainerResponse, err error) {
 	// The next line is just needed to make the linter happy.

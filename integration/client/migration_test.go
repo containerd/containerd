@@ -68,7 +68,7 @@ func TestMigration(t *testing.T) {
 				Name: "1.7-Custom",
 				File: "testdata/custom-1.7.toml",
 				Migrated: replaceAllValues(defaultContent, map[string]string{
-					"sandbox":               "'custom.io/pause:3.10'",
+					"sandbox":               "'custom.io/pause:3.10.2'",
 					"stream_idle_timeout":   "'2h0m0s'",
 					"stream_server_address": "'127.0.1.1'",
 					"stream_server_port":    "'15000'",
@@ -79,7 +79,6 @@ func TestMigration(t *testing.T) {
 	}
 
 	for _, tc := range migrationTests {
-		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
 			buf := bytes.NewBuffer(nil)
 			cmd := exec.Command("containerd", "-c", tc.File, "config", "migrate")

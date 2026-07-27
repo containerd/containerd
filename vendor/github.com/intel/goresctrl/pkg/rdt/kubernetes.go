@@ -18,6 +18,7 @@ package rdt
 
 import (
 	"fmt"
+
 	"github.com/intel/goresctrl/pkg/kubernetes"
 )
 
@@ -55,8 +56,8 @@ func ContainerClassFromAnnotations(containerName string, containerAnnotations, p
 		}
 
 		// If RDT has been initialized we check that the class exists
-		if _, ok := rdt.getClass(clsName); !ok {
-			return "", fmt.Errorf("RDT class %q does not exist in configuration", clsName)
+		if _, err := rdt.getClass(clsName); err != nil {
+			return "", fmt.Errorf("RDT class not found: %w", err)
 		}
 
 		// If classes have been configured by goresctrl

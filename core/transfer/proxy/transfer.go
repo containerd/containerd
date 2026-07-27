@@ -28,15 +28,17 @@ import (
 
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
-	"github.com/containerd/containerd/v2/core/streaming"
-	"github.com/containerd/containerd/v2/core/transfer"
-	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/streaming"
+	"github.com/containerd/containerd/v2/core/transfer"
+	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 type proxyTransferrer struct {
@@ -83,7 +85,7 @@ func (c convertClient) Transfer(ctx context.Context, r *transferapi.TransferRequ
 	return c.TransferClient.Transfer(ctx, r)
 }
 
-func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst interface{}, opts ...transfer.Opt) error {
+func (p *proxyTransferrer) Transfer(ctx context.Context, src any, dst any, opts ...transfer.Opt) error {
 	o := &transfer.Config{}
 	for _, opt := range opts {
 		opt(o)
@@ -150,9 +152,9 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst in
 		Options: apiOpts,
 	}
 	_, err = p.client.Transfer(ctx, req)
-	return err
+	return errgrpc.ToNative(err)
 }
-func (p *proxyTransferrer) marshalAny(ctx context.Context, i interface{}) (typeurl.Any, error) {
+func (p *proxyTransferrer) marshalAny(ctx context.Context, i any) (typeurl.Any, error) {
 	switch m := i.(type) {
 	case streamMarshaler:
 		return m.MarshalAny(ctx, p.streamCreator)

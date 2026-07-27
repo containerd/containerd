@@ -30,6 +30,7 @@ import (
 
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/experimental/stats"
 	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/serviceconfig"
 )
@@ -175,10 +176,13 @@ type BuildOptions struct {
 	// Authority is the effective authority of the clientconn for which the
 	// resolver is built.
 	Authority string
+	// MetricsRecorder is the metrics recorder to do recording.
+	MetricsRecorder stats.MetricsRecorder
 }
 
 // An Endpoint is one network endpoint, or server, which may have multiple
 // addresses with which it can be accessed.
+// TODO(i/8773) : make resolver.Endpoint and resolver.Address immutable
 type Endpoint struct {
 	// Addresses contains a list of addresses used to access this endpoint.
 	Addresses []Address
@@ -329,6 +333,11 @@ type AuthorityOverrider interface {
 	// OverrideAuthority returns the authority to use for a ClientConn with the
 	// given target. The implementation must generate it without blocking,
 	// typically in line, and must keep it unchanged.
+	//
+	// The returned string must be a valid ":authority" header value, i.e. be
+	// encoded according to
+	// [RFC3986](https://datatracker.ietf.org/doc/html/rfc3986#section-3.2) as
+	// necessary.
 	OverrideAuthority(Target) string
 }
 

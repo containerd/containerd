@@ -11,6 +11,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/encoding/messageset"
+	"google.golang.org/protobuf/internal/filedesc"
 	"google.golang.org/protobuf/internal/order"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	piface "google.golang.org/protobuf/runtime/protoiface"
@@ -45,19 +46,16 @@ func (mi *MessageInfo) makeOpaqueCoderMethods(t reflect.Type, si opaqueStructInf
 		var childMessage *MessageInfo
 		switch {
 		case fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic():
-			fieldOffset = offsetOf(fs, mi.Exporter)
-		case fd.IsWeak():
-			fieldOffset = si.weakOffset
-			funcs = makeWeakMessageFieldCoder(fd)
+			fieldOffset = offsetOf(fs)
 		case fd.Message() != nil && !fd.IsMap():
-			fieldOffset = offsetOf(fs, mi.Exporter)
+			fieldOffset = offsetOf(fs)
 			if fd.IsList() {
 				childMessage, funcs = makeOpaqueRepeatedMessageFieldCoder(fd, ft)
 			} else {
 				childMessage, funcs = makeOpaqueMessageFieldCoder(fd, ft)
 			}
 		default:
-			fieldOffset = offsetOf(fs, mi.Exporter)
+			fieldOffset = offsetOf(fs)
 			childMessage, funcs = fieldCoder(fd, ft)
 		}
 		cf := &coderFieldInfo{
@@ -83,7 +81,7 @@ func (mi *MessageInfo) makeOpaqueCoderMethods(t reflect.Type, si opaqueStructInf
 		// permit us to skip over definitely-unset fields at marshal time.
 
 		var hasPresence bool
-		hasPresence, cf.isLazy = usePresenceForField(si, fd)
+		hasPresence, cf.isLazy = filedesc.UsePresenceForField(fd)
 
 		if hasPresence {
 			cf.presenceIndex, mi.presenceSize = presenceIndex(mi.Desc, fd)

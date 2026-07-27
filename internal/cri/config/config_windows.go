@@ -23,6 +23,10 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 )
 
+func defaultNetworkPluginBinDirs() []string {
+	return []string{filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin")}
+}
+
 func DefaultImageConfig() ImageConfig {
 	return ImageConfig{
 		Snapshotter:            defaults.DefaultSnapshotter,
@@ -42,7 +46,7 @@ func DefaultImageConfig() ImageConfig {
 func DefaultRuntimeConfig() RuntimeConfig {
 	return RuntimeConfig{
 		CniConfig: CniConfig{
-			NetworkPluginBinDir:        filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin"),
+			NetworkPluginBinDirs:       defaultNetworkPluginBinDirs(),
 			NetworkPluginConfDir:       filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "conf"),
 			NetworkPluginMaxConfNum:    1,
 			NetworkPluginSetupSerially: false,
@@ -62,7 +66,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 					ContainerAnnotations: []string{"io.microsoft.container.*"},
 					// Full set of Windows shim options:
 					// https://pkg.go.dev/github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options#Options
-					Options: map[string]interface{}{
+					Options: map[string]any{
 						// SandboxIsolation specifies the isolation level of the sandbox.
 						// PROCESS (0) and HYPERVISOR (1) are the valid options.
 						"SandboxIsolation": 1,
@@ -83,5 +87,6 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		// TODO(windows): Add platform specific config, so that most common defaults can be shared.
 
 		DrainExecSyncIOTimeout: "0s",
+		EnableCRIU:             func() *bool { v := false; return &v }(),
 	}
 }

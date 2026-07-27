@@ -20,16 +20,6 @@ syntax = "proto3";
 package runtime.v1;
 option go_package = "k8s.io/cri-api/pkg/apis/runtime/v1";
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-
-option (gogoproto.goproto_stringer_all) = false;
-option (gogoproto.stringer_all) =  true;
-option (gogoproto.goproto_getters_all) = true;
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_unrecognized_all) = false;
-
 // Runtime service defines the public APIs for remote container runtimes
 service RuntimeService {
     // Version returns the runtime name, runtime version, and runtime API version.
@@ -58,6 +48,19 @@ service RuntimeService {
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
     // ListPodSandbox returns a list of PodSandboxes.
     rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
+    // StreamPodSandboxes returns a stream of PodSandboxes.
+    // This is an alternative to ListPodSandbox that streams results in lists
+    // of at least one item, avoiding the gRPC message size limit for nodes with
+    // many pods. The number of items per list may vary depending on the
+    // container runtime. Each item must appear in exactly one response and must
+    // not be duplicated across responses in the same stream. The server must
+    // close the stream with EOF after all items have been sent. The kubelet
+    // collects all items from the stream and processes them all at once after
+    // the stream completes. The kubelet enforces a timeout on the entire stream
+    // and will discard partial results if the stream is not completed in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamPodSandboxes(StreamPodSandboxesRequest) returns (stream StreamPodSandboxesResponse) {}
 
     // CreateContainer creates a new container in specified PodSandbox
     rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
@@ -76,6 +79,19 @@ service RuntimeService {
     rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
     // ListContainers lists all containers by filters.
     rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
+    // StreamContainers returns a stream of containers.
+    // This is an alternative to ListContainers that streams results in lists
+    // of at least one item, avoiding the gRPC message size limit for nodes with
+    // many containers. The number of items per list may vary depending on the
+    // container runtime. Each item must appear in exactly one response and must
+    // not be duplicated across responses in the same stream. The server must
+    // close the stream with EOF after all items have been sent. The kubelet
+    // collects all items from the stream and processes them all at once after
+    // the stream completes. The kubelet enforces a timeout on the entire stream
+    // and will discard partial results if the stream is not completed in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamContainers(StreamContainersRequest) returns (stream StreamContainersResponse) {}
     // ContainerStatus returns status of the container. If the container is not
     // present, returns an error.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
@@ -103,12 +119,40 @@ service RuntimeService {
     rpc ContainerStats(ContainerStatsRequest) returns (ContainerStatsResponse) {}
     // ListContainerStats returns stats of all running containers.
     rpc ListContainerStats(ListContainerStatsRequest) returns (ListContainerStatsResponse) {}
+    // StreamContainerStats returns a stream of container stats.
+    // This is an alternative to ListContainerStats that streams results in
+    // lists of at least one item, avoiding the gRPC message size limit for
+    // nodes with many containers. The number of items per list may vary
+    // depending on the container runtime. Each item must appear in exactly one
+    // response and must not be duplicated across responses in the same stream.
+    // The server must close the stream with EOF after all items have been sent.
+    // The kubelet collects all items from the stream and processes them all at
+    // once after the stream completes. The kubelet enforces a timeout on the
+    // entire stream and will discard partial results if the stream is not
+    // completed in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamContainerStats(StreamContainerStatsRequest) returns (stream StreamContainerStatsResponse) {}
 
     // PodSandboxStats returns stats of the pod sandbox. If the pod sandbox does not
     // exist, the call returns an error.
     rpc PodSandboxStats(PodSandboxStatsRequest) returns (PodSandboxStatsResponse) {}
     // ListPodSandboxStats returns stats of the pod sandboxes matching a filter.
     rpc ListPodSandboxStats(ListPodSandboxStatsRequest) returns (ListPodSandboxStatsResponse) {}
+    // StreamPodSandboxStats returns a stream of pod sandbox stats.
+    // This is an alternative to ListPodSandboxStats that streams results in
+    // lists of at least one item, avoiding the gRPC message size limit for
+    // nodes with many pods. The number of items per list may vary depending on
+    // the container runtime. Each item must appear in exactly one response and
+    // must not be duplicated across responses in the same stream. The server
+    // must close the stream with EOF after all items have been sent. The
+    // kubelet collects all items from the stream and processes them all at once
+    // after the stream completes. The kubelet enforces a timeout on the entire
+    // stream and will discard partial results if the stream is not completed
+    // in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamPodSandboxStats(StreamPodSandboxStatsRequest) returns (stream StreamPodSandboxStatsResponse) {}
 
     // UpdateRuntimeConfig updates the runtime configuration based on the given request.
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
@@ -131,6 +175,20 @@ service RuntimeService {
 
     // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
     rpc ListPodSandboxMetrics(ListPodSandboxMetricsRequest) returns (ListPodSandboxMetricsResponse) {}
+    // StreamPodSandboxMetrics returns a stream of pod sandbox metrics.
+    // This is an alternative to ListPodSandboxMetrics that streams results in
+    // lists of at least one item, avoiding the gRPC message size limit for
+    // nodes with many pods. The number of items per list may vary depending on
+    // the container runtime. Each item must appear in exactly one response and
+    // must not be duplicated across responses in the same stream. The server
+    // must close the stream with EOF after all items have been sent. The
+    // kubelet collects all items from the stream and processes them all at once
+    // after the stream completes. The kubelet enforces a timeout on the entire
+    // stream and will discard partial results if the stream is not completed
+    // in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamPodSandboxMetrics(StreamPodSandboxMetricsRequest) returns (stream StreamPodSandboxMetricsResponse) {}
 
     // RuntimeConfig returns configuration information of the runtime.
     // A couple of notes:
@@ -140,12 +198,32 @@ service RuntimeService {
     //   The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
     //   avoid updating them without a full node reboot.
     rpc RuntimeConfig(RuntimeConfigRequest) returns (RuntimeConfigResponse) {}
+
+    // UpdatePodSandboxResources synchronously updates the PodSandboxConfig with
+    // the pod-level resource configuration. This method is called _after_ the
+    // Kubelet reconfigures the pod-level cgroups.
+    // This request is treated as best effort, and failure will not block the
+    // Kubelet with proceeding with a resize.
+    rpc UpdatePodSandboxResources(UpdatePodSandboxResourcesRequest) returns (UpdatePodSandboxResourcesResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
 service ImageService {
     // ListImages lists existing images.
     rpc ListImages(ListImagesRequest) returns (ListImagesResponse) {}
+    // StreamImages returns a stream of images.
+    // This is an alternative to ListImages that streams results in lists of at
+    // least one item, avoiding the gRPC message size limit for nodes with many
+    // images. The number of items per list may vary depending on the container
+    // runtime. Each item must appear in exactly one response and must not be
+    // duplicated across responses in the same stream. The server must close the
+    // stream with EOF after all items have been sent. The kubelet collects all
+    // items from the stream and processes them all at once after the stream
+    // completes. The kubelet enforces a timeout on the entire stream and will
+    // discard partial results if the stream is not completed in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamImages(StreamImagesRequest) returns (stream StreamImagesResponse) {}
     // ImageStatus returns the status of the image. If the image is not
     // present, returns a response with ImageStatusResponse.Image set to
     // nil.
@@ -155,8 +233,16 @@ service ImageService {
     // RemoveImage removes the image.
     // This call is idempotent, and must not return an error if the image has
     // already been removed.
+    // Note that if the image is referenced by multiple tags (even across different repositories
+    // if they resolve to the same image digest), removing the image by a single tag
+    // will remove all of its tags. For example, if `repo/image:v1` and `another_repo/image:latest`
+    // point to the same image, removing `repo/image:v1` will also remove `another_repo/image:latest`.
+    // The next call to ListImages, ImageStatus, ImageFsInfo will not return this image.
+    // The resources (e.g. disk space) may be cleaned asynchronously
+    // and not guaranteed to be cleaned up by the time this method returns.
     rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse) {}
     // ImageFSInfo returns information of the filesystem that is used to store images.
+    // Usage information may include images that were removed, but are still being cleaned up.
     rpc ImageFsInfo(ImageFsInfoRequest) returns (ImageFsInfoResponse) {}
 }
 
@@ -201,7 +287,16 @@ message PortMapping {
     Protocol protocol = 1;
     // Port number within the container. Default: 0 (not specified).
     int32 container_port = 2;
-    // Port number on the host. Default: 0 (not specified).
+    // Port number on the host to map the container port to.
+    //
+    // * Valid host port range is 1-65535.
+    // * The value 0 has explicit semantic meaning: it indicates NO host port should be allocated.
+    // * The value 0 does NOT indicate dynamic port allocation. Future implementations
+    //   of dynamic allocation will use different values/semantics.
+    // * Implementations MUST handle the case where this field is explicitly set to 0,
+    //   This field SHOULD be omitted when no port is required.
+    //
+    // Default: If omitted, container port will not be exposed on the host.
     int32 host_port = 3;
     // Host IP.
     string host_ip = 4;
@@ -221,8 +316,10 @@ enum MountPropagation {
 message Mount {
     // Path of the mount within the container.
     string container_path = 1;
-    // Path of the mount on the host. If the hostPath doesn't exist, then runtimes
-    // should report error. If the hostpath is a symbolic link, runtimes should
+    // Path of the mount on the host. Has to be empty if the image field below
+    // is provided, because those fields are mutually exclusive. If the image
+    // field below is nil and the host path doesn't exist, then runtimes should
+    // report an error. If the hostpath is a symbolic link, runtimes should
     // follow the symlink and mount the real destination to container.
     string host_path = 2;
     // If set, the mount is read-only.
@@ -246,13 +343,19 @@ message Mount {
     bool recursive_read_only = 8;
     // Mount an image reference (image ID, with or without digest), which is a
     // special use case for image volume mounts. If this field is set, then
-    // host_path should be unset. All OCI mounts are per feature definition
+    // host_path should be unset. All image mounts are per feature definition
     // readonly. The kubelet does an PullImage RPC and evaluates the returned
     // PullImageResponse.image_ref value, which is then set to the
     // ImageSpec.image field. Runtimes are expected to mount the image as
     // required.
-    // Introduced in the OCI Volume Source KEP: https://kep.k8s.io/4639
+    // Introduced in the Image Volume Source KEP: https://kep.k8s.io/4639
     ImageSpec image = 9;
+    // Specific image sub path to be used from inside the image instead of its
+    // root, only necessary if the above image field is set. If the sub path is
+    // not empty and does not exist in the image, then runtimes should fail and
+    // return an error.
+    // Introduced in the Image Volume Source KEP beta graduation: https://kep.k8s.io/4639
+    string image_sub_path = 10;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -601,7 +704,7 @@ message PodSandboxStatusResponse {
     map<string, string> info = 2;
     // Container statuses
     repeated ContainerStatus containers_statuses = 3;
-    // Timestamp at which container and pod statuses were recorded
+    // Timestamp in nanoseconds at which container and pod statuses were recorded
     int64 timestamp = 4;
 }
 
@@ -656,6 +759,16 @@ message ListPodSandboxResponse {
     repeated PodSandbox items = 1;
 }
 
+message StreamPodSandboxesRequest {
+    // Filter for the list request.
+    PodSandboxFilter filter = 1;
+}
+
+message StreamPodSandboxesResponse {
+    // List of PodSandboxes.
+    repeated PodSandbox pod_sandboxes = 1;
+}
+
 message PodSandboxStatsRequest {
     // ID of the pod sandbox for which to retrieve stats.
     string pod_sandbox_id = 1;
@@ -684,6 +797,16 @@ message ListPodSandboxStatsRequest {
 message ListPodSandboxStatsResponse {
     // Stats of the pod sandbox.
     repeated PodSandboxStats stats = 1;
+}
+
+message StreamPodSandboxStatsRequest {
+    // Filter for the list request.
+    PodSandboxStatsFilter filter = 1;
+}
+
+message StreamPodSandboxStatsResponse {
+    // List of pod sandbox stats.
+    repeated PodSandboxStats pod_sandbox_stats = 1;
 }
 
 // PodSandboxAttributes provides basic information of the pod sandbox.
@@ -724,6 +847,8 @@ message LinuxPodSandboxStats {
     ProcessUsage process = 4;
     // Stats of containers in the measured pod sandbox.
     repeated ContainerStats containers = 5;
+    // IO usage gathered for the pod sandbox.
+    IoUsage io = 6;
 }
 
 // WindowsPodSandboxStats provides the resource usage statistics for a pod sandbox on windows
@@ -819,11 +944,14 @@ message ImageSpec {
     // If the runtime handler is unknown, the request should be rejected.
     // An empty string would select the default runtime handler.
     string runtime_handler = 19;
+    // The digest of the image used for this volume.
+    // It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+    string image_ref = 20;
 }
 
 message KeyValue {
     string key = 1;
-    string value = 2;
+    bytes value = 2;
 }
 
 // LinuxContainerResources specifies Linux specific configuration for
@@ -987,7 +1115,7 @@ message LinuxContainerUser {
 // WindowsNamespaceOption provides options for Windows namespaces.
 message WindowsNamespaceOption {
     // Network namespace for this container/sandbox.
-    // Namespaces currently set by the kubelet: POD, NODE
+    // This is currently never set by the kubelet
     NamespaceMode network = 1;
 }
 
@@ -1053,6 +1181,19 @@ message WindowsContainerResources {
     int64 memory_limit_in_bytes = 4;
     // Specifies the size of the rootfs / scratch space in bytes to be configured for this container. Default: 0 (not specified).
     int64 rootfs_size_in_bytes = 5;
+    // Optionally specifies the set of CPUs to affinitize for this container.
+    repeated WindowsCpuGroupAffinity affinity_cpus = 6;
+}
+
+// WindowsCpuGroupAffinity specifies the CPU mask and group to affinitize.
+// This is similar to the following _GROUP_AFFINITY structure:
+// https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/miniport/ns-miniport-_group_affinity
+message WindowsCpuGroupAffinity {
+    // CPU mask relative to this CPU group.
+    uint64 cpu_mask = 1;
+    // Processor group the mask refers to, as returned by
+    // GetLogicalProcessorInformationEx.
+    uint32 cpu_group = 2;
 }
 
 // ContainerMetadata holds all necessary information for building the container
@@ -1149,6 +1290,78 @@ message ContainerConfig {
 
     // CDI devices for the container.
     repeated CDIDevice CDI_devices = 17;
+
+    // The custom stop signal for the container
+    Signal stop_signal = 18;
+}
+
+enum Signal {
+    RUNTIME_DEFAULT   = 0;
+    SIGABRT           = 1;
+    SIGALRM           = 2;
+    SIGBUS            = 3;
+    SIGCHLD           = 4;
+    SIGCLD            = 5;
+    SIGCONT           = 6;
+    SIGFPE            = 7;
+    SIGHUP            = 8;
+    SIGILL            = 9;
+    SIGINT            = 10;
+    SIGIO             = 11;
+    SIGIOT            = 12;
+    SIGKILL           = 13;
+    SIGPIPE           = 14;
+    SIGPOLL           = 15;
+    SIGPROF           = 16;
+    SIGPWR            = 17;
+    SIGQUIT           = 18;
+    SIGSEGV           = 19;
+    SIGSTKFLT         = 20;
+    SIGSTOP           = 21;
+    SIGSYS            = 22;
+    SIGTERM           = 23;
+    SIGTRAP           = 24;
+    SIGTSTP           = 25;
+    SIGTTIN           = 26;
+    SIGTTOU           = 27;
+    SIGURG            = 28;
+    SIGUSR1           = 29;
+    SIGUSR2           = 30;
+    SIGVTALRM         = 31;
+    SIGWINCH          = 32;
+    SIGXCPU           = 33;
+    SIGXFSZ           = 34;
+    SIGRTMIN          = 35;
+    SIGRTMINPLUS1     = 36;
+    SIGRTMINPLUS2     = 37;
+    SIGRTMINPLUS3     = 38;
+    SIGRTMINPLUS4     = 39;
+    SIGRTMINPLUS5     = 40;
+    SIGRTMINPLUS6     = 41;
+    SIGRTMINPLUS7     = 42;
+    SIGRTMINPLUS8     = 43;
+    SIGRTMINPLUS9     = 44;
+    SIGRTMINPLUS10    = 45;
+    SIGRTMINPLUS11    = 46;
+    SIGRTMINPLUS12    = 47;
+    SIGRTMINPLUS13    = 48;
+    SIGRTMINPLUS14    = 49;
+    SIGRTMINPLUS15    = 50;
+    SIGRTMAXMINUS14   = 51;
+    SIGRTMAXMINUS13   = 52;
+    SIGRTMAXMINUS12   = 53;
+    SIGRTMAXMINUS11   = 54;
+    SIGRTMAXMINUS10   = 55;
+    SIGRTMAXMINUS9    = 56;
+    SIGRTMAXMINUS8    = 57;
+    SIGRTMAXMINUS7    = 58;
+    SIGRTMAXMINUS6    = 59;
+    SIGRTMAXMINUS5    = 60;
+    SIGRTMAXMINUS4    = 61;
+    SIGRTMAXMINUS3    = 62;
+    SIGRTMAXMINUS2    = 63;
+    SIGRTMAXMINUS1    = 64;
+    SIGRTMAX          = 65;
 }
 
 message CreateContainerRequest {
@@ -1249,19 +1462,25 @@ message Container {
     // MUST be identical to that of the corresponding ContainerConfig used to
     // instantiate this Container.
     map<string, string> annotations = 9;
-    // Reference to the unique identifier of the image, on the node, as
-    // returned in the image service apis.
+    // Reference to the unique identifier of the image on the node, as
+    // returned in the image and runtime service apis.
     //
-    // Note: The image_ref above has been historically used by container
-    // runtimes to reference images by digest. The image_ref has been also used
-    // in the kubelet image garbage collection, which does not work with
-    // digests at all. To separate and avoid possible misusage, we now
-    // introduce the image_id field, which should always refer to a unique
-    // image identifier on the node.
+    // This value MUST always match `PullImageResponse.image_ref` when referring
+    // to the same image.
     string image_id = 10;
 }
 
 message ListContainersResponse {
+    // List of containers.
+    repeated Container containers = 1;
+}
+
+message StreamContainersRequest {
+    // Filter for the list request.
+    ContainerFilter filter = 1;
+}
+
+message StreamContainersResponse {
     // List of containers.
     repeated Container containers = 1;
 }
@@ -1312,16 +1531,17 @@ message ContainerStatus {
     string log_path = 15;
     // Resource limits configuration of the container.
     ContainerResources resources = 16;
-    // Reference to the unique identifier of the image, on the node, as
-    // returned in the image service apis.
+    // Reference to the unique identifier of the image on the node, as
+    // returned in the image and runtime service apis.
     //
-    // Note: The image_ref above has been historically used by container
-    // runtimes to reference images by digest. To separate and avoid possible
-    // misusage, we now introduce the image_id field, which should always refer
-    // to a unique image identifier on the node.
+    // This value MUST always match `PullImageResponse.image_ref` when referring
+    // to the same image.
     string image_id = 17;
     // User identities initially attached to the container
     ContainerUser user = 18;
+
+    // Returns the stop signal used by the container runtime to terminate the container 
+    Signal stop_signal = 19;
 }
 
 message ContainerStatusResponse {
@@ -1344,7 +1564,7 @@ message ContainerResources {
 
 message ContainerUser {
     // User identities initially attached to first process in the Linux container.
-	// Note that the actual running identity can be changed if the process has enough privilege to do so.
+    // Note that the actual running identity can be changed if the process has enough privilege to do so.
     LinuxContainerUser linux = 1;
 
     // User identities initially attached to first process in the Windows container
@@ -1469,7 +1689,11 @@ message ListImagesRequest {
 
 // Basic information about a container image.
 message Image {
-    // ID of the image.
+    // Reference to the unique identifier of the image on the node, as
+    // returned in the image and runtime service apis.
+    //
+    // This value MUST always match `PullImageResponse.image_ref` when referring
+    // to the same image.
     string id = 1;
     // Other names by which this image is known.
     repeated string repo_tags = 2;
@@ -1497,6 +1721,16 @@ message ListImagesResponse {
     repeated Image images = 1;
 }
 
+message StreamImagesRequest {
+    // Filter to list images.
+    ImageFilter filter = 1;
+}
+
+message StreamImagesResponse {
+    // List of images.
+    repeated Image images = 1;
+}
+
 message ImageStatusRequest {
     // Spec of the image.
     ImageSpec image = 1;
@@ -1517,14 +1751,14 @@ message ImageStatusResponse {
 // AuthConfig contains authorization information for connecting to a registry.
 message AuthConfig {
     string username = 1;
-    string password = 2;
-    string auth = 3;
+    string password = 2 [debug_redact = true];
+    string auth = 3 [debug_redact = true];
     string server_address = 4;
     // IdentityToken is used to authenticate the user and get
     // an access token for the registry.
-    string identity_token = 5;
+    string identity_token = 5 [debug_redact = true];
     // RegistryToken is a bearer token to be sent to a registry
-    string registry_token = 6;
+    string registry_token = 6 [debug_redact = true];
 }
 
 message PullImageRequest {
@@ -1537,8 +1771,19 @@ message PullImageRequest {
 }
 
 message PullImageResponse {
-    // Reference to the image in use. For most runtimes, this should be an
-    // image ID or digest.
+    // Reference to the unique identifier of the image on the node, as
+    // returned in the image and runtime service apis.
+    //
+    // When referring to the same image, the container runtime MUST always return
+    // the same value for:
+    //     - Image.id
+    //     - Container.image_id
+    //     - ContainerStatus.image_id
+    //     - PullImageResponse.image_ref
+    // Note: this field has a stricter meaning starting with v1.36.
+    // It used to be image ID OR digest, which are different values,
+    // and would not necessarily match other ID fields in the Container,
+    // ContainerStatus, and Image messages
     string image_ref = 1;
 }
 
@@ -1627,6 +1872,9 @@ message RuntimeHandler {
 message RuntimeFeatures {
     // supplemental_groups_policy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
     bool supplemental_groups_policy = 1;
+    // user_namespaces_host_network is set to true if the runtime supports containers using both
+    // host network and user namespace simultaneously.
+    bool user_namespaces_host_network = 2;
 }
 
 message StatusResponse {
@@ -1729,6 +1977,16 @@ message ListContainerStatsResponse {
     repeated ContainerStats stats = 1;
 }
 
+message StreamContainerStatsRequest {
+    // Filter for the list request.
+    ContainerStatsFilter filter = 1;
+}
+
+message StreamContainerStatsResponse {
+    // List of container stats.
+    repeated ContainerStats container_stats = 1;
+}
+
 // ContainerAttributes provides basic information of the container.
 message ContainerAttributes {
     // ID of the container.
@@ -1756,6 +2014,8 @@ message ContainerStats {
     FilesystemUsage writable_layer = 4;
     // Swap usage gathered from the container.
     SwapUsage swap = 5;
+    // IO usage gathered from the container.
+    IoUsage io = 6;
 }
 
 // WindowsContainerStats provides the resource usage statistics for a container specific for Windows
@@ -1770,6 +2030,27 @@ message WindowsContainerStats {
     WindowsFilesystemUsage writable_layer = 4;
 }
 
+// PSI statistics for an individual resource.
+message PsiStats {
+	// PSI data for all tasks in the cgroup.
+	PsiData Full = 1;
+	// PSI data for some tasks in the cgroup.
+	PsiData Some = 2;
+}
+
+// PSI data for an individual resource.
+message PsiData {
+	// Total time duration for tasks in the cgroup have waited due to congestion.
+	// Unit: nanoseconds.
+	uint64 Total = 1;
+	// The average (in %) tasks have waited due to congestion over a 10 second window.
+	double Avg10 = 2;
+	// The average (in %) tasks have waited due to congestion over a 60 second window.
+	double Avg60 = 3;
+	// The average (in %) tasks have waited due to congestion over a 300 second window.
+	double Avg300 = 4;
+}
+
 // CpuUsage provides the CPU usage information.
 message CpuUsage {
     // Timestamp in nanoseconds at which the information were collected. Must be > 0.
@@ -1779,6 +2060,8 @@ message CpuUsage {
     // Total CPU usage (sum of all cores) averaged over the sample window.
     // The "core" unit can be interpreted as CPU core-nanoseconds per second.
     UInt64Value usage_nano_cores = 3;
+    // CPU PSI statistics.
+    PsiStats psi = 4;
 }
 
 // WindowsCpuUsage provides the CPU usage information specific to Windows
@@ -1808,6 +2091,15 @@ message MemoryUsage {
     UInt64Value page_faults = 6;
     // Cumulative number of major page faults.
     UInt64Value major_page_faults = 7;
+    // Memory PSI statistics.
+    PsiStats psi = 8;
+}
+
+message IoUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // IO PSI statistics.
+    PsiStats psi = 2;
 }
 
 message SwapUsage {
@@ -1863,7 +2155,7 @@ message ContainerEventResponse {
     // Type of the container event
     ContainerEventType container_event_type = 2;
 
-    // Creation timestamp of this event
+    // Creation timestamp in nanoseconds of this event
     int64 created_at = 3;
 
     // Sandbox status
@@ -1911,6 +2203,13 @@ message ListPodSandboxMetricsResponse {
     repeated PodSandboxMetrics pod_metrics = 1;
 }
 
+message StreamPodSandboxMetricsRequest {}
+
+message StreamPodSandboxMetricsResponse {
+    // List of pod sandbox metrics.
+    repeated PodSandboxMetrics pod_sandbox_metrics = 1;
+}
+
 message PodSandboxMetrics {
     string pod_sandbox_id = 1;
     repeated Metric metrics = 2;
@@ -1927,7 +2226,7 @@ message Metric {
     // otherwise, it will be ignored.
     string name = 1;
     // Timestamp should be 0 if the metric was gathered live.
-    // If it was cached, the Timestamp should reflect the time it was collected.
+    // If it was cached, the Timestamp should reflect the time in nanoseconds it was collected.
     int64 timestamp = 2;
     MetricType metric_type = 3;
     // The corresponding LabelValues to the LabelKeys defined in the MetricDescriptor.
@@ -1967,3 +2266,14 @@ enum CgroupDriver {
     CGROUPFS = 1;
 }
 
+message UpdatePodSandboxResourcesRequest {
+    // ID of the PodSandbox to update.
+    string pod_sandbox_id = 1;
+
+    // Optional overhead represents the overheads associated with this sandbox
+    LinuxContainerResources overhead = 2;
+    // Optional resources represents the sum of container resources for this sandbox
+    LinuxContainerResources resources = 3;
+}
+
+message UpdatePodSandboxResourcesResponse {}

@@ -79,7 +79,6 @@ func TestGetUserFromImage(t *testing.T) {
 			name: "test",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			actualUID, actualName := getUserFromImage(test.user)
 			assert.Equal(t, test.uid, actualUID)
@@ -129,7 +128,7 @@ systemd_cgroup = true
 		desc            string
 		r               criconfig.Runtime
 		c               criconfig.Config
-		expectedOptions interface{}
+		expectedOptions any
 	}{
 		{
 			desc:            "when options is nil, should return nil option for io.containerd.runc.v2",
@@ -148,7 +147,6 @@ systemd_cgroup = true
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			opts, err := criconfig.GenerateRuntimeOptions(test.r)
 			assert.NoError(t, err)
@@ -221,7 +219,6 @@ func TestEnvDeduplication(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			var spec runtimespec.Spec
 			if len(test.existing) > 0 {
@@ -252,14 +249,12 @@ func TestEnsureRemoveAllWithDir(t *testing.T) {
 }
 
 func TestEnsureRemoveAllWithFile(t *testing.T) {
-	tmp, err := os.CreateTemp("", "test-ensure-removeall-with-dir")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmp, err := os.CreateTemp(t.TempDir(), "test-ensure-removeall-with-dir")
+	require.NoError(t, err)
 	tmp.Close()
-	if err := ensureRemoveAll(context.Background(), tmp.Name()); err != nil {
-		t.Fatal(err)
-	}
+
+	err = ensureRemoveAll(context.Background(), tmp.Name())
+	require.NoError(t, err)
 }
 
 // Helper function for setting up an environment to test PID namespace targeting.
@@ -344,7 +339,6 @@ func TestValidateTargetContainer(t *testing.T) {
 			expectError:       true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			targetContainer, err := c.validateTargetContainer(testSandboxID, test.targetContainerID)
 			if test.expectError {
@@ -367,6 +361,28 @@ func TestGetRuntimeOptions(t *testing.T) {
 	var typeurlAny typeurl.Any = pbany // This is typed nil.
 	_, err = getRuntimeOptions(containers.Container{Runtime: containers.RuntimeInfo{Options: typeurlAny}})
 	require.NoError(t, err)
+}
+
+func TestCopyResourcesToStatusWindowsAffinity(t *testing.T) {
+	spec := &runtimespec.Spec{
+		Windows: &runtimespec.Windows{
+			Resources: &runtimespec.WindowsResources{
+				CPU: &runtimespec.WindowsCPUResources{
+					Affinity: []runtimespec.WindowsCPUGroupAffinity{
+						{Mask: 0x3, Group: 0},
+						{Mask: 0xf, Group: 1},
+					},
+				},
+			},
+		},
+	}
+	status := copyResourcesToStatus(spec, containerstore.Status{})
+	require.NotNil(t, status.Resources)
+	require.NotNil(t, status.Resources.Windows)
+	assert.Equal(t, []*runtime.WindowsCpuGroupAffinity{
+		{CpuMask: 0x3, CpuGroup: 0},
+		{CpuMask: 0xf, CpuGroup: 1},
+	}, status.Resources.Windows.AffinityCpus)
 }
 
 func TestHostNetwork(t *testing.T) {
@@ -408,7 +424,6 @@ func TestHostNetwork(t *testing.T) {
 			t.Skip()
 		}
 
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if hostNetwork(tt.c) != tt.expected {
 				t.Errorf("failed hostNetwork got %t expected %t", hostNetwork(tt.c), tt.expected)

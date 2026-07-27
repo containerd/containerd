@@ -18,8 +18,10 @@ package command
 
 import (
 	"context"
+	"iter"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
@@ -27,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/version"
+	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
@@ -40,7 +43,7 @@ func outputConfig(ctx context.Context, config *srvconfig.Config) error {
 	}
 	if len(plugins) != 0 {
 		if config.Plugins == nil {
-			config.Plugins = make(map[string]interface{})
+			config.Plugins = make(map[string]any)
 		}
 		for _, p := range plugins {
 			if p.Config == nil {
@@ -92,82 +95,50 @@ var configCommand = &cli.Command{
 			},
 		},
 		{
-			Name:  "dump",
-			Usage: "See the output of the final main config with imported in subconfig files",
-			Action: func(cliContext *cli.Context) error {
-				config := defaultConfig()
-				ctx := cliContext.Context
-				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
-					return err
-				}
-
-				return outputConfig(ctx, config)
-			},
+			Name:   "dump",
+			Usage:  "See the output of the final main config with imported in subconfig files",
+			Action: dumpConfig,
 		},
 		{
 			Name:  "migrate",
 			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
-			Action: func(cliContext *cli.Context) error {
-				config := defaultConfig()
-				ctx := cliContext.Context
-				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
-					return err
-				}
-
-				if config.Version < version.ConfigVersion {
-					plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
-					for _, p := range plugins {
-						if p.ConfigMigration != nil {
-							if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
-								return err
-							}
-						}
-					}
-				}
-
-				plugins, err := server.LoadPlugins(ctx, config)
-				if err != nil {
-					return err
-				}
-				if len(plugins) != 0 {
-					if config.Plugins == nil {
-						config.Plugins = make(map[string]interface{})
-					}
-					for _, p := range plugins {
-						if p.Config == nil {
-							continue
-						}
-
-						pc, err := config.Decode(ctx, p.URI(), p.Config)
-						if err != nil {
-							return err
-						}
-
-						config.Plugins[p.URI()] = pc
-					}
-				}
-
-				config.Version = version.ConfigVersion
-
-				return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
-			},
+			// TODO(vinayakankugoyal): This should not output fields that were not set in the current configuration.
+			Action: dumpConfig,
 		},
 	},
 }
 
+func dumpConfig(cliContext *cli.Context) error {
+	config := defaultConfig()
+	ctx := cliContext.Context
+
+	g := registry.Graph(func(*plugin.Registration) bool { return false })
+	plugins := func() iter.Seq[plugin.Registration] {
+		return slices.Values(g)
+	}
+	if err := srvconfig.LoadConfigWithPlugins(ctx, cliContext.String("config"), plugins, config); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return outputConfig(ctx, config)
+}
+
 func platformAgnosticDefaultConfig() *srvconfig.Config {
 	return &srvconfig.Config{
-		Version: version.ConfigVersion,
-		Root:    defaults.DefaultRootDir,
-		State:   defaults.DefaultStateDir,
-		GRPC: srvconfig.GRPCConfig{
-			Address:        defaults.DefaultAddress,
-			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
-			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
-		},
+		Version:          version.ConfigVersion,
+		Root:             defaults.DefaultRootDir,
+		State:            defaults.DefaultStateDir,
 		DisabledPlugins:  []string{},
 		RequiredPlugins:  []string{},
 		StreamProcessors: streamProcessors(),
+		Imports:          []string{defaults.DefaultConfigIncludePattern},
+		Plugins: map[string]any{
+			"io.containerd.server.v1.grpc": map[string]any{
+				"address":               defaults.DefaultAddress,
+				"max_recv_message_size": defaults.DefaultMaxRecvMsgSize,
+				"max_send_message_size": defaults.DefaultMaxSendMsgSize,
+			},
+		},
 	}
 }
 

@@ -255,7 +255,6 @@ func TestImageSupportedBySnapshotter_Error(t *testing.T) {
 	}
 
 	_, err = client.Pull(ctx, unsupportedImage,
-		WithSchema1Conversion,
 		WithPlatform(platforms.DefaultString()),
 		WithPullSnapshotter(defaults.DefaultSnapshotter),
 		WithPullUnpack,

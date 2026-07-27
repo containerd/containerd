@@ -132,7 +132,7 @@ func (tc ContentStore) RandomBlob(mediaType string, n int) Content {
 
 // JSONObject creates an object in the content store by first marshaling
 // to JSON and then storing the data.
-func (tc ContentStore) JSONObject(mediaType string, i interface{}) Content {
+func (tc ContentStore) JSONObject(mediaType string, i any) Content {
 	tc.t.Helper()
 
 	data, err := json.Marshal(i)
@@ -165,7 +165,7 @@ func (tc ContentStore) Walk(c Content, fn func(context.Context, *Content, conten
 	return c
 }
 
-// AddPlatform alters the content desciptor by setting the platform
+// AddPlatform alters the content descriptor by setting the platform
 func AddPlatform(c Content, p ocispec.Platform) Content {
 	c.Descriptor.Platform = &p
 	return c
@@ -204,7 +204,7 @@ func SimpleIndex(manifests, layerSize int) ContentCreator {
 	manifestFn := SimpleManifest(layerSize)
 	return func(tc ContentStore) Content {
 		var m []Content
-		for i := 0; i < manifests; i++ {
+		for range manifests {
 			m = append(m, manifestFn(tc))
 		}
 		return tc.Index(m...)

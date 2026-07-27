@@ -18,12 +18,17 @@ package server
 
 import (
 	"context"
+	"iter"
+	"os"
+	"runtime"
+	"slices"
 	"testing"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,7 +78,7 @@ func TestMigration(t *testing.T) {
 		Type:   "io.containerd.test",
 		ID:     "t1",
 		Config: &testConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			c, ok := ic.Config.(*testConfig)
 			if !ok {
 				t.Error("expected first plugin to have configuration")
@@ -95,7 +100,7 @@ func TestMigration(t *testing.T) {
 		},
 		ID:     "t2",
 		Config: &testConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			c, ok := ic.Config.(*testConfig)
 			if !ok {
 				t.Error("expected second plugin to have configuration")
@@ -109,21 +114,21 @@ func TestMigration(t *testing.T) {
 			}
 			return nil, nil
 		},
-		ConfigMigration: func(ctx context.Context, v int, plugins map[string]interface{}) error {
+		ConfigMigration: func(ctx context.Context, v int, plugins map[string]any) error {
 			if v != configVersion {
-				t.Errorf("unxpected version: %d", v)
+				t.Errorf("unexpected version: %d", v)
 			}
 			t1, ok := plugins["io.containerd.test.t1"]
 			if !ok {
 				t.Error("plugin not set as expected")
 				return nil
 			}
-			conf, ok := t1.(map[string]interface{})
+			conf, ok := t1.(map[string]any)
 			if !ok {
 				t.Errorf("unexpected config value: %v", t1)
 				return nil
 			}
-			newconf := map[string]interface{}{
+			newconf := map[string]any{
 				"migrated": conf["migrated"],
 			}
 			delete(conf, "migrated")
@@ -135,16 +140,58 @@ func TestMigration(t *testing.T) {
 
 	config := &srvconfig.Config{}
 	config.Version = configVersion
-	config.Plugins = map[string]interface{}{
-		"io.containerd.test.t1": map[string]interface{}{
+	config.Plugins = map[string]any{
+		"io.containerd.test.t1": map[string]any{
 			"migrated":    "migrate me",
 			"notmigrated": "don't migrate me",
 		},
 	}
-
-	ctx := context.Background()
-	_, err := New(ctx, config)
+	td := t.TempDir()
+	b, err := toml.Marshal(config)
 	if err != nil {
 		t.Fatal(err)
+	}
+	configPath := td + "/config.toml"
+	if err := os.WriteFile(configPath, b, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	g := registry.Graph(func(*plugin.Registration) bool { return false })
+	plugins := func() iter.Seq[plugin.Registration] {
+		return slices.Values(g)
+	}
+	config = &srvconfig.Config{
+		Version: version.ConfigVersion,
+	}
+	if err := srvconfig.LoadConfigWithPlugins(t.Context(), configPath, plugins, config); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	_, err = New(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSetTempDirEnv(t *testing.T) {
+	const tempDir = "/tmp/path/for/testing/temp"
+
+	var keys []string
+	if runtime.GOOS == "windows" {
+		keys = []string{"TEMP", "TMP", "SystemTemp"}
+	} else {
+		keys = []string{"TMPDIR"}
+	}
+	for _, k := range keys {
+		t.Setenv(k, "")
+	}
+
+	setTempDirEnv(tempDir)
+
+	for _, k := range keys {
+		if got := os.Getenv(k); got != tempDir {
+			t.Errorf("expected %s=%q, got %q", k, tempDir, got)
+		}
 	}
 }

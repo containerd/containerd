@@ -50,7 +50,7 @@ func init() {
 			plugins.ShimPlugin,
 			plugins.EventPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			shimPlugin, err := ic.GetSingle(plugins.ShimPlugin)
 			if err != nil {
 				return nil, err
@@ -68,12 +68,16 @@ func init() {
 			state := ic.Properties[plugins.PropertyStateDir]
 			root := ic.Properties[plugins.PropertyRootDir]
 			for _, d := range []string{root, state} {
-				if err := os.MkdirAll(d, 0711); err != nil {
+				if err := os.MkdirAll(d, 0700); err != nil {
+					return nil, err
+				}
+				// chmod is needed for upgrading from an older release that created the dir with 0o711
+				if err := os.Chmod(d, 0o700); err != nil {
 					return nil, err
 				}
 			}
 
-			if err := shims.LoadExistingShims(ic.Context, root, state); err != nil {
+			if err := shims.LoadExistingShims(ic.Context, state, root); err != nil {
 				return nil, fmt.Errorf("failed to load existing shim sandboxes, %v", err)
 			}
 
@@ -153,11 +157,12 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 	}
 
 	if _, err := svc.CreateSandbox(ctx, &runtimeAPI.CreateSandboxRequest{
-		SandboxID:  sandboxID,
-		BundlePath: shim.Bundle(),
-		Rootfs:     mount.ToProto(coptions.Rootfs),
-		Options:    typeurl.MarshalProto(coptions.Options),
-		NetnsPath:  coptions.NetNSPath,
+		SandboxID:   sandboxID,
+		BundlePath:  shim.Bundle(),
+		Rootfs:      mount.ToProto(coptions.Rootfs),
+		Options:     typeurl.MarshalProto(coptions.Options),
+		NetnsPath:   coptions.NetNSPath,
+		Annotations: coptions.Annotations,
 	}); err != nil {
 		c.cleanupShim(ctx, sandboxID, svc)
 		return fmt.Errorf("failed to create sandbox %s: %w", sandboxID, errgrpc.ToNative(err))
@@ -189,6 +194,7 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 		Address:   address,
 		Version:   uint32(version),
 		CreatedAt: resp.GetCreatedAt().AsTime(),
+		Spec:      resp.GetSpec(),
 	}, nil
 }
 

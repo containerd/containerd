@@ -38,13 +38,17 @@ func notifyStopping(ctx context.Context) error {
 
 func sdNotify(ctx context.Context, state string) error {
 	notified, err := sd.SdNotify(false, state)
-	entry := log.G(ctx)
 	if err != nil {
-		entry = entry.WithError(err)
+		return err
 	}
-	entry.WithField("notified", notified).
-		WithField("state", state).
-		Debug("sd notification")
-
-	return err
+	logger := log.G(ctx).WithFields(log.Fields{
+		"notified": notified,
+		"state":    state,
+	})
+	if notified {
+		logger.Debug("systemd notification successful")
+	} else {
+		logger.Debug("systemd notification is not sent (i.e. NOTIFY_SOCKET is unset)")
+	}
+	return nil
 }

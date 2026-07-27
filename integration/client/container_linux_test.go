@@ -35,6 +35,7 @@ import (
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/containerd/containerd/v2/client"
@@ -50,6 +51,7 @@ import (
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/sys/unix"
 )
 
@@ -114,7 +116,7 @@ func TestTaskUpdate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		stat, err := cgroup2.Stat()
+		stat, err := cgroup2.StatFiltered(cgroupsv2.StatMemory)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -144,7 +146,7 @@ func TestTaskUpdate(t *testing.T) {
 	}
 	// check that the task has a limit of 64mb
 	if cgroups.Mode() == cgroups.Unified {
-		stat, err := cgroup2.Stat()
+		stat, err := cgroup2.StatFiltered(cgroupsv2.StatMemory)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -486,7 +488,7 @@ func getLogDirPath(runtimeVersion, id string) string {
 	case "v2":
 		return filepath.Join(defaultState, "io.containerd.runtime.v2.task", testNamespace, id)
 	default:
-		panic(fmt.Errorf("Unsupported runtime version %s", runtimeVersion))
+		panic(fmt.Errorf("unsupported runtime version %s", runtimeVersion))
 	}
 }
 
@@ -528,11 +530,9 @@ func TestContainerAttach(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	task, err := container.NewTask(ctx, direct.IOCreate)
 	if err != nil {
@@ -623,11 +623,9 @@ func testContainerUser(t *testing.T, userstr, expectedOutput string) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	container, err := client.NewContainer(ctx, id,
 		WithNewSnapshot(id, image),
@@ -701,11 +699,9 @@ func TestContainerAttachProcess(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
@@ -872,11 +868,9 @@ func TestContainerUserID(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	// sys user in the busybox image has a uid and gid of 3.
 	container, err := client.NewContainer(ctx, id,
@@ -1082,6 +1076,19 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	task, err := container.NewTask(ctx, empty())
+	if err == nil {
+		t.Errorf("task creation should have failed")
+		task.Delete(ctx)
+		return
+	}
+	if !strings.Contains(err.Error(), `"no-runc"`) {
+		t.Errorf("task creation should have failed because of lack of executable. Instead failed with: %v", err.Error())
+	}
+
+	// It doesn't matter what the NewTaskOpts function is. We are using an existing function in the client package,
+	// which will cause the TaskOptions in the new task request to be non-empty.
+	// https://github.com/containerd/containerd/issues/11568
+	task, err = container.NewTask(ctx, empty(), WithNoNewKeyring)
 	if err == nil {
 		t.Errorf("task creation should have failed")
 		task.Delete(ctx)
@@ -1469,10 +1476,7 @@ func TestShimOOMScore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedScore := containerdScore + 1
-	if expectedScore > sys.OOMScoreAdjMax {
-		expectedScore = sys.OOMScoreAdjMax
-	}
+	expectedScore := min(containerdScore+1, sys.OOMScoreAdjMax)
 
 	// find the shim's pid
 	if cgroups.Mode() == cgroups.Unified {
@@ -1583,7 +1587,6 @@ func TestIssue9103(t *testing.T) {
 			expectedStatus: Stopped,
 		},
 	} {
-		tc := tc
 		tName := fmt.Sprintf("%s%d", id, idx)
 		t.Run(tc.desc, func(t *testing.T) {
 			container, err := client.NewContainer(ctx, tName,
@@ -1810,4 +1813,71 @@ func TestIssue10589(t *testing.T) {
 	t.Logf("task status: %s", status.Status)
 	require.NoError(t, err, "container status")
 	assert.Equal(t, Stopped, status.Status)
+}
+
+// TestIssue13030 is a regression test for parallel image unpacking.
+// The test validates that when multiple layers are unpacked in parallel,
+// that whiteout files are properly processed and do not cause files to
+// be unexpectedly present in the final rootfs.
+//
+// https://github.com/containerd/containerd/issues/13030
+func TestIssue13030(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { client.Close() })
+
+	ctx, cancel := testContext(t)
+	t.Cleanup(cancel)
+
+	image, err := client.Pull(ctx,
+		images.Get(images.Whiteout),
+		WithPlatformMatcher(platforms.Default()),
+		WithPullUnpack,
+		WithUnpackOpts([]UnpackOpt{WithUnpackLimiter(semaphore.NewWeighted(3))}),
+	)
+	t.Cleanup(func() {
+		client.ImageService().Delete(ctx, images.Get(images.Whiteout))
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, t.Name(),
+		WithNewSnapshot(t.Name(), image),
+		WithNewSpec(oci.WithImageConfig(image),
+			withProcessArgs("/bin/sh", "-e", "-c", "test ! -e /file-to-delete && test ! -e /dir-to-delete")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		container.Delete(ctx, WithSnapshotCleanup)
+	})
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		task.Delete(ctx)
+	})
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = task.Start(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := <-statusC
+	code, _, err := status.Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 0 {
+		t.Errorf("expected status 0 from wait but received %d", code)
+	}
 }

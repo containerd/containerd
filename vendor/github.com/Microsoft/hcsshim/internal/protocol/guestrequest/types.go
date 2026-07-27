@@ -31,13 +31,13 @@ type ModificationRequest struct {
 }
 
 type NetworkModifyRequest struct {
-	AdapterId   string      `json:"AdapterId,omitempty"` //nolint:stylecheck
+	AdapterId   string      `json:"AdapterId,omitempty"` //nolint:staticcheck // ST1003: ALL_CAPS
 	RequestType RequestType `json:"RequestType,omitempty"`
 	Settings    interface{} `json:"Settings,omitempty"`
 }
 
 type RS4NetworkModifyRequest struct {
-	AdapterInstanceId string      `json:"AdapterInstanceId,omitempty"` //nolint:stylecheck
+	AdapterInstanceId string      `json:"AdapterInstanceId,omitempty"` //nolint:staticcheck // ST1003: ALL_CAPS
 	RequestType       RequestType `json:"RequestType,omitempty"`
 	Settings          interface{} `json:"Settings,omitempty"`
 }
@@ -73,4 +73,18 @@ const (
 	STDOutHandle STDIOHandle = "StdOut"
 	STDErrHandle STDIOHandle = "StdErr"
 	AllHandles   STDIOHandle = "All"
+)
+
+type LogForwardServiceRPCRequest struct {
+	RPCType  RPCType `json:"RPCType,omitempty"` // "LogForwardService"
+	Settings string  `json:"Settings,omitempty"`
+}
+
+type RPCType string
+
+const (
+	// LogForwardServiceRPC is the RPC type for the log forward service.
+	RPCModifyServiceSettings RPCType = "ModifyServiceSettings"
+	RPCStartLogForwarding    RPCType = "StartLogForwarding"
+	RPCStopLogForwarding     RPCType = "StopLogForwarding"
 )

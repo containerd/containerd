@@ -48,7 +48,5 @@ func SubtractStringSlice(ss []string, str string) []string {
 
 // MergeStringSlices merges 2 string slices into one and remove duplicated elements.
 func MergeStringSlices(a []string, b []string) []string {
-	set := sets.NewString(a...)
-	set.Insert(b...)
-	return set.UnsortedList()
+	return sets.New(a...).Insert(b...).UnsortedList()
 }

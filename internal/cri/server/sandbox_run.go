@@ -26,11 +26,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/leases"
 	sb "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/bandwidth"
@@ -50,7 +52,11 @@ func init() {
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
 func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {
-	span := tracing.SpanFromContext(ctx)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("cri", "sandbox", "run"),
+		tracing.WithNamespace(ctx),
+	)
+	defer span.End()
+
 	config := r.GetConfig()
 	log.G(ctx).Debugf("Sandbox config %+v", config)
 
@@ -84,6 +90,22 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// When cleanupErr != nil, the name will be cleaned in sandbox_remove.
 		if retErr != nil && cleanupErr == nil {
 			c.sandboxNameIndex.ReleaseByName(name)
+		}
+	}()
+
+	leaseSvc := c.client.LeasesService()
+	ls, lerr := leaseSvc.Create(ctx, leases.WithID(id))
+	if lerr != nil {
+		return nil, fmt.Errorf("failed to create lease for sandbox name %q: %w", name, lerr)
+	}
+	defer func() {
+		if retErr != nil {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+
+			if derr := leaseSvc.Delete(deferCtx, ls); derr != nil {
+				log.G(deferCtx).WithError(derr).Error("failed to delete lease during cleanup")
+			}
 		}
 	}()
 
@@ -131,6 +153,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		},
 	)
 	sandbox.Sandboxer = ociRuntime.Sandboxer
+
+	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+	}
 
 	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
 		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
@@ -202,13 +228,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}()
 
 		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
-			return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
+			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 		}
 		// Save sandbox metadata to store
 		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+			return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
 		}
-
 		// Define this defer to teardownPodNetwork prior to the setupPodNetwork function call.
 		// This is because in setupPodNetwork the resource is allocated even if it returns error, unlike other resource
 		// creation functions.
@@ -242,19 +267,41 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
 		}
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
-	}
 
-	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
-		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
-	}
+		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+		}
 
-	// Save sandbox metadata to store
-	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+		// Save sandbox metadata to store
+		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
+			return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
+		}
 	}
 
 	if err := c.sandboxService.CreateSandbox(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
+	}
+
+	// HACK: Ensure pause container image is present before starting the sandbox.
+	// Ideally, this should be called from the sandbox implementation itself, but it's
+	// challenging to decouple CRI image APIs and controller, as a lot of information
+	// needs to be pulled from various sources in order to make pull backward compatible
+	// with previous implementations. Additionally, the Image Service relies on an
+	// in-memory image store to store image metadata, making it challenging to pull images
+	// just via containerd client. Since most runtime implementations rely on pause
+	// containers anyway, the CRI layer will pre-pull the pause container to guarantee
+	// it exists (even though it's counter to the purpose of the sandbox API). This may
+	// be removed/deprecated in the distant future, if we decide to remove pause containers.
+	//
+	// Runtimes set disable_pause_image_pull = true to tell the CRI layer that they manage
+	// pause image availability on their own (e.g. shim sandboxers).
+	if !ociRuntime.DisablePauseImagePull {
+		if err := c.ensurePauseImageExists(ctx, r.GetConfig(), r.GetRuntimeHandler()); err != nil {
+			return nil, err
+		}
+	} else {
+		log.G(ctx).Debugf("Skipping pause image pull for runtime handler %q (type=%q, sandboxer=%q, disable_pause_image_pull=true)",
+			r.GetRuntimeHandler(), ociRuntime.Type, ociRuntime.Sandboxer)
 	}
 
 	ctrl, err := c.sandboxService.StartSandbox(ctx, sandbox.Sandboxer, id)
@@ -273,6 +320,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
 
+	// Shutdown the sandbox if we fail before adding it to store.
+	rollbackSandbox := true
+	defer func() {
+		if retErr != nil && rollbackSandbox {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+			cleanupErr = c.sandboxService.ShutdownSandbox(deferCtx, sandbox.Sandboxer, id)
+		}
+	}()
+
 	if ctrl.Address != "" {
 		sandbox.Endpoint = sandboxstore.Endpoint{
 			Version: ctrl.Version,
@@ -280,17 +337,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}
 
-	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
-	}
+	sandboxInfo.Labels = ctrl.Labels
+	sandboxInfo.Spec = ctrl.Spec
 
-	// TODO: get rid of this. sandbox object should no longer have Container field.
-	if ociRuntime.Sandboxer == string(criconfig.ModePodSandbox) {
-		container, err := c.client.LoadContainer(ctx, id)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
-		}
-		sandbox.Container = container
+	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions", "spec", "labels"); err != nil {
+		return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
 	}
 
 	labels := ctrl.Labels
@@ -299,6 +350,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	sandbox.ProcessLabel = labels["selinux_label"]
+
+	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		status.Pid = ctrl.Pid // NRI reads the pid from status during RunPodSandbox hook
+		status.CreatedAt = ctrl.CreatedAt
+		return status, nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to update sandbox pid: %w", err)
+	}
+
+	defer c.nri.BlockPluginSync().Unblock()
 
 	err = c.nri.RunPodSandbox(ctx, &sandbox)
 	if err != nil {
@@ -315,9 +376,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		// Set the pod sandbox as ready after successfully start sandbox container.
-		status.Pid = ctrl.Pid
 		status.State = sandboxstore.StateReady
-		status.CreatedAt = ctrl.CreatedAt
 		return status, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update sandbox status: %w", err)
@@ -327,6 +386,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
+	// We no longer need to stop sandbox with a cleanup defer since it is in the store.
+	rollbackSandbox = false
 
 	// Send CONTAINER_CREATED event with both ContainerId and SandboxId equal to SandboxId.
 	// Note that this has to be done after sandboxStore.Add() because we need to get
@@ -353,6 +414,30 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }
 
+func (c *criService) ensurePauseImageExists(ctx context.Context, config *runtime.PodSandboxConfig, runtimeHandler string) error {
+	imageConfig := c.ImageService.Config()
+
+	ref := criconfig.DefaultSandboxImage
+
+	if img, ok := imageConfig.PinnedImages["sandbox"]; ok && img != "" {
+		ref = img
+	}
+
+	_, err := c.ImageService.LocalResolve(ref)
+	if err == nil {
+		return nil
+	} else if !errdefs.IsNotFound(err) {
+		return fmt.Errorf("failed to get image %q: %w", ref, err)
+	}
+
+	_, err = c.ImageService.PullImage(ctx, ref, nil, config, runtimeHandler)
+	if err != nil {
+		return fmt.Errorf("failed to pull image %q: %w", ref, err)
+	}
+
+	return nil
+}
+
 // getNetworkPlugin returns the network plugin to be used by the runtime class
 // defaults to the global CNI options in the CRI config
 func (c *criService) getNetworkPlugin(runtimeClass string) cni.CNI {
@@ -369,7 +454,17 @@ func (c *criService) getNetworkPlugin(runtimeClass string) cni.CNI {
 }
 
 // setupPodNetwork setups up the network for a pod
-func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) error {
+func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) (retErr error) {
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("cni", "setup_pod_network"),
+		tracing.WithNamespace(ctx),
+	)
+	defer span.End()
+	defer func() {
+		if retErr != nil {
+			span.RecordError(retErr)
+		}
+	}()
+
 	var (
 		id        = sandbox.ID
 		config    = sandbox.Config
@@ -378,6 +473,14 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		err       error
 		result    *cni.Result
 	)
+
+	// Add tracing attributes
+	span.SetAttributes(
+		tracing.Attribute("sandbox.id", id),
+		tracing.Attribute("netns.path", path),
+		tracing.Attribute("runtime.handler", sandbox.RuntimeHandler),
+	)
+
 	if netPlugin == nil {
 		return errors.New("cni config not initialized")
 	}
@@ -393,6 +496,8 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	netStart := time.Now()
+
+	span.AddEvent("cni.setup.start")
 	if c.config.CniConfig.NetworkPluginSetupSerially {
 		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
 	} else {
@@ -404,11 +509,19 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		networkPluginOperationsErrors.WithValues(networkSetUpOp).Inc()
 		return err
 	}
+
+	span.AddEvent("cni.setup.complete")
 	logDebugCNIResult(ctx, id, result)
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
 		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
 		sandbox.CNIResult = result
+
+		// Add IP information to span
+		span.SetAttributes(
+			tracing.Attribute("sandbox.ip", sandbox.IP),
+			tracing.Attribute("sandbox.additional_ips.count", len(sandbox.AdditionalIPs)),
+		)
 		return nil
 	}
 	return fmt.Errorf("failed to find network info for sandbox %q", id)

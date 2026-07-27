@@ -44,7 +44,7 @@ import (
 // should only use a single address.
 //
 // NOTICE: This interface is intended to be implemented by gRPC, or intercepted
-// by custom load balancing poilices.  Users should not need their own complete
+// by custom load balancing polices.  Users should not need their own complete
 // implementation of this interface -- they should always delegate to a SubConn
 // returned by ClientConn.NewSubConn() by embedding it in their implementations.
 // An embedded SubConn must never be nil, or runtime panics will occur.
@@ -111,20 +111,6 @@ type SubConnState struct {
 	// ConnectionError is set if the ConnectivityState is TransientFailure,
 	// describing the reason the SubConn failed.  Otherwise, it is nil.
 	ConnectionError error
-	// connectedAddr contains the connected address when ConnectivityState is
-	// Ready. Otherwise, it is indeterminate.
-	connectedAddress resolver.Address
-}
-
-// connectedAddress returns the connected address for a SubConnState. The
-// address is only valid if the state is READY.
-func connectedAddress(scs SubConnState) resolver.Address {
-	return scs.connectedAddress
-}
-
-// setConnectedAddress sets the connected address for a SubConnState.
-func setConnectedAddress(scs *SubConnState, addr resolver.Address) {
-	scs.connectedAddress = addr
 }
 
 // A Producer is a type shared among potentially many consumers.  It is

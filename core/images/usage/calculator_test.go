@@ -72,7 +72,6 @@ func TestUsageCalculation(t *testing.T) {
 		},
 		// TODO: Add test with snapshot
 	} {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := logtest.WithT(context.Background(), t)
 

@@ -61,7 +61,7 @@ type service struct {
 	transferapi.UnimplementedTransferServer
 }
 
-func newService(ic *plugin.InitContext) (interface{}, error) {
+func newService(ic *plugin.InitContext) (any, error) {
 	sps, err := ic.GetByType(plugins.TransferPlugin)
 	if err != nil {
 		return nil, err
@@ -138,11 +138,12 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 		} else if !errdefs.IsNotImplemented(err) {
 			return nil, errgrpc.ToGRPC(err)
 		}
+		log.G(ctx).WithError(err).Debugf("transfer not implemented for %T to %T", src, dst)
 	}
 	return nil, status.Errorf(codes.Unimplemented, "method Transfer not implemented for %s to %s", req.Source.GetTypeUrl(), req.Destination.GetTypeUrl())
 }
 
-func (s *service) convertAny(ctx context.Context, a typeurl.Any) (interface{}, error) {
+func (s *service) convertAny(ctx context.Context, a typeurl.Any) (any, error) {
 	obj, err := tplugins.ResolveType(a)
 	if err != nil {
 		if errdefs.IsNotFound(err) {

@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/transfer"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
@@ -49,14 +51,25 @@ func init() {
 			plugins.SandboxStorePlugin,
 			plugins.ServicePlugin,  // For client
 			plugins.SnapshotPlugin, // For root directory properties
+			plugins.TransferPlugin, // For pulling image using transfer service
 			plugins.WarningPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
 			mdb := m.(*metadata.DB)
+
+			// only set the default value of config path, if both mirrors and
+			// config path are empty and we are on Linux.
+			// This also makes sure that if the loaded config already contains both config path and mirrors
+			// the validation will fail.
+			if runtime.GOOS == "linux" {
+				if config.Registry.ConfigPath == "" && len(config.Registry.Mirrors) == 0 {
+					config.Registry.ConfigPath = "/etc/containerd/certs.d:/etc/docker/certs.d"
+				}
+			}
 
 			if warnings, err := criconfig.ValidateImageConfig(ic.Context, &config); err != nil {
 				return nil, fmt.Errorf("invalid cri image config: %w", err)
@@ -71,15 +84,24 @@ func init() {
 				}
 			}
 
+			if !config.UseLocalImagePull {
+				criconfig.CheckLocalImagePullConfigs(ic.Context, &config)
+			}
+
+			ts, err := ic.GetSingle(plugins.TransferPlugin)
+			if err != nil {
+				return nil, err
+			}
+
 			options := &images.CRIImageServiceOptions{
 				Content:          mdb.ContentStore(),
-				Images:           metadata.NewImageStore(mdb),
 				RuntimePlatforms: map[string]images.ImagePlatform{},
 				Snapshotters:     map[string]snapshots.Snapshotter{},
 				ImageFSPaths:     map[string]string{},
+				Transferrer:      ts.(transfer.Transferrer),
 			}
 
-			options.Client, err = containerd.New(
+			ctrdCli, err := containerd.New(
 				"",
 				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
 				containerd.WithDefaultPlatform(platforms.Default()),
@@ -88,6 +110,8 @@ func init() {
 			if err != nil {
 				return nil, fmt.Errorf("unable to init client for cri image service: %w", err)
 			}
+			options.Images = ctrdCli.ImageService()
+			options.Client = ctrdCli
 
 			allSnapshotters := mdb.Snapshotters()
 			defaultSnapshotter := config.Snapshotter
@@ -96,39 +120,32 @@ func init() {
 			} else {
 				return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
 			}
-			var snapshotRoot string
-			if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, defaultSnapshotter); plugin != nil {
-				snapshotRoot = plugin.Meta.Exports["root"]
+
+			snapshotRoot := func(snapshotter string) (snapshotRoot string) {
+				if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
+					snapshotRoot = plugin.Meta.Exports["root"]
+				}
+				if snapshotRoot == "" {
+					// Try a root in the same parent as this plugin
+					snapshotRoot = filepath.Join(filepath.Dir(ic.Properties[plugins.PropertyRootDir]), plugins.SnapshotPlugin.String()+"."+snapshotter)
+				}
+				return snapshotRoot
 			}
-			if snapshotRoot == "" {
-				// Try a root in the same parent as this plugin
-				snapshotRoot = filepath.Join(filepath.Dir(ic.Properties[plugins.PropertyRootDir]), plugins.SnapshotPlugin.String()+"."+defaultSnapshotter)
-			}
-			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot
-			log.L.Infof("Get image filesystem path %q for snapshotter %q", snapshotRoot, defaultSnapshotter)
+
+			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot(defaultSnapshotter)
+			log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[defaultSnapshotter], defaultSnapshotter)
 
 			for runtimeName, rp := range config.RuntimePlatforms {
 				snapshotter := rp.Snapshotter
 				if snapshotter == "" {
 					snapshotter = defaultSnapshotter
-				} else if _, ok := options.ImageFSPaths[snapshotter]; !ok {
-					if s, ok := options.Snapshotters[defaultSnapshotter]; ok {
-						options.Snapshotters[defaultSnapshotter] = s
-					} else {
-						return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
-					}
-					var snapshotRoot string
-					if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
-						snapshotRoot = plugin.Meta.Exports["root"]
-					}
-					if snapshotRoot == "" {
-						// Try a root in the same parent as this plugin
-						snapshotRoot = filepath.Join(filepath.Dir(ic.Properties[plugins.PropertyRootDir]), plugins.SnapshotPlugin.String()+"."+snapshotter)
-					}
+				}
 
-					options.ImageFSPaths[defaultSnapshotter] = snapshotRoot
+				if _, ok := options.ImageFSPaths[snapshotter]; !ok {
+					options.ImageFSPaths[snapshotter] = snapshotRoot(snapshotter)
 					log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[snapshotter], snapshotter)
 				}
+
 				platform := platforms.DefaultSpec()
 				if rp.Platform != "" {
 					p, err := platforms.Parse(rp.Platform)
@@ -137,6 +154,7 @@ func init() {
 					}
 					platform = p
 				}
+
 				options.RuntimePlatforms[runtimeName] = images.ImagePlatform{
 					Snapshotter: snapshotter,
 					Platform:    platform,
@@ -154,7 +172,7 @@ func init() {
 	})
 }
 
-func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 	if configVersion >= version.ConfigVersion {
 		return nil
 	}
@@ -162,25 +180,25 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	if !ok {
 		return nil
 	}
-	src := original.(map[string]interface{})
+	src := original.(map[string]any)
 	updated, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".images"]
-	var dst map[string]interface{}
+	var dst map[string]any
 	if ok {
-		dst = updated.(map[string]interface{})
+		dst = updated.(map[string]any)
 	} else {
-		dst = map[string]interface{}{}
+		dst = map[string]any{}
 	}
 
 	migrateConfig(dst, src)
 	pluginConfigs[string(plugins.CRIServicePlugin)+".images"] = dst
 	return nil
 }
-func migrateConfig(dst, src map[string]interface{}) {
-	var pinnedImages map[string]interface{}
+func migrateConfig(dst, src map[string]any) {
+	var pinnedImages map[string]any
 	if v, ok := dst["pinned_images"]; ok {
-		pinnedImages = v.(map[string]interface{})
+		pinnedImages = v.(map[string]any)
 	} else {
-		pinnedImages = map[string]interface{}{}
+		pinnedImages = map[string]any{}
 	}
 
 	if simage, ok := src["sandbox_image"]; ok {
@@ -207,22 +225,22 @@ func migrateConfig(dst, src map[string]interface{}) {
 	if !ok {
 		return
 	}
-	containerdConfMap := containerdConf.(map[string]interface{})
+	containerdConfMap := containerdConf.(map[string]any)
 	runtimesConf, ok := containerdConfMap["runtimes"]
 	if !ok {
 		return
 	}
 
-	var runtimePlatforms map[string]interface{}
+	var runtimePlatforms map[string]any
 	if v, ok := dst["runtime_platform"]; ok {
-		runtimePlatforms = v.(map[string]interface{})
+		runtimePlatforms = v.(map[string]any)
 	} else {
-		runtimePlatforms = map[string]interface{}{}
+		runtimePlatforms = map[string]any{}
 	}
-	for runtime, v := range runtimesConf.(map[string]interface{}) {
-		runtimeConf := v.(map[string]interface{})
+	for runtime, v := range runtimesConf.(map[string]any) {
+		runtimeConf := v.(map[string]any)
 		if snapshotter, ok := runtimeConf["snapshot"]; ok && snapshotter != "" {
-			runtimePlatforms[runtime] = map[string]interface{}{
+			runtimePlatforms[runtime] = map[string]any{
 				"platform":    platforms.DefaultStrict(),
 				"snapshotter": snapshotter,
 			}

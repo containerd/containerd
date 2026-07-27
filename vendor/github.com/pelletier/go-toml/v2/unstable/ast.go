@@ -1,10 +1,8 @@
 package unstable
 
 import (
+	"errors"
 	"fmt"
-	"unsafe"
-
-	"github.com/pelletier/go-toml/v2/internal/danger"
 )
 
 // Iterator over a sequence of nodes.
@@ -23,8 +21,8 @@ type Iterator struct {
 	node    *Node
 }
 
-// Next moves the iterator forward and returns true if points to a
-// node, false otherwise.
+// Next moves the iterator forward and returns true if points to a node, false
+// otherwise.
 func (c *Iterator) Next() bool {
 	if !c.started {
 		c.started = true
@@ -35,7 +33,7 @@ func (c *Iterator) Next() bool {
 }
 
 // IsLast returns true if the current node of the iterator is the last
-// one.  Subsequent calls to Next() will return false.
+// one. Subsequent calls to Next() will return false.
 func (c *Iterator) IsLast() bool {
 	return c.node.next == 0
 }
@@ -53,8 +51,8 @@ func (c *Iterator) Node() *Node {
 //   - Array have one child per element in the array.
 //   - InlineTable have one child per key-value in the table (each of kind
 //     InlineTable).
-//   - KeyValue have at least two children. The first one is the value. The rest
-//     make a potentially dotted key.
+//   - KeyValue have at least two children. The first one is the value. The
+//     rest make a potentially dotted key.
 //   - Table and ArrayTable's children represent a dotted key (same as
 //     KeyValue, but without the first node being the value).
 //
@@ -65,17 +63,11 @@ type Node struct {
 	Raw  Range  // Raw bytes from the input.
 	Data []byte // Node value (either allocated or referencing the input).
 
-	// References to other nodes, as offsets in the backing array
-	// from this node. References can go backward, so those can be
-	// negative.
-	next  int // 0 if last element
-	child int // 0 if no child
-}
-
-// Range of bytes in the document.
-type Range struct {
-	Offset uint32
-	Length uint32
+	// References to other nodes, as 1-based indexes into the parser's arena.
+	// 0 means no node.
+	parser *Parser
+	next   int32
+	child  int32
 }
 
 // Next returns a pointer to the next node, or nil if there is no next node.
@@ -83,37 +75,33 @@ func (n *Node) Next() *Node {
 	if n.next == 0 {
 		return nil
 	}
-	ptr := unsafe.Pointer(n)
-	size := unsafe.Sizeof(Node{})
-	return (*Node)(danger.Stride(ptr, size, n.next))
+	return &n.parser.nodes[n.next-1]
 }
 
 // Child returns a pointer to the first child node of this node. Other children
-// can be accessed calling Next on the first child.  Returns an nil if this Node
-// has no child.
+// can be accessed calling Next on the first child. Returns nil if there is no
+// child node.
 func (n *Node) Child() *Node {
 	if n.child == 0 {
 		return nil
 	}
-	ptr := unsafe.Pointer(n)
-	size := unsafe.Sizeof(Node{})
-	return (*Node)(danger.Stride(ptr, size, n.child))
+	return &n.parser.nodes[n.child-1]
 }
 
 // Valid returns true if the node's kind is set (not to Invalid).
 func (n *Node) Valid() bool {
-	return n != nil
+	return n != nil && n.Kind != Invalid
 }
 
 // Key returns the children nodes making the Key on a supported node. Panics
-// otherwise.  They are guaranteed to be all be of the Kind Key. A simple key
+// otherwise. They are guaranteed to be all be of the Kind Key. A simple key
 // would return just one element.
 func (n *Node) Key() Iterator {
 	switch n.Kind {
 	case KeyValue:
 		value := n.Child()
 		if !value.Valid() {
-			panic(fmt.Errorf("KeyValue should have at least two children"))
+			panic(errors.New("KeyValue should have at least two children"))
 		}
 		return Iterator{node: value.Next()}
 	case Table, ArrayTable:
@@ -124,7 +112,7 @@ func (n *Node) Key() Iterator {
 }
 
 // Value returns a pointer to the value node of a KeyValue.
-// Guaranteed to be non-nil.  Panics if not called on a KeyValue node,
+// Guaranteed to be non-nil. Panics if not called on a KeyValue node,
 // or if the Children are malformed.
 func (n *Node) Value() *Node {
 	return n.Child()

@@ -28,7 +28,10 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -40,6 +43,7 @@ import (
 	ocispecv "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetManifestPath(t *testing.T) {
@@ -85,6 +89,37 @@ func TestPusherErrClosedRetry(t *testing.T) {
 
 	// retry
 	reg.uploadable = true
+	if err := tryUpload(ctx, t, p, layerContent); err != nil {
+		t.Errorf("upload should succeed but got %v", err)
+	}
+}
+func TestPusherCustomNamespace(t *testing.T) {
+	ctx := context.Background()
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.uploadable = true
+	reg.putHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path == "/upload" {
+			reg.lastPutQueryParams = r.URL.Query()
+		}
+		return false
+	}
+
+	assert.Nil(t, tryUpload(ctx, t, p, []byte("test")))
+	assert.Equal(t, samplePusherHostname, reg.lastPutQueryParams.Get("ns"))
+	assert.NotEmpty(t, reg.lastPutQueryParams.Get("digest"))
+}
+
+func TestPusherAcceptsMissingDigestHeader(t *testing.T) {
+	ctx := context.Background()
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+	reg.omitDigestHdr = true
+	reg.uploadable = true
+	layerContent := []byte("test")
+
 	if err := tryUpload(ctx, t, p, layerContent); err != nil {
 		t.Errorf("upload should succeed but got %v", err)
 	}
@@ -173,6 +208,136 @@ func TestPusherErrReset(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestPusherInvalidAuthorizationOnMount(t *testing.T) {
+	t.Parallel()
+	// Simulate trying to mount a private repo that we cannot access to
+
+	isCrossRepoMount := func(r *http.Request) bool {
+		return r.URL.Query().Get("mount") != ""
+	}
+
+	testCases := []struct {
+		name  string
+		setup func(t *testing.T, p *dockerPusher, reg *uploadableMockRegistry, triggered func())
+	}{
+		{
+			name: "Authorizer.Authorize error",
+			setup: func(t *testing.T, p *dockerPusher, _ *uploadableMockRegistry, triggered func()) {
+				p.hosts[0].Authorizer = &mockAuthorizer{
+					authorize: func(ctx context.Context, r *http.Request) error {
+						// When trying to authorize the request to mount, return an error
+						// to force a fallback
+						if isCrossRepoMount(r) {
+							triggered()
+							return ErrInvalidAuthorization
+						}
+						return nil
+					},
+				}
+			},
+		},
+		{
+			name: "Authorizer.AddResponses error",
+			setup: func(t *testing.T, p *dockerPusher, reg *uploadableMockRegistry, triggered func()) {
+
+				reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+					if isCrossRepoMount(r) && r.Header.Get("Authorization") == "" {
+						w.Header().Set("WWW-Authenticate", "Bearer realm=localhost")
+						w.WriteHeader(http.StatusUnauthorized)
+						return true
+					}
+					return false
+				}
+
+				var allResp []*http.Response
+				var mu sync.Mutex
+				p.hosts[0].Authorizer = &mockAuthorizer{
+					authorize: func(ctc context.Context, r *http.Request) error {
+						mu.Lock()
+						defer mu.Unlock()
+						hasFirstResp := slices.ContainsFunc(allResp, func(resp *http.Response) bool {
+							return resp.Request.URL.String() == r.URL.String()
+						})
+						if hasFirstResp {
+							r.Header.Add("Authorization", "Bearer test")
+						}
+						return nil
+					},
+					addResponses: func(ctx context.Context, resp []*http.Response) error {
+						mu.Lock()
+						defer mu.Unlock()
+						// When trying to add a response to the request to mount, return an error
+						// to force a fallback
+						allResp = append(allResp, resp...)
+						last := resp[len(resp)-1]
+						if isCrossRepoMount(last.Request) {
+							triggered()
+							return ErrInvalidAuthorization
+						}
+						return nil
+					},
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			//t.Parallel()
+
+			p, reg, _, done := samplePusher(t)
+			defer done()
+
+			var triggered atomic.Bool
+
+			p.object = "layer@sha256:9f7d2a1b5c8d6eeadfbb8e786ce21958a1b6cc0b7c263c9d3e4eaf6f24c3a1bd"
+
+			reg.uploadable = true
+			tc.setup(t, &p, reg, func() { triggered.Store(true) })
+
+			ct := []byte("layer-bytes")
+
+			desc := ocispec.Descriptor{
+				MediaType: ocispec.MediaTypeImageLayer,
+				Digest:    digest.FromBytes(ct),
+				Size:      int64(len(ct)),
+				Annotations: map[string]string{
+					distributionSourceLabelKey(samplePusherHostname): samplePusherHostname + "/anotherrepository:latest",
+				},
+			}
+
+			w, err := p.push(context.Background(), desc, remotes.MakeRefKey(context.Background(), desc), false)
+			require.NoError(t, err)
+
+			_, err = w.Write(ct)
+			assert.NoError(t, err)
+			err = w.Commit(context.Background(), desc.Size, desc.Digest)
+			assert.NoError(t, err)
+
+			assert.True(t, triggered.Load(), "error return was not triggered")
+		})
+	}
+}
+
+type mockAuthorizer struct {
+	authorize    func(ctx context.Context, r *http.Request) error
+	addResponses func(ctx context.Context, resp []*http.Response) error
+}
+
+func (a *mockAuthorizer) Authorize(ctx context.Context, r *http.Request) error {
+	if a.authorize == nil {
+		return nil
+	}
+	return a.authorize(ctx, r)
+}
+
+func (a *mockAuthorizer) AddResponses(ctx context.Context, resp []*http.Response) error {
+	if a.addResponses == nil {
+		return nil
+	}
+	return a.addResponses(ctx, resp)
+}
+
 func tryUpload(ctx context.Context, t *testing.T, p dockerPusher, layerContent []byte) error {
 	desc := ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageLayerGzip,
@@ -235,6 +400,11 @@ func tryUpload(ctx context.Context, t *testing.T, p dockerPusher, layerContent [
 	return nil
 }
 
+const (
+	samplePusherHostname = "example.com"
+	samplePusherLocator  = samplePusherHostname + "/samplerepository:latest"
+)
+
 func samplePusher(t *testing.T) (dockerPusher, *uploadableMockRegistry, StatusTrackLocker, func()) {
 	reg := &uploadableMockRegistry{
 		availableContents: make([]string, 0),
@@ -248,7 +418,7 @@ func samplePusher(t *testing.T) (dockerPusher, *uploadableMockRegistry, StatusTr
 	return dockerPusher{
 		dockerBase: &dockerBase{
 			refspec: reference.Spec{
-				Locator: "example.com/samplerepository:latest",
+				Locator: samplePusherLocator,
 			},
 			repository: "samplerepository",
 			hosts: []RegistryHost{
@@ -271,12 +441,15 @@ var blobUploadRegexp = regexp.MustCompile(`/([a-z0-9]+)/blobs/uploads/(.*)`)
 
 // uploadableMockRegistry provides minimal registry APIs which are enough to serve requests from dockerPusher.
 type uploadableMockRegistry struct {
-	availableContents []string
-	uploadable        bool
-	putHandlerFunc    func(w http.ResponseWriter, r *http.Request) bool
-	locationPrefix    string
-	username          string
-	secret            string
+	availableContents  []string
+	uploadable         bool
+	omitDigestHdr      bool
+	putHandlerFunc     func(w http.ResponseWriter, r *http.Request) bool
+	defaultHandlerFunc func(w http.ResponseWriter, r *http.Request) bool
+	locationPrefix     string
+	username           string
+	secret             string
+	lastPutQueryParams url.Values // Track query params from last PUT request
 }
 
 func (u *uploadableMockRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -289,10 +462,13 @@ func (u *uploadableMockRegistry) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	if r.Method == http.MethodPut && u.putHandlerFunc != nil {
-		// if true return the response witout calling default handler
+		// if true return the response without calling default handler
 		if u.putHandlerFunc(w, r) {
 			return
 		}
+	}
+	if u.defaultHandlerFunc != nil && u.defaultHandlerFunc(w, r) {
+		return
 	}
 	u.defaultHandler(w, r)
 }
@@ -315,7 +491,9 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 
 			query := r.URL.Query()
 			if query.Has("mount") && query.Get("from") == "always-mount" {
-				w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+				if !u.omitDigestHdr {
+					w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+				}
 				w.WriteHeader(http.StatusCreated)
 				return
 			}
@@ -333,7 +511,9 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 				return
 			}
 			u.availableContents = append(u.availableContents, dgstr.Digest().String())
-			w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+			if !u.omitDigestHdr {
+				w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+			}
 			w.WriteHeader(http.StatusCreated)
 			return
 		} else if r.URL.Path == "/cannotupload" {
@@ -363,12 +543,7 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 
 // checks if the content is already present in the registry
 func (u *uploadableMockRegistry) isContentAlreadyExist(c string) bool {
-	for _, ct := range u.availableContents {
-		if ct == c {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(u.availableContents, c)
 }
 
 func Test_dockerPusher_push(t *testing.T) {
@@ -525,7 +700,6 @@ func Test_dockerPusher_push(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			desc := ocispec.Descriptor{
 				MediaType:   test.args.mediatype,
@@ -564,4 +738,79 @@ func Test_dockerPusher_push(t *testing.T) {
 
 		})
 	}
+}
+
+func TestPusherForbiddenGETFallbackForErrorBody(t *testing.T) {
+	// When the existence-check HEAD returns 403, the pusher should issue
+	// a follow-up GET to retrieve the registry's error body for diagnostics.
+	const errorMessage = "encryption key is disabled"
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			// HEAD: no body
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage,
+		"expected registry error body from GET fallback")
+	assert.Contains(t, err.Error(), "403")
+}
+
+func TestPusherForbiddenGETFallbackProxy(t *testing.T) {
+	// When the pusher is configured as a proxy (Host != image hostname),
+	// the GET fallback must include the ?ns= query parameter so the proxy
+	// can route the request to the correct upstream registry.
+	const errorMessage = "encryption key is disabled"
+
+	var gotNsParam string
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			if r.Method == http.MethodGet {
+				gotNsParam = r.URL.Query().Get("ns")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage)
+	assert.Equal(t, samplePusherHostname, gotNsParam,
+		"GET fallback on proxy must include ?ns= query parameter")
 }

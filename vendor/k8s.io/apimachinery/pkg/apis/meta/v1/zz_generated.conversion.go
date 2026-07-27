@@ -339,6 +339,13 @@ func autoConvert_url_Values_To_v1_DeleteOptions(in *url.Values, out *DeleteOptio
 	} else {
 		out.DryRun = nil
 	}
+	if values, ok := map[string][]string(*in)["ignoreStoreReadErrorWithClusterBreakingPotential"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_Pointer_bool(&values, &out.IgnoreStoreReadErrorWithClusterBreakingPotential, s); err != nil {
+			return err
+		}
+	} else {
+		out.IgnoreStoreReadErrorWithClusterBreakingPotential = nil
+	}
 	return nil
 }
 
@@ -432,6 +439,13 @@ func autoConvert_url_Values_To_v1_ListOptions(in *url.Values, out *ListOptions, 
 		}
 	} else {
 		out.SendInitialEvents = nil
+	}
+	if values, ok := map[string][]string(*in)["shardSelector"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.ShardSelector, s); err != nil {
+			return err
+		}
+	} else {
+		out.ShardSelector = ""
 	}
 	return nil
 }

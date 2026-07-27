@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,8 +33,8 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
@@ -95,7 +96,7 @@ type DB struct {
 	// a garbage collection to ensure the database is clean. This tracks
 	// the number of dirty operations. This should be updated and read
 	// atomically if outside of wlock.Lock.
-	dirty uint32
+	dirty atomic.Uint32
 
 	// dirtySS and dirtyCS flags keeps track of datastores which have had
 	// deletions since the last garbage collection. These datastores will
@@ -137,6 +138,17 @@ func NewDB(db Transactor, cs content.Store, ss map[string]snapshots.Snapshotter,
 	}
 
 	return m
+}
+
+// Close closes the underlying bolt database.
+// Acquires wlock so no GC cycle is in progress when bolt is closed.
+func (m *DB) Close() error {
+	m.wlock.Lock()
+	defer m.wlock.Unlock()
+	if c, ok := m.db.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
 }
 
 // Init ensures the database is at the correct version
@@ -262,7 +274,7 @@ func (m *DB) Update(fn func(*bolt.Tx) error) error {
 	defer m.wlock.RUnlock()
 	err := m.db.Update(fn)
 	if err == nil {
-		dirty := atomic.LoadUint32(&m.dirty) > 0
+		dirty := m.dirty.Load() > 0
 		for _, fn := range m.mutationCallbacks {
 			fn(dirty)
 		}
@@ -274,7 +286,7 @@ func (m *DB) Update(fn func(*bolt.Tx) error) error {
 // Publisher returns an event publisher if one is configured
 // and the current context is not inside a transaction.
 func (m *DB) Publisher(ctx context.Context) events.Publisher {
-	_, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
+	_, ok := boltutil.Transaction(ctx)
 	if ok {
 		// Do no publish events within a transaction
 		return nil
@@ -330,7 +342,7 @@ func (m *DB) RegisterCollectibleResource(t gc.ResourceType, c Collector) {
 // namespacedEvent is used to handle any event for a namespace
 type namespacedEvent struct {
 	namespace string
-	event     interface{}
+	event     any
 }
 
 func (m *DB) publishEvents(events []namespacedEvent) {
@@ -390,12 +402,13 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 				return nil
 			}
 
-			if n.Type == ResourceSnapshot {
+			switch n.Type {
+			case ResourceSnapshot:
 				if idx := strings.IndexRune(n.Key, '/'); idx > 0 {
 					m.dirtySS[n.Key[:idx]] = struct{}{}
 				}
 				// queue event to publish after successful commit
-			} else if n.Type == ResourceContent || n.Type == ResourceIngest {
+			case ResourceContent, ResourceIngest:
 				m.dirtyCS = true
 			}
 
@@ -425,14 +438,13 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	var wg sync.WaitGroup
 
 	// Flush events asynchronously after commit
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		m.publishEvents(events)
-		wg.Done()
-	}()
+	})
 
-	// reset dirty, no need for atomic inside of wlock.Lock
-	m.dirty = 0
+	// Reset dirty. Truly don't need to be atomically stored inside of the wlock
+	// but we're using the atomic wrappers that guarantee atomic access everywhere.
+	m.dirty.Store(0)
 
 	if len(m.dirtySS) > 0 {
 		var sl sync.Mutex
@@ -466,10 +478,10 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 		m.dirtyCS = false
 	}
 
+	c.finish(ctx, &wg)
+
 	stats.MetaD = time.Since(t1)
 	m.wlock.Unlock()
-
-	c.finish(ctx)
 
 	wg.Wait()
 
@@ -488,13 +500,11 @@ func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{},
 			wg    sync.WaitGroup
 			roots = make(chan gc.Node)
 		)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for n := range roots {
 				nodes = append(nodes, n)
 			}
-		}()
+		})
 		// Call roots
 		if err := c.scanRoots(ctx, tx, roots); err != nil { // From gc context
 			cancel()
@@ -526,7 +536,7 @@ func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{},
 }
 
 func (m *DB) cleanupSnapshotter(ctx context.Context, name string) (time.Duration, error) {
-	ctx = cleanup.Background(ctx)
+	ctx = context.WithoutCancel(ctx)
 	sn, ok := m.ss[name]
 	if !ok {
 		return 0, nil
@@ -543,7 +553,7 @@ func (m *DB) cleanupSnapshotter(ctx context.Context, name string) (time.Duration
 }
 
 func (m *DB) cleanupContent(ctx context.Context) (time.Duration, error) {
-	ctx = cleanup.Background(ctx)
+	ctx = context.WithoutCancel(ctx)
 	if m.cs == nil {
 		return 0, nil
 	}

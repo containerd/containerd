@@ -42,7 +42,7 @@ import (
 const binaryIOProcTermTimeout = 12 * time.Second // Give logger process solid 10 seconds for cleanup
 
 var bufPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		// setting to 4096 to align with PIPE_BUF
 		// http://man7.org/linux/man-pages/man7/pipe.7.html
 		buffer := make([]byte, 4096)
@@ -105,7 +105,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	case "fifo":
 		pio.copy = true
 		pio.io, err = runc.NewPipeIO(ioUID, ioGID, withConditionalIO(stdio))
-	case "binary":
+	case "binary", "binary-v2":
 		pio.io, err = NewBinaryIO(ctx, id, u)
 	case "file":
 		filePath := u.Path
@@ -194,7 +194,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			}
 		} else {
 			if sameFile != nil {
-				sameFile.count++
+				sameFile.bumpCount(1)
 				i.dest(sameFile, nil)
 				continue
 			}
@@ -202,10 +202,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				return fmt.Errorf("containerd-shim: opening file %q failed: %w", i.name, err)
 			}
 			if stdout == stderr {
-				sameFile = &countingWriteCloser{
-					WriteCloser: fw,
-					count:       1,
-				}
+				sameFile = newCountingWriteCloser(fw, 1)
 			}
 		}
 		i.dest(fw, fr)
@@ -233,11 +230,24 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 // countingWriteCloser masks io.Closer() until close has been invoked a certain number of times.
 type countingWriteCloser struct {
 	io.WriteCloser
-	count int64
+	count atomic.Int64
+}
+
+func newCountingWriteCloser(c io.WriteCloser, count int64) *countingWriteCloser {
+	cwc := &countingWriteCloser{
+		c,
+		atomic.Int64{},
+	}
+	cwc.bumpCount(count)
+	return cwc
+}
+
+func (c *countingWriteCloser) bumpCount(delta int64) int64 {
+	return c.count.Add(delta)
 }
 
 func (c *countingWriteCloser) Close() error {
-	if atomic.AddInt64(&c.count, -1) > 0 {
+	if c.bumpCount(-1) > 0 {
 		return nil
 	}
 	return c.WriteCloser.Close()
@@ -295,9 +305,15 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 	}
 
 	// wait for the logging binary to be ready
+	// For binary-v2, readiness requires a byte to be written before close.
+	// For binary, EOF is treated as ready for backward compatibility.
 	b := make([]byte, 1)
-	if _, err := r.Read(b); err != nil && err != io.EOF {
+	n, err := r.Read(b)
+	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("failed to read from logging binary: %w", err)
+	}
+	if uri.Scheme == "binary-v2" && n == 0 {
+		return nil, fmt.Errorf("logging binary did not call ready (it may have crashed or exited prematurely)")
 	}
 
 	return &binaryIO{
@@ -369,6 +385,13 @@ func (b *binaryIO) cancel() error {
 
 	select {
 	case err := <-done:
+		// If the process exited due to the SIGTERM we just sent,
+		// that is expected and should not be treated as an error.
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok && status.Signal() == syscall.SIGTERM {
+				return nil
+			}
+		}
 		return err
 	case <-time.After(binaryIOProcTermTimeout):
 		log.L.Warn("failed to wait for shim logger process to exit, killing")

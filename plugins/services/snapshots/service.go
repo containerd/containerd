@@ -53,7 +53,7 @@ type service struct {
 	snapshotsapi.UnimplementedSnapshotsServer
 }
 
-func newService(ic *plugin.InitContext) (interface{}, error) {
+func newService(ic *plugin.InitContext) (any, error) {
 	i, err := ic.GetByID(plugins.ServicePlugin, services.SnapshotsService)
 	if err != nil {
 		return nil, err
@@ -144,6 +144,9 @@ func (s *service) Commit(ctx context.Context, cr *snapshotsapi.CommitSnapshotReq
 	var opts []snapshots.Opt
 	if cr.Labels != nil {
 		opts = append(opts, snapshots.WithLabels(cr.Labels))
+	}
+	if cr.Parent != "" {
+		opts = append(opts, snapshots.WithParent(cr.Parent))
 	}
 	if err := sn.Commit(ctx, cr.Name, cr.Key, opts...); err != nil {
 		return nil, errgrpc.ToGRPC(err)

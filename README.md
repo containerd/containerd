@@ -4,7 +4,6 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/containerd/v2)](https://pkg.go.dev/github.com/containerd/containerd/v2)
 [![Build Status](https://github.com/containerd/containerd/actions/workflows/ci.yml/badge.svg?event=merge_group)](https://github.com/containerd/containerd/actions?query=workflow%3ACI+event%3Amerge_group)
 [![Nightlies](https://github.com/containerd/containerd/workflows/Nightly/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ANightly)
-[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd/v2)](https://goreportcard.com/report/github.com/containerd/containerd/v2)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1271/badge)](https://bestpractices.coreinfrastructure.org/projects/1271)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/containerd/containerd/badge)](https://scorecard.dev/viewer/?uri=github.com/containerd/containerd)
 [![Check Links](https://github.com/containerd/containerd/actions/workflows/links.yml/badge.svg)](https://github.com/containerd/containerd/actions/workflows/links.yml)
@@ -18,9 +17,6 @@ containerd is designed to be embedded into a larger system, rather than being us
 ![architecture](docs/historical/design/architecture.png)
 
 ## Announcements
-
-### containerd v2.0 is now released!
-See [`docs/containerd-2.0.md`](docs/containerd-2.0.md).
 
 ### Now Recruiting
 
@@ -101,7 +97,10 @@ Please see [RELEASES.md](RELEASES.md) for details on versioning and stability
 of containerd components.
 
 Downloadable 64-bit Intel/AMD binaries of all official releases are available on
-our [releases page](https://github.com/containerd/containerd/releases).
+our [releases page](https://github.com/containerd/containerd/releases). Binaries
+are published for additional platforms as well; see
+[Platform Support](RELEASES.md#platform-support) for the full list of platforms
+and the level of support for each.
 
 For other architectures and distribution support, you will find that many
 Linux distributions package their own containerd and provide it across several
@@ -151,7 +150,7 @@ A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/c
 
 #### CRI Guides
 * [Installing with Ansible and Kubeadm](contrib/ansible/README.md)
-* [For Non-Ansible Users, Preforming a Custom Installation Using the Release Tarball and Kubeadm](docs/getting-started.md)
+* [For Non-Ansible Users, Performing a Custom Installation Using the Release Tarball and Kubeadm](docs/getting-started.md)
 * [CRI Plugin Testing Guide](./docs/cri/testing.md)
 * [Debugging Pods, Containers, and Images with `crictl`](./docs/cri/crictl.md)
 * [Configuring `cri` Plugins](./docs/cri/config.md)

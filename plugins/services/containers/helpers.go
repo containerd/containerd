@@ -28,7 +28,6 @@ func containersToProto(containers []containers.Container) []*api.Container {
 	var containerspb []*api.Container
 
 	for _, image := range containers {
-		image := image
 		containerspb = append(containerspb, containerToProto(&image))
 	}
 
@@ -68,7 +67,6 @@ func containerFromProto(containerpb *api.Container) containers.Container {
 	}
 	extensions := make(map[string]typeurl.Any)
 	for k, v := range containerpb.Extensions {
-		v := v
 		extensions[k] = v
 	}
 	return containers.Container{

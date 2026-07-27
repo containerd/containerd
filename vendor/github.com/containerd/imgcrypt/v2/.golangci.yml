@@ -1,31 +1,39 @@
+version: "2"
 linters:
   enable:
     - depguard
-    - staticcheck
+    - misspell
+    - revive
     - unconvert
+  settings:
+    depguard:
+      rules:
+        main:
+          files:
+            - $all
+          deny:
+            - pkg: io/ioutil
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - cmd/ctr/commands/run
+      - cmd/ctr/commands/images
+      - cmd\\ctr\\commands\\run
+      - cmd\\ctr\\commands\\images
+      - cmd/ctr/commands/commands.go
+      - cmd\\ctr\\commands\\commands.go
+formatters:
+  enable:
     - gofmt
     - goimports
-    - govet
-    - revive
-    - ineffassign
-    - unused
-    - misspell
-
-issue:
-  exclude-dirs:
-    - cmd/ctr/commands/run
-    - cmd/ctr/commands/images
-    - cmd\\ctr\\commands\\run
-    - cmd\\ctr\\commands\\images
-  exclude-files:
-    - cmd/ctr/commands/commands.go
-    - cmd\\ctr\\commands\\commands.go
-
-linters-settings:
-  depguard:
-    rules:
-      main:
-        files:
-          - $all
-        deny:
-          - pkg: "io/ioutil"
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

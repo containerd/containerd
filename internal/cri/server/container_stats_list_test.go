@@ -28,14 +28,15 @@ import (
 	v1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/api/types"
-	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
-	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 )
 
 func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
@@ -48,27 +49,26 @@ func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
 		desc                        string
 		firstCPUValue               uint64
 		secondCPUValue              uint64
-		expectedNanoCoreUsageFirst  uint64
-		expectedNanoCoreUsageSecond uint64
+		expectedNanoCoreUsageFirst  *uint64
+		expectedNanoCoreUsageSecond *uint64
 	}{
 		{
 			id:                          "id1",
-			desc:                        "metrics",
+			desc:                        "normal increase",
 			firstCPUValue:               50,
 			secondCPUValue:              500,
-			expectedNanoCoreUsageFirst:  0,
-			expectedNanoCoreUsageSecond: 45,
+			expectedNanoCoreUsageFirst:  nil,
+			expectedNanoCoreUsageSecond: uint64Ptr(45),
 		},
 		{
 			id:                          "id2",
-			desc:                        "metrics",
+			desc:                        "counter goes backwards",
 			firstCPUValue:               234235,
 			secondCPUValue:              0,
-			expectedNanoCoreUsageFirst:  0,
-			expectedNanoCoreUsageSecond: 0,
+			expectedNanoCoreUsageFirst:  nil,
+			expectedNanoCoreUsageSecond: nil,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: test.id},
@@ -98,6 +98,8 @@ func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
 	}
 }
 
+func uint64Ptr(v uint64) *uint64 { return &v }
+
 func TestGetWorkingSet(t *testing.T) {
 	for _, test := range []struct {
 		desc     string
@@ -126,7 +128,6 @@ func TestGetWorkingSet(t *testing.T) {
 			expected: 0,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := getWorkingSet(test.memory)
 			assert.Equal(t, test.expected, got)
@@ -162,7 +163,6 @@ func TestGetWorkingSetV2(t *testing.T) {
 			expected: 0,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := getWorkingSetV2(test.memory)
 			assert.Equal(t, test.expected, got)
@@ -200,7 +200,6 @@ func TestGetAvailableBytes(t *testing.T) {
 			expected:        5000 - 500,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := getAvailableBytes(test.memory, test.workingSetBytes)
 			assert.Equal(t, test.expected, got)
@@ -234,7 +233,6 @@ func TestGetAvailableBytesV2(t *testing.T) {
 			expected:        5000 - 500,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := getAvailableBytesV2(test.memory, test.workingSetBytes)
 			assert.Equal(t, test.expected, got)
@@ -248,12 +246,12 @@ func TestContainerMetricsMemory(t *testing.T) {
 
 	for _, test := range []struct {
 		desc     string
-		metrics  interface{}
+		metrics  cgroupMetrics
 		expected *runtime.MemoryUsage
 	}{
 		{
 			desc: "v1 metrics - no memory limit",
-			metrics: &v1.Metrics{
+			metrics: cgroupMetrics{v1: &v1.Metrics{
 				Memory: &v1.MemoryStat{
 					Usage: &v1.MemoryEntry{
 						Limit: math.MaxUint64, // no limit
@@ -264,7 +262,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 					TotalPgMajFault:   12,
 					TotalInactiveFile: 500,
 				},
-			},
+			}},
 			expected: &runtime.MemoryUsage{
 				Timestamp:       timestamp.UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{Value: 500},
@@ -277,7 +275,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 		},
 		{
 			desc: "v1 metrics - memory limit",
-			metrics: &v1.Metrics{
+			metrics: cgroupMetrics{v1: &v1.Metrics{
 				Memory: &v1.MemoryStat{
 					Usage: &v1.MemoryEntry{
 						Limit: 5000,
@@ -288,7 +286,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 					TotalPgMajFault:   12,
 					TotalInactiveFile: 500,
 				},
-			},
+			}},
 			expected: &runtime.MemoryUsage{
 				Timestamp:       timestamp.UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{Value: 500},
@@ -301,7 +299,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 		},
 		{
 			desc: "v2 metrics - memory limit",
-			metrics: &v2.Metrics{
+			metrics: cgroupMetrics{v2: &v2.Metrics{
 				Memory: &v2.MemoryStat{
 					Usage:        1000,
 					UsageLimit:   5000,
@@ -309,7 +307,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 					Pgfault:      11,
 					Pgmajfault:   12,
 				},
-			},
+			}},
 			expected: &runtime.MemoryUsage{
 				Timestamp:       timestamp.UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{Value: 1000},
@@ -322,7 +320,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 		},
 		{
 			desc: "v2 metrics - no memory limit",
-			metrics: &v2.Metrics{
+			metrics: cgroupMetrics{v2: &v2.Metrics{
 				Memory: &v2.MemoryStat{
 					Usage:        1000,
 					UsageLimit:   math.MaxUint64, // no limit
@@ -330,7 +328,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 					Pgfault:      11,
 					Pgmajfault:   12,
 				},
-			},
+			}},
 			expected: &runtime.MemoryUsage{
 				Timestamp:       timestamp.UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{Value: 1000},
@@ -342,9 +340,8 @@ func TestContainerMetricsMemory(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
-			got, err := c.memoryContainerStats("ID", test.metrics, timestamp)
+			got, err := c.memoryContainerStats(test.metrics, timestamp)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expected, got)
 		})

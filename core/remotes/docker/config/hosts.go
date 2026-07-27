@@ -20,6 +20,7 @@ package config
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -51,6 +52,8 @@ type hostConfig struct {
 	caCerts     []string
 	clientPairs [][2]string
 	skipVerify  *bool
+
+	dialTimeout *time.Duration
 
 	header http.Header
 
@@ -129,7 +132,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				}
 			}
 			hosts[len(hosts)-1].path = "/v2"
-			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
+			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush | docker.HostCapabilityReferrers
 		}
 
 		// tlsConfigured indicates that TLS was configured and HTTP endpoints should
@@ -144,19 +147,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			defaultTLSConfig = &tls.Config{}
 		}
 
-		defaultTransport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:       30 * time.Second,
-				KeepAlive:     30 * time.Second,
-				FallbackDelay: 300 * time.Millisecond,
-			}).DialContext,
-			MaxIdleConns:          10,
-			IdleConnTimeout:       30 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			TLSClientConfig:       defaultTLSConfig,
-			ExpectContinueTimeout: 5 * time.Second,
-		}
+		defaultTransport := docker.DefaultHTTPTransport(defaultTLSConfig)
 
 		client := &http.Client{
 			Transport: defaultTransport,
@@ -177,63 +168,41 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		rhosts := make([]docker.RegistryHost, len(hosts))
 		for i, host := range hosts {
 			// Allow setting for each host as well
-			explicitTLS := tlsConfigured
+			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
+			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil {
-				explicitTLS = true
-				tr := defaultTransport.Clone()
-				tlsConfig := tr.TLSClientConfig
-				if host.skipVerify != nil {
-					tlsConfig.InsecureSkipVerify = *host.skipVerify
-				}
-				if host.caCerts != nil {
-					if tlsConfig.RootCAs == nil {
-						rootPool, err := rootSystemPool()
-						if err != nil {
-							return nil, fmt.Errorf("unable to initialize cert pool: %w", err)
-						}
-						tlsConfig.RootCAs = rootPool
-					}
-					for _, f := range host.caCerts {
-						data, err := os.ReadFile(f)
-						if err != nil {
-							return nil, fmt.Errorf("unable to read CA cert %q: %w", f, err)
-						}
-						if !tlsConfig.RootCAs.AppendCertsFromPEM(data) {
-							return nil, fmt.Errorf("unable to load CA cert %q", f)
-						}
-					}
-				}
-
-				for _, pair := range host.clientPairs {
-					certPEMBlock, err := os.ReadFile(pair[0])
-					if err != nil {
-						return nil, fmt.Errorf("unable to read CERT file %q: %w", pair[0], err)
-					}
-					var keyPEMBlock []byte
-					if pair[1] != "" {
-						keyPEMBlock, err = os.ReadFile(pair[1])
-						if err != nil {
-							return nil, fmt.Errorf("unable to read CERT file %q: %w", pair[1], err)
-						}
-					} else {
-						// Load key block from same PEM file
-						keyPEMBlock = certPEMBlock
-					}
-					cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
-					if err != nil {
-						return nil, fmt.Errorf("failed to load X509 key pair: %w", err)
-					}
-
-					tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
-				}
-
+			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
 				c := *client
-				c.Transport = tr
+				if explicitTLSFromHost || host.dialTimeout != nil {
+					tr := defaultTransport.Clone()
+
+					if explicitTLSFromHost {
+						if err := updateTLSConfigFromHost(tr.TLSClientConfig, &host); err != nil {
+							return nil, err
+						}
+					}
+
+					if host.dialTimeout != nil {
+						tr.DialContext = (&net.Dialer{
+							Timeout:       *host.dialTimeout,
+							KeepAlive:     30 * time.Second,
+							FallbackDelay: 300 * time.Millisecond,
+						}).DialContext
+					}
+
+					c.Transport = tr
+				}
+
 				if options.UpdateClient != nil {
 					if err := options.UpdateClient(&c); err != nil {
 						return nil, err
 					}
+				}
+
+				// redeclare here to allow per-host changes
+				authOpts := authOpts
+				if len(host.header) != 0 {
+					authOpts = append(authOpts, docker.WithAuthHeader(host.header))
 				}
 
 				rhosts[i].Client = &c
@@ -268,6 +237,55 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		return rhosts, nil
 	}
 
+}
+
+func updateTLSConfigFromHost(tlsConfig *tls.Config, host *hostConfig) error {
+	if host.skipVerify != nil {
+		tlsConfig.InsecureSkipVerify = *host.skipVerify
+	}
+
+	if host.caCerts != nil {
+		if tlsConfig.RootCAs == nil {
+			rootPool, err := x509.SystemCertPool()
+			if err != nil {
+				return fmt.Errorf("unable to initialize cert pool: %w", err)
+			}
+			tlsConfig.RootCAs = rootPool
+		}
+		for _, f := range host.caCerts {
+			data, err := os.ReadFile(f)
+			if err != nil {
+				return fmt.Errorf("unable to read CA cert %q: %w", f, err)
+			}
+			if !tlsConfig.RootCAs.AppendCertsFromPEM(data) {
+				return fmt.Errorf("unable to load CA cert %q", f)
+			}
+		}
+	}
+
+	for _, pair := range host.clientPairs {
+		certPEMBlock, err := os.ReadFile(pair[0])
+		if err != nil {
+			return fmt.Errorf("unable to read CERT file %q: %w", pair[0], err)
+		}
+		var keyPEMBlock []byte
+		if pair[1] != "" {
+			keyPEMBlock, err = os.ReadFile(pair[1])
+			if err != nil {
+				return fmt.Errorf("unable to read CERT file %q: %w", pair[1], err)
+			}
+		} else {
+			// Load key block from same PEM file
+			keyPEMBlock = certPEMBlock
+		}
+		cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+		if err != nil {
+			return fmt.Errorf("failed to load X509 key pair: %w", err)
+		}
+		tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
+	}
+
+	return nil
 }
 
 // HostDirFromRoot returns a function which finds a host directory
@@ -329,14 +347,14 @@ type hostFileConfig struct {
 	// Accepted types
 	// - string - Single file with certificate(s)
 	// - []string - Multiple files with certificates
-	CACert interface{} `toml:"ca"`
+	CACert any `toml:"ca"`
 
 	// Client keypair(s) for TLS with client authentication
 	// Accepted types
 	// - string - Single file with public and private keys
 	// - []string - Multiple files with public and private keys
 	// - [][2]string - Multiple keypairs with public and private keys in separate files
-	Client interface{} `toml:"client"`
+	Client any `toml:"client"`
 
 	// SkipVerify skips verification of the server's certificate chain
 	// and host name. This should only be used for testing or in
@@ -344,13 +362,17 @@ type hostFileConfig struct {
 	SkipVerify *bool `toml:"skip_verify"`
 
 	// Header are additional header files to send to the server
-	Header map[string]interface{} `toml:"header"`
+	Header map[string]any `toml:"header"`
 
 	// OverridePath indicates the API root endpoint is defined in the URL
 	// path rather than by the API specification.
 	// This may be used with non-compliant OCI registries to override the
 	// API root endpoint.
 	OverridePath bool `toml:"override_path"`
+
+	// DialTimeout is the maximum amount of time a dial will wait for
+	// a connect to complete.
+	DialTimeout string `toml:"dial_timeout"`
 
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
@@ -437,19 +459,21 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 				result.capabilities |= docker.HostCapabilityResolve
 			case "push":
 				result.capabilities |= docker.HostCapabilityPush
+			case "referrers":
+				result.capabilities |= docker.HostCapabilityReferrers
 			default:
 				return hostConfig{}, fmt.Errorf("unknown capability %v", c)
 			}
 		}
 	} else {
-		result.capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
+		result.capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush | docker.HostCapabilityReferrers
 	}
 
 	if config.CACert != nil {
 		switch cert := config.CACert.(type) {
 		case string:
 			result.caCerts = []string{makeAbsPath(cert, baseDir)}
-		case []interface{}:
+		case []any:
 			result.caCerts, err = makeStringSlice(cert, func(p string) string {
 				return makeAbsPath(p, baseDir)
 			})
@@ -465,13 +489,13 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		switch client := config.Client.(type) {
 		case string:
 			result.clientPairs = [][2]string{{makeAbsPath(client, baseDir), ""}}
-		case []interface{}:
+		case []any:
 			// []string or [][2]string
 			for _, pairs := range client {
 				switch p := pairs.(type) {
 				case string:
 					result.clientPairs = append(result.clientPairs, [2]string{makeAbsPath(p, baseDir), ""})
-				case []interface{}:
+				case []any:
 					slice, err := makeStringSlice(p, func(s string) string {
 						return makeAbsPath(s, baseDir)
 					})
@@ -500,7 +524,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			switch value := ty.(type) {
 			case string:
 				header[key] = []string{value}
-			case []interface{}:
+			case []any:
 				header[key], err = makeStringSlice(value, nil)
 				if err != nil {
 					return hostConfig{}, err
@@ -510,6 +534,14 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			}
 		}
 		result.header = header
+	}
+
+	if config.DialTimeout != "" {
+		dialTimeout, err := time.ParseDuration(config.DialTimeout)
+		if err != nil {
+			return hostConfig{}, err
+		}
+		result.dialTimeout = &dialTimeout
 	}
 
 	return result, nil
@@ -552,9 +584,9 @@ func getSortedHosts(b []byte) ([]string, error) {
 	return hostsInOrder, nil
 }
 
-// makeStringSlice is a helper func to convert from []interface{} to []string.
+// makeStringSlice is a helper func to convert from []any to []string.
 // Additionally an optional cb func may be passed to perform string mapping.
-func makeStringSlice(slice []interface{}, cb func(string) string) ([]string, error) {
+func makeStringSlice(slice []any, cb func(string) string) ([]string, error) {
 	out := make([]string, len(slice))
 	for i, value := range slice {
 		str, ok := value.(string)

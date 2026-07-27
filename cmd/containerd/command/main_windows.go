@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"unsafe"
 
 	"github.com/Microsoft/go-winio/pkg/etw"
@@ -33,10 +32,7 @@ import (
 )
 
 var (
-	handledSignals = []os.Signal{
-		windows.SIGTERM,
-		windows.SIGINT,
-	}
+	handledSignals = []os.Signal{os.Interrupt}
 )
 
 func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server, cancel func()) chan struct{} {
@@ -117,8 +113,4 @@ func init() {
 			log.L.Error(err)
 		}
 	}
-}
-
-func isLocalAddress(path string) bool {
-	return strings.HasPrefix(path, `\\.\pipe\`)
 }

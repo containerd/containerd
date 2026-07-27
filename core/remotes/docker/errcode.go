@@ -18,8 +18,12 @@ package docker
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 )
 
 // ErrorCoder is the base interface for ErrorCode and Error allowing
@@ -42,7 +46,7 @@ func (ec ErrorCode) ErrorCode() ErrorCode {
 // Error returns the ID/Value
 func (ec ErrorCode) Error() string {
 	// NOTE(stevvooe): Cannot use message here since it may have unpopulated args.
-	return strings.ToLower(strings.Replace(ec.String(), "_", " ", -1))
+	return strings.ToLower(strings.ReplaceAll(ec.String(), "_", " "))
 }
 
 // Descriptor returns the descriptor for the error code.
@@ -96,7 +100,7 @@ func (ec ErrorCode) WithMessage(message string) Error {
 
 // WithDetail creates a new Error struct based on the passed-in info and
 // set the Detail property appropriately
-func (ec ErrorCode) WithDetail(detail interface{}) Error {
+func (ec ErrorCode) WithDetail(detail any) Error {
 	return Error{
 		Code:    ec,
 		Message: ec.Message(),
@@ -104,7 +108,7 @@ func (ec ErrorCode) WithDetail(detail interface{}) Error {
 }
 
 // WithArgs creates a new Error struct and sets the Args slice
-func (ec ErrorCode) WithArgs(args ...interface{}) Error {
+func (ec ErrorCode) WithArgs(args ...any) Error {
 	return Error{
 		Code:    ec,
 		Message: ec.Message(),
@@ -113,9 +117,9 @@ func (ec ErrorCode) WithArgs(args ...interface{}) Error {
 
 // Error provides a wrapper around ErrorCode with extra Details provided.
 type Error struct {
-	Code    ErrorCode   `json:"code"`
-	Message string      `json:"message"`
-	Detail  interface{} `json:"detail,omitempty"`
+	Code    ErrorCode `json:"code"`
+	Message string    `json:"message"`
+	Detail  any       `json:"detail,omitempty"`
 
 	// TODO(duglin): See if we need an "args" property so we can do the
 	// variable substitution right before showing the message to the user
@@ -135,7 +139,7 @@ func (e Error) Error() string {
 
 // WithDetail will return a new Error, based on the current one, but with
 // some Detail info added
-func (e Error) WithDetail(detail interface{}) Error {
+func (e Error) WithDetail(detail any) Error {
 	return Error{
 		Code:    e.Code,
 		Message: e.Message,
@@ -143,9 +147,9 @@ func (e Error) WithDetail(detail interface{}) Error {
 	}
 }
 
-// WithArgs uses the passed-in list of interface{} as the substitution
+// WithArgs uses the passed-in list of args as the substitution
 // variables in the Error's Message string, but returns a new Error
-func (e Error) WithArgs(args ...interface{}) Error {
+func (e Error) WithArgs(args ...any) Error {
 	return Error{
 		Code:    e.Code,
 		Message: fmt.Sprintf(e.Code.Message(), args...),
@@ -200,11 +204,12 @@ func (errs Errors) Error() string {
 	case 1:
 		return errs[0].Error()
 	default:
-		msg := "errors:\n"
+		var msg strings.Builder
+		msg.WriteString("errors:\n")
 		for _, err := range errs {
-			msg += err.Error() + "\n"
+			msg.WriteString(err.Error() + "\n")
 		}
-		return msg
+		return msg.String()
 	}
 }
 
@@ -280,4 +285,22 @@ func (errs *Errors) UnmarshalJSON(data []byte) error {
 
 	*errs = newErrs
 	return nil
+}
+
+func unexpectedResponseErr(resp *http.Response) (retErr error) {
+	retErr = remoteerrors.NewUnexpectedStatusErr(resp)
+
+	// Decode registry error if provided
+	if rerr := retErr.(remoteerrors.ErrUnexpectedStatus); len(rerr.Body) > 0 {
+		var registryErr Errors
+		if err := json.Unmarshal(rerr.Body, &registryErr); err == nil && registryErr.Len() > 0 {
+			// Join the unexpected error with the typed errors, when printed it will
+			// show the unexpected error message and the registry errors. The body
+			// is always excluded from the unexpected error message. This also allows
+			// clients to decode into either type.
+			retErr = errors.Join(rerr, registryErr)
+		}
+	}
+
+	return
 }

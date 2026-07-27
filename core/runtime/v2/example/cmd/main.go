@@ -25,5 +25,5 @@ import (
 
 func main() {
 	// init and execute the shim
-	shim.Run(context.Background(), example.NewManager("io.containerd.example.v1"))
+	shim.RunShim(context.Background(), example.NewManager("io.containerd.example.v1"))
 }

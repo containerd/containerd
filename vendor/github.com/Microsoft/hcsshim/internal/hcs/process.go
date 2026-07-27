@@ -57,16 +57,22 @@ func (process *Process) Pid() int {
 	return process.processID
 }
 
+// MigrationState returns the zero value: HCS processes route stdio over
+// named pipes and don't use a GCS bridge.
+func (process *Process) MigrationState() cow.MigrationState {
+	return cow.MigrationState{}
+}
+
 // SystemID returns the ID of the process's compute system.
 func (process *Process) SystemID() string {
 	return process.system.ID()
 }
 
 func (process *Process) processSignalResult(ctx context.Context, err error) (bool, error) {
-	switch err { //nolint:errorlint
-	case nil:
+	if err == nil {
 		return true, nil
-	case ErrVmcomputeOperationInvalidState, ErrComputeSystemDoesNotExist, ErrElementNotFound:
+	}
+	if errors.Is(err, ErrVmcomputeOperationInvalidState) || errors.Is(err, ErrComputeSystemDoesNotExist) || errors.Is(err, ErrElementNotFound) {
 		if !process.stopped() {
 			// The process should be gone, but we have not received the notification.
 			// After a second, force unblock the process wait to work around a possible
@@ -82,9 +88,8 @@ func (process *Process) processSignalResult(ctx context.Context, err error) (boo
 			}()
 		}
 		return false, nil
-	default:
-		return false, err
 	}
+	return false, nil
 }
 
 // Signal signals the process with `options`.

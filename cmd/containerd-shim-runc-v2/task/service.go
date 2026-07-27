@@ -24,8 +24,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/moby/sys/userns"
-
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
@@ -39,14 +37,16 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
+	"github.com/moby/sys/userns"
 
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
+	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/runtime"
+	oomv2 "github.com/containerd/containerd/v2/internal/oom"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	oomv1 "github.com/containerd/containerd/v2/pkg/oom/v1"
-	oomv2 "github.com/containerd/containerd/v2/pkg/oom/v2"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/shim"
@@ -66,20 +66,20 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		ep  oom.Watcher
 		err error
 	)
-	if cgroups.Mode() == cgroups.Unified {
-		ep, err = oomv2.New(publisher)
-	} else {
+	if cgroups.Mode() != cgroups.Unified {
 		ep, err = oomv1.New(publisher)
+		if err != nil {
+			return nil, err
+		}
+		go ep.Run(ctx)
 	}
-	if err != nil {
-		return nil, err
-	}
-	go ep.Run(ctx)
 	s := &service{
 		context:              ctx,
-		events:               make(chan interface{}, 128),
+		events:               make(chan any, 128),
 		ec:                   reaper.Default.Subscribe(),
-		ep:                   ep,
+		cg1oom:               ep,
+		cg2oom:               oomv2.New(),
+		publisher:            publisher,
 		shutdown:             sd,
 		containers:           make(map[string]*runc.Container),
 		running:              make(map[int][]containerProcess),
@@ -94,10 +94,6 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
 	go s.forward(ctx, publisher)
-	sd.RegisterCallback(func(context.Context) error {
-		close(s.events)
-		return nil
-	})
 
 	if address, err := shim.ReadAddress("address"); err == nil {
 		sd.RegisterCallback(func(context.Context) error {
@@ -112,10 +108,13 @@ type service struct {
 	mu sync.Mutex
 
 	context  context.Context
-	events   chan interface{}
+	events   chan any
 	platform stdio.Platform
 	ec       chan runcC.Exit
-	ep       oom.Watcher
+	cg1oom   oom.Watcher
+	cg2oom   oomv2.Interface
+
+	publisher events.Publisher
 
 	containers map[string]*runc.Container
 
@@ -222,9 +221,6 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 
 // Create a new initial process and container with the underlying OCI runtime
 func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *taskAPI.CreateTaskResponse, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.lifecycleMu.Lock()
 	handleStarted, cleanup := s.preStart(nil)
 	s.lifecycleMu.Unlock()
@@ -235,7 +231,9 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		return nil, err
 	}
 
+	s.mu.Lock()
 	s.containers[r.ID] = container
+	s.mu.Unlock()
 
 	s.send(&eventstypes.TaskCreate{
 		ContainerID: r.ID,
@@ -250,6 +248,33 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		Checkpoint: r.Checkpoint,
 		Pid:        uint32(container.Pid()),
 	})
+
+	// After runc.Create(init), the container’s cgroup contains a paused init process.
+	// Therefore, we should start monitoring OOM events immediately after creation, in
+	// case the process goes OOM very quickly. Otherwise, we may encounter flaky cases
+	switch cg := container.Cgroup().(type) {
+	case cgroup1.Cgroup:
+		if err := s.cg1oom.Add(container.ID, cg); err != nil {
+			log.G(ctx).WithError(err).Error("add cg to OOM monitor")
+		}
+	case *cgroupsv2.Manager:
+		allControllers, err := cg.RootControllers()
+		if err != nil {
+			log.G(ctx).WithError(err).Error("failed to get root controllers")
+		} else {
+			if err := cg.ToggleControllers(allControllers, cgroupsv2.Enable); err != nil {
+				if userns.RunningInUserNS() {
+					log.G(ctx).WithError(err).Debugf("failed to enable controllers (%v)", allControllers)
+				} else {
+					log.G(ctx).WithError(err).Errorf("failed to enable controllers (%v)", allControllers)
+				}
+			}
+		}
+
+		if err := s.cg2oom.Add(container.ID, container.Pid(), s.oomEvent); err != nil {
+			log.G(ctx).WithError(err).WithField("container_id", container.ID).Error("failed to watch oom events")
+		}
+	}
 
 	// The following line cannot return an error as the only state in which that
 	// could happen would also cause the container.Pid() call above to
@@ -308,29 +333,6 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 
 	switch r.ExecID {
 	case "":
-		switch cg := container.Cgroup().(type) {
-		case cgroup1.Cgroup:
-			if err := s.ep.Add(container.ID, cg); err != nil {
-				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
-			}
-		case *cgroupsv2.Manager:
-			allControllers, err := cg.RootControllers()
-			if err != nil {
-				log.G(ctx).WithError(err).Error("failed to get root controllers")
-			} else {
-				if err := cg.ToggleControllers(allControllers, cgroupsv2.Enable); err != nil {
-					if userns.RunningInUserNS() {
-						log.G(ctx).WithError(err).Debugf("failed to enable controllers (%v)", allControllers)
-					} else {
-						log.G(ctx).WithError(err).Errorf("failed to enable controllers (%v)", allControllers)
-					}
-				}
-			}
-			if err := s.ep.Add(container.ID, cg); err != nil {
-				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
-			}
-		}
-
 		s.send(&eventstypes.TaskStart{
 			ContainerID: container.ID,
 			Pid:         uint32(p.Pid()),
@@ -369,6 +371,9 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 			ExitStatus:  uint32(p.ExitStatus()),
 			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 		})
+		s.lifecycleMu.Lock()
+		delete(s.containerInitExit, container)
+		s.lifecycleMu.Unlock()
 	}
 	return &taskAPI.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
@@ -577,7 +582,10 @@ func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.Wa
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
-	p.Wait()
+
+	if err = p.Wait(ctx); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
 
 	return &taskAPI.WaitResponse{
 		ExitStatus: uint32(p.ExitStatus()),
@@ -622,7 +630,7 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	if cgx == nil {
 		return nil, errgrpc.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
 	}
-	var statsx interface{}
+	var statsx any
 	switch cg := cgx.(type) {
 	case cgroup1.Cgroup:
 		stats, err := cg.Stat(cgroup1.IgnoreNotExist)
@@ -687,8 +695,20 @@ func (s *service) processExits() {
 	}
 }
 
-func (s *service) send(evt interface{}) {
-	s.events <- evt
+func (s *service) oomEvent(id string) {
+	err := s.publisher.Publish(s.context, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
+		ContainerID: id,
+	})
+	if err != nil {
+		log.G(s.context).WithError(err).Error("post event")
+	}
+}
+
+func (s *service) send(evt any) {
+	select {
+	case s.events <- evt:
+	case <-s.shutdown.Done():
+	}
 }
 
 // handleInitExit processes container init process exits.
@@ -746,6 +766,15 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
 	p.SetExited(e.Status)
+	_, isInit := p.(*process.Init)
+	if isInit {
+		if err := s.cg2oom.Stop(c.ID); err != nil {
+			log.G(context.Background()).
+				WithField("container_id", c.ID).
+				WithError(err).
+				Error("failed to stop oom event watcher")
+		}
+	}
 	s.send(&eventstypes.TaskExit{
 		ContainerID: c.ID,
 		ID:          p.ID(),
@@ -753,7 +782,7 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 		ExitStatus:  uint32(e.Status),
 		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 	})
-	if _, init := p.(*process.Init); !init {
+	if !isInit {
 		s.lifecycleMu.Lock()
 		s.runningExecs[c]--
 		if ch, ok := s.execCountSubscribers[c]; ok {
@@ -782,13 +811,29 @@ func (s *service) getContainerPids(ctx context.Context, container *runc.Containe
 func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
 	ns, _ := namespaces.Namespace(ctx)
 	ctx = namespaces.WithNamespace(context.Background(), ns)
-	for e := range s.events {
-		err := publisher.Publish(ctx, runtime.GetTopic(e), e)
-		if err != nil {
+	defer publisher.Close()
+
+	publish := func(e any) {
+		if err := publisher.Publish(ctx, runtime.GetTopic(e), e); err != nil {
 			log.G(ctx).WithError(err).Error("post event")
 		}
 	}
-	publisher.Close()
+
+	for {
+		select {
+		case e := <-s.events:
+			publish(e)
+		case <-s.shutdown.Done():
+			for {
+				select {
+				case e := <-s.events:
+					publish(e)
+				default:
+					return
+				}
+			}
+		}
+	}
 }
 
 func (s *service) getContainer(id string) (*runc.Container, error) {

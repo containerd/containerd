@@ -35,7 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	criapiv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/v2/internal/cri/types"
+	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	"github.com/containerd/containerd/v2/internal/failpoint"
 )
 
@@ -112,8 +112,13 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 
 			t.Log("Inject Shim failpoint")
 			injectShimFailpoint(t, sbConfig, map[string]string{
-				"Start":  "1*error(failed to start shim)",
-				"Delete": "1*error(please retry)", // inject failpoint during rollback shim
+				"Start": "1*error(failed to start shim)",
+				// Kill invoked by Delete during rollback, we should block it instead of Delete
+				//
+				// NOTE: If we allow to Kill, there could be a race condition. The event handler
+				// will cleanup the sandbox record after Kill asynchronously. It could cause that
+				// ListPodSandbox returns empty.
+				"Kill": "1*error(please retry)",
 			})
 
 			t.Log("Create a sandbox")
@@ -251,15 +256,13 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 	injectCNIFailpoint(t, sbConfig, conf)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		t.Log("Create a sandbox")
 		_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "error reading from server: EOF")
-	}()
+	})
 
 	assert.NoError(t, ensureCNIAddRunning(t, sbName), "check that failpoint CNI.Add is running")
 
@@ -299,11 +302,12 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 }
 
 // sbserverSandboxInfo gets sandbox info.
-func sbserverSandboxInfo(id string) (*criapiv1.PodSandboxStatus, *types.SandboxInfo, error) {
-	client, err := RawRuntimeClient()
+func sbserverSandboxInfo(id string) (*criapiv1.PodSandboxStatus, *podsandboxtypes.SandboxInfo, error) {
+	client, conn, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
 	}
+	defer conn.Close()
 	resp, err := client.PodSandboxStatus(context.Background(), &criapiv1.PodSandboxStatusRequest{
 		PodSandboxId: id,
 		Verbose:      true,
@@ -312,7 +316,7 @@ func sbserverSandboxInfo(id string) (*criapiv1.PodSandboxStatus, *types.SandboxI
 		return nil, nil, fmt.Errorf("failed to get sandbox status: %w", err)
 	}
 	status := resp.GetStatus()
-	var info types.SandboxInfo
+	var info podsandboxtypes.SandboxInfo
 	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal sandbox info: %w", err)
 	}
@@ -339,7 +343,7 @@ func ensureCNIAddRunning(t *testing.T, sbName string) error {
 				continue
 			}
 
-			for _, arg := range strings.Split(args, ";") {
+			for arg := range strings.SplitSeq(args, ";") {
 				if arg == "K8S_POD_NAME="+sbName {
 					return true, nil
 				}

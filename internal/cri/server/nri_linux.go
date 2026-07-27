@@ -31,5 +31,5 @@ func (i *criImplementation) UpdateContainerResources(ctx context.Context, ctr cs
 }
 
 func (i *criImplementation) StopContainer(ctx context.Context, ctr cstore.Container, timeout time.Duration) error {
-	return i.c.stopContainer(ctx, ctr, timeout)
+	return i.c.stopContainerRetryOnConnectionClosed(ctx, ctr, timeout)
 }

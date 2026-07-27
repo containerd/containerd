@@ -20,15 +20,18 @@ import (
 	"context"
 	"encoding/base64"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/platforms"
 
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestParseAuth(t *testing.T) {
@@ -113,7 +116,6 @@ func TestParseAuth(t *testing.T) {
 			expectedSecret: testPasswd,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			u, s, err := ParseAuth(test.auth, test.host)
 			assert.Equal(t, test.expectErr, err != nil)
@@ -272,7 +274,6 @@ func TestRegistryEndpoints(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c, _ := newTestCRIService()
 			c.config.Registry.Mirrors = test.mirrors
@@ -340,7 +341,6 @@ func TestDefaultScheme(t *testing.T) {
 			expected: "https",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := defaultScheme(test.host)
 			assert.Equal(t, test.expected, got)
@@ -366,7 +366,6 @@ func TestEncryptedImagePullOpts(t *testing.T) {
 			expectedOpts: 0,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c, _ := newTestCRIService()
 			c.config.ImageDecryption.KeyModel = test.keyModel
@@ -382,42 +381,62 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 	tests := []struct {
 		desc                string
 		podSandboxConfig    *runtime.PodSandboxConfig
+		runtimeHandler      string
 		expectedSnapshotter string
 		expectedErr         bool
 	}{
 		{
 			desc:                "should return default snapshotter for nil podSandboxConfig",
+			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
-			desc:                "should return default snapshotter for nil podSandboxConfig.Annotations",
+			desc:                "should return default snapshotter for empty runtimeHandler",
 			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
-			desc: "should return default snapshotter for empty podSandboxConfig.Annotations",
-			podSandboxConfig: &runtime.PodSandboxConfig{
-				Annotations: make(map[string]string),
-			},
+			desc:                "should return default snapshotter for runtime not found",
+			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "runtime-not-exists",
 			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
-			desc: "should return default snapshotter for runtime not found",
-			podSandboxConfig: &runtime.PodSandboxConfig{
-				Annotations: map[string]string{
-					annotations.RuntimeHandler: "runtime-not-exists",
-				},
-			},
-			expectedSnapshotter: defaultSnapshotter,
+			desc:                "should return snapshotter for existing runtime",
+			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "existing-runtime",
+			expectedSnapshotter: runtimeSnapshotter,
 		},
 		{
-			desc: "should return snapshotter provided in podSandboxConfig.Annotations",
+			desc: "should fall back to annotation when runtimeHandler is empty",
 			podSandboxConfig: &runtime.PodSandboxConfig{
 				Annotations: map[string]string{
 					annotations.RuntimeHandler: "existing-runtime",
 				},
 			},
+			runtimeHandler:      "",
 			expectedSnapshotter: runtimeSnapshotter,
+		},
+		{
+			desc: "should prefer runtimeHandler parameter over annotation",
+			podSandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.RuntimeHandler: "runtime-not-exists",
+				},
+			},
+			runtimeHandler:      "existing-runtime",
+			expectedSnapshotter: runtimeSnapshotter,
+		},
+		{
+			desc: "should return default when annotation has unknown runtime and runtimeHandler is empty",
+			podSandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.RuntimeHandler: "runtime-not-exists",
+				},
+			},
+			runtimeHandler:      "",
+			expectedSnapshotter: defaultSnapshotter,
 		},
 	}
 
@@ -429,7 +448,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
-			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
+			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig, tt.runtimeHandler)
 			assert.Equal(t, tt.expectedSnapshotter, snapshotter)
 			if tt.expectedErr {
 				assert.Error(t, err)
@@ -451,8 +470,8 @@ func TestImageGetLabels(t *testing.T) {
 		{
 			name:          "pinned image labels should get added on sandbox image",
 			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			pinnedImages:  map[string]string{"sandbox": "k8s.gcr.io/pause:3.10"},
-			pullImageName: "k8s.gcr.io/pause:3.10",
+			pinnedImages:  map[string]string{"sandbox": "registry.k8s.io/pause:3.10.2"},
+			pullImageName: "registry.k8s.io/pause:3.10.2",
 		},
 		{
 			name:          "pinned image labels should get added on sandbox image without tag",
@@ -491,6 +510,390 @@ func TestImageGetLabels(t *testing.T) {
 			labels := criService.getLabels(context.Background(), tt.pullImageName)
 			assert.Equal(t, tt.expectedLabel, labels)
 
+		})
+	}
+}
+
+func TestTransferProgressReporter(t *testing.T) {
+
+	tests := []struct {
+		name     string
+		setup    func(*transferProgressReporter) chan struct{}
+		progress []transfer.Progress
+		check    func(*testing.T, *transferProgressReporter, <-chan struct{})
+	}{
+		{
+			name: "PullImageWithCompleteEvent",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 1000,
+					Event:    "complete",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(0), activeReqs, "Expected 0 active requests")
+				assert.Equal(t, uint64(1000), totalBytesRead, "Expected 1000 bytes read")
+			},
+		},
+		{
+			name: "FinishedDownloadingWithNoCompleteEvent",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 1000,
+					Event:    "downloading",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(0), activeReqs, "Expected 0 active requests")
+				assert.Equal(t, uint64(1000), totalBytesRead, "Expected 1000 bytes read")
+			},
+		},
+		{
+			name: "NilDescriptorInProgressNode",
+			progress: []transfer.Progress{
+				{
+					Name:     "layer1",
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				assert.Equal(t, int32(0), r.reqReporter.activeReqs.Load(), "Expected zero active request")
+				assert.Equal(t, uint64(0), r.reqReporter.totalBytesRead.Load(), "Expected zero bytes read")
+			},
+		},
+		{
+			name: "EmptyTotalInProgressNode",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    0,
+					Progress: 500,
+					Event:    "downloading",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(0), activeReqs, "Expected zero active request")
+				assert.Equal(t, uint64(0), totalBytesRead, "Expected zero bytes read")
+			},
+		},
+		{
+			name: "TimeoutDuringPull",
+			setup: func(r *transferProgressReporter) chan struct{} {
+				r.timeout = 100 * time.Millisecond
+
+				cancelCalled := make(chan struct{})
+				originalCancel := r.cancel
+				r.cancel = func() {
+					originalCancel()
+					close(cancelCalled)
+				}
+
+				return cancelCalled
+			},
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				select {
+				case <-cancelCalled:
+					// Expected behavior: cancel was called
+				case <-time.After(150 * time.Millisecond):
+					t.Error("Cancel function was not called within the expected timeframe")
+				}
+			},
+		},
+		{
+			name: "MultipleRequests",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef1",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer2",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef2",
+						Size:      2000,
+					},
+					Total:    2000,
+					Progress: 1000,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef1",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 1000,
+					Event:    "complete",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(1), activeReqs, "Expected one active request")
+				assert.Equal(t, uint64(2000), totalBytesRead, "Expected 2000 bytes read")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			reporter := &transferProgressReporter{
+				reqReporter: pullRequestReporter{},
+				pc:          make(chan transfer.Progress),
+				statuses:    make(map[string]*transfer.Progress),
+				ref:         "test-image:latest",
+				timeout:     30 * time.Second,
+				cancel:      cancel,
+			}
+
+			var cancelCalled chan struct{}
+			if tt.setup != nil {
+				cancelCalled = tt.setup(reporter)
+			}
+
+			go reporter.start(ctx)
+
+			for _, progress := range tt.progress {
+				reporter.pc <- progress
+				time.Sleep(50 * time.Millisecond) // Allow some time for processing
+			}
+
+			if tt.check != nil {
+				tt.check(t, reporter, cancelCalled)
+			}
+		})
+	}
+}
+
+// TestPullProgressReporter covers the core no-progress cancellation
+// behavior of pullProgressReporter: a stuck request (active, no bytes)
+// is eventually cancelled, while a progressing request is not.
+//
+// The flaky failure in TestCRIImagePullTimeout/HoldingContentOpenWriterWithLocalPull
+// — which this fix addresses — is a timing race that's not cleanly
+// expressible as a unit test: the boundary between the buggy and fixed
+// cancel times coincides at 1.5*timeout, so any check near that
+// threshold is scheduler-jitter prone. The semantic regression is
+// covered by the existing integration test.
+func TestPullProgressReporter(t *testing.T) {
+	t.Run("StuckRequestStillGetsCancelled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		cancelCalled := make(chan struct{})
+		reporter := newPullProgressReporter("test-image:latest", func() {
+			select {
+			case <-cancelCalled:
+			default:
+				close(cancelCalled)
+			}
+		}, 200*time.Millisecond)
+
+		// Start a request immediately (no idle period) and never produce
+		// bytes. The reporter must cancel after timeout elapses.
+		reporter.reqReporter.incRequest()
+		reporter.start(ctx)
+
+		select {
+		case <-cancelCalled:
+		case <-time.After(2 * time.Second):
+			t.Fatal("stuck request was not cancelled")
+		}
+	})
+
+	t.Run("ProgressingRequestIsNotCancelled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		cancelCalled := make(chan struct{})
+		reporter := newPullProgressReporter("test-image:latest", func() {
+			select {
+			case <-cancelCalled:
+			default:
+				close(cancelCalled)
+			}
+		}, 200*time.Millisecond)
+
+		reporter.reqReporter.incRequest()
+		reporter.start(ctx)
+
+		// Advance bytes faster than timeout so the reporter keeps
+		// refreshing lastSeenBytesRead.
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			ticker := time.NewTicker(50 * time.Millisecond)
+			defer ticker.Stop()
+			for i := 0; i < 10; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					reporter.reqReporter.incByteRead(1024)
+				}
+			}
+		}()
+
+		select {
+		case <-cancelCalled:
+			t.Fatal("pull was cancelled despite making byte progress")
+		case <-done:
+		}
+	})
+}
+
+// fakeObserver records every Observe call so tests can assert both the
+// presence and the value of observations without touching the real histogram.
+type fakeObserver struct {
+	samples []float64
+}
+
+func (f *fakeObserver) Observe(v float64) {
+	f.samples = append(f.samples, v)
+}
+
+func TestRecordImagePullThroughput(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		bytesPulled uint64
+		duration    time.Duration
+		wantSamples int
+		wantValue   float64 // only checked when wantSamples == 1
+	}{
+		{
+			name:        "fully cached pull is not observed",
+			bytesPulled: 0,
+			duration:    2 * time.Second,
+			wantSamples: 0,
+		},
+		{
+			name:        "zero duration is not observed",
+			bytesPulled: 10 * mibToByte,
+			duration:    0,
+			wantSamples: 0,
+		},
+		{
+			name:        "cold pull observes MiB/s from fetched bytes",
+			bytesPulled: 10 * mibToByte,
+			duration:    2 * time.Second,
+			wantSamples: 1,
+			wantValue:   5.0,
+		},
+		{
+			name: "partial cache hit observes only fetched bytes",
+			// 200 MiB image, 150 MiB cached, 50 MiB actually fetched over 1s.
+			bytesPulled: 50 * mibToByte,
+			duration:    1 * time.Second,
+			wantSamples: 1,
+			wantValue:   50.0,
+		},
+		{
+			name:        "sub-second pull observes correctly",
+			bytesPulled: 25 * mibToByte,
+			duration:    500 * time.Millisecond,
+			wantSamples: 1,
+			wantValue:   50.0,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			obs := &fakeObserver{}
+			recordImagePullThroughput(obs, tc.bytesPulled, tc.duration)
+			if assert.Len(t, obs.samples, tc.wantSamples) && tc.wantSamples == 1 {
+				assert.InDelta(t, tc.wantValue, obs.samples[0], 0.001)
+			}
 		})
 	}
 }

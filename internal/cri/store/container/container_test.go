@@ -163,7 +163,7 @@ func TestContainerStore(t *testing.T) {
 		containers[id] = container
 	}
 
-	s := NewStore(label.NewStore())
+	s := NewStore(label.NewStore(), nil)
 	reserved := map[string]bool{}
 	s.labels.Reserver = func(label string) {
 		reserved[strings.SplitN(label, ":", 4)[3]] = true

@@ -30,12 +30,12 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	docker "github.com/distribution/reference"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
 	imageidentity "github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Image contains all resources associated with the image. All fields

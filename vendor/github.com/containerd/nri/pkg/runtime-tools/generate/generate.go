@@ -20,14 +20,58 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/runtime-tools/generate"
 
 	nri "github.com/containerd/nri/pkg/api"
 )
+
+const (
+	// UnlimitedPidsLimit indicates unlimited Linux PIDs limit.
+	UnlimitedPidsLimit = -1
+)
+
+// UnderlyingGenerator is the interface for
+// [github.com/opencontainers/runtime-tools/generate.Generator].
+type UnderlyingGenerator interface {
+	AddAnnotation(key, value string)
+	AddDevice(device rspec.LinuxDevice)
+	AddOrReplaceLinuxNamespace(ns string, path string) error
+	AddPostStartHook(postStartHook rspec.Hook)
+	AddPostStopHook(postStopHook rspec.Hook)
+	AddPreStartHook(preStartHook rspec.Hook)
+	AddProcessEnv(name, value string)
+	AddLinuxResourcesDevice(allow bool, devType string, major, minor *int64, access string)
+	AddLinuxResourcesHugepageLimit(pageSize string, limit uint64)
+	AddLinuxResourcesUnified(key, val string)
+	AddMount(mnt rspec.Mount)
+	AddLinuxSysctl(key, value string)
+	ClearMounts()
+	ClearProcessEnv()
+	Mounts() []rspec.Mount
+	RemoveAnnotation(key string)
+	RemoveDevice(path string)
+	RemoveLinuxNamespace(ns string) error
+	RemoveMount(dest string)
+	RemoveLinuxSysctl(key string)
+	SetProcessArgs(args []string)
+	SetLinuxCgroupsPath(path string)
+	SetLinuxResourcesCPUCpus(cpus string)
+	SetLinuxResourcesCPUMems(mems string)
+	SetLinuxResourcesCPUPeriod(period uint64)
+	SetLinuxResourcesCPUQuota(quota int64)
+	SetLinuxResourcesCPURealtimePeriod(period uint64)
+	SetLinuxResourcesCPURealtimeRuntime(time int64)
+	SetLinuxResourcesCPUShares(shares uint64)
+	SetLinuxResourcesMemoryLimit(limit int64)
+	SetLinuxResourcesMemorySwap(swap int64)
+	SetLinuxRootPropagation(rp string) error
+	SetProcessOOMScoreAdj(adj int)
+	Spec() *rspec.Spec
+}
 
 // GeneratorOption is an option for Generator().
 type GeneratorOption func(*Generator)
@@ -35,9 +79,11 @@ type GeneratorOption func(*Generator)
 // Generator extends a stock runtime-tools Generator and extends it with
 // a few functions for handling NRI container adjustment.
 type Generator struct {
-	*generate.Generator
+	UnderlyingGenerator
+	Config            *rspec.Spec
 	filterLabels      func(map[string]string) (map[string]string, error)
 	filterAnnotations func(map[string]string) (map[string]string, error)
+	filterSysctl      func(map[string]string) (map[string]string, error)
 	resolveBlockIO    func(string) (*rspec.LinuxBlockIO, error)
 	resolveRdt        func(string) (*rspec.LinuxIntelRdt, error)
 	injectCDIDevices  func(*rspec.Spec, []string) error
@@ -45,12 +91,14 @@ type Generator struct {
 }
 
 // SpecGenerator returns a wrapped OCI Spec Generator.
-func SpecGenerator(gg *generate.Generator, opts ...GeneratorOption) *Generator {
+func SpecGenerator(gg UnderlyingGenerator, opts ...GeneratorOption) *Generator {
 	g := &Generator{
-		Generator: gg,
+		UnderlyingGenerator: gg,
+		Config:              gg.Spec(),
 	}
 	g.filterLabels = nopFilter
 	g.filterAnnotations = nopFilter
+	g.filterSysctl = nopFilter
 	for _, o := range opts {
 		o(g)
 	}
@@ -110,6 +158,7 @@ func (g *Generator) Adjust(adjust *nri.ContainerAdjustment) error {
 		return fmt.Errorf("failed to adjust annotations in OCI Spec: %w", err)
 	}
 	g.AdjustEnv(adjust.GetEnv())
+	g.AdjustArgs(adjust.GetArgs())
 	g.AdjustHooks(adjust.GetHooks())
 	if err := g.InjectCDIDevices(adjust.GetCDIDevices()); err != nil {
 		return err
@@ -117,6 +166,21 @@ func (g *Generator) Adjust(adjust *nri.ContainerAdjustment) error {
 	g.AdjustDevices(adjust.GetLinux().GetDevices())
 	g.AdjustCgroupsPath(adjust.GetLinux().GetCgroupsPath())
 	g.AdjustOomScoreAdj(adjust.GetLinux().GetOomScoreAdj())
+	g.AdjustIOPriority(adjust.GetLinux().GetIoPriority())
+	g.AdjustLinuxScheduler(adjust.GetLinux().GetScheduler())
+
+	if err := g.AdjustSeccompPolicy(adjust.GetLinux().GetSeccompPolicy()); err != nil {
+		return err
+	}
+	if err := g.AdjustNamespaces(adjust.GetLinux().GetNamespaces()); err != nil {
+		return err
+	}
+	if err := g.AdjustSysctl(adjust.GetLinux().GetSysctl()); err != nil {
+		return err
+	}
+	g.AdjustLinuxNetDevices(adjust.GetLinux().GetNetDevices())
+
+	g.AdjustMemoryPolicy(adjust.GetLinux().GetMemoryPolicy())
 
 	resources := adjust.GetLinux().GetResources()
 	if err := g.AdjustResources(resources); err != nil {
@@ -128,6 +192,7 @@ func (g *Generator) Adjust(adjust *nri.ContainerAdjustment) error {
 	if err := g.AdjustRdtClass(resources.GetRdtClass().Get()); err != nil {
 		return err
 	}
+	g.AdjustRdt(adjust.GetLinux().GetRdt())
 
 	if err := g.AdjustMounts(adjust.GetMounts()); err != nil {
 		return err
@@ -176,6 +241,13 @@ func (g *Generator) AdjustEnv(env []*nri.KeyValue) {
 		if _, ok := mod[e.Key]; ok {
 			g.AddProcessEnv(e.Key, e.Value)
 		}
+	}
+}
+
+// AdjustArgs adjusts the process arguments in the OCI Spec.
+func (g *Generator) AdjustArgs(args []string) {
+	if len(args) != 0 {
+		g.SetProcessArgs(args)
 	}
 }
 
@@ -268,6 +340,9 @@ func (g *Generator) AdjustResources(r *nri.LinuxResources) error {
 	if v := r.GetPids(); v != nil {
 		g.SetLinuxResourcesPidsLimit(v.GetLimit())
 	}
+	for _, d := range r.Devices {
+		g.AddLinuxResourcesDevice(d.Allow, d.Type, d.Major.Get(), d.Minor.Get(), d.Access)
+	}
 	if g.checkResources != nil {
 		if err := g.checkResources(g.Config.Linux.Resources); err != nil {
 			return fmt.Errorf("failed to adjust resources in OCI Spec: %w", err)
@@ -317,6 +392,42 @@ func (g *Generator) AdjustRdtClass(rdtClass *string) error {
 	return nil
 }
 
+// AdjustRdt adjusts the intelRdt object in the OCI Spec.
+func (g *Generator) AdjustRdt(r *nri.LinuxRdt) {
+	if r == nil {
+		return
+	}
+
+	if r.Remove {
+		g.ClearLinuxIntelRdt()
+	}
+
+	g.AdjustRdtClosID(r.ClosId.Get())
+	g.AdjustRdtSchemata(r.Schemata.Get())
+	g.AdjustRdtEnableMonitoring(r.EnableMonitoring.Get())
+}
+
+// AdjustRdtClosID adjusts the RDT CLOS id in the OCI Spec.
+func (g *Generator) AdjustRdtClosID(value *string) {
+	if value != nil {
+		g.SetLinuxIntelRdtClosID(*value)
+	}
+}
+
+// AdjustRdtSchemata adjusts the RDT schemata in the OCI Spec.
+func (g *Generator) AdjustRdtSchemata(value *[]string) {
+	if value != nil {
+		g.SetLinuxIntelRdtSchemata(*value)
+	}
+}
+
+// AdjustRdtEnableMonitoring adjusts the RDT monitoring in the OCI Spec.
+func (g *Generator) AdjustRdtEnableMonitoring(value *bool) {
+	if value != nil {
+		g.SetLinuxIntelRdtEnableMonitoring(*value)
+	}
+}
+
 // AdjustCgroupsPath adjusts the cgroup pseudofs path in the OCI Spec.
 func (g *Generator) AdjustCgroupsPath(path string) {
 	if path != "" {
@@ -332,6 +443,103 @@ func (g *Generator) AdjustOomScoreAdj(score *nri.OptionalInt) {
 	}
 }
 
+// AdjustIOPriority adjusts the IO priority of the container.
+func (g *Generator) AdjustIOPriority(ioprio *nri.LinuxIOPriority) {
+	if ioprio != nil {
+		g.SetProcessIOPriority(ioprio.ToOCI())
+	}
+}
+
+// AdjustSeccompPolicy adjusts the seccomp policy for the container, which may
+// override kubelet's settings for the seccomp policy.
+func (g *Generator) AdjustSeccompPolicy(policy *nri.LinuxSeccomp) error {
+	if policy == nil {
+		return nil
+	}
+
+	// Note: we explicitly do not use the SetDefaultSeccompAction() and
+	// SetSeccompArchitecture() helpers from generate here, because they
+	// expect a "humanized" version of the action (e.g. "allow" or "x86").
+	// since these helpers do not exist for the below, we would be
+	// inconsistent: here we would want the humanized strings, in favor of
+	// the rspec definitions like SCMP_ACT_ALLOW. let's just use the rspec
+	// versions everywhere since helpers don't exist in runtime-tools for
+	// setting actual syscall policies, only default actions.
+	archs := make([]rspec.Arch, len(policy.Architectures))
+	for i, arch := range policy.Architectures {
+		archs[i] = rspec.Arch(arch)
+	}
+
+	flags := make([]rspec.LinuxSeccompFlag, len(policy.Flags))
+	for i, f := range policy.Flags {
+		flags[i] = rspec.LinuxSeccompFlag(f)
+	}
+
+	g.Config.Linux.Seccomp = &rspec.LinuxSeccomp{
+		DefaultAction:    rspec.LinuxSeccompAction(policy.DefaultAction),
+		Architectures:    archs,
+		ListenerPath:     policy.ListenerPath,
+		ListenerMetadata: policy.ListenerMetadata,
+		Flags:            flags,
+		Syscalls:         nri.ToOCILinuxSyscalls(policy.Syscalls),
+	}
+
+	return nil
+}
+
+// AdjustNamespaces adds or replaces namespaces in the OCI Spec.
+func (g *Generator) AdjustNamespaces(namespaces []*nri.LinuxNamespace) error {
+	for _, n := range namespaces {
+		if n == nil {
+			continue
+		}
+		if key, marked := n.IsMarkedForRemoval(); marked {
+			if err := g.RemoveLinuxNamespace(key); err != nil {
+				return err
+			}
+		} else {
+			if err := g.AddOrReplaceLinuxNamespace(n.Type, n.Path); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// AdjustSysctl adds, replaces, or removes the sysctl settings in the OCI Spec.
+func (g *Generator) AdjustSysctl(sysctl map[string]string) error {
+	var err error
+
+	if sysctl, err = g.filterSysctl(sysctl); err != nil {
+		return err
+	}
+	for k, v := range sysctl {
+		if key, marked := nri.IsMarkedForRemoval(k); marked {
+			g.RemoveLinuxSysctl(key)
+		} else {
+			g.AddLinuxSysctl(k, v)
+		}
+	}
+
+	return nil
+}
+
+// AdjustLinuxScheduler adjusts linux scheduling policy parameters.
+func (g *Generator) AdjustLinuxScheduler(sch *nri.LinuxScheduler) {
+	if sch == nil {
+		return
+	}
+	g.initConfigProcess()
+	g.Config.Process.Scheduler = sch.ToOCI()
+}
+
+// AdjustMemoryPolicy adjusts default memory policy (set_mempolicy) for the container.
+func (g *Generator) AdjustMemoryPolicy(memoryPolicy *nri.LinuxMemoryPolicy) {
+	if memoryPolicy != nil {
+		g.SetLinuxMemoryPolicy(memoryPolicy.ToOCI())
+	}
+}
+
 // AdjustDevices adjusts the (Linux) devices in the OCI Spec.
 func (g *Generator) AdjustDevices(devices []*nri.LinuxDevice) {
 	for _, d := range devices {
@@ -344,6 +552,19 @@ func (g *Generator) AdjustDevices(devices []*nri.LinuxDevice) {
 		major, minor, access := &d.Major, &d.Minor, d.AccessString()
 		g.AddLinuxResourcesDevice(true, d.Type, major, minor, access)
 	}
+}
+
+// AdjustLinuxNetDevices adjusts the linux net devices in the OCI Spec.
+func (g *Generator) AdjustLinuxNetDevices(devices map[string]*nri.LinuxNetDevice) error {
+	for k, v := range devices {
+		if key, marked := nri.IsMarkedForRemoval(k); marked {
+			g.RemoveLinuxNetDevice(key)
+		} else {
+			g.AddLinuxNetDevice(k, v)
+		}
+	}
+
+	return nil
 }
 
 // InjectCDIDevices injects the requested CDI devices into the OCI Spec.
@@ -363,6 +584,7 @@ func (g *Generator) InjectCDIDevices(devices []*nri.CDIDevice) error {
 	return g.injectCDIDevices(g.Config, names)
 }
 
+// AdjustRlimits adjusts the (Linux) POSIX resource limits in the OCI Spec.
 func (g *Generator) AdjustRlimits(rlimits []*nri.POSIXRlimit) error {
 	for _, l := range rlimits {
 		if l == nil {
@@ -422,15 +644,15 @@ func (g *Generator) AdjustMounts(mounts []*nri.Mount) error {
 
 // sortMounts sorts the mounts in the generated OCI Spec.
 func (g *Generator) sortMounts() {
-	mounts := g.Generator.Mounts()
-	g.Generator.ClearMounts()
+	mounts := g.Mounts()
+	g.ClearMounts()
 	sort.Sort(orderedMounts(mounts))
 
 	// TODO(klihub): This is now a bit ugly maybe we should introduce a
 	// SetMounts([]rspec.Mount) to runtime-tools/generate.Generator. That
 	// could also take care of properly sorting the mount slice.
 
-	g.Generator.Config.Mounts = mounts
+	g.Config.Mounts = mounts
 }
 
 // orderedMounts defines how to sort an OCI Spec Mount slice.
@@ -507,6 +729,24 @@ func (g *Generator) SetLinuxIntelRdt(rdt *rspec.LinuxIntelRdt) {
 	g.Config.Linux.IntelRdt = rdt
 }
 
+// SetLinuxIntelRdtClosID sets g.Config.Linux.IntelRdt.ClosID
+func (g *Generator) SetLinuxIntelRdtClosID(closID string) {
+	g.initConfigLinuxIntelRdt()
+	g.Config.Linux.IntelRdt.ClosID = closID
+}
+
+// SetLinuxIntelRdtEnableMonitoring sets g.Config.Linux.IntelRdt.EnableMonitoring
+func (g *Generator) SetLinuxIntelRdtEnableMonitoring(value bool) {
+	g.initConfigLinuxIntelRdt()
+	g.Config.Linux.IntelRdt.EnableMonitoring = value
+}
+
+// SetLinuxIntelRdtSchemata sets g.Config.Linux.IntelRdt.Schemata
+func (g *Generator) SetLinuxIntelRdtSchemata(schemata []string) {
+	g.initConfigLinuxIntelRdt()
+	g.Config.Linux.IntelRdt.Schemata = slices.Clone(schemata)
+}
+
 // ClearLinuxResourcesBlockIO clears Block I/O settings.
 func (g *Generator) ClearLinuxResourcesBlockIO() {
 	g.initConfigLinuxResources()
@@ -519,9 +759,64 @@ func (g *Generator) SetLinuxResourcesBlockIO(blockIO *rspec.LinuxBlockIO) {
 	g.Config.Linux.Resources.BlockIO = blockIO
 }
 
+// SetProcessIOPriority sets the (Linux) IO priority of the container.
+func (g *Generator) SetProcessIOPriority(ioprio *rspec.LinuxIOPriority) {
+	g.initConfigProcess()
+	if ioprio != nil && ioprio.Class == "" {
+		ioprio = nil
+	}
+	g.Config.Process.IOPriority = ioprio
+}
+
+// SetLinuxResourcesPidsLimit sets Linux PID limit. Starting with
+// v1.3.0 opencontainers/runtime-spec switched the PID limit to
+// *int64 from int64 with nil meaning "unlimited". We don't want
+// to change our API types though, so instead we use a dedicated
+// value for unlimited.
+func (g *Generator) SetLinuxResourcesPidsLimit(limit int64) {
+	g.initConfigLinuxResources()
+	if g.Config.Linux.Resources.Pids == nil {
+		g.Config.Linux.Resources.Pids = &rspec.LinuxPids{}
+	}
+	if limit > UnlimitedPidsLimit {
+		g.Config.Linux.Resources.Pids.Limit = &limit
+	}
+}
+
+// AddLinuxNetDevice adds a new Linux net device.
+func (g *Generator) AddLinuxNetDevice(hostDev string, device *nri.LinuxNetDevice) {
+	if device == nil {
+		return
+	}
+	g.initConfigLinuxNetDevices()
+	g.Config.Linux.NetDevices[hostDev] = device.ToOCI()
+}
+
+// RemoveLinuxNetDevice removes a Linux net device.
+func (g *Generator) RemoveLinuxNetDevice(hostDev string) {
+	g.initConfigLinuxNetDevices()
+	delete(g.Config.Linux.NetDevices, hostDev)
+}
+
+// SetLinuxMemoryPolicy sets the given Linux memory policy.
+func (g *Generator) SetLinuxMemoryPolicy(mpol *rspec.LinuxMemoryPolicy) {
+	g.initConfigLinux()
+	if mpol != nil && mpol.Mode == "" {
+		mpol = nil
+	}
+	g.Config.Linux.MemoryPolicy = mpol
+}
+
 func (g *Generator) initConfig() {
 	if g.Config == nil {
 		g.Config = &rspec.Spec{}
+	}
+}
+
+func (g *Generator) initConfigProcess() {
+	g.initConfig()
+	if g.Config.Process == nil {
+		g.Config.Process = &rspec.Process{}
 	}
 }
 
@@ -543,5 +838,19 @@ func (g *Generator) initConfigLinuxResources() {
 	g.initConfigLinux()
 	if g.Config.Linux.Resources == nil {
 		g.Config.Linux.Resources = &rspec.LinuxResources{}
+	}
+}
+
+func (g *Generator) initConfigLinuxNetDevices() {
+	g.initConfigLinux()
+	if g.Config.Linux.NetDevices == nil {
+		g.Config.Linux.NetDevices = map[string]rspec.LinuxNetDevice{}
+	}
+}
+
+func (g *Generator) initConfigLinuxIntelRdt() {
+	g.initConfigLinux()
+	if g.Config.Linux.IntelRdt == nil {
+		g.Config.Linux.IntelRdt = &rspec.LinuxIntelRdt{}
 	}
 }

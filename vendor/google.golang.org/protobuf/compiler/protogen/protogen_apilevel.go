@@ -124,25 +124,6 @@ func (field *Field) getterName() (getter, compat string) {
 // setterName returns the (possibly mangled) name of the generated Set method,
 // along with the backwards-compatible name (if needed).
 func (field *Field) setterName() (setter, compat string) {
-	// TODO(b/359846588): remove weak field support?
-	if field.Desc.IsWeak() && field.Parent.APILevel != gofeaturespb.GoFeatures_API_OPAQUE {
-		switch field.Parent.APILevel {
-		case gofeaturespb.GoFeatures_API_OPEN:
-			return "Set" + field.GoName, ""
-
-		default:
-			var infix string
-			if field.hasConflictHybrid {
-				infix = "_"
-			}
-			orig := "Set" + infix + field.camelCase
-			mangled := "Set" + field.GoName
-			if mangled == orig {
-				mangled = ""
-			}
-			return orig, mangled
-		}
-	}
 	return field.methodName("Set"), ""
 }
 

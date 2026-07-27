@@ -48,7 +48,7 @@ func TestImageStatus(t *testing.T) {
 		Id:          testID,
 		RepoTags:    []string{"gcr.io/library/busybox:latest"},
 		RepoDigests: []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"},
-		Size_:       uint64(1234),
+		Size:        uint64(1234),
 		Username:    "user",
 	}
 
@@ -112,7 +112,6 @@ func TestGetUserFromImage(t *testing.T) {
 			name: "test",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			actualUID, actualName := getUserFromImage(test.user)
 			assert.Equal(t, test.uid, actualUID)

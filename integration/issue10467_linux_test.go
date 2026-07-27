@@ -28,6 +28,9 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+// TestIssue10467 tests the migration of sandboxes into the proper bucket. Prior to v1.7.21, the
+// sandboxes were stored incorrectly in the root bucket. In order to verify the migration, a v1.7.20
+// must run and create a sandbox, then check the migration after upgrading to a newer version.
 func TestIssue10467(t *testing.T) {
 	latestVersion := "v1.7.20"
 
@@ -37,7 +40,7 @@ func TestIssue10467(t *testing.T) {
 
 	t.Logf("Install config for release %s", latestVersion)
 	workDir := t.TempDir()
-	previousReleaseCtrdConfig(t, releaseBinDir, workDir)
+	oneSevenCtrdConfig(t, releaseBinDir, workDir)
 
 	t.Log("Starting the previous release's containerd")
 	previousCtrdBinPath := filepath.Join(releaseBinDir, "bin", "containerd")
@@ -63,7 +66,8 @@ func TestIssue10467(t *testing.T) {
 	})
 
 	t.Log("Prepare pods for current release")
-	upgradeCaseFunc, hookFunc := shouldManipulateContainersInPodAfterUpgrade(t, previousProc.criRuntimeService(t), previousProc.criImageService(t))
+	upgradeCaseFuncs, hookFunc := shouldManipulateContainersInPodAfterUpgrade("")(t, 2, previousProc.criRuntimeService(t), previousProc.criImageService(t))
+	upgradeCaseFunc := upgradeCaseFuncs[0]
 	needToCleanup = false
 	require.Nil(t, hookFunc)
 

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http/httptrace"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -31,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/pkg/httpdbg"
 	"github.com/containerd/containerd/v2/pkg/progress"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -50,14 +50,9 @@ This command ensures that containerd has all the necessary resources to build
 an image's rootfs and convert the configuration to a runtime format supported
 by containerd.
 
-This command uses the same syntax, of remote and object, as 'ctr fetch-object'.
-We may want to make this nicer, but agnostism is preferred for the moment.
-
-Right now, the responsibility of the daemon and the cli aren't quite clear. Do
-not use this implementation as a guide. The end goal should be having metadata,
-content and snapshots ready for a direct use via the 'ctr run'.
-
-Most of this is experimental and there are few leaps to make this work.`,
+This command pulls image content (manifests, configs, and layers) into the
+content store without unpacking. It can be used to pre-fetch images or to
+pull content that will later be used with 'ctr run' or 'ctr images unpack'.`,
 	Flags: append(commands.RegistryFlags, commands.LabelFlag,
 		&cli.StringSliceFlag{
 			Name:  "platform",
@@ -150,11 +145,6 @@ func NewFetchConfig(ctx context.Context, cliContext *cli.Context) (*FetchConfig,
 		config.AllMetadata = true
 	}
 
-	if cliContext.IsSet("max-concurrent-downloads") {
-		mcd := cliContext.Int("max-concurrent-downloads")
-		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentDownloads(mcd))
-	}
-
 	if cliContext.IsSet("max-concurrent-uploaded-layers") {
 		mcu := cliContext.Int("max-concurrent-uploaded-layers")
 		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentUploadedLayers(mcu))
@@ -168,7 +158,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 	ongoing := NewJobs(ref)
 
 	if config.TraceHTTP {
-		ctx = httptrace.WithClientTrace(ctx, commands.NewDebugClientTrace(ctx))
+		ctx = httpdbg.WithClientTrace(ctx)
 	}
 
 	pctx, stopProgress := context.WithCancel(ctx)
@@ -183,9 +173,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 	}()
 
 	h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
-			ongoing.Add(desc)
-		}
+		ongoing.Add(desc)
 		return nil, nil
 	})
 
@@ -195,7 +183,6 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		containerd.WithPullLabels(labels),
 		containerd.WithResolver(config.Resolver),
 		containerd.WithImageHandler(h),
-		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	}
 	opts = append(opts, config.RemoteOpts...)
 

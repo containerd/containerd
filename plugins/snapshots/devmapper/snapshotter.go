@@ -428,8 +428,13 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				errs = append(errs, sErr)
 			}
 
+			poolStatus := "unavailable"
+			if status != nil {
+				poolStatus = status.RawOutput
+			}
+
 			// Rollback thin device creation if mkfs failed
-			log.G(ctx).WithError(errors.Join(errs...)).Errorf("failed to initialize thin device %q for snapshot %s pool status %s", deviceName, snap.ID, status.RawOutput)
+			log.G(ctx).WithError(errors.Join(errs...)).Errorf("failed to initialize thin device %q for snapshot %s pool status %s", deviceName, snap.ID, poolStatus)
 			return nil, errors.Join(append(errs, s.pool.RemoveDevice(ctx, deviceName))...)
 		}
 	} else {
@@ -509,10 +514,11 @@ func (s *Snapshotter) getDevicePath(snap storage.Snapshot) string {
 func (s *Snapshotter) buildMounts(ctx context.Context, snap storage.Snapshot, fileSystemType fsType) []mount.Mount {
 	var options []string
 
-	if fileSystemType == "" {
+	switch fileSystemType {
+	case "":
 		log.G(ctx).Error("File system type cannot be empty")
 		return nil
-	} else if fileSystemType == fsTypeXFS {
+	case fsTypeXFS:
 		options = append(options, "nouuid")
 	}
 	if snap.Kind != snapshots.KindActive {

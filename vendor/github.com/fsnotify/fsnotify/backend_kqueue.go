@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"sync"
 	"time"
 
@@ -16,14 +17,13 @@ import (
 )
 
 type kqueue struct {
+	*shared
 	Events chan Event
 	Errors chan error
 
 	kq        int    // File descriptor (as returned by the kqueue() syscall).
 	closepipe [2]int // Pipe used for closing kq.
 	watches   *watches
-	done      chan struct{}
-	doneMu    sync.Mutex
 }
 
 type (
@@ -132,14 +132,18 @@ func (w *watches) byPath(path string) (watch, bool) {
 	return info, ok
 }
 
-func (w *watches) updateDirFlags(path string, flags uint32) {
+func (w *watches) updateDirFlags(path string, flags uint32) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	fd := w.path[path]
+	fd, ok := w.path[path]
+	if !ok { // Already deleted: don't re-set it here.
+		return false
+	}
 	info := w.wd[fd]
 	info.dirFlags = flags
 	w.wd[fd] = info
+	return true
 }
 
 func (w *watches) remove(fd int, path string) bool {
@@ -179,22 +183,20 @@ func (w *watches) seenBefore(path string) bool {
 	return ok
 }
 
-func newBackend(ev chan Event, errs chan error) (backend, error) {
-	return newBufferedBackend(0, ev, errs)
-}
+var defaultBufferSize = 0
 
-func newBufferedBackend(sz uint, ev chan Event, errs chan error) (backend, error) {
+func newBackend(ev chan Event, errs chan error) (backend, error) {
 	kq, closepipe, err := newKqueue()
 	if err != nil {
 		return nil, err
 	}
 
 	w := &kqueue{
+		shared:    newShared(ev, errs),
 		Events:    ev,
 		Errors:    errs,
 		kq:        kq,
 		closepipe: closepipe,
-		done:      make(chan struct{}),
 		watches:   newWatches(),
 	}
 
@@ -210,7 +212,7 @@ func newBufferedBackend(sz uint, ev chan Event, errs chan error) (backend, error
 // all.
 func newKqueue() (kq int, closepipe [2]int, err error) {
 	kq, err = unix.Kqueue()
-	if kq == -1 {
+	if err != nil {
 		return kq, closepipe, err
 	}
 
@@ -239,54 +241,34 @@ func newKqueue() (kq int, closepipe [2]int, err error) {
 	return kq, closepipe, nil
 }
 
-// Returns true if the event was sent, or false if watcher is closed.
-func (w *kqueue) sendEvent(e Event) bool {
-	select {
-	case <-w.done:
-		return false
-	case w.Events <- e:
-		return true
-	}
-}
-
-// Returns true if the error was sent, or false if watcher is closed.
-func (w *kqueue) sendError(err error) bool {
-	if err == nil {
-		return true
-	}
-	select {
-	case <-w.done:
-		return false
-	case w.Errors <- err:
-		return true
-	}
-}
-
-func (w *kqueue) isClosed() bool {
-	select {
-	case <-w.done:
-		return true
-	default:
-		return false
-	}
-}
-
 func (w *kqueue) Close() error {
-	w.doneMu.Lock()
-	if w.isClosed() {
-		w.doneMu.Unlock()
+	if w.shared.close() {
 		return nil
 	}
-	close(w.done)
-	w.doneMu.Unlock()
 
+	// Snapshot and drop all watches directly. w.Remove -> w.remove
+	// short-circuits on isClosed() (which is already true after
+	// w.shared.close() above), so calling Remove here in the happy path
+	// leaked every watched directory + file descriptor. On macOS a
+	// single directory watch opens an fd for every file in the dir, so
+	// long-running processes that recreate watchers (hot-reload dev
+	// servers, etc.) ran out of fds with EMFILE (#732).
 	pathsToRemove := w.watches.listPaths(false)
 	for _, name := range pathsToRemove {
-		w.Remove(name)
+		info, ok := w.watches.byPath(name)
+		if !ok {
+			// w.path has an entry for name but w.wd doesn't --
+			// drop the stale lookup entry so the map state is
+			// consistent after Close.
+			w.watches.remove(0, name)
+			continue
+		}
+		_ = w.register([]int{info.wd}, unix.EV_DELETE, 0)
+		unix.Close(info.wd)
+		w.watches.remove(info.wd, name)
 	}
 
-	// Send "quit" message to the reader goroutine.
-	unix.Close(w.closepipe[1])
+	unix.Close(w.closepipe[1]) // Send "quit" message to readEvents
 	return nil
 }
 
@@ -303,7 +285,7 @@ func (w *kqueue) AddWith(name string, opts ...addOpt) error {
 		return fmt.Errorf("%w: %s", xErrUnsupported, with.op)
 	}
 
-	_, err := w.addWatch(name, noteAllEvents)
+	_, err := w.addWatch(name, noteAllEvents, false)
 	if err != nil {
 		return err
 	}
@@ -366,7 +348,7 @@ const noteAllEvents = unix.NOTE_DELETE | unix.NOTE_WRITE | unix.NOTE_ATTRIB | un
 // described in kevent(2).
 //
 // Returns the real path to the file which was added, with symlinks resolved.
-func (w *kqueue) addWatch(name string, flags uint32) (string, error) {
+func (w *kqueue) addWatch(name string, flags uint32, listDir bool) (string, error) {
 	if w.isClosed() {
 		return "", ErrClosed
 	}
@@ -385,15 +367,15 @@ func (w *kqueue) addWatch(name string, flags uint32) (string, error) {
 			return "", nil
 		}
 
-		// Follow symlinks.
-		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
+		// Follow symlinks, but only for paths added with Add(), and not paths
+		// we're adding from internalWatch from a listdir.
+		if !listDir && fi.Mode()&os.ModeSymlink == os.ModeSymlink {
 			link, err := os.Readlink(name)
 			if err != nil {
-				// Return nil because Linux can add unresolvable symlinks to the
-				// watch list without problems, so maintain consistency with
-				// that. There will be no file events for broken symlinks.
-				// TODO: more specific check; returns os.PathError; ENOENT?
-				return "", nil
+				return "", err
+			}
+			if !filepath.IsAbs(link) {
+				link = filepath.Join(filepath.Dir(name), link)
 			}
 
 			_, alreadyWatching = w.watches.byPath(link)
@@ -408,24 +390,16 @@ func (w *kqueue) addWatch(name string, flags uint32) (string, error) {
 			name = link
 			fi, err = os.Lstat(name)
 			if err != nil {
-				return "", nil
+				return "", err
 			}
 		}
 
-		// Retry on EINTR; open() can return EINTR in practice on macOS.
-		// See #354, and Go issues 11180 and 39237.
-		for {
-			info.wd, err = unix.Open(name, openMode, 0)
-			if err == nil {
-				break
-			}
-			if errors.Is(err, unix.EINTR) {
-				continue
-			}
-
+		info.wd, err = internal.IgnoringEINTR(func() (int, error) {
+			return unix.Open(name, openMode, 0)
+		})
+		if err != nil {
 			return "", err
 		}
-
 		info.isDir = fi.IsDir()
 	}
 
@@ -444,10 +418,16 @@ func (w *kqueue) addWatch(name string, flags uint32) (string, error) {
 	if info.isDir {
 		watchDir := (flags&unix.NOTE_WRITE) == unix.NOTE_WRITE &&
 			(!alreadyWatching || (info.dirFlags&unix.NOTE_WRITE) != unix.NOTE_WRITE)
-		w.watches.updateDirFlags(name, flags)
+		if !w.watches.updateDirFlags(name, flags) {
+			return "", nil
+		}
 
 		if watchDir {
-			if err := w.watchDirectoryFiles(name); err != nil {
+			d := name
+			if info.linkName != "" {
+				d = info.linkName
+			}
+			if err := w.watchDirectoryFiles(d); err != nil {
 				return "", err
 			}
 		}
@@ -467,9 +447,10 @@ func (w *kqueue) readEvents() {
 
 	eventBuffer := make([]unix.Kevent_t, 10)
 	for {
-		kevents, err := w.read(eventBuffer)
-		// EINTR is okay, the syscall was interrupted before timeout expired.
-		if err != nil && err != unix.EINTR {
+		kevents, err := internal.IgnoringEINTR(func() ([]unix.Kevent_t, error) {
+			return w.read(eventBuffer)
+		})
+		if err != nil {
 			if !w.sendError(fmt.Errorf("fsnotify.readEvents: %w", err)) {
 				return
 			}
@@ -614,12 +595,14 @@ func (w *kqueue) watchDirectoryFiles(dirPath string) error {
 
 		cleanPath, err := w.internalWatch(path, fi)
 		if err != nil {
-			// No permission to read the file; that's not a problem: just skip.
-			// But do add it to w.fileExists to prevent it from being picked up
-			// as a "new" file later (it still shows up in the directory
+			// No permission, or the entry resolved to a missing target
+			// (e.g. a dangling symlink): not a problem, just skip. But
+			// do mark it as seen to prevent it from being picked up as
+			// a "new" file later (it still shows up in the directory
 			// listing).
 			switch {
-			case errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM):
+			case errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM) ||
+				errors.Is(err, os.ErrNotExist):
 				cleanPath = filepath.Clean(path)
 			default:
 				return fmt.Errorf("%q: %w", path, err)
@@ -644,19 +627,22 @@ func (w *kqueue) dirChange(dir string) error {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
-		return fmt.Errorf("fsnotify.dirChange: %w", err)
+		return fmt.Errorf("fsnotify.dirChange %q: %w", dir, err)
 	}
 
 	for _, f := range files {
 		fi, err := f.Info()
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
 			return fmt.Errorf("fsnotify.dirChange: %w", err)
 		}
 
 		err = w.sendCreateIfNew(filepath.Join(dir, fi.Name()), fi)
 		if err != nil {
 			// Don't need to send an error if this file isn't readable.
-			if errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM) {
+			if errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM) || errors.Is(err, os.ErrNotExist) {
 				return nil
 			}
 			return fmt.Errorf("fsnotify.dirChange: %w", err)
@@ -688,11 +674,11 @@ func (w *kqueue) internalWatch(name string, fi os.FileInfo) (string, error) {
 		// mimic Linux providing delete events for subdirectories, but preserve
 		// the flags used if currently watching subdirectory
 		info, _ := w.watches.byPath(name)
-		return w.addWatch(name, info.dirFlags|unix.NOTE_DELETE|unix.NOTE_RENAME)
+		return w.addWatch(name, info.dirFlags|unix.NOTE_DELETE|unix.NOTE_RENAME, true)
 	}
 
-	// watch file to mimic Linux inotify
-	return w.addWatch(name, noteAllEvents)
+	// Watch file to mimic Linux inotify.
+	return w.addWatch(name, noteAllEvents, true)
 }
 
 // Register events with the queue.
@@ -722,12 +708,28 @@ func (w *kqueue) read(events []unix.Kevent_t) ([]unix.Kevent_t, error) {
 }
 
 func (w *kqueue) xSupports(op Op) bool {
-	if runtime.GOOS == "freebsd" {
-		//return true // Supports everything.
-	}
+	//if runtime.GOOS == "freebsd" {
+	//	return true // Supports everything.
+	//}
 	if op.Has(xUnportableOpen) || op.Has(xUnportableRead) ||
 		op.Has(xUnportableCloseWrite) || op.Has(xUnportableCloseRead) {
 		return false
 	}
 	return true
+}
+
+func (w *kqueue) state() {
+	w.watches.mu.Lock()
+	defer w.watches.mu.Unlock()
+
+	all := make([]int, 0, len(w.watches.wd))
+	for wd := range w.watches.wd {
+		all = append(all, wd)
+	}
+	sort.Ints(all)
+
+	for _, wd := range all {
+		ww := w.watches.wd[wd]
+		fmt.Fprintf(os.Stderr, "%4d  %q  linkname=%q\n", wd, ww.name, ww.linkName)
+	}
 }

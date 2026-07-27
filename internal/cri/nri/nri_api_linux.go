@@ -19,8 +19,13 @@ package nri
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"maps"
+	"os"
+	"slices"
 
+	eventtypes "github.com/containerd/containerd/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
@@ -29,6 +34,8 @@ import (
 	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/blockio"
+	cdispec "github.com/containerd/containerd/v2/pkg/cdi"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -93,6 +100,28 @@ func (a *API) RunPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
 	return err
 }
 
+func (a *API) UpdatePodSandboxResources(ctx context.Context, criPod *sstore.Sandbox, overhead *cri.LinuxContainerResources, req *cri.LinuxContainerResources) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	err := a.nri.UpdatePodSandbox(ctx, pod, fromCRILinuxResources(overhead), fromCRILinuxResources(req))
+
+	return err
+}
+
+func (a *API) PostUpdatePodSandboxResources(ctx context.Context, criPod *sstore.Sandbox) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	err := a.nri.PostUpdatePodSandbox(ctx, pod)
+
+	return err
+}
+
 func (a *API) StopPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
 	if a.IsDisabled() {
 		return nil
@@ -117,7 +146,7 @@ func (a *API) RemovePodSandbox(ctx context.Context, criPod *sstore.Sandbox) erro
 }
 
 func (a *API) CreateContainer(ctx context.Context, ctrs *containers.Container, spec *runtimespec.Spec) (*api.ContainerAdjustment, error) {
-	ctr := a.nriContainer(ctrs, spec)
+	ctr := a.nriContainer(ctrs, withContainerSpec(spec))
 
 	criPod, err := a.cri.SandboxStore().Get(ctr.GetPodSandboxID())
 	if err != nil {
@@ -137,7 +166,7 @@ func (a *API) PostCreateContainer(ctx context.Context, criPod *sstore.Sandbox, c
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.PostCreateContainer(ctx, pod, ctr)
 
@@ -150,7 +179,7 @@ func (a *API) StartContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.StartContainer(ctx, pod, ctr)
 
@@ -163,7 +192,7 @@ func (a *API) PostStartContainer(ctx context.Context, criPod *sstore.Sandbox, cr
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.PostStartContainer(ctx, pod, ctr)
 
@@ -178,14 +207,14 @@ func (a *API) UpdateContainerResources(ctx context.Context, criPod *sstore.Sandb
 	const noOomAdj = 0
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
-	r, err := a.nri.UpdateContainer(ctx, pod, ctr, api.FromCRILinuxResources(req))
+	r, err := a.nri.UpdateContainer(ctx, pod, ctr, fromCRILinuxResources(req))
 	if err != nil {
 		return nil, err
 	}
 
-	return r.ToCRI(noOomAdj), nil
+	return toCRIResources(r, noOomAdj), nil
 }
 
 func (a *API) PostUpdateContainerResources(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
@@ -194,7 +223,7 @@ func (a *API) PostUpdateContainerResources(ctx context.Context, criPod *sstore.S
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.PostUpdateContainer(ctx, pod, ctr)
 
@@ -206,7 +235,7 @@ func (a *API) StopContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr 
 		return nil
 	}
 
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	if criPod == nil || criPod.ID == "" {
 		criPod = &sstore.Sandbox{
@@ -222,12 +251,12 @@ func (a *API) StopContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr 
 	return err
 }
 
-func (a *API) NotifyContainerExit(ctx context.Context, criCtr *cstore.Container) {
+func (a *API) NotifyContainerExit(ctx context.Context, criCtr *cstore.Container, e *eventtypes.TaskExit) {
 	if a.IsDisabled() {
 		return
 	}
 
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr, withExitEvent(e))
 
 	criPod, _ := a.cri.SandboxStore().Get(ctr.GetPodSandboxID())
 	if criPod.ID == "" {
@@ -248,7 +277,7 @@ func (a *API) RemoveContainer(ctx context.Context, criPod *sstore.Sandbox, criCt
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(criCtr, nil)
+	ctr := a.nriContainer(criCtr)
 
 	err := a.nri.RemoveContainer(ctx, pod, ctr)
 
@@ -261,7 +290,7 @@ func (a *API) UndoCreateContainer(ctx context.Context, criPod *sstore.Sandbox, i
 	}
 
 	pod := a.nriPodSandbox(criPod)
-	ctr := a.nriContainer(&containers.Container{ID: id}, spec)
+	ctr := a.nriContainer(&containers.Container{ID: id}, withContainerSpec(spec))
 
 	err := a.nri.StopContainer(ctx, pod, ctr)
 	if err != nil {
@@ -281,40 +310,49 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		}
 	}
 
-	resourceCheckOpt := nrigen.WithResourceChecker(
-		func(r *runtimespec.LinuxResources) error {
-			if r != nil {
-				if a.cri.Config().DisableHugetlbController {
-					r.HugepageLimits = nil
+	generatorOptions := []nrigen.GeneratorOption{
+		// resource checker
+		nrigen.WithResourceChecker(
+			func(r *runtimespec.LinuxResources) error {
+				if r != nil {
+					if a.cri.Config().DisableHugetlbController {
+						r.HugepageLimits = nil
+					}
 				}
-			}
-			return nil
-		},
-	)
-
-	rdtResolveOpt := nrigen.WithRdtResolver(
-		func(className string) (*runtimespec.LinuxIntelRdt, error) {
-			if className == "" {
-				return nil, nil
-			}
-			return &runtimespec.LinuxIntelRdt{
-				ClosID: className,
-			}, nil
-		},
-	)
-
-	blkioResolveOpt := nrigen.WithBlockIOResolver(
-		func(className string) (*runtimespec.LinuxBlockIO, error) {
-			if className == "" {
-				return nil, nil
-			}
-			blockIO, err := blockio.ClassNameToLinuxOCI(className)
-			if err != nil {
-				return nil, err
-			}
-			return blockIO, nil
-		},
-	)
+				return nil
+			},
+		),
+		// RDT class resolver
+		nrigen.WithRdtResolver(
+			func(className string) (*runtimespec.LinuxIntelRdt, error) {
+				if className == "" {
+					return nil, nil
+				}
+				return &runtimespec.LinuxIntelRdt{
+					ClosID: className,
+				}, nil
+			},
+		),
+		// Block I/O throttling class resolver
+		nrigen.WithBlockIOResolver(
+			func(className string) (*runtimespec.LinuxBlockIO, error) {
+				if className == "" {
+					return nil, nil
+				}
+				blockIO, err := blockio.ClassNameToLinuxOCI(className)
+				if err != nil {
+					return nil, err
+				}
+				return blockIO, nil
+			},
+		),
+		// CDI injector
+		nrigen.WithCDIDeviceInjector(
+			func(s *runtimespec.Spec, devices []string) error {
+				return cdispec.WithCDIDevices(devices...)(context.TODO(), nil, nil, s)
+			},
+		),
+	}
 
 	return func(ctx context.Context, _ *containerd.Client, c *containers.Container) error {
 		spec := &runtimespec.Spec{}
@@ -326,9 +364,12 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		if err != nil {
 			return fmt.Errorf("failed to get NRI adjustment for container: %w", err)
 		}
+		if adjust == nil {
+			return nil
+		}
 
 		sgen := generate.Generator{Config: spec}
-		ngen := nrigen.SpecGenerator(&sgen, resourceCheckOpt, rdtResolveOpt, blkioResolveOpt)
+		ngen := nrigen.SpecGenerator(&sgen, generatorOptions...)
 
 		err = ngen.Adjust(adjust)
 		if err != nil {
@@ -345,7 +386,7 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 	}
 }
 
-func (a *API) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDeleteOpts {
+func (a *API) WithContainerExit(criCtr *cstore.Container, e *eventtypes.TaskExit) containerd.ProcessDeleteOpts {
 	if a.IsDisabled() {
 		return func(_ context.Context, _ containerd.Process) error {
 			return nil
@@ -353,9 +394,18 @@ func (a *API) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDele
 	}
 
 	return func(_ context.Context, _ containerd.Process) error {
-		a.NotifyContainerExit(context.Background(), criCtr)
+		a.NotifyContainerExit(context.Background(), criCtr, e)
 		return nil
 	}
+}
+
+type PluginSyncBlock = nri.PluginSyncBlock
+
+func (a *API) BlockPluginSync() *PluginSyncBlock {
+	if a.IsDisabled() {
+		return nil
+	}
+	return a.nri.BlockPluginSync()
 }
 
 //
@@ -394,8 +444,7 @@ func (a *API) ListContainers() []nri.Container {
 		case cri.ContainerState_CONTAINER_UNKNOWN:
 			continue
 		}
-		ctr := ctr
-		containers = append(containers, a.nriContainer(&ctr, nil))
+		containers = append(containers, a.nriContainer(&ctr))
 	}
 	return containers
 }
@@ -415,7 +464,7 @@ func (a *API) GetContainer(id string) (nri.Container, bool) {
 		return nil, false
 	}
 
-	return a.nriContainer(&ctr, nil), true
+	return a.nriContainer(&ctr), true
 }
 
 func (a *API) UpdateContainer(ctx context.Context, u *api.ContainerUpdate) error {
@@ -428,7 +477,7 @@ func (a *API) UpdateContainer(ctx context.Context, u *api.ContainerUpdate) error
 		func(status cstore.Status) (cstore.Status, error) {
 			criReq := &cri.UpdateContainerResourcesRequest{
 				ContainerId: u.ContainerId,
-				Linux:       u.GetLinux().GetResources().ToCRI(0),
+				Linux:       toCRIResources(u.GetLinux().GetResources(), 0),
 			}
 			newStatus, err := a.cri.UpdateContainerResources(ctx, ctr, criReq, status)
 			return newStatus, err
@@ -462,8 +511,9 @@ func (a *API) EvictContainer(ctx context.Context, e *api.ContainerEviction) erro
 
 type criPodSandbox struct {
 	*sstore.Sandbox
-	spec *runtimespec.Spec
-	pid  uint32
+	spec   *runtimespec.Spec
+	labels map[string]string
+	pid    uint32
 }
 
 func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
@@ -472,28 +522,27 @@ func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 		spec:    &runtimespec.Spec{},
 	}
 
-	if pod == nil || pod.Container == nil {
+	if pod == nil {
 		return criPod
 	}
 
-	ctx := ctrdutil.NamespacedContext()
-	task, err := pod.Container.Task(ctx, nil)
+	criPod.pid = pod.Status.Get().Pid
+
+	sandboxInfo, err := a.cri.SandboxMetadataStore().Get(ctrdutil.NamespacedContext(), pod.ID)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			log.L.WithError(err).Errorf("failed to get task for sandbox container %s",
-				pod.Container.ID())
+			log.L.WithError(err).Errorf("failed to get sandbox metadata for pod %s", pod.ID)
 		}
 		return criPod
 	}
 
-	criPod.pid = task.Pid()
-	spec, err := task.Spec(ctx)
-	if err != nil {
-		log.L.WithError(err).Errorf("failed to get spec for sandbox container %s",
-			pod.Container.ID())
-		return criPod
+	criPod.labels = sandboxInfo.Labels
+
+	if sandboxInfo.Spec != nil {
+		if err := typeurl.UnmarshalTo(sandboxInfo.Spec, criPod.spec); err != nil {
+			log.L.WithError(err).Errorf("failed to unmarshal sandbox spec for pod %s", pod.ID)
+		}
 	}
-	criPod.spec = spec
 
 	return criPod
 }
@@ -535,16 +584,13 @@ func (p *criPodSandbox) GetAnnotations() map[string]string {
 		return nil
 	}
 
-	annotations := map[string]string{}
-
-	for key, value := range p.Config.GetAnnotations() {
-		annotations[key] = value
+	merged := maps.Clone(p.Config.GetAnnotations())
+	if merged == nil {
+		merged = map[string]string{}
 	}
-	for key, value := range p.spec.Annotations {
-		annotations[key] = value
-	}
+	maps.Copy(merged, p.spec.Annotations)
 
-	return annotations
+	return merged
 }
 
 func (p *criPodSandbox) GetLabels() map[string]string {
@@ -552,27 +598,13 @@ func (p *criPodSandbox) GetLabels() map[string]string {
 		return nil
 	}
 
-	labels := map[string]string{}
-
-	for key, value := range p.Config.GetLabels() {
-		labels[key] = value
+	labels := maps.Clone(p.Config.GetLabels())
+	if labels == nil {
+		labels = make(map[string]string)
 	}
 
-	if p.Sandbox.Container == nil {
-		return labels
-	}
-
-	ctx := ctrdutil.NamespacedContext()
-	ctrd := p.Sandbox.Container
-	ctrs, err := ctrd.Info(ctx, containerd.WithoutRefreshedMetadata)
-	if err != nil {
-		log.L.WithError(err).Errorf("failed to get info for sandbox container %s", ctrd.ID())
-		return labels
-	}
-
-	for key, value := range ctrs.Labels {
-		labels[key] = value
-	}
+	// Append sandbox labels
+	maps.Copy(labels, p.labels)
 
 	return labels
 }
@@ -589,23 +621,39 @@ func (p *criPodSandbox) GetLinuxPodSandbox() nri.LinuxPodSandbox {
 }
 
 func (p *criPodSandbox) GetLinuxNamespaces() []*api.LinuxNamespace {
-	if p.spec.Linux != nil {
-		return api.FromOCILinuxNamespaces(p.spec.Linux.Namespaces)
+	if p.Sandbox == nil {
+		return nil
 	}
-	return nil
+
+	var namespaces []*api.LinuxNamespace
+	if p.spec.Linux != nil {
+		namespaces = api.FromOCILinuxNamespaces(p.spec.Linux.Namespaces)
+	}
+
+	// Filter out stale network namespaces (netns is torn down before RemovePodSandbox).
+	return slices.DeleteFunc(namespaces, func(ns *api.LinuxNamespace) bool {
+		if ns.GetType() != "network" {
+			return false
+		}
+		if ns.GetPath() == "" {
+			return true
+		}
+		_, err := os.Stat(ns.GetPath())
+		return err != nil && errors.Is(err, os.ErrNotExist)
+	})
 }
 
 func (p *criPodSandbox) GetPodLinuxOverhead() *api.LinuxResources {
 	if p.Sandbox == nil {
 		return nil
 	}
-	return api.FromCRILinuxResources(p.Config.GetLinux().GetOverhead())
+	return fromCRILinuxResources(p.Config.GetLinux().GetOverhead())
 }
 func (p *criPodSandbox) GetPodLinuxResources() *api.LinuxResources {
 	if p.Sandbox == nil {
 		return nil
 	}
-	return api.FromCRILinuxResources(p.Config.GetLinux().GetResources())
+	return fromCRILinuxResources(p.Config.GetLinux().GetResources())
 }
 
 func (p *criPodSandbox) GetLinuxResources() *api.LinuxResources {
@@ -634,7 +682,8 @@ func (p *criPodSandbox) GetPid() uint32 {
 }
 
 func (p *criPodSandbox) GetIPs() []string {
-	if p.IP == "" {
+	// IP and AdditionalIPs are promoted fields from the embedded Sandbox struct.
+	if p.Sandbox == nil || p.IP == "" {
 		return nil
 	}
 	ips := append([]string{p.IP}, p.AdditionalIPs...)
@@ -645,15 +694,36 @@ func (p *criPodSandbox) GetIPs() []string {
 // NRI integration wrapper for CRI Containers
 //
 
+type criContainerOption func(*criContainer)
+
+func withContainerSpec(spec *runtimespec.Spec) criContainerOption {
+	return func(c *criContainer) {
+		c.spec = spec
+	}
+}
+
+func withExitEvent(e *eventtypes.TaskExit) criContainerOption {
+	return func(c *criContainer) {
+		c.exit = e
+	}
+}
+
 type criContainer struct {
 	api  *API
 	ctrs *containers.Container
 	spec *runtimespec.Spec
 	meta *cstore.Metadata
 	pid  uint32
+	exit *eventtypes.TaskExit
 }
 
-func (a *API) nriContainer(ctr interface{}, spec *runtimespec.Spec) *criContainer {
+func (a *API) nriContainer(ctr any, opts ...criContainerOption) *criContainer {
+	criCtr := &criContainer{}
+	for _, o := range opts {
+		o(criCtr)
+	}
+	criCtr.api = a
+
 	switch c := ctr.(type) {
 	case *cstore.Container:
 		ctx := ctrdutil.NamespacedContext()
@@ -677,13 +747,12 @@ func (a *API) nriContainer(ctr interface{}, spec *runtimespec.Spec) *criContaine
 			pid = task.Pid()
 		}
 
-		return &criContainer{
-			api:  a,
-			ctrs: &ctrs,
-			meta: &c.Metadata,
-			spec: spec,
-			pid:  pid,
-		}
+		criCtr.ctrs = &ctrs
+		criCtr.meta = &c.Metadata
+		criCtr.spec = spec
+		criCtr.pid = pid
+
+		return criCtr
 
 	case *containers.Container:
 		ctrs := c
@@ -695,20 +764,17 @@ func (a *API) nriContainer(ctr interface{}, spec *runtimespec.Spec) *criContaine
 			}
 		}
 
-		return &criContainer{
-			api:  a,
-			ctrs: ctrs,
-			meta: meta,
-			spec: spec,
-		}
+		criCtr.ctrs = ctrs
+		criCtr.meta = meta
+
+		return criCtr
 	}
 
 	log.L.Errorf("can't wrap %T as NRI container", ctr)
-	return &criContainer{
-		api:  a,
-		meta: &cstore.Metadata{},
-		spec: &runtimespec.Spec{},
-	}
+	criCtr.meta = &cstore.Metadata{}
+	criCtr.spec = &runtimespec.Spec{}
+
+	return criCtr
 }
 
 func (c *criContainer) GetDomain() string {
@@ -730,21 +796,56 @@ func (c *criContainer) GetName() string {
 	return c.spec.Annotations[annotations.ContainerName]
 }
 
-func (c *criContainer) GetState() api.ContainerState {
-	criCtr, err := c.api.cri.ContainerStore().Get(c.GetID())
-	if err != nil {
-		return api.ContainerState_CONTAINER_UNKNOWN
-	}
-	switch criCtr.Status.Get().State() {
-	case cri.ContainerState_CONTAINER_CREATED:
-		return api.ContainerState_CONTAINER_CREATED
-	case cri.ContainerState_CONTAINER_RUNNING:
-		return api.ContainerState_CONTAINER_RUNNING
-	case cri.ContainerState_CONTAINER_EXITED:
-		return api.ContainerState_CONTAINER_STOPPED
+func (c *criContainer) GetStatus() *nri.ContainerStatus {
+	const (
+		// completedExitReason is the exit reason when container exits with 0.
+		completedExitReason = "Completed"
+		// errorExitReason is the exit reason when container exits with non-zero.
+		errorExitReason = "Error"
+	)
+
+	status := &nri.ContainerStatus{
+		State: api.ContainerState_CONTAINER_UNKNOWN,
 	}
 
-	return api.ContainerState_CONTAINER_UNKNOWN
+	criCtr, err := c.api.cri.ContainerStore().Get(c.GetID())
+	if err == nil {
+		s := criCtr.Status.Get()
+		switch s.State() {
+		case cri.ContainerState_CONTAINER_CREATED:
+			status.State = api.ContainerState_CONTAINER_CREATED
+		case cri.ContainerState_CONTAINER_RUNNING:
+			status.State = api.ContainerState_CONTAINER_RUNNING
+		case cri.ContainerState_CONTAINER_EXITED:
+			if s.ExitCode == 0 {
+				status.Reason = completedExitReason
+			} else {
+				status.Reason = errorExitReason
+			}
+		}
+
+		if status.Reason == "" {
+			status.Reason = s.Reason
+		}
+		status.Message = s.Message
+		status.Pid = s.Pid
+		status.CreatedAt = s.CreatedAt
+		status.StartedAt = s.StartedAt
+		status.FinishedAt = s.FinishedAt
+		status.ExitCode = s.ExitCode
+
+		if status.Pid == 0 { // in StartContainer we don't have the PID in status yet
+			status.Pid = c.pid
+		}
+	}
+
+	if c.exit != nil { // when handling an exit event use the exit info
+		status.State = api.ContainerState_CONTAINER_STOPPED
+		status.FinishedAt = protobuf.FromTimestamp(c.exit.ExitedAt).UnixNano()
+		status.ExitCode = int32(c.exit.ExitStatus)
+	}
+
+	return status
 }
 
 func (c *criContainer) GetLabels() map[string]string {
@@ -752,30 +853,25 @@ func (c *criContainer) GetLabels() map[string]string {
 		return nil
 	}
 
-	labels := map[string]string{}
-	for key, value := range c.ctrs.Labels {
-		labels[key] = value
+	labels := maps.Clone(c.ctrs.Labels)
+	if labels == nil {
+		labels = map[string]string{}
 	}
 
 	if c.meta != nil && c.meta.Config != nil {
-		for key, value := range c.meta.Config.Labels {
-			labels[key] = value
-		}
+		maps.Copy(labels, c.meta.Config.Labels)
 	}
 
 	return labels
 }
 
 func (c *criContainer) GetAnnotations() map[string]string {
-	annotations := map[string]string{}
-
-	for key, value := range c.spec.Annotations {
-		annotations[key] = value
+	annotations := maps.Clone(c.spec.Annotations)
+	if annotations == nil {
+		annotations = map[string]string{}
 	}
 	if c.meta != nil && c.meta.Config != nil {
-		for key, value := range c.meta.Config.Annotations {
-			annotations[key] = value
-		}
+		maps.Copy(annotations, c.meta.Config.Annotations)
 	}
 
 	return annotations
@@ -842,6 +938,177 @@ func (c *criContainer) GetCgroupsPath() string {
 	return c.spec.Linux.CgroupsPath
 }
 
+func (c *criContainer) GetIOPriority() *api.LinuxIOPriority {
+	if c.spec.Process == nil {
+		return nil
+	}
+	return api.FromOCILinuxIOPriority(c.spec.Process.IOPriority)
+}
+
+func (c *criContainer) GetScheduler() *api.LinuxScheduler {
+	if c.spec.Process == nil || c.spec.Process.Scheduler == nil {
+		return nil
+	}
+	return api.FromOCILinuxScheduler(c.spec.Process.Scheduler)
+}
+
+func (c *criContainer) GetNetDevices() map[string]*api.LinuxNetDevice {
+	if c.spec.Linux == nil {
+		return nil
+	}
+	return api.FromOCILinuxNetDevices(c.spec.Linux.NetDevices)
+}
+
+func (c *criContainer) GetCDIDevices() []*api.CDIDevice {
+	if c.meta != nil && c.meta.Config != nil {
+		devices := make([]*api.CDIDevice, 0, len(c.meta.Config.CDIDevices))
+		for _, d := range c.meta.Config.CDIDevices {
+			devices = append(devices, &api.CDIDevice{
+				Name: d.Name,
+			})
+		}
+		return devices
+	}
+	return nil
+}
+
+func (c *criContainer) GetRdt() *api.LinuxRdt {
+	if c.spec.Linux == nil || c.spec.Linux.IntelRdt == nil {
+		return nil
+	}
+	return &api.LinuxRdt{
+		ClosId:           api.String(c.spec.Linux.IntelRdt.ClosID),
+		Schemata:         api.RepeatedString(c.spec.Linux.IntelRdt.Schemata),
+		EnableMonitoring: api.Bool(c.spec.Linux.IntelRdt.EnableMonitoring),
+	}
+}
+
+func (c *criContainer) GetSeccompProfile() *api.SecurityProfile {
+	if c == nil || c.meta == nil || c.meta.Config == nil {
+		return nil
+	}
+
+	profile := c.meta.Config.GetLinux().GetSecurityContext().GetSeccomp()
+	if profile == nil {
+		return nil
+	}
+
+	return &api.SecurityProfile{
+		ProfileType:  api.SecurityProfile_ProfileType(profile.GetProfileType()),
+		LocalhostRef: profile.GetLocalhostRef(),
+	}
+}
+
+func (c *criContainer) GetSysctl() map[string]string {
+	if c.spec.Linux == nil || len(c.spec.Linux.Sysctl) == 0 {
+		return nil
+	}
+	return maps.Clone(c.spec.Linux.Sysctl)
+}
+
+func (c *criContainer) GetSeccompPolicy() *api.LinuxSeccomp {
+	if c.spec.Linux == nil || c.spec.Linux.Seccomp == nil {
+		return nil
+	}
+
+	return api.FromOCILinuxSeccomp(c.spec.Linux.Seccomp)
+}
+
 func (c *criContainer) GetPid() uint32 {
 	return c.pid
+}
+
+func (c *criContainer) GetRlimits() []*api.POSIXRlimit {
+	if c.spec == nil {
+		return nil
+	}
+
+	var rlimits []*api.POSIXRlimit
+
+	for _, l := range c.spec.Process.Rlimits {
+		rlimits = append(rlimits, &api.POSIXRlimit{
+			Type: l.Type,
+			Hard: l.Hard,
+			Soft: l.Soft,
+		})
+	}
+
+	return rlimits
+}
+
+func (c *criContainer) GetUser() *api.User {
+	if c.spec.Process == nil {
+		return nil
+	}
+
+	return &api.User{
+		Uid:            c.spec.Process.User.UID,
+		Gid:            c.spec.Process.User.GID,
+		AdditionalGids: slices.Clone(c.spec.Process.User.AdditionalGids),
+	}
+}
+
+//
+// conversion to/from CRI types
+//
+
+// fromCRILinuxResources converts linux container resources from CRI to NRI representation.
+func fromCRILinuxResources(c *cri.LinuxContainerResources) *api.LinuxResources {
+	if c == nil {
+		return nil
+	}
+	shares, quota, period := uint64(c.CpuShares), c.CpuQuota, uint64(c.CpuPeriod)
+	r := &api.LinuxResources{
+		Cpu: &api.LinuxCPU{
+			Shares: api.UInt64(&shares),
+			Quota:  api.Int64(&quota),
+			Period: api.UInt64(&period),
+			Cpus:   c.CpusetCpus,
+			Mems:   c.CpusetMems,
+		},
+		Memory: &api.LinuxMemory{
+			Limit: api.Int64(&c.MemoryLimitInBytes),
+		},
+	}
+	for _, l := range c.HugepageLimits {
+		r.HugepageLimits = append(r.HugepageLimits,
+			&api.HugepageLimit{
+				PageSize: l.PageSize,
+				Limit:    l.Limit,
+			})
+	}
+	if len(c.Unified) != 0 {
+		r.Unified = maps.Clone(c.Unified)
+	}
+	return r
+}
+
+// toCRIResources converts linux container resources from NRI to CRI representation.
+func toCRIResources(r *api.LinuxResources, oomScoreAdj int64) *cri.LinuxContainerResources {
+	if r == nil {
+		return nil
+	}
+	o := &cri.LinuxContainerResources{}
+	if r.Memory != nil {
+		o.MemoryLimitInBytes = r.Memory.GetLimit().GetValue()
+		o.OomScoreAdj = oomScoreAdj
+	}
+	if r.Cpu != nil {
+		o.CpuShares = int64(r.Cpu.GetShares().GetValue())
+		o.CpuPeriod = int64(r.Cpu.GetPeriod().GetValue())
+		o.CpuQuota = r.Cpu.GetQuota().GetValue()
+		o.CpusetCpus = r.Cpu.Cpus
+		o.CpusetMems = r.Cpu.Mems
+	}
+	for _, l := range r.HugepageLimits {
+		o.HugepageLimits = append(o.HugepageLimits, &cri.HugepageLimit{
+			PageSize: l.PageSize,
+			Limit:    l.Limit,
+		})
+	}
+	if len(r.Unified) != 0 {
+		o.Unified = maps.Clone(r.Unified)
+	}
+
+	return o
 }

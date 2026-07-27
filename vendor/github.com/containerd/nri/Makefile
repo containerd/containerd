@@ -12,14 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-PROTO_SOURCES = $(shell find . -name '*.proto' | grep -v /vendor/)
-PROTO_GOFILES = $(patsubst %.proto,%.pb.go,$(PROTO_SOURCES))
-PROTO_INCLUDE = -I$(PWD):/usr/local/include:/usr/include
-PROTO_OPTIONS = --proto_path=. $(PROTO_INCLUDE) \
-    --go_opt=paths=source_relative --go_out=. \
-    --go-ttrpc_opt=paths=source_relative --go-ttrpc_out=.
-PROTO_COMPILE = PATH=$(PATH):$(shell go env GOPATH)/bin; protoc $(PROTO_OPTIONS)
-
 GO_CMD     := go
 GO_BUILD   := $(GO_CMD) build
 GO_INSTALL := $(GO_CMD) install
@@ -28,14 +20,28 @@ GO_LINT    := golint -set_exit_status
 GO_FMT     := gofmt
 GO_VET     := $(GO_CMD) vet
 
+GO_BUILD_FLAGS ?=
+
 GO_MODULES := $(shell $(GO_CMD) list ./...)
 
 GOLANG_CILINT := golangci-lint
 GINKGO        := ginkgo
 
-BUILD_PATH    := $(shell pwd)/build
+RESOLVED_PWD  := $(shell realpath $(shell pwd))
+BUILD_PATH    := $(RESOLVED_PWD)/build
 BIN_PATH      := $(BUILD_PATH)/bin
+TOOLS_PATH    := $(BUILD_PATH)/tools
+PROTOC_PATH   := $(TOOLS_PATH)/protoc
 COVERAGE_PATH := $(BUILD_PATH)/coverage
+
+PROTOBUF_VERSION = 3.20.1
+PROTO_SOURCES = $(shell find pkg -name '*.proto' | grep -v /vendor/)
+PROTO_INCLUDE = -I $(PWD) -I$(PROTOC_PATH)/include
+PROTO_OPTIONS = --proto_path=. $(PROTO_INCLUDE) \
+    --go_opt=paths=source_relative --go_out=. \
+    --go-ttrpc_opt=paths=source_relative --go-ttrpc_out=. \
+    --go-plugin_opt=paths=source_relative,disable_pb_gen=true --go-plugin_out=.
+PROTO_COMPILE = PATH=$(PROTOC_PATH)/bin protoc $(PROTO_OPTIONS)
 
 PLUGINS := \
 	$(BIN_PATH)/logger \
@@ -44,8 +50,12 @@ PLUGINS := \
 	$(BIN_PATH)/differ \
 	$(BIN_PATH)/ulimit-adjuster \
 	$(BIN_PATH)/v010-adapter \
-	$(BIN_PATH)/template
-
+	$(BIN_PATH)/template \
+	$(BIN_PATH)/wasm \
+	$(BIN_PATH)/network-device-injector \
+	$(BIN_PATH)/network-logger \
+	$(BIN_PATH)/rdt \
+	$(BIN_PATH)/writable-cgroups
 
 ifneq ($(V),1)
   Q := @
@@ -65,16 +75,43 @@ allclean: clean clean-cache
 
 test: test-gopkgs
 
+FORCE:
+
 #
 # build targets
 #
 
-build-proto: $(PROTO_GOFILES)
+build-proto: check-protoc install-ttrpc-plugin install-wasm-plugin install-protoc-dependencies build-protoc-gen-strip build-protoc-gen-owners
+	for src in $(PROTO_SOURCES); do \
+		$(PROTO_COMPILE) \
+			--plugin=protoc-gen-strip=$(abspath $(BIN_PATH)/protoc-gen-strip) \
+			--strip_out=pkg/api \
+			--strip_opt=file=strip.go \
+			--plugin=protoc-gen-owners=$(abspath $(BIN_PATH)/protoc-gen-owners) \
+			--owners_out=pkg/api \
+			--owners_opt=file=owners_generated.go \
+			$$src; \
+	done
+	sed -i '1s;^;//go:build !wasip1\n\n;' pkg/api/api_ttrpc.pb.go
 
-build-plugins: $(PLUGINS)
+.PHONY: build-proto-dockerized
+build-proto-dockerized:
+	$(Q)docker build --build-arg ARTIFACTS="$(dir $(PROTO_SOURCES))" --target final \
+		--output type=local,dest=$(RESOLVED_PWD) \
+		-f hack/Dockerfile.buildproto .
+	$(Q)tar xf artifacts.tgz && rm -f artifacts.tgz
+
+build-plugins: go-generate $(PLUGINS)
 
 build-check:
 	$(Q)$(GO_BUILD) -v $(GO_MODULES)
+
+mod-tidy:
+	$(Q)$(GO_CMD) mod tidy
+	$(Q)./scripts/go-mod-tidy
+
+go-generate:
+	$(Q)$(GO_CMD) generate ./...
 
 #
 # clean targets
@@ -90,41 +127,32 @@ clean-cache:
 # plugins build targets
 #
 
-$(BIN_PATH)/logger: $(wildcard plugins/logger/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
+.PHONY: build-protoc-gen-owners
+build-protoc-gen-owners:
+	$(Q)echo "Building build/bin/protoc-gen-owners..."; \
+	$(GO_BUILD) -C tools/protoc-gen-owners -o $(abspath $(BIN_PATH)/protoc-gen-owners) $(GO_BUILD_FLAGS) .
 
-$(BIN_PATH)/device-injector: $(wildcard plugins/device-injector/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
+.PHONY: build-protoc-gen-strip
+build-protoc-gen-strip:
+	$(Q)echo "Building build/bin/protoc-gen-strip..."; \
+	$(GO_BUILD) -C tools/protoc-gen-strip -o $(abspath $(BIN_PATH)/protoc-gen-strip) $(GO_BUILD_FLAGS) .
 
-$(BIN_PATH)/hook-injector: $(wildcard plugins/hook-injector/*.go)
+$(BIN_PATH)/% build/bin/%: FORCE
 	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
+	$(GO_BUILD) -C plugins/$* -o $(abspath $@) $(GO_BUILD_FLAGS) .
 
-$(BIN_PATH)/differ: $(wildcard plugins/differ/*.go)
+$(BIN_PATH)/wasm build/bin/wasm: FORCE
 	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
-
-$(BIN_PATH)/ulimit-adjuster: $(wildcard plugins/ulimit-adjuster/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
-
-$(BIN_PATH)/v010-adapter: $(wildcard plugins/v010-adapter/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
-
-$(BIN_PATH)/template: $(wildcard plugins/template/*.go)
-	$(Q)echo "Building $@..."; \
-	cd $(dir $<) && $(GO_BUILD) -o $@ .
+	mkdir -p $(BIN_PATH) && \
+	GOOS=wasip1 GOARCH=wasm $(GO_BUILD) -C plugins/wasm -o $(abspath $@) $(GO_BUILD_FLAGS) -buildmode=c-shared .
 
 #
 # test targets
 #
 
-test-gopkgs: ginkgo-tests test-ulimits
+test-gopkgs: go-generate ginkgo-tests test-ulimits test-rdt test-hook-injector test-writable-cgroups
 
-SKIPPED_PKGS="ulimit-adjuster,device-injector"
+SKIPPED_PKGS="ulimit-adjuster,device-injector,rdt,hook-injector,writable-cgroups"
 
 ginkgo-tests:
 	$(Q)$(GINKGO) run \
@@ -145,6 +173,15 @@ test-ulimits:
 
 test-device-injector:
 	$(Q)cd ./plugins/device-injector && $(GO_TEST) -v
+
+test-rdt:
+	$(Q)cd ./plugins/rdt && $(GO_TEST) -v
+
+test-hook-injector:
+	$(Q)cd ./plugins/hook-injector && $(GO_TEST) -v
+
+test-writable-cgroups:
+	$(Q)cd ./plugins/writable-cgroups && $(GO_TEST) -v
 
 codecov: SHELL := $(shell which bash)
 codecov:
@@ -174,25 +211,32 @@ validate-repo-no-changes:
 	}
 
 #
-# proto generation targets
-#
-
-%.pb.go: %.proto
-	$(Q)echo "Generating $@..."; \
-	$(PROTO_COMPILE) $<
-
-#
 # targets for installing dependencies
 #
+check-protoc:
+	$(Q)found_proto=$(shell $(PROTO_COMPILE) --version 2> /dev/null | awk '{print $$2}'); \
+	if [ "$$found_proto" != "$(PROTOBUF_VERSION)" ]; then \
+	echo "installing protoc version $(PROTOBUF_VERSION) (found: $$found_proto)"; \
+		make clean-protoc; \
+		make install-protoc; \
+	else \
+		echo "protoc version $$found_proto found."; \
+	fi
 
 install-protoc install-protobuf:
-	$(Q)./scripts/install-protobuf
+	$(Q)PROTOBUF_VERSION=$(PROTOBUF_VERSION) INSTALL_DIR=$(PROTOC_PATH) ./scripts/install-protobuf
+
+clean-protoc:
+	$(Q)rm -rf $(PROTOC_PATH)
 
 install-ttrpc-plugin:
-	$(Q)$(GO_INSTALL) -mod=mod github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@74421d10189e8c118870d294c9f7f62db2d33ec1
+	$(Q)GOBIN="$(PROTOC_PATH)/bin" $(GO_INSTALL) github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc
+
+install-wasm-plugin:
+	$(Q)GOBIN="$(PROTOC_PATH)/bin" $(GO_INSTALL) github.com/knqyf263/go-plugin/cmd/protoc-gen-go-plugin
 
 install-protoc-dependencies:
-	$(Q)$(GO_INSTALL) -mod=mod google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+	$(Q)GOBIN="$(PROTOC_PATH)/bin" $(GO_INSTALL) google.golang.org/protobuf/cmd/protoc-gen-go
 
 install-ginkgo:
 	$(Q)$(GO_INSTALL) -mod=mod github.com/onsi/ginkgo/v2/ginkgo

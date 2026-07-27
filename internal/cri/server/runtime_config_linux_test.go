@@ -28,7 +28,7 @@ import (
 )
 
 func newFakeRuntimeConfig(runcV2, systemdCgroup bool) criconfig.Runtime {
-	r := criconfig.Runtime{Type: "default", Options: map[string]interface{}{}}
+	r := criconfig.Runtime{Type: "default", Options: map[string]any{}}
 	if runcV2 {
 		r.Type = plugins.RuntimeRuncV2
 		if systemdCgroup {
@@ -91,7 +91,6 @@ func TestRuntimeConfig(t *testing.T) {
 			expectedCgroupDriver: runtime.CgroupDriver_SYSTEMD,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			c.config.RuntimeConfig.ContainerdConfig.DefaultRuntimeName = test.defaultRuntime

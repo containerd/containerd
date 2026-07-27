@@ -20,6 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"path/filepath"
+	"strings"
 
 	"github.com/containerd/log"
 	"github.com/containerd/nri"
@@ -27,7 +30,6 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/opencontainers/selinux/go-selinux"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
@@ -36,11 +38,12 @@ import (
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
-	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/errdefs"
+	dockerref "github.com/distribution/reference"
 )
 
 func init() {
@@ -76,15 +79,19 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	)
 
 	sandboxImage := c.getSandboxImageName()
-	// Ensure sandbox container image snapshot.
-	image, err := c.ensureImageExists(ctx, sandboxImage, config, metadata.RuntimeHandler)
+	normalized, err := dockerref.ParseDockerRef(sandboxImage)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox image %q: %w", sandboxImage, err)
+		return cin, fmt.Errorf("failed to parse image reference %q: %w", sandboxImage, err)
+	}
+	pauseImage, err := c.client.GetImage(ctx, normalized.String())
+	if err != nil {
+		return cin, fmt.Errorf("failed to get sandbox image %q: %w", normalized.String(), err)
 	}
 
-	containerdImage, err := c.toContainerdImage(ctx, *image)
+	// Get the image spec from containerd image
+	imageSpec, err := pauseImage.Spec(ctx)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
+		return cin, fmt.Errorf("failed to get image spec: %w", err)
 	}
 
 	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
@@ -132,10 +139,11 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
 	// it safely.
-	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
+	spec, err := c.sandboxContainerSpec(id, config, &imageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
+
 	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
 
 	metadata.ProcessLabel = spec.Process.SelinuxLabel
@@ -155,15 +163,27 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		// If privileged don't set selinux label, but we still record the MCS label so that
 		// the unused label can be freed later.
 		spec.Process.SelinuxLabel = ""
+		// If privileged is enabled, sysfs should have the rw attribute
+		for i, k := range spec.Mounts {
+			if filepath.Clean(k.Destination) == "/sys" {
+				for j, v := range spec.Mounts[i].Options {
+					if v == "ro" {
+						spec.Mounts[i].Options[j] = "rw"
+						break
+					}
+				}
+				break
+			}
+		}
 	}
 
 	// Generate spec options that will be applied to the spec later.
-	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)
+	specOpts, err := c.sandboxContainerSpecOpts(config, &imageSpec.Config)
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
 	}
 
-	sandboxLabels := ctrdutil.BuildLabels(config.Labels, image.ImageSpec.Config.Labels, crilabels.ContainerKindSandbox)
+	sandboxLabels := ctrdutil.BuildLabels(config.Labels, imageSpec.Config.Labels, crilabels.ContainerKindSandbox)
 
 	snapshotterOpt := []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))}
 	extraSOpts, err := sandboxSnapshotterOpts(config)
@@ -172,9 +192,14 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	}
 	snapshotterOpt = append(snapshotterOpt, extraSOpts...)
 
+	sandboxSnapshotter := c.imageConfig.Snapshotter
+	if ociRuntime.Snapshotter != "" {
+		sandboxSnapshotter = ociRuntime.Snapshotter
+	}
+
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.imageService.RuntimeSnapshotter(ctx, ociRuntime)),
-		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt...),
+		containerd.WithSnapshotter(sandboxSnapshotter),
+		customopts.WithNewSnapshot(id, pauseImage, !c.imageConfig.DisableSnapshotAnnotations, snapshotterOpt...),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(crilabels.SandboxMetadataExtension, &metadata),
@@ -247,16 +272,22 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 	}
 
-	nric, err := nri.New()
+	nric, err := nri.New() //nolint:staticcheck
 	if err != nil {
 		return cin, fmt.Errorf("unable to create nri client: %w", err)
 	}
 	if nric != nil {
-		nriSB := &nri.Sandbox{
+		if plugins := nric.Plugins(); len(plugins) != 0 { //nolint:staticcheck
+			c.warningService.Emit(ctx, deprecation.NRIV010Plugin)
+			msg, _ := deprecation.Message(deprecation.NRIV010Plugin)
+			log.G(ctx).Warnf("Deprecated NRI plugin(s) %s: %s", strings.Join(plugins, ","), msg)
+		}
+
+		nriSB := &nri.Sandbox{ //nolint:staticcheck
 			ID:     id,
 			Labels: config.Labels,
 		}
-		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
+		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil { //nolint:staticcheck
 			return cin, fmt.Errorf("nri invoke: %w", err)
 		}
 	}
@@ -277,7 +308,20 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	cin.SandboxID = id
 	cin.Pid = task.Pid()
 	cin.CreatedAt = info.CreatedAt
+
+	maps.Copy(labels, sandboxLabels)
+
 	cin.Labels = labels
+
+	spec, err = task.Spec(ctx)
+	if err != nil {
+		return cin, fmt.Errorf("failed to get spec for sandbox container %s: %w", id, err)
+	}
+
+	cin.Spec, err = typeurl.MarshalAny(spec)
+	if err != nil {
+		return cin, fmt.Errorf("failed to marshal spec for sandbox container %s: %w", id, err)
+	}
 
 	go func() {
 		if err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, exitCh); err != nil {
@@ -299,36 +343,12 @@ func (c *Controller) Create(_ctx context.Context, info sandbox.Sandbox, opts ...
 	return c.store.Save(podSandbox)
 }
 
-func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig, runtimeHandler string) (*imagestore.Image, error) {
-	image, err := c.imageService.LocalResolve(ref)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
-	}
-	if err == nil {
-		return &image, nil
-	}
-	// Pull image to ensure the image exists
-	// TODO: Cleaner interface
-	imageID, err := c.imageService.PullImage(ctx, ref, nil, config, runtimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
-	}
-	newImage, err := c.imageService.GetImage(imageID)
-	if err != nil {
-		// It's still possible that someone removed the image right after it is pulled.
-		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
-	}
-	return &newImage, nil
-}
-
 func (c *Controller) getSandboxImageName() string {
 	// returns the name of the sandbox image used to scope pod shared resources used by the pod's containers,
 	// if empty return the default sandbox image.
-	if c.imageService != nil {
-		sandboxImage := c.imageService.PinnedImage("sandbox")
-		if sandboxImage != "" {
-			return sandboxImage
-		}
+	if image, ok := c.imageConfig.PinnedImages["sandbox"]; ok && image != "" {
+		return image
 	}
+
 	return criconfig.DefaultSandboxImage
 }

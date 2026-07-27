@@ -19,7 +19,6 @@ import (
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/internal/strs"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 // Edition is an Enum for proto2.Edition
@@ -33,6 +32,7 @@ const (
 	EditionProto3      Edition = 999
 	Edition2023        Edition = 1000
 	Edition2024        Edition = 1001
+	EditionUnstable    Edition = 9999
 	EditionUnsupported Edition = 100000
 )
 
@@ -73,9 +73,10 @@ type (
 		EditionFeatures EditionFeatures
 	}
 	FileL2 struct {
-		Options   func() protoreflect.ProtoMessage
-		Imports   FileImports
-		Locations SourceLocations
+		Options       func() protoreflect.ProtoMessage
+		Imports       FileImports
+		OptionImports func() protoreflect.FileImports
+		Locations     SourceLocations
 	}
 
 	// EditionFeatures is a frequently-instantiated struct, so please take care
@@ -127,12 +128,9 @@ func (fd *File) ParentFile() protoreflect.FileDescriptor { return fd }
 func (fd *File) Parent() protoreflect.Descriptor         { return nil }
 func (fd *File) Index() int                              { return 0 }
 func (fd *File) Syntax() protoreflect.Syntax             { return fd.L1.Syntax }
-
-// Not exported and just used to reconstruct the original FileDescriptor proto
-func (fd *File) Edition() int32                  { return int32(fd.L1.Edition) }
-func (fd *File) Name() protoreflect.Name         { return fd.L1.Package.Name() }
-func (fd *File) FullName() protoreflect.FullName { return fd.L1.Package }
-func (fd *File) IsPlaceholder() bool             { return false }
+func (fd *File) Name() protoreflect.Name                 { return fd.L1.Package.Name() }
+func (fd *File) FullName() protoreflect.FullName         { return fd.L1.Package }
+func (fd *File) IsPlaceholder() bool                     { return false }
 func (fd *File) Options() protoreflect.ProtoMessage {
 	if f := fd.lazyInit().Options; f != nil {
 		return f()
@@ -150,6 +148,16 @@ func (fd *File) SourceLocations() protoreflect.SourceLocations { return &fd.lazy
 func (fd *File) Format(s fmt.State, r rune)                    { descfmt.FormatDesc(s, r, fd) }
 func (fd *File) ProtoType(protoreflect.FileDescriptor)         {}
 func (fd *File) ProtoInternal(pragma.DoNotImplement)           {}
+
+// The next two are not part of the FileDescriptor interface. They are just used to reconstruct
+// the original FileDescriptor proto.
+func (fd *File) Edition() int32 { return int32(fd.L1.Edition) }
+func (fd *File) OptionImports() protoreflect.FileImports {
+	if f := fd.lazyInit().OptionImports; f != nil {
+		return f()
+	}
+	return emptyFiles
+}
 
 func (fd *File) lazyInit() *FileL2 {
 	if atomic.LoadUint32(&fd.once) == 0 {
@@ -183,9 +191,9 @@ type (
 		L2 *EnumL2 // protected by fileDesc.once
 	}
 	EnumL1 struct {
-		eagerValues bool // controls whether EnumL2.Values is already populated
-
 		EditionFeatures EditionFeatures
+		Visibility      int32
+		eagerValues     bool // controls whether EnumL2.Values is already populated
 	}
 	EnumL2 struct {
 		Options        func() protoreflect.ProtoMessage
@@ -220,6 +228,11 @@ func (ed *Enum) ReservedNames() protoreflect.Names       { return &ed.lazyInit()
 func (ed *Enum) ReservedRanges() protoreflect.EnumRanges { return &ed.lazyInit().ReservedRanges }
 func (ed *Enum) Format(s fmt.State, r rune)              { descfmt.FormatDesc(s, r, ed) }
 func (ed *Enum) ProtoType(protoreflect.EnumDescriptor)   {}
+
+// This is not part of the EnumDescriptor interface. It is just used to reconstruct
+// the original FileDescriptor proto.
+func (ed *Enum) Visibility() int32 { return ed.L1.Visibility }
+
 func (ed *Enum) lazyInit() *EnumL2 {
 	ed.L0.ParentFile.lazyInit() // implicitly initializes L2
 	return ed.L2
@@ -245,13 +258,13 @@ type (
 		L2 *MessageL2 // protected by fileDesc.once
 	}
 	MessageL1 struct {
-		Enums        Enums
-		Messages     Messages
-		Extensions   Extensions
-		IsMapEntry   bool // promoted from google.protobuf.MessageOptions
-		IsMessageSet bool // promoted from google.protobuf.MessageOptions
-
+		Enums           Enums
+		Messages        Messages
+		Extensions      Extensions
 		EditionFeatures EditionFeatures
+		Visibility      int32
+		IsMapEntry      bool // promoted from google.protobuf.MessageOptions
+		IsMessageSet    bool // promoted from google.protobuf.MessageOptions
 	}
 	MessageL2 struct {
 		Options               func() protoreflect.ProtoMessage
@@ -275,7 +288,6 @@ type (
 		Kind             protoreflect.Kind
 		StringName       stringName
 		IsProto3Optional bool // promoted from google.protobuf.FieldDescriptorProto
-		IsWeak           bool // promoted from google.protobuf.FieldOptions
 		IsLazy           bool // promoted from google.protobuf.FieldOptions
 		Default          defaultValue
 		ContainingOneof  protoreflect.OneofDescriptor // must be consistent with Message.Oneofs.Fields
@@ -321,6 +333,11 @@ func (md *Message) Messages() protoreflect.MessageDescriptors     { return &md.L
 func (md *Message) Extensions() protoreflect.ExtensionDescriptors { return &md.L1.Extensions }
 func (md *Message) ProtoType(protoreflect.MessageDescriptor)      {}
 func (md *Message) Format(s fmt.State, r rune)                    { descfmt.FormatDesc(s, r, md) }
+
+// This is not part of the MessageDescriptor interface. It is just used to reconstruct
+// the original FileDescriptor proto.
+func (md *Message) Visibility() int32 { return md.L1.Visibility }
+
 func (md *Message) lazyInit() *MessageL2 {
 	md.L0.ParentFile.lazyInit() // implicitly initializes L2
 	return md.L2
@@ -369,7 +386,7 @@ func (fd *Field) IsPacked() bool {
 	return fd.L1.EditionFeatures.IsPacked
 }
 func (fd *Field) IsExtension() bool { return false }
-func (fd *Field) IsWeak() bool      { return fd.L1.IsWeak }
+func (fd *Field) IsWeak() bool      { return false }
 func (fd *Field) IsLazy() bool      { return fd.L1.IsLazy }
 func (fd *Field) IsList() bool      { return fd.Cardinality() == protoreflect.Repeated && !fd.IsMap() }
 func (fd *Field) IsMap() bool       { return fd.Message() != nil && fd.Message().IsMapEntry() }
@@ -396,11 +413,6 @@ func (fd *Field) Enum() protoreflect.EnumDescriptor {
 	return fd.L1.Enum
 }
 func (fd *Field) Message() protoreflect.MessageDescriptor {
-	if fd.L1.IsWeak {
-		if d, _ := protoregistry.GlobalFiles.FindDescriptorByName(fd.L1.Message.FullName()); d != nil {
-			return d.(protoreflect.MessageDescriptor)
-		}
-	}
 	return fd.L1.Message
 }
 func (fd *Field) IsMapEntry() bool {

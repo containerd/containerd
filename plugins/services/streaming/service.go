@@ -49,7 +49,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.StreamingPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			i, err := ic.GetByID(plugins.StreamingPlugin, "manager")
 			if err != nil {
 				return nil, err

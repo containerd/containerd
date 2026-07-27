@@ -44,6 +44,9 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		log.G(ctx).Tracef("RemoveContainer called for container %q that does not exist", ctrID)
 		return &runtime.RemoveContainerResponse{}, nil
 	}
+
+	defer c.nri.BlockPluginSync().Unblock()
+
 	id := container.ID
 	span.SetAttributes(tracing.Attribute("container.id", id))
 	i, err := container.Container.Info(ctx)
@@ -65,7 +68,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	if state == runtime.ContainerState_CONTAINER_RUNNING ||
 		state == runtime.ContainerState_CONTAINER_UNKNOWN {
 		log.L.Infof("Forcibly stopping container %q", id)
-		if err := c.stopContainer(ctx, container, 0); err != nil {
+		if err := c.stopContainerRetryOnConnectionClosed(ctx, container, 0); err != nil {
 			return nil, fmt.Errorf("failed to forcibly stop container %q: %w", id, err)
 		}
 

@@ -15,6 +15,10 @@ import (
 	"github.com/Microsoft/hcsshim/pkg/cimfs/format"
 )
 
+const (
+	cimHashSize = 32 // size of a hash of a verified CIM in bytes
+)
+
 var (
 	// Equivalent to SDDL of "D:NO_ACCESS_CONTROL".
 	nullSd = []byte{1, 0, 4, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}

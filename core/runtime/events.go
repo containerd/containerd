@@ -48,7 +48,7 @@ const (
 
 // GetTopic converts an event from an interface type to the specific
 // event topic id
-func GetTopic(e interface{}) string {
+func GetTopic(e any) string {
 	switch e.(type) {
 	case *events.TaskCreate:
 		return TaskCreateEventTopic

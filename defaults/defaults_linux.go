@@ -33,4 +33,6 @@ const (
 	// DefaultStateDir is the default location used by containerd to store
 	// transient data
 	DefaultStateDir = "/run/containerd"
+	// DefaultDiffer will set the default differ for the platform.
+	DefaultDiffer = "walking"
 )

@@ -5,7 +5,7 @@
 # lived test environment.
 Set-MpPreference -DisableRealtimeMonitoring:$true
 
-$PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.23.4"; make = ""; nssm = "" }
+$PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.26.5"; make = ""; nssm = "" }
 
 Write-Host "Downloading chocolatey package"
 curl.exe -L "https://packages.chocolatey.org/chocolatey.0.10.15.nupkg" -o 'c:\choco.zip'
@@ -49,7 +49,7 @@ cat c:\Logs\go-env.txt
 go install github.com/jstemmer/go-junit-report@v0.9.1
 
 # Get critctl tool. Used for cri-integration tests
-$CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.26.0/crictl-v1.26.0-windows-amd64.tar.gz"
+$CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.35.0/crictl-v1.35.0-windows-amd64.tar.gz"
 curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
 tar -xvf c:\crictl.tar.gz
 mv crictl.exe "${userGoBin}\crictl.exe" # Move crictl somewhere in path

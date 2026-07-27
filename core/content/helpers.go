@@ -35,7 +35,7 @@ import (
 var ErrReset = errors.New("writer has been reset")
 
 var bufPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		buffer := make([]byte, 1<<20)
 		return &buffer
 	},
@@ -65,9 +65,23 @@ type nopCloserSectionReader struct {
 
 func (*nopCloserSectionReader) Close() error { return nil }
 
+func useDescriptorData(desc ocispec.Descriptor) (bool, error) {
+	if int64(len(desc.Data)) != desc.Size {
+		return false, nil
+	}
+	if err := desc.Digest.Validate(); err != nil {
+		return false, fmt.Errorf("invalid descriptor digest: %w", err)
+	}
+	return desc.Digest.Algorithm().FromBytes(desc.Data) == desc.Digest, nil
+}
+
 // BlobReadSeeker returns a read seeker for the blob from the provider.
 func BlobReadSeeker(ctx context.Context, provider Provider, desc ocispec.Descriptor) (io.ReadSeekCloser, error) {
-	if int64(len(desc.Data)) == desc.Size && digest.FromBytes(desc.Data) == desc.Digest {
+	useData, err := useDescriptorData(desc)
+	if err != nil {
+		return nil, err
+	}
+	if useData {
 		return &nopCloserBytesReader{bytes.NewReader(desc.Data)}, nil
 	}
 
@@ -82,7 +96,11 @@ func BlobReadSeeker(ctx context.Context, provider Provider, desc ocispec.Descrip
 //
 // Avoid using this for large blobs, such as layers.
 func ReadBlob(ctx context.Context, provider Provider, desc ocispec.Descriptor) ([]byte, error) {
-	if int64(len(desc.Data)) == desc.Size && digest.FromBytes(desc.Data) == desc.Digest {
+	useData, err := useDescriptorData(desc)
+	if err != nil {
+		return nil, err
+	}
+	if useData {
 		return desc.Data, nil
 	}
 
@@ -200,7 +218,7 @@ func Copy(ctx context.Context, cw Writer, or io.Reader, size int64, expected dig
 		}
 		if size != 0 && copied < size-ws.Offset {
 			// Short writes would return its own error, this indicates a read failure
-			return fmt.Errorf("failed to read expected number of bytes: %w", io.ErrUnexpectedEOF)
+			return fmt.Errorf("short read: expected %d bytes but got %d: %w", size-ws.Offset, copied, io.ErrUnexpectedEOF)
 		}
 		if err := cw.Commit(ctx, size, expected, opts...); err != nil {
 			if errors.Is(err, ErrReset) {

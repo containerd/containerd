@@ -63,7 +63,7 @@ func BenchmarkTricolor(b *testing.B) {
 		"F": {"H", "C"},
 	}
 	// assume 100 nodes can reach D.
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		ref := fmt.Sprintf("X%d", i)
 		refs["A"] = append(refs["A"], ref)
 		refs[ref] = []string{"D"}

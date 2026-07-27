@@ -21,12 +21,47 @@ import (
 	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/prototestutil"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	testingclock "k8s.io/utils/clock/testing"
 )
+
+type noopEventHandler struct {
+	t       *testing.T
+	eventCh chan any
+}
+
+func (h *noopEventHandler) HandleEvent(any any) error {
+	h.t.Logf("NoopEventHandler: %v", any)
+	h.eventCh <- any
+	return nil
+}
+
+func TestEventMonitor_SubscribeNothing(t *testing.T) {
+	eventCh := make(chan any, 100)
+	backOffEvent := &eventtypes.TaskOOM{ContainerID: "testContainer"}
+
+	em := NewEventMonitor(&noopEventHandler{t: t, eventCh: eventCh})
+	errCh := em.Start()
+
+	em.backOff.enBackOff(backOffEvent.ContainerID, backOffEvent)
+	select {
+	case <-time.After(30 * time.Second):
+		t.Error("No events received as expected")
+	case ev := <-eventCh:
+		assert.Equal(t, backOffEvent, ev)
+	}
+
+	em.Stop()
+	select {
+	case <-time.After(10 * time.Second):
+		t.Error("No error received as expected")
+	case err := <-errCh:
+		assert.NoError(t, err)
+	}
+}
 
 // TestBackOff tests the logic of backOff struct.
 func TestBackOff(t *testing.T) {
@@ -34,13 +69,13 @@ func TestBackOff(t *testing.T) {
 	testClock := testingclock.NewFakeClock(testStartTime)
 	inputQueues := map[string]*backOffQueue{
 		"container1": {
-			events: []interface{}{
+			events: []any{
 				&eventtypes.TaskOOM{ContainerID: "container1"},
 				&eventtypes.TaskOOM{ContainerID: "container1"},
 			},
 		},
 		"container2": {
-			events: []interface{}{
+			events: []any{
 				&eventtypes.TaskOOM{ContainerID: "container2"},
 				&eventtypes.TaskOOM{ContainerID: "container2"},
 			},
@@ -48,7 +83,7 @@ func TestBackOff(t *testing.T) {
 	}
 	expectedQueues := map[string]*backOffQueue{
 		"container2": {
-			events: []interface{}{
+			events: []any{
 				&eventtypes.TaskOOM{ContainerID: "container2"},
 				&eventtypes.TaskOOM{ContainerID: "container2"},
 			},
@@ -57,7 +92,7 @@ func TestBackOff(t *testing.T) {
 			clock:      testClock,
 		},
 		"container1": {
-			events: []interface{}{
+			events: []any{
 				&eventtypes.TaskOOM{ContainerID: "container1"},
 				&eventtypes.TaskOOM{ContainerID: "container1"},
 			},
@@ -109,7 +144,7 @@ func TestBackOff(t *testing.T) {
 	for k := range inputQueues {
 		actQueue := actual.deBackOff(k)
 		doneQueues[k] = actQueue
-		assert.True(t, cmp.Equal(actQueue.events, expectedQueues[k].events, protobuf.Compare))
+		assert.True(t, cmp.Equal(actQueue.events, expectedQueues[k].events, prototestutil.Compare))
 	}
 
 	t.Logf("Should not get out the event again after having got out the backOff event")

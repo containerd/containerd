@@ -34,6 +34,7 @@ const (
 	UtilityVMPath       = `UtilityVM`
 	UtilityVMFilesPath  = `UtilityVM\Files`
 	RegFilesPath        = `Files\Windows\System32\config`
+	BootDirRelativePath = `\EFI\Microsoft\Boot`
 	BcdFilePath         = `UtilityVM\Files\EFI\Microsoft\Boot\BCD`
 	BootMgrFilePath     = `UtilityVM\Files\EFI\Microsoft\Boot\bootmgfw.efi`
 	ContainerBaseVhd    = `blank-base.vhdx`
@@ -435,13 +436,32 @@ func (w *legacyLayerWriter) initUtilityVM() error {
 	return nil
 }
 
-func (w *legacyLayerWriter) reset() error {
-	err := w.bufWriter.Flush()
-	if err != nil {
+func (w *legacyLayerWriter) reset() (err error) {
+	// Always close the current backup writer and file handle, even if an error
+	// occurs below (e.g. bufWriter.Flush fails with ENOSPC when the disk is
+	// full). Leaving these handles open on Windows prevents the temporary
+	// import directory (defaults to SystemTemp, i.e. C:\Windows\SystemTemp\hcs*)
+	// from being removed by the deferred os.RemoveAll in legacyLayerWriterWrapper.Close,
+	// which leaks the directory and compounds disk-space exhaustion.
+	defer func() {
+		if w.backupWriter != nil {
+			w.backupWriter.Close()
+			w.backupWriter = nil
+		}
+		if w.currentFile != nil {
+			w.currentFile.Close()
+			w.currentFile = nil
+			w.currentFileName = ""
+			w.currentFileRoot = nil
+		}
+		w.currentIsDir = false
+	}()
+
+	if err = w.bufWriter.Flush(); err != nil {
 		return err
 	}
 	w.bufWriter.Reset(io.Discard)
-	if w.currentIsDir {
+	if w.currentIsDir && w.currentFile != nil {
 		r := w.currentFile
 		br := winio.NewBackupStreamReader(r)
 		// Seek to the beginning of the backup stream, skipping the fileattrs
@@ -473,16 +493,6 @@ func (w *legacyLayerWriter) reset() error {
 			}
 		}
 		w.currentIsDir = false
-	}
-	if w.backupWriter != nil {
-		w.backupWriter.Close()
-		w.backupWriter = nil
-	}
-	if w.currentFile != nil {
-		w.currentFile.Close()
-		w.currentFile = nil
-		w.currentFileName = ""
-		w.currentFileRoot = nil
 	}
 	return nil
 }

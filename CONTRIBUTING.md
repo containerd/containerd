@@ -25,6 +25,18 @@ $ script/setup/install-dev-tools
 $ make install-deps
 ```
 
+## Automated and AI-generated contributions
+
+Pull requests must be opened by a human. Any use of automation to create
+pull requests must be approved by a maintainer. Accounts creating pull requests
+using automation without prior approval may be restricted from the containerd
+organization.
+
+All AI-generated or AI-assisted submissions — whether code, PR descriptions,
+or comments — must be reviewed by the human author before being submitted.
+The human author is responsible for the correctness and quality of all content
+in their pull request and any associated comments.
+
 ## Code style
 
 - Go files adhere to standard Go formatting and styling

@@ -97,7 +97,6 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 			expectCNIConfig: true,
 		},
 	} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			testDir := t.TempDir()
 			templateName := filepath.Join(testDir, "template")

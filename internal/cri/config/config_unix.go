@@ -23,11 +23,16 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+func defaultNetworkPluginBinDirs() []string {
+	return []string{"/opt/cni/bin"}
+}
+
 func DefaultImageConfig() ImageConfig {
 	return ImageConfig{
 		Snapshotter:                defaults.DefaultSnapshotter,
 		DisableSnapshotAnnotations: true,
 		MaxConcurrentDownloads:     3,
+		Registry:                   Registry{},
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
@@ -61,18 +66,21 @@ func DefaultRuntimeConfig() RuntimeConfig {
 	# Root is the runc root directory.
 	Root = ""
 
+	# SystemdCgroup enables systemd cgroups.
+	SystemdCgroup = false
+
 	# CriuImagePath is the criu image path
 	CriuImagePath = ""
 
 	# CriuWorkPath is the criu work path.
 	CriuWorkPath = ""
 `
-	var m map[string]interface{}
+	var m map[string]any
 	toml.Unmarshal([]byte(defaultRuncV2Opts), &m)
 
 	return RuntimeConfig{
 		CniConfig: CniConfig{
-			NetworkPluginBinDir:        "/opt/cni/bin",
+			NetworkPluginBinDirs:       defaultNetworkPluginBinDirs(),
 			NetworkPluginConfDir:       "/etc/cni/net.d",
 			NetworkPluginMaxConfNum:    1, // only one CNI plugin config file will be loaded
 			NetworkPluginSetupSerially: false,
@@ -96,10 +104,11 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		TolerateMissingHugetlbController: true,
 		DisableHugetlbController:         true,
 		IgnoreImageDefinedVolumes:        false,
-		EnableCDI:                        true,
+		EnableCDI:                        func() *bool { v := true; return &v }(),
 		CDISpecDirs:                      []string{"/etc/cdi", "/var/run/cdi"},
 		DrainExecSyncIOTimeout:           "0s",
 		EnableUnprivilegedPorts:          true,
 		EnableUnprivilegedICMP:           true,
+		EnableCRIU:                       func() *bool { v := true; return &v }(),
 	}
 }

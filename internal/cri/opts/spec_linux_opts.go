@@ -20,8 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,8 +41,7 @@ import (
 	"github.com/containerd/log"
 )
 
-// WithMounts sorts and adds runtime and CRI mounts to the spec
-func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
+func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler, cgroupWritable bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
@@ -67,12 +68,39 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 		// shadow other mounts.
 		sort.Stable(orderedMounts(mounts))
 
-		// Mount cgroup into the container as readonly, which inherits docker's behavior.
+		mode := "ro"
+		if cgroupWritable {
+			mode = "rw"
+		}
+
+		cgroupOptions := []string{"nosuid", "noexec", "nodev", "relatime", mode}
+
+		hasCgroupNS := false
+		if s.Linux != nil {
+			hasCgroupNS = slices.ContainsFunc(s.Linux.Namespaces, func(ns runtimespec.LinuxNamespace) bool {
+				return ns.Type == runtimespec.CgroupNamespace
+			})
+		}
+
+		// If a container shares the host's cgroup namespace, mounting cgroup2
+		// inside the container applies the new mount options to the single shared
+		// cgroup2 VFS superblock. Therefore, explicitly copy these options from
+		// the host's /sys/fs/cgroup to avoid being stripped.
+		if !hasCgroupNS {
+			if mountInfo, err := osi.LookupMount("/sys/fs/cgroup"); err == nil {
+				for opt := range strings.SplitSeq(mountInfo.VFSOptions, ",") {
+					if opt == "nsdelegate" || opt == "memory_recursiveprot" {
+						cgroupOptions = append(cgroupOptions, opt)
+					}
+				}
+			}
+		}
+
 		s.Mounts = append(s.Mounts, runtimespec.Mount{
 			Source:      "cgroup",
 			Destination: "/sys/fs/cgroup",
 			Type:        "cgroup",
-			Options:     []string{"nosuid", "noexec", "nodev", "relatime", "ro"},
+			Options:     cgroupOptions,
 		})
 
 		// Copy all mounts from default mounts, except for
@@ -214,6 +242,17 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 	}
 }
 
+// WithMounts sorts and adds runtime and CRI mounts to the spec
+func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
+	return withMounts(osi, config, extra, mountLabel, handler, false)
+
+}
+
+// WithMountsCgroupWritable sorts and adds runtime and CRI mounts to the spec if cgroup_writable is enabled.
+func WithMountsCgroupWritable(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
+	return withMounts(osi, config, extra, mountLabel, handler, true)
+}
+
 // Ensure mount point on which path is mounted, is shared.
 func ensureShared(path string, lookupMount func(string) (mount.Info, error)) error {
 	mountInfo, err := lookupMount(path)
@@ -222,8 +261,8 @@ func ensureShared(path string, lookupMount func(string) (mount.Info, error)) err
 	}
 
 	// Make sure source mount point is shared.
-	optsSplit := strings.Split(mountInfo.Optional, " ")
-	for _, opt := range optsSplit {
+	optsSplit := strings.SplitSeq(mountInfo.Optional, " ")
+	for opt := range optsSplit {
 		if strings.HasPrefix(opt, "shared:") {
 			return nil
 		}
@@ -239,8 +278,8 @@ func ensureSharedOrSlave(path string, lookupMount func(string) (mount.Info, erro
 		return err
 	}
 	// Make sure source mount point is shared.
-	optsSplit := strings.Split(mountInfo.Optional, " ")
-	for _, opt := range optsSplit {
+	optsSplit := strings.SplitSeq(mountInfo.Optional, " ")
+	for opt := range optsSplit {
 		if strings.HasPrefix(opt, "shared:") {
 			return nil
 		} else if strings.HasPrefix(opt, "master:") {
@@ -391,9 +430,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 			if s.Linux.Resources.Unified == nil {
 				s.Linux.Resources.Unified = make(map[string]string)
 			}
-			for k, v := range unified {
-				s.Linux.Resources.Unified[k] = v
-			}
+			maps.Copy(s.Linux.Resources.Unified, unified)
 		}
 		return nil
 	}

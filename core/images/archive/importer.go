@@ -104,15 +104,16 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 		}
 
 		hdrName := path.Clean(hdr.Name)
-		if hdrName == ocispec.ImageLayoutFile {
+		switch hdrName {
+		case ocispec.ImageLayoutFile:
 			if err = onUntarJSON(tr, &ociLayout); err != nil {
 				return ocispec.Descriptor{}, fmt.Errorf("untar oci layout %q: %w", hdr.Name, err)
 			}
-		} else if hdrName == "manifest.json" {
+		case "manifest.json":
 			if err = onUntarJSON(tr, &mfsts); err != nil {
 				return ocispec.Descriptor{}, fmt.Errorf("untar manifest %q: %w", hdr.Name, err)
 			}
-		} else {
+		default:
 			dgst, err := onUntarBlob(ctx, tr, store, hdr.Size, "tar-"+hdrName)
 			if err != nil {
 				return ocispec.Descriptor{}, fmt.Errorf("failed to ingest %q: %w", hdr.Name, err)
@@ -240,7 +241,7 @@ const (
 	jsonLimit = 20 * mib
 )
 
-func onUntarJSON(r io.Reader, j interface{}) error {
+func onUntarJSON(r io.Reader, j any) error {
 	return json.NewDecoder(io.LimitReader(r, jsonLimit)).Decode(j)
 }
 
@@ -375,7 +376,7 @@ func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string
 	return desc, nil
 }
 
-func writeManifest(ctx context.Context, cs content.Ingester, manifest interface{}, mediaType string) (ocispec.Descriptor, error) {
+func writeManifest(ctx context.Context, cs content.Ingester, manifest any, mediaType string) (ocispec.Descriptor, error) {
 	manifestBytes, err := json.Marshal(manifest)
 	if err != nil {
 		return ocispec.Descriptor{}, err

@@ -17,25 +17,30 @@
 package client
 
 import (
+	"maps"
+	"slices"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 )
 
 type clientOpts struct {
-	defaultns       string
-	defaultRuntime  string
-	defaultPlatform platforms.MatchComparer
-	services        *services
-	dialOptions     []grpc.DialOption
-	callOptions     []grpc.CallOption
-	timeout         time.Duration
+	defaultns        string
+	defaultRuntime   string
+	defaultSandboxer string
+	defaultPlatform  platforms.MatchComparer
+	services         *services
+	dialOptions      []grpc.DialOption
+	extraDialOpts    []grpc.DialOption
+	callOptions      []grpc.CallOption
+	timeout          time.Duration
 }
 
 // Opt allows callers to set options on the containerd client
@@ -60,6 +65,14 @@ func WithDefaultRuntime(rt string) Opt {
 	}
 }
 
+// WithDefaultSandboxer sets the default sandboxer on the client
+func WithDefaultSandboxer(sb string) Opt {
+	return func(c *clientOpts) error {
+		c.defaultSandboxer = sb
+		return nil
+	}
+}
+
 // WithDefaultPlatform sets the default platform matcher on the client
 func WithDefaultPlatform(platform platforms.MatchComparer) Opt {
 	return func(c *clientOpts) error {
@@ -72,6 +85,19 @@ func WithDefaultPlatform(platform platforms.MatchComparer) Opt {
 func WithDialOpts(opts []grpc.DialOption) Opt {
 	return func(c *clientOpts) error {
 		c.dialOptions = opts
+		return nil
+	}
+}
+
+// WithExtraDialOpts allows additional grpc.DialOptions to be set on the
+// connection. Unlike [WithDialOpts], options set here are appended to,
+// instead of overriding previous options, which allows setting options
+// to extend containerd client's defaults.
+//
+// This option can be used multiple times to set additional dial options.
+func WithExtraDialOpts(opts []grpc.DialOption) Opt {
+	return func(c *clientOpts) error {
+		c.extraDialOpts = append(c.extraDialOpts, opts...)
 		return nil
 	}
 }
@@ -113,10 +139,8 @@ func WithPlatform(platform string) RemoteOpt {
 		platform = platforms.DefaultString()
 	}
 	return func(_ *Client, c *RemoteContext) error {
-		for _, p := range c.Platforms {
-			if p == platform {
-				return nil
-			}
+		if slices.Contains(c.Platforms, platform) {
+			return nil
 		}
 
 		c.Platforms = append(c.Platforms, platform)
@@ -178,9 +202,7 @@ func WithPullLabels(labels map[string]string) RemoteOpt {
 			rc.Labels = make(map[string]string)
 		}
 
-		for k, v := range labels {
-			rc.Labels[k] = v
-		}
+		maps.Copy(rc.Labels, labels)
 		return nil
 	}
 }
@@ -195,16 +217,6 @@ func WithChildLabelMap(fn func(ocispec.Descriptor) []string) RemoteOpt {
 		c.ChildLabelMap = fn
 		return nil
 	}
-}
-
-// WithSchema1Conversion is used to convert Docker registry schema 1
-// manifests to oci manifests on pull. Without this option schema 1
-// manifests will return a not supported error.
-//
-// Deprecated: use Schema 2 or OCI images.
-func WithSchema1Conversion(client *Client, c *RemoteContext) error {
-	c.ConvertSchema1 = true
-	return nil
 }
 
 // WithResolver specifies the resolver to use.
@@ -231,10 +243,26 @@ func WithImageHandlerWrapper(w func(images.Handler) images.Handler) RemoteOpt {
 	}
 }
 
+// WithDownloadLimiter sets the limiter for concurrent download operations.
+func WithDownloadLimiter(limiter *semaphore.Weighted) RemoteOpt {
+	return func(client *Client, c *RemoteContext) error {
+		c.DownloadLimiter = limiter
+		return nil
+	}
+}
+
 // WithMaxConcurrentDownloads sets max concurrent download limit.
 func WithMaxConcurrentDownloads(max int) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
 		c.MaxConcurrentDownloads = max
+		return nil
+	}
+}
+
+// WithConcurrentLayerFetchBuffer sets the buffer size for concurrent layer fetches.
+func WithConcurrentLayerFetchBuffer(buffer int) RemoteOpt {
+	return func(client *Client, c *RemoteContext) error {
+		c.ConcurrentLayerFetchBuffer = buffer
 		return nil
 	}
 }
@@ -251,6 +279,14 @@ func WithMaxConcurrentUploadedLayers(max int) RemoteOpt {
 func WithAllMetadata() RemoteOpt {
 	return func(_ *Client, c *RemoteContext) error {
 		c.AllMetadata = true
+		return nil
+	}
+}
+
+// WithReferrersProvider sets a referrers provider to resolve referrer objects.
+func WithReferrersProvider(r content.ReferrersProvider) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.ReferrersProvider = r
 		return nil
 	}
 }

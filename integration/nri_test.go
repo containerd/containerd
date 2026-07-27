@@ -34,12 +34,11 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/integration/images"
+	"github.com/containerd/containerd/v2/integration/remote"
 )
 
 const (
@@ -115,9 +114,9 @@ func TestNriPluginSynchronization(t *testing.T) {
 
 	tc.setup()
 
-	for i := 0; i < podCount; i++ {
+	for i := range podCount {
 		podID := tc.runPod(fmt.Sprintf("pod%d", i))
-		for j := 0; j < ctrPerPod; j++ {
+		for j := range ctrPerPod {
 			tc.startContainer(podID, fmt.Sprintf("ctr%d", j))
 		}
 	}
@@ -531,6 +530,87 @@ func TestNriLinuxMemsetAdjustmentUpdate(t *testing.T) {
 	require.Equal(t, expected, string(chk), "check result")
 }
 
+// Test pod sandbox updates received by NRI plugins.
+func TestNriUpdatePodSandbox(t *testing.T) {
+	skipNriTestIfNecessary(t)
+
+	t.Log("Test that NRI plugins receive pod sandbox updates.")
+
+	var (
+		tc = &nriTest{
+			t:       t,
+			plugins: []*mockPlugin{{}},
+		}
+		overheadMemLimit int64
+		resMemLimit      int64
+		updateMemLimit   = func(mp *mockPlugin, pod *api.PodSandbox, overhead *api.LinuxResources, res *api.LinuxResources) error {
+			overheadMemLimit = overhead.GetMemory().GetLimit().GetValue()
+			resMemLimit = res.GetMemory().GetLimit().GetValue()
+			return nil
+		}
+	)
+
+	tc.plugins[0].updatePodSandbox = updateMemLimit
+	tc.setup()
+
+	podID := tc.runPod("pod0")
+	_ = tc.startContainer(podID, "ctr0")
+
+	overhead := &runtime.LinuxContainerResources{MemoryLimitInBytes: 10}
+	res := &runtime.LinuxContainerResources{MemoryLimitInBytes: 5}
+	err := tc.runtime.UpdatePodSandboxResources(podID, overhead, res)
+	assert.NoError(tc.t, err, "update pod sandbox")
+
+	timeout := time.After(pluginSyncTimeout)
+	err = tc.plugins[0].Wait(PodSandboxEvent(tc.plugins[0].pods[podID], UpdatePodSandbox), timeout)
+	assert.NoError(tc.t, err, "wait for update pod sandbox")
+
+	err = tc.plugins[0].Wait(PodSandboxEvent(tc.plugins[0].pods[podID], PostUpdatePodSandbox), timeout)
+	assert.NoError(tc.t, err, "wait for post update pod sandbox")
+
+	assert.Equal(t, overheadMemLimit, overhead.MemoryLimitInBytes)
+	assert.Equal(t, resMemLimit, res.MemoryLimitInBytes)
+}
+
+// Test pod sandbox resource updates persist across containerd restarts.
+func TestUpdatePodSandboxWithRestart(t *testing.T) {
+	skipNriTestIfNecessary(t)
+
+	t.Log("Test that pod sandbox resource updates persist across containerd restarts.")
+
+	tc := &nriTest{
+		t: t,
+	}
+	tc.setup()
+
+	podID := tc.runPod("pod0")
+	_ = tc.startContainer(podID, "ctr0")
+
+	overhead := &runtime.LinuxContainerResources{MemoryLimitInBytes: 10}
+	res := &runtime.LinuxContainerResources{MemoryLimitInBytes: 5}
+	err := tc.runtime.UpdatePodSandboxResources(podID, overhead, res)
+	assert.NoError(tc.t, err, "update pod sandbox")
+
+	t.Logf("Verify sandbox resources are updated before restart")
+	_, info, err := SandboxInfo(podID)
+	require.NoError(t, err)
+	require.NotNil(t, info.Resources)
+	require.NotNil(t, info.Overhead)
+	assert.Equal(t, res.MemoryLimitInBytes, info.Resources.GetLinux().GetMemoryLimitInBytes())
+	assert.Equal(t, overhead.MemoryLimitInBytes, info.Overhead.GetLinux().GetMemoryLimitInBytes())
+
+	t.Logf("Restart containerd")
+	RestartContainerd(t, syscall.SIGTERM)
+
+	t.Logf("Verify sandbox resources are still updated after restart")
+	_, info, err = SandboxInfo(podID)
+	require.NoError(t, err)
+	require.NotNil(t, info.Resources)
+	require.NotNil(t, info.Overhead)
+	assert.Equal(t, res.MemoryLimitInBytes, info.Resources.GetLinux().GetMemoryLimitInBytes())
+	assert.Equal(t, overhead.MemoryLimitInBytes, info.Overhead.GetLinux().GetMemoryLimitInBytes())
+}
+
 // Test NRI vs. containerd restart.
 func TestNriPluginContainerdRestart(t *testing.T) {
 	skipNriTestIfNecessary(t)
@@ -547,9 +627,9 @@ func TestNriPluginContainerdRestart(t *testing.T) {
 
 	tc.setup()
 
-	for i := 0; i < podCount; i++ {
+	for i := range podCount {
 		podID := tc.runPod(fmt.Sprintf("pod%d", i))
-		for j := 0; j < ctrPerPod; j++ {
+		for j := range ctrPerPod {
 			tc.startContainer(podID, fmt.Sprintf("ctr%d", j))
 		}
 	}
@@ -590,7 +670,7 @@ type nriTest struct {
 	t         *testing.T
 	name      string
 	prefix    string
-	runtime   cri.RuntimeService
+	runtime   *remote.RuntimeService
 	plugins   []*mockPlugin
 	namespace string
 	sbCfg     map[string]*runtime.PodSandboxConfig
@@ -706,15 +786,20 @@ type mockPlugin struct {
 	pods map[string]*api.PodSandbox
 	ctrs map[string]*api.Container
 
-	closed              bool
-	namespace           string
-	logf                func(string, ...interface{})
-	synchronize         func(*mockPlugin, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
-	createContainer     func(*mockPlugin, *api.PodSandbox, *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error)
-	postCreateContainer func(*mockPlugin, *api.PodSandbox, *api.Container)
-	updateContainer     func(*mockPlugin, *api.PodSandbox, *api.Container) ([]*api.ContainerUpdate, error)
-	postUpdateContainer func(*mockPlugin, *api.PodSandbox, *api.Container)
-	stopContainer       func(*mockPlugin, *api.PodSandbox, *api.Container) ([]*api.ContainerUpdate, error)
+	closed               bool
+	namespace            string
+	logf                 func(string, ...any)
+	synchronize          func(*mockPlugin, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
+	runPodSandbox        func(*mockPlugin, *api.PodSandbox) error
+	updatePodSandbox     func(*mockPlugin, *api.PodSandbox, *api.LinuxResources, *api.LinuxResources) error
+	postUpdatePodSandbox func(*mockPlugin, *api.PodSandbox) error
+	stopPodSandbox       func(*mockPlugin, *api.PodSandbox) error
+	removePodSandbox     func(*mockPlugin, *api.PodSandbox) error
+	createContainer      func(*mockPlugin, *api.PodSandbox, *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error)
+	postCreateContainer  func(*mockPlugin, *api.PodSandbox, *api.Container)
+	updateContainer      func(*mockPlugin, *api.PodSandbox, *api.Container) ([]*api.ContainerUpdate, error)
+	postUpdateContainer  func(*mockPlugin, *api.PodSandbox, *api.Container)
+	stopContainer        func(*mockPlugin, *api.PodSandbox, *api.Container) ([]*api.ContainerUpdate, error)
 }
 
 func (m *mockPlugin) Start() error {
@@ -730,6 +815,8 @@ func (m *mockPlugin) Start() error {
 	if m.mask == 0 {
 		m.mask.Set(
 			api.Event_RUN_POD_SANDBOX,
+			api.Event_UPDATE_POD_SANDBOX,
+			api.Event_POST_UPDATE_POD_SANDBOX,
 			api.Event_STOP_POD_SANDBOX,
 			api.Event_REMOVE_POD_SANDBOX,
 			api.Event_CREATE_CONTAINER,
@@ -754,13 +841,28 @@ func (m *mockPlugin) Start() error {
 	}
 
 	if m.logf == nil {
-		m.logf = func(format string, args ...interface{}) {
+		m.logf = func(format string, args ...any) {
 			fmt.Printf(format+"\n", args...)
 		}
 	}
 
 	if m.synchronize == nil {
 		m.synchronize = nopSynchronize
+	}
+	if m.runPodSandbox == nil {
+		m.runPodSandbox = nopRunPodSandbox
+	}
+	if m.updatePodSandbox == nil {
+		m.updatePodSandbox = nopUpdatePodSandbox
+	}
+	if m.postUpdatePodSandbox == nil {
+		m.postUpdatePodSandbox = nopPostUpdatePodSandbox
+	}
+	if m.stopPodSandbox == nil {
+		m.stopPodSandbox = nopStopPodSandbox
+	}
+	if m.removePodSandbox == nil {
+		m.removePodSandbox = nopRemovePodSandbox
 	}
 	if m.createContainer == nil {
 		m.createContainer = nopCreateContainer
@@ -809,7 +911,7 @@ func (m *mockPlugin) inNamespace(namespace string) bool {
 	return strings.HasPrefix(namespace, m.namespace)
 }
 
-func (m *mockPlugin) Log(format string, args ...interface{}) {
+func (m *mockPlugin) Log(format string, args ...any) {
 	m.logf(fmt.Sprintf("[plugin:%s-%s] ", m.idx, m.name)+format, args...)
 }
 
@@ -845,7 +947,29 @@ func (m *mockPlugin) RunPodSandbox(ctx context.Context, pod *api.PodSandbox) err
 	m.Log("RunPodSandbox %s/%s", pod.Namespace, pod.Name)
 	m.pods[pod.Id] = pod
 	m.q.Add(PodSandboxEvent(pod, RunPodSandbox))
-	return nil
+	return m.runPodSandbox(m, pod)
+}
+
+func (m *mockPlugin) UpdatePodSandbox(ctx context.Context, pod *api.PodSandbox, overhead *api.LinuxResources, res *api.LinuxResources) error {
+	if !m.inNamespace(pod.Namespace) {
+		return nil
+	}
+
+	m.Log("UpdatePodSandbox %s/%s", pod.Namespace, pod.Name)
+	m.pods[pod.Id] = pod
+	m.q.Add(PodSandboxEvent(pod, UpdatePodSandbox))
+	return m.updatePodSandbox(m, pod, overhead, res)
+}
+
+func (m *mockPlugin) PostUpdatePodSandbox(ctx context.Context, pod *api.PodSandbox) error {
+	if !m.inNamespace(pod.Namespace) {
+		return nil
+	}
+
+	m.Log("PostUpdatePodSandbox %s/%s", pod.Namespace, pod.Name)
+	m.pods[pod.Id] = pod
+	m.q.Add(PodSandboxEvent(pod, PostUpdatePodSandbox))
+	return m.postUpdatePodSandbox(m, pod)
 }
 
 func (m *mockPlugin) StopPodSandbox(ctx context.Context, pod *api.PodSandbox) error {
@@ -856,7 +980,7 @@ func (m *mockPlugin) StopPodSandbox(ctx context.Context, pod *api.PodSandbox) er
 	m.Log("StopPodSandbox %s/%s", pod.Namespace, pod.Name)
 	m.pods[pod.Id] = pod
 	m.q.Add(PodSandboxEvent(pod, StopPodSandbox))
-	return nil
+	return m.stopPodSandbox(m, pod)
 }
 
 func (m *mockPlugin) RemovePodSandbox(ctx context.Context, pod *api.PodSandbox) error {
@@ -867,7 +991,7 @@ func (m *mockPlugin) RemovePodSandbox(ctx context.Context, pod *api.PodSandbox) 
 	m.Log("RemovePodSandbox %s/%s", pod.Namespace, pod.Name)
 	delete(m.pods, pod.Id)
 	m.q.Add(PodSandboxEvent(pod, RemovePodSandbox))
-	return nil
+	return m.removePodSandbox(m, pod)
 }
 
 func (m *mockPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {
@@ -978,6 +1102,26 @@ func nopSynchronize(*mockPlugin, []*api.PodSandbox, []*api.Container) ([]*api.Co
 	return nil, nil
 }
 
+func nopRunPodSandbox(*mockPlugin, *api.PodSandbox) error {
+	return nil
+}
+
+func nopUpdatePodSandbox(*mockPlugin, *api.PodSandbox, *api.LinuxResources, *api.LinuxResources) error {
+	return nil
+}
+
+func nopPostUpdatePodSandbox(*mockPlugin, *api.PodSandbox) error {
+	return nil
+}
+
+func nopStopPodSandbox(*mockPlugin, *api.PodSandbox) error {
+	return nil
+}
+
+func nopRemovePodSandbox(*mockPlugin, *api.PodSandbox) error {
+	return nil
+}
+
 func nopCreateContainer(*mockPlugin, *api.PodSandbox, *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {
 	return nil, nil, nil
 }
@@ -1007,17 +1151,19 @@ const (
 	Disconnected = "closed"
 	Stopped      = "stopped"
 
-	RunPodSandbox       = "RunPodSandbox"
-	StopPodSandbox      = "StopPodSandbox"
-	RemovePodSandbox    = "RemovePodSandbox"
-	CreateContainer     = "CreateContainer"
-	StartContainer      = "StartContainer"
-	UpdateContainer     = "UpdateContainer"
-	StopContainer       = "StopContainer"
-	RemoveContainer     = "RemoveContainer"
-	PostCreateContainer = "PostCreateContainer"
-	PostStartContainer  = "PostStartContainer"
-	PostUpdateContainer = "PostUpdateContainer"
+	RunPodSandbox        = "RunPodSandbox"
+	UpdatePodSandbox     = "UpdatePodSandbox"
+	PostUpdatePodSandbox = "PostUpdatePodSandbox"
+	StopPodSandbox       = "StopPodSandbox"
+	RemovePodSandbox     = "RemovePodSandbox"
+	CreateContainer      = "CreateContainer"
+	StartContainer       = "StartContainer"
+	UpdateContainer      = "UpdateContainer"
+	StopContainer        = "StopContainer"
+	RemoveContainer      = "RemoveContainer"
+	PostCreateContainer  = "PostCreateContainer"
+	PostStartContainer   = "PostStartContainer"
+	PostUpdateContainer  = "PostUpdateContainer"
 
 	Error   = "Error"
 	Timeout = ""
@@ -1227,7 +1373,7 @@ func getXxxset(t *testing.T, kind, path string) []string {
 		return nil
 	}
 
-	for _, rng := range strings.Split(strings.TrimSpace(string(data)), ",") {
+	for rng := range strings.SplitSeq(strings.TrimSpace(string(data)), ",") {
 		var (
 			lo int
 			hi = -1

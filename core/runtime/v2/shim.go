@@ -17,6 +17,7 @@
 package v2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -34,6 +35,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	eventstypes "github.com/containerd/containerd/api/events"
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
@@ -45,10 +47,13 @@ import (
 
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/pkg/archive"
+	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -58,6 +63,11 @@ const (
 	loadTimeout     = "io.containerd.timeout.shim.load"
 	cleanupTimeout  = "io.containerd.timeout.shim.cleanup"
 	shutdownTimeout = "io.containerd.timeout.shim.shutdown"
+
+	// rootFsDiffTar is the name of the rootfs diff archive written next to a
+	// checkpoint. It is part of the checkpoint layout produced by CRIU tooling,
+	// so it must stay in sync with github.com/checkpoint-restore/checkpointctl/lib.RootFsDiffTar.
+	rootFsDiffTar = "rootfs-diff.tar"
 )
 
 func init() {
@@ -91,9 +101,9 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		// To prevent flood of error messages, the expected error
 		// should be reset, like os.ErrClosed or os.ErrNotExist, which
 		// depends on platform.
-		err = checkCopyShimLogError(ctx, err)
+		err = checkCopyShimLogError(shimCtx, err)
 		if err != nil {
-			log.G(ctx).WithError(err).Error("copy shim log after reload")
+			log.G(shimCtx).WithError(err).Error("copy shim log after reload")
 		}
 	}()
 	onCloseWithShimLog := func() {
@@ -107,7 +117,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		return nil, fmt.Errorf("failed to read bootstrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
-	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog)
+	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog, client.AnonReconnectDialer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to make connection: %w", err)
 	}
@@ -125,7 +135,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		bundle:  bundle,
 		client:  conn,
 		address: address,
-		version: params.Version,
+		version: int(params.Version),
 	}
 
 	return shim, nil
@@ -135,7 +145,7 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
 
-	log.G(ctx).WithField("id", id).Warn("cleaning up after shim disconnected")
+	log.G(ctx).WithField("id", id).Info("cleaning up after shim disconnected")
 	response, err := binaryCall.Delete(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to clean up after shim disconnected")
@@ -199,9 +209,34 @@ type ShimInstance interface {
 	Endpoint() (string, int)
 }
 
-func parseStartResponse(response []byte) (client.BootstrapParams, error) {
-	var params client.BootstrapParams
+type clientVersionDowngrader interface {
+	// Downgrade is to lower shim's client version.
+	//
+	// Assume there is a running pod created by containerd-shim-runc-v2 from v1.7.x.
+	// After upgrading to v2.x, the containerd-shim-runc-v2 binary will support the
+	// sandbox API, and calling `shim start` for the existing running pod will return
+	// a version=3 address. However, that pod shim does not support the streaming IO API,
+	// so we should downgrade the shim version.
+	//
+	// Additionally, if a container record was created with v1.7.x, it will not have
+	// a SandboxID field in the metadata store. In the CRI case, this will cause
+	// the new shim client to use the v3 protocol to send requests to a running shim
+	// that still uses the v2 protocol, resulting in a failure to start.
+	// In this case, we should also downgrade the shim version and retry.
+	Downgrade() error
+}
 
+func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
+	var result bootapi.BootstrapResult
+
+	if err := proto.Unmarshal(response, &result); err == nil {
+		return &result, nil
+	}
+
+	// Fallback to legacy parsing for backward compatibility with legacy shims that return the address as a plain string or JSON.
+	response = bytes.TrimSpace(response)
+
+	var params client.BootstrapParams //nolint:staticcheck // Used for backward compatibility with legacy shims
 	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
 		// Use TTRPC for legacy shims
 		params.Address = string(response)
@@ -210,14 +245,18 @@ func parseStartResponse(response []byte) (client.BootstrapParams, error) {
 	}
 
 	if params.Version > CurrentShimVersion {
-		return client.BootstrapParams{}, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
+		return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
 	}
 
-	return params, nil
+	return &bootapi.BootstrapResult{
+		Version:  int32(params.Version),
+		Address:  params.Address,
+		Protocol: params.Protocol,
+	}, nil
 }
 
 // writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
-func writeBootstrapParams(path string, params client.BootstrapParams) error {
+func writeBootstrapParams(path string, params *bootapi.BootstrapResult) error {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -228,7 +267,7 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 		return err
 	}
 
-	f, err := atomicfile.New(path, 0o666)
+	f, err := atomicfile.New(path, 0o644)
 	if err != nil {
 		return err
 	}
@@ -242,23 +281,27 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 	return f.Close()
 }
 
-func readBootstrapParams(path string) (client.BootstrapParams, error) {
+func readBootstrapParams(path string) (*bootapi.BootstrapResult, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	return parseStartResponse(data)
 }
 
-// makeConnection creates a new TTRPC or GRPC connection object from address.
-// address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
-func makeConnection(ctx context.Context, id string, params client.BootstrapParams, onClose func()) (_ io.Closer, retErr error) {
+// makeConnection creates a new TTRPC or GRPC connection using the address and
+// protocol from params. Legacy plain-string or JSON bootstrap responses are
+// normalized by parseStartResponse before calling this function.
+// The dialer parameter controls connection behavior: use AnonDialer for newly
+// started shims (retries if pipe doesn't exist yet) or AnonReconnectDialer for
+// reconnecting to already-running shims (fails fast if pipe is missing).
+func makeConnection(ctx context.Context, id string, params *bootapi.BootstrapResult, onClose func(), dialer func(string, time.Duration) (net.Conn, error)) (_ io.Closer, retErr error) {
 	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
@@ -267,7 +310,7 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 
 	switch strings.ToLower(params.Protocol) {
 	case "ttrpc":
-		conn, err := client.Connect(params.Address, client.AnonReconnectDialer)
+		conn, err := client.Connect(params.Address, dialer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TTRPC connection: %w", err)
 		}
@@ -285,8 +328,7 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 	case "grpc":
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),   //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
-			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()), //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		}
 		return grpcDialContext(params.Address, onClose, gopts...)
 	default:
@@ -377,6 +419,7 @@ type shim struct {
 }
 
 var _ ShimInstance = (*shim)(nil)
+var _ clientVersionDowngrader = (*shim)(nil)
 
 // ID of the shim/task
 func (s *shim) ID() string {
@@ -385,6 +428,15 @@ func (s *shim) ID() string {
 
 func (s *shim) Endpoint() (string, int) {
 	return s.address, s.version
+}
+
+func (s *shim) Downgrade() error {
+	if s.version >= CurrentShimVersion {
+		s.version--
+		return nil
+	}
+	return fmt.Errorf("unable to downgrade because shim version (%d) is lower than CurrentShimVersion (%d)",
+		s.version, CurrentShimVersion)
 }
 
 func (s *shim) Namespace() string {
@@ -497,7 +549,7 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		ID: s.ID(),
 	})
 	if shimErr != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Debug("failed to delete task")
+		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Error("failed to delete task")
 		if !errors.Is(shimErr, ttrpc.ErrClosed) {
 			shimErr = errgrpc.ToNative(shimErr)
 			if !errdefs.IsNotFound(shimErr) {
@@ -524,6 +576,11 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	// REF: https://github.com/containerd/containerd/issues/4769
 	if shimErr == nil {
 		removeTask(ctx, s.ID())
+	}
+
+	const supportSandboxAPIVersion = 3
+	if _, apiVer := s.ShimInstance.Endpoint(); apiVer < supportSandboxAPIVersion {
+		sandboxed = false
 	}
 
 	// Don't shutdown sandbox as there may be other containers running.
@@ -584,6 +641,50 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 	_, err := s.task.Create(ctx, request)
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
+	}
+
+	if opts.RestoreFromPath {
+		// Unpack rootfs-diff.tar if it exists.
+		// This needs to happen between the 'Create()' from above and before the 'Start()' from below.
+		rootfsDiff := filepath.Join(opts.Checkpoint, "..", rootFsDiffTar)
+
+		_, err = os.Stat(rootfsDiff)
+		if err == nil {
+			rootfsDiffTar, err := os.Open(rootfsDiff)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open rootfs-diff archive %s for import: %w", rootfsDiffTar.Name(), err)
+			}
+			defer func(f *os.File) {
+				if err := f.Close(); err != nil {
+					log.G(ctx).Errorf("Unable to close file %s: %q", f.Name(), err)
+				}
+			}(rootfsDiffTar)
+
+			decompressed, err := compression.DecompressStream(rootfsDiffTar)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decompress archive %s for import: %w", rootfsDiffTar.Name(), err)
+			}
+
+			rootfs := filepath.Join(s.Bundle(), "rootfs")
+			_, err = archive.Apply(
+				ctx,
+				rootfs,
+				decompressed,
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("unpacking of rootfs-diff archive %s into %s failed: %w", rootfsDiffTar.Name(), rootfs, err)
+			}
+			log.G(ctx).Debugf("Unpacked checkpoint in %s", rootfs)
+		}
+		// (adrianreber): This is unclear to me. But it works (and it is necessary).
+		// This is probably connected to my misunderstanding why
+		// restoring a container goes through Create().
+		log.G(ctx).Infof("About to start with opts.Checkpoint %s", opts.Checkpoint)
+		err = s.Start(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return s, nil
@@ -757,6 +858,9 @@ func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
+		if errdefs.IsDeadlineExceeded(err) {
+			return runtime.State{}, err
+		}
 		if !errors.Is(err, ttrpc.ErrClosed) {
 			return runtime.State{}, errgrpc.ToNative(err)
 		}

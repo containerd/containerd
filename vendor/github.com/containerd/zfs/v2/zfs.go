@@ -102,12 +102,12 @@ func destroySnapshot(dataset *zfs.Dataset) error {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (z *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
-	ctx, t, err := z.ms.TransactionContext(ctx, false)
+func (s *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
+	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshots.Info{}, err
 	}
-	defer t.Rollback() //nolint:errcheck
+	defer func() { _ = t.Rollback() }()
 	_, info, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
 		return snapshots.Info{}, err
@@ -117,31 +117,31 @@ func (z *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, err
 }
 
 // Usage retrieves the disk usage of the top-level snapshot.
-func (z *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	return z.usage(ctx, key)
+func (s *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
+	return s.usage(ctx, key)
 }
 
-func (z *snapshotter) usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	ctx, t, err := z.ms.TransactionContext(ctx, false)
+func (s *snapshotter) usage(ctx context.Context, key string) (snapshots.Usage, error) {
+	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
 	id, info, usage, err := storage.GetInfo(ctx, key)
-	t.Rollback() //nolint:errcheck
+	_ = t.Rollback()
 
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
 
 	if info.Kind == snapshots.KindActive {
-		activeName := filepath.Join(z.dataset.Name, id)
+		activeName := filepath.Join(s.dataset.Name, id)
 		sDataset, err := zfs.GetDataset(activeName)
 		if err != nil {
 			return snapshots.Usage{}, err
 		}
 
 		if int64(sDataset.Used) > maxSnapshotSize {
-			return snapshots.Usage{}, fmt.Errorf("Dataset size exceeds maximum snapshot size of %d bytes", maxSnapshotSize)
+			return snapshots.Usage{}, fmt.Errorf("dataset size exceeds maximum snapshot size of %d bytes", maxSnapshotSize)
 		}
 
 		usage = snapshots.Usage{
@@ -154,25 +154,25 @@ func (z *snapshotter) usage(ctx context.Context, key string) (snapshots.Usage, e
 }
 
 // Walk the committed snapshots.
-func (z *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, filters ...string) error {
-	ctx, t, err := z.ms.TransactionContext(ctx, false)
+func (s *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, filters ...string) error {
+	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
 	}
-	defer t.Rollback() //nolint:errcheck
+	defer func() { _ = t.Rollback() }()
 	return storage.WalkInfo(ctx, fn, filters...)
 }
 
-func (z *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	return z.createSnapshot(ctx, snapshots.KindActive, key, parent, opts...)
+func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	return s.createSnapshot(ctx, snapshots.KindActive, key, parent, opts...)
 }
 
-func (z *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	return z.createSnapshot(ctx, snapshots.KindView, key, parent, opts...)
+func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	return s.createSnapshot(ctx, snapshots.KindView, key, parent, opts...)
 }
 
-func (z *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	ctx, t, err := z.ms.TransactionContext(ctx, true)
+func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (z *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		return nil, err
 	}
 
-	targetName := filepath.Join(z.dataset.Name, a.ID)
+	targetName := filepath.Join(s.dataset.Name, a.ID)
 	var target *zfs.Dataset
 	if len(a.ParentIDs) == 0 {
 		target, err = createFilesystem(targetName)
@@ -197,7 +197,7 @@ func (z *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			return nil, err
 		}
 	} else {
-		parent0Name := filepath.Join(z.dataset.Name, a.ParentIDs[0]) + "@" + snapshotSuffix
+		parent0Name := filepath.Join(s.dataset.Name, a.ParentIDs[0]) + "@" + snapshotSuffix
 		parent0, err := zfs.GetDataset(parent0Name)
 		if err != nil {
 			return nil, err
@@ -217,10 +217,10 @@ func (z *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		return nil, err
 	}
 	readonly := kind == snapshots.KindView
-	return z.mounts(target, readonly)
+	return s.mounts(target, readonly)
 }
 
-func (z *snapshotter) mounts(dataset *zfs.Dataset, readonly bool) ([]mount.Mount, error) {
+func (s *snapshotter) mounts(dataset *zfs.Dataset, readonly bool) ([]mount.Mount, error) {
 	var options []string
 	if readonly {
 		options = append(options, "ro")
@@ -234,13 +234,13 @@ func (z *snapshotter) mounts(dataset *zfs.Dataset, readonly bool) ([]mount.Mount
 	}, nil
 }
 
-func (z *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (err error) {
-	usage, err := z.usage(ctx, key)
+func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (err error) {
+	usage, err := s.usage(ctx, key)
 	if err != nil {
 		return fmt.Errorf("failed to compute usage: %w", err)
 	}
 
-	ctx, t, err := z.ms.TransactionContext(ctx, true)
+	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,7 @@ func (z *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		return fmt.Errorf("failed to commit: %w", err)
 	}
 
-	activeName := filepath.Join(z.dataset.Name, id)
+	activeName := filepath.Join(s.dataset.Name, id)
 	active, err := zfs.GetDataset(activeName)
 	if err != nil {
 		return err
@@ -282,28 +282,28 @@ func (z *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (z *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
-	ctx, t, err := z.ms.TransactionContext(ctx, false)
+func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
+	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return nil, err
 	}
-	s, err := storage.GetSnapshot(ctx, key)
-	t.Rollback() //nolint:errcheck
+	snapshot, err := storage.GetSnapshot(ctx, key)
+	_ = t.Rollback()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active snapshot: %w", err)
 	}
-	sName := filepath.Join(z.dataset.Name, s.ID)
+	sName := filepath.Join(s.dataset.Name, snapshot.ID)
 	sDataset, err := zfs.GetDataset(sName)
 	if err != nil {
 		return nil, err
 	}
-	return z.mounts(sDataset, false)
+	return s.mounts(sDataset, false)
 }
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
-func (z *snapshotter) Remove(ctx context.Context, key string) (err error) {
-	ctx, t, err := z.ms.TransactionContext(ctx, true)
+func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
+	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -321,7 +321,7 @@ func (z *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		return fmt.Errorf("failed to remove snapshot: %w", err)
 	}
 
-	datasetName := filepath.Join(z.dataset.Name, id)
+	datasetName := filepath.Join(s.dataset.Name, id)
 	if k == snapshots.KindCommitted {
 		snapshotName := datasetName + "@" + snapshotSuffix
 		snapshot, err := zfs.GetDataset(snapshotName)
@@ -344,15 +344,15 @@ func (z *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	return err
 }
 
-func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
-	ctx, t, err := o.ms.TransactionContext(ctx, true)
+func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
+	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return snapshots.Info{}, err
 	}
 
 	info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
 	if err != nil {
-		t.Rollback() //nolint:errcheck
+		_ = t.Rollback()
 		return snapshots.Info{}, err
 	}
 
@@ -363,6 +363,6 @@ func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 	return info, nil
 }
 
-func (o *snapshotter) Close() error {
-	return o.ms.Close()
+func (s *snapshotter) Close() error {
+	return s.ms.Close()
 }

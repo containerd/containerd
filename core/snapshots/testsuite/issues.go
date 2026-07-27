@@ -56,7 +56,7 @@ func checkLayerFileUpdate(ctx context.Context, t *testing.T, sn snapshots.Snapsh
 	var sleepTime time.Duration
 
 	// run 5 times to account for sporadic failure
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		time.Sleep(sleepTime)
 
 		if err := checkSnapshots(ctx, sn, work, l1Init, l2Init); err != nil {
@@ -135,7 +135,9 @@ func checkRename(ss string) func(ctx context.Context, t *testing.T, sn snapshots
 		//
 		// It doesn't work on fuse-overlayfs either.
 		// https://github.com/containerd/fuse-overlayfs-snapshotter/pull/53#issuecomment-1543442048
-		case "overlayfs", "fuse-overlayfs":
+		//
+		// EROFS snapshotter also uses overlayfs and has the same limitation.
+		case "overlayfs", "fuse-overlayfs", "erofs":
 			// NOP
 		default:
 			applier = append(applier, fstest.Rename("/dir1", "/dir2"))

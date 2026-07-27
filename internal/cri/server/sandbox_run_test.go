@@ -23,7 +23,10 @@ import (
 
 	"github.com/containerd/go-cni"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 )
 
 func TestToCNIPortMappings(t *testing.T) {
@@ -122,7 +125,6 @@ func TestToCNIPortMappings(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
 		})
@@ -176,7 +178,6 @@ func TestSelectPodIP(t *testing.T) {
 			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334", "2001:db8:85a3::8a2e:370:7335", "192.168.17.45"},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			var ipConfigs []*cni.IPConfig
 			for _, ip := range test.ips {
@@ -187,6 +188,48 @@ func TestSelectPodIP(t *testing.T) {
 			ip, additionalIPs := selectPodIPs(context.Background(), ipConfigs, test.pref)
 			assert.Equal(t, test.expectedIP, ip)
 			assert.Equal(t, test.expectedAdditionalIPs, additionalIPs)
+		})
+	}
+}
+
+func TestDisablePauseImagePullConfig(t *testing.T) {
+	for _, test := range []struct {
+		desc                  string
+		sandboxer             string
+		DisablePauseImagePull bool
+	}{
+		{
+			desc:                  "Podsandbox sandboxer should pull pause image when DisablePauseImagePull is false",
+			sandboxer:             "podsandbox",
+			DisablePauseImagePull: false,
+		},
+		{
+			desc:                  "Shim sandboxer should skip pause image pull when DisablePauseImagePull is true",
+			sandboxer:             "shim",
+			DisablePauseImagePull: true,
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			cfg := criconfig.Config{
+				RuntimeConfig: criconfig.RuntimeConfig{
+					ContainerdConfig: criconfig.ContainerdConfig{
+						DefaultRuntimeName: "test-runtime",
+						Runtimes: map[string]criconfig.Runtime{
+							"test-runtime": {
+								Type:                  "io.containerd.runc.v2",
+								Sandboxer:             test.sandboxer,
+								DisablePauseImagePull: test.DisablePauseImagePull,
+							},
+						},
+					},
+				},
+			}
+
+			ociRuntime, err := cfg.GetSandboxRuntime(&runtime.PodSandboxConfig{
+				Metadata: &runtime.PodSandboxMetadata{Name: "test", Namespace: "default"},
+			}, "")
+			require.NoError(t, err)
+			assert.Equal(t, test.DisablePauseImagePull, ociRuntime.DisablePauseImagePull)
 		})
 	}
 }

@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
    Copyright The containerd Authors.
@@ -49,7 +48,7 @@ func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.SnapshotPlugin,
 		ID:   "windows",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
 			return NewWindowsSnapshotter(ic.Properties[plugins.PropertyRootDir])
 		},

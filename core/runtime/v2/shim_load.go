@@ -22,14 +22,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/internal/cleanup"
+	runtimeapi "github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
+	"golang.org/x/sync/errgroup"
 )
 
 // LoadExistingShims loads existing shims from the path specified by stateDir
@@ -72,6 +74,9 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 	if err != nil {
 		return err
 	}
+	eg, ctx2 := errgroup.WithContext(ctx)
+	eg.SetLimit(runtime.GOMAXPROCS(0))
+	var errLoad error
 	for _, sd := range shimDirs {
 		if !sd.IsDir() {
 			continue
@@ -83,37 +88,41 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 		}
 		bundle, err := LoadBundle(ctx, stateDir, id)
 		if err != nil {
+			errLoad = err
 			// fine to return error here, it is a programmer error if the context
 			// does not have a namespace
-			return err
+			break
 		}
-		// fast path
-		f, err := os.Open(bundle.Path)
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
-			continue
-		}
+		eg.Go(func() error {
+			// fast path
+			f, err := os.Open(bundle.Path)
+			if err != nil {
+				bundle.Delete()
+				log.G(ctx2).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+				return nil
+			}
 
-		bf, err := f.Readdirnames(-1)
-		f.Close()
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
-			continue
-		}
-		if len(bf) == 0 {
-			bundle.Delete()
-			continue
-		}
-		if err := m.loadShim(ctx, bundle); err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
-			bundle.Delete()
-			continue
-		}
-
+			bf, err := f.Readdirnames(-1)
+			f.Close()
+			if err != nil {
+				bundle.Delete()
+				log.G(ctx2).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+				return nil
+			}
+			if len(bf) == 0 {
+				bundle.Delete()
+				return nil
+			}
+			if err := m.loadShim(ctx2, bundle); err != nil {
+				log.G(ctx2).WithError(err).Errorf("failed to load shim %s", bundle.Path)
+				bundle.Delete()
+				return nil
+			}
+			return nil
+		})
 	}
-	return nil
+	_ = eg.Wait()
+	return errLoad
 }
 
 func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
@@ -154,13 +163,14 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 			runtime:      runtime,
 			address:      m.containerdAddress,
 			ttrpcAddress: m.containerdTTRPCAddress,
+			socketDir:    m.socketDir,
 			env:          m.env,
 		})
 	// TODO: It seems we can only call loadShim here if it is a sandbox shim?
 	shim, err := loadShimTask(ctx, bundle, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
+		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, binaryCall)
 		// Remove self from the runtime task list.
 		m.shims.Delete(ctx, id)
 	})
@@ -179,16 +189,29 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 
 	_, sgetErr := m.sandboxStore.Get(ctx, id)
 	pInfo, pidErr := shim.Pids(ctx)
-	if sgetErr != nil && errors.Is(sgetErr, errdefs.ErrNotFound) && (len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound)) {
-		log.G(ctx).WithField("id", id).Info("cleaning leaked shim process")
-		// We are unable to get Pids from the shim and it's not a sandbox
-		// shim. We should clean it up her.
-		// No need to do anything for removeTask since we never added this shim.
+	if shouldCleanupShim(sgetErr, pidErr, pInfo) {
+		logEntry := log.G(ctx).WithField("id", id)
+		if pidErr != nil {
+			logEntry = logEntry.WithError(pidErr)
+		}
+		logEntry.Info("cleaning leaked shim process")
 		shim.delete(ctx, false, func(ctx context.Context, id string) {})
 	} else {
+		if pidErr != nil {
+			log.G(ctx).WithField("id", id).WithError(pidErr).Warn("failed to query shim pids, keeping shim registered")
+		}
 		m.shims.Add(ctx, shim.ShimInstance)
 	}
 	return nil
+}
+
+// shouldCleanupShim determines whether or not a shim is in such a state that
+// we should reap it. To be reapable we confirm that it is not a sandbox shim
+// and it has no pids running
+func shouldCleanupShim(sgetErr, pidErr error, pInfo []runtimeapi.ProcessInfo) bool {
+	return errors.Is(sgetErr, errdefs.ErrNotFound) &&
+		(errors.Is(pidErr, errdefs.ErrNotFound) ||
+			(pidErr == nil && len(pInfo) == 0))
 }
 
 func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask, retErr error) {
@@ -206,7 +229,26 @@ func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimT
 	defer cancel()
 
 	if _, err := s.PID(ctx); err != nil {
-		return nil, err
+		if !errdefs.IsNotImplemented(err) {
+			return nil, err
+		}
+
+		downgrader, ok := shim.(clientVersionDowngrader)
+		if ok {
+			if derr := downgrader.Downgrade(); derr == nil {
+				log.G(ctx).WithError(err).WithField("id", shim.ID()).
+					Warning("failed to call task.PID, downgrading client API version to try again")
+
+				s, err = newShimTask(shim)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create shim task after downgrading: %w", err)
+				}
+				_, err = s.PID(ctx)
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 	return s, nil
 }
@@ -219,6 +261,9 @@ func (m *ShimManager) cleanupWorkDirs(ctx context.Context, rootDir string) error
 
 	f, err := os.Open(filepath.Join(rootDir, ns))
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
 		return err
 	}
 	defer f.Close()

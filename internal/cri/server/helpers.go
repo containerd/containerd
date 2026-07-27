@@ -33,6 +33,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/errdefs"
@@ -52,6 +53,8 @@ const (
 	completeExitReason = "Completed"
 	// errorExitReason is the exit reason when container exits with code non-zero.
 	errorExitReason = "Error"
+	// oomExitCodeInLinux is the exit code (137) returned when a process is terminated by the Linux OOM killer.
+	oomExitCodeInLinux = 137
 	// oomExitReason is the exit reason when process in container is oom killed.
 	oomExitReason = "OOMKilled"
 
@@ -61,6 +64,8 @@ const (
 	sandboxesDir = "sandboxes"
 	// containersDir contains all container root.
 	containersDir = "containers"
+	// imageVolumeDir contains all image volume root.
+	imageVolumeDir = "image-volumes"
 	// Delimiter used to construct container/sandbox names.
 	nameDelimiter = "_"
 
@@ -137,6 +142,16 @@ func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetada
 // e.g. state checkpoint.
 func (c *criService) getContainerRootDir(id string) string {
 	return filepath.Join(c.config.RootDir, containersDir, id)
+}
+
+// getImageVolumeHostPath returns the image volume directory for share.
+func (c *criService) getImageVolumeHostPath(podID, imageID string) string {
+	return filepath.Join(c.config.StateDir, imageVolumeDir, podID, imageID)
+}
+
+// getImageVolumeBaseDir returns the image volume base directory for cleanup.
+func (c *criService) getImageVolumeBaseDir(podID string) string {
+	return filepath.Join(c.config.StateDir, imageVolumeDir, podID)
 }
 
 // getVolatileContainerRootDir returns the root directory for managing volatile container files,
@@ -219,7 +234,7 @@ func filterLabel(k, v string) string {
 }
 
 // getRuntimeOptions get runtime options from container metadata.
-func getRuntimeOptions(c containers.Container) (interface{}, error) {
+func getRuntimeOptions(c containers.Container) (any, error) {
 	from := c.Runtime.Options
 	if from == nil || from.GetValue() == nil {
 		return nil, nil
@@ -321,6 +336,12 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 			if spec.Windows.Resources.CPU.Maximum != nil {
 				status.Resources.Windows.CpuMaximum = int64(*spec.Windows.Resources.CPU.Maximum)
 			}
+			for _, a := range spec.Windows.Resources.CPU.Affinity {
+				status.Resources.Windows.AffinityCpus = append(
+					status.Resources.Windows.AffinityCpus,
+					&runtime.WindowsCpuGroupAffinity{CpuMask: a.Mask, CpuGroup: a.Group},
+				)
+			}
 		}
 
 		if spec.Windows.Resources.Memory != nil {
@@ -353,7 +374,19 @@ func (c *criService) generateAndSendContainerEvent(ctx context.Context, containe
 		ContainersStatuses: containerStatuses,
 	}
 
-	c.containerEventsQ.Send(event)
+	c.containerEventsQ.Send(&event)
+}
+
+func (c *criService) getPodSandboxRuntime(sandboxID string) (runtime criconfig.Runtime, err error) {
+	sandbox, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return criconfig.Runtime{}, err
+	}
+	runtime, err = c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
+	if err != nil {
+		return criconfig.Runtime{}, err
+	}
+	return runtime, nil
 }
 
 func (c *criService) getPodSandboxStatus(ctx context.Context, podSandboxID string) (*runtime.PodSandboxStatus, error) {
@@ -477,7 +510,7 @@ func parseUsernsIDMap(runtimeIDMap []*runtime.IDMapping) ([]runtimespec.LinuxIDM
 	if runtimeIDMap[0] == nil {
 		return m, nil
 	}
-	uidMap := *runtimeIDMap[0]
+	uidMap := runtimeIDMap[0]
 
 	if uidMap.Length < 1 {
 		return m, fmt.Errorf("invalid mapping length: %v", uidMap.Length)

@@ -19,10 +19,11 @@ package local
 import (
 	"testing"
 
+	"github.com/containerd/platforms"
+
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/platforms"
 )
 
 func TestGetSupportedPlatform(t *testing.T) {
@@ -120,9 +121,8 @@ func TestGetSupportedPlatform(t *testing.T) {
 			},
 		},
 	} {
-		testCase := testCase
 		t.Run(testCase.Name, func(t *testing.T) {
-			m, sp := getSupportedPlatform(testCase.UnpackConfig, testCase.SupportedPlatforms)
+			m, sp := getSupportedPlatform(t.Context(), testCase.UnpackConfig, testCase.SupportedPlatforms)
 
 			// Match result should match expected
 			if m != testCase.Match {
@@ -143,7 +143,7 @@ func TestGetSupportedPlatform(t *testing.T) {
 			if sp.Platform != nil && !sp.Platform.Match(testCase.ExpectedPlatform.Platform) {
 				t.Fatalf("Expect Platform %v doesn't match", testCase.ExpectedPlatform.Platform)
 			}
-			// If the ExectedPlatform is not empty, the matched Platform shoule not be nil either
+			// If the ExectedPlatform is not empty, the matched Platform should not be nil either
 			if sp.Platform == nil && testCase.ExpectedPlatform.Platform.OS != "" {
 				t.Fatalf("Expect Platform %v doesn't match", testCase.ExpectedPlatform.Platform)
 			}

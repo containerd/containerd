@@ -23,6 +23,56 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestRootPair(t *testing.T) {
+	for _, test := range []struct {
+		idmap  IDMap
+		expUID uint32
+		expGID uint32
+		expErr bool
+	}{
+		{
+			idmap: IDMap{
+				UidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      100,
+						Size:        1,
+					},
+				},
+				GidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      200,
+						Size:        1,
+					},
+				},
+			},
+			expUID: 100,
+			expGID: 200,
+			expErr: false,
+		},
+		{
+			idmap: IDMap{
+				UidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 1,
+						HostID:      100,
+						Size:        1,
+					},
+				},
+			},
+			expUID: invalidID,
+			expGID: invalidID,
+			expErr: true,
+		},
+	} {
+		user, err := test.idmap.RootPair()
+		assert.Equal(t, test.expErr, err != nil)
+		assert.Equal(t, test.expUID, user.Uid)
+		assert.Equal(t, test.expGID, user.Gid)
+	}
+}
+
 func TestToHost(t *testing.T) {
 	idmap := IDMap{
 		UidMap: []specs.LinuxIDMapping{
@@ -248,5 +298,195 @@ func TestToHostOverflow(t *testing.T) {
 		r, err := test.idmap.ToHost(test.user)
 		assert.Error(t, err)
 		assert.Equal(t, r, invalidUser)
+	}
+}
+
+func TestMarshal(t *testing.T) {
+	for _, test := range []struct {
+		idmap  IDMap
+		expUID string
+		expGID string
+	}{
+		{
+			idmap: IDMap{
+				UidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      1000,
+						Size:        10000,
+					},
+					{
+						ContainerID: 1000,
+						HostID:      20000,
+						Size:        10000,
+					},
+				},
+				GidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      1000,
+						Size:        1000,
+					},
+					{
+						ContainerID: 1000,
+						HostID:      1000,
+						Size:        10000,
+					},
+				},
+			},
+			expUID: "0:1000:10000,1000:20000:10000",
+			expGID: "0:1000:1000,1000:1000:10000",
+		},
+		{
+			idmap: IDMap{
+				GidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      1000,
+						Size:        10000,
+					},
+				},
+			},
+			expUID: "",
+			expGID: "0:1000:10000",
+		},
+		{
+			idmap: IDMap{
+				UidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      1000,
+						Size:        10000,
+					},
+				},
+			},
+			expUID: "0:1000:10000",
+			expGID: "",
+		},
+		{
+			idmap:  IDMap{},
+			expUID: "",
+			expGID: "",
+		},
+	} {
+		uid, gid := test.idmap.Marshal()
+		assert.Equal(t, test.expUID, uid)
+		assert.Equal(t, test.expGID, gid)
+	}
+}
+
+func TestUnmarshal(t *testing.T) {
+	for _, test := range []struct {
+		idmap  IDMap
+		uid    string
+		gid    string
+		expErr bool
+	}{
+		{
+			idmap: IDMap{
+				UidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      1000,
+						Size:        10000,
+					},
+					{
+						ContainerID: 1000,
+						HostID:      20000,
+						Size:        10000,
+					},
+				},
+				GidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      1000,
+						Size:        1000,
+					},
+					{
+						ContainerID: 1000,
+						HostID:      1000,
+						Size:        10000,
+					},
+				},
+			},
+			uid:    "0:1000:10000,1000:20000:10000",
+			gid:    "0:1000:1000,1000:1000:10000",
+			expErr: false,
+		},
+		{
+			idmap: IDMap{
+				GidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      1000,
+						Size:        10000,
+					},
+				},
+			},
+			uid:    "",
+			gid:    "0:1000:10000",
+			expErr: false,
+		},
+		{
+			idmap: IDMap{
+				UidMap: []specs.LinuxIDMapping{
+					{
+						ContainerID: 0,
+						HostID:      1000,
+						Size:        10000,
+					},
+				},
+			},
+			uid:    "0:1000:10000",
+			gid:    "",
+			expErr: false,
+		},
+		{
+			idmap:  IDMap{},
+			uid:    "0-0-0",
+			gid:    "0-0-0",
+			expErr: true,
+		},
+		{
+			idmap:  IDMap{},
+			uid:    "-1:1000:10000",
+			gid:    "",
+			expErr: true,
+		},
+		{
+			idmap:  IDMap{},
+			uid:    "0:1000:",
+			gid:    "",
+			expErr: true,
+		},
+		{
+			idmap:  IDMap{},
+			uid:    "0:1000",
+			gid:    "",
+			expErr: true,
+		},
+		{
+			idmap:  IDMap{},
+			uid:    "1:4294967295:10000",
+			gid:    "",
+			expErr: true,
+		},
+		{
+			idmap:  IDMap{},
+			uid:    "",
+			gid:    "1:1:4294967295",
+			expErr: true,
+		},
+		{
+			idmap:  IDMap{},
+			uid:    "",
+			gid:    "",
+			expErr: false,
+		},
+	} {
+		var idmap IDMap
+		err := idmap.Unmarshal(test.uid, test.gid)
+		assert.Equal(t, test.expErr, err != nil)
+		assert.Equal(t, test.idmap, idmap)
 	}
 }

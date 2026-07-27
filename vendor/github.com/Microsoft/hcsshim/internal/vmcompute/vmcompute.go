@@ -17,7 +17,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/timeout"
 )
 
-//go:generate go run github.com/Microsoft/go-winio/tools/mkwinsyscall -output zsyscall_windows.go vmcompute.go
+//go:generate go tool github.com/Microsoft/go-winio/tools/mkwinsyscall -output zsyscall_windows.go vmcompute.go
 
 //sys hcsEnumerateComputeSystems(query string, computeSystems **uint16, result **uint16) (hr error) = vmcompute.HcsEnumerateComputeSystems?
 //sys hcsCreateComputeSystem(id string, configuration string, identity syscall.Handle, computeSystem *HcsSystem, result **uint16) (hr error) = vmcompute.HcsCreateComputeSystem?
@@ -104,7 +104,7 @@ func execute(ctx gcontext.Context, timeout time.Duration, f func() error) error 
 	}()
 	select {
 	case <-ctx.Done():
-		if ctx.Err() == gcontext.DeadlineExceeded { //nolint:errorlint
+		if ctx.Err() == gcontext.DeadlineExceeded {
 			log.G(ctx).WithField(logfields.Timeout, trueTimeout).
 				Warning("Syscall did not complete within operation timeout. This may indicate a platform issue. " +
 					"If it appears to be making no forward progress, obtain the stacks and see if there is a syscall " +

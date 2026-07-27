@@ -63,7 +63,7 @@ func init() {
 			plugins.DiffPlugin,
 		},
 		Config: defaultDifferConfig,
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			differs, err := ic.GetByType(plugins.DiffPlugin)
 			if err != nil {
 				return nil, err

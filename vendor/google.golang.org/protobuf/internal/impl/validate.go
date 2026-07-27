@@ -68,9 +68,13 @@ func Validate(mt protoreflect.MessageType, in protoiface.UnmarshalInput) (out pr
 	if in.Resolver == nil {
 		in.Resolver = protoregistry.GlobalTypes
 	}
+	if in.Depth == 0 {
+		in.Depth = protowire.DefaultRecursionLimit
+	}
 	o, st := mi.validate(in.Buf, 0, unmarshalOptions{
 		flags:    in.Flags,
 		resolver: in.Resolver,
+		depth:    in.Depth,
 	})
 	if o.initialized {
 		out.Flags |= protoiface.UnmarshalInitialized
@@ -211,9 +215,7 @@ func newValidationInfo(fd protoreflect.FieldDescriptor, ft reflect.Type) validat
 		switch fd.Kind() {
 		case protoreflect.MessageKind:
 			vi.typ = validationTypeMessage
-			if !fd.IsWeak() {
-				vi.mi = getMessageInfo(ft)
-			}
+			vi.mi = getMessageInfo(ft)
 		case protoreflect.GroupKind:
 			vi.typ = validationTypeGroup
 			vi.mi = getMessageInfo(ft)
@@ -258,6 +260,9 @@ func (mi *MessageInfo) validate(b []byte, groupTag protowire.Number, opts unmars
 	if groupTag > 0 {
 		states[0].typ = validationTypeGroup
 		states[0].endGroup = groupTag
+	}
+	if opts.depth--; opts.depth < 0 {
+		return out, ValidationInvalid
 	}
 	initialized := true
 	start := len(b)
@@ -320,26 +325,6 @@ State:
 				}
 				if f != nil {
 					vi = f.validation
-					if vi.typ == validationTypeMessage && vi.mi == nil {
-						// Probable weak field.
-						//
-						// TODO: Consider storing the results of this lookup somewhere
-						// rather than recomputing it on every validation.
-						fd := st.mi.Desc.Fields().ByNumber(num)
-						if fd == nil || !fd.IsWeak() {
-							break
-						}
-						messageName := fd.Message().FullName()
-						messageType, err := protoregistry.GlobalTypes.FindMessageByName(messageName)
-						switch err {
-						case nil:
-							vi.mi, _ = messageType.(*MessageInfo)
-						case protoregistry.NotFound:
-							vi.typ = validationTypeBytes
-						default:
-							return out, ValidationUnknown
-						}
-					}
 					break
 				}
 				// Possible extension field.
@@ -473,6 +458,13 @@ State:
 						mi:      vi.mi,
 						tail:    b,
 					})
+					if vi.typ == validationTypeMessage ||
+						vi.typ == validationTypeGroup ||
+						vi.typ == validationTypeMap {
+						if opts.depth--; opts.depth < 0 {
+							return out, ValidationInvalid
+						}
+					}
 					b = v
 					continue State
 				case validationTypeRepeatedVarint:
@@ -521,6 +513,9 @@ State:
 						mi:       vi.mi,
 						endGroup: num,
 					})
+					if opts.depth--; opts.depth < 0 {
+						return out, ValidationInvalid
+					}
 					continue State
 				case flags.ProtoLegacy && vi.typ == validationTypeMessageSetItem:
 					typeid, v, n, err := messageset.ConsumeFieldValue(b, false)
@@ -543,6 +538,13 @@ State:
 							mi:   xvi.mi,
 							tail: b[n:],
 						})
+						if xvi.typ == validationTypeMessage ||
+							xvi.typ == validationTypeGroup ||
+							xvi.typ == validationTypeMap {
+							if opts.depth--; opts.depth < 0 {
+								return out, ValidationInvalid
+							}
+						}
 						b = v
 						continue State
 					}
@@ -569,12 +571,14 @@ State:
 		switch st.typ {
 		case validationTypeMessage, validationTypeGroup:
 			numRequiredFields = int(st.mi.numRequiredFields)
+			opts.depth++
 		case validationTypeMap:
 			// If this is a map field with a message value that contains
 			// required fields, require that the value be present.
 			if st.mi != nil && st.mi.numRequiredFields > 0 {
 				numRequiredFields = 1
 			}
+			opts.depth++
 		}
 		// If there are more than 64 required fields, this check will
 		// always fail and we will report that the message is potentially

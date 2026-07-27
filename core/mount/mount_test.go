@@ -202,6 +202,52 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 			},
 		},
 		{
+			desc: "remove fsync=volatile option from overlay mounts, ignore non overlay",
+			input: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"workdir=/path/to/snapshots/4/work",
+						"upperdir=/path/to/snapshots/4/fs",
+						"lowerdir=/path/to/snapshots/1/fs",
+						"fsync=volatile",
+					},
+				},
+				{
+					Type:   "underlay",
+					Source: "underlay",
+					Options: []string{
+						"index=on",
+						"lowerdir=/another/path/to/snapshots/2/fs",
+						"fsync=volatile",
+					},
+				},
+			},
+			expected: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"workdir=/path/to/snapshots/4/work",
+						"upperdir=/path/to/snapshots/4/fs",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
+				{
+					Type:   "underlay",
+					Source: "underlay",
+					Options: []string{
+						"index=on",
+						"lowerdir=/another/path/to/snapshots/2/fs",
+						"fsync=volatile",
+					},
+				},
+			},
+		},
+		{
 			desc: "return original slice since no volatile options on overlay",
 			input: []Mount{
 				{

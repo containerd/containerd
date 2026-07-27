@@ -33,7 +33,8 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
-	"github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/internal/cri/sputil"
+	criutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
@@ -104,11 +105,12 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		case runtime.NamespaceMode_POD:
 			specOpts = append(specOpts, oci.WithUserNamespace(uids, gids))
 			usernsEnabled = true
-
-			if err := c.pinUserNamespace(id, nsPath); err != nil {
-				return nil, fmt.Errorf("failed to pin user namespace: %w", err)
+			if !hostNetwork(config) {
+				if err := c.pinUserNamespace(id, nsPath); err != nil {
+					return nil, fmt.Errorf("failed to pin user namespace: %w", err)
+				}
+				specOpts = append(specOpts, customopts.WithNamespacePath(runtimespec.UserNamespace, c.getSandboxPinnedUserNamespace(id)))
 			}
-			specOpts = append(specOpts, customopts.WithNamespacePath(runtimespec.UserNamespace, c.getSandboxPinnedUserNamespace(id)))
 		default:
 			return nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
 		}
@@ -125,7 +127,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	// When user-namespace is enabled, the `nosuid, nodev, noexec` flags are
 	// required, otherwise the remount will fail with EPERM. Just use them
 	// unconditionally, they are nice to have anyways.
-	specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
+	mounts := []runtimespec.Mount{
 		{
 			Source:      sandboxDevShm,
 			Destination: devShm,
@@ -139,7 +141,21 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 			Type:        "bind",
 			Options:     []string{"rbind", "ro", "nosuid", "nodev", "noexec"},
 		},
-	}))
+	}
+
+	// When using both host network and user namespace, we need to bind mount /sys
+	// instead of mounting sysfs, because mounting sysfs will fail with EPERM in this configuration.
+	if nsOptions.GetNetwork() == runtime.NamespaceMode_NODE && usernsEnabled {
+		specOpts = append(specOpts, oci.WithoutMounts("/sys"))
+		mounts = append(mounts, runtimespec.Mount{
+			Source:      "/sys",
+			Destination: "/sys",
+			Type:        "bind",
+			Options:     []string{"rbind", "rro", "nosuid", "nodev", "noexec"},
+		})
+	}
+
+	specOpts = append(specOpts, oci.WithMounts(mounts))
 
 	processLabel, mountLabel, err := initLabelsFromOpt(securityContext.GetSelinuxOptions())
 	if err != nil {
@@ -188,14 +204,14 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.config.RestrictOOMScoreAdj))
 
-	for pKey, pValue := range util.GetPassthroughAnnotations(config.Annotations,
+	for pKey, pValue := range criutil.GetPassthroughAnnotations(config.Annotations,
 		runtimePodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
 	specOpts = append(specOpts, annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...)
 
-	return c.runtimeSpec(id, "", specOpts...)
+	return c.runtimeSpec(id, specOpts...)
 }
 
 // sandboxContainerSpecOpts generates OCI spec options for
@@ -208,14 +224,14 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 	)
 	ssp := securityContext.GetSeccomp()
 	if ssp == nil {
-		ssp, err = generateSeccompSecurityProfile(
+		ssp, err = sputil.GenerateSeccompSecurityProfile(
 			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
 			c.config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 		}
 	}
-	seccompSpecOpts, err := c.generateSeccompSpecOpts(
+	seccompSpecOpts, err := sputil.GenerateSeccompSpecOpts(
 		ssp,
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
@@ -226,7 +242,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
 
-	userstr, err := generateUserString(
+	userstr, err := criutil.GenerateUserString(
 		"",
 		securityContext.GetRunAsUser(),
 		securityContext.GetRunAsGroup(),

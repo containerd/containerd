@@ -28,8 +28,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	remotecommand "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/internal/cri/config"
@@ -49,10 +49,7 @@ func (cw *cappedWriter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
-	end := cw.remain
-	if end > len(p) {
-		end = len(p)
-	}
+	end := min(cw.remain, len(p))
 	written, err := cw.w.Write(p[0:end])
 	cw.remain -= written
 

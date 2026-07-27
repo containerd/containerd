@@ -20,6 +20,17 @@ import (
 	nri "github.com/containerd/nri/pkg/adaptation"
 )
 
+type ContainerStatus struct {
+	State      nri.ContainerState
+	Reason     string
+	Message    string
+	Pid        uint32
+	CreatedAt  int64
+	StartedAt  int64
+	FinishedAt int64
+	ExitCode   int32
+}
+
 // Container interface for interacting with NRI.
 type Container interface {
 	GetDomain() string
@@ -27,7 +38,7 @@ type Container interface {
 	GetPodSandboxID() string
 	GetID() string
 	GetName() string
-	GetState() nri.ContainerState
+	GetStatus() *ContainerStatus
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
 	GetArgs() []string
@@ -35,8 +46,9 @@ type Container interface {
 	GetMounts() []*nri.Mount
 	GetHooks() *nri.Hooks
 	GetLinuxContainer() LinuxContainer
-
-	GetPid() uint32
+	GetCDIDevices() []*nri.CDIDevice
+	GetRlimits() []*nri.POSIXRlimit
+	GetUser() *nri.User
 }
 
 type LinuxContainer interface {
@@ -45,21 +57,36 @@ type LinuxContainer interface {
 	GetLinuxResources() *nri.LinuxResources
 	GetOOMScoreAdj() *int
 	GetCgroupsPath() string
+	GetIOPriority() *nri.LinuxIOPriority
+	GetScheduler() *nri.LinuxScheduler
+	GetNetDevices() map[string]*nri.LinuxNetDevice
+	GetRdt() *nri.LinuxRdt
+	GetSeccompProfile() *nri.SecurityProfile
+	GetSysctl() map[string]string
+	GetSeccompPolicy() *nri.LinuxSeccomp
 }
 
 func commonContainerToNRI(ctr Container) *nri.Container {
+	status := ctr.GetStatus()
 	return &nri.Container{
 		Id:           ctr.GetID(),
 		PodSandboxId: ctr.GetPodSandboxID(),
 		Name:         ctr.GetName(),
-		State:        ctr.GetState(),
+		State:        status.State,
 		Labels:       ctr.GetLabels(),
 		Annotations:  ctr.GetAnnotations(),
 		Args:         ctr.GetArgs(),
 		Env:          ctr.GetEnv(),
 		Mounts:       ctr.GetMounts(),
 		Hooks:        ctr.GetHooks(),
-		Pid:          ctr.GetPid(),
+		CDIDevices:   ctr.GetCDIDevices(),
+		Pid:          status.Pid,
+		CreatedAt:    status.CreatedAt,
+		StartedAt:    status.StartedAt,
+		FinishedAt:   status.FinishedAt,
+		ExitCode:     status.ExitCode,
+		Rlimits:      ctr.GetRlimits(),
+		User:         ctr.GetUser(),
 	}
 }
 

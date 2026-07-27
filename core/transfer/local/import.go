@@ -20,15 +20,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 func (ts *localTransferService) importStream(ctx context.Context, i transfer.ImageImporter, is transfer.ImageStorer, tops *transfer.Config) error {
@@ -74,11 +76,10 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 			return nil, err
 		}
 
-		for _, m := range idx.Manifests {
-			m.Annotations = mergeMap(m.Annotations, map[string]string{"io.containerd.import.ref-source": "annotation"})
-			descriptors = append(descriptors, m)
+		for i := range idx.Manifests {
+			idx.Manifests[i].Annotations = mergeMap(idx.Manifests[i].Annotations, map[string]string{"io.containerd.import.ref-source": "annotation"})
+			descriptors = append(descriptors, idx.Manifests[i])
 		}
-
 		return idx.Manifests, nil
 	}
 
@@ -95,7 +96,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 		if len(unpacks) > 0 {
 			uopts := []unpack.UnpackerOpt{}
 			for _, u := range unpacks {
-				matched, mu := getSupportedPlatform(u, ts.config.UnpackPlatforms)
+				matched, mu := getSupportedPlatform(ctx, u, ts.config.UnpackPlatforms)
 				if matched {
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 				}
@@ -128,7 +129,6 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 	}
 
 	for _, desc := range descriptors {
-		desc := desc
 		imgs, err := is.Store(ctx, desc, ts.images)
 		if err != nil {
 			if errdefs.IsNotFound(err) {
@@ -160,11 +160,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 
 func mergeMap(m1, m2 map[string]string) map[string]string {
 	merged := make(map[string]string, len(m1)+len(m2))
-	for k, v := range m1 {
-		merged[k] = v
-	}
-	for k, v := range m2 {
-		merged[k] = v
-	}
+	maps.Copy(merged, m1)
+	maps.Copy(merged, m2)
 	return merged
 }

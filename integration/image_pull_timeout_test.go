@@ -18,12 +18,14 @@ package integration
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -61,9 +63,12 @@ func TestCRIImagePullTimeout(t *testing.T) {
 		t.Skip()
 	}
 
-	t.Run("HoldingContentOpenWriter", testCRIImagePullTimeoutByHoldingContentOpenWriter)
-	t.Run("NoDataTransferred", testCRIImagePullTimeoutByNoDataTransferred)
-	t.Run("SlowCommitWriter", testCRIImagePullTimeoutBySlowCommitWriter)
+	t.Run("HoldingContentOpenWriterWithLocalPull", testCRIImagePullTimeoutByHoldingContentOpenWriterWithLocal)
+	t.Run("HoldingContentOpenWriterWithTransferService", testCRIImagePullTimeoutByHoldingContentOpenWriterWithTransfer)
+	t.Run("NoDataTransferredWithLocalPull", testCRIImagePullTimeoutByNoDataTransferredWithLocal)
+	t.Run("NoDataTransferredWithTransferService", testCRIImagePullTimeoutByNoDataTransferredWithTransfer)
+	t.Run("SlowCommitWriterWithLocalPull", testCRIImagePullTimeoutBySlowCommitWriterWithLocal)
+	t.Run("SlowCommitWriterWithTransferService", testCRIImagePullTimeoutBySlowCommitWriterWithTransfer)
 }
 
 // testCRIImagePullTimeoutBySlowCommitWriter tests that
@@ -79,21 +84,30 @@ func TestCRIImagePullTimeout(t *testing.T) {
 // ImagePull.
 //
 // It's reproducer for #9347.
-func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T) {
-	t.Parallel()
-
+func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T, useLocal bool) {
 	tmpDir := t.TempDir()
 
 	delayDuration := 2 * defaultImagePullProgressTimeout
 	cli := buildLocalContainerdClient(t, tmpDir, tweakContentInitFnWithDelayer(delayDuration))
 
-	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{})
+	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{}, useLocal)
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
+	ctx = withPullHTTPTrace(ctx)
 
 	_, err = criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
 	assert.NoError(t, err)
+}
+
+func testCRIImagePullTimeoutBySlowCommitWriterWithLocal(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutBySlowCommitWriter(t, true)
+}
+
+func testCRIImagePullTimeoutBySlowCommitWriterWithTransfer(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutBySlowCommitWriter(t, false)
 }
 
 // testCRIImagePullTimeoutByHoldingContentOpenWriter tests that
@@ -103,14 +117,12 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T) {
 // When there are several pulling requests for the same blob content, there
 // will only one active http request. It is singleflight. For the waiting pulling
 // request, we should not cancel.
-func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
-	t.Parallel()
-
+func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bool) {
 	tmpDir := t.TempDir()
 
 	cli := buildLocalContainerdClient(t, tmpDir, nil)
 
-	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{})
+	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{}, useLocal)
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
@@ -211,7 +223,8 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 	go func() {
 		defer close(errCh)
 
-		_, err := criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
+		tctx := withPullHTTPTrace(ctx)
+		_, err := criService.PullImage(tctx, pullProgressTestImageName, nil, nil, "")
 		errCh <- err
 	}()
 
@@ -223,6 +236,16 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 		t.Fatalf("PullImage should not return because the manifest has been locked, but got error=%v", err)
 	}
 	assert.NoError(t, <-errCh)
+}
+
+func testCRIImagePullTimeoutByHoldingContentOpenWriterWithLocal(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutByHoldingContentOpenWriter(t, true)
+}
+
+func testCRIImagePullTimeoutByHoldingContentOpenWriterWithTransfer(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutByHoldingContentOpenWriter(t, false)
 }
 
 // testCRIImagePullTimeoutByNoDataTransferred tests that
@@ -237,9 +260,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 //
 // This case uses ghcr.io/containerd/volume-ownership:2.1 which has one layer > 3MB.
 // The circuit breaker will enable after transferred 3MB in one connection.
-func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
-	t.Parallel()
-
+func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 	tmpDir := t.TempDir()
 
 	cli := buildLocalContainerdClient(t, tmpDir, nil)
@@ -288,12 +309,18 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 			},
 		},
 	} {
-		criService, err := initLocalCRIImageService(cli, tmpDir, registryCfg)
+		// Skip Mirrors configuration (idx=1) when using transfer service
+		if idx == 1 && !useLocal {
+			t.Log("Skipping Mirrors configuration with Transfer service as it's not supported")
+			continue
+		}
+		criService, err := initLocalCRIImageService(cli, tmpDir, registryCfg, useLocal)
 		assert.NoError(t, err)
 
 		dctx, _, err := cli.WithLease(ctx)
 		assert.NoError(t, err)
 
+		dctx = withPullHTTPTrace(dctx)
 		_, err = criService.PullImage(dctx, fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"), nil, nil, "")
 
 		assert.Equal(t, context.Canceled, errors.Unwrap(err), "[%v] expected canceled error, but got (%v)", idx, err)
@@ -305,6 +332,16 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 		err = cli.LeasesService().Delete(ctx, leases.Lease{ID: lid}, leases.SynchronousDelete)
 		assert.NoError(t, err)
 	}
+}
+
+func testCRIImagePullTimeoutByNoDataTransferredWithLocal(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutByNoDataTransferred(t, true)
+}
+
+func testCRIImagePullTimeoutByNoDataTransferredWithTransfer(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutByNoDataTransferred(t, false)
 }
 
 func setupLocalMirrorRegistry(srv *mirrorRegistryServer) *httptest.Server {
@@ -373,7 +410,7 @@ var (
 	defaultBufSize = 1024 * 4
 
 	bufPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			buffer := make([]byte, defaultBufSize)
 			return &buffer
 		},
@@ -446,7 +483,7 @@ func (l *ioCopyLimiter) limitedCopy(ctx context.Context, dst io.Writer, src io.R
 			l.hitCircuitBreaker = false
 		}
 
-		nr, er := io.ReadAtLeast(src, buf, len(buf))
+		nr, er := src.Read(buf)
 		if nr > 0 {
 			nw, ew := dst.Write(buf[0:nr])
 			if nw > 0 {
@@ -473,7 +510,7 @@ func (l *ioCopyLimiter) limitedCopy(ctx context.Context, dst io.Writer, src io.R
 //
 // NOTE: We don't need to start the CRI plugin here because we just need the
 // ImageService API.
-func initLocalCRIImageService(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry) (criserver.ImageService, error) {
+func initLocalCRIImageService(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry, useLocalPull bool) (criserver.ImageService, error) {
 	containerdRootDir := filepath.Join(tmpDir, "root")
 
 	cfg := criconfig.ImageConfig{
@@ -481,6 +518,7 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 		Registry:                 registryCfg,
 		ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
 		StatsCollectPeriod:       10,
+		UseLocalImagePull:        useLocalPull,
 	}
 
 	return images.NewService(cfg, &images.CRIImageServiceOptions{
@@ -491,5 +529,57 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 		Content:          client.ContentStore(),
 		Images:           client.ImageService(),
 		Client:           client,
+		Transferrer:      client.TransferService(),
+	})
+}
+
+func withPullHTTPTrace(ctx context.Context) context.Context {
+	logTraceFunc := func(event string, fields log.Fields) {
+		log.G(ctx).WithField("event", event).
+			WithFields(fields).
+			Info("HTTP trace event")
+	}
+
+	return httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		DNSStart: func(info httptrace.DNSStartInfo) {
+			logTraceFunc("dns_start", log.Fields{
+				"host": info.Host,
+			})
+		},
+		DNSDone: func(_ httptrace.DNSDoneInfo) {
+			logTraceFunc("dns_done", log.Fields{})
+		},
+		ConnectStart: func(network, addr string) {
+			logTraceFunc("connect_start", log.Fields{
+				"network": network,
+				"addr":    addr,
+			})
+		},
+		ConnectDone: func(network, addr string, err error) {
+			logTraceFunc("connect_done", log.Fields{
+				"network": network,
+				"addr":    addr,
+				"error":   err,
+			})
+		},
+		TLSHandshakeStart: func() {
+			logTraceFunc("tls_handshake_start", log.Fields{})
+		},
+		TLSHandshakeDone: func(_ tls.ConnectionState, err error) {
+			logTraceFunc("tls_handshake_done", log.Fields{
+				"error": err,
+			})
+		},
+		GetConn: func(hostPort string) {
+			logTraceFunc("get_conn", log.Fields{
+				"hostPort": hostPort,
+			})
+		},
+		GotConn: func(_ httptrace.GotConnInfo) {
+			logTraceFunc("got_conn", log.Fields{})
+		},
+		GotFirstResponseByte: func() {
+			logTraceFunc("got_first_response_byte", log.Fields{})
+		},
 	})
 }

@@ -78,7 +78,7 @@ func getCgroupSwapLimitForTask(t *testing.T, task containerd.Task) uint64 {
 		if err != nil {
 			t.Fatal(err)
 		}
-		stat, err := cgroup2.Stat()
+		stat, err := cgroup2.StatFiltered(cgroupsv2.StatMemory)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,7 +105,7 @@ func getCgroupMemoryLimitForTask(t *testing.T, task containerd.Task) uint64 {
 		if err != nil {
 			t.Fatal(err)
 		}
-		stat, err := cgroup2.Stat()
+		stat, err := cgroup2.StatFiltered(cgroupsv2.StatMemory)
 		if err != nil {
 			t.Fatal(err)
 		}

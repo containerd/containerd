@@ -25,9 +25,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // TreeFormat is used to format tree based output using 4 values.
@@ -119,11 +122,15 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 	fmt.Fprintf(p.w, "%s%s @%s (%d bytes)\n", prefix, desc.MediaType, desc.Digest, desc.Size)
 
 	if desc.Platform != nil && desc.Platform.Architecture != "" {
-		// TODO: Use containerd platform library to format
-		fmt.Fprintf(p.w, "%s Platform: %s/%s\n", subchild, desc.Platform.OS, desc.Platform.Architecture)
+		fmt.Fprintf(p.w, "%s Platform: %s\n", subchild, platforms.Format(*desc.Platform))
 	}
 	b, err := content.ReadBlob(ctx, store, desc)
 	if err != nil {
+		if errdefs.IsNotFound(err) {
+			// If the blob is not found, we can still display the tree
+			fmt.Fprintf(p.w, "%s Content does not exist locally, skipping\n", childprefix+p.format.LastDrop)
+			return nil
+		}
 		return err
 	}
 	if err := p.showContent(ctx, store, desc, subchild); err != nil {

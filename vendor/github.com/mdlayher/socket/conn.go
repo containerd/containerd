@@ -120,7 +120,7 @@ func (c *Conn) ReadContext(ctx context.Context, b []byte) (int, error) {
 		b = b[:maxRW]
 	}
 
-	n, err := readT(c, ctx, "read", func(fd int) (int, error) {
+	n, err := readT(ctx, c, "read", func(fd int) (int, error) {
 		return unix.Read(fd, b)
 	})
 	if n == 0 && err == nil && c.facts.zeroReadIsEOF {
@@ -142,12 +142,12 @@ func (c *Conn) WriteContext(ctx context.Context, b []byte) (int, error) {
 	)
 
 	doErr := c.write(ctx, "write", func(fd int) error {
-		max := len(b)
-		if c.facts.isStream && max-nn > maxRW {
-			max = nn + maxRW
+		lenb := len(b)
+		if c.facts.isStream && lenb-nn > maxRW {
+			lenb = nn + maxRW
 		}
 
-		n, err = unix.Write(fd, b[nn:max])
+		n, err = unix.Write(fd, b[nn:lenb])
 		if n > 0 {
 			nn += n
 		}
@@ -418,7 +418,7 @@ func (c *Conn) Accept(ctx context.Context, flags int) (*Conn, unix.Sockaddr, err
 		sa  unix.Sockaddr
 	}
 
-	r, err := readT(c, ctx, sysAccept, func(fd int) (ret, error) {
+	r, err := readT(ctx, c, sysAccept, func(fd int) (ret, error) {
 		// Either accept(2) or accept4(2) depending on the OS.
 		nfd, sa, err := accept(fd, flags|socketFlags)
 		return ret{nfd, sa}, err
@@ -440,9 +440,7 @@ func (c *Conn) Accept(ctx context.Context, flags int) (*Conn, unix.Sockaddr, err
 
 // Bind wraps bind(2).
 func (c *Conn) Bind(sa unix.Sockaddr) error {
-	return c.control(context.Background(), "bind", func(fd int) error {
-		return unix.Bind(fd, sa)
-	})
+	return c.control("bind", func(fd int) error { return unix.Bind(fd, sa) })
 }
 
 // Connect wraps connect(2). In order to verify that the underlying socket is
@@ -466,7 +464,7 @@ func (c *Conn) Connect(ctx context.Context, sa unix.Sockaddr) (unix.Sockaddr, er
 		// have an explicit WaitWrite call like internal/poll does, so we have
 		// to wait until the runtime calls the closure again to indicate we can
 		// write.
-		progress uint32
+		progress atomic.Uint32
 
 		// Capture closure sockaddr and error.
 		rsa unix.Sockaddr
@@ -474,7 +472,7 @@ func (c *Conn) Connect(ctx context.Context, sa unix.Sockaddr) (unix.Sockaddr, er
 	)
 
 	doErr := c.write(ctx, op, func(fd int) error {
-		if atomic.AddUint32(&progress, 1) == 1 {
+		if progress.Add(1) == 1 {
 			// First call: initiate connect.
 			return unix.Connect(fd, sa)
 		}
@@ -530,26 +528,38 @@ func (c *Conn) Connect(ctx context.Context, sa unix.Sockaddr) (unix.Sockaddr, er
 
 // Getsockname wraps getsockname(2).
 func (c *Conn) Getsockname() (unix.Sockaddr, error) {
-	return controlT(c, context.Background(), "getsockname", unix.Getsockname)
+	return controlT(c, "getsockname", unix.Getsockname)
 }
 
 // Getpeername wraps getpeername(2).
 func (c *Conn) Getpeername() (unix.Sockaddr, error) {
-	return controlT(c, context.Background(), "getpeername", unix.Getpeername)
+	return controlT(c, "getpeername", unix.Getpeername)
+}
+
+// GetsockoptICMPv6Filter wraps getsockopt(2) for *unix.ICMPv6Filter values.
+func (c *Conn) GetsockoptICMPv6Filter(level, opt int) (*unix.ICMPv6Filter, error) {
+	return controlT(c, "getsockopt", func(fd int) (*unix.ICMPv6Filter, error) {
+		return unix.GetsockoptICMPv6Filter(fd, level, opt)
+	})
 }
 
 // GetsockoptInt wraps getsockopt(2) for integer values.
 func (c *Conn) GetsockoptInt(level, opt int) (int, error) {
-	return controlT(c, context.Background(), "getsockopt", func(fd int) (int, error) {
+	return controlT(c, "getsockopt", func(fd int) (int, error) {
 		return unix.GetsockoptInt(fd, level, opt)
+	})
+}
+
+// GetsockoptString wraps getsockopt(2) for string values.
+func (c *Conn) GetsockoptString(level, opt int) (string, error) {
+	return controlT(c, "getsockopt", func(fd int) (string, error) {
+		return unix.GetsockoptString(fd, level, opt)
 	})
 }
 
 // Listen wraps listen(2).
 func (c *Conn) Listen(n int) error {
-	return c.control(context.Background(), "listen", func(fd int) error {
-		return unix.Listen(fd, n)
-	})
+	return c.control("listen", func(fd int) error { return unix.Listen(fd, n) })
 }
 
 // Recvmsg wraps recvmsg(2).
@@ -559,7 +569,7 @@ func (c *Conn) Recvmsg(ctx context.Context, p, oob []byte, flags int) (int, int,
 		from               unix.Sockaddr
 	}
 
-	r, err := readT(c, ctx, "recvmsg", func(fd int) (ret, error) {
+	r, err := readT(ctx, c, "recvmsg", func(fd int) (ret, error) {
 		n, oobn, recvflags, from, err := unix.Recvmsg(fd, p, oob, flags)
 		return ret{n, oobn, recvflags, from}, err
 	})
@@ -577,7 +587,7 @@ func (c *Conn) Recvfrom(ctx context.Context, p []byte, flags int) (int, unix.Soc
 		addr unix.Sockaddr
 	}
 
-	out, err := readT(c, ctx, "recvfrom", func(fd int) (ret, error) {
+	out, err := readT(ctx, c, "recvfrom", func(fd int) (ret, error) {
 		n, addr, err := unix.Recvfrom(fd, p, flags)
 		return ret{n, addr}, err
 	})
@@ -590,7 +600,7 @@ func (c *Conn) Recvfrom(ctx context.Context, p []byte, flags int) (int, unix.Soc
 
 // Sendmsg wraps sendmsg(2).
 func (c *Conn) Sendmsg(ctx context.Context, p, oob []byte, to unix.Sockaddr, flags int) (int, error) {
-	return writeT(c, ctx, "sendmsg", func(fd int) (int, error) {
+	return writeT(ctx, c, "sendmsg", func(fd int) (int, error) {
 		return unix.SendmsgN(fd, p, oob, to, flags)
 	})
 }
@@ -602,18 +612,30 @@ func (c *Conn) Sendto(ctx context.Context, p []byte, flags int, to unix.Sockaddr
 	})
 }
 
+// SetsockoptICMPv6Filter wraps setsockopt(2) for *unix.ICMPv6Filter values.
+func (c *Conn) SetsockoptICMPv6Filter(level, opt int, filter *unix.ICMPv6Filter) error {
+	return c.control("setsockopt", func(fd int) error {
+		return unix.SetsockoptICMPv6Filter(fd, level, opt, filter)
+	})
+}
+
 // SetsockoptInt wraps setsockopt(2) for integer values.
 func (c *Conn) SetsockoptInt(level, opt, value int) error {
-	return c.control(context.Background(), "setsockopt", func(fd int) error {
+	return c.control("setsockopt", func(fd int) error {
 		return unix.SetsockoptInt(fd, level, opt, value)
+	})
+}
+
+// SetsockoptString wraps setsockopt(2) for string values.
+func (c *Conn) SetsockoptString(level, opt int, value string) error {
+	return c.control("setsockopt", func(fd int) error {
+		return unix.SetsockoptString(fd, level, opt, value)
 	})
 }
 
 // Shutdown wraps shutdown(2).
 func (c *Conn) Shutdown(how int) error {
-	return c.control(context.Background(), "shutdown", func(fd int) error {
-		return unix.Shutdown(fd, how)
-	})
+	return c.control("shutdown", func(fd int) error { return unix.Shutdown(fd, how) })
 }
 
 // Conn low-level read/write/control functions. These functions mirror the
@@ -623,7 +645,7 @@ func (c *Conn) Shutdown(how int) error {
 // read wraps readT to execute a function and capture its error result. This is
 // a convenience wrapper for functions which don't return any extra values.
 func (c *Conn) read(ctx context.Context, op string, f func(fd int) error) error {
-	_, err := readT(c, ctx, op, func(fd int) (struct{}, error) {
+	_, err := readT(ctx, c, op, func(fd int) (struct{}, error) {
 		return struct{}{}, f(fd)
 	})
 	return err
@@ -632,7 +654,7 @@ func (c *Conn) read(ctx context.Context, op string, f func(fd int) error) error 
 // write executes f, a write function, against the associated file descriptor.
 // op is used to create an *os.SyscallError if the file descriptor is closed.
 func (c *Conn) write(ctx context.Context, op string, f func(fd int) error) error {
-	_, err := writeT(c, ctx, op, func(fd int) (struct{}, error) {
+	_, err := writeT(ctx, c, op, func(fd int) (struct{}, error) {
 		return struct{}{}, f(fd)
 	})
 	return err
@@ -640,7 +662,7 @@ func (c *Conn) write(ctx context.Context, op string, f func(fd int) error) error
 
 // readT executes c.rc.Read for op using the input function, returning a newly
 // allocated result T.
-func readT[T any](c *Conn, ctx context.Context, op string, f func(fd int) (T, error)) (T, error) {
+func readT[T any](ctx context.Context, c *Conn, op string, f func(fd int) (T, error)) (T, error) {
 	return rwT(c, rwContext[T]{
 		Context: ctx,
 		Type:    read,
@@ -651,7 +673,7 @@ func readT[T any](c *Conn, ctx context.Context, op string, f func(fd int) (T, er
 
 // writeT executes c.rc.Write for op using the input function, returning a newly
 // allocated result T.
-func writeT[T any](c *Conn, ctx context.Context, op string, f func(fd int) (T, error)) (T, error) {
+func writeT[T any](ctx context.Context, c *Conn, op string, f func(fd int) (T, error)) (T, error) {
 	return rwT(c, rwContext[T]{
 		Context: ctx,
 		Type:    write,
@@ -725,10 +747,7 @@ func rwT[T any](c *Conn, rw rwContext[T]) (T, error) {
 		doneC = make(chan struct{})
 
 		// Atomic: reports whether we have to disarm the deadline.
-		//
-		// TODO(mdlayher): switch back to atomic.Bool when we drop support for
-		// Go 1.18.
-		needDisarm int64
+		needDisarm atomic.Bool
 	)
 
 	// On cancel, clean up the watcher.
@@ -744,7 +763,7 @@ func rwT[T any](c *Conn, rw rwContext[T]) (T, error) {
 			return *new(T), err
 		}
 		setDeadline = true
-		atomic.AddInt64(&needDisarm, 1)
+		needDisarm.Store(true)
 	} else {
 		// The context does not have an explicit deadline. We have to watch for
 		// cancelation so we can propagate that signal to immediately unblock
@@ -752,20 +771,18 @@ func rwT[T any](c *Conn, rw rwContext[T]) (T, error) {
 		//
 		// TODO(mdlayher): is it possible to detect a background context vs a
 		// context with possible future cancel?
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
 			select {
 			case <-rw.Context.Done():
 				// Cancel the operation. Make the caller disarm after poll
 				// returns.
-				atomic.AddInt64(&needDisarm, 1)
+				needDisarm.Store(true)
 				_ = deadline(time.Unix(0, 1))
 			case <-doneC:
 				// Nothing to do.
 			}
-		}()
+		})
 	}
 
 	var (
@@ -778,7 +795,7 @@ func rwT[T any](c *Conn, rw rwContext[T]) (T, error) {
 		return ready(err)
 	})
 
-	if atomic.LoadInt64(&needDisarm) > 0 {
+	if needDisarm.Load() {
 		_ = deadline(time.Time{})
 	}
 
@@ -805,8 +822,8 @@ func rwT[T any](c *Conn, rw rwContext[T]) (T, error) {
 }
 
 // control executes Conn.control for op using the input function.
-func (c *Conn) control(ctx context.Context, op string, f func(fd int) error) error {
-	_, err := controlT(c, ctx, op, func(fd int) (struct{}, error) {
+func (c *Conn) control(op string, f func(fd int) error) error {
+	_, err := controlT(c, op, func(fd int) (struct{}, error) {
 		return struct{}{}, f(fd)
 	})
 	return err
@@ -814,7 +831,7 @@ func (c *Conn) control(ctx context.Context, op string, f func(fd int) error) err
 
 // controlT executes c.rc.Control for op using the input function, returning a
 // newly allocated result T.
-func controlT[T any](c *Conn, ctx context.Context, op string, f func(fd int) (T, error)) (T, error) {
+func controlT[T any](c *Conn, op string, f func(fd int) (T, error)) (T, error) {
 	if atomic.LoadUint32(&c.closed) != 0 {
 		// If the file descriptor is already closed, do nothing.
 		return *new(T), os.NewSyscallError(op, unix.EBADF)
@@ -832,11 +849,6 @@ func controlT[T any](c *Conn, ctx context.Context, op string, f func(fd int) (T,
 		// The last values for t and err are captured outside of the closure for
 		// use when the loop breaks.
 		for {
-			if err = ctx.Err(); err != nil {
-				// Early exit due to context cancel.
-				return
-			}
-
 			t, err = f(int(fd))
 			if ready(err) {
 				return

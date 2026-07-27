@@ -17,6 +17,7 @@
 package leases
 
 import (
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,7 +58,6 @@ func TestWithLabels(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			lease := newLease(tc.initialLabels)
 			err := WithLabels(tc.labels)(lease)
@@ -66,7 +66,6 @@ func TestWithLabels(t *testing.T) {
 		})
 	}
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name+"-WithLabel", func(t *testing.T) {
 			lease := newLease(tc.initialLabels)
 			for k, v := range tc.labels {
@@ -82,9 +81,7 @@ func newLease(labels map[string]string) *Lease {
 	lease := &Lease{}
 	if labels != nil {
 		lease.Labels = map[string]string{}
-		for k, v := range labels {
-			lease.Labels[k] = v
-		}
+		maps.Copy(lease.Labels, labels)
 	}
 	return lease
 }

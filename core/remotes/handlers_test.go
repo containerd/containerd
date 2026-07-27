@@ -109,7 +109,7 @@ func TestSkipNonDistributableBlobs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	write := func(i interface{}, ref string) digest.Digest {
+	write := func(i any, ref string) digest.Digest {
 		t.Helper()
 
 		data, err := json.Marshal(i)

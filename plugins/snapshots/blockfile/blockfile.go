@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -158,6 +159,10 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 
 	if config.mountOptions == nil {
 		config.mountOptions = []string{"loop"}
+	}
+
+	if !slices.Contains(config.mountOptions, "loop") {
+		config.mountOptions = append(config.mountOptions, "loop")
 	}
 
 	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))

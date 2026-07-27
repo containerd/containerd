@@ -18,6 +18,7 @@ package ioutil
 
 import (
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,23 +63,24 @@ func TestSerialWriteCloser(t *testing.T) {
 		goroutine = 10
 		dataLen   = 100000
 	)
-	for n := 0; n < testCount; n++ {
+	for range testCount {
 		testData := make([][]byte, goroutine)
-		for i := 0; i < goroutine; i++ {
+		for i := range goroutine {
 			testData[i] = []byte(repeatNumber(i, dataLen) + "\n")
 		}
 
-		f, err := os.CreateTemp("", "serial-write-closer")
+		f, err := os.Create(filepath.Join(t.TempDir(), "serial-write-closer"))
 		require.NoError(t, err)
-		defer os.RemoveAll(f.Name())
-		defer f.Close()
+		t.Cleanup(func() {
+			f.Close()
+		})
 		wc := NewSerialWriteCloser(f)
 		defer wc.Close()
 
 		// Write data in parallel
 		var wg sync.WaitGroup
 		wg.Add(goroutine)
-		for i := 0; i < goroutine; i++ {
+		for i := range goroutine {
 			go func(id int) {
 				n, err := wc.Write(testData[id])
 				assert.NoError(t, err)
@@ -95,7 +97,7 @@ func TestSerialWriteCloser(t *testing.T) {
 		resultData := strings.Split(strings.TrimSpace(string(content)), "\n")
 		require.Len(t, resultData, goroutine)
 		sort.Strings(resultData)
-		for i := 0; i < goroutine; i++ {
+		for i := range goroutine {
 			expected := repeatNumber(i, dataLen)
 			assert.Equal(t, expected, resultData[i])
 		}

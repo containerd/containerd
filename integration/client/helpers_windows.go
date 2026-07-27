@@ -26,6 +26,7 @@ import (
 	"syscall"
 
 	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hcsshim/osversion"
 	"golang.org/x/sys/windows"
 )
 
@@ -53,8 +54,8 @@ func cleanupWCOWLayers(root string) error {
 	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if path != root && info.IsDir() {
 			name := filepath.Base(path)
-			if strings.HasPrefix(name, "rm-") {
-				layerNum, err := strconv.Atoi(strings.TrimPrefix(name, "rm-"))
+			if after, ok := strings.CutPrefix(name, "rm-"); ok {
+				layerNum, err := strconv.Atoi(after)
 				if err != nil {
 					return err
 				}
@@ -113,4 +114,9 @@ func cleanupWCOWLayer(layerPath string) error {
 	}
 
 	return nil
+}
+
+// Temporarily used on windows to skip failing test on WS2025.
+func SkipTestOnHost() bool {
+	return osversion.Build() == osversion.LTSC2025
 }

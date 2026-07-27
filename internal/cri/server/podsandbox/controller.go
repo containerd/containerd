@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
@@ -34,12 +33,11 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
-	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 )
@@ -52,10 +50,12 @@ func init() {
 			plugins.EventPlugin,
 			plugins.LeasePlugin,
 			plugins.SandboxStorePlugin,
+			plugins.TransferPlugin,
 			plugins.CRIServicePlugin,
 			plugins.ServicePlugin,
+			plugins.WarningPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			client, err := containerd.New(
 				"",
 				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
@@ -71,7 +71,6 @@ func init() {
 			if err != nil {
 				return nil, fmt.Errorf("unable to load CRI runtime service plugin dependency: %w", err)
 			}
-			runtimeService := criRuntimePlugin.(RuntimeService)
 
 			// Get image service.
 			criImagePlugin, err := ic.GetByID(plugins.CRIServicePlugin, "images")
@@ -79,51 +78,43 @@ func init() {
 				return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 			}
 
+			warningPlugin, err := ic.GetSingle(plugins.WarningPlugin)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load CRI warning service plugin dependency: %w", err)
+			}
+
 			c := Controller{
 				client:         client,
-				config:         runtimeService.Config(),
+				config:         criRuntimePlugin.(interface{ Config() criconfig.Config }).Config(),
+				imageConfig:    criImagePlugin.(interface{ Config() criconfig.ImageConfig }).Config(),
 				os:             osinterface.RealOS{},
-				runtimeService: runtimeService,
-				imageService:   criImagePlugin.(ImageService),
+				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
 			}
 
-			eventMonitor := events.NewEventMonitor(&podSandboxEventHandler{
-				controller: &c,
-			})
-			eventMonitor.Subscribe(client, []string{`topic=="/tasks/exit"`})
-			eventMonitor.Start()
-			c.eventMonitor = eventMonitor
-
+			// There is no need to subscribe to the exit event for the pause container,
+			// as a dedicated goroutine already monitors the sandbox exit event.
+			// The eventMonitor handles the backoff mechanism in case the pause container cleanup fails.
+			c.eventMonitor = events.NewEventMonitor(
+				&podSandboxEventHandler{
+					controller: &c,
+				},
+			)
+			c.eventMonitor.Start()
 			return &c, nil
 		},
 	})
 }
 
-// RuntimeService specifies dependencies to CRI runtime service.
-type RuntimeService interface {
-	Config() criconfig.Config
-	LoadOCISpec(string) (*oci.Spec, error)
-}
-
-// ImageService specifies dependencies to CRI image service.
-type ImageService interface {
-	LocalResolve(refOrID string) (imagestore.Image, error)
-	GetImage(id string) (imagestore.Image, error)
-	PullImage(ctx context.Context, name string, creds func(string) (string, string, error), sc *runtime.PodSandboxConfig, runtimeHandler string) (string, error)
-	RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string
-	PinnedImage(string) string
-}
-
 type Controller struct {
 	// config contains all configurations.
 	config criconfig.Config
+	// imageConfig contains CRI image configuration.
+	imageConfig criconfig.ImageConfig
 	// client is an instance of the containerd client
 	client *containerd.Client
-	// runtimeService is a dependency to CRI runtime service.
-	runtimeService RuntimeService
-	// imageService is a dependency to CRI image service.
-	imageService ImageService
+	// warningService is used to emit deprecation warnings.
+	warningService warning.Service
 	// os is an interface for all required os operations.
 	os osinterface.OS
 	// eventMonitor is the event monitor for podsandbox controller to handle sandbox task exit event
@@ -173,11 +164,23 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 			exitStatus = unknownExitCode
 			exitedAt = time.Now()
 		}
+
 		dctx := ctrdutil.NamespacedContext()
 		dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 		defer dcancel()
-		event := &eventtypes.TaskExit{ExitStatus: exitStatus, ExitedAt: protobuf.ToTimestamp(exitedAt)}
+
+		event := &eventtypes.TaskExit{
+			ID:          p.ID,
+			ContainerID: p.ID,
+			ExitStatus:  exitStatus,
+			ExitedAt:    protobuf.ToTimestamp(exitedAt),
+		}
+
+		log.G(ctx).WithField("monitor_name", "podsandbox").
+			Infof("received sandbox exit event %+v", event)
+
 		if err := handleSandboxTaskExit(dctx, p, event); err != nil {
+			log.G(ctx).WithError(err).Errorf("failed to handle sandbox exit event %+v", event)
 			c.eventMonitor.Backoff(p.ID, event)
 		}
 		return nil

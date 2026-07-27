@@ -19,14 +19,20 @@ package run
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"os"
 	"strings"
 
 	"github.com/containerd/console"
 	gocni "github.com/containerd/go-cni"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -35,8 +41,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 func withMounts(cliContext *cli.Context) oci.SpecOpts {
@@ -131,6 +135,10 @@ var Command = &cli.Command{
 			Name:  "sync-fs",
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
+		&cli.StringFlag{
+			Name:  "dump-config",
+			Usage: "Dump the generated OCI config to a file",
+		},
 	}, append(platformRunFlags,
 		append(commands.RuntimeFlags,
 			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
@@ -184,6 +192,23 @@ var Command = &cli.Command{
 					log.L.WithError(err).Error("failed to cleanup container")
 				}
 			}()
+		}
+		if cliContext.IsSet("dump-config") {
+			filename := cliContext.String("dump-config")
+			if filename == "" {
+				return errors.New("file name is required with --dump-config")
+			}
+			spec, err := container.Spec(ctx)
+			if err != nil {
+				return err
+			}
+			specBytes, err := json.MarshalIndent(spec, "", "  ")
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(filename, specBytes, 0o666); err != nil {
+				return err
+			}
 		}
 		var con console.Console
 		if tty {
@@ -269,7 +294,7 @@ var Command = &cli.Command{
 	},
 }
 
-// buildLabel builds the labels from command line labels and the image labels
+// buildLabels builds the labels from command line labels and the image labels
 func buildLabels(cmdLabels, imageLabels map[string]string) map[string]string {
 	labels := make(map[string]string)
 	for k, v := range imageLabels {
@@ -282,8 +307,6 @@ func buildLabels(cmdLabels, imageLabels map[string]string) map[string]string {
 		}
 	}
 	// labels from the command line will override image and the initial image config labels
-	for k, v := range cmdLabels {
-		labels[k] = v
-	}
+	maps.Copy(labels, cmdLabels)
 	return labels
 }

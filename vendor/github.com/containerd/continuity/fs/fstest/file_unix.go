@@ -48,10 +48,10 @@ func Lchtimes(name string, atime, mtime time.Time) Applier {
 }
 
 // CreateDeviceFile provides creates devices Applier.
-func CreateDeviceFile(name string, mode os.FileMode, maj, min int) Applier {
+func CreateDeviceFile(name string, mode os.FileMode, major, minor int) Applier {
 	return applyFn(func(root string) error {
 		fullPath := filepath.Join(root, name)
-		return devices.Mknod(fullPath, mode, maj, min)
+		return devices.Mknod(fullPath, mode, major, minor)
 	})
 }
 

@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/typeurl/v2"
 	ver "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/selinux/go-selinux/label"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/images"
@@ -85,6 +84,9 @@ type Container interface {
 	Update(context.Context, ...UpdateContainerOpts) error
 	// Checkpoint creates a checkpoint image of the current container
 	Checkpoint(context.Context, string, ...CheckpointOpts) (Image, error)
+	// Restore restores a container and returns the PID of the
+	// restored containers init process.
+	Restore(context.Context, cio.Creator, string) (int, error)
 }
 
 func containerFromRecord(client *Client, c containers.Container) *container {
@@ -221,7 +223,7 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 	return NewImage(c.client, i), nil
 }
 
-func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...NewTaskOpts) (_ Task, err error) {
+func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...NewTaskOpts) (_ Task, retErr error) {
 	ctx, span := tracing.StartSpan(ctx, "container.NewTask")
 	defer span.End()
 	i, err := ioCreate(c.id)
@@ -229,7 +231,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		return nil, err
 	}
 	defer func() {
-		if err != nil && i != nil {
+		if retErr != nil && i != nil {
 			i.Cancel()
 			i.Close()
 		}
@@ -242,44 +244,17 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		Stdout:      cfg.Stdout,
 		Stderr:      cfg.Stderr,
 	}
+	if err := c.handleMounts(ctx, request); err != nil {
+		return nil, err
+	}
+
 	r, err := c.get(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if r.SnapshotKey != "" {
-		if r.Snapshotter == "" {
-			return nil, fmt.Errorf("unable to resolve rootfs mounts without snapshotter on container: %w", errdefs.ErrInvalidArgument)
-		}
-
-		// get the rootfs from the snapshotter and add it to the request
-		s, err := c.client.getSnapshotter(ctx, r.Snapshotter)
-		if err != nil {
-			return nil, err
-		}
-		mounts, err := s.Mounts(ctx, r.SnapshotKey)
-		if err != nil {
-			return nil, err
-		}
-		spec, err := c.Spec(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, m := range mounts {
-			if spec.Linux != nil && spec.Linux.MountLabel != "" {
-				if ml := label.FormatMountLabel("", spec.Linux.MountLabel); ml != "" {
-					m.Options = append(m.Options, ml)
-				}
-			}
-			request.Rootfs = append(request.Rootfs, &types.Mount{
-				Type:    m.Type,
-				Source:  m.Source,
-				Target:  m.Target,
-				Options: m.Options,
-			})
-		}
-	}
 	info := TaskInfo{
-		runtime: r.Runtime.Name,
+		runtime:        r.Runtime.Name,
+		runtimeOptions: r.Runtime.Options,
 	}
 	for _, o := range opts {
 		if err := o(ctx, c.client, &info); err != nil {
@@ -295,6 +270,8 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		})
 	}
 	request.RuntimePath = info.RuntimePath
+	request.TaskApiAddress = info.taskAPIAddress
+	request.TaskApiVersion = info.taskAPIVersion
 	if info.Options != nil {
 		o, err := typeurl.MarshalAny(info.Options)
 		if err != nil {
@@ -346,6 +323,93 @@ func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) err
 		return errgrpc.ToNative(err)
 	}
 	return nil
+}
+
+func (c *container) handleMounts(ctx context.Context, request *tasks.CreateTaskRequest) error {
+	r, err := c.get(ctx)
+	if err != nil {
+		return err
+	}
+
+	if r.SnapshotKey != "" {
+		if r.Snapshotter == "" {
+			return fmt.Errorf("unable to resolve rootfs mounts without snapshotter on container: %w", errdefs.ErrInvalidArgument)
+		}
+
+		// get the rootfs from the snapshotter and add it to the request
+		s, err := c.client.getSnapshotter(ctx, r.Snapshotter)
+		if err != nil {
+			return err
+		}
+		mounts, err := s.Mounts(ctx, r.SnapshotKey)
+		if err != nil {
+			return err
+		}
+		spec, err := c.Spec(ctx)
+		if err != nil {
+			return err
+		}
+		for _, m := range mounts {
+			if spec.Linux != nil && spec.Linux.MountLabel != "" {
+				ml := fmt.Sprintf("context=%q", spec.Linux.MountLabel)
+				m.Options = append(m.Options, ml)
+			}
+			request.Rootfs = append(request.Rootfs, &types.Mount{
+				Type:    m.Type,
+				Source:  m.Source,
+				Target:  m.Target,
+				Options: m.Options,
+			})
+		}
+	}
+
+	return nil
+}
+
+func (c *container) Restore(ctx context.Context, ioCreate cio.Creator, rootDir string) (_ int, retErr error) {
+	errorPid := -1
+	i, err := ioCreate(c.id)
+	if err != nil {
+		return errorPid, err
+	}
+	defer func() {
+		if retErr != nil && i != nil {
+			i.Cancel()
+			i.Close()
+		}
+	}()
+	cfg := i.Config()
+
+	request := &tasks.CreateTaskRequest{
+		ContainerID: c.id,
+		Terminal:    cfg.Terminal,
+		Stdin:       cfg.Stdin,
+		Stdout:      cfg.Stdout,
+		Stderr:      cfg.Stderr,
+	}
+
+	if err := c.handleMounts(ctx, request); err != nil {
+		return errorPid, err
+	}
+
+	request.Checkpoint = &types.Descriptor{
+		Annotations: map[string]string{
+			// The following annotation is used to restore a checkpoint
+			// via CRI. This is mainly used to restore a container
+			// in Kubernetes.
+			"RestoreFromPath": rootDir,
+		},
+	}
+	// (adrianreber): it is not totally clear to me, but it seems the only
+	// way to restore a container in containerd is going through Create().
+	// This functions sets up Create() in such a way to handle container
+	// restore coming through the CRI.
+	response, err := c.client.TaskService().Create(ctx, request)
+	if err != nil {
+		return errorPid, errgrpc.ToNative(err)
+	}
+
+	return int(response.GetPid()), nil
 }
 
 func (c *container) Checkpoint(ctx context.Context, ref string, opts ...CheckpointOpts) (Image, error) {

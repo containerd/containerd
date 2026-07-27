@@ -60,7 +60,7 @@ func openPath(path string) (windows.Handle, error) {
 
 // GetFinalPathNameByHandle flags.
 //
-//nolint:revive // SNAKE_CASE is not idiomatic in Go, but aligned with Win32 API.
+//nolint:revive,staticcheck // SNAKE_CASE is not idiomatic in Go, but aligned with Win32 API.
 const (
 	cFILE_NAME_OPENED = 0x8
 
@@ -69,7 +69,7 @@ const (
 )
 
 var pool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		// Size of buffer chosen somewhat arbitrarily to accommodate a large number of path strings.
 		// MAX_PATH (260) + size of volume GUID prefix (49) + null terminator = 310.
 		b := make([]uint16, 310)

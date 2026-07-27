@@ -22,17 +22,28 @@ import (
 // of the job and a mutex for synchronized handle access.
 type JobObject struct {
 	handle windows.Handle
-	// All accesses to this MUST be done atomically except in `Open` as the object
-	// is being created in the function. 1 signifies that this job is currently a silo.
-	silo       uint32
+	// silo signifies that this job is currently a silo.
+	silo       atomic.Bool
 	mq         *queue.MessageQueue
 	handleLock sync.RWMutex
+}
+
+// GroupAffinity specifies a processor group and an affinity mask within that group.
+// It corresponds to the Win32 GROUP_AFFINITY structure and is used for multi-group
+// CPU affinity on machines with more than 64 logical processors (WS2022+).
+type GroupAffinity struct {
+	// Mask is the bitmask of processors within Group.
+	Mask uint64
+	// Group is the processor group number (0-based).
+	Group uint16
 }
 
 // JobLimits represents the resource constraints that can be applied to a job object.
 type JobLimits struct {
 	CPULimit           uint32
 	CPUWeight          uint32
+	CPUAffinity        uint64          // legacy single-group (group 0) affinity mask; use GroupAffinities when non-empty
+	GroupAffinities    []GroupAffinity // multi-processor-group affinity (WS2022+); takes precedence over CPUAffinity
 	MemoryLimitInBytes uint64
 	MaxIOPS            int64
 	MaxBandwidth       int64
@@ -204,9 +215,7 @@ func Open(ctx context.Context, options *Options) (_ *JobObject, err error) {
 		handle: jobHandle,
 	}
 
-	if isJobSilo(jobHandle) {
-		job.silo = 1
-	}
+	job.silo.Store(isJobSilo(jobHandle))
 
 	// If the IOCP we'll be using to receive messages for all jobs hasn't been
 	// created, create it and start polling.
@@ -479,7 +488,7 @@ func (job *JobObject) ApplyFileBinding(root, target string, readOnly bool) error
 		return ErrAlreadyClosed
 	}
 
-	if !job.isSilo() {
+	if !job.silo.Load() {
 		return ErrNotSilo
 	}
 
@@ -546,7 +555,7 @@ func (job *JobObject) PromoteToSilo() error {
 		return ErrAlreadyClosed
 	}
 
-	if job.isSilo() {
+	if job.silo.Load() {
 		return nil
 	}
 
@@ -569,13 +578,8 @@ func (job *JobObject) PromoteToSilo() error {
 		return fmt.Errorf("failed to promote job to silo: %w", err)
 	}
 
-	atomic.StoreUint32(&job.silo, 1)
+	job.silo.Store(true)
 	return nil
-}
-
-// isSilo returns if the job object is a silo.
-func (job *JobObject) isSilo() bool {
-	return atomic.LoadUint32(&job.silo) == 1
 }
 
 // QueryPrivateWorkingSet returns the private working set size for the job. This is calculated by adding up the

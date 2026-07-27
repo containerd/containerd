@@ -17,11 +17,17 @@
 package mount
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/continuity/testutil"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
 var randomData = []byte("randomdata")
@@ -29,15 +35,14 @@ var randomData = []byte("randomdata")
 func createTempFile(t *testing.T) string {
 	t.Helper()
 
-	f, err := os.CreateTemp("", "losetup")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
+	f, err := os.Create(filepath.Join(t.TempDir(), "losetup"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		f.Close()
+	})
 
-	if err = f.Truncate(512); err != nil {
-		t.Fatal(err)
-	}
+	err = f.Truncate(512)
+	require.NoError(t, err)
 
 	return f.Name()
 }
@@ -46,7 +51,7 @@ func TestNonExistingLoop(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	backingFile := "setup-loop-test-no-such-file"
-	_, err := setupLoop(backingFile, LoopParams{})
+	_, err := SetupLoop(backingFile, LoopParams{})
 	if err == nil {
 		t.Fatalf("setupLoop with non-existing file should fail")
 	}
@@ -56,17 +61,12 @@ func TestRoLoop(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	backingFile := createTempFile(t)
-	defer func() {
-		if err := os.Remove(backingFile); err != nil {
-			t.Fatal(err)
-		}
-	}()
 
-	file, err := setupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
+	file, err := SetupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		file.Close()
+	})
 
 	if _, err := file.Write(randomData); err == nil {
 		t.Fatalf("writing to readonly loop device should fail")
@@ -77,17 +77,12 @@ func TestRwLoop(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	backingFile := createTempFile(t)
-	defer func() {
-		if err := os.Remove(backingFile); err != nil {
-			t.Fatal(err)
-		}
-	}()
 
-	file, err := setupLoop(backingFile, LoopParams{Autoclear: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
+	file, err := SetupLoop(backingFile, LoopParams{Autoclear: true})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		file.Close()
+	})
 
 	if _, err := file.Write(randomData); err != nil {
 		t.Fatal(err)
@@ -98,45 +93,61 @@ func TestAttachDetachLoopDevice(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	path := createTempFile(t)
-	defer func() {
-		if err := os.Remove(path); err != nil {
-			t.Fatal(err)
-		}
-	}()
 
 	dev, err := AttachLoopDevice(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if err = DetachLoopDevice(dev); err != nil {
-		t.Fatal(err)
-	}
+	err = DetachLoopDevice(dev)
+	require.NoError(t, err)
 }
 
 func TestAutoclearTrueLoop(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	dev := func() string {
-		backingFile := createTempFile(t)
-		defer func() {
-			if err := os.Remove(backingFile); err != nil {
-				t.Fatal(err)
-			}
-		}()
+	backingFile := createTempFile(t)
+	bInfo, err := os.Stat(backingFile)
+	require.NoError(t, err)
+	bInode := bInfo.Sys().(*syscall.Stat_t).Ino
 
-		file, err := setupLoop(backingFile, LoopParams{Autoclear: true})
+	file, err := SetupLoop(backingFile, LoopParams{Autoclear: true})
+	require.NoError(t, err)
+	dev := file.Name()
+	file.Close()
+
+	var checkFn = func(loopDev string, expectedInode uint64) (_shouldRetry bool, _ error) {
+		loop, err := os.Open(loopDev)
 		if err != nil {
-			t.Fatal(err)
+			if os.IsNotExist(err) {
+				return false, nil
+			}
+			return false, fmt.Errorf("failed to open loop device: %w", err)
 		}
-		dev := file.Name()
-		file.Close()
-		return dev
-	}()
-	time.Sleep(100 * time.Millisecond)
-	if err := removeLoop(dev); err == nil {
-		t.Fatalf("removeLoop should fail if Autoclear is true")
+		info, err := unix.IoctlLoopGetStatus64(int(loop.Fd()))
+		loop.Close()
+		if err != nil {
+			if errors.Is(err, unix.ENXIO) {
+				return false, nil
+			}
+			return false, fmt.Errorf("failed to get loop device info: %w", err)
+		}
+
+		if info.Inode != expectedInode {
+			return false, nil
+		}
+
+		t.Logf("loop device %s still present with backing inode %d", loopDev, expectedInode)
+		return true, nil
 	}
+
+	for range 10 {
+		retry, err := checkFn(dev, bInode)
+		require.NoError(t, err)
+		if !retry {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("loop device %s still present after autoclear", dev)
 }
 
 func TestAutoclearFalseLoop(t *testing.T) {
@@ -144,22 +155,14 @@ func TestAutoclearFalseLoop(t *testing.T) {
 
 	dev := func() string {
 		backingFile := createTempFile(t)
-		defer func() {
-			if err := os.Remove(backingFile); err != nil {
-				t.Fatal(err)
-			}
-		}()
 
-		file, err := setupLoop(backingFile, LoopParams{Autoclear: false})
-		if err != nil {
-			t.Fatal(err)
-		}
+		file, err := SetupLoop(backingFile, LoopParams{Autoclear: false})
+		require.NoError(t, err)
 		dev := file.Name()
 		file.Close()
 		return dev
 	}()
 	time.Sleep(100 * time.Millisecond)
-	if err := removeLoop(dev); err != nil {
-		t.Fatal(err)
-	}
+	err := removeLoop(dev)
+	require.NoError(t, err)
 }

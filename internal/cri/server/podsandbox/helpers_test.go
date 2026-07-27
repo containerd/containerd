@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnvDeduplication(t *testing.T) {
@@ -90,7 +91,6 @@ func TestEnvDeduplication(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			var spec runtimespec.Spec
 			if len(test.existing) > 0 {
@@ -121,12 +121,10 @@ func TestEnsureRemoveAllWithDir(t *testing.T) {
 }
 
 func TestEnsureRemoveAllWithFile(t *testing.T) {
-	tmp, err := os.CreateTemp("", "test-ensure-removeall-with-dir")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmp, err := os.CreateTemp(t.TempDir(), "test-ensure-removeall-with-dir")
+	require.NoError(t, err)
 	tmp.Close()
-	if err := ensureRemoveAll(context.Background(), tmp.Name()); err != nil {
-		t.Fatal(err)
-	}
+
+	err = ensureRemoveAll(context.Background(), tmp.Name())
+	require.NoError(t, err)
 }

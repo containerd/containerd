@@ -29,16 +29,17 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
-	"github.com/containerd/containerd/v2/core/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/pkg/reference"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
@@ -142,6 +143,7 @@ type dockerResolver struct {
 	header        http.Header
 	resolveHeader http.Header
 	tracker       StatusTracker
+	config        transfer.ImageResolverOptions
 }
 
 // NewResolver returns a new resolver to a Docker registry
@@ -155,9 +157,6 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 	} else {
 		// make a copy of the headers to avoid race due to concurrent map write
 		options.Headers = options.Headers.Clone()
-	}
-	if _, ok := options.Headers["User-Agent"]; !ok {
-		options.Headers.Set("User-Agent", "containerd/"+version.Version)
 	}
 
 	resolveHeader := http.Header{}
@@ -232,7 +231,7 @@ func (r *countingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-var _ remotes.Resolver = &dockerResolver{}
+var _ remotes.ResolverWithOptions = &dockerResolver{}
 
 func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocispec.Descriptor, error) {
 	base, err := r.resolveDockerBase(ref)
@@ -294,9 +293,15 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	}
 
 	for _, u := range paths {
+		// falling back to /blobs endpoint should happen in extreme cases - those to
+		// support legacy registries. we want to limit the fallback to when /manifests endpoint
+		// returned 404. Falling back on transient errors could do more harm, like polluting
+		// the local content store with incorrectly typed descriptors as /blobs endpoint tends
+		// always return with application/octet-stream.
+		if firstErrPriority > 2 {
+			break
+		}
 		for i, host := range hosts {
-			ctx := log.WithLogger(ctx, log.G(ctx).WithField("host", host.Host))
-
 			req := base.request(host, http.MethodHead, u...)
 			if err := req.addNamespace(base.refspec.Hostname()); err != nil {
 				return "", ocispec.Descriptor{}, err
@@ -306,8 +311,13 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				req.header[key] = append(req.header[key], value...)
 			}
 
+			ctx := log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+				"host":   req.host.Host,
+				"method": req.method,
+				"url":    req.sanitizedURL(),
+			}))
 			log.G(ctx).Debug("resolving")
-			resp, err := req.doWithRetries(ctx, nil)
+			resp, err := req.doWithRetries(ctx, i == len(hosts)-1)
 			if err != nil {
 				if errors.Is(err, ErrInvalidAuthorization) {
 					err = fmt.Errorf("pull access denied, repository does not exist or may require authorization: %w", err)
@@ -331,14 +341,31 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					continue
 				}
 				if resp.StatusCode > 399 {
+					err := unexpectedResponseErr(resp)
+					// A HEAD 403 carries no body, so issue a follow-up GET to
+					// the same URL to surface the registry's error details
+					// (e.g. "key vault access denied", IP restrictions) for
+					// diagnostics.
+					if resp.StatusCode == http.StatusForbidden && req.method == http.MethodHead {
+						err = withGETErrorBody(ctx, err, resp, func() (*http.Response, error) {
+							getReq := base.request(host, http.MethodGet, u...)
+							if addErr := getReq.addNamespace(base.refspec.Hostname()); addErr != nil {
+								return nil, addErr
+							}
+							for key, value := range r.resolveHeader {
+								getReq.header[key] = append(getReq.header[key], value...)
+							}
+							return getReq.doWithRetries(ctx, false)
+						})
+					}
 					if firstErrPriority < 3 {
-						firstErr = remoteerrors.NewUnexpectedStatusErr(resp)
+						firstErr = err
 						firstErrPriority = 3
 					}
 					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
 					continue // try another host
 				}
-				return "", ocispec.Descriptor{}, remoteerrors.NewUnexpectedStatusErr(resp)
+				return "", ocispec.Descriptor{}, unexpectedResponseErr(resp)
 			}
 			size := resp.ContentLength
 			contentType := getManifestMediaType(resp)
@@ -371,9 +398,15 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					req.header[key] = append(req.header[key], value...)
 				}
 
-				resp, err := req.doWithRetries(ctx, nil)
+				resp, err := req.doWithRetries(ctx, true)
 				if err != nil {
 					return "", ocispec.Descriptor{}, err
+				}
+
+				// Check for error status code
+				if resp.StatusCode >= http.StatusBadRequest {
+					defer resp.Body.Close()
+					return "", ocispec.Descriptor{}, unexpectedResponseErr(resp)
 				}
 
 				bodyReader := countingReader{reader: resp.Body}
@@ -387,13 +420,8 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					}
 
 					if contentType == images.MediaTypeDockerSchema1Manifest {
-						b, err := schema1.ReadStripSignature(&bodyReader)
-						if err != nil {
-							return err
-						}
-
-						dgst = digest.FromBytes(b)
-						return nil
+						return fmt.Errorf("%w: media type %q is no longer supported since containerd v2.0, please rebuild the image as %q or %q",
+							errdefs.ErrNotImplemented, images.MediaTypeDockerSchema1Manifest, images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest)
 					}
 
 					dgst, err = digest.FromReader(&bodyReader)
@@ -431,6 +459,12 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	}
 
 	return "", ocispec.Descriptor{}, firstErr
+}
+
+func (r *dockerResolver) SetOptions(options ...transfer.ImageResolverOption) {
+	for _, opt := range options {
+		opt(&r.config)
+	}
 }
 
 func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetcher, error) {
@@ -481,10 +515,25 @@ func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
 }
 
 type dockerBase struct {
-	refspec    reference.Spec
-	repository string
-	hosts      []RegistryHost
-	header     http.Header
+	refspec      reference.Spec
+	repository   string
+	hosts        []RegistryHost
+	header       http.Header
+	performances transfer.ImageResolverPerformanceSettings
+	limiter      *semaphore.Weighted
+}
+
+func (r *dockerBase) Acquire(ctx context.Context, weight int64) error {
+	if r.limiter == nil {
+		return nil
+	}
+	return r.limiter.Acquire(ctx, weight)
+}
+
+func (r *dockerBase) Release(weight int64) {
+	if r.limiter != nil {
+		r.limiter.Release(weight)
+	}
 }
 
 func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
@@ -494,10 +543,12 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 		return nil, err
 	}
 	return &dockerBase{
-		refspec:    refspec,
-		repository: strings.TrimPrefix(refspec.Locator, host+"/"),
-		hosts:      hosts,
-		header:     r.header,
+		refspec:      refspec,
+		repository:   strings.TrimPrefix(refspec.Locator, host+"/"),
+		hosts:        hosts,
+		header:       r.header,
+		performances: r.config.Performances,
+		limiter:      r.config.DownloadLimiter,
 	}, nil
 }
 
@@ -519,6 +570,11 @@ func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *re
 	for key, value := range host.Header {
 		header[key] = append(header[key], value...)
 	}
+
+	if len(header.Get("User-Agent")) == 0 {
+		header.Set("User-Agent", "containerd/"+version.Version)
+	}
+
 	parts := append([]string{"/", host.Path, r.repository}, ps...)
 	p := path.Join(parts...)
 	// Join strips trailing slash, re-add ending "/" if included
@@ -544,27 +600,33 @@ func (r *request) authorize(ctx context.Context, req *http.Request) error {
 	return nil
 }
 
-func (r *request) addNamespace(ns string) (err error) {
-	if !r.host.isProxy(ns) {
-		return nil
-	}
+func (r *request) addQuery(key, value string) (err error) {
 	var q url.Values
 	// Parse query
-	if i := strings.IndexByte(r.path, '?'); i > 0 {
-		r.path = r.path[:i+1]
-		q, err = url.ParseQuery(r.path[i+1:])
+	if p, query, ok := strings.Cut(r.path, "?"); ok {
+		q, err = url.ParseQuery(query)
 		if err != nil {
 			return
 		}
+		r.path = p + "?"
 	} else {
 		r.path = r.path + "?"
 		q = url.Values{}
 	}
-	q.Add("ns", ns)
+	q.Add(key, value)
 
 	r.path = r.path + q.Encode()
 
 	return
+}
+
+const namespaceQueryArg = "ns"
+
+func (r *request) addNamespace(ns string) error {
+	if !r.host.isProxy(ns) {
+		return nil
+	}
+	return r.addQuery(namespaceQueryArg, ns)
 }
 
 type request struct {
@@ -576,9 +638,14 @@ type request struct {
 	size   int64
 }
 
+func (r *request) clone() *request {
+	res := *r
+	res.header = r.header.Clone()
+	return &res
+}
+
 func (r *request) do(ctx context.Context) (*http.Response, error) {
-	u := r.host.Scheme + "://" + r.host.Host + r.path
-	req, err := http.NewRequestWithContext(ctx, r.method, u, nil)
+	req, err := http.NewRequestWithContext(ctx, r.method, r.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +666,7 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 		}
 	}
 
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", r.sanitizedURL()))
 	log.G(ctx).WithFields(requestFields(req)).Debug("do request")
 	if err := r.authorize(ctx, req); err != nil {
 		return nil, fmt.Errorf("failed to authorize: %w", err)
@@ -631,29 +698,141 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	return resp, nil
 }
 
-func (r *request) doWithRetries(ctx context.Context, responses []*http.Response) (*http.Response, error) {
-	resp, err := r.do(ctx)
+type doChecks func(r *request, resp *http.Response) error
+
+func withErrorCheck(r *request, resp *http.Response) error {
+	if resp.StatusCode > 299 {
+		if resp.StatusCode == http.StatusNotFound {
+			return fmt.Errorf("content at %v not found: %w", r.sanitizedURL(), errdefs.ErrNotFound)
+		}
+
+		return unexpectedResponseErr(resp)
+	}
+	return nil
+}
+
+var errContentRangeIgnored = errors.New("content range requests ignored")
+
+func withOffsetCheck(offset, parallelism int64) doChecks {
+	return func(r *request, resp *http.Response) error {
+		if parallelism <= 1 && offset == 0 {
+			return nil
+		}
+		if resp.StatusCode == http.StatusPartialContent {
+			return nil
+		}
+		if cr := resp.Header.Get("Content-Range"); cr != "" {
+			if !strings.HasPrefix(cr, fmt.Sprintf("bytes %d-", offset)) {
+				return fmt.Errorf("unhandled content range in response: %v", cr)
+			}
+			return nil
+		}
+
+		// Discard up to offset
+		// Could use buffer pool here but this case should be rare
+		n, err := io.Copy(io.Discard, io.LimitReader(resp.Body, offset))
+		if err != nil {
+			return fmt.Errorf("failed to discard to offset: %w", err)
+		}
+		if n != offset {
+			return errors.New("unable to discard to offset")
+		}
+
+		// content range ignored, we can't do concurrent fetches here.
+		// return an error to be caught
+		return errContentRangeIgnored
+	}
+}
+
+const maxAttempts = 5
+
+func (r *request) doWithRetries(ctx context.Context, lastHost bool, checks ...doChecks) (resp *http.Response, err error) {
+	attempts := maxAttempts
+	resp, err = r.doWithRetriesInner(ctx, nil, &attempts, lastHost)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil && err != errContentRangeIgnored {
+			resp.Body.Close()
+		}
+	}()
+	for _, check := range checks {
+		if err := check(r, resp); err != nil {
+			return resp, err
+		}
+	}
+
+	return resp, nil
+}
+
+func (r *request) doWithRetriesInner(ctx context.Context, responses []*http.Response, attempts *int, lastHost bool) (*http.Response, error) {
+	resp, err := r.doWithTransportRetries(ctx, attempts, lastHost)
 	if err != nil {
 		return nil, err
 	}
 
 	responses = append(responses, resp)
-	retry, err := r.retryRequest(ctx, responses)
+	retry, err := r.retryRequest(ctx, responses, lastHost)
 	if err != nil {
 		resp.Body.Close()
 		return nil, err
 	}
-	if retry {
+	if retry && *attempts > 0 {
 		resp.Body.Close()
-		return r.doWithRetries(ctx, responses)
+		return r.doWithRetriesInner(ctx, responses, attempts, lastHost)
 	}
 	return resp, err
 }
 
-func (r *request) retryRequest(ctx context.Context, responses []*http.Response) (bool, error) {
-	if len(responses) > 5 {
-		return false, nil
+// doWithTransportRetries calls r.do, retrying on transient transport errors
+// (e.g. response header timeouts). Retries are only attempted on the last host
+// to match the response-status retry policy for 5xx errors and preserve mirror
+// fallback semantics. Context cancellation stops retries immediately.
+func (r *request) doWithTransportRetries(ctx context.Context, attempts *int, lastHost bool) (*http.Response, error) {
+	for *attempts > 0 {
+		resp, err := r.do(ctx)
+		*attempts--
+		if err == nil {
+			return resp, nil
+		}
+		if !lastHost || !isTransientTransportErr(err) {
+			return nil, err
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if *attempts == 0 {
+			return nil, err
+		}
+		log.G(ctx).WithError(err).WithField("attempt", maxAttempts-*attempts).Debug("transient transport error, retrying")
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
 	}
+	return nil, nil
+}
+
+// isTransientTransportErr reports whether err is a transport-level error worth
+// retrying. context.Canceled and context.DeadlineExceeded are not considered
+// transient.
+func isTransientTransportErr(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	return false
+}
+
+func (r *request) retryRequest(ctx context.Context, responses []*http.Response, lastHost bool) (bool, error) {
 	last := responses[len(responses)-1]
 	switch last.StatusCode {
 	case http.StatusUnauthorized:
@@ -676,9 +855,17 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response) 
 		}
 	case http.StatusRequestTimeout, http.StatusTooManyRequests:
 		return true, nil
+	case http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusInternalServerError:
+		// Do not retry if the same error was seen in the last request
+		if len(responses) > 1 && responses[len(responses)-2].StatusCode == last.StatusCode {
+			return false, nil
+		}
+		// Only retry if this is the last host that will be attempted
+		if lastHost {
+			return true, nil
+		}
 	}
 
-	// TODO: Handle 50x errors accounting for attempt history
 	return false, nil
 }
 
@@ -686,8 +873,54 @@ func (r *request) String() string {
 	return r.host.Scheme + "://" + r.host.Host + r.path
 }
 
+// sanitizedURL returns the request URL with query parameters and auth (if any)
+// sanitized. It is intended for errors and logging, and similar to [internal/cri/util.sanitizeURL].
+//
+// [internal/cri/util.sanitizeURL]: https://github.com/containerd/containerd/blob/v2.2.1/internal/cri/util/sanitize.go#L53-L75
+func (r *request) sanitizedURL() string {
+	rawURL := r.String()
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		// URL parsing failed; return original (malformed URLs shouldn't leak tokens)
+		return rawURL
+	}
+
+	if parsed.RawQuery == "" {
+		// Fast path: no query arguments to sanitize.
+		return parsed.Redacted()
+	}
+
+	query := parsed.Query()
+	for k := range query {
+		if k == namespaceQueryArg {
+			// preserve namespace query arguments
+			continue
+		}
+		for i := range query[k] {
+			if query[k][i] != "" {
+				query[k][i] = "REDACTED"
+			}
+		}
+	}
+
+	parsed.RawQuery = query.Encode()
+	return parsed.Redacted()
+}
+
+func (r *request) setMediaType(mediatype string) {
+	if mediatype == "" {
+		r.header.Set("Accept", "*/*")
+	} else {
+		r.header.Set("Accept", strings.Join([]string{mediatype, `*/*`}, ", "))
+	}
+}
+
+func (r *request) setOffset(offset int64) {
+	r.header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+}
+
 func requestFields(req *http.Request) log.Fields {
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"request.method": req.Method,
 	}
 	for k, vals := range req.Header {
@@ -708,7 +941,7 @@ func requestFields(req *http.Request) log.Fields {
 }
 
 func responseFields(resp *http.Response) log.Fields {
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"response.status": resp.Status,
 	}
 	for k, vals := range resp.Header {

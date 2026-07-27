@@ -34,8 +34,7 @@ package bandwidth
 
 import (
 	"github.com/containerd/errdefs"
-
-	"k8s.io/apimachinery/pkg/api/resource"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
 // FakeShaper provides an implementation of the bandwidth.Shaper.

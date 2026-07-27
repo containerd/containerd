@@ -119,7 +119,6 @@ func TestRuntimeSnapshotter(t *testing.T) {
 			expectSnapshotter: "devmapper",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			cri, _ := newTestCRIService()
 			cri.config = criconfig.DefaultImageConfig()

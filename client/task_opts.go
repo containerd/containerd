@@ -54,15 +54,16 @@ func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 // usually it is served inside a sandbox, and we can get it from sandbox status.
 func WithTaskAPIEndpoint(address string, version uint32) NewTaskOpts {
 	return func(ctx context.Context, client *Client, info *TaskInfo) error {
-		if info.Options == nil {
-			info.Options = &options.Options{}
+		info.taskAPIAddress = address
+		info.taskAPIVersion = version
+		// Also populate the deprecated runc options fields so this keeps
+		// working against older containerd servers that only read the task
+		// API endpoint from runc options. Non-runc runtimes never supported
+		// these fields, so an error here is ignored.
+		if opts, err := info.getRuncOptions(); err == nil {
+			opts.TaskApiAddress = address //nolint:staticcheck // deprecated, kept for backward compatibility
+			opts.TaskApiVersion = version //nolint:staticcheck // deprecated, kept for backward compatibility
 		}
-		opts, ok := info.Options.(*options.Options)
-		if !ok {
-			return errors.New("invalid runtime v2 options format")
-		}
-		opts.TaskApiAddress = address
-		opts.TaskApiVersion = version
 		return nil
 	}
 }
@@ -119,12 +120,9 @@ func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 // WithRestoreImagePath sets image path for create option
 func WithRestoreImagePath(path string) NewTaskOpts {
 	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		if ti.Options == nil {
-			ti.Options = &options.Options{}
-		}
-		opts, ok := ti.Options.(*options.Options)
-		if !ok {
-			return errors.New("invalid runtime v2 options format")
+		opts, err := ti.getRuncOptions()
+		if err != nil {
+			return err
 		}
 		opts.CriuImagePath = path
 		return nil
@@ -134,12 +132,9 @@ func WithRestoreImagePath(path string) NewTaskOpts {
 // WithRestoreWorkPath sets criu work path for create option
 func WithRestoreWorkPath(path string) NewTaskOpts {
 	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		if ti.Options == nil {
-			ti.Options = &options.Options{}
-		}
-		opts, ok := ti.Options.(*options.Options)
-		if !ok {
-			return errors.New("invalid runtime v2 options format")
+		opts, err := ti.getRuncOptions()
+		if err != nil {
+			return err
 		}
 		opts.CriuWorkPath = path
 		return nil
@@ -214,7 +209,7 @@ func WithKillExecID(execID string) KillOpts {
 
 // WithResources sets the provided resources for task updates. Resources must be
 // either a *specs.LinuxResources or a *specs.WindowsResources
-func WithResources(resources interface{}) UpdateTaskOpts {
+func WithResources(resources any) UpdateTaskOpts {
 	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
 		switch resources.(type) {
 		case *specs.LinuxResources:

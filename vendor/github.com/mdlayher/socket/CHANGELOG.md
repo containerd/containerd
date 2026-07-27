@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## v0.5.2
+
+- [Improvement]: Bump build to Go 1.23.0. Note this is required for the latest
+  Go extended library versions.
+
+## v0.5.1
+
+- [Improvement]: revert `go.mod` to Go 1.20 to [resolve an issue around Go
+  module version upgrades](https://github.com/mdlayher/socket/issues/13).
+
+## v0.5.0
+
+**This is the first release of package socket that only supports Go 1.21+.
+Users on older versions of Go must use v0.4.1.**
+
+- [Improvement]: drop support for older versions of Go.
+- [New API]: add `socket.Conn` wrappers for various `Getsockopt` and
+  `Setsockopt` system calls.
+
 ## v0.4.1
 
 - [Bug Fix] [commit](https://github.com/mdlayher/socket/commit/2a14ceef4da279de1f957c5761fffcc6c87bbd3b):

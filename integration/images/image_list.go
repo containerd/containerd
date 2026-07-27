@@ -32,13 +32,14 @@ var imageListFile = flag.String("image-list", "", "The TOML file containing the 
 type ImageList struct {
 	Alpine           string
 	BusyBox          string
+	BusyBoxByDigest  string
 	Pause            string
 	ResourceConsumer string
 	VolumeCopyUp     string
 	VolumeOwnership  string
 	ArgsEscaped      string
-	DockerSchema1    string
 	Nginx            string
+	Whiteout         string
 }
 
 var (
@@ -52,13 +53,14 @@ func initImages(imageListFile string) {
 	imageList = ImageList{
 		Alpine:           "ghcr.io/containerd/alpine:3.14.0",
 		BusyBox:          "ghcr.io/containerd/busybox:1.36",
-		Pause:            "registry.k8s.io/pause:3.10",
+		BusyBoxByDigest:  "ghcr.io/containerd/busybox@sha256:7b3ccabffc97de872a30dfd234fd972a66d247c8cfc69b0550f276481852627c",
+		Pause:            "registry.k8s.io/pause:3.10.2",
 		ResourceConsumer: "registry.k8s.io/e2e-test-images/resource-consumer:1.10",
 		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.2",
 		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
 		ArgsEscaped:      "cplatpublic.azurecr.io/args-escaped-test-image-ns:1.0",
-		DockerSchema1:    "registry.k8s.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
 		Nginx:            "ghcr.io/containerd/nginx:1.27.0",
+		Whiteout:         "ghcr.io/containerd/whiteout-test:1.0",
 	}
 
 	if imageListFile != "" {
@@ -86,6 +88,8 @@ const (
 	Alpine
 	// BusyBox image
 	BusyBox
+	// BusyBox by digest
+	BusyBoxByDigest
 	// Pause image
 	Pause
 	// ResourceConsumer image
@@ -96,23 +100,24 @@ const (
 	VolumeOwnership
 	// ArgsEscaped tests image for ArgsEscaped windows bug
 	ArgsEscaped
-	// DockerSchema1 image with docker schema 1
-	DockerSchema1
 	// Nginx image
 	Nginx
+	// Whiteout image
+	Whiteout
 )
 
 func initImageMap(imageList ImageList) map[int]string {
 	images := map[int]string{}
 	images[Alpine] = imageList.Alpine
 	images[BusyBox] = imageList.BusyBox
+	images[BusyBoxByDigest] = imageList.BusyBoxByDigest
 	images[Pause] = imageList.Pause
 	images[ResourceConsumer] = imageList.ResourceConsumer
 	images[VolumeCopyUp] = imageList.VolumeCopyUp
 	images[VolumeOwnership] = imageList.VolumeOwnership
 	images[ArgsEscaped] = imageList.ArgsEscaped
-	images[DockerSchema1] = imageList.DockerSchema1
 	images[Nginx] = imageList.Nginx
+	images[Whiteout] = imageList.Whiteout
 	return images
 }
 

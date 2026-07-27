@@ -22,12 +22,14 @@ import (
 	"path/filepath"
 
 	"github.com/Microsoft/hcsshim/osversion"
+	"github.com/containerd/containerd/v2/integration/images"
 )
 
 var (
 	defaultRoot           = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
 	defaultState          = filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
 	testImage             string
+	testImageByDigest     = images.Get(images.BusyBoxByDigest)
 	testMultiLayeredImage = "ghcr.io/containerd/volume-copy-up:2.1"
 	shortCommand          = withTrue()
 	longCommand           = withProcessArgs("ping", "-t", "localhost")

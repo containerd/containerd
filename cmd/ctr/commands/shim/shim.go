@@ -30,15 +30,16 @@ import (
 	"github.com/containerd/console"
 	taskv2 "github.com/containerd/containerd/api/runtime/task/v2"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/shim"
 )
 
 var fifoFlags = []cli.Flag{
@@ -70,12 +71,17 @@ var Command = &cli.Command{
 			Name:  "id",
 			Usage: "shim ID",
 		},
+		&cli.StringFlag{
+			Name:  "shim-address",
+			Usage: "shim address (default: computed from shim ID)",
+		},
 	},
 	Subcommands: []*cli.Command{
 		deleteCommand,
 		execCommand,
 		startCommand,
 		stateCommand,
+		shutdownCommand,
 		pprofCommand,
 	},
 }
@@ -110,6 +116,47 @@ var deleteCommand = &cli.Command{
 			return err
 		}
 		fmt.Printf("container deleted and returned exit status %d\n", r.ExitStatus)
+		return nil
+	},
+}
+
+var shutdownCommand = &cli.Command{
+	Name:  "shutdown",
+	Usage: "Shutdown shim if there is no active container",
+	Flags: []cli.Flag{
+		&cli.IntFlag{
+			Name:  "api-version",
+			Usage: "shim API version {2,3}",
+			Value: 3,
+			Action: func(c *cli.Context, v int) error {
+				if v != 2 && v != 3 {
+					return fmt.Errorf("api-version must be 2 or 3")
+				}
+				return nil
+			},
+		},
+	},
+	Action: func(cliContext *cli.Context) error {
+		switch cliContext.Int("api-version") {
+		case 2:
+			service, err := getTaskServiceV2(cliContext)
+			if err != nil {
+				return err
+			}
+			_, err = service.Shutdown(context.Background(), &taskv2.ShutdownRequest{})
+			if err != nil {
+				return err
+			}
+		default:
+			service, err := getTaskService(cliContext)
+			if err != nil {
+				return err
+			}
+			_, err = service.Shutdown(context.Background(), &task.ShutdownRequest{})
+			if err != nil {
+				return err
+			}
+		}
 		return nil
 	},
 }
@@ -279,30 +326,38 @@ func getTaskService(cliContext *cli.Context) (task.TTRPCTaskService, error) {
 	}
 	return task.NewTTRPCTaskClient(client), nil
 }
-func getTaskServiceV2(cliContext *cli.Context) (taskv2.TaskService, error) {
+func getTaskServiceV2(cliContext *cli.Context) (taskv2.TTRPCTaskService, error) {
 	client, err := getTTRPCClient(cliContext)
 	if err != nil {
 		return nil, err
 	}
-	return taskv2.NewTaskClient(client), nil
+	return taskv2.NewTTRPCTaskClient(client), nil
 }
 
 func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
 	id := cliContext.String("id")
-	if id == "" {
-		return nil, fmt.Errorf("container id must be specified")
+	shimAddress := cliContext.String("shim-address")
+	if id == "" && shimAddress == "" {
+		return nil, fmt.Errorf("shim ID (--id) or address (--shim-address) must be specified")
 	}
 	ns := cliContext.String("namespace")
 
-	// /containerd-shim/ns/id/shim.sock is the old way to generate shim socket,
-	// compatible it
-	s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
-	// this should not error, ctr always get a default ns
-	ctx := namespaces.WithNamespace(context.Background(), ns)
-	s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, false)
-	s2 = strings.TrimPrefix(s2, "unix://")
-
-	for _, socket := range []string{s2, "\x00" + s1} {
+	sockets := make([]string, 0)
+	if shimAddress != "" {
+		trimmed := strings.TrimPrefix(shimAddress, "unix://")
+		sockets = append(sockets, trimmed)
+	}
+	if id != "" {
+		// /containerd-shim/ns/id/shim.sock is the old way to generate shim socket,
+		// compatible it
+		s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
+		// this should not error, ctr always get a default ns
+		ctx := namespaces.WithNamespace(context.Background(), ns)
+		s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, false)
+		s2 = strings.TrimPrefix(s2, "unix://")
+		sockets = append(sockets, s2, "\x00"+s1)
+	}
+	for _, socket := range sockets {
 		conn, err := net.Dial("unix", socket)
 		if err == nil {
 			client := ttrpc.NewClient(conn)
@@ -314,5 +369,5 @@ func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("fail to connect to container %s's shim", id)
+	return nil, fmt.Errorf("fail to connect to container shim with sockets: %v", sockets)
 }

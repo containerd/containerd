@@ -46,6 +46,8 @@ func arches() []specs.Arch {
 	case "riscv64":
 		// ArchRISCV32 (SCMP_ARCH_RISCV32) does not exist
 		return []specs.Arch{specs.ArchRISCV64}
+	case "loong64":
+		return []specs.Arch{specs.ArchLOONGARCH64}
 	default:
 		return []specs.Arch{}
 	}
@@ -174,6 +176,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"getuid",
 				"getuid32",
 				"getxattr",
+				"getxattrat", // kernel v6.13, libseccomp v2.6.0
 				"inotify_add_watch",
 				"inotify_init",
 				"inotify_init1",
@@ -199,12 +202,17 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"link",
 				"linkat",
 				"listen",
+				"listmount", // kernel v6.8, libseccomp v2.6.0
 				"listxattr",
+				"listxattrat", // kernel v6.13, libseccomp v2.6.0
 				"llistxattr",
 				"_llseek",
 				"lremovexattr",
 				"lseek",
 				"lsetxattr",
+				"lsm_get_self_attr", // kernel v6.8, libseccomp v2.6.0
+				"lsm_list_modules",  // kernel v6.8, libseccomp v2.6.0
+				"lsm_set_self_attr", // kernel v6.8, libseccomp v2.6.0
 				"lstat",
 				"lstat64",
 				"madvise",
@@ -232,6 +240,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"mq_timedsend_time64",
 				"mq_unlink",
 				"mremap",
+				"mseal", // kernel v6.10, libseccomp v2.6.0
 				"msgctl",
 				"msgget",
 				"msgrcv",
@@ -281,6 +290,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"recvmsg",
 				"remap_file_pages",
 				"removexattr",
+				"removexattrat", // kernel v6.13, libseccomp v2.6.0
 				"rename",
 				"renameat",
 				"renameat2",
@@ -350,6 +360,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"setuid",
 				"setuid32",
 				"setxattr",
+				"setxattrat", // kernel v6.13, libseccomp v2.6.0
 				"shmat",
 				"shmctl",
 				"shmdt",
@@ -367,6 +378,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"stat64",
 				"statfs",
 				"statfs64",
+				"statmount", // kernel v6.8, libseccomp v2.6.0
 				"statx",
 				"symlink",
 				"symlinkat",
@@ -398,6 +410,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"uname",
 				"unlink",
 				"unlinkat",
+				"uretprobe", // kernel v6.11, libseccomp v2.6.0
 				"utime",
 				"utimensat",
 				"utimensat_time64",
@@ -413,6 +426,45 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
 		},
+		// Allow socket(2) for all address families except AF_VSOCK and AF_ALG.
+		// NOTE: on socketcall(2)-based ABIs (for example 32-bit x86), socket()
+		// goes through socketcall(2), which is allowed unconditionally above.
+		// These arg filters only apply to the direct socket syscall.
+		//
+		// Do not use one rule with both "arg0 != AF_VSOCK" and "arg0 != AF_ALG".
+		// runc splits repeated argument-index conditions into separate
+		// libseccomp rules, so they behave like OR and allow both blocked
+		// domains.
+		//
+		// Do not combine explicit ERRNO rules with a broad socket ALLOW.
+		// libseccomp can make the ERRNO branch unreachable, collapse an
+		// unconditional ALLOW into a bare syscall allow, or silently reject
+		// repeated not-equal checks.
+		//
+		// These three single-condition ranges make AF_ALG and AF_VSOCK match
+		// none and fall through to the default errno action.
+		{
+			Names:  []string{"socket"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
+					Value: unix.AF_ALG,
+					Op:    specs.OpLessThan,
+				},
+			},
+		},
+		{
+			Names:  []string{"socket"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
+					Value: unix.AF_ALG + 1,
+					Op:    specs.OpEqualTo,
+				},
+			},
+		},
 		{
 			Names:  []string{"socket"},
 			Action: specs.ActAllow,
@@ -420,7 +472,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				{
 					Index: 0,
 					Value: unix.AF_VSOCK,
-					Op:    specs.OpNotEqual,
+					Op:    specs.OpGreaterThan,
 				},
 			},
 		},
@@ -558,6 +610,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 			Names: []string{
 				"riscv_flush_icache",
+				"riscv_hwprobe", // kernel v6.12, libseccomp v2.6.0
 			},
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},

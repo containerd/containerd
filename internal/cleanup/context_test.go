@@ -19,11 +19,14 @@ package cleanup
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBackground(t *testing.T) {
+func TestDo(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	var k struct{}
 	v := "incontext"
@@ -36,16 +39,55 @@ func TestBackground(t *testing.T) {
 	assert.Error(t, contextError(ctx))
 	assert.Equal(t, ctx.Value(k), v)
 
-	// cleanup context should no longer be canceled
-	ctx = Background(ctx)
-	assert.Nil(t, contextError(ctx))
-	assert.Equal(t, ctx.Value(k), v)
+	t.Run("with canceled context", func(t *testing.T) {
+		t.Parallel()
+		Do(ctx, func(ctx context.Context) {
+			assert.NoError(t, contextError(ctx))
+			assert.Equal(t, ctx.Value(k), v)
+		})
+	})
 
-	// cleanup contexts can be rewrapped in cancel context
-	ctx, cancel = context.WithCancel(ctx)
-	cancel()
-	assert.Error(t, contextError(ctx))
-	assert.Equal(t, ctx.Value(k), v)
+	t.Run("wrap with cancel", func(t *testing.T) {
+		t.Parallel()
+		Do(ctx, func(ctx context.Context) {
+			ctx, cancelFn := context.WithCancel(ctx)
+			cancelFn()
+			assert.ErrorIs(t, contextError(ctx), context.Canceled)
+			assert.Equal(t, ctx.Value(k), v)
+		})
+	})
+
+	// canceled after 10 seconds
+	t.Run("timeout", func(t *testing.T) {
+		t.Parallel()
+
+		done := make(chan struct{})
+		called := make(chan struct{})
+
+		Do(context.Background(), func(ctx context.Context) {
+			close(called)
+			select {
+			case <-ctx.Done():
+				close(done)
+			case <-time.After(11 * time.Second):
+				t.Error("context was not canceled in time")
+			}
+		})
+
+		select {
+		case <-done:
+			// success
+		case <-time.After(1 * time.Second):
+			t.Error("timeout waiting for context cancellation")
+		}
+
+		select {
+		case <-called:
+			// success
+		default:
+			t.Error("do function was not called")
+		}
+	})
 }
 
 func contextError(ctx context.Context) error {

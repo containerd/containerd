@@ -23,12 +23,10 @@ import (
 	fmt "fmt"
 
 	io "io"
+	"sort"
 
-	proto "github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
-	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
@@ -37,1506 +35,97 @@ import (
 	k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
-var _ = time.Kitchen
-
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
-
-func (m *APIGroup) Reset()      { *m = APIGroup{} }
-func (*APIGroup) ProtoMessage() {}
-func (*APIGroup) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{0}
-}
-func (m *APIGroup) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *APIGroup) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *APIGroup) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_APIGroup.Merge(m, src)
-}
-func (m *APIGroup) XXX_Size() int {
-	return m.Size()
-}
-func (m *APIGroup) XXX_DiscardUnknown() {
-	xxx_messageInfo_APIGroup.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_APIGroup proto.InternalMessageInfo
-
-func (m *APIGroupList) Reset()      { *m = APIGroupList{} }
-func (*APIGroupList) ProtoMessage() {}
-func (*APIGroupList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{1}
-}
-func (m *APIGroupList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *APIGroupList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *APIGroupList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_APIGroupList.Merge(m, src)
-}
-func (m *APIGroupList) XXX_Size() int {
-	return m.Size()
-}
-func (m *APIGroupList) XXX_DiscardUnknown() {
-	xxx_messageInfo_APIGroupList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_APIGroupList proto.InternalMessageInfo
-
-func (m *APIResource) Reset()      { *m = APIResource{} }
-func (*APIResource) ProtoMessage() {}
-func (*APIResource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{2}
-}
-func (m *APIResource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *APIResource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *APIResource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_APIResource.Merge(m, src)
-}
-func (m *APIResource) XXX_Size() int {
-	return m.Size()
-}
-func (m *APIResource) XXX_DiscardUnknown() {
-	xxx_messageInfo_APIResource.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_APIResource proto.InternalMessageInfo
-
-func (m *APIResourceList) Reset()      { *m = APIResourceList{} }
-func (*APIResourceList) ProtoMessage() {}
-func (*APIResourceList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{3}
-}
-func (m *APIResourceList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *APIResourceList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *APIResourceList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_APIResourceList.Merge(m, src)
-}
-func (m *APIResourceList) XXX_Size() int {
-	return m.Size()
-}
-func (m *APIResourceList) XXX_DiscardUnknown() {
-	xxx_messageInfo_APIResourceList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_APIResourceList proto.InternalMessageInfo
-
-func (m *APIVersions) Reset()      { *m = APIVersions{} }
-func (*APIVersions) ProtoMessage() {}
-func (*APIVersions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{4}
-}
-func (m *APIVersions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *APIVersions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *APIVersions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_APIVersions.Merge(m, src)
-}
-func (m *APIVersions) XXX_Size() int {
-	return m.Size()
-}
-func (m *APIVersions) XXX_DiscardUnknown() {
-	xxx_messageInfo_APIVersions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_APIVersions proto.InternalMessageInfo
-
-func (m *ApplyOptions) Reset()      { *m = ApplyOptions{} }
-func (*ApplyOptions) ProtoMessage() {}
-func (*ApplyOptions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{5}
-}
-func (m *ApplyOptions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ApplyOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ApplyOptions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ApplyOptions.Merge(m, src)
-}
-func (m *ApplyOptions) XXX_Size() int {
-	return m.Size()
-}
-func (m *ApplyOptions) XXX_DiscardUnknown() {
-	xxx_messageInfo_ApplyOptions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ApplyOptions proto.InternalMessageInfo
-
-func (m *Condition) Reset()      { *m = Condition{} }
-func (*Condition) ProtoMessage() {}
-func (*Condition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{6}
-}
-func (m *Condition) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Condition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Condition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Condition.Merge(m, src)
-}
-func (m *Condition) XXX_Size() int {
-	return m.Size()
-}
-func (m *Condition) XXX_DiscardUnknown() {
-	xxx_messageInfo_Condition.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Condition proto.InternalMessageInfo
-
-func (m *CreateOptions) Reset()      { *m = CreateOptions{} }
-func (*CreateOptions) ProtoMessage() {}
-func (*CreateOptions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{7}
-}
-func (m *CreateOptions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CreateOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CreateOptions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CreateOptions.Merge(m, src)
-}
-func (m *CreateOptions) XXX_Size() int {
-	return m.Size()
-}
-func (m *CreateOptions) XXX_DiscardUnknown() {
-	xxx_messageInfo_CreateOptions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_CreateOptions proto.InternalMessageInfo
-
-func (m *DeleteOptions) Reset()      { *m = DeleteOptions{} }
-func (*DeleteOptions) ProtoMessage() {}
-func (*DeleteOptions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{8}
-}
-func (m *DeleteOptions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeleteOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeleteOptions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeleteOptions.Merge(m, src)
-}
-func (m *DeleteOptions) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeleteOptions) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeleteOptions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_DeleteOptions proto.InternalMessageInfo
-
-func (m *Duration) Reset()      { *m = Duration{} }
-func (*Duration) ProtoMessage() {}
-func (*Duration) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{9}
-}
-func (m *Duration) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Duration) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Duration) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Duration.Merge(m, src)
-}
-func (m *Duration) XXX_Size() int {
-	return m.Size()
-}
-func (m *Duration) XXX_DiscardUnknown() {
-	xxx_messageInfo_Duration.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Duration proto.InternalMessageInfo
-
-func (m *FieldSelectorRequirement) Reset()      { *m = FieldSelectorRequirement{} }
-func (*FieldSelectorRequirement) ProtoMessage() {}
-func (*FieldSelectorRequirement) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{10}
-}
-func (m *FieldSelectorRequirement) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *FieldSelectorRequirement) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *FieldSelectorRequirement) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_FieldSelectorRequirement.Merge(m, src)
-}
-func (m *FieldSelectorRequirement) XXX_Size() int {
-	return m.Size()
-}
-func (m *FieldSelectorRequirement) XXX_DiscardUnknown() {
-	xxx_messageInfo_FieldSelectorRequirement.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_FieldSelectorRequirement proto.InternalMessageInfo
-
-func (m *FieldsV1) Reset()      { *m = FieldsV1{} }
-func (*FieldsV1) ProtoMessage() {}
-func (*FieldsV1) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{11}
-}
-func (m *FieldsV1) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *FieldsV1) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *FieldsV1) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_FieldsV1.Merge(m, src)
-}
-func (m *FieldsV1) XXX_Size() int {
-	return m.Size()
-}
-func (m *FieldsV1) XXX_DiscardUnknown() {
-	xxx_messageInfo_FieldsV1.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_FieldsV1 proto.InternalMessageInfo
-
-func (m *GetOptions) Reset()      { *m = GetOptions{} }
-func (*GetOptions) ProtoMessage() {}
-func (*GetOptions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{12}
-}
-func (m *GetOptions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *GetOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *GetOptions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetOptions.Merge(m, src)
-}
-func (m *GetOptions) XXX_Size() int {
-	return m.Size()
-}
-func (m *GetOptions) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetOptions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetOptions proto.InternalMessageInfo
-
-func (m *GroupKind) Reset()      { *m = GroupKind{} }
-func (*GroupKind) ProtoMessage() {}
-func (*GroupKind) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{13}
-}
-func (m *GroupKind) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *GroupKind) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *GroupKind) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GroupKind.Merge(m, src)
-}
-func (m *GroupKind) XXX_Size() int {
-	return m.Size()
-}
-func (m *GroupKind) XXX_DiscardUnknown() {
-	xxx_messageInfo_GroupKind.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GroupKind proto.InternalMessageInfo
-
-func (m *GroupResource) Reset()      { *m = GroupResource{} }
-func (*GroupResource) ProtoMessage() {}
-func (*GroupResource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{14}
-}
-func (m *GroupResource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *GroupResource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *GroupResource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GroupResource.Merge(m, src)
-}
-func (m *GroupResource) XXX_Size() int {
-	return m.Size()
-}
-func (m *GroupResource) XXX_DiscardUnknown() {
-	xxx_messageInfo_GroupResource.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GroupResource proto.InternalMessageInfo
-
-func (m *GroupVersion) Reset()      { *m = GroupVersion{} }
-func (*GroupVersion) ProtoMessage() {}
-func (*GroupVersion) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{15}
-}
-func (m *GroupVersion) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *GroupVersion) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *GroupVersion) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GroupVersion.Merge(m, src)
-}
-func (m *GroupVersion) XXX_Size() int {
-	return m.Size()
-}
-func (m *GroupVersion) XXX_DiscardUnknown() {
-	xxx_messageInfo_GroupVersion.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GroupVersion proto.InternalMessageInfo
-
-func (m *GroupVersionForDiscovery) Reset()      { *m = GroupVersionForDiscovery{} }
-func (*GroupVersionForDiscovery) ProtoMessage() {}
-func (*GroupVersionForDiscovery) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{16}
-}
-func (m *GroupVersionForDiscovery) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *GroupVersionForDiscovery) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *GroupVersionForDiscovery) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GroupVersionForDiscovery.Merge(m, src)
-}
-func (m *GroupVersionForDiscovery) XXX_Size() int {
-	return m.Size()
-}
-func (m *GroupVersionForDiscovery) XXX_DiscardUnknown() {
-	xxx_messageInfo_GroupVersionForDiscovery.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GroupVersionForDiscovery proto.InternalMessageInfo
-
-func (m *GroupVersionKind) Reset()      { *m = GroupVersionKind{} }
-func (*GroupVersionKind) ProtoMessage() {}
-func (*GroupVersionKind) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{17}
-}
-func (m *GroupVersionKind) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *GroupVersionKind) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *GroupVersionKind) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GroupVersionKind.Merge(m, src)
-}
-func (m *GroupVersionKind) XXX_Size() int {
-	return m.Size()
-}
-func (m *GroupVersionKind) XXX_DiscardUnknown() {
-	xxx_messageInfo_GroupVersionKind.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GroupVersionKind proto.InternalMessageInfo
-
-func (m *GroupVersionResource) Reset()      { *m = GroupVersionResource{} }
-func (*GroupVersionResource) ProtoMessage() {}
-func (*GroupVersionResource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{18}
-}
-func (m *GroupVersionResource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *GroupVersionResource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *GroupVersionResource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GroupVersionResource.Merge(m, src)
-}
-func (m *GroupVersionResource) XXX_Size() int {
-	return m.Size()
-}
-func (m *GroupVersionResource) XXX_DiscardUnknown() {
-	xxx_messageInfo_GroupVersionResource.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GroupVersionResource proto.InternalMessageInfo
-
-func (m *LabelSelector) Reset()      { *m = LabelSelector{} }
-func (*LabelSelector) ProtoMessage() {}
-func (*LabelSelector) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{19}
-}
-func (m *LabelSelector) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *LabelSelector) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *LabelSelector) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_LabelSelector.Merge(m, src)
-}
-func (m *LabelSelector) XXX_Size() int {
-	return m.Size()
-}
-func (m *LabelSelector) XXX_DiscardUnknown() {
-	xxx_messageInfo_LabelSelector.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_LabelSelector proto.InternalMessageInfo
-
-func (m *LabelSelectorRequirement) Reset()      { *m = LabelSelectorRequirement{} }
-func (*LabelSelectorRequirement) ProtoMessage() {}
-func (*LabelSelectorRequirement) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{20}
-}
-func (m *LabelSelectorRequirement) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *LabelSelectorRequirement) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *LabelSelectorRequirement) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_LabelSelectorRequirement.Merge(m, src)
-}
-func (m *LabelSelectorRequirement) XXX_Size() int {
-	return m.Size()
-}
-func (m *LabelSelectorRequirement) XXX_DiscardUnknown() {
-	xxx_messageInfo_LabelSelectorRequirement.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_LabelSelectorRequirement proto.InternalMessageInfo
-
-func (m *List) Reset()      { *m = List{} }
-func (*List) ProtoMessage() {}
-func (*List) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{21}
-}
-func (m *List) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *List) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *List) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_List.Merge(m, src)
-}
-func (m *List) XXX_Size() int {
-	return m.Size()
-}
-func (m *List) XXX_DiscardUnknown() {
-	xxx_messageInfo_List.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_List proto.InternalMessageInfo
-
-func (m *ListMeta) Reset()      { *m = ListMeta{} }
-func (*ListMeta) ProtoMessage() {}
-func (*ListMeta) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{22}
-}
-func (m *ListMeta) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ListMeta) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ListMeta) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ListMeta.Merge(m, src)
-}
-func (m *ListMeta) XXX_Size() int {
-	return m.Size()
-}
-func (m *ListMeta) XXX_DiscardUnknown() {
-	xxx_messageInfo_ListMeta.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ListMeta proto.InternalMessageInfo
-
-func (m *ListOptions) Reset()      { *m = ListOptions{} }
-func (*ListOptions) ProtoMessage() {}
-func (*ListOptions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{23}
-}
-func (m *ListOptions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ListOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ListOptions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ListOptions.Merge(m, src)
-}
-func (m *ListOptions) XXX_Size() int {
-	return m.Size()
-}
-func (m *ListOptions) XXX_DiscardUnknown() {
-	xxx_messageInfo_ListOptions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ListOptions proto.InternalMessageInfo
-
-func (m *ManagedFieldsEntry) Reset()      { *m = ManagedFieldsEntry{} }
-func (*ManagedFieldsEntry) ProtoMessage() {}
-func (*ManagedFieldsEntry) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{24}
-}
-func (m *ManagedFieldsEntry) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ManagedFieldsEntry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ManagedFieldsEntry) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ManagedFieldsEntry.Merge(m, src)
-}
-func (m *ManagedFieldsEntry) XXX_Size() int {
-	return m.Size()
-}
-func (m *ManagedFieldsEntry) XXX_DiscardUnknown() {
-	xxx_messageInfo_ManagedFieldsEntry.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ManagedFieldsEntry proto.InternalMessageInfo
-
-func (m *MicroTime) Reset()      { *m = MicroTime{} }
-func (*MicroTime) ProtoMessage() {}
-func (*MicroTime) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{25}
-}
-func (m *MicroTime) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_MicroTime.Unmarshal(m, b)
-}
-func (m *MicroTime) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_MicroTime.Marshal(b, m, deterministic)
-}
-func (m *MicroTime) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MicroTime.Merge(m, src)
-}
-func (m *MicroTime) XXX_Size() int {
-	return xxx_messageInfo_MicroTime.Size(m)
-}
-func (m *MicroTime) XXX_DiscardUnknown() {
-	xxx_messageInfo_MicroTime.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MicroTime proto.InternalMessageInfo
-
-func (m *ObjectMeta) Reset()      { *m = ObjectMeta{} }
-func (*ObjectMeta) ProtoMessage() {}
-func (*ObjectMeta) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{26}
-}
-func (m *ObjectMeta) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ObjectMeta) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ObjectMeta) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ObjectMeta.Merge(m, src)
-}
-func (m *ObjectMeta) XXX_Size() int {
-	return m.Size()
-}
-func (m *ObjectMeta) XXX_DiscardUnknown() {
-	xxx_messageInfo_ObjectMeta.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ObjectMeta proto.InternalMessageInfo
-
-func (m *OwnerReference) Reset()      { *m = OwnerReference{} }
-func (*OwnerReference) ProtoMessage() {}
-func (*OwnerReference) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{27}
-}
-func (m *OwnerReference) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *OwnerReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *OwnerReference) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_OwnerReference.Merge(m, src)
-}
-func (m *OwnerReference) XXX_Size() int {
-	return m.Size()
-}
-func (m *OwnerReference) XXX_DiscardUnknown() {
-	xxx_messageInfo_OwnerReference.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_OwnerReference proto.InternalMessageInfo
-
-func (m *PartialObjectMetadata) Reset()      { *m = PartialObjectMetadata{} }
-func (*PartialObjectMetadata) ProtoMessage() {}
-func (*PartialObjectMetadata) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{28}
-}
-func (m *PartialObjectMetadata) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *PartialObjectMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *PartialObjectMetadata) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PartialObjectMetadata.Merge(m, src)
-}
-func (m *PartialObjectMetadata) XXX_Size() int {
-	return m.Size()
-}
-func (m *PartialObjectMetadata) XXX_DiscardUnknown() {
-	xxx_messageInfo_PartialObjectMetadata.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_PartialObjectMetadata proto.InternalMessageInfo
-
-func (m *PartialObjectMetadataList) Reset()      { *m = PartialObjectMetadataList{} }
-func (*PartialObjectMetadataList) ProtoMessage() {}
-func (*PartialObjectMetadataList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{29}
-}
-func (m *PartialObjectMetadataList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *PartialObjectMetadataList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *PartialObjectMetadataList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PartialObjectMetadataList.Merge(m, src)
-}
-func (m *PartialObjectMetadataList) XXX_Size() int {
-	return m.Size()
-}
-func (m *PartialObjectMetadataList) XXX_DiscardUnknown() {
-	xxx_messageInfo_PartialObjectMetadataList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_PartialObjectMetadataList proto.InternalMessageInfo
-
-func (m *Patch) Reset()      { *m = Patch{} }
-func (*Patch) ProtoMessage() {}
-func (*Patch) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{30}
-}
-func (m *Patch) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Patch) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Patch) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Patch.Merge(m, src)
-}
-func (m *Patch) XXX_Size() int {
-	return m.Size()
-}
-func (m *Patch) XXX_DiscardUnknown() {
-	xxx_messageInfo_Patch.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Patch proto.InternalMessageInfo
-
-func (m *PatchOptions) Reset()      { *m = PatchOptions{} }
-func (*PatchOptions) ProtoMessage() {}
-func (*PatchOptions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{31}
-}
-func (m *PatchOptions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *PatchOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *PatchOptions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PatchOptions.Merge(m, src)
-}
-func (m *PatchOptions) XXX_Size() int {
-	return m.Size()
-}
-func (m *PatchOptions) XXX_DiscardUnknown() {
-	xxx_messageInfo_PatchOptions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_PatchOptions proto.InternalMessageInfo
-
-func (m *Preconditions) Reset()      { *m = Preconditions{} }
-func (*Preconditions) ProtoMessage() {}
-func (*Preconditions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{32}
-}
-func (m *Preconditions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Preconditions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Preconditions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Preconditions.Merge(m, src)
-}
-func (m *Preconditions) XXX_Size() int {
-	return m.Size()
-}
-func (m *Preconditions) XXX_DiscardUnknown() {
-	xxx_messageInfo_Preconditions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Preconditions proto.InternalMessageInfo
-
-func (m *RootPaths) Reset()      { *m = RootPaths{} }
-func (*RootPaths) ProtoMessage() {}
-func (*RootPaths) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{33}
-}
-func (m *RootPaths) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *RootPaths) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *RootPaths) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RootPaths.Merge(m, src)
-}
-func (m *RootPaths) XXX_Size() int {
-	return m.Size()
-}
-func (m *RootPaths) XXX_DiscardUnknown() {
-	xxx_messageInfo_RootPaths.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_RootPaths proto.InternalMessageInfo
-
-func (m *ServerAddressByClientCIDR) Reset()      { *m = ServerAddressByClientCIDR{} }
-func (*ServerAddressByClientCIDR) ProtoMessage() {}
-func (*ServerAddressByClientCIDR) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{34}
-}
-func (m *ServerAddressByClientCIDR) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ServerAddressByClientCIDR) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ServerAddressByClientCIDR) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ServerAddressByClientCIDR.Merge(m, src)
-}
-func (m *ServerAddressByClientCIDR) XXX_Size() int {
-	return m.Size()
-}
-func (m *ServerAddressByClientCIDR) XXX_DiscardUnknown() {
-	xxx_messageInfo_ServerAddressByClientCIDR.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ServerAddressByClientCIDR proto.InternalMessageInfo
-
-func (m *Status) Reset()      { *m = Status{} }
-func (*Status) ProtoMessage() {}
-func (*Status) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{35}
-}
-func (m *Status) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Status) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Status) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Status.Merge(m, src)
-}
-func (m *Status) XXX_Size() int {
-	return m.Size()
-}
-func (m *Status) XXX_DiscardUnknown() {
-	xxx_messageInfo_Status.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Status proto.InternalMessageInfo
-
-func (m *StatusCause) Reset()      { *m = StatusCause{} }
-func (*StatusCause) ProtoMessage() {}
-func (*StatusCause) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{36}
-}
-func (m *StatusCause) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatusCause) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatusCause) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatusCause.Merge(m, src)
-}
-func (m *StatusCause) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatusCause) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatusCause.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StatusCause proto.InternalMessageInfo
-
-func (m *StatusDetails) Reset()      { *m = StatusDetails{} }
-func (*StatusDetails) ProtoMessage() {}
-func (*StatusDetails) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{37}
-}
-func (m *StatusDetails) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatusDetails) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatusDetails) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatusDetails.Merge(m, src)
-}
-func (m *StatusDetails) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatusDetails) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatusDetails.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StatusDetails proto.InternalMessageInfo
-
-func (m *TableOptions) Reset()      { *m = TableOptions{} }
-func (*TableOptions) ProtoMessage() {}
-func (*TableOptions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{38}
-}
-func (m *TableOptions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *TableOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *TableOptions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TableOptions.Merge(m, src)
-}
-func (m *TableOptions) XXX_Size() int {
-	return m.Size()
-}
-func (m *TableOptions) XXX_DiscardUnknown() {
-	xxx_messageInfo_TableOptions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_TableOptions proto.InternalMessageInfo
-
-func (m *Time) Reset()      { *m = Time{} }
-func (*Time) ProtoMessage() {}
-func (*Time) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{39}
-}
-func (m *Time) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Time.Unmarshal(m, b)
-}
-func (m *Time) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Time.Marshal(b, m, deterministic)
-}
-func (m *Time) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Time.Merge(m, src)
-}
-func (m *Time) XXX_Size() int {
-	return xxx_messageInfo_Time.Size(m)
-}
-func (m *Time) XXX_DiscardUnknown() {
-	xxx_messageInfo_Time.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Time proto.InternalMessageInfo
-
-func (m *Timestamp) Reset()      { *m = Timestamp{} }
-func (*Timestamp) ProtoMessage() {}
-func (*Timestamp) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{40}
-}
-func (m *Timestamp) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Timestamp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Timestamp) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Timestamp.Merge(m, src)
-}
-func (m *Timestamp) XXX_Size() int {
-	return m.Size()
-}
-func (m *Timestamp) XXX_DiscardUnknown() {
-	xxx_messageInfo_Timestamp.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Timestamp proto.InternalMessageInfo
-
-func (m *TypeMeta) Reset()      { *m = TypeMeta{} }
-func (*TypeMeta) ProtoMessage() {}
-func (*TypeMeta) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{41}
-}
-func (m *TypeMeta) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *TypeMeta) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *TypeMeta) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TypeMeta.Merge(m, src)
-}
-func (m *TypeMeta) XXX_Size() int {
-	return m.Size()
-}
-func (m *TypeMeta) XXX_DiscardUnknown() {
-	xxx_messageInfo_TypeMeta.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_TypeMeta proto.InternalMessageInfo
-
-func (m *UpdateOptions) Reset()      { *m = UpdateOptions{} }
-func (*UpdateOptions) ProtoMessage() {}
-func (*UpdateOptions) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{42}
-}
-func (m *UpdateOptions) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *UpdateOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *UpdateOptions) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_UpdateOptions.Merge(m, src)
-}
-func (m *UpdateOptions) XXX_Size() int {
-	return m.Size()
-}
-func (m *UpdateOptions) XXX_DiscardUnknown() {
-	xxx_messageInfo_UpdateOptions.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_UpdateOptions proto.InternalMessageInfo
-
-func (m *Verbs) Reset()      { *m = Verbs{} }
-func (*Verbs) ProtoMessage() {}
-func (*Verbs) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{43}
-}
-func (m *Verbs) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Verbs) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Verbs) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Verbs.Merge(m, src)
-}
-func (m *Verbs) XXX_Size() int {
-	return m.Size()
-}
-func (m *Verbs) XXX_DiscardUnknown() {
-	xxx_messageInfo_Verbs.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Verbs proto.InternalMessageInfo
-
-func (m *WatchEvent) Reset()      { *m = WatchEvent{} }
-func (*WatchEvent) ProtoMessage() {}
-func (*WatchEvent) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a8431b6e0aeeb761, []int{44}
-}
-func (m *WatchEvent) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *WatchEvent) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *WatchEvent) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_WatchEvent.Merge(m, src)
-}
-func (m *WatchEvent) XXX_Size() int {
-	return m.Size()
-}
-func (m *WatchEvent) XXX_DiscardUnknown() {
-	xxx_messageInfo_WatchEvent.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_WatchEvent proto.InternalMessageInfo
-
-func init() {
-	proto.RegisterType((*APIGroup)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.APIGroup")
-	proto.RegisterType((*APIGroupList)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.APIGroupList")
-	proto.RegisterType((*APIResource)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.APIResource")
-	proto.RegisterType((*APIResourceList)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.APIResourceList")
-	proto.RegisterType((*APIVersions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.APIVersions")
-	proto.RegisterType((*ApplyOptions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.ApplyOptions")
-	proto.RegisterType((*Condition)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.Condition")
-	proto.RegisterType((*CreateOptions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.CreateOptions")
-	proto.RegisterType((*DeleteOptions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.DeleteOptions")
-	proto.RegisterType((*Duration)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.Duration")
-	proto.RegisterType((*FieldSelectorRequirement)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.FieldSelectorRequirement")
-	proto.RegisterType((*FieldsV1)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.FieldsV1")
-	proto.RegisterType((*GetOptions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.GetOptions")
-	proto.RegisterType((*GroupKind)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.GroupKind")
-	proto.RegisterType((*GroupResource)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.GroupResource")
-	proto.RegisterType((*GroupVersion)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersion")
-	proto.RegisterType((*GroupVersionForDiscovery)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery")
-	proto.RegisterType((*GroupVersionKind)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind")
-	proto.RegisterType((*GroupVersionResource)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionResource")
-	proto.RegisterType((*LabelSelector)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector")
-	proto.RegisterMapType((map[string]string)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector.MatchLabelsEntry")
-	proto.RegisterType((*LabelSelectorRequirement)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement")
-	proto.RegisterType((*List)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.List")
-	proto.RegisterType((*ListMeta)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta")
-	proto.RegisterType((*ListOptions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.ListOptions")
-	proto.RegisterType((*ManagedFieldsEntry)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry")
-	proto.RegisterType((*MicroTime)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime")
-	proto.RegisterType((*ObjectMeta)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta")
-	proto.RegisterMapType((map[string]string)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta.AnnotationsEntry")
-	proto.RegisterMapType((map[string]string)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta.LabelsEntry")
-	proto.RegisterType((*OwnerReference)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.OwnerReference")
-	proto.RegisterType((*PartialObjectMetadata)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.PartialObjectMetadata")
-	proto.RegisterType((*PartialObjectMetadataList)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.PartialObjectMetadataList")
-	proto.RegisterType((*Patch)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.Patch")
-	proto.RegisterType((*PatchOptions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.PatchOptions")
-	proto.RegisterType((*Preconditions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.Preconditions")
-	proto.RegisterType((*RootPaths)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.RootPaths")
-	proto.RegisterType((*ServerAddressByClientCIDR)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.ServerAddressByClientCIDR")
-	proto.RegisterType((*Status)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.Status")
-	proto.RegisterType((*StatusCause)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.StatusCause")
-	proto.RegisterType((*StatusDetails)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.StatusDetails")
-	proto.RegisterType((*TableOptions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.TableOptions")
-	proto.RegisterType((*Time)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.Time")
-	proto.RegisterType((*Timestamp)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.Timestamp")
-	proto.RegisterType((*TypeMeta)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta")
-	proto.RegisterType((*UpdateOptions)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.UpdateOptions")
-	proto.RegisterType((*Verbs)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.Verbs")
-	proto.RegisterType((*WatchEvent)(nil), "k8s.io.apimachinery.pkg.apis.meta.v1.WatchEvent")
-}
-
-func init() {
-	proto.RegisterFile("k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto", fileDescriptor_a8431b6e0aeeb761)
-}
-
-var fileDescriptor_a8431b6e0aeeb761 = []byte{
-	// 2873 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x1a, 0x5d, 0x6f, 0x23, 0x57,
-	0x35, 0x63, 0xc7, 0x89, 0x7d, 0x6c, 0xe7, 0xe3, 0x6e, 0x16, 0xbc, 0x41, 0xc4, 0xe9, 0xb4, 0xaa,
-	0xb6, 0xd0, 0x3a, 0xdd, 0xa5, 0x54, 0xdb, 0x2d, 0x2d, 0xc4, 0xf1, 0x66, 0x9b, 0x76, 0xd3, 0x44,
-	0x37, 0xbb, 0x0b, 0x94, 0x0a, 0x75, 0xe2, 0xb9, 0x71, 0x86, 0x8c, 0x67, 0xdc, 0x7b, 0xc7, 0x49,
-	0x0d, 0x0f, 0xf4, 0x01, 0x04, 0x48, 0xa8, 0x2a, 0x6f, 0x3c, 0xa1, 0x56, 0xf0, 0x03, 0x10, 0x4f,
-	0xbc, 0x83, 0x44, 0x1f, 0x8b, 0x78, 0xa9, 0x04, 0xb2, 0xba, 0xe1, 0x81, 0x47, 0xc4, 0x6b, 0x84,
-	0x04, 0xba, 0x1f, 0x33, 0x73, 0xc7, 0x1f, 0x9b, 0xf1, 0xee, 0x52, 0xf1, 0xe6, 0x39, 0xdf, 0xf7,
-	0xde, 0x73, 0xce, 0x3d, 0xe7, 0x5c, 0xc3, 0x73, 0x47, 0xd7, 0x58, 0xcd, 0xf1, 0xd7, 0xac, 0x8e,
-	0xd3, 0xb6, 0x9a, 0x87, 0x8e, 0x47, 0x68, 0x6f, 0xad, 0x73, 0xd4, 0xe2, 0x00, 0xb6, 0xd6, 0x26,
-	0x81, 0xb5, 0x76, 0x7c, 0x65, 0xad, 0x45, 0x3c, 0x42, 0xad, 0x80, 0xd8, 0xb5, 0x0e, 0xf5, 0x03,
-	0x1f, 0x3d, 0x21, 0xb9, 0x6a, 0x3a, 0x57, 0xad, 0x73, 0xd4, 0xe2, 0x00, 0x56, 0xe3, 0x5c, 0xb5,
-	0xe3, 0x2b, 0xcb, 0xcf, 0xb4, 0x9c, 0xe0, 0xb0, 0xbb, 0x5f, 0x6b, 0xfa, 0xed, 0xb5, 0x96, 0xdf,
-	0xf2, 0xd7, 0x04, 0xf3, 0x7e, 0xf7, 0x40, 0x7c, 0x89, 0x0f, 0xf1, 0x4b, 0x0a, 0x5d, 0x5e, 0x1b,
-	0x67, 0x0a, 0xed, 0x7a, 0x81, 0xd3, 0x26, 0x83, 0x56, 0x2c, 0x3f, 0x7f, 0x1e, 0x03, 0x6b, 0x1e,
-	0x92, 0xb6, 0x35, 0xc8, 0x67, 0xfe, 0x29, 0x0b, 0xf9, 0xf5, 0xdd, 0xad, 0x9b, 0xd4, 0xef, 0x76,
-	0xd0, 0x2a, 0x4c, 0x7b, 0x56, 0x9b, 0x54, 0x8c, 0x55, 0xe3, 0x72, 0xa1, 0x5e, 0xfa, 0xa8, 0x5f,
-	0x9d, 0x3a, 0xed, 0x57, 0xa7, 0x5f, 0xb7, 0xda, 0x04, 0x0b, 0x0c, 0x72, 0x21, 0x7f, 0x4c, 0x28,
-	0x73, 0x7c, 0x8f, 0x55, 0x32, 0xab, 0xd9, 0xcb, 0xc5, 0xab, 0x2f, 0xd7, 0xd2, 0xac, 0xbf, 0x26,
-	0x14, 0xdc, 0x95, 0xac, 0x9b, 0x3e, 0x6d, 0x38, 0xac, 0xe9, 0x1f, 0x13, 0xda, 0xab, 0x2f, 0x28,
-	0x2d, 0x79, 0x85, 0x64, 0x38, 0xd2, 0x80, 0x7e, 0x64, 0xc0, 0x42, 0x87, 0x92, 0x03, 0x42, 0x29,
-	0xb1, 0x15, 0xbe, 0x92, 0x5d, 0x35, 0x1e, 0x81, 0xda, 0x8a, 0x52, 0xbb, 0xb0, 0x3b, 0x20, 0x1f,
-	0x0f, 0x69, 0x44, 0xbf, 0x36, 0x60, 0x99, 0x11, 0x7a, 0x4c, 0xe8, 0xba, 0x6d, 0x53, 0xc2, 0x58,
-	0xbd, 0xb7, 0xe1, 0x3a, 0xc4, 0x0b, 0x36, 0xb6, 0x1a, 0x98, 0x55, 0xa6, 0xc5, 0x3e, 0x7c, 0x3d,
-	0x9d, 0x41, 0x7b, 0xe3, 0xe4, 0xd4, 0x4d, 0x65, 0xd1, 0xf2, 0x58, 0x12, 0x86, 0xef, 0x63, 0x86,
-	0x79, 0x00, 0xa5, 0xf0, 0x20, 0x6f, 0x39, 0x2c, 0x40, 0x77, 0x61, 0xa6, 0xc5, 0x3f, 0x58, 0xc5,
-	0x10, 0x06, 0xd6, 0xd2, 0x19, 0x18, 0xca, 0xa8, 0xcf, 0x29, 0x7b, 0x66, 0xc4, 0x27, 0xc3, 0x4a,
-	0x9a, 0xf9, 0xb3, 0x69, 0x28, 0xae, 0xef, 0x6e, 0x61, 0xc2, 0xfc, 0x2e, 0x6d, 0x92, 0x14, 0x4e,
-	0x73, 0x0d, 0x4a, 0xcc, 0xf1, 0x5a, 0x5d, 0xd7, 0xa2, 0x1c, 0x5a, 0x99, 0x11, 0x94, 0x4b, 0x8a,
-	0xb2, 0xb4, 0xa7, 0xe1, 0x70, 0x82, 0x12, 0x5d, 0x05, 0xe0, 0x12, 0x58, 0xc7, 0x6a, 0x12, 0xbb,
-	0x92, 0x59, 0x35, 0x2e, 0xe7, 0xeb, 0x48, 0xf1, 0xc1, 0xeb, 0x11, 0x06, 0x6b, 0x54, 0xe8, 0x71,
-	0xc8, 0x09, 0x4b, 0x2b, 0x79, 0xa1, 0xa6, 0xac, 0xc8, 0x73, 0x62, 0x19, 0x58, 0xe2, 0xd0, 0x53,
-	0x30, 0xab, 0xbc, 0xac, 0x52, 0x10, 0x64, 0xf3, 0x8a, 0x6c, 0x36, 0x74, 0x83, 0x10, 0xcf, 0xd7,
-	0x77, 0xe4, 0x78, 0xb6, 0xf0, 0x3b, 0x6d, 0x7d, 0xaf, 0x39, 0x9e, 0x8d, 0x05, 0x06, 0xdd, 0x82,
-	0xdc, 0x31, 0xa1, 0xfb, 0xdc, 0x13, 0xb8, 0x6b, 0x7e, 0x39, 0xdd, 0x46, 0xdf, 0xe5, 0x2c, 0xf5,
-	0x02, 0x37, 0x4d, 0xfc, 0xc4, 0x52, 0x08, 0xaa, 0x01, 0xb0, 0x43, 0x9f, 0x06, 0x62, 0x79, 0x95,
-	0xdc, 0x6a, 0xf6, 0x72, 0xa1, 0x3e, 0xc7, 0xd7, 0xbb, 0x17, 0x41, 0xb1, 0x46, 0xc1, 0xe9, 0x9b,
-	0x56, 0x40, 0x5a, 0x3e, 0x75, 0x08, 0xab, 0xcc, 0xc6, 0xf4, 0x1b, 0x11, 0x14, 0x6b, 0x14, 0xe8,
-	0x55, 0x40, 0x2c, 0xf0, 0xa9, 0xd5, 0x22, 0x6a, 0xa9, 0xaf, 0x58, 0xec, 0xb0, 0x02, 0x62, 0x75,
-	0xcb, 0x6a, 0x75, 0x68, 0x6f, 0x88, 0x02, 0x8f, 0xe0, 0x32, 0x7f, 0x67, 0xc0, 0xbc, 0xe6, 0x0b,
-	0xc2, 0xef, 0xae, 0x41, 0xa9, 0xa5, 0x45, 0x9d, 0xf2, 0x8b, 0xe8, 0xb4, 0xf5, 0x88, 0xc4, 0x09,
-	0x4a, 0x44, 0xa0, 0x40, 0x95, 0xa4, 0x30, 0xbb, 0x5c, 0x49, 0xed, 0xb4, 0xa1, 0x0d, 0xb1, 0x26,
-	0x0d, 0xc8, 0x70, 0x2c, 0xd9, 0xfc, 0x87, 0x21, 0x1c, 0x38, 0xcc, 0x37, 0xe8, 0xb2, 0x96, 0xd3,
-	0x0c, 0xb1, 0x7d, 0xa5, 0x31, 0xf9, 0xe8, 0x9c, 0x44, 0x90, 0xf9, 0xbf, 0x48, 0x04, 0xd7, 0xf3,
-	0xbf, 0xfc, 0xa0, 0x3a, 0xf5, 0xee, 0xdf, 0x56, 0xa7, 0xcc, 0x5f, 0x18, 0x50, 0x5a, 0xef, 0x74,
-	0xdc, 0xde, 0x4e, 0x27, 0x10, 0x0b, 0x30, 0x61, 0xc6, 0xa6, 0x3d, 0xdc, 0xf5, 0xd4, 0x42, 0x81,
-	0xc7, 0x77, 0x43, 0x40, 0xb0, 0xc2, 0xf0, 0xf8, 0x39, 0xf0, 0x69, 0x93, 0xa8, 0x70, 0x8b, 0xe2,
-	0x67, 0x93, 0x03, 0xb1, 0xc4, 0xf1, 0x43, 0x3e, 0x70, 0x88, 0x6b, 0x6f, 0x5b, 0x9e, 0xd5, 0x22,
-	0x54, 0x05, 0x47, 0xb4, 0xf5, 0x9b, 0x1a, 0x0e, 0x27, 0x28, 0xcd, 0xff, 0x64, 0xa0, 0xb0, 0xe1,
-	0x7b, 0xb6, 0x13, 0xa8, 0xe0, 0x0a, 0x7a, 0x9d, 0xa1, 0xe4, 0x71, 0xbb, 0xd7, 0x21, 0x58, 0x60,
-	0xd0, 0x0b, 0x30, 0xc3, 0x02, 0x2b, 0xe8, 0x32, 0x61, 0x4f, 0xa1, 0xfe, 0x58, 0x98, 0x96, 0xf6,
-	0x04, 0xf4, 0xac, 0x5f, 0x9d, 0x8f, 0xc4, 0x49, 0x10, 0x56, 0x0c, 0xdc, 0xd3, 0xfd, 0x7d, 0xb1,
-	0x51, 0xf6, 0x4d, 0x79, 0xed, 0x85, 0xf7, 0x47, 0x36, 0xf6, 0xf4, 0x9d, 0x21, 0x0a, 0x3c, 0x82,
-	0x0b, 0x1d, 0x03, 0x72, 0x2d, 0x16, 0xdc, 0xa6, 0x96, 0xc7, 0x84, 0xae, 0xdb, 0x4e, 0x9b, 0xa8,
-	0x80, 0xff, 0x52, 0xba, 0x13, 0xe7, 0x1c, 0xb1, 0xde, 0x5b, 0x43, 0xd2, 0xf0, 0x08, 0x0d, 0xe8,
-	0x49, 0x98, 0xa1, 0xc4, 0x62, 0xbe, 0x57, 0xc9, 0x89, 0xe5, 0x47, 0x59, 0x19, 0x0b, 0x28, 0x56,
-	0x58, 0x9e, 0xd0, 0xda, 0x84, 0x31, 0xab, 0x15, 0xa6, 0xd7, 0x28, 0xa1, 0x6d, 0x4b, 0x30, 0x0e,
-	0xf1, 0xe6, 0x6f, 0x0d, 0x28, 0x6f, 0x50, 0x62, 0x05, 0x64, 0x12, 0xb7, 0x78, 0xe0, 0x13, 0x47,
-	0xeb, 0x30, 0x2f, 0xbe, 0xef, 0x5a, 0xae, 0x63, 0xcb, 0x33, 0x98, 0x16, 0xcc, 0x9f, 0x57, 0xcc,
-	0xf3, 0x9b, 0x49, 0x34, 0x1e, 0xa4, 0x37, 0x7f, 0x92, 0x85, 0x72, 0x83, 0xb8, 0x24, 0x36, 0x79,
-	0x13, 0x50, 0x8b, 0x5a, 0x4d, 0xb2, 0x4b, 0xa8, 0xe3, 0xdb, 0x7b, 0xa4, 0xe9, 0x7b, 0x36, 0x13,
-	0x6e, 0x94, 0xad, 0x7f, 0x8e, 0xef, 0xef, 0xcd, 0x21, 0x2c, 0x1e, 0xc1, 0x81, 0x5c, 0x28, 0x77,
-	0xa8, 0xf8, 0x2d, 0xf6, 0x5c, 0x7a, 0x59, 0xf1, 0xea, 0x57, 0xd2, 0x1d, 0xe9, 0xae, 0xce, 0x5a,
-	0x5f, 0x3c, 0xed, 0x57, 0xcb, 0x09, 0x10, 0x4e, 0x0a, 0x47, 0xdf, 0x80, 0x05, 0x9f, 0x76, 0x0e,
-	0x2d, 0xaf, 0x41, 0x3a, 0xc4, 0xb3, 0x89, 0x17, 0x30, 0xb1, 0x91, 0xf9, 0xfa, 0x12, 0xaf, 0x45,
-	0x76, 0x06, 0x70, 0x78, 0x88, 0x1a, 0xbd, 0x01, 0x8b, 0x1d, 0xea, 0x77, 0xac, 0x96, 0xd8, 0x98,
-	0x5d, 0xdf, 0x75, 0x9a, 0x3d, 0xb5, 0x9d, 0x4f, 0x9f, 0xf6, 0xab, 0x8b, 0xbb, 0x83, 0xc8, 0xb3,
-	0x7e, 0xf5, 0x82, 0xd8, 0x3a, 0x0e, 0x89, 0x91, 0x78, 0x58, 0x8c, 0xe6, 0x06, 0xb9, 0x71, 0x6e,
-	0x60, 0x6e, 0x41, 0xbe, 0xd1, 0x55, 0x31, 0xf1, 0x12, 0xe4, 0x6d, 0xf5, 0x5b, 0xed, 0x7c, 0x18,
-	0x9c, 0x11, 0xcd, 0x59, 0xbf, 0x5a, 0xe6, 0xe5, 0x67, 0x2d, 0x04, 0xe0, 0x88, 0xc5, 0xfc, 0x8d,
-	0x01, 0x15, 0x71, 0xf2, 0x7b, 0xc4, 0x25, 0xcd, 0xc0, 0xa7, 0x98, 0xbc, 0xdd, 0x75, 0x28, 0x69,
-	0x13, 0x2f, 0x40, 0x5f, 0x84, 0xec, 0x11, 0xe9, 0xa9, 0xbc, 0x50, 0x54, 0x62, 0xb3, 0xaf, 0x91,
-	0x1e, 0xe6, 0x70, 0x74, 0x03, 0xf2, 0x7e, 0x87, 0xc7, 0xa6, 0x4f, 0x55, 0x5e, 0x78, 0x2a, 0x54,
-	0xbd, 0xa3, 0xe0, 0x67, 0xfd, 0xea, 0xc5, 0x84, 0xf8, 0x10, 0x81, 0x23, 0x56, 0xbe, 0xe2, 0x63,
-	0xcb, 0xed, 0x12, 0x7e, 0x0a, 0xd1, 0x8a, 0xef, 0x0a, 0x08, 0x56, 0x18, 0xf3, 0x49, 0xc8, 0x0b,
-	0x31, 0xec, 0xee, 0x15, 0xb4, 0x00, 0x59, 0x6c, 0x9d, 0x08, 0xab, 0x4a, 0x98, 0xff, 0xd4, 0x92,
-	0xed, 0x0e, 0xc0, 0x4d, 0x12, 0x84, 0xfe, 0xb9, 0x0e, 0xf3, 0xe1, 0x8d, 0x93, 0xbc, 0x08, 0x23,
-	0xa7, 0xc7, 0x49, 0x34, 0x1e, 0xa4, 0x37, 0xdf, 0x84, 0x82, 0xb8, 0x2c, 0x79, 0xa5, 0x11, 0x57,
-	0x35, 0xc6, 0x7d, 0xaa, 0x9a, 0xb0, 0x54, 0xc9, 0x8c, 0x2b, 0x55, 0x34, 0x73, 0x5d, 0x28, 0x4b,
-	0xde, 0xb0, 0x8e, 0x4b, 0xa5, 0xe1, 0x69, 0xc8, 0x87, 0x66, 0x2a, 0x2d, 0x51, 0xfd, 0x1e, 0x0a,
-	0xc2, 0x11, 0x85, 0xa6, 0xed, 0x10, 0x12, 0x17, 0x7f, 0x3a, 0x65, 0x5a, 0x91, 0x96, 0xb9, 0x7f,
-	0x91, 0xa6, 0x69, 0xfa, 0x21, 0x54, 0xc6, 0x15, 0xfd, 0x0f, 0x51, 0x9a, 0xa4, 0x37, 0xc5, 0x7c,
-	0xcf, 0x80, 0x05, 0x5d, 0x52, 0xfa, 0xe3, 0x4b, 0xaf, 0xe4, 0xfc, 0xa2, 0x54, 0xdb, 0x91, 0x5f,
-	0x19, 0xb0, 0x94, 0x58, 0xda, 0x44, 0x27, 0x3e, 0x81, 0x51, 0xba, 0x73, 0x64, 0x27, 0x70, 0x8e,
-	0xbf, 0x64, 0xa0, 0x7c, 0xcb, 0xda, 0x27, 0x6e, 0x18, 0xa9, 0xe8, 0x07, 0x50, 0x6c, 0x5b, 0x41,
-	0xf3, 0x50, 0x40, 0xc3, 0x06, 0xa6, 0x91, 0x2e, 0x27, 0x27, 0x24, 0xd5, 0xb6, 0x63, 0x31, 0x37,
-	0xbc, 0x80, 0xf6, 0xea, 0x17, 0x94, 0x49, 0x45, 0x0d, 0x83, 0x75, 0x6d, 0xa2, 0xeb, 0x14, 0xdf,
-	0x37, 0xde, 0xe9, 0xf0, 0xea, 0x6a, 0xf2, 0x66, 0x37, 0x61, 0x82, 0x96, 0xd5, 0xe2, 0xae, 0x73,
-	0x7b, 0x40, 0x3e, 0x1e, 0xd2, 0xb8, 0xfc, 0x32, 0x2c, 0x0c, 0x1a, 0xcf, 0xf3, 0x4f, 0x94, 0x15,
-	0x65, 0x22, 0x5c, 0x82, 0x9c, 0xc8, 0x53, 0xf2, 0x70, 0xb0, 0xfc, 0xb8, 0x9e, 0xb9, 0x66, 0x88,
-	0xf4, 0x3a, 0xce, 0x90, 0x47, 0x94, 0x5e, 0x13, 0xe2, 0x1f, 0x30, 0xbd, 0xfe, 0xde, 0x80, 0x69,
-	0xd1, 0x37, 0xbc, 0x09, 0x79, 0xbe, 0x7f, 0xb6, 0x15, 0x58, 0xc2, 0xae, 0xd4, 0x1d, 0x2b, 0xe7,
-	0xde, 0x26, 0x81, 0x15, 0x7b, 0x5b, 0x08, 0xc1, 0x91, 0x44, 0x84, 0x21, 0xe7, 0x04, 0xa4, 0x1d,
-	0x1e, 0xe4, 0x33, 0x63, 0x45, 0xab, 0x79, 0x49, 0x0d, 0x5b, 0x27, 0x37, 0xde, 0x09, 0x88, 0xc7,
-	0x0f, 0x23, 0x0e, 0x8d, 0x2d, 0x2e, 0x03, 0x4b, 0x51, 0xe6, 0xbf, 0x0c, 0x88, 0x54, 0x71, 0xe7,
-	0x67, 0xc4, 0x3d, 0xb8, 0xe5, 0x78, 0x47, 0x6a, 0x5b, 0x23, 0x73, 0xf6, 0x14, 0x1c, 0x47, 0x14,
-	0xa3, 0xae, 0x87, 0xcc, 0x64, 0xd7, 0x03, 0x57, 0xd8, 0xf4, 0xbd, 0xc0, 0xf1, 0xba, 0x43, 0xd1,
-	0xb6, 0xa1, 0xe0, 0x38, 0xa2, 0xe0, 0xf5, 0x12, 0x25, 0x6d, 0xcb, 0xf1, 0x1c, 0xaf, 0xc5, 0x17,
-	0xb1, 0xe1, 0x77, 0xbd, 0x40, 0x14, 0x0e, 0xaa, 0x5e, 0xc2, 0x43, 0x58, 0x3c, 0x82, 0xc3, 0xfc,
-	0xf7, 0x34, 0x14, 0xf9, 0x9a, 0xc3, 0x7b, 0xee, 0x45, 0x28, 0xbb, 0xba, 0x17, 0xa8, 0xb5, 0x5f,
-	0x54, 0xa6, 0x24, 0xe3, 0x1a, 0x27, 0x69, 0x39, 0xf3, 0x81, 0x7e, 0x43, 0xab, 0x3d, 0x88, 0x98,
-	0x93, 0xd5, 0x41, 0x92, 0x96, 0x67, 0xaf, 0x13, 0x1e, 0x1f, 0xaa, 0x80, 0x8a, 0x8e, 0xe8, 0x9b,
-	0x1c, 0x88, 0x25, 0x0e, 0x6d, 0xc3, 0x05, 0xcb, 0x75, 0xfd, 0x13, 0x01, 0xac, 0xfb, 0xfe, 0x51,
-	0xdb, 0xa2, 0x47, 0x4c, 0xf4, 0xfc, 0xf9, 0xfa, 0x17, 0x14, 0xcb, 0x85, 0xf5, 0x61, 0x12, 0x3c,
-	0x8a, 0x6f, 0xd4, 0xb1, 0x4d, 0x4f, 0x78, 0x6c, 0x87, 0xb0, 0x34, 0x00, 0x12, 0x51, 0xae, 0x1a,
-	0xf0, 0xe7, 0x94, 0x9c, 0x25, 0x3c, 0x82, 0xe6, 0x6c, 0x0c, 0x1c, 0x8f, 0x94, 0x88, 0xae, 0xc3,
-	0x1c, 0xf7, 0x64, 0xbf, 0x1b, 0x84, 0xe5, 0x71, 0x4e, 0x1c, 0x37, 0x3a, 0xed, 0x57, 0xe7, 0x6e,
-	0x27, 0x30, 0x78, 0x80, 0x92, 0x6f, 0xae, 0xeb, 0xb4, 0x9d, 0xa0, 0x32, 0x2b, 0x58, 0xa2, 0xcd,
-	0xbd, 0xc5, 0x81, 0x58, 0xe2, 0x12, 0x1e, 0x98, 0x3f, 0xd7, 0x03, 0x37, 0x60, 0x91, 0x11, 0xcf,
-	0xde, 0xf2, 0x9c, 0xc0, 0xb1, 0xdc, 0x1b, 0xc7, 0xa2, 0xf8, 0x2d, 0x8a, 0x83, 0xb8, 0xc8, 0x2b,
-	0xd7, 0xbd, 0x41, 0x24, 0x1e, 0xa6, 0x37, 0xff, 0x9c, 0x05, 0x24, 0xfb, 0x0a, 0x5b, 0x16, 0x65,
-	0x32, 0x2f, 0xf2, 0xee, 0x47, 0xf5, 0x25, 0xc6, 0x40, 0xf7, 0xa3, 0x5a, 0x92, 0x10, 0x8f, 0xb6,
-	0xa1, 0x20, 0xf3, 0x53, 0x1c, 0x73, 0x6b, 0x8a, 0xb8, 0xb0, 0x13, 0x22, 0xce, 0xfa, 0xd5, 0xe5,
-	0x84, 0x9a, 0x08, 0x23, 0x3a, 0xd3, 0x58, 0x02, 0xba, 0x0a, 0x60, 0x75, 0x1c, 0x7d, 0x36, 0x59,
-	0x88, 0x27, 0x54, 0xf1, 0x94, 0x01, 0x6b, 0x54, 0xe8, 0x15, 0x98, 0x0e, 0x1e, 0xac, 0x7b, 0xcc,
-	0x8b, 0xe6, 0x98, 0xf7, 0x8a, 0x42, 0x02, 0xd7, 0x2e, 0x82, 0x82, 0x71, 0xb3, 0x54, 0xe3, 0x17,
-	0x69, 0xdf, 0x8c, 0x30, 0x58, 0xa3, 0x42, 0xdf, 0x82, 0xfc, 0x81, 0xaa, 0x67, 0xc5, 0xe9, 0xa6,
-	0xce, 0xb3, 0x61, 0x15, 0x2c, 0xc7, 0x23, 0xe1, 0x17, 0x8e, 0xa4, 0xa1, 0xaf, 0x42, 0x91, 0x75,
-	0xf7, 0xa3, 0x12, 0x40, 0xba, 0x44, 0x74, 0xdf, 0xee, 0xc5, 0x28, 0xac, 0xd3, 0x99, 0x6f, 0x43,
-	0x61, 0xdb, 0x69, 0x52, 0x5f, 0xf4, 0xbb, 0x4f, 0xc1, 0x2c, 0x4b, 0x34, 0x73, 0xd1, 0x49, 0x86,
-	0xae, 0x1a, 0xe2, 0xb9, 0x8f, 0x7a, 0x96, 0xe7, 0xcb, 0x96, 0x2d, 0x17, 0xfb, 0xe8, 0xeb, 0x1c,
-	0x88, 0x25, 0xee, 0xfa, 0x12, 0xaf, 0x32, 0x7e, 0xfa, 0x61, 0x75, 0xea, 0xfd, 0x0f, 0xab, 0x53,
-	0x1f, 0x7c, 0xa8, 0x2a, 0x8e, 0x3f, 0x00, 0xc0, 0xce, 0xfe, 0xf7, 0x48, 0x53, 0xe6, 0xee, 0x54,
-	0x23, 0xcc, 0x70, 0x72, 0x2e, 0x46, 0x98, 0x99, 0x81, 0xca, 0x51, 0xc3, 0xe1, 0x04, 0x25, 0x5a,
-	0x83, 0x42, 0x34, 0x9c, 0x54, 0xfe, 0xb1, 0x18, 0xfa, 0x5b, 0x34, 0xc1, 0xc4, 0x31, 0x4d, 0xe2,
-	0x22, 0x99, 0x3e, 0xf7, 0x22, 0xa9, 0x43, 0xb6, 0xeb, 0xd8, 0x6a, 0x38, 0xf0, 0x6c, 0x78, 0x91,
-	0xdf, 0xd9, 0x6a, 0x9c, 0xf5, 0xab, 0x8f, 0x8d, 0x7b, 0x13, 0x08, 0x7a, 0x1d, 0xc2, 0x6a, 0x77,
-	0xb6, 0x1a, 0x98, 0x33, 0x8f, 0xca, 0x6a, 0x33, 0x13, 0x66, 0xb5, 0xab, 0x00, 0xad, 0x78, 0xc4,
-	0x22, 0x93, 0x46, 0xe4, 0x88, 0xda, 0x68, 0x45, 0xa3, 0x42, 0x0c, 0x16, 0x9b, 0x94, 0x58, 0xe1,
-	0xa8, 0x83, 0x05, 0x56, 0x5b, 0x0e, 0x6d, 0x27, 0x8b, 0x89, 0x4b, 0x4a, 0xcd, 0xe2, 0xc6, 0xa0,
-	0x30, 0x3c, 0x2c, 0x1f, 0xf9, 0xb0, 0x68, 0xab, 0x6e, 0x38, 0x56, 0x5a, 0x98, 0x58, 0xa9, 0xc8,
-	0x58, 0x8d, 0x41, 0x41, 0x78, 0x58, 0x36, 0xfa, 0x2e, 0x2c, 0x87, 0xc0, 0xe1, 0x91, 0x84, 0xc8,
-	0xfa, 0xd9, 0xfa, 0xca, 0x69, 0xbf, 0xba, 0xdc, 0x18, 0x4b, 0x85, 0xef, 0x23, 0x01, 0xd9, 0x30,
-	0xe3, 0xca, 0x2a, 0xb9, 0x28, 0x2a, 0x9b, 0xaf, 0xa5, 0x5b, 0x45, 0xec, 0xfd, 0x35, 0xbd, 0x3a,
-	0x8e, 0xc6, 0x4b, 0xaa, 0x30, 0x56, 0xb2, 0xd1, 0x3b, 0x50, 0xb4, 0x3c, 0xcf, 0x0f, 0x2c, 0x39,
-	0x24, 0x29, 0x09, 0x55, 0xeb, 0x13, 0xab, 0x5a, 0x8f, 0x65, 0x0c, 0x54, 0xe3, 0x1a, 0x06, 0xeb,
-	0xaa, 0xd0, 0x09, 0xcc, 0xfb, 0x27, 0x1e, 0xa1, 0x98, 0x1c, 0x10, 0x4a, 0xbc, 0x26, 0x61, 0x95,
-	0xb2, 0xd0, 0xfe, 0x5c, 0x4a, 0xed, 0x09, 0xe6, 0xd8, 0xa5, 0x93, 0x70, 0x86, 0x07, 0xb5, 0xa0,
-	0x1a, 0xcf, 0xad, 0x9e, 0xe5, 0x3a, 0xdf, 0x27, 0x94, 0x55, 0xe6, 0xe2, 0xb9, 0xfa, 0x66, 0x04,
-	0xc5, 0x1a, 0x05, 0xea, 0x42, 0xb9, 0xad, 0x5f, 0x19, 0x95, 0x45, 0x61, 0xe6, 0xb5, 0x74, 0x66,
-	0x0e, 0x5f, 0x6a, 0x71, 0x19, 0x94, 0xc0, 0xe1, 0xa4, 0x96, 0xe5, 0x17, 0xa0, 0xf8, 0x80, 0x1d,
-	0x02, 0xef, 0x30, 0x06, 0x0f, 0x64, 0xa2, 0x0e, 0xe3, 0x8f, 0x19, 0x98, 0x4b, 0x6e, 0xe3, 0xc0,
-	0x75, 0x98, 0x4b, 0x75, 0x1d, 0x86, 0xbd, 0xac, 0x31, 0xf6, 0x81, 0x25, 0xcc, 0xcf, 0xd9, 0xb1,
-	0xf9, 0x59, 0xa5, 0xc1, 0xe9, 0x87, 0x49, 0x83, 0x35, 0x00, 0x5e, 0xac, 0x50, 0xdf, 0x75, 0x09,
-	0x15, 0x19, 0x30, 0xaf, 0x1e, 0x52, 0x22, 0x28, 0xd6, 0x28, 0x78, 0x49, 0xbd, 0xef, 0xfa, 0xcd,
-	0x23, 0xb1, 0x05, 0x61, 0xf4, 0x8a, 0xdc, 0x97, 0x97, 0x25, 0x75, 0x7d, 0x08, 0x8b, 0x47, 0x70,
-	0x98, 0x3d, 0xb8, 0xb8, 0x6b, 0x51, 0x5e, 0xe4, 0xc4, 0x91, 0x22, 0x7a, 0x96, 0xb7, 0x86, 0x3a,
-	0xa2, 0x67, 0x27, 0x8d, 0xb8, 0x78, 0xf3, 0x63, 0x58, 0xdc, 0x15, 0x99, 0x7f, 0x35, 0xe0, 0xd2,
-	0x48, 0xdd, 0x9f, 0x41, 0x47, 0xf6, 0x56, 0xb2, 0x23, 0x7b, 0x31, 0xe5, 0xc4, 0x75, 0x94, 0xb5,
-	0x63, 0xfa, 0xb3, 0x59, 0xc8, 0xed, 0xf2, 0x4a, 0xd8, 0xfc, 0xd8, 0x80, 0x92, 0xf8, 0x35, 0xc9,
-	0xc0, 0xbb, 0x9a, 0x7c, 0x07, 0x29, 0x3c, 0xba, 0x37, 0x90, 0x47, 0x31, 0x11, 0x7f, 0xcf, 0x80,
-	0xe4, 0xa8, 0x19, 0xbd, 0x2c, 0x43, 0xc0, 0x88, 0x66, 0xc1, 0x13, 0xba, 0xff, 0x4b, 0xe3, 0x5a,
-	0xd2, 0x0b, 0xa9, 0xa6, 0x95, 0x4f, 0x43, 0x01, 0xfb, 0x7e, 0xb0, 0x6b, 0x05, 0x87, 0x8c, 0xef,
-	0x5d, 0x87, 0xff, 0x50, 0xdb, 0x2b, 0xf6, 0x4e, 0x60, 0xb0, 0x84, 0x9b, 0x3f, 0x37, 0xe0, 0xd2,
-	0xd8, 0xe7, 0x2d, 0x9e, 0x45, 0x9a, 0xd1, 0x97, 0x5a, 0x51, 0xe4, 0xc8, 0x31, 0x1d, 0xd6, 0xa8,
-	0x78, 0x2f, 0x99, 0x78, 0x13, 0x1b, 0xec, 0x25, 0x13, 0xda, 0x70, 0x92, 0xd6, 0xfc, 0x67, 0x06,
-	0xd4, 0x7b, 0xd2, 0xff, 0xd8, 0xe9, 0x9f, 0x1c, 0x78, 0xcd, 0x9a, 0x4b, 0xbe, 0x66, 0x45, 0x4f,
-	0x57, 0xda, 0x73, 0x4e, 0xf6, 0xfe, 0xcf, 0x39, 0xe8, 0xf9, 0xe8, 0x85, 0x48, 0xfa, 0xd0, 0x4a,
-	0xf2, 0x85, 0xe8, 0xac, 0x5f, 0x2d, 0x29, 0xe1, 0xc9, 0x17, 0xa3, 0x37, 0x60, 0xd6, 0x26, 0x81,
-	0xe5, 0xb8, 0xb2, 0x2f, 0x4c, 0xfd, 0xe6, 0x21, 0x85, 0x35, 0x24, 0x6b, 0xbd, 0xc8, 0x6d, 0x52,
-	0x1f, 0x38, 0x14, 0xc8, 0x13, 0x76, 0xd3, 0xb7, 0x65, 0x47, 0x92, 0x8b, 0x13, 0xf6, 0x86, 0x6f,
-	0x13, 0x2c, 0x30, 0xe6, 0xfb, 0x06, 0x14, 0xa5, 0xa4, 0x0d, 0xab, 0xcb, 0x08, 0xba, 0x12, 0xad,
-	0x42, 0x1e, 0xf7, 0x25, 0xfd, 0x29, 0xf0, 0xac, 0x5f, 0x2d, 0x08, 0x32, 0xd1, 0xcc, 0x8c, 0x78,
-	0xf2, 0xca, 0x9c, 0xb3, 0x47, 0x8f, 0x43, 0x4e, 0x04, 0x90, 0xda, 0xcc, 0xf8, 0x4d, 0x93, 0x03,
-	0xb1, 0xc4, 0x99, 0x9f, 0x66, 0xa0, 0x9c, 0x58, 0x5c, 0x8a, 0xbe, 0x20, 0x1a, 0xa1, 0x66, 0x52,
-	0x8c, 0xe5, 0xc7, 0xff, 0x83, 0x40, 0x5d, 0x5f, 0x33, 0x0f, 0x73, 0x7d, 0x7d, 0x1b, 0x66, 0x9a,
-	0x7c, 0x8f, 0xc2, 0x3f, 0xa4, 0x5c, 0x99, 0xe4, 0x38, 0xc5, 0xee, 0xc6, 0xde, 0x28, 0x3e, 0x19,
-	0x56, 0x02, 0xd1, 0x4d, 0x58, 0xa4, 0x24, 0xa0, 0xbd, 0xf5, 0x83, 0x80, 0x50, 0x7d, 0x98, 0x90,
-	0x8b, 0xab, 0x6f, 0x3c, 0x48, 0x80, 0x87, 0x79, 0xcc, 0x7d, 0x28, 0xdd, 0xb6, 0xf6, 0xdd, 0xe8,
-	0x15, 0x0f, 0x43, 0xd9, 0xf1, 0x9a, 0x6e, 0xd7, 0x26, 0x32, 0xa1, 0x87, 0xd9, 0x2b, 0x0c, 0xda,
-	0x2d, 0x1d, 0x79, 0xd6, 0xaf, 0x5e, 0x48, 0x00, 0xe4, 0xb3, 0x15, 0x4e, 0x8a, 0x30, 0x5d, 0x98,
-	0xfe, 0x0c, 0x3b, 0xc9, 0xef, 0x40, 0x21, 0xae, 0xf5, 0x1f, 0xb1, 0x4a, 0xf3, 0x2d, 0xc8, 0x73,
-	0x8f, 0x0f, 0x7b, 0xd4, 0x73, 0xaa, 0xa4, 0x64, 0xed, 0x95, 0x49, 0x53, 0x7b, 0x89, 0xb7, 0xe0,
-	0x3b, 0x1d, 0xfb, 0x21, 0xdf, 0x82, 0x33, 0x0f, 0x73, 0xf3, 0x65, 0x27, 0xbc, 0xf9, 0xae, 0x82,
-	0xfc, 0xbf, 0x0c, 0xbf, 0x64, 0x64, 0x01, 0xa1, 0x5d, 0x32, 0xfa, 0xfd, 0xaf, 0xbd, 0x30, 0xfc,
-	0xd8, 0x00, 0x10, 0xa3, 0x3c, 0x31, 0x46, 0x4a, 0xf1, 0xaf, 0x83, 0x3b, 0x30, 0xe3, 0x4b, 0x8f,
-	0x94, 0xef, 0xc1, 0x13, 0xce, 0x8b, 0xa3, 0x40, 0x92, 0x3e, 0x89, 0x95, 0xb0, 0xfa, 0xab, 0x1f,
-	0xdd, 0x5b, 0x99, 0xfa, 0xf8, 0xde, 0xca, 0xd4, 0x27, 0xf7, 0x56, 0xa6, 0xde, 0x3d, 0x5d, 0x31,
-	0x3e, 0x3a, 0x5d, 0x31, 0x3e, 0x3e, 0x5d, 0x31, 0x3e, 0x39, 0x5d, 0x31, 0x3e, 0x3d, 0x5d, 0x31,
-	0xde, 0xff, 0xfb, 0xca, 0xd4, 0x1b, 0x4f, 0xa4, 0xf9, 0x1f, 0xe2, 0x7f, 0x03, 0x00, 0x00, 0xff,
-	0xff, 0xd3, 0xee, 0xe4, 0x1c, 0xae, 0x28, 0x00, 0x00,
-}
+func (m *APIGroup) Reset() { *m = APIGroup{} }
+
+func (m *APIGroupList) Reset() { *m = APIGroupList{} }
+
+func (m *APIResource) Reset() { *m = APIResource{} }
+
+func (m *APIResourceList) Reset() { *m = APIResourceList{} }
+
+func (m *APIVersions) Reset() { *m = APIVersions{} }
+
+func (m *ApplyOptions) Reset() { *m = ApplyOptions{} }
+
+func (m *Condition) Reset() { *m = Condition{} }
+
+func (m *CreateOptions) Reset() { *m = CreateOptions{} }
+
+func (m *DeleteOptions) Reset() { *m = DeleteOptions{} }
+
+func (m *Duration) Reset() { *m = Duration{} }
+
+func (m *FieldSelectorRequirement) Reset() { *m = FieldSelectorRequirement{} }
+
+func (m *FieldsV1) Reset() { *m = FieldsV1{} }
+
+func (m *GetOptions) Reset() { *m = GetOptions{} }
+
+func (m *GroupKind) Reset() { *m = GroupKind{} }
+
+func (m *GroupResource) Reset() { *m = GroupResource{} }
+
+func (m *GroupVersion) Reset() { *m = GroupVersion{} }
+
+func (m *GroupVersionForDiscovery) Reset() { *m = GroupVersionForDiscovery{} }
+
+func (m *GroupVersionKind) Reset() { *m = GroupVersionKind{} }
+
+func (m *GroupVersionResource) Reset() { *m = GroupVersionResource{} }
+
+func (m *LabelSelector) Reset() { *m = LabelSelector{} }
+
+func (m *LabelSelectorRequirement) Reset() { *m = LabelSelectorRequirement{} }
+
+func (m *List) Reset() { *m = List{} }
+
+func (m *ListMeta) Reset() { *m = ListMeta{} }
+
+func (m *ListOptions) Reset() { *m = ListOptions{} }
+
+func (m *ManagedFieldsEntry) Reset() { *m = ManagedFieldsEntry{} }
+
+func (m *MicroTime) Reset() { *m = MicroTime{} }
+
+func (m *ObjectMeta) Reset() { *m = ObjectMeta{} }
+
+func (m *OwnerReference) Reset() { *m = OwnerReference{} }
+
+func (m *PartialObjectMetadata) Reset() { *m = PartialObjectMetadata{} }
+
+func (m *PartialObjectMetadataList) Reset() { *m = PartialObjectMetadataList{} }
+
+func (m *Patch) Reset() { *m = Patch{} }
+
+func (m *PatchOptions) Reset() { *m = PatchOptions{} }
+
+func (m *Preconditions) Reset() { *m = Preconditions{} }
+
+func (m *RootPaths) Reset() { *m = RootPaths{} }
+
+func (m *ServerAddressByClientCIDR) Reset() { *m = ServerAddressByClientCIDR{} }
+
+func (m *ShardInfo) Reset() { *m = ShardInfo{} }
+
+func (m *Status) Reset() { *m = Status{} }
+
+func (m *StatusCause) Reset() { *m = StatusCause{} }
+
+func (m *StatusDetails) Reset() { *m = StatusDetails{} }
+
+func (m *TableOptions) Reset() { *m = TableOptions{} }
+
+func (m *Time) Reset() { *m = Time{} }
+
+func (m *Timestamp) Reset() { *m = Timestamp{} }
+
+func (m *TypeMeta) Reset() { *m = TypeMeta{} }
+
+func (m *UpdateOptions) Reset() { *m = UpdateOptions{} }
+
+func (m *Verbs) Reset() { *m = Verbs{} }
+
+func (m *WatchEvent) Reset() { *m = WatchEvent{} }
 
 func (m *APIGroup) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -1983,6 +572,16 @@ func (m *DeleteOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.IgnoreStoreReadErrorWithClusterBreakingPotential != nil {
+		i--
+		if *m.IgnoreStoreReadErrorWithClusterBreakingPotential {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x30
+	}
 	if len(m.DryRun) > 0 {
 		for iNdEx := len(m.DryRun) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.DryRun[iNdEx])
@@ -2094,36 +693,6 @@ func (m *FieldSelectorRequirement) MarshalToSizedBuffer(dAtA []byte) (int, error
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Key)))
 	i--
 	dAtA[i] = 0xa
-	return len(dAtA) - i, nil
-}
-
-func (m *FieldsV1) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *FieldsV1) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *FieldsV1) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.Raw != nil {
-		i -= len(m.Raw)
-		copy(dAtA[i:], m.Raw)
-		i = encodeVarintGenerated(dAtA, i, uint64(len(m.Raw)))
-		i--
-		dAtA[i] = 0xa
-	}
 	return len(dAtA) - i, nil
 }
 
@@ -2402,7 +971,7 @@ func (m *LabelSelector) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		for k := range m.MatchLabels {
 			keysForMatchLabels = append(keysForMatchLabels, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForMatchLabels)
+		sort.Strings(keysForMatchLabels)
 		for iNdEx := len(keysForMatchLabels) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.MatchLabels[string(keysForMatchLabels[iNdEx])]
 			baseI := i
@@ -2533,6 +1102,18 @@ func (m *ListMeta) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ShardInfo != nil {
+		{
+			size, err := m.ShardInfo.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
+	}
 	if m.RemainingItemCount != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.RemainingItemCount))
 		i--
@@ -2576,6 +1157,11 @@ func (m *ListOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i -= len(m.ShardSelector)
+	copy(dAtA[i:], m.ShardSelector)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ShardSelector)))
+	i--
+	dAtA[i] = 0x7a
 	if m.SendInitialEvents != nil {
 		i--
 		if *m.SendInitialEvents {
@@ -2774,7 +1360,7 @@ func (m *ObjectMeta) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		for k := range m.Annotations {
 			keysForAnnotations = append(keysForAnnotations, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+		sort.Strings(keysForAnnotations)
 		for iNdEx := len(keysForAnnotations) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.Annotations[string(keysForAnnotations[iNdEx])]
 			baseI := i
@@ -2798,7 +1384,7 @@ func (m *ObjectMeta) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		for k := range m.Labels {
 			keysForLabels = append(keysForLabels, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+		sort.Strings(keysForLabels)
 		for iNdEx := len(keysForLabels) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.Labels[string(keysForLabels[iNdEx])]
 			baseI := i
@@ -3195,6 +1781,34 @@ func (m *ServerAddressByClientCIDR) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	i -= len(m.ClientCIDR)
 	copy(dAtA[i:], m.ClientCIDR)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ClientCIDR)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ShardInfo) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ShardInfo) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ShardInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Selector)
+	copy(dAtA[i:], m.Selector)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Selector)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -3773,6 +2387,9 @@ func (m *DeleteOptions) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	if m.IgnoreStoreReadErrorWithClusterBreakingPotential != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -3801,19 +2418,6 @@ func (m *FieldSelectorRequirement) Size() (n int) {
 			l = len(s)
 			n += 1 + l + sovGenerated(uint64(l))
 		}
-	}
-	return n
-}
-
-func (m *FieldsV1) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Raw != nil {
-		l = len(m.Raw)
-		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -3985,6 +2589,10 @@ func (m *ListMeta) Size() (n int) {
 	if m.RemainingItemCount != nil {
 		n += 1 + sovGenerated(uint64(*m.RemainingItemCount))
 	}
+	if m.ShardInfo != nil {
+		l = m.ShardInfo.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -4013,6 +2621,8 @@ func (m *ListOptions) Size() (n int) {
 	if m.SendInitialEvents != nil {
 		n += 2
 	}
+	l = len(m.ShardSelector)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -4231,6 +2841,17 @@ func (m *ServerAddressByClientCIDR) Size() (n int) {
 	l = len(m.ClientCIDR)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.ServerAddress)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *ShardInfo) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Selector)
 	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
@@ -4506,6 +3127,7 @@ func (this *DeleteOptions) String() string {
 		`OrphanDependents:` + valueToStringGenerated(this.OrphanDependents) + `,`,
 		`PropagationPolicy:` + valueToStringGenerated(this.PropagationPolicy) + `,`,
 		`DryRun:` + fmt.Sprintf("%v", this.DryRun) + `,`,
+		`IgnoreStoreReadErrorWithClusterBreakingPotential:` + valueToStringGenerated(this.IgnoreStoreReadErrorWithClusterBreakingPotential) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4566,7 +3188,7 @@ func (this *LabelSelector) String() string {
 	for k := range this.MatchLabels {
 		keysForMatchLabels = append(keysForMatchLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForMatchLabels)
+	sort.Strings(keysForMatchLabels)
 	mapStringForMatchLabels := "map[string]string{"
 	for _, k := range keysForMatchLabels {
 		mapStringForMatchLabels += fmt.Sprintf("%v: %v,", k, this.MatchLabels[k])
@@ -4616,6 +3238,7 @@ func (this *ListMeta) String() string {
 		`ResourceVersion:` + fmt.Sprintf("%v", this.ResourceVersion) + `,`,
 		`Continue:` + fmt.Sprintf("%v", this.Continue) + `,`,
 		`RemainingItemCount:` + valueToStringGenerated(this.RemainingItemCount) + `,`,
+		`ShardInfo:` + strings.Replace(this.ShardInfo.String(), "ShardInfo", "ShardInfo", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4635,6 +3258,7 @@ func (this *ListOptions) String() string {
 		`AllowWatchBookmarks:` + fmt.Sprintf("%v", this.AllowWatchBookmarks) + `,`,
 		`ResourceVersionMatch:` + fmt.Sprintf("%v", this.ResourceVersionMatch) + `,`,
 		`SendInitialEvents:` + valueToStringGenerated(this.SendInitialEvents) + `,`,
+		`ShardSelector:` + fmt.Sprintf("%v", this.ShardSelector) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4673,7 +3297,7 @@ func (this *ObjectMeta) String() string {
 	for k := range this.Labels {
 		keysForLabels = append(keysForLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	sort.Strings(keysForLabels)
 	mapStringForLabels := "map[string]string{"
 	for _, k := range keysForLabels {
 		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
@@ -4683,7 +3307,7 @@ func (this *ObjectMeta) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sort.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
@@ -4800,6 +3424,16 @@ func (this *ServerAddressByClientCIDR) String() string {
 	s := strings.Join([]string{`&ServerAddressByClientCIDR{`,
 		`ClientCIDR:` + fmt.Sprintf("%v", this.ClientCIDR) + `,`,
 		`ServerAddress:` + fmt.Sprintf("%v", this.ServerAddress) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ShardInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ShardInfo{`,
+		`Selector:` + fmt.Sprintf("%v", this.Selector) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -6456,6 +5090,27 @@ func (m *DeleteOptions) Unmarshal(dAtA []byte) error {
 			}
 			m.DryRun = append(m.DryRun, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IgnoreStoreReadErrorWithClusterBreakingPotential", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.IgnoreStoreReadErrorWithClusterBreakingPotential = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -6670,90 +5325,6 @@ func (m *FieldSelectorRequirement) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Values = append(m.Values, string(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *FieldsV1) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: FieldsV1: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: FieldsV1: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Raw", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Raw = append(m.Raw[:0], dAtA[iNdEx:postIndex]...)
-			if m.Raw == nil {
-				m.Raw = []byte{}
-			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -8225,6 +6796,42 @@ func (m *ListMeta) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.RemainingItemCount = &v
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShardInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ShardInfo == nil {
+				m.ShardInfo = &ShardInfo{}
+			}
+			if err := m.ShardInfo.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -8535,6 +7142,38 @@ func (m *ListOptions) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.SendInitialEvents = &b
+		case 15:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShardSelector", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ShardSelector = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -10469,6 +9108,88 @@ func (m *ServerAddressByClientCIDR) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.ServerAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ShardInfo) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ShardInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ShardInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Selector", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Selector = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

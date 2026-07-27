@@ -118,7 +118,7 @@ type CheckpointTaskInfo struct {
 	// ParentCheckpoint is the digest of a parent checkpoint
 	ParentCheckpoint digest.Digest
 	// Options hold runtime specific settings for checkpointing a task
-	Options interface{}
+	Options any
 
 	runtime string
 }
@@ -139,18 +139,52 @@ type TaskInfo struct {
 	// RootFS is a list of mounts to use as the task's root filesystem
 	RootFS []mount.Mount
 	// Options hold runtime specific settings for task creation
-	Options interface{}
+	Options any
 	// RuntimePath is an absolute path that can be used to overwrite path
 	// to a shim runtime binary.
 	RuntimePath string
 
 	// runtime is the runtime name for the container, and cannot be changed.
 	runtime string
+
+	// runtimeOptions is the runtime options for the container, and when task options are set,
+	// they will be based on the runtimeOptions.
+	// https://github.com/containerd/containerd/issues/11568
+	runtimeOptions typeurl.Any
+
+	// taskAPIAddress is sandbox API address for this task, can be a unix domain socket, or vsock address.
+	// It is in the form of ttrpc+unix://path/to/uds or grpc+vsock://<vsock cid>:<port>.
+	taskAPIAddress string
+	// taskAPIVersion is task api version, currently supported value is 2 and 3.
+	taskAPIVersion uint32
 }
 
 // Runtime name for the container
 func (i *TaskInfo) Runtime() string {
 	return i.runtime
+}
+
+// getRuncOptions returns a reference to the runtime options for use by the task.
+// If the set of options is not set by the opts passed into the NewTask creation
+// this function first attempts to initialize the runtime options with a copy of the runtimeOptions,
+// otherwise an empty set of options is assigned and returned
+func (i *TaskInfo) getRuncOptions() (*options.Options, error) {
+	if i.Options != nil {
+		opts, ok := i.Options.(*options.Options)
+		if !ok {
+			return nil, errors.New("invalid runtime v2 options format")
+		}
+		return opts, nil
+	}
+
+	opts := &options.Options{}
+	if i.runtimeOptions != nil && i.runtimeOptions.GetValue() != nil {
+		if err := typeurl.UnmarshalTo(i.runtimeOptions, opts); err != nil {
+			return nil, fmt.Errorf("failed to get runtime v2 options: %w", err)
+		}
+	}
+	i.Options = opts
+	return opts, nil
 }
 
 // Task is the executable object within containerd
@@ -213,10 +247,12 @@ func (t *task) Pid() uint32 {
 }
 
 func (t *task) Start(ctx context.Context) error {
-	ctx, span := tracing.StartSpan(ctx, "task.Start",
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Start"),
 		tracing.WithAttribute("task.id", t.ID()),
+		tracing.WithNamespace(ctx),
 	)
 	defer span.End()
+
 	r, err := t.client.TaskService().Start(ctx, &tasks.StartRequest{
 		ContainerID: t.id,
 	})
@@ -233,11 +269,13 @@ func (t *task) Start(ctx context.Context) error {
 }
 
 func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) error {
-	ctx, span := tracing.StartSpan(ctx, "task.Kill",
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Kill"),
 		tracing.WithAttribute("task.id", t.ID()),
 		tracing.WithAttribute("task.pid", int(t.Pid())),
+		tracing.WithNamespace(ctx),
 	)
 	defer span.End()
+
 	var i KillInfo
 	for _, o := range opts {
 		if err := o(ctx, &i); err != nil {
@@ -319,6 +357,7 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 			}
 			return
 		}
+
 		c <- ExitStatus{
 			code:     r.ExitStatus,
 			exitedAt: protobuf.FromTimestamp(r.ExitedAt),
@@ -331,8 +370,9 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 // it returns the exit status of the task and any errors that were encountered
 // during cleanup
 func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStatus, error) {
-	ctx, span := tracing.StartSpan(ctx, "task.Delete",
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Delete"),
 		tracing.WithAttribute("task.id", t.ID()),
+		tracing.WithNamespace(ctx),
 	)
 	defer span.End()
 	for _, o := range opts {
@@ -345,10 +385,15 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 		return nil, err
 	}
 
+	runtime, err := t.client.defaultRuntime(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get default runtime: %w", err)
+	}
+
 	switch status.Status {
 	case Stopped, Unknown, "":
 	case Created:
-		if t.client.runtime == plugins.RuntimePlugin.String()+".windows" {
+		if runtime == plugins.RuntimePlugin.String()+".windows" {
 			// On windows Created is akin to Stopped
 			break
 		}
@@ -365,7 +410,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 		// io.Wait locks for restored tasks on Windows unless we call
 		// io.Close first (https://github.com/containerd/containerd/issues/5621)
 		// in other cases, preserve the contract and let IO finish before closing
-		if t.client.runtime == plugins.RuntimePlugin.String()+".windows" {
+		if runtime == plugins.RuntimePlugin.String()+".windows" {
 			t.io.Close()
 		}
 		// io.Cancel is used to cancel the io goroutine while it is in
@@ -381,18 +426,27 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
 	}
+
+	es := &ExitStatus{code: r.ExitStatus, exitedAt: protobuf.FromTimestamp(r.ExitedAt)}
+	span.SetAttributes(
+		tracing.Attribute("task.exit_status", int64(es.code)),
+		tracing.Attribute("task.exited_at", es.exitedAt.Format(time.RFC3339)),
+	)
+
 	// Only cleanup the IO after a successful Delete
 	if t.io != nil {
 		t.io.Close()
 	}
-	return &ExitStatus{code: r.ExitStatus, exitedAt: protobuf.FromTimestamp(r.ExitedAt)}, nil
+	return es, nil
 }
 
-func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, err error) {
-	ctx, span := tracing.StartSpan(ctx, "task.Exec",
+func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, retErr error) {
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Exec"),
 		tracing.WithAttribute("task.id", t.ID()),
+		tracing.WithNamespace(ctx),
 	)
 	defer span.End()
+
 	if id == "" {
 		return nil, fmt.Errorf("exec id must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
@@ -402,7 +456,7 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 		return nil, err
 	}
 	defer func() {
-		if err != nil && i != nil {
+		if retErr != nil && i != nil {
 			i.Cancel()
 			i.Close()
 		}
@@ -474,10 +528,16 @@ func (t *task) IO() cio.IO {
 }
 
 func (t *task) Resize(ctx context.Context, w, h uint32) error {
-	ctx, span := tracing.StartSpan(ctx, "task.Resize",
+	ctx, span := tracing.StartSpan(ctx, tracing.Name("client.task", "Resize"),
 		tracing.WithAttribute("task.id", t.ID()),
+		tracing.WithNamespace(ctx),
 	)
 	defer span.End()
+	span.SetAttributes(
+		tracing.Attribute("task.pty.width", int64(w)),
+		tracing.Attribute("task.pty.height", int64(h)),
+	)
+
 	_, err := t.client.TaskService().ResizePty(ctx, &tasks.ResizePtyRequest{
 		ContainerID: t.id,
 		Width:       w,
@@ -582,7 +642,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 // UpdateTaskInfo allows updated specific settings to be changed on a task
 type UpdateTaskInfo struct {
 	// Resources updates a tasks resource constraints
-	Resources interface{}
+	Resources any
 	// Annotations allows arbitrary and/or experimental resource constraints for task update
 	Annotations map[string]string
 }
@@ -741,7 +801,7 @@ func writeContent(ctx context.Context, store content.Ingester, mediaType, ref st
 }
 
 // isCheckpointPathExist only suitable for runc runtime now
-func isCheckpointPathExist(runtime string, v interface{}) bool {
+func isCheckpointPathExist(runtime string, v any) bool {
 	if v == nil {
 		return false
 	}

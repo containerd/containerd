@@ -19,10 +19,8 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
+	"maps"
 	"reflect"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -30,39 +28,10 @@ import (
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/testutil"
-	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 	"github.com/containerd/errdefs"
-	bolt "go.etcd.io/bbolt"
 )
-
-func newTestSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-	nativeRoot := filepath.Join(root, "native")
-	if err := os.Mkdir(nativeRoot, 0770); err != nil {
-		return nil, nil, err
-	}
-	snapshotter, err := native.NewSnapshotter(nativeRoot)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	db, err := bolt.Open(filepath.Join(root, "metadata.db"), 0660, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sn := NewDB(db, nil, map[string]snapshots.Snapshotter{"native": snapshotter}).Snapshotter("native")
-
-	return sn, func() error {
-		if err := sn.Close(); err != nil {
-			return err
-		}
-		return db.Close()
-	}, nil
-}
 
 func snapshotLease(ctx context.Context, t *testing.T, db *DB, sn string) (context.Context, func(string) bool) {
 	lm := NewLeaseManager(db)
@@ -90,15 +59,6 @@ func snapshotLease(ctx context.Context, t *testing.T, db *DB, sn string) (contex
 	}
 }
 
-func TestMetadata(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("snapshotter not implemented on windows")
-	}
-	// Snapshot tests require mounting, still requires root
-	testutil.RequiresRoot(t)
-	testsuite.SnapshotterSuite(t, "Metadata", newTestSnapshotter)
-}
-
 func TestSnapshotterWithRef(t *testing.T) {
 	ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
 		return NewTmpSnapshotter(), nil
@@ -110,7 +70,7 @@ func TestSnapshotterWithRef(t *testing.T) {
 	key1 := "test1"
 	test1opt := snapshots.WithLabels(
 		map[string]string{
-			labelSnapshotRef: key1,
+			snapshots.LabelSnapshotRef: key1,
 		},
 	)
 
@@ -153,7 +113,7 @@ func TestSnapshotterWithRef(t *testing.T) {
 	key2 := "test2"
 	test2opt := snapshots.WithLabels(
 		map[string]string{
-			labelSnapshotRef: key2,
+			snapshots.LabelSnapshotRef: key2,
 		},
 	)
 
@@ -332,9 +292,7 @@ func (s *tmpSnapshotter) Update(ctx context.Context, info snapshots.Info, fieldp
 		return snapshots.Info{}, errdefs.ErrNotFound
 	}
 
-	for k, v := range info.Labels {
-		i.Labels[k] = v
-	}
+	maps.Copy(i.Labels, info.Labels)
 
 	s.snapshots[i.Name] = i
 
@@ -382,7 +340,7 @@ func (s *tmpSnapshotter) create(ctx context.Context, key, parent string, kind sn
 	base.Name = key
 	base.Kind = kind
 
-	target := base.Labels[labelSnapshotRef]
+	target := base.Labels[snapshots.LabelSnapshotRef]
 	if target != "" {
 		for _, name := range s.targets[target] {
 			if s.snapshots[name].Parent == parent {
@@ -441,7 +399,7 @@ func (s *tmpSnapshotter) Commit(ctx context.Context, name, key string, opts ...s
 	s.snapshots[name] = base
 	delete(s.snapshots, key)
 
-	if target := base.Labels[labelSnapshotRef]; target != "" {
+	if target := base.Labels[snapshots.LabelSnapshotRef]; target != "" {
 		s.targets[target] = append(s.targets[target], name)
 	}
 

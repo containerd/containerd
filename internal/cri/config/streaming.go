@@ -26,8 +26,7 @@ import (
 
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	k8scert "k8s.io/client-go/util/cert"
-
-	"k8s.io/kubelet/pkg/cri/streaming"
+	streaming "k8s.io/cri-streaming/pkg/streaming"
 )
 
 type streamListenerMode int

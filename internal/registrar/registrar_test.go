@@ -25,6 +25,8 @@ import (
 func TestRegistrar(t *testing.T) {
 	r := NewRegistrar()
 	assert := assertlib.New(t)
+	var err error
+	var resErr *ReservedErr
 
 	t.Logf("should be able to reserve a name<->key mapping")
 	assert.NoError(r.Reserve("test-name-1", "test-id-1"))
@@ -36,8 +38,14 @@ func TestRegistrar(t *testing.T) {
 	assert.NoError(r.Reserve("test-name-1", "test-id-1"))
 
 	t.Logf("should not be able to reserve conflict name<->key mapping")
-	assert.Error(r.Reserve("test-name-1", "test-id-conflict"))
-	assert.Error(r.Reserve("test-name-conflict", "test-id-2"))
+	err = r.Reserve("test-name-1", "test-id-conflict")
+	assert.Error(err)
+	assert.ErrorAs(err, &resErr)
+	assert.ErrorContains(resErr, `name "test-name-1" is reserved for "test-id-1"`)
+	err = r.Reserve("test-name-conflict", "test-id-2")
+	assert.Error(err)
+	assert.ErrorAs(err, &resErr)
+	assert.ErrorContains(resErr, `key "test-id-2" is reserved for "test-name-2"`)
 
 	t.Logf("should be able to release name<->key mapping by key")
 	r.ReleaseByKey("test-id-1")

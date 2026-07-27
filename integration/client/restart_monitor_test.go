@@ -63,7 +63,10 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 		t.Fatal(err)
 	}
 
-	address := configTOMLDecoded.GRPC.Address
+	var address string
+	if grpcPlugin, ok := configTOMLDecoded.Plugins["io.containerd.server.v1.grpc"].(map[string]any); ok {
+		address, _ = grpcPlugin["address"].(string)
+	}
 	if address == "" {
 		if runtime.GOOS == "windows" {
 			address = fmt.Sprintf(`\\.\pipe\containerd-containerd-test-%s`, filepath.Base(tempDir))
@@ -125,9 +128,9 @@ func TestRestartMonitor(t *testing.T) {
 	)
 
 	configTOML := fmt.Sprintf(`
-version = 2
+version = 3
 [plugins]
-  [plugins."io.containerd.internal.v1.restart"]
+  [plugins."io.containerd.monitor.container.v1.restart"]
 	  interval = "%s"
 `, interval.String())
 	client, _, cleanup := newDaemonWithConfig(t, configTOML)

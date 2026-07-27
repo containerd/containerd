@@ -17,7 +17,6 @@
 package config
 
 import (
-	"crypto/x509"
 	"path/filepath"
 	"strings"
 )
@@ -25,17 +24,13 @@ import (
 func hostPaths(root, host string) (hosts []string) {
 	ch := hostDirectory(host)
 	if ch != host {
-		hosts = append(hosts, filepath.Join(root, strings.Replace(ch, ":", "", -1)))
+		hosts = append(hosts, filepath.Join(root, strings.ReplaceAll(ch, ":", "")))
 	}
 
 	hosts = append(hosts,
-		filepath.Join(root, strings.Replace(host, ":", "", -1)),
+		filepath.Join(root, strings.ReplaceAll(host, ":", "")),
 		filepath.Join(root, "_default"),
 	)
 
 	return
-}
-
-func rootSystemPool() (*x509.CertPool, error) {
-	return x509.NewCertPool(), nil
 }

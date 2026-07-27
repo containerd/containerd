@@ -24,8 +24,8 @@ import (
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
-	"github.com/containerd/containerd/v2/internal/cri/types"
 	"github.com/containerd/errdefs"
 )
 
@@ -46,7 +46,6 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		state     string
 		info      map[string]string
 	)
-	timestamp := time.Now().UnixNano()
 	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, r.GetVerbose())
 	if err != nil {
 		// If the shim died unexpectedly (segfault etc.) let's set the state as
@@ -73,6 +72,13 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		info = cstatus.Info
 	}
 
+	if info == nil {
+		info = make(map[string]string)
+	}
+	if err := setUpdatedResources(ctx, sandbox, info); err != nil {
+		return nil, err
+	}
+
 	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip, additionalIPs)
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
@@ -84,9 +90,8 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	}
 
 	return &runtime.PodSandboxStatusResponse{
-		Status:    status,
-		Info:      info,
-		Timestamp: timestamp,
+		Status: status,
+		Info:   info,
 	}, nil
 }
 
@@ -106,6 +111,34 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 	}
 
 	return sandbox.IP, sandbox.AdditionalIPs, nil
+}
+
+// setUpdatedResources sets updated pod sandbox resources in the sandbox info.
+func setUpdatedResources(ctx context.Context, sandbox sandboxstore.Sandbox, info map[string]string) error {
+	var sbInfo podsandboxtypes.SandboxInfo
+	if info == nil {
+		return nil
+	}
+	if i, ok := info["info"]; ok {
+		if err := json.Unmarshal([]byte(i), &sbInfo); err != nil {
+			return fmt.Errorf("failed to unmarshal sandbox info: %w", err)
+		}
+	}
+
+	if overhead := sandbox.Status.Get().Overhead; overhead != nil {
+		sbInfo.Overhead = overhead
+	}
+	if resources := sandbox.Status.Get().Resources; resources != nil {
+		sbInfo.Resources = resources
+	}
+
+	infoBytes, err := json.Marshal(sbInfo)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sandbox info: %w", err)
+	}
+	info["info"] = string(infoBytes)
+
+	return nil
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
@@ -145,7 +178,7 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status string, createdAt tim
 // but if controller.Status() returns a NotFound error,
 // we should fallback to get SandboxInfo from cached sandbox itself.
 func toDeletedCRISandboxInfo(sandbox sandboxstore.Sandbox) (map[string]string, error) {
-	si := &types.SandboxInfo{
+	si := &podsandboxtypes.SandboxInfo{
 		Pid:       sandbox.Status.Get().Pid,
 		Config:    sandbox.Config,
 		CNIResult: sandbox.CNIResult,

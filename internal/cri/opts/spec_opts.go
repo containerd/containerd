@@ -20,9 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -67,7 +68,7 @@ func WithProcessArgs(config *runtime.ContainerConfig, image *imagespec.ImageConf
 				args = append([]string{}, image.Cmd...)
 			}
 			if command == nil {
-				if !(len(image.Entrypoint) == 1 && image.Entrypoint[0] == "") {
+				if len(image.Entrypoint) != 1 || image.Entrypoint[0] != "" {
 					command = append([]string{}, image.Entrypoint...)
 				}
 			}
@@ -118,6 +119,33 @@ func WithAnnotation(k, v string) oci.SpecOpts {
 	}
 }
 
+// WithWindowsAffinityCPUs sets the CPU affinity values in runtime spec for windows.
+func WithWindowsAffinityCPUs(config *runtime.WindowsContainerConfig) oci.SpecOpts {
+	return func(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+		if s.Windows == nil || config.Resources == nil || config.Resources.AffinityCpus == nil {
+			return nil
+		}
+
+		if s.Windows.Resources == nil {
+			s.Windows.Resources = &runtimespec.WindowsResources{}
+		}
+
+		if s.Windows.Resources.CPU == nil {
+			s.Windows.Resources.CPU = &runtimespec.WindowsCPUResources{}
+		}
+
+		affinities := make([]runtimespec.WindowsCPUGroupAffinity, 0, len(config.Resources.AffinityCpus))
+		for _, affinity := range config.Resources.AffinityCpus {
+			affinities = append(affinities, runtimespec.WindowsCPUGroupAffinity{
+				Mask:  affinity.CpuMask,
+				Group: affinity.CpuGroup,
+			})
+		}
+		s.Windows.Resources.CPU.Affinity = affinities
+		return nil
+	}
+}
+
 // WithAdditionalGIDs adds any additional groups listed for a particular user in the
 // /etc/groups file of the image's root filesystem to the OCI spec's additionalGids array.
 func WithAdditionalGIDs(userstr string) oci.SpecOpts {
@@ -147,7 +175,7 @@ func mergeGids(gids1, gids2 []uint32) []uint32 {
 	for gid := range gidsMap {
 		gids = append(gids, gid)
 	}
-	sort.Slice(gids, func(i, j int) bool { return gids[i] < gids[j] })
+	slices.Sort(gids)
 	return gids
 }
 
@@ -246,9 +274,7 @@ func WithSysctls(sysctls map[string]string) oci.SpecOpts {
 		if s.Linux.Sysctl == nil {
 			s.Linux.Sysctl = make(map[string]string)
 		}
-		for k, v := range sysctls {
-			s.Linux.Sysctl[k] = v
-		}
+		maps.Copy(s.Linux.Sysctl, sysctls)
 		return nil
 	}
 }
@@ -305,7 +331,7 @@ func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
 func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
 		if s.Linux == nil {
-			return fmt.Errorf("Linux spec is required")
+			return fmt.Errorf("linux spec is required")
 		}
 
 		for i, ns := range s.Linux.Namespaces {

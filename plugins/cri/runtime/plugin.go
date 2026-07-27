@@ -51,24 +51,12 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.WarningPlugin,
 		},
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
-			if configVersion >= version.ConfigVersion {
-				return nil
-			}
-			c, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"]
-			if !ok {
-				return nil
-			}
-			conf := c.(map[string]interface{})
-			migrateConfig(conf)
-			pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"] = conf
-			return nil
-		},
-		InitFn: initCRIRuntime,
+		ConfigMigration: configMigration,
+		InitFn:          initCRIRuntime,
 	})
 }
 
-func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
+func initCRIRuntime(ic *plugin.InitContext) (any, error) {
 	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
 	ctx := ic.Context
@@ -91,6 +79,13 @@ func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
 	rootDir := filepath.Join(containerdRootDir, "io.containerd.grpc.v1.cri")
 	containerdStateDir := filepath.Dir(ic.Properties[plugins.PropertyStateDir])
 	stateDir := filepath.Join(containerdStateDir, "io.containerd.grpc.v1.cri")
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		return nil, err
+	}
+	// chmod is needed for upgrading from an older release that created the dir with 0o755
+	if err := os.Chmod(stateDir, 0o700); err != nil {
+		return nil, err
+	}
 	c := criconfig.Config{
 		RuntimeConfig:      *pluginConfig,
 		ContainerdRootDir:  containerdRootDir,
@@ -178,10 +173,18 @@ func loadOCISpec(filename string) (*oci.Spec, error) {
 }
 
 // Set glog level.
+// TODO: mikebrow remove this klog inititialization func once we are no longer vendoring k8s.io/klog
 func setGLogLevel() error {
 	l := log.GetLevel()
 	fs := flag.NewFlagSet("klog", flag.PanicOnError)
 	klog.InitFlags(fs)
+	// Opt into fixed stderrthreshold behavior (kubernetes/klog#212).
+	if err := fs.Set("legacy_stderr_threshold_behavior", "false"); err != nil {
+		return err
+	}
+	if err := fs.Set("stderrthreshold", "INFO"); err != nil {
+		return err
+	}
 	if err := fs.Set("logtostderr", "true"); err != nil {
 		return err
 	}
@@ -198,20 +201,113 @@ func setGLogLevel() error {
 	return nil
 }
 
-func migrateConfig(conf map[string]interface{}) {
-	containerdConf, ok := conf["containerd"]
+func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
+	if configVersion >= version.ConfigVersion {
+		return nil
+	}
+	src, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	dst, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"].(map[string]any)
+	if !ok {
+		dst = make(map[string]any)
+	}
+	migrateConfig(dst, src)
+	pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"] = dst
+	return nil
+}
+
+func migrateConfig(dst, src map[string]any) {
+	for k, v := range src {
+		switch k {
+		case "cni":
+			// skip (handled separately below)
+			continue
+		case "containerd":
+			// skip (handled separately below)
+			continue
+		case
+			"sandbox_image",
+			"registry",
+			"image_decryption",
+			"max_concurrent_downloads",
+			"image_pull_progress_timeout",
+			"image_pull_with_sync_fs",
+			"stats_collect_period":
+			// skip (moved to cri image service plugin)
+			continue
+		case
+			"disable_tcp_service",
+			"stream_server_address",
+			"stream_server_port",
+			"stream_idle_timeout",
+			"enable_tls_streaming",
+			"x509_key_pair_streaming":
+			// skip (moved to cri ServerConfig)
+			continue
+		default:
+			if _, ok := dst[k]; !ok {
+				dst[k] = v
+			}
+		}
+	}
+
+	if cniConf, ok := src["cni"].(map[string]any); ok {
+		newCniConf, ok := dst["cni"].(map[string]any)
+		if !ok {
+			newCniConf = map[string]any{}
+		}
+		for k, v := range cniConf {
+			switch k {
+			case "bin_dir":
+				// migrate `bin_dir` to `bin_dirs` only if `bin_dirs`
+				// is not already set
+				if binDirs, ok := newCniConf["bin_dirs"].([]string); !ok || len(binDirs) == 0 {
+					newCniConf["bin_dirs"] = []string{v.(string)}
+				}
+			default:
+				if _, ok := newCniConf[k]; !ok {
+					newCniConf[k] = v
+				}
+			}
+		}
+		dst["cni"] = newCniConf
+	}
+
+	// migrate cri containerd configs
+	containerdConf, ok := src["containerd"].(map[string]any)
 	if !ok {
 		return
 	}
-	runtimesConf, ok := containerdConf.(map[string]interface{})["runtimes"]
+	newContainerdConf, ok := dst["containerd"].(map[string]any)
+	if !ok {
+		newContainerdConf = map[string]any{}
+	}
+	for k, v := range containerdConf {
+		switch k {
+		case "snapshotter", "disable_snapshot_annotations", "discard_unpacked_layers":
+			// skip (moved to cri image service plugin)
+			continue
+		default:
+			if _, ok := newContainerdConf[k]; !ok {
+				newContainerdConf[k] = v
+			}
+		}
+	}
+	dst["containerd"] = newContainerdConf
+
+	// migrate runtimes configs
+	runtimesConf, ok := newContainerdConf["runtimes"]
 	if !ok {
 		return
 	}
-	for _, v := range runtimesConf.(map[string]interface{}) {
-		runtimeConf := v.(map[string]interface{})
+	for _, v := range runtimesConf.(map[string]any) {
+		runtimeConf := v.(map[string]any)
 		if sandboxMode, ok := runtimeConf["sandbox_mode"]; ok {
 			if _, ok := runtimeConf["sandboxer"]; !ok {
 				runtimeConf["sandboxer"] = sandboxMode
+				delete(runtimeConf, "sandbox_mode")
 			}
 		}
 	}

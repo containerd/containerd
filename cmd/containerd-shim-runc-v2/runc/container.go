@@ -235,7 +235,7 @@ type Container struct {
 	Bundle string
 
 	// cgroup is either cgroups.Cgroup or *cgroupsv2.Manager
-	cgroup          interface{}
+	cgroup          any
 	process         process.Process
 	processes       map[string]process.Process
 	reservedProcess map[string]struct{}
@@ -273,14 +273,14 @@ func (c *Container) Pid() int {
 }
 
 // Cgroup of the container
-func (c *Container) Cgroup() interface{} {
+func (c *Container) Cgroup() any {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.cgroup
 }
 
 // CgroupSet sets the cgroup to the container
-func (c *Container) CgroupSet(cg interface{}) {
+func (c *Container) CgroupSet(cg any) {
 	c.mu.Lock()
 	c.cgroup = cg
 	c.mu.Unlock()
@@ -350,11 +350,6 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 	}
 	if err := p.Start(ctx); err != nil {
 		return p, err
-	}
-	if c.Cgroup() == nil && p.Pid() > 0 {
-		if cg, err := loadProcessCgroup(ctx, p.Pid()); err == nil {
-			c.cgroup = cg
-		}
 	}
 	return p, nil
 }
@@ -459,6 +454,7 @@ func (c *Container) Checkpoint(ctx context.Context, r *task.CheckpointTaskReques
 		FileLocks:                opts.FileLocks,
 		EmptyNamespaces:          opts.EmptyNamespaces,
 		WorkDir:                  opts.WorkPath,
+		ParentPath:               opts.ParentPath,
 	})
 }
 
@@ -484,7 +480,7 @@ func (c *Container) HasPid(pid int) bool {
 	return false
 }
 
-func loadProcessCgroup(ctx context.Context, pid int) (cg interface{}, err error) {
+func loadProcessCgroup(ctx context.Context, pid int) (cg any, err error) {
 	if cgroups.Mode() == cgroups.Unified {
 		g, err := cgroupsv2.PidGroupPath(pid)
 		if err != nil {

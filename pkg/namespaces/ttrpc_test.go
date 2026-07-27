@@ -27,7 +27,7 @@ import (
 func TestCopyTTRPCMetadata(t *testing.T) {
 	src := ttrpc.MD{}
 	src.Set("key", "a", "b", "c", "d")
-	md := copyMetadata(src)
+	md := src.Clone()
 
 	if !reflect.DeepEqual(src, md) {
 		t.Fatalf("metadata is copied incorrectly")

@@ -36,8 +36,7 @@ package bandwidth
 
 import (
 	"github.com/containerd/errdefs"
-
-	"k8s.io/apimachinery/pkg/api/resource"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
 type unsupportedShaper struct {

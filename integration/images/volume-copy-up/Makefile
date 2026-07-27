@@ -31,7 +31,7 @@ endif
 
 # Operating systems supported: linux, windows
 OS ?= linux
-# Architectures supported: amd64, arm64
+# Architectures supported: amd64, arm64, ppc64le, s390x
 ARCH ?= amd64
 # OS Version for the Windows images: 1809, 20H2, ltsc2022
 OSVERSION ?= 1809
@@ -41,7 +41,7 @@ OSVERSION ?= 1809
 OUTPUT_TYPE ?= docker
 
 ALL_OS = linux
-ALL_ARCH.linux = amd64 arm64 ppc64le
+ALL_ARCH.linux = amd64 arm64 ppc64le s390x
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 
 ifneq ($(REMOTE_DOCKER_URL),)
@@ -54,6 +54,7 @@ endif
 BASE.linux.amd64 := busybox
 BASE.linux.arm64 := arm64v8/busybox
 BASE.linux.ppc64le := busybox
+BASE.linux.s390x := busybox
 BASE.linux := ${BASE.linux.${ARCH}}
 BASE := ${BASE.${OS}}
 

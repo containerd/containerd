@@ -28,14 +28,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/core/remotes"
-	remoteserrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
 )
 
 type dockerPusher struct {
@@ -59,6 +59,12 @@ func (p dockerPusher) Writer(ctx context.Context, opts ...content.WriterOpt) (co
 	}
 	if wOpts.Ref == "" {
 		return nil, fmt.Errorf("ref must not be empty: %w", errdefs.ErrInvalidArgument)
+	}
+	if wOpts.Desc.Digest == "" {
+		return nil, fmt.Errorf("descriptor digest must not be empty: %w", errdefs.ErrInvalidArgument)
+	}
+	if wOpts.Desc.MediaType == "" {
+		return nil, fmt.Errorf("descriptor media type must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
 	return p.push(ctx, wOpts.Desc, wOpts.Ref, true)
 }
@@ -111,11 +117,14 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	}
 
 	req := p.request(host, http.MethodHead, existCheck...)
+	if err := req.addNamespace(p.refspec.Hostname()); err != nil {
+		return nil, err
+	}
 	req.header.Set("Accept", strings.Join([]string{desc.MediaType, `*/*`}, ", "))
 
-	log.G(ctx).WithField("url", req.String()).Debugf("checking and pushing to")
+	log.G(ctx).WithField("url", req.sanitizedURL()).Debugf("checking and pushing to")
 
-	resp, err := req.doWithRetries(ctx, nil)
+	resp, err := req.doWithRetries(ctx, true)
 	if err != nil {
 		if !errors.Is(err, ErrInvalidAuthorization) {
 			return nil, err
@@ -148,8 +157,20 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 				return nil, fmt.Errorf("content %v on remote: %w", desc.Digest, errdefs.ErrAlreadyExists)
 			}
 		} else if resp.StatusCode != http.StatusNotFound {
-			err := remoteserrors.NewUnexpectedStatusErr(resp)
-			log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
+			err := unexpectedResponseErr(resp)
+			// A HEAD 403 carries no body, so issue a follow-up GET to the
+			// same URL to surface the registry's error details for diagnostics.
+			if resp.StatusCode == http.StatusForbidden && req.method == http.MethodHead {
+				err = withGETErrorBody(ctx, err, resp, func() (*http.Response, error) {
+					getReq := p.request(host, http.MethodGet, existCheck...)
+					getReq.header.Set("Accept", strings.Join([]string{desc.MediaType, `*/*`}, ", "))
+					if addErr := getReq.addNamespace(p.refspec.Hostname()); addErr != nil {
+						return nil, addErr
+					}
+					return getReq.doWithRetries(ctx, false)
+				})
+			}
+			log.G(ctx).WithError(err).Debug("unexpected response")
 			resp.Body.Close()
 			return nil, err
 		}
@@ -159,10 +180,16 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	if isManifest {
 		putPath := getManifestPath(p.object, desc.Digest)
 		req = p.request(host, http.MethodPut, putPath...)
+		if err := req.addNamespace(p.refspec.Hostname()); err != nil {
+			return nil, err
+		}
 		req.header.Add("Content-Type", desc.MediaType)
 	} else {
 		// Start upload request
 		req = p.request(host, http.MethodPost, "blobs", "uploads/")
+		if err := req.addNamespace(p.refspec.Hostname()); err != nil {
+			return nil, err
+		}
 
 		mountedFrom := ""
 		var resp *http.Response
@@ -176,24 +203,28 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			//
 			// for the private repo, we should remove mount-from
 			// query and send the request again.
-			resp, err = preq.doWithRetries(pctx, nil)
+			resp, err = preq.doWithRetries(pctx, true)
 			if err != nil {
-				return nil, err
+				if !errors.Is(err, ErrInvalidAuthorization) {
+					return nil, fmt.Errorf("pushing with mount from %s: %w", fromRepo, err)
+				}
+				log.G(ctx).Debugf("failed to push with mount from repository %s: %v", fromRepo, err)
 			}
+			if resp != nil {
+				switch resp.StatusCode {
+				case http.StatusUnauthorized:
+					log.G(ctx).Debugf("failed to mount from repository %s, not authorized", fromRepo)
 
-			switch resp.StatusCode {
-			case http.StatusUnauthorized:
-				log.G(ctx).Debugf("failed to mount from repository %s", fromRepo)
-
-				resp.Body.Close()
-				resp = nil
-			case http.StatusCreated:
-				mountedFrom = path.Join(p.refspec.Hostname(), fromRepo)
+					resp.Body.Close()
+					resp = nil
+				case http.StatusCreated:
+					mountedFrom = path.Join(p.refspec.Hostname(), fromRepo)
+				}
 			}
 		}
 
 		if resp == nil {
-			resp, err = req.doWithRetries(ctx, nil)
+			resp, err = req.doWithRetries(ctx, true)
 			if err != nil {
 				if errors.Is(err, ErrInvalidAuthorization) {
 					return nil, fmt.Errorf("push access denied, repository does not exist or may require authorization: %w", err)
@@ -219,8 +250,8 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			})
 			return nil, fmt.Errorf("content %v on remote: %w", desc.Digest, errdefs.ErrAlreadyExists)
 		default:
-			err := remoteserrors.NewUnexpectedStatusErr(resp)
-			log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
+			err := unexpectedResponseErr(resp)
+			log.G(ctx).WithError(err).Debug("unexpected response")
 			return nil, err
 		}
 
@@ -263,6 +294,9 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		req = p.request(lhost, http.MethodPut)
 		req.header.Set("Content-Type", "application/octet-stream")
 		req.path = lurl.Path + "?" + q.Encode()
+		if err := req.addNamespace(p.refspec.Hostname()); err != nil {
+			return nil, err
+		}
 	}
 	p.tracker.SetStatus(ref, Status{
 		Status: content.Status{
@@ -285,7 +319,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	req.size = desc.Size
 
 	go func() {
-		resp, err := req.doWithRetries(ctx, nil)
+		resp, err := req.doWithRetries(ctx, true)
 		if err != nil {
 			pushw.setError(err)
 			return
@@ -294,8 +328,8 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		switch resp.StatusCode {
 		case http.StatusOK, http.StatusCreated, http.StatusNoContent:
 		default:
-			err := remoteserrors.NewUnexpectedStatusErr(resp)
-			log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
+			err := unexpectedResponseErr(resp)
+			log.G(ctx).WithError(err).Debug("unexpected response")
 			pushw.setError(err)
 			return
 		}
@@ -477,13 +511,15 @@ func (pw *pushWriter) Digest() digest.Digest {
 
 func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	// Check whether read has already thrown an error
-	if _, err := pw.pipe.Write([]byte{}); err != nil && !errors.Is(err, io.ErrClosedPipe) {
-		return fmt.Errorf("pipe error before commit: %w", err)
+	if pw.pipe != nil {
+		if _, err := pw.pipe.Write([]byte{}); err != nil && !errors.Is(err, io.ErrClosedPipe) {
+			return fmt.Errorf("pipe error before commit: %w", err)
+		}
+		if err := pw.pipe.Close(); err != nil {
+			return err
+		}
 	}
 
-	if err := pw.pipe.Close(); err != nil {
-		return err
-	}
 	// TODO: timeout waiting for response
 	var resp *http.Response
 	select {
@@ -506,7 +542,7 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 	switch resp.StatusCode {
 	case http.StatusOK, http.StatusCreated, http.StatusNoContent, http.StatusAccepted:
 	default:
-		return remoteserrors.NewUnexpectedStatusErr(resp)
+		return unexpectedResponseErr(resp)
 	}
 
 	status, err := pw.tracker.GetStatus(pw.ref)
@@ -520,15 +556,21 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 
 	if expected == "" {
 		expected = status.Expected
+	} else if expected != status.Expected {
+		return fmt.Errorf("unexpected digest received: got %q, expected %q", status.Expected, expected)
 	}
 
-	actual, err := digest.Parse(resp.Header.Get("Docker-Content-Digest"))
-	if err != nil {
-		return fmt.Errorf("invalid content digest in response: %w", err)
-	}
+	if dgstHdr := resp.Header.Get("Docker-Content-Digest"); dgstHdr != "" {
+		actual, err := digest.Parse(dgstHdr)
+		if err != nil {
+			return fmt.Errorf("invalid content digest in response: %w", err)
+		}
 
-	if actual != expected {
-		return fmt.Errorf("got digest %s, expected %s", actual, expected)
+		if actual != expected {
+			return fmt.Errorf("got digest %s, expected %s", actual, expected)
+		}
+	} else {
+		log.G(ctx).Info("registry did not send a Docker-Content-Digest header")
 	}
 
 	status.Committed = true
@@ -542,6 +584,41 @@ func (pw *pushWriter) Truncate(size int64) error {
 	// TODO: if blob close request and start new request at offset
 	// TODO: always error on manifest
 	return errors.New("cannot truncate remote upload")
+}
+
+// withGETErrorBody enriches originalErr, produced from a bodyless HEAD
+// response, with the error body from a follow-up GET to the same URL. HEAD
+// responses carry no body, so a 403 only surfaces its status code; a GET
+// returns the registry's error details (e.g. "key vault access denied", IP
+// restrictions) that explain the failure.
+//
+// The GET body is only used when the GET also returns 403, so the enriched
+// error's status and body stay consistent. In that case the original HEAD
+// request's method and status are preserved and only the body is borrowed from
+// the GET; any other outcome (GET failed, or returned a different status)
+// leaves originalErr untouched.
+func withGETErrorBody(ctx context.Context, originalErr error, headResp *http.Response, doGET func() (*http.Response, error)) error {
+	getResp, err := doGET()
+	if err != nil {
+		log.G(ctx).WithError(err).Debug("failed to retrieve error body with GET fallback")
+		return originalErr
+	}
+	defer getResp.Body.Close()
+
+	if getResp.StatusCode != http.StatusForbidden {
+		log.G(ctx).WithFields(log.Fields{
+			"head_status": headResp.Status,
+			"get_status":  getResp.Status,
+		}).Debug("ignoring GET fallback response with different status")
+		return originalErr
+	}
+
+	// Preserve the original HEAD request's method and status and borrow only
+	// the body from the GET, so the error still reflects the request the caller
+	// actually made.
+	enriched := *headResp
+	enriched.Body = getResp.Body
+	return unexpectedResponseErr(&enriched)
 }
 
 func requestWithMountFrom(req *request, mount, from string) *request {

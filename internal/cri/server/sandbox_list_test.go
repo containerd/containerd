@@ -74,7 +74,6 @@ func TestToCRISandbox(t *testing.T) {
 			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			status := sandboxstore.Status{
 				CreatedAt: createdAt,
@@ -216,7 +215,6 @@ func TestFilterSandboxes(t *testing.T) {
 			expect: []*runtime.PodSandbox{testSandboxes[2]},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			filtered := c.filterCRISandboxes(testSandboxes, test.filter)
 			assert.Equal(t, test.expect, filtered, test.desc)

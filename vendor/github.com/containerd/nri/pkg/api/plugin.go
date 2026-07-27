@@ -17,6 +17,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -51,8 +52,29 @@ func CheckPluginIndex(idx string) error {
 	if len(idx) != 2 {
 		return fmt.Errorf("invalid plugin index %q, must be 2 digits", idx)
 	}
+	//nolint:staticcheck // could apply De Morgan's law
 	if !('0' <= idx[0] && idx[0] <= '9') || !('0' <= idx[1] && idx[1] <= '9') {
 		return fmt.Errorf("invalid plugin index %q (not [0-9][0-9])", idx)
 	}
+	return nil
+}
+
+// CheckPluginName verifies that a plugin name is not empty and only contains
+// characters from the set [a-zA-Z0-9_.+-].
+func CheckPluginName(name string) error {
+	if name == "" {
+		return errors.New("invalid plugin name: name is empty")
+	}
+
+	for _, r := range name {
+		switch {
+		case 'a' <= r && r <= 'z', 'A' <= r && r <= 'Z':
+		case '0' <= r && r <= '9':
+		case r == '-', r == '_', r == '.', r == '+':
+		default:
+			return fmt.Errorf("invalid plugin name %q: contains invalid character %q", name, r)
+		}
+	}
+
 	return nil
 }

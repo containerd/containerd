@@ -5,6 +5,8 @@
 package protogen
 
 import (
+	"strconv"
+
 	"google.golang.org/protobuf/internal/strs"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -15,6 +17,33 @@ func opaqueNewFieldHook(desc protoreflect.FieldDescriptor, field *Field) {
 
 func opaqueNewOneofHook(desc protoreflect.OneofDescriptor, oneof *Oneof) {
 	oneof.camelCase = strs.GoCamelCase(string(desc.Name()))
+}
+
+func resolveCamelCaseConflict(f *Field) {
+	suffix := "_" + strconv.Itoa(int(f.Desc.Number()))
+	f.camelCase += suffix
+	if f.Oneof != nil {
+		f.Oneof.camelCase += suffix
+	}
+}
+
+// This function finds fields with different names whose GoCamelCase() is
+// identical, for example _foo and X_foo, for both of which camelCase == "XFoo",
+// and resolves the resulting conflict by appending a _<fieldnum> suffix,
+// like the Java implementation does.
+func resolveCamelCaseConflicts(message *Message) {
+	camel2field := make(map[string]*Field)
+	for _, field := range message.Fields {
+		other, conflicting := camel2field[field.camelCase]
+		if conflicting {
+			resolveCamelCaseConflict(other)
+			resolveCamelCaseConflict(field)
+			// Assumption: at most two fields can have the same camelCase.
+			// Otherwise, the first field ends up with another suffix.
+			continue
+		}
+		camel2field[field.camelCase] = field
+	}
 }
 
 func opaqueNewMessageHook(message *Message) {
@@ -33,17 +62,19 @@ func opaqueNewMessageHook(message *Message) {
 	// Then find all names of the original field names, we do not want the old scheme to affect
 	// how we name things.
 
+	resolveCamelCaseConflicts(message)
+
 	camelCases := map[string]bool{}
 	for _, field := range message.Fields {
 		if field.Oneof != nil {
 			// We add the name of the union here (potentially many times).
 			camelCases[field.Oneof.camelCase] = true
+			// fallthrough: The member fields of the oneof are considered fields
+			// in the struct although they are not technically there. This is to
+			// allow changing a proto2 optional to a oneof with source code
+			// compatibility.
 		}
-		// The member fields of the oneof are considered fields in the struct although
-		// they are not technically there. This is to allow changing a proto2 optional
-		// to a oneof with source code compatibility.
 		camelCases[field.camelCase] = true
-
 	}
 	// For each field, check if any of it's methods would clash with an original field name
 	for _, field := range message.Fields {

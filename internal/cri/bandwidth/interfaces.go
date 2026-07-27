@@ -32,7 +32,7 @@ limitations under the License.
 
 package bandwidth
 
-import "k8s.io/apimachinery/pkg/api/resource"
+import resource "k8s.io/apimachinery/pkg/api/resource"
 
 // Shaper is designed so that the shaper structs created
 // satisfy the Shaper interface.

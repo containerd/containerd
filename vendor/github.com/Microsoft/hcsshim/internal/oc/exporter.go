@@ -9,7 +9,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/logfields"
 )
 
-const spanMessage = "Span"
+const spanMessage = "Span %s"
 
 var _errorCodeKey = logrus.ErrorKey + "Code"
 
@@ -68,19 +68,19 @@ func (le *LogrusExporter) ExportSpan(s *trace.SpanData) {
 	}
 
 	level := logrus.InfoLevel
-	if s.Status.Code != 0 {
+	if s.Code != 0 {
 		level = logrus.ErrorLevel
 
 		// don't overwrite an existing "error" or "errorCode" attributes
 		if _, ok := data[logrus.ErrorKey]; !ok {
-			data[logrus.ErrorKey] = s.Status.Message
+			data[logrus.ErrorKey] = s.Message
 		}
 		if _, ok := data[_errorCodeKey]; !ok {
-			data[_errorCodeKey] = codes.Code(s.Status.Code).String()
+			data[_errorCodeKey] = codes.Code(s.Code).String()
 		}
 	}
 
 	entry.Data = data
 	entry.Time = s.StartTime
-	entry.Log(level, spanMessage)
+	entry.Logf(level, spanMessage, s.Name)
 }

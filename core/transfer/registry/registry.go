@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
+	"github.com/containerd/containerd/v2/pkg/httpdbg"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -48,6 +49,9 @@ type registryOpts struct {
 	creds         CredentialHelper
 	hostDir       string
 	defaultScheme string
+	httpDebug     bool
+	httpTrace     bool
+	localStream   io.WriteCloser
 }
 
 // Opt sets registry-related configurations.
@@ -85,6 +89,31 @@ func WithDefaultScheme(s string) Opt {
 	}
 }
 
+// WithHTTPDebug dumps requests made to an OCI registry. Useful to debug interactions between containerd and registry.
+func WithHTTPDebug() Opt {
+	return func(o *registryOpts) error {
+		o.httpDebug = true
+		return nil
+	}
+}
+
+// WithHTTPTrace traces HTTP events made to an OCI registry.
+func WithHTTPTrace() Opt {
+	return func(o *registryOpts) error {
+		o.httpTrace = true
+		return nil
+	}
+}
+
+// WithClientStream tells the registry to stream HTTP debug data back to the client.
+// Applicable only when HTTP debug or tracing enabled.
+func WithClientStream(writer io.WriteCloser) Opt {
+	return func(o *registryOpts) error {
+		o.localStream = writer
+		return nil
+	}
+}
+
 // NewOCIRegistry initializes with hosts, authorizer callback, and headers
 func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry, error) {
 	var ropts registryOpts
@@ -93,6 +122,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 			return nil, err
 		}
 	}
+
 	hostOptions := config.HostOptions{}
 	if ropts.hostDir != "" {
 		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
@@ -111,10 +141,22 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	if ropts.defaultScheme != "" {
 		hostOptions.DefaultScheme = ropts.defaultScheme
 	}
+
+	hostOptions.UpdateClient = func(client *http.Client) error {
+		if ropts.httpDebug {
+			httpdbg.DumpRequests(ctx, client, ropts.localStream)
+		}
+		if ropts.httpTrace {
+			httpdbg.DumpTraces(ctx, client)
+		}
+		return nil
+	}
+
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Hosts:   config.ConfigureHosts(ctx, hostOptions),
 		Headers: ropts.headers,
 	})
+
 	return &OCIRegistry{
 		reference:     ref,
 		headers:       ropts.headers,
@@ -122,6 +164,9 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		resolver:      resolver,
 		hostDir:       ropts.hostDir,
 		defaultScheme: ropts.defaultScheme,
+		httpDebug:     ropts.httpDebug,
+		httpTrace:     ropts.httpTrace,
+		localStream:   ropts.localStream,
 	}, nil
 }
 
@@ -150,6 +195,10 @@ type OCIRegistry struct {
 
 	defaultScheme string
 
+	httpDebug   bool
+	httpTrace   bool
+	localStream io.WriteCloser
+
 	// This could be an interface which returns resolver?
 	// Resolver could also be a plug-able interface, to call out to a program to fetch?
 }
@@ -164,6 +213,12 @@ func (r *OCIRegistry) Image() string {
 
 func (r *OCIRegistry) Resolve(ctx context.Context) (name string, desc ocispec.Descriptor, err error) {
 	return r.resolver.Resolve(ctx, r.reference)
+}
+
+func (r *OCIRegistry) SetResolverOptions(options ...transfer.ImageResolverOption) {
+	if resolver, ok := r.resolver.(remotes.ResolverWithOptions); ok {
+		resolver.SetOptions(options...)
+	}
 }
 
 func (r *OCIRegistry) Fetcher(ctx context.Context, ref string) (transfer.Fetcher, error) {
@@ -248,6 +303,41 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 		}()
 		res.AuthStream = sid
 	}
+
+	if r.httpDebug || r.httpTrace {
+		switch {
+		case r.httpDebug && r.httpTrace:
+			res.HttpDebug = transfertypes.HTTPDebug_BOTH
+		case r.httpDebug:
+			res.HttpDebug = transfertypes.HTTPDebug_DEBUG
+		case r.httpTrace:
+			res.HttpDebug = transfertypes.HTTPDebug_TRACE
+		default:
+			res.HttpDebug = transfertypes.HTTPDebug_DISABLED
+		}
+
+		if r.localStream != nil {
+			res.LogsStream = tstreaming.GenerateID("http-debug-logs")
+
+			stream, err := sm.Create(ctx, res.LogsStream)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create stream for HTTP debug logs: %w", err)
+			}
+
+			go func() {
+				// Start pumping logs to the client
+				_, err := io.Copy(r.localStream, tstreaming.ReceiveStream(ctx, stream))
+				if err != nil && !errors.Is(err, io.EOF) {
+					log.G(ctx).WithError(err).Error("failed to copy HTTP debug logs stream")
+				}
+
+				if err := r.localStream.Close(); err != nil {
+					log.G(ctx).WithError(err).Error("failed to close HTTP debug logs local stream")
+				}
+			}()
+		}
+	}
+
 	res.HostDir = r.hostDir
 	res.DefaultScheme = r.defaultScheme
 	s := &transfertypes.OCIRegistry{
@@ -293,6 +383,42 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 		r.headers = http.Header{}
 		for k, v := range s.Resolver.Headers {
 			r.headers.Add(k, v)
+		}
+
+		if s.Resolver.HttpDebug != transfertypes.HTTPDebug_DISABLED {
+			var writer io.WriteCloser
+
+			// Stream to local client.
+			if sid := s.Resolver.LogsStream; sid != "" {
+				stream, err := sm.Get(ctx, sid)
+				if err != nil {
+					return fmt.Errorf("failed to get stream for HTTP debug logs: %w", err)
+				}
+
+				writer = tstreaming.WriteByteStream(ctx, stream)
+			} else {
+				writer = log.G(ctx).Writer()
+			}
+
+			go func() {
+				<-ctx.Done()
+				if err := writer.Close(); err != nil {
+					log.G(ctx).Errorf("failed to close HTTP debug logs stream: %v", err)
+				}
+			}()
+
+			hostOptions.UpdateClient = func(client *http.Client) error {
+				switch s.Resolver.HttpDebug {
+				case transfertypes.HTTPDebug_DEBUG:
+					httpdbg.DumpRequests(ctx, client, writer)
+				case transfertypes.HTTPDebug_TRACE:
+					httpdbg.DumpTraces(ctx, client)
+				case transfertypes.HTTPDebug_BOTH:
+					httpdbg.DumpRequests(ctx, client, writer)
+					httpdbg.DumpTraces(ctx, client)
+				}
+				return nil
+			}
 		}
 	}
 

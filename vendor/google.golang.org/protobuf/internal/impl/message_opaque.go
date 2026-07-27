@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"google.golang.org/protobuf/internal/filedesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -53,12 +54,9 @@ func opaqueInitHook(mi *MessageInfo) bool {
 		fd := fds.Get(i)
 		fs := si.fieldsByNumber[fd.Number()]
 		var fi fieldInfo
-		usePresence, _ := usePresenceForField(si, fd)
+		usePresence, _ := filedesc.UsePresenceForField(fd)
 
 		switch {
-		case fd.IsWeak():
-			// Weak fields are no different for opaque.
-			fi = fieldInfoForWeakMessage(fd, si.weakOffset)
 		case fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic():
 			// Oneofs are no different for opaque.
 			fi = fieldInfoForOneof(fd, si.oneofsByName[fd.ContainingOneof().Name()], mi.Exporter, si.oneofWrappersByNumber[fd.Number()])
@@ -88,9 +86,7 @@ func opaqueInitHook(mi *MessageInfo) bool {
 	mi.oneofs = map[protoreflect.Name]*oneofInfo{}
 	for i := 0; i < mi.Desc.Oneofs().Len(); i++ {
 		od := mi.Desc.Oneofs().Get(i)
-		if !od.IsSynthetic() {
-			mi.oneofs[od.Name()] = makeOneofInfo(od, si.structInfo, mi.Exporter)
-		}
+		mi.oneofs[od.Name()] = makeOneofInfoOpaque(mi, od, si.structInfo, mi.Exporter)
 	}
 
 	mi.denseFields = make([]*fieldInfo, fds.Len()*2)
@@ -119,12 +115,32 @@ func opaqueInitHook(mi *MessageInfo) bool {
 	return true
 }
 
+func makeOneofInfoOpaque(mi *MessageInfo, od protoreflect.OneofDescriptor, si structInfo, x exporter) *oneofInfo {
+	oi := &oneofInfo{oneofDesc: od}
+	if od.IsSynthetic() {
+		fd := od.Fields().Get(0)
+		index, _ := presenceIndex(mi.Desc, fd)
+		oi.which = func(p pointer) protoreflect.FieldNumber {
+			if p.IsNil() {
+				return 0
+			}
+			if !mi.present(p, index) {
+				return 0
+			}
+			return od.Fields().Get(0).Number()
+		}
+		return oi
+	}
+	// Dispatch to non-opaque oneof implementation for non-synthetic oneofs.
+	return makeOneofInfo(od, si, x)
+}
+
 func (mi *MessageInfo) fieldInfoForMapOpaque(si opaqueStructInfo, fd protoreflect.FieldDescriptor, fs reflect.StructField) fieldInfo {
 	ft := fs.Type
 	if ft.Kind() != reflect.Map {
 		panic(fmt.Sprintf("invalid type: got %v, want map kind", ft))
 	}
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	conv := NewConverter(ft, fd)
 	return fieldInfo{
 		fieldDesc: fd,
@@ -178,7 +194,7 @@ func (mi *MessageInfo) fieldInfoForScalarListOpaque(si opaqueStructInfo, fd prot
 		panic(fmt.Sprintf("invalid type: got %v, want slice kind", ft))
 	}
 	conv := NewConverter(reflect.PtrTo(ft), fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	index, _ := presenceIndex(mi.Desc, fd)
 	return fieldInfo{
 		fieldDesc: fd,
@@ -228,7 +244,7 @@ func (mi *MessageInfo) fieldInfoForMessageListOpaque(si opaqueStructInfo, fd pro
 		panic(fmt.Sprintf("invalid type: got %v, want slice kind", ft))
 	}
 	conv := NewConverter(ft, fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	index, _ := presenceIndex(mi.Desc, fd)
 	fieldNumber := fd.Number()
 	return fieldInfo{
@@ -321,24 +337,22 @@ func (mi *MessageInfo) fieldInfoForMessageListOpaqueNoPresence(si opaqueStructIn
 		panic(fmt.Sprintf("invalid type: got %v, want slice kind", ft))
 	}
 	conv := NewConverter(ft, fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		fieldDesc: fd,
 		has: func(p pointer) bool {
 			if p.IsNil() {
 				return false
 			}
-			sp := p.Apply(fieldOffset).AtomicGetPointer()
-			if sp.IsNil() {
+			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
+			if rv.IsNil() {
 				return false
 			}
-			rv := sp.AsValueOf(fs.Type.Elem())
 			return rv.Elem().Len() > 0
 		},
 		clear: func(p pointer) {
-			sp := p.Apply(fieldOffset).AtomicGetPointer()
-			if !sp.IsNil() {
-				rv := sp.AsValueOf(fs.Type.Elem())
+			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
+			if !rv.IsNil() {
 				rv.Elem().Set(reflect.Zero(rv.Type().Elem()))
 			}
 		},
@@ -346,11 +360,10 @@ func (mi *MessageInfo) fieldInfoForMessageListOpaqueNoPresence(si opaqueStructIn
 			if p.IsNil() {
 				return conv.Zero()
 			}
-			sp := p.Apply(fieldOffset).AtomicGetPointer()
-			if sp.IsNil() {
+			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
+			if rv.IsNil() {
 				return conv.Zero()
 			}
-			rv := sp.AsValueOf(fs.Type.Elem())
 			if rv.Elem().Len() == 0 {
 				return conv.Zero()
 			}
@@ -393,7 +406,7 @@ func (mi *MessageInfo) fieldInfoForScalarOpaque(si opaqueStructInfo, fd protoref
 		deref = true
 	}
 	conv := NewConverter(ft, fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	index, _ := presenceIndex(mi.Desc, fd)
 	var getter func(p pointer) protoreflect.Value
 	if !nullable {
@@ -462,7 +475,7 @@ func (mi *MessageInfo) fieldInfoForScalarOpaque(si opaqueStructInfo, fd protoref
 func (mi *MessageInfo) fieldInfoForMessageOpaque(si opaqueStructInfo, fd protoreflect.FieldDescriptor, fs reflect.StructField) fieldInfo {
 	ft := fs.Type
 	conv := NewConverter(ft, fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	index, _ := presenceIndex(mi.Desc, fd)
 	fieldNumber := fd.Number()
 	elemType := fs.Type.Elem()
@@ -582,33 +595,4 @@ func (mi *MessageInfo) clearPresent(p pointer, index uint32) {
 
 func (mi *MessageInfo) present(p pointer, index uint32) bool {
 	return p.Apply(mi.presenceOffset).PresenceInfo().Present(index)
-}
-
-// usePresenceForField implements the somewhat intricate logic of when
-// the presence bitmap is used for a field.  The main logic is that a
-// field that is optional or that can be lazy will use the presence
-// bit, but for proto2, also maps have a presence bit. It also records
-// if the field can ever be lazy, which is true if we have a
-// lazyOffset and the field is a message or a slice of messages. A
-// field that is lazy will always need a presence bit.  Oneofs are not
-// lazy and do not use presence, unless they are a synthetic oneof,
-// which is a proto3 optional field. For proto3 optionals, we use the
-// presence and they can also be lazy when applicable (a message).
-func usePresenceForField(si opaqueStructInfo, fd protoreflect.FieldDescriptor) (usePresence, canBeLazy bool) {
-	hasLazyField := fd.(interface{ IsLazy() bool }).IsLazy()
-
-	// Non-oneof scalar fields with explicit field presence use the presence array.
-	usesPresenceArray := fd.HasPresence() && fd.Message() == nil && (fd.ContainingOneof() == nil || fd.ContainingOneof().IsSynthetic())
-	switch {
-	case fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic():
-		return false, false
-	case fd.IsWeak():
-		return false, false
-	case fd.IsMap():
-		return false, false
-	case fd.Kind() == protoreflect.MessageKind || fd.Kind() == protoreflect.GroupKind:
-		return hasLazyField, hasLazyField
-	default:
-		return usesPresenceArray || (hasLazyField && fd.HasPresence()), false
-	}
 }

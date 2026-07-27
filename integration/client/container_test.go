@@ -364,6 +364,67 @@ func withStdout(stdout io.Writer) cio.Opt {
 	}
 }
 
+func TestContainerWait(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	ctx2, cancle2 := context.WithCancel(ctx)
+	cancle2()
+	statusErrC, _ := task.Wait(ctx2)
+	s := <-statusErrC
+	require.Error(t, s.Error(), "expected wait error, but got nil")
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
+
+	err = task.Kill(ctx, syscall.SIGTERM)
+	if err == nil {
+		t.Fatal("second call to kill should return an error")
+	}
+	if !errdefs.IsNotFound(err) {
+		t.Errorf("expected error %q but received %q", errdefs.ErrNotFound, err)
+	}
+}
+
 func TestContainerExec(t *testing.T) {
 	t.Parallel()
 
@@ -1787,10 +1848,7 @@ func TestShimSockLength(t *testing.T) {
 	// Max length of namespace should be 76
 	namespace := strings.Repeat("n", 76)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, namespace)
+	ctx := namespaces.WithNamespace(t.Context(), namespace)
 
 	client, err := newClient(t, address)
 	if err != nil {
@@ -1883,7 +1941,7 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		spec, err := container.Spec(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -1925,6 +1983,9 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 
 		const expectedSuffix = "999999 1000000"
 		stdoutString := stdout.String()
+		if len(stdoutString) == 0 {
+			t.Fatal(fmt.Errorf("len (stdoutString) is 0"))
+		}
 		if !strings.Contains(stdoutString, expectedSuffix) {
 			t.Fatalf("process output does not end with %q at iteration %d, here are the last 20 characters of the output:\n\n %q", expectedSuffix, i, stdoutString[len(stdoutString)-20:])
 		}
@@ -2008,10 +2069,7 @@ func TestRegressionIssue4769(t *testing.T) {
 	id := t.Name()
 	ns := fmt.Sprintf("%s-%s", testNamespace, id)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, ns)
+	ctx := namespaces.WithNamespace(t.Context(), ns)
 	ctx = logtest.WithT(ctx, t)
 
 	image, err := client.Pull(ctx, testImage, WithPullUnpack)
@@ -2116,10 +2174,7 @@ func TestRegressionIssue6429(t *testing.T) {
 	id := t.Name()
 	ns := fmt.Sprintf("%s-%s", testNamespace, id)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, ns)
+	ctx := namespaces.WithNamespace(t.Context(), ns)
 	ctx = logtest.WithT(ctx, t)
 
 	image, err := client.Pull(ctx, testImage, WithPullUnpack)
@@ -2339,8 +2394,8 @@ func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) 
 		t.Fatal(err)
 	}
 
-	// The container is using longCommand, which contains sleep 1 on Linux, and ping -t localhost on Windows.
-	if strings.Contains(string(b), "sleep 1") || strings.Contains(string(b), "ping -t localhost") {
+	// The container is using longCommand, which contains sleep inf on Linux, and ping -t localhost on Windows.
+	if strings.Contains(string(b), "sleep inf") || strings.Contains(string(b), "ping -t localhost") {
 		t.Fatalf("killing init didn't kill all its children:\n%v", string(b))
 	}
 
@@ -2718,12 +2773,18 @@ func TestContainerPTY(t *testing.T) {
 
 	<-statusC
 
+	// Wait for all IO copy operations to complete before inspecting buf.
+	// Otherwise there is a race between the IO copy goroutine writing to buf
+	// and the read below, which is flaky on Windows named pipes. Wait must be
+	// called before Delete, which cancels the IO.
+	task.IO().Wait()
+
 	if _, err := task.Delete(ctx); err != nil {
 		t.Fatal(err)
 	}
 
 	out := buf.String()
 	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
-		t.Fatal(`expected \x00 in output`)
+		t.Fatalf(`expected \x00 in output, got %#q`, out)
 	}
 }
