@@ -51,6 +51,10 @@ const (
 	MediaTypeContainerd1CheckpointRuntimeName    = "application/vnd.containerd.container.checkpoint.runtime.name"
 	MediaTypeContainerd1CheckpointRuntimeOptions = "application/vnd.containerd.container.checkpoint.runtime.options+proto"
 
+	// Image Verification Media Types
+
+	MediaTypeContainerd1ImageVerificationInput = "application/vnd.containerd.image-verifier.input.v1+json"
+
 	// MediaTypeDockerSchema1Manifest is the legacy Docker schema1 manifest
 	MediaTypeDockerSchema1Manifest = "application/vnd.docker.distribution.manifest.v1+prettyjws"
 

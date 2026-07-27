@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/internal/tomlext"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
@@ -420,5 +421,132 @@ func TestBinDirVerifyImage(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
+	})
+
+	t.Run("verify_on_run disabled is a no-op for VerifyImageContext", func(t *testing.T) {
+		binDir := newBinDir(t, allBinsDir,
+			"verifier_test_input_output_management",
+		)
+
+		v := NewImageVerifier(&Config{
+			BinDir:             binDir,
+			MaxVerifiers:       -1,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
+			VerifyOnRun:        false,
+		})
+
+		j, err := v.VerifyImageContext(ctx, "registry.example.com/image:abc", ocispec.Descriptor{
+			Digest:    "sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4",
+			MediaType: "application/vnd.docker.distribution.manifest.list.v2+json",
+			Size:      2048,
+		}, imageverifier.VerifyOptions{
+			Operation: imageverifier.OperationRun,
+		})
+		// With request context disabled, no verifier binaries run and the
+		// operation is allowed.
+		assert.NoError(t, err)
+		assert.True(t, j.OK)
+		assert.Contains(t, j.Reason, "disabled")
+	})
+
+	t.Run("verify_on_run enabled passes neutral context", func(t *testing.T) {
+		binDir := newBinDir(t, allBinsDir,
+			"verifier_test_input_output_management",
+		)
+
+		v := NewImageVerifier(&Config{
+			BinDir:             binDir,
+			MaxVerifiers:       -1,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
+			VerifyOnRun:        true,
+		})
+
+		j, err := v.VerifyImageContext(ctx, "registry.example.com/image:abc", ocispec.Descriptor{
+			Digest:      "sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4",
+			MediaType:   "application/vnd.docker.distribution.manifest.list.v2+json",
+			Size:        2048,
+			Annotations: map[string]string{"a": "b"},
+		}, imageverifier.VerifyOptions{
+			Operation:   imageverifier.OperationRun,
+			Annotations: map[string]string{"io.kubernetes.cri.sandbox-namespace": "test-namespace", "x": "y"},
+		})
+		assert.NoError(t, err)
+		assert.True(t, j.OK)
+
+		b, err := os.ReadFile(data.ArgsFile)
+		require.NoError(t, err)
+		assert.Equal(t, "-name registry.example.com/image:abc -digest sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4 -stdin-media-type application/vnd.containerd.image-verifier.input.v1+json -operation run", string(b))
+
+		b, err = os.ReadFile(data.StdinFile)
+		require.NoError(t, err)
+		assert.Equal(t, `{"descriptor":{"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","digest":"sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4","size":2048,"annotations":{"a":"b"}},"operation":"run","annotations":{"io.kubernetes.cri.sandbox-namespace":"test-namespace","x":"y"}}`, strings.TrimSpace(string(b)))
+	})
+
+	t.Run("verify_on_run enabled sends operation on pull", func(t *testing.T) {
+		binDir := newBinDir(t, allBinsDir,
+			"verifier_test_input_output_management",
+		)
+
+		v := NewImageVerifier(&Config{
+			BinDir:             binDir,
+			MaxVerifiers:       -1,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
+			VerifyOnRun:        true,
+		})
+
+		// The pull entrypoint (VerifyImage) with verify_on_run enabled uses the
+		// richer contract and signals the pull operation, without run context.
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{
+			Digest:      "sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4",
+			MediaType:   "application/vnd.docker.distribution.manifest.list.v2+json",
+			Size:        2048,
+			Annotations: map[string]string{"a": "b"},
+		})
+		assert.NoError(t, err)
+		assert.True(t, j.OK)
+
+		b, err := os.ReadFile(data.ArgsFile)
+		require.NoError(t, err)
+		assert.Equal(t, "-name registry.example.com/image:abc -digest sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4 -stdin-media-type application/vnd.containerd.image-verifier.input.v1+json -operation pull", string(b))
+
+		b, err = os.ReadFile(data.StdinFile)
+		require.NoError(t, err)
+		assert.Equal(t, `{"descriptor":{"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","digest":"sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4","size":2048,"annotations":{"a":"b"}},"operation":"pull"}`, strings.TrimSpace(string(b)))
+	})
+
+	t.Run("verify_on_run enabled with rejecting verifier", func(t *testing.T) {
+		binDir := newBinDir(t, allBinsDir, "reject_reason_d")
+
+		v := NewImageVerifier(&Config{
+			BinDir:             binDir,
+			MaxVerifiers:       -1,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
+			VerifyOnRun:        true,
+		})
+
+		j, err := v.VerifyImageContext(ctx, "registry.example.com/image:abc", ocispec.Descriptor{}, imageverifier.VerifyOptions{
+			Operation: imageverifier.OperationRun,
+		})
+		assert.NoError(t, err)
+		assert.False(t, j.OK)
+		assert.Equal(t, fmt.Sprintf("verifier verifier-0%[1]v rejected image (exit code 1): Reason D", exeIfWindows()), j.Reason)
+	})
+
+	t.Run("verify_on_run enabled with exec failure", func(t *testing.T) {
+		binDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(binDir, "bad.sh"), []byte("BAD"), 0744))
+
+		v := NewImageVerifier(&Config{
+			BinDir:             binDir,
+			MaxVerifiers:       -1,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
+			VerifyOnRun:        true,
+		})
+
+		j, err := v.VerifyImageContext(ctx, "registry.example.com/image:abc", ocispec.Descriptor{}, imageverifier.VerifyOptions{
+			Operation: imageverifier.OperationRun,
+		})
+		assert.Error(t, err)
+		assert.Nil(t, j)
 	})
 }

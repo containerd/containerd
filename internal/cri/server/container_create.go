@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -47,6 +48,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/blockio"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 )
@@ -189,6 +191,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		tracing.Attribute("container.image.ref", containerdImage.Name()),
 	)
 
+	// Verify the image for this run request. No-op unless a verifier opts in.
+	if err := c.verifyImageForRun(ctx, containerdImage.Name(), containerdImage.Target(), sandboxID, containerName, config, sandboxConfig); err != nil {
+		return nil, err
+	}
+
 	_, err = c.createContainer(
 		&createContainerRequest{
 			ctx:                   ctx,
@@ -213,6 +220,70 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 
 	return &runtime.CreateContainerResponse{ContainerId: id}, nil
+}
+
+// verifyImageForRun runs the configured image verifiers at container creation.
+// Only verifiers implementing imageverifier.ContextImageVerifier participate.
+func (c *criService) verifyImageForRun(ctx context.Context, name string, desc imagespec.Descriptor, sandboxID, containerName string, containerConfig *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig) error {
+	if len(c.imageVerifiers) == 0 {
+		return nil
+	}
+
+	verifierAnnotations := runVerifierAnnotations(sandboxID, containerName, name, containerConfig, sandboxConfig)
+
+	for vfName, vf := range c.imageVerifiers {
+		cv, ok := vf.(imageverifier.ContextImageVerifier)
+		if !ok {
+			continue
+		}
+
+		// Give each verifier its own copy of the annotations so one cannot mutate
+		// what subsequent verifiers see.
+		opts := imageverifier.VerifyOptions{
+			Operation:   imageverifier.OperationRun,
+			Annotations: maps.Clone(verifierAnnotations),
+		}
+
+		logger := log.G(ctx).WithFields(log.Fields{
+			"name":     name,
+			"digest":   desc.Digest.String(),
+			"verifier": vfName,
+		})
+		logger.Debug("Verifying image for run")
+
+		jdg, err := cv.VerifyImageContext(ctx, name, desc, opts)
+		if err != nil {
+			logger.WithError(err).Error("No judgement received from verifier")
+			return fmt.Errorf("blocking run of %v with digest %v: image verifier %v returned error: %w", name, desc.Digest.String(), vfName, err)
+		}
+		if jdg == nil {
+			logger.Error("No judgement received from verifier")
+			return fmt.Errorf("blocking run of %v with digest %v: image verifier %v returned no judgement", name, desc.Digest.String(), vfName)
+		}
+		logger = logger.WithFields(log.Fields{
+			"ok":     jdg.OK,
+			"reason": jdg.Reason,
+		})
+
+		if !jdg.OK {
+			logger.Warn("Image verifier blocked run")
+			return fmt.Errorf("image verifier %s blocked run of %v with digest %v for reason: %v", vfName, name, desc.Digest.String(), jdg.Reason)
+		}
+		logger.Debug("Image verifier allowed run")
+	}
+
+	return nil
+}
+
+// runVerifierAnnotations returns the sandbox and container request annotations,
+// overlaid with the well-known CRI keys (ex. io.kubernetes.cri.*). The CRI keys are
+// applied last so request annotations cannot spoof identity.
+func runVerifierAnnotations(sandboxID, containerName, imageName string, containerConfig *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig) map[string]string {
+	ann := map[string]string{}
+	maps.Copy(ann, sandboxConfig.GetAnnotations())
+	maps.Copy(ann, containerConfig.GetAnnotations())
+	maps.Copy(ann, annotations.DefaultCRIAnnotationsMap(sandboxID, containerName, imageName, sandboxConfig, false))
+	return ann
 }
 
 type createContainerRequest struct {
