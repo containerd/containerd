@@ -128,7 +128,10 @@ their own options (see https://containerd.io/docs/).
 **[proxy_plugins]**
 : External plugins reached over gRPC. Each named entry accepts:
 
-- **type** — `snapshot`, `content`, `diff`, or `sandbox`
+- **type** — short name (`snapshot`, `content`, `diff`, `sandbox`) or the
+  fully qualified plugin type string (for example
+  `io.containerd.snapshotter.v1`, `io.containerd.content.v1`,
+  `io.containerd.differ.v1`, `io.containerd.sandbox.controller.v1`)
 - **address** — local socket path
 - **platform** (optional)
 - **exports** (optional) — string map
