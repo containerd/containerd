@@ -59,6 +59,13 @@ func DefaultRuntimeConfig() RuntimeConfig {
 				"runhcs-wcow-process": {
 					Type:                 "io.containerd.runhcs.v1",
 					ContainerAnnotations: []string{"io.microsoft.container.*"},
+					// Full set of Windows shim options:
+					// https://pkg.go.dev/github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options#Options
+					Options: map[string]any{
+						// ScrubLogs enables removing environment variables and other potentially sensitive information
+						// from logs
+						"ScrubLogs": true,
+					},
 				},
 				"runhcs-wcow-hypervisor": {
 					Type:                 "io.containerd.runhcs.v1",
@@ -67,6 +74,9 @@ func DefaultRuntimeConfig() RuntimeConfig {
 					// Full set of Windows shim options:
 					// https://pkg.go.dev/github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options#Options
 					Options: map[string]any{
+						// ScrubLogs enables removing environment variables and other potentially sensitive information
+						// from logs
+						"ScrubLogs": true,
 						// SandboxIsolation specifies the isolation level of the sandbox.
 						// PROCESS (0) and HYPERVISOR (1) are the valid options.
 						"SandboxIsolation": 1,
