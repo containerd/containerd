@@ -404,7 +404,10 @@ func (u *Unpacker) unpack(
 		var (
 			key    string
 			mounts []mount.Mount
-			opts   = append(unpack.SnapshotOpts, snapshots.WithLabels(snapshotLabels))
+			// Clone before appending: topHalf runs concurrently per layer in
+			// parallel mode, and appending directly to unpack.SnapshotOpts could
+			// write into its shared backing array from multiple goroutines.
+			opts   = append(slices.Clone(unpack.SnapshotOpts), snapshots.WithLabels(snapshotLabels))
 			staged bool
 		)
 
@@ -413,14 +416,6 @@ func (u *Unpacker) unpack(
 			key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
 			mounts, err = sn.Prepare(ctx, key, parent, opts...)
 			if err != nil {
-				if errors.Is(err, snapshots.ErrAlreadyStaged) {
-					// The snapshotter staged the layer content into the active
-					// snapshot (e.g. a layer content cache hit). Skip fetch+apply,
-					// but still commit it below (which applies the parent).
-					staged = true
-					err = nil
-					break
-				}
 				if errdefs.IsAlreadyExists(err) {
 					if snInfo, err := sn.Stat(ctx, chainID); err != nil {
 						if !errdefs.IsNotFound(err) {
@@ -442,6 +437,13 @@ func (u *Unpacker) unpack(
 		}
 		if err != nil {
 			return nil, fmt.Errorf("unable to prepare extraction snapshot: %w", err)
+		}
+
+		if isStaged(mounts) {
+			// The snapshotter staged the layer content into the active snapshot
+			// as read-only (e.g. a layer content cache hit). Skip fetch+apply,
+			// but still commit it below (which applies the parent).
+			staged = true
 		}
 
 		// Abort the snapshot if commit does not happen
@@ -792,6 +794,24 @@ func uniquePart() string {
 	// Ignore read failures, just decreases uniqueness
 	rand.Read(b[:])
 	return fmt.Sprintf("%d-%s", t.Nanosecond(), base64.URLEncoding.EncodeToString(b[:]))
+}
+
+// isStaged reports whether a successful Prepare has already staged the
+// layer's content into the active snapshot instead of returning a normal,
+// writable active snapshot (e.g. a snapshotter serving the layer from a local
+// content cache). There is nothing to write into a staged snapshot, so the
+// caller should skip fetching and applying the layer, and just Commit the
+// snapshot as-is (applying the real parent at Commit time).
+//
+// Only the last mount in the slice is inspected: earlier entries are inputs
+// consumed by mount templating (e.g. "{{ mount 0 }}" in an overlay's
+// lowerdir) rather than the mount that is actually stacked on top, so they
+// carry no information about writability.
+func isStaged(mounts []mount.Mount) bool {
+	if len(mounts) == 0 {
+		return false
+	}
+	return mounts[len(mounts)-1].ReadOnly()
 }
 
 // TODO: this is a temporary workaround until #13053 lands.

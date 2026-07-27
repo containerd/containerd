@@ -60,6 +60,10 @@ type Config struct {
 	// LayerContentCache is a directory of pre-converted, diffID-keyed erofs
 	// layer blobs. When set, layers already present in the cache are committed
 	// without being downloaded or converted. Empty disables the feature.
+	//
+	// Only layers prepared without a parent can be served from the cache. With
+	// sequential unpacking that is the first layer alone, so getting hits for a
+	// whole image needs max_concurrent_unpacks > 1, which is not the default.
 	LayerContentCache string `toml:"layer_content_cache"`
 }
 

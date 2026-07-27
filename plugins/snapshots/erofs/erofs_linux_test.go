@@ -882,21 +882,24 @@ func newCacheSnapshotter(t *testing.T, opts ...Opt) *snapshotter {
 }
 
 // stageCacheHit runs an extraction Prepare for target/diffID and asserts the
-// cache staged the blob into the active snapshot: no mounts, and ErrAlreadyStaged
-// (so the unpacker skips fetch+apply but still commits). It returns the extraction
-// key so the caller can Commit it as the target chainID.
+// cache staged the blob into the active snapshot: a read-only mount, with no
+// error (so the unpacker skips fetch+apply but still commits). It returns the
+// extraction key so the caller can Commit it as the target chainID.
 func stageCacheHit(t *testing.T, ctx context.Context, s *snapshotter, target string, diffID digest.Digest) string {
 	t.Helper()
 	key := "extract-1 " + target
 	mounts, err := s.Prepare(ctx, key, "", extractionOpt(target, diffID))
-	require.ErrorIs(t, err, snapshots.ErrAlreadyStaged, "cache hit must stage and signal ErrAlreadyStaged")
-	assert.Nil(t, mounts, "a staged cache hit returns no mounts")
+	require.NoError(t, err, "cache hit must stage without an error")
+	require.NotEmpty(t, mounts, "a staged cache hit returns mounts")
+	for _, m := range mounts {
+		assert.True(t, m.ReadOnly(), "a staged cache hit returns read-only mounts")
+	}
 	return key
 }
 
 // TestCacheHit covers the happy path: an extraction Prepare whose diffID blob is
 // in the cache stages the blob into the active snapshot (symlinked) and returns
-// ErrAlreadyStaged without committing; a subsequent Commit finalizes the target
+// read-only mounts without committing; a subsequent Commit finalizes the target
 // chainID without re-converting.
 func TestCacheHit(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
@@ -972,11 +975,16 @@ func TestCacheMiss(t *testing.T) {
 	target := cacheTestChainID
 
 	// Each case must leave the extraction as a normal active snapshot: mounts are
-	// returned and the target chainID is not committed.
-	assertFellThrough := func(t *testing.T, s *snapshotter, mounts []mount.Mount, err error) {
+	// returned and the target chainID is not committed. wantRO distinguishes a
+	// KindActive miss (no layer.erofs staged yet, so mounts must be writable)
+	// from the KindView case below (read-only for its own, cache-unrelated reason).
+	assertFellThrough := func(t *testing.T, s *snapshotter, mounts []mount.Mount, err error, wantRO bool) {
 		t.Helper()
 		require.NoError(t, err)
 		assert.NotEmpty(t, mounts, "a miss must return normal active-snapshot mounts")
+		for _, m := range mounts {
+			assert.Equal(t, wantRO, m.ReadOnly())
+		}
 		_, err = s.Stat(ctx, target)
 		assert.Error(t, err, "target chainID must not be committed on a miss")
 	}
@@ -984,13 +992,13 @@ func TestCacheMiss(t *testing.T) {
 	t.Run("cache disabled", func(t *testing.T) {
 		s := newCacheSnapshotter(t) // no cache configured
 		mounts, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
-		assertFellThrough(t, s, mounts, err)
+		assertFellThrough(t, s, mounts, err, false)
 	})
 
 	t.Run("blob absent", func(t *testing.T) {
 		s := newCacheSnapshotter(t, WithLayerContentCache(t.TempDir()))
 		mounts, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
-		assertFellThrough(t, s, mounts, err)
+		assertFellThrough(t, s, mounts, err, false)
 	})
 
 	t.Run("no extraction labels", func(t *testing.T) {
@@ -1008,9 +1016,46 @@ func TestCacheMiss(t *testing.T) {
 		writeCacheBlob(t, cacheDir, diffID, []byte("blob"))
 		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
 		// Even with matching labels and a cached blob, a View must not commit.
+		// It's read-only, but via the KindView roFlag in mounts(), not the cache.
 		mounts, err := s.View(ctx, "view-1", "", extractionOpt(target, diffID))
-		assertFellThrough(t, s, mounts, err)
+		assertFellThrough(t, s, mounts, err, true)
 	})
+}
+
+// TestCacheParentedPrepare covers a cached blob whose extraction Prepare carries
+// a parent (the sequential unpack path): it must not be staged. mounts() only
+// picks a staged blob up when the snapshot has no parents, so otherwise the
+// unpacker would see a writable overlay, apply the layer, and let the differ
+// write through the symlink into the shared cache blob.
+func TestCacheParentedPrepare(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	var (
+		cacheDir     = t.TempDir()
+		parentDiffID = digest.Digest(cacheTestDiffID)
+		parentChain  = cacheTestChainID
+		childDiffID  = digest.Digest("sha256:0000000000000000000000000000000000000000000000000000000000000003")
+		childChain   = "sha256:0000000000000000000000000000000000000000000000000000000000000004"
+	)
+	writeCacheBlob(t, cacheDir, parentDiffID, []byte("fake parent blob"))
+	writeCacheBlob(t, cacheDir, childDiffID, []byte("fake child blob"))
+
+	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+
+	// The first layer has no parent, so it is served from the cache as usual.
+	require.NoError(t, s.Commit(ctx, parentChain, stageCacheHit(t, ctx, s, parentChain, parentDiffID)))
+
+	key := "extract-1 " + childChain
+	mounts, err := s.Prepare(ctx, key, parentChain, extractionOpt(childChain, childDiffID))
+	require.NoError(t, err)
+	require.NotEmpty(t, mounts)
+	// The unpacker only inspects the last mount, which must be the writable
+	// overlay so the layer gets applied (the parents' lowers are read-only).
+	assert.False(t, mounts[len(mounts)-1].ReadOnly(), "a parented Prepare must expose a writable overlay")
+
+	// Nothing was staged, so the differ has no symlink to write through.
+	_, err = os.Lstat(s.layerBlobPath(snapshotID(t, ctx, s, key)))
+	assert.ErrorIs(t, err, os.ErrNotExist, "no cached blob may be staged into a parented snapshot")
 }
 
 // TestCacheRemove covers removal of a cache-hit snapshot: it succeeds (the
@@ -1077,9 +1122,9 @@ func TestCacheDmverity(t *testing.T) {
 
 		// dmverity_mode=on requires a sidecar; a cache entry without one is a hard
 		// error rather than a silent fallback.
-		_, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
+		mounts, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
 		require.Error(t, err)
-		assert.NotErrorIs(t, err, snapshots.ErrAlreadyStaged, "missing sidecar must not be treated as a hit")
+		assert.Nil(t, mounts, "missing sidecar must not be treated as a hit")
 		_, err = s.Stat(ctx, target)
 		assert.Error(t, err, "no snapshot should be committed on failure")
 	})

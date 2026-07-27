@@ -189,9 +189,52 @@ func TestBindToOverlay(t *testing.T) {
 	}
 }
 
-// stagedSnapshotter reports every layer as staged (ErrAlreadyStaged) and records
-// the Prepare/Commit calls. Only Prepare and Commit are exercised on the staged
-// path, so the embedded (nil) Snapshotter covers the rest of the interface.
+func TestIsStaged(t *testing.T) {
+	testCases := []struct {
+		name   string
+		mounts []mount.Mount
+		expect bool
+	}{
+		{
+			name:   "no mounts",
+			mounts: nil,
+			expect: false,
+		},
+		{
+			name: "read-only mount",
+			mounts: []mount.Mount{
+				{Type: "erofs", Source: "/path/to/layer.erofs", Options: []string{"loop"}},
+			},
+			expect: true,
+		},
+		{
+			name: "writable mount",
+			mounts: []mount.Mount{
+				{Type: "bind", Source: "/path", Options: []string{"rbind"}},
+			},
+			expect: false,
+		},
+		{
+			name: "only the last mount is inspected",
+			mounts: []mount.Mount{
+				{Type: "bind", Source: "/lower", Options: []string{"rbind"}},
+				{Type: "erofs", Source: "/path/to/layer.erofs", Options: []string{"loop"}},
+			},
+			expect: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expect, isStaged(tc.mounts))
+		})
+	}
+}
+
+// stagedSnapshotter reports every layer as staged (read-only mounts) and
+// records the Prepare/Commit calls. Only Prepare and Commit are exercised on
+// the staged path, so the embedded (nil) Snapshotter covers the rest of the
+// interface.
 type stagedSnapshotter struct {
 	snapshots.Snapshotter
 	prepares []call
@@ -202,7 +245,7 @@ type call struct{ name, key, parent string }
 
 func (s *stagedSnapshotter) Prepare(_ context.Context, key, parent string, _ ...snapshots.Opt) ([]mount.Mount, error) {
 	s.prepares = append(s.prepares, call{key: key, parent: parent})
-	return nil, snapshots.ErrAlreadyStaged
+	return []mount.Mount{{Type: "erofs", Source: "/staged/layer.erofs", Options: []string{"ro"}}}, nil
 }
 
 func (s *stagedSnapshotter) Commit(_ context.Context, name, key string, opts ...snapshots.Opt) error {
@@ -223,8 +266,9 @@ func (a failApplier) Apply(_ context.Context, desc ocispec.Descriptor, _ []mount
 }
 
 // TestUnpackStagedLayers verifies that when the snapshotter reports layers as
-// staged (ErrAlreadyStaged) in parallel mode, the unpacker skips fetch+apply but
-// still commits each layer, rebasing the real parent in at Commit time.
+// staged (read-only mounts from Prepare) in parallel mode, the unpacker skips
+// fetch+apply but still commits each layer, rebasing the real parent in at
+// Commit time.
 func TestUnpackStagedLayers(t *testing.T) {
 	ctx := context.Background()
 

@@ -54,9 +54,9 @@ type SnapshotterConfig struct {
 	dmverityMode string
 	// layerContentCache is a directory of pre-converted, diffID-keyed erofs
 	// layer blobs. When set and an unpacked layer's blob is present, the
-	// snapshotter commits the layer immediately (symlinking the blob) and
-	// returns ErrAlreadyExists, skipping the download and tar->erofs
-	// conversion. Empty disables the feature.
+	// snapshotter stages the blob (as a symlink) into the active snapshot,
+	// skipping the download and tar->erofs conversion. Only parentless Prepares
+	// can be served. Empty disables the feature.
 	layerContentCache string
 }
 
@@ -173,11 +173,10 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		}
 	}
 
-	// Cache blobs may live on a read-only mount the snapshotter can't modify, so
-	// fsverity and IMMUTABLE_FL can't be applied to them. Be explicit about this to
-	// the user instead of ignoring them silently (they're bypassed because cache
-	// hits commit during Prepare and skip Commit); dm-verity is the cache's
-	// integrity mechanism.
+	// A cache hit merely symlinks a shared, operator-owned blob into the snapshot,
+	// so fsverity and IMMUTABLE_FL can't be applied without mutating that blob out
+	// from under other snapshots. Reject them explicitly instead of silently
+	// skipping; dm-verity is the cache's integrity mechanism.
 	if config.layerContentCache != "" {
 		if config.enableFsverity {
 			return nil, fmt.Errorf("enable_fsverity is incompatible with layer_content_cache; use dm-verity for cache integrity")
@@ -422,9 +421,6 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 
 	if len(snap.ParentIDs) == 0 {
 		if layerBlob, err := s.lowerPath(snap.ID); err == nil {
-			if snap.Kind != snapshots.KindView {
-				return nil, fmt.Errorf("only works for snapshots.KindView on a committed snapshot: %w", err)
-			}
 			if s.enableFsverity {
 				if err := s.verifyFsverity(layerBlob); err != nil {
 					return nil, err
@@ -577,11 +573,12 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 }
 
 // createSnapshot creates an active (or view) snapshot and returns its mounts.
-// On an image-layer extraction whose diffID blob is in the layer content cache,
+// On a parentless image-layer extraction whose diffID blob is in the layer content cache,
 // it stages the cached blob into the active snapshot (without committing) and
-// returns ErrAlreadyStaged, so the unpacker skips the layer download and
-// conversion but still commits the snapshot normally — applying the parent at
-// Commit time, which keeps the cache compatible with parallel unpacking.
+// returns it as a read-only mount, so the unpacker can detect the fast path
+// (skip the layer download and conversion) while still committing the
+// snapshot normally — applying the parent at Commit time, which keeps the
+// cache compatible with parallel unpacking.
 func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
 	var (
 		snap     storage.Snapshot
@@ -589,21 +586,21 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		info     snapshots.Info
 	)
 
-	// Only image-layer extractions (active snapshots) can be served from the
-	// layer content cache; View and container-rootfs Prepares get an empty path
-	// and fall through to the normal path.
+	// Only parentless extractions can be served: s.mounts picks a staged blob up
+	// only when there are no parents, so with a parent the differ would write
+	// through the staged symlink into the shared cache blob.
 	var cacheBlob string
-	if kind == snapshots.KindActive {
-		cacheBlob = s.lookupCache(ctx, opts...)
+	if kind == snapshots.KindActive && parent == "" {
+		if cacheBlob = s.lookupCache(ctx, opts...); cacheBlob != "" {
+			log.G(ctx).WithFields(log.Fields{
+				"key":  key,
+				"blob": cacheBlob,
+			}).Debug("layer content cache hit, staged cached erofs blob")
+		}
 	}
 
-	// staged is set once the cached blob has been staged into the active snapshot
-	// and we deliberately return ErrAlreadyStaged; the snapshot dir must then be
-	// kept (the caller commits it later). Any real error leaves it false so the
-	// staged td/path is reclaimed.
-	var staged bool
 	defer func() {
-		if err != nil && !staged {
+		if err != nil {
 			if td != "" {
 				if err1 := os.RemoveAll(td); err1 != nil {
 					log.G(ctx).WithError(err1).Warn("failed to cleanup temp snapshot directory")
@@ -693,18 +690,6 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		return nil
 	}); err != nil {
 		return nil, err
-	}
-
-	// Cache hit: the blob is staged into the active snapshot but not committed.
-	// Signal the unpacker via ErrAlreadyStaged so it skips the layer download and
-	// conversion but still commits the snapshot (applying the parent at Commit).
-	if cacheBlob != "" {
-		log.G(ctx).WithFields(log.Fields{
-			"key":  key,
-			"blob": cacheBlob,
-		}).Debug("layer content cache hit, staged cached erofs blob")
-		staged = true
-		return nil, snapshots.ErrAlreadyStaged
 	}
 
 	return s.mounts(snap, info)

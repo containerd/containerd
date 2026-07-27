@@ -149,6 +149,71 @@ func TestReadonlyMounts(t *testing.T) {
 	}
 }
 
+func TestMountReadOnly(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		mount    Mount
+		expected bool
+	}{
+		{
+			desc:     "erofs is always read-only",
+			mount:    Mount{Type: "erofs", Source: "/path/to/layer.erofs", Options: []string{"loop"}},
+			expected: true,
+		},
+		{
+			desc:     "overlay without upperdir is read-only",
+			mount:    Mount{Type: "overlay", Source: "overlay", Options: []string{"lowerdir=/lower"}},
+			expected: true,
+		},
+		{
+			desc:     "overlay with upperdir is writable",
+			mount:    Mount{Type: "overlay", Source: "overlay", Options: []string{"lowerdir=/lower", "upperdir=/upper"}},
+			expected: false,
+		},
+		{
+			desc:     "overlay with upperdir packed into a comma-joined options string is writable",
+			mount:    Mount{Type: "overlay", Source: "overlay", Options: []string{"lowerdir=/lower,upperdir=/upper,workdir=/work"}},
+			expected: false,
+		},
+		{
+			desc:     "type modifiers are stripped before matching overlay",
+			mount:    Mount{Type: "format/mkdir/overlay", Source: "overlay", Options: []string{"lowerdir=/lower"}},
+			expected: true,
+		},
+		{
+			desc:     "type modifiers are stripped, overlay with upperdir still writable",
+			mount:    Mount{Type: "format/mkdir/overlay", Source: "overlay", Options: []string{"upperdir=/upper"}},
+			expected: false,
+		},
+		{
+			desc:     "overlay with an explicit `ro` option is read-only despite upperdir",
+			mount:    Mount{Type: "overlay", Source: "overlay", Options: []string{"lowerdir=/lower", "upperdir=/upper", "ro"}},
+			expected: true,
+		},
+		{
+			desc:     "overlay `ro` packed into a comma-joined options string is read-only",
+			mount:    Mount{Type: "overlay", Source: "overlay", Options: []string{"lowerdir=/lower,upperdir=/upper,ro"}},
+			expected: true,
+		},
+		{
+			desc:     "other types are read-only only with the `ro` option",
+			mount:    Mount{Type: "bind", Source: "/path", Options: []string{"ro", "rbind"}},
+			expected: true,
+		},
+		{
+			desc:     "other types are writable without the `ro` option",
+			mount:    Mount{Type: "bind", Source: "/path", Options: []string{"rbind"}},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		if got := tc.mount.ReadOnly(); got != tc.expected {
+			t.Errorf("%s: ReadOnly() = %v, want %v", tc.desc, got, tc.expected)
+		}
+	}
+}
+
 func TestRemoveVolatileTempMount(t *testing.T) {
 	testCases := []struct {
 		desc     string
