@@ -26,7 +26,7 @@ Additional commands (see __containerd-config(8)__):
 - **containerd config dump** — print the merged active configuration
 - **containerd config migrate** — alias of **dump** (latest config version)
 
-Topic guides: https://containerd.io/docs/
+Documentation: https://containerd.io/docs/
 
 ## FORMAT
 
@@ -135,13 +135,27 @@ their own options (see https://containerd.io/docs/).
 - **capabilities** (optional) — list of capability strings
 
 **timeouts**
-: Timeouts specified as durations
+: Map of timeout name to duration string. Duration values use Go
+**time.ParseDuration** syntax (for example **"5s"**, **"100ms"**, **"1m"**).
+Default keys (see **containerd config default**):
 
-<!-- [timeouts]
+- **io.containerd.timeout.shim.cleanup**
+- **io.containerd.timeout.shim.load**
+- **io.containerd.timeout.shim.shutdown**
+- **io.containerd.timeout.task.state**
+- **io.containerd.timeout.bolt.open**
+- **io.containerd.timeout.metrics.shimstats**
+- **io.containerd.timeout.cri.defercleanup**
+
+Example:
+
+```toml
+[timeouts]
   "io.containerd.timeout.shim.cleanup" = "5s"
   "io.containerd.timeout.shim.load" = "5s"
   "io.containerd.timeout.shim.shutdown" = "3s"
-  "io.containerd.timeout.task.state" = "2s" -->
+  "io.containerd.timeout.task.state" = "2s"
+```
 
 **imports**
 : List of additional configuration files to include. Imported files overwrite
@@ -149,17 +163,19 @@ non-empty simple fields and append array/map fields. Imported files are
 versioned; their version must not be higher than the main config.
 
 **stream_processors**
+: Named stream processors. Each entry is a table under
+**[stream_processors.\<id\>]** with:
 
-- **accepts** (Default: "[]") media-types accepted
-- **returns** (Default: "") media-type returned
-- **path** (Default: "") binary path or name
-- **args** (Default: "[]") binary arguments
+- **accepts** — list of accepted media types (Default: [])
+- **returns** — media type produced (Default: "")
+- **path** — processor binary path or name (Default: "")
+- **args** — arguments passed to the binary (Default: [])
 
-### Deprecated top-level server sections (pre–version 4)
+### Deprecated top-level server sections
 
-These top-level tables are deprecated in version 4. Prefer the
-**io.containerd.server.v1.*** plugins above. Existing configs are migrated
-automatically.
+The following top-level tables are deprecated. Prefer the
+**io.containerd.server.v1.*** plugins listed above. Existing configs are
+migrated automatically on startup.
 
 **[grpc]**
 : Legacy gRPC socket settings. Prefer **plugins."io.containerd.server.v1.grpc"**
@@ -256,10 +272,12 @@ version = 4
       BinaryName = "/usr/bin/path-to-runtime"
 ```
 
-**runtime_type** selects the containerd runtime v2 shim.
-**BinaryName** is a shim option: path to the OCI runtime binary.
-CRI clients select a named runtime via the CRI **runtime_handler** field
-(Kubernetes RuntimeClass). These settings apply only to CRI clients.
+Fields:
+
+- **runtime_type** — containerd runtime v2 shim type
+- **BinaryName** — path to the OCI runtime binary (shim option)
+- CRI clients select a named runtime with the CRI **runtime_handler**
+  field (Kubernetes RuntimeClass)
 
 ### CRI: registry hosts.toml
 

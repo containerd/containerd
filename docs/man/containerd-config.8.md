@@ -16,7 +16,7 @@ so the subcommands below are the authoritative way to list defaults for a
 given install.
 
 See __containerd-config.toml(5)__ for global settings and the plugin
-configuration model. Guides: https://containerd.io/docs/
+configuration model. Documentation: https://containerd.io/docs/
 
 ## OPTIONS
 
