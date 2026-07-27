@@ -820,6 +820,88 @@ func TestMountFsMeta(t *testing.T) {
 	})
 }
 
+// TestMountsWithMergedFsMeta covers s.mounts()'s assembly of the overlay
+// lowerdir when a merged fsmeta is present on a parent below the top of the
+// chain, i.e. one or more plain (non-merged) layers are stacked on top of a
+// merged fsmeta lower.
+func TestMountsWithMergedFsMeta(t *testing.T) {
+	root := t.TempDir()
+	s := &snapshotter{root: root}
+
+	// Chain (top to bottom): p0, p1, p2, p3. A merged fsmeta is only
+	// present for p2, flattening the sub-chain [p2, p3]. p0 and p1 are
+	// plain layers stacked on top of that merged base.
+	parents := []string{"p0", "p1", "p2", "p3"}
+	for _, id := range parents {
+		require.NoError(t, os.MkdirAll(filepath.Join(root, "snapshots", id), 0755))
+		require.NoError(t, os.WriteFile(s.layerBlobPath(id), []byte("layer"), 0644))
+	}
+	require.NoError(t, os.WriteFile(s.fsMetaPath("p2"), []byte("merged"), 0644))
+
+	snap := storage.Snapshot{Kind: snapshots.KindView, ParentIDs: parents}
+	info := snapshots.Info{}
+
+	mounts, err := s.mounts(snap, info)
+	require.NoError(t, err)
+
+	// Expect: [erofs(p0), erofs(p1), erofs(fsmeta p2, device=p3,p2), overlay]
+	require.Len(t, mounts, 4)
+
+	assert.Equal(t, "erofs", mounts[0].Type)
+	assert.Equal(t, s.layerBlobPath("p0"), mounts[0].Source)
+
+	assert.Equal(t, "erofs", mounts[1].Type)
+	assert.Equal(t, s.layerBlobPath("p1"), mounts[1].Source)
+
+	assert.Equal(t, "erofs", mounts[2].Type)
+	assert.Equal(t, s.fsMetaPath("p2"), mounts[2].Source)
+	assert.Equal(t, []string{
+		"ro", "loop",
+		"device=" + s.layerBlobPath("p3"),
+		"device=" + s.layerBlobPath("p2"),
+	}, mounts[2].Options)
+
+	// The overlay must span all three lowers (indices 0-2): the two plain
+	// top layers plus the merged fsmeta.
+	overlay := mounts[3]
+	assert.Equal(t, "format/mkdir/overlay", overlay.Type)
+	assert.Contains(t, overlay.Options, "lowerdir={{ overlay 0 2 }}")
+}
+
+// TestMountsWithMergedFsMetaOnTopParent covers the case where the merged
+// fsmeta is valid for the topmost parent, so it is the only lower. Since
+// overlayfs rejects a lowerdir with no upperdir, this collapses to a plain
+// bind mount instead.
+func TestMountsWithMergedFsMetaOnTopParent(t *testing.T) {
+	root := t.TempDir()
+	s := &snapshotter{root: root}
+
+	parents := []string{"p0", "p1"}
+	for _, id := range parents {
+		require.NoError(t, os.MkdirAll(filepath.Join(root, "snapshots", id), 0755))
+		require.NoError(t, os.WriteFile(s.layerBlobPath(id), []byte("layer"), 0644))
+	}
+	require.NoError(t, os.WriteFile(s.fsMetaPath("p0"), []byte("merged"), 0644))
+
+	snap := storage.Snapshot{Kind: snapshots.KindView, ParentIDs: parents}
+	info := snapshots.Info{}
+
+	mounts, err := s.mounts(snap, info)
+	require.NoError(t, err)
+
+	require.Len(t, mounts, 2)
+	assert.Equal(t, "erofs", mounts[0].Type)
+	assert.Equal(t, s.fsMetaPath("p0"), mounts[0].Source)
+	assert.Equal(t, []string{
+		"ro", "loop",
+		"device=" + s.layerBlobPath("p1"),
+		"device=" + s.layerBlobPath("p0"),
+	}, mounts[0].Options)
+
+	assert.Equal(t, "format/bind", mounts[1].Type)
+	assert.Equal(t, "{{ mount 0 }}", mounts[1].Source)
+}
+
 // --- layer content cache tests ---
 
 const (

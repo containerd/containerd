@@ -521,13 +521,14 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 		return []mount.Mount{m}, nil
 	}
 
+	// first marks the start of the lowerdir range. A merged fsmeta ends the
+	// range but never moves its start: lowers stacked above it stay in range.
 	first := len(mounts)
 	for i := range snap.ParentIDs {
 		// If a merged fsmeta is valid for this layer, skip the remaining bottom layers.
 		// Why? Because bottom layers have been flattened with the thin fsmeta.
 		if m, ok := s.mountFsMeta(snap, i); ok {
 			mounts = append(mounts, m)
-			first = len(mounts) - 1
 			break
 		}
 
