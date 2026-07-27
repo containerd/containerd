@@ -87,10 +87,12 @@ func mkdirAs(path string, uid, gid int) error {
 }
 
 // wrapSocketDirPermissionErr adds a hint to a permission-denied error
-// encountered while stat-ing or creating a socket directory. The grpc and
-// ttrpc server plugins carry their own hardcoded default socket address, so
-// a user who only overrides one of root/state/[grpc] address can still hit
-// this on the others.
+// encountered while stat-ing or creating a socket directory. This directory
+// is derived from a plugin's configured socket address, and the grpc and
+// ttrpc server plugins carry their own hardcoded default for that address,
+// so a user who only overrides one of root/state/[grpc] address can still
+// hit this on the others (including the debug plugin, if its address is
+// configured to a similarly unwritable path).
 func wrapSocketDirPermissionErr(err error) error {
-	return fmt.Errorf("%w (the configured socket address points at a directory that is not writable/accessible by the current user, which is the hardcoded default for the grpc and ttrpc plugins; if running containerd as a non-root user, configure a writable address for the grpc, ttrpc, and debug plugins)", err)
+	return fmt.Errorf("%w (the configured socket address points at a directory that is not writable/accessible by the current user; if running containerd as a non-root user, configure a writable address for the grpc, ttrpc, and debug plugins, whose addresses may otherwise default to or be set to a directory that requires root)", err)
 }
