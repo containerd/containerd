@@ -70,6 +70,30 @@ github.com/Microsoft/hcsshim/pkg/cimfs/format
 github.com/Microsoft/hcsshim/pkg/go-runhcs
 github.com/Microsoft/hcsshim/pkg/ociwclayer
 github.com/Microsoft/hcsshim/pkg/ociwclayer/cim
+# github.com/ProtonMail/go-crypto v1.4.1
+## explicit; go 1.23.0
+github.com/ProtonMail/go-crypto/bitcurves
+github.com/ProtonMail/go-crypto/brainpool
+github.com/ProtonMail/go-crypto/eax
+github.com/ProtonMail/go-crypto/internal/byteutil
+github.com/ProtonMail/go-crypto/ocb
+github.com/ProtonMail/go-crypto/openpgp
+github.com/ProtonMail/go-crypto/openpgp/aes/keywrap
+github.com/ProtonMail/go-crypto/openpgp/armor
+github.com/ProtonMail/go-crypto/openpgp/ecdh
+github.com/ProtonMail/go-crypto/openpgp/ecdsa
+github.com/ProtonMail/go-crypto/openpgp/ed25519
+github.com/ProtonMail/go-crypto/openpgp/ed448
+github.com/ProtonMail/go-crypto/openpgp/eddsa
+github.com/ProtonMail/go-crypto/openpgp/elgamal
+github.com/ProtonMail/go-crypto/openpgp/errors
+github.com/ProtonMail/go-crypto/openpgp/internal/algorithm
+github.com/ProtonMail/go-crypto/openpgp/internal/ecc
+github.com/ProtonMail/go-crypto/openpgp/internal/encoding
+github.com/ProtonMail/go-crypto/openpgp/packet
+github.com/ProtonMail/go-crypto/openpgp/s2k
+github.com/ProtonMail/go-crypto/openpgp/x25519
+github.com/ProtonMail/go-crypto/openpgp/x448
 # github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
 ## explicit
 github.com/StackExchange/wmi
@@ -106,6 +130,20 @@ github.com/cilium/ebpf/internal/testutils/fdtrace
 github.com/cilium/ebpf/internal/tracefs
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
+# github.com/cloudflare/circl v1.6.3
+## explicit; go 1.22.0
+github.com/cloudflare/circl/dh/x25519
+github.com/cloudflare/circl/dh/x448
+github.com/cloudflare/circl/ecc/goldilocks
+github.com/cloudflare/circl/internal/conv
+github.com/cloudflare/circl/internal/sha3
+github.com/cloudflare/circl/math
+github.com/cloudflare/circl/math/fp25519
+github.com/cloudflare/circl/math/fp448
+github.com/cloudflare/circl/math/mlsbset
+github.com/cloudflare/circl/sign
+github.com/cloudflare/circl/sign/ed25519
+github.com/cloudflare/circl/sign/ed448
 # github.com/containerd/btrfs/v2 v2.0.0
 ## explicit; go 1.19
 github.com/containerd/btrfs/v2
@@ -182,8 +220,8 @@ github.com/containerd/go-dmverity/pkg/verity
 # github.com/containerd/go-runc v1.1.0
 ## explicit; go 1.18
 github.com/containerd/go-runc
-# github.com/containerd/imgcrypt/v2 v2.0.2
-## explicit; go 1.23.0
+# github.com/containerd/imgcrypt/v2 v2.0.3
+## explicit; go 1.25.0
 github.com/containerd/imgcrypt/v2
 github.com/containerd/imgcrypt/v2/images/encryption
 # github.com/containerd/log v0.1.0
@@ -244,12 +282,13 @@ github.com/containernetworking/cni/pkg/version
 # github.com/containernetworking/plugins v1.9.1
 ## explicit; go 1.24.2
 github.com/containernetworking/plugins/pkg/ns
-# github.com/containers/ocicrypt v1.2.1
-## explicit; go 1.22
+# github.com/containers/ocicrypt v1.3.2
+## explicit; go 1.25.0
 github.com/containers/ocicrypt
 github.com/containers/ocicrypt/blockcipher
 github.com/containers/ocicrypt/config
 github.com/containers/ocicrypt/config/keyprovider-config
+github.com/containers/ocicrypt/config/pkcs11config
 github.com/containers/ocicrypt/crypto/pkcs11
 github.com/containers/ocicrypt/keywrap
 github.com/containers/ocicrypt/keywrap/jwe
@@ -336,9 +375,6 @@ github.com/godbus/dbus/v5
 # github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8
 ## explicit; go 1.20
 github.com/golang/groupcache/lru
-# github.com/golang/protobuf v1.5.4
-## explicit; go 1.17
-github.com/golang/protobuf/proto
 # github.com/google/certtostore v1.0.6
 ## explicit; go 1.18
 github.com/google/certtostore
@@ -402,7 +438,7 @@ github.com/mdlayher/socket
 # github.com/mdlayher/vsock v1.3.0
 ## explicit; go 1.25.0
 github.com/mdlayher/vsock
-# github.com/miekg/pkcs11 v1.1.1
+# github.com/miekg/pkcs11 v1.1.2
 ## explicit; go 1.12
 github.com/miekg/pkcs11
 # github.com/mistifyio/go-zfs/v3 v3.0.1
@@ -509,7 +545,7 @@ github.com/sasha-s/go-deadlock
 # github.com/sirupsen/logrus v1.9.4
 ## explicit; go 1.17
 github.com/sirupsen/logrus
-# github.com/smallstep/pkcs7 v0.1.1
+# github.com/smallstep/pkcs7 v0.2.1
 ## explicit; go 1.14
 github.com/smallstep/pkcs7
 github.com/smallstep/pkcs7/internal/legacy/x509
@@ -676,17 +712,18 @@ go.opentelemetry.io/proto/otlp/trace/v1
 # go.yaml.in/yaml/v2 v2.4.4
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
+# go.yaml.in/yaml/v3 v3.0.4
+## explicit; go 1.16
+go.yaml.in/yaml/v3
 # golang.org/x/crypto v0.53.0
 ## explicit; go 1.25.0
+golang.org/x/crypto/argon2
+golang.org/x/crypto/blake2b
 golang.org/x/crypto/cast5
 golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
-golang.org/x/crypto/openpgp
-golang.org/x/crypto/openpgp/armor
-golang.org/x/crypto/openpgp/elgamal
-golang.org/x/crypto/openpgp/errors
-golang.org/x/crypto/openpgp/packet
-golang.org/x/crypto/openpgp/s2k
+golang.org/x/crypto/hkdf
+golang.org/x/crypto/sha3
 # golang.org/x/mod v0.38.0
 ## explicit; go 1.25.0
 golang.org/x/mod/semver
