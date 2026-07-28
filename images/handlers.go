@@ -37,8 +37,8 @@ const (
 	// goroutines when Dispatch is called with a nil limiter.
 	defaultMaxConcurrency = 32
 
-	// maxReferences caps the references a single Dispatch admits, duplicates
-	// included.
+	// maxReferences caps the references in a single Dispatch or Walk.
+	// Duplicate references count toward this limit.
 	maxReferences = 10_000
 )
 
@@ -98,9 +98,26 @@ func Handlers(handlers ...Handler) HandlerFunc {
 //
 // This differs from dispatch in that each sibling resource is considered
 // synchronously.
+//
+// Each call is limited to 10,000 references, including duplicates.
+// Exceeding this limit returns an error wrapping
+// [errdefs.ErrResourceExhausted].
 func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) error {
-	for _, desc := range descs {
+	w := &walker{}
+	return w.walk(ctx, handler, descs...)
+}
 
+type walker struct {
+	referenceCount int
+}
+
+func (w *walker) walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) error {
+	if w.referenceCount+len(descs) > maxReferences {
+		return fmt.Errorf("too many descriptors (limit %d): %w", maxReferences, errdefs.ErrResourceExhausted)
+	}
+	w.referenceCount += len(descs)
+
+	for _, desc := range descs {
 		children, err := handler.Handle(ctx, desc)
 		if err != nil {
 			if errors.Is(err, ErrSkipDesc) {
@@ -110,7 +127,7 @@ func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) err
 		}
 
 		if len(children) > 0 {
-			if err := Walk(ctx, handler, children...); err != nil {
+			if err := w.walk(ctx, handler, children...); err != nil {
 				return err
 			}
 		}
