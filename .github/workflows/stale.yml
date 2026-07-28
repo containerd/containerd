@@ -37,6 +37,10 @@ jobs:
           exempt-all-issue-milestones: true
           exempt-all-pr-milestones: true
 
+          # Exempt labels
+          exempt-issue-labels: "priority/*, status/accepted, status/needs-major-release, status/roadmapped"
+          exempt-pr-labels: "priority/*, status/accepted, status/needs-major-release, status/roadmapped"
+
           # How many items to process per run, default is 30, which is not
           # enough to process the whole backlog. This number should strike the
           # right balance: too high value might cause rate limits.
@@ -47,16 +51,16 @@ jobs:
           # Messages
           stale-issue-message: >
             This issue has not been updated in 12 months and is now marked as stale.
-            It will be closed in 2 weeks unless there is new activity or it is
-            assigned to a milestone.
+            It will be closed in 2 weeks unless there is new activity, a milestone
+            is assigned, or a maintainer adds a priority or status label.
           close-issue-message: >
             This issue was closed because it has been stale for 2 weeks with no activity.
             Feel free to reopen or create a new issue if you would like to continue
             working on it.
           stale-pr-message: >
             This PR has not been updated in 6 months and is now marked as stale.
-            It will be closed in 2 weeks unless there is new activity or it is
-            assigned to a milestone.
+            It will be closed in 2 weeks unless there is new activity, a milestone
+            is assigned, or a maintainer adds a priority or status label.
           close-pr-message: >
             This PR was closed because it has been stale for 2 weeks with no activity.
             Feel free to reopen or create a new PR if you would like to continue
