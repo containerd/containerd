@@ -50,6 +50,246 @@ func digestSet(digests []digest.Digest) map[digest.Digest]struct{} {
 	return set
 }
 
+func TestWalkTreeTraversal(t *testing.T) {
+	root := newDesc("root")
+	child1 := newDesc("child1")
+	child2 := newDesc("child2")
+	grandchild1 := newDesc("grandchild1")
+
+	graph := map[digest.Digest][]ocispec.Descriptor{
+		root.Digest:   {child1, child2},
+		child1.Digest: {grandchild1},
+	}
+
+	var visited []digest.Digest
+	handler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		visited = append(visited, desc.Digest)
+		return graph[desc.Digest], nil
+	})
+
+	err := Walk(context.Background(), handler, root)
+	require.NoError(t, err)
+
+	want := []digest.Digest{root.Digest, child1.Digest, grandchild1.Digest, child2.Digest}
+	assert.Equal(t, want, visited)
+}
+
+func TestWalkRepeatedReferences(t *testing.T) {
+	root := newDesc("root")
+	childA := newDesc("A")
+	childB := newDesc("B")
+	shared := newDesc("shared")
+
+	graph := map[digest.Digest][]ocispec.Descriptor{
+		root.Digest:   {childA, childB},
+		childA.Digest: {shared},
+		childB.Digest: {shared},
+	}
+
+	tests := []struct {
+		name            string
+		walk            func(context.Context, Handler, ...ocispec.Descriptor) error
+		wantTotalCalls  int
+		wantSharedCalls int
+	}{
+		{
+			name:            "Walk visits every reference",
+			walk:            Walk,
+			wantTotalCalls:  5,
+			wantSharedCalls: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var totalCalls, sharedCalls int
+			handler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+				totalCalls++
+				if desc.Digest == shared.Digest {
+					sharedCalls++
+				}
+				return graph[desc.Digest], nil
+			})
+
+			err := tt.walk(context.Background(), handler, root)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantTotalCalls, totalCalls)
+			assert.Equal(t, tt.wantSharedCalls, sharedCalls)
+		})
+	}
+}
+
+func TestWalkErrSkipDesc(t *testing.T) {
+	root := newDesc("root")
+	child1 := newDesc("child1")
+	child2 := newDesc("child2")
+	grandchild := newDesc("grandchild")
+
+	graph := map[digest.Digest][]ocispec.Descriptor{
+		root.Digest:   {child1, child2},
+		child1.Digest: {grandchild},
+	}
+
+	var visited []digest.Digest
+	handler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		visited = append(visited, desc.Digest)
+		if desc.Digest == child1.Digest {
+			return graph[desc.Digest], ErrSkipDesc
+		}
+		return graph[desc.Digest], nil
+	})
+
+	err := Walk(context.Background(), handler, root)
+	require.NoError(t, err)
+
+	set := digestSet(visited)
+	assert.Contains(t, set, root.Digest)
+	assert.Contains(t, set, child1.Digest)
+	assert.Contains(t, set, child2.Digest)
+	assert.NotContains(t, set, grandchild.Digest, "grandchild must not be visited when its parent returns ErrSkipDesc")
+}
+
+func TestWalkReferenceLimit(t *testing.T) {
+	root := newDesc("root")
+	handlerReturning := func(childCount int) Handler {
+		children := make([]ocispec.Descriptor, childCount)
+		for i := range children {
+			children[i] = newDesc(fmt.Sprintf("node-%d", i))
+		}
+		return HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			if desc.Digest == root.Digest {
+				return children, nil
+			}
+			return nil, nil
+		})
+	}
+
+	require.NoError(t, Walk(context.Background(), handlerReturning(maxReferences-1), root))
+	require.ErrorIs(t, Walk(context.Background(), handlerReturning(maxReferences), root), errdefs.ErrResourceExhausted)
+}
+
+func TestWalkRejectsChildrenBeforeVisiting(t *testing.T) {
+	root := newDesc("root")
+	children := make([]ocispec.Descriptor, maxReferences)
+	for i := range children {
+		children[i] = newDesc(fmt.Sprintf("node-%d", i))
+	}
+	var childVisits int
+	handler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		if desc.Digest == root.Digest {
+			return children, nil
+		}
+		childVisits++
+		return nil, nil
+	})
+
+	require.ErrorIs(t, Walk(context.Background(), handler, root), errdefs.ErrResourceExhausted)
+	assert.Equal(t, 0, childVisits, "children of an over-limit slice must not be visited")
+}
+
+func TestWalkErrorPropagation(t *testing.T) {
+	root := newDesc("root")
+	child1 := newDesc("child1")
+	child2 := newDesc("child2")
+
+	graph := map[digest.Digest][]ocispec.Descriptor{
+		root.Digest: {child1, child2},
+	}
+
+	errTest := errors.New("handler error")
+
+	handler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		if desc.Digest == child1.Digest {
+			return nil, errTest
+		}
+		return graph[desc.Digest], nil
+	})
+
+	err := Walk(context.Background(), handler, root)
+	require.ErrorIs(t, err, errTest)
+}
+
+func TestWalkDuplicateRoots(t *testing.T) {
+	root := newDesc("root")
+
+	tests := []struct {
+		name      string
+		walk      func(context.Context, Handler, ...ocispec.Descriptor) error
+		wantCalls int
+	}{
+		{"Walk visits each root", Walk, 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var calls int
+			handler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+				calls++
+				return nil, nil
+			})
+			require.NoError(t, tt.walk(context.Background(), handler, root, root))
+			assert.Equal(t, tt.wantCalls, calls)
+		})
+	}
+}
+
+func TestWalkCountsDuplicateReferences(t *testing.T) {
+	root := newDesc("root")
+	dup := newDesc("dup")
+	children := make([]ocispec.Descriptor, maxReferences+1)
+	for i := range children {
+		children[i] = dup
+	}
+	fanout := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		if desc.Digest == root.Digest {
+			return children, nil
+		}
+		return nil, nil
+	})
+	require.ErrorIs(t, Walk(context.Background(), fanout, root), errdefs.ErrResourceExhausted)
+
+	a, b := newDesc("a"), newDesc("b")
+	cycle := map[digest.Digest][]ocispec.Descriptor{a.Digest: {b}, b.Digest: {a}}
+	cyclic := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		return cycle[desc.Digest], nil
+	})
+	require.ErrorIs(t, Walk(context.Background(), cyclic, a), errdefs.ErrResourceExhausted)
+}
+
+func TestWalkNotEmpty(t *testing.T) {
+	root := newDesc("root")
+	child := newDesc("child")
+
+	t.Run("returns nil when a handler produces children", func(t *testing.T) {
+		graph := map[digest.Digest][]ocispec.Descriptor{root.Digest: {child}}
+		handler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			return graph[desc.Digest], nil
+		})
+		require.NoError(t, WalkNotEmpty(context.Background(), handler, root))
+	})
+
+	t.Run("returns ErrEmptyWalk when everything is filtered out", func(t *testing.T) {
+		handler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			return nil, nil
+		})
+		require.ErrorIs(t, WalkNotEmpty(context.Background(), handler, root), ErrEmptyWalk)
+	})
+
+	t.Run("propagates the reference-cap error", func(t *testing.T) {
+		children := make([]ocispec.Descriptor, maxReferences+1)
+		for i := range children {
+			children[i] = newDesc(fmt.Sprintf("node-%d", i))
+		}
+		handler := HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			if desc.Digest == root.Digest {
+				return children, nil
+			}
+			return nil, nil
+		})
+		require.ErrorIs(t, WalkNotEmpty(context.Background(), handler, root), errdefs.ErrResourceExhausted)
+	})
+}
+
 func TestDispatchTreeTraversal(t *testing.T) {
 	root := newDesc("root")
 	child1 := newDesc("child1")
