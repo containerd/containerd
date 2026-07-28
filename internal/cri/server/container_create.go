@@ -47,7 +47,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/blockio"
-	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 )
@@ -129,63 +128,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		Config:    config,
 	}
 
-	// Check if image is a file. If it is a file it might be a checkpoint archive.
-	checkpointImage, err := func() (bool, error) {
-		if _, err := c.os.Stat(config.GetImage().GetImage()); err == nil {
-			log.G(ctx).Infof(
-				"%q is a file. Assuming it is a checkpoint archive",
-				config.GetImage().GetImage(),
-			)
-			return true, nil
-		}
-		// Check if this is an OCI checkpoint image
-		imageID, err := c.checkIfCheckpointOCIImage(ctx, config.GetImage().GetImage())
-		if err != nil {
-			return false, fmt.Errorf("failed to check if this is a checkpoint image: %w", err)
-		}
-
-		return imageID != "", nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	if checkpointImage {
-		// This might be a checkpoint image. Let's pass
-		// it to the checkpoint code.
-
-		if c.warningService != nil {
-			c.warningService.Emit(ctx, deprecation.CRICreateContainerCheckpointRestore)
-			if msg, ok := deprecation.Message(deprecation.CRICreateContainerCheckpointRestore); ok {
-				log.G(ctx).WithFields(log.Fields{
-					"podsandboxid":  sandboxID,
-					"containerid":   id,
-					"containername": name,
-				}).Warn(msg)
-			}
-		}
-
-		if sandboxConfig.GetMetadata() == nil {
-			return nil, fmt.Errorf("sandboxConfig must not be empty")
-		}
-
-		ctrID, err := c.CRImportCheckpoint(
-			ctx,
-			&meta,
-			&sandbox,
-			sandboxConfig,
-		)
-		if err != nil {
-			log.G(ctx).Errorf("failed to prepare %s for restore %q", ctrID, err)
-			return nil, err
-		}
-		log.G(ctx).Infof("Prepared %s for restore", ctrID)
-
-		return &runtime.CreateContainerResponse{
-			ContainerId: id,
-		}, nil
-	}
-
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
 	image, err := c.LocalResolve(config.GetImage().GetImage())
@@ -242,7 +184,6 @@ type createContainerRequest struct {
 	containerName         string
 	containerdImage       *containerd.Image
 	meta                  *containerstore.Metadata
-	restore               bool
 	start                 time.Time
 }
 
@@ -472,7 +413,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	status := containerstore.Status{CreatedAt: time.Now().UnixNano(), Restore: r.restore}
+	status := containerstore.Status{CreatedAt: time.Now().UnixNano()}
 	status = copyResourcesToStatus(spec, status)
 	container, err := containerstore.NewContainer(*r.meta,
 		containerstore.WithStatus(status, containerRootDir),

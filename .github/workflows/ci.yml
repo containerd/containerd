@@ -555,23 +555,6 @@ jobs:
           env
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
-      - name: Install tools
-        # The GitHub Actions image already has buildah and podman included. Not the
-        # ubuntu-24.04-arm images. buildah and podman  is needed to convert the
-        # Kubernetes checkpoint archive to an OCI image.
-        # See contrib/checkpoint/checkpoint-restore-cri-test.sh
-        if: matrix.os == 'ubuntu-24.04-arm'
-        run: sudo apt-get install -y buildah podman
-
-      - if: matrix.os != 'ubuntu-24.04-arm'
-        name: Checkpoint/Restore via CRI
-        env:
-          TEST_RUNTIME: ${{ matrix.runtime }}
-          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
-        run: |
-          env
-          sudo -E PATH=$PATH ./contrib/checkpoint/checkpoint-restore-cri-test.sh
-
       - if: matrix.os != 'ubuntu-24.04-arm'
         name: Checkpoint/Restore Disable via CRI
         env:
