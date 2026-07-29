@@ -20,7 +20,7 @@ require (
 	github.com/containerd/go-cni v1.1.13
 	github.com/containerd/go-dmverity v0.1.0
 	github.com/containerd/go-runc v1.1.0
-	github.com/containerd/imgcrypt/v2 v2.0.2
+	github.com/containerd/imgcrypt/v2 v2.0.3
 	github.com/containerd/log v0.1.0
 	github.com/containerd/nri v0.12.1
 	github.com/containerd/otelttrpc v0.1.0
@@ -95,12 +95,14 @@ require (
 
 require (
 	cyphar.com/go-pathrs v0.2.4 // indirect
+	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cilium/ebpf v0.17.3 // indirect
-	github.com/containers/ocicrypt v1.2.1 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
+	github.com/containers/ocicrypt v1.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
@@ -112,7 +114,6 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/deck v0.0.0-20230104221208-105ad94aa8ae // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
@@ -121,7 +122,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/knqyf263/go-plugin v0.9.0 // indirect
 	github.com/mdlayher/socket v0.6.0 // indirect
-	github.com/miekg/pkcs11 v1.1.1 // indirect
+	github.com/miekg/pkcs11 v1.1.2 // indirect
 	github.com/mistifyio/go-zfs/v3 v3.0.1 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/sys/capability v0.4.0 // indirect
@@ -135,7 +136,7 @@ require (
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
-	github.com/smallstep/pkcs7 v0.1.1 // indirect
+	github.com/smallstep/pkcs7 v0.2.1 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20230803200340-78284954bff6 // indirect
 	github.com/tetratelabs/wazero v1.11.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
@@ -145,6 +146,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
