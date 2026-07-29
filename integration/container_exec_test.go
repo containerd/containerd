@@ -17,11 +17,17 @@
 package integration
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/v2/integration/client"
 	"github.com/containerd/containerd/v2/integration/images"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,4 +75,77 @@ func TestContainerDrainExecIOAfterExit(t *testing.T) {
 	t.Log("Exec in container")
 	_, _, err = runtimeService.ExecSync(cn, []string{"sh", "-c", "sleep 2s &"}, 10*time.Second)
 	require.NoError(t, err, "should drain IO in time")
+}
+
+// runtimeTypeForHandler returns the containerd runtime type that the CRI plugin
+// uses for the given runtime handler. An empty handler resolves to the
+// configured default.
+func runtimeTypeForHandler(t *testing.T, handler string) string {
+	resp, err := runtimeService.Status()
+	require.NoError(t, err)
+
+	var cfg criconfig.Config
+	require.NoError(t, json.Unmarshal([]byte(resp.GetInfo()["config"]), &cfg))
+
+	if handler == "" {
+		handler = cfg.DefaultRuntimeName
+	}
+	r, ok := cfg.Runtimes[handler]
+	require.Truef(t, ok, "runtime handler %q is not configured", handler)
+	return r.Type
+}
+
+func TestContainerExecLogGrow(t *testing.T) {
+	rt := runtimeTypeForHandler(t, *runtimeHandler)
+
+	if rt != "io.containerd.runc.v2" {
+		t.Skip("runtime need io.containerd.runc.v2")
+	}
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-exec-log-grow")
+	var (
+		testImage     = images.Get(images.BusyBox)
+		containerName = "test-container-exec"
+	)
+	EnsureImageExists(t, testImage)
+	t.Log("Create a container")
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		WithCommand("sh", "-c", "sleep 365d"),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.RemoveContainer(cn))
+	}()
+	t.Logf("Start the container %s", cn)
+	require.NoError(t, runtimeService.StartContainer(cn))
+	defer func() {
+		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+	}()
+	t.Logf("Exec in container %s", cn)
+
+	execLogDir := getLogDirPath(client.GetDefaultState(), "v2", "k8s.io", cn)
+	logJSON := filepath.Join(execLogDir, "log.json")
+	before, err := os.Stat(logJSON)
+	require.NoError(t, err)
+
+	// run a non-existent process repeatedly; log.json should not grow
+	for i := 0; i < 20; i++ {
+		_, _, err = runtimeService.ExecSync(cn, []string{"ls001"}, 10*time.Second)
+		require.ErrorContains(t, err, "failed to exec in container")
+	}
+
+	after, err := os.Stat(logJSON)
+	require.NoError(t, err)
+	require.Equal(t, before.Size(), after.Size(), "log.json should not grow on repeated exec failures")
+}
+
+func getLogDirPath(defaultState, runtimeVersion, ns, id string) string {
+	switch runtimeVersion {
+	case "v2":
+		return filepath.Join(defaultState, "io.containerd.runtime.v2.task", ns, id)
+	default:
+		panic(fmt.Errorf("unsupported runtime version %s", runtimeVersion))
+	}
 }
