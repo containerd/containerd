@@ -44,7 +44,7 @@ var buildErofsCacheCommand = &cli.Command{
 	Description: `Convert each layer of an already-pulled image into a directory of
 diffID-keyed erofs blobs (<cache_dir>/<algorithm>/<xx>/<hex>.erofs, where <xx> is
 the first two characters of <hex>) for the erofs
-snapshotter's layer_content_cache. Layers are read from the content store; no
+snapshotter's layer_content_caches. Layers are read from the content store; no
 converted image is produced. The directory can then be synced to the read-only
 location the fleet mounts. Requires mkfs.erofs.
 
