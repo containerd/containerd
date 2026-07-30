@@ -82,14 +82,15 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 	}
 
+	ws, err := ic.GetSingle(plugins.WarningPlugin)
+	if err != nil {
+		return nil, err
+	}
+	warn := ws.(warning.Service)
+
 	if warnings, err := criconfig.ValidateServerConfig(ic.Context, config); err != nil {
 		return nil, fmt.Errorf("invalid cri image config: %w", err)
 	} else if len(warnings) > 0 {
-		ws, err := ic.GetSingle(plugins.WarningPlugin)
-		if err != nil {
-			return nil, err
-		}
-		warn := ws.(warning.Service)
 		for _, w := range warnings {
 			warn.Emit(ic.Context, w)
 		}
@@ -140,6 +141,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		Client:             client,
 		SandboxControllers: sbControllers,
 		ShimPath:           shimPath,
+		WarningService:     warn,
 	}
 	is := criImagePlugin.(imageService).GRPCService()
 
