@@ -1,0 +1,37 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+ignore_deps = [ "github.com/containerd/containerd" ]
+
+# previous release
+previous = "v2.3.0"
+
+pre_release = true
+
+preface = """\
+containerd 2.4 is a regular (non-LTS) release with a shorter support window,
+intended for users who want to adopt new features sooner. As the release
+following the 2.3 LTS, it is the point in the release cycle where previously
+deprecated features may be removed, so this release may include breaking
+changes; check the notes below and clear any deprecation warnings from your
+current version before upgrading.
+
+Users prioritizing stability and a longer support lifecycle should stay on the
+2.3 LTS release.
+
+This is a beta release and some functionality is still under development.
+"""
+
+postface = """\
+### Which file should I download?
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.35 (Ubuntu 22.04).
+* `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on Linux distributions that do not use glibc >= 2.35. Not position-independent.
+
+In addition to containerd, typically you will have to install [runc](https://github.com/opencontainers/runc/releases)
+and [CNI plugins](https://github.com/containernetworking/plugins/releases) from their official sites too.
+
+See also the [Getting Started](https://github.com/containerd/containerd/blob/main/docs/getting-started.md) documentation.
+"""
