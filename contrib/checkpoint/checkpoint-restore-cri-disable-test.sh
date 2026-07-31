@@ -201,87 +201,33 @@ fi
 echo "PASS: Test 1: Checkpoint fails fast and source container remains running"
 cleanup_container "$pod_id" "$ctr_id"
 
-# Test 2: Restore fails fast when enable_criu = false.
-POD_JSON=$(mktemp)
-jq ".log_directory=\"${TESTDIR}\"" "$TESTDATA"/sandbox_config.json >"$POD_JSON"
-pod_id=$(crictl runp "$POD_JSON")
-touch "$TESTDIR/dummy-checkpoint.tar"
-RESTORE_JSON=$(mktemp)
-jq ".image.image=\"$TESTDIR/dummy-checkpoint.tar\"" "$TESTDATA"/container_sleep.json >"$RESTORE_JSON"
-set +e
-output=$(crictl create "$pod_id" "$RESTORE_JSON" "$POD_JSON" 2>&1)
-exit_code=$?
-set -e
-rm -f "$RESTORE_JSON" "$POD_JSON"
-if [ $exit_code -eq 0 ] || [[ ! "$output" =~ "criu support is disabled by configuration" ]]; then
-	echo "ERROR: Test 2 failed (restore did not fail fast). Output: $output"
-	exit 1
-fi
-echo "PASS: Test 2: Restore fails fast when enable_criu = false"
-crictl rmp -f "$pod_id" >/dev/null 2>&1 || true
-
 stop_containerd
 
 # ==============================================================================
-# Group 2 (Configuration: enable_criu = true, normal PATH)
-# ==============================================================================
-start_containerd "true" ""
-
-# Test 3: Normal checkpoint and restore preserves container state.
-ids=$(setup_container)
-pod_id=$(echo "$ids" | cut -d: -f1)
-ctr_id=$(echo "$ids" | cut -d: -f2)
-crictl exec "$ctr_id" touch /root/state_file
-rm -f "$TESTDIR"/state_checkpoint.tar
-crictl checkpoint --export="$TESTDIR"/state_checkpoint.tar "${ctr_id}"
-cleanup_container "$pod_id" "$ctr_id"
-
-POD_JSON=$(mktemp)
-jq ".log_directory=\"${TESTDIR}\"" "$TESTDATA"/sandbox_config.json >"$POD_JSON"
-pod_id=$(crictl runp "$POD_JSON")
-RESTORE_JSON=$(mktemp)
-jq ".image.image=\"$TESTDIR/state_checkpoint.tar\"" "$TESTDATA"/container_sleep.json >"$RESTORE_JSON"
-restored_ctr_id=$(crictl create "$pod_id" "$RESTORE_JSON" "$POD_JSON")
-rm -f "$RESTORE_JSON" "$POD_JSON"
-crictl start "$restored_ctr_id"
-set +e
-crictl exec "$restored_ctr_id" ls /root/state_file >/dev/null 2>&1
-exit_code=$?
-set -e
-if [ $exit_code -ne 0 ]; then
-	echo "ERROR: Test 3 failed (state_file not found in restored container)."
-	exit 1
-fi
-echo "PASS: Test 3: Normal checkpoint and restore preserves container state"
-cleanup_container "$pod_id" "$restored_ctr_id"
-
-stop_containerd
-
-# ==============================================================================
-# Group 3 (Configuration: enable_criu omitted/defaults, normal PATH)
+# Group 2 (Configuration: enable_criu omitted/defaults, normal PATH)
 # ==============================================================================
 start_containerd "omit" ""
 
-# Test 4: enable_criu omitted from configuration defaults to true (allowing checkpoint/restore).
+# Test 2: enable_criu omitted from configuration defaults to true (allowing checkpoint).
 ids=$(setup_container)
 pod_id=$(echo "$ids" | cut -d: -f1)
 ctr_id=$(echo "$ids" | cut -d: -f2)
 rm -f "$TESTDIR"/omitted_checkpoint.tar
 crictl checkpoint --export="$TESTDIR"/omitted_checkpoint.tar "${ctr_id}"
-echo "PASS: Test 4: enable_criu omitted from configuration defaults to true"
+echo "PASS: Test 2: enable_criu omitted from configuration defaults to true"
 cleanup_container "$pod_id" "$ctr_id"
 
 stop_containerd
 
 # ==============================================================================
-# Group 4 (Configuration: enable_criu = true, cleaned PATH without CRIU)
+# Group 3 (Configuration: enable_criu = true, cleaned PATH without CRIU)
 # ==============================================================================
 if [ -n "${CRIU_DIR}" ]; then
 	CLEANED_PATH=$(get_cleaned_path)
 
 	start_containerd "true" "${CLEANED_PATH}"
 
-	# Test 5: CRIU missing from PATH, enable_criu = true.
+	# Test 3: CRIU missing from PATH, enable_criu = true.
 	# Verifies that when CRIU is enabled but missing, it fails with the binary missing error.
 	ids=$(setup_container)
 	pod_id=$(echo "$ids" | cut -d: -f1)
@@ -291,10 +237,10 @@ if [ -n "${CRIU_DIR}" ]; then
 	exit_code=$?
 	set -e
 	if [ $exit_code -eq 0 ] || [[ ! "$output" =~ "criu binary not found" ]]; then
-		echo "ERROR: Test 5 failed. Output: $output"
+		echo "ERROR: Test 3 failed. Output: $output"
 		exit 1
 	fi
-	echo "PASS: Test 5: Fails with binary not found as expected when enable_criu = true"
+	echo "PASS: Test 3: Fails with binary not found as expected when enable_criu = true"
 	cleanup_container "$pod_id" "$ctr_id"
 
 	stop_containerd

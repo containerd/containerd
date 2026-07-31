@@ -19,17 +19,13 @@
 package server
 
 import (
-	"archive/tar"
 	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
-	"github.com/containerd/log"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -105,137 +101,6 @@ func TestCopyNoFollowRejectsDirectory(t *testing.T) {
 	err := copyNoFollow(src, dst, 0o600)
 	require.Error(t, err)
 	assert.NoFileExists(t, dst)
-}
-
-func TestAssertCheckpointDirSafe(t *testing.T) {
-	t.Run("regular files and dirs allowed", func(t *testing.T) {
-		root := t.TempDir()
-		require.NoError(t, os.MkdirAll(filepath.Join(root, "checkpoint"), 0o700))
-		require.NoError(t, os.WriteFile(filepath.Join(root, "checkpoint", "img"), []byte("x"), 0o600))
-		require.NoError(t, os.WriteFile(filepath.Join(root, "rootfs-diff.tar"), []byte("x"), 0o600))
-		assert.NoError(t, assertCheckpointDirSafe(root))
-	})
-
-	t.Run("symlink rejected", func(t *testing.T) {
-		root := t.TempDir()
-		require.NoError(t, os.Symlink("/some/outside/path", filepath.Join(root, "rootfs-diff.tar")))
-		assert.Error(t, assertCheckpointDirSafe(root))
-	})
-
-	t.Run("symlink nested in subdir rejected", func(t *testing.T) {
-		root := t.TempDir()
-		require.NoError(t, os.MkdirAll(filepath.Join(root, "checkpoint"), 0o700))
-		require.NoError(t, os.Symlink("/some/outside/path", filepath.Join(root, "checkpoint", "pages-1.img")))
-		assert.Error(t, assertCheckpointDirSafe(root))
-	})
-
-	t.Run("fifo rejected", func(t *testing.T) {
-		root := t.TempDir()
-		require.NoError(t, unix.Mkfifo(filepath.Join(root, "fifo"), 0o600))
-		assert.Error(t, assertCheckpointDirSafe(root))
-	})
-}
-
-func TestCheckpointArchiveEntryAllowed(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		typ     byte
-		allowed bool
-	}{
-		{"regular", tar.TypeReg, true},
-		//nolint:staticcheck // TypeRegA is deprecated but external tars may still use it
-		{"regular-A", tar.TypeRegA, true},
-		{"directory", tar.TypeDir, true},
-		{"global-header", tar.TypeXGlobalHeader, true},
-		{"symlink", tar.TypeSymlink, false},
-		{"hardlink", tar.TypeLink, false},
-		{"char-device", tar.TypeChar, false},
-		{"block-device", tar.TypeBlock, false},
-		{"fifo", tar.TypeFifo, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got := checkpointArchiveEntryAllowed(&tar.Header{Typeflag: tc.typ, Name: tc.name})
-			assert.Equal(t, tc.allowed, got)
-		})
-	}
-}
-
-type testLogHook struct {
-	mu      sync.Mutex
-	entries []string
-}
-
-func (h *testLogHook) Levels() []logrus.Level {
-	return []logrus.Level{logrus.WarnLevel}
-}
-
-func (h *testLogHook) Fire(entry *logrus.Entry) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.entries = append(h.entries, entry.Message)
-	return nil
-}
-
-func TestFilterAndMergeAnnotations(t *testing.T) {
-	for desc, tc := range map[string]struct {
-		checkpointAnnotations map[string]string
-		createAnnotations     map[string]string
-		expectedAnnotations   map[string]string
-		expectedWarnings      []string
-	}{
-		"cdi denied prefix boundaries": {
-			checkpointAnnotations: map[string]string{
-				"cdi.k8s.io/device":   "gpu",
-				"cdi.k8s.io/":         "true",
-				"cdi.k8s.io":          "true",
-				"safe.org/cdi.k8s.io": "ignored",
-				"other":               "val",
-			},
-			expectedAnnotations: map[string]string{
-				"safe.org/cdi.k8s.io": "ignored",
-				"other":               "val",
-			},
-			expectedWarnings: []string{
-				`Denying annotation "cdi.k8s.io/device" in checkpoint restore`,
-				`Denying annotation "cdi.k8s.io/" in checkpoint restore`,
-				`Denying annotation "cdi.k8s.io" in checkpoint restore`,
-			},
-		},
-
-		"createAnnotations update kubernetes metadata if present in both": {
-			checkpointAnnotations: map[string]string{
-				"io.kubernetes.container.hash":         "old-hash",
-				"io.kubernetes.container.restartCount": "1",
-				"safe.annotation":                      "2",
-			},
-			createAnnotations: map[string]string{
-				"io.kubernetes.container.hash":         "new-hash",
-				"io.kubernetes.container.restartCount": "2",
-			},
-			expectedAnnotations: map[string]string{
-				"io.kubernetes.container.hash":         "new-hash",
-				"io.kubernetes.container.restartCount": "2",
-				"safe.annotation":                      "2",
-			},
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			logger := logrus.New()
-			logger.SetLevel(logrus.WarnLevel)
-			hook := &testLogHook{}
-			logger.AddHook(hook)
-			ctx := log.WithLogger(context.Background(), logrus.NewEntry(logger))
-
-			res := filterAndMergeAnnotations(
-				ctx,
-				tc.checkpointAnnotations,
-				tc.createAnnotations,
-			)
-
-			assert.Equal(t, tc.expectedAnnotations, res)
-			assert.ElementsMatch(t, tc.expectedWarnings, hook.entries)
-		})
-	}
 }
 
 func TestResolveCriuPath(t *testing.T) {
@@ -350,18 +215,6 @@ func TestCheckpointContainerDisabled(t *testing.T) {
 	_, err := c.CheckpointContainer(context.Background(), &runtime.CheckpointContainerRequest{
 		ContainerId: "test-container",
 	})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
-		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
-	}
-}
-
-func TestCRImportCheckpointDisabled(t *testing.T) {
-	c := newTestCRIService()
-	c.config.EnableCRIU = func() *bool { v := false; return &v }()
-	_, err := c.CRImportCheckpoint(context.Background(), nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

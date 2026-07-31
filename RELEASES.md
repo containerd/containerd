@@ -613,7 +613,7 @@ The deprecated features are shown in the following table:
 | Go-Plugin library (`*.so`) as containerd runtime plugin                          | containerd v2.0     | containerd v2.1 ✅                    | Use external plugins (proxy or binary)                                                         |
 | NRI v0.1.0 plugin support                                                        | containerd v2.2     | containerd v2.3                       | Use the v010-adapter NRI plugin, or update v0.1.0 plugins to use the current NRI API           |
 | cgroup v1 support                                                                | containerd v2.2     | (May 2029)                            | Use cgroup v2                                                                                  |
-| Restoring checkpoint data during CRI `CreateContainer`                           | containerd v2.3     | containerd v2.4                       | Follow [KEP-5823](https://github.com/kubernetes/enhancements/issues/5823) for a replacement `RestorePod` API |
+| Restoring checkpoint data during CRI `CreateContainer`                           | containerd v2.3     | containerd v2.4 ✅                    | Follow [KEP-5823](https://github.com/kubernetes/enhancements/issues/5823) for a replacement `RestorePod` API |
 
 - Pulling Schema 1 images has been disabled in containerd v2.0, but it still can be enabled by setting an environment variable `CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1`
   until containerd v2.1. `ctr` users have to specify `--local` too (e.g., `ctr images pull --local`). Users of CRI clients (such as Kubernetes and `crictl`) have to specify this environment variable on the containerd daemon (usually in the systemd unit).
