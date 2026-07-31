@@ -699,9 +699,9 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 			continue
 		}
 		collected := time.Now()
-	        sctx, cancel := timeout.WithContext(ctx, cmetrics.ShimStatsRequestTimeout)
-                stats, err := tk.Stats(sctx)
-                cancel()
+		sctx, cancel := timeout.WithContext(ctx, cmetrics.ShimStatsRequestTimeout)
+		stats, err := tk.Stats(sctx)
+		cancel()
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				log.G(ctx).WithError(err).Errorf("collecting metrics for %s", tk.ID())
