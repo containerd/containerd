@@ -47,6 +47,7 @@ import (
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/metadata"
+	cmetrics "github.com/containerd/containerd/v2/core/metrics"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/archive"
@@ -698,7 +699,9 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 			continue
 		}
 		collected := time.Now()
-		stats, err := tk.Stats(ctx)
+	        sctx, cancel := timeout.WithContext(ctx, cmetrics.ShimStatsRequestTimeout)
+                stats, err := tk.Stats(sctx)
+                cancel()
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				log.G(ctx).WithError(err).Errorf("collecting metrics for %s", tk.ID())
