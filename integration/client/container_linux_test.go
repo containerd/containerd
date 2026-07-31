@@ -19,6 +19,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -40,15 +41,20 @@ import (
 
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	coreimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/integration/failpoint"
 	"github.com/containerd/containerd/v2/integration/images"
+	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/fifosync"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/sys"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins"
 
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
@@ -1815,6 +1821,79 @@ func TestIssue10589(t *testing.T) {
 	assert.Equal(t, Stopped, status.Status)
 }
 
+// buildWhiteoutImage builds an image on top of the base image, appending
+// layers generated with archive.WriteDiff that create files and then delete
+// them again with whiteouts:
+//
+//	touch /file-to-delete
+//	rm /file-to-delete
+//	mkdir /dir-to-delete && touch /dir-to-delete/foo
+//	rm -rf /dir-to-delete
+//
+// The image is returned as the blobs of the new layers, config, and manifest
+// keyed by digest, together with the manifest descriptor, to be served with
+// testutil.ServeImage. The blobs of the base image are not included; they
+// are expected to be present in the content store already.
+func buildWhiteoutImage(ctx context.Context, t *testing.T, client *Client, base Image) (map[digest.Digest][]byte, ocispec.Descriptor) {
+	blobs := map[digest.Digest][]byte{}
+
+	empty := t.TempDir()
+	withFile := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(withFile, "file-to-delete"), nil, 0644))
+	withDir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(withDir, "dir-to-delete"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(withDir, "dir-to-delete", "foo"), nil, 0644))
+
+	config, err := base.Spec(ctx)
+	require.NoError(t, err)
+	manifest, err := coreimages.Manifest(ctx, client.ContentStore(), base.Target(), platforms.Default())
+	require.NoError(t, err)
+
+	for _, l := range []struct {
+		createdBy    string
+		lower, upper string
+	}{
+		{"touch /file-to-delete", empty, withFile},
+		{"rm /file-to-delete", withFile, empty},
+		{"mkdir /dir-to-delete && touch /dir-to-delete/foo", empty, withDir},
+		{"rm -rf /dir-to-delete", withDir, empty},
+	} {
+		var buf bytes.Buffer
+		require.NoError(t, archive.WriteDiff(ctx, &buf, l.lower, l.upper))
+		desc := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Digest:    digest.FromBytes(buf.Bytes()),
+			Size:      int64(buf.Len()),
+		}
+		blobs[desc.Digest] = buf.Bytes()
+		manifest.Layers = append(manifest.Layers, desc)
+		// The layer is uncompressed, so its diff ID is its blob digest.
+		config.RootFS.DiffIDs = append(config.RootFS.DiffIDs, desc.Digest)
+		config.History = append(config.History, ocispec.History{CreatedBy: l.createdBy})
+	}
+
+	configBlob, err := json.Marshal(config)
+	require.NoError(t, err)
+	manifest.Config = ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageConfig,
+		Digest:    digest.FromBytes(configBlob),
+		Size:      int64(len(configBlob)),
+	}
+	blobs[manifest.Config.Digest] = configBlob
+
+	manifest.MediaType = ocispec.MediaTypeImageManifest
+	manifestBlob, err := json.Marshal(manifest)
+	require.NoError(t, err)
+	target := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromBytes(manifestBlob),
+		Size:      int64(len(manifestBlob)),
+	}
+	blobs[target.Digest] = manifestBlob
+
+	return blobs, target
+}
+
 // TestIssue13030 is a regression test for parallel image unpacking.
 // The test validates that when multiple layers are unpacked in parallel,
 // that whiteout files are properly processed and do not cause files to
@@ -1831,14 +1910,22 @@ func TestIssue13030(t *testing.T) {
 	ctx, cancel := testContext(t)
 	t.Cleanup(cancel)
 
+	// Pull the base image without unpacking it, so that all the layers of
+	// the derived image built below are unpacked in parallel.
+	base, err := client.Pull(ctx, images.Get(images.BusyBox), WithPlatformMatcher(platforms.Default()))
+	require.NoError(t, err)
+
+	blobs, target := buildWhiteoutImage(ctx, t, client, base)
+	ref := testutil.ServeImage(t, "whiteout-test", "latest", target, blobs)
+
 	image, err := client.Pull(ctx,
-		images.Get(images.Whiteout),
+		ref,
 		WithPlatformMatcher(platforms.Default()),
 		WithPullUnpack,
 		WithUnpackOpts([]UnpackOpt{WithUnpackLimiter(semaphore.NewWeighted(3))}),
 	)
 	t.Cleanup(func() {
-		client.ImageService().Delete(ctx, images.Get(images.Whiteout))
+		client.ImageService().Delete(ctx, ref)
 	})
 	if err != nil {
 		t.Fatal(err)

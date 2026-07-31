@@ -39,7 +39,6 @@ type ImageList struct {
 	VolumeOwnership  string
 	ArgsEscaped      string
 	Nginx            string
-	Whiteout         string
 }
 
 var (
@@ -60,7 +59,6 @@ func initImages(imageListFile string) {
 		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
 		ArgsEscaped:      "cplatpublic.azurecr.io/args-escaped-test-image-ns:1.0",
 		Nginx:            "ghcr.io/containerd/nginx:1.27.0",
-		Whiteout:         "ghcr.io/containerd/whiteout-test:1.0",
 	}
 
 	if imageListFile != "" {
@@ -102,8 +100,6 @@ const (
 	ArgsEscaped
 	// Nginx image
 	Nginx
-	// Whiteout image
-	Whiteout
 )
 
 func initImageMap(imageList ImageList) map[int]string {
@@ -117,7 +113,6 @@ func initImageMap(imageList ImageList) map[int]string {
 	images[VolumeOwnership] = imageList.VolumeOwnership
 	images[ArgsEscaped] = imageList.ArgsEscaped
 	images[Nginx] = imageList.Nginx
-	images[Whiteout] = imageList.Whiteout
 	return images
 }
 
