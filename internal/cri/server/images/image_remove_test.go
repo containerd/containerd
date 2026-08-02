@@ -55,9 +55,9 @@ func (f *fakeImageStore) Get(_ context.Context, _ string) (images.Image, error) 
 }
 
 const (
-	testRemoveImageID   = "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799"
-	testRemoveRepoTag   = "docker.io/library/busybox:latest"
-	testRemoveRepoDigst = "docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"
+	testRemoveImageID    = "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799"
+	testRemoveRepoTag    = "docker.io/library/busybox:latest"
+	testRemoveRepoDigest = "docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"
 )
 
 func addTestImage(t *testing.T, c *CRIImageService, refs []string, getter imagestore.Getter) {
@@ -81,14 +81,14 @@ func TestRemoveImageDeletesImageIDFirst(t *testing.T) {
 	c.images = fake
 
 	// References are stored sorted, which places the bare config digest last.
-	addTestImage(t, c, []string{testRemoveRepoTag, testRemoveRepoDigst, testRemoveImageID}, fake)
+	addTestImage(t, c, []string{testRemoveRepoTag, testRemoveRepoDigest, testRemoveImageID}, fake)
 
 	err := c.RemoveImage(context.Background(), &runtime.ImageSpec{Image: testRemoveImageID})
 	require.NoError(t, err)
 
 	require.Len(t, fake.deleted, 3)
 	assert.Equal(t, testRemoveImageID, fake.deleted[0], "image ID reference must be deleted first")
-	assert.ElementsMatch(t, []string{testRemoveRepoTag, testRemoveRepoDigst}, fake.deleted[1:])
+	assert.ElementsMatch(t, []string{testRemoveRepoTag, testRemoveRepoDigest}, fake.deleted[1:])
 }
 
 func TestRemoveImageInterruptedLeavesNamedReference(t *testing.T) {
@@ -98,7 +98,7 @@ func TestRemoveImageInterruptedLeavesNamedReference(t *testing.T) {
 	fake := &fakeImageStore{failAfter: 1, err: errors.New("context deadline exceeded")}
 	c.images = fake
 
-	addTestImage(t, c, []string{testRemoveRepoTag, testRemoveRepoDigst, testRemoveImageID}, fake)
+	addTestImage(t, c, []string{testRemoveRepoTag, testRemoveRepoDigest, testRemoveImageID}, fake)
 
 	err := c.RemoveImage(context.Background(), &runtime.ImageSpec{Image: testRemoveImageID})
 	require.Error(t, err)
