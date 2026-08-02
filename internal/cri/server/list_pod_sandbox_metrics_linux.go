@@ -103,21 +103,26 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 			}
 
 			for _, container := range sandboxContainerMap[sandbox.ID] {
-				containerMetrics, err := c.collectContainerMetrics(ctx, container, baseLabels)
+				containerMetrics, err := c.collectContainerMetrics(gctx, container, baseLabels)
 				if err != nil {
 					switch {
-					case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
+					case errdefs.IsNotFound(err):
+						// A completed Kubernetes init container has no task, which is fine.
+						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Debug("skipping container metrics")
+						// Skip this container but keep collecting the rest of the sandbox.
+						continue
+					case errdefs.IsUnavailable(err):
 						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to get container metrics, this is likely a transient error")
-						// Don't return error for transient issues, just log and continue
-						return nil
+						// Skip this container but keep collecting the rest of the sandbox.
+						continue
 					case errdefs.IsCanceled(err):
 						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Debug("metrics collection cancelled")
 						// Return the cancellation error to stop other goroutines
 						return err
 					default:
 						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to collect container metrics")
-						// Don't return error for individual failures, just log and continue
-						return nil
+						// Skip this container but keep collecting the rest of the sandbox.
+						continue
 					}
 				}
 
