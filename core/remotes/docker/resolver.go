@@ -905,6 +905,17 @@ func (r *request) setOffset(offset int64) {
 	r.header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
 }
 
+// setRange sets an explicit, bounded byte range (inclusive on both ends),
+// unlike setOffset's open-ended "from offset to the end of the resource".
+// This is used when the caller already knows exactly how many bytes it
+// wants (e.g. a single chunk of a parallel download), so a well-behaved
+// server can respond with just that range instead of streaming everything
+// from start to the end of the resource only for the client to discard the
+// remainder after reading its chunk.
+func (r *request) setRange(start, end int64) {
+	r.header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+}
+
 func requestFields(req *http.Request) log.Fields {
 	fields := map[string]any{
 		"request.method": req.Method,
