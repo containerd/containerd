@@ -104,7 +104,7 @@ func init() {
 			ContentSharingPolicy: SharingPolicyShared,
 			NoSync:               false,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			root := ic.Properties[plugins.PropertyRootDir]
 			if err := os.MkdirAll(root, 0711); err != nil {
 				return nil, err
@@ -137,6 +137,11 @@ func init() {
 			options.NoFreelistSync = true
 			// Without the timeout, bbolt.Open would block indefinitely due to flock(2).
 			options.Timeout = timeout.Get(boltOpenTimeout)
+
+			// Disable stat usage since we never consume the data.
+			// This can reduce unnecessary contention during transactions.
+			// https://github.com/etcd-io/bbolt/pull/977
+			options.NoStatistics = true
 
 			shared := true
 			ic.Meta.Exports["policy"] = SharingPolicyShared

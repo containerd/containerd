@@ -1,44 +1,48 @@
+version: "2"
+
 linters:
   enable:
     - staticcheck
     - unconvert
-    - gofmt
-    - goimports
     - ineffassign
-    - vet
+    - govet
     - unused
     - misspell
     - revive
   disable:
     - errcheck
+  exclusions:
+    rules:
+      # We have protoc-generated ttRPC/gRPC code. When adding extra functions
+      # for generated types we want to consistently violate golint's semantic
+      # function name spelling rules, instead of inconsistently doing so only
+      # from automatically generated files. These rules are for that.
+      - path: pkg/adaptation/result.go
+        linters:
+          - golint
+          - revive
+        text: "should be claim"
+      # Differ copies pods and containers with Mutexes for diffing. Should be harmless.
+      - path: plugins/differ/nri-differ.go
+        linters:
+          - govet
+        text: "copylocks: .*protobuf/internal/impl.MessageState.*"
+      # We dot-import ginkgo and gomega in some tests. Silence any related errors.
+      - path: 'pkg/adaptation|pkg/runtime-tools/generate|pkg/net/multiplex'
+        linters:
+          - revive
+        text: "dot-imports:"
+      - linters:
+          - revive
+        text: "package-comments:"
+      - linters:
+          - staticcheck
+        text: "QF1008:"
 
-issues:
-  include:
-    - EXC0002
-  exclude-rules:
-    # We have protoc-generated ttRPC/gRPC code. When adding extra functions
-    # for generated types we want to consistently violate golint's semantic
-    # function name spelling rules, instead of inconsistently doing so only
-    # from automatically generated files. These rules are for that.
-    - path: pkg/adaptation/result.go
-      linters:
-        - golint
-        - revive
-      text: "should be claim"
-    # Ignore naming violation in the test suite as well.
-    - path: pkg/adaptation/adaptation_suite_test.go
-      linters:
-        - golint
-        - revive
-      text: "should be strip"
-    # Differ copies pods and containers with Mutexes for diffing. Should be harmless.
-    - path: plugins/differ/nri-differ.go
-      linters:
-        - govet
-      text: "copylocks: .*protobuf/internal/impl.MessageState.*"
-    # We dot-import ginkgo and gomega in some tests. Silence any related errors.
-    - path: 'pkg/adaptation|pkg/runtime-tools/generate|pkg/net/multiplex'
-      text: "dot-imports:"
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 run:
   timeout: 2m

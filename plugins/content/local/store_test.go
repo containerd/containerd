@@ -22,9 +22,11 @@ import (
 	"context"
 	"crypto/rand"
 	_ "crypto/sha256" // required for digest package
+	_ "crypto/sha512" // required for sha512 digest support
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -94,119 +96,157 @@ func (mls *memoryLabelStore) Update(d digest.Digest, update map[string]string) (
 func TestContent(t *testing.T) {
 	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
 		cs, err := NewLabeledStore(root, newMemoryLabelStore())
-		if err != nil {
-			return nil, nil, nil, err
-		}
+		assert.NoError(t, err)
 		return ctx, cs, func() error {
 			return nil
 		}, nil
 	})
 }
 
+func TestContentRootDir(t *testing.T) {
+	// test dir exist
+	dirExist := t.TempDir()
+	_, err := NewLabeledStore(dirExist, newMemoryLabelStore())
+	assert.NoError(t, err)
+	// test dir doesn't exist
+	dir := filepath.Join(t.TempDir(), "test_dir001")
+	_, err = NewLabeledStore(dir, newMemoryLabelStore())
+	assert.NoError(t, err)
+	_, err = os.Stat(dir)
+	assert.NoError(t, err)
+}
+
+func TestInvalidPermissionRootDir(t *testing.T) {
+	// test dir permissions are invalid
+	if os.Getuid() != 0 {
+		t.Skip("skipping test that requires root")
+	}
+	_, err := exec.LookPath("chattr")
+	if err != nil {
+		t.Skip("skipping test that requires chattr command")
+	}
+	dirBadPermission := t.TempDir()
+	cmd := exec.Command("chattr", "+i", dirBadPermission)
+	_, err = cmd.CombinedOutput()
+	assert.NoError(t, err)
+	defer func() {
+		cmd := exec.Command("chattr", "-i", dirBadPermission)
+		_, err = cmd.CombinedOutput()
+		assert.NoError(t, err)
+	}()
+	_, err = fsverity.IsSupported(dirBadPermission)
+	if err == nil {
+		t.Fatal(fmt.Errorf("err can't be nil"))
+	}
+}
+
 func TestContentWriter(t *testing.T) {
-	ctx, tmpdir, cs, cleanup := contentStoreEnv(t)
-	defer cleanup()
-	defer testutil.DumpDirOnFailure(t, tmpdir)
+	for _, alg := range []digest.Algorithm{digest.SHA256, digest.SHA512} {
+		t.Run(alg.String(), func(t *testing.T) {
+			ctx, tmpdir, cs, cleanup := contentStoreEnv(t)
+			defer cleanup()
+			defer testutil.DumpDirOnFailure(t, tmpdir)
 
-	cw, err := cs.Writer(ctx, content.WithRef("myref"))
-	if err != nil {
-		t.Fatal(err)
+			cw, err := cs.Writer(ctx, content.WithRef("myref"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := cw.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := os.Stat(filepath.Join(tmpdir, "ingest")); os.IsNotExist(err) {
+				t.Fatal("ingest dir should be created", err)
+			}
+
+			// reopen, so we can test things
+			cw, err = cs.Writer(ctx, content.WithRef("myref"))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// make sure that second resume also fails
+			if _, err = cs.Writer(ctx, content.WithRef("myref")); err == nil {
+				// TODO(stevvooe): This also works across processes. Need to find a way
+				// to test that, as well.
+				t.Fatal("no error on second resume")
+			}
+
+			// we should also see this as an active ingestion
+			ingestions, err := cs.ListStatuses(ctx, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// clear out the time and meta cause we don't care for this test
+			for i := range ingestions {
+				ingestions[i].UpdatedAt = time.Time{}
+				ingestions[i].StartedAt = time.Time{}
+			}
+
+			if !reflect.DeepEqual(ingestions, []content.Status{
+				{
+					Ref:    "myref",
+					Offset: 0,
+				},
+			}) {
+				t.Fatalf("unexpected ingestion set: %v", ingestions)
+			}
+
+			p := make([]byte, 4<<20)
+			if _, err := rand.Read(p); err != nil {
+				t.Fatal(err)
+			}
+			expected := alg.FromBytes(p)
+
+			checkCopy(t, int64(len(p)), cw, bufio.NewReader(io.NopCloser(bytes.NewReader(p))))
+
+			if err := cw.Commit(ctx, int64(len(p)), expected); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := cw.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			cw, err = cs.Writer(ctx, content.WithRef("aref"))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// now, attempt to write the same data again
+			checkCopy(t, int64(len(p)), cw, bufio.NewReader(io.NopCloser(bytes.NewReader(p))))
+			if err := cw.Commit(ctx, int64(len(p)), expected); err == nil {
+				t.Fatal("expected already exists error")
+			} else if !errdefs.IsAlreadyExists(err) {
+				t.Fatal(err)
+			}
+
+			path := checkBlobPath(t, cs, expected)
+
+			// read the data back, make sure its the same
+			pp, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !bytes.Equal(p, pp) {
+				t.Fatal("mismatched data written to disk")
+			}
+
+			// ensure fsverity is enabled on blob if fsverity is supported
+			ok, err := fsverity.IsSupported(tmpdir)
+			if !ok || err != nil {
+				t.Log("fsverity not supported, skipping fsverity check")
+				return
+			}
+
+			ok, err = fsverity.IsEnabled(path)
+			if !ok || err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
-	if err := cw.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := os.Stat(filepath.Join(tmpdir, "ingest")); os.IsNotExist(err) {
-		t.Fatal("ingest dir should be created", err)
-	}
-
-	// reopen, so we can test things
-	cw, err = cs.Writer(ctx, content.WithRef("myref"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// make sure that second resume also fails
-	if _, err = cs.Writer(ctx, content.WithRef("myref")); err == nil {
-		// TODO(stevvooe): This also works across processes. Need to find a way
-		// to test that, as well.
-		t.Fatal("no error on second resume")
-	}
-
-	// we should also see this as an active ingestion
-	ingestions, err := cs.ListStatuses(ctx, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// clear out the time and meta cause we don't care for this test
-	for i := range ingestions {
-		ingestions[i].UpdatedAt = time.Time{}
-		ingestions[i].StartedAt = time.Time{}
-	}
-
-	if !reflect.DeepEqual(ingestions, []content.Status{
-		{
-			Ref:    "myref",
-			Offset: 0,
-		},
-	}) {
-		t.Fatalf("unexpected ingestion set: %v", ingestions)
-	}
-
-	p := make([]byte, 4<<20)
-	if _, err := rand.Read(p); err != nil {
-		t.Fatal(err)
-	}
-	expected := digest.FromBytes(p)
-
-	checkCopy(t, int64(len(p)), cw, bufio.NewReader(io.NopCloser(bytes.NewReader(p))))
-
-	if err := cw.Commit(ctx, int64(len(p)), expected); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := cw.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	cw, err = cs.Writer(ctx, content.WithRef("aref"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// now, attempt to write the same data again
-	checkCopy(t, int64(len(p)), cw, bufio.NewReader(io.NopCloser(bytes.NewReader(p))))
-	if err := cw.Commit(ctx, int64(len(p)), expected); err == nil {
-		t.Fatal("expected already exists error")
-	} else if !errdefs.IsAlreadyExists(err) {
-		t.Fatal(err)
-	}
-
-	path := checkBlobPath(t, cs, expected)
-
-	// read the data back, make sure its the same
-	pp, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(p, pp) {
-		t.Fatal("mismatched data written to disk")
-	}
-
-	// ensure fsverity is enabled on blob if fsverity is supported
-	ok, err := fsverity.IsSupported(tmpdir)
-	if !ok || err != nil {
-		t.Log("fsverity not supported, skipping fsverity check")
-		return
-	}
-
-	ok, err = fsverity.IsEnabled(path)
-	if !ok || err != nil {
-		t.Fatal(err)
-	}
-
 }
 
 func TestWalkBlobs(t *testing.T) {
@@ -275,21 +315,22 @@ func BenchmarkIngests(b *testing.B) {
 }
 
 type checker interface {
-	Fatal(args ...interface{})
+	Fatal(args ...any)
 }
 
 func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	blobs := map[digest.Digest][]byte{}
 
-	for i := int64(0); i < nblobs; i++ {
+	for range nblobs {
 		p := make([]byte, randutil.Int63n(maxsize))
 
 		if _, err := rand.Read(p); err != nil {
 			t.Fatal(err)
 		}
 
-		dgst := digest.FromBytes(p)
-		blobs[dgst] = p
+		for _, alg := range []digest.Algorithm{digest.SHA256, digest.SHA512} {
+			blobs[alg.FromBytes(p)] = p
+		}
 	}
 
 	return blobs
@@ -353,8 +394,7 @@ func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
 	cs, err := NewStore(t.TempDir())
 	assert.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	ref := "ref"
 	contentB := []byte("this is the content")

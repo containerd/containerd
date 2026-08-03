@@ -18,24 +18,27 @@ package client
 
 import (
 	"fmt"
+	"maps"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/diff/v1"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/plugin"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	srv "github.com/containerd/containerd/v2/plugins/services"
-	"github.com/containerd/plugin"
 )
 
 type services struct {
@@ -52,6 +55,7 @@ type services struct {
 	sandboxStore         sandbox.Store
 	sandboxers           map[string]sandbox.Controller
 	transferService      transfer.Transferrer
+	mountManager         mount.Manager
 }
 
 // ServicesOpt allows callers to set options on the services
@@ -82,9 +86,7 @@ func WithImageStore(imageStore images.Store) ServicesOpt {
 func WithSnapshotters(snapshotters map[string]snapshots.Snapshotter) ServicesOpt {
 	return func(s *services) {
 		s.snapshotters = make(map[string]snapshots.Snapshotter)
-		for n, sn := range snapshotters {
-			s.snapshotters[n] = sn
-		}
+		maps.Copy(s.snapshotters, snapshotters)
 	}
 }
 
@@ -172,23 +174,33 @@ func WithTransferService(tr transfer.Transferrer) ServicesOpt {
 	}
 }
 
+// WithMountManager sets the mount manager.
+func WithMountManager(mm mount.Manager) ServicesOpt {
+	return func(s *services) {
+		s.mountManager = mm
+	}
+}
+
 // WithInMemoryServices is suitable for cases when there is need to use containerd's client from
 // another (in-memory) containerd plugin (such as CRI).
 func WithInMemoryServices(ic *plugin.InitContext) Opt {
 	return func(c *clientOpts) error {
 		var opts []ServicesOpt
-		for t, fn := range map[plugin.Type]func(interface{}) ServicesOpt{
-			plugins.EventPlugin: func(i interface{}) ServicesOpt {
+		for t, fn := range map[plugin.Type]func(any) ServicesOpt{
+			plugins.EventPlugin: func(i any) ServicesOpt {
 				return WithEventService(i.(EventService))
 			},
-			plugins.LeasePlugin: func(i interface{}) ServicesOpt {
+			plugins.LeasePlugin: func(i any) ServicesOpt {
 				return WithLeasesService(i.(leases.Manager))
 			},
-			plugins.SandboxStorePlugin: func(i interface{}) ServicesOpt {
+			plugins.SandboxStorePlugin: func(i any) ServicesOpt {
 				return WithSandboxStore(i.(sandbox.Store))
 			},
-			plugins.TransferPlugin: func(i interface{}) ServicesOpt {
+			plugins.TransferPlugin: func(i any) ServicesOpt {
 				return WithTransferService(i.(transfer.Transferrer))
+			},
+			plugins.MountManagerPlugin: func(i any) ServicesOpt {
+				return WithMountManager(i.(mount.Manager))
 			},
 		} {
 			i, err := ic.GetSingle(t)
@@ -202,29 +214,29 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 		if err != nil {
 			return fmt.Errorf("failed to get service plugin: %w", err)
 		}
-		for s, fn := range map[string]func(interface{}) ServicesOpt{
-			srv.ContentService: func(s interface{}) ServicesOpt {
+		for s, fn := range map[string]func(any) ServicesOpt{
+			srv.ContentService: func(s any) ServicesOpt {
 				return WithContentStore(s.(content.Store))
 			},
-			srv.ImagesService: func(s interface{}) ServicesOpt {
+			srv.ImagesService: func(s any) ServicesOpt {
 				return WithImageClient(s.(imagesapi.ImagesClient))
 			},
-			srv.SnapshotsService: func(s interface{}) ServicesOpt {
+			srv.SnapshotsService: func(s any) ServicesOpt {
 				return WithSnapshotters(s.(map[string]snapshots.Snapshotter))
 			},
-			srv.ContainersService: func(s interface{}) ServicesOpt {
+			srv.ContainersService: func(s any) ServicesOpt {
 				return WithContainerClient(s.(containersapi.ContainersClient))
 			},
-			srv.TasksService: func(s interface{}) ServicesOpt {
+			srv.TasksService: func(s any) ServicesOpt {
 				return WithTaskClient(s.(tasks.TasksClient))
 			},
-			srv.DiffService: func(s interface{}) ServicesOpt {
+			srv.DiffService: func(s any) ServicesOpt {
 				return WithDiffClient(s.(diff.DiffClient))
 			},
-			srv.NamespacesService: func(s interface{}) ServicesOpt {
+			srv.NamespacesService: func(s any) ServicesOpt {
 				return WithNamespaceClient(s.(namespacesapi.NamespacesClient))
 			},
-			srv.IntrospectionService: func(s interface{}) ServicesOpt {
+			srv.IntrospectionService: func(s any) ServicesOpt {
 				return WithIntrospectionService(s.(introspection.Service))
 			},
 		} {

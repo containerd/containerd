@@ -1848,10 +1848,7 @@ func TestShimSockLength(t *testing.T) {
 	// Max length of namespace should be 76
 	namespace := strings.Repeat("n", 76)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, namespace)
+	ctx := namespaces.WithNamespace(t.Context(), namespace)
 
 	client, err := newClient(t, address)
 	if err != nil {
@@ -1944,7 +1941,7 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		spec, err := container.Spec(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -2072,10 +2069,7 @@ func TestRegressionIssue4769(t *testing.T) {
 	id := t.Name()
 	ns := fmt.Sprintf("%s-%s", testNamespace, id)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, ns)
+	ctx := namespaces.WithNamespace(t.Context(), ns)
 	ctx = logtest.WithT(ctx, t)
 
 	image, err := client.Pull(ctx, testImage, WithPullUnpack)
@@ -2180,10 +2174,7 @@ func TestRegressionIssue6429(t *testing.T) {
 	id := t.Name()
 	ns := fmt.Sprintf("%s-%s", testNamespace, id)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, ns)
+	ctx := namespaces.WithNamespace(t.Context(), ns)
 	ctx = logtest.WithT(ctx, t)
 
 	image, err := client.Pull(ctx, testImage, WithPullUnpack)
@@ -2403,8 +2394,8 @@ func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) 
 		t.Fatal(err)
 	}
 
-	// The container is using longCommand, which contains sleep 1 on Linux, and ping -t localhost on Windows.
-	if strings.Contains(string(b), "sleep 1") || strings.Contains(string(b), "ping -t localhost") {
+	// The container is using longCommand, which contains sleep inf on Linux, and ping -t localhost on Windows.
+	if strings.Contains(string(b), "sleep inf") || strings.Contains(string(b), "ping -t localhost") {
 		t.Fatalf("killing init didn't kill all its children:\n%v", string(b))
 	}
 
@@ -2782,27 +2773,18 @@ func TestContainerPTY(t *testing.T) {
 
 	<-statusC
 
+	// Wait for all IO copy operations to complete before inspecting buf.
+	// Otherwise there is a race between the IO copy goroutine writing to buf
+	// and the read below, which is flaky on Windows named pipes. Wait must be
+	// called before Delete, which cancels the IO.
+	task.IO().Wait()
+
 	if _, err := task.Delete(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	tries := 1
-	if runtime.GOOS == "windows" {
-		// TODO: Fix flakiness on Window by checking for race in writing to buffer
-		tries += 2
-	}
-
-	for {
-		out := buf.String()
-		if strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
-			break
-
-		}
-		tries--
-		if tries == 0 {
-			t.Fatal(`expected \x00 in output`)
-		}
-		t.Logf("output %#q does not contain \\x00, trying again", out)
-		time.Sleep(time.Millisecond)
+	out := buf.String()
+	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
+		t.Fatalf(`expected \x00 in output, got %#q`, out)
 	}
 }

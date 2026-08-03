@@ -44,6 +44,7 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/gc"
 	_ "github.com/containerd/containerd/v2/plugins/leases"
 	_ "github.com/containerd/containerd/v2/plugins/metadata"
+	_ "github.com/containerd/containerd/v2/plugins/mount"
 	_ "github.com/containerd/containerd/v2/plugins/services/containers"
 	_ "github.com/containerd/containerd/v2/plugins/services/content"
 	_ "github.com/containerd/containerd/v2/plugins/services/diff"
@@ -144,7 +145,7 @@ func tweakContentInitFnWithDelayer(commitDelayDuration time.Duration) tweakPlugi
 		}
 
 		oldInitFn := p.InitFn
-		p.InitFn = func(ic *plugin.InitContext) (interface{}, error) {
+		p.InitFn = func(ic *plugin.InitContext) (any, error) {
 			instance, err := oldInitFn(ic)
 			if err != nil {
 				return nil, err

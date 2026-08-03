@@ -17,11 +17,15 @@
 package util
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/ttrpc"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -141,21 +145,29 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 
 func TestBuildLabels(t *testing.T) {
 	imageConfigLabels := map[string]string{
-		"a":          "z",
-		"d":          "y",
-		"long-label": strings.Repeat("example", 10000),
+		"a":                            "z",
+		"d":                            "y",
+		"long-label":                   strings.Repeat("example", 10000),
+		"containerd.io/restart.policy": "always",
+		"io.cri-containerd.image":      "managed",
 	}
 	configLabels := map[string]string{
 		"a": "b",
 		"c": "d",
+		// reserved namespaces are only filtered for image config labels, not
+		// for labels from the CRI request
+		"containerd.io/restart.status": "stopped",
 	}
 	newLabels := BuildLabels(configLabels, imageConfigLabels, crilabels.ContainerKindSandbox)
-	assert.Len(t, newLabels, 4)
+	assert.Len(t, newLabels, 5)
 	assert.Equal(t, "b", newLabels["a"])
 	assert.Equal(t, "d", newLabels["c"])
 	assert.Equal(t, "y", newLabels["d"])
+	assert.Equal(t, "stopped", newLabels["containerd.io/restart.status"])
 	assert.Equal(t, crilabels.ContainerKindSandbox, newLabels[crilabels.ContainerKindLabel])
 	assert.NotContains(t, newLabels, "long-label")
+	assert.NotContains(t, newLabels, "containerd.io/restart.policy")
+	assert.NotContains(t, newLabels, "io.cri-containerd.image")
 
 	newLabels["a"] = "e"
 	assert.Empty(t, configLabels[crilabels.ContainerKindLabel], "should not add new labels into original label")
@@ -229,6 +241,46 @@ func TestGenerateUserString(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			assert.Equal(t, tc.result, r)
+		})
+	}
+}
+
+func TestIsShimTTRPCClosed(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "ttrpc closed error text",
+			err:      fmt.Errorf("ttrpc: closed"),
+			expected: true,
+		},
+		{
+			name:     "ttrpc closed error",
+			err:      ttrpc.ErrClosed,
+			expected: true,
+		},
+		{
+			name:     "wrapped ttrpc closed error",
+			err:      fmt.Errorf("some context: %w", ttrpc.ErrClosed),
+			expected: true,
+		},
+		{
+			name:     "non-ttrpc error",
+			err:      fmt.Errorf("some other error"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, IsShimTTRPCClosed(errgrpc.ToNative(tt.err)))
 		})
 	}
 }

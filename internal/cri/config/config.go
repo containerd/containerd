@@ -34,9 +34,9 @@ import (
 	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
-	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/plugins"
+	streaming "k8s.io/cri-streaming/pkg/streaming"
 )
 
 const (
@@ -73,7 +73,7 @@ const (
 	ModeShim SandboxControllerMode = "shim"
 	// DefaultSandboxImage is the default image to use for sandboxes when empty or
 	// for default configurations.
-	DefaultSandboxImage = "registry.k8s.io/pause:3.10"
+	DefaultSandboxImage = "registry.k8s.io/pause:3.10.2"
 	// IOTypeFifo is container io implemented by creating named pipe
 	IOTypeFifo = "fifo"
 	// IOTypeStreaming is container io implemented by connecting the streaming api to sandbox endpoint
@@ -97,7 +97,7 @@ type Runtime struct {
 	// Currently, only device plugins populate the annotations.
 	ContainerAnnotations []string `toml:"container_annotations" json:"ContainerAnnotations"`
 	// Options are config options for the runtime.
-	Options map[string]interface{} `toml:"options" json:"options"`
+	Options map[string]any `toml:"options" json:"options"`
 	// PrivilegedWithoutHostDevices overloads the default behaviour for adding host devices to the
 	// runtime spec when the container is privileged. Defaults to false.
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
@@ -125,6 +125,12 @@ type Runtime struct {
 	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
 	// podsandbox - means use Controller implementation from sbserver podsandbox package.
 	Sandboxer string `toml:"sandboxer" json:"sandboxer"`
+	// DisablePauseImagePull disables the automatic pre-pull of the pause container image
+	// in ensurePauseImageExists() during RunPodSandbox. When set to true, the shim controller
+	// implementation is responsible for ensuring the pause image (or its equivalent) is available.
+	// This is useful for sandboxers that do not require the host-level pause image.
+	// Default: false (CRI pre-pulls the pause image for all runtimes).
+	DisablePauseImagePull bool `toml:"disable_pause_image_pull" json:"disablePauseImagePull"`
 	// IOType defines how containerd transfer the io streams of the container
 	// if it is not set, the named pipe will be created for the container
 	// we can also set it to "streaming" to create a stream by streaming api,
@@ -228,20 +234,22 @@ type Registry struct {
 	// ConfigPath is a path to the root directory containing registry-specific
 	// configurations.
 	// If ConfigPath is set, the rest of the registry specific options are ignored.
+	// If no registry-specific options are set, ConfigPath defaults to
+	// "/etc/containerd/certs.d:/etc/docker/certs.d" for compatibility with Docker.
 	ConfigPath string `toml:"config_path" json:"configPath"`
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	// This option will not be used when ConfigPath is provided.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.2.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.3.
 	// Supported in 1.x releases.
 	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
 	// Configs are configs for each registry.
 	// The key is the domain name or IP of the registry.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.2.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.3.
 	// Supported in 1.x releases.
 	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.2.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.3.
 	// Supported in 1.x releases.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
@@ -298,7 +306,7 @@ type ImageConfig struct {
 	// by other plugins to lookup the current image name.
 	// Image names should be full names including domain and tag
 	// Examples:
-	//   "sandbox": "k8s.gcr.io/pause:3.10"
+	//   "sandbox": "registry.k8s.io/pause:3.10.2"
 	//   "base": "docker.io/library/ubuntu:latest"
 	// Migrated from:
 	// (PluginConfig).SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
@@ -407,7 +415,8 @@ type RuntimeConfig struct {
 	// into the OCI config
 	// For more details about CDI and the syntax of CDI Spec files please refer to
 	// https://tags.cncf.io/container-device-interface.
-	EnableCDI bool `toml:"enable_cdi" json:"enableCDI"`
+	// DEPRECATED: CDI support will always be enabled in a future release.
+	EnableCDI *bool `toml:"enable_cdi" json:"enableCDI"`
 	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
 	// For more details about CDI configuration please refer to
 	// https://tags.cncf.io/container-device-interface#containerd-configuration
@@ -425,6 +434,23 @@ type RuntimeConfig struct {
 	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
+
+	// StatsCollectPeriod is the period for collecting container/sandbox CPU stats
+	// used for calculating UsageNanoCores. This matches cAdvisor's default housekeeping interval.
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	// Default: "1s"
+	StatsCollectPeriod string `toml:"stats_collect_period" json:"statsCollectPeriod"`
+
+	// StatsRetentionPeriod is how long to retain CPU stats samples for calculating UsageNanoCores.
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	// Default: "2m"
+	StatsRetentionPeriod string `toml:"stats_retention_period" json:"statsRetentionPeriod"`
+
+	// EnableCRIU enables CRIU (Checkpoint/Restore In Userspace) support.
+	// When set to false, checkpoint/restore operations will be disabled.
+	EnableCRIU *bool `toml:"enable_criu" json:"enableCRIU"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -667,9 +693,27 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 			return warnings, fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
 		}
 	}
+	// Validation for stats_collect_period
+	if c.StatsCollectPeriod != "" {
+		if _, err := time.ParseDuration(c.StatsCollectPeriod); err != nil {
+			return warnings, fmt.Errorf("invalid `stats_collect_period`: %w", err)
+		}
+	}
+	// Validation for stats_retention_period
+	if c.StatsRetentionPeriod != "" {
+		if _, err := time.ParseDuration(c.StatsRetentionPeriod); err != nil {
+			return warnings, fmt.Errorf("invalid `stats_retention_period`: %w", err)
+		}
+	}
 	if err := ValidateEnableUnprivileged(ctx, c); err != nil {
 		return warnings, err
 	}
+
+	// Validation for enable_cdi
+	if c.EnableCDI != nil && !*c.EnableCDI {
+		warnings = append(warnings, deprecation.CRIEnableCDI)
+	}
+
 	return warnings, nil
 }
 
@@ -738,7 +782,7 @@ func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
 }
 
 // GenerateRuntimeOptions generates runtime options from cri plugin config.
-func GenerateRuntimeOptions(r Runtime) (interface{}, error) {
+func GenerateRuntimeOptions(r Runtime) (any, error) {
 	if r.Options == nil {
 		return nil, nil
 	}
@@ -763,7 +807,7 @@ func GenerateRuntimeOptions(r Runtime) (interface{}, error) {
 }
 
 // getRuntimeOptionsType gets empty runtime options by the runtime type name.
-func getRuntimeOptionsType(t string) interface{} {
+func getRuntimeOptionsType(t string) any {
 	switch t {
 	case plugins.RuntimeRuncV2:
 		return &runcoptions.Options{}

@@ -98,9 +98,6 @@ type Status struct {
 	Unknown bool `json:"-"`
 	// Resources has container runtime resource constraints
 	Resources *runtime.ContainerResources
-	// Restore marks this container as a container to be restored from a
-	// checkpoint and not started.
-	Restore bool
 }
 
 // State returns current state of the container based on the container status.
@@ -255,6 +252,15 @@ func deepCopyOf(s Status) Status {
 				CpuMaximum:         s.Resources.Windows.CpuMaximum,
 				MemoryLimitInBytes: s.Resources.Windows.MemoryLimitInBytes,
 				RootfsSizeInBytes:  s.Resources.Windows.RootfsSizeInBytes,
+				AffinityCpus: func() []*runtime.WindowsCpuGroupAffinity {
+					cp := make([]*runtime.WindowsCpuGroupAffinity, 0, len(s.Resources.Windows.AffinityCpus))
+					for _, a := range s.Resources.Windows.AffinityCpus {
+						if a != nil {
+							cp = append(cp, &runtime.WindowsCpuGroupAffinity{CpuMask: a.CpuMask, CpuGroup: a.CpuGroup})
+						}
+					}
+					return cp
+				}(),
 			},
 		}
 	}

@@ -26,441 +26,127 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
-	"github.com/checkpoint-restore/go-criu/v7/stats"
+	criu "github.com/checkpoint-restore/go-criu/v7"
 	"github.com/checkpoint-restore/go-criu/v7/utils"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/internal/cri/annotations"
-	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
-	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
-	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
-	critypes "github.com/containerd/containerd/v2/internal/cri/types"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/continuity/fs"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 
-	"github.com/distribution/reference"
-	"github.com/opencontainers/image-spec/identity"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	spec "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	// TODO: This package import is kept to prevent merge conflicts while integrating multiple
+	// branches, specifically because this changes vendoring.
+	_ "github.com/checkpoint-restore/go-criu/v7/stats"
 )
 
-// checkIfCheckpointOCIImage returns checks if the input refers to a checkpoint image.
-// It returns the StorageImageID of the image the input resolves to, nil otherwise.
-func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string) (string, error) {
-	if input == "" {
-		return "", nil
-	}
-	if _, err := os.Stat(input); err == nil {
-		return "", nil
-	}
-
-	image, err := c.LocalResolve(input)
+// copyNoFollow copies the regular file at src to dst without following a symlink
+// at the final path component of src.
+//
+// The checkpoint code reads files (container.log, status, stats-dump, dump.log)
+// out of the container state directory, which can contain entries unpacked from a
+// checkpoint archive or OCI image. Those entries are externally provided, so they
+// are read defensively.
+//
+// src is first lstat'd (which does not follow a final-component symlink) and must
+// be a regular file; non-regular entries are rejected before src is ever opened.
+// src is then opened with O_NOFOLLOW as a belt-and-suspenders guard in case the
+// entry changes type between the lstat and the open.
+func copyNoFollow(src, dst string, perm os.FileMode) error {
+	fi, err := os.Lstat(src)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve image %q: %w", input, err)
+		return err
 	}
-	containerdImage, err := c.toContainerdImage(ctx, image)
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("refusing to copy %s: not a regular file", src)
+	}
+
+	in, err := os.OpenFile(src, os.O_RDONLY|unix.O_NOFOLLOW, 0)
 	if err != nil {
-		return "", fmt.Errorf("failed to get image from containerd %q: %w", input, err)
+		return err
 	}
-	input = containerdImage.Name()
-	images, err := c.client.ImageService().Get(ctx, input)
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
 	if err != nil {
-		return "", fmt.Errorf("failed to get image from containerd %q: %w", input, err)
+		return err
 	}
+	defer out.Close()
 
-	rawIndex, err := content.ReadBlob(ctx, c.client.ContentStore(), images.Target)
-	if err != nil {
-		return "", fmt.Errorf("failed to read image blob from containerd %q: %w", input, err)
-	}
-
-	var index v1.Index
-	if err = json.Unmarshal(rawIndex, &index); err != nil {
-		return "", fmt.Errorf("failed to unmarshall blob into OCI index: %w", err)
-	}
-
-	if index.Annotations == nil {
-		return "", nil
-	}
-
-	ann, ok := index.Annotations[crmetadata.CheckpointAnnotationName]
-	if !ok {
-		return "", nil
-	}
-
-	log.G(ctx).Infof("Found checkpoint of container %v in %v", ann, input)
-
-	return image.ID, nil
+	_, err = io.Copy(out, in)
+	return err
 }
 
-func (c *criService) CRImportCheckpoint(
-	ctx context.Context,
-	meta *containerstore.Metadata,
-	sandbox *sandbox.Sandbox,
-	sandboxConfig *runtime.PodSandboxConfig,
-) (ctrID string, retErr error) {
-	var mountPoint string
-	start := time.Now()
-	// Ensure that the image to restore the checkpoint from has been provided.
-	if meta.Config.Image == nil || meta.Config.Image.Image == "" {
-		return "", errors.New(`attribute "image" missing from container definition`)
+func (c *criService) checkCriu() error {
+	c.checkCriuOnce.Do(func() {
+		c.checkCriuErr = c.doCheckCriu()
+	})
+	return c.checkCriuErr
+}
+
+func (c *criService) doCheckCriu() error {
+	if c.config.EnableCRIU != nil && !*c.config.EnableCRIU {
+		return errors.New("criu support is disabled by configuration")
 	}
-
-	inputImage := meta.Config.Image.Image
-	createAnnotations := meta.Config.Annotations
-	createLabels := meta.Config.Labels
-
-	restoreStorageImageID, err := c.checkIfCheckpointOCIImage(ctx, inputImage)
+	path := resolveCriuPath(c.shimPath)
+	if path == "" {
+		return errors.New("criu binary not found in shim path or system PATH")
+	}
+	client := criu.MakeCriu()
+	client.SetCriuPath(path)
+	version, err := client.GetCriuVersion()
 	if err != nil {
-		return "", err
+		return fmt.Errorf("failed to retrieve criu version: %w", err)
 	}
-
-	mountPoint, err = os.MkdirTemp("", "checkpoint")
-	if err != nil {
-		return "", err
+	if version < utils.PodCriuVersion {
+		return fmt.Errorf("checkpoint/restore requires at least CRIU %d, current version is %d", utils.PodCriuVersion, version)
 	}
-	defer func() {
-		if err := os.RemoveAll(mountPoint); err != nil {
-			log.G(ctx).Errorf("Could not recursively remove %s: %q", mountPoint, err)
-		}
-	}()
-	var archiveFile *os.File
-	if restoreStorageImageID != "" {
-		log.G(ctx).Debugf("Restoring from oci image %s", inputImage)
-		platform, err := c.sandboxService.SandboxPlatform(ctx, sandbox.Sandboxer, sandbox.ID)
-		if err != nil {
-			return "", fmt.Errorf("failed to query sandbox platform: %w", err)
-		}
-		img, err := c.client.ImageService().Get(ctx, restoreStorageImageID)
-		if err != nil {
-			return "", err
-		}
+	return nil
+}
 
-		i := client.NewImageWithPlatform(c.client, img, platforms.Only(platform))
-		diffIDs, err := i.RootFS(ctx)
-		if err != nil {
-			return "", err
-		}
-		chainID := identity.ChainID(diffIDs).String()
-		ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
-		if err != nil {
-			return "", fmt.Errorf("failed to get sandbox runtime: %w", err)
-		}
-		s := c.client.SnapshotService(c.RuntimeSnapshotter(ctx, ociRuntime))
-
-		mounts, err := s.View(ctx, mountPoint, chainID)
-		if err != nil {
-			if errdefs.IsAlreadyExists(err) {
-				mounts, err = s.Mounts(ctx, mountPoint)
+func resolveCriuPath(customPath string) string {
+	if customPath != "" {
+		// This logic is Linux-specific. If CRIU is ever supported on other
+		// operating systems, path lookup will need to respect that OS's
+		// conventions.
+		for _, dir := range filepath.SplitList(customPath) {
+			if !filepath.IsAbs(dir) {
+				continue
 			}
-			if err != nil {
-				return "", err
+			criuPath := filepath.Join(dir, "criu")
+			if fi, err := os.Stat(criuPath); err == nil && fi.Mode().IsRegular() && fi.Mode()&0111 != 0 {
+				return criuPath
 			}
 		}
-		if err := mount.All(mounts, mountPoint); err != nil {
-			return "", err
+		return ""
+	}
+	if criuPath, err := exec.LookPath("criu"); err == nil {
+		if absPath, err := filepath.Abs(criuPath); err == nil {
+			return absPath
 		}
-	} else {
-
-		archiveFile, err = os.Open(inputImage)
-		if err != nil {
-			return "", fmt.Errorf("failed to open checkpoint archive %s for import: %w", inputImage, err)
-		}
-		defer func(f *os.File) {
-			if err := f.Close(); err != nil {
-				log.G(ctx).Errorf("Unable to close file %s: %q", f.Name(), err)
-			}
-		}(archiveFile)
-
-		filter := archive.WithFilter(func(hdr *tar.Header) (bool, error) {
-			// The checkpoint archive is unpacked twice if using a tar file directly.
-			// The first time only the metadata files are relevant to prepare the
-			// restore operation. This filter function ignores the large parts of
-			// the checkpoint archive. This is usually the actual checkpoint
-			// coming from CRIU as well as the rootfs diff tar file.
-			excludePatterns := []string{
-				"artifacts",
-				"ctr.log",
-				crmetadata.RootFsDiffTar,
-				crmetadata.NetworkStatusFile,
-				crmetadata.DeletedFilesFile,
-				crmetadata.CheckpointDirectory,
-			}
-			for _, pattern := range excludePatterns {
-				if strings.HasPrefix(hdr.Name, pattern) {
-					return false, nil
-				}
-			}
-			return true, nil
-		})
-
-		_, err = archive.Apply(
-			ctx,
-			mountPoint,
-			archiveFile,
-			[]archive.ApplyOpt{filter}...,
-		)
-
-		if err != nil {
-			return "", fmt.Errorf("unpacking of checkpoint archive %s failed: %w", mountPoint, err)
-		}
-		log.G(ctx).Debugf("Unpacked checkpoint in %s", mountPoint)
+		return criuPath
 	}
-	// Load spec.dump from temporary directory
-	dumpSpec := new(spec.Spec)
-	if _, err := crmetadata.ReadJSONFile(dumpSpec, mountPoint, crmetadata.SpecDumpFile); err != nil {
-		return "", fmt.Errorf("failed to read %q: %w", crmetadata.SpecDumpFile, err)
-	}
-
-	// Load config.dump from temporary directory
-	config := new(crmetadata.ContainerConfig)
-	if _, err := crmetadata.ReadJSONFile(config, mountPoint, crmetadata.ConfigDumpFile); err != nil {
-		return "", fmt.Errorf("failed to read %q: %w", crmetadata.ConfigDumpFile, err)
-	}
-
-	// Load status.dump from temporary directory
-	containerStatus := new(runtime.ContainerStatus)
-	if _, err := crmetadata.ReadJSONFile(containerStatus, mountPoint, crmetadata.StatusDumpFile); err != nil {
-		return "", fmt.Errorf("failed to read %q: %w", crmetadata.StatusDumpFile, err)
-	}
-
-	if meta.SandboxID == "" {
-		// restore into previous sandbox
-		meta.SandboxID = dumpSpec.Annotations[annotations.SandboxID]
-		ctrID = config.ID
-	} else {
-		ctrID = ""
-	}
-
-	ctrMetadata := runtime.ContainerMetadata{}
-
-	if meta.Config.Metadata != nil && meta.Config.Metadata.Name != "" {
-		ctrMetadata.Name = containerStatus.GetMetadata().GetName()
-	}
-
-	originalAnnotations := containerStatus.GetAnnotations()
-	originalLabels := containerStatus.GetLabels()
-
-	sandboxUID := sandboxConfig.GetMetadata().GetUid()
-
-	if sandboxUID != "" {
-		if _, ok := originalLabels[critypes.KubernetesPodUIDLabel]; ok {
-			originalLabels[critypes.KubernetesPodUIDLabel] = sandboxUID
-		}
-		if _, ok := originalAnnotations[critypes.KubernetesPodUIDLabel]; ok {
-			originalAnnotations[critypes.KubernetesPodUIDLabel] = sandboxUID
-		}
-	}
-
-	if createLabels != nil {
-		fixupLabels := []string{
-			// Update the container name. It has already been update in metadata.Name.
-			// It also needs to be updated in the container labels.
-			critypes.KubernetesContainerNameLabel,
-			// Update pod name in the labels.
-			critypes.KubernetesPodNameLabel,
-			// Also update namespace.
-			critypes.KubernetesPodNamespaceLabel,
-		}
-
-		for _, annotation := range fixupLabels {
-			_, ok1 := createLabels[annotation]
-			_, ok2 := originalLabels[annotation]
-
-			// If the value is not set in the original container or
-			// if it is not set in the new container, just skip
-			// the step of updating metadata.
-			if ok1 && ok2 {
-				originalLabels[annotation] = createLabels[annotation]
-			}
-		}
-	}
-
-	if createAnnotations != nil {
-		// The hash also needs to be update or Kubernetes thinks the container needs to be restarted
-		_, ok1 := createAnnotations["io.kubernetes.container.hash"]
-		_, ok2 := originalAnnotations["io.kubernetes.container.hash"]
-
-		if ok1 && ok2 {
-			originalAnnotations["io.kubernetes.container.hash"] = createAnnotations["io.kubernetes.container.hash"]
-		}
-
-		// The restart count also needs to be correctly updated
-		_, ok1 = createAnnotations["io.kubernetes.container.restartCount"]
-		_, ok2 = originalAnnotations["io.kubernetes.container.restartCount"]
-
-		if ok1 && ok2 {
-			originalAnnotations["io.kubernetes.container.restartCount"] = createAnnotations["io.kubernetes.container.restartCount"]
-		}
-	}
-
-	// Pulling the image the checkpoint is based on. This is a bit different
-	// than automatic image pulling. The checkpoint image is not automatically
-	// pulled, but the image the checkpoint is based on.
-	// During checkpointing the base image of the checkpoint is stored in the
-	// checkpoint archive as NAME@DIGEST. The checkpoint archive also contains
-	// the tag with which it was initially pulled.
-	// First step is to pull NAME@DIGEST
-	containerdImage, err := c.client.Pull(ctx, config.RootfsImageRef)
-	if err != nil {
-		return "", fmt.Errorf("failed to pull checkpoint base image %s: %w", config.RootfsImageRef, err)
-	}
-	if _, err := reference.ParseAnyReference(config.RootfsImageName); err != nil {
-		return "", fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", config.RootfsImageName, err)
-	}
-	tagImage, err := c.client.ImageService().Get(ctx, config.RootfsImageRef)
-	if err != nil {
-		return "", fmt.Errorf("failed to get checkpoint base image %s: %w", config.RootfsImageRef, err)
-	}
-	// Second step is to tag the image with the same tag it used to have
-	// during checkpointing. For the error that the image NAME:TAG already
-	// exists is ignored. It could happen that NAME:TAG now belongs to
-	// another NAME@DIGEST than during checkpointing and the restore will
-	// happen on another image.
-	// TODO: handle if NAME:TAG points to a different NAME@DIGEST
-	tagImage.Name = config.RootfsImageName
-	_, err = c.client.ImageService().Create(ctx, tagImage)
-	if err != nil {
-		if !errdefs.IsAlreadyExists(err) {
-			return "", fmt.Errorf("failed to tag checkpoint base image %s with %s: %w", config.RootfsImageRef, config.RootfsImageName, err)
-		}
-	}
-
-	var image imagestore.Image
-	for i := 1; i < 500; i++ {
-		// This is probably wrong. Not sure how to wait for an image to appear in
-		// the image (or content) store.
-		log.G(ctx).Debugf("Trying to resolve %s:%d", containerdImage.Name(), i)
-		image, err = c.LocalResolve(containerdImage.Name())
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Microsecond * time.Duration(i))
-	}
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve image %q during checkpoint import: %w", config.RootfsImageName, err)
-	}
-	imageConfig := image.ImageSpec.Config
-	env := append([]string{}, imageConfig.Env...)
-	for _, e := range meta.Config.GetEnvs() {
-		env = append(env, e.GetKey()+"="+e.GetValue())
-	}
-	imageConfig.Env = append(imageConfig.Env, env...)
-
-	originalAnnotations["restored"] = "true"
-	originalAnnotations["checkpointedAt"] = config.CheckpointedAt.Format(time.RFC3339Nano)
-	originalAnnotations["checkpointImage"] = meta.Config.Image.GetUserSpecifiedImage()
-
-	meta.Config.Annotations = originalAnnotations
-
-	// Remove the checkpoint image name and show the base image name in the metadata.
-	// The checkpoint image name is still available in the annotations.
-	meta.Config.Image.Image = containerStatus.Image.GetImage()
-	meta.Config.Image.UserSpecifiedImage = containerStatus.Image.GetUserSpecifiedImage()
-
-	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, false)
-	if err != nil {
-		return "", fmt.Errorf("failed to get controller status: %w", err)
-	}
-
-	containerRootDir, err := c.createContainer(
-		&createContainerRequest{
-			ctx:                   ctx,
-			containerID:           meta.ID,
-			sandbox:               sandbox,
-			sandboxID:             meta.SandboxID,
-			imageID:               image.ID,
-			containerConfig:       meta.Config,
-			imageConfig:           &imageConfig,
-			podSandboxConfig:      sandboxConfig,
-			sandboxRuntimeHandler: sandbox.Metadata.RuntimeHandler,
-			sandboxPid:            cstatus.Pid,
-			NetNSPath:             sandbox.NetNSPath,
-			containerName:         containerName,
-			containerdImage:       &containerdImage,
-			meta:                  meta,
-			restore:               true,
-			start:                 start,
-		},
-	)
-	if err != nil {
-		return "", err
-	}
-
-	if restoreStorageImageID != "" {
-		if err := fs.CopyDir(containerRootDir, mountPoint); err != nil {
-			return "", err
-		}
-		if err := mount.UnmountAll(mountPoint, 0); err != nil {
-			return "", err
-		}
-	} else {
-		// unpack the checkpoint archive
-		filter := archive.WithFilter(func(hdr *tar.Header) (bool, error) {
-			excludePatterns := []string{
-				crmetadata.ConfigDumpFile,
-				crmetadata.SpecDumpFile,
-				crmetadata.StatusDumpFile,
-			}
-
-			for _, pattern := range excludePatterns {
-				if strings.HasPrefix(hdr.Name, pattern) {
-					return false, nil
-				}
-			}
-
-			return true, nil
-		})
-
-		// Start from the beginning of the checkpoint archive
-		archiveFile.Seek(0, 0)
-		_, err = archive.Apply(ctx, containerRootDir, archiveFile, []archive.ApplyOpt{filter}...)
-
-		if err != nil {
-			return "", fmt.Errorf("unpacking of checkpoint archive %s failed: %w", containerRootDir, err)
-		}
-	}
-	log.G(ctx).Debugf("Unpacked checkpoint in %s", containerRootDir)
-
-	// Restore container log file (if it exists)
-	containerLog := filepath.Join(containerRootDir, "container.log")
-	_, err = c.os.Stat(containerLog)
-	if err == nil {
-		if err := c.os.CopyFile(containerLog, meta.LogPath, 0600); err != nil {
-			return "", fmt.Errorf("restoring container log file %s failed: %w", containerLog, err)
-		}
-	}
-	return meta.ID, nil
+	return ""
 }
 
 func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (*runtime.CheckpointContainerResponse, error) {
 	start := time.Now()
-	if err := utils.CheckForCriu(utils.PodCriuVersion); err != nil {
-		errorMessage := fmt.Sprintf(
-			"CRIU binary not found or too old (<%d). Failed to checkpoint container %q",
-			utils.PodCriuVersion,
-			r.GetContainerId(),
-		)
-		log.G(ctx).WithError(err).Error(errorMessage)
-		return nil, fmt.Errorf(
-			"%s: %w",
-			errorMessage,
-			err,
-		)
+	if err := c.checkCriu(); err != nil {
+		log.G(ctx).WithError(err).Errorf("Failed to checkpoint container %q", r.GetContainerId())
+		return nil, fmt.Errorf("failed to checkpoint container %q: %w", r.GetContainerId(), err)
 	}
 
 	criContainerStatus, err := c.ContainerStatus(ctx, &runtime.ContainerStatusRequest{
@@ -479,7 +165,7 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
 		return nil, fmt.Errorf(
 			"container %q is in %s state. only %s containers can be checkpointed",
-			r.GetContainerId(),
+			container.ID,
 			criContainerStateToString(state),
 			criContainerStateToString(runtime.ContainerState_CONTAINER_RUNNING),
 		)
@@ -506,11 +192,29 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 
 	task, err := container.Container.Task(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get task for container %q: %w", r.GetContainerId(), err)
+		return nil, fmt.Errorf("failed to get task for container %q: %w", container.ID, err)
 	}
-	img, err := task.Checkpoint(ctx, []client.CheckpointTaskOpts{withCheckpointOpts(i.Runtime.Name, c.getContainerRootDir(r.GetContainerId()))}...)
+
+	cpPath := filepath.Join(c.getContainerRootDir(container.ID), "ctrd-checkpoint")
+	// ctrd-checkpoint may already exist from a prior checkpoint operation. RemoveAll
+	// unlinks any existing entry (including a symlink) itself rather than its target,
+	// so creating the directory afterwards cannot write through a link.
+	if err := os.RemoveAll(cpPath); err != nil {
+		return nil, err
+	}
+	if err := os.Mkdir(cpPath, 0o700); err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(cpPath)
+
+	// Point CRIU's work directory (where it writes dump.log and stats-dump) at the
+	// dedicated, freshly-created checkpoint dir instead of the persistent container
+	// state dir. Otherwise checkpoint creation litters those files into the state
+	// dir where they are never cleaned up; here they land directly where they are
+	// archived from and are removed with cpPath.
+	img, err := task.Checkpoint(ctx, []client.CheckpointTaskOpts{withCheckpointOpts(i.Runtime.Name, cpPath)}...)
 	if err != nil {
-		return nil, fmt.Errorf("checkpointing container %q failed: %w", r.GetContainerId(), err)
+		return nil, fmt.Errorf("checkpointing container %q failed: %w", container.ID, err)
 	}
 
 	// the checkpoint image has been provided as an index with manifests representing the tar of criu data, the rw layer, and the config
@@ -533,43 +237,20 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 		return nil, fmt.Errorf("failed to unmarshall blob into checkpoint data OCI index: %w", err)
 	}
 
-	cpPath := filepath.Join(c.getContainerRootDir(r.GetContainerId()), "ctrd-checkpoint")
-	if err := os.MkdirAll(cpPath, 0o700); err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(cpPath)
-
-	// This internal containerd file is used by checkpointctl for
-	// checkpoint archive analysis.
-	if err := c.os.CopyFile(
-		filepath.Join(c.getContainerRootDir(r.GetContainerId()), crmetadata.StatusFile),
+	// This internal containerd file is used by checkpointctl for checkpoint archive
+	// analysis. It lives in the container state dir, which can hold files from a
+	// prior checkpoint operation, so it is read without following symlinks.
+	if err := copyNoFollow(
+		filepath.Join(c.getContainerRootDir(container.ID), crmetadata.StatusFile),
 		filepath.Join(cpPath, crmetadata.StatusFile),
 		0o600,
 	); err != nil {
 		return nil, err
 	}
 
-	// This file is created by CRIU and includes timing analysis.
-	// Also used by checkpointctl
-	if err := c.os.CopyFile(
-		filepath.Join(c.getContainerRootDir(r.GetContainerId()), stats.StatsDump),
-		filepath.Join(cpPath, stats.StatsDump),
-		0o600,
-	); err != nil {
-		return nil, err
-	}
-
-	// The log file created by CRIU. This file could be missing.
-	// Let's ignore errors if the file is missing.
-	if err := c.os.CopyFile(
-		filepath.Join(c.getContainerRootDir(r.GetContainerId()), crmetadata.DumpLogFile),
-		filepath.Join(cpPath, crmetadata.DumpLogFile),
-		0o600,
-	); err != nil {
-		if !errors.Is(errors.Unwrap(err), os.ErrNotExist) {
-			return nil, err
-		}
-	}
+	// dump.log and stats-dump are written directly into cpPath by CRIU via its
+	// work directory (see withCheckpointOpts above), so they are already present
+	// for archiving and do not need to be copied out of the container state dir.
 
 	// Save the existing container log file
 	_, err = c.os.Stat(criContainerStatus.GetStatus().GetLogPath())
@@ -636,7 +317,7 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 
 	containerCheckpointTimer.WithValues(i.Runtime.Name).UpdateSince(start)
 
-	log.G(ctx).Infof("Wrote checkpoint archive to %s for %s", outFile.Name(), r.GetContainerId())
+	log.G(ctx).Infof("Wrote checkpoint archive to %s for %s", outFile.Name(), container.ID)
 
 	return &runtime.CheckpointContainerResponse{}, nil
 }

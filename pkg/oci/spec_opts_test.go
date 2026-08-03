@@ -18,6 +18,7 @@ package oci
 
 import (
 	"context"
+	_ "crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,7 +77,7 @@ func newFakeImage(config ocispec.Image) (Image, error) {
 	}
 	configDescriptor := ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageConfig,
-		Digest:    digest.NewDigestFromBytes(digest.SHA256, configBlob),
+		Digest:    digest.Canonical.FromBytes(configBlob),
 	}
 
 	return fakeImage{
@@ -182,15 +183,6 @@ func TestWithDefaultSpecForPlatform(t *testing.T) {
 		}
 	}
 
-}
-
-func Contains(a []string, x string) bool {
-	for _, n := range a {
-		if x == n {
-			return true
-		}
-	}
-	return false
 }
 
 func TestWithProcessCwd(t *testing.T) {
@@ -302,8 +294,7 @@ func TestWithSpecFromFile(t *testing.T) {
 	p, err := json.Marshal(expected)
 	assert.NoError(t, err)
 
-	tmpDir := t.TempDir()
-	specFile := filepath.Join(tmpDir, "testwithdefaultspec.json")
+	specFile := filepath.Join(t.TempDir(), "testwithdefaultspec.json")
 	err = os.WriteFile(specFile, p, 0o600)
 	assert.NoError(t, err)
 
@@ -393,7 +384,7 @@ func TestWithPidsLimit(t *testing.T) {
 			err := WithPidsLimit(expected)(nil, nil, nil, &spec)
 			assert.NoError(t, err)
 			if name == "linux" {
-				assert.Equal(t, expected, spec.Linux.Resources.Pids.Limit)
+				assert.Equal(t, expected, *spec.Linux.Resources.Pids.Limit)
 			} else {
 				assert.Empty(t, spec.Linux, "should not have modified spec")
 			}
@@ -777,6 +768,32 @@ func TestWithoutMounts(t *testing.T) {
 	if !reflect.DeepEqual(expected, s.Mounts) {
 		t.Fatalf("expected %+v, got %+v", expected, s.Mounts)
 	}
+}
+
+func TestWithParentCgroupDevices(t *testing.T) {
+	t.Parallel()
+
+	// TODO(thaJeztah): WithParentCgroupDevices should probably be a no-op if the Spec is non-Linux.
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			err := WithParentCgroupDevices(context.Background(), nil, nil, &spec)
+			assert.NoError(t, err)
+			assert.Nil(t, spec.Linux.Resources.Devices)
+		})
+	}
+
+	t.Run("reset existing", func(t *testing.T) {
+		s := Spec{
+			Linux: &specs.Linux{
+				Resources: &specs.LinuxResources{
+					Devices: []specs.LinuxDeviceCgroup{{Allow: true, Access: rwm}},
+				},
+			},
+		}
+		err := WithParentCgroupDevices(context.Background(), nil, nil, &s)
+		assert.NoError(t, err)
+		assert.Nil(t, s.Linux.Resources.Devices)
+	})
 }
 
 func TestWithWindowsDevice(t *testing.T) {

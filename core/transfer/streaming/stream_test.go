@@ -33,6 +33,8 @@ func FuzzSendAndReceive(f *testing.F) {
 	f.Add([]byte("hello"))
 	f.Add(bytes.Repeat([]byte("hello"), windowSize+1))
 
+	// TODO(thaJeztah): use f.Context() once github.com/AdamKorcz/go-118-fuzz-build/testing is updated.
+	// see https://github.com/containerd/containerd/pull/13022#discussion_r2937038804
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f.Fuzz(func(t *testing.T, expected []byte) {
@@ -101,6 +103,45 @@ func runWriterFuzz(ctx context.Context, t *testing.T, expected []byte) {
 	if !bytes.Equal(expected, actual) {
 		t.Fatalf("received bytes are not equal\n\tactual: %v\n\texpected:%v", actual, expected)
 	}
+}
+
+// TestSendReceiveEOFWithData verifies that data is not dropped when a reader
+// returns both n > 0 and io.EOF from the same Read call.
+func TestSendReceiveEOFWithData(t *testing.T) {
+	expected := []byte("one and only chunk with eof")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	rs, ws := pipeStream()
+	SendStream(ctx, &eofReader{data: expected}, ws)
+	or := ReceiveStream(ctx, rs)
+
+	actual, err := io.ReadAll(or)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(expected, actual) {
+		t.Fatalf("received bytes are not equal\n\tactual: %v\n\texpected: %v", actual, expected)
+	}
+}
+
+// eofReader returns all remaining data together with io.EOF on the final Read,
+// exercising the io.Reader contract where n > 0 && err == io.EOF.
+type eofReader struct {
+	data []byte
+}
+
+func (r *eofReader) Read(p []byte) (int, error) {
+	if len(r.data) == 0 {
+		return 0, io.EOF
+	}
+	n := copy(p, r.data)
+	r.data = r.data[n:]
+	if len(r.data) == 0 {
+		return n, io.EOF
+	}
+	return n, nil
 }
 
 func chainStreams(ctx context.Context, r io.Reader) io.Reader {

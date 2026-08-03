@@ -101,8 +101,9 @@ func TestContainerStopCancellation(t *testing.T) {
 	t.Log("Stop the container with 3s timeout, but 1s context timeout")
 	// Note that with container pid namespace, the sleep process
 	// is pid 1, and SIGTERM sent by `StopContainer` will be ignored.
-	rawClient, err := RawRuntimeClient()
+	rawClient, conn, err := RawRuntimeClient()
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	_, err = rawClient.StopContainer(ctx, &runtime.StopContainerRequest{

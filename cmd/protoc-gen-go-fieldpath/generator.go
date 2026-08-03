@@ -107,14 +107,27 @@ func (gen *generator) genFieldMethod(m *protogen.Message) {
 				p.P("}")
 				p.P("return m.", f.GoName, ".Field(fieldpath[1:])")
 			case f.Desc.Kind() == protoreflect.StringKind:
-				p.P("return string(m.", f.GoName, "), len(m.", f.GoName, ") > 0")
+				if f.Desc.HasPresence() {
+					p.P("if m.", f.GoName, " == nil {")
+					p.P(`return "", false`)
+					p.P("}")
+					p.P("return *m.", f.GoName, ", true")
+				} else {
+					p.P("return string(m.", f.GoName, "), len(m.", f.GoName, ") > 0")
+				}
 			case f.Desc.Kind() == protoreflect.BoolKind:
 				fmtSprint := gen.out.QualifiedGoIdent(protogen.GoIdent{
 					GoImportPath: "fmt",
 					GoName:       "Sprint",
 				})
-
-				p.P("return ", fmtSprint, "(m.", f.GoName, "), true")
+				if f.Desc.HasPresence() {
+					p.P("if m.", f.GoName, " == nil {")
+					p.P(`return "", false`)
+					p.P("}")
+					p.P("return ", fmtSprint, "(*m.", f.GoName, "), true")
+				} else {
+					p.P("return ", fmtSprint, "(m.", f.GoName, "), true")
+				}
 			}
 		}
 

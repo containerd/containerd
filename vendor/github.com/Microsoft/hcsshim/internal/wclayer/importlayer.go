@@ -70,7 +70,7 @@ func (r *legacyLayerWriterWrapper) Close() (err error) {
 	defer r.s.End()
 	defer func() { oc.SetSpanStatus(r.s, err) }()
 	defer os.RemoveAll(r.root.Name())
-	defer r.legacyLayerWriter.CloseRoots()
+	defer r.CloseRoots()
 
 	err = r.legacyLayerWriter.Close()
 	if err != nil {
@@ -155,6 +155,10 @@ func NewLayerWriter(ctx context.Context, path string, parentLayerPaths []string)
 	}
 	w, err := newLegacyLayerWriter(importPath, parentLayerPaths, path)
 	if err != nil {
+		// Clean up the temporary import directory so it is not leaked when
+		// the writer fails to initialize (matches NewLayerReader's handling
+		// of exportPath).
+		os.RemoveAll(importPath)
 		return nil, err
 	}
 	return &legacyLayerWriterWrapper{

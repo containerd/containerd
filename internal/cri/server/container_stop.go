@@ -55,7 +55,7 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 	defer c.nri.BlockPluginSync().Unblock()
 
 	span.SetAttributes(tracing.Attribute("container.id", container.ID))
-	if err := c.stopContainer(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
+	if err := c.stopContainerRetryOnConnectionClosed(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
 		return nil, err
 	}
 
@@ -77,6 +77,34 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 	containerStopTimer.WithValues(i.Runtime.Name).UpdateSince(start)
 
 	return &runtime.StopContainerResponse{}, nil
+}
+
+// stopContainerRetryOnConnectionClosed attempts to stop the container.
+//
+// If the container has already exited and the connection is closed (like, ttrpc: closed),
+// it retries up to 3 times since this is a race condition where the container
+// self-exited before we attempted to stop it.
+func (c *criService) stopContainerRetryOnConnectionClosed(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
+	const maxRetries = 3
+
+	var err error
+	for i := 1; i <= maxRetries; i++ {
+		err = c.stopContainer(ctx, container, timeout)
+		if err == nil {
+			return nil
+		}
+
+		if !ctrdutil.IsShimTTRPCClosed(err) {
+			return err
+		}
+
+		if i+1 <= maxRetries {
+			retryAfter := time.Duration(100*i*i) * time.Millisecond
+			log.G(ctx).WithError(err).Warnf("Shim ttrpc connection closed when stopping container %q, retry after %s", container.ID, retryAfter)
+			time.Sleep(retryAfter)
+		}
+	}
+	return err
 }
 
 // stopContainer stops a container based on the container metadata.
@@ -136,7 +164,12 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	// task from containerd after it handles the Exited event.
 	if timeout > 0 {
 		stopSignal := "SIGTERM"
-		if container.StopSignal != "" {
+		if signal := container.Config.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
+			stopSignal, err = criSignalToOCIStopSignal(signal)
+			if err != nil {
+				return err
+			}
+		} else if container.StopSignal != "" {
 			stopSignal = container.StopSignal
 		} else {
 			// The image may have been deleted, and the `StopSignal` field is

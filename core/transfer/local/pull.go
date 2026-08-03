@@ -26,6 +26,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
@@ -200,6 +201,9 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 					if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
 						enableRemoteSnapshotAnnotations = true
 					}
+					if progressTracker != nil {
+						mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
+					}
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 				} else {
 					log.G(ctx).WithFields(log.Fields{
@@ -211,6 +215,10 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 
 			if ts.config.DuplicationSuppressor != nil {
 				uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
+			}
+
+			if ts.limiterP != nil {
+				uopts = append(uopts, unpack.WithUnpackLimiter(ts.limiterP))
 			}
 
 			if enableRemoteSnapshotAnnotations {

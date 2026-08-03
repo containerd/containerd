@@ -153,7 +153,7 @@ func TestContainerdImage(t *testing.T) {
 			return false, err
 		}
 		if s.Resources == nil || (s.Resources.Linux == nil && s.Resources.Windows == nil) {
-			return false, fmt.Errorf("No Resource field in container status: %+v", s)
+			return false, fmt.Errorf("no Resource field in container status: %+v", s)
 		}
 		return s.GetState() == runtime.ContainerState_CONTAINER_RUNNING, nil
 	}

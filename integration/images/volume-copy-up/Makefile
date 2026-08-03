@@ -31,22 +31,22 @@ endif
 
 # Operating systems supported: linux, windows
 OS ?= linux
-# Architectures supported: amd64, arm64
+# Architectures supported: amd64, arm64, ppc64le, s390x
 ARCH ?= amd64
-# OS Version for the Windows images: ltsc2022, ltsc2025
-OSVERSION ?= ltsc2022
+# OS Version for the Windows images: 1809, 20H2, ltsc2022
+OSVERSION ?= 1809
 
 # The output type could either be docker (local), or registry.
 # If it is registry, it will also allow us to push the Windows images.
 OUTPUT_TYPE ?= docker
 
 ALL_OS = linux
-ALL_ARCH.linux = amd64 arm64 ppc64le
+ALL_ARCH.linux = amd64 arm64 ppc64le s390x
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 
 ifneq ($(REMOTE_DOCKER_URL),)
 ALL_OS += windows
-ALL_OSVERSIONS.windows := ltsc2022 ltsc2025
+ALL_OSVERSIONS.windows := 1809 20H2 ltsc2022
 ALL_OS_ARCH.windows = $(foreach osversion, ${ALL_OSVERSIONS.windows}, windows-amd64-${osversion})
 BASE.windows := mcr.microsoft.com/windows/nanoserver
 endif
@@ -54,6 +54,7 @@ endif
 BASE.linux.amd64 := busybox
 BASE.linux.arm64 := arm64v8/busybox
 BASE.linux.ppc64le := busybox
+BASE.linux.s390x := busybox
 BASE.linux := ${BASE.linux.${ARCH}}
 BASE := ${BASE.${OS}}
 

@@ -32,6 +32,7 @@ import (
 
 	v2shimcli "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/ttrpc"
+	"github.com/stretchr/testify/require"
 )
 
 const abstractSocketPrefix = "\x00"
@@ -122,14 +123,40 @@ func testFailFastWhenConnectShim(abstract bool, dialFn dialFunc) func(*testing.T
 			t.Fatalf("failed to dial: %v", err)
 		}
 
+		pollECONNREFUSED := func(addr string) error {
+			to := time.After(2 * time.Second)
+			for {
+				select {
+				case <-to:
+					return errors.New("timeout waiting for ECONNREFUSED")
+				default:
+				}
+
+				conn, err := dialFn(addr, 100*time.Millisecond)
+				if err != nil {
+					if errors.Is(err, syscall.ECONNREFUSED) {
+						return nil
+					}
+				} else {
+					conn.Close()
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+		}
+
 		// NOTE(fuweid):
 		//
 		// UnixListener will unlink that the socket file when call Close.
 		// Disable unlink when close to keep the socket file.
 		listener.(*net.UnixListener).SetUnlinkOnClose(false)
 
-		listener.Close()
-		ttrpcSrv.Shutdown(ctx)
+		// Rely on Shutdown to close the listener during the normal path. The deferred close remains as a panic safeguard.
+		shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
+		err = ttrpcSrv.Shutdown(shutdownCtx)
+		shutdownCancel()
+		require.NoError(t, err)
+
+		require.NoError(t, pollECONNREFUSED(addr))
 
 		checkDialErr(addr, errCh, syscall.ECONNREFUSED)
 

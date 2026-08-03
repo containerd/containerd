@@ -180,7 +180,7 @@ func benchmarkSnapshotter(b *testing.B, snapshotter snapshots.Snapshotter) {
 
 		var timer time.Time
 		for i := 0; i < b.N; i++ {
-			for l := 0; l < layerCount; l++ {
+			for l := range layerCount {
 				current = fmt.Sprintf("prepare-layer-%d", layerIndex.Add(1))
 
 				timer = time.Now()

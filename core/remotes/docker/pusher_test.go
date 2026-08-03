@@ -93,6 +93,37 @@ func TestPusherErrClosedRetry(t *testing.T) {
 		t.Errorf("upload should succeed but got %v", err)
 	}
 }
+func TestPusherCustomNamespace(t *testing.T) {
+	ctx := context.Background()
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.uploadable = true
+	reg.putHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path == "/upload" {
+			reg.lastPutQueryParams = r.URL.Query()
+		}
+		return false
+	}
+
+	assert.Nil(t, tryUpload(ctx, t, p, []byte("test")))
+	assert.Equal(t, samplePusherHostname, reg.lastPutQueryParams.Get("ns"))
+	assert.NotEmpty(t, reg.lastPutQueryParams.Get("digest"))
+}
+
+func TestPusherAcceptsMissingDigestHeader(t *testing.T) {
+	ctx := context.Background()
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+	reg.omitDigestHdr = true
+	reg.uploadable = true
+	layerContent := []byte("test")
+
+	if err := tryUpload(ctx, t, p, layerContent); err != nil {
+		t.Errorf("upload should succeed but got %v", err)
+	}
+}
 
 func TestPusherHTTPFallback(t *testing.T) {
 	ctx := logtest.WithT(context.Background(), t)
@@ -412,11 +443,13 @@ var blobUploadRegexp = regexp.MustCompile(`/([a-z0-9]+)/blobs/uploads/(.*)`)
 type uploadableMockRegistry struct {
 	availableContents  []string
 	uploadable         bool
+	omitDigestHdr      bool
 	putHandlerFunc     func(w http.ResponseWriter, r *http.Request) bool
 	defaultHandlerFunc func(w http.ResponseWriter, r *http.Request) bool
 	locationPrefix     string
 	username           string
 	secret             string
+	lastPutQueryParams url.Values // Track query params from last PUT request
 }
 
 func (u *uploadableMockRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -458,7 +491,9 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 
 			query := r.URL.Query()
 			if query.Has("mount") && query.Get("from") == "always-mount" {
-				w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+				if !u.omitDigestHdr {
+					w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+				}
 				w.WriteHeader(http.StatusCreated)
 				return
 			}
@@ -476,7 +511,9 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 				return
 			}
 			u.availableContents = append(u.availableContents, dgstr.Digest().String())
-			w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+			if !u.omitDigestHdr {
+				w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+			}
 			w.WriteHeader(http.StatusCreated)
 			return
 		} else if r.URL.Path == "/cannotupload" {
@@ -506,12 +543,7 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 
 // checks if the content is already present in the registry
 func (u *uploadableMockRegistry) isContentAlreadyExist(c string) bool {
-	for _, ct := range u.availableContents {
-		if ct == c {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(u.availableContents, c)
 }
 
 func Test_dockerPusher_push(t *testing.T) {
@@ -706,4 +738,79 @@ func Test_dockerPusher_push(t *testing.T) {
 
 		})
 	}
+}
+
+func TestPusherForbiddenGETFallbackForErrorBody(t *testing.T) {
+	// When the existence-check HEAD returns 403, the pusher should issue
+	// a follow-up GET to retrieve the registry's error body for diagnostics.
+	const errorMessage = "encryption key is disabled"
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			// HEAD: no body
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage,
+		"expected registry error body from GET fallback")
+	assert.Contains(t, err.Error(), "403")
+}
+
+func TestPusherForbiddenGETFallbackProxy(t *testing.T) {
+	// When the pusher is configured as a proxy (Host != image hostname),
+	// the GET fallback must include the ?ns= query parameter so the proxy
+	// can route the request to the correct upstream registry.
+	const errorMessage = "encryption key is disabled"
+
+	var gotNsParam string
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			if r.Method == http.MethodGet {
+				gotNsParam = r.URL.Query().Get("ns")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage)
+	assert.Equal(t, samplePusherHostname, gotNsParam,
+		"GET fallback on proxy must include ?ns= query parameter")
 }

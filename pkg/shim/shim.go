@@ -18,7 +18,6 @@ package shim
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,8 +29,10 @@ import (
 	"runtime/debug"
 	"time"
 
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	shimapi "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
+
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -51,33 +52,17 @@ type Publisher interface {
 	io.Closer
 }
 
-// StartOpts describes shim start configuration received from containerd
-type StartOpts struct {
-	Address      string
-	TTRPCAddress string
-	Debug        bool
-}
-
-// BootstrapParams is a JSON payload returned in stdout from shim.Start call.
-type BootstrapParams struct {
-	// Version is the version of shim parameters (expected 2 for shim v2)
-	Version int `json:"version"`
-	// Address is a address containerd should use to connect to shim.
-	Address string `json:"address"`
-	// Protocol is either TTRPC or GRPC.
-	Protocol string `json:"protocol"`
-}
-
 type StopStatus struct {
 	Pid        int
 	ExitStatus int
 	ExitedAt   time.Time
 }
 
-// Manager is the interface which manages the shim process
-type Manager interface {
+// Shim is the interface which manages the shim process lifecycle using the
+// new bootstrap protocol.
+type Shim interface {
 	Name() string
-	Start(ctx context.Context, id string, opts StartOpts) (BootstrapParams, error)
+	Start(ctx context.Context, params *bootapi.BootstrapParams) (*bootapi.BootstrapResult, error)
 	Stop(ctx context.Context, id string) (StopStatus, error)
 	Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeInfo, error)
 }
@@ -139,7 +124,12 @@ const (
 
 func parseFlags() {
 	flag.BoolVar(&debugFlag, "debug", false, "enable debug output in logs")
-	flag.BoolVar(&versionFlag, "v", false, "show the shim version and exit")
+
+	// short + long form. omitting the usage (description) of the short-form
+	// to group it with the long form.
+	flag.BoolVar(&versionFlag, "v", false, "")
+	flag.BoolVar(&versionFlag, "version", false, "show the shim version and exit")
+
 	// "info" is not a subcommand, because old shims produce very confusing errors for unknown subcommands
 	// https://github.com/containerd/containerd/pull/8509#discussion_r1210021403
 	flag.BoolVar(&infoFlag, "info", false, "get the option protobuf from stdin, print the shim info protobuf to stdout, and exit")
@@ -147,7 +137,7 @@ func parseFlags() {
 	flag.StringVar(&id, "id", "", "id of the task")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
 	flag.StringVar(&debugSocketFlag, "debug-socket", "", "debug socket path to serve")
-	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
+	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir") // Provided only during -delete action
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
 	flag.StringVar(&containerdBinaryFlag, "publish-binary", "",
@@ -186,22 +176,22 @@ func setLogger(ctx context.Context, id string) (context.Context, error) {
 	return log.WithLogger(ctx, l), nil
 }
 
-// Run initializes and runs a shim server.
-func Run(ctx context.Context, manager Manager, opts ...BinaryOpts) {
+// RunShim initializes and runs a shim server using the new bootstrap protocol.
+func RunShim(ctx context.Context, shim Shim, opts ...BinaryOpts) {
 	var config Config
 	for _, o := range opts {
 		o(&config)
 	}
 
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", manager.Name()))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", shim.Name()))
 
-	if err := run(ctx, manager, config); err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %s", manager.Name(), err)
+	if err := run(ctx, shim, config); err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %s", shim.Name(), err)
 		os.Exit(1)
 	}
 }
 
-func runInfo(ctx context.Context, manager Manager) error {
+func runInfo(ctx context.Context, manager Shim) error {
 	info, err := manager.Info(ctx, os.Stdin)
 	if err != nil {
 		return err
@@ -214,7 +204,7 @@ func runInfo(ctx context.Context, manager Manager) error {
 	return err
 }
 
-func run(ctx context.Context, manager Manager, config Config) error {
+func run(ctx context.Context, manager Shim, config Config) error {
 	parseFlags()
 	if versionFlag {
 		fmt.Printf("%s:\n", filepath.Base(os.Args[0]))
@@ -281,20 +271,47 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		}
 		return nil
 	case "start":
-		opts := StartOpts{
-			Address:      addressFlag,
-			TTRPCAddress: ttrpcAddress,
-			Debug:        debugFlag,
+		// We try reading stdin twice: first for the new boot API, then runc Options.
+		// The stdin pipe is not seekable, so this should be read into memory first.
+		// Protect against unbounded memory consumption with a limit (e.g., 10MB).
+		input, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
+		if err != nil {
+			return fmt.Errorf("failed to read stdin: %w", err)
 		}
 
-		params, err := manager.Start(ctx, id, opts)
+		var params bootapi.BootstrapParams
+		if len(input) == 0 || proto.Unmarshal(input, &params) != nil {
+			// TODO: Return error once the new API is stable
+			if err := readBootstrapParamsFromDeprecatedFields(input, &params, id, namespaceFlag, containerdBinaryFlag, debugFlag); err != nil {
+				return err
+			}
+		}
+
+		// Persist the socket directory so the long-running server process
+		// (which doesn't receive bootstrap params) can read it for cleanup.
+		if dir := params.GetSocketDir(); dir != "" {
+			if err := writeSocketDir(dir); err != nil {
+				return fmt.Errorf("failed to write socket-dir: %w", err)
+			}
+		}
+
+		result, err := manager.Start(ctx, &params)
 		if err != nil {
 			return err
 		}
 
-		data, err := json.Marshal(&params)
+		// On Windows, the shim daemon may not have created its named pipe
+		// yet when this start helper returns. Wait for it to be connectable
+		// before writing the bootstrap result to stdout.
+		// Similar to hcsshim's readiness pattern (microsoft/hcsshim notifyReady).
+		// On Unix this is a no-op: domain sockets appear atomically.
+		if err := awaitPipeReady(result.Address); err != nil {
+			return fmt.Errorf("shim pipe not ready: %w", err)
+		}
+
+		data, err := proto.Marshal(result)
 		if err != nil {
-			return fmt.Errorf("failed to marshal bootstrap params to json: %w", err)
+			return fmt.Errorf("failed to marshal bootstrap params: %w", err)
 		}
 
 		if _, err := os.Stdout.Write(data); err != nil {
@@ -314,7 +331,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	registry.Register(&plugin.Registration{
 		Type: plugins.InternalPlugin,
 		ID:   "shutdown",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			return sd, nil
 		},
 	})
@@ -323,7 +340,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	registry.Register(&plugin.Registration{
 		Type: plugins.EventPlugin,
 		ID:   "publisher",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			return NewPublisher(ttrpcAddress, func(cfg *publisherConfig) {
 				p, _ := ic.GetByID(plugins.TTRPCPlugin, "otelttrpc")
 				if p == nil {

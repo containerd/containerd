@@ -27,9 +27,14 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/containerd/nri/pkg/adaptation/builtin"
 	"github.com/containerd/nri/pkg/api"
 	"github.com/containerd/nri/pkg/log"
+	nriver "github.com/containerd/nri/pkg/version"
+	validator "github.com/containerd/nri/plugins/default-validator/builtin"
 	"github.com/containerd/ttrpc"
+
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -37,7 +42,7 @@ const (
 	DefaultPluginPath = "/opt/nri/plugins"
 	// DefaultSocketPath is the default socket path for external plugins.
 	DefaultSocketPath = api.DefaultSocketPath
-	// PluginConfigDir is the drop-in directory for NRI-launched plugin configuration.
+	// DefaultPluginConfigPath is the drop-in directory for NRI-launched plugin configuration.
 	DefaultPluginConfigPath = "/etc/nri/conf.d"
 )
 
@@ -53,24 +58,33 @@ type UpdateFn func(context.Context, []*ContainerUpdate) ([]*ContainerUpdate, err
 // Adaptation is the NRI abstraction for container runtime NRI adaptation/integration.
 type Adaptation struct {
 	sync.Mutex
-	name       string
-	version    string
-	dropinPath string
-	pluginPath string
-	socketPath string
-	dontListen bool
-	syncFn     SyncFn
-	updateFn   UpdateFn
-	clientOpts []ttrpc.ClientOpts
-	serverOpts []ttrpc.ServerOpt
-	listener   net.Listener
-	plugins    []*plugin
-	syncLock   sync.RWMutex
+	name        string
+	version     string
+	nriVersion  string
+	dropinPath  string
+	pluginPath  string
+	socketPath  string
+	dontListen  bool
+	syncFn      SyncFn
+	updateFn    UpdateFn
+	clientOpts  []ttrpc.ClientOpts
+	serverOpts  []ttrpc.ServerOpt
+	listener    net.Listener
+	plugins     []*plugin
+	validators  []*plugin
+	builtin     []*builtin.BuiltinPlugin
+	syncLock    sync.RWMutex
+	wasmService *api.PluginPlugin
+	metrics     Metrics
+	deprecation DeprecationRecorder
 }
 
 var (
 	// Used instead of nil Context in logging.
 	noCtx = context.TODO()
+
+	// ErrWasmDisabled is returned for WASM initialization if WASM support is disabled.
+	ErrWasmDisabled = errors.New("WASM support is disabled (at build time)")
 )
 
 // Option to apply to the NRI runtime.
@@ -117,6 +131,43 @@ func WithTTRPCOptions(clientOpts []ttrpc.ClientOpts, serverOpts []ttrpc.ServerOp
 	}
 }
 
+// WithBuiltinPlugins sets extra builtin plugins to register.
+func WithBuiltinPlugins(plugins ...*builtin.BuiltinPlugin) Option {
+	return func(r *Adaptation) error {
+		r.builtin = append(r.builtin, plugins...)
+		return nil
+	}
+}
+
+// WithMetrics allows consumers to register an implementation of the Metrics interface.
+func WithMetrics(m Metrics) Option {
+	return func(r *Adaptation) error {
+		if m != nil {
+			r.metrics = m
+		}
+		return nil
+	}
+}
+
+// WithDefaultValidator sets up builtin validator plugin if it is configured.
+func WithDefaultValidator(cfg *validator.DefaultValidatorConfig) Option {
+	return func(r *Adaptation) error {
+		if plugin := validator.GetDefaultValidator(cfg); plugin != nil {
+			r.builtin = append([]*builtin.BuiltinPlugin{plugin}, r.builtin...)
+		}
+		return nil
+	}
+}
+
+// WithDeprecationRecorder sets up functions to record usage of deprecated
+// NRI interfaces or features.
+func WithDeprecationRecorder(d DeprecationRecorder) Option {
+	return func(r *Adaptation) error {
+		r.deprecation = d
+		return nil
+	}
+}
+
 // New creates a new NRI Runtime.
 func New(name, version string, syncFn SyncFn, updateFn UpdateFn, opts ...Option) (*Adaptation, error) {
 	var err error
@@ -128,15 +179,26 @@ func New(name, version string, syncFn SyncFn, updateFn UpdateFn, opts ...Option)
 		return nil, fmt.Errorf("failed to create NRI adaptation, nil UpdateFn")
 	}
 
+	wasmService, err := getWasmService()
+	if err != nil {
+		log.Errorf(noCtx, "failed to initialize WASM support: %v", err)
+		if !errors.Is(err, ErrWasmDisabled) {
+			return nil, err
+		}
+	}
+
 	r := &Adaptation{
-		name:       name,
-		version:    version,
-		syncFn:     syncFn,
-		updateFn:   updateFn,
-		pluginPath: DefaultPluginPath,
-		dropinPath: DefaultPluginConfigPath,
-		socketPath: DefaultSocketPath,
-		syncLock:   sync.RWMutex{},
+		name:        name,
+		version:     version,
+		nriVersion:  nriver.GetFromBuildInfo(),
+		syncFn:      syncFn,
+		updateFn:    updateFn,
+		pluginPath:  DefaultPluginPath,
+		dropinPath:  DefaultPluginConfigPath,
+		socketPath:  DefaultSocketPath,
+		syncLock:    sync.RWMutex{},
+		wasmService: wasmService,
+		metrics:     &noopMetrics{},
 	}
 
 	for _, o := range opts {
@@ -179,22 +241,83 @@ func (r *Adaptation) Stop() {
 	r.stopPlugins()
 }
 
-// RunPodSandbox relays the corresponding CRI event to plugins.
-func (r *Adaptation) RunPodSandbox(ctx context.Context, evt *StateChangeEvent) error {
-	evt.Event = Event_RUN_POD_SANDBOX
-	return r.StateChange(ctx, evt)
+// RunPodSandbox relays the corresponding CRI request to plugins.
+func (r *Adaptation) RunPodSandbox(ctx context.Context, req *RunPodSandboxRequest) error {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		if _, err := plugin.runPodSandbox(ctx, req); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-// StopPodSandbox relays the corresponding CRI event to plugins.
-func (r *Adaptation) StopPodSandbox(ctx context.Context, evt *StateChangeEvent) error {
-	evt.Event = Event_STOP_POD_SANDBOX
-	return r.StateChange(ctx, evt)
+// UpdatePodSandbox relays the corresponding CRI request to plugins.
+func (r *Adaptation) UpdatePodSandbox(ctx context.Context, req *UpdatePodSandboxRequest) (*UpdatePodSandboxResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		_, err := plugin.updatePodSandbox(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &UpdatePodSandboxResponse{}, nil
 }
 
-// RemovePodSandbox relays the corresponding CRI event to plugins.
-func (r *Adaptation) RemovePodSandbox(ctx context.Context, evt *StateChangeEvent) error {
-	evt.Event = Event_REMOVE_POD_SANDBOX
-	return r.StateChange(ctx, evt)
+// PostUpdatePodSandbox relays the corresponding CRI request to plugins.
+func (r *Adaptation) PostUpdatePodSandbox(ctx context.Context, req *PostUpdatePodSandboxRequest) error {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		_, err := plugin.postUpdatePodSandbox(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// StopPodSandbox relays the corresponding CRI request to plugins.
+func (r *Adaptation) StopPodSandbox(ctx context.Context, req *StopPodSandboxRequest) error {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		_, err := plugin.stopPodSandbox(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// RemovePodSandbox relays the corresponding CRI request to plugins.
+func (r *Adaptation) RemovePodSandbox(ctx context.Context, req *RemovePodSandboxRequest) error {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		_, err := plugin.removePodSandbox(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // CreateContainer relays the corresponding CRI request to plugins.
@@ -203,8 +326,22 @@ func (r *Adaptation) CreateContainer(ctx context.Context, req *CreateContainerRe
 	defer r.Unlock()
 	defer r.removeClosedPlugins()
 
-	result := collectCreateContainerResult(req)
+	var (
+		result   = collectCreateContainerResult(req)
+		validate *ValidateContainerAdjustmentRequest
+	)
+
+	if r.hasValidators() {
+		validate = &ValidateContainerAdjustmentRequest{
+			Pod:       req.Pod,
+			Container: proto.Clone(req.Container).(*Container),
+		}
+	}
+
 	for _, plugin := range r.plugins {
+		if validate != nil {
+			validate.AddPlugin(plugin.base, plugin.idx)
+		}
 		rpl, err := plugin.createContainer(ctx, req)
 		if err != nil {
 			return nil, err
@@ -215,25 +352,55 @@ func (r *Adaptation) CreateContainer(ctx context.Context, req *CreateContainerRe
 		}
 	}
 
-	return result.createContainerResponse(), nil
+	return r.validateContainerAdjustment(ctx, validate, result)
 }
 
-// PostCreateContainer relays the corresponding CRI event to plugins.
-func (r *Adaptation) PostCreateContainer(ctx context.Context, evt *StateChangeEvent) error {
-	evt.Event = Event_POST_CREATE_CONTAINER
-	return r.StateChange(ctx, evt)
+// PostCreateContainer relays the corresponding CRI request to plugins.
+func (r *Adaptation) PostCreateContainer(ctx context.Context, req *PostCreateContainerRequest) error {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		_, err := plugin.postCreateContainer(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-// StartContainer relays the corresponding CRI event to plugins.
-func (r *Adaptation) StartContainer(ctx context.Context, evt *StateChangeEvent) error {
-	evt.Event = Event_START_CONTAINER
-	return r.StateChange(ctx, evt)
+// StartContainer relays the corresponding CRI request to plugins.
+func (r *Adaptation) StartContainer(ctx context.Context, req *StartContainerRequest) error {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		_, err := plugin.startContainer(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-// PostStartContainer relays the corresponding CRI event to plugins.
-func (r *Adaptation) PostStartContainer(ctx context.Context, evt *StateChangeEvent) error {
-	evt.Event = Event_POST_START_CONTAINER
-	return r.StateChange(ctx, evt)
+// PostStartContainer relays the corresponding CRI request to plugins.
+func (r *Adaptation) PostStartContainer(ctx context.Context, req *PostStartContainerRequest) error {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		_, err := plugin.postStartContainer(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // UpdateContainer relays the corresponding CRI request to plugins.
@@ -257,10 +424,20 @@ func (r *Adaptation) UpdateContainer(ctx context.Context, req *UpdateContainerRe
 	return result.updateContainerResponse(), nil
 }
 
-// PostUpdateContainer relays the corresponding CRI event to plugins.
-func (r *Adaptation) PostUpdateContainer(ctx context.Context, evt *StateChangeEvent) error {
-	evt.Event = Event_POST_UPDATE_CONTAINER
-	return r.StateChange(ctx, evt)
+// PostUpdateContainer relays the corresponding CRI request to plugins.
+func (r *Adaptation) PostUpdateContainer(ctx context.Context, req *PostUpdateContainerRequest) error {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		_, err := plugin.postUpdateContainer(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // StopContainer relays the corresponding CRI request to plugins.
@@ -284,24 +461,14 @@ func (r *Adaptation) StopContainer(ctx context.Context, req *StopContainerReques
 	return result.stopContainerResponse(), nil
 }
 
-// RemoveContainer relays the corresponding CRI event to plugins.
-func (r *Adaptation) RemoveContainer(ctx context.Context, evt *StateChangeEvent) error {
-	evt.Event = Event_REMOVE_CONTAINER
-	return r.StateChange(ctx, evt)
-}
-
-// StateChange relays pod- or container events to plugins.
-func (r *Adaptation) StateChange(ctx context.Context, evt *StateChangeEvent) error {
-	if evt.Event == Event_UNKNOWN {
-		return errors.New("invalid (unset) event in state change notification")
-	}
-
+// RemoveContainer relays the corresponding CRI request to plugins.
+func (r *Adaptation) RemoveContainer(ctx context.Context, req *RemoveContainerRequest) error {
 	r.Lock()
 	defer r.Unlock()
 	defer r.removeClosedPlugins()
 
 	for _, plugin := range r.plugins {
-		err := plugin.StateChange(ctx, evt)
+		_, err := plugin.removeContainer(ctx, req)
 		if err != nil {
 			return err
 		}
@@ -312,10 +479,41 @@ func (r *Adaptation) StateChange(ctx context.Context, evt *StateChangeEvent) err
 
 // Perform a set of unsolicited container updates requested by a plugin.
 func (r *Adaptation) updateContainers(ctx context.Context, req []*ContainerUpdate) ([]*ContainerUpdate, error) {
-	r.Lock()
-	defer r.Unlock()
-
 	return r.updateFn(ctx, req)
+}
+
+// Validate requested container adjustments.
+func (r *Adaptation) validateContainerAdjustment(ctx context.Context, req *ValidateContainerAdjustmentRequest, result *result) (*CreateContainerResponse, error) {
+	rpl := result.createContainerResponse()
+
+	if req == nil || len(r.validators) == 0 {
+		return rpl, nil
+	}
+
+	req.AddResponse(rpl)
+	req.AddOwners(result.owners)
+
+	errors := make(chan error, len(r.validators))
+	wg := sync.WaitGroup{}
+
+	for _, p := range r.validators {
+		wg.Add(1)
+		go func(p *plugin) {
+			defer wg.Done()
+			errors <- p.ValidateContainerAdjustment(ctx, req)
+		}(p)
+	}
+
+	wg.Wait()
+	close(errors)
+
+	for err := range errors {
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return rpl, nil
 }
 
 // Start up pre-installed plugins.
@@ -336,6 +534,20 @@ func (r *Adaptation) startPlugins() (retErr error) {
 			}
 		}
 	}()
+
+	for _, b := range r.builtin {
+		log.Infof(noCtx, "starting builtin NRI plugin %q...", b.Index+"-"+b.Base)
+		p, err := r.newBuiltinPlugin(b)
+		if err != nil {
+			return fmt.Errorf("failed to initialize builtin NRI plugin %q: %v", b.Base, err)
+		}
+
+		if err := p.start(r.name, r.version); err != nil {
+			return fmt.Errorf("failed to start builtin NRI plugin %q: %v", b.Base, err)
+		}
+
+		plugins = append(plugins, p)
+	}
 
 	for i, name := range names {
 		log.Infof(noCtx, "starting pre-installed NRI plugin %q...", name)
@@ -394,12 +606,15 @@ func (r *Adaptation) stopPlugins() {
 }
 
 func (r *Adaptation) removeClosedPlugins() {
-	var active, closed []*plugin
+	var active, closed, validators []*plugin
 	for _, p := range r.plugins {
 		if p.isClosed() {
 			closed = append(closed, p)
 		} else {
 			active = append(active, p)
+			if p.isContainerAdjustmentValidator() {
+				validators = append(validators, p)
+			}
 		}
 	}
 
@@ -410,7 +625,10 @@ func (r *Adaptation) removeClosedPlugins() {
 			}
 		}()
 	}
+
 	r.plugins = active
+	r.validators = validators
+	r.metrics.UpdatePluginCount(len(r.plugins))
 }
 
 func (r *Adaptation) startListener() error {
@@ -467,18 +685,22 @@ func (r *Adaptation) acceptPluginConnections(l net.Listener) error {
 			}
 
 			r.requestPluginSync()
-
 			err = r.syncFn(ctx, p.synchronize)
 			if err != nil {
-				log.Infof(ctx, "failed to synchronize plugin: %v", err)
+				log.Errorf(ctx, "failed to synchronize plugin: %v", err)
+				p.close()
 			} else {
 				r.Lock()
 				r.plugins = append(r.plugins, p)
+				if p.isContainerAdjustmentValidator() {
+					r.validators = append(r.validators, p)
+				}
 				r.sortPlugins()
+				count := len(r.plugins)
 				r.Unlock()
+				r.metrics.UpdatePluginCount(count)
 				log.Infof(ctx, "plugin %q connected and synchronized", p.name())
 			}
-
 			r.finishedPluginSync()
 		}
 	}()
@@ -543,12 +765,25 @@ func (r *Adaptation) sortPlugins() {
 	sort.Slice(r.plugins, func(i, j int) bool {
 		return r.plugins[i].idx < r.plugins[j].idx
 	})
+	sort.Slice(r.validators, func(i, j int) bool {
+		return r.validators[i].idx < r.validators[j].idx
+	})
 	if len(r.plugins) > 0 {
 		log.Infof(noCtx, "plugin invocation order")
 		for i, p := range r.plugins {
 			log.Infof(noCtx, "  #%d: %q (%s)", i+1, p.name(), p.qualifiedName())
 		}
 	}
+	if len(r.validators) > 0 {
+		log.Infof(noCtx, "validator plugins")
+		for _, p := range r.validators {
+			log.Infof(noCtx, "  %q (%s)", p.name(), p.qualifiedName())
+		}
+	}
+}
+
+func (r *Adaptation) hasValidators() bool {
+	return len(r.validators) > 0
 }
 
 func (r *Adaptation) requestPluginSync() {
@@ -559,6 +794,7 @@ func (r *Adaptation) finishedPluginSync() {
 	r.syncLock.Unlock()
 }
 
+// PluginSyncBlock is a handle for blocking plugin synchronization.
 type PluginSyncBlock struct {
 	r *Adaptation
 }

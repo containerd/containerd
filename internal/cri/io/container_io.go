@@ -17,6 +17,7 @@
 package io
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -160,7 +161,7 @@ func (c *ContainerIO) Pipe() {
 
 // Attach attaches container stdio.
 // TODO(random-liu): Use pools.Copy in docker to reduce memory usage?
-func (c *ContainerIO) Attach(opts AttachOptions) {
+func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 	var wg sync.WaitGroup
 	key := util.GenerateID()
 	stdinKey := streamKey(c.id, "attach-"+key, Stdin)
@@ -173,8 +174,7 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 		// wrapper doesn't close the actual stdin, it only stops io.Copy.
 		// The actual stdin will be closed by stream server.
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
 				log.L.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
 			}
@@ -196,13 +196,19 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 					c.stderrGroup.Remove(stderrKey)
 				}
 			}
-			wg.Done()
-		}()
+		})
 	}
 
 	attachStream := func(key string, close <-chan struct{}) {
-		<-close
-		log.L.Infof("Attach stream %q closed", key)
+		select {
+		case <-close:
+			log.L.Infof("Attach stream %q closed", key)
+		case <-ctx.Done():
+			log.L.Infof("Attach client of %q cancelled", key)
+			// Avoid writeGroup heap up
+			c.stdoutGroup.Remove(key)
+			c.stderrGroup.Remove(key)
+		}
 		// Make sure stdin gets closed.
 		if stdinStreamRC != nil {
 			stdinStreamRC.Close()

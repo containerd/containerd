@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	_ "crypto/sha256" // required by go-digest
+	_ "crypto/sha512" // required for sha512 digest tests
 	"errors"
 	"io"
 	"strings"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -233,4 +235,333 @@ func (f *fakeWriter) Status() (Status, error) {
 func (f *fakeWriter) Truncate(size int64) error {
 	f.Buffer.Truncate(int(size))
 	return nil
+}
+
+func TestUseDescriptorData(t *testing.T) {
+	helloData := []byte("hello")
+	helloDigest := digest.FromBytes(helloData)
+	helloSHA512 := digest.SHA512.FromBytes(helloData)
+
+	tests := []struct {
+		name        string
+		desc        ocispec.Descriptor
+		wantUse     bool
+		wantErrorIs error
+	}{
+		{
+			name: "valid data with matching size and sha256 digest",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: helloDigest,
+			},
+			wantUse: true,
+		},
+		{
+			name: "valid data with matching size and sha512 digest",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: helloSHA512,
+			},
+			wantUse: true,
+		},
+		{
+			name: "nil data with zero size and valid empty digest",
+			desc: ocispec.Descriptor{
+				Data:   nil,
+				Size:   0,
+				Digest: digest.FromBytes(nil),
+			},
+			wantUse: true,
+		},
+		{
+			name: "size mismatch data longer than size",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   3,
+				Digest: helloDigest,
+			},
+			wantUse: false,
+		},
+		{
+			name: "size mismatch data shorter than size",
+			desc: ocispec.Descriptor{
+				Data:   []byte("hi"),
+				Size:   10,
+				Digest: helloDigest,
+			},
+			wantUse: false,
+		},
+		{
+			name: "nil data with non-zero size",
+			desc: ocispec.Descriptor{
+				Data:   nil,
+				Size:   5,
+				Digest: helloDigest,
+			},
+			wantUse: false,
+		},
+		{
+			name: "size matches but digest is malformed",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: digest.Digest("not-a-valid-digest"),
+			},
+			wantErrorIs: digest.ErrDigestInvalidFormat,
+		},
+		{
+			name: "size matches but digest does not match data",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: digest.FromBytes([]byte("world")),
+			},
+			wantUse: false,
+		},
+		{
+			name: "empty data and empty size with no digest",
+			desc: ocispec.Descriptor{
+				Data: nil,
+				Size: 0,
+			},
+			wantErrorIs: digest.ErrDigestInvalidFormat,
+		},
+		{
+			name: "size matches but digest algorithm is not registered",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: digest.Digest("fakealg:0000000000000000000000000000000000000000000000000000000000000000"),
+			},
+			wantErrorIs: digest.ErrDigestUnsupported,
+		},
+		{
+			name: "empty embedded data with zero size and valid digest",
+			desc: ocispec.Descriptor{
+				Data:   []byte{},
+				Size:   0,
+				Digest: digest.FromBytes([]byte{}),
+			},
+			wantUse: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := useDescriptorData(tt.desc)
+			if tt.wantErrorIs != nil {
+				assert.ErrorIs(t, err, tt.wantErrorIs)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantUse, got)
+		})
+	}
+}
+
+// fakeReaderAt implements ReaderAt for testing.
+type fakeReaderAt struct {
+	*bytes.Reader
+	size int64
+}
+
+func (f *fakeReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	return f.Reader.ReadAt(p, off)
+}
+
+func (f *fakeReaderAt) Close() error { return nil }
+func (f *fakeReaderAt) Size() int64  { return f.size }
+
+// fakeProvider implements Provider for testing. It records whether
+// ReaderAt was called so tests can verify that desc.Data was (or was
+// not) used as a shortcut.
+type fakeProvider struct {
+	content []byte
+	called  bool
+	err     error
+}
+
+func (f *fakeProvider) ReaderAt(_ context.Context, _ ocispec.Descriptor) (ReaderAt, error) {
+	f.called = true
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &fakeReaderAt{
+		Reader: bytes.NewReader(f.content),
+		size:   int64(len(f.content)),
+	}, nil
+}
+
+func TestBlobReadSeeker_WithDescriptorData(t *testing.T) {
+	helloData := []byte("hello")
+	helloDigest := digest.FromBytes(helloData)
+	providerData := []byte("from provider")
+
+	tests := []struct {
+		name             string
+		desc             ocispec.Descriptor
+		providerContent  []byte
+		wantContent      string
+		wantError        bool
+		wantProviderUsed bool
+	}{
+		{
+			name: "valid embedded data bypasses provider",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: helloDigest,
+			},
+			providerContent:  providerData,
+			wantContent:      "hello",
+			wantProviderUsed: false,
+		},
+		{
+			name: "nil data falls through to provider",
+			desc: ocispec.Descriptor{
+				Data:   nil,
+				Size:   int64(len(providerData)),
+				Digest: digest.FromBytes(providerData),
+			},
+			providerContent:  providerData,
+			wantContent:      "from provider",
+			wantProviderUsed: true,
+		},
+		{
+			name: "malformed digest returns error",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: digest.Digest("bad"),
+			},
+			providerContent: providerData,
+			wantError:       true,
+		},
+		{
+			name: "digest mismatch falls through to provider",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: digest.FromBytes([]byte("other")),
+			},
+			providerContent:  providerData,
+			wantContent:      "from provider",
+			wantProviderUsed: true,
+		},
+		{
+			name: "size mismatch falls through to provider",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   100,
+				Digest: helloDigest,
+			},
+			providerContent:  providerData,
+			wantContent:      "from provider",
+			wantProviderUsed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &fakeProvider{content: tt.providerContent}
+			rsc, err := BlobReadSeeker(context.Background(), provider, tt.desc)
+			if tt.wantError {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			defer rsc.Close()
+
+			got, err := io.ReadAll(rsc)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantContent, string(got))
+			assert.Equal(t, tt.wantProviderUsed, provider.called)
+		})
+	}
+}
+
+func TestReadBlob_WithDescriptorData(t *testing.T) {
+	helloData := []byte("hello")
+	helloDigest := digest.FromBytes(helloData)
+	providerData := []byte("from provider")
+
+	tests := []struct {
+		name             string
+		desc             ocispec.Descriptor
+		providerContent  []byte
+		wantContent      string
+		wantError        bool
+		wantProviderUsed bool
+	}{
+		{
+			name: "valid embedded data bypasses provider",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: helloDigest,
+			},
+			providerContent:  providerData,
+			wantContent:      "hello",
+			wantProviderUsed: false,
+		},
+		{
+			name: "nil data falls through to provider",
+			desc: ocispec.Descriptor{
+				Data:   nil,
+				Size:   int64(len(providerData)),
+				Digest: digest.FromBytes(providerData),
+			},
+			providerContent:  providerData,
+			wantContent:      "from provider",
+			wantProviderUsed: true,
+		},
+		{
+			name: "malformed digest returns error",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: digest.Digest("bad"),
+			},
+			providerContent: providerData,
+			wantError:       true,
+		},
+		{
+			name: "digest mismatch falls through to provider",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   int64(len(helloData)),
+				Digest: digest.FromBytes([]byte("other")),
+			},
+			providerContent:  providerData,
+			wantContent:      "from provider",
+			wantProviderUsed: true,
+		},
+		{
+			name: "size mismatch falls through to provider",
+			desc: ocispec.Descriptor{
+				Data:   helloData,
+				Size:   100,
+				Digest: helloDigest,
+			},
+			providerContent:  providerData,
+			wantContent:      "from provider",
+			wantProviderUsed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &fakeProvider{content: tt.providerContent}
+			got, err := ReadBlob(context.Background(), provider, tt.desc)
+			if tt.wantError {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantContent, string(got))
+			assert.Equal(t, tt.wantProviderUsed, provider.called)
+		})
+	}
 }

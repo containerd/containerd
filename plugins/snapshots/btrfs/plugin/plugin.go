@@ -41,7 +41,7 @@ func init() {
 		ID:     "btrfs",
 		Type:   plugins.SnapshotPlugin,
 		Config: &Config{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
 
 			config, ok := ic.Config.(*Config)

@@ -19,9 +19,13 @@ package client
 import (
 	"archive/tar"
 	"context"
+	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
+	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -34,6 +38,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/google/uuid"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExportAllCases(t *testing.T) {
@@ -233,6 +238,26 @@ func TestExportAllCases(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "export image setting ocispec.AnnotationRefName",
+			prepare: func(ctx context.Context, t *testing.T, client *Client) images.Image {
+				img, err := client.Fetch(ctx, testImageByDigest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return img
+			},
+			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, img images.Image) {
+				if err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImageByDigest), archive.WithPlatform(platforms.All)); err != nil {
+					t.Fatal(err)
+				}
+
+				if _, err := dstFile.Seek(0, io.SeekStart); err != nil {
+					t.Fatal(err)
+				}
+				assertOCIIndexAnnotationRefName(t, dstFile)
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -241,23 +266,20 @@ func TestExportAllCases(t *testing.T) {
 
 			namespace := uuid.New().String()
 			client, err := newClient(t, address, WithDefaultNamespace(namespace))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer client.Close()
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				client.Close()
+			})
 
 			ctx = namespaces.WithNamespace(ctx, namespace)
 
 			img := tc.prepare(ctx, t, client)
 
-			dstFile, err := os.CreateTemp("", "export-test")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer func() {
+			dstFile, err := os.Create(filepath.Join(t.TempDir(), "export-test"))
+			require.NoError(t, err)
+			t.Cleanup(func() {
 				dstFile.Close()
-				os.Remove(dstFile.Name())
-			}()
+			})
 
 			tc.check(ctx, t, client, dstFile, img)
 		})
@@ -287,10 +309,8 @@ func isImageInArchive(ctx context.Context, t *testing.T, client *Client, dstFile
 	allPresent := true
 	// Check if the archive contains all blobs referenced by the manifest.
 	images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		for _, b := range blobs {
-			if desc.Digest.Hex() == b {
-				return images.Children(ctx, client.ContentStore(), desc)
-			}
+		if slices.Contains(blobs, desc.Digest.Hex()) {
+			return images.Children(ctx, client.ContentStore(), desc)
 		}
 		allPresent = false
 		return nil, images.ErrStopHandler
@@ -360,5 +380,47 @@ func assertOCITar(t *testing.T, r io.Reader, docker bool) {
 		t.Error("manifest.json not found")
 	} else if !docker && foundManifestJSON {
 		t.Error("manifest.json found")
+	}
+}
+
+func assertOCIIndexAnnotationRefName(t *testing.T, r io.Reader) {
+
+	// The required grammar of the well-known org.opencontainer.image.ref.name annotation as specified at
+	// https://github.com/opencontainers/image-spec/blob/v1.1.1/annotations.md#pre-defined-annotation-keys
+	var ociImageRefNameRegex = regexp.MustCompile(`^[A-Za-z0-9]+(?:(?:[-._:@+]|--)[A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:(?:[-._:@+]|--)[A-Za-z0-9]+)*)*$`)
+
+	t.Helper()
+	tr := tar.NewReader(r)
+	foundIndexJSON := false
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Name == ocispec.ImageIndexFile {
+			foundIndexJSON = true
+			var idx ocispec.Index
+			if err := json.NewDecoder(tr).Decode(&idx); err != nil {
+				t.Fatal(err)
+			}
+			if len(idx.Manifests) == 0 {
+				t.Error("index contains no manifests to verify")
+			}
+			for _, m := range idx.Manifests {
+				if ref, ok := m.Annotations[ocispec.AnnotationRefName]; !ok {
+					t.Errorf("manifest does not have %s annotation", ocispec.AnnotationRefName)
+				} else if !ociImageRefNameRegex.MatchString(ref) {
+					t.Errorf("manifest annotation %s=%q does not match required grammar", ocispec.AnnotationRefName, ref)
+				}
+			}
+
+			break
+		}
+	}
+	if !foundIndexJSON {
+		t.Error("index.json not found")
 	}
 }

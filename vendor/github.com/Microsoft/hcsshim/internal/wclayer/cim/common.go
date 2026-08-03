@@ -17,6 +17,7 @@ import (
 var (
 	ErrBlockCIMWriterNotSupported = fmt.Errorf("writing block device CIM isn't supported")
 	ErrBlockCIMParentTypeMismatch = fmt.Errorf("parent layer block CIM type doesn't match with extraction layer")
+	ErrBlockCIMIntegrityMismatch  = fmt.Errorf("verified CIMs can not be mixed with non verified CIMs")
 )
 
 type hive struct {

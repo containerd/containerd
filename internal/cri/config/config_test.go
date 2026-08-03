@@ -297,6 +297,29 @@ func TestValidateConfig(t *testing.T) {
 			},
 			runtimeExpectedErr: "invalid `drain_exec_sync_io_timeout`",
 		},
+		"deprecated enable_cdi false": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				EnableCDI: func() *bool { v := false; return &v }(),
+			},
+			runtimeExpected: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Sandboxer: string(ModePodSandbox),
+						},
+					},
+				},
+				EnableCDI: func() *bool { v := false; return &v }(),
+			},
+			warnings: []deprecation.Warning{deprecation.CRIEnableCDI},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			var warnings []deprecation.Warning
@@ -507,4 +530,13 @@ func TestCheckLocalImagePullConfigs(t *testing.T) {
 			assert.Equal(t, tc.expectLocalPull, imageConfig.UseLocalImagePull)
 		})
 	}
+}
+
+func TestDefaultConfigEnableCRIU(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("only supported on Linux")
+	}
+	cfg := DefaultRuntimeConfig()
+	assert.NotNil(t, cfg.EnableCRIU)
+	assert.True(t, *cfg.EnableCRIU)
 }

@@ -46,7 +46,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.EventPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ep, err := ic.GetByID(plugins.EventPlugin, "exchange")
 			if err != nil {
 				return nil, err
@@ -78,7 +78,7 @@ func (s *service) Register(server *grpc.Server) error {
 }
 
 func (s *service) RegisterTTRPC(server *ttrpc.Server) error {
-	apittrpc.RegisterEventsService(server, s.ttService)
+	apittrpc.RegisterTTRPCEventsService(server, s.ttService)
 	return nil
 }
 

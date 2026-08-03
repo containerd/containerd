@@ -26,7 +26,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -35,6 +34,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -61,6 +61,7 @@ func (p *bufferPool) Get() *bytes.Buffer {
 }
 
 func (p *bufferPool) Put(buffer *bytes.Buffer) {
+	buffer.Reset()
 	p.pool.Put(buffer)
 }
 
@@ -260,7 +261,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				req.path = req.path + "?" + u.RawQuery
 			}
 
-			rc, err := r.open(ctx, req, desc.MediaType, offset, false)
+			rc, _, err := r.open(ctx, req, desc.MediaType, offset, false)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					continue // try one of the other urls.
@@ -282,7 +283,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 					return nil, err
 				}
 
-				rc, err := r.open(ctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
+				rc, _, err := r.open(ctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
 				if err != nil {
 					// Store the error for referencing later
 					if firstErr == nil {
@@ -305,7 +306,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				return nil, err
 			}
 
-			rc, err := r.open(ctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
+			rc, _, err := r.open(ctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
 			if err != nil {
 				// Store the error for referencing later
 				if firstErr == nil {
@@ -348,7 +349,7 @@ func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, last
 		headResp.Body.Close()
 	}
 	if headResp.StatusCode > 299 {
-		return nil, 0, fmt.Errorf("unexpected HEAD status code %v: %s", headReq.String(), headResp.Status)
+		return nil, 0, fmt.Errorf("unexpected HEAD status code %v: %s", headReq.sanitizedURL(), headResp.Status)
 	}
 
 	getReq := r.request(host, http.MethodGet, ps...)
@@ -419,8 +420,9 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 		return nil, desc, firstErr
 	}
 
-	seeker, err := newHTTPReadSeeker(sz, func(offset int64) (io.ReadCloser, error) {
-		return r.open(ctx, getReq, config.Mediatype, offset, true)
+	seeker, err := newHTTPReadSeeker(sz, func(offset int64) (rc io.ReadCloser, err error) {
+		rc, _, err = r.open(ctx, getReq, config.Mediatype, offset, true)
+		return
 	})
 	if err != nil {
 		return nil, desc, err
@@ -437,7 +439,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 	return seeker, desc, nil
 }
 
-func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64, lastHost bool) (_ io.ReadCloser, retErr error) {
+func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64, lastHost bool) (_ io.ReadCloser, _ int64, retErr error) {
 	const minChunkSize = 512
 
 	chunkSize := int64(r.performances.ConcurrentLayerFetchBuffer)
@@ -457,29 +459,42 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	}
 
 	if err := r.Acquire(ctx, 1); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	resp, err := req.doWithRetries(ctx, lastHost, withErrorCheck, withOffsetCheck(offset))
+	var remaining int64
+	resp, err := req.doWithRetries(ctx, lastHost, withErrorCheck, withOffsetCheck(offset, parallelism))
 	switch err {
 	case nil:
 		// all good
+		remaining = resp.ContentLength
 	case errContentRangeIgnored:
 		if parallelism != 1 {
 			log.G(ctx).WithError(err).Info("remote host ignored content range, forcing parallelism to 1")
 			parallelism = 1
 		}
+		remaining = resp.ContentLength - offset
 	default:
 		log.G(ctx).WithError(err).Debug("fetch failed")
 		r.Release(1)
-		return nil, err
+		return nil, 0, err
 	}
 
-	body := resp.Body
+	body := &fnOnClose{
+		BeforeClose: func() {
+			r.Release(1)
+		},
+		ReadCloser: resp.Body,
+	}
+	defer func() {
+		if retErr != nil {
+			body.Close()
+		}
+	}()
+
 	encoding := strings.FieldsFunc(resp.Header.Get("Content-Encoding"), func(r rune) bool {
 		return r == ' ' || r == '\t' || r == ','
 	})
 
-	remaining, _ := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 0)
 	if remaining <= chunkSize {
 		parallelism = 1
 	}
@@ -497,48 +512,51 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		if numChunks < parallelism {
 			parallelism = numChunks
 		}
+
+		// Prepare channels, buffer pool, and readers/writers for parallel fetching.
 		queue := make(chan int64, parallelism)
-		ctx, cancelCtx := context.WithCancel(ctx)
-		done := ctx.Done()
+		ctx, cancel := context.WithCancel(ctx)
+		eg, ctx := errgroup.WithContext(ctx)
 		readers, writers := make([]io.Reader, numChunks), make([]*pipeWriter, numChunks)
 		bufPool := newbufferPool(chunkSize)
 		for i := range numChunks {
 			readers[i], writers[i] = newPipeWriter(bufPool)
 		}
-		go func() {
+		// keep reference of the initial body value to ensure it is closed
+		ibody := body
+		eg.Go(func() error {
+			defer close(queue)
 			for i := range numChunks {
 				select {
 				case queue <- i:
-				case <-done:
-					return // avoid leaking a goroutine if we exit early.
+				case <-ctx.Done():
+					if i == 0 {
+						ibody.Close()
+					}
+					return ctx.Err()
 				}
 			}
-			close(queue)
-		}()
-		r.Release(1)
+			return nil
+		})
+
 		for range parallelism {
-			go func() {
+			eg.Go(func() error {
 				for i := range queue { // first in first out
 					copy := func() error {
-						if err := r.Acquire(ctx, 1); err != nil {
-							return err
-						}
-						defer r.Release(1)
 						var body io.ReadCloser
 						if i == 0 {
-							body = resp.Body
+							body = ibody
 						} else {
+							if err := r.Acquire(ctx, 1); err != nil {
+								_ = writers[i].CloseWithError(err)
+								return err
+							}
+							defer r.Release(1)
 							reqClone := req.clone()
 							reqClone.setOffset(offset + i*chunkSize)
 							nresp, err := reqClone.doWithRetries(ctx, lastHost, withErrorCheck)
 							if err != nil {
 								_ = writers[i].CloseWithError(err)
-								select {
-								case <-done:
-									return ctx.Err()
-								default:
-									cancelCtx()
-								}
 								return err
 							}
 							body = nresp.Body
@@ -547,57 +565,55 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 						_ = body.Close()
 						_ = writers[i].CloseWithError(err)
 						if err != nil && err != io.EOF {
-							cancelCtx()
 							return err
 						}
 						return nil
 					}
-					if copy() != nil {
-						return
+					if err := copy(); err != nil {
+						return err
 					}
 				}
-			}()
+				return nil
+			})
 		}
 		body = &fnOnClose{
 			BeforeClose: func() {
-				cancelCtx()
+				cancel()
+				if err := eg.Wait(); err != nil {
+					log.G(ctx).WithError(err).Warn("parallel fetch failed")
+				}
 			},
 			ReadCloser: io.NopCloser(io.MultiReader(readers...)),
 		}
-	} else {
-		body = &fnOnClose{
-			BeforeClose: func() {
-				r.Release(1)
-			},
-			ReadCloser: body,
-		}
 	}
+
 	for i := len(encoding) - 1; i >= 0; i-- {
 		algorithm := strings.ToLower(encoding[i])
 		switch algorithm {
 		case "zstd":
-			r, err := zstd.NewReader(body,
+			r, err := zstd.NewReader(body.ReadCloser,
 				zstd.WithDecoderLowmem(false),
 			)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
-			body = r.IOReadCloser()
+			body.ReadCloser = r.IOReadCloser()
 		case "gzip":
-			body, err = gzip.NewReader(body)
+			r, err := gzip.NewReader(body.ReadCloser)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
+			body.ReadCloser = r
 		case "deflate":
-			body = flate.NewReader(body)
+			body.ReadCloser = flate.NewReader(body.ReadCloser)
 		case "identity", "":
 			// no content-encoding applied, use raw body
 		default:
-			return nil, errors.New("unsupported Content-Encoding algorithm: " + algorithm)
+			return nil, 0, errors.New("unsupported Content-Encoding algorithm: " + algorithm)
 		}
 	}
 
-	return body, nil
+	return body, remaining, nil
 }
 
 type fnOnClose struct {

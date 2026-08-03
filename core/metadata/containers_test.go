@@ -25,10 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/filters"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/typeurl/v2"
@@ -37,6 +33,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
+	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 )
 
 func init() {
@@ -51,7 +53,7 @@ func TestContainersList(t *testing.T) {
 	require.NoError(t, err)
 
 	testset := map[string]*containers.Container{}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := "container-" + fmt.Sprint(i)
 		testset[id] = &containers.Container{
 			ID: id,
@@ -71,7 +73,7 @@ func TestContainersList(t *testing.T) {
 
 		if err := db.Update(func(tx *bolt.Tx) error {
 			now := time.Now()
-			result, err := store.Create(WithTransactionContext(ctx, tx), *testset[id])
+			result, err := store.Create(boltutil.WithTransaction(ctx, tx), *testset[id])
 			if err != nil {
 				return err
 			}
@@ -700,12 +702,12 @@ func checkContainerTimestamps(t *testing.T, c *containers.Container, now time.Ti
 	}
 }
 
-func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...interface{}) {
+func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...any) {
 	assert.True(t, cmp.Equal(a, b, compareNil, compareAny))
 }
 
 func testEnv(t *testing.T) (context.Context, *bolt.DB) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := t.Context()
 	ctx = namespaces.WithNamespace(ctx, "testing")
 	ctx = logtest.WithT(ctx, t)
 	dirname := t.TempDir()
@@ -715,7 +717,6 @@ func testEnv(t *testing.T) (context.Context, *bolt.DB) {
 
 	t.Cleanup(func() {
 		assert.NoError(t, db.Close())
-		cancel()
 	})
 
 	return ctx, db

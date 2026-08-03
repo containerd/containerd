@@ -7,7 +7,7 @@ metrics from the pseudo-filesystems /proc and /sys.
 backwards-incompatible ways without warnings. Use it at your own risk.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/prometheus/procfs.svg)](https://pkg.go.dev/github.com/prometheus/procfs)
-[![CircleCI](https://circleci.com/gh/prometheus/procfs/tree/master.svg?style=svg)](https://circleci.com/gh/prometheus/procfs/tree/master)
+[![Build Status](https://github.com/prometheus/procfs/actions/workflows/ci.yml/badge.svg)](https://github.com/prometheus/procfs/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/prometheus/procfs)](https://goreportcard.com/report/github.com/prometheus/procfs)
 
 ## Usage
@@ -47,15 +47,15 @@ However, most of the API includes unit tests which can be run with `make test`.
 The procfs library includes a set of test fixtures which include many example files from
 the `/proc` and `/sys` filesystems.  These fixtures are included as a [ttar](https://github.com/ideaship/ttar) file
 which is extracted automatically during testing.  To add/update the test fixtures, first
-ensure the `fixtures` directory is up to date by removing the existing directory and then
-extracting the ttar file using `make fixtures/.unpacked` or just `make test`.
+ensure the `testdata/fixtures` directory is up to date by removing the existing directory and then
+extracting the ttar file using `make testdata/fixtures/.unpacked` or just `make test`.
 
 ```bash
 rm -rf testdata/fixtures
 make test
 ```
 
-Next, make the required changes to the extracted files in the `fixtures` directory.  When
+Next, make the required changes to the extracted files in the `testdata/fixtures` directory.  When
 the changes are complete, run `make update_fixtures` to create a new `fixtures.ttar` file
 based on the updated `fixtures` directory.  And finally, verify the changes using
 `git diff testdata/fixtures.ttar`.

@@ -28,8 +28,8 @@ import (
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/internal/cri/clock"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -39,7 +39,7 @@ const (
 )
 
 type EventHandler interface {
-	HandleEvent(any interface{}) error
+	HandleEvent(any any) error
 }
 
 // EventMonitor monitors containerd event and updates internal state correspondingly.
@@ -67,7 +67,7 @@ type backOff struct {
 }
 
 type backOffQueue struct {
-	events     []interface{}
+	events     []any
 	expireTime time.Time
 	duration   time.Duration
 	clock      clock.Clock
@@ -90,7 +90,7 @@ func (em *EventMonitor) Subscribe(subscriber events.Subscriber, filters []string
 	em.ch, em.errCh = subscriber.Subscribe(em.ctx, filters...)
 }
 
-func convertEvent(e typeurl.Any) (string, interface{}, error) {
+func convertEvent(e typeurl.Any) (string, any, error) {
 	id := ""
 	evt, err := typeurl.UnmarshalAny(e)
 	if err != nil {
@@ -121,16 +121,13 @@ func convertEvent(e typeurl.Any) (string, interface{}, error) {
 // event monitor.
 //
 // NOTE:
-//  1. Start must be called after Subscribe.
-//  2. The task exit event has been handled in individual startSandboxExitMonitor
-//     or startContainerExitMonitor goroutine at the first. If the goroutine fails,
-//     it puts the event into backoff retry queue and event monitor will handle
-//     it later.
+//
+//	The task exit event has been handled in individual startSandboxExitMonitor
+//	or startContainerExitMonitor goroutine at the first. If the goroutine fails,
+//	it puts the event into backoff retry queue and event monitor will handle
+//	it later.
 func (em *EventMonitor) Start() <-chan error {
 	errCh := make(chan error)
-	if em.ch == nil || em.errCh == nil {
-		panic("event channel is nil")
-	}
 	backOffCheckCh := em.backOff.start()
 	go func() {
 		defer close(errCh)
@@ -175,13 +172,23 @@ func (em *EventMonitor) Start() <-chan error {
 						}
 					}
 				}
+			case <-em.ctx.Done():
+				if em.errCh == nil {
+					return
+				}
+
+				if err := <-em.errCh; err != nil {
+					log.L.WithError(err).Error("Failed to handle event stream")
+					errCh <- err
+				}
+				return
 			}
 		}
 	}()
 	return errCh
 }
 
-func (em *EventMonitor) Backoff(key string, evt interface{}) {
+func (em *EventMonitor) Backoff(key string, evt any) {
 	em.backOff.enBackOff(key, evt)
 }
 
@@ -226,7 +233,7 @@ func (b *backOff) isInBackOff(key string) bool {
 }
 
 // enBackOff start to backOff and put event to the tail of queue
-func (b *backOff) enBackOff(key string, evt interface{}) {
+func (b *backOff) enBackOff(key string, evt any) {
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
 
@@ -234,10 +241,10 @@ func (b *backOff) enBackOff(key string, evt interface{}) {
 		queue.events = append(queue.events, evt)
 		return
 	}
-	b.queuePool[key] = newBackOffQueue([]interface{}{evt}, b.minDuration, b.clock)
+	b.queuePool[key] = newBackOffQueue([]any{evt}, b.minDuration, b.clock)
 }
 
-// enBackOff get out the whole queue
+// deBackOff get out the whole queue
 func (b *backOff) deBackOff(key string) *backOffQueue {
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
@@ -248,14 +255,11 @@ func (b *backOff) deBackOff(key string) *backOffQueue {
 }
 
 // enBackOff start to backOff again and put events to the queue
-func (b *backOff) reBackOff(key string, events []interface{}, oldDuration time.Duration) {
+func (b *backOff) reBackOff(key string, events []any, oldDuration time.Duration) {
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
 
-	duration := 2 * oldDuration
-	if duration > b.maxDuration {
-		duration = b.maxDuration
-	}
+	duration := min(2*oldDuration, b.maxDuration)
 	b.queuePool[key] = newBackOffQueue(events, duration, b.clock)
 }
 
@@ -274,7 +278,7 @@ func (b *backOff) stop() {
 	}
 }
 
-func newBackOffQueue(events []interface{}, init time.Duration, c clock.Clock) *backOffQueue {
+func newBackOffQueue(events []any, init time.Duration, c clock.Clock) *backOffQueue {
 	return &backOffQueue{
 		events:     events,
 		duration:   init,

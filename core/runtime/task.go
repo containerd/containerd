@@ -139,5 +139,5 @@ type ProcessInfo struct {
 	Pid uint32
 	// Info includes additional process information
 	// Info varies by platform
-	Info interface{}
+	Info any
 }

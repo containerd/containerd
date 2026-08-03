@@ -114,7 +114,7 @@ func (s *sandboxClient) Stop(ctx context.Context) error {
 }
 
 func (s *sandboxClient) Shutdown(ctx context.Context) error {
-	if err := s.client.SandboxController(s.metadata.Sandboxer).Shutdown(ctx, s.ID()); err != nil && errdefs.IsNotFound(err) {
+	if err := s.client.SandboxController(s.metadata.Sandboxer).Shutdown(ctx, s.ID()); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("failed to shutdown sandbox: %w", err)
 	}
 
@@ -131,10 +131,15 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 		return nil, errors.New("sandbox ID must be specified")
 	}
 
+	sandboxer, err := c.defaultSandboxer(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get default sandboxer: %w", err)
+	}
 	newSandbox := api.Sandbox{
 		ID:        sandboxID,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
+		Sandboxer: sandboxer,
 	}
 
 	for _, opt := range opts {
@@ -146,6 +151,10 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 	metadata, err := c.SandboxStore().Create(ctx, newSandbox)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := c.SandboxController(sandboxer).Create(ctx, newSandbox); err != nil {
+		return nil, fmt.Errorf("failed to create sandbox with %s sandboxer: %w", sandboxer, err)
 	}
 
 	return &sandboxClient{
@@ -171,7 +180,7 @@ func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 type NewSandboxOpts func(ctx context.Context, client *Client, sandbox *api.Sandbox) error
 
 // WithSandboxRuntime allows a user to specify the runtime to be used to run a sandbox
-func WithSandboxRuntime(name string, options interface{}) NewSandboxOpts {
+func WithSandboxRuntime(name string, options any) NewSandboxOpts {
 	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
 		if options == nil {
 			options = &types.Empty{}
@@ -211,7 +220,7 @@ func WithSandboxSpec(s *oci.Spec, opts ...oci.SpecOpts) NewSandboxOpts {
 }
 
 // WithSandboxExtension attaches an extension to sandbox
-func WithSandboxExtension(name string, extension interface{}) NewSandboxOpts {
+func WithSandboxExtension(name string, extension any) NewSandboxOpts {
 	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
 		if s.Extensions == nil {
 			s.Extensions = make(map[string]typeurl.Any)

@@ -21,15 +21,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/cgroups/v3"
-	"github.com/containerd/cgroups/v3/cgroup1"
-	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
+	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/api/types"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
 func (c *criService) podSandboxStats(
@@ -41,9 +43,17 @@ func (c *criService) podSandboxStats(
 		return nil, fmt.Errorf("failed to get pod sandbox stats since sandbox container %q is not in ready state: %w", meta.ID, errdefs.ErrUnavailable)
 	}
 
-	stats, err := metricsForSandbox(sandbox)
+	ctrl, err := c.sandboxService.SandboxController(sandbox.Sandboxer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get controller for sandbox %s: %w", sandbox.ID, err)
+	}
+	metric, err := ctrl.Metrics(ctx, sandbox.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed getting metrics for sandbox %s: %w", sandbox.ID, err)
+	}
+	stats, err := decodeSandboxCgroupMetrics(metric)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding metrics for sandbox %s: %w", sandbox.ID, err)
 	}
 
 	podSandboxStats := &runtime.PodSandboxStats{
@@ -56,56 +66,92 @@ func (c *criService) podSandboxStats(
 		},
 	}
 
-	if stats != nil {
-		timestamp := time.Now()
+	timestamp := time.Now()
 
-		cpuStats, err := c.cpuContainerStats(meta.ID, true /* isSandbox */, stats, timestamp)
+	cpuStats, err := c.cpuContainerStats(*stats, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
+	}
+	if cpuStats != nil && cpuStats.UsageCoreNanoSeconds != nil {
+		nanoUsage, err := c.getUsageNanoCores(meta.ID, true /* isSandbox */, cpuStats.UsageCoreNanoSeconds.Value, timestamp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
+			return nil, fmt.Errorf("failed to get usage nano cores: %w", err)
 		}
-		podSandboxStats.Linux.Cpu = cpuStats
+		if nanoUsage != nil {
+			cpuStats.UsageNanoCores = &runtime.UInt64Value{Value: *nanoUsage}
+		}
+	}
+	podSandboxStats.Linux.Cpu = cpuStats
 
-		memoryStats, err := c.memoryContainerStats(meta.ID, stats, timestamp)
+	memoryStats, err := c.memoryContainerStats(*stats, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain memory stats: %w", err)
+	}
+	podSandboxStats.Linux.Memory = memoryStats
+
+	if sandbox.NetNSPath != "" {
+		allStats, err := getAllContainerNetIO(ctx, sandbox.NetNSPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to obtain memory stats: %w", err)
+			return nil, fmt.Errorf("failed to obtain network stats: %w", err)
 		}
-		podSandboxStats.Linux.Memory = memoryStats
 
-		if sandbox.NetNSPath != "" {
-			rxBytes, rxErrors, txBytes, txErrors := getContainerNetIO(ctx, sandbox.NetNSPath)
-			podSandboxStats.Linux.Network = &runtime.NetworkUsage{
-				DefaultInterface: &runtime.NetworkInterfaceUsage{
-					Name:     defaultIfName,
-					RxBytes:  &runtime.UInt64Value{Value: rxBytes},
-					RxErrors: &runtime.UInt64Value{Value: rxErrors},
-					TxBytes:  &runtime.UInt64Value{Value: txBytes},
-					TxErrors: &runtime.UInt64Value{Value: txErrors},
-				},
+		networkUsage := &runtime.NetworkUsage{
+			Timestamp: timestamp.UnixNano(),
+		}
+
+		for _, ifStats := range allStats {
+			interfaceUsage := &runtime.NetworkInterfaceUsage{
+				Name:     ifStats.name,
+				RxBytes:  &runtime.UInt64Value{Value: ifStats.stats.RxBytes},
+				RxErrors: &runtime.UInt64Value{Value: ifStats.stats.RxErrors},
+				TxBytes:  &runtime.UInt64Value{Value: ifStats.stats.TxBytes},
+				TxErrors: &runtime.UInt64Value{Value: ifStats.stats.TxErrors},
+			}
+			networkUsage.Interfaces = append(networkUsage.Interfaces, interfaceUsage)
+
+			// Set the default interface to eth0, or the first interface if eth0 is not found
+			if ifStats.name == defaultIfName {
+				networkUsage.DefaultInterface = interfaceUsage
 			}
 		}
 
-		listContainerStatsRequest := &runtime.ListContainerStatsRequest{Filter: &runtime.ContainerStatsFilter{PodSandboxId: meta.ID}}
-		css, err := c.listContainerStats(ctx, listContainerStatsRequest)
-		if err != nil {
-			return nil, fmt.Errorf("failed to obtain container stats during podSandboxStats call: %w", err)
+		// If we didn't find eth0, use the first interface as default
+		if networkUsage.DefaultInterface == nil && len(networkUsage.Interfaces) > 0 {
+			networkUsage.DefaultInterface = networkUsage.Interfaces[0]
 		}
-		var pidCount uint64
-		for _, cs := range css {
-			pidCount += cs.pids
-			podSandboxStats.Linux.Containers = append(podSandboxStats.Linux.Containers, cs.stats)
-		}
-		podSandboxStats.Linux.Process = &runtime.ProcessUsage{
-			Timestamp:    timestamp.UnixNano(),
-			ProcessCount: &runtime.UInt64Value{Value: pidCount},
-		}
+
+		podSandboxStats.Linux.Network = networkUsage
+	}
+
+	listContainerStatsRequest := &runtime.ListContainerStatsRequest{Filter: &runtime.ContainerStatsFilter{PodSandboxId: meta.ID}}
+	css, err := c.listContainerStats(ctx, listContainerStatsRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain container stats during podSandboxStats call: %w", err)
+	}
+	var pidCount uint64
+	for _, cs := range css {
+		pidCount += cs.pids
+		podSandboxStats.Linux.Containers = append(podSandboxStats.Linux.Containers, cs.stats)
+	}
+	podSandboxStats.Linux.Process = &runtime.ProcessUsage{
+		Timestamp:    timestamp.UnixNano(),
+		ProcessCount: &runtime.UInt64Value{Value: pidCount},
 	}
 
 	return podSandboxStats, nil
 }
 
+// interfaceStats contains statistics for a single network interface
+type interfaceStats struct {
+	name  string
+	stats netlink.LinkStatistics64
+}
+
+// getContainerNetIO returns network stats for the default interface (eth0)
 // https://github.com/cri-o/cri-o/blob/74a5cf8dffd305b311eb1c7f43a4781738c388c1/internal/oci/stats.go#L32
-func getContainerNetIO(ctx context.Context, netNsPath string) (rxBytes, rxErrors, txBytes, txErrors uint64) {
-	ns.WithNetNSPath(netNsPath, func(_ ns.NetNS) error {
+func getContainerNetIO(ctx context.Context, netNsPath string) (netlink.LinkStatistics64, error) {
+	var stats netlink.LinkStatistics64
+	err := ns.WithNetNSPath(netNsPath, func(_ ns.NetNS) error {
 		link, err := netlink.LinkByName(defaultIfName)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("unable to retrieve network namespace stats for netNsPath: %v, interface: %v", netNsPath, defaultIfName)
@@ -113,47 +159,61 @@ func getContainerNetIO(ctx context.Context, netNsPath string) (rxBytes, rxErrors
 		}
 		attrs := link.Attrs()
 		if attrs != nil && attrs.Statistics != nil {
-			rxBytes = attrs.Statistics.RxBytes
-			rxErrors = attrs.Statistics.RxErrors
-			txBytes = attrs.Statistics.TxBytes
-			txErrors = attrs.Statistics.TxErrors
+			stats = netlink.LinkStatistics64(*attrs.Statistics)
 		}
 		return nil
 	})
 
-	return rxBytes, rxErrors, txBytes, txErrors
+	return stats, err
 }
 
-func metricsForSandbox(sandbox sandboxstore.Sandbox) (interface{}, error) {
-	cgroupPath := sandbox.Config.GetLinux().GetCgroupParent()
+// getAllContainerNetIO returns network stats for all interfaces in the network namespace
+func getAllContainerNetIO(ctx context.Context, netNsPath string) ([]interfaceStats, error) {
+	var allStats []interfaceStats
+	err := ns.WithNetNSPath(netNsPath, func(_ ns.NetNS) error {
+		links, err := netlink.LinkList()
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("unable to list network interfaces for netNsPath: %v", netNsPath)
+			return err
+		}
+		for _, link := range links {
+			attrs := link.Attrs()
+			if attrs == nil {
+				continue
+			}
+			// Skip loopback interface
+			if attrs.Name == "lo" {
+				continue
+			}
+			var stats netlink.LinkStatistics64
+			if attrs.Statistics != nil {
+				stats = netlink.LinkStatistics64(*attrs.Statistics)
+			}
+			allStats = append(allStats, interfaceStats{
+				name:  attrs.Name,
+				stats: stats,
+			})
+		}
+		return nil
+	})
 
-	if cgroupPath == "" {
-		return nil, fmt.Errorf("failed to get cgroup metrics for sandbox %v because cgroupPath is empty", sandbox.ID)
+	return allStats, err
+}
+
+func decodeSandboxCgroupMetrics(m *types.Metric) (*cgroupMetrics, error) {
+	if m == nil || m.Data == nil {
+		return nil, fmt.Errorf("sandbox metric is empty")
 	}
-
-	var statsx interface{}
-	if cgroups.Mode() == cgroups.Unified {
-		cg, err := cgroupsv2.Load(cgroupPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load sandbox cgroup: %v: %w", cgroupPath, err)
-		}
-		stats, err := cg.Stat()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get stats for cgroup: %v: %w", cgroupPath, err)
-		}
-		statsx = stats
-
-	} else {
-		control, err := cgroup1.Load(cgroup1.StaticPath(cgroupPath))
-		if err != nil {
-			return nil, fmt.Errorf("failed to load sandbox cgroup %v: %w", cgroupPath, err)
-		}
-		stats, err := control.Stat(cgroup1.IgnoreNotExist)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get stats for cgroup %v: %w", cgroupPath, err)
-		}
-		statsx = stats
+	a, err := typeurl.UnmarshalAny(m.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract sandbox metric: %w", err)
 	}
-
-	return statsx, nil
+	switch v := a.(type) {
+	case *cg1.Metrics:
+		return &cgroupMetrics{v1: v}, nil
+	case *cg2.Metrics:
+		return &cgroupMetrics{v2: v}, nil
+	default:
+		return nil, fmt.Errorf("unexpected sandbox metric type %T", v)
+	}
 }

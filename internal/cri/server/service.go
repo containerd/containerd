@@ -32,6 +32,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	streaming "k8s.io/cri-streaming/pkg/streaming"
 
 	apitypes "github.com/containerd/containerd/api/types"
 
@@ -42,19 +43,21 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/nri"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
+	"github.com/containerd/containerd/v2/internal/cri/server/images"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
-	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/eventq"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/internal/registrar"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 )
 
 var kernelSupportsRRO bool
@@ -76,6 +79,7 @@ type sandboxService interface {
 	CreateSandbox(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error
 	StartSandbox(ctx context.Context, sandboxer string, sandboxID string) (sandbox.ControllerInstance, error)
 	WaitSandbox(ctx context.Context, sandboxer string, sandboxID string) (<-chan containerd.ExitStatus, error)
+	UpdateSandbox(ctx context.Context, sandboxer string, sandboxID string, sandbox sandbox.Sandbox, fields ...string) error
 	StopSandbox(ctx context.Context, sandboxer, sandboxID string, opts ...sandbox.StopOpt) error
 	ShutdownSandbox(ctx context.Context, sandboxer string, sandboxID string) error
 	SandboxStatus(ctx context.Context, sandboxer string, sandboxID string, verbose bool) (sandbox.ControllerStatus, error)
@@ -107,10 +111,17 @@ type ImageService interface {
 	LocalResolve(refOrID string) (imagestore.Image, error)
 
 	ImageFSPaths() map[string]string
+
+	Config() criconfig.ImageConfig
+
+	UpdateRuntimeSnapshotter(runtimeName string, imagePlatform images.ImagePlatform)
 }
 
 // criService implements CRIService.
 type criService struct {
+	runtime.UnimplementedRuntimeServiceServer
+	runtime.UnimplementedImageServiceServer
+
 	RuntimeService
 	ImageService
 	// config contains all configurations.
@@ -148,7 +159,7 @@ type criService struct {
 	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
 	// containerEventsQ is used to capture container events and send them
 	// to the callers of GetContainerEvents.
-	containerEventsQ eventq.EventQueue[runtime.ContainerEventResponse]
+	containerEventsQ eventq.EventQueue[*runtime.ContainerEventResponse]
 	// nri is used to hook NRI into CRI request processing.
 	nri *nri.API
 	// sandboxService is the sandbox related service for CRI
@@ -157,6 +168,15 @@ type criService struct {
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
+	// statsCollector collects CPU stats in background for UsageNanoCores calculation
+	statsCollector *StatsCollector
+	// shimPath is the custom PATH environment variable value from the shim manager
+	shimPath string
+	// warningService is used to emit deprecation warnings.
+	warningService warning.Service
+
+	checkCriuOnce sync.Once //nolint:nolintlint,unused // Ignore on non-Linux
+	checkCriuErr  error     //nolint:nolintlint,unused // Ignore on non-Linux
 }
 
 type CRIServiceOptions struct {
@@ -175,6 +195,12 @@ type CRIServiceOptions struct {
 	//
 	// TODO: Replace this gradually with directly configured instances
 	Client *containerd.Client
+
+	// ShimPath is the custom PATH environment variable value from the shim manager
+	ShimPath string
+
+	// WarningService is used to emit deprecation warnings.
+	WarningService warning.Service
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -184,6 +210,9 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	labels := label.NewStore()
 	config := options.RuntimeService.Config()
 
+	// Create the stats collector first so it can be passed to the stores
+	statsCollector := NewStatsCollector(config)
+
 	c := &criService{
 		RuntimeService:     options.RuntimeService,
 		ImageService:       options.ImageService,
@@ -191,17 +220,20 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		client:             options.Client,
 		imageFSPaths:       options.ImageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
-		sandboxStore:       sandboxstore.NewStore(labels),
-		containerStore:     containerstore.NewStore(labels),
+		sandboxStore:       sandboxstore.NewStore(labels, statsCollector),
+		containerStore:     containerstore.NewStore(labels, statsCollector),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
+		statsCollector:     statsCollector,
+		shimPath:           options.ShimPath,
+		warningService:     options.WarningService,
 	}
 
 	// TODO: Make discard time configurable
-	c.containerEventsQ = eventq.New[runtime.ContainerEventResponse](5*time.Minute, func(event runtime.ContainerEventResponse) {
+	c.containerEventsQ = eventq.New[*runtime.ContainerEventResponse](5*time.Minute, func(event *runtime.ContainerEventResponse) {
 		containerEventsDroppedCount.Inc()
 		log.L.WithFields(
 			log.Fields{
@@ -252,6 +284,11 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		SupplementalGroupsPolicy: true,
 	}
 
+	if c.config.EnableCDI != nil && !*c.config.EnableCDI {
+		msg, _ := deprecation.Message(deprecation.CRIEnableCDI)
+		log.L.Warnf("enable_cdi set to false. %s", msg)
+	}
+
 	return c, c, nil
 }
 
@@ -261,6 +298,19 @@ func (c *criService) Run(ready func()) error {
 	// note: filters are any match, if you want any match but not in namespace foo
 	// then you have to manually filter namespace foo
 	c.eventMonitor.Subscribe(c.client, []string{`topic=="/tasks/oom"`, `topic~="/images/"`})
+
+	// Start the background stats collector for UsageNanoCores calculation
+	log.L.Info("Start stats collector")
+	if c.statsCollector != nil {
+		// TODO: Find a better way to inject service dependencies.
+		c.statsCollector.SetDependencies(
+			c.client.TaskService(),
+			c.containerStore.List,
+			c.sandboxStore.List,
+			c.sandboxService.SandboxController,
+		)
+		c.statsCollector.Start()
+	}
 
 	log.L.Infof("Start recovering state")
 	if err := c.recover(ctrdutil.NamespacedContext()); err != nil {
@@ -356,6 +406,9 @@ func (c *criService) Close() error {
 		}
 	}
 	c.eventMonitor.Stop()
+	if c.statsCollector != nil {
+		c.statsCollector.Stop()
+	}
 	if err := c.streamServer.Stop(); err != nil {
 		return fmt.Errorf("failed to stop stream server: %w", err)
 	}
@@ -391,23 +444,21 @@ func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introsp
 
 	c.runtimeHandlers[name] = h
 	if name == c.config.DefaultRuntimeName {
-		defH := *h
-		defH.Name = "" // denotes default
-		c.runtimeHandlers[""] = &defH
+		// Copying runtime.RuntimeHandler isn't allowed so a new struct with the same
+		// contents as the variable "h" is created here for the default runtime.
+		defH := &runtime.RuntimeHandler{
+			Name:     "", // denotes default
+			Features: h.Features,
+		}
+		c.runtimeHandlers[""] = defH
 	}
 
 	return nil
 }
 
 func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r criconfig.Runtime) (*features.Features, error) {
-	if r.Type != plugins.RuntimeRuncV2 {
-		return nil, fmt.Errorf("introspecting OCI runtime features needs the runtime type to be %q, got %q",
-			plugins.RuntimeRuncV2, r.Type)
-		// For other runtimes, typeurl.MarshalAnyToProto will cause nil panic during typeurl dereference
-	}
-
 	rr := &apitypes.RuntimeRequest{
-		RuntimePath: r.Type, // "io.containerd.runc.v2"
+		RuntimePath: r.Type, // e.g. "io.containerd.runc.v2" or "io.containerd.runsc.v1"
 	}
 	if r.Path != "" {
 		rr.RuntimePath = r.Path // "/usr/local/bin/crun"
@@ -416,6 +467,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if err != nil {
 		return nil, err
 	}
+	// options is nil when the runtime has no config section; marshalling a nil interface panics in typeurl.
 	if options != nil {
 		rr.Options, err = typeurl.MarshalAnyToProto(options)
 		if err != nil {
@@ -427,9 +479,15 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if err != nil {
 		return nil, fmt.Errorf("failed to call PluginInfo: %w", err)
 	}
+	if infoResp.Extra == nil {
+		return nil, fmt.Errorf("runtime plugin info has no extra data")
+	}
 	var info apitypes.RuntimeInfo
 	if err := typeurl.UnmarshalTo(infoResp.Extra, &info); err != nil {
 		return nil, fmt.Errorf("failed to get runtime info from plugin info: %w", err)
+	}
+	if info.Features == nil {
+		return nil, fmt.Errorf("runtime info has no features")
 	}
 	featuresX, err := typeurl.UnmarshalAny(info.Features)
 	if err != nil {
@@ -443,7 +501,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 }
 
 func supportsCRIUserns(f *features.Features) bool {
-	if f == nil {
+	if f == nil || f.Linux == nil {
 		return false
 	}
 	userns := slices.Contains(f.Linux.Namespaces, "user")

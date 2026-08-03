@@ -409,7 +409,7 @@ func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descr
 		newManifests = append(newManifests, newManifest)
 	}
 	if cryptoOp == cryptoOpUnwrapOnly {
-		return ocispec.Descriptor{}, false, fmt.Errorf("No manifest found for local platform")
+		return ocispec.Descriptor{}, false, fmt.Errorf("no manifest found for local platform")
 	}
 
 	if modified {

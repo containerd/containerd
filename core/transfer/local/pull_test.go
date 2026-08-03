@@ -143,7 +143,7 @@ func TestGetSupportedPlatform(t *testing.T) {
 			if sp.Platform != nil && !sp.Platform.Match(testCase.ExpectedPlatform.Platform) {
 				t.Fatalf("Expect Platform %v doesn't match", testCase.ExpectedPlatform.Platform)
 			}
-			// If the ExectedPlatform is not empty, the matched Platform shoule not be nil either
+			// If the ExectedPlatform is not empty, the matched Platform should not be nil either
 			if sp.Platform == nil && testCase.ExpectedPlatform.Platform.OS != "" {
 				t.Fatalf("Expect Platform %v doesn't match", testCase.ExpectedPlatform.Platform)
 			}

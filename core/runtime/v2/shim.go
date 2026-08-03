@@ -17,6 +17,7 @@
 package v2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -33,8 +34,8 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 
-	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
 	eventstypes "github.com/containerd/containerd/api/events"
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
@@ -52,6 +53,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -61,6 +63,11 @@ const (
 	loadTimeout     = "io.containerd.timeout.shim.load"
 	cleanupTimeout  = "io.containerd.timeout.shim.cleanup"
 	shutdownTimeout = "io.containerd.timeout.shim.shutdown"
+
+	// rootFsDiffTar is the name of the rootfs diff archive written next to a
+	// checkpoint. It is part of the checkpoint layout produced by CRIU tooling,
+	// so it must stay in sync with github.com/checkpoint-restore/checkpointctl/lib.RootFsDiffTar.
+	rootFsDiffTar = "rootfs-diff.tar"
 )
 
 func init() {
@@ -110,7 +117,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		return nil, fmt.Errorf("failed to read bootstrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
-	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog)
+	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog, client.AnonReconnectDialer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to make connection: %w", err)
 	}
@@ -128,7 +135,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		bundle:  bundle,
 		client:  conn,
 		address: address,
-		version: params.Version,
+		version: int(params.Version),
 	}
 
 	return shim, nil
@@ -219,9 +226,17 @@ type clientVersionDowngrader interface {
 	Downgrade() error
 }
 
-func parseStartResponse(response []byte) (client.BootstrapParams, error) {
-	var params client.BootstrapParams
+func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
+	var result bootapi.BootstrapResult
 
+	if err := proto.Unmarshal(response, &result); err == nil {
+		return &result, nil
+	}
+
+	// Fallback to legacy parsing for backward compatibility with legacy shims that return the address as a plain string or JSON.
+	response = bytes.TrimSpace(response)
+
+	var params client.BootstrapParams //nolint:staticcheck // Used for backward compatibility with legacy shims
 	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
 		// Use TTRPC for legacy shims
 		params.Address = string(response)
@@ -230,14 +245,18 @@ func parseStartResponse(response []byte) (client.BootstrapParams, error) {
 	}
 
 	if params.Version > CurrentShimVersion {
-		return client.BootstrapParams{}, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
+		return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
 	}
 
-	return params, nil
+	return &bootapi.BootstrapResult{
+		Version:  int32(params.Version),
+		Address:  params.Address,
+		Protocol: params.Protocol,
+	}, nil
 }
 
 // writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
-func writeBootstrapParams(path string, params client.BootstrapParams) error {
+func writeBootstrapParams(path string, params *bootapi.BootstrapResult) error {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -248,7 +267,7 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 		return err
 	}
 
-	f, err := atomicfile.New(path, 0o666)
+	f, err := atomicfile.New(path, 0o644)
 	if err != nil {
 		return err
 	}
@@ -262,23 +281,27 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 	return f.Close()
 }
 
-func readBootstrapParams(path string) (client.BootstrapParams, error) {
+func readBootstrapParams(path string) (*bootapi.BootstrapResult, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	return parseStartResponse(data)
 }
 
-// makeConnection creates a new TTRPC or GRPC connection object from address.
-// address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
-func makeConnection(ctx context.Context, id string, params client.BootstrapParams, onClose func()) (_ io.Closer, retErr error) {
+// makeConnection creates a new TTRPC or GRPC connection using the address and
+// protocol from params. Legacy plain-string or JSON bootstrap responses are
+// normalized by parseStartResponse before calling this function.
+// The dialer parameter controls connection behavior: use AnonDialer for newly
+// started shims (retries if pipe doesn't exist yet) or AnonReconnectDialer for
+// reconnecting to already-running shims (fails fast if pipe is missing).
+func makeConnection(ctx context.Context, id string, params *bootapi.BootstrapResult, onClose func(), dialer func(string, time.Duration) (net.Conn, error)) (_ io.Closer, retErr error) {
 	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
@@ -287,7 +310,7 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 
 	switch strings.ToLower(params.Protocol) {
 	case "ttrpc":
-		conn, err := client.Connect(params.Address, client.AnonReconnectDialer)
+		conn, err := client.Connect(params.Address, dialer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TTRPC connection: %w", err)
 		}
@@ -305,8 +328,7 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 	case "grpc":
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),   //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
-			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()), //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		}
 		return grpcDialContext(params.Address, onClose, gopts...)
 	default:
@@ -624,7 +646,7 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 	if opts.RestoreFromPath {
 		// Unpack rootfs-diff.tar if it exists.
 		// This needs to happen between the 'Create()' from above and before the 'Start()' from below.
-		rootfsDiff := filepath.Join(opts.Checkpoint, "..", crmetadata.RootFsDiffTar)
+		rootfsDiff := filepath.Join(opts.Checkpoint, "..", rootFsDiffTar)
 
 		_, err = os.Stat(rootfsDiff)
 		if err == nil {
@@ -836,6 +858,9 @@ func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
+		if errdefs.IsDeadlineExceeded(err) {
+			return runtime.State{}, err
+		}
 		if !errors.Is(err, ttrpc.ErrClosed) {
 			return runtime.State{}, errgrpc.ToNative(err)
 		}

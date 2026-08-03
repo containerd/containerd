@@ -22,6 +22,7 @@ import (
 
 var (
 	sandboxListTimer          metrics.Timer
+	sandboxStreamTimer        metrics.Timer
 	sandboxCreateNetworkTimer metrics.Timer
 	sandboxDeleteNetwork      metrics.Timer
 
@@ -30,6 +31,7 @@ var (
 	sandboxRemoveTimer        metrics.LabeledTimer
 
 	containerListTimer          metrics.Timer
+	containerStreamTimer        metrics.Timer
 	containerRemoveTimer        metrics.LabeledTimer
 	containerCreateTimer        metrics.LabeledTimer
 	containerStopTimer          metrics.LabeledTimer
@@ -47,6 +49,7 @@ func init() {
 	ns := metrics.NewNamespace("containerd", "cri", nil)
 
 	sandboxListTimer = ns.NewTimer("sandbox_list", "time to list sandboxes")
+	sandboxStreamTimer = ns.NewTimer("stream_sandbox_list", "time to stream sandboxes")
 	sandboxCreateNetworkTimer = ns.NewTimer("sandbox_create_network", "time to create the network for a sandbox")
 	sandboxDeleteNetwork = ns.NewTimer("sandbox_delete_network", "time to delete a sandbox's network")
 
@@ -55,6 +58,7 @@ func init() {
 	sandboxRemoveTimer = ns.NewLabeledTimer("sandbox_remove", "time to remove a sandbox", "runtime")
 
 	containerListTimer = ns.NewTimer("container_list", "time to list containers")
+	containerStreamTimer = ns.NewTimer("stream_container_list", "time to stream containers")
 	containerRemoveTimer = ns.NewLabeledTimer("container_remove", "time to remove a container", "runtime")
 	containerCreateTimer = ns.NewLabeledTimer("container_create", "time to create a container", "runtime")
 	containerStopTimer = ns.NewLabeledTimer("container_stop", "time to stop a container", "runtime")

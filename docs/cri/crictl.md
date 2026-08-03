@@ -59,29 +59,29 @@ command. With the load command you inject a container image into the container
 runtime from a file. First you need to create a container image tarball. For
 example to create an image tarball for a pause container using Docker:
 ```console
-$ docker pull registry.k8s.io/pause:3.10
-  3.10: Pulling from pause
-  7582c2cc65ef: Pull complete
-  Digest: sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a
-  Status: Downloaded newer image for registry.k8s.io/pause:3.10
-  registry.k8s.io/pause:3.10
-$ docker save registry.k8s.io/pause:3.10 -o pause.tar
+$ docker pull registry.k8s.io/pause:3.10.2
+  3.10.2: Pulling from pause
+  81ede36234b0: Pull complete
+  Digest: sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4
+  Status: Downloaded newer image for registry.k8s.io/pause:3.10.2
+  registry.k8s.io/pause:3.10.2
+$ docker save registry.k8s.io/pause:3.10.2 -o pause.tar
 ```
 Then use `ctr` to load the container image into the container runtime:
 ```console
 # The cri plugin uses the "k8s.io" containerd namespace.
 $ sudo ctr -n=k8s.io images import pause.tar
-  Loaded image: registry.k8s.io/pause:3.10
+  Loaded image: registry.k8s.io/pause:3.10.2
 ```
 List images and inspect the pause image:
 ```console
 $ sudo crictl images
 IMAGE                       TAG                 IMAGE ID            SIZE
 docker.io/library/busybox   latest              f6e427c148a76       728kB
-registry.k8s.io/pause            3.10                 873ed75102791       311kB
-$ sudo crictl inspecti 873ed75102791
+registry.k8s.io/pause       3.10.2              4a83b15d3ecfe       736kB
+$ sudo crictl inspecti 4a83b15d3ecfe
   ... displays information about the pause image.
-$ sudo crictl inspecti registry.k8s.io/pause:3.10
+$ sudo crictl inspecti registry.k8s.io/pause:3.10.2
   ... displays information about the pause image.
 ```
 
@@ -290,7 +290,7 @@ $ crictl info
     "streamIdleTimeout": "4h0m0s",
     "enableSelinux": false,
     "selinuxCategoryRange": 1024,
-    "sandboxImage": "registry.k8s.io/pause:3.10",
+    "sandboxImage": "registry.k8s.io/pause:3.10.2",
     "statsCollectPeriod": 10,
     "systemdCgroup": false,
     "enableTLSStreaming": false,

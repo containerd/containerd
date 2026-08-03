@@ -108,6 +108,7 @@ func MergeMountBlockCIMLayer(ctx context.Context, mergedLayer *cimfs.BlockCIM, p
 	if err != nil {
 		return "", fmt.Errorf("generated cim mount GUID: %w", err)
 	}
+
 	return cimfs.MountMergedBlockCIMs(mergedLayer, parentLayers, mountFlags, volumeGUID)
 }
 

@@ -18,6 +18,15 @@ package store
 
 import "sync"
 
+// StatsCollector is an interface for managing container/sandbox stats.
+// The stats collector tracks CPU usage samples for calculating UsageNanoCores.
+type StatsCollector interface {
+	// AddContainer creates a stats store for the container/sandbox.
+	AddContainer(id string)
+	// RemoveContainer removes the stats store for the container/sandbox.
+	RemoveContainer(id string)
+}
+
 // StopCh is used to propagate the stop information of a container.
 type StopCh struct {
 	ch   chan struct{}

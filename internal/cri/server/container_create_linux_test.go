@@ -60,10 +60,10 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		Args:       []string{"test", "args"},
 		WorkingDir: "test-cwd",
 		Envs: []*runtime.KeyValue{
-			{Key: "k1", Value: "v1"},
-			{Key: "k2", Value: "v2"},
-			{Key: "k3", Value: "v3=v3bis"},
-			{Key: "k4", Value: "v4=v4bis=foop"},
+			{Key: "k1", Value: []byte("v1")},
+			{Key: "k2", Value: []byte("v2")},
+			{Key: "k3", Value: []byte("v3=v3bis")},
+			{Key: "k4", Value: []byte("v4=v4bis=foop")},
 		},
 		Mounts: []*runtime.Mount{
 			// everything default
@@ -483,6 +483,77 @@ func TestPrivilegedBindMount(t *testing.T) {
 			} else {
 				checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", []string{"rw"}, []string{"ro"})
 			}
+		})
+	}
+}
+
+// TestCgroupNamespace verifies that a cgroup namespace is only assigned to
+// non-privileged containers on cgroupv2 hosts.
+func TestCgroupNamespace(t *testing.T) {
+	testPid := uint32(1234)
+	c := newTestCRIService()
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
+
+	tests := []struct {
+		desc                  string
+		privileged            bool
+		requireCgroupV2       bool
+		expectCgroupNamespace bool
+	}{
+		{
+			desc:                  "cgroupv2: non-privileged container should get cgroup namespace",
+			privileged:            false,
+			requireCgroupV2:       true,
+			expectCgroupNamespace: true,
+		},
+		{
+			desc:                  "cgroupv2: privileged container should not get cgroup namespace",
+			privileged:            true,
+			requireCgroupV2:       true,
+			expectCgroupNamespace: false,
+		},
+		{
+			desc:                  "cgroupv1: non-privileged container should not get cgroup namespace",
+			privileged:            false,
+			requireCgroupV2:       false,
+			expectCgroupNamespace: false,
+		},
+		{
+			desc:                  "cgroupv1: privileged container should not get cgroup namespace",
+			privileged:            true,
+			requireCgroupV2:       false,
+			expectCgroupNamespace: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// Skip if the host's cgroup mode doesn't match what the test case requires.
+			if tt.requireCgroupV2 && !isUnifiedCgroupsMode() {
+				t.Skip("requires cgroups v2")
+			}
+			if !tt.requireCgroupV2 && isUnifiedCgroupsMode() {
+				t.Skip("requires cgroups v1")
+			}
+
+			containerConfig.Linux.SecurityContext.Privileged = tt.privileged
+			sandboxConfig.Linux.SecurityContext.Privileged = tt.privileged
+
+			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			require.NoError(t, err)
+
+			hasCgroupNS := false
+			for _, ns := range spec.Linux.Namespaces {
+				if ns.Type == runtimespec.CgroupNamespace {
+					hasCgroupNS = true
+					break
+				}
+			}
+
+			assert.Equal(t, tt.expectCgroupNamespace, hasCgroupNS)
 		})
 	}
 }
@@ -1315,16 +1386,12 @@ func TestBaseOCISpec(t *testing.T) {
 	assert.Equal(t, *spec.Linux.Resources.Memory.Limit, containerConfig.Linux.Resources.MemoryLimitInBytes)
 }
 
-func writeFilesToTempDir(tmpDirPattern string, content []string) (string, error) {
+func writeFilesToTempDir(t *testing.T, content []string) (string, error) {
 	if len(content) == 0 {
 		return "", nil
 	}
 
-	dir, err := os.MkdirTemp("", tmpDirPattern)
-	if err != nil {
-		return "", err
-	}
-
+	dir := t.TempDir()
 	for idx, data := range content {
 		file := filepath.Join(dir, fmt.Sprintf("spec-%d.yaml", idx))
 		err := os.WriteFile(file, []byte(data), 0644)
@@ -1638,10 +1705,7 @@ containerEdits:
 
 			specCheck(t, testID, testSandboxID, testPid, spec)
 
-			cdiDir, err := writeFilesToTempDir("containerd-test-CDI-injections-", test.cdiSpecFiles)
-			if cdiDir != "" {
-				defer os.RemoveAll(cdiDir)
-			}
+			cdiDir, err := writeFilesToTempDir(t, test.cdiSpecFiles)
 			require.NoError(t, err)
 
 			err = cdi.Configure(cdi.WithSpecDirs(cdiDir))
@@ -1663,6 +1727,101 @@ containerEdits:
 					}
 				}
 			}
+		})
+	}
+}
+
+func TestUserNamespaceWithHostNetwork(t *testing.T) {
+	testID := "test-id"
+	testPid := uint32(1234)
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	idMap := runtime.IDMapping{
+		HostId:      1000,
+		ContainerId: 1000,
+		Length:      10,
+	}
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
+	c := newTestCRIService()
+
+	for _, test := range []struct {
+		desc             string
+		userNS           *runtime.UserNamespace
+		networkMode      runtime.NamespaceMode
+		expectedSysMount *runtimespec.Mount
+	}{
+		{
+			desc: "host network with user namespace should bind mount /sys",
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			networkMode: runtime.NamespaceMode_NODE,
+			expectedSysMount: &runtimespec.Mount{
+				Source:      "/sys",
+				Destination: "/sys",
+				Type:        "bind",
+				Options:     []string{"rbind", "rro", "nosuid", "nodev", "noexec"},
+			},
+		},
+		{
+			desc: "pod network with user namespace should use default sysfs",
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			networkMode: runtime.NamespaceMode_POD,
+			expectedSysMount: &runtimespec.Mount{
+				Source:      "sysfs",
+				Destination: "/sys",
+				Type:        "sysfs",
+				Options:     []string{"nosuid", "noexec", "nodev", "ro"},
+			},
+		},
+		{
+			desc:        "host network without user namespace should use default sysfs",
+			userNS:      &runtime.UserNamespace{Mode: runtime.NamespaceMode_NODE},
+			networkMode: runtime.NamespaceMode_NODE,
+			expectedSysMount: &runtimespec.Mount{
+				Source:      "sysfs",
+				Destination: "/sys",
+				Type:        "sysfs",
+				Options:     []string{"nosuid", "noexec", "nodev", "ro"},
+			},
+		},
+		{
+			desc:        "pod network without user namespace should use default sysfs",
+			userNS:      &runtime.UserNamespace{Mode: runtime.NamespaceMode_NODE},
+			networkMode: runtime.NamespaceMode_POD,
+			expectedSysMount: &runtimespec.Mount{
+				Source:      "sysfs",
+				Destination: "/sys",
+				Type:        "sysfs",
+				Options:     []string{"nosuid", "noexec", "nodev", "ro"},
+			},
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{
+				UsernsOptions: test.userNS,
+				Network:       test.networkMode,
+			}
+			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+				NamespaceOptions: &runtime.NamespaceOption{
+					Network:       test.networkMode,
+					UsernsOptions: test.userNS,
+				},
+			}
+
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			require.NoError(t, err)
+			require.NotNil(t, spec)
+
+			checkMount(t, spec.Mounts, test.expectedSysMount.Source, test.expectedSysMount.Destination,
+				test.expectedSysMount.Type, test.expectedSysMount.Options, nil)
 		})
 	}
 }

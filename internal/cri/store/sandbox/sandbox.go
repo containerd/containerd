@@ -19,7 +19,6 @@ package sandbox
 import (
 	"sync"
 
-	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/internal/cri/store"
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
@@ -35,8 +34,6 @@ type Sandbox struct {
 	Metadata
 	// Status stores the status of the sandbox.
 	Status StatusStorage
-	// Container is the containerd sandbox container client.
-	Container containerd.Container
 	// Sandboxer is the sandbox controller name of the sandbox
 	Sandboxer string
 	// CNI network namespace client.
@@ -76,18 +73,20 @@ func NewSandbox(metadata Metadata, status Status) Sandbox {
 
 // Store stores all sandboxes.
 type Store struct {
-	lock      sync.RWMutex
-	sandboxes map[string]Sandbox
-	idIndex   *truncindex.TruncIndex
-	labels    *label.Store
+	lock           sync.RWMutex
+	sandboxes      map[string]Sandbox
+	idIndex        *truncindex.TruncIndex
+	labels         *label.Store
+	statsCollector store.StatsCollector
 }
 
 // NewStore creates a sandbox store.
-func NewStore(labels *label.Store) *Store {
+func NewStore(labels *label.Store, statsCollector store.StatsCollector) *Store {
 	return &Store{
-		sandboxes: make(map[string]Sandbox),
-		idIndex:   truncindex.NewTruncIndex([]string{}),
-		labels:    labels,
+		sandboxes:      make(map[string]Sandbox),
+		idIndex:        truncindex.NewTruncIndex([]string{}),
+		labels:         labels,
+		statsCollector: statsCollector,
 	}
 }
 
@@ -106,6 +105,9 @@ func (s *Store) Add(sb Sandbox) error {
 		return err
 	}
 	s.sandboxes[sb.ID] = sb
+	if s.statsCollector != nil {
+		s.statsCollector.AddContainer(sb.ID)
+	}
 	return nil
 }
 
@@ -175,4 +177,7 @@ func (s *Store) Delete(id string) {
 	s.labels.Release(s.sandboxes[id].ProcessLabel)
 	s.idIndex.Delete(id)
 	delete(s.sandboxes, id)
+	if s.statsCollector != nil {
+		s.statsCollector.RemoveContainer(id)
+	}
 }

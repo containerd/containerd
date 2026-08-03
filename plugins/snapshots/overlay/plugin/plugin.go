@@ -21,6 +21,9 @@ package overlay
 import (
 	"errors"
 
+	"github.com/moby/sys/userns"
+
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
@@ -55,7 +58,7 @@ func init() {
 		Type:   plugins.SnapshotPlugin,
 		ID:     "overlayfs",
 		Config: &Config{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 
 			config, ok := ic.Config.(*Config)
@@ -90,6 +93,13 @@ func init() {
 				// If slowChown is false, we use capaOnlyRemapIDs to signal we only
 				// allow idmap mounts.
 				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaOnlyRemapIDs)
+			}
+
+			if !userns.RunningInUserNS() {
+				// "rebase" capability depends on `mknod c 0 0` via OverlayConvertWhiteout,
+				// so it does not work when running in UserNS.
+				// https://github.com/containerd/containerd/issues/13388
+				ic.Meta.Capabilities = append(ic.Meta.Capabilities, snapshots.RebaseCap)
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root

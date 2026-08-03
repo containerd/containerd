@@ -19,8 +19,10 @@ package util
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -30,7 +32,9 @@ import (
 	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
 )
 
 // deferCleanupTimeoutKey is used to retrieve the configurable timeout for containerd cleanup operations in defer.
@@ -78,11 +82,21 @@ func GetPassthroughAnnotations(podAnnotations map[string]string,
 	return passthroughAnnotations
 }
 
-// BuildLabels builds the labels from config to be passed to containerd
+// BuildLabels builds the labels from config to be passed to containerd.
+// Image config labels in the namespaces reserved for containerd
+// (containerd.io/) and the CRI plugin (io.cri-containerd) are not copied
+// to the container.
 func BuildLabels(configLabels, imageConfigLabels map[string]string, containerType string) map[string]string {
 	labels := make(map[string]string)
 
 	for k, v := range imageConfigLabels {
+		// Labels in the containerd.io/* namespace are interpreted by containerd
+		// itself, and labels in the io.cri-containerd.* namespace are interpreted
+		// by the CRI plugin, so they are not copied from untrusted image configs.
+		if clabels.IsReserved(k) {
+			log.L.Warnf("skipping image label %q: the label namespace is reserved for containerd; possible malicious image attempting to alter containerd behavior", k)
+			continue
+		}
 		if err := clabels.Validate(k, v); err == nil {
 			labels[k] = v
 		} else {
@@ -92,9 +106,7 @@ func BuildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 		}
 	}
 	// labels from the CRI request (config) will override labels in the image config
-	for k, v := range configLabels {
-		labels[k] = v
-	}
+	maps.Copy(labels, configLabels)
 	labels[crilabels.ContainerKindLabel] = containerType
 	return labels
 }
@@ -135,4 +147,13 @@ func GenerateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 		userstr = userstr + ":" + groupstr
 	}
 	return userstr, nil
+}
+
+// IsShimTTRPCClosed returns true if the cause of error is ttrpc.ErrClosed from shim.
+func IsShimTTRPCClosed(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errdefs.IsUnknown(err) && strings.HasSuffix(err.Error(), ttrpc.ErrClosed.Error())
 }

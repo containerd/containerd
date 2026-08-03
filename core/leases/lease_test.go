@@ -17,6 +17,7 @@
 package leases
 
 import (
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,9 +81,7 @@ func newLease(labels map[string]string) *Lease {
 	lease := &Lease{}
 	if labels != nil {
 		lease.Labels = map[string]string{}
-		for k, v := range labels {
-			lease.Labels[k] = v
-		}
+		maps.Copy(lease.Labels, labels)
 	}
 	return lease
 }

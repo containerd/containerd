@@ -244,7 +244,7 @@ version = 3
     use_local_image_pull = false
 
     [plugins.'io.containerd.cri.v1.images'.pinned_images]
-      sandbox = 'registry.k8s.io/pause:3.10'
+      sandbox = 'registry.k8s.io/pause:3.10.2'
 
     [plugins.'io.containerd.cri.v1.images'.registry]
       config_path = ''
@@ -272,6 +272,9 @@ version = 3
     cdi_spec_dirs = ['/etc/cdi', '/var/run/cdi']
     drain_exec_sync_io_timeout = '0s'
     ignore_deprecation_warnings = []
+    stats_collect_period = '1s'
+    stats_retention_period = '2m'
+    enable_criu = true
 
     [plugins.'io.containerd.cri.v1.runtime'.containerd]
       default_runtime_name = 'runc'
@@ -286,11 +289,13 @@ version = 3
           container_annotations = []
           privileged_without_host_devices = false
           privileged_without_host_devices_all_devices_allowed = false
+          cgroup_writable = false
           base_runtime_spec = ''
           cni_conf_dir = ''
           cni_max_conf_num = 0
           snapshotter = ''
           sandboxer = 'podsandbox'
+          disable_pause_image_pull = false
           io_type = ''
 
           [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
@@ -371,7 +376,7 @@ version = 2
   selinux_category_range = 1024
 
   # sandbox_image is the image used by sandbox container.
-  sandbox_image = "registry.k8s.io/pause:3.10"
+  sandbox_image = "registry.k8s.io/pause:3.10.2"
 
   # stats_collect_period is the period (in seconds) of snapshots stats collection.
   stats_collect_period = 10
@@ -433,15 +438,15 @@ version = 2
   # enable_unprivileged_ports configures net.ipv4.ip_unprivileged_port_start=0
   # for all containers which are not using host network
   # and if it is not overwritten by PodSandboxConfig
-  # Note that currently default is set to disabled but target change it in future, see:
+  # Note that before containerd v2.0, this value defaulted to false.
   #   [k8s discussion](https://github.com/kubernetes/kubernetes/issues/102612)
-  enable_unprivileged_ports = false
+  enable_unprivileged_ports = true
 
   # enable_unprivileged_icmp configures net.ipv4.ping_group_range="0 2147483647"
   # for all containers which are not using host network, are not running in user namespace
   # and if it is not overwritten by PodSandboxConfig
-  # Note that currently default is set to disabled but target change it in future together with enable_unprivileged_ports
-  enable_unprivileged_icmp = false
+  # Note that before containerd v2.0, this value defaulted to false.
+  enable_unprivileged_icmp = true
 
   # enable_cdi enables support of the Container Device Interface (CDI)
   # For more details about CDI and the syntax of CDI Spec files please refer to
@@ -567,6 +572,9 @@ version = 2
       # option so that even when no host devices are implicitly added to the container, all devices allowlisting is still enabled.
       # Requires privileged_without_host_devices to be enabled. Defaults to false.
       privileged_without_host_devices_all_devices_allowed = false
+
+      # cgroup_writable field enables the support for writable cgroups in unprivileged containers with cgroup v2 enabled. When disabled, the cgroup interface (/sys/fs/cgroup) is mounted as read-only, preventing containers from managing their own cgroup hierarchies.
+      cgroup_writable = false
 
       # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
       # container's are created from.
@@ -704,7 +712,8 @@ version = 2
     #
     # *** registry.configs and registry.mirrors that were a part of containerd 1.4
     # are now DEPRECATED and will only be used if the config_path is not specified.
-    config_path = ""
+    # It is an error to specify both config_path and the deprecated configs or mirrors
+    config_path = "/etc/containerd/certs.d:/etc/docker/certs.d"
 ```
 
 </p>

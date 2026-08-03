@@ -28,6 +28,11 @@ import (
 
 // getUsernsFD returns pinnable user namespace's file descriptor.
 func getUsernsFD(uidMaps, gidMaps []syscall.SysProcIDMap) (_ *os.File, retErr error) {
+	if !sys.SupportsPidFD() {
+		return nil, fmt.Errorf("kernel doesn't support pidfd")
+
+	}
+
 	var pidfd int
 
 	proc, err := os.StartProcess("/proc/self/exe", []string{"containerd[getUsernsFD]"}, &os.ProcAttr{
@@ -46,7 +51,7 @@ func getUsernsFD(uidMaps, gidMaps []syscall.SysProcIDMap) (_ *os.File, retErr er
 		return nil, fmt.Errorf("failed to start noop process for unshare: %w", err)
 	}
 
-	if pidfd == -1 || !sys.SupportsPidFD() {
+	if pidfd == -1 {
 		proc.Kill()
 		proc.Wait()
 		return nil, fmt.Errorf("failed to prevent pid reused issue because pidfd isn't supported")

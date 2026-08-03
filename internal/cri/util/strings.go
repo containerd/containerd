@@ -19,7 +19,7 @@ package util
 import (
 	"strings"
 
-	"github.com/containerd/containerd/v2/internal/cri/setutils"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // InStringSlice checks whether a string is inside a string slice.
@@ -48,7 +48,5 @@ func SubtractStringSlice(ss []string, str string) []string {
 
 // MergeStringSlices merges 2 string slices into one and remove duplicated elements.
 func MergeStringSlices(a []string, b []string) []string {
-	set := setutils.NewString(a...)
-	set.Insert(b...)
-	return set.UnsortedList()
+	return sets.New(a...).Insert(b...).UnsortedList()
 }

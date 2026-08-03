@@ -21,6 +21,7 @@ package nri
 import (
 	"context"
 
+	eventtypes "github.com/containerd/containerd/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	cstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -54,6 +55,14 @@ func (a *API) IsEnabled() bool {
 //
 
 func (*API) RunPodSandbox(context.Context, *sstore.Sandbox) error {
+	return nil
+}
+
+func (a *API) UpdatePodSandboxResources(context.Context, *sstore.Sandbox, *cri.LinuxContainerResources, *cri.LinuxContainerResources) error {
+	return nil
+}
+
+func (a *API) PostUpdatePodSandboxResources(context.Context, *sstore.Sandbox) error {
 	return nil
 }
 
@@ -102,7 +111,7 @@ func (*API) WithContainerAdjustment() containerd.NewContainerOpts {
 	}
 }
 
-func (*API) WithContainerExit(*cstore.Container) containerd.ProcessDeleteOpts {
+func (*API) WithContainerExit(*cstore.Container, *eventtypes.TaskExit) containerd.ProcessDeleteOpts {
 	return func(_ context.Context, _ containerd.Process) error {
 		return nil
 	}

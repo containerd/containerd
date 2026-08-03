@@ -10,10 +10,6 @@ on:
         required: true
       AZURE_CREDS:
         required: true
-      GCP_SERVICE_ACCOUNT:
-        required: true
-      GCP_WORKLOAD_IDENTITY_PROVIDER:
-        required: true
 
 env:
   AZURE_DEFAULT_LOCATION: westeurope
@@ -33,29 +29,24 @@ permissions:  # added using https://github.com/step-security/secure-workflows
 
 jobs:
   winIntegration:
-    # NOTE: the following permissions are required by `google-github-actions/auth`:
     permissions:
       contents: 'read'
-      id-token: 'write'
     strategy:
       # NOTE(aznashwan): this will permit all other jobs from the matrix to finish and
       # upload their results even if one has a failing non-test-task:
       # (e.g. hitting resource limits in the `AZTestVMCreate` task)
       fail-fast: false
       matrix:
-        win_ver: [ltsc2022, ltsc2025]
+        win_ver: [ltsc2022]
         include:
         - win_ver: ltsc2022
           AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:latest"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2022-${{ github.run_id }}
-          GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022-hyperv/"
-        - win_ver: ltsc2025
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2025-Datacenter:latest"
-          AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2025-${{ github.run_id }}
-          GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2025-hyperv/"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install required packages
         run: |
@@ -81,18 +72,18 @@ jobs:
           echo "SSH_PUB_KEY=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
 
       - name: AZLogin
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         with:
           creds: ${{ secrets.AZURE_CREDS }}
 
       - name: AZResourceGroupCreate
-        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
+        uses: azure/CLI@9eb25b8360668fb0ecbafa808d40e2197b2f5f52 # v3.0.0
         with:
           inlinescript: |
             az group create -n ${{ matrix.AZURE_RESOURCE_GROUP }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
       - name: AZTestVMCreate
-        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
+        uses: azure/CLI@9eb25b8360668fb0ecbafa808d40e2197b2f5f52 # v3.0.0
         with:
           inlinescript: |
             DETAILS=$(az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }} --public-ip-sku Standard -o json)
@@ -116,7 +107,7 @@ jobs:
             echo "VM_PUB_IP=$PUB_IP" >> $GITHUB_ENV
 
       - name: EnableAZVMSSH
-        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
+        uses: azure/CLI@9eb25b8360668fb0ecbafa808d40e2197b2f5f52 # v3.0.0
         with:
           inlinescript: |
             az vm run-command invoke  --command-id RunPowerShellScript -n winTestVM -g ${{ matrix.AZURE_RESOURCE_GROUP }} --scripts @$GITHUB_WORKSPACE/script/setup/enable_ssh_windows.ps1 --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
@@ -294,42 +285,8 @@ jobs:
               mv ${{ env.LOGS_DIR }}/$(basename $f) $f
           done
 
-      - name: FinishJob
-        run: |
-          jq -n --arg result SUCCESS --arg timestamp $(date +%s) '$timestamp|tonumber|{timestamp:.,$result}' > ${{ env.LOGS_DIR }}/finished.json
-          echo "${{ env.STARTED_TIME }}" > ${{ github.workspace }}/latest-build.txt
-
-      - name: AssignGcpCreds
-        id: AssignGcpCreds
-        run: |
-          echo 'GCP_SERVICE_ACCOUNT=${{ secrets.GCP_SERVICE_ACCOUNT }}' >> $GITHUB_OUTPUT
-          echo 'GCP_WORKLOAD_IDENTITY_PROVIDER=${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}' >> $GITHUB_OUTPUT
-
-      - name: AuthGcp
-        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # v2.1.10
-        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
-        with:
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-
-      - name: UploadJobReport
-        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
-        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
-        with:
-          path: ${{ github.workspace }}/latest-build.txt
-          destination: ${{ matrix.GOOGLE_BUCKET }}
-          parent: false
-
-      - name: UploadLogsDir
-        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
-        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
-        with:
-          path: ${{ env.LOGS_DIR }}
-          destination: ${{ matrix.GOOGLE_BUCKET }}${{ env.STARTED_TIME}}
-          parent: false
-
       - name: Check all CI stages succeeded
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const stepResults = {
@@ -349,7 +306,7 @@ jobs:
 
       - name: ResourceCleanup
         if: always()
-        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
+        uses: azure/CLI@9eb25b8360668fb0ecbafa808d40e2197b2f5f52 # v3.0.0
         with:
           inlinescript: |
             az group delete -g ${{ matrix.AZURE_RESOURCE_GROUP }} --yes

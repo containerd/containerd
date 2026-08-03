@@ -269,7 +269,7 @@ func AnnotationArgs(annoStrings []string) (map[string]string, error) {
 }
 
 // PrintAsJSON prints input in JSON format
-func PrintAsJSON(x interface{}) {
+func PrintAsJSON(x any) {
 	b, err := json.MarshalIndent(x, "", "    ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "can't marshal %+v as a JSON string: %v\n", x, err)

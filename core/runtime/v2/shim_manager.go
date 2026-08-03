@@ -26,6 +26,14 @@ import (
 	"strings"
 	"sync"
 
+	apitypes "github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
+
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -36,17 +44,19 @@ import (
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/containerd/typeurl/v2"
 )
 
 // ShimConfig for the shim
 type ShimConfig struct {
 	// Env is environment variables added to shim processes
 	Env []string `toml:"env"`
+
+	// SocketDir is the directory to place shim sockets. The path must be
+	// short enough to fit within the platform's unix socket path limit.
+	// Defaults:
+	//  Linux (UID 0):  /run/containerd/s
+	//  Linux (UID >0): /run/$UID/containerd/s or /tmp/containerd-s-$(UID)
+	SocketDir string `toml:"socket_dir"`
 }
 
 func init() {
@@ -61,7 +71,7 @@ func init() {
 			plugins.MetadataPlugin,
 		},
 		Config: &ShimConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			config := ic.Config.(*ShimConfig)
 
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
@@ -75,16 +85,34 @@ func init() {
 			events := ep.(*exchange.Exchange)
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
 			ss := metadata.NewSandboxStore(m.(*metadata.DB))
+
+			// Allow configurable directory
+			if config.SocketDir != "" {
+				if !filepath.IsAbs(config.SocketDir) {
+					return nil, fmt.Errorf("socket_dir must be an absolute path: %q", config.SocketDir)
+				}
+				config.SocketDir = filepath.Clean(config.SocketDir)
+				if len(config.SocketDir) > maxSocketDirLen {
+					return nil, fmt.Errorf("socket_dir length must be no longer than %d characters", maxSocketDirLen)
+				}
+			} else {
+				config.SocketDir = defaultSocketDir()
+				if config.SocketDir == "" {
+					return nil, fmt.Errorf("failed to find a suitable socket directory for shim, please configure one")
+				}
+			}
+
 			return NewShimManager(&ManagerConfig{
 				Address:      ic.Properties[plugins.PropertyGRPCAddress],
 				TTRPCAddress: ic.Properties[plugins.PropertyTTRPCAddress],
+				SocketDir:    config.SocketDir,
 				Events:       events,
 				Store:        cs,
 				ShimEnv:      config.Env,
 				SandboxStore: ss,
 			})
 		},
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 			// Migrate configurations from io.containerd.runtime.v2.task
 			// if the configVersion >= 3 please make sure the config is under io.containerd.shim.v1.manager.
 			if configVersion >= version.ConfigVersion {
@@ -95,8 +123,8 @@ func init() {
 			if !ok {
 				return nil
 			}
-			src := original.(map[string]interface{})
-			dest := map[string]interface{}{}
+			src := original.(map[string]any)
+			dest := map[string]any{}
 
 			if v, ok := src["sched_core"]; ok {
 				if schedCore, ok := v.(bool); schedCore {
@@ -121,6 +149,7 @@ type ManagerConfig struct {
 	Events       *exchange.Exchange
 	Address      string
 	TTRPCAddress string
+	SocketDir    string
 	SandboxStore sandbox.Store
 	ShimEnv      []string
 }
@@ -130,6 +159,7 @@ func NewShimManager(config *ManagerConfig) (*ShimManager, error) {
 	m := &ShimManager{
 		containerdAddress:      config.Address,
 		containerdTTRPCAddress: config.TTRPCAddress,
+		socketDir:              config.SocketDir,
 		shims:                  runtime.NewNSMap[ShimInstance](),
 		events:                 config.Events,
 		containers:             config.Store,
@@ -151,9 +181,12 @@ type ShimManager struct {
 	shims                  *runtime.NSMap[ShimInstance]
 	events                 *exchange.Exchange
 	containers             containers.Store
+	socketDir              string
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
 	runtimePaths sync.Map
 	sandboxStore sandbox.Store
+	// shimInfos is a cache of the shim info
+	shimInfos sync.Map
 }
 
 // ID of the shim manager
@@ -161,11 +194,21 @@ func (m *ShimManager) ID() string {
 	return plugins.ShimPlugin.String() + ".manager"
 }
 
+// Env returns the environment configured for the shim manager.
+func (m *ShimManager) Env() []string {
+	if m.env == nil {
+		return nil
+	}
+	cp := make([]string, len(m.env))
+	copy(cp, m.env)
+	return cp
+}
+
 // Start launches a new shim instance
 func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
 	shouldInvokeShimBinary := false
 
-	var params shimbinary.BootstrapParams
+	var params = &bootapi.BootstrapResult{}
 	if opts.SandboxID != "" {
 		_, sbErr := m.sandboxStore.Get(ctx, opts.SandboxID)
 		if sbErr != nil {
@@ -189,8 +232,8 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 					return nil, fmt.Errorf("the scheme of sandbox address should be in " +
 						" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
 				}
-				params = shimbinary.BootstrapParams{
-					Version:  int(opts.Version),
+				params = &bootapi.BootstrapResult{
+					Version:  int32(opts.Version),
 					Protocol: protocol,
 					Address:  address,
 				}
@@ -284,6 +327,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		runtime:      runtimePath,
 		address:      m.containerdAddress,
 		ttrpcAddress: m.containerdTTRPCAddress,
+		socketDir:    m.socketDir,
 		env:          m.env,
 	})
 	shim, err := b.Start(ctx, typeurl.MarshalProto(topts), func() {
@@ -306,34 +350,34 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 // restoreBootstrapParams reads bootstrap.json to restore shim configuration.
 // If its an old shim, this will perform migration - read address file and write default bootstrap
 // configuration (version = 2, protocol = ttrpc, and address).
-func restoreBootstrapParams(bundlePath string) (shimbinary.BootstrapParams, error) {
+func restoreBootstrapParams(bundlePath string) (*bootapi.BootstrapResult, error) {
 	filePath := filepath.Join(bundlePath, "bootstrap.json")
 
 	// Read bootstrap.json if exists
 	if _, err := os.Stat(filePath); err == nil {
 		return readBootstrapParams(filePath)
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("failed to stat %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to stat %s: %w", filePath, err)
 	}
 
 	// File not found, likely its an older shim. Try migrate.
 
 	address, err := shimbinary.ReadAddress(filepath.Join(bundlePath, "address"))
 	if err != nil {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("unable to migrate shim: failed to get socket address for bundle %s: %w", bundlePath, err)
+		return nil, fmt.Errorf("unable to migrate shim: failed to get socket address for bundle %s: %w", bundlePath, err)
 	}
 
-	params := shimbinary.BootstrapParams{
+	params := bootapi.BootstrapResult{
 		Version:  2,
 		Address:  address,
 		Protocol: "ttrpc",
 	}
 
-	if err := writeBootstrapParams(filePath, params); err != nil {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("unable to migrate: failed to write bootstrap.json file: %w", err)
+	if err := writeBootstrapParams(filePath, &params); err != nil {
+		return nil, fmt.Errorf("unable to migrate: failed to write bootstrap.json file: %w", err)
 	}
 
-	return params, nil
+	return &params, nil
 }
 
 func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
@@ -438,4 +482,41 @@ func (m *ShimManager) Delete(ctx context.Context, id string) error {
 	m.shims.Delete(ctx, id)
 
 	return err
+}
+
+type shimInfo struct {
+	handledMounts []string
+}
+
+func (m *ShimManager) loadShimInfo(ctx context.Context, shim string) (*shimInfo, error) {
+	if i, ok := m.shimInfos.Load(shim); ok {
+		return i.(*shimInfo), nil
+	}
+	// Avoid fetching info for default shims with known behavior
+	if shim == "io.containerd.runc.v2" || shim == "io.containerd.runhcs.v1" {
+		sinfo := &shimInfo{}
+		m.shimInfos.Store(shim, sinfo)
+		return sinfo, nil
+	}
+
+	rinfo, err := getRuntimeInfo(ctx, m, &apitypes.RuntimeRequest{RuntimePath: shim})
+	if err != nil {
+		return nil, err
+	}
+	sinfo := &shimInfo{}
+
+	if rinfo.Annotations != nil {
+		if v, ok := rinfo.Annotations[allowedMounts]; ok {
+			sinfo.handledMounts = strings.Split(v, ",")
+		}
+	}
+
+	fields := log.Fields{}
+	for k, v := range rinfo.Annotations {
+		fields[k] = v
+	}
+	log.G(ctx).WithFields(fields).WithField("shim", shim).Debug("loaded shim info")
+
+	m.shimInfos.Store(shim, sinfo)
+	return sinfo, nil
 }

@@ -22,31 +22,51 @@ import (
 	"path/filepath"
 	"testing"
 
-	client "github.com/containerd/containerd/v2/pkg/shim"
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/require"
 )
 
 func TestParseStartResponse(t *testing.T) {
-	for _, tc := range []struct {
+	protobufResponse, err := proto.Marshal(&bootapi.BootstrapResult{
+		Version:  3,
+		Address:  "unix:///run/containerd/shim.sock",
+		Protocol: "ttrpc",
+		Metadata: map[string]string{"note": "line\n"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, byte('\n'), protobufResponse[len(protobufResponse)-1])
+
+	testCases := []struct {
 		Name     string
-		Response string
-		Expected client.BootstrapParams
+		Response []byte
+		Expected bootapi.BootstrapResult
 		Err      error
 	}{
 		{
-			Name:     "v2 shim",
-			Response: "/somedirectory/somesocket",
-			Expected: client.BootstrapParams{
+			Name:     "v2 shim with trailing newline",
+			Response: []byte("/somedirectory/somesocket\n"),
+			Expected: bootapi.BootstrapResult{
 				Version:  2,
 				Address:  "/somedirectory/somesocket",
 				Protocol: "ttrpc",
 			},
 		},
 		{
+			Name:     "v3 shim protobuf",
+			Response: protobufResponse,
+			Expected: bootapi.BootstrapResult{
+				Version:  3,
+				Address:  "unix:///run/containerd/shim.sock",
+				Protocol: "ttrpc",
+				Metadata: map[string]string{"note": "line\n"},
+			},
+		},
+		{
 			Name:     "v2 shim using grpc",
-			Response: `{"version":2,"address":"/somedirectory/somesocket","protocol":"grpc"}`,
-			Expected: client.BootstrapParams{
+			Response: []byte(`{"version":2,"address":"/somedirectory/somesocket","protocol":"grpc"}`),
+			Expected: bootapi.BootstrapResult{
 				Version:  2,
 				Address:  "/somedirectory/somesocket",
 				Protocol: "grpc",
@@ -54,8 +74,8 @@ func TestParseStartResponse(t *testing.T) {
 		},
 		{
 			Name:     "v2 shim using ttrpc",
-			Response: `{"version":2,"address":"/somedirectory/somesocket","protocol":"ttrpc"}`,
-			Expected: client.BootstrapParams{
+			Response: []byte(`{"version":2,"address":"/somedirectory/somesocket","protocol":"ttrpc"}`),
+			Expected: bootapi.BootstrapResult{
 				Version:  2,
 				Address:  "/somedirectory/somesocket",
 				Protocol: "ttrpc",
@@ -63,8 +83,8 @@ func TestParseStartResponse(t *testing.T) {
 		},
 		{
 			Name:     "invalid shim v2 response",
-			Response: `{"address":"/somedirectory/somesocket","protocol":"ttrpc"}`,
-			Expected: client.BootstrapParams{
+			Response: []byte(`{"address":"/somedirectory/somesocket","protocol":"ttrpc"}`),
+			Expected: bootapi.BootstrapResult{
 				Version:  2,
 				Address:  `{"address":"/somedirectory/somesocket","protocol":"ttrpc"}`,
 				Protocol: "ttrpc",
@@ -72,13 +92,16 @@ func TestParseStartResponse(t *testing.T) {
 		},
 		{
 			Name:     "later unsupported shim",
-			Response: `{"Version": 4,"Address":"/somedirectory/somesocket","Protocol":"ttrpc"}`,
-			Expected: client.BootstrapParams{},
+			Response: []byte(`{"Version": 4,"Address":"/somedirectory/somesocket","Protocol":"ttrpc"}`),
+			Expected: bootapi.BootstrapResult{},
 			Err:      errdefs.ErrNotImplemented,
 		},
-	} {
+	}
+
+	for i := range testCases {
+		tc := &testCases[i]
 		t.Run(tc.Name, func(t *testing.T) {
-			params, err := parseStartResponse([]byte(tc.Response))
+			params, err := parseStartResponse(tc.Response)
 			if err != nil {
 				if !errors.Is(err, tc.Err) {
 					t.Errorf("unexpected error: %v", err)
@@ -96,6 +119,7 @@ func TestParseStartResponse(t *testing.T) {
 			if params.Address != tc.Expected.Address {
 				t.Errorf("unexpected address %q, expected %q", params.Address, tc.Expected.Address)
 			}
+			require.Equal(t, tc.Expected.Metadata, params.Metadata)
 		})
 	}
 }
@@ -109,7 +133,7 @@ func TestRestoreBootstrapParams(t *testing.T) {
 	restored, err := restoreBootstrapParams(bundlePath)
 	require.NoError(t, err)
 
-	expected := client.BootstrapParams{
+	expected := &bootapi.BootstrapResult{
 		Version:  2,
 		Address:  "unix://123",
 		Protocol: "ttrpc",

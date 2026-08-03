@@ -26,9 +26,10 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: src/github.com/containerd/containerd
+          persist-credentials: false
 
       - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
@@ -54,13 +55,16 @@ jobs:
 
       - name: Pull and push image
         shell: bash
+        env:
+          UPSTREAM_IMAGE: ${{ github.event.inputs.upstream }}
+          TARGET_IMAGE: ${{ github.event.inputs.image }}
         run: |
-          sudo containerd -l debug & > /tmp/containerd.out
+          sudo containerd -l debug > /tmp/containerd.out 2>&1 &
           containerd_pid=$!
           sleep 5
 
-          upstream=${{ github.event.inputs.upstream }}
-          target=${{ github.event.inputs.image }}
+          upstream="$UPSTREAM_IMAGE"
+          target="$TARGET_IMAGE"
           if [[ "$target" == "" ]]; then
             mirror="ghcr.io/containerd/${upstream##*/}"
           else
@@ -69,8 +73,8 @@ jobs:
 
           echo "Mirroring $upstream to $mirror"
 
-          sudo ctr content fetch --all-platforms ${upstream}
+          sudo ctr content fetch --all-platforms "${upstream}"
           sudo ctr images ls
-          sudo ctr --debug images push -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} ${mirror} ${upstream}
+          sudo ctr --debug images push -u "${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}" "${mirror}" "${upstream}"
 
-          sudo kill $containerd_pid
+          sudo kill "$containerd_pid"

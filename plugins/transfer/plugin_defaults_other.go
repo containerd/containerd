@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !darwin && !linux
 
 /*
    Copyright The containerd Authors.

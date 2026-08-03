@@ -48,6 +48,29 @@ func newSnapshotterWithOpts(opts ...Opt) testsuite.SnapshotterFunc {
 	}
 }
 
+// NewSnapshotter must not auto-append "index=off" when the configuration
+// already carries an index option: mount options are last-wins in the
+// kernel, so the appended "index=off" would silently override a configured
+// "index=on" — and combined with "nfs_export=on" it makes every overlay
+// mount fail with EINVAL (nfs_export=on conflicts with an explicit
+// index=off).
+func TestOverlayConfiguredIndexNotOverridden(t *testing.T) {
+	if !supportsIndex() {
+		t.Skip("kernel does not expose the overlay index parameter")
+	}
+	sn, err := NewSnapshotter(t.TempDir(), WithMountOptions([]string{"index=on", "nfs_export=on"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sn.Close()
+	options := sn.(*snapshotter).options
+	for _, opt := range options {
+		if opt == "index=off" {
+			t.Fatalf("configured index option overridden by auto-appended index=off (options: %v)", options)
+		}
+	}
+}
+
 func TestOverlay(t *testing.T) {
 	testutil.RequiresRoot(t)
 	optTestCases := map[string][]Opt{
@@ -138,6 +161,65 @@ func testOverlayCommit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
 		t.Fatal(err)
+	}
+
+	activeParent := "active-parent"
+	if _, err := o.Prepare(ctx, activeParent, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	// test rebase
+	testCases := []struct {
+		oldParent string
+		newParent string
+		expError  bool
+	}{
+		{
+			oldParent: "",
+			newParent: "",
+			expError:  false,
+		},
+		{
+			oldParent: "",
+			newParent: "base",
+			expError:  false,
+		},
+		{
+			oldParent: "base",
+			newParent: "base",
+			expError:  false,
+		},
+		{
+			oldParent: "base",
+			newParent: "",
+			expError:  false,
+		},
+		{
+			oldParent: "base",
+			newParent: "new",
+			expError:  true,
+		},
+		{
+			oldParent: "",
+			newParent: activeParent,
+			expError:  true,
+		},
+	}
+	for i, tc := range testCases {
+		key := fmt.Sprintf("/tmp/test-%d", i)
+		name := fmt.Sprintf("test-%d", i)
+		_, err := o.Prepare(ctx, key, tc.oldParent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := o.Commit(ctx, name, key, snapshots.WithParent(tc.newParent)); err != nil {
+			if !tc.expError {
+				t.Fatal(err)
+			}
+			t.Logf("expected error received: %v", err)
+		} else if tc.expError {
+			t.Fatal("expected error but commit succeeded")
+		}
 	}
 }
 

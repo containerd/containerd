@@ -30,6 +30,7 @@ import (
 	"sync"
 
 	"github.com/containerd/log"
+	kgzip "github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -61,7 +62,7 @@ var (
 
 var (
 	bufioReader32KPool = &sync.Pool{
-		New: func() interface{} { return bufio.NewReaderSize(nil, 32*1024) },
+		New: func() any { return bufio.NewReaderSize(nil, 32*1024) },
 	}
 )
 
@@ -279,7 +280,7 @@ func gzipDecompress(ctx context.Context, buf io.Reader) (io.ReadCloser, error) {
 	})
 
 	if gzipPath == "" {
-		return gzip.NewReader(buf)
+		return kgzip.NewReader(buf)
 	}
 	return cmdStream(exec.CommandContext(ctx, gzipPath, "-d", "-c"), buf)
 }

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 	"sync"
 
@@ -45,6 +46,7 @@ func WithMediaTypeKeyPrefix(ctx context.Context, mediaType, prefix string) conte
 	var values map[string]string
 	if v := ctx.Value(refKeyPrefix{}); v != nil {
 		values = v.(map[string]string)
+		values = maps.Clone(values)
 	} else {
 		values = make(map[string]string)
 	}
@@ -53,9 +55,27 @@ func WithMediaTypeKeyPrefix(ctx context.Context, mediaType, prefix string) conte
 	return context.WithValue(ctx, refKeyPrefix{}, values)
 }
 
-// MakeRefKey returns a unique reference for the descriptor. This reference can be
-// used to lookup ongoing processes related to the descriptor. This function
-// may look to the context to namespace the reference appropriately.
+// MakeRefKey returns a stable ingest reference for desc.
+//
+// The returned key is used as a content-store reference to correlate ongoing
+// fetch and push operations for the same descriptor. The key is derived from
+// the descriptor digest and, when present, the
+// [ocispec.AnnotationRefName] annotation.
+//
+// By default, the key is prefixed according to the descriptor media type:
+//
+//   - "manifest-" for manifest media types recognized by [images.IsManifestType]
+//   - "index-" for index media types recognized by [images.IsIndexType]
+//   - "layer-" for layer media types recognized by [images.IsLayerType]
+//   - "config-" for config media types recognized by [images.IsKnownConfig]
+//   - "attestation-" for attestation media types recognized by [images.IsAttestationType]
+//
+// Additional exact media type mappings may be provided through
+// [WithMediaTypeKeyPrefix]. A context-provided mapping takes precedence over the
+// built-in classification.
+//
+// If the media type is not recognized and no context override exists,
+// MakeRefKey falls back to the "unknown-" prefix.
 func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 	key := desc.Digest.String()
 	if desc.Annotations != nil {
@@ -83,7 +103,11 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 	case images.IsAttestationType(desc.MediaType):
 		return "attestation-" + key
 	default:
-		log.G(ctx).Warnf("reference for unknown type: %s", desc.MediaType)
+		log.G(ctx).WithFields(log.Fields{
+			"digest":       desc.Digest,
+			"mediatype":    desc.MediaType,
+			"artifactType": desc.ArtifactType,
+		}).Debug("using generic reference key prefix for unclassified descriptor")
 		return "unknown-" + key
 	}
 }
@@ -148,9 +172,18 @@ func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
+	var wrapped io.ReadCloser
+	if seeker, ok := rc.(io.Seeker); ok {
+		wrapped = &closeOnEOFReadSeeker{
+			closeOnEOFReader: closeOnEOFReader{rc: rc},
+			seeker:           seeker,
+		}
+	} else {
+		wrapped = &closeOnEOFReader{rc: rc}
+	}
+	defer wrapped.Close()
 
-	return content.Copy(ctx, cw, rc, desc.Size, desc.Digest)
+	return content.Copy(ctx, cw, wrapped, desc.Size, desc.Digest)
 }
 
 // PushHandler returns a handler that will push all content from the provider
@@ -393,4 +426,44 @@ func copyDistributionSourceLabels(from map[string]string, to *ocispec.Descriptor
 		}
 		to.Annotations[k] = v
 	}
+}
+
+type closeOnEOFReader struct {
+	rc     io.ReadCloser
+	once   sync.Once
+	closed bool
+}
+
+func (c *closeOnEOFReader) Read(p []byte) (n int, err error) {
+	if c.closed {
+		return 0, io.EOF
+	}
+	n, err = c.rc.Read(p)
+	if err != nil {
+		if err == io.EOF {
+			c.Close()
+		}
+	}
+	return n, err
+}
+
+func (c *closeOnEOFReader) Close() error {
+	var err error
+	c.once.Do(func() {
+		c.closed = true
+		err = c.rc.Close()
+	})
+	return err
+}
+
+type closeOnEOFReadSeeker struct {
+	closeOnEOFReader
+	seeker io.Seeker
+}
+
+func (c *closeOnEOFReadSeeker) Seek(offset int64, whence int) (int64, error) {
+	if c.closed {
+		return 0, fmt.Errorf("seek on closed reader: %w", io.ErrClosedPipe)
+	}
+	return c.seeker.Seek(offset, whence)
 }

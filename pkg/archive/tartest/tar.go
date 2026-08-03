@@ -20,6 +20,7 @@ import (
 	"archive/tar"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"time"
 )
@@ -134,7 +135,7 @@ func (ti tarInfo) ModTime() time.Time {
 func (ti tarInfo) IsDir() bool {
 	return (ti.mode & os.ModeDir) != 0
 }
-func (ti tarInfo) Sys() interface{} {
+func (ti tarInfo) Sys() any {
 	return ti.hdr
 }
 
@@ -160,9 +161,7 @@ func (tc TarContext) WithXattrs(xattrs map[string]string) TarContext {
 	if ntc.Xattrs == nil {
 		ntc.Xattrs = map[string]string{}
 	}
-	for k, v := range xattrs {
-		ntc.Xattrs[k] = v
-	}
+	maps.Copy(ntc.Xattrs, xattrs)
 	return ntc
 }
 

@@ -123,44 +123,38 @@ func (t Time) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (t *Time) UnmarshalJSON(b []byte) error {
-	p := strings.Split(string(b), ".")
-	switch len(p) {
-	case 1:
-		v, err := strconv.ParseInt(string(p[0]), 10, 64)
+	base, frac, found := strings.Cut(string(b), ".")
+	if !found {
+		v, err := strconv.ParseInt(base, 10, 64)
 		if err != nil {
 			return err
 		}
 		*t = Time(v * second)
-
-	case 2:
-		v, err := strconv.ParseInt(string(p[0]), 10, 64)
+	} else {
+		v, err := strconv.ParseInt(base, 10, 64)
 		if err != nil {
 			return err
 		}
-		v *= second
 
-		prec := dotPrecision - len(p[1])
+		prec := dotPrecision - len(frac)
 		if prec < 0 {
-			p[1] = p[1][:dotPrecision]
-		} else if prec > 0 {
-			p[1] = p[1] + strings.Repeat("0", prec)
+			frac = frac[:dotPrecision]
 		}
-
-		va, err := strconv.ParseInt(p[1], 10, 32)
+		va, err := strconv.ParseInt(frac, 10, 32)
 		if err != nil {
 			return err
 		}
-
-		// If the value was something like -0.1 the negative is lost in the
-		// parsing because of the leading zero, this ensures that we capture it.
-		if len(p[0]) > 0 && p[0][0] == '-' && v+va > 0 {
-			*t = Time(v+va) * -1
-		} else {
-			*t = Time(v + va)
+		switch prec {
+		case 1:
+			va *= 10
+		case 2:
+			va *= 100
 		}
 
-	default:
-		return fmt.Errorf("invalid time %q", string(b))
+		if len(base) > 0 && base[0] == '-' {
+			va = -va
+		}
+		*t = Time(v*second + va)
 	}
 	return nil
 }
@@ -170,15 +164,15 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 // This type should not propagate beyond the scope of input/output processing.
 type Duration time.Duration
 
-// Set implements pflag/flag.Value
+// Set implements pflag/flag.Value.
 func (d *Duration) Set(s string) error {
 	var err error
 	*d, err = ParseDuration(s)
 	return err
 }
 
-// Type implements pflag.Value
-func (d *Duration) Type() string {
+// Type implements pflag.Value.
+func (*Duration) Type() string {
 	return "duration"
 }
 
@@ -201,6 +195,7 @@ var unitMap = map[string]struct {
 
 // ParseDuration parses a string into a time.Duration, assuming that a year
 // always has 365d, a week always has 7d, and a day always has 24h.
+// Negative durations are not supported.
 func ParseDuration(s string) (Duration, error) {
 	switch s {
 	case "0":
@@ -253,16 +248,34 @@ func ParseDuration(s string) (Duration, error) {
 			return 0, errors.New("duration out of range")
 		}
 	}
+
 	return Duration(dur), nil
+}
+
+// ParseDurationAllowNegative is like ParseDuration but also accepts negative durations.
+func ParseDurationAllowNegative(s string) (Duration, error) {
+	if s == "" || s[0] != '-' {
+		return ParseDuration(s)
+	}
+
+	d, err := ParseDuration(s[1:])
+
+	return -d, err
 }
 
 func (d Duration) String() string {
 	var (
-		ms = int64(time.Duration(d) / time.Millisecond)
-		r  = ""
+		ms   = int64(time.Duration(d) / time.Millisecond)
+		r    = ""
+		sign = ""
 	)
+
 	if ms == 0 {
 		return "0s"
+	}
+
+	if ms < 0 {
+		sign, ms = "-", -ms
 	}
 
 	f := func(unit string, mult int64, exact bool) {
@@ -286,7 +299,7 @@ func (d Duration) String() string {
 	f("s", 1000, false)
 	f("ms", 1, false)
 
-	return r
+	return sign + r
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -321,12 +334,12 @@ func (d *Duration) UnmarshalText(text []byte) error {
 }
 
 // MarshalYAML implements the yaml.Marshaler interface.
-func (d Duration) MarshalYAML() (interface{}, error) {
+func (d Duration) MarshalYAML() (any, error) {
 	return d.String(), nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (d *Duration) UnmarshalYAML(unmarshal func(any) error) error {
 	var s string
 	if err := unmarshal(&s); err != nil {
 		return err

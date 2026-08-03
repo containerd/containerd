@@ -19,17 +19,24 @@ package oci
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/containerd/continuity/fs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/moby/sys/user"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -39,6 +46,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/fsview"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
@@ -126,10 +134,8 @@ func setCapabilities(s *Spec) {
 // ensureAdditionalGids ensures that the primary GID is also included in the additional GID list.
 func ensureAdditionalGids(s *Spec) {
 	setProcess(s)
-	for _, f := range s.Process.User.AdditionalGids {
-		if f == s.Process.User.GID {
-			return
-		}
+	if slices.Contains(s.Process.User.AdditionalGids, s.Process.User.GID) {
+		return
 	}
 	s.Process.User.AdditionalGids = append([]uint32{s.Process.User.GID}, s.Process.User.AdditionalGids...)
 }
@@ -615,9 +621,7 @@ func WithUser(userstr string) SpecOpts {
 		// The `Username` field on the runtime spec is marked by Platform as only for Windows, and in this case it
 		// *is* being set on a Windows host at least, but will be used as a temporary holding spot until the guest
 		// can use the string to perform these same operations to grab the uid:gid inside.
-		//
-		// Mounts are not supported on Darwin, so using the same workaround.
-		if (s.Windows != nil && s.Linux != nil) || runtime.GOOS == "darwin" {
+		if s.Windows != nil && s.Linux != nil {
 			s.Process.User.Username = userstr
 			return nil
 		}
@@ -626,9 +630,15 @@ func WithUser(userstr string) SpecOpts {
 		switch len(parts) {
 		case 1:
 			v, err := strconv.Atoi(parts[0])
-			if err != nil || v < minUserID || v > maxUserID {
-				// if we cannot parse as an int32 then try to see if it is a username
+			if err != nil {
+				if errors.Is(err, strconv.ErrRange) {
+					return fmt.Errorf("invalid USER value %q: uid out of range", userstr)
+				}
+				// Non-numeric user value; treat it as a username.
 				return WithUsername(userstr)(ctx, client, c, s)
+			}
+			if v < minUserID || v > maxUserID {
+				return fmt.Errorf("invalid USER value %q: uid out of range", userstr)
 			}
 			return WithUserID(uint32(v))(ctx, client, c, s)
 		case 2:
@@ -638,14 +648,24 @@ func WithUser(userstr string) SpecOpts {
 			)
 			var uid, gid uint32
 			v, err := strconv.Atoi(parts[0])
-			if err != nil || v < minUserID || v > maxUserID {
+			if err != nil {
+				if errors.Is(err, strconv.ErrRange) {
+					return fmt.Errorf("invalid USER value %q: uid out of range", userstr)
+				}
 				username = parts[0]
+			} else if v < minUserID || v > maxUserID {
+				return fmt.Errorf("invalid USER value %q: uid out of range", userstr)
 			} else {
 				uid = uint32(v)
 			}
 			v, err = strconv.Atoi(parts[1])
-			if err != nil || v < minGroupID || v > maxGroupID {
+			if err != nil {
+				if errors.Is(err, strconv.ErrRange) {
+					return fmt.Errorf("invalid USER value %q: gid out of range", userstr)
+				}
 				groupname = parts[1]
+			} else if v < minGroupID || v > maxGroupID {
+				return fmt.Errorf("invalid USER value %q: gid out of range", userstr)
 			} else {
 				gid = uint32(v)
 			}
@@ -653,9 +673,9 @@ func WithUser(userstr string) SpecOpts {
 				s.Process.User.UID, s.Process.User.GID = uid, gid
 				return nil
 			}
-			f := func(root string) error {
+			f := func(root fs.FS) error {
 				if username != "" {
-					usr, err := UserFromPath(root, func(u user.User) bool {
+					usr, err := UserFromFS(root, func(u user.User) bool {
 						return u.Name == username
 					})
 					if err != nil {
@@ -664,7 +684,7 @@ func WithUser(userstr string) SpecOpts {
 					uid = uint32(usr.Uid)
 				}
 				if groupname != "" {
-					gid, err = GIDFromPath(root, func(g user.Group) bool {
+					gid, err = GIDFromFS(root, func(g user.Group) bool {
 						return g.Name == groupname
 					})
 					if err != nil {
@@ -678,7 +698,12 @@ func WithUser(userstr string) SpecOpts {
 				if !isRootfsAbs(s.Root.Path) {
 					return errors.New("rootfs absolute path is required")
 				}
-				return f(s.Root.Path)
+				rootfs, err := os.OpenRoot(s.Root.Path)
+				if err != nil {
+					return err
+				}
+				defer rootfs.Close()
+				return f(rootfs.FS())
 			}
 			if c.Snapshotter == "" {
 				return errors.New("no snapshotter set for container")
@@ -696,7 +721,7 @@ func WithUser(userstr string) SpecOpts {
 			// from the container's rootfs. Since the option does read operation
 			// only, we append ReadOnly mount option to prevent the Linux kernel
 			// from syncing whole filesystem in umount syscall.
-			return mount.WithReadonlyTempMount(ctx, mounts, f)
+			return withReadonlyFS(ctx, client, mounts, f)
 		default:
 			return fmt.Errorf("invalid USER value %s", userstr)
 		}
@@ -715,6 +740,16 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 	}
 }
 
+// WithUmask sets the process user's umask in the OCI spec's Process.User.Umask
+func WithUmask(umask uint32) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setProcess(s)
+		u := umask
+		s.Process.User.Umask = &u
+		return nil
+	}
+}
+
 // WithUserID sets the correct UID and GID for the container based
 // on the image's /etc/passwd contents. If /etc/passwd does not exist,
 // or uid is not found in /etc/passwd, it sets the requested uid,
@@ -724,12 +759,12 @@ func WithUserID(uid uint32) SpecOpts {
 		defer ensureAdditionalGids(s)
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
-		setUser := func(root string) error {
-			usr, err := UserFromPath(root, func(u user.User) bool {
+		setUser := func(root fs.FS) error {
+			usr, err := UserFromFS(root, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
-				if os.IsNotExist(err) || errors.Is(err, ErrNoUsersFound) {
+				if errors.Is(err, fs.ErrNotExist) || errors.Is(err, ErrNoUsersFound) {
 					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
@@ -742,7 +777,12 @@ func WithUserID(uid uint32) SpecOpts {
 			if !isRootfsAbs(s.Root.Path) {
 				return errors.New("rootfs absolute path is required")
 			}
-			return setUser(s.Root.Path)
+			rootfs, err := os.OpenRoot(s.Root.Path)
+			if err != nil {
+				return err
+			}
+			defer rootfs.Close()
+			return setUser(rootfs.FS())
 		}
 		if c.Snapshotter == "" {
 			return errors.New("no snapshotter set for container")
@@ -760,7 +800,7 @@ func WithUserID(uid uint32) SpecOpts {
 		// from the container's rootfs. Since the option does read operation
 		// only, we append ReadOnly mount option to prevent the Linux kernel
 		// from syncing whole filesystem in umount syscall.
-		return mount.WithReadonlyTempMount(ctx, mounts, setUser)
+		return withReadonlyFS(ctx, client, mounts, setUser)
 	}
 }
 
@@ -776,8 +816,8 @@ func WithUsername(username string) SpecOpts {
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
 		if s.Linux != nil {
-			setUser := func(root string) error {
-				usr, err := UserFromPath(root, func(u user.User) bool {
+			setUser := func(root fs.FS) error {
+				usr, err := UserFromFS(root, func(u user.User) bool {
 					return u.Name == username
 				})
 				if err != nil {
@@ -790,7 +830,12 @@ func WithUsername(username string) SpecOpts {
 				if !isRootfsAbs(s.Root.Path) {
 					return errors.New("rootfs absolute path is required")
 				}
-				return setUser(s.Root.Path)
+				rootfs, err := os.OpenRoot(s.Root.Path)
+				if err != nil {
+					return err
+				}
+				defer rootfs.Close()
+				return setUser(rootfs.FS())
 			}
 			if c.Snapshotter == "" {
 				return errors.New("no snapshotter set for container")
@@ -808,7 +853,7 @@ func WithUsername(username string) SpecOpts {
 			// from the container's rootfs. Since the option does read operation
 			// only, we append ReadOnly mount option to prevent the Linux kernel
 			// from syncing whole filesystem in umount syscall.
-			return mount.WithReadonlyTempMount(ctx, mounts, setUser)
+			return withReadonlyFS(ctx, client, mounts, setUser)
 		} else if s.Windows != nil {
 			s.Process.User.Username = username
 		} else {
@@ -823,22 +868,22 @@ func WithUsername(username string) SpecOpts {
 // The passed in user can be either a uid or a username.
 func WithAdditionalGIDs(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
-		// For LCOW or on Darwin additional GID's not supported
-		if s.Windows != nil || runtime.GOOS == "darwin" {
+		// For LCOW additional GID's not supported
+		if s.Windows != nil {
 			return nil
 		}
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
-		setAdditionalGids := func(root string) error {
+		setAdditionalGids := func(root fs.FS) error {
 			defer ensureAdditionalGids(s)
 			var username string
 			uid, err := strconv.Atoi(userstr)
 			if err == nil {
-				usr, err := UserFromPath(root, func(u user.User) bool {
+				usr, err := UserFromFS(root, func(u user.User) bool {
 					return u.Uid == uid
 				})
 				if err != nil {
-					if os.IsNotExist(err) || errors.Is(err, ErrNoUsersFound) {
+					if errors.Is(err, fs.ErrNotExist) || errors.Is(err, ErrNoUsersFound) {
 						return nil
 					}
 					return err
@@ -847,20 +892,15 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 			} else {
 				username = userstr
 			}
-			gids, err := getSupplementalGroupsFromPath(root, func(g user.Group) bool {
+			gids, err := getSupplementalGroupsFromFS(root, func(g user.Group) bool {
 				// we only want supplemental groups
 				if g.Name == username {
 					return false
 				}
-				for _, entry := range g.List {
-					if entry == username {
-						return true
-					}
-				}
-				return false
+				return slices.Contains(g.List, username)
 			})
 			if err != nil {
-				if os.IsNotExist(err) {
+				if errors.Is(err, fs.ErrNotExist) {
 					return nil
 				}
 				return err
@@ -872,7 +912,12 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 			if !isRootfsAbs(s.Root.Path) {
 				return errors.New("rootfs absolute path is required")
 			}
-			return setAdditionalGids(s.Root.Path)
+			rootfs, err := os.OpenRoot(s.Root.Path)
+			if err != nil {
+				return err
+			}
+			defer rootfs.Close()
+			return setAdditionalGids(rootfs.FS())
 		}
 		if c.Snapshotter == "" {
 			return errors.New("no snapshotter set for container")
@@ -890,29 +935,75 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 		// from the container's rootfs. Since the option does read operation
 		// only, we append ReadOnly mount option to prevent the Linux kernel
 		// from syncing whole filesystem in umount syscall.
-		return mount.WithReadonlyTempMount(ctx, mounts, setAdditionalGids)
+		return withReadonlyFS(ctx, client, mounts, setAdditionalGids)
 	}
+}
+
+func withReadonlyFS(ctx context.Context, client Client, mounts []mount.Mount, fn func(fs.FS) error) error {
+	// Try to avoid mount if possible by using fsview to directly open
+	// overlay/erofs/bind mounts without actually mounting them
+	if viewFS, err := fsview.FSMounts(mounts); err == nil && viewFS != nil {
+		defer viewFS.Close()
+		return fn(viewFS)
+	} else if !errors.Is(err, errdefs.ErrNotImplemented) || runtime.GOOS == "darwin" {
+		return err
+	}
+
+	var mm mount.Manager
+	if cwm, ok := client.(interface{ MountManager() mount.Manager }); ok {
+		mm = cwm.MountManager()
+	}
+
+	if mm != nil {
+		t := time.Now()
+		var b [3]byte
+		// Ignore read failures, just decreases uniqueness
+		rand.Read(b[:])
+		id := fmt.Sprintf("readonly-fs-%d-%s", t.Nanosecond(), base64.URLEncoding.EncodeToString(b[:]))
+
+		// TODO: Use temporary once the read only can be optimized for single bind mounts
+		active, err := mm.Activate(ctx, id, mounts)
+		if err == nil {
+			defer mm.Deactivate(ctx, id)
+			mounts = active.System
+		} else if !errors.Is(err, errdefs.ErrNotImplemented) {
+			return fmt.Errorf("failed to activate mounts: %w", err)
+		}
+	}
+	return mount.WithReadonlyTempMount(ctx, mounts, func(root string) error {
+		rootfs, err := os.OpenRoot(root)
+		if err != nil {
+			return err
+		}
+		defer rootfs.Close()
+		return fn(rootfs.FS())
+	})
 }
 
 // WithAppendAdditionalGroups append additional groups within the container.
 // The passed in groups can be either a gid or a groupname.
 func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
-		// For LCOW or on Darwin additional GID's are not supported
-		if s.Windows != nil || runtime.GOOS == "darwin" {
+		// For LCOW additional GID's are not supported
+		if s.Windows != nil {
 			return nil
 		}
 		setProcess(s)
-		setAdditionalGids := func(root string) error {
+		setAdditionalGids := func(root fs.FS) error {
 			defer ensureAdditionalGids(s)
-			gpath, err := fs.RootPath(root, "/etc/group")
-			if err != nil {
-				return err
-			}
-			ugroups, groupErr := user.ParseGroupFile(gpath)
-			if groupErr != nil && !os.IsNotExist(groupErr) {
+
+			var ugroups []user.Group
+			f, groupErr := openUserFile(root, "etc/group")
+			if groupErr == nil {
+				defer f.Close()
+				ugroups, groupErr = user.ParseGroup(f)
+				if groupErr != nil {
+					return groupErr
+				}
+			} else if !errors.Is(groupErr, fs.ErrNotExist) {
 				return groupErr
 			}
+
 			groupMap := make(map[string]user.Group)
 			for _, group := range ugroups {
 				groupMap[group.Name] = group
@@ -940,7 +1031,12 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 			if !filepath.IsAbs(s.Root.Path) {
 				return errors.New("rootfs absolute path is required")
 			}
-			return setAdditionalGids(s.Root.Path)
+			rootfs, err := os.OpenRoot(s.Root.Path)
+			if err != nil {
+				return err
+			}
+			defer rootfs.Close()
+			return setAdditionalGids(rootfs.FS())
 		}
 		if c.Snapshotter == "" {
 			return errors.New("no snapshotter set for container")
@@ -958,7 +1054,7 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 		// from the container's rootfs. Since the option does read operation
 		// only, we append ReadOnly mount option to prevent the Linux kernel
 		// from syncing whole filesystem in umount syscall.
-		return mount.WithReadonlyTempMount(ctx, mounts, setAdditionalGids)
+		return withReadonlyFS(ctx, client, mounts, setAdditionalGids)
 	}
 }
 
@@ -981,12 +1077,7 @@ func WithCapabilities(caps []string) SpecOpts {
 }
 
 func capsContain(caps []string, s string) bool {
-	for _, c := range caps {
-		if c == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(caps, s)
 }
 
 func removeCap(caps *[]string, s string) {
@@ -1065,11 +1156,23 @@ var ErrNoUsersFound = errors.New("no users found")
 // UserFromPath inspects the user object using /etc/passwd in the specified rootfs.
 // filter can be nil.
 func UserFromPath(root string, filter func(user.User) bool) (user.User, error) {
-	ppath, err := fs.RootPath(root, "/etc/passwd")
+	r, err := os.OpenRoot(root)
 	if err != nil {
 		return user.User{}, err
 	}
-	users, err := user.ParsePasswdFileFilter(ppath, filter)
+	defer r.Close()
+	return UserFromFS(r.FS(), filter)
+}
+
+// UserFromFS inspects the user object using /etc/passwd in the specified fs.FS.
+// filter can be nil.
+func UserFromFS(root fs.FS, filter func(user.User) bool) (user.User, error) {
+	f, err := openUserFile(root, "etc/passwd")
+	if err != nil {
+		return user.User{}, err
+	}
+	defer f.Close()
+	users, err := user.ParsePasswdFilter(f, filter)
 	if err != nil {
 		return user.User{}, err
 	}
@@ -1085,11 +1188,23 @@ var ErrNoGroupsFound = errors.New("no groups found")
 // GIDFromPath inspects the GID using /etc/group in the specified rootfs.
 // filter can be nil.
 func GIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err error) {
-	gpath, err := fs.RootPath(root, "/etc/group")
+	r, err := os.OpenRoot(root)
 	if err != nil {
 		return 0, err
 	}
-	groups, err := user.ParseGroupFileFilter(gpath, filter)
+	defer r.Close()
+	return GIDFromFS(r.FS(), filter)
+}
+
+// GIDFromFS inspects the GID using /etc/group in the specified fs.FS.
+// filter can be nil.
+func GIDFromFS(root fs.FS, filter func(user.Group) bool) (gid uint32, err error) {
+	f, err := openUserFile(root, "etc/group")
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	groups, err := user.ParseGroupFilter(f, filter)
 	if err != nil {
 		return 0, err
 	}
@@ -1100,12 +1215,13 @@ func GIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err err
 	return uint32(g.Gid), nil
 }
 
-func getSupplementalGroupsFromPath(root string, filter func(user.Group) bool) ([]uint32, error) {
-	gpath, err := fs.RootPath(root, "/etc/group")
+func getSupplementalGroupsFromFS(root fs.FS, filter func(user.Group) bool) ([]uint32, error) {
+	f, err := openUserFile(root, "etc/group")
 	if err != nil {
 		return []uint32{}, err
 	}
-	groups, err := user.ParseGroupFileFilter(gpath, filter)
+	defer f.Close()
+	groups, err := user.ParseGroupFilter(f, filter)
 	if err != nil {
 		return []uint32{}, err
 	}
@@ -1368,9 +1484,7 @@ func WithAnnotations(annotations map[string]string) SpecOpts {
 		if s.Annotations == nil {
 			s.Annotations = make(map[string]string)
 		}
-		for k, v := range annotations {
-			s.Annotations[k] = v
-		}
+		maps.Copy(s.Annotations, annotations)
 		return nil
 	}
 }
@@ -1510,7 +1624,7 @@ func WithPidsLimit(limit int64) SpecOpts {
 		if s.Linux.Resources.Pids == nil {
 			s.Linux.Resources.Pids = &specs.LinuxPids{}
 		}
-		s.Linux.Resources.Pids.Limit = limit
+		s.Linux.Resources.Pids.Limit = &limit
 		return nil
 	}
 }
@@ -1620,6 +1734,23 @@ func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
 	}
 }
 
+func WithRlimit(rlimit *specs.POSIXRlimit) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setProcess(s)
+		if s.Process.Rlimits == nil {
+			s.Process.Rlimits = make([]specs.POSIXRlimit, 0)
+		}
+		for i := range s.Process.Rlimits {
+			if s.Process.Rlimits[i].Type == rlimit.Type {
+				s.Process.Rlimits[i] = *rlimit
+				return nil
+			}
+		}
+		s.Process.Rlimits = append(s.Process.Rlimits, *rlimit)
+		return nil
+	}
+}
+
 // WithWindowsCPUCount sets the `Windows.Resources.CPU.Count` section to the
 // `count` specified. It is a no-op for non-Windows specs.
 func WithWindowsCPUCount(count uint64) SpecOpts {
@@ -1697,4 +1828,95 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
 		s.Windows.Network.NetworkNamespace = ns
 		return nil
 	}
+}
+
+// readLinker defines the ReadLink method locally.
+// We keep this shim to ensure compatibility with build environments where
+// the standard library's fs.ReadLinkFS interface is not yet available or recognized.
+type readLinker interface {
+	ReadLink(name string) (string, error)
+}
+
+// openUserFile attempts to open a file within the root fs.
+// It handles cases where the file is an absolute symlink (e.g., NixOS /etc/passwd -> /nix/store/...),
+// which triggers "path escapes from parent" errors in Go 1.24+ due to stricter os.DirFS validation.
+//
+// The returned file rejects non-regular sources and returns an error if more
+// than maxUserFileBytes are read from it.
+func openUserFile(root fs.FS, name string) (fs.File, error) {
+	f, err := root.Open(name)
+	if err == nil {
+		return wrapUserFile(f, name)
+	}
+
+	// Check if the FS implements our local ReadLink interface.
+	// We use a local interface instead of fs.ReadLinkFS to avoid strict dependency
+	// issues in some build environments.
+	if lfs, ok := root.(readLinker); ok {
+		if target, lerr := lfs.ReadLink(name); lerr == nil {
+			// Use filepath.IsAbs to handle platform-agnostic absolute path checks
+			if filepath.IsAbs(target) {
+				// Re-anchor the absolute path to the root.
+				// e.g. /nix/store/... becomes nix/store/... (relative to root fs)
+				// We use filepath.Rel to safely strip the leading separator.
+				rel, rerr := filepath.Rel(string(filepath.Separator), target)
+				if rerr == nil {
+					// filepath.Rel might return OS-specific separators (backslashes on Windows).
+					// fs.Open strictly expects forward slashes, so we convert it.
+					f, oerr := root.Open(filepath.ToSlash(rel))
+					if oerr != nil {
+						return nil, oerr
+					}
+					return wrapUserFile(f, name)
+				}
+			}
+		}
+	}
+
+	// Return the original error if we couldn't resolve it
+	return nil, err
+}
+
+// maxUserFileBytes caps how much data is read from any user-database file
+// opened via openUserFile. Real systems keep these files well under 1 MiB;
+// 10 MiB is generous headroom while keeping peak memory during
+// user.ParsePasswd/ParseGroup bounded to single-digit MiB.
+const maxUserFileBytes = 10 << 20
+
+// wrapUserFile rejects non-regular sources and returns an fs.File that
+// errors out if more than maxUserFileBytes are read from it.
+func wrapUserFile(f fs.File, name string) (fs.File, error) {
+	info, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, fmt.Errorf("stat %s: %w", name, err)
+	}
+	if !info.Mode().IsRegular() {
+		f.Close()
+		return nil, fmt.Errorf("%s is not a regular file", name)
+	}
+	return &limitedFile{
+		File: f,
+		// Allow one byte past the cap so an overflow surfaces as an
+		// error rather than a silent EOF that the parser would treat as
+		// a clean end-of-file (and miss any entries past the cap).
+		r:    &io.LimitedReader{R: f, N: maxUserFileBytes + 1},
+		name: name,
+	}, nil
+}
+
+// limitedFile is an fs.File whose Read returns an error once more than
+// maxUserFileBytes have been read.
+type limitedFile struct {
+	fs.File
+	r    *io.LimitedReader
+	name string
+}
+
+func (l *limitedFile) Read(p []byte) (int, error) {
+	n, err := l.r.Read(p)
+	if l.r.N == 0 {
+		return n, fmt.Errorf("%q exceeds %d bytes", l.name, maxUserFileBytes)
+	}
+	return n, err
 }

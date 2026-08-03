@@ -27,12 +27,12 @@ import (
 func TestCRIGRPCServerConfigMigration(t *testing.T) {
 	pluginName := string(plugins.GRPCPlugin) + ".cri"
 
-	src := map[string]interface{}{
+	src := map[string]any{
 		// these should be removed in the new cri grpc config
-		"registry": map[string]interface{}{
+		"registry": map[string]any{
 			"config_path": "/etc/containerd/certs.d",
 		},
-		"containerd": map[string]interface{}{
+		"containerd": map[string]any{
 			"default_runtime_name": "runc",
 		},
 
@@ -42,17 +42,17 @@ func TestCRIGRPCServerConfigMigration(t *testing.T) {
 		"stream_server_port":    "10000",
 		"stream_idle_timeout":   "3h0m0s",
 		"enable_tls_streaming":  true,
-		"x509_key_pair_streaming": map[string]interface{}{
+		"x509_key_pair_streaming": map[string]any{
 			"cert_file": "/etc/containerd/certs.d/server.crt",
 			"key_file":  "/etc/containerd/certs.d/server.key",
 		},
 	}
-	pluginConfigs := map[string]interface{}{
+	pluginConfigs := map[string]any{
 		pluginName: src,
 	}
 	configMigration(context.Background(), 2, pluginConfigs)
 
-	dst, ok := pluginConfigs[pluginName].(map[string]interface{})
+	dst, ok := pluginConfigs[pluginName].(map[string]any)
 	assert.True(t, ok)
 	assert.NotNil(t, dst)
 

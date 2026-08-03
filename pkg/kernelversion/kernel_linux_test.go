@@ -14,15 +14,17 @@
    limitations under the License.
 */
 
-/*
-   File copied and customized based on
-   https://github.com/moby/moby/tree/v20.10.14/profiles/seccomp/kernel_linux_test.go
-*/
+// SPDX-FileCopyrightText: Copyright The containerd Authors
+// SPDX-FileCopyrightText: Copyright The Moby Authors
+// SPDX-License-Identifier: Apache-2.0
+//
+// File copied and customized based on
+// https://github.com/moby/profiles/blob/seccomp/v0.2.3/seccomp/kernel_linux_test.go
 
 package kernelversion
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 )
 
@@ -55,19 +57,19 @@ func TestParseRelease(t *testing.T) {
 		{in: "3.12-1-amd64", out: KernelVersion{Kernel: 3, Major: 12}},
 		{in: "3.12foobar", out: KernelVersion{Kernel: 3, Major: 12}},
 		{in: "99.999.999-19-generic", out: KernelVersion{Kernel: 99, Major: 999}},
-		{in: "", expectedErr: fmt.Errorf(`failed to parse kernel version "": EOF`)},
-		{in: "3", expectedErr: fmt.Errorf(`failed to parse kernel version "3": unexpected EOF`)},
-		{in: "3.", expectedErr: fmt.Errorf(`failed to parse kernel version "3.": EOF`)},
-		{in: "3a", expectedErr: fmt.Errorf(`failed to parse kernel version "3a": input does not match format`)},
-		{in: "3.a", expectedErr: fmt.Errorf(`failed to parse kernel version "3.a": expected integer`)},
-		{in: "a", expectedErr: fmt.Errorf(`failed to parse kernel version "a": expected integer`)},
-		{in: "a.a", expectedErr: fmt.Errorf(`failed to parse kernel version "a.a": expected integer`)},
-		{in: "a.a.a-a", expectedErr: fmt.Errorf(`failed to parse kernel version "a.a.a-a": expected integer`)},
-		{in: "-3", expectedErr: fmt.Errorf(`failed to parse kernel version "-3": expected integer`)},
-		{in: "-3.", expectedErr: fmt.Errorf(`failed to parse kernel version "-3.": expected integer`)},
-		{in: "-3.8", expectedErr: fmt.Errorf(`failed to parse kernel version "-3.8": expected integer`)},
-		{in: "-3.-8", expectedErr: fmt.Errorf(`failed to parse kernel version "-3.-8": expected integer`)},
-		{in: "3.-8", expectedErr: fmt.Errorf(`failed to parse kernel version "3.-8": expected integer`)},
+		{in: "", expectedErr: errors.New(`failed to parse kernel version "": EOF`)},
+		{in: "3", expectedErr: errors.New(`failed to parse kernel version "3": unexpected EOF`)},
+		{in: "3.", expectedErr: errors.New(`failed to parse kernel version "3.": EOF`)},
+		{in: "3a", expectedErr: errors.New(`failed to parse kernel version "3a": input does not match format`)},
+		{in: "3.a", expectedErr: errors.New(`failed to parse kernel version "3.a": expected integer`)},
+		{in: "a", expectedErr: errors.New(`failed to parse kernel version "a": expected integer`)},
+		{in: "a.a", expectedErr: errors.New(`failed to parse kernel version "a.a": expected integer`)},
+		{in: "a.a.a-a", expectedErr: errors.New(`failed to parse kernel version "a.a.a-a": expected integer`)},
+		{in: "-3", expectedErr: errors.New(`failed to parse kernel version "-3": expected integer`)},
+		{in: "-3.", expectedErr: errors.New(`failed to parse kernel version "-3.": expected integer`)},
+		{in: "-3.8", expectedErr: errors.New(`failed to parse kernel version "-3.8": expected integer`)},
+		{in: "-3.-8", expectedErr: errors.New(`failed to parse kernel version "-3.-8": expected integer`)},
+		{in: "3.-8", expectedErr: errors.New(`failed to parse kernel version "3.-8": expected integer`)},
 	}
 	for _, tc := range tests {
 		t.Run(tc.in, func(t *testing.T) {

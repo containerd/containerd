@@ -129,7 +129,12 @@ command. As part of this process, we do the following:
 				return errors.New("cannot specify both --platform and --all-platforms")
 			}
 			if len(p) == 0 && !allPlatforms {
-				p = append(p, platforms.DefaultSpec())
+				spec := platforms.DefaultSpec()
+				// Use linux by default for unpacking images on darwin as configured by transfer service
+				if spec.OS == "darwin" {
+					spec.OS = "linux"
+				}
+				p = append(p, spec)
 			}
 			// we use an empty `Platform` slice to indicate that we want to pull all platforms
 			sopts = append(sopts, image.WithPlatforms(p...))
@@ -265,9 +270,14 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 		statuses = map[string]*progressNode{}
 		roots    = []*progressNode{}
 		progress transfer.ProgressFunc
-		pc       = make(chan transfer.Progress, 1)
-		status   string
-		closeC   = make(chan struct{})
+		// Use a buffered channel for progress to allow multiple completed
+		// progress updates to be processed before shutting down the progress
+		// handler. Currently the progress stream does not have an explicit
+		// end, however, done indicates the server has already completed
+		// sending all progress.
+		pc     = make(chan transfer.Progress, 5)
+		status string
+		closeC = make(chan struct{})
 	)
 
 	progress = func(p transfer.Progress) {
@@ -409,7 +419,7 @@ func displayNode(w io.Writer, prefix string, nodes []*progressNode) int64 {
 		name := prefix + pf + displayName(status.Name)
 
 		switch status.Event {
-		case "downloading", "uploading":
+		case "downloading", "uploading", "extracting":
 			var bar progress.Bar
 			if status.Total > 0.0 {
 				bar = progress.Bar(float64(status.Progress) / float64(status.Total))
@@ -425,7 +435,7 @@ func displayNode(w io.Writer, prefix string, nodes []*progressNode) int64 {
 				name,
 				status.Event,
 				bar)
-		case "complete":
+		case "complete", "extracted":
 			bar := progress.Bar(1.0)
 			fmt.Fprintf(w, "%-40.40s\t%-11s\t%40r\t\n",
 				name,

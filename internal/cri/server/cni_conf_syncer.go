@@ -70,7 +70,7 @@ func newCNINetConfSyncer(confDir string, netPlugin cni.CNI, loadOpts []cni.Opt) 
 	}
 
 	if err := syncer.netPlugin.Load(syncer.loadOpts...); err != nil {
-		log.L.WithError(err).Error("failed to load cni during init, please check CRI plugin status before setting up network for pods")
+		log.L.WithError(err).Warn("failed to load cni during init, please check CRI plugin status before setting up network for pods")
 		syncer.updateLastStatus(err)
 	}
 	return syncer, nil

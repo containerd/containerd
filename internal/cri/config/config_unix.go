@@ -32,6 +32,7 @@ func DefaultImageConfig() ImageConfig {
 		Snapshotter:                defaults.DefaultSnapshotter,
 		DisableSnapshotAnnotations: true,
 		MaxConcurrentDownloads:     3,
+		Registry:                   Registry{},
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
@@ -65,13 +66,16 @@ func DefaultRuntimeConfig() RuntimeConfig {
 	# Root is the runc root directory.
 	Root = ""
 
+	# SystemdCgroup enables systemd cgroups.
+	SystemdCgroup = false
+
 	# CriuImagePath is the criu image path
 	CriuImagePath = ""
 
 	# CriuWorkPath is the criu work path.
 	CriuWorkPath = ""
 `
-	var m map[string]interface{}
+	var m map[string]any
 	toml.Unmarshal([]byte(defaultRuncV2Opts), &m)
 
 	return RuntimeConfig{
@@ -100,10 +104,11 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		TolerateMissingHugetlbController: true,
 		DisableHugetlbController:         true,
 		IgnoreImageDefinedVolumes:        false,
-		EnableCDI:                        true,
+		EnableCDI:                        func() *bool { v := true; return &v }(),
 		CDISpecDirs:                      []string{"/etc/cdi", "/var/run/cdi"},
 		DrainExecSyncIOTimeout:           "0s",
 		EnableUnprivilegedPorts:          true,
 		EnableUnprivilegedICMP:           true,
+		EnableCRIU:                       func() *bool { v := true; return &v }(),
 	}
 }

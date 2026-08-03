@@ -169,7 +169,7 @@ func waitTimeout(ctx context.Context, wg *sync.WaitGroup, timeout time.Duration)
 	}
 }
 
-func stateName(v interface{}) string {
+func stateName(v any) string {
 	switch v.(type) {
 	case *runningState, *execRunningState:
 		return "running"

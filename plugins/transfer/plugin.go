@@ -17,6 +17,7 @@
 package transfer
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/containerd/errdefs"
@@ -34,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	// Load packages with type registrations
 	_ "github.com/containerd/containerd/v2/core/transfer/archive"
@@ -54,7 +56,7 @@ func init() {
 			plugins.SnapshotPlugin,
 		},
 		Config: defaultConfig(),
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			config := ic.Config.(*transferConfig)
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
@@ -71,7 +73,7 @@ func init() {
 			lc.Leases = l.(leases.Manager)
 
 			vps, err := ic.GetByType(plugins.ImageVerifierPlugin)
-			if err != nil {
+			if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
 				return nil, err
 			}
 			if len(vps) > 0 {
@@ -86,91 +88,10 @@ func init() {
 			lc.ConcurrentLayerFetchBuffer = config.ConcurrentLayerFetchBuffer
 
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
+			lc.MaxConcurrentUnpacks = config.MaxConcurrentUnpacks
 
-			// If UnpackConfiguration is not defined, set the default.
-			// If UnpackConfiguration is defined and empty, ignore.
-			if config.UnpackConfiguration == nil {
-				config.UnpackConfiguration = defaultUnpackConfig()
-			}
-			for _, uc := range config.UnpackConfiguration {
-				p, err := platforms.Parse(uc.Platform)
-				if err != nil {
-					return nil, fmt.Errorf("%s: platform configuration %v invalid", plugins.TransferPlugin, uc.Platform)
-				}
-
-				sn := ms.Snapshotter(uc.Snapshotter)
-				if sn == nil {
-					return nil, fmt.Errorf("snapshotter %q not found: %w", uc.Snapshotter, errdefs.ErrNotFound)
-				}
-				var snExports map[string]string
-				if p := ic.Plugins().Get(plugins.SnapshotPlugin, uc.Snapshotter); p != nil {
-					snExports = p.Meta.Exports
-				}
-
-				var applier diff.Applier
-				target := platforms.Only(p)
-				if uc.Differ != "" {
-					inst, err := ic.GetByID(plugins.DiffPlugin, uc.Differ)
-					if err != nil {
-						return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", uc.Differ, err)
-					}
-					applier = inst.(diff.Applier)
-				} else {
-					var applierID string
-					for name, plugin := range ic.GetAll() {
-						if plugin.Registration.Type != plugins.DiffPlugin {
-							continue
-						}
-						var matched bool
-						for _, p := range plugin.Meta.Platforms {
-							if target.Match(p) {
-								matched = true
-							}
-						}
-						if !matched {
-							continue
-						}
-						if applier != nil {
-							skippedApplier := plugin.Registration.ID
-
-							// Prefer the default when multiple plugins match
-							if skippedApplier == defaults.DefaultDiffer {
-								skippedApplier = applierID
-							}
-
-							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", skippedApplier)
-
-							if plugin.Registration.ID == skippedApplier {
-								continue
-							}
-						}
-						inst, err := plugin.Instance()
-						if err != nil {
-							return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", name, err)
-						}
-						applier = inst.(diff.Applier)
-						applierID = plugin.Registration.ID
-					}
-				}
-				if applier == nil {
-					return nil, fmt.Errorf("no matching diff plugins: %w", errdefs.ErrNotFound)
-				}
-
-				// If CheckPlatformSupported is false, we will match all platforms
-				if !config.CheckPlatformSupported {
-					target = platforms.All
-				}
-
-				up := unpack.Platform{
-					Platform:           target,
-					SnapshotterKey:     uc.Snapshotter,
-					Snapshotter:        sn,
-					SnapshotterExports: snExports,
-					Applier:            applier,
-					ConfigType:         uc.ConfigType,
-					LayerTypes:         uc.LayerTypes,
-				}
-				lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
+			if err := configureUnpackPlatforms(ic, ms, config, &lc); err != nil {
+				return nil, err
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
 			lc.DuplicationSuppressor = kmutex.New()
@@ -178,6 +99,135 @@ func init() {
 			return local.NewTransferService(ms.ContentStore(), metadata.NewImageStore(ms), lc), nil
 		},
 	})
+}
+
+func configureUnpackPlatforms(ic *plugin.InitContext, ms *metadata.DB, config *transferConfig, lc *local.TransferConfig) error {
+	// If UnpackConfiguration is not defined, set the default.
+	// If UnpackConfiguration is defined and empty, ignore.
+	if config.UnpackConfiguration == nil {
+		config.UnpackConfiguration = defaultUnpackConfig()
+	}
+	for _, uc := range config.UnpackConfiguration {
+		p, err := platforms.Parse(uc.Platform)
+		if err != nil {
+			return fmt.Errorf("%s: platform configuration %v invalid", plugins.TransferPlugin, uc.Platform)
+		}
+
+		sn := ms.Snapshotter(uc.Snapshotter)
+		if sn == nil {
+			if uc.Optional {
+				continue
+			}
+			return fmt.Errorf("snapshotter %q not found: %w", uc.Snapshotter, errdefs.ErrNotFound)
+		}
+		var (
+			snExports      map[string]string
+			snCapabilities []string
+		)
+		if p := ic.Plugins().Get(plugins.SnapshotPlugin, uc.Snapshotter); p != nil {
+			snExports = p.Meta.Exports
+			snCapabilities = p.Meta.Capabilities
+		}
+
+		applier, skip, err := getApplier(ic, uc, p)
+		if err != nil {
+			return err
+		}
+		if skip {
+			continue
+		}
+		if applier == nil {
+			if uc.Optional {
+				continue
+			}
+			return fmt.Errorf("no matching diff plugins: %w", errdefs.ErrNotFound)
+		}
+
+		target := platforms.Only(p)
+		// If CheckPlatformSupported is false, platforms.OnlyOS() is applied
+		if !config.CheckPlatformSupported {
+			target = platforms.OnlyOS(p)
+		}
+
+		up := unpack.Platform{
+			Platform:                target,
+			SnapshotterKey:          uc.Snapshotter,
+			Snapshotter:             sn,
+			SnapshotterExports:      snExports,
+			SnapshotterCapabilities: snCapabilities,
+			Applier:                 applier,
+			ConfigType:              uc.ConfigType,
+			LayerTypes:              uc.LayerTypes,
+		}
+		lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
+	}
+	return nil
+}
+
+func getApplier(ic *plugin.InitContext, uc unpackConfiguration, p specs.Platform) (diff.Applier, bool, error) {
+	if uc.Differ != "" {
+		inst, err := ic.GetByID(plugins.DiffPlugin, uc.Differ)
+		if err != nil {
+			if uc.Optional {
+				return nil, true, nil
+			}
+			return nil, false, fmt.Errorf("failed to get instance for diff plugin %q: %w", uc.Differ, err)
+		}
+		return inst.(diff.Applier), false, nil
+	}
+
+	var (
+		applier   diff.Applier
+		applierID string
+	)
+	for _, candidate := range ic.GetAll() {
+		if candidate.Registration.Type != plugins.DiffPlugin {
+			continue
+		}
+		var matched bool
+		for _, pd := range candidate.Meta.Platforms {
+			// Note that we must use the platforms supported by the differ to
+			// match the platform in `UnpackConfiguration`.
+			//
+			// For example, a differ might only support "linux/amd64", while
+			// the platform in `UnpackConfiguration` is "linux(+erofs)/amd64".
+			// If we reverse this logic, this wrong differ will be applied.
+			if platforms.Only(pd).Match(p) {
+				matched = true
+			}
+		}
+		if !matched {
+			continue
+		}
+		if applier != nil {
+			skippedApplier := candidate.Registration.ID
+
+			// Prefer the default when multiple plugins match
+			if skippedApplier == defaults.DefaultDiffer {
+				skippedApplier = applierID
+			}
+
+			log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", skippedApplier)
+
+			if candidate.Registration.ID == skippedApplier {
+				continue
+			}
+		}
+		inst, err := candidate.Instance()
+		if err != nil {
+			if plugin.IsSkipPlugin(err) {
+				continue
+			}
+			if uc.Optional {
+				return nil, true, nil
+			}
+			return nil, false, fmt.Errorf("failed to get instance for diff plugin %q: %w", candidate.Registration.ID, err)
+		}
+		applier = inst.(diff.Applier)
+		applierID = candidate.Registration.ID
+	}
+
+	return applier, false, nil
 }
 
 type transferConfig struct {
@@ -202,6 +252,9 @@ type transferConfig struct {
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
 	RegistryConfigPath string `toml:"config_path"`
+
+	// MaxConcurrentUnpacks controls the number of concurrent layer unpack operations.
+	MaxConcurrentUnpacks int `toml:"max_concurrent_unpacks"`
 }
 
 type unpackConfiguration struct {
@@ -219,12 +272,16 @@ type unpackConfiguration struct {
 
 	// LayerTypes are the allowed layer types for this unpack configuration
 	LayerTypes []string `toml:"layer_types"`
+
+	// Optional skips the configuration when initialization fails
+	Optional bool `toml:"optional"`
 }
 
 func defaultConfig() *transferConfig {
 	return &transferConfig{
 		MaxConcurrentDownloads:      3,
 		MaxConcurrentUploadedLayers: 3,
+		MaxConcurrentUnpacks:        1,
 		CheckPlatformSupported:      false,
 	}
 }

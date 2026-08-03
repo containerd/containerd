@@ -53,6 +53,23 @@ func TestInvalidLabels(t *testing.T) {
 	}
 }
 
+func TestIsReserved(t *testing.T) {
+	for key, reserved := range map[string]bool{
+		"containerd.io/":               true,
+		"containerd.io/restart.status": true,
+		"containerd.io/gc.ref.content": true,
+		"io.cri-containerd":            true,
+		"io.cri-containerd.kind":       true,
+		"io.cri-containerd.image":      true,
+		"io.cri-containerdfoo":         true,
+		"containerd.io":                false,
+		"io.containerd.something":      false,
+		"com.example.app":              false,
+	} {
+		assert.Equal(t, reserved, IsReserved(key), "IsReserved(%q)", key)
+	}
+}
+
 func TestLongKey(t *testing.T) {
 	key := strings.Repeat("s", keyMaxLen+1)
 	value := strings.Repeat("v", maxSize-len(key))

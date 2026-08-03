@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
+	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -39,4 +41,9 @@ func (c *criService) PodSandboxStats(
 	}
 
 	return &runtime.PodSandboxStatsResponse{Stats: podSandboxStats}, nil
+}
+
+type cgroupMetrics struct {
+	v1 *cg1.Metrics
+	v2 *cg2.Metrics
 }

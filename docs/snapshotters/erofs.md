@@ -1,22 +1,25 @@
 # EROFS Snapshotter
 
-The [EROFS](https://erofs.docs.kernel.org) snapshotter is an experimental
-feature, which is able to leverage EROFS-formatted blobs for each committed
-snapshot and prepares an EROFS + OverlayFS mount for each active snapshot.
+The [EROFS](https://erofs.docs.kernel.org) snapshotter is a native containerd
+snapshotter to enable the EROFS filesystem, specifically to keep EROFS‑formatted
+blobs for each committed snapshot and to prepare an OverlayFS mount for each
+active snapshot.
 
-In order to leverage EROFS-formatted blobs, the EROFS differ is needed to be
-used together to apply image layers.  Otherwise, the EROFS snapshotter will
-just behave as the existing OverlayFS snapshotter: the default applier will
-unpack the image layer into the active EROFS snapshot, and commit it.
+In order to convert OCI container images directly into EROFS-formatted blobs,
+the EROFS differ must be specified with the EROFS snapshotter.  Otherwise,
+if the walking differ is used, the EROFS snapshotter will behave much like the
+existing OverlayFS snapshotter: the applier of the walking differ will unpack
+the current layer into the active EROFS snapshot of the mounted OverlayFS, and
+the EROFS snapshotter will commit it into an EROFS-formatted blob, which is
+slower than using the EROFS differ. Also see _the [Configuration](#configuration) section_.
 
-Although it sounds somewhat similar to an enhanced OverlayFS snapshotter but
-I believe there are clear differences if looking into `s.mount()` and it highly
-tightens to the EROFS internals.  Currently, it's not quite clear to form an
-enhanced OverlayFS snapshotter directly, and (I think) it's not urgent since
-in the very beginning, it'd be better to be left as an independent snapshotter
-so that existing overlayfs users won't be impacted by the new behaviors and
-users could have a chance to try and develop the related ecosystems (such as
-ComposeFS, confidential containers, gVisor, Kata, gVisor, and more) together.
+Although the EROFS snapshotter sounds somewhat similar to an enhanced OverlayFS
+snapshotter, several kernel features are highly tied to the EROFS internals, so
+it would be better to leave it as an independent snapshotter. This way, existing
+OverlayFS users will not be impacted by the new EROFS‑specific behaviors, and
+interested users will also have a chance to use the EROFS filesystem and even
+develop the related ecosystems (such as ComposeFS, confidential containers,
+gVisor, Kata, nerdbox and more) together.
 
 ## Use Cases
 
@@ -25,8 +28,28 @@ The EROFS snapshotter can benefit to several use cases:
 For runC containers, instead of unpacking individual files into a directory
 on the backing filesystem, it applies OCI layers into EROFS blobs, therefore:
 
- - Improved image unpacking performance (~14% for WordPress image with the
-   latest erofs-utils 1.8.2) due to reduced metadata overhead;
+ - Improved image unpacking performance by live-converting tar archives into
+   EROFS-formatted layers during unpacking, compared with directly unpacking
+   to the host filesystem: By converting to EROFS-formatted layers, there is no
+   extra filesystem metadata journal traffic during handling individual files
+   and no need to remove a large number of files when GCing unused snapshots;
+
+   Here are the unpacking benchmark results against the OverlayFS snapshotter
+   using containerd 2.2.1 (pulling from a local registry, without parallel
+   unpacking):
+
+   ![Top25 container images](erofsbench-top25-images.png)
+   ![Large AI container images](erofsbench-ai-images.png)
+
+ - Parallel unpacking is now supported natively, similar to the OverlayFS
+   snapshotter.  This capability is difficult to implement in
+   disk‑snapshot‑style snapshotters such as blockfile, devmapper and ZFS
+   snapshotters.  It also uses an efficient method to persist layer data (via
+   fsync) compared to the OverlayFS snapshotter, which can only use syncfs;
+
+ - Better data persistence guarantee: compared to directly unpacking to the host
+   filesystem, it provides better semantics by fsyncing the individual
+   EROFS-formatted layer blobs instead of syncfsing the whole disk each time.
 
  - Full data protection for each snapshot using the FS_IMMUTABLE_FL file
    attribute and fsverity.  EROFS uses FS_IMMUTABLE_FL and fsverity to protect
@@ -35,8 +58,13 @@ on the backing filesystem, it applies OCI layers into EROFS blobs, therefore:
    sub-filesystem tree, other snapshotter implementations like the overlayfs
    snapshotter are not quite applicable due to less efficiency at least;
 
- - Parallel unpacking can be supported in a more reliable way (fsync) compared
-   to the overlayfs snapshotter (syncfs);
+ - Support given‑size block devices as the upper layer for OverlayFS to
+   limit the disk quota for writable layers (usually ephemeral storage);
+
+ - A dedicated EROFS default mount handler enables EROFS file‑backed mounts
+   to avoid loop devices on runC.  Note that specific runtime shims can
+   handle EROFS mounts without this built‑in handler; for more details, see
+   [containerd Mounts and Mount Management](../mounts.md);
 
  - Native EROFS layers can be pulled from registries without conversion.
 
@@ -48,21 +76,28 @@ the popular application kernel [gVisor](https://gvisor.dev/) also supports
 [EROFS](https://github.com/google/gvisor/pull/9486) for efficient image
 pass-through.
 
+## Why consider EROFS over other kernel filesystems?
+
+EROFS is specifically designed as an immutable filesystem with the following
+highlights:
+
+ - **Lightweight, flexible on-disk format:** Designed for archival use to
+   avoid any serious filesystem consistency issues and minimize attack vectors.
+   There is no need to estimate filesystem size or total inode counts in
+   advance, unlike generic filesystems like EXT4;
+
+ - **Multi-device support:** Enables native layering or content-addressable
+   storage;
+
+ - **Bdev- and file-backed mounts:** File-backed mounts supported since Linux
+   6.12, eliminating the need for loopback devices.  This covers the latest
+   mainstream distributions such as RHEL 10, Fedora 40, Debian 13, Ubuntu 26.04
+   LTS (or 24.04 LTS with HWE kernels), and more;
+
+ - **Memory sharing:** Supports FSDAX using virtio-pmem and per-inode page cache
+   sharing.
+
 ## Usage
-
-### Checking if the EROFS snapshotter and differ are available
-
-To check if the EROFS snapshotter is available, run the following command:
-
-```bash
-$ ctr plugins ls | grep erofs
-```
-
-The following message will be shown like below:
-```
-io.containerd.snapshotter.v1           erofs                    linux/amd64    ok
-io.containerd.differ.v1                erofs                    linux/amd64    ok
-```
 
 ### Ensure that EROFS filesystem is available
 
@@ -78,8 +113,23 @@ $ dnf install erofs-utils
 
 Make sure that erofs-utils version is 1.7 or higher.
 
-Before using EROFS snapshotter, also make sure the _EROFS kernel module_ is
-loaded (Linux 5.4 or later is required): it can be loaded with `modprobe erofs`.
+When using the EROFS snapshotter, before starting containerd, also make sure
+the _EROFS kernel module_ is loaded (Linux 5.4 or later is required): it can be
+loaded with `modprobe erofs`.
+
+### Checking if the EROFS snapshotter and differ are available
+
+To check if the EROFS snapshotter is available, run the following command:
+
+```bash
+$ ctr plugins ls | grep erofs
+```
+
+The following message will be shown like below:
+```
+io.containerd.snapshotter.v1           erofs                    linux/amd64    ok
+io.containerd.differ.v1                erofs                    linux/amd64    ok
+```
 
 ### Configuration
 
@@ -104,7 +154,7 @@ builds, as shown below:
 
 ``` toml
   [plugins."io.containerd.differ.v1.erofs"]
-    mkfs_options = ["-T0 --mkfs-time"]
+    mkfs_options = ["-T0", "--mkfs-time"]
 ```
 
 If erofs-utils is 1.8.2 or higher, it's preferred to append `--sort=none` to
@@ -113,7 +163,7 @@ improved performance, as shown below:
 
 ``` toml
   [plugins."io.containerd.differ.v1.erofs"]
-    mkfs_options = ["-T0 --mkfs-time --sort=none"]
+    mkfs_options = ["-T0", "--mkfs-time", "--sort=none"]
 ```
 
 ### Running a container
@@ -127,6 +177,108 @@ $ ctr image pull docker.io/library/busybox:latest
 $ # run the container with the provides snapshotter
 $ ctr run -rm -t --snapshotter erofs docker.io/library/busybox:latest hello sh
 ```
+
+## Quota Support
+
+EROFS supports block mode to generate fixed‑size virtual blocks as the upper
+layers for overlayfs with a given filesystem formatted in order enable the disk
+quota.  The `default_size` option can be used in the containerd configuration:
+
+```toml
+  [plugins."io.containerd.snapshotter.v1.erofs"]
+    default_size = "20GiB"
+```
+
+## Data Integrity
+
+The EROFS snapshotter provides three methods to consolidate data integrity:
+
+### Data Integrity with Immutable File Attribute
+
+By setting `set_immutable = true`, the EROFS snapshotter marks each layer blob
+with `IMMUTABLE_FL`. This ensures that dirty data is flushed immediately and the
+EROFS layer blob cannot be deleted, renamed, or modified.
+
+The immutable file attribute is mainly used to ensure data persistence and
+prevent artificial data loss, but it cannot detect data corruption caused by
+hardware failures. Since it can flush in-memory dirty data, it may significantly
+increase the unpacking time it takes to launch a container: for example, the
+unpacking time for tensorflow:2.19.0 increases by 108.86% (from 10.090s to
+21.074s) on EXT4. However, it has no impact on runtime performance.
+
+### Data Integrity with fs-verity
+
+By setting `enable_fsverity = true`, the EROFS snapshotter will:
+
+ - Enable fs-verity on EROFS layers during commit;
+
+ - Verify the fs-verity status before mounting layers;
+
+ - Skip fs-verity if the filesystem or kernel does not support it.
+
+The fs-verity method guarantees that EROFS blob layers never change, but it
+introduces additional runtime overhead since all container image reads from
+the container will be slower because it needs to verify the Merkle hash tree
+first.
+
+### Data Integrity with dm-verity
+
+The EROFS snapshotter supports device-mapper verity to provide block-level integrity
+verification for each EROFS layer. This method creates a dm-verity device for each
+layer and mounts it read-only. The dm-verity implementation uses the `go-dmverity`
+Go library, eliminating the need for external `veritysetup` command-line tools.
+This requires a Linux kernel with dm-verity support (CONFIG_DM_VERITY) and the
+device-mapper kernel module loaded.
+
+The differ must be configured to generate dm-verity metadata:
+
+```toml
+[plugins."io.containerd.differ.v1.erofs"]
+  enable_dmverity = true
+```
+
+When dm-verity is enabled, the EROFS differ formats each layer with dm-verity
+by appending a Merkle hash tree to the EROFS blob and generating a root hash.
+The hash tree is stored inline within the layer blob itself.
+The root hash and hash offset are saved in a `.dmverity` metadata file alongside the
+layer blob in JSON format. All other dm-verity parameters (block sizes, salt, etc.)
+are stored in a superblock within the layer blob and are auto-detected when mounting.
+Regular mode uses 4096-byte blocks (standard page size), while tar-index mode uses
+512-byte blocks (dm-verity logical_block_size constraint).
+
+The snapshotter can be configured to control dm-verity behavior using `dmverity_mode`:
+
+```toml
+[plugins."io.containerd.snapshotter.v1.erofs"]
+  dmverity_mode = "auto"  # Options: "auto" (default), "on", "off"
+```
+
+The available modes are:
+
+- `"auto"` (default): Uses dm-verity if `.dmverity` metadata exists for a layer,
+  otherwise mounts as regular EROFS. This allows mixing dm-verity and non-dm-verity
+  layers in the same system.
+
+- `"on"`: Requires dm-verity for all layers. If a layer lacks `.dmverity` metadata,
+  mounting will fail with an error. Use this mode when you want to enforce integrity
+  verification for all layers.
+
+  > **Important**: If you enable `dmverity_mode = "on"` after layers have already been
+  > unpacked without dm-verity enabled in the differ, those existing layers will not
+  > have `.dmverity` metadata files. In this case, you must clean up the existing
+  > snapshots and re-pull the images with both `enable_dmverity = true` in the differ
+  > and `dmverity_mode = "on"` in the snapshotter configured. Alternatively, use
+  > `dmverity_mode = "auto"` to allow mixing dm-verity and non-dm-verity layers.
+
+- `"off"`: Disables dm-verity completely, even if `.dmverity` metadata exists.
+  Layers are mounted as regular EROFS without integrity verification. Use this for
+  compatibility or when dm-verity overhead is unacceptable.
+
+When mounting a layer with dm-verity enabled, the snapshotter reads the metadata
+from the `.dmverity` file and creates a dm-verity device. The dm-verity library
+automatically reads all parameters from the superblock, ensuring that any corruption
+or tampering will be detected at read time. The dm-verity device is then mounted as
+the backing layer in the OverlayFS stack
 
 ## How It Works
 
@@ -154,9 +306,19 @@ In this case, the snapshot layer directory will look like this:
   work
 ```
 
+If dm-verity is enabled, a `.dmverity` metadata file will also be present:
+```
+  .erofslayer
+  fs
+  layer.erofs
+  layer.erofs.dmverity
+  work
+```
+
 Then the EROFS snapshotter will check for the existence of `layer.erofs`: it
 will mount the EROFS layer blob to `fs/` and return a valid overlayfs mount
-with all parent layers.
+with all parent layers. If dm-verity is enabled and the `.dmverity` file exists,
+the snapshotter will create a dm-verity device and mount that instead.
 
 If other differs (not the EROFS differ) are used, the EROFS snapshotter will
 convert the flat directory into an EROFS layer blob on Commit instead.
@@ -164,14 +326,6 @@ convert the flat directory into an EROFS layer blob on Commit instead.
 In other words, the EROFS differ can only be used with the EROFS snapshotter;
 otherwise, it will skip to the next differ.  The EROFS snapshotter can work
 with or without the EROFS differ.
-
-## Data Integrity with fsverity
-
-The EROFS snapshotter supports fsverity for data integrity verification of EROFS layers.
-When enabled via `enable_fsverity = true`, the snapshotter will:
-- Enable fsverity on EROFS layers during commit
-- Verify fsverity status before mounting layers
-- Skip fsverity if the filesystem or kernel does not support it
 
 ## Tar Index Mode
 
@@ -194,9 +348,3 @@ For the EROFS differ:
 [plugins."io.containerd.differ.v1.erofs"]
   enable_tar_index = true
 ```
-
-## TODO
-
-The EROFS Fsmerge feature is NOT supported in the current implementation
-because it was somewhat unclean (relying on `containerd.io/snapshot.ref`).
-It needs to be reconsidered later.

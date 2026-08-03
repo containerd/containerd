@@ -18,6 +18,7 @@ package timeout
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"time"
 )
@@ -59,8 +60,6 @@ func All() map[string]time.Duration {
 	out := make(map[string]time.Duration)
 	mu.RLock()
 	defer mu.RUnlock()
-	for k, v := range timeouts {
-		out[k] = v
-	}
+	maps.Copy(out, timeouts)
 	return out
 }

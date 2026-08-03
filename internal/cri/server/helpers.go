@@ -53,6 +53,8 @@ const (
 	completeExitReason = "Completed"
 	// errorExitReason is the exit reason when container exits with code non-zero.
 	errorExitReason = "Error"
+	// oomExitCodeInLinux is the exit code (137) returned when a process is terminated by the Linux OOM killer.
+	oomExitCodeInLinux = 137
 	// oomExitReason is the exit reason when process in container is oom killed.
 	oomExitReason = "OOMKilled"
 
@@ -232,7 +234,7 @@ func filterLabel(k, v string) string {
 }
 
 // getRuntimeOptions get runtime options from container metadata.
-func getRuntimeOptions(c containers.Container) (interface{}, error) {
+func getRuntimeOptions(c containers.Container) (any, error) {
 	from := c.Runtime.Options
 	if from == nil || from.GetValue() == nil {
 		return nil, nil
@@ -334,6 +336,12 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 			if spec.Windows.Resources.CPU.Maximum != nil {
 				status.Resources.Windows.CpuMaximum = int64(*spec.Windows.Resources.CPU.Maximum)
 			}
+			for _, a := range spec.Windows.Resources.CPU.Affinity {
+				status.Resources.Windows.AffinityCpus = append(
+					status.Resources.Windows.AffinityCpus,
+					&runtime.WindowsCpuGroupAffinity{CpuMask: a.Mask, CpuGroup: a.Group},
+				)
+			}
 		}
 
 		if spec.Windows.Resources.Memory != nil {
@@ -366,7 +374,7 @@ func (c *criService) generateAndSendContainerEvent(ctx context.Context, containe
 		ContainersStatuses: containerStatuses,
 	}
 
-	c.containerEventsQ.Send(event)
+	c.containerEventsQ.Send(&event)
 }
 
 func (c *criService) getPodSandboxRuntime(sandboxID string) (runtime criconfig.Runtime, err error) {
@@ -502,7 +510,7 @@ func parseUsernsIDMap(runtimeIDMap []*runtime.IDMapping) ([]runtimespec.LinuxIDM
 	if runtimeIDMap[0] == nil {
 		return m, nil
 	}
-	uidMap := *runtimeIDMap[0]
+	uidMap := runtimeIDMap[0]
 
 	if uidMap.Length < 1 {
 		return m, fmt.Errorf("invalid mapping length: %v", uidMap.Length)

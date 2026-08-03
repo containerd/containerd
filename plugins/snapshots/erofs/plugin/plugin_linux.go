@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
    Copyright The containerd Authors.
 
@@ -17,56 +19,9 @@
 package plugin
 
 import (
-	"errors"
-
-	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/snapshots/erofs"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
+	overlayutils "github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 )
 
-// Config represents configuration for the native plugin.
-type Config struct {
-	// Root directory for the plugin
-	RootPath string `toml:"root_path"`
-
-	// MountOptions are options used for the EROFS overlayfs mount
-	OvlOptions []string `toml:"ovl_mount_options"`
-
-	// EnableFsverity enables fsverity for EROFS layers
-	EnableFsverity bool `toml:"enable_fsverity"`
-}
-
-func init() {
-	registry.Register(&plugin.Registration{
-		Type:   plugins.SnapshotPlugin,
-		ID:     "erofs",
-		Config: &Config{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
-
-			config, ok := ic.Config.(*Config)
-			if !ok {
-				return nil, errors.New("invalid erofs configuration")
-			}
-
-			var opts []erofs.Opt
-			root := ic.Properties[plugins.PropertyRootDir]
-			if len(config.RootPath) != 0 {
-				root = config.RootPath
-			}
-
-			if len(config.OvlOptions) > 0 {
-				opts = append(opts, erofs.WithOvlOptions(config.OvlOptions))
-			}
-
-			if config.EnableFsverity {
-				opts = append(opts, erofs.WithFsverity())
-			}
-
-			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
-			return erofs.NewSnapshotter(root, opts...)
-		},
-	})
+func supportsIDMappedMounts() (bool, error) {
+	return overlayutils.SupportsIDMappedMounts()
 }

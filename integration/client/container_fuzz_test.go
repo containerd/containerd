@@ -32,6 +32,7 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -112,9 +113,7 @@ func initInSteps(t *testing.T) bool {
 	if !haveChangedDownloadPATH {
 		oldPathEnv := os.Getenv("PATH")
 		newPathEnv := fmt.Sprintf("%s:%s", filepath.Join(downloadBinDir, "bin"), oldPathEnv)
-		if err := os.Setenv("PATH", newPathEnv); err != nil {
-			return true
-		}
+		t.Setenv("PATH", newPathEnv)
 		haveChangedDownloadPATH = true
 		return true
 	}
@@ -153,13 +152,11 @@ func checkIfShouldRestart(err error) {
 func startDaemon(ctx context.Context, t *testing.T, shouldTearDown bool) {
 	buf := bytes.NewBuffer(nil)
 	tmpDir := t.TempDir()
-	stdioFile, err := os.CreateTemp(tmpDir, "")
-	if err != nil {
-		// We panic here as it is a fuzz-blocker that
-		// may need fixing
-		t.Fatalf("failed to create temp file: %v", err)
-	}
-	defer stdioFile.Close()
+	stdioFile, err := os.Create(filepath.Join(tmpDir, "stdio"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		stdioFile.Close()
+	})
 
 	ctrdStdioFilePath = stdioFile.Name()
 	stdioWriter := io.MultiWriter(stdioFile, buf)

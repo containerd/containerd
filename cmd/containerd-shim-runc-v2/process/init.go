@@ -298,7 +298,9 @@ func (p *Init) Delete(ctx context.Context) error {
 }
 
 func (p *Init) delete(ctx context.Context) error {
-	waitTimeout(ctx, &p.wg, 2*time.Second)
+	if err := waitTimeout(ctx, &p.wg, 10*time.Second); err != nil {
+		log.G(ctx).WithError(err).Errorf("failed to drain init process %s io", p.id)
+	}
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes
@@ -451,6 +453,7 @@ func (p *Init) checkpoint(ctx context.Context, r *CheckpointConfig) error {
 		AllowTerminal:            r.AllowTerminal,
 		FileLocks:                r.FileLocks,
 		EmptyNamespaces:          r.EmptyNamespaces,
+		ParentPath:               r.ParentPath,
 	}, actions...); err != nil {
 		dumpLog := filepath.Join(p.Bundle, "criu-dump.log")
 		if cerr := copyFile(dumpLog, filepath.Join(work, "dump.log")); cerr != nil {

@@ -40,7 +40,7 @@ type podSandboxEventHandler struct {
 	controller *Controller
 }
 
-func (p *podSandboxEventHandler) HandleEvent(any interface{}) error {
+func (p *podSandboxEventHandler) HandleEvent(any any) error {
 	switch e := any.(type) {
 	case *eventtypes.TaskExit:
 		log.L.Debugf("TaskExit event in podsandbox handler %+v", e)

@@ -18,11 +18,11 @@ package instrument
 
 import (
 	"context"
-	"errors"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
+	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/pkg/tracing"
@@ -45,6 +45,9 @@ type GRPCServices interface {
 
 // instrumentedService wraps service with containerd namespace and logs.
 type instrumentedService struct {
+	runtime.UnimplementedRuntimeServiceServer
+	runtime.UnimplementedImageServiceServer
+
 	c criService
 }
 
@@ -360,6 +363,10 @@ func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullIma
 		span.RecordError(err)
 	}()
 	res, err = in.c.PullImage(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -377,6 +384,10 @@ func (in *instrumentedService) ListImages(ctx context.Context, r *runtime.ListIm
 		}
 	}()
 	res, err = in.c.ListImages(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -394,6 +405,10 @@ func (in *instrumentedService) ImageStatus(ctx context.Context, r *runtime.Image
 		}
 	}()
 	res, err = in.c.ImageStatus(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -412,6 +427,10 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 		span.RecordError(err)
 	}()
 	res, err := in.c.RemoveImage(ctrdutil.WithNamespace(ctx), r)
+	// Sanitize error to remove sensitive information from both logs and returned gRPC error
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
 	return res, errgrpc.ToGRPC(err)
 }
 
@@ -645,5 +664,141 @@ func (in *instrumentedService) RuntimeConfig(ctx context.Context, r *runtime.Run
 }
 
 func (in *instrumentedService) UpdatePodSandboxResources(ctx context.Context, r *runtime.UpdatePodSandboxResourcesRequest) (res *runtime.UpdatePodSandboxResourcesResponse, err error) {
-	return nil, errors.New("not implemented yet")
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	log.G(ctx).Infof("UpdatePodSandboxResources for %q with Overhead: %+v / Resources: %+v", r.GetPodSandboxId(), r.GetOverhead(), r.GetResources())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("UpdatePodSandboxResources for %q failed", r.GetPodSandboxId())
+		} else {
+			log.G(ctx).Infof("UpdatePodSandboxResources for %q returns successfully", r.GetPodSandboxId())
+		}
+	}()
+	res, err = in.c.UpdatePodSandboxResources(ctrdutil.WithNamespace(ctx), r)
+	return res, errgrpc.ToGRPC(err)
+}
+
+// withNamespaceContext wraps a server streaming server to inject the
+// containerd namespace into its context, matching the unary method pattern.
+func withNamespaceContext[Res any](s grpc.ServerStreamingServer[Res]) grpc.ServerStreamingServer[Res] {
+	return &wrappedServerStreamingServer[Res]{
+		ServerStreamingServer: s,
+		ctx:                   ctrdutil.WithNamespace(s.Context()),
+	}
+}
+
+type wrappedServerStreamingServer[Res any] struct {
+	grpc.ServerStreamingServer[Res]
+	ctx context.Context
+}
+
+func (w *wrappedServerStreamingServer[Res]) Context() context.Context {
+	return w.ctx
+}
+
+func (in *instrumentedService) StreamContainers(r *runtime.StreamContainersRequest, s grpc.ServerStreamingServer[runtime.StreamContainersResponse]) (err error) {
+	if err := in.checkInitialized(); err != nil {
+		return err
+	}
+	ctx := s.Context()
+	log.G(ctx).Tracef("StreamContainers with filter %+v", r.GetFilter())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("StreamContainers with filter %+v failed", r.GetFilter())
+		} else {
+			log.G(ctx).Tracef("StreamContainers returns successfully")
+		}
+	}()
+	err = in.c.StreamContainers(r, withNamespaceContext(s))
+	return errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) StreamPodSandboxes(r *runtime.StreamPodSandboxesRequest, s grpc.ServerStreamingServer[runtime.StreamPodSandboxesResponse]) (err error) {
+	if err := in.checkInitialized(); err != nil {
+		return err
+	}
+	ctx := s.Context()
+	log.G(ctx).Tracef("StreamPodSandboxes with filter %+v", r.GetFilter())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("StreamPodSandboxes with filter %+v failed", r.GetFilter())
+		} else {
+			log.G(ctx).Tracef("StreamPodSandboxes returns successfully")
+		}
+	}()
+	err = in.c.StreamPodSandboxes(r, withNamespaceContext(s))
+	return errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) StreamContainerStats(r *runtime.StreamContainerStatsRequest, s grpc.ServerStreamingServer[runtime.StreamContainerStatsResponse]) (err error) {
+	if err := in.checkInitialized(); err != nil {
+		return err
+	}
+	ctx := s.Context()
+	log.G(ctx).Tracef("StreamContainerStats with filter %+v", r.GetFilter())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("StreamContainerStats with filter %+v failed", r.GetFilter())
+		} else {
+			log.G(ctx).Tracef("StreamContainerStats returns successfully")
+		}
+	}()
+	err = in.c.StreamContainerStats(r, withNamespaceContext(s))
+	return errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) StreamPodSandboxStats(r *runtime.StreamPodSandboxStatsRequest, s grpc.ServerStreamingServer[runtime.StreamPodSandboxStatsResponse]) (err error) {
+	if err := in.checkInitialized(); err != nil {
+		return err
+	}
+	ctx := s.Context()
+	log.G(ctx).Tracef("StreamPodSandboxStats with filter %+v", r.GetFilter())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("StreamPodSandboxStats with filter %+v failed", r.GetFilter())
+		} else {
+			log.G(ctx).Tracef("StreamPodSandboxStats returns successfully")
+		}
+	}()
+	err = in.c.StreamPodSandboxStats(r, withNamespaceContext(s))
+	return errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) StreamPodSandboxMetrics(r *runtime.StreamPodSandboxMetricsRequest, s grpc.ServerStreamingServer[runtime.StreamPodSandboxMetricsResponse]) (err error) {
+	if err := in.checkInitialized(); err != nil {
+		return err
+	}
+	ctx := s.Context()
+	log.G(ctx).Tracef("StreamPodSandboxMetrics")
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("StreamPodSandboxMetrics failed")
+		} else {
+			log.G(ctx).Tracef("StreamPodSandboxMetrics returns successfully")
+		}
+	}()
+	err = in.c.StreamPodSandboxMetrics(r, withNamespaceContext(s))
+	return errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) StreamImages(r *runtime.StreamImagesRequest, s grpc.ServerStreamingServer[runtime.StreamImagesResponse]) (err error) {
+	if err := in.checkInitialized(); err != nil {
+		return err
+	}
+	ctx := s.Context()
+	log.G(ctx).Tracef("StreamImages with filter %+v", r.GetFilter())
+	defer func() {
+		if err != nil {
+			err = ctrdutil.SanitizeError(err)
+			log.G(ctx).WithError(err).Errorf("StreamImages with filter %+v failed", r.GetFilter())
+		} else {
+			log.G(ctx).Tracef("StreamImages returns successfully")
+		}
+	}()
+	err = in.c.StreamImages(r, withNamespaceContext(s))
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+	}
+	return errgrpc.ToGRPC(err)
 }

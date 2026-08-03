@@ -24,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,14 +45,13 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var
 	"github.com/containerd/containerd/v2/integration/remote"
-	dialer "github.com/containerd/containerd/v2/integration/remote/util"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
-	"github.com/containerd/containerd/v2/internal/cri/types"
+	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	"github.com/containerd/containerd/v2/internal/cri/util"
+	dialer "k8s.io/cri-client/pkg/util"
 )
 
 const (
@@ -61,9 +61,9 @@ const (
 )
 
 var (
-	runtimeService     cri.RuntimeService
-	runtimeService2    cri.RuntimeService // to test GetContainerEvents broadcast
-	imageService       cri.ImageManagerService
+	runtimeService     *remote.RuntimeService
+	runtimeService2    *remote.RuntimeService // to test GetContainerEvents broadcast
+	imageService       *remote.ImageService
 	containerdClient   *containerd.Client
 	containerdEndpoint string
 )
@@ -71,53 +71,91 @@ var (
 var criEndpoint = flag.String("cri-endpoint", "unix:///run/containerd/containerd.sock", "The endpoint of cri plugin.")
 var runtimeHandler = flag.String("runtime-handler", "", "The runtime handler to use in the test.")
 var containerdBin = flag.String("containerd-bin", "containerd", "The containerd binary name. The name is used to restart containerd during test.")
+var buildDir = flag.String("build-dir", "", "Build output directory for containerd binaries")
 
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if err := ConnectDaemons(); err != nil {
 		log.L.WithError(err).Fatalf("Failed to connect daemons")
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	if err := DisconnectDaemons(); err != nil {
+		log.L.WithError(err).Error("Failed to disconnect daemons")
+	}
+	os.Exit(code)
 }
 
 // ConnectDaemons connect cri plugin and containerd, and initialize the clients.
 func ConnectDaemons() error {
+	fail := func(format string, args ...any) error {
+		err := fmt.Errorf(format, args...)
+		if cleanupErr := DisconnectDaemons(); cleanupErr != nil {
+			return errors.Join(err, cleanupErr)
+		}
+		return err
+	}
+
 	var err error
 	runtimeService, err = remote.NewRuntimeService(*criEndpoint, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to create runtime service: %w", err)
+		return fail("failed to create runtime service: %w", err)
 	}
 	runtimeService2, err = remote.NewRuntimeService(*criEndpoint, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to create runtime service: %w", err)
+		return fail("failed to create runtime service: %w", err)
 	}
 	imageService, err = remote.NewImageService(*criEndpoint, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to create image service: %w", err)
+		return fail("failed to create image service: %w", err)
 	}
 	// Since CRI grpc client doesn't have `WithBlock` specified, we
 	// need to check whether it is actually connected.
 	// TODO(#6069) Use grpc options to block on connect and remove for this list containers request.
 	_, err = runtimeService.ListContainers(&runtime.ContainerFilter{})
 	if err != nil {
-		return fmt.Errorf("failed to list containers: %w", err)
+		return fail("failed to list containers: %w", err)
 	}
 	_, err = runtimeService2.ListContainers(&runtime.ContainerFilter{})
 	if err != nil {
-		return fmt.Errorf("failed to list containers: %w", err)
+		return fail("failed to list containers: %w", err)
 	}
 	_, err = imageService.ListImages(&runtime.ImageFilter{})
 	if err != nil {
-		return fmt.Errorf("failed to list images: %w", err)
+		return fail("failed to list images: %w", err)
 	}
 	// containerdEndpoint is the same with criEndpoint now
 	containerdEndpoint = strings.TrimPrefix(*criEndpoint, "unix://")
 	containerdEndpoint = strings.TrimPrefix(containerdEndpoint, "npipe:")
 	containerdClient, err = containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sNamespace))
 	if err != nil {
-		return fmt.Errorf("failed to connect containerd: %w", err)
+		return fail("failed to connect containerd: %w", err)
 	}
 	return nil
+}
+
+// DisconnectDaemons tears down the shared CRI and containerd clients.
+func DisconnectDaemons() error {
+	ctx := context.Background()
+
+	var err error
+	if runtimeService != nil {
+		err = errors.Join(err, runtimeService.Close(ctx))
+		runtimeService = nil
+	}
+	if runtimeService2 != nil {
+		err = errors.Join(err, runtimeService2.Close(ctx))
+		runtimeService2 = nil
+	}
+	if imageService != nil {
+		err = errors.Join(err, imageService.Close(ctx))
+		imageService = nil
+	}
+	if containerdClient != nil {
+		err = errors.Join(err, containerdClient.Close())
+		containerdClient = nil
+	}
+
+	return err
 }
 
 // Opts sets specific information in pod sandbox config.
@@ -227,9 +265,7 @@ func WithPodHostname(hostname string) PodSandboxOpts {
 // Add pod labels.
 func WithPodLabels(kvs map[string]string) PodSandboxOpts {
 	return func(p *runtime.PodSandboxConfig) {
-		for k, v := range kvs {
-			p.Labels[k] = v
-		}
+		maps.Copy(p.Labels, kvs)
 	}
 }
 
@@ -311,6 +347,12 @@ func WithTestLabels() ContainerOpts {
 func WithTestAnnotations() ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		c.Annotations = map[string]string{"a.b.c": "test"}
+	}
+}
+
+func WithStopSignal(signal runtime.Signal) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		c.StopSignal = signal
 	}
 }
 
@@ -633,13 +675,17 @@ func KillProcess(name string, signal syscall.Signal) error {
 
 // KillPid kills the process by pid. kill is used.
 func KillPid(pid int) error {
-	command := "kill"
-	if goruntime.GOOS == "windows" {
-		command = "tskill"
-	}
-	output, err := exec.Command(command, strconv.Itoa(pid)).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+	switch goruntime.GOOS {
+	case "windows":
+		output, err := exec.Command("tskill", strconv.Itoa(pid)).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+		}
+	default:
+		output, err := exec.Command("kill", "-9", strconv.Itoa(pid)).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+		}
 	}
 	return nil
 }
@@ -731,28 +777,36 @@ func PidEnvs(pid int) (map[string]string, error) {
 	return res, nil
 }
 
-// RawRuntimeClient returns a raw grpc runtime service client.
-func RawRuntimeClient() (runtime.RuntimeServiceClient, error) {
+// RawRuntimeClient returns a raw grpc runtime service client and its connection.
+func RawRuntimeClient() (runtime.RuntimeServiceClient, *grpc.ClientConn, error) {
 	addr, dialer, err := dialer.GetAddressAndDialer(*criEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get dialer: %w", err)
+		return nil, nil, fmt.Errorf("failed to get dialer: %w", err)
 	}
-	conn, err := grpc.NewClient(addr,
+	conn, err := grpc.NewClient(clientTargetForAddress(addr),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect cri endpoint: %w", err)
+		return nil, nil, fmt.Errorf("failed to connect cri endpoint: %w", err)
 	}
-	return runtime.NewRuntimeServiceClient(conn), nil
+	return runtime.NewRuntimeServiceClient(conn), conn, nil
+}
+
+func clientTargetForAddress(addr string) string {
+	if strings.HasPrefix(addr, "/") {
+		return "passthrough:///" + addr
+	}
+	return addr
 }
 
 // CRIConfig gets current cri config from containerd.
 func CRIConfig() (*criconfig.Config, error) {
-	client, err := RawRuntimeClient()
+	client, conn, err := RawRuntimeClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get raw runtime client: %w", err)
 	}
+	defer conn.Close()
 	resp, err := client.Status(context.Background(), &runtime.StatusRequest{Verbose: true})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get status: %w", err)
@@ -765,11 +819,12 @@ func CRIConfig() (*criconfig.Config, error) {
 }
 
 // SandboxInfo gets sandbox info.
-func SandboxInfo(id string) (*runtime.PodSandboxStatus, *types.SandboxInfo, error) {
-	client, err := RawRuntimeClient()
+func SandboxInfo(id string) (*runtime.PodSandboxStatus, *podsandboxtypes.SandboxInfo, error) {
+	client, conn, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
 	}
+	defer conn.Close()
 	resp, err := client.PodSandboxStatus(context.Background(), &runtime.PodSandboxStatusRequest{
 		PodSandboxId: id,
 		Verbose:      true,
@@ -778,7 +833,7 @@ func SandboxInfo(id string) (*runtime.PodSandboxStatus, *types.SandboxInfo, erro
 		return nil, nil, fmt.Errorf("failed to get sandbox status: %w", err)
 	}
 	status := resp.GetStatus()
-	var info types.SandboxInfo
+	var info podsandboxtypes.SandboxInfo
 	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal sandbox info: %w", err)
 	}

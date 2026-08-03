@@ -11,7 +11,7 @@ The transfer API consists of a single operation which can be called with various
 In Go the API looks like,
 ```go
 type Transferrer interface {
-	Transfer(ctx context.Context, source interface{}, destination interface{}, opts ...Opt) error
+	Transfer(ctx context.Context, source any, destination any, opts ...Opt) error
 }
 ```
 
@@ -104,7 +104,7 @@ Streaming is used by the transfer service to send or receive data streams as par
 
 ### Progress
 
-Progress is an asynchronous callback sent from the server to the client. It is normally representing in the Go interface as a simple callback function, which the the client implements and the server calls.
+Progress is an asynchronous callback sent from the server to the client. It is normally representing in the Go interface as a simple callback function, which the client implements and the server calls.
 
 From Go types progress uses these types
 ```go

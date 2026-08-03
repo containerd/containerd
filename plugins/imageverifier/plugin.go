@@ -32,7 +32,7 @@ func init() {
 		Type:   plugins.ImageVerifierPlugin,
 		ID:     "bindir",
 		Config: defaultConfig(),
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			cfg := ic.Config.(*bindir.Config)
 			return bindir.NewImageVerifier(cfg), nil
 		},

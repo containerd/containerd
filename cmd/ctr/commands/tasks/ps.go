@@ -56,7 +56,7 @@ var psCommand = &cli.Command{
 		w := tabwriter.NewWriter(os.Stdout, 1, 8, 4, ' ', 0)
 		fmt.Fprintln(w, "PID\tINFO")
 		for _, ps := range processes {
-			var info interface{} = "-"
+			var info any = "-"
 			if ps.Info != nil {
 				info, err = typeurl.UnmarshalAny(ps.Info)
 				if err != nil {

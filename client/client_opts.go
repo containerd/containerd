@@ -17,27 +17,30 @@
 package client
 
 import (
+	"maps"
+	"slices"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/semaphore"
-
 	"google.golang.org/grpc"
 )
 
 type clientOpts struct {
-	defaultns       string
-	defaultRuntime  string
-	defaultPlatform platforms.MatchComparer
-	services        *services
-	dialOptions     []grpc.DialOption
-	extraDialOpts   []grpc.DialOption
-	callOptions     []grpc.CallOption
-	timeout         time.Duration
+	defaultns        string
+	defaultRuntime   string
+	defaultSandboxer string
+	defaultPlatform  platforms.MatchComparer
+	services         *services
+	dialOptions      []grpc.DialOption
+	extraDialOpts    []grpc.DialOption
+	callOptions      []grpc.CallOption
+	timeout          time.Duration
 }
 
 // Opt allows callers to set options on the containerd client
@@ -58,6 +61,14 @@ func WithDefaultNamespace(ns string) Opt {
 func WithDefaultRuntime(rt string) Opt {
 	return func(c *clientOpts) error {
 		c.defaultRuntime = rt
+		return nil
+	}
+}
+
+// WithDefaultSandboxer sets the default sandboxer on the client
+func WithDefaultSandboxer(sb string) Opt {
+	return func(c *clientOpts) error {
+		c.defaultSandboxer = sb
 		return nil
 	}
 }
@@ -128,10 +139,8 @@ func WithPlatform(platform string) RemoteOpt {
 		platform = platforms.DefaultString()
 	}
 	return func(_ *Client, c *RemoteContext) error {
-		for _, p := range c.Platforms {
-			if p == platform {
-				return nil
-			}
+		if slices.Contains(c.Platforms, platform) {
+			return nil
 		}
 
 		c.Platforms = append(c.Platforms, platform)
@@ -193,9 +202,7 @@ func WithPullLabels(labels map[string]string) RemoteOpt {
 			rc.Labels = make(map[string]string)
 		}
 
-		for k, v := range labels {
-			rc.Labels[k] = v
-		}
+		maps.Copy(rc.Labels, labels)
 		return nil
 	}
 }
@@ -272,6 +279,14 @@ func WithMaxConcurrentUploadedLayers(max int) RemoteOpt {
 func WithAllMetadata() RemoteOpt {
 	return func(_ *Client, c *RemoteContext) error {
 		c.AllMetadata = true
+		return nil
+	}
+}
+
+// WithReferrersProvider sets a referrers provider to resolve referrer objects.
+func WithReferrersProvider(r content.ReferrersProvider) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.ReferrersProvider = r
 		return nil
 	}
 }

@@ -110,3 +110,10 @@ func handleExitSignals(ctx context.Context, logger *log.Entry, cancel context.Ca
 func openLog(ctx context.Context, _ string) (io.Writer, error) {
 	return fifo.OpenFifoDup2(ctx, "log", unix.O_WRONLY, 0700, int(os.Stderr.Fd()))
 }
+
+// awaitPipeReady is a no-op on Unix. Unix domain sockets appear atomically
+// when net.Listen("unix", path) is called, so there is no race between the
+// shim creating its endpoint and the parent connecting to it.
+func awaitPipeReady(_ string) error {
+	return nil
+}

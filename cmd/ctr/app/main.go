@@ -43,6 +43,9 @@ import (
 	versionCmd "github.com/containerd/containerd/v2/cmd/ctr/commands/version"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+
+	// Register the EROFS fsview handler for client-side OCI user resolution.
+	_ "github.com/containerd/containerd/v2/plugins/mount/fsview/erofs"
 	"github.com/containerd/containerd/v2/version"
 )
 
@@ -55,15 +58,22 @@ func init() {
 	cli.VersionPrinter = func(cliContext *cli.Context) {
 		fmt.Println(cliContext.App.Name, version.Package, cliContext.App.Version)
 	}
+
+	// Override the default flag descriptions for '--version' and '--help'
+	// to align with other flags and start with uppercase.
 	cli.VersionFlag = &cli.BoolFlag{
 		Name:    "version",
 		Aliases: []string{"v"},
 		Usage:   "Print the version",
+
+		DisableDefaultText: true,
 	}
 	cli.HelpFlag = &cli.BoolFlag{
 		Name:    "help",
 		Aliases: []string{"h"},
 		Usage:   "Show help",
+
+		DisableDefaultText: true,
 	}
 }
 
