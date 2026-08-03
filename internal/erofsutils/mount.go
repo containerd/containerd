@@ -19,6 +19,7 @@ package erofsutils
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -206,6 +207,22 @@ func MountsToLayer(mounts []mount.Mount) (string, error) {
 		return "", fmt.Errorf("mount layer type must be erofs-layer: %w", errdefs.ErrNotImplemented)
 	}
 	return layer, nil
+}
+
+// StagedLayerBlob reports whether the layer directory's blob was staged from a
+// layer content cache, which makes it a symlink into that operator-owned cache
+// and shared with every other snapshot of the layer. Such a blob must never be
+// written to.
+func StagedLayerBlob(layer string) (bool, error) {
+	layerBlob := filepath.Join(layer, "layer.erofs")
+	fi, err := os.Lstat(layerBlob)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to stat layer blob %q: %w", layerBlob, err)
+	}
+	return fi.Mode()&os.ModeSymlink != 0, nil
 }
 
 // SupportGenerateFromTar checks if the installed version of mkfs.erofs supports

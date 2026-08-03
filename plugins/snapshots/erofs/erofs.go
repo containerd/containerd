@@ -59,8 +59,7 @@ type SnapshotterConfig struct {
 	// layer blobs. Each is checked one by one; the first hit is staged into the
 	// snapshot (symlinked) instead of downloading and converting the layer. A
 	// directory that doesn't exist is treated as a cache miss. Layers missing
-	// from all of them are converted normally. Only parentless Prepares can be
-	// served.
+	// from all of them are converted normally.
 	layerContentCaches []string
 }
 
@@ -414,6 +413,55 @@ func (s *snapshotter) createErofsMount(layerBlob string) (mount.Mount, error) {
 	}, nil
 }
 
+// stagedBlob reports whether the layer blob at path was staged from the layer
+// content cache, which makes it a symlink into the operator-owned cache
+// directory rather than a blob written into the snapshot itself. A missing blob
+// is not staged; any other failure to tell is an error, since callers use this
+// to decide whether writing to the blob is safe.
+func stagedBlob(path string) (bool, error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to stat layer blob %q: %w", path, err)
+	}
+	return fi.Mode()&os.ModeSymlink != 0, nil
+}
+
+// stagedLayerMounts returns the read-only mounts of the cache blob staged into
+// the active snapshot id, or none if it has no staged blob. The caller stacks
+// them on top of the parents. fsverity isn't checked since it's rejected
+// together with the cache (see NewSnapshotter).
+func (s *snapshotter) stagedLayerMounts(id string) ([]mount.Mount, error) {
+	// Just a fast path: erofsutils.MountsToLayer refuses a symlinked layer blob
+	// whatever the config, so a blob staged before caching was turned off stays
+	// safe from the differ.
+	if len(s.layerContentCaches) == 0 {
+		return nil, nil
+	}
+
+	layerBlob := s.layerBlobPath(id)
+	// Don't swallow errors: writable mounts would let the differ write through a
+	// symlink we failed to rule out.
+	staged, err := stagedBlob(layerBlob)
+	if err != nil || !staged {
+		return nil, err
+	}
+	// The entry may have been pruned since staging. A dangling symlink must not
+	// pass as staged content, or Commit would write an empty blob through it and
+	// poison the cache entry.
+	if _, err := os.Stat(layerBlob); err != nil {
+		return nil, fmt.Errorf("staged layer content cache blob %q is unusable: %w", layerBlob, err)
+	}
+
+	m, err := s.createErofsMount(layerBlob)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create erofs mount: %w", err)
+	}
+	return []mount.Mount{m}, nil
+}
+
 func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]mount.Mount, error) {
 	var options []string
 
@@ -475,9 +523,17 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 
 	var (
 		mounts   []mount.Mount
+		staged   []mount.Mount
 		writable bool
 	)
 	if snap.Kind == snapshots.KindActive {
+		// A staged blob already holds this layer, so no writable upperdir.
+		var err error
+		if staged, err = s.stagedLayerMounts(snap.ID); err != nil {
+			return nil, err
+		}
+	}
+	if snap.Kind == snapshots.KindActive && len(staged) == 0 {
 		if s.blockMode {
 			mounts = append(mounts, mount.Mount{
 				Source: s.writablePath(snap.ID),
@@ -503,7 +559,8 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 			)
 		}
 		writable = true
-	} else if len(snap.ParentIDs) == 1 {
+	} else if snap.Kind != snapshots.KindActive && len(snap.ParentIDs) == 1 {
+		// A view of a single committed layer is that layer, read-only.
 		layerBlob, err := s.lowerPath(snap.ParentIDs[0])
 		if err != nil {
 			return nil, err
@@ -518,6 +575,9 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 	// first marks the start of the lowerdir range. A merged fsmeta ends the
 	// range but never moves its start: lowers stacked above it stay in range.
 	first := len(mounts)
+	// A staged blob is this snapshot's own layer, so it stacks above the parents.
+	// With no upperdir the overlay is read-only, which is what marks it staged.
+	mounts = append(mounts, staged...)
 	for i := range snap.ParentIDs {
 		// If a merged fsmeta is valid for this layer, skip the remaining bottom layers.
 		// Why? Because bottom layers have been flattened with the thin fsmeta.
@@ -562,6 +622,9 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 	} else {
 		options = append(options, fmt.Sprintf("lowerdir={{ overlay %d %d }}", first, len(mounts)-1))
 	}
+	if len(staged) > 0 {
+		options = append(options, "ro")
+	}
 	options = append(options, s.ovlOptions...)
 
 	return append(mounts, mount.Mount{
@@ -572,12 +635,13 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 }
 
 // createSnapshot creates an active (or view) snapshot and returns its mounts.
-// On a parentless image-layer extraction whose diffID blob is in the layer content cache,
+// On an image-layer extraction whose diffID blob is in the layer content cache,
 // it stages the cached blob into the active snapshot (without committing) and
 // returns it as a read-only mount, so the unpacker can detect the fast path
 // (skip the layer download and conversion) while still committing the
-// snapshot normally — applying the parent at Commit time, which keeps the
-// cache compatible with parallel unpacking.
+// snapshot normally. The parent is applied either at Prepare (sequential
+// unpacking) or at Commit via WithParent (parallel unpacking); staging works
+// with both.
 func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
 	var (
 		snap     storage.Snapshot
@@ -585,11 +649,15 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		info     snapshots.Info
 	)
 
-	// Only parentless extractions can be served: s.mounts picks a staged blob up
-	// only when there are no parents, so with a parent the differ would write
-	// through the staged symlink into the shared cache blob.
+	// Any image-layer extraction can be served, parented or not: s.mounts hands a
+	// staged snapshot out read-only, so the differ can't write the layer through
+	// the staged symlink into the shared cache blob.
+	//
+	// TODO(2.5): staged layers above the unpacker's first cache miss still have
+	// their blobs downloaded; skipping those fetches needs the unpacker rework
+	// planned for 2.5 and is out of scope here.
 	var cacheBlob string
-	if kind == snapshots.KindActive && parent == "" {
+	if kind == snapshots.KindActive {
 		if cacheBlob = s.lookupCache(ctx, opts...); cacheBlob != "" {
 			log.G(ctx).WithFields(log.Fields{
 				"key":  key,
@@ -828,6 +896,18 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	// the EROFS differ (possibly the walking differ), convert the upperdir instead.
 	layerBlob = s.layerBlobPath(id)
 	if _, err := os.Stat(layerBlob); err != nil {
+		// Unless the blob was staged from the layer content cache and its entry
+		// has been pruned since. Converting would run mkfs.erofs through the
+		// dangling symlink, committing an empty layer and writing that empty
+		// blob into the cache for every future pull of this layer.
+		staged, serr := stagedBlob(layerBlob)
+		if serr != nil {
+			return serr
+		}
+		if staged {
+			return fmt.Errorf("staged layer content cache blob %q is unusable: %w", layerBlob, err)
+		}
+
 		if cerr := s.commitBlock(ctx, layerBlob, id); cerr != nil {
 			if errdefs.IsNotImplemented(cerr) {
 				return err
