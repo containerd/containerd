@@ -19,6 +19,7 @@ package unpack
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -321,4 +322,80 @@ func TestUnpackStagedLayers(t *testing.T) {
 	assert.Equal(t, "", sn.commits[0].parent)
 	assert.Equal(t, chainIDs[1].String(), sn.commits[1].name)
 	assert.Equal(t, chainIDs[0].String(), sn.commits[1].parent)
+}
+
+// failPrepareSnapshotter stages every layer like stagedSnapshotter, except the
+// Prepare of the layer at index failAt, which fails with a non-AlreadyExists
+// error.
+type failPrepareSnapshotter struct {
+	stagedSnapshotter
+	failAt int
+	// prepareCalls counts every Prepare, including the failing one, which
+	// stagedSnapshotter only records on success. Prepare is called from the
+	// layer launch loop alone, so this needs no synchronization.
+	prepareCalls int
+}
+
+var errPrepareFailed = errors.New("prepare failed")
+
+func (s *failPrepareSnapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	layer := s.prepareCalls
+	s.prepareCalls++
+	if layer == s.failAt {
+		return nil, errPrepareFailed
+	}
+	return s.stagedSnapshotter.Prepare(ctx, key, parent, opts...)
+}
+
+// TestUnpackParallelPrepareError verifies that a topHalf failure in parallel
+// mode is reported back from unpack instead of being silently dropped, while
+// the layers queued before the failure are still committed.
+func TestUnpackParallelPrepareError(t *testing.T) {
+	ctx := context.Background()
+
+	diffIDs := generateRandomDiffIDs(t, 3)
+	chainIDs := identity.ChainIDs(append([]digest.Digest{}, diffIDs...))
+	layers := []ocispec.Descriptor{
+		{MediaType: ocispec.MediaTypeImageLayerGzip, Digest: digest.FromString("layer-0"), Size: 1},
+		{MediaType: ocispec.MediaTypeImageLayerGzip, Digest: digest.FromString("layer-1"), Size: 1},
+		{MediaType: ocispec.MediaTypeImageLayerGzip, Digest: digest.FromString("layer-2"), Size: 1},
+	}
+
+	cs := imagetest.NewContentStore(ctx, t)
+	config := cs.JSONObject(ocispec.MediaTypeImageConfig, struct {
+		ocispec.Platform
+		RootFS ocispec.RootFS `json:"rootfs"`
+	}{
+		Platform: ocispec.Platform{OS: "linux", Architecture: "amd64"},
+		RootFS:   ocispec.RootFS{Type: "layers", DiffIDs: diffIDs},
+	}).Descriptor
+
+	sn := &failPrepareSnapshotter{failAt: 1}
+	u, err := NewUnpacker(ctx, cs.Store,
+		WithUnpackLimiter(semaphore.NewWeighted(4)),
+		WithUnpackPlatform(Platform{
+			Platform:                platforms.All,
+			Snapshotter:             sn,
+			Applier:                 failApplier{t},
+			SnapshotterCapabilities: []string{snapshots.RebaseCap},
+		}),
+	)
+	require.NoError(t, err)
+
+	fetch := images.HandlerFunc(func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		t.Errorf("fetch must not happen for a staged layer (%s)", desc.Digest)
+		return nil, nil
+	})
+
+	err = u.unpack(fetch, config, layers)
+	require.ErrorIs(t, err, errPrepareFailed)
+
+	// The launch loop stops at the failing layer: the third one is never
+	// prepared, and only the first was prepared successfully.
+	assert.Equal(t, 2, sn.prepareCalls)
+	require.Len(t, sn.prepares, 1)
+
+	// The layer prepared before the failure is still committed.
+	require.Len(t, sn.commits, 1)
+	assert.Equal(t, chainIDs[0].String(), sn.commits[0].name)
 }
