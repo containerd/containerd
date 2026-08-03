@@ -404,7 +404,11 @@ func (u *Unpacker) unpack(
 		var (
 			key    string
 			mounts []mount.Mount
-			opts   = append(unpack.SnapshotOpts, snapshots.WithLabels(snapshotLabels))
+			// Clone before appending: topHalf runs concurrently per layer in
+			// parallel mode, and appending directly to unpack.SnapshotOpts could
+			// write into its shared backing array from multiple goroutines.
+			opts   = append(slices.Clone(unpack.SnapshotOpts), snapshots.WithLabels(snapshotLabels))
+			staged bool
 		)
 
 		for try := 1; try <= 3; try++ {
@@ -435,11 +439,73 @@ func (u *Unpacker) unpack(
 			return nil, fmt.Errorf("unable to prepare extraction snapshot: %w", err)
 		}
 
+		if isStaged(mounts) {
+			// The snapshotter staged the layer content into the active snapshot
+			// as read-only (e.g. a layer content cache hit). Skip fetch+apply,
+			// but still commit it below (which applies the parent).
+			staged = true
+		}
+
 		// Abort the snapshot if commit does not happen
 		abort := func(ctx context.Context) {
 			if err := sn.Remove(ctx, key); err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to cleanup %q", key)
 			}
+		}
+
+		// commitF is the bottom half shared by normal and staged layers: it rebases
+		// in the real parent (parallel mode) and commits the snapshot. Staged layers
+		// have no fetched content, so they skip the post-apply uncompressed label.
+		commitF := func(shouldAbort bool) error {
+			defer unlock()
+			if shouldAbort {
+				cleanup.Do(ctx, abort)
+				return nil
+			}
+
+			if i > 0 && parallel {
+				opts = append(opts, snapshots.WithParent(chainIDs[i-1].String()))
+			}
+			if err := sn.Commit(ctx, chainID, key, opts...); err != nil {
+				cleanup.Do(ctx, abort)
+				if errdefs.IsAlreadyExists(err) {
+					return nil
+				}
+				return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
+			}
+
+			if staged {
+				// No layer was fetched, so there is no content to label.
+				return nil
+			}
+
+			// Set the uncompressed label after the uncompressed
+			// digest has been verified through apply.
+			cinfo := content.Info{
+				Digest: desc.Digest,
+				Labels: map[string]string{
+					labels.LabelUncompressed: diffIDs[i].String(),
+				},
+			}
+			if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
+				return err
+			}
+			return nil
+		}
+
+		if staged {
+			// Content is already staged in the active snapshot; there is nothing to
+			// fetch or apply. Emit a status that runs commitF in the (serialized)
+			// bottom half so the parent is rebased in and the chain is linked.
+			resCh := make(chan *unpackStatus, 1)
+			resCh <- &unpackStatus{
+				desc:    desc,
+				span:    span,
+				startAt: startAt,
+				bottomF: commitF,
+			}
+			close(resCh)
+			return resCh, nil
 		}
 
 		if fetchErr == nil {
@@ -478,38 +544,7 @@ func (u *Unpacker) unpack(
 				desc:    desc,
 				span:    span,
 				startAt: startAt,
-				bottomF: func(shouldAbort bool) error {
-					defer unlock()
-					if shouldAbort {
-						cleanup.Do(ctx, abort)
-						return nil
-					}
-
-					if i > 0 && parallel {
-						parent = chainIDs[i-1].String()
-						opts = append(opts, snapshots.WithParent(parent))
-					}
-					if err = sn.Commit(ctx, chainID, key, opts...); err != nil {
-						cleanup.Do(ctx, abort)
-						if errdefs.IsAlreadyExists(err) {
-							return nil
-						}
-						return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
-					}
-
-					// Set the uncompressed label after the uncompressed
-					// digest has been verified through apply.
-					cinfo := content.Info{
-						Digest: desc.Digest,
-						Labels: map[string]string{
-							labels.LabelUncompressed: diffIDs[i].String(),
-						},
-					}
-					if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
-						return err
-					}
-					return nil
-				},
+				bottomF: commitF,
 			}
 
 			select {
@@ -746,7 +781,7 @@ func (u *Unpacker) supportParallel(unpack *Platform) bool {
 	if u.unpackLimiter == nil {
 		return false
 	}
-	if !slices.Contains(unpack.SnapshotterCapabilities, "rebase") {
+	if !slices.Contains(unpack.SnapshotterCapabilities, snapshots.RebaseCap) {
 		log.L.Infof("snapshotter does not support rebase capability, unpacking will be sequential")
 		return false
 	}
@@ -759,6 +794,24 @@ func uniquePart() string {
 	// Ignore read failures, just decreases uniqueness
 	rand.Read(b[:])
 	return fmt.Sprintf("%d-%s", t.Nanosecond(), base64.URLEncoding.EncodeToString(b[:]))
+}
+
+// isStaged reports whether a successful Prepare has already staged the
+// layer's content into the active snapshot instead of returning a normal,
+// writable active snapshot (e.g. a snapshotter serving the layer from a local
+// content cache). There is nothing to write into a staged snapshot, so the
+// caller should skip fetching and applying the layer, and just Commit the
+// snapshot as-is (applying the real parent at Commit time).
+//
+// Only the last mount in the slice is inspected: earlier entries are inputs
+// consumed by mount templating (e.g. "{{ mount 0 }}" in an overlay's
+// lowerdir) rather than the mount that is actually stacked on top, so they
+// carry no information about writability.
+func isStaged(mounts []mount.Mount) bool {
+	if len(mounts) == 0 {
+		return false
+	}
+	return mounts[len(mounts)-1].ReadOnly()
 }
 
 // TODO: this is a temporary workaround until #13053 lands.

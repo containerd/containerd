@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/snapshots/erofs"
 	"github.com/docker/go-units"
@@ -59,6 +60,10 @@ type Config struct {
 	// LayerContentCache is a directory of pre-converted, diffID-keyed erofs
 	// layer blobs. When set, layers already present in the cache are committed
 	// without being downloaded or converted. Empty disables the feature.
+	//
+	// Only layers prepared without a parent can be served from the cache. With
+	// sequential unpacking that is the first layer alone, so getting hits for a
+	// whole image needs max_concurrent_unpacks > 1, which is not the default.
 	LayerContentCache string `toml:"layer_content_cache"`
 }
 
@@ -117,19 +122,7 @@ func init() {
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
-			// The "rebase" capability lets the unpacker unpack layers in parallel
-			// via a deferred commit: Prepare receives no parent and the real parent
-			// is applied at Commit time. The layer content cache is incompatible
-			// with that — it commits the layer during Prepare (returning
-			// ErrAlreadyExists), when the parent is not yet known in parallel mode,
-			// so the committed layer would be parentless and the chain would break.
-			// With the cache enabled we therefore unpack sequentially. Cache hits
-			// skip the download and conversion anyway, but a cache *miss* is then
-			// slower than a cold pull on an uncached node.
-			// TODO: keep "rebase" and defer the cache commit so misses stay parallel.
-			if config.LayerContentCache == "" {
-				ic.Meta.Capabilities = append(ic.Meta.Capabilities, "rebase")
-			}
+			ic.Meta.Capabilities = append(ic.Meta.Capabilities, snapshots.RebaseCap)
 			return erofs.NewSnapshotter(root, opts...)
 		},
 	})
