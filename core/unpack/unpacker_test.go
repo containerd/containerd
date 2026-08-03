@@ -273,18 +273,22 @@ func (a failApplier) Apply(_ context.Context, desc ocispec.Descriptor, _ []mount
 	return ocispec.Descriptor{}, nil
 }
 
-// TestUnpackStagedLayers verifies that when the snapshotter reports layers as
-// staged (read-only mounts from Prepare) in parallel mode, the unpacker skips
-// fetch+apply but still commits each layer, rebasing the real parent in at
-// Commit time.
-func TestUnpackStagedLayers(t *testing.T) {
+// unpackStaged unpacks an image of nLayers staged layers and returns the
+// snapshotter's recorded calls together with the layer chainIDs. The fetch
+// handler and the applier both fail the test if they are reached.
+func unpackStaged(t *testing.T, nLayers int, opts ...UnpackerOpt) (*stagedSnapshotter, []digest.Digest) {
+	t.Helper()
 	ctx := context.Background()
 
-	diffIDs := generateRandomDiffIDs(t, 2)
+	diffIDs := generateRandomDiffIDs(t, nLayers)
 	chainIDs := identity.ChainIDs(append([]digest.Digest{}, diffIDs...))
-	layers := []ocispec.Descriptor{
-		{MediaType: ocispec.MediaTypeImageLayerGzip, Digest: digest.FromString("layer-0"), Size: 1},
-		{MediaType: ocispec.MediaTypeImageLayerGzip, Digest: digest.FromString("layer-1"), Size: 1},
+	layers := make([]ocispec.Descriptor, nLayers)
+	for i := range layers {
+		layers[i] = ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayerGzip,
+			Digest:    digest.FromString(fmt.Sprintf("layer-%d", i)),
+			Size:      1,
+		}
 	}
 
 	cs := imagetest.NewContentStore(ctx, t)
@@ -299,24 +303,29 @@ func TestUnpackStagedLayers(t *testing.T) {
 	}).Descriptor
 
 	sn := &stagedSnapshotter{}
-	u, err := NewUnpacker(ctx, cs.Store,
-		WithUnpackLimiter(semaphore.NewWeighted(4)),
-		WithUnpackPlatform(Platform{
-			Platform:                platforms.All,
-			Snapshotter:             sn,
-			Applier:                 failApplier{t},
-			SnapshotterCapabilities: []string{snapshots.RebaseCap},
-		}),
-	)
+	u, err := NewUnpacker(ctx, cs.Store, append(opts, WithUnpackPlatform(Platform{
+		Platform:                platforms.All,
+		Snapshotter:             sn,
+		Applier:                 failApplier{t},
+		SnapshotterCapabilities: []string{snapshots.RebaseCap},
+	}))...)
 	require.NoError(t, err)
 
-	// A staged layer must never be fetched.
 	fetch := images.HandlerFunc(func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		t.Errorf("fetch must not happen for a staged layer (%s)", desc.Digest)
 		return nil, nil
 	})
 
 	require.NoError(t, u.unpack(fetch, config, layers))
+	return sn, chainIDs
+}
+
+// TestUnpackStagedLayers verifies that when the snapshotter reports layers as
+// staged (read-only mounts from Prepare) in parallel mode, the unpacker skips
+// fetch+apply but still commits each layer, rebasing the real parent in at
+// Commit time.
+func TestUnpackStagedLayers(t *testing.T) {
+	sn, chainIDs := unpackStaged(t, 2, WithUnpackLimiter(semaphore.NewWeighted(4)))
 
 	// Parallel mode: Prepare gets no parent...
 	require.Len(t, sn.prepares, 2)
@@ -614,5 +623,27 @@ func blobDesc(mediaType string, body []byte) ocispec.Descriptor {
 		MediaType: mediaType,
 		Digest:    digest.FromBytes(body),
 		Size:      int64(len(body)),
+	}
+}
+
+// TestUnpackStagedSequential verifies that a snapshotter which stages a layer on
+// a parented Prepare (as the erofs layer content cache does) takes the staged
+// path in sequential mode. The unpacker skips the fetch and the apply, and
+// commits the layer with the parent it already passed to Prepare.
+func TestUnpackStagedSequential(t *testing.T) {
+	// No unpack limiter, so layers are unpacked sequentially.
+	sn, chainIDs := unpackStaged(t, 3)
+
+	// Sequential mode: the parent is passed to Prepare...
+	require.Len(t, sn.prepares, 3)
+	assert.Equal(t, "", sn.prepares[0].parent)
+	assert.Equal(t, chainIDs[0].String(), sn.prepares[1].parent)
+	assert.Equal(t, chainIDs[1].String(), sn.prepares[2].parent)
+
+	// ...so Commit does not rebase one in. The chain is already linked.
+	require.Len(t, sn.commits, 3)
+	for i, c := range sn.commits {
+		assert.Equal(t, chainIDs[i].String(), c.name)
+		assert.Equal(t, "", c.parent, "a sequentially staged layer is committed without WithParent")
 	}
 }

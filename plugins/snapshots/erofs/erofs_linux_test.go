@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -991,14 +992,37 @@ func newCacheSnapshotter(t *testing.T, opts ...Opt) *snapshotter {
 	return sn.(*snapshotter)
 }
 
-// stageCacheHit runs an extraction Prepare for target/diffID and asserts the
-// cache staged the blob into the active snapshot: a read-only mount, with no
-// error (so the unpacker skips fetch+apply but still commits). It returns the
-// extraction key so the caller can Commit it as the target chainID.
+// requireStagedSymlink asserts that the snapshot behind key holds the cache
+// blob as an absolute symlink, which is what staging leaves behind. A converted
+// layer would be a regular file.
+func requireStagedSymlink(t *testing.T, ctx context.Context, s *snapshotter, key, blob string) {
+	t.Helper()
+	link := s.layerBlobPath(snapshotID(t, ctx, s, key))
+	fi, err := os.Lstat(link)
+	require.NoError(t, err, "the cached blob must be staged as layer.erofs")
+	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "layer.erofs should be a symlink")
+	dst, err := os.Readlink(link)
+	require.NoError(t, err)
+	assert.True(t, filepath.IsAbs(dst), "symlink target should be absolute")
+	assert.Equal(t, blob, dst)
+}
+
+// stageCacheHit runs a parentless extraction Prepare for target/diffID; see
+// stageCacheHitFrom.
 func stageCacheHit(t *testing.T, ctx context.Context, s *snapshotter, target string, diffID digest.Digest) string {
 	t.Helper()
+	return stageCacheHitFrom(t, ctx, s, "", target, diffID)
+}
+
+// stageCacheHitFrom runs an extraction Prepare for target/diffID on top of
+// parent and asserts the cache staged the blob into the active snapshot. The
+// Prepare succeeds and returns read-only mounts, which is what tells the
+// unpacker to skip the fetch and the apply and still commit. It returns the
+// extraction key so the caller can Commit it as the target chainID.
+func stageCacheHitFrom(t *testing.T, ctx context.Context, s *snapshotter, parent, target string, diffID digest.Digest) string {
+	t.Helper()
 	key := "extract-1 " + target
-	mounts, err := s.Prepare(ctx, key, "", extractionOpt(target, diffID))
+	mounts, err := s.Prepare(ctx, key, parent, extractionOpt(target, diffID))
 	require.NoError(t, err, "cache hit must stage without an error")
 	require.NotEmpty(t, mounts, "a staged cache hit returns mounts")
 	for _, m := range mounts {
@@ -1029,14 +1053,7 @@ func TestCacheHit(t *testing.T) {
 	assert.Error(t, err, "target chainID must not be committed before Commit")
 
 	// layer.erofs is an absolute symlink into the operator-owned cache blob.
-	link := s.layerBlobPath(snapshotID(t, ctx, s, key))
-	fi, err := os.Lstat(link)
-	require.NoError(t, err)
-	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "layer.erofs should be a symlink")
-	dst, err := os.Readlink(link)
-	require.NoError(t, err)
-	assert.True(t, filepath.IsAbs(dst), "symlink target should be absolute")
-	assert.Equal(t, blob, dst)
+	requireStagedSymlink(t, ctx, s, key, blob)
 
 	// Commit finalizes the staged snapshot as the target chainID, without any
 	// re-conversion (the blob is already present).
@@ -1121,6 +1138,29 @@ func TestCacheMiss(t *testing.T) {
 		assert.NotEmpty(t, mounts)
 	})
 
+	t.Run("no extraction labels, parented", func(t *testing.T) {
+		// Staging is keyed on the extraction labels alone. A container-rootfs
+		// Prepare on top of a cached layer gets a writable overlay.
+		cacheDir := t.TempDir()
+		writeCacheBlob(t, cacheDir, diffID, []byte("blob"))
+		s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
+
+		parentChain := "sha256:0000000000000000000000000000000000000000000000000000000000000005"
+		require.NoError(t, s.Commit(ctx, parentChain, stageCacheHit(t, ctx, s, parentChain, diffID)))
+
+		key := "container-rootfs"
+		mounts, err := s.Prepare(ctx, key, parentChain)
+		require.NoError(t, err)
+		require.NotEmpty(t, mounts)
+		// assertFellThrough does not apply here, since a parented snapshot also
+		// returns the read-only lowers. The unpacker only inspects the last
+		// mount, which must be the writable overlay.
+		assert.False(t, mounts[len(mounts)-1].ReadOnly(), "a Prepare without extraction labels must expose a writable overlay")
+
+		_, err = os.Lstat(s.layerBlobPath(snapshotID(t, ctx, s, key)))
+		assert.ErrorIs(t, err, os.ErrNotExist, "no cached blob may be staged without extraction labels")
+	})
+
 	t.Run("view is never short-circuited", func(t *testing.T) {
 		cacheDir := t.TempDir()
 		writeCacheBlob(t, cacheDir, diffID, []byte("blob"))
@@ -1132,12 +1172,71 @@ func TestCacheMiss(t *testing.T) {
 	})
 }
 
-// TestCacheParentedPrepare covers a cached blob whose extraction Prepare carries
-// a parent (the sequential unpack path): it must not be staged. mounts() only
-// picks a staged blob up when the snapshot has no parents, so otherwise the
-// unpacker would see a writable overlay, apply the layer, and let the differ
-// write through the symlink into the shared cache blob.
-func TestCacheParentedPrepare(t *testing.T) {
+// TestCacheParentedStage covers a cached blob whose extraction Prepare carries
+// a parent, which is what sequential unpacking does for every layer but the
+// first. It is staged like a parentless one, so an image is served from the
+// cache in either unpack mode. The staged blob is mounted read-only, so the
+// differ can never write through the symlink into the shared cache blob.
+func TestCacheParentedStage(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	var (
+		cacheDir     = t.TempDir()
+		parentDiffID = digest.Digest(cacheTestDiffID)
+		parentChain  = cacheTestChainID
+		childDiffID  = digest.Digest("sha256:0000000000000000000000000000000000000000000000000000000000000003")
+		childChain   = "sha256:0000000000000000000000000000000000000000000000000000000000000004"
+		childData    = []byte("fake child blob")
+	)
+	writeCacheBlob(t, cacheDir, parentDiffID, []byte("fake parent blob"))
+	childBlob := writeCacheBlob(t, cacheDir, childDiffID, childData)
+
+	s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
+
+	// The first layer has no parent, so it is served from the cache as usual.
+	require.NoError(t, s.Commit(ctx, parentChain, stageCacheHit(t, ctx, s, parentChain, parentDiffID)))
+
+	// The second layer is prepared on top of it and is served from the cache too.
+	key := stageCacheHitFrom(t, ctx, s, parentChain, childChain, childDiffID)
+
+	// The Snapshotter contract requires a parented Prepare to hand out the
+	// parent's content, so the staged blob is stacked as the top lower over the
+	// parent. The overlay does not get an upperdir, so it is read-only, and the
+	// unpacker reads that as a staged layer.
+	mounts, err := s.Mounts(ctx, key)
+	require.NoError(t, err)
+	require.Len(t, mounts, 3, "staged blob, the parent lower and the overlay")
+	assert.Equal(t, s.layerBlobPath(snapshotID(t, ctx, s, key)), mounts[0].Source,
+		"the staged blob is the top lower")
+	assert.Equal(t, "erofs", mounts[1].Type, "the parent layer is stacked below it")
+	assert.Equal(t, "format/mkdir/overlay", mounts[2].Type)
+	assert.Contains(t, strings.Join(mounts[2].Options, ","), "lowerdir={{ overlay 0 1 }}",
+		"both layers are in the lowerdir range")
+	assert.NotContains(t, strings.Join(mounts[2].Options, ","), "upperdir=",
+		"a staged snapshot does not have a writable layer")
+	assert.True(t, mounts[len(mounts)-1].ReadOnly(), "the unpacker detects staging on the last mount")
+
+	// The unpacker commits a staged snapshot without WithParent when the parent
+	// was already given to Prepare, so the chain is linked through that parent.
+	require.NoError(t, s.Commit(ctx, childChain, key))
+	info, err := s.Stat(ctx, childChain)
+	require.NoError(t, err)
+	assert.Equal(t, snapshots.KindCommitted, info.Kind)
+	assert.Equal(t, parentChain, info.Parent)
+
+	// Commit did not convert anything. The blob is still the symlinked cache
+	// entry and the operator-owned blob itself is untouched.
+	requireStagedSymlink(t, ctx, s, childChain, childBlob)
+	data, err := os.ReadFile(childBlob)
+	require.NoError(t, err)
+	assert.Equal(t, childData, data, "the cache blob must not be written through")
+}
+
+// TestCacheStaleBlob covers a cache entry pruned after it was staged. Mounts
+// must not report a dangling symlink as staged content. The caller would skip
+// the layer, and Commit would then write an empty blob through the symlink and
+// leave it in the cache for every image using that layer.
+func TestCacheStaleBlob(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
 	var (
@@ -1148,24 +1247,51 @@ func TestCacheParentedPrepare(t *testing.T) {
 		childChain   = "sha256:0000000000000000000000000000000000000000000000000000000000000004"
 	)
 	writeCacheBlob(t, cacheDir, parentDiffID, []byte("fake parent blob"))
-	writeCacheBlob(t, cacheDir, childDiffID, []byte("fake child blob"))
+	childBlob := writeCacheBlob(t, cacheDir, childDiffID, []byte("fake child blob"))
 
 	s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
 
-	// The first layer has no parent, so it is served from the cache as usual.
 	require.NoError(t, s.Commit(ctx, parentChain, stageCacheHit(t, ctx, s, parentChain, parentDiffID)))
+	key := stageCacheHitFrom(t, ctx, s, parentChain, childChain, childDiffID)
 
-	key := "extract-1 " + childChain
-	mounts, err := s.Prepare(ctx, key, parentChain, extractionOpt(childChain, childDiffID))
-	require.NoError(t, err)
-	require.NotEmpty(t, mounts)
-	// The unpacker only inspects the last mount, which must be the writable
-	// overlay so the layer gets applied (the parents' lowers are read-only).
-	assert.False(t, mounts[len(mounts)-1].ReadOnly(), "a parented Prepare must expose a writable overlay")
+	// The operator prunes the cache entry while the pull is in flight.
+	require.NoError(t, os.Remove(childBlob))
 
-	// Nothing was staged, so the differ has no symlink to write through.
-	_, err = os.Lstat(s.layerBlobPath(snapshotID(t, ctx, s, key)))
-	assert.ErrorIs(t, err, os.ErrNotExist, "no cached blob may be staged into a parented snapshot")
+	_, err := s.Mounts(ctx, key)
+	require.Error(t, err, "a dangling staged blob must not pass as staged content")
+	assert.ErrorIs(t, err, os.ErrNotExist)
+}
+
+// TestCacheStaleBlobCommit covers a cache entry pruned between Prepare and
+// Commit, which is the window the unpacker runs in: it commits the mounts
+// Prepare returned and never calls Mounts. Commit must not fall back to
+// converting the snapshot. mkfs.erofs would write through the dangling symlink,
+// committing an empty layer and leaving that empty blob in the cache for every
+// future pull of the layer.
+func TestCacheStaleBlobCommit(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	cacheDir := t.TempDir()
+	diffID := digest.Digest(cacheTestDiffID)
+	blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
+
+	s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
+
+	target := cacheTestChainID
+	key := stageCacheHit(t, ctx, s, target, diffID)
+
+	// The operator prunes the cache entry while the pull is in flight.
+	require.NoError(t, os.Remove(blob))
+
+	err := s.Commit(ctx, target, key)
+	require.Error(t, err, "a dangling staged blob must not be converted")
+	assert.ErrorIs(t, err, os.ErrNotExist)
+
+	// The symlink target was not written back through.
+	_, err = os.Stat(blob)
+	assert.ErrorIs(t, err, os.ErrNotExist, "the pruned cache entry must not be recreated")
+	_, err = s.Stat(ctx, target)
+	assert.Error(t, err, "the layer must not be committed")
 }
 
 // TestCacheRemove covers removal of a cache-hit snapshot: it succeeds (the
