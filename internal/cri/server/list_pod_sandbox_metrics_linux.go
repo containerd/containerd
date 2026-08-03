@@ -109,7 +109,7 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 					case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
 						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to get container metrics, this is likely a transient error")
 						// Don't return error for transient issues, just log and continue
-						return nil
+						continue
 					case errdefs.IsCanceled(err):
 						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Debug("metrics collection cancelled")
 						// Return the cancellation error to stop other goroutines
@@ -117,7 +117,7 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 					default:
 						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to collect container metrics")
 						// Don't return error for individual failures, just log and continue
-						return nil
+						continue
 					}
 				}
 
