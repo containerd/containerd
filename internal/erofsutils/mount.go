@@ -19,6 +19,7 @@ package erofsutils
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -204,6 +205,22 @@ func MountsToLayer(mounts []mount.Mount) (string, error) {
 	// If the layer is not prepared by the EROFS snapshotter, fall back to the next differ
 	if _, err := os.Stat(filepath.Join(layer, ".erofslayer")); err != nil {
 		return "", fmt.Errorf("mount layer type must be erofs-layer: %w", errdefs.ErrNotImplemented)
+	}
+	// A symlinked layer blob is served from the snapshotter's layer content
+	// cache and is shared with every other snapshot of that layer, so it must
+	// never be written to. Callers are expected to notice that such a snapshot
+	// is mounted read-only and skip applying it entirely; refuse rather than
+	// truncate the cache entry through the symlink. Not ErrNotImplemented: no
+	// other differ can write this layer either.
+	layerBlob := filepath.Join(layer, "layer.erofs")
+	if fi, err := os.Lstat(layerBlob); err != nil {
+		// Proceeding would risk writing the layer through a symlink we failed
+		// to inspect.
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("failed to stat layer blob %q: %w", layerBlob, err)
+		}
+	} else if fi.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("layer %q is already populated from the layer content cache: %w", layer, errdefs.ErrFailedPrecondition)
 	}
 	return layer, nil
 }
