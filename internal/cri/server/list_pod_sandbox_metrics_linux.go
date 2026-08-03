@@ -275,7 +275,7 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 			Timestamp:   timestamp,
 			MetricType:  runtime.MetricType_GAUGE,
 			LabelValues: containerLabels,
-			Value:       &runtime.UInt64Value{Value: uint64(container.Status.Get().StartedAt)},
+			Value:       &runtime.UInt64Value{Value: uint64(container.Status.Get().StartedAt / int64(time.Second))},
 		},
 	}...)
 
