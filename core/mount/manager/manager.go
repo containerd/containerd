@@ -1192,9 +1192,8 @@ func unmountAll(ctx context.Context, root string, handlers map[string]mount.Hand
 				continue
 			} else if !os.IsNotExist(serr) {
 				return serr
-			} else {
-				log.G(ctx).WithField("mount", d).Infof("missing type file, attempting unmount with no handler")
 			}
+			log.G(ctx).WithField("mount", d).Infof("missing type file, attempting unmount with no handler")
 		}
 
 		if h != nil {
