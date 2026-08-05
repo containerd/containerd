@@ -616,7 +616,10 @@ func (u *Unpacker) unpack(
 		return err
 	}
 
-	var statusChans []<-chan *unpackStatus
+	var (
+		statusChans []<-chan *unpackStatus
+		topErr      error
+	)
 
 	for i, desc := range layers {
 		_, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpackLayer"))
@@ -628,13 +631,16 @@ func (u *Unpacker) unpack(
 		)
 		statusCh, err := topHalf(i, desc, layerSpan, unpackLayerStart)
 		if err != nil {
-			if parallel {
-				break
-			} else {
-				layerSpan.SetStatus(err)
-				layerSpan.End()
+			layerSpan.SetStatus(err)
+			layerSpan.End()
+			if !parallel {
 				return err
 			}
+			// Layers queued before the failure still need to be drained and
+			// committed (or aborted) below, so remember the error and join it
+			// after the drain instead of returning right away.
+			topErr = err
+			break
 		}
 		if statusCh == nil {
 			// nothing to do, already exists
@@ -658,6 +664,7 @@ func (u *Unpacker) unpack(
 				errs = errors.Join(errs, err)
 			}
 		}
+		errs = errors.Join(errs, topErr)
 		if errs != nil {
 			return errs
 		}
