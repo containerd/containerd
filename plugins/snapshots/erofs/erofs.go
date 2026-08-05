@@ -461,18 +461,18 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 					),
 				},
 			}, nil
-		} else {
-			return []mount.Mount{
-				{
-					Source: s.upperPath(snap.ID),
-					Type:   "bind",
-					Options: append(options,
-						roFlag,
-						"rbind",
-					),
-				},
-			}, nil
 		}
+		return []mount.Mount{
+			{
+				Source: s.upperPath(snap.ID),
+				Type:   "bind",
+				Options: append(options,
+					roFlag,
+					"rbind",
+				),
+			},
+		}, nil
+
 	}
 
 	var (

@@ -630,11 +630,10 @@ func (u *Unpacker) unpack(
 		if err != nil {
 			if parallel {
 				break
-			} else {
-				layerSpan.SetStatus(err)
-				layerSpan.End()
-				return err
 			}
+			layerSpan.SetStatus(err)
+			layerSpan.End()
+			return err
 		}
 		if statusCh == nil {
 			// nothing to do, already exists
