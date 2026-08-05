@@ -90,6 +90,8 @@ $ tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.1.1.tgz
 
 The binaries are built statically and should work on any Linux distribution.
 
+In order for containerd to use them, you need to create a `.conflist` file in `/etc/cni/net.d`. See [install-cni](https://github.com/containerd/containerd/blob/main/script/setup/install-cni) for a basic config.
+
 ### Option 2: From `apt-get` or `dnf`
 
 The `containerd.io` packages in DEB and RPM formats are distributed by Docker (not by the containerd project).
