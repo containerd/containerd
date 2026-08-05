@@ -990,7 +990,7 @@ func TestCacheHit(t *testing.T) {
 	diffID := digest.Digest(cacheTestDiffID)
 	blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
 
-	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+	s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
 
 	target := cacheTestChainID
 	key := stageCacheHit(t, ctx, s, target, diffID)
@@ -1031,7 +1031,7 @@ func TestCacheSidecar(t *testing.T) {
 	require.NoError(t, os.WriteFile(dmverity.MetadataPath(blob), []byte(testDmverityMetadata), 0644))
 
 	// dmverity_mode defaults to "auto": use the sidecar if present.
-	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+	s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
 
 	target := cacheTestChainID
 	key := stageCacheHit(t, ctx, s, target, diffID)
@@ -1078,7 +1078,7 @@ func TestCacheMiss(t *testing.T) {
 	})
 
 	t.Run("blob absent", func(t *testing.T) {
-		s := newCacheSnapshotter(t, WithLayerContentCache(t.TempDir()))
+		s := newCacheSnapshotter(t, WithLayerContentCaches(t.TempDir()))
 		mounts, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
 		assertFellThrough(t, s, mounts, err, false)
 	})
@@ -1086,7 +1086,7 @@ func TestCacheMiss(t *testing.T) {
 	t.Run("no extraction labels", func(t *testing.T) {
 		cacheDir := t.TempDir()
 		writeCacheBlob(t, cacheDir, diffID, []byte("blob"))
-		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+		s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
 		// A container-rootfs Prepare carries no snapshot.ref/diff-id labels.
 		mounts, err := s.Prepare(ctx, "container-rootfs", "")
 		require.NoError(t, err)
@@ -1096,7 +1096,7 @@ func TestCacheMiss(t *testing.T) {
 	t.Run("view is never short-circuited", func(t *testing.T) {
 		cacheDir := t.TempDir()
 		writeCacheBlob(t, cacheDir, diffID, []byte("blob"))
-		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+		s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
 		// Even with matching labels and a cached blob, a View must not commit.
 		// It's read-only, but via the KindView roFlag in mounts(), not the cache.
 		mounts, err := s.View(ctx, "view-1", "", extractionOpt(target, diffID))
@@ -1122,7 +1122,7 @@ func TestCacheParentedPrepare(t *testing.T) {
 	writeCacheBlob(t, cacheDir, parentDiffID, []byte("fake parent blob"))
 	writeCacheBlob(t, cacheDir, childDiffID, []byte("fake child blob"))
 
-	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+	s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
 
 	// The first layer has no parent, so it is served from the cache as usual.
 	require.NoError(t, s.Commit(ctx, parentChain, stageCacheHit(t, ctx, s, parentChain, parentDiffID)))
@@ -1152,7 +1152,7 @@ func TestCacheRemove(t *testing.T) {
 	sidecar := dmverity.MetadataPath(blob)
 	require.NoError(t, os.WriteFile(sidecar, []byte(testDmverityMetadata), 0644))
 
-	s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir))
+	s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
 
 	target := cacheTestChainID
 	key := stageCacheHit(t, ctx, s, target, diffID)
@@ -1189,7 +1189,7 @@ func TestCacheDmverity(t *testing.T) {
 		blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
 		require.NoError(t, os.WriteFile(dmverity.MetadataPath(blob), []byte(testDmverityMetadata), 0644))
 
-		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir), WithDmverityMode("on"))
+		s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir), WithDmverityMode("on"))
 		key := stageCacheHit(t, ctx, s, target, diffID)
 
 		_, err := os.Stat(dmverity.MetadataPath(s.layerBlobPath(snapshotID(t, ctx, s, key))))
@@ -1200,7 +1200,7 @@ func TestCacheDmverity(t *testing.T) {
 		cacheDir := t.TempDir()
 		writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob")) // no sidecar
 
-		s := newCacheSnapshotter(t, WithLayerContentCache(cacheDir), WithDmverityMode("on"))
+		s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir), WithDmverityMode("on"))
 
 		// dmverity_mode=on requires a sidecar; a cache entry without one is a hard
 		// error rather than a silent fallback.
@@ -1210,4 +1210,72 @@ func TestCacheDmverity(t *testing.T) {
 		_, err = s.Stat(ctx, target)
 		assert.Error(t, err, "no snapshot should be committed on failure")
 	})
+}
+
+// TestCacheMultipleDirs covers the layer_content_caches search path: directories
+// are searched in configured order, the first hit wins, later caches are reached
+// when earlier ones lack the blob, and a miss in every cache falls through to a
+// normal writable snapshot.
+func TestCacheMultipleDirs(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	diffID := digest.Digest(cacheTestDiffID)
+	target := cacheTestChainID
+
+	// stagedBlob returns the cache blob the snapshot's layer.erofs symlink points
+	// at, i.e. which of the configured caches actually served the layer.
+	stagedBlob := func(t *testing.T, s *snapshotter, key string) string {
+		t.Helper()
+		dst, err := os.Readlink(s.layerBlobPath(snapshotID(t, ctx, s, key)))
+		require.NoError(t, err)
+		return dst
+	}
+
+	t.Run("first cache with the blob wins", func(t *testing.T) {
+		first, second := t.TempDir(), t.TempDir()
+		// Both caches hold the diffID; the earlier one must be the one used.
+		firstBlob := writeCacheBlob(t, first, diffID, []byte("from first"))
+		writeCacheBlob(t, second, diffID, []byte("from second"))
+
+		s := newCacheSnapshotter(t, WithLayerContentCaches(first, second))
+		key := stageCacheHit(t, ctx, s, target, diffID)
+		assert.Equal(t, firstBlob, stagedBlob(t, s, key))
+	})
+
+	t.Run("falls through to a later cache", func(t *testing.T) {
+		empty, populated := t.TempDir(), t.TempDir()
+		blob := writeCacheBlob(t, populated, diffID, []byte("from second"))
+
+		s := newCacheSnapshotter(t, WithLayerContentCaches(empty, populated))
+		key := stageCacheHit(t, ctx, s, target, diffID)
+		assert.Equal(t, blob, stagedBlob(t, s, key))
+	})
+
+	t.Run("miss in every cache falls back to a writable snapshot", func(t *testing.T) {
+		s := newCacheSnapshotter(t, WithLayerContentCaches(
+			filepath.Join(t.TempDir(), "missing"), t.TempDir(), t.TempDir()))
+
+		mounts, err := s.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
+		require.NoError(t, err)
+		require.NotEmpty(t, mounts)
+		for _, m := range mounts {
+			assert.False(t, m.ReadOnly(), "a miss in every cache must return writable mounts")
+		}
+		_, err = s.Stat(ctx, target)
+		assert.Error(t, err, "target chainID must not be committed on a miss")
+	})
+}
+
+// TestCacheDirMustBeAbsolute covers the one thing NewSnapshotter checks about a
+// configured cache dir: it must be absolute, since a relative one would be
+// symlinked into the snapshot dir and dangle. The empty string is covered by the
+// same check, which otherwise resolves to the daemon's working directory.
+func TestCacheDirMustBeAbsolute(t *testing.T) {
+	requireErofs(t)
+
+	for _, dir := range []string{"relative-cache", "./cache", "", "a/b"} {
+		t.Run(fmt.Sprintf("%q", dir), func(t *testing.T) {
+			_, err := NewSnapshotter(t.TempDir(), WithLayerContentCaches(dir))
+			assert.ErrorContains(t, err, "must be an absolute path")
+		})
+	}
 }

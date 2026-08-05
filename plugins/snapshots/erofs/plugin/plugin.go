@@ -57,14 +57,16 @@ type Config struct {
 	// Linux only
 	DmverityMode string `toml:"dmverity_mode"`
 
-	// LayerContentCache is a directory of pre-converted, diffID-keyed erofs
-	// layer blobs. When set, layers already present in the cache are committed
-	// without being downloaded or converted. Empty disables the feature.
+	// LayerContentCaches lists directories of pre-converted, diffID-keyed erofs
+	// layer blobs. Each is checked one by one and the first hit is used instead
+	// of downloading and converting the layer; a directory that doesn't exist is
+	// treated as a cache miss. Layers missing from all of them are converted
+	// normally.
 	//
 	// Only layers prepared without a parent can be served from the cache. With
 	// sequential unpacking that is the first layer alone, so getting hits for a
 	// whole image needs max_concurrent_unpacks > 1, which is not the default.
-	LayerContentCache string `toml:"layer_content_cache"`
+	LayerContentCaches []string `toml:"layer_content_caches"`
 }
 
 func init() {
@@ -110,8 +112,8 @@ func init() {
 				opts = append(opts, erofs.WithDmverityMode(config.DmverityMode))
 			}
 
-			if config.LayerContentCache != "" {
-				opts = append(opts, erofs.WithLayerContentCache(config.LayerContentCache))
+			if len(config.LayerContentCaches) > 0 {
+				opts = append(opts, erofs.WithLayerContentCaches(config.LayerContentCaches...))
 			}
 
 			// Don't bother supporting overlay's slow_chown, only RemapIDs
