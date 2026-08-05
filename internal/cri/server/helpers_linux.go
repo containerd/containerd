@@ -36,9 +36,10 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/internal/cri/seutil"
+
 	"github.com/containerd/containerd/v2/pkg/apparmor"
 	"github.com/containerd/containerd/v2/pkg/seccomp"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 )
 
 // apparmorEnabled returns true if apparmor is enabled, supported by the host,
@@ -173,10 +174,10 @@ func isVMBasedRuntime(runtimeType string) bool {
 }
 
 func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
-	if !isVMBasedRuntime(runtimeType) {
+	if !selinux.GetEnabled() || !isVMBasedRuntime(runtimeType) {
 		return nil
 	}
-	l, err := seutil.ChangeToKVM(spec.Process.SelinuxLabel)
+	l, err := selinux.SetProcessKind(spec.Process.SelinuxLabel, selinux.ProcessKindKVM)
 	if err != nil {
 		return fmt.Errorf("failed to get selinux kvm label: %w", err)
 	}
