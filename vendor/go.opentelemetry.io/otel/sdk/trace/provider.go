@@ -1,21 +1,11 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package trace // import "go.opentelemetry.io/otel/sdk/trace"
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -24,14 +14,13 @@ import (
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace/internal/observ"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
-const (
-	defaultTracerName = "go.opentelemetry.io/otel/sdk/tracer"
-)
+const defaultTracerName = "go.opentelemetry.io/otel/sdk/tracer"
 
 // tracerProviderConfig.
 type tracerProviderConfig struct {
@@ -55,8 +44,8 @@ type tracerProviderConfig struct {
 	resource *resource.Resource
 }
 
-// MarshalLog is the marshaling function used by the logging system to represent this exporter.
-func (cfg tracerProviderConfig) MarshalLog() interface{} {
+// MarshalLog is the marshaling function used by the logging system to represent this Provider.
+func (cfg tracerProviderConfig) MarshalLog() any {
 	return struct {
 		SpanProcessors  []SpanProcessor
 		SamplerType     string
@@ -150,9 +139,10 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		name = defaultTracerName
 	}
 	is := instrumentation.Scope{
-		Name:      name,
-		Version:   c.InstrumentationVersion(),
-		SchemaURL: c.SchemaURL(),
+		Name:       name,
+		Version:    c.InstrumentationVersion(),
+		SchemaURL:  c.SchemaURL(),
+		Attributes: c.InstrumentationAttributes(),
 	}
 
 	t, ok := func() (trace.Tracer, bool) {
@@ -169,6 +159,13 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 				provider:             p,
 				instrumentationScope: is,
 			}
+
+			var err error
+			t.inst, err = observ.NewTracer()
+			if err != nil {
+				otel.Handle(err)
+			}
+
 			p.namedTracer[is] = t
 		}
 		return t, ok
@@ -179,7 +176,17 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		//   slowing down all tracing consumers.
 		// - Logging code may be instrumented with tracing and deadlock because it could try
 		//   acquiring the same non-reentrant mutex.
-		global.Info("Tracer created", "name", name, "version", is.Version, "schemaURL", is.SchemaURL)
+		global.Info(
+			"Tracer created",
+			"name",
+			name,
+			"version",
+			is.Version,
+			"schemaURL",
+			is.SchemaURL,
+			"attributes",
+			is.Attributes,
+		)
 	}
 	return t
 }
@@ -256,6 +263,7 @@ func (p *TracerProvider) ForceFlush(ctx context.Context) error {
 		return nil
 	}
 
+	var err error
 	for _, sps := range spss {
 		select {
 		case <-ctx.Done():
@@ -263,11 +271,9 @@ func (p *TracerProvider) ForceFlush(ctx context.Context) error {
 		default:
 		}
 
-		if err := sps.sp.ForceFlush(ctx); err != nil {
-			return err
-		}
+		err = errors.Join(err, sps.sp.ForceFlush(ctx))
 	}
-	return nil
+	return err
 }
 
 // Shutdown shuts down TracerProvider. All registered span processors are shut down
@@ -297,14 +303,7 @@ func (p *TracerProvider) Shutdown(ctx context.Context) error {
 		sps.state.Do(func() {
 			err = sps.sp.Shutdown(ctx)
 		})
-		if err != nil {
-			if retErr == nil {
-				retErr = err
-			} else {
-				// Poor man's list of errors
-				retErr = fmt.Errorf("%v; %v", retErr, err)
-			}
-		}
+		retErr = errors.Join(retErr, err)
 	}
 	p.spanProcessors.Store(&spanProcessorStates{})
 	return retErr
