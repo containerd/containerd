@@ -37,12 +37,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/log"
 	"github.com/klauspost/compress/zstd"
+	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/pkg/reference"
 )
 
 type writeFunc func(p []byte) (int, error)
@@ -785,4 +790,72 @@ func parseRange(s string, size int64) ([]httpRange, error) {
 		return nil, errNoOverlap
 	}
 	return ranges, nil
+}
+
+// TestFetcherForeignURLLogRedaction verifies that when a blob is fetched from a
+// descriptor-provided external URL, the URL logged for the request has its
+// userinfo and query values redacted. A registry-controlled foreign-layer URL
+// may embed short-lived credentials (basic-auth userinfo or a signed-URL token
+// in the query), which must not be written to the daemon log verbatim.
+func TestFetcherForeignURLLogRedaction(t *testing.T) {
+	content := []byte("foreign layer content")
+	dgst := digest.FromBytes(content)
+
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("content-length", strconv.Itoa(len(content)))
+		_, _ = rw.Write(content)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const secret = "s3cr3t-signature-token"
+	foreignURL := u.Scheme + "://user:" + secret + "@" + u.Host + "/blob?X-Amz-Signature=" + secret
+
+	logger := logrus.New()
+	var logBuf bytes.Buffer
+	logger.SetOutput(&logBuf)
+	logger.SetLevel(logrus.InfoLevel)
+	ctx := log.WithLogger(context.Background(), logrus.NewEntry(logger))
+
+	f := dockerFetcher{&dockerBase{
+		refspec: reference.Spec{Locator: "example.com/foreign"},
+		hosts: []RegistryHost{{
+			Client:       s.Client(),
+			Host:         u.Host,
+			Scheme:       u.Scheme,
+			Path:         u.Path,
+			Capabilities: HostCapabilityPull,
+		}},
+	}}
+
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayerGzip,
+		Digest:    dgst,
+		Size:      int64(len(content)),
+		URLs:      []string{foreignURL},
+	}
+
+	rc, err := f.Fetch(ctx, desc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rc.Close()
+	if _, err := io.ReadAll(rc); err != nil {
+		t.Fatal(err)
+	}
+
+	out := logBuf.String()
+	if !strings.Contains(out, "request") {
+		t.Fatalf("expected a request log for the foreign url path, got: %s", out)
+	}
+	if strings.Contains(out, secret) {
+		t.Errorf("foreign url credentials leaked into the log: %s", out)
+	}
+	if !strings.Contains(out, "REDACTED") {
+		t.Errorf("expected the foreign url query value to be redacted, got: %s", out)
+	}
 }
