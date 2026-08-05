@@ -28,6 +28,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -231,6 +232,14 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 		return nil, err
 	}
 
+	activity := NewActivityTracker(5 * time.Second)
+	if existing, ok := ActivityTrackerFromContext(ctx); ok {
+		if t, ok := existing.(*ActivityTracker); ok {
+			activity = t
+		}
+	}
+	ctx = WithActivityTracker(ctx, activity)
+
 	return newHTTPReadSeeker(desc.Size, func(offset int64) (io.ReadCloser, error) {
 		// firstly try fetch via external urls
 		for _, us := range desc.URLs {
@@ -326,7 +335,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 
 		return nil, firstErr
 
-	})
+	}, activity)
 }
 
 func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, lastHost bool, mediatype string, ps ...string) (*request, int64, error) {
@@ -420,10 +429,18 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 		return nil, desc, firstErr
 	}
 
+	activity := NewActivityTracker(5 * time.Second)
+	if existing, ok := ActivityTrackerFromContext(ctx); ok {
+		if t, ok := existing.(*ActivityTracker); ok {
+			activity = t
+		}
+	}
+	ctx = WithActivityTracker(ctx, activity)
+
 	seeker, err := newHTTPReadSeeker(sz, func(offset int64) (rc io.ReadCloser, err error) {
 		rc, _, err = r.open(ctx, getReq, config.Mediatype, offset, true)
 		return
-	})
+	}, activity)
 	if err != nil {
 		return nil, desc, err
 	}

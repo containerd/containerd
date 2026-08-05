@@ -45,6 +45,23 @@ import (
 	"github.com/containerd/containerd/v2/version"
 )
 
+type activityTrackerContextKey struct{}
+
+// WithActivityTracker stores an ActivityTrackerInterface in the context for
+// use by the resolver's request pipeline. When present, the resolver disables
+// ResponseHeaderTimeout on uploads to avoid premature timeouts during slow pushes.
+func WithActivityTracker(ctx context.Context, tracker ActivityTrackerInterface) context.Context {
+	return context.WithValue(ctx, activityTrackerContextKey{}, tracker)
+}
+
+// ActivityTrackerFromContext retrieves an ActivityTrackerInterface previously
+// stored via WithActivityTracker. Returns the tracker and true if found, or
+// nil and false otherwise.
+func ActivityTrackerFromContext(ctx context.Context) (ActivityTrackerInterface, bool) {
+	tracker, ok := ctx.Value(activityTrackerContextKey{}).(ActivityTrackerInterface)
+	return tracker, ok
+}
+
 var (
 	// ErrInvalidAuthorization is used when credentials are passed to a server but
 	// those credentials are rejected.
@@ -662,6 +679,21 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	if r.host.Client != nil {
 		*client = *r.host.Client
 	}
+
+	if _, ok := ActivityTrackerFromContext(ctx); ok {
+		if tr := unwrapTransport(client.Transport); tr != nil {
+			newTr := tr.Clone()
+			if _, ok := client.Transport.(*httpFallback); ok {
+				client.Transport = &httpFallback{super: newTr}
+			} else {
+				client.Transport = newTr
+			}
+			newTr.ResponseHeaderTimeout = 0
+		} else {
+			log.G(ctx).WithField("transport", fmt.Sprintf("%T", client.Transport)).Debug("ActivityTracker set but no custom transport configured (using default) - ResponseHeaderTimeout will not be disabled")
+		}
+	}
+
 	if client.CheckRedirect == nil {
 		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
@@ -956,6 +988,24 @@ func IsLocalhost(host string) bool {
 
 	ip := net.ParseIP(host)
 	return ip.IsLoopback()
+}
+
+// unwrapTransport attempts to extract the underlying *http.Transport from a potentially
+// wrapped RoundTripper. This handles common wrapper patterns like httpFallback.
+// Returns nil if the underlying transport cannot be determined.
+func unwrapTransport(rt http.RoundTripper) *http.Transport {
+	if tr, ok := rt.(*http.Transport); ok {
+		return tr
+	}
+
+	if wf, ok := rt.(*httpFallback); ok {
+		if tr, ok := wf.super.(*http.Transport); ok {
+			return tr
+		}
+		return unwrapTransport(wf.super)
+	}
+
+	return nil
 }
 
 // NewHTTPFallback returns http.RoundTripper which allows fallback from https to

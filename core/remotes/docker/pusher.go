@@ -309,11 +309,20 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 
 	// TODO: Support chunked upload
 
-	pushw := newPushWriter(p.dockerBase, ref, desc.Digest, p.tracker, isManifest)
+	activity := NewActivityTracker(5 * time.Second)
+	if existing, ok := ActivityTrackerFromContext(ctx); ok {
+		if t, ok := existing.(*ActivityTracker); ok {
+			activity = t
+		}
+	}
+	ctx = WithActivityTracker(ctx, activity)
+
+	pushw := newPushWriter(p.dockerBase, ref, desc.Digest, p.tracker, isManifest, activity)
 
 	req.body = func() (io.ReadCloser, error) {
 		pr, pw := io.Pipe()
-		pushw.setPipe(pw)
+		pwWrapper := &activityPipeWriter{pw: pw, tracker: pushw.activity}
+		pushw.setPipe(pwWrapper)
 		return pr, nil
 	}
 	req.size = desc.Size
@@ -358,16 +367,47 @@ func getManifestPath(object string, dgst digest.Digest) []string {
 	return []string{"manifests", object}
 }
 
+// activityPipeWriter wraps an io.PipeWriter and calls Touch() on an ActivityTrackerInterface
+// before each write operation.
+type activityPipeWriter struct {
+	pw      *io.PipeWriter
+	tracker ActivityTrackerInterface
+}
+
+func (apw *activityPipeWriter) Write(p []byte) (n int, err error) {
+	if apw.tracker != nil {
+		apw.tracker.Touch()
+	}
+	return apw.pw.Write(p)
+}
+
+func (apw *activityPipeWriter) Close() error {
+	return apw.pw.Close()
+}
+
+func (apw *activityPipeWriter) CloseWithError(err error) error {
+	return apw.pw.CloseWithError(err)
+}
+
+// noopActivityTracker is an ActivityTrackerInterface implementation that does nothing.
+type noopActivityTracker struct{}
+
+func (n *noopActivityTracker) Touch()                               {}
+func (n *noopActivityTracker) Stalled(window time.Duration) bool    { return false }
+func (n *noopActivityTracker) TimeSinceLastActivity() time.Duration { return 0 }
+
 type pushWriter struct {
 	base *dockerBase
 	ref  string
 
-	pipe *io.PipeWriter
+	pipe      *activityPipeWriter
+	pipeMu    sync.Mutex
+	pipeReady *sync.Cond
 
 	done      chan struct{}
 	closeOnce sync.Once
 
-	pipeC chan *io.PipeWriter
+	pipeC chan *activityPipeWriter
 	respC chan *http.Response
 	errC  chan error
 
@@ -375,24 +415,44 @@ type pushWriter struct {
 
 	expected digest.Digest
 	tracker  StatusTracker
+	activity ActivityTrackerInterface
+	clock    Clock
 }
 
-func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker StatusTracker, isManifest bool) *pushWriter {
-	// Initialize and create response
-	return &pushWriter{
+func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker StatusTracker, isManifest bool, activity ActivityTrackerInterface) *pushWriter {
+	clock := Clock(realClock{})
+	if at, ok := activity.(*ActivityTracker); ok {
+		clock = at.clock
+	}
+
+	pw := &pushWriter{
 		base:       db,
 		ref:        ref,
 		expected:   expected,
 		tracker:    tracker,
-		pipeC:      make(chan *io.PipeWriter, 1),
+		activity:   activity,
+		clock:      clock,
+		pipeC:      make(chan *activityPipeWriter, 1),
 		respC:      make(chan *http.Response, 1),
 		errC:       make(chan error, 1),
 		done:       make(chan struct{}),
 		isManifest: isManifest,
 	}
+	pw.pipeReady = sync.NewCond(&pw.pipeMu)
+	return pw
 }
 
-func (pw *pushWriter) setPipe(p *io.PipeWriter) {
+func (pw *pushWriter) setPipe(p *activityPipeWriter) {
+	pw.pipeMu.Lock()
+	if pw.pipe == nil {
+		// First pipe — set directly and wake all waiters.
+		pw.pipe = p
+		pw.pipeReady.Broadcast()
+		pw.pipeMu.Unlock()
+		return
+	}
+	pw.pipeMu.Unlock()
+	// Replacement pipe — deliver via channel for Write/Commit replacement paths.
 	select {
 	case <-pw.done:
 	case pw.pipeC <- p:
@@ -413,7 +473,9 @@ func (pw *pushWriter) setResponse(resp *http.Response) {
 	}
 }
 
-func (pw *pushWriter) replacePipe(p *io.PipeWriter) error {
+func (pw *pushWriter) replacePipe(p *activityPipeWriter) error {
+	pw.pipeMu.Lock()
+	defer pw.pipeMu.Unlock()
 	if pw.pipe == nil {
 		pw.pipe = p
 		return nil
@@ -440,14 +502,20 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 		return n, err
 	}
 
+	pw.pipeMu.Lock()
 	if pw.pipe == nil {
-		select {
-		case <-pw.done:
-			return 0, io.ErrClosedPipe
-		case p := <-pw.pipeC:
-			pw.replacePipe(p)
+		for pw.pipe == nil {
+			select {
+			case <-pw.done:
+				pw.pipeMu.Unlock()
+				return 0, io.ErrClosedPipe
+			default:
+			}
+			pw.pipeReady.Wait()
 		}
+		pw.pipeMu.Unlock()
 	} else {
+		pw.pipeMu.Unlock()
 		select {
 		case <-pw.done:
 			return 0, io.ErrClosedPipe
@@ -457,7 +525,9 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 		}
 	}
 
+	pw.pipeMu.Lock()
 	n, err = pw.pipe.Write(p)
+	pw.pipeMu.Unlock()
 	if errors.Is(err, io.ErrClosedPipe) {
 		// if the pipe is closed, we might have the original error on the error
 		// channel - so we should try and get it
@@ -478,10 +548,11 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 }
 
 func (pw *pushWriter) Close() error {
-	// Ensure pipeC is closed but handle `Close()` being
-	// called multiple times without panicking
 	pw.closeOnce.Do(func() {
 		close(pw.done)
+		pw.pipeMu.Lock()
+		pw.pipeReady.Broadcast()
+		pw.pipeMu.Unlock()
 	})
 	if pw.pipe != nil {
 		status, err := pw.tracker.GetStatus(pw.ref)
@@ -520,22 +591,43 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 		}
 	}
 
-	// TODO: timeout waiting for response
+	// Wait for server response. Use activity-based stall detection: if no
+	// data has flowed through the stream for 30s (matching the original
+	// ResponseHeaderTimeout), abort. Also respect ctx cancellation.
+	const stallWindow = 30 * time.Second
+	const tickerInterval = 1 * time.Second
+
+	ticker := pw.clock.NewTicker(tickerInterval)
+	defer ticker.Stop()
+
 	var resp *http.Response
-	select {
-	case <-pw.done:
-		return io.ErrClosedPipe
-	case err := <-pw.errC:
-		pw.Close()
-		return err
-	case resp = <-pw.respC:
-		defer resp.Body.Close()
-	case p := <-pw.pipeC:
-		// check whether the pipe has changed in the commit, because sometimes Write
-		// can complete successfully, but the pipe may have changed. In that case, the
-		// content needs to be reset.
-		return pw.replacePipe(p)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-pw.done:
+			return io.ErrClosedPipe
+		case e := <-pw.errC:
+			pw.Close()
+			return e
+		case r := <-pw.respC:
+			resp = r
+			goto gotResponse
+		case p := <-pw.pipeC:
+			if err := pw.replacePipe(p); err != nil {
+				return err
+			}
+		case <-ticker.C():
+			if pw.activity != nil && pw.activity.Stalled(stallWindow) {
+				pw.Close()
+				return fmt.Errorf("no activity for %v during commit: %w", stallWindow, context.DeadlineExceeded)
+			}
+		}
 	}
+
+gotResponse:
+	defer resp.Body.Close()
 
 	// 201 is specified return status, some registries return
 	// 200, 202 or 204.
