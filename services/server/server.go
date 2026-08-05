@@ -117,6 +117,12 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 			// extracted layer to the snapshot dir location.
 			os.Setenv("TEMP", config.TempDir)
 			os.Setenv("TMP", config.TempDir)
+			// Since Go 1.21, os.MkdirTemp/os.TempDir resolve the temp dir via
+			// Windows' GetTempPath2W. For processes running as SYSTEM (as
+			// containerd does under the SCM), that API reads SystemTemp rather
+			// than TEMP/TMP, so set it too to keep the override effective.
+			// https://cs.opensource.google/go/go/+/refs/tags/go1.21.0:src/os/file_windows.go
+			os.Setenv("SystemTemp", config.TempDir)
 		} else {
 			os.Setenv("TMPDIR", config.TempDir)
 		}
