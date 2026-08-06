@@ -329,16 +329,30 @@ with or without the EROFS differ.
 
 ## Tar Index Mode
 
-The EROFS differ also supports a "tar index" mode that offers a unique approach to handling OCI image layers:
+The EROFS differ also supports a "tar index" mode that offers a unique approach
+to handling OCI image layers:
 
-Instead of extracting the entire tar archive to create an EROFS filesystem, the tar index mode:
+Instead of extracting the entire tar archive to create an EROFS filesystem, the
+tar index mode:
 1. Generates a tar index for the tar content
 2. Appends the original tar content to the index
 3. Creates a combined file: `[Tar index][Original tar content]`
 
-The tar index can be stored in a registry alongside image layers, allowing nodes to fetch it directly when needed. Typically, the tar index is much smaller than a full EROFS blob, making it more efficient to store and transfer. If the tar index is not available in the registry, it can be generated on the node as a fallback. When integrating with dm-verity, the registry can also store the dm-verity Merkle tree and root hash signature together with the tar index, enabling nodes to retrieve all necessary artifacts without redundant computation.
+The tar index can be stored in a registry alongside image layers, allowing nodes
+to fetch it directly when needed. Typically, the tar index is much smaller than
+a full EROFS blob, making it more efficient to store and transfer. If the tar
+index is not available in the registry, it can be generated on the node as a
+fallback. When integrating with dm-verity, the registry can also store the
+dm-verity Merkle tree and root hash signature together with the tar index,
+enabling nodes to retrieve all necessary artifacts without redundant
+computation.
 
-In addition, we have a tar diffID for each layer according to the OCI image spec, so we don't need to reinvent a new way to verify the image layer content for confidential containers but just calculate the sha256 of the original tar data (because erofs could just reuse the tar data with 512-byte fs block size and build a minimal index for direct mounting of tar) out of the tar index mode in the guest and compare it with each diffID.
+In addition, we have a tar diffID for each layer according to the OCI image
+spec, so we don't need to reinvent a new way to verify the image layer content
+for confidential containers but just calculate the sha256 of the original tar
+data (because erofs could just reuse the tar data with 512-byte fs block size
+and build a minimal index for direct mounting of tar) out of the tar index mode
+in the guest and compare it with each diffID.
 
 ### Configuration
 
@@ -348,3 +362,58 @@ For the EROFS differ:
 [plugins."io.containerd.differ.v1.erofs"]
   enable_tar_index = true
 ```
+
+## Layer Content Cache
+
+When pulling a regular OCI image, every layer is converted on the node into
+either a native EROFS blob or an indexed tar (see _the
+[Tar Index Mode](#tar-index-mode) section_). That is an EROFS image build per
+layer, on every node that pulls the image.
+
+The conversion can be done upfront instead and handed to containerd as a
+pre-warmed cache. `layer_content_caches` lists directories of pre-built EROFS
+blobs keyed by layer `diffID`. When a layer is unpacked, the snapshotter checks the
+cache first, and on a hit it just symlinks the cached blob into the snapshot and
+mounts it, with no conversion. A miss is unpacked and converted as usual, so a
+partially populated cache is fine. Cache hits also skip the layer download, so no
+layer blobs are fetched for a fully cached image.
+
+```toml
+  [plugins."io.containerd.snapshotter.v1.erofs"]
+    layer_content_caches = ["/var/lib/erofs-cache/base-images", "/mnt/shared/erofs-cache"]
+```
+
+Directories are searched in order and the first hit wins. A directory that isn't
+there counts as a miss, so an empty or not-yet-populated cache won't break pulls.
+
+Listing more than one is handy when they have different lifetimes or owners, e.g.
+a small local cache of base images baked into the machine image, plus a larger
+one on shared storage that's refreshed on its own schedule.
+
+Populating and maintaining a cache is the operator's responsibility: containerd
+never writes to these directories, so they can be mounted read-only.
+
+> [!IMPORTANT]
+> A hit symlinks the blob instead of copying it, so an entry has to stay in place
+> for as long as any snapshot references it. Removing one that's still in use
+> breaks those layers.
+
+> [!NOTE]
+> For the same reason `enable_fsverity` and `set_immutable` can't be used
+> together with a cache, since both would have to modify a blob that every
+> snapshot using that layer shares. Use dm-verity instead.
+
+To build a new cache, fetch the image content and convert its layers:
+
+```bash
+$ ctr content fetch $IMG
+$ ctr images build-erofs-cache \
+    --compressors lz4 \
+    --dmverity \
+    $IMG ./output
+```
+
+Blobs land at `<algo>/<xx>/<digest>.erofs` (`<xx>` shards on the first two
+digest characters), and `--dmverity` writes a `.dmverity` sidecar alongside each
+one. Since the key is the diffID, one cache serves every image sharing those
+layers.
