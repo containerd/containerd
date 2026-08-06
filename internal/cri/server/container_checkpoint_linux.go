@@ -32,8 +32,8 @@ import (
 	"time"
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
-	criu "github.com/checkpoint-restore/go-criu/v7"
-	"github.com/checkpoint-restore/go-criu/v7/utils"
+	criu "github.com/checkpoint-restore/go-criu/v8"
+	"github.com/checkpoint-restore/go-criu/v8/utils"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
@@ -50,7 +50,7 @@ import (
 
 	// TODO: This package import is kept to prevent merge conflicts while integrating multiple
 	// branches, specifically because this changes vendoring.
-	_ "github.com/checkpoint-restore/go-criu/v7/stats"
+	_ "github.com/checkpoint-restore/go-criu/v8/stats"
 )
 
 // copyNoFollow copies the regular file at src to dst without following a symlink
