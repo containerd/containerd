@@ -60,6 +60,11 @@ enum criu_pre_dump_mode {
 	VM_READ =	2;
 };
 
+enum criu_image_io_mode {
+	IMAGE_IO_WRITEBACK	= 0;
+	IMAGE_IO_DIRECT	= 1;
+};
+
 message criu_opts {
 	required int32			images_dir_fd	= 1 [default = -1];
 	optional string			images_dir	= 68; /* used only if images_dir_fd == -1 */
@@ -145,6 +150,7 @@ message criu_opts {
 	optional bool			leave_stopped		= 69;
 	optional bool			display_stats		= 70;
 	optional bool			log_to_stderr		= 71;
+	optional criu_image_io_mode	image_io_mode		= 72 [default = IMAGE_IO_WRITEBACK];
 /*	optional bool			check_mounts		= 128;	*/
 }
 
