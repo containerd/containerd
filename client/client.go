@@ -46,6 +46,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -363,12 +364,14 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 		}
 	}
 
-	span.SetAttributes(
+	attrs := []attribute.KeyValue{
 		tracing.Attribute("container.id", container.ID),
 		tracing.Attribute("container.image.ref", container.Image),
 		tracing.Attribute("container.runtime.name", container.Runtime.Name),
-		tracing.Attribute("container.snapshotter.name", container.Snapshotter),
-	)
+		tracing.Attribute("containerd.snapshotter.name", container.Snapshotter),
+	}
+	span.SetAttributes(attrs...)
+	span.SetAttributes(tracing.LegacyAttributes(attrs)...)
 	r, err := c.ContainerService().Create(ctx, container)
 	if err != nil {
 		return nil, err
@@ -385,14 +388,16 @@ func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error
 		return nil, err
 	}
 
-	span.SetAttributes(
+	attrs := []attribute.KeyValue{
 		tracing.Attribute("container.id", r.ID),
 		tracing.Attribute("container.image.ref", r.Image),
 		tracing.Attribute("container.runtime.name", r.Runtime.Name),
-		tracing.Attribute("container.snapshotter.name", r.Snapshotter),
+		tracing.Attribute("containerd.snapshotter.name", r.Snapshotter),
 		tracing.Attribute("container.createdAt", r.CreatedAt.Format(time.RFC3339)),
 		tracing.Attribute("container.updatedAt", r.UpdatedAt.Format(time.RFC3339)),
-	)
+	}
+	span.SetAttributes(attrs...)
+	span.SetAttributes(tracing.LegacyAttributes(attrs)...)
 	return containerFromRecord(c, r), nil
 }
 

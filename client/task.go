@@ -36,6 +36,7 @@ import (
 	is "github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
@@ -263,7 +264,9 @@ func (t *task) Start(ctx context.Context) error {
 		}
 		return errgrpc.ToNative(err)
 	}
-	span.SetAttributes(tracing.Attribute("task.pid", r.Pid))
+	attrs := []attribute.KeyValue{tracing.Attribute("process.pid", int(r.Pid))}
+	span.SetAttributes(attrs...)
+	span.SetAttributes(tracing.LegacyAttributes(attrs)...)
 	t.pid = r.Pid
 	return nil
 }
