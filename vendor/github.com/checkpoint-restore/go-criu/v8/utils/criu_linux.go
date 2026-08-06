@@ -3,9 +3,9 @@ package utils
 import (
 	"fmt"
 
-	"github.com/checkpoint-restore/go-criu/v7"
-	"github.com/checkpoint-restore/go-criu/v7/rpc"
-	"google.golang.org/protobuf/proto"
+	"github.com/checkpoint-restore/go-criu/v8"
+	proto "github.com/checkpoint-restore/go-criu/v8/internal/proto"
+	"github.com/checkpoint-restore/go-criu/v8/rpc"
 )
 
 // CheckForCRIU checks if CRIU is available and if it is as least the
@@ -26,7 +26,7 @@ func CheckForCriu(version int) error {
 func IsMemTrack() bool {
 	features, err := criu.MakeCriu().FeatureCheck(
 		&rpc.CriuFeatures{
-			MemTrack: proto.Bool(true),
+			MemTrack: proto.Ptr(true),
 		},
 	)
 	if err != nil {
