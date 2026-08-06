@@ -38,7 +38,7 @@ function install_runc() {
 	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
-	env -u VERSION make BUILDTAGS='seccomp' runc
+	env -u VERSION make runc
 	$SUDO make install
 	popd
 }
