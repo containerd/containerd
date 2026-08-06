@@ -38,6 +38,34 @@ function install_runc() {
 	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
+
+	# runc 1.5+ links against libpathrs by default, so build and install it
+	# using runc's own script. The version is pinned by the runc revision we
+	# just checked out.
+	local libpathrs_version
+	libpathrs_version="$(sed -n 's/^ARG LIBPATHRS_VERSION=//p' Dockerfile | head -n1)"
+	: "${libpathrs_version:?could not determine libpathrs version from runc Dockerfile}"
+
+	# Build into an unprivileged staging prefix: build-libpathrs.sh runs cargo
+	# and install.sh as the current user, so it cannot write to /usr/local.
+	local libpathrs_prefix="${TMPROOT}"/libpathrs
+	script/build-libpathrs.sh "${libpathrs_version}" "${libpathrs_prefix}"
+
+	# runc links against libpathrs dynamically, so the shared object has to be
+	# installed next to the runc binary, not just be present at build time.
+	# Honour DESTDIR the same way "make install" below does, so callers that
+	# stage an install tree (the Makefile's install-cri-deps,
+	# contrib/Dockerfile.test) pick libpathrs up as well.
+	local libdir="${DESTDIR:-}/usr/local/lib"
+	$SUDO install -d "${libdir}"
+	$SUDO cp -a "${libpathrs_prefix}"/lib/libpathrs.so* "${libdir}"/
+	# /usr/local/lib is only searched via the ld.so cache, which a staged
+	# install tree has to refresh itself once it is unpacked.
+	if [ -z "${DESTDIR:-}" ]; then
+		$SUDO ldconfig
+	fi
+	export PKG_CONFIG_PATH="${libpathrs_prefix}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+
 	env -u VERSION make runc
 	$SUDO make install
 	popd
