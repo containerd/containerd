@@ -58,8 +58,8 @@ func WithTaskAPIEndpoint(address string, version uint32) NewTaskOpts {
 		if err != nil {
 			return err
 		}
-		opts.TaskApiAddress = address
-		opts.TaskApiVersion = version
+		opts.TaskApiAddress = address //nolint:staticcheck // Required by the containerd 2.2 task protocol.
+		opts.TaskApiVersion = version //nolint:staticcheck // Required by the containerd 2.2 task protocol.
 		return nil
 	}
 }
