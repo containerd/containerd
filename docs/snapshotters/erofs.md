@@ -348,3 +348,58 @@ For the EROFS differ:
 [plugins."io.containerd.differ.v1.erofs"]
   enable_tar_index = true
 ```
+
+## Layer Content Cache
+
+When pulling a regular OCI image, every layer is converted on the node into
+either a native EROFS blob or an indexed tar (see _the
+[Tar Index Mode](#tar-index-mode) section_). That is an EROFS image build per
+layer, on every node that pulls the image.
+
+The conversion can be done upfront instead and handed to containerd as a
+pre-warmed cache. `layer_content_caches` lists directories of pre-built EROFS
+blobs keyed by layer `diffID`. When a layer is unpacked, the snapshotter checks the
+cache first, and on a hit it just symlinks the cached blob into the snapshot and
+mounts it, with no conversion. A miss is unpacked and converted as usual, so a
+partially populated cache is fine. Cache hits also skip the layer download, so no
+layer blobs are fetched for a fully cached image.
+
+```toml
+  [plugins."io.containerd.snapshotter.v1.erofs"]
+    layer_content_caches = ["/var/lib/erofs-cache/base-images", "/mnt/shared/erofs-cache"]
+```
+
+Directories are searched in order and the first hit wins. A directory that isn't
+there counts as a miss, so an empty or not-yet-populated cache won't break pulls.
+
+Listing more than one is handy when they have different lifetimes or owners, e.g.
+a small local cache of base images baked into the machine image, plus a larger
+one on shared storage that's refreshed on its own schedule.
+
+Populating and maintaining a cache is the operator's responsibility: containerd
+never writes to these directories, so they can be mounted read-only.
+
+> [!IMPORTANT]
+> A hit symlinks the blob instead of copying it, so an entry has to stay in place
+> for as long as any snapshot references it. Removing one that's still in use
+> breaks those layers.
+
+> [!NOTE]
+> For the same reason `enable_fsverity` and `set_immutable` can't be used
+> together with a cache, since both would have to modify a blob that every
+> snapshot using that layer shares. Use dm-verity instead.
+
+To build a new cache, fetch the image content and convert its layers:
+
+```bash
+$ ctr content fetch $IMG
+$ ctr images build-erofs-cache \
+    --compressors lz4 \
+    --dmverity \
+    $IMG ./output
+```
+
+Blobs land at `<algo>/<xx>/<digest>.erofs` (`<xx>` shards on the first two
+digest characters), and `--dmverity` writes a `.dmverity` sidecar alongside each
+one. Since the key is the diffID, one cache serves every image sharing those
+layers.
