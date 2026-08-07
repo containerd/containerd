@@ -41,3 +41,7 @@ sudo install bin/runc-fp "${RUNCFP_BIN_DIR}"
 LOOPBACKV2_BIN_DIR=${LOOPBACKV2_BIN_DIR:-"/usr/local/bin"}
 make bin/loopback-v2
 sudo install bin/loopback-v2 "${LOOPBACKV2_BIN_DIR}"
+
+FAKEFUSE_BIN_DIR=${FAKEFUSE_BIN_DIR:-"/usr/local/bin"}
+make bin/fake-fuse
+sudo install bin/fake-fuse "${FAKEFUSE_BIN_DIR}"
