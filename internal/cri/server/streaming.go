@@ -39,10 +39,11 @@ func newStreamRuntime(c *criService) streaming.Runtime {
 
 // Exec executes a command inside the container. executil.ExitError is returned if the command
 // returns non-zero exit code.
-func (s *streamRuntime) Exec(ctx context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser,
+func (s *streamRuntime) Exec(ctx context.Context, containerID string, cmd []string, env []string, stdin io.Reader, stdout, stderr io.WriteCloser,
 	tty bool, resize <-chan remotecommand.TerminalSize) error {
 	exitCode, err := s.c.execInContainer(ctrdutil.WithNamespace(ctx), containerID, execOptions{
 		cmd:    cmd,
+		env:    env,
 		stdin:  stdin,
 		stdout: stdout,
 		stderr: stderr,
