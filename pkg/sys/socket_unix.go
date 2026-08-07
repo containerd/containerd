@@ -19,6 +19,7 @@
 package sys
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -69,12 +70,29 @@ func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
 
 func mkdirAs(path string, uid, gid int) error {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		if errors.Is(err, os.ErrPermission) {
+			return wrapSocketDirPermissionErr(err)
+		}
 		return err
 	}
 
 	if err := os.MkdirAll(path, 0770); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			return wrapSocketDirPermissionErr(err)
+		}
 		return err
 	}
 
 	return os.Chown(path, uid, gid)
+}
+
+// wrapSocketDirPermissionErr adds a hint to a permission-denied error
+// encountered while stat-ing or creating a socket directory. This directory
+// is derived from a plugin's configured socket address, and the grpc and
+// ttrpc server plugins carry their own hardcoded default for that address,
+// so a user who only overrides one of root/state/[grpc] address can still
+// hit this on the others (including the debug plugin, if its address is
+// configured to a similarly unwritable path).
+func wrapSocketDirPermissionErr(err error) error {
+	return fmt.Errorf("%w (the configured socket address points at a directory that is not writable/accessible by the current user; if running containerd as a non-root user, configure a writable address for the grpc, ttrpc, and debug plugins, whose addresses may otherwise default to or be set to a directory that requires root)", err)
 }
