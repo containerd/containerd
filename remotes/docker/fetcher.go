@@ -45,9 +45,27 @@ func stripSensitiveHeadersForExternalURLs(h http.Header) {
 	h.Del("Cookie2")
 }
 
+func effectivePort(u *url.URL) string {
+	if port := u.Port(); port != "" {
+		return port
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http":
+		return "80"
+	case "https":
+		return "443"
+	default:
+		return ""
+	}
+}
+
 func isRegistryOrigin(u *url.URL, hosts []RegistryHost) bool {
 	for _, host := range hosts {
-		if strings.EqualFold(u.Scheme, host.Scheme) && strings.EqualFold(u.Host, host.Host) {
+		if !strings.EqualFold(u.Scheme, host.Scheme) {
+			continue
+		}
+		hostURL := &url.URL{Scheme: host.Scheme, Host: host.Host}
+		if strings.EqualFold(u.Hostname(), hostURL.Hostname()) && effectivePort(u) == effectivePort(hostURL) {
 			return true
 		}
 	}
