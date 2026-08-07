@@ -228,6 +228,7 @@ cat >"${TESTDIR}/config.toml" <<EOF
 version = 3
 [plugins."io.containerd.cri.v1.runtime"]
   enable_cdi = false
+  enable_experimental_restore_via_create = true
 [plugins."io.containerd.cri.v1.runtime".containerd]
   default_runtime_name = "test-runtime"
 [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.test-runtime]
