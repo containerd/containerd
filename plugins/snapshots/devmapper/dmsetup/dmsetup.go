@@ -415,7 +415,8 @@ func parseDmsetupError(output string) string {
 
 	line := lines[0]
 	// Handle output like "Device /dev/mapper/snapshotter-suite-pool-snap-1 not found"
-	if strings.HasSuffix(line, "not found") {
+	// Handle output like "Device does not exist.\nCommand failed.\n"
+	if strings.HasSuffix(line, "not found") || strings.HasPrefix(line, "Device does not exist") {
 		return unix.ENXIO.Error()
 	}
 
