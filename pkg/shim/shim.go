@@ -279,10 +279,12 @@ func run(ctx context.Context, manager Shim, config Config) error {
 			return fmt.Errorf("failed to read stdin: %w", err)
 		}
 
-		var params bootapi.BootstrapParams
-		if len(input) == 0 || proto.Unmarshal(input, &params) != nil {
-			// TODO: Return error once the new API is stable
-			if err := readBootstrapParamsFromDeprecatedFields(input, &params, id, namespaceFlag, containerdBinaryFlag, debugFlag); err != nil {
+		// A pre-2.3 runtime-options Any can unmarshal as BootstrapParams.
+		// Matching its decoded ID and namespace against the command-line values
+		// distinguishes it from the new protocol.
+		params, usesBootstrapProtocol := parseBootstrapParams(input, id, namespaceFlag)
+		if !usesBootstrapProtocol {
+			if err := readBootstrapParamsFromDeprecatedFields(input, params, id, namespaceFlag, containerdBinaryFlag, debugFlag); err != nil {
 				return err
 			}
 		}
@@ -295,7 +297,7 @@ func run(ctx context.Context, manager Shim, config Config) error {
 			}
 		}
 
-		result, err := manager.Start(ctx, &params)
+		result, err := manager.Start(ctx, params)
 		if err != nil {
 			return err
 		}
@@ -309,9 +311,9 @@ func run(ctx context.Context, manager Shim, config Config) error {
 			return fmt.Errorf("shim pipe not ready: %w", err)
 		}
 
-		data, err := proto.Marshal(result)
+		data, err := marshalBootstrapResponse(result, usesBootstrapProtocol)
 		if err != nil {
-			return fmt.Errorf("failed to marshal bootstrap params: %w", err)
+			return fmt.Errorf("failed to marshal bootstrap response: %w", err)
 		}
 
 		if _, err := os.Stdout.Write(data); err != nil {

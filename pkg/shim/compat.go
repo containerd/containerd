@@ -23,12 +23,55 @@ package shim
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 
 	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 )
+
+// parseBootstrapParams decodes the shim start payload and reports whether it
+// uses the new bootstrap protocol.
+//
+// The runtime-options Any used by pre-2.3 containerd shares protobuf field
+// numbers with BootstrapParams, so both payloads unmarshal successfully.
+// Compare the decoded instance ID and namespace with the command-line values
+// to distinguish the two.
+func parseBootstrapParams(input []byte, parsedID, parsedNamespace string) (*bootapi.BootstrapParams, bool) {
+	params := &bootapi.BootstrapParams{}
+	if len(input) == 0 || proto.Unmarshal(input, params) != nil {
+		return &bootapi.BootstrapParams{}, false
+	}
+
+	// TODO: Remove CLI identity matching together with support for the
+	// deprecated startup fields.
+	if params.InstanceID != parsedID || params.Namespace != parsedNamespace {
+		// Do not let fields decoded from a legacy or malformed payload affect
+		// bootstrap behavior.
+		return &bootapi.BootstrapParams{}, false
+	}
+	return params, true
+}
+
+func marshalBootstrapResponse(result *bootapi.BootstrapResult, usesBootstrapProtocol bool) ([]byte, error) {
+	if usesBootstrapProtocol {
+		return proto.Marshal(result)
+	}
+
+	// containerd 2.0-2.2 expects a JSON BootstrapParams response.
+	// This compatibility path does not support containerd 1.x.
+	// The JSON envelope is legacy, but Version selects the task service API,
+	// so preserve the shim result.
+	// Marshal the legacy type to preserve its field names and omit unsupported
+	// capabilities and metadata.
+	return json.Marshal(&BootstrapParams{ //nolint:staticcheck // Required for compatibility with containerd 2.0-2.2.
+		Version:  int(result.Version),
+		Address:  result.Address,
+		Protocol: result.Protocol,
+	})
+}
 
 func readBootstrapParamsFromDeprecatedFields(input []byte, params *bootapi.BootstrapParams, parsedID string, parsedNamespace string, parsedBinary string, parsedDebug bool) error {
 	params.InstanceID = parsedID
