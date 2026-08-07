@@ -371,6 +371,37 @@ func TestActivateAlreadyExists(t *testing.T) {
 	assert.NoError(t, m.Deactivate(ctx, "task1"))
 }
 
+func TestTemporaryActivationWithAllMountsHandled(t *testing.T) {
+	td := t.TempDir()
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	mountC := new(atomic.Int32)
+	m, err := NewManager(
+		db,
+		filepath.Join(td, "m"),
+		WithMountHandler("noop", &noopHandler{mounts: mountC}),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
+
+	info, err := m.Activate(
+		ctx,
+		"task1",
+		[]mount.Mount{{Type: "format/noop"}},
+		mount.WithTemporary,
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, m.Deactivate(ctx, "task1")) })
+
+	require.Len(t, info.Active, 1)
+	require.Len(t, info.System, 1)
+	assert.Equal(t, "bind", info.System[0].Type)
+	assert.Equal(t, info.Active[0].MountPoint, info.System[0].Source)
+	assert.Equal(t, []string{"rbind"}, info.System[0].Options)
+}
+
 func TestActivateStaleIncomplete(t *testing.T) {
 	td := t.TempDir()
 	metadb := filepath.Join(td, "mounts.db")
