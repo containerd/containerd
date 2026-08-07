@@ -292,6 +292,23 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 		status = unknownContainerStatus()
 	}
 
+	info, err := cntr.Info(ctx)
+	if err != nil {
+		log.G(ctx).WithError(err).Warnf("container %q info", id)
+	} else {
+		// Check snapshot is exist.
+		if info.Snapshotter != "" {
+			if ss := c.client.SnapshotService(info.Snapshotter); ss != nil {
+				if _, err := ss.Usage(ctx, info.SnapshotKey); err != nil {
+					if !errdefs.IsNotFound(err) {
+						log.G(ctx).WithError(err).Errorf("get snapshot %q uasge fail", info.SnapshotKey)
+						status = unknownContainerStatus()
+					}
+				}
+			}
+		}
+	}
+
 	var containerIO *cio.ContainerIO
 	err = func() error {
 		// Load up-to-date status from containerd.
