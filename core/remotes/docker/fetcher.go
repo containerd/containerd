@@ -567,7 +567,24 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 							}
 							defer r.Release(1)
 							reqClone := req.clone()
-							reqClone.setOffset(offset + i*chunkSize)
+							// Request only this chunk's bytes (bounded range)
+							// rather than an open-ended range from the start
+							// offset to the end of the blob. Since this
+							// goroutine only ever reads chunkSize bytes from
+							// the response before closing it (see
+							// io.LimitReader below), an open-ended range
+							// causes a well-behaved server to prepare and
+							// start streaming the entire remainder of the
+							// blob for every chunk, only for the connection
+							// to be closed early once this chunk's bytes are
+							// read - wasting server-side bandwidth/CPU that
+							// scales with the number of chunks.
+							start := offset + i*chunkSize
+							end := start + chunkSize - 1
+							if last := offset + remaining - 1; end > last {
+								end = last
+							}
+							reqClone.setRange(start, end)
 							nresp, err := reqClone.doWithRetries(ctx, lastHost, withErrorCheck)
 							if err != nil {
 								_ = writers[i].CloseWithError(err)
