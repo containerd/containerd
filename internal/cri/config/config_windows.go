@@ -96,7 +96,8 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		IgnoreImageDefinedVolumes: false,
 		// TODO(windows): Add platform specific config, so that most common defaults can be shared.
 
-		DrainExecSyncIOTimeout: "0s",
-		EnableCRIU:             func() *bool { v := false; return &v }(),
+		DrainExecSyncIOTimeout:             "0s",
+		EnableCRIU:                         func() *bool { v := false; return &v }(),
+		EnableExperimentalRestoreViaCreate: false,
 	}
 }

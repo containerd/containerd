@@ -273,6 +273,7 @@ version = 3
     drain_exec_sync_io_timeout = '0s'
     ignore_deprecation_warnings = []
     enable_criu = true
+    enable_experimental_restore_via_create = false
 
     [plugins.'io.containerd.cri.v1.runtime'.containerd]
       default_runtime_name = 'runc'
@@ -470,6 +471,15 @@ version = 2
   #
   # For example, the value can be '5h', '2h30m', '10s'.
   drain_exec_sync_io_timeout = "0s"
+
+  # enable_criu enables CRIU (Checkpoint/Restore In Userspace) support.
+  # When set to false, checkpoint/restore operations will be disabled.
+  enable_criu = true
+
+  # enable_experimental_restore_via_create enables experimental restore of
+  # container checkpoints via CreateContainer.
+  # When set to false, checkpoint restore via CreateContainer will be disabled.
+  enable_experimental_restore_via_create = false
 
   # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
   [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]

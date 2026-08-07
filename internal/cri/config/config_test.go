@@ -517,3 +517,8 @@ func TestDefaultConfigEnableCRIU(t *testing.T) {
 	assert.NotNil(t, cfg.EnableCRIU)
 	assert.True(t, *cfg.EnableCRIU)
 }
+
+func TestDefaultConfigEnableExperimentalRestoreViaCreate(t *testing.T) {
+	cfg := DefaultRuntimeConfig()
+	assert.False(t, cfg.EnableExperimentalRestoreViaCreate)
+}
