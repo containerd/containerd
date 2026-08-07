@@ -150,7 +150,9 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 	for name, linkname := range symlinks {
 		desc, ok := blobs[linkname]
 		if !ok {
-			return ocispec.Descriptor{}, fmt.Errorf("no target for symlink layer from %q to %q", name, linkname)
+			if desc, ok = blobs[path.Base(linkname)]; !ok {
+				return ocispec.Descriptor{}, fmt.Errorf("no target for symlink layer from %q to %q", name, linkname)
+			}
 		}
 		blobs[name] = desc
 	}
