@@ -30,6 +30,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1800,4 +1801,110 @@ func TestResolveForbiddenGETFallbackNetworkError(t *testing.T) {
 	if !strings.Contains(err.Error(), "403") {
 		t.Errorf("expected 403 in error, got: %s", err.Error())
 	}
+}
+
+// TestRedirectAuthorization verifies that credentials are only attached to a
+// redirect that stays on the host the request was created for.
+func TestRedirectAuthorization(t *testing.T) {
+	const (
+		user   = "totallyvaliduser"
+		secret = "totallyvalidpassword"
+	)
+	creds := func(string) (string, string, error) {
+		return user, secret, nil
+	}
+	content := newContent(ocispec.MediaTypeImageManifest, []byte("not anything parse-able"))
+
+	t.Run("other host", func(t *testing.T) {
+		var (
+			mu       sync.Mutex
+			authSeen []string
+		)
+		other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			if a := r.Header.Get("Authorization"); a != "" {
+				authSeen = append(authSeen, a)
+			}
+			mu.Unlock()
+			w.Header().Set("WWW-Authenticate", `Basic realm="other"`)
+			w.WriteHeader(http.StatusUnauthorized)
+		}))
+		defer other.Close()
+
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, other.URL+r.URL.Path, http.StatusFound)
+		}))
+		defer s.Close()
+
+		base := s.URL[len("http://"):]
+		resolver := NewResolver(ResolverOptions{
+			Hosts: func(host string) ([]RegistryHost, error) {
+				return []RegistryHost{{
+					Client:       s.Client(),
+					Host:         host,
+					Scheme:       "http",
+					Path:         "/v2",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve,
+					Authorizer:   NewDockerAuthorizer(WithAuthCreds(creds)),
+				}}, nil
+			},
+		})
+
+		if _, _, err := resolver.Resolve(context.Background(), base+"/somerepo:sometag"); err == nil {
+			t.Fatal("expected resolve to fail")
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if len(authSeen) > 0 {
+			t.Fatalf("credentials sent to redirect target on another host: %v", authSeen)
+		}
+	})
+
+	t.Run("same host", func(t *testing.T) {
+		var (
+			mu            sync.Mutex
+			authenticated bool
+		)
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if u, p, ok := r.BasicAuth(); !ok || u != user || p != secret {
+				w.Header().Set("WWW-Authenticate", `Basic realm="same"`)
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			if strings.HasSuffix(r.URL.Path, "/sometag") {
+				http.Redirect(w, r, "/v2/somerepo/manifests/redirected", http.StatusFound)
+				return
+			}
+			mu.Lock()
+			authenticated = true
+			mu.Unlock()
+			content.ServeHTTP(w, r)
+		}))
+		defer s.Close()
+
+		base := s.URL[len("http://"):]
+		resolver := NewResolver(ResolverOptions{
+			Hosts: func(host string) ([]RegistryHost, error) {
+				return []RegistryHost{{
+					Client:       s.Client(),
+					Host:         host,
+					Scheme:       "http",
+					Path:         "/v2",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve,
+					Authorizer:   NewDockerAuthorizer(WithAuthCreds(creds)),
+				}}, nil
+			},
+		})
+
+		if _, _, err := resolver.Resolve(context.Background(), base+"/somerepo:sometag"); err != nil {
+			t.Fatal(err)
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if !authenticated {
+			t.Fatal("redirect on the same host was not authorized")
+		}
+	})
 }
