@@ -18,6 +18,8 @@ Documentation=https://containerd.io
 After=network.target dbus.service
 
 [Service]
+Environment="INOTIFY_INSTANCES_LIMIT=1024"
+ExecStartPre=/bin/sh -c 'current=$(cat /proc/sys/fs/inotify/max_user_instances); [ "$current" -lt ${INOTIFY_INSTANCES_LIMIT} ] && echo ${INOTIFY_INSTANCES_LIMIT} > /proc/sys/fs/inotify/max_user_instances || true'
 ExecStartPre=-/sbin/modprobe overlay
 ExecStart=/usr/local/bin/containerd
 
