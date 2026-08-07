@@ -18,6 +18,7 @@ package testsuite
 
 import (
 	"context"
+
 	//nolint:revive // go-digest needs the blank import. See https://github.com/opencontainers/go-digest#usage.
 	_ "crypto/sha256"
 	"fmt"
@@ -104,6 +105,13 @@ func makeTest(
 		if err := os.MkdirAll(root, 0777); err != nil {
 			t.Fatal(err)
 		}
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				debugDiskUsage(t, tmpDir)
+				debugDiskUsage(t, root)
+			}
+		})
 
 		snapshotter, cleanup, err := snapshotterFn(ctx, root)
 		if err != nil {
