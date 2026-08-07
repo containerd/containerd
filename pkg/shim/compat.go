@@ -23,12 +23,30 @@ package shim
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 
 	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 )
+
+var errDeprecatedBootstrapAPI = errors.New("shim was started through the deprecated API but was built against the new API; if you upgraded containerd, you may need to restart the daemon")
+
+// parseBootstrapParams parses input from a caller using the bootstrap API.
+// Legacy runtime options can unmarshal as BootstrapParams, so verify the
+// identity against the command-line values.
+func parseBootstrapParams(input []byte, cliID, cliNamespace string) (*bootapi.BootstrapParams, error) {
+	params := &bootapi.BootstrapParams{}
+	if len(input) == 0 || proto.Unmarshal(input, params) != nil {
+		return nil, errDeprecatedBootstrapAPI
+	}
+	if params.InstanceID != cliID || params.Namespace != cliNamespace {
+		return nil, errDeprecatedBootstrapAPI
+	}
+	return params, nil
+}
 
 func readBootstrapParamsFromDeprecatedFields(input []byte, params *bootapi.BootstrapParams, parsedID string, parsedNamespace string, parsedBinary string, parsedDebug bool) error {
 	params.InstanceID = parsedID
