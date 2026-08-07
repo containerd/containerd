@@ -24,10 +24,13 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/containerd/continuity/fs/fstest"
 	"github.com/moby/sys/userns"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func cleanupTest() {
@@ -163,5 +166,270 @@ func TestHostDevicesAllValid(t *testing.T) {
 		default:
 			t.Errorf("device entry %+v has unexpected type %v", device, device.Type)
 		}
+	}
+}
+
+func TestSplitPathComponents(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "empty path",
+			input: "",
+			want:  []string{},
+		},
+		{
+			name:  "single component",
+			input: "passwd",
+			want:  []string{"passwd"},
+		},
+		{
+			name:  "relative path",
+			input: "etc/passwd",
+			want:  []string{"etc", "passwd"},
+		},
+		{
+			name:  "absolute path",
+			input: "/etc/passwd",
+			want:  []string{"etc", "passwd"},
+		},
+		{
+			name:  "repeated separators",
+			input: "//a///b//c",
+			want:  []string{"a", "b", "c"},
+		},
+		{
+			name:  "dot components are preserved",
+			input: "a/./link/../real",
+			want:  []string{"a", ".", "link", "..", "real"},
+		},
+		{
+			name:  "trailing separator splits as dot",
+			input: "a/b/",
+			want:  []string{"a", "b", "."},
+		},
+		{
+			name:  "root path",
+			input: "/",
+			want:  []string{"."},
+		},
+		{
+			name:  "only separators",
+			input: "///",
+			want:  []string{"."},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, splitPathComponents(tc.input))
+		})
+	}
+}
+
+func TestResolveInRootFS(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		initOps  []fstest.Applier
+		original string
+		expected string
+		err      string
+	}{
+		{
+			name: "no symlink",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir/a/b", 0o755),
+				fstest.CreateFile("/dir/a/b/c", nil, 0o644),
+			},
+			original: "/dir/a/b/c",
+			expected: "dir/a/b/c",
+		},
+		{
+			name: "symlink deadloop - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir", 0o755),
+				fstest.Symlink("b", "/dir/a"),
+				fstest.Symlink("c", "/dir/b"),
+				fstest.Symlink("a", "/dir/c"),
+			},
+			original: "/dir/a",
+			err:      "too many levels of symbolic links",
+		},
+		{
+			name: "symlink deadloop - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir", 0o755),
+				fstest.Symlink("/dir/b", "/dir/a"),
+				fstest.Symlink("/dir/c", "/dir/b"),
+				fstest.Symlink("/dir/a", "/dir/c"),
+			},
+			original: "/dir/a",
+			err:      "too many levels of symbolic links",
+		},
+		{
+			name: "symlink deadloop - v3",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir", 0o755),
+				fstest.Symlink("loop", "/dir/loop"),
+			},
+			original: "/dir/loop",
+			err:      "too many levels of symbolic links",
+		},
+		{
+			name: "symlink deadloop - v4",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir", 0o755),
+				fstest.Symlink("loop/..", "/dir/loop"),
+			},
+			original: "/dir/loop",
+			err:      "too many levels of symbolic links",
+		},
+		{
+			name: "symlink target component is too long",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir", 0o755),
+				fstest.Symlink(strings.Repeat("a", 256), "/dir/link"),
+			},
+			original: "/dir/link",
+			err:      "file name too long",
+		},
+		{
+			name: "41 levels of symbolic links",
+			initOps: func() []fstest.Applier {
+				res := []fstest.Applier{
+					fstest.CreateDir("/dir", 0o755),
+					fstest.CreateFile("/dir/empty", nil, 0o644),
+					fstest.Symlink("/dir/empty", "/dir/link1"),
+				}
+
+				for i := range 40 {
+					res = append(res, fstest.Symlink(
+						fmt.Sprintf("link%d", i+1),
+						fmt.Sprintf("/dir/link%d", i+2)),
+					)
+				}
+				return res
+			}(),
+			original: "/dir/link41",
+			err:      "too many levels of symbolic links",
+		},
+		{
+			name: "try to escape root",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir", 0o755),
+				fstest.CreateDir("/real", 0o755),
+				fstest.CreateFile("/real/empty", nil, 0o644),
+				fstest.Symlink("../../../../../../real", "/dir/link"),
+			},
+			original: "/dir/link/empty",
+			expected: "real/empty",
+		},
+		{
+			name: "unfold symlink",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir", 0o755),
+				fstest.CreateDir("/dir/l1", 0o755),
+				fstest.CreateDir("/dir/l1/l2", 0o755),
+				fstest.CreateFile("/dir/l1/empty", nil, 0o644),
+				fstest.Symlink("l1/l2", "/dir/link"),
+			},
+			original: "/dir/link/../empty",
+			expected: "dir/l1/empty",
+		},
+		{
+			name: "not empty",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir", 0o755),
+			},
+			original: "./../.././.",
+			expected: ".",
+		},
+		{
+			name: "respect trailing slash - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/dir", 0o755),
+			},
+			original: "./../.././dir/",
+			expected: "dir",
+		},
+		{
+			name: "respect trailing slash - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateFile("/fake-dir", nil, 0o644),
+			},
+			original: "./../.././fake-dir/",
+			err:      "not a directory",
+		},
+		{
+			name:     "respect trailing slash - v3",
+			initOps:  []fstest.Applier{},
+			original: "/",
+			expected: ".",
+		},
+		{
+			name: "respect trailing slash - v4",
+			initOps: []fstest.Applier{
+				fstest.CreateFile("/f", nil, 0o644),
+				fstest.Symlink("f", "/link"),
+			},
+			original: "link/",
+			err:      "not a directory",
+		},
+		{
+			// The symlink target's own trailing slash requires the
+			// final entity to be a directory.
+			name: "respect trailing slash - v5",
+			initOps: []fstest.Applier{
+				fstest.CreateFile("/f", nil, 0o644),
+				fstest.Symlink("f/", "/link"),
+			},
+			original: "link",
+			err:      "not a directory",
+		},
+		{
+			// The trailing-slash requirement is sticky across
+			// chained symlinks.
+			name: "respect trailing slash - v6",
+			initOps: []fstest.Applier{
+				fstest.CreateFile("/f", nil, 0o644),
+				fstest.Symlink("link2/", "/link1"),
+				fstest.Symlink("f", "/link2"),
+			},
+			original: "link1",
+			err:      "not a directory",
+		},
+		{
+			name:     "empty path",
+			initOps:  []fstest.Applier{},
+			original: "",
+			err:      "no such file or directory",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+
+			err := fstest.Apply(tc.initOps...).Apply(rootDir)
+			require.NoError(t, err)
+
+			rootFS, err := os.OpenRoot(rootDir)
+			require.NoError(t, err)
+			defer rootFS.Close()
+
+			got, err := resolveInRootFS(rootFS.FS().(fs.ReadLinkFS), tc.original)
+			if tc.err != "" {
+				t.Logf("received %v", err)
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, got)
+
+			assert.True(t, fs.ValidPath(got))
+
+			fd, err := rootFS.FS().Open(got)
+			require.NoError(t, err)
+			fd.Close()
+		})
 	}
 }
