@@ -32,8 +32,8 @@ message first. The metadata can be anything supported by an attached
 then performs the final write of the message.
 
 In this example, a log message is marked with *Verbosity* level 2.
-[Verbosity](#message-verbosity) can be used to dynamically show or hide log events at
-runtime.
+[Verbosity](#message-verbosity) can be used to dynamically show or hide log
+events at runtime.
 
 ```
 deck.InfoA("a verbose message").With(deck.V(2)).Go()
@@ -100,19 +100,44 @@ The eventlog backend is for Windows only. This backend supports logging to the
 Windows Event Log. It exports the `EventID` attribute that allows logging
 messages with custom Event IDs.
 
+[eventlog Documentation](backends/eventlog/README.md).
+
 ### logger Backend
 
 The logger backend is based on Go's core `log` package. It can take any
 io.Writer, including os.Stdout, os.Stderr, io.Multiwriter, and any open file
 handles.
 
+[logger Documentation](backends/logger/README.md).
+
 ### syslog Backend
 
 The syslog backend is based on Go's core `syslog` package for Linux/Unix.
 
+[syslog Documentation](backends/syslog/README.md).
+
 ### discard Backend
 
-The discard backend discards all log events. Deck requires at least one backend to be registered to handle logs. To suppress all output, add the discard backend.
+The discard backend discards all log events. Deck requires at least one backend
+to be registered to handle logs. To suppress all output, add the discard
+backend.
+
+[discard Documentation](backends/discard/README.md).
+
+### glog Backend
+
+The glog backend provides support for logging to the glog package from
+github.com/golang/glog. This backend supports the Depth attribute as well as
+exporting a V() attribute for glog's V-style logging.
+
+[glog Documentation](backends/glog/README.md).
+
+### replay Backend
+
+The replay backend provides the ability to record and replay log events for use
+in testing.
+
+[replay Documentation](backends/replay/README.md).
 
 ## Message Verbosity
 
