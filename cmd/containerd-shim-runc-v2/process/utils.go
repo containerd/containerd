@@ -31,6 +31,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )
 
@@ -166,6 +167,41 @@ func waitTimeout(ctx context.Context, wg *sync.WaitGroup, timeout time.Duration)
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+// drainStdioTimeout bounds the stdio drain. Package-level var so tests
+// can shorten it; production should not mutate it.
+var drainStdioTimeout = 10 * time.Second
+
+// drainAndCloseStdio waits up to `timeout` for the stdio io.CopyBuffer
+// goroutines tracked by wg to finish, then closes closers and pio. The
+// drain budget is independent of ctx (so it does not consume caller ctx
+// budget), but ctx.Done() is observed so callers that cancel exit early.
+// Closers always run, even if the drain times out. See #12364 and #13377.
+func drainAndCloseStdio(ctx context.Context, wg *sync.WaitGroup, pio *processIO, closers []io.Closer, logger *log.Entry, what string, timeout time.Duration) {
+	drainCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-drainCtx.Done():
+		logger.WithError(drainCtx.Err()).Errorf("failed to drain %s io", what)
+	case <-ctx.Done():
+		// Caller canceled; closers still fire below.
+	}
+
+	for _, c := range closers {
+		_ = c.Close()
+	}
+	if pio != nil {
+		pio.Close()
 	}
 }
 
