@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/archive"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
@@ -236,6 +237,7 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 		return idx.Manifests, nil
 	}
 
+	handler = docker.DistributionSourceHandler(cs, handler)
 	handler = images.FilterPlatforms(handler, platformMatcher)
 	if iopts.referrers != nil {
 		handler = images.SetReferrers(iopts.referrers, handler)
