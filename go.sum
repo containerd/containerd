@@ -35,6 +35,10 @@ github.com/checkpoint-restore/checkpointctl v1.5.0 h1:Uu+D2cOf/GUyCMk23Y8L69P6Yo
 github.com/checkpoint-restore/checkpointctl v1.5.0/go.mod h1:y5HRs1ZWQUZGyEuthlTHmTJN9PUMOjlaH6JvVaNq9kE=
 github.com/checkpoint-restore/go-criu/v7 v7.2.0 h1:qGiWA4App1gGlEfIJ68WR9jbezV9J7yZdjzglezcqKo=
 github.com/checkpoint-restore/go-criu/v7 v7.2.0/go.mod h1:u0LCWLg0w4yqqu14aXhiB4YD3a1qd8EcCEg7vda5dwo=
+github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260717143731-0771cf9d1a26 h1:ZiUeuhdlrO9eB1dBq0qk4MVRAzSBI+cVkRmdG3WhKjc=
+github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260717143731-0771cf9d1a26/go.mod h1:1gMX7udEAiRCWGS4uxscdbxq6vufwhZt38Ri+XH6P00=
+github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260717143731-0771cf9d1a26 h1:wHIB2gSyTKwTtMjOkyyl2jK1y2YJuXSs+Nc4GkT5+dM=
+github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260717143731-0771cf9d1a26/go.mod h1:hIbYArKyFbf0UZzFXFYD+aQYmMylp/e4oMT8+LhBdzI=
 github.com/cilium/ebpf v0.17.3 h1:FnP4r16PWYSE4ux6zN+//jMcW4nMVRvuTLVTvCjyyjg=
 github.com/cilium/ebpf v0.17.3/go.mod h1:G5EDHij8yiLzaqn0WjyfJHvRa+3aDlReIaLVRMvOyJk=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
