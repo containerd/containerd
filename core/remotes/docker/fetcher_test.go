@@ -179,6 +179,66 @@ func TestFetcherDescURLsDoesNotForwardResolverHeaders(t *testing.T) {
 	}
 }
 
+func TestIsRegistryOrigin(t *testing.T) {
+	tests := []struct {
+		name          string
+		descriptorURL string
+		registryHost  RegistryHost
+		want          bool
+	}{
+		{
+			name:          "https implicit and explicit default port",
+			descriptorURL: "https://example.com/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com:443"},
+			want:          true,
+		},
+		{
+			name:          "https explicit and implicit default port",
+			descriptorURL: "https://example.com:443/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          true,
+		},
+		{
+			name:          "http implicit and explicit default port",
+			descriptorURL: "http://example.com/layer",
+			registryHost:  RegistryHost{Scheme: "http", Host: "example.com:80"},
+			want:          true,
+		},
+		{
+			name:          "matching non-default port",
+			descriptorURL: "https://example.com:8443/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com:8443"},
+			want:          true,
+		},
+		{
+			name:          "different non-default port",
+			descriptorURL: "https://example.com:8443/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          false,
+		},
+		{
+			name:          "different scheme",
+			descriptorURL: "http://example.com/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          false,
+		},
+		{
+			name:          "different hostname",
+			descriptorURL: "https://cdn.example.com/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			u, err := url.Parse(test.descriptorURL)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, isRegistryOrigin(u, []RegistryHost{test.registryHost}))
+		})
+	}
+}
+
 func TestFetcherDescURLsForwardsResolverHeadersToRegistryOrigin(t *testing.T) {
 	body := []byte("ok")
 
