@@ -109,6 +109,7 @@ func applyPlatformFlags(cliContext *cli.Context) {
 type handler struct {
 	fromsvc chan error
 	s       *server.Server
+	cancel  func()
 	done    chan struct{} // Indicates back to app main to quit
 }
 
@@ -270,7 +271,7 @@ func registerUnregisterService(root string) (bool, error) {
 }
 
 // launchService is the entry point for running the daemon under SCM.
-func launchService(s *server.Server, done chan struct{}) error {
+func launchService(s *server.Server, done chan struct{}, cancel func()) error {
 	if !runServiceFlag {
 		return nil
 	}
@@ -278,6 +279,7 @@ func launchService(s *server.Server, done chan struct{}) error {
 	h := &handler{
 		fromsvc: make(chan error),
 		s:       s,
+		cancel:  cancel,
 		done:    done,
 	}
 
@@ -318,6 +320,7 @@ Loop:
 			s <- c.CurrentStatus
 		case svc.Stop, svc.Shutdown:
 			s <- svc.Status{State: svc.StopPending, Accepts: 0}
+			h.cancel()
 			h.s.Stop()
 			break Loop
 		}
