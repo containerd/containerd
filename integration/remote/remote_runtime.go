@@ -148,6 +148,13 @@ func (r *RuntimeService) PodSandboxStatus(podSandboxID string, _ ...grpc.CallOpt
 	return resp.GetStatus(), nil
 }
 
+func (r *RuntimeService) PodSandboxStatusVerbose(podSandboxID string, opts ...grpc.CallOption) (*runtimeapi.PodSandboxStatusResponse, error) {
+	return r.runtimeClient.PodSandboxStatus(context.Background(), &runtimeapi.PodSandboxStatusRequest{
+		PodSandboxId: podSandboxID,
+		Verbose:      true,
+	}, opts...)
+}
+
 func (r *RuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter, _ ...grpc.CallOption) ([]*runtimeapi.PodSandbox, error) {
 	return r.runtimeService.ListPodSandbox(context.Background(), filter)
 }

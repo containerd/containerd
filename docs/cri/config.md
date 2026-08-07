@@ -159,6 +159,42 @@ spec:
 
 See also [the Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/).
 
+### Runtime Config Directory (since containerd v2.4)
+
+Starting with containerd v2.4, runtime configurations can be added via a config directory
+instead of (or in addition to) the main `config.toml`. By default the directory is
+`/etc/containerd/runtimes`.
+
+Each runtime handler is a subdirectory containing a `runtime.toml` file:
+
+```
+/etc/containerd/runtimes/
+  my-runtime/
+    runtime.toml
+  another-runtime/
+    runtime.toml
+```
+
+The directory format is shared with other containerd consumers. The CRI plugin
+decodes each `runtime.toml` using the same format as a runtime entry under
+`[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.<name>]`:
+
+```toml
+runtime_type = "io.containerd.runc.v2"
+runtime_path = "/usr/local/bin/containerd-shim-runc-v2"
+```
+
+Runtimes defined in the main `config.toml` take precedence over those in the config
+directory. A containerd restart is required for changes to the directory to take effect.
+See [Runtime Handler Configuration](../runtime-config.md) for the common fields
+and how the directory differs from top-level containerd config imports.
+
+The config directory path can be customized:
+
+```toml
+[plugins.'io.containerd.cri.v1.runtime'.containerd]
+  runtime_config_dir = '/etc/containerd/runtimes'
+```
 
 ## Image Pull Configuration (since containerd v2.1)
 
@@ -278,6 +314,7 @@ version = 3
 
     [plugins.'io.containerd.cri.v1.runtime'.containerd]
       default_runtime_name = 'runc'
+      runtime_config_dir = '/etc/containerd/runtimes'
       ignore_blockio_not_enabled_errors = false
       ignore_rdt_not_enabled_errors = false
 
