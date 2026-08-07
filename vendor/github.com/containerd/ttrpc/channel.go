@@ -125,7 +125,7 @@ func (ch *channel) recv() (messageHeader, []byte, error) {
 
 	if mh.Length > uint32(messageLengthMax) {
 		if _, err := ch.br.Discard(int(mh.Length)); err != nil {
-			return mh, nil, fmt.Errorf("failed to discard after receiving oversized message: %w", err)
+			return mh, nil, DiscardError(fmt.Errorf("failed to discard after receiving oversized message: %w ,message length %v maximum message size %v", err, mh.Length, messageLengthMax))
 		}
 
 		return mh, nil, status.Errorf(codes.ResourceExhausted, "message length %v exceed maximum message size of %v", mh.Length, messageLengthMax)
