@@ -50,8 +50,8 @@ func TestAdaptInfo(t *testing.T) {
 			"size fieldpath",
 			Info{},
 			[]string{"size"},
-			"",
-			false,
+			"0",
+			true,
 		},
 		{
 			"labels fieldpath",
