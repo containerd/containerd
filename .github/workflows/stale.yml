@@ -20,7 +20,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629 # v10.4.0
+      - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
         # All stale bot options: https://github.com/actions/stale#all-options
         with:
           # Issues: stale after 12 months, close after 2 weeks
