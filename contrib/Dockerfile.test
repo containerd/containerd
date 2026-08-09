@@ -46,6 +46,7 @@ FROM golang AS runc
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cargo \
     libseccomp-dev \
+    lld \
     wget \
     xz-utils \
     && rm -rf /var/lib/apt/lists/*

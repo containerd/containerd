@@ -52,6 +52,7 @@ dnf -y install \
 	iptables \
 	libseccomp-devel \
 	libselinux-devel \
+	lld \
 	lsof \
 	make \
 	strace \
