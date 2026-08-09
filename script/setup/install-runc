@@ -48,8 +48,10 @@ function install_runc() {
 
 	# Build into an unprivileged staging prefix: build-libpathrs.sh runs cargo
 	# and install.sh as the current user, so it cannot write to /usr/local.
+	# libpathrs' install.sh honours DESTDIR itself, which would relocate the
+	# staging prefix out from under us, so clear it for this call only.
 	local libpathrs_prefix="${TMPROOT}"/libpathrs
-	script/build-libpathrs.sh "${libpathrs_version}" "${libpathrs_prefix}"
+	env -u DESTDIR script/build-libpathrs.sh "${libpathrs_version}" "${libpathrs_prefix}"
 
 	# runc links against libpathrs dynamically, so the shared object has to be
 	# installed next to the runc binary, not just be present at build time.
@@ -59,9 +61,12 @@ function install_runc() {
 	local libdir="${DESTDIR:-}/usr/local/lib"
 	$SUDO install -d "${libdir}"
 	$SUDO cp -a "${libpathrs_prefix}"/lib/libpathrs.so* "${libdir}"/
-	# /usr/local/lib is only searched via the ld.so cache, which a staged
-	# install tree has to refresh itself once it is unpacked.
+	# /usr/local/lib is only searched via the ld.so cache, and it is not in the
+	# default search path at all on RPM-based distros, so register it before
+	# refreshing the cache. A staged install tree has to do this itself once it
+	# is unpacked.
 	if [ -z "${DESTDIR:-}" ]; then
+		echo "${libdir}" | $SUDO tee /etc/ld.so.conf.d/libpathrs.conf > /dev/null
 		$SUDO ldconfig
 	fi
 	export PKG_CONFIG_PATH="${libpathrs_prefix}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
