@@ -113,6 +113,34 @@ func TestErofsWithQuota(t *testing.T) {
 	testsuite.SnapshotterSuite(t, "erofs", newSnapshotter(t, WithDefaultSize(16*1024*1024)))
 }
 
+func TestGetCleanupDirectoriesSkipsSnapshotTempDirs(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	snapshotDir := filepath.Join(root, "snapshots")
+	require.NoError(t, os.Mkdir(snapshotDir, 0700))
+
+	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, ms.Close()) })
+	s := &snapshotter{root: root, ms: ms}
+
+	_, err = os.MkdirTemp(snapshotDir, snapshotTempDirPrefix)
+	require.NoError(t, err)
+	orphanDir := filepath.Join(snapshotDir, "orphan")
+	require.NoError(t, os.Mkdir(orphanDir, 0700))
+	require.NoError(t, ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		_, err := storage.CreateSnapshot(ctx, snapshots.KindActive, "existing", "")
+		return err
+	}))
+
+	var cleanup []string
+	require.NoError(t, ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		cleanup, err = s.getCleanupDirectories(ctx)
+		return err
+	}))
+	assert.Equal(t, []string{orphanDir}, cleanup)
+}
+
 // TestWritableSize exercises the LabelSnapshotMaxSize override that the
 // block-mode mkfs path passes to X-containerd.mkfs.size. Covers the
 // happy path (label overrides default), fallback cases (missing, empty,

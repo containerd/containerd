@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/errdefs"
@@ -38,6 +39,8 @@ import (
 	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/internal/userns"
 )
+
+const snapshotTempDirPrefix = "new-"
 
 // SnapshotterConfig is used to configure the erofs snapshotter instance
 type SnapshotterConfig struct {
@@ -293,7 +296,7 @@ func (s *snapshotter) lowerPath(id string) (string, error) {
 }
 
 func (s *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, kind snapshots.Kind, cacheBlob string) (string, error) {
-	td, err := os.MkdirTemp(snapshotDir, "new-")
+	td, err := os.MkdirTemp(snapshotDir, snapshotTempDirPrefix)
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
@@ -891,6 +894,12 @@ func (s *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, erro
 
 	cleanup := []string{}
 	for _, d := range dirs {
+		// A new-* directory may belong to a concurrent snapshot creation. It is
+		// renamed to its metadata ID after the writer transaction is acquired, so
+		// Remove must not treat it as an orphan in the meantime.
+		if strings.HasPrefix(d, snapshotTempDirPrefix) {
+			continue
+		}
 		if _, ok := ids[d]; ok {
 			continue
 		}
