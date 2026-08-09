@@ -38,6 +38,7 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 // TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functinal.
@@ -171,7 +172,21 @@ func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Ima
 	if len(image.References) == 0 {
 		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
 	}
-	return c.client.GetImage(ctx, image.References[0])
+	img, err := c.client.GetImage(ctx, image.References[0])
+	if err != nil {
+		return nil, err
+	}
+
+	// The client resolves images against the platform of the node, but an
+	// image may have been pulled for another platform through the
+	// runtime_platforms config. The image store already resolved the image,
+	// so its spec carries the platform the rest of the container lifecycle
+	// has to use.
+	platform := image.ImageSpec.Platform
+	if platform.OS == "" || platform.Architecture == "" {
+		return img, nil
+	}
+	return containerd.NewImageWithPlatform(c.client, img.Metadata(), platforms.Only(platform)), nil
 }
 
 // getUserFromImage gets uid or user name of the image user.

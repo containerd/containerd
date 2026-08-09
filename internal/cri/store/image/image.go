@@ -72,21 +72,32 @@ type Store struct {
 	// content provider
 	provider content.InfoReaderProvider
 
-	// platform represents the currently supported platform for images
-	// TODO: Make this store multi-platform
-	platform platforms.MatchComparer
+	// matchers are the platforms supported by this store, in preference
+	// order. An image is resolved using the first matcher whose content is
+	// present locally, which allows an image that was pulled for a
+	// non-default platform (see the CRI runtime_platforms config) to still
+	// be resolvable.
+	// TODO: Make this store key images by (reference, platform) so that the
+	// same reference pulled for two platforms can be represented at once.
+	matchers []platforms.MatchComparer
 
 	// store is the internal image store indexed by image id.
 	store *store
 }
 
-// NewStore creates an image store.
-func NewStore(img Getter, provider content.InfoReaderProvider, platform platforms.MatchComparer) *Store {
+// NewStore creates an image store. The given platform matchers are tried in
+// order when resolving an image, and the first one that fully resolves against
+// the local content store wins. When no matcher is given, the platform of the
+// current node is used.
+func NewStore(img Getter, provider content.InfoReaderProvider, matchers ...platforms.MatchComparer) *Store {
+	if len(matchers) == 0 {
+		matchers = []platforms.MatchComparer{platforms.Default()}
+	}
 	return &Store{
 		refCache: make(map[string]string),
 		images:   img,
 		provider: provider,
-		platform: platform,
+		matchers: matchers,
 		store: &store{
 			images:     make(map[string]Image),
 			digestSet:  digestset.NewSet(),
@@ -146,20 +157,44 @@ func (s *Store) update(ref string, img *Image) error {
 	return s.store.add(*img)
 }
 
-// getImage gets image information from containerd for current platform.
+// getImage gets image information from containerd for the first of the store's
+// platforms that resolves against the local content store.
+//
+// An image is only present locally for the platforms it was actually pulled
+// for, so a matcher that is not backed by local content reports ErrNotFound.
+// That is not a failure here, it just means the next candidate platform should
+// be tried; any other error is returned as-is.
 func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
-	diffIDs, err := i.RootFS(ctx, s.provider, s.platform)
+	var firstErr error
+	for _, matcher := range s.matchers {
+		img, err := s.getImageForPlatform(ctx, i, matcher)
+		if err == nil {
+			return img, nil
+		}
+		if !errdefs.IsNotFound(err) {
+			return nil, err
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	return nil, firstErr
+}
+
+// getImageForPlatform gets image information from containerd for the given platform.
+func (s *Store) getImageForPlatform(ctx context.Context, i images.Image, platform platforms.MatchComparer) (*Image, error) {
+	diffIDs, err := i.RootFS(ctx, s.provider, platform)
 	if err != nil {
 		return nil, fmt.Errorf("get image diffIDs: %w", err)
 	}
 	chainID := imageidentity.ChainID(diffIDs)
 
-	size, err := usage.CalculateImageUsage(ctx, i, s.provider, usage.WithManifestLimit(s.platform, 1), usage.WithManifestUsage())
+	size, err := usage.CalculateImageUsage(ctx, i, s.provider, usage.WithManifestLimit(platform, 1), usage.WithManifestUsage())
 	if err != nil {
 		return nil, fmt.Errorf("get image compressed resource size: %w", err)
 	}
 
-	desc, err := i.Config(ctx, s.provider, s.platform)
+	desc, err := i.Config(ctx, s.provider, platform)
 	if err != nil {
 		return nil, fmt.Errorf("get image config descriptor: %w", err)
 	}
