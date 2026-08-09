@@ -26,6 +26,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -104,6 +107,34 @@ func TestErofs(t *testing.T) {
 func TestErofsWithQuota(t *testing.T) {
 	testutil.RequiresRoot(t)
 	testsuite.SnapshotterSuite(t, "erofs", newSnapshotter(t, WithDefaultSize(16*1024*1024)))
+}
+
+func TestGetCleanupDirectoriesSkipsSnapshotTempDirs(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	snapshotDir := filepath.Join(root, "snapshots")
+	require.NoError(t, os.Mkdir(snapshotDir, 0700))
+
+	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, ms.Close()) })
+	s := &snapshotter{root: root, ms: ms}
+
+	_, err = os.MkdirTemp(snapshotDir, snapshotTempDirPrefix)
+	require.NoError(t, err)
+	orphanDir := filepath.Join(snapshotDir, "orphan")
+	require.NoError(t, os.Mkdir(orphanDir, 0700))
+	require.NoError(t, ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		_, err := storage.CreateSnapshot(ctx, snapshots.KindActive, "existing", "")
+		return err
+	}))
+
+	var cleanup []string
+	require.NoError(t, ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		cleanup, err = s.getCleanupDirectories(ctx)
+		return err
+	}))
+	assert.Equal(t, []string{orphanDir}, cleanup)
 }
 
 func TestErofsFsverity(t *testing.T) {
