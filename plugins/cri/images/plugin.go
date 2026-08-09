@@ -156,7 +156,11 @@ func init() {
 				}
 
 				options.RuntimePlatforms[runtimeName] = images.ImagePlatform{
-					Snapshotter: snapshotter,
+					// Keep the snapshotter unset when runtime_platforms does
+					// not configure one, so that a snapshotter configured on
+					// the runtime itself can still be propagated. An unset
+					// snapshotter resolves to the default at pull time.
+					Snapshotter: rp.Snapshotter,
 					Platform:    platform,
 				}
 			}

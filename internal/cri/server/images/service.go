@@ -222,9 +222,17 @@ func (c *CRIImageService) UpdateRuntimeSnapshotter(runtimeName string, imagePlat
 	if c.runtimePlatforms == nil {
 		c.runtimePlatforms = make(map[string]ImagePlatform)
 	}
-	// Don't override if already configured
-	if _, exists := c.runtimePlatforms[runtimeName]; exists {
-		log.L.Debugf("Runtime %q already has snapshotter configured, not overriding", runtimeName)
+	if existing, exists := c.runtimePlatforms[runtimeName]; exists {
+		// Don't override a snapshotter that runtime_platforms configured.
+		if existing.Snapshotter != "" {
+			log.L.Debugf("Runtime %q already has snapshotter %q configured, not overriding", runtimeName, existing.Snapshotter)
+			return
+		}
+		// The runtime_platforms entry only configured a platform, so the
+		// snapshotter of the runtime still applies to it.
+		existing.Snapshotter = imagePlatform.Snapshotter
+		c.runtimePlatforms[runtimeName] = existing
+		log.L.Infof("Registered runtime %q with snapshotter %q", runtimeName, existing.Snapshotter)
 		return
 	}
 	c.runtimePlatforms[runtimeName] = imagePlatform
