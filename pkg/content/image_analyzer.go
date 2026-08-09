@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -24,34 +23,41 @@ func NewImageAnalyzer(store content.Store) *ImageAnalyzer {
 
 // ImageInfo contains information about a container image.
 type ImageInfo struct {
-	MediaType    string
-	Size         int64
-	Digest       string
-	Platforms    []string
-	Layers       int
-	CreatedAt    time.Time
-	Labels       map[string]string
+	MediaType string
+	Size      int64
+	Digest    string
+	Platforms []string
+	Layers    int
+	CreatedAt time.Time
+	Labels    map[string]string
 }
 
-// AnalyzeImage analyzes a container image and returns its information.
-func (a *ImageAnalyzer) AnalyzeImage(ctx context.Context, ref string) (*ImageInfo, error) {
-	img, err := a.store.Get(ctx, ref)
+// AnalyzeImage analyzes a container image by reading its descriptor from the content store.
+func (a *ImageAnalyzer) AnalyzeImage(ctx context.Context, desc ocispec.Descriptor) (*ImageInfo, error) {
+	reader, err := a.store.ReaderAt(ctx, desc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image: %w", err)
+		return nil, fmt.Errorf("failed to read content: %w", err)
+	}
+	defer reader.Close()
+
+	platformsList := []string{}
+	if desc.Platform != nil {
+		platformsList = append(platformsList, platforms.Format(*desc.Platform))
 	}
 
 	info := &ImageInfo{
-		MediaType: img.MediaType,
-		Size:      img.Size,
-		Digest:    img.Digest.String(),
-		Labels:    img.Labels,
+		MediaType: desc.MediaType,
+		Size:      desc.Size,
+		Digest:    desc.Digest.String(),
+		Platforms: platformsList,
+		Labels:    desc.Annotations,
 	}
 
 	return info, nil
 }
 
-// GetImageSize returns the total size of an image.
-func (a *ImageAnalyzer) GetImageSize(ctx context.Context, manifest *ocispec.Manifest) (int64, error) {
+// GetImageSize returns the total size of an image manifest.
+func (a *ImageAnalyzer) GetImageSize(manifest *ocispec.Manifest) (int64, error) {
 	var totalSize int64
 	for _, layer := range manifest.Layers {
 		totalSize += layer.Size
@@ -60,12 +66,12 @@ func (a *ImageAnalyzer) GetImageSize(ctx context.Context, manifest *ocispec.Mani
 }
 
 // GetImagePlatforms returns the platforms an image supports.
-func (a *ImageAnalyzer) GetImagePlatforms(ctx context.Context, desc *images.Descriptor) []string {
-	var platforms []string
+func (a *ImageAnalyzer) GetImagePlatforms(desc *ocispec.Descriptor) []string {
+	var platformsList []string
 	if desc.Platform != nil {
-		platforms = append(platforms, platforms.Format(*desc.Platform))
+		platformsList = append(platformsList, platforms.Format(*desc.Platform))
 	}
-	return platforms
+	return platformsList
 }
 
 // CompareImages compares two images and returns differences.
@@ -87,19 +93,19 @@ func (a *ImageAnalyzer) CompareImages(img1, img2 *ImageInfo) []string {
 	return diffs
 }
 
-// GetLayerInfo returns information about image layers.
-func (a *ImageAnalyzer) GetLayerInfo(ctx context.Context, manifest *ocispec.Manifest) ([]LayerInfo, error) {
+// GetLayerInfo returns information about image layers from a manifest.
+func (a *ImageAnalyzer) GetLayerInfo(manifest *ocispec.Manifest) []LayerInfo {
 	var layers []LayerInfo
 	for i, layer := range manifest.Layers {
 		info := LayerInfo{
-			Index:   i,
-			Digest:  layer.Digest.String(),
-			Size:    layer.Size,
+			Index:     i,
+			Digest:    layer.Digest.String(),
+			Size:      layer.Size,
 			MediaType: layer.MediaType,
 		}
 		layers = append(layers, info)
 	}
-	return layers, nil
+	return layers
 }
 
 // LayerInfo contains information about an image layer.
@@ -112,8 +118,8 @@ type LayerInfo struct {
 
 // PrintImageReport prints a formatted report of image information.
 func PrintImageReport(info *ImageInfo) string {
-	report := fmt.Sprintf("Image Analysis Report\n")
-	report += fmt.Sprintf("====================\n")
+	report := "Image Analysis Report\n"
+	report += "====================\n"
 	report += fmt.Sprintf("Digest: %s\n", info.Digest)
 	report += fmt.Sprintf("Media Type: %s\n", info.MediaType)
 	report += fmt.Sprintf("Size: %d bytes\n", info.Size)
