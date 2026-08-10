@@ -121,9 +121,6 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 		}
 		out.Close()
 		stream.Close()
-		if stdinStreamRC != nil {
-			stdinStreamRC.Close()
-		}
 		e.closer.wg.Done()
 		wg.Done()
 		log.L.Debugf("Finish piping %q of container exec %q", t, e.id)
