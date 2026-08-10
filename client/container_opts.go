@@ -51,7 +51,7 @@ type InfoOpts func(*InfoConfig)
 
 // InfoConfig specifies how container metadata is fetched
 type InfoConfig struct {
-	// Refresh will to a fetch of the latest container metadata
+	// Refresh will trigger a fetch of the latest container metadata
 	Refresh bool
 }
 
