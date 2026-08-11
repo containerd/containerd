@@ -667,10 +667,11 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 			if len(via) >= 10 {
 				return errors.New("stopped after 10 redirects")
 			}
-			// Credentials belong to the host the request was created for, so a
-			// redirect elsewhere is followed without them. This mirrors how the
-			// pusher drops the authorizer when an upload location changes host.
-			if req.URL.Host != r.host.Host {
+			// Credentials belong to the host and scheme the request was created
+			// for, so a redirect that changes either is followed without them.
+			// This mirrors how the pusher drops the authorizer when an upload
+			// location changes host or scheme.
+			if req.URL.Host != r.host.Host || req.URL.Scheme != r.host.Scheme {
 				return nil
 			}
 			if err := r.authorize(ctx, req); err != nil {
