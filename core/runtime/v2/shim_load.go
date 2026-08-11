@@ -127,8 +127,9 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 
 func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	var (
-		runtime string
-		id      = bundle.ID
+		runtime  string
+		id       = bundle.ID
+		logEntry = log.G(ctx).WithField("id", id)
 	)
 
 	// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
@@ -168,7 +169,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		})
 	// TODO: It seems we can only call loadShim here if it is a sandbox shim?
 	shim, err := loadShimTask(ctx, bundle, func() {
-		log.G(ctx).WithField("id", id).Info("shim disconnected")
+		logEntry.Info("shim disconnected")
 
 		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, binaryCall)
 		// Remove self from the runtime task list.
@@ -190,7 +191,6 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	_, sgetErr := m.sandboxStore.Get(ctx, id)
 	pInfo, pidErr := shim.Pids(ctx)
 	if shouldCleanupShim(sgetErr, pidErr, pInfo) {
-		logEntry := log.G(ctx).WithField("id", id)
 		if pidErr != nil {
 			logEntry = logEntry.WithError(pidErr)
 		}
@@ -198,7 +198,13 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		shim.delete(ctx, false, func(ctx context.Context, id string) {})
 	} else {
 		if pidErr != nil {
-			log.G(ctx).WithField("id", id).WithError(pidErr).Warn("failed to query shim pids, keeping shim registered")
+			logEntry.WithError(pidErr).Warn("failed to query shim pids, keeping shim registered")
+		} else {
+			address, version := shim.Endpoint()
+			logEntry.WithFields(log.Fields{
+				"address": address,
+				"version": version,
+			}).Debug("loaded existing shim")
 		}
 		m.shims.Add(ctx, shim.ShimInstance)
 	}
