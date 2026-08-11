@@ -361,11 +361,25 @@ func TestCheckpointContainerDisabled(t *testing.T) {
 func TestCRImportCheckpointDisabled(t *testing.T) {
 	c := newTestCRIService()
 	c.config.EnableCRIU = func() *bool { v := false; return &v }()
+	c.config.EnableExperimentalRestoreViaCreate = true
 	_, err := c.CRImportCheckpoint(context.Background(), nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
 		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
+	}
+}
+
+func TestCRImportCheckpointRestoreViaCreateDisabled(t *testing.T) {
+	c := newTestCRIService()
+	c.config.EnableCRIU = func() *bool { v := true; return &v }()
+	c.config.EnableExperimentalRestoreViaCreate = false
+	_, err := c.CRImportCheckpoint(context.Background(), nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "checkpoint restore via CreateContainer is disabled by configuration") {
+		t.Errorf("expected error containing 'checkpoint restore via CreateContainer is disabled by configuration', got: %v", err)
 	}
 }

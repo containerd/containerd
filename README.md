@@ -78,7 +78,7 @@ require the btrfs kernel module and btrfs tools to be installed on your Linux
 distribution.
 
 To use Linux checkpoint and restore features, you will need `criu` installed on
-your system. See more details in [Checkpoint and Restore](#checkpoint-and-restore).
+your system. See more details in [Checkpoint and Restore](docs/features.md#checkpoint-and-restore).
 
 Build requirements for developers are listed in [BUILDING](BUILDING.md).
 

@@ -431,6 +431,11 @@ type RuntimeConfig struct {
 	// EnableCRIU enables CRIU (Checkpoint/Restore In Userspace) support.
 	// When set to false, checkpoint/restore operations will be disabled.
 	EnableCRIU *bool `toml:"enable_criu" json:"enableCRIU"`
+
+	// EnableExperimentalRestoreViaCreate enables experimental restore of container checkpoints via CreateContainer.
+	// When set to false, checkpoint restore via CreateContainer will be disabled.
+	// Default: false
+	EnableExperimentalRestoreViaCreate bool `toml:"enable_experimental_restore_via_create" json:"enableExperimentalRestoreViaCreate"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

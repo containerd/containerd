@@ -481,6 +481,7 @@ The deprecated features are shown in the following table:
 - Pulling Schema 1 images has been disabled in containerd v2.0, but it still can be enabled by setting an environment variable `CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1`
   until containerd v2.1. `ctr` users have to specify `--local` too (e.g., `ctr images pull --local`). Users of CRI clients (such as Kubernetes and `crictl`) have to specify this environment variable on the containerd daemon (usually in the systemd unit).
 - The latest release in May 2029 may not necessarily support cgroup v1, but there will be at least one maintained branch with the support for cgroup v1.
+- Starting in containerd v2.3.4 and v2.2.7, restoring checkpoint data during CRI `CreateContainer` is disabled by default. If your workflow requires the deprecated restore behavior prior to containerd v2.4, set `enable_experimental_restore_via_create = true` in `[plugins."io.containerd.cri.v1.runtime"]`. Forensic checkpoint generation remains enabled by default via `enable_criu = true`.
 
 ### Deprecated config properties
 The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in the following table:
@@ -499,6 +500,7 @@ The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in 
 |`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `mirrors`                    | containerd v1.5     | containerd v2.3            | Use [`config_path`](./docs/hosts.md)            |
 |`[plugins."io.containerd.tracing.processor.v1.otlp"]`                 | `endpoint`, `protocol`, `insecure` | containerd v1.6.29 | containerd v2.3       | Use [OTLP environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), e.g. OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, OTEL_EXPORTER_OTLP_PROTOCOL, OTEL_SDK_DISABLED    |
 |`[plugins."io.containerd.internal.v1.tracing"]`                       | `service_name`, `sampling_ratio`   | containerd v1.6.29 | containerd v2.3       | Instead use [OTel environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), e.g. OTEL_SERVICE_NAME, OTEL_TRACES_SAMPLER*  |
+|`[plugins."io.containerd.cri.v1.runtime"]`                            | `enable_experimental_restore_via_create` | containerd v2.3.4 | containerd v2.4    | Follow [KEP-5823](https://github.com/kubernetes/enhancements/issues/5823) for a replacement `RestorePod` API |
 
 
 > **Note**
@@ -556,3 +558,4 @@ more quickly.
 | [gRPC Shim](https://github.com/containerd/containerd/pull/8052)                        | containerd v1.7 | containerd v2.0          |
 | [CRI Runtime Specific Snapshotter](https://github.com/containerd/containerd/pull/6899) | containerd v1.7 | containerd v2.0          |
 | [CRI Support for User Namespaces](./docs/user-namespaces/README.md)                    | containerd v1.7 | containerd v2.0          |
+| [CRI Restore via CreateContainer](https://github.com/containerd/containerd/pull/10365) | containerd v2.1 | Deprecated (v2.3), removal in v2.4 (see [KEP-5823](https://github.com/kubernetes/enhancements/issues/5823)) |

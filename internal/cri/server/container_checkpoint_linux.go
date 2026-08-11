@@ -243,6 +243,9 @@ func (c *criService) CRImportCheckpoint(
 	sandbox *sandbox.Sandbox,
 	sandboxConfig *runtime.PodSandboxConfig,
 ) (ctrID string, retErr error) {
+	if !c.config.EnableExperimentalRestoreViaCreate {
+		return "", errors.New("checkpoint restore via CreateContainer is disabled by configuration")
+	}
 	if err := c.checkCriu(); err != nil {
 		return "", fmt.Errorf("checkpoint restore is not enabled: %w", err)
 	}
