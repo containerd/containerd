@@ -186,6 +186,8 @@ var execCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
+		process.IO().Wait()
+		process.IO().Close()
 		if code != 0 {
 			return cli.Exit("", int(code))
 		}
