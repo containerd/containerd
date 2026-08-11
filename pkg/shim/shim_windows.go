@@ -23,43 +23,135 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
+	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	winio "github.com/Microsoft/go-winio"
-	"github.com/containerd/errdefs"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"golang.org/x/sys/windows"
 )
 
-func setupSignals(config Config) (chan os.Signal, error) {
-	return nil, errdefs.ErrNotImplemented
+// setupSignals creates a signal channel for Windows.
+// On Windows, we don't register any signals here because:
+// 1. Child process reaping (SIGCHLD) is not needed - the OS handles it.
+// 2. Exit signals (SIGINT/SIGTERM) are handled by handleExitSignals separately.
+// We return an empty channel that reap() can use, but it won't receive signals.
+func setupSignals(_ Config) (chan os.Signal, error) {
+	signals := make(chan os.Signal, 32)
+	return signals, nil
 }
 
+// newServer creates a new ttrpc server for Windows.
+// Unlike Unix, Windows doesn't have user-based socket authentication,
+// so we create a basic ttrpc server without the handshaker.
 func newServer(opts ...ttrpc.ServerOpt) (*ttrpc.Server, error) {
-	return nil, errdefs.ErrNotImplemented
+	return ttrpc.NewServer(opts...)
 }
 
+// subreaper is not applicable on Windows as the OS automatically
+// handles orphaned processes differently than Unix systems.
 func subreaper() error {
-	return errdefs.ErrNotImplemented
+	// This is a no-op on Windows - the OS handles orphaned processes
+	return nil
 }
 
-func setupDumpStacks(dump chan<- os.Signal) {
+// setupDumpStacks is currently not implemented for Windows.
+// Windows doesn't have SIGUSR1, so stack dumping would need to use
+// a different mechanism (e.g., a named event or debug console).
+func setupDumpStacks(_ chan<- os.Signal) {
+	// No-op on Windows - SIGUSR1 doesn't exist
+	// Future: could implement using Windows events or console signals
 }
 
-func serveListener(path string, fd uintptr) (net.Listener, error) {
-	return nil, errdefs.ErrNotImplemented
+// serveListener creates a named pipe listener for Windows.
+// If path is provided, it creates a new named pipe at that location.
+// If path is empty and fd is provided, it attempts to inherit the listener (not commonly used on Windows).
+func serveListener(path string, _ uintptr) (net.Listener, error) {
+	if path == "" {
+		// On Windows, inheriting file descriptors is more complex and rarely used
+		// with named pipes. We'll return an error if no path is provided.
+		return nil, fmt.Errorf("named pipe path is required on Windows")
+	}
+
+	// Ensure the path is in the correct Windows named pipe format
+	// Expected format: \\.\pipe\<name>
+	if !strings.HasPrefix(path, `\\.\pipe`) {
+		return nil, fmt.Errorf("socket is required to be pipe address")
+	}
+
+	l, err := winio.ListenPipe(path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create named pipe listener at %s: %w", path, err)
+	}
+
+	log.L.WithField("pipe", path).Debug("serving api on named pipe")
+	return l, nil
 }
 
+// reap handles signals on Windows. Unlike Unix, Windows doesn't send SIGCHLD
+// when child processes exit, so we only need to handle shutdown signals.
 func reap(ctx context.Context, logger *log.Entry, signals chan os.Signal) error {
-	return errdefs.ErrNotImplemented
+	logger.Debug("starting signal loop")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case s := <-signals:
+			logger.WithField("signal", s).Debug("received signal in reap loop")
+			// On Windows, we just log the signal
+			// Exit signals are handled in handleExitSignals
+		}
+	}
 }
 
+// handleExitSignals listens for shutdown signals (SIGINT, SIGTERM) and
+// triggers the provided cancel function for graceful shutdown.
 func handleExitSignals(ctx context.Context, logger *log.Entry, cancel context.CancelFunc) {
+	ch := make(chan os.Signal, 32)
+	// On Windows, os.Kill cannot be caught. We handle os.Interrupt (Ctrl+C) and SIGTERM.
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+
+	for {
+		select {
+		case s := <-ch:
+			logger.WithField("signal", s).Debug("caught exit signal")
+			cancel()
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
-func openLog(ctx context.Context, _ string) (io.Writer, error) {
-	return nil, errdefs.ErrNotImplemented
+// openLog creates a named pipe for shim logging on Windows.
+// The containerd daemon connects to this pipe as a client to read log output.
+// The pipe format is: \\.\pipe\containerd-shim-{namespace}-{id}-log
+func openLog(ctx context.Context, id string) (io.Writer, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pipePath := fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, id)
+	l, err := winio.ListenPipe(pipePath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create shim log pipe: %w", err)
+	}
+
+	rlw := &reconnectingLogWriter{
+		l: l,
+	}
+
+	// Accept connections from containerd in the background.
+	// Supports reconnection if containerd restarts.
+	go rlw.acceptConnections()
+
+	return rlw, nil
 }
 
 // awaitPipeReady polls a named pipe address until it is connectable,
@@ -105,4 +197,94 @@ func awaitPipeReady(address string) error {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
+}
+
+// reconnectingLogWriter adapts containerd's log channel to the Windows
+// named-pipe model.
+//
+// On Unix the shim log is a FIFO: a passive kernel object the shim writes to
+// while containerd reads the far end, and containerd can detach and reattach
+// (for example across a restart) with no involvement from the shim. Windows
+// named pipes have no such passive form — they are connection-oriented, so the
+// shim is a server that must Accept a reader, serves one reader at a time, and
+// must Accept a fresh connection each time that reader reconnects.
+//
+// This type provides exactly what the pipe model forces the shim to handle
+// itself, and which the FIFO gave for free:
+//   - a background Accept loop so a reader can connect at any time,
+//   - swapping to the newest connection (closing the old) on reconnect,
+//   - dropping writes while no reader is attached so logging never blocks the shim.
+//
+// Logs written while no reader is connected — including the brief window during
+// a reconnect — are intentionally discarded rather than buffered.
+type reconnectingLogWriter struct {
+	l    net.Listener // named pipe listener that accepts reader connections
+	mu   sync.Mutex   // guards conn
+	conn net.Conn     // current reader connection, or nil when none is attached
+}
+
+// acceptConnections listens for log connections in the background.
+func (rlw *reconnectingLogWriter) acceptConnections() {
+	for {
+		newConn, err := rlw.l.Accept()
+		if err != nil {
+			// Listener was closed, stop accepting
+			return
+		}
+
+		rlw.mu.Lock()
+		// Close the old connection if one exists
+		if rlw.conn != nil {
+			rlw.conn.Close()
+		}
+		rlw.conn = newConn
+		rlw.mu.Unlock()
+	}
+}
+
+// Write implements io.Writer. It writes to the current connection if one exists.
+// If no connection is established yet, writes are silently dropped to avoid
+// blocking the shim.
+func (rlw *reconnectingLogWriter) Write(p []byte) (n int, err error) {
+	rlw.mu.Lock()
+	conn := rlw.conn
+	rlw.mu.Unlock()
+
+	if conn == nil {
+		// No connection yet, drop the log.
+		return len(p), nil
+	}
+
+	n, err = conn.Write(p)
+	if err != nil {
+		// Connection may have been closed, clear it so next write
+		// doesn't try to use a broken connection
+		rlw.mu.Lock()
+		if rlw.conn == conn {
+			rlw.conn.Close()
+			rlw.conn = nil
+		}
+		rlw.mu.Unlock()
+		// Return success anyway to avoid log write errors propagating
+		return len(p), nil
+	}
+	return n, nil
+}
+
+// Close implements io.Closer. It closes both the listener and any active connection.
+func (rlw *reconnectingLogWriter) Close() error {
+	rlw.mu.Lock()
+	defer rlw.mu.Unlock()
+
+	var err error
+	if rlw.l != nil {
+		err = rlw.l.Close()
+	}
+	if rlw.conn != nil {
+		if cerr := rlw.conn.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+		rlw.conn = nil
+	}
+	return err
 }
