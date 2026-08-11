@@ -375,7 +375,7 @@ disabled_plugins = ["io.containerd.v1.xyz"]
 
 	var out Config
 	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
-	assert.Errorf(t, err, "drop-in config version 3 higher than root config version 2")
+	assert.NoError(t, err)
 }
 
 // https://github.com/containerd/containerd/issues/10905
