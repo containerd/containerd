@@ -31,14 +31,14 @@ import (
 )
 
 // LoadBundle loads an existing bundle from disk
-func LoadBundle(ctx context.Context, root, id string) (*Bundle, error) {
+func LoadBundle(ctx context.Context, state, id string) (*Bundle, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &Bundle{
 		ID:        id,
-		Path:      filepath.Join(root, ns, id),
+		Path:      filepath.Join(state, ns, id),
 		Namespace: ns,
 	}, nil
 }
