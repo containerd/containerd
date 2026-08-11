@@ -254,6 +254,21 @@ type Registry struct {
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
 	Headers map[string][]string `toml:"headers" json:"headers"`
+	// AllowRequestAuthOnMirrors controls whether the auth config from a CRI
+	// PullImageRequest (e.g. a pod's imagePullSecrets) is sent to mirror
+	// endpoints in addition to the image reference's own registry.
+	//
+	// When false, request auth is only sent to the registry the image
+	// reference names, so credentials for one registry are not disclosed to
+	// unrelated mirror hosts. Mirrors then authenticate on their own: client
+	// certificates via the `client` option in hosts.toml, or username/password
+	// and token auth via `configs`, since hosts.toml has no auth field.
+	//
+	// Defaults to true for backwards compatibility. The default is expected to
+	// flip to false in a future release once mirror operators have had time to
+	// configure per-mirror auth via hosts.toml `client` certs or `configs`;
+	// see https://github.com/containerd/containerd/issues/<TODO> for tracking.
+	AllowRequestAuthOnMirrors bool `toml:"allow_request_auth_on_mirrors" json:"allowRequestAuthOnMirrors"`
 }
 
 // RegistryConfig contains configuration used to communicate with the registry.

@@ -32,7 +32,7 @@ func DefaultImageConfig() ImageConfig {
 		Snapshotter:                defaults.DefaultSnapshotter,
 		DisableSnapshotAnnotations: true,
 		MaxConcurrentDownloads:     3,
-		Registry:                   Registry{},
+		Registry:                   Registry{AllowRequestAuthOnMirrors: true},
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},

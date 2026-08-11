@@ -19,6 +19,14 @@ package images
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
+	goruntime "runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,6 +35,7 @@ import (
 
 	"github.com/containerd/platforms"
 
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -121,6 +130,260 @@ func TestParseAuth(t *testing.T) {
 			assert.Equal(t, test.expectErr, err != nil)
 			assert.Equal(t, test.expectedUser, u)
 			assert.Equal(t, test.expectedSecret, s)
+		})
+	}
+}
+
+func TestCredentialsForRef(t *testing.T) {
+	reqUser, reqPass := "req-user", "req-pass"
+	mirrorUser, mirrorPass := "mirror-user", "mirror-pass"
+	primaryUser, primaryPass := "primary-user", "primary-pass"
+
+	reqAuth := &runtime.AuthConfig{Username: reqUser, Password: reqPass}
+
+	for _, test := range []struct {
+		desc           string
+		ref            string
+		reqAuth        *runtime.AuthConfig
+		configs        map[string]criconfig.RegistryConfig
+		allowOnMirrors bool
+		host           string
+		expectedUser   string
+		expectedPass   string
+	}{
+		{
+			desc:         "request auth applies to ref's default host",
+			ref:          "docker.io/library/nginx:latest",
+			reqAuth:      reqAuth,
+			host:         "registry-1.docker.io",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+		{
+			desc:         "request auth applies to ref's domain",
+			ref:          "quay.io/foo/bar:latest",
+			reqAuth:      reqAuth,
+			host:         "quay.io",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+		{
+			desc:    "request auth does not leak to mirror hosts",
+			ref:     "docker.io/library/nginx:latest",
+			reqAuth: reqAuth,
+			host:    "mirror.example.com",
+		},
+		{
+			desc:    "request auth does not leak to a different primary registry",
+			ref:     "docker.io/library/nginx:latest",
+			reqAuth: reqAuth,
+			host:    "quay.io",
+		},
+		{
+			desc:           "request auth reaches mirrors when allow_request_auth_on_mirrors is set",
+			ref:            "docker.io/library/nginx:latest",
+			reqAuth:        reqAuth,
+			allowOnMirrors: true,
+			host:           "mirror.example.com",
+			expectedUser:   reqUser,
+			expectedPass:   reqPass,
+		},
+		{
+			desc: "request auth reaches a mirror it explicitly names via ServerAddress",
+			ref:  "docker.io/library/nginx:latest",
+			reqAuth: &runtime.AuthConfig{
+				Username:      reqUser,
+				Password:      reqPass,
+				ServerAddress: "https://mirror.example.com",
+			},
+			host:         "mirror.example.com",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+		{
+			desc: "ServerAddress still scopes auth away from non-matching mirrors",
+			ref:  "docker.io/library/nginx:latest",
+			reqAuth: &runtime.AuthConfig{
+				Username:      reqUser,
+				Password:      reqPass,
+				ServerAddress: "https://mirror.example.com",
+			},
+			host: "other-mirror.example.com",
+		},
+		{
+			desc:    "per-host Registry.Configs auth is honored for mirror hosts",
+			ref:     "docker.io/library/nginx:latest",
+			reqAuth: reqAuth,
+			configs: map[string]criconfig.RegistryConfig{
+				"mirror.example.com": {Auth: &criconfig.AuthConfig{Username: mirrorUser, Password: mirrorPass}},
+			},
+			host:         "mirror.example.com",
+			expectedUser: mirrorUser,
+			expectedPass: mirrorPass,
+		},
+		{
+			// Configured mirror auth is what the operator asked for, so it wins
+			// over the request's even when mirrors are allowed to see it.
+			desc:           "per-host Registry.Configs auth wins on mirrors with allow_request_auth_on_mirrors set",
+			ref:            "docker.io/library/nginx:latest",
+			reqAuth:        reqAuth,
+			allowOnMirrors: true,
+			configs: map[string]criconfig.RegistryConfig{
+				"mirror.example.com": {Auth: &criconfig.AuthConfig{Username: mirrorUser, Password: mirrorPass}},
+			},
+			host:         "mirror.example.com",
+			expectedUser: mirrorUser,
+			expectedPass: mirrorPass,
+		},
+		{
+			desc:    "request auth takes precedence over Registry.Configs on the primary host",
+			ref:     "docker.io/library/nginx:latest",
+			reqAuth: reqAuth,
+			configs: map[string]criconfig.RegistryConfig{
+				"registry-1.docker.io": {Auth: &criconfig.AuthConfig{Username: primaryUser, Password: primaryPass}},
+			},
+			host:         "registry-1.docker.io",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+		{
+			desc: "no request auth falls back to per-host config",
+			ref:  "docker.io/library/nginx:latest",
+			configs: map[string]criconfig.RegistryConfig{
+				"mirror.example.com": {Auth: &criconfig.AuthConfig{Username: mirrorUser, Password: mirrorPass}},
+			},
+			host:         "mirror.example.com",
+			expectedUser: mirrorUser,
+			expectedPass: mirrorPass,
+		},
+		{
+			desc: "no request auth and no per-host config yields anonymous",
+			ref:  "docker.io/library/nginx:latest",
+			host: "registry-1.docker.io",
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			c, _ := newTestCRIService()
+			c.config.Registry.Configs = test.configs
+			c.config.Registry.AllowRequestAuthOnMirrors = test.allowOnMirrors
+
+			u, s, err := c.credentialsForRef(test.ref, test.reqAuth)(test.host)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedUser, u)
+			assert.Equal(t, test.expectedPass, s)
+		})
+	}
+}
+
+// TestPullCredentialScopingWithMirror drives a real resolver against two stub
+// registries so the scoping is verified where it matters: the Authorization
+// headers actually put on the wire.
+func TestPullCredentialScopingWithMirror(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("registry host directories contain ':', which is not a valid path element on Windows")
+	}
+
+	const (
+		testUser   = "user"
+		testPasswd = "passwd"
+	)
+	expectedAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(testUser+":"+testPasswd))
+
+	// Always answers 401 so every request reaches the recorder and the pull
+	// ends without needing a real image.
+	newRegistry := func() (*httptest.Server, func() []string) {
+		var (
+			mu   sync.Mutex
+			seen []string
+		)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			seen = append(seen, r.Header.Get("Authorization"))
+			mu.Unlock()
+			w.Header().Set("WWW-Authenticate", `Basic realm="test"`)
+			w.WriteHeader(http.StatusUnauthorized)
+		}))
+		return srv, func() []string {
+			mu.Lock()
+			defer mu.Unlock()
+			return append([]string(nil), seen...)
+		}
+	}
+
+	for _, test := range []struct {
+		desc string
+		// mirrorPath, when set, is appended to the mirror's URL in hosts.toml
+		// and paired with override_path.
+		mirrorPath      string
+		allowOnMirrors  bool
+		mirrorSeesCreds bool
+	}{
+		{
+			desc:            "request auth is withheld from the mirror",
+			allowOnMirrors:  false,
+			mirrorSeesCreds: false,
+		},
+		{
+			desc:            "request auth reaches the mirror when allow_request_auth_on_mirrors is set",
+			allowOnMirrors:  true,
+			mirrorSeesCreds: true,
+		},
+		{
+			// Reproduces the hosts.toml from
+			// https://github.com/containerd/containerd/issues/9997, where a
+			// path-scoped pull-through cache was sent the upstream registry's
+			// pull secret and answered 401.
+			desc:            "request auth is withheld from a path-scoped pull-through mirror",
+			mirrorPath:      "/v2/quay.io",
+			allowOnMirrors:  false,
+			mirrorSeesCreds: false,
+		},
+		{
+			desc:            "path-scoped pull-through mirror still sees request auth by default",
+			mirrorPath:      "/v2/quay.io",
+			allowOnMirrors:  true,
+			mirrorSeesCreds: true,
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			primary, primarySeen := newRegistry()
+			defer primary.Close()
+			mirror, mirrorSeen := newRegistry()
+			defer mirror.Close()
+
+			primaryURL, err := url.Parse(primary.URL)
+			assert.NoError(t, err)
+
+			configPath := t.TempDir()
+			hostDir := filepath.Join(configPath, primaryURL.Host)
+			assert.NoError(t, os.MkdirAll(hostDir, 0700))
+			hostsToml := fmt.Sprintf("server = %q\n\n[host.%q]\n  capabilities = [\"pull\", \"resolve\"]\n", primary.URL, mirror.URL+test.mirrorPath)
+			if test.mirrorPath != "" {
+				hostsToml += "  override_path = true\n"
+			}
+			assert.NoError(t, os.WriteFile(filepath.Join(hostDir, "hosts.toml"), []byte(hostsToml), 0600))
+
+			c, _ := newTestCRIService()
+			c.config.Registry.ConfigPath = configPath
+			c.config.Registry.AllowRequestAuthOnMirrors = test.allowOnMirrors
+
+			ctx := context.Background()
+			ref := primaryURL.Host + "/test/image:latest"
+			credentials := c.credentialsForRef(ref, &runtime.AuthConfig{Username: testUser, Password: testPasswd})
+			resolver := docker.NewResolver(docker.ResolverOptions{
+				Hosts: c.registryHosts(ctx, credentials, nil),
+			})
+
+			_, _, err = resolver.Resolve(ctx, ref)
+			assert.Error(t, err, "both registries always answer 401")
+
+			assert.Contains(t, primarySeen(), expectedAuth, "primary registry should be offered the request auth")
+			if test.mirrorSeesCreds {
+				assert.Contains(t, mirrorSeen(), expectedAuth)
+			} else {
+				assert.NotContains(t, mirrorSeen(), expectedAuth)
+				assert.NotEmpty(t, mirrorSeen(), "mirror should still have been contacted")
+			}
 		})
 	}
 }
