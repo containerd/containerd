@@ -135,6 +135,9 @@ ca = "/etc/path/default"
 [host."https://dns-and-timeout.registry"]
   dns_servers = ["10.96.0.10"]
   dial_timeout = "5s"
+
+[host."https://system-dns.registry"]
+  dns_servers = []
 `
 
 	var tb, fb = true, false
@@ -242,6 +245,13 @@ ca = "/etc/path/default"
 			capabilities: allCaps,
 			dnsServers:   []string{"10.96.0.10"},
 			dialTimeout:  &dnsAndTimeout,
+		},
+		{
+			scheme:       "https",
+			host:         "system-dns.registry",
+			path:         "/v2",
+			capabilities: allCaps,
+			dnsServers:   []string{},
 		},
 		{
 			scheme:       "https",
@@ -399,6 +409,48 @@ func TestDialTimeoutPreservesGlobalDialContext(t *testing.T) {
 
 	if !dialContextCalled {
 		t.Error("global DialContext was not called: per-host dial_timeout overwrote the global dns_servers configuration")
+	}
+}
+
+func TestEmptyDNSServersOverridesGlobalDialContext(t *testing.T) {
+	dir := t.TempDir()
+	hostDir := filepath.Join(dir, "system-dns.registry")
+	if err := os.MkdirAll(hostDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	hostsToml := `[host."https://system-dns.registry"]
+  dns_servers = []
+`
+	if err := os.WriteFile(filepath.Join(hostDir, "hosts.toml"), []byte(hostsToml), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	globalDialContextCalled := false
+	resolve := ConfigureHosts(context.Background(), HostOptions{
+		HostDir: HostDirFromRoot(dir),
+		DialContext: func(context.Context, string, string) (net.Conn, error) {
+			globalDialContextCalled = true
+			return nil, errors.New("global dial context called")
+		},
+	})
+
+	hosts, err := resolve("system-dns.registry")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hosts) == 0 {
+		t.Fatal("expected at least one host")
+	}
+	transport, ok := hosts[0].Client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	//nolint:staticcheck // intentional call to verify which dialer is active
+	_, _ = transport.DialContext(context.Background(), "invalid", "127.0.0.1:443")
+
+	if globalDialContextCalled {
+		t.Fatal("empty per-host dns_servers did not override the global DialContext")
 	}
 }
 
@@ -959,6 +1011,9 @@ func compareHostConfig(j, k hostConfig) bool {
 	}
 
 	if len(j.dnsServers) != len(k.dnsServers) {
+		return false
+	}
+	if (j.dnsServers == nil) != (k.dnsServers == nil) {
 		return false
 	}
 	for i := range j.dnsServers {

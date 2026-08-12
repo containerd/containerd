@@ -698,7 +698,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		result.dialTimeout = &dialTimeout
 	}
 
-	if len(config.DNSServers) > 0 {
+	if config.DNSServers != nil {
 		result.dnsServers = config.DNSServers
 	}
 
