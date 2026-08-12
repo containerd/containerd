@@ -171,17 +171,15 @@ func filterImageListForDisplay(imageList []images.Image, all bool) []images.Imag
 
 	type group struct {
 		images []images.Image
-		// first index in the original list, for stable ordering by first appearance
-		order int
 	}
 	byDigest := make(map[digest.Digest]*group)
 	var order []digest.Digest
 
-	for i, img := range imageList {
+	for _, img := range imageList {
 		d := img.Target.Digest
 		g, ok := byDigest[d]
 		if !ok {
-			g = &group{order: i}
+			g = &group{}
 			byDigest[d] = g
 			order = append(order, d)
 		}
@@ -210,8 +208,9 @@ func filterImageListForDisplay(imageList []images.Image, all bool) []images.Imag
 func isTaggedImageName(name string) bool {
 	parsed, err := reference.ParseAnyReference(name)
 	if err != nil {
-		// Keep names we cannot parse so nothing unexpected disappears.
-		return true
+		// Unparseable refs are not treated as tags, so they cannot alone
+		// trigger the "prefer tags" path for a digest group.
+		return false
 	}
 	_, ok := parsed.(reference.Tagged)
 	return ok

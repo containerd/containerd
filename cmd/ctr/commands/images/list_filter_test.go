@@ -101,6 +101,19 @@ func TestFilterImageListForDisplay(t *testing.T) {
 			t.Fatalf("unexpected order: %#v", names(got))
 		}
 	})
+
+	t.Run("unparseable name does not hide other refs in digest group", func(t *testing.T) {
+		// Unparseable ref alone must not count as a "tag" and drop the
+		// digest-only sibling for the same target.
+		list := []images.Image{
+			{Name: "not a valid image reference!!!", Target: target1},
+			{Name: d1.String(), Target: target1},
+		}
+		got := filterImageListForDisplay(list, false)
+		if len(got) != 2 {
+			t.Fatalf("expected both refs kept, got %d: %#v", len(got), names(got))
+		}
+	})
 }
 
 func names(list []images.Image) []string {
