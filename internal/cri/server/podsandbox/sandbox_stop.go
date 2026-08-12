@@ -133,7 +133,7 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types
 	}
 
 	// Kill the pod sandbox container.
-	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
+	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) && !ctrdutil.IsRuntimeStateMissing(err) {
 		return fmt.Errorf("failed to kill pod sandbox container: %w", err)
 	}
 
