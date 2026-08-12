@@ -450,6 +450,25 @@ func TestDNSDialTimeoutIncludesResolution(t *testing.T) {
 	}
 }
 
+func TestDNSDialTriesAllResolvedAddresses(t *testing.T) {
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	lookup := func(context.Context, string) ([]string, error) {
+		return []string{"127.0.0.2", "127.0.0.1"}, nil
+	}
+	dialFn := newDNSDialContextWithLookups([]hostLookup{lookup}, 250*time.Millisecond)
+
+	conn, err := dialFn(context.Background(), "tcp", net.JoinHostPort("registry.example.com", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+}
+
 func TestHTTPFallback(t *testing.T) {
 	for _, tc := range []struct {
 		host           string

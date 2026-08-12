@@ -21,6 +21,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -107,6 +108,9 @@ func newDNSDialContext(dnsServers []string, timeout time.Duration) func(context.
 }
 
 func newDNSDialContextWithLookups(lookups []hostLookup, timeout time.Duration) func(context.Context, string, string) (net.Conn, error) {
+	// FallbackDelay only takes effect when the dialer resolves a hostname
+	// itself, i.e. on the system-resolver fallback below. Addresses resolved
+	// through lookups are dialed one IP literal at a time.
 	d := &net.Dialer{
 		Timeout:       timeout,
 		KeepAlive:     30 * time.Second,
@@ -130,8 +134,25 @@ func newDNSDialContextWithLookups(lookups []hostLookup, timeout time.Duration) f
 				rCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				ips, err := lookup(rCtx, host)
 				cancel()
-				if err == nil {
-					return d.DialContext(ctx, network, net.JoinHostPort(ips[0], port))
+				if err == nil && len(ips) > 0 {
+					var dialErrors []error
+					// Try addresses until one connects. Give each non-final attempt
+					// a share of the remaining deadline so later addresses get tried.
+					for i, ip := range ips {
+						dialCtx := ctx
+						dialCancel := func() {}
+						if deadline, ok := ctx.Deadline(); ok && i < len(ips)-1 {
+							remaining := time.Until(deadline) / time.Duration(len(ips)-i)
+							dialCtx, dialCancel = context.WithTimeout(ctx, remaining)
+						}
+						conn, err := d.DialContext(dialCtx, network, net.JoinHostPort(ip, port))
+						dialCancel()
+						if err == nil {
+							return conn, nil
+						}
+						dialErrors = append(dialErrors, err)
+					}
+					return nil, errors.Join(dialErrors...)
 				}
 			}
 		}
