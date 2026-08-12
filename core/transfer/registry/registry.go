@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -50,6 +51,7 @@ type registryOpts struct {
 	creds         CredentialHelper
 	hostDir       string
 	defaultScheme string
+	dnsServers    []string
 	dialContext   func(ctx context.Context, network, addr string) (net.Conn, error)
 	httpDebug     bool
 	httpTrace     bool
@@ -87,6 +89,16 @@ func WithHostDir(hostDir string) Opt {
 func WithDefaultScheme(s string) Opt {
 	return func(o *registryOpts) error {
 		o.defaultScheme = s
+		return nil
+	}
+}
+
+// WithDNSServers configures DNS servers used to resolve registry hostnames.
+// The configuration is preserved when the registry is sent to a remote
+// transfer service.
+func WithDNSServers(servers []string) Opt {
+	return func(o *registryOpts) error {
+		o.dnsServers = slices.Clone(servers)
 		return nil
 	}
 }
@@ -154,6 +166,9 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	if ropts.defaultScheme != "" {
 		hostOptions.DefaultScheme = ropts.defaultScheme
 	}
+	if len(ropts.dnsServers) > 0 {
+		hostOptions.DialContext = config.NewDNSDialContext(ropts.dnsServers)
+	}
 	if ropts.dialContext != nil {
 		hostOptions.DialContext = ropts.dialContext
 	}
@@ -180,7 +195,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		resolver:      resolver,
 		hostDir:       ropts.hostDir,
 		defaultScheme: ropts.defaultScheme,
-		dialContext:   ropts.dialContext,
+		dnsServers:    slices.Clone(ropts.dnsServers),
 		httpDebug:     ropts.httpDebug,
 		httpTrace:     ropts.httpTrace,
 		localStream:   ropts.localStream,
@@ -210,7 +225,7 @@ type OCIRegistry struct {
 
 	hostDir       string
 	defaultScheme string
-	dialContext   func(ctx context.Context, network, addr string) (net.Conn, error)
+	dnsServers    []string
 
 	httpDebug   bool
 	httpTrace   bool
@@ -357,6 +372,7 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 
 	res.HostDir = r.hostDir
 	res.DefaultScheme = r.defaultScheme
+	res.DnsServers = slices.Clone(r.dnsServers)
 	s := &transfertypes.OCIRegistry{
 		Reference: r.reference,
 		Resolver:  res,
@@ -378,6 +394,10 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 		}
 		if s.Resolver.DefaultScheme != "" {
 			hostOptions.DefaultScheme = s.Resolver.DefaultScheme
+		}
+		if len(s.Resolver.DnsServers) > 0 {
+			r.dnsServers = slices.Clone(s.Resolver.DnsServers)
+			hostOptions.DialContext = config.NewDNSDialContext(r.dnsServers)
 		}
 		if sid := s.Resolver.AuthStream; sid != "" {
 			stream, err := sm.Get(ctx, sid)
