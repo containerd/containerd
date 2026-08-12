@@ -266,8 +266,7 @@ type Registry struct {
 	//
 	// Defaults to true for backwards compatibility. The default is expected to
 	// flip to false in a future release once mirror operators have had time to
-	// configure per-mirror auth via hosts.toml `client` certs or `configs`;
-	// see https://github.com/containerd/containerd/issues/<TODO> for tracking.
+	// configure per-mirror auth via hosts.toml `client` certs or `configs`.
 	AllowRequestAuthOnMirrors bool `toml:"allow_request_auth_on_mirrors" json:"allowRequestAuthOnMirrors"`
 }
 
