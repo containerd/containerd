@@ -103,10 +103,10 @@ func WithDNSServers(servers []string) Opt {
 	}
 }
 
-// WithDialContext overrides the dialer used for all registry connections.
-// The provided function is tried before the system resolver for each
-// connection, allowing callers to redirect DNS resolution (e.g. to cluster
-// DNS) while still falling back to system DNS when unreachable.
+// WithDialContext overrides the dialer used by this registry instance.
+// The function is process-local and is not preserved when the registry is sent
+// to a remote transfer service. Use WithDNSServers for transferable DNS
+// configuration.
 func WithDialContext(dial func(ctx context.Context, network, addr string) (net.Conn, error)) Opt {
 	return func(o *registryOpts) error {
 		o.dialContext = dial
