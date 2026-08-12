@@ -36,13 +36,15 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// setupSignals creates a signal channel for Windows.
-// On Windows, we don't register any signals here because:
-// 1. Child process reaping (SIGCHLD) is not needed - the OS handles it.
-// 2. Exit signals (SIGINT/SIGTERM) are handled by handleExitSignals separately.
-// We return an empty channel that reap() can use, but it won't receive signals.
+// setupSignals creates the shim's signal channel for Windows and registers
+// interrupt/terminate on it. Short-lived actions (e.g. "delete") run only
+// reap(), which drains these so a stray Ctrl+C / termination cannot kill the
+// process mid-action via the default OS behavior; serve() additionally handles
+// graceful shutdown through handleExitSignals. Windows has no SIGCHLD (the OS
+// reaps children), so no reaping signal is registered.
 func setupSignals(_ Config) (chan os.Signal, error) {
 	signals := make(chan os.Signal, 32)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 	return signals, nil
 }
 
@@ -68,20 +70,17 @@ func setupDumpStacks(_ chan<- os.Signal) {
 	// Future: could implement using Windows events or console signals
 }
 
-// serveListener creates a named pipe listener for Windows.
-// If path is provided, it creates a new named pipe at that location.
-// If path is empty and fd is provided, it attempts to inherit the listener (not commonly used on Windows).
+// serveListener creates a named pipe listener for Windows at the given path.
+// Windows requires an explicit named-pipe path; unlike Unix there is no
+// inherited-descriptor fallback, so an empty path is an error.
 func serveListener(path string, _ uintptr) (net.Listener, error) {
 	if path == "" {
-		// On Windows, inheriting file descriptors is more complex and rarely used
-		// with named pipes. We'll return an error if no path is provided.
 		return nil, fmt.Errorf("named pipe path is required on Windows")
 	}
 
-	// Ensure the path is in the correct Windows named pipe format
-	// Expected format: \\.\pipe\<name>
-	if !strings.HasPrefix(path, `\\.\pipe`) {
-		return nil, fmt.Errorf("socket is required to be pipe address")
+	// Require the canonical Windows named pipe prefix: \\.\pipe\<name>.
+	if !strings.HasPrefix(path, `\\.\pipe\`) {
+		return nil, fmt.Errorf("address %q is not a named pipe path (must start with %q)", path, `\\.\pipe\`)
 	}
 
 	l, err := winio.ListenPipe(path, nil)
@@ -256,19 +255,19 @@ func (rlw *reconnectingLogWriter) Write(p []byte) (n int, err error) {
 	}
 
 	n, err = conn.Write(p)
-	if err != nil {
-		// Connection may have been closed, clear it so next write
-		// doesn't try to use a broken connection
+	if err != nil || n < len(p) {
+		// A write error or short write means the reader is gone or wedged.
+		// Drop the connection so the next write starts fresh, and report full
+		// success so logging never backpressures the shim.
 		rlw.mu.Lock()
 		if rlw.conn == conn {
 			rlw.conn.Close()
 			rlw.conn = nil
 		}
 		rlw.mu.Unlock()
-		// Return success anyway to avoid log write errors propagating
 		return len(p), nil
 	}
-	return n, nil
+	return len(p), nil
 }
 
 // Close implements io.Closer. It closes both the listener and any active connection.

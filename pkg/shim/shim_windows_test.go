@@ -51,7 +51,8 @@ func uniquePipePath(prefix string) string {
 	return fmt.Sprintf(`\\.\pipe\%s-%d-%d`, prefix, os.Getpid(), testPipeCounter.Add(1))
 }
 
-// createTestPipe creates a named pipe listener for testing and returns cleanup function
+// createTestPipe creates a named pipe listener for testing. The caller is
+// responsible for closing the returned listener.
 func createTestPipe(t *testing.T, pipePath string) net.Listener {
 	t.Helper()
 	l, err := winio.ListenPipe(pipePath, nil)
@@ -61,7 +62,8 @@ func createTestPipe(t *testing.T, pipePath string) net.Listener {
 	return l
 }
 
-// connectToPipe connects to a pipe and returns cleanup function
+// connectToPipe dials the named pipe for testing. The caller is responsible
+// for closing the returned connection.
 func connectToPipe(t *testing.T, pipePath string) net.Conn {
 	t.Helper()
 	conn, err := winio.DialPipe(pipePath, nil)
@@ -630,5 +632,49 @@ func TestHandleExitSignalsReturnsOnContextCancel(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("handleExitSignals did not return after context cancellation")
+	}
+}
+
+// shortWriteConn is a net.Conn whose Write reports fewer bytes than requested
+// with a nil error, to exercise reconnectingLogWriter's short-write handling.
+type shortWriteConn struct {
+	net.Conn
+	closed bool
+}
+
+func (c *shortWriteConn) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	return len(p) - 1, nil // short write with nil error
+}
+
+func (c *shortWriteConn) Close() error {
+	c.closed = true
+	return nil
+}
+
+func TestReconnectingLogWriterDropsConnectionOnShortWrite(t *testing.T) {
+	conn := &shortWriteConn{}
+	rlw := &reconnectingLogWriter{conn: conn}
+
+	data := []byte("hello world")
+	n, err := rlw.Write(data)
+	if err != nil {
+		t.Fatalf("Write returned error on short write: %v", err)
+	}
+	if n != len(data) {
+		t.Fatalf("Write returned n=%d; want %d (must report full success, never a short write)", n, len(data))
+	}
+
+	// A short write must drop the connection so the next write starts fresh.
+	rlw.mu.Lock()
+	dropped := rlw.conn == nil
+	rlw.mu.Unlock()
+	if !dropped {
+		t.Fatal("short write should have dropped the connection")
+	}
+	if !conn.closed {
+		t.Fatal("short write should have closed the dropped connection")
 	}
 }
