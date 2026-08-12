@@ -329,7 +329,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 		registry.WithHostDir(c.config.Registry.ConfigPath),
 	}
 	if len(c.config.Registry.DNSServers) > 0 {
-		opts = append(opts, registry.WithDialContext(config.NewDNSDialContext(c.config.Registry.DNSServers)))
+		opts = append(opts, registry.WithDNSServers(c.config.Registry.DNSServers))
 	}
 	reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 	if err != nil {

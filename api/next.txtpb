@@ -70188,6 +70188,13 @@ file: {
       type: TYPE_STRING
       json_name: "logsStream"
     }
+    field: {
+      name: "dns_servers"
+      number: 7
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "dnsServers"
+    }
     nested_type: {
       name: "HeadersEntry"
       field: {
@@ -70311,7 +70318,7 @@ file: {
     location: {
       span: 16
       span: 0
-      span: 96
+      span: 99
       span: 1
     }
     location: {
@@ -70581,7 +70588,7 @@ file: {
       path: 1
       span: 39
       span: 0
-      span: 59
+      span: 62
       span: 1
     }
     location: {
@@ -70833,10 +70840,60 @@ file: {
     }
     location: {
       path: 4
+      path: 1
       path: 2
-      span: 62
+      path: 6
+      path: 4
+      span: 61
+      span: 2
+      span: 10
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 6
+      span: 61
+      span: 2
+      span: 34
+      leading_comments: " DNS servers used to resolve registry hostnames.\n"
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 6
+      path: 5
+      span: 61
+      span: 11
+      span: 17
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 6
+      path: 1
+      span: 61
+      span: 18
+      span: 29
+    }
+    location: {
+      path: 4
+      path: 1
+      path: 2
+      path: 6
+      path: 3
+      span: 61
+      span: 32
+      span: 33
+    }
+    location: {
+      path: 4
+      path: 2
+      span: 65
       span: 0
-      span: 71
+      span: 74
       span: 1
       leading_comments: " AuthRequest is sent as a callback on a stream\n"
     }
@@ -70844,7 +70901,7 @@ file: {
       path: 4
       path: 2
       path: 1
-      span: 62
+      span: 65
       span: 8
       span: 19
     }
@@ -70854,7 +70911,7 @@ file: {
       path: 2
       path: 0
       path: 5
-      span: 64
+      span: 67
       span: 2
       span: 8
     }
@@ -70863,7 +70920,7 @@ file: {
       path: 2
       path: 2
       path: 0
-      span: 64
+      span: 67
       span: 2
       span: 18
       leading_comments: " host is the registry host\n"
@@ -70874,7 +70931,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 64
+      span: 67
       span: 9
       span: 13
     }
@@ -70884,7 +70941,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 64
+      span: 67
       span: 16
       span: 17
     }
@@ -70894,7 +70951,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 67
+      span: 70
       span: 2
       span: 8
     }
@@ -70903,7 +70960,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 67
+      span: 70
       span: 2
       span: 23
       leading_comments: " reference is the namespace and repository name requested from the registry\n"
@@ -70914,7 +70971,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 67
+      span: 70
       span: 9
       span: 18
     }
@@ -70924,7 +70981,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 67
+      span: 70
       span: 21
       span: 22
     }
@@ -70934,7 +70991,7 @@ file: {
       path: 2
       path: 2
       path: 4
-      span: 70
+      span: 73
       span: 2
       span: 10
     }
@@ -70943,7 +71000,7 @@ file: {
       path: 2
       path: 2
       path: 2
-      span: 70
+      span: 73
       span: 2
       span: 38
       leading_comments: " wwwauthenticate is the HTTP WWW-Authenticate header values returned from the registry\n"
@@ -70954,7 +71011,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 70
+      span: 73
       span: 11
       span: 17
     }
@@ -70964,7 +71021,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 70
+      span: 73
       span: 18
       span: 33
     }
@@ -70974,23 +71031,23 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 70
+      span: 73
       span: 36
       span: 37
     }
     location: {
       path: 5
       path: 1
-      span: 73
+      span: 76
       span: 0
-      span: 88
+      span: 91
       span: 1
     }
     location: {
       path: 5
       path: 1
       path: 1
-      span: 73
+      span: 76
       span: 5
       span: 13
     }
@@ -71000,7 +71057,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 74
+      span: 77
       span: 2
       span: 6
     }
@@ -71009,7 +71066,7 @@ file: {
       path: 1
       path: 2
       path: 0
-      span: 74
+      span: 77
       span: 2
       span: 11
     }
@@ -71019,7 +71076,7 @@ file: {
       path: 2
       path: 0
       path: 2
-      span: 74
+      span: 77
       span: 9
       span: 10
     }
@@ -71029,7 +71086,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 78
+      span: 81
       span: 2
       span: 13
     }
@@ -71038,7 +71095,7 @@ file: {
       path: 1
       path: 2
       path: 1
-      span: 78
+      span: 81
       span: 2
       span: 18
       leading_comments: " CREDENTIALS is used to exchange username/password for access token\n using an oauth or \"Docker Registry Token\" server\n"
@@ -71049,7 +71106,7 @@ file: {
       path: 2
       path: 1
       path: 2
-      span: 78
+      span: 81
       span: 16
       span: 17
     }
@@ -71059,7 +71116,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 82
+      span: 85
       span: 2
       span: 9
     }
@@ -71068,7 +71125,7 @@ file: {
       path: 1
       path: 2
       path: 2
-      span: 82
+      span: 85
       span: 2
       span: 14
       leading_comments: " REFRESH is used to exchange secret for access token using an oauth\n or \"Docker Registry Token\" server\n"
@@ -71079,7 +71136,7 @@ file: {
       path: 2
       path: 2
       path: 2
-      span: 82
+      span: 85
       span: 12
       span: 13
     }
@@ -71089,7 +71146,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 87
+      span: 90
       span: 2
       span: 8
     }
@@ -71098,7 +71155,7 @@ file: {
       path: 1
       path: 2
       path: 3
-      span: 87
+      span: 90
       span: 2
       span: 13
       leading_comments: " HEADER is used to set the HTTP Authorization header to secret\n directly for the registry.\n Value should be `<auth-scheme> <authorization-parameters>`\n"
@@ -71109,23 +71166,23 @@ file: {
       path: 2
       path: 3
       path: 2
-      span: 87
+      span: 90
       span: 11
       span: 12
     }
     location: {
       path: 4
       path: 3
-      span: 90
+      span: 93
       span: 0
-      span: 96
+      span: 99
       span: 1
     }
     location: {
       path: 4
       path: 3
       path: 1
-      span: 90
+      span: 93
       span: 8
       span: 20
     }
@@ -71135,7 +71192,7 @@ file: {
       path: 2
       path: 0
       path: 6
-      span: 91
+      span: 94
       span: 2
       span: 10
     }
@@ -71144,7 +71201,7 @@ file: {
       path: 3
       path: 2
       path: 0
-      span: 91
+      span: 94
       span: 2
       span: 24
     }
@@ -71154,7 +71211,7 @@ file: {
       path: 2
       path: 0
       path: 1
-      span: 91
+      span: 94
       span: 11
       span: 19
     }
@@ -71164,7 +71221,7 @@ file: {
       path: 2
       path: 0
       path: 3
-      span: 91
+      span: 94
       span: 22
       span: 23
     }
@@ -71174,7 +71231,7 @@ file: {
       path: 2
       path: 1
       path: 5
-      span: 92
+      span: 95
       span: 2
       span: 8
     }
@@ -71183,7 +71240,7 @@ file: {
       path: 3
       path: 2
       path: 1
-      span: 92
+      span: 95
       span: 2
       span: 20
     }
@@ -71193,7 +71250,7 @@ file: {
       path: 2
       path: 1
       path: 1
-      span: 92
+      span: 95
       span: 9
       span: 15
     }
@@ -71203,7 +71260,7 @@ file: {
       path: 2
       path: 1
       path: 3
-      span: 92
+      span: 95
       span: 18
       span: 19
     }
@@ -71213,7 +71270,7 @@ file: {
       path: 2
       path: 2
       path: 5
-      span: 93
+      span: 96
       span: 2
       span: 8
     }
@@ -71222,7 +71279,7 @@ file: {
       path: 3
       path: 2
       path: 2
-      span: 93
+      span: 96
       span: 2
       span: 22
     }
@@ -71232,7 +71289,7 @@ file: {
       path: 2
       path: 2
       path: 1
-      span: 93
+      span: 96
       span: 9
       span: 17
     }
@@ -71242,7 +71299,7 @@ file: {
       path: 2
       path: 2
       path: 3
-      span: 93
+      span: 96
       span: 20
       span: 21
     }
@@ -71252,7 +71309,7 @@ file: {
       path: 2
       path: 3
       path: 6
-      span: 94
+      span: 97
       span: 2
       span: 27
     }
@@ -71261,7 +71318,7 @@ file: {
       path: 3
       path: 2
       path: 3
-      span: 94
+      span: 97
       span: 2
       span: 42
       trailing_comments: " TODO: Stream error\n"
@@ -71272,7 +71329,7 @@ file: {
       path: 2
       path: 3
       path: 1
-      span: 94
+      span: 97
       span: 28
       span: 37
     }
@@ -71282,7 +71339,7 @@ file: {
       path: 2
       path: 3
       path: 3
-      span: 94
+      span: 97
       span: 40
       span: 41
     }
