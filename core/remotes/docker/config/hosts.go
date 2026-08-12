@@ -83,6 +83,8 @@ func NewDNSDialContext(dnsServers []string) func(context.Context, string, string
 	return newDNSDialContext(dnsServers, 30*time.Second)
 }
 
+type hostLookup func(context.Context, string) ([]string, error)
+
 // newDNSDialContext builds a DialContext with a custom DNS resolver and the
 // given connection timeout. Used internally to combine dns_servers with a
 // per-host dial_timeout.
@@ -91,16 +93,20 @@ func newDNSDialContext(dnsServers []string, timeout time.Duration) func(context.
 	// Checking reachability via net.Dialer.DialContext does not work for UDP;
 	// it always succeeds, thus an unreachable server is never
 	// detected and fallback to the system resolver is never reached.
-	resolvers := make([]*net.Resolver, len(dnsServers))
+	lookups := make([]hostLookup, len(dnsServers))
 	for i, server := range dnsServers {
-		resolvers[i] = &net.Resolver{
+		resolver := &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return (&net.Dialer{}).DialContext(ctx, network, net.JoinHostPort(server, "53"))
 			},
 		}
+		lookups[i] = resolver.LookupHost
 	}
+	return newDNSDialContextWithLookups(lookups, timeout)
+}
 
+func newDNSDialContextWithLookups(lookups []hostLookup, timeout time.Duration) func(context.Context, string, string) (net.Conn, error) {
 	d := &net.Dialer{
 		Timeout:       timeout,
 		KeepAlive:     30 * time.Second,
@@ -108,15 +114,21 @@ func newDNSDialContext(dnsServers []string, timeout time.Duration) func(context.
 	}
 
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if timeout != 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, timeout)
+			defer cancel()
+		}
+
 		host, port, _ := net.SplitHostPort(addr)
 		// Only apply custom resolution for hostnames; IP literals need no DNS.
 		if host != "" && net.ParseIP(host) == nil {
-			for _, r := range resolvers {
+			for _, lookup := range lookups {
 				if ctx.Err() != nil {
 					break
 				}
 				rCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-				ips, err := r.LookupHost(rCtx, host)
+				ips, err := lookup(rCtx, host)
 				cancel()
 				if err == nil {
 					return d.DialContext(ctx, network, net.JoinHostPort(ips[0], port))
