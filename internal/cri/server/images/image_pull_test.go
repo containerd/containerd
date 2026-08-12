@@ -125,6 +125,118 @@ func TestParseAuth(t *testing.T) {
 	}
 }
 
+func TestCredentialsForRef(t *testing.T) {
+	const (
+		reqUser    = "req-user"
+		reqPass    = "req-pass"
+		configUser = "config-user"
+		configPass = "config-pass"
+	)
+	reqAuth := &runtime.AuthConfig{Username: reqUser, Password: reqPass}
+	reqAuthScoped := &runtime.AuthConfig{
+		Username:      reqUser,
+		Password:      reqPass,
+		ServerAddress: "https://quay.io",
+	}
+
+	for _, test := range []struct {
+		desc         string
+		ref          string
+		reqAuth      *runtime.AuthConfig
+		configs      map[string]criconfig.RegistryConfig
+		forward      bool
+		host         string
+		expectedUser string
+		expectedPass string
+	}{
+		{
+			desc:         "unscoped request auth reaches the ref's own registry",
+			ref:          "quay.io/acme/api:v1",
+			reqAuth:      reqAuth,
+			host:         "quay.io",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+		{
+			desc:         "unscoped request auth already reaches mirrors without forwarding",
+			ref:          "quay.io/acme/api:v1",
+			reqAuth:      reqAuth,
+			host:         "mirror.example.com",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+		{
+			desc:         "ServerAddress-scoped request auth still reaches its own host",
+			ref:          "quay.io/acme/api:v1",
+			reqAuth:      reqAuthScoped,
+			host:         "quay.io",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+		{
+			desc:    "ServerAddress-scoped request auth is withheld from mirrors by default",
+			ref:     "quay.io/acme/api:v1",
+			reqAuth: reqAuthScoped,
+			host:    "mirror.example.com",
+		},
+		{
+			desc:         "forwarding lets a ServerAddress-scoped auth reach mirrors",
+			ref:          "quay.io/acme/api:v1",
+			reqAuth:      reqAuthScoped,
+			forward:      true,
+			host:         "mirror.example.com",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+		{
+			desc:         "forwarding still delivers the request auth to the primary host",
+			ref:          "quay.io/acme/api:v1",
+			reqAuth:      reqAuthScoped,
+			forward:      true,
+			host:         "quay.io",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+		{
+			desc: "no request auth falls back to per-host Registry.Configs",
+			ref:  "quay.io/acme/api:v1",
+			configs: map[string]criconfig.RegistryConfig{
+				"mirror.example.com": {Auth: &criconfig.AuthConfig{Username: configUser, Password: configPass}},
+			},
+			host:         "mirror.example.com",
+			expectedUser: configUser,
+			expectedPass: configPass,
+		},
+		{
+			desc: "no request auth and no per-host config yields anonymous",
+			ref:  "quay.io/acme/api:v1",
+			host: "mirror.example.com",
+		},
+		{
+			// docker.io -> registry-1.docker.io: the resolver remaps the
+			// host, and the callback must still treat it as the ref's own.
+			desc:         "docker.io ref is matched against registry-1.docker.io",
+			ref:          "docker.io/library/nginx:latest",
+			reqAuth:      reqAuth,
+			forward:      true,
+			host:         "registry-1.docker.io",
+			expectedUser: reqUser,
+			expectedPass: reqPass,
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			c, _ := newTestCRIService()
+			c.config.Registry.Configs = test.configs
+			c.config.Registry.ForwardRequestAuthToMirrors = test.forward
+
+			u, s, err := c.credentialsForRef(test.ref, test.reqAuth)(test.host)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedUser, u)
+			assert.Equal(t, test.expectedPass, s)
+		})
+	}
+}
+
 func TestRegistryEndpoints(t *testing.T) {
 	for _, test := range []struct {
 		desc     string

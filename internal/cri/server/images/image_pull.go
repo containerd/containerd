@@ -102,22 +102,53 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 
 	imageRef := r.GetImage().GetImage()
 
-	credentials := func(host string) (string, string, error) {
-		hostauth := r.GetAuth()
-		if hostauth == nil {
-			config := c.config.Registry.Configs[host]
-			if config.Auth != nil {
-				hostauth = toRuntimeAuthConfig(*config.Auth)
-			}
-		}
-		return ParseAuth(hostauth, host)
-	}
+	credentials := c.credentialsForRef(imageRef, r.GetAuth())
 
 	ref, err := c.CRIImageService.PullImage(ctx, imageRef, credentials, r.SandboxConfig, r.GetImage().GetRuntimeHandler())
 	if err != nil {
 		return nil, err
 	}
 	return &runtime.PullImageResponse{ImageRef: ref}, nil
+}
+
+// credentialsForRef returns the per-host credential callback that the resolver
+// invokes for every registry endpoint it contacts (primary and mirrors).
+//
+// The request auth is meant for the registry the image reference names, so on
+// any other host the fallback is per-host Registry.Configs. When
+// ForwardRequestAuthToMirrors is set and the request auth has a ServerAddress
+// that would keep ParseAuth from delivering it to a mirror, a copy is passed
+// with ServerAddress cleared so the mirror still receives the credentials.
+func (c *CRIImageService) credentialsForRef(ref string, reqAuth *runtime.AuthConfig) func(string) (string, string, error) {
+	var refDomain, refHost string
+	// An unparseable ref leaves both empty, so no host counts as the ref's own;
+	// PullImage rejects such a ref moments later regardless.
+	if named, err := distribution.ParseDockerRef(ref); err == nil {
+		refDomain = distribution.Domain(named)
+		// The resolver invokes the callback with the remapped host, so compare
+		// against "registry-1.docker.io" as well as "docker.io".
+		refHost, _ = docker.DefaultHost(refDomain)
+	}
+	forwardToMirrors := c.config.Registry.ForwardRequestAuthToMirrors
+
+	return func(host string) (string, string, error) {
+		hostauth := reqAuth
+		if hostauth == nil {
+			config := c.config.Registry.Configs[host]
+			if config.Auth != nil {
+				hostauth = toRuntimeAuthConfig(*config.Auth)
+			}
+		} else if forwardToMirrors && host != refDomain && host != refHost && hostauth.GetServerAddress() != "" {
+			hostauth = &runtime.AuthConfig{
+				Username:      hostauth.GetUsername(),
+				Password:      hostauth.GetPassword(),
+				Auth:          hostauth.GetAuth(),
+				IdentityToken: hostauth.GetIdentityToken(),
+				RegistryToken: hostauth.GetRegistryToken(),
+			}
+		}
+		return ParseAuth(hostauth, host)
+	}
 }
 
 func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (_ string, err error) {

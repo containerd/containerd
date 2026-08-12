@@ -254,6 +254,23 @@ type Registry struct {
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
 	Headers map[string][]string `toml:"headers" json:"headers"`
+	// ForwardRequestAuthToMirrors makes the auth from a CRI PullImageRequest
+	// (e.g. a pod's imagePullSecrets) reach every host the resolver contacts,
+	// including mirrors, even when the request's AuthConfig has a
+	// ServerAddress that names only the registry the image reference itself
+	// points at.
+	//
+	// Kubernetes credential providers usually build the AuthConfig from a
+	// docker config auths entry, which sets ServerAddress. ParseAuth then
+	// strips the credentials away from any host that doesn't match, so a
+	// registry pull secret never reaches the mirror in front of that
+	// registry. When this option is true, containerd hands mirrors an
+	// unscoped copy of the request auth so ParseAuth delivers it.
+	//
+	// Defaults to false to preserve historical scoping behavior; enable
+	// it only when the mirror is trusted to see the same credentials as the
+	// upstream registry.
+	ForwardRequestAuthToMirrors bool `toml:"forward_request_auth_to_mirrors" json:"forwardRequestAuthToMirrors"`
 }
 
 // RegistryConfig contains configuration used to communicate with the registry.
