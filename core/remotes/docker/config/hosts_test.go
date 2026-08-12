@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -399,34 +400,59 @@ func TestDialTimeoutPreservesGlobalDialContext(t *testing.T) {
 	}
 }
 
-// TestNewDNSDialContextFallback verifies that newDNSDialContext falls back to
-// the system resolver when all configured DNS servers are unreachable.
-func TestNewDNSDialContextFallback(t *testing.T) {
-	// Bind a UDP port and immediately close it. Any query sent to that address
-	// will receive a "port unreachable" response, causing LookupHost to
-	// fail.
-	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+func TestDNSDialUsesServersInOrder(t *testing.T) {
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	badServer := pc.LocalAddr().(*net.UDPAddr).IP.String()
-	pc.Close()
+	defer listener.Close()
 
-	dialFn := newDNSDialContext([]string{badServer}, 10*time.Second)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-
-	conn, err := dialFn(ctx, "tcp", "localhost:1")
-	if conn != nil {
-		conn.Close()
+	var order []string
+	first := func(context.Context, string) ([]string, error) {
+		order = append(order, "first")
+		return nil, &net.DNSError{IsTimeout: true}
 	}
-
-	if ctx.Err() != nil {
-		t.Fatal("DialContext timed out: bad DNS server was not failed over to the system resolver")
+	second := func(context.Context, string) ([]string, error) {
+		order = append(order, "second")
+		return []string{"127.0.0.1"}, nil
 	}
-	// TCP "connection refused" is expected
-	_ = err
+	dialFn := newDNSDialContextWithLookups([]hostLookup{first, second}, time.Second)
+
+	conn, err := dialFn(context.Background(), "tcp", net.JoinHostPort("registry.example.com", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+
+	want := []string{"first", "second"}
+	if !slices.Equal(order, want) {
+		t.Fatalf("lookup order = %v, want %v", order, want)
+	}
+}
+
+func TestDNSDialFallsBackToSystemResolver(t *testing.T) {
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	lookupCalls := 0
+	lookup := func(context.Context, string) ([]string, error) {
+		lookupCalls++
+		return nil, &net.DNSError{IsTimeout: true}
+	}
+	dialFn := newDNSDialContextWithLookups([]hostLookup{lookup}, time.Second)
+
+	conn, err := dialFn(context.Background(), "tcp", net.JoinHostPort("localhost", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+
+	if lookupCalls != 1 {
+		t.Fatalf("custom DNS lookup called %d times, want 1", lookupCalls)
+	}
 }
 
 func TestDNSDialTimeoutIncludesResolution(t *testing.T) {
