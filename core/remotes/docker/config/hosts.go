@@ -85,6 +85,24 @@ func NewDNSDialContext(dnsServers []string) func(context.Context, string, string
 }
 
 type hostLookup func(context.Context, string) ([]string, error)
+type dnsDialContext func(context.Context, string, string) (net.Conn, error)
+
+func newDNSHostLookup(server string) hostLookup {
+	return newDNSHostLookupWithDial(server, (&net.Dialer{}).DialContext)
+}
+
+func newDNSHostLookupWithDial(server string, dial dnsDialContext) hostLookup {
+	// Do not wrap the returned connection: Go's resolver selects UDP or TCP
+	// wire framing by type asserting net.PacketConn on it, and a wrapper that
+	// hides that interface makes every UDP query malformed.
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return dial(ctx, network, net.JoinHostPort(server, "53"))
+		},
+	}
+	return resolver.LookupHost
+}
 
 // newDNSDialContext builds a DialContext with a custom DNS resolver and the
 // given connection timeout. Used internally to combine dns_servers with a
@@ -96,13 +114,7 @@ func newDNSDialContext(dnsServers []string, timeout time.Duration) func(context.
 	// detected and fallback to the system resolver is never reached.
 	lookups := make([]hostLookup, len(dnsServers))
 	for i, server := range dnsServers {
-		resolver := &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return (&net.Dialer{}).DialContext(ctx, network, net.JoinHostPort(server, "53"))
-			},
-		}
-		lookups[i] = resolver.LookupHost
+		lookups[i] = newDNSHostLookup(server)
 	}
 	return newDNSDialContextWithLookups(lookups, timeout)
 }
@@ -127,6 +139,11 @@ func newDNSDialContextWithLookups(lookups []hostLookup, timeout time.Duration) f
 		host, port, _ := net.SplitHostPort(addr)
 		// Only apply custom resolution for hostnames; IP literals need no DNS.
 		if host != "" && net.ParseIP(host) == nil {
+			// answered records that some configured server refused the query
+			// outright. The system resolver is only used when none of them
+			// could answer.
+			var answered bool
+			var lastErr error
 			for _, lookup := range lookups {
 				if ctx.Err() != nil {
 					break
@@ -134,6 +151,20 @@ func newDNSDialContextWithLookups(lookups []hostLookup, timeout time.Duration) f
 				rCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				ips, err := lookup(rCtx, host)
 				cancel()
+				lastErr = err
+				var dnsErr *net.DNSError
+				if errors.As(err, &dnsErr) {
+					// A definitive NXDOMAIN is an answer
+					if dnsErr.IsNotFound {
+						return nil, err
+					}
+					// A refusal is a policy decision by a working server, so
+					// respect it rather than look for a resolver that answers
+					// differently.
+					if !dnsErr.IsTimeout && !dnsErr.IsTemporary {
+						answered = true
+					}
+				}
 				if err == nil && len(ips) > 0 {
 					var dialErrors []error
 					// Try addresses until one connects. Give each non-final attempt
@@ -154,6 +185,9 @@ func newDNSDialContextWithLookups(lookups []hostLookup, timeout time.Duration) f
 					}
 					return nil, errors.Join(dialErrors...)
 				}
+			}
+			if answered {
+				return nil, lastErr
 			}
 		}
 
