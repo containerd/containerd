@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -426,6 +427,27 @@ func TestNewDNSDialContextFallback(t *testing.T) {
 	}
 	// TCP "connection refused" is expected
 	_ = err
+}
+
+func TestDNSDialTimeoutIncludesResolution(t *testing.T) {
+	const timeout = 50 * time.Millisecond
+	lookup := func(ctx context.Context, host string) ([]string, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	dialFn := newDNSDialContextWithLookups([]hostLookup{lookup}, timeout)
+
+	started := time.Now()
+	_, err := dialFn(context.Background(), "tcp", "registry.example.com:443")
+	if err == nil {
+		t.Fatal("expected dial to time out")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("dial error = %v, want context deadline exceeded", err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("dial took %v, want it bounded by %v", elapsed, timeout)
+	}
 }
 
 func TestHTTPFallback(t *testing.T) {
