@@ -42,6 +42,8 @@ func NewAPI(nri.API, CRIImplementation) *API {
 	return nil
 }
 
+func (*API) IsDisabled() bool { return true }
+
 func (a *API) Register() error {
 	return nil
 }

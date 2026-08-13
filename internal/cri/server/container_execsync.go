@@ -34,6 +34,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
@@ -109,7 +110,7 @@ type execOptions struct {
 	timeout time.Duration
 }
 
-func (c *criService) execInternal(ctx context.Context, container containerd.Container, id string, opts execOptions) (*uint32, error) {
+func (c *criService) execInternal(ctx context.Context, container containerd.Container, id, execID string, opts execOptions) (*uint32, error) {
 	// Cancel the context before returning to ensure goroutines are stopped.
 	// This is important, because if `Start` returns error, `Wait` will hang
 	// forever unless we cancel the context.
@@ -154,7 +155,6 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	if opts.stderr == nil {
 		opts.stderr = cio.NewDiscardLogger()
 	}
-	execID := util.GenerateID()
 	log.G(ctx).Debugf("Generated exec id %q for container %q", execID, id)
 	volatileRootDir := c.getVolatileContainerRootDir(id)
 	var execIO *cio.ExecIO
@@ -270,9 +270,10 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 // to exit and log the exit code, but dockershim won't.
 func (c *criService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
 	span := tracing.SpanFromContext(ctx)
-	// Get container from our container store.
-	cntr, err := c.containerStore.Get(id)
-
+	// Admit the actual Exec while briefly holding the sandbox operation lock.
+	// Checkpoint can then reject active exec processes, while Stop/Remove remain
+	// able to acquire the lifecycle lock and terminate a long-running exec.
+	cntr, unlock, err := c.lockContainerSandboxOperation(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container %q in store: %w", id, err)
 	}
@@ -281,10 +282,36 @@ func (c *criService) execInContainer(ctx context.Context, id string, opts execOp
 
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
+		unlock()
 		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))
 	}
+	sandboxID := cntr.SandboxID
+	execID := util.GenerateID()
+	if err := cntr.Status.UpdateSync(func(s containerstore.Status) (containerstore.Status, error) {
+		s.ActiveExecIDs = append(s.ActiveExecIDs, execID)
+		return s, nil
+	}); err != nil {
+		unlock()
+		return nil, fmt.Errorf("failed to persist exec %q admission: %w", execID, err)
+	}
+	c.beginSandboxExec(sandboxID)
+	unlock()
+	defer c.endSandboxExec(sandboxID)
+	defer func() {
+		if err := cntr.Status.UpdateSync(func(s containerstore.Status) (containerstore.Status, error) {
+			for i, id := range s.ActiveExecIDs {
+				if id == execID {
+					s.ActiveExecIDs = append(s.ActiveExecIDs[:i], s.ActiveExecIDs[i+1:]...)
+					break
+				}
+			}
+			return s, nil
+		}); err != nil {
+			log.G(ctx).WithError(err).Errorf("Failed to clear persisted exec %q for container %q", execID, id)
+		}
+	}()
 
-	return c.execInternal(ctx, cntr.Container, id, opts)
+	return c.execInternal(ctx, cntr.Container, id, execID, opts)
 }
 
 // drainExecSyncIO drains process IO with timeout after exec init process exits.

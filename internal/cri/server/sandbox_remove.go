@@ -34,7 +34,7 @@ import (
 func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodSandboxRequest) (*runtime.RemovePodSandboxResponse, error) {
 	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
-	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	sandbox, unlock, err := c.lockSandboxLifecycleByID(ctx, r.GetPodSandboxId())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %w",
@@ -45,6 +45,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 			r.GetPodSandboxId())
 		return &runtime.RemovePodSandboxResponse{}, nil
 	}
+	defer unlock()
 
 	defer c.nri.BlockPluginSync().Unblock()
 
@@ -86,7 +87,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		if cntr.SandboxID != id {
 			continue
 		}
-		_, err = c.RemoveContainer(ctx, &runtime.RemoveContainerRequest{ContainerId: cntr.ID})
+		_, err = c.removeContainer(ctx, &runtime.RemoveContainerRequest{ContainerId: cntr.ID}, false)
 		if err != nil {
 			return nil, fmt.Errorf("failed to remove container %q: %w", cntr.ID, err)
 		}
@@ -96,13 +97,25 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		return nil, fmt.Errorf("failed to delete sandbox %q: %w", id, err)
 	}
 
-	// Send CONTAINER_DELETED event with ContainerId equal to SandboxId.
-	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
-
 	err = c.nri.RemovePodSandbox(ctx, &sandbox)
 	if err != nil {
 		log.G(ctx).WithError(err).Errorf("NRI pod removal notification failed")
 	}
+
+	// Delete the durable sandbox record before making the removal visible in the
+	// in-memory CRI store. If persistence fails, retaining the in-memory entry
+	// makes the operation retryable and prevents a stale restore marker/name from
+	// becoming unreachable through the normal CRI removal path.
+	if err := c.client.SandboxStore().Delete(ctx, id); err != nil {
+		if !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to remove sandbox metadata from store: %w", err)
+		}
+		log.G(ctx).WithError(err).Warnf("failed to delete sandbox metadata from store: %q maybe recovered from v1.x release", id)
+	}
+
+	// Emit the terminal event only after the durable delete has succeeded, so a
+	// failed removal remains retryable without publishing a false final state.
+	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
 
 	// Remove sandbox from sandbox store. Note that once the sandbox is successfully
 	// deleted:
@@ -110,13 +123,6 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// 2) PodSandboxStatus and StopPodSandbox will return error.
 	// 3) On-going operations which have held the reference will not be affected.
 	c.sandboxStore.Delete(id)
-
-	if err := c.client.SandboxStore().Delete(ctx, id); err != nil {
-		if !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to remove sandbox metadata from store: %w", err)
-		}
-		log.G(ctx).WithError(err).Warnf("failed to delete sandbox metadata from store: %q maybe recovered from v1.x release", id)
-	}
 
 	// Release the sandbox name reserved for the sandbox.
 	c.sandboxNameIndex.ReleaseByKey(id)

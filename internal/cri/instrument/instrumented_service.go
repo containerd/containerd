@@ -84,6 +84,24 @@ func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	return res, errgrpc.ToGRPC(err)
 }
 
+func (in *instrumentedService) CheckpointPod(ctx context.Context, r *runtime.CheckpointPodRequest) (res *runtime.CheckpointPodResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	log.G(ctx).Infof("CheckpointPod for %q", r.GetPodSandboxId())
+	res, err = in.c.CheckpointPod(ctrdutil.WithNamespace(ctx), r)
+	return res, errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) RestorePod(ctx context.Context, r *runtime.RestorePodRequest) (res *runtime.RestorePodResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	log.G(ctx).Infof("RestorePod from %q", r.GetCheckpointPath())
+	res, err = in.c.RestorePod(ctrdutil.WithNamespace(ctx), r)
+	return res, errgrpc.ToGRPC(err)
+}
+
 func (in *instrumentedService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (res *runtime.ListPodSandboxResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err

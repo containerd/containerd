@@ -237,56 +237,15 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		}
 	}()
 	cfg := i.Config()
-	request := &tasks.CreateTaskRequest{
-		ContainerID: c.id,
-		Terminal:    cfg.Terminal,
-		Stdin:       cfg.Stdin,
-		Stdout:      cfg.Stdout,
-		Stderr:      cfg.Stderr,
-	}
-	if err := c.handleMounts(ctx, request); err != nil {
-		return nil, err
-	}
-
-	r, err := c.get(ctx)
+	request, info, err := c.newTaskCreateRequest(ctx, cfg, true, opts...)
 	if err != nil {
 		return nil, err
-	}
-	info := TaskInfo{
-		runtime:        r.Runtime.Name,
-		runtimeOptions: r.Runtime.Options,
-	}
-	for _, o := range opts {
-		if err := o(ctx, c.client, &info); err != nil {
-			return nil, err
-		}
-	}
-	for _, m := range info.RootFS {
-		request.Rootfs = append(request.Rootfs, &types.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		})
-	}
-	request.RuntimePath = info.RuntimePath
-	request.TaskApiAddress = info.taskAPIAddress
-	request.TaskApiVersion = info.taskAPIVersion
-	if info.Options != nil {
-		o, err := typeurl.MarshalAny(info.Options)
-		if err != nil {
-			return nil, err
-		}
-		request.Options = typeurl.MarshalProto(o)
 	}
 	t := &task{
 		client: c.client,
 		io:     i,
 		id:     c.id,
 		c:      c,
-	}
-	if info.Checkpoint != nil {
-		request.Checkpoint = info.Checkpoint
 	}
 
 	span.SetAttributes(
@@ -304,6 +263,62 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	)
 	t.pid = response.Pid
 	return t, nil
+}
+
+// NewRestoredTaskRequest builds task management data for a task whose rootfs
+// is restored and owned by the sandbox runtime. It never resolves or attaches
+// the container snapshotter rootfs.
+func NewRestoredTaskRequest(ctx context.Context, target Container, cfg cio.Config, opts ...NewTaskOpts) (*tasks.CreateTaskRequest, error) {
+	c, ok := target.(*container)
+	if !ok {
+		return nil, fmt.Errorf("unsupported container implementation %T: %w", target, errdefs.ErrInvalidArgument)
+	}
+	request, _, err := c.newTaskCreateRequest(ctx, cfg, false, opts...)
+	return request, err
+}
+
+func (c *container) newTaskCreateRequest(ctx context.Context, cfg cio.Config, withRootfs bool, opts ...NewTaskOpts) (*tasks.CreateTaskRequest, TaskInfo, error) {
+	request := &tasks.CreateTaskRequest{
+		ContainerID: c.id,
+		Terminal:    cfg.Terminal,
+		Stdin:       cfg.Stdin,
+		Stdout:      cfg.Stdout,
+		Stderr:      cfg.Stderr,
+	}
+	if withRootfs {
+		if err := c.handleMounts(ctx, request); err != nil {
+			return nil, TaskInfo{}, err
+		}
+	}
+	r, err := c.get(ctx)
+	if err != nil {
+		return nil, TaskInfo{}, err
+	}
+	info := TaskInfo{runtime: r.Runtime.Name, runtimeOptions: r.Runtime.Options}
+	for _, o := range opts {
+		if err := o(ctx, c.client, &info); err != nil {
+			return nil, TaskInfo{}, err
+		}
+	}
+	if withRootfs {
+		for _, m := range info.RootFS {
+			request.Rootfs = append(request.Rootfs, &types.Mount{Type: m.Type, Source: m.Source, Target: m.Target, Options: m.Options})
+		}
+	}
+	request.RuntimePath = info.RuntimePath
+	request.TaskApiAddress = info.taskAPIAddress
+	request.TaskApiVersion = info.taskAPIVersion
+	if info.Options != nil {
+		o, err := typeurl.MarshalAny(info.Options)
+		if err != nil {
+			return nil, TaskInfo{}, err
+		}
+		request.Options = typeurl.MarshalProto(o)
+	}
+	if info.Checkpoint != nil {
+		request.Checkpoint = info.Checkpoint
+	}
+	return request, info, nil
 }
 
 func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) error {

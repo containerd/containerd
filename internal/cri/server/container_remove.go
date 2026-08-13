@@ -32,10 +32,26 @@ import (
 
 // RemoveContainer removes the container.
 func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
+	return c.removeContainer(ctx, r, true)
+}
+
+// removeContainer performs container removal. Callers that already hold the
+// owning sandbox operation lock must pass lockSandbox=false to avoid re-entering
+// the non-reentrant keyed lock.
+func (c *criService) removeContainer(ctx context.Context, r *runtime.RemoveContainerRequest, lockSandbox bool) (_ *runtime.RemoveContainerResponse, retErr error) {
 	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
 	ctrID := r.GetContainerId()
-	container, err := c.containerStore.Get(ctrID)
+	var (
+		container containerstore.Container
+		unlock    func()
+		err       error
+	)
+	if lockSandbox {
+		container, unlock, err = c.lockContainerSandboxOperation(ctx, ctrID)
+	} else {
+		container, err = c.containerStore.Get(ctrID)
+	}
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("an error occurred when try to find container %q: %w", ctrID, err)
@@ -43,6 +59,9 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		// Do not return error if container metadata doesn't exist.
 		log.G(ctx).Tracef("RemoveContainer called for container %q that does not exist", ctrID)
 		return &runtime.RemoveContainerResponse{}, nil
+	}
+	if unlock != nil {
+		defer unlock()
 	}
 
 	defer c.nri.BlockPluginSync().Unblock()
@@ -103,8 +122,20 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	// kubelet implementation, we'll never start a container once we decide to remove it,
 	// so we don't need the "Dead" state for now.
 
-	// Delete containerd container.
-	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+	// Restored sandbox tasks have no containerd snapshot: their writable rootfs
+	// remains owned by the sandbox runtime until ShutdownSandbox.
+	deleteOpts := []containerd.DeleteOpts{}
+	if i.Labels[restoredTaskSourceLabel] == restoredTaskSourceValue {
+		if c.restoredTaskManager == nil {
+			return nil, fmt.Errorf("tasks service does not support restored task cleanup: %w", errdefs.ErrNotImplemented)
+		}
+		if err := c.restoredTaskManager.CleanupRestoredTask(ctx, id); err != nil {
+			return nil, fmt.Errorf("failed to remove restored task %q: %w", id, err)
+		}
+	} else {
+		deleteOpts = append(deleteOpts, containerd.WithSnapshotCleanup)
+	}
+	if err := container.Container.Delete(ctx, deleteOpts...); err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to delete containerd container %q: %w", id, err)
 		}

@@ -31,6 +31,11 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	return nil, nil
 }
 
+// No rootfs-independent restore spec options are needed for Windows.
+func (c *criService) restorePlatformSpecOpts(platform imagespec.Platform, config *runtime.ContainerConfig) ([]oci.SpecOpts, error) {
+	return nil, nil
+}
+
 // snapshotterOpts returns any Windows specific snapshotter options for the r/w layer
 func snapshotterOpts(config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
 	var opts []snapshots.Opt

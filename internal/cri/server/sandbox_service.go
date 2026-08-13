@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/errdefs"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/client"
@@ -124,4 +125,28 @@ func (c *criSandboxService) StopSandbox(ctx context.Context, sandboxer, sandboxI
 		return err
 	}
 	return ctrl.Stop(ctx, sandboxID, opts...)
+}
+
+func (c *criSandboxService) CheckpointSandbox(ctx context.Context, sandboxer, sandboxID string, opts sandbox.CheckpointOptions) error {
+	ctrl, err := c.SandboxController(sandboxer)
+	if err != nil {
+		return err
+	}
+	checkpointController, ok := ctrl.(sandbox.CheckpointRestoreController)
+	if !ok {
+		return fmt.Errorf("sandbox controller %q does not support checkpoint: %w", sandboxer, errdefs.ErrNotImplemented)
+	}
+	return checkpointController.Checkpoint(ctx, sandboxID, opts)
+}
+
+func (c *criSandboxService) RestoreSandbox(ctx context.Context, sandboxer string, info sandbox.Sandbox, opts sandbox.RestoreOptions) (sandbox.RestoreResult, error) {
+	ctrl, err := c.SandboxController(sandboxer)
+	if err != nil {
+		return sandbox.RestoreResult{}, err
+	}
+	restoreController, ok := ctrl.(sandbox.CheckpointRestoreController)
+	if !ok {
+		return sandbox.RestoreResult{}, fmt.Errorf("sandbox controller %q does not support restore: %w", sandboxer, errdefs.ErrNotImplemented)
+	}
+	return restoreController.Restore(ctx, info, opts)
 }

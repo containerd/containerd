@@ -36,6 +36,10 @@ func TestMetadataMarshalUnmarshal(t *testing.T) {
 				Attempt:   1,
 			},
 		},
+		Restore: &RestoreMetadata{
+			State: "restored-created", CheckpointPath: "/checkpoints/pod",
+			ExpectedContainers: []RestoreContainer{{Name: "app", ID: "new-id"}},
+		},
 	}
 	assert := assertlib.New(t)
 	newMeta := &Metadata{}

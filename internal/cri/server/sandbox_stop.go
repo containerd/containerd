@@ -34,7 +34,7 @@ import (
 // sandbox, they should be forcibly terminated.
 func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
 	span := tracing.SpanFromContext(ctx)
-	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	sandbox, unlock, err := c.lockSandboxLifecycleByID(ctx, r.GetPodSandboxId())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %w",
@@ -46,6 +46,7 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 		// https://github.com/kubernetes/cri-api/blob/c20fa40/pkg/apis/runtime/v1/api.proto#L45-L46
 		return &runtime.StopPodSandboxResponse{}, nil
 	}
+	defer unlock()
 
 	defer c.nri.BlockPluginSync().Unblock()
 

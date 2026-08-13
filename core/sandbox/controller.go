@@ -116,6 +116,54 @@ type Controller interface {
 	Update(ctx context.Context, sandboxID string, sandbox Sandbox, fields ...string) error
 }
 
+// CheckpointRestoreController is an optional sandbox controller capability.
+// Controllers that do not implement it do not support pod-level checkpoint
+// and restore.
+type CheckpointRestoreController interface {
+	Checkpoint(ctx context.Context, sandboxID string, opts CheckpointOptions) error
+	Restore(ctx context.Context, sandboxInfo Sandbox, opts RestoreOptions) (RestoreResult, error)
+}
+
+type CheckpointTask struct {
+	CheckpointKey string
+	TaskID        string
+}
+
+type CheckpointOptions struct {
+	OutputPath string
+	Tasks      []CheckpointTask
+	Options    map[string]string
+}
+
+type RestoreTask struct {
+	CheckpointKey string
+	TaskID        string
+	Bundle        string
+	Terminal      bool
+	Stdin         string
+	Stdout        string
+	Stderr        string
+	Options       typeurl.Any
+}
+
+type RestoreOptions struct {
+	CheckpointPath string
+	SandboxOptions typeurl.Any
+	NetNSPath      string
+	Options        map[string]string
+	Tasks          []RestoreTask
+}
+
+type RestoredTask struct {
+	CheckpointKey string
+	TaskID        string
+}
+
+type RestoreResult struct {
+	Controller ControllerInstance
+	Tasks      []RestoredTask
+}
+
 type ControllerInstance struct {
 	SandboxID string
 	Pid       uint32

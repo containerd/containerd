@@ -40,7 +40,7 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
 	// Get container config from container store.
-	container, err := c.containerStore.Get(r.GetContainerId())
+	container, unlock, err := c.lockContainerSandboxOperation(ctx, r.GetContainerId())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
@@ -51,6 +51,7 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 		// https://github.com/kubernetes/cri-api/blob/c20fa40/pkg/apis/runtime/v1/api.proto#L67-L68
 		return &runtime.StopContainerResponse{}, nil
 	}
+	defer unlock()
 
 	defer c.nri.BlockPluginSync().Unblock()
 

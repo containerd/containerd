@@ -100,6 +100,7 @@ type controllerLocal struct {
 }
 
 var _ sandbox.Controller = (*controllerLocal)(nil)
+var _ sandbox.CheckpointRestoreController = (*controllerLocal)(nil)
 
 func (c *controllerLocal) cleanupShim(ctx context.Context, sandboxID string, svc runtimeAPI.TTRPCSandboxService) {
 	// Let the shim exit, then we can clean up the bundle after.
@@ -351,4 +352,147 @@ func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI
 	}
 
 	return sandbox.NewClient(shim.Client())
+}
+
+func (c *controllerLocal) Checkpoint(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) error {
+	svc, err := c.getSandbox(ctx, sandboxID)
+	if err != nil {
+		return err
+	}
+
+	tasks := make([]*runtimeAPI.SandboxCheckpointTask, 0, len(opts.Tasks))
+	for _, task := range opts.Tasks {
+		tasks = append(tasks, &runtimeAPI.SandboxCheckpointTask{
+			CheckpointKey: task.CheckpointKey,
+			TaskID:        task.TaskID,
+		})
+	}
+
+	_, err = svc.CheckpointSandbox(ctx, &runtimeAPI.CheckpointSandboxRequest{
+		SandboxID:  sandboxID,
+		OutputPath: opts.OutputPath,
+		Tasks:      tasks,
+		Options:    cloneStringMap(opts.Options),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to checkpoint sandbox %s: %w", sandboxID, errgrpc.ToNative(err))
+	}
+	return nil
+}
+
+func (c *controllerLocal) Restore(ctx context.Context, info sandbox.Sandbox, opts sandbox.RestoreOptions) (_ sandbox.RestoreResult, retErr error) {
+	if _, err := c.shims.Get(ctx, info.ID); err == nil {
+		return sandbox.RestoreResult{}, fmt.Errorf("sandbox %s already running: %w", info.ID, errdefs.ErrAlreadyExists)
+	}
+
+	bundle, err := v2.NewBundle(ctx, c.root, c.state, info.ID, info.Spec)
+	if err != nil {
+		return sandbox.RestoreResult{}, err
+	}
+	defer func() {
+		if retErr != nil {
+			bundle.Delete()
+		}
+	}()
+
+	shim, err := c.shims.Start(ctx, info.ID, bundle, runtime.CreateOpts{
+		Spec:           info.Spec,
+		RuntimeOptions: info.Runtime.Options,
+		Runtime:        info.Runtime.Name,
+	})
+	if err != nil {
+		return sandbox.RestoreResult{}, fmt.Errorf("failed to start new shim for restored sandbox %s: %w", info.ID, err)
+	}
+
+	var svc runtimeAPI.TTRPCSandboxService
+	defer func() {
+		if retErr == nil {
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if svc != nil {
+			c.cleanupShim(cleanupCtx, info.ID, svc)
+			return
+		}
+		if err := c.shims.Delete(cleanupCtx, info.ID); err != nil && !errdefs.IsNotFound(err) {
+			log.G(cleanupCtx).WithError(err).WithField("sandboxID", info.ID).Error("failed to delete restore shim")
+		}
+	}()
+
+	svc, err = sandbox.NewClient(shim.Client())
+	if err != nil {
+		return sandbox.RestoreResult{}, err
+	}
+
+	tasks := make([]*runtimeAPI.SandboxRestoreTask, 0, len(opts.Tasks))
+	for _, task := range opts.Tasks {
+		tasks = append(tasks, &runtimeAPI.SandboxRestoreTask{
+			CheckpointKey: task.CheckpointKey,
+			TaskID:        task.TaskID,
+			Bundle:        task.Bundle,
+			Terminal:      task.Terminal,
+			Stdin:         task.Stdin,
+			Stdout:        task.Stdout,
+			Stderr:        task.Stderr,
+			Options:       typeurl.MarshalProto(task.Options),
+		})
+	}
+
+	resp, err := svc.RestoreSandbox(ctx, &runtimeAPI.RestoreSandboxRequest{
+		SandboxID:      info.ID,
+		BundlePath:     shim.Bundle(),
+		CheckpointPath: opts.CheckpointPath,
+		SandboxOptions: typeurl.MarshalProto(opts.SandboxOptions),
+		NetnsPath:      opts.NetNSPath,
+		Options:        cloneStringMap(opts.Options),
+		Tasks:          tasks,
+	})
+	if err != nil {
+		return sandbox.RestoreResult{}, fmt.Errorf("failed to restore sandbox %s: %w", info.ID, errgrpc.ToNative(err))
+	}
+	if resp.GetCreatedAt() == nil {
+		return sandbox.RestoreResult{}, fmt.Errorf("restore sandbox %s returned no creation time: %w", info.ID, errdefs.ErrInvalidArgument)
+	}
+
+	restored := make([]sandbox.RestoredTask, 0, len(resp.GetTasks()))
+	for _, task := range resp.GetTasks() {
+		restored = append(restored, sandbox.RestoredTask{
+			CheckpointKey: task.GetCheckpointKey(),
+			TaskID:        task.GetTaskID(),
+		})
+	}
+	address, version := shim.Endpoint()
+	return sandbox.RestoreResult{
+		Controller: sandbox.ControllerInstance{
+			SandboxID: info.ID,
+			Pid:       resp.GetPid(),
+			CreatedAt: resp.GetCreatedAt().AsTime(),
+			Address:   address,
+			Version:   uint32(version),
+			Spec:      restoredSandboxSpec(resp.GetSpec()),
+		},
+		Tasks: restored,
+	}, nil
+}
+
+// restoredSandboxSpec treats an Any without a type URL as absent. Persisting
+// an empty Any makes later sandbox status/metrics paths repeatedly attempt an
+// impossible typeurl decode.
+func restoredSandboxSpec(spec typeurl.Any) typeurl.Any {
+	if spec == nil || spec.GetTypeUrl() == "" {
+		return nil
+	}
+	return spec
+}
+
+func cloneStringMap(in map[string]string) map[string]string {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }

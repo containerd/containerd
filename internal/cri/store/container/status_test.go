@@ -53,6 +53,13 @@ func TestDeepCopyOfWindowsAffinityCpus(t *testing.T) {
 	assertlib.Equal(t, uint64(0x3), orig.Resources.Windows.AffinityCpus[0].CpuMask)
 }
 
+func TestDeepCopyOfActiveExecIDs(t *testing.T) {
+	orig := Status{ActiveExecIDs: []string{"exec-1"}}
+	cp := deepCopyOf(orig)
+	cp.ActiveExecIDs[0] = "changed"
+	assertlib.Equal(t, []string{"exec-1"}, orig.ActiveExecIDs)
+}
+
 func TestContainerState(t *testing.T) {
 	for c, test := range map[string]struct {
 		status Status
@@ -97,16 +104,17 @@ func TestContainerState(t *testing.T) {
 
 func TestStatusEncodeDecode(t *testing.T) {
 	s := &Status{
-		Pid:        1234,
-		CreatedAt:  time.Now().UnixNano(),
-		StartedAt:  time.Now().UnixNano(),
-		FinishedAt: time.Now().UnixNano(),
-		ExitCode:   1,
-		Reason:     "test-reason",
-		Message:    "test-message",
-		Removing:   true,
-		Starting:   true,
-		Unknown:    true,
+		Pid:           1234,
+		CreatedAt:     time.Now().UnixNano(),
+		StartedAt:     time.Now().UnixNano(),
+		FinishedAt:    time.Now().UnixNano(),
+		ExitCode:      1,
+		Reason:        "test-reason",
+		Message:       "test-message",
+		Removing:      true,
+		Starting:      true,
+		Unknown:       true,
+		ActiveExecIDs: []string{"exec-1", "exec-2"},
 	}
 	assert := assertlib.New(t)
 	data, err := s.encode()
