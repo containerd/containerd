@@ -29,6 +29,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -91,6 +92,32 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 	span.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
 
+	var containerIO *cio.ContainerIO
+	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+	switch ociRuntime.IOType {
+	case criconfig.IOTypeStreaming:
+		cntr.Config.GetTty()
+		containerIO, err = cio.NewContainerIO(cntr.ID,
+			cio.WithStreams(sandbox.Endpoint.Address, cntr.Config.GetTty(), cntr.Config.GetStdin()))
+	default:
+		containerIO, err = cio.NewContainerIO(cntr.ID,
+			cio.WithNewFIFOs(c.getVolatileContainerRootDir(cntr.ID), cntr.Config.GetTty(), cntr.Config.GetStdin()))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create container io: %w", err)
+	}
+	defer func() {
+		if retErr != nil {
+			if err := containerIO.Close(); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to close container io %q", cntr.ID)
+			}
+		}
+	}()
+	cntr.IO = containerIO
+
 	ioCreation := func(id string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
@@ -111,12 +138,6 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			}
 		}
 	}
-
-	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
-	}
-
 	var taskOpts []containerd.NewTaskOpts
 	if ociRuntime.Path != "" {
 		taskOpts = append(taskOpts, containerd.WithRuntimePath(ociRuntime.Path))
