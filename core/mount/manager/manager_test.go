@@ -617,3 +617,34 @@ func TestClose(t *testing.T) {
 	_, err = db.Begin(false)
 	assert.ErrorIs(t, err, bolterr.ErrDatabaseNotOpen)
 }
+
+// TestActivateAllMountsHandled covers a transformed chain in which every
+// mount is handled by the manager, leaving no system mount to convert.
+func TestActivateAllMountsHandled(t *testing.T) {
+	td := t.TempDir()
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	mountC := new(atomic.Int32)
+	m, err := NewManager(db, filepath.Join(td, "m"),
+		WithMountHandler("lower", &noopHandler{mounts: mountC}),
+		WithMountHandler("upper", &noopHandler{mounts: mountC}))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
+
+	// Both mounts carry a transform and both have a handler, so
+	// firstSystemMount is the length of the chain.
+	ainfo, err := m.Activate(ctx, "a", []mount.Mount{
+		{Type: "format/lower", Source: "/dev/null"},
+		{Type: "format/upper", Source: "{{ mount 0 }}/child"},
+	})
+	require.NoError(t, err)
+	require.Len(t, ainfo.Active, 2)
+	assert.Empty(t, ainfo.System, "nothing is left for the system to mount")
+	assert.Equal(t, ainfo.Active[0].MountPoint+"/child", ainfo.Active[1].Source,
+		"the second mount should resolve against the first")
+
+	require.NoError(t, m.Deactivate(ctx, "a"))
+	assert.Equal(t, int32(0), mountC.Load())
+}
