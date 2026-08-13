@@ -17,6 +17,8 @@ type TTRPCSandboxService interface {
 	PingSandbox(context.Context, *PingRequest) (*PingResponse, error)
 	ShutdownSandbox(context.Context, *ShutdownSandboxRequest) (*ShutdownSandboxResponse, error)
 	SandboxMetrics(context.Context, *SandboxMetricsRequest) (*SandboxMetricsResponse, error)
+	CheckpointSandbox(context.Context, *CheckpointSandboxRequest) (*CheckpointSandboxResponse, error)
+	RestoreSandbox(context.Context, *RestoreSandboxRequest) (*RestoreSandboxResponse, error)
 }
 
 func RegisterTTRPCSandboxService(srv *ttrpc.Server, svc TTRPCSandboxService) {
@@ -84,6 +86,20 @@ func RegisterTTRPCSandboxService(srv *ttrpc.Server, svc TTRPCSandboxService) {
 					return nil, err
 				}
 				return svc.SandboxMetrics(ctx, &req)
+			},
+			"CheckpointSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req CheckpointSandboxRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.CheckpointSandbox(ctx, &req)
+			},
+			"RestoreSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req RestoreSandboxRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.RestoreSandbox(ctx, &req)
 			},
 		},
 	})
@@ -166,6 +182,22 @@ func (c *ttrpcsandboxClient) ShutdownSandbox(ctx context.Context, req *ShutdownS
 func (c *ttrpcsandboxClient) SandboxMetrics(ctx context.Context, req *SandboxMetricsRequest) (*SandboxMetricsResponse, error) {
 	var resp SandboxMetricsResponse
 	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "SandboxMetrics", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpcsandboxClient) CheckpointSandbox(ctx context.Context, req *CheckpointSandboxRequest) (*CheckpointSandboxResponse, error) {
+	var resp CheckpointSandboxResponse
+	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "CheckpointSandbox", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpcsandboxClient) RestoreSandbox(ctx context.Context, req *RestoreSandboxRequest) (*RestoreSandboxResponse, error) {
+	var resp RestoreSandboxResponse
+	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "RestoreSandbox", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

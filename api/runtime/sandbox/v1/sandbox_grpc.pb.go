@@ -44,6 +44,10 @@ type SandboxClient interface {
 	ShutdownSandbox(ctx context.Context, in *ShutdownSandboxRequest, opts ...grpc.CallOption) (*ShutdownSandboxResponse, error)
 	// SandboxMetrics retrieves metrics about a sandbox instance.
 	SandboxMetrics(ctx context.Context, in *SandboxMetricsRequest, opts ...grpc.CallOption) (*SandboxMetricsResponse, error)
+	// CheckpointSandbox checkpoints a consistent set of tasks in a sandbox.
+	CheckpointSandbox(ctx context.Context, in *CheckpointSandboxRequest, opts ...grpc.CallOption) (*CheckpointSandboxResponse, error)
+	// RestoreSandbox restores a sandbox and all requested tasks in CREATED state.
+	RestoreSandbox(ctx context.Context, in *RestoreSandboxRequest, opts ...grpc.CallOption) (*RestoreSandboxResponse, error)
 }
 
 type sandboxClient struct {
@@ -135,6 +139,24 @@ func (c *sandboxClient) SandboxMetrics(ctx context.Context, in *SandboxMetricsRe
 	return out, nil
 }
 
+func (c *sandboxClient) CheckpointSandbox(ctx context.Context, in *CheckpointSandboxRequest, opts ...grpc.CallOption) (*CheckpointSandboxResponse, error) {
+	out := new(CheckpointSandboxResponse)
+	err := c.cc.Invoke(ctx, "/containerd.runtime.sandbox.v1.Sandbox/CheckpointSandbox", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sandboxClient) RestoreSandbox(ctx context.Context, in *RestoreSandboxRequest, opts ...grpc.CallOption) (*RestoreSandboxResponse, error) {
+	out := new(RestoreSandboxResponse)
+	err := c.cc.Invoke(ctx, "/containerd.runtime.sandbox.v1.Sandbox/RestoreSandbox", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SandboxServer is the server API for Sandbox service.
 // All implementations must embed UnimplementedSandboxServer
 // for forward compatibility
@@ -159,6 +181,10 @@ type SandboxServer interface {
 	ShutdownSandbox(context.Context, *ShutdownSandboxRequest) (*ShutdownSandboxResponse, error)
 	// SandboxMetrics retrieves metrics about a sandbox instance.
 	SandboxMetrics(context.Context, *SandboxMetricsRequest) (*SandboxMetricsResponse, error)
+	// CheckpointSandbox checkpoints a consistent set of tasks in a sandbox.
+	CheckpointSandbox(context.Context, *CheckpointSandboxRequest) (*CheckpointSandboxResponse, error)
+	// RestoreSandbox restores a sandbox and all requested tasks in CREATED state.
+	RestoreSandbox(context.Context, *RestoreSandboxRequest) (*RestoreSandboxResponse, error)
 	mustEmbedUnimplementedSandboxServer()
 }
 
@@ -192,6 +218,12 @@ func (UnimplementedSandboxServer) ShutdownSandbox(context.Context, *ShutdownSand
 }
 func (UnimplementedSandboxServer) SandboxMetrics(context.Context, *SandboxMetricsRequest) (*SandboxMetricsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SandboxMetrics not implemented")
+}
+func (UnimplementedSandboxServer) CheckpointSandbox(context.Context, *CheckpointSandboxRequest) (*CheckpointSandboxResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckpointSandbox not implemented")
+}
+func (UnimplementedSandboxServer) RestoreSandbox(context.Context, *RestoreSandboxRequest) (*RestoreSandboxResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RestoreSandbox not implemented")
 }
 func (UnimplementedSandboxServer) mustEmbedUnimplementedSandboxServer() {}
 
@@ -368,6 +400,42 @@ func _Sandbox_SandboxMetrics_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sandbox_CheckpointSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckpointSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxServer).CheckpointSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.runtime.sandbox.v1.Sandbox/CheckpointSandbox",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxServer).CheckpointSandbox(ctx, req.(*CheckpointSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Sandbox_RestoreSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestoreSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxServer).RestoreSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.runtime.sandbox.v1.Sandbox/RestoreSandbox",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxServer).RestoreSandbox(ctx, req.(*RestoreSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Sandbox_ServiceDesc is the grpc.ServiceDesc for Sandbox service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -410,6 +478,14 @@ var Sandbox_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SandboxMetrics",
 			Handler:    _Sandbox_SandboxMetrics_Handler,
+		},
+		{
+			MethodName: "CheckpointSandbox",
+			Handler:    _Sandbox_CheckpointSandbox_Handler,
+		},
+		{
+			MethodName: "RestoreSandbox",
+			Handler:    _Sandbox_RestoreSandbox_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
