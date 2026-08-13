@@ -25,7 +25,7 @@ import (
 )
 
 func criSignalToOCIStopSignal(signal runtime.Signal) (string, error) {
-	if signal == runtime.Signal_RUNTIME_DEFAULT {
+	if signal == runtime.Signal_SIGNAL_RUNTIME_DEFAULT {
 		return "", nil
 	}
 
@@ -37,7 +37,8 @@ func criSignalToOCIStopSignal(signal runtime.Signal) (string, error) {
 }
 
 func convertFromCRISignal(criSignal string) string {
-	normalized := strings.Replace(criSignal, "PLUS", "+", 1)
+	normalized := strings.TrimPrefix(criSignal, "SIGNAL_")
+	normalized = strings.Replace(normalized, "PLUS", "+", 1)
 	normalized = strings.Replace(normalized, "MINUS", "-", 1)
 	return normalized
 }
@@ -46,9 +47,9 @@ func toCRISignal(stopsignal string) runtime.Signal {
 	stopsignal = strings.Replace(stopsignal, "+", "PLUS", 1)
 	stopsignal = strings.Replace(stopsignal, "-", "MINUS", 1)
 
-	signalValue, ok := runtime.Signal_value[stopsignal]
+	signalValue, ok := runtime.Signal_value["SIGNAL_"+stopsignal]
 	if !ok {
-		return runtime.Signal_RUNTIME_DEFAULT
+		return runtime.Signal_SIGNAL_RUNTIME_DEFAULT
 	}
 	return runtime.Signal(signalValue)
 }
