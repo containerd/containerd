@@ -286,7 +286,7 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: cntr.Container.ID()})
 		if err != nil {
 			err = errgrpc.ToNative(err)
-			if !errdefs.IsNotFound(err) {
+			if !errdefs.IsNotFound(err) && !ctrdutil.IsRuntimeStateMissing(err) {
 				return fmt.Errorf("failed to cleanup container %s in task-service: %w", cntr.Container.ID(), err)
 			}
 		}
