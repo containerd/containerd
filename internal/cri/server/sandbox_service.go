@@ -150,3 +150,27 @@ func (c *criSandboxService) RestoreSandbox(ctx context.Context, sandboxer string
 	}
 	return restoreController.Restore(ctx, info, opts)
 }
+
+func (c *criSandboxService) PrepareRestoreSandbox(ctx context.Context, sandboxer string, info sandbox.Sandbox, opts sandbox.RestoreOptions) (sandbox.ControllerInstance, error) {
+	ctrl, err := c.SandboxController(sandboxer)
+	if err != nil {
+		return sandbox.ControllerInstance{}, err
+	}
+	staged, ok := ctrl.(sandbox.StagedRestoreController)
+	if !ok {
+		return sandbox.ControllerInstance{}, fmt.Errorf("sandbox controller %q does not support staged restore: %w", sandboxer, errdefs.ErrNotImplemented)
+	}
+	return staged.PrepareRestore(ctx, info, opts)
+}
+
+func (c *criSandboxService) CompleteRestoreSandbox(ctx context.Context, sandboxer string, info sandbox.Sandbox, opts sandbox.RestoreOptions) ([]sandbox.RestoredTask, error) {
+	ctrl, err := c.SandboxController(sandboxer)
+	if err != nil {
+		return nil, err
+	}
+	staged, ok := ctrl.(sandbox.StagedRestoreController)
+	if !ok {
+		return nil, fmt.Errorf("sandbox controller %q does not support staged restore: %w", sandboxer, errdefs.ErrNotImplemented)
+	}
+	return staged.CompleteRestore(ctx, info, opts)
+}

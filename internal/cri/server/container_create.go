@@ -419,7 +419,11 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 
 	opts = append(opts, containerd.WithSandbox(r.sandboxID))
 
-	opts = append(opts, c.nri.WithContainerAdjustment())
+	if r.deferPublish {
+		opts = append(opts, c.nri.WithContainerAdjustmentForSandbox(r.sandbox))
+	} else {
+		opts = append(opts, c.nri.WithContainerAdjustment())
+	}
 	defer func() {
 		if retErr != nil {
 			deferCtx, deferCancel := util.DeferContext()

@@ -471,6 +471,11 @@ func (m *ShimManager) Get(ctx context.Context, id string) (ShimInstance, error) 
 	return m.shims.Get(ctx, id)
 }
 
+// RuntimeInfo queries capabilities advertised by a runtime binary.
+func (m *ShimManager) RuntimeInfo(ctx context.Context, runtime string) (*apitypes.RuntimeInfo, error) {
+	return getRuntimeInfo(ctx, m, &apitypes.RuntimeRequest{RuntimePath: runtime})
+}
+
 // Delete a runtime task
 func (m *ShimManager) Delete(ctx context.Context, id string) error {
 	shim, err := m.shims.Get(ctx, id)

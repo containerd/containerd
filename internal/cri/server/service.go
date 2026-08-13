@@ -99,6 +99,11 @@ type checkpointRestoreSandboxService interface {
 	RestoreSandbox(ctx context.Context, sandboxer string, info sandbox.Sandbox, opts sandbox.RestoreOptions) (sandbox.RestoreResult, error)
 }
 
+type stagedRestoreSandboxService interface {
+	PrepareRestoreSandbox(ctx context.Context, sandboxer string, info sandbox.Sandbox, opts sandbox.RestoreOptions) (sandbox.ControllerInstance, error)
+	CompleteRestoreSandbox(ctx context.Context, sandboxer string, info sandbox.Sandbox, opts sandbox.RestoreOptions) ([]sandbox.RestoredTask, error)
+}
+
 // RestoredTaskManager exposes the in-process restore staging operations. They
 // intentionally aren't part of the public Tasks gRPC service: restored tasks
 // already exist in the restored sandbox and must be adopted without Task.Create.

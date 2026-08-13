@@ -78,8 +78,17 @@ func (c *criService) RestorePod(ctx context.Context, request *runtime.RestorePod
 	if err != nil {
 		return nil, toCRIError(err)
 	}
-	if err := validateRestoreSupport(controller, ociRuntime.Sandboxer, c.nri.IsDisabled()); err != nil {
+	stagedRestore, err := validateRestoreSupport(ctx, controller, ociRuntime.Sandboxer, ociRuntime.Type, c.nri.IsDisabled())
+	if err != nil {
 		return nil, err
+	}
+	var stagedService stagedRestoreSandboxService
+	if stagedRestore {
+		var ok bool
+		stagedService, ok = c.sandboxService.(stagedRestoreSandboxService)
+		if !ok {
+			return nil, status.Error(codes.Unimplemented, "sandbox service does not support staged restore")
+		}
 	}
 	if c.restoredTaskManager == nil {
 		return nil, status.Error(codes.Unimplemented, "tasks service does not support restored task adoption")
@@ -139,6 +148,7 @@ func (c *criService) RestorePod(ctx context.Context, request *runtime.RestorePod
 		return nil, toCRIError(fmt.Errorf("failed to create restoring record: %w", err))
 	}
 	committed := false
+	nriSandboxStarted := false
 	defer func() {
 		if committed {
 			return
@@ -160,13 +170,20 @@ func (c *criService) RestorePod(ctx context.Context, request *runtime.RestorePod
 				recordCleanup("task resources", c.restoredTaskManager.CleanupRestoredTask(cc, plans[i].id))
 			}
 		}
+		if nriSandboxStarted {
+			for i := len(plans) - 1; i >= 0; i-- {
+				if plans[i].container.Container != nil {
+					if spec, err := plans[i].container.Container.Spec(cc); err == nil {
+						c.nri.UndoCreateContainer(cc, &sandbox, plans[i].id, spec)
+					}
+				}
+			}
+			recordCleanup("NRI pod sandbox", c.nri.RemovePodSandbox(cc, &sandbox))
+		}
 		recordCleanup("sandbox runtime", c.sandboxService.ShutdownSandbox(cc, sandbox.Sandboxer, sandboxID))
 		for i := len(plans) - 1; i >= 0; i-- {
 			if plans[i].container.Container != nil {
 				c.containerStore.Delete(plans[i].id)
-				if spec, err := plans[i].container.Container.Spec(cc); err == nil {
-					c.nri.UndoCreateContainer(cc, &sandbox, plans[i].id, spec)
-				}
 				if plans[i].container.IO != nil {
 					recordCleanup("container IO", plans[i].container.IO.Close())
 				}
@@ -214,6 +231,42 @@ func (c *criService) RestorePod(ctx context.Context, request *runtime.RestorePod
 	if err := c.setupRestorePodNetwork(ctx, &sandbox, &sandboxInfo); err != nil {
 		return nil, toCRIError(err)
 	}
+	packedConfig, err := typeurl.MarshalAny(config)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to marshal sandbox config: %v", err)
+	}
+	baseRestoreOptions := sb.RestoreOptions{
+		CheckpointPath: request.GetCheckpointPath(), SandboxOptions: packedConfig,
+		NetNSPath: sandbox.NetNSPath, Options: cloneStringMap(request.GetOptions()),
+	}
+	var preparedController sb.ControllerInstance
+	if stagedRestore {
+		for i := range plans {
+			baseRestoreOptions.Tasks = append(baseRestoreOptions.Tasks, sb.RestoreTask{
+				CheckpointKey: plans[i].name, TaskID: plans[i].id,
+			})
+		}
+		preparedController, err = stagedService.PrepareRestoreSandbox(
+			ctx, sandbox.Sandboxer, sandboxInfo, baseRestoreOptions,
+		)
+		if err != nil {
+			return nil, toCRIError(err)
+		}
+		sandbox.Endpoint = sandboxstore.Endpoint{
+			Address: preparedController.Address, Version: preparedController.Version,
+		}
+		if err := sandbox.Status.Update(func(s sandboxstore.Status) (sandboxstore.Status, error) {
+			s.Pid, s.CreatedAt = preparedController.Pid, preparedController.CreatedAt
+			return s, nil
+		}); err != nil {
+			return nil, toCRIError(err)
+		}
+		defer c.nri.BlockPluginSync().Unblock()
+		if err := c.nri.RunPodSandbox(ctx, &sandbox); err != nil {
+			return nil, toCRIError(fmt.Errorf("NRI RunPodSandbox failed: %w", err))
+		}
+		nriSandboxStarted = true
+	}
 	for i := range plans {
 		if err := c.containerNameIndex.Reserve(plans[i].fullName, plans[i].id); err != nil {
 			return nil, toCRIError(fmt.Errorf("failed to reserve container name %q: %w", plans[i].name, err))
@@ -223,6 +276,11 @@ func (c *criService) RestorePod(ctx context.Context, request *runtime.RestorePod
 			return nil, toCRIError(err)
 		}
 		plans[i].container = cntr
+		if stagedRestore {
+			if err := c.nri.PostCreateContainer(ctx, &sandbox, &plans[i].container); err != nil {
+				log.G(ctx).WithError(err).Errorf("NRI post-create notification failed for restored container %q", plans[i].name)
+			}
+		}
 		taskRequest, err := containerd.NewRestoredTaskRequest(ctx, cntr.Container, cntr.IO.Config())
 		if err != nil {
 			return nil, toCRIError(fmt.Errorf("failed to build task request for %q: %w", plans[i].name, err))
@@ -233,10 +291,6 @@ func (c *criService) RestorePod(ctx context.Context, request *runtime.RestorePod
 		}
 	}
 
-	packedConfig, err := typeurl.MarshalAny(config)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to marshal sandbox config: %v", err)
-	}
 	restoreTasks := make([]sb.RestoreTask, 0, len(plans))
 	for i := range plans {
 		prepared := plans[i].prepared.Create
@@ -251,10 +305,17 @@ func (c *criService) RestorePod(ctx context.Context, request *runtime.RestorePod
 			Options:       prepared.Options,
 		})
 	}
-	result, err := restoreService.RestoreSandbox(ctx, sandbox.Sandboxer, sandboxInfo, sb.RestoreOptions{
-		CheckpointPath: request.GetCheckpointPath(), SandboxOptions: packedConfig,
-		NetNSPath: sandbox.NetNSPath, Options: cloneStringMap(request.GetOptions()), Tasks: restoreTasks,
-	})
+	finalRestoreOptions := baseRestoreOptions
+	finalRestoreOptions.Tasks = restoreTasks
+	var result sb.RestoreResult
+	if stagedRestore {
+		result.Controller = preparedController
+		result.Tasks, err = stagedService.CompleteRestoreSandbox(
+			ctx, sandbox.Sandboxer, sandboxInfo, finalRestoreOptions,
+		)
+	} else {
+		result, err = restoreService.RestoreSandbox(ctx, sandbox.Sandboxer, sandboxInfo, finalRestoreOptions)
+	}
 	if err != nil {
 		return nil, toCRIError(err)
 	}
@@ -347,16 +408,24 @@ func (c *criService) RestorePod(ctx context.Context, request *runtime.RestorePod
 	return response, nil
 }
 
-func validateRestoreSupport(controller sb.Controller, sandboxer string, nriDisabled bool) error {
+func validateRestoreSupport(ctx context.Context, controller sb.Controller, sandboxer, runtime string, nriDisabled bool) (bool, error) {
 	if _, ok := controller.(sb.CheckpointRestoreController); !ok {
-		return status.Errorf(codes.Unimplemented, "sandbox controller %q does not support restore", sandboxer)
+		return false, status.Errorf(codes.Unimplemented, "sandbox controller %q does not support restore", sandboxer)
 	}
-	// FIXME: The current Sandbox API restores the sandbox and its tasks in one call,
-	// so it cannot preserve NRI's RunPodSandbox-before-CreateContainer ordering.
-	if !nriDisabled {
-		return status.Error(codes.Unimplemented, "pod restore with NRI enabled requires two-phase runtime restore to preserve NRI sandbox/container ordering")
+	if nriDisabled {
+		return false, nil
 	}
-	return nil
+	staged, ok := controller.(sb.StagedRestoreController)
+	if !ok {
+		return false, status.Error(codes.Unimplemented, "pod restore with NRI enabled requires a staged restore sandbox controller")
+	}
+	if err := staged.SupportsStagedRestore(ctx, runtime); err != nil {
+		if errdefs.IsNotImplemented(err) {
+			return false, status.Errorf(codes.Unimplemented, "runtime %q does not support staged pod restore", runtime)
+		}
+		return false, status.Errorf(codes.Internal, "failed to query runtime %q staged restore capability: %v", runtime, err)
+	}
+	return true, nil
 }
 
 func (c *criService) clearCompletedRestoreRecord(ctx context.Context, sbx sb.Sandbox, metadata *sandboxstore.Metadata) error {
@@ -374,6 +443,9 @@ func (c *criService) clearCompletedRestoreRecord(ctx context.Context, sbx sb.San
 func (c *criService) validateRestorePodRequest(request *runtime.RestorePodRequest) (*runtime.PodSandboxConfig, []restoreContainerPlan, criconfig.Runtime, error) {
 	if request == nil {
 		return nil, nil, criconfig.Runtime{}, status.Error(codes.InvalidArgument, "restore request is required")
+	}
+	if _, ok := request.GetOptions()[sb.RestorePhaseOption]; ok {
+		return nil, nil, criconfig.Runtime{}, status.Errorf(codes.InvalidArgument, "restore option %q is reserved", sb.RestorePhaseOption)
 	}
 	path := request.GetCheckpointPath()
 	if path == "" || !filepath.IsAbs(path) {

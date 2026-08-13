@@ -18,6 +18,7 @@ package sandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -101,6 +103,7 @@ type controllerLocal struct {
 
 var _ sandbox.Controller = (*controllerLocal)(nil)
 var _ sandbox.CheckpointRestoreController = (*controllerLocal)(nil)
+var _ sandbox.StagedRestoreController = (*controllerLocal)(nil)
 
 func (c *controllerLocal) cleanupShim(ctx context.Context, sandboxID string, svc runtimeAPI.TTRPCSandboxService) {
 	// Let the shim exit, then we can clean up the bundle after.
@@ -249,20 +252,34 @@ func (c *controllerLocal) Stop(ctx context.Context, sandboxID string, opts ...sa
 
 func (c *controllerLocal) Shutdown(ctx context.Context, sandboxID string) error {
 	svc, err := c.getSandbox(ctx, sandboxID)
+	if errdefs.IsNotFound(err) {
+		return nil
+	}
+
+	var shutdownErr error
 	if err != nil {
-		return err
+		shutdownErr = fmt.Errorf("failed to get sandbox client: %w", err)
+	} else if _, err = svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{SandboxID: sandboxID}); err != nil {
+		nativeErr := errgrpc.ToNative(err)
+		if !ignorableSandboxShutdownError(err) && !ignorableSandboxShutdownError(nativeErr) {
+			shutdownErr = fmt.Errorf("failed to shutdown sandbox: %w", nativeErr)
+		}
 	}
 
-	_, err = svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{SandboxID: sandboxID})
-	if err != nil {
-		return fmt.Errorf("failed to shutdown sandbox: %w", errgrpc.ToNative(err))
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	deleteErr := c.shims.Delete(cleanupCtx, sandboxID)
+	if errdefs.IsNotFound(deleteErr) {
+		deleteErr = nil
+	} else if deleteErr != nil {
+		deleteErr = fmt.Errorf("failed to delete sandbox shim: %w", deleteErr)
 	}
 
-	if err := c.shims.Delete(ctx, sandboxID); err != nil {
-		return fmt.Errorf("failed to delete sandbox shim: %w", err)
-	}
+	return errors.Join(shutdownErr, deleteErr)
+}
 
-	return nil
+func ignorableSandboxShutdownError(err error) bool {
+	return err == nil || errors.Is(err, ttrpc.ErrClosed) || errdefs.IsNotFound(err) || errdefs.IsUnavailable(err)
 }
 
 func (c *controllerLocal) Wait(ctx context.Context, sandboxID string) (sandbox.ExitStatus, error) {
@@ -380,20 +397,22 @@ func (c *controllerLocal) Checkpoint(ctx context.Context, sandboxID string, opts
 	return nil
 }
 
-func (c *controllerLocal) Restore(ctx context.Context, info sandbox.Sandbox, opts sandbox.RestoreOptions) (_ sandbox.RestoreResult, retErr error) {
+type restoreShim struct {
+	bundle     *v2.Bundle
+	service    runtimeAPI.TTRPCSandboxService
+	controller sandbox.ControllerInstance
+	bundlePath string
+}
+
+func (c *controllerLocal) startRestoreShim(ctx context.Context, info sandbox.Sandbox) (*restoreShim, error) {
 	if _, err := c.shims.Get(ctx, info.ID); err == nil {
-		return sandbox.RestoreResult{}, fmt.Errorf("sandbox %s already running: %w", info.ID, errdefs.ErrAlreadyExists)
+		return nil, fmt.Errorf("sandbox %s already running: %w", info.ID, errdefs.ErrAlreadyExists)
 	}
 
 	bundle, err := v2.NewBundle(ctx, c.root, c.state, info.ID, info.Spec)
 	if err != nil {
-		return sandbox.RestoreResult{}, err
+		return nil, err
 	}
-	defer func() {
-		if retErr != nil {
-			bundle.Delete()
-		}
-	}()
 
 	shim, err := c.shims.Start(ctx, info.ID, bundle, runtime.CreateOpts{
 		Spec:           info.Spec,
@@ -401,30 +420,30 @@ func (c *controllerLocal) Restore(ctx context.Context, info sandbox.Sandbox, opt
 		Runtime:        info.Runtime.Name,
 	})
 	if err != nil {
-		return sandbox.RestoreResult{}, fmt.Errorf("failed to start new shim for restored sandbox %s: %w", info.ID, err)
+		bundle.Delete()
+		return nil, fmt.Errorf("failed to start new shim for restored sandbox %s: %w", info.ID, err)
 	}
 
-	var svc runtimeAPI.TTRPCSandboxService
-	defer func() {
-		if retErr == nil {
-			return
-		}
+	svc, err := sandbox.NewClient(shim.Client())
+	if err != nil {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		if svc != nil {
-			c.cleanupShim(cleanupCtx, info.ID, svc)
-			return
-		}
 		if err := c.shims.Delete(cleanupCtx, info.ID); err != nil && !errdefs.IsNotFound(err) {
 			log.G(cleanupCtx).WithError(err).WithField("sandboxID", info.ID).Error("failed to delete restore shim")
 		}
-	}()
-
-	svc, err = sandbox.NewClient(shim.Client())
-	if err != nil {
-		return sandbox.RestoreResult{}, err
+		bundle.Delete()
+		return nil, err
 	}
+	address, version := shim.Endpoint()
+	return &restoreShim{
+		bundle: bundle, service: svc, bundlePath: shim.Bundle(),
+		controller: sandbox.ControllerInstance{
+			SandboxID: info.ID, Address: address, Version: uint32(version),
+		},
+	}, nil
+}
 
+func sandboxRestoreRequest(info sandbox.Sandbox, bundlePath string, opts sandbox.RestoreOptions) *runtimeAPI.RestoreSandboxRequest {
 	tasks := make([]*runtimeAPI.SandboxRestoreTask, 0, len(opts.Tasks))
 	for _, task := range opts.Tasks {
 		tasks = append(tasks, &runtimeAPI.SandboxRestoreTask{
@@ -439,15 +458,55 @@ func (c *controllerLocal) Restore(ctx context.Context, info sandbox.Sandbox, opt
 		})
 	}
 
-	resp, err := svc.RestoreSandbox(ctx, &runtimeAPI.RestoreSandboxRequest{
+	return &runtimeAPI.RestoreSandboxRequest{
 		SandboxID:      info.ID,
-		BundlePath:     shim.Bundle(),
+		BundlePath:     bundlePath,
 		CheckpointPath: opts.CheckpointPath,
 		SandboxOptions: typeurl.MarshalProto(opts.SandboxOptions),
 		NetnsPath:      opts.NetNSPath,
 		Options:        cloneStringMap(opts.Options),
 		Tasks:          tasks,
-	})
+	}
+}
+
+func restoreOptionsForPhase(opts sandbox.RestoreOptions, phase string) sandbox.RestoreOptions {
+	opts.Options = cloneStringMap(opts.Options)
+	if opts.Options == nil {
+		opts.Options = make(map[string]string, 1)
+	}
+	opts.Options[sandbox.RestorePhaseOption] = phase
+	return opts
+}
+
+func restoredTasks(tasks []*runtimeAPI.RestoredSandboxTask) []sandbox.RestoredTask {
+	restored := make([]sandbox.RestoredTask, 0, len(tasks))
+	for _, task := range tasks {
+		restored = append(restored, sandbox.RestoredTask{
+			CheckpointKey: task.GetCheckpointKey(), TaskID: task.GetTaskID(),
+		})
+	}
+	return restored
+}
+
+func (c *controllerLocal) discardRestoreShim(ctx context.Context, sandboxID string, restored *restoreShim) {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	c.cleanupShim(cleanupCtx, sandboxID, restored.service)
+	restored.bundle.Delete()
+}
+
+func (c *controllerLocal) Restore(ctx context.Context, info sandbox.Sandbox, opts sandbox.RestoreOptions) (_ sandbox.RestoreResult, retErr error) {
+	session, err := c.startRestoreShim(ctx, info)
+	if err != nil {
+		return sandbox.RestoreResult{}, err
+	}
+	defer func() {
+		if retErr != nil {
+			c.discardRestoreShim(ctx, info.ID, session)
+		}
+	}()
+
+	resp, err := session.service.RestoreSandbox(ctx, sandboxRestoreRequest(info, session.bundlePath, opts))
 	if err != nil {
 		return sandbox.RestoreResult{}, fmt.Errorf("failed to restore sandbox %s: %w", info.ID, errgrpc.ToNative(err))
 	}
@@ -455,25 +514,79 @@ func (c *controllerLocal) Restore(ctx context.Context, info sandbox.Sandbox, opt
 		return sandbox.RestoreResult{}, fmt.Errorf("restore sandbox %s returned no creation time: %w", info.ID, errdefs.ErrInvalidArgument)
 	}
 
-	restored := make([]sandbox.RestoredTask, 0, len(resp.GetTasks()))
-	for _, task := range resp.GetTasks() {
-		restored = append(restored, sandbox.RestoredTask{
-			CheckpointKey: task.GetCheckpointKey(),
-			TaskID:        task.GetTaskID(),
-		})
-	}
-	address, version := shim.Endpoint()
 	return sandbox.RestoreResult{
 		Controller: sandbox.ControllerInstance{
 			SandboxID: info.ID,
 			Pid:       resp.GetPid(),
 			CreatedAt: resp.GetCreatedAt().AsTime(),
-			Address:   address,
-			Version:   uint32(version),
+			Address:   session.controller.Address,
+			Version:   session.controller.Version,
 			Spec:      restoredSandboxSpec(resp.GetSpec()),
 		},
-		Tasks: restored,
+		Tasks: restoredTasks(resp.GetTasks()),
 	}, nil
+}
+
+func (c *controllerLocal) SupportsStagedRestore(ctx context.Context, runtime string) error {
+	info, err := c.shims.RuntimeInfo(ctx, runtime)
+	if err != nil {
+		return fmt.Errorf("query runtime %q capabilities: %w", runtime, err)
+	}
+	if info.GetAnnotations()[sandbox.StagedRestoreRuntimeAnnotation] != "true" {
+		return fmt.Errorf("runtime %q does not advertise staged restore: %w", runtime, errdefs.ErrNotImplemented)
+	}
+	return nil
+}
+
+func (c *controllerLocal) PrepareRestore(ctx context.Context, info sandbox.Sandbox, opts sandbox.RestoreOptions) (_ sandbox.ControllerInstance, retErr error) {
+	restored, err := c.startRestoreShim(ctx, info)
+	if err != nil {
+		return sandbox.ControllerInstance{}, err
+	}
+	defer func() {
+		if retErr != nil {
+			c.discardRestoreShim(ctx, info.ID, restored)
+		}
+	}()
+	opts = restoreOptionsForPhase(opts, sandbox.RestorePhasePrepare)
+	resp, err := restored.service.RestoreSandbox(ctx, sandboxRestoreRequest(info, restored.bundlePath, opts))
+	if err != nil {
+		return sandbox.ControllerInstance{}, fmt.Errorf("failed to prepare restored sandbox %s: %w", info.ID, errgrpc.ToNative(err))
+	}
+	if err := validatePreparedRestoreResponse(info.ID, resp); err != nil {
+		return sandbox.ControllerInstance{}, err
+	}
+	restored.controller.Pid = resp.GetPid()
+	restored.controller.CreatedAt = resp.GetCreatedAt().AsTime()
+	restored.controller.Spec = restoredSandboxSpec(resp.GetSpec())
+	return restored.controller, nil
+}
+
+func validatePreparedRestoreResponse(sandboxID string, resp *runtimeAPI.RestoreSandboxResponse) error {
+	if len(resp.GetTasks()) != 0 {
+		return fmt.Errorf("prepare restored sandbox %s returned task records and did not honor staged restore: %w", sandboxID, errdefs.ErrNotImplemented)
+	}
+	if resp.GetCreatedAt() == nil {
+		return fmt.Errorf("prepare restored sandbox %s returned no creation time: %w", sandboxID, errdefs.ErrInvalidArgument)
+	}
+	return nil
+}
+
+func (c *controllerLocal) CompleteRestore(ctx context.Context, info sandbox.Sandbox, opts sandbox.RestoreOptions) ([]sandbox.RestoredTask, error) {
+	shim, err := c.shims.Get(ctx, info.ID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find prepared sandbox %q: %w", info.ID, err)
+	}
+	svc, err := sandbox.NewClient(shim.Client())
+	if err != nil {
+		return nil, err
+	}
+	opts = restoreOptionsForPhase(opts, sandbox.RestorePhaseComplete)
+	resp, err := svc.RestoreSandbox(ctx, sandboxRestoreRequest(info, shim.Bundle(), opts))
+	if err != nil {
+		return nil, fmt.Errorf("failed to complete restored sandbox %s: %w", info.ID, errgrpc.ToNative(err))
+	}
+	return restoredTasks(resp.GetTasks()), nil
 }
 
 // restoredSandboxSpec treats an Any without a type URL as absent. Persisting

@@ -303,6 +303,17 @@ func (a *API) UndoCreateContainer(ctx context.Context, criPod *sstore.Sandbox, i
 }
 
 func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
+	return a.withContainerAdjustment(nil)
+}
+
+// WithContainerAdjustmentForSandbox applies the normal NRI CreateContainer
+// adjustment without requiring the sandbox to be published in the CRI store.
+// Restore uses it while all restored objects are still transaction-local.
+func (a *API) WithContainerAdjustmentForSandbox(criPod *sstore.Sandbox) containerd.NewContainerOpts {
+	return a.withContainerAdjustment(criPod)
+}
+
+func (a *API) withContainerAdjustment(criPod *sstore.Sandbox) containerd.NewContainerOpts {
 	if a.IsDisabled() {
 		return func(context.Context, *containerd.Client, *containers.Container) error {
 			return nil
@@ -359,7 +370,15 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 			return fmt.Errorf("failed to unmarshal container OCI Spec for NRI: %w", err)
 		}
 
-		adjust, err := a.CreateContainer(ctx, c, spec)
+		var adjust *api.ContainerAdjustment
+		var err error
+		if criPod == nil {
+			adjust, err = a.CreateContainer(ctx, c, spec)
+		} else {
+			pod := a.nriPodSandbox(criPod)
+			ctr := a.nriContainer(c, withContainerSpec(spec))
+			adjust, err = a.nri.CreateContainer(ctx, pod, ctr)
+		}
 		if err != nil {
 			return fmt.Errorf("failed to get NRI adjustment for container: %w", err)
 		}

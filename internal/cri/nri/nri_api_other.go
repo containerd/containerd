@@ -113,6 +113,10 @@ func (*API) WithContainerAdjustment() containerd.NewContainerOpts {
 	}
 }
 
+func (*API) WithContainerAdjustmentForSandbox(*sstore.Sandbox) containerd.NewContainerOpts {
+	return func(context.Context, *containerd.Client, *containers.Container) error { return nil }
+}
+
 func (*API) WithContainerExit(*cstore.Container, *eventtypes.TaskExit) containerd.ProcessDeleteOpts {
 	return func(_ context.Context, _ containerd.Process) error {
 		return nil
