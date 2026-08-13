@@ -32,7 +32,7 @@ fi
 script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 containerd_dir="$(cd -- "${script_dir}/../.." > /dev/null 2>&1; pwd -P)"
 
-: "${GO_VERSION:=1.26.5}"
+: "${GO_VERSION:=1.26.6}"
 : "${RUNC_FLAVOR:=runc}"
 : "${SELINUX:=Enforcing}"
 : "${INSTALL_PACKAGES:=}"
