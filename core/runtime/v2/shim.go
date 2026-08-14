@@ -197,11 +197,11 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 // delete removes it), so callers that own one must remove it on error. The shim
 // map is untouched: callers reach this having already removed the task, or never
 // added it.
-func cleanupShimTask(ctx context.Context, st *shimTask, sandboxed bool) error {
+func cleanupShimTask(ctx context.Context, st *shimTask) error {
 	dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
 	defer cancel()
 
-	_, err := st.delete(dctx, sandboxed, func(context.Context, string) {})
+	_, err := st.delete(dctx, func(context.Context, string) {})
 	if err == nil {
 		return nil
 	}
@@ -579,7 +579,7 @@ func (s *shimTask) PID(ctx context.Context) (uint32, error) {
 	return response.TaskPid, nil
 }
 
-func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
+func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
 	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
@@ -613,21 +613,12 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		removeTask(ctx, s.ID())
 	}
 
-	const supportSandboxAPIVersion = 3
-	if _, apiVer := s.ShimInstance.Endpoint(); apiVer < supportSandboxAPIVersion {
-		sandboxed = false
-	}
-
-	// Don't shutdown sandbox as there may be other containers running.
-	// Let controller decide when to shutdown.
-	if !sandboxed {
-		if err := s.waitShutdown(ctx); err != nil {
-			// FIXME(fuweid):
-			//
-			// If the error is context canceled, should we use context.TODO()
-			// to wait for it?
-			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
-		}
+	if err := s.waitShutdown(ctx); err != nil {
+		// FIXME(fuweid):
+		//
+		// If the error is context canceled, should we use context.TODO()
+		// to wait for it?
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
 	}
 
 	if err := s.ShimInstance.Delete(ctx); err != nil {

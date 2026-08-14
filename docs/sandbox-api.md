@@ -109,6 +109,8 @@ sequenceDiagram
     loop for each container in sandbox
         containerd->>shim: TaskService.Kill / Delete
         shim-->>containerd: OK
+        containerd->>shim: TaskService.Shutdown
+        shim-->>containerd: OK (exit only if no tasks remain)
     end
     containerd->>containerd: SandboxController.Stop
     containerd->>shim: SandboxService.StopSandbox
@@ -126,6 +128,17 @@ sequenceDiagram
     containerd->>containerd: Delete sandbox metadata
     containerd-->>kubelet: OK
 ```
+
+### Shutdown behavior for grouped shims
+
+containerd invokes `TaskService.Shutdown` after deleting every task. It may be
+invoked multiple times for a grouped shim. It does not mean that the shim must
+terminate immediately. The shim should return without terminating while it still
+has active tasks. It should terminate only after receiving `TaskService.Shutdown`
+when no active tasks remain.
+
+`SandboxService.ShutdownSandbox` is independent from `TaskService.Shutdown` and
+shuts down the sandbox instance.
 
 ## Controller Implementations
 

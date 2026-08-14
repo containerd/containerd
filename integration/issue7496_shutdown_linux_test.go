@@ -18,12 +18,17 @@ package integration
 
 import (
 	"context"
+	"syscall"
 	"testing"
+	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/require"
 
 	apitask "github.com/containerd/containerd/api/runtime/task/v3"
+	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // TestIssue7496_ShouldRetryShutdown is based on https://github.com/containerd/containerd/issues/7496.
@@ -62,4 +67,98 @@ func TestIssue7496_ShouldRetryShutdown(t *testing.T) {
 	t.Logf("Check the shim connection")
 	_, err = shimCli.Connect(ctx, &apitask.ConnectRequest{})
 	require.Error(t, err, "should failed to call shim connect API")
+}
+
+func TestShutdownShimWhenPauseExitsBeforeWorkload(t *testing.T) {
+	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
+
+	t.Logf("RunPodSandbox")
+	sbConfig := PodSandboxConfig("sandbox", t.Name(), WithHostNetwork)
+	sbID, err := runtimeService.RunPodSandbox(sbConfig, "")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = runtimeService.StopPodSandbox(sbID)
+		_ = runtimeService.RemovePodSandbox(sbID)
+	})
+
+	t.Logf("Connect to the shim %s", sbID)
+	shimCli := connectToShim(ctx, t, containerdEndpoint, 3, sbID)
+
+	testImage := images.Get(images.BusyBox)
+	EnsureImageExists(t, testImage)
+
+	t.Log("Create a container - sleep 1d")
+	containerName := "test-container"
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		WithCommand("sh", "-c", "sleep 1d"),
+		WithPidNamespace(runtime.NamespaceMode_CONTAINER),
+	)
+	cnID, err := runtimeService.CreateContainer(sbID, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cnID))
+
+	t.Log("Load pause task and wait")
+	pauseContainer, err := containerdClient.LoadContainer(ctx, sbID)
+	require.NoError(t, err)
+	pauseTask, err := pauseContainer.Task(ctx, nil)
+	require.NoError(t, err)
+	pauseExitCh, err := pauseTask.Wait(ctx)
+	require.NoError(t, err)
+
+	t.Log("Load workload task and wait")
+	workloadContainer, err := containerdClient.LoadContainer(ctx, cnID)
+	require.NoError(t, err)
+	workloadTask, err := workloadContainer.Task(ctx, nil)
+	require.NoError(t, err)
+	workloadExitCh, err := workloadTask.Wait(ctx)
+	require.NoError(t, err)
+
+	t.Log("Kill pause container by containerd client API")
+	require.NoError(t, pauseTask.Kill(ctx, syscall.SIGKILL))
+
+	select {
+	case status := <-pauseExitCh:
+		pauseExitStatus, _, err := status.Result()
+		require.NoError(t, err)
+		require.Equal(t, uint32(137), pauseExitStatus)
+	case <-time.After(30 * time.Second):
+		t.Fatal("timed out waiting for pause task exit")
+	}
+
+	t.Log("Wait for pause task deletion")
+	require.NoError(t, Eventually(func() (bool, error) {
+		_, err := pauseContainer.Task(ctx, nil)
+		if err == nil {
+			return false, nil
+		}
+
+		if errdefs.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}, time.Second, 30*time.Second))
+
+	t.Log("Stop sandbox and wait for workload")
+	require.NoError(t, runtimeService.StopPodSandbox(sbID))
+
+	select {
+	case status := <-workloadExitCh:
+		workloadExitStatus, _, err := status.Result()
+		require.NoError(t, err)
+		require.Equal(t, uint32(137), workloadExitStatus)
+	case <-time.After(30 * time.Second):
+		t.Fatal("timed out waiting for workload task exit")
+	}
+
+	t.Log("Remove sandbox")
+	require.NoError(t, runtimeService.RemovePodSandbox(sbID))
+
+	t.Log("Shim should be shutdown")
+	_, err = shimCli.Connect(ctx, &apitask.ConnectRequest{})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "ttrpc: closed")
 }
