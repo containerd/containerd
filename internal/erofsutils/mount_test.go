@@ -22,6 +22,8 @@ import (
 
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/v2/core/images"
 )
 
 func TestCacheBlobPath(t *testing.T) {
@@ -34,4 +36,24 @@ func TestCacheBlobPath(t *testing.T) {
 	want := filepath.Join("/cache", "sha256", enc[:2], enc+".erofs")
 	assert.Equal(t, want, got)
 	assert.Equal(t, enc[:2], filepath.Base(filepath.Dir(got)), "blob must live under a 2-char prefix dir")
+}
+
+func TestIsErofsMediaType(t *testing.T) {
+	cases := []struct {
+		mt   string
+		want bool
+	}{
+		{images.MediaTypeErofsLayer, true},
+		{images.MediaTypeErofsLayer + "+zstd", true},
+		{images.MediaTypeErofs, true},
+		{images.MediaTypeErofs + "+zstd", true},
+		// A standalone chunk-index layer is not itself a mountable EROFS
+		// filesystem image and must not be treated as one.
+		{images.MediaTypeErofsChunkIndex, false},
+		{"application/vnd.oci.image.layer.v1.tar+gzip", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, IsErofsMediaType(c.mt), c.mt)
+	}
 }

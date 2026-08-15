@@ -34,12 +34,29 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
+	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 
 	"github.com/google/uuid"
 )
 
 var emptyDesc = ocispec.Descriptor{}
+
+// annotationErofsRole is the org.erofs.role layer descriptor annotation
+// defined by the EROFS image layer format specification
+// (https://github.com/erofs/erofs-image-spec), identifying a layer's
+// composition role. See §2.4 of the specification for the full definition
+// of each role.
+const annotationErofsRole = "org.erofs.role"
+
+// The composition roles defined by §2.4 of the specification. A layer with
+// no org.erofs.role annotation at all is treated the same as
+// erofsRoleOverlayLower.
+const (
+	erofsRoleOverlayLower = "overlay-lower"
+	erofsRoleOverlayData  = "overlay-data"
+	erofsRoleDevice       = "device"
+)
 
 type differ interface {
 	diff.Applier
@@ -126,12 +143,31 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		}
 	}()
 
+	role := desc.Annotations[annotationErofsRole]
+	switch role {
+	case "", erofsRoleOverlayLower, erofsRoleOverlayData, erofsRoleDevice:
+	default:
+		return emptyDesc, fmt.Errorf("erofs layer role %q is not supported", role)
+	}
+
+	// A device-role layer is a raw byte source for EROFS multi-device
+	// addressing; unlike other roles it MAY carry any media type (§2.4) and
+	// is never itself converted to or mounted as an EROFS filesystem, so it
+	// is handled entirely separately from the rest of this method.
+	if role == erofsRoleDevice {
+		return s.applyDevice(ctx, desc, mounts)
+	}
+
 	var (
 		erofsLayerType string
 		fastcopy       bool
 	)
 	diffLayerType := desc.MediaType
 	native := erofsutils.IsErofsMediaType(diffLayerType)
+	if role == erofsRoleOverlayData && !native {
+		// §2.4: the overlay-data role MUST imply application/vnd.erofs[+zstd].
+		return emptyDesc, fmt.Errorf("erofs overlay-data layer must use an EROFS media type, got %q", desc.MediaType)
+	}
 	if native {
 		base, ext, hasExt := strings.Cut(diffLayerType, "+")
 		// Mimic the OCI layer for EROFS blobs for diff.NewProcessorChain(), so
@@ -184,7 +220,15 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	}
 	defer ra.Close()
 
-	layerBlobPath := path.Join(layer, "layer.erofs")
+	// An overlay-data layer is a normal EROFS filesystem image, but is
+	// written to a different file so the EROFS snapshotter can supply it to
+	// the overlay mount as a data-only lower instead of a regular lowerdir
+	// (§2.4, §7 step 3).
+	blobName := erofsutils.LayerBlobName
+	if role == erofsRoleOverlayData {
+		blobName = erofsutils.DataBlobName
+	}
+	layerBlobPath := path.Join(layer, blobName)
 	// Allow copy file range when there is an uncompressed native EROFS layer
 	if fastcopy {
 		f, err := os.Create(layerBlobPath)
@@ -267,6 +311,75 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	}
 	return ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageLayer,
+		Size:      rc.c,
+		Digest:    digester.Digest(),
+	}, nil
+}
+
+// applyDevice writes a device-role layer's decompressed byte stream to
+// device.blob in the snapshot directory. Per §2.4 of the EROFS image layer
+// format specification, a device-role layer is a raw byte source for EROFS
+// multi-device addressing and MAY carry any media type; the runtime
+// decompresses it per the carrier media type's "+suffix" convention (RFC
+// 8478) and places the resulting stream at a predictable per-snapshot path,
+// passed to the consuming layer's mount via the device= mount option by the
+// EROFS snapshotter (see plugins/snapshots/erofs).
+//
+// Unlike overlay-lower/overlay-data layers, a device-role layer's bytes are
+// never converted to or interpreted as an EROFS filesystem image here:
+// whether they are one is a matter for the consuming layer's metadata,
+// which addresses into this stream by raw block offset.
+//
+// Per the specification, the DiffID of a device-role layer follows the
+// DiffID rules of its own media type: for a bare (no "+suffix") media type
+// this is its own descriptor digest, since no decompression happens: for a
+// "+gzip" or "+zstd" suffixed media type, this is the digest of the
+// decompressed stream, matching normal OCI/EROFS DiffID semantics.
+func (s erofsDiff) applyDevice(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (ocispec.Descriptor, error) {
+	layer, err := erofsutils.MountsToLayer(mounts)
+	if err != nil {
+		return emptyDesc, err
+	}
+
+	ra, err := s.store.ReaderAt(ctx, desc)
+	if err != nil {
+		return emptyDesc, fmt.Errorf("failed to get reader from content store: %w", err)
+	}
+	defer ra.Close()
+
+	base, ext, hasExt := strings.Cut(desc.MediaType, "+")
+	stream := content.NewReader(ra)
+	if hasExt {
+		switch ext {
+		case "gzip", "zstd":
+			dr, err := compression.DecompressStream(stream)
+			if err != nil {
+				return emptyDesc, fmt.Errorf("failed to decompress device layer: %w", err)
+			}
+			defer dr.Close()
+			stream = dr
+		default:
+			return emptyDesc, fmt.Errorf("unsupported device layer suffix: %s", ext)
+		}
+	}
+
+	digester := digest.Canonical.Digester()
+	rc := &readCounter{r: io.TeeReader(stream, digester.Hash())}
+
+	devicePath := path.Join(layer, erofsutils.DeviceBlobName)
+	f, err := os.Create(devicePath)
+	if err != nil {
+		return emptyDesc, err
+	}
+	_, err = io.Copy(f, rc)
+	f.Close()
+	if err != nil {
+		return emptyDesc, err
+	}
+	log.G(ctx).WithField("path", devicePath).Debug("applied device layer")
+
+	return ocispec.Descriptor{
+		MediaType: base,
 		Size:      rc.c,
 		Digest:    digester.Digest(),
 	}, nil
