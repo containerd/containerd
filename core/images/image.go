@@ -108,16 +108,32 @@ func (image *Image) Config(ctx context.Context, provider content.Provider, platf
 	return Config(ctx, provider, image.Target, platform)
 }
 
-// RootFS returns the unpacked diffids that make up and images rootfs.
+// RootFS returns the per-layer IDs that make up an image's rootfs, one per
+// manifest layer, in order.
 //
-// These are used to verify that a set of layers unpacked to the expected
-// values.
+// These are used both to key the ChainID-derived snapshots that make up
+// the unpacked rootfs, and to verify that a set of layers unpacked to the
+// expected values.
+//
+// Per-layer IDs are resolved with LayerIDs, which additionally honors the
+// AnnotationErofsUncompressedDigest layer annotation defined by the EROFS
+// image layer format specification; this has no effect on images that do
+// not carry that annotation. See LayerIDs for the security invariant this
+// resolution must uphold.
 func (image *Image) RootFS(ctx context.Context, provider content.Provider, platform platforms.MatchComparer) ([]digest.Digest, error) {
-	desc, err := image.Config(ctx, provider, platform)
+	manifest, err := Manifest(ctx, provider, image.Target, platform)
 	if err != nil {
 		return nil, err
 	}
-	return RootFS(ctx, provider, desc)
+	p, err := content.ReadBlob(ctx, provider, manifest.Config)
+	if err != nil {
+		return nil, err
+	}
+	var config ocispec.Image
+	if err := json.Unmarshal(p, &config); err != nil {
+		return nil, err
+	}
+	return LayerIDs(manifest.Layers, config.RootFS.DiffIDs)
 }
 
 // Size returns the total size of an image's packed resources.

@@ -317,9 +317,14 @@ func (u *Unpacker) unpack(
 		return fmt.Errorf("unmarshal image config: %w", err)
 	}
 
-	diffIDs := i.RootFS.DiffIDs
-	if len(layers) != len(diffIDs) {
-		return fmt.Errorf("number of layers and diffIDs don't match: %d != %d", len(layers), len(diffIDs))
+	// LayerDiffIDs resolves diffIDs from i.RootFS.DiffIDs, additionally
+	// honoring the AnnotationErofsUncompressedDigest layer annotation
+	// defined by the EROFS image layer format specification; this has no
+	// effect on images that do not carry that annotation, and rootfs.diff_ids
+	// must still have one entry per layer if none of them do.
+	diffIDs, err := images.LayerDiffIDs(layers, i.RootFS.DiffIDs)
+	if err != nil {
+		return err
 	}
 
 	// TODO: Support multiple unpacks rather than just first match
