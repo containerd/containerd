@@ -18,12 +18,14 @@ package mount
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"golang.org/x/sys/unix"
 )
 
 func LoopbackHandler() Handler {
@@ -63,6 +65,49 @@ func (loopbackHandler) Mount(ctx context.Context, m Mount, mp string, _ []Active
 		MountedAt:  &t,
 		MountPoint: mp,
 	}, nil
+}
+
+// Mounted reports whether path is still a symlink to a loop device
+// which is attached and not marked for auto clear. A symlink to a
+// device is not something the host's mount table has any record of,
+// so the loopback handler cannot rely on the generic check other
+// handlers use and must inspect the device directly instead.
+func (loopbackHandler) Mounted(ctx context.Context, path string) (bool, error) {
+	loopdev, err := os.Readlink(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	loop, err := os.Open(loopdev)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	defer loop.Close()
+
+	info, err := unix.IoctlLoopGetStatus64(int(loop.Fd()))
+	if err != nil {
+		// ENXIO: no backing file is attached to the device, so
+		// whatever this symlink once pointed to is gone.
+		if errors.Is(err, unix.ENXIO) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	// LO_FLAGS_AUTOCLEAR is only ever set here between Unmount
+	// removing the symlink and the device actually clearing, which
+	// Mounted cannot observe as a distinct state, so treat it as
+	// already gone rather than live.
+	if info.Flags&unix.LO_FLAGS_AUTOCLEAR != 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (loopbackHandler) Unmount(ctx context.Context, path string) error {

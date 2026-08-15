@@ -48,6 +48,25 @@ type Handler interface {
 	Unmount(context.Context, string) error
 }
 
+// MountedChecker is an optional interface a Handler may implement to
+// report whether the mount it manages at path is still in effect. A
+// manager which reuses a Handler's mounts across activations uses this
+// to verify a recorded mount is still live before handing it out
+// again, rather than trusting its own bookkeeping, and to detect and
+// repair a mount which was torn down outside of it, for example by a
+// reboot or an operator's manual unmount.
+//
+// A Handler which does not implement MountedChecker is checked by
+// inspecting the host's mount table instead, which is only accurate
+// for a Handler whose mount point is a real kernel mount. A Handler
+// which leaves something else at the mount point, such as a symlink
+// to a device, must implement this interface: a generic check would
+// otherwise always report it as not mounted and cause it to be
+// needlessly, and possibly unsafely, redone.
+type MountedChecker interface {
+	Mounted(ctx context.Context, path string) (bool, error)
+}
+
 // Transformer is an interface that can make changes to the mount based on
 // the previous mount state. This can be used to update the values of the
 // mount, such as with formatting, or for mount initialization that do not
