@@ -75,7 +75,15 @@ func init() {
 		ID:     "erofs",
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
-			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
+			p := platforms.DefaultSpec()
+			ic.Meta.Platforms = append(ic.Meta.Platforms, p)
+			// Also advertise the "erofs" OS feature platform (see the EROFS
+			// image layer format specification,
+			// https://github.com/erofs/erofs-image-spec) so that clients
+			// pulling with --snapshotter erofs prefer the native EROFS image
+			// variant when one is available in a multi-platform index.
+			p.OSFeatures = []string{"erofs"}
+			ic.Meta.Platforms = append(ic.Meta.Platforms, p)
 
 			config, ok := ic.Config.(*Config)
 			if !ok {
