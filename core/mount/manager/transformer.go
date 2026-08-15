@@ -19,6 +19,8 @@ package manager
 import (
 	"context"
 
+	"github.com/containerd/log"
+
 	"github.com/containerd/containerd/v2/core/mount"
 )
 
@@ -39,4 +41,68 @@ type typeTransformer struct {
 func (t typeTransformer) Transform(ctx context.Context, m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
 	m.Type = t.mountType
 	return t.Transformer.Transform(ctx, m, a)
+}
+
+// rewritePosition applies chain, a position's pending transforms as
+// recorded by the loop which builds mountConv, to m. mountFormatter is
+// already pure, so it is applied directly; mkfs and mkdir also have a
+// pure part, computing the mount value their options imply, and an
+// impure part which actually creates whatever that implies. Only the
+// pure part runs here: the impure part is returned as a closure for
+// the caller to run whenever it, not this function, decides reality
+// needs to change, which lets this run inside a bolt transaction to
+// resolve a mount's final identity without that transaction ever
+// waiting on real filesystem work.
+//
+// A transformer this package does not know how to split this way is
+// run in full immediately as a defensive fallback; none of the
+// transforms this package registers reach that branch.
+func rewritePosition(ctx context.Context, chain []mount.Transformer, m mount.Mount, resolved []mount.ActiveMount) (mount.Mount, []func(context.Context) error, error) {
+	var ensures []func(context.Context) error
+	for _, elem := range chain {
+		tt, ok := elem.(typeTransformer)
+		if !ok {
+			rewritten, err := elem.Transform(ctx, m, resolved)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+			continue
+		}
+		m.Type = tt.mountType
+		switch tr := tt.Transformer.(type) {
+		case mountFormatter:
+			rewritten, err := tr.Transform(ctx, m, resolved)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+		case *mkfs:
+			rewritten, ensure, err := tr.rewrite(m)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+			if ensure != nil {
+				ensures = append(ensures, ensure)
+			}
+		case *mkdir:
+			rewritten, ensure, err := tr.rewrite(m)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+			if ensure != nil {
+				ensures = append(ensures, ensure)
+			}
+		default:
+			log.G(ctx).Warnf("transform %T has no pure rewrite, running it in full", tr)
+			rewritten, err := tt.Transform(ctx, m, resolved)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+		}
+	}
+	return m, ensures, nil
 }
