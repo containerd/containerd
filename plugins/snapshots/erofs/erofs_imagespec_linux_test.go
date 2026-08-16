@@ -19,10 +19,12 @@
 package erofs
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -30,6 +32,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -161,7 +164,7 @@ func activateAndMount(t *testing.T, mgr mount.Manager, tempDir, name string, vie
 // see TestUnpackSkipsChunkIndexLayer[Parallel] - since core/unpack never
 // creates a snapshot, and so never calls the differ, for such a layer.)
 //
-// It verifies that images.LayerDiffIDs resolves the correct DiffID for each
+// It verifies that images.LayerIDs resolves the correct DiffID for each
 // layer, that the EROFS differ's diff.Digest for each layer matches, and
 // that the final mounted rootfs contains the content of both layers.
 func TestErofsImageSpecMultiLayer(t *testing.T) {
@@ -189,7 +192,7 @@ func TestErofsImageSpecMultiLayer(t *testing.T) {
 	// rootfs.diff_ids is entirely absent: the only compressed layer
 	// (descB) carries the annotation, and the raw layer falls back to its
 	// own descriptor digest.
-	diffIDs, err := images.LayerDiffIDs(manifestLayers, nil)
+	diffIDs, err := images.LayerIDs(manifestLayers, nil)
 	require.NoError(t, err)
 	require.Equal(t, []digest.Digest{descA.Digest, uncompressedB}, diffIDs)
 
@@ -226,4 +229,203 @@ func TestErofsImageSpecMultiLayer(t *testing.T) {
 
 		require.NoError(t, sn.Remove(ctx, viewKey))
 	}
+}
+
+// mkfsErofsTarIndexOnly runs `mkfs.erofs --tar=i` over tarBytes, producing an
+// EROFS metadata-only image whose file data is *not* embedded but instead
+// addressed via EROFS multi-device addressing into an external device blob
+// containing the original tar bytes verbatim - the layout the "device" role
+// layer described in the EROFS image layer format specification (§2.4) is
+// designed around ("matching the way mkfs.erofs --tar=i already produces
+// metadata images that reference an original tar as a data device").
+func mkfsErofsTarIndexOnly(t *testing.T, tarBytes []byte) []byte {
+	t.Helper()
+	out := filepath.Join(t.TempDir(), "index.erofs")
+	cmd := exec.Command("mkfs.erofs", "--tar=i", "--aufs", "--quiet", "-Enoinline_data", out)
+	cmd.Stdin = bytes.NewReader(tarBytes)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "mkfs.erofs --tar=i: %s", output)
+	b, err := os.ReadFile(out)
+	require.NoError(t, err)
+	return b
+}
+
+// buildTestTar returns an uncompressed tar archive containing a single file
+// name -> content.
+func buildTestTar(t *testing.T, name, content string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	require.NoError(t, tw.WriteHeader(&tar.Header{
+		Name: name,
+		Mode: 0644,
+		Size: int64(len(content)),
+	}))
+	_, err := tw.Write([]byte(content))
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+	return buf.Bytes()
+}
+
+// TestErofsImageSpecDeviceRole exercises the "device" composition role
+// (EROFS image layer format specification, §2.4): a layer holding a raw
+// byte stream - here, of media type application/vnd.oci.image.layer.v1.tar
+// (no compression suffix, so applied verbatim with no attempt at
+// decompression) - consumed by the following EROFS metadata layer via
+// EROFS multi-device addressing rather than being mounted on its own.
+//
+// It verifies that the EROFS snapshotter attaches the device layer's blob
+// to the metadata layer's mount via the device= option (see
+// snapshotter.composeRoleLowers), and that the file the metadata layer
+// addresses into the device blob is visible and correct once mounted.
+func TestErofsImageSpecDeviceRole(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	tempDir, cs, sn, mgr := setupErofsImageSpecTest(t)
+	differ := erofsdiffer.NewErofsDiffer(cs)
+
+	tarBytes := buildTestTar(t, "hello.txt", "hello-device-content")
+	metaBytes := mkfsErofsTarIndexOnly(t, tarBytes)
+
+	// Layer 0: the device blob - the raw, uncompressed tar stream the
+	// layer 1 metadata addresses into. Any media type is permitted for a
+	// device-role layer; a plain (bare) tar type here means the differ
+	// applies it verbatim with no decompression, so its DiffID is its own
+	// descriptor digest. Unlike a raw EROFS or standalone chunk-index
+	// layer, a bare tar layer is not self-digest-eligible in
+	// images.LayerIDs, so rootfs.diff_ids must supply it explicitly
+	// (as a producer following the specification's compatibility
+	// recommendation would).
+	descDevice := writeBlob(ctx, t, cs, ocispec.MediaTypeImageLayer, tarBytes, map[string]string{
+		"org.erofs.role": "device",
+	})
+
+	// Layer 1: the EROFS metadata image referencing the device blob above;
+	// role-less (top of the stack).
+	descMeta := writeBlob(ctx, t, cs, images.MediaTypeErofs, metaBytes, nil)
+
+	manifestLayers := []ocispec.Descriptor{descDevice, descMeta}
+	diffIDs, err := images.LayerIDs(manifestLayers, []digest.Digest{descDevice.Digest, descMeta.Digest})
+	require.NoError(t, err)
+	require.Equal(t, []digest.Digest{descDevice.Digest, descMeta.Digest}, diffIDs)
+
+	var parent string
+	for i, desc := range manifestLayers {
+		prepareKey := fmt.Sprintf("prepare-%d", i)
+		mounts, err := sn.Prepare(ctx, prepareKey, parent)
+		require.NoError(t, err, "prepare layer %d", i)
+
+		diff, err := differ.Apply(ctx, desc, mounts)
+		require.NoError(t, err, "apply layer %d", i)
+		require.Equal(t, diffIDs[i], diff.Digest, "diff id mismatch for layer %d", i)
+
+		commitKey := fmt.Sprintf("committed-%d", i)
+		require.NoError(t, sn.Commit(ctx, commitKey, prepareKey), "commit layer %d", i)
+		parent = commitKey
+	}
+
+	// The device layer (index 0) was consumed by the metadata layer
+	// (index 1) and must not be independently mountable/visible: only the
+	// final, top-level view matters.
+	viewMounts, err := sn.View(ctx, "view", parent)
+	require.NoError(t, err)
+
+	mountPoint := activateAndMount(t, mgr, tempDir, "mount", viewMounts)
+	data, err := os.ReadFile(filepath.Join(mountPoint, "hello.txt"))
+	require.NoError(t, err, "hello.txt should be visible via the device= mount option")
+	require.Equal(t, "hello-device-content", string(data))
+}
+
+// TestErofsImageSpecOverlayDataRole exercises the "overlay-data"
+// composition role (EROFS image layer format specification, §2.4): an
+// EROFS layer supplied to the overlay mount as a data-only lower (using the
+// overlayfs "::" lowerdir separator and metacopy=on) rather than a regular
+// lowerdir.
+//
+// Verifying that an overlayfs metacopy file's "trusted.overlay.redirect"
+// xattr actually resolves content from the data-only lower is a kernel
+// overlayfs behavior, not a containerd one, and requires writing "trusted."
+// xattrs into the source tree before running mkfs.erofs - which some
+// sandboxed environments silently disallow (setxattr succeeds but the
+// value is not persisted). This test verifies what is within containerd's
+// control regardless of that: the EROFS snapshotter's composed mount
+// options are accepted by the kernel (i.e. composeRoleLowers's
+// lowerdir=...::... plus metacopy=on is well-formed) and a non-metacopy
+// file in the metadata layer is visible through the composed mount. When
+// the sandbox does support "trusted." xattrs, it additionally verifies
+// that the redirected file's content resolves correctly.
+func TestErofsImageSpecOverlayDataRole(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	tempDir, cs, sn, mgr := setupErofsImageSpecTest(t)
+	differ := erofsdiffer.NewErofsDiffer(cs)
+
+	dataSrc := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dataSrc, "payload.bin"), []byte("real-file-content-in-data-layer"), 0644))
+
+	metaSrc := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(metaSrc, "normal.txt"), []byte("normal-metadata-file"), 0644))
+	redirectPath := filepath.Join(metaSrc, "redirected.txt")
+	require.NoError(t, os.WriteFile(redirectPath, nil, 0644))
+	xattrsPersist := true
+	if err := unix.Setxattr(redirectPath, "trusted.overlay.metacopy", []byte{}, 0); err != nil {
+		xattrsPersist = false
+	}
+	if err := unix.Setxattr(redirectPath, "trusted.overlay.redirect", []byte("/payload.bin"), 0); err != nil {
+		xattrsPersist = false
+	}
+	if v, err := unix.Getxattr(redirectPath, "trusted.overlay.redirect", nil); err != nil || v <= 0 {
+		// Some sandboxed environments accept the setxattr call but do not
+		// actually persist "trusted." namespace xattrs.
+		xattrsPersist = false
+	}
+
+	dataBlobPath := filepath.Join(t.TempDir(), "data.erofs")
+	require.NoError(t, erofsutils.ConvertErofs(ctx, dataBlobPath, dataSrc, nil))
+	dataBytes, err := os.ReadFile(dataBlobPath)
+	require.NoError(t, err)
+
+	metaBlobPath := filepath.Join(t.TempDir(), "meta.erofs")
+	require.NoError(t, erofsutils.ConvertErofs(ctx, metaBlobPath, metaSrc, nil))
+	metaBytes, err := os.ReadFile(metaBlobPath)
+	require.NoError(t, err)
+
+	descData := writeBlob(ctx, t, cs, images.MediaTypeErofs, dataBytes, map[string]string{
+		"org.erofs.role": "overlay-data",
+	})
+	descMeta := writeBlob(ctx, t, cs, images.MediaTypeErofs, metaBytes, nil)
+
+	manifestLayers := []ocispec.Descriptor{descData, descMeta}
+	diffIDs, err := images.LayerIDs(manifestLayers, nil)
+	require.NoError(t, err)
+
+	var parent string
+	for i, desc := range manifestLayers {
+		prepareKey := fmt.Sprintf("prepare-%d", i)
+		mounts, err := sn.Prepare(ctx, prepareKey, parent)
+		require.NoError(t, err, "prepare layer %d", i)
+
+		diff, err := differ.Apply(ctx, desc, mounts)
+		require.NoError(t, err, "apply layer %d", i)
+		require.Equal(t, diffIDs[i], diff.Digest, "diff id mismatch for layer %d", i)
+
+		commitKey := fmt.Sprintf("committed-%d", i)
+		require.NoError(t, sn.Commit(ctx, commitKey, prepareKey), "commit layer %d", i)
+		parent = commitKey
+	}
+
+	viewMounts, err := sn.View(ctx, "view", parent)
+	require.NoError(t, err)
+
+	mountPoint := activateAndMount(t, mgr, tempDir, "mount", viewMounts)
+
+	data, err := os.ReadFile(filepath.Join(mountPoint, "normal.txt"))
+	require.NoError(t, err, "non-redirected metadata file should be visible")
+	require.Equal(t, "normal-metadata-file", string(data))
+
+	if !xattrsPersist {
+		t.Log("sandbox does not persist trusted.overlay.* xattrs; skipping redirect content verification")
+		return
+	}
+	data, err = os.ReadFile(filepath.Join(mountPoint, "redirected.txt"))
+	require.NoError(t, err, "metacopy-redirected file should resolve via the overlay-data lower")
+	require.Equal(t, "real-file-content-in-data-layer", string(data))
 }
