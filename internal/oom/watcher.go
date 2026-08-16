@@ -104,21 +104,17 @@ func (w *watcher) start() {
 		defer close(w.errCh)
 		defer w.eventFD.Close()
 
-		// The inotify read buffer and the memory.events read buffer are
-		// allocated once and reused for the lifetime of the watcher. This loop
-		// is woken for every modification of memory.events (which the kernel
-		// updates on every low/high/max reclaim event, not only on OOM kills),
-		// so avoiding per-wakeup allocations keeps long-running shims with
-		// stable workloads from accumulating CPU and GC overhead.
+		// Reuse a stack-allocated inotify read buffer for the lifetime of the
+		// watcher to avoid per-wakeup heap allocations.
 		// See https://github.com/containerd/containerd/issues/13558.
 		var (
 			oomKills   uint64
 			shouldExit bool
-			eventBuf   = make([]byte, unix.SizeofInotifyEvent*10)
-			statsBuf   = make([]byte, memoryEventsBufSize)
+			eventBuf   [unix.SizeofInotifyEvent * 10]byte
 		)
 		for !shouldExit {
-			bytesRead, err := w.eventFD.Read(eventBuf)
+			clear(eventBuf[:])
+			bytesRead, err := w.eventFD.Read(eventBuf[:])
 			if err != nil {
 				if !errors.Is(err, os.ErrClosed) {
 					w.errCh <- err
@@ -129,8 +125,9 @@ func (w *watcher) start() {
 				continue
 			}
 
-			oomKill, err := readMemoryOOMKill(w.cgroupPath, statsBuf)
-			if err != nil {
+			// TODO: We should export MemoryEventsStat function
+			out := make(map[string]uint64)
+			if err := readKVStatsFile(w.cgroupPath, "memory.events", out); err != nil {
 				// When cgroup is deleted read may return -ENODEV instead of -ENOENT from open.
 				if _, statErr := os.Lstat(filepath.Join(w.cgroupPath, "memory.events")); !os.IsNotExist(statErr) {
 					w.errCh <- err
@@ -138,8 +135,8 @@ func (w *watcher) start() {
 				return
 			}
 
-			if oomKill > oomKills {
-				oomKills = oomKill
+			if v := out["oom_kill"]; v > oomKills {
+				oomKills = v
 				w.eventFn(w.cid)
 			}
 		}
