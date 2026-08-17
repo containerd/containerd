@@ -32,7 +32,8 @@ func ParseImageReferences(refs []string) ([]string, []string) {
 		}
 		if _, ok := parsed.(reference.Canonical); ok {
 			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(reference.Tagged); ok {
+		}
+		if _, ok := parsed.(reference.Tagged); ok {
 			tags = append(tags, parsed.String())
 		}
 	}
