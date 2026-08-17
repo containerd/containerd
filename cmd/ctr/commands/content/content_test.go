@@ -41,13 +41,20 @@ func TestIngestContentLease(t *testing.T) {
 		ctx, db, cs, lm := newIngestStore(t)
 		data := []byte("temporarily protected content")
 		desc := descriptorFromBytes(data)
-		leaseCreatedAt := time.Now()
+		ingestStartedAt := time.Now()
 
 		require.NoError(t, ingestContent(ctx, cs, lm, defaultIngestLeaseDuration, "protected", bytes.NewReader(data), desc))
+		ingestFinishedAt := time.Now()
 		lease := requireSingleLease(t, ctx, lm)
-		expiresAt, err := time.Parse(time.RFC3339, lease.Labels["containerd.io/gc.expire"])
+		expiresAt, err := time.Parse(time.RFC3339Nano, lease.Labels["containerd.io/gc.expire"])
 		require.NoError(t, err)
-		require.WithinDuration(t, leaseCreatedAt.Add(defaultIngestLeaseDuration), expiresAt, time.Second)
+		// Lease expiration is recorded with one-second precision. Bound creation by
+		// timestamps on both sides of ingest so service or scheduler latency cannot
+		// make this assertion flaky.
+		require.False(t, expiresAt.Before(ingestStartedAt.Add(defaultIngestLeaseDuration-time.Second)))
+		require.False(t, expiresAt.After(ingestFinishedAt.Add(defaultIngestLeaseDuration+time.Second)))
+		require.Equal(t, "true", lease.Labels[ingestLeaseLabel])
+		require.Equal(t, "protected", lease.Labels[ingestLeaseRefLabel])
 
 		_, err = db.GarbageCollect(ctx)
 		require.NoError(t, err)
@@ -59,7 +66,7 @@ func TestIngestContentLease(t *testing.T) {
 		}
 		_, err = cs.Update(ctx, info, "labels.containerd.io/gc.root")
 		require.NoError(t, err)
-		require.NoError(t, lm.Delete(ctx, lease))
+		require.NoError(t, lm.Delete(ctx, lease, leases.SynchronousDelete))
 
 		_, err = db.GarbageCollect(ctx)
 		require.NoError(t, err)
@@ -90,7 +97,7 @@ func TestIngestContentLease(t *testing.T) {
 
 		require.NoError(t, ingestContent(ctx, cs, lm, defaultIngestLeaseDuration, "collectible", bytes.NewReader(data), desc))
 		lease := requireSingleLease(t, ctx, lm)
-		require.NoError(t, lm.Delete(ctx, lease))
+		require.NoError(t, lm.Delete(ctx, lease, leases.SynchronousDelete))
 
 		_, err := db.GarbageCollect(ctx)
 		require.NoError(t, err)
@@ -110,16 +117,41 @@ func TestIngestContentLease(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, listed)
 	})
+
+	t.Run("canceled ingest removes temporary lease", func(t *testing.T) {
+		ctx, _, cs, lm := newIngestStore(t)
+		data := []byte("canceled content")
+		desc := descriptorFromBytes(data)
+		canceledCtx, cancel := context.WithCancel(ctx)
+
+		err := ingestContent(canceledCtx, cs, lm, defaultIngestLeaseDuration, "canceled", cancelingReader{cancel: cancel}, desc)
+		require.ErrorIs(t, err, context.Canceled)
+		listed, err := lm.List(ctx)
+		require.NoError(t, err)
+		require.Empty(t, listed)
+	})
 }
 
 func TestIngestLeaseDurationDefault(t *testing.T) {
 	for _, flag := range ingestCommand.Flags {
-		if flag.Names()[0] == "lease-duration" {
-			require.Equal(t, defaultIngestLeaseDuration, flag.(*cli.DurationFlag).Value)
+		for _, name := range flag.Names() {
+			if name != "lease-duration" {
+				continue
+			}
+			durationFlag, ok := flag.(*cli.DurationFlag)
+			if !ok {
+				t.Fatalf("lease-duration flag has type %T, want *cli.DurationFlag", flag)
+			}
+			require.Equal(t, defaultIngestLeaseDuration, durationFlag.Value)
 			return
 		}
 	}
 	t.Fatal("lease-duration flag not found")
+}
+
+func TestIngestLeaseDurationValidation(t *testing.T) {
+	err := ingestContent(t.Context(), nil, nil, -time.Second, "negative", bytes.NewReader(nil), ocispec.Descriptor{})
+	require.EqualError(t, err, "--lease-duration must be >= 0, got -1s")
 }
 
 func newIngestStore(t *testing.T) (context.Context, *metadata.DB, content.Store, leases.Manager) {
@@ -151,4 +183,13 @@ func requireSingleLease(t *testing.T, ctx context.Context, lm leases.Manager) le
 	require.NoError(t, err)
 	require.Len(t, listed, 1)
 	return listed[0]
+}
+
+type cancelingReader struct {
+	cancel context.CancelFunc
+}
+
+func (r cancelingReader) Read([]byte) (int, error) {
+	r.cancel()
+	return 0, context.Canceled
 }

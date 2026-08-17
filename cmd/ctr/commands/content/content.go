@@ -40,7 +40,12 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-const defaultIngestLeaseDuration = 5 * time.Minute
+const (
+	defaultIngestLeaseDuration = 5 * time.Minute
+	ingestLeaseCleanupTimeout  = 10 * time.Second
+	ingestLeaseLabel           = "containerd.io/ctr/content-ingest"
+	ingestLeaseRefLabel        = "containerd.io/ctr/content-ingest.ref"
+)
 
 var (
 	// Command is the cli command for managing content
@@ -587,19 +592,28 @@ var (
 
 func ingestContent(ctx context.Context, cs content.Ingester, lm leases.Manager, leaseDuration time.Duration, ref string, r io.Reader, desc ocispec.Descriptor) error {
 	if leaseDuration < 0 {
-		return errors.New("lease duration must not be negative")
+		return fmt.Errorf("--lease-duration must be >= 0, got %s", leaseDuration)
 	}
 	if leaseDuration == 0 {
 		return content.WriteBlob(ctx, cs, ref, r, desc)
 	}
 
-	lease, err := lm.Create(ctx, leases.WithRandomID(), leases.WithExpiration(leaseDuration))
+	lease, err := lm.Create(ctx,
+		leases.WithRandomID(),
+		leases.WithExpiration(leaseDuration),
+		leases.WithLabels(map[string]string{
+			ingestLeaseLabel:    "true",
+			ingestLeaseRefLabel: ref,
+		}),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary lease: %w", err)
 	}
 
 	if err := content.WriteBlob(leases.WithLease(ctx, lease.ID), cs, ref, r, desc); err != nil {
-		if cleanupErr := lm.Delete(ctx, lease, leases.SynchronousDelete); cleanupErr != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), ingestLeaseCleanupTimeout)
+		defer cancel()
+		if cleanupErr := lm.Delete(cleanupCtx, lease, leases.SynchronousDelete); cleanupErr != nil {
 			return errors.Join(err, fmt.Errorf("failed to delete temporary lease: %w", cleanupErr))
 		}
 		return err
