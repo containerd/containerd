@@ -207,7 +207,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 
 		if sswt {
 			log.G(ctx).Infof("Stop container %q with signal %v", id, sig)
-			if err = task.Kill(ctx, sig); err != nil && !errdefs.IsNotFound(err) && !ctrdutil.IsRuntimeStateMissing(err) {
+			if err = task.Kill(ctx, sig); err != nil && !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to stop container %q: %w", id, err)
 			}
 		} else {
@@ -230,7 +230,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	}
 
 	log.G(ctx).Infof("Kill container %q", id)
-	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) && !ctrdutil.IsRuntimeStateMissing(err) {
+	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("failed to kill container %q: %w", id, err)
 	}
 

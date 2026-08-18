@@ -157,17 +157,3 @@ func IsShimTTRPCClosed(err error) bool {
 
 	return errdefs.IsUnknown(err) && strings.HasSuffix(err.Error(), ttrpc.ErrClosed.Error())
 }
-
-// IsRuntimeStateMissing checks whether an error from a kill or delete
-// operation indicates that the OCI runtime's state files for the
-// container have already been removed (e.g., by a previous delete that
-// completed after its context was cancelled). The runtime returns an
-// unstructured "No such file or directory" error which is not wrapped
-// as errdefs.ErrNotFound.
-func IsRuntimeStateMissing(err error) bool {
-	if err == nil {
-		return false
-	}
-	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "no such file or directory")
-}

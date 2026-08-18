@@ -245,56 +245,6 @@ func TestGenerateUserString(t *testing.T) {
 	}
 }
 
-func TestIsRuntimeStateMissing(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      error
-		expected bool
-	}{
-		{
-			name:     "nil error",
-			err:      nil,
-			expected: false,
-		},
-		{
-			name:     "crun state file missing",
-			err:      fmt.Errorf("rpc error: code = Unknown desc = No such file or directory"),
-			expected: true,
-		},
-		{
-			name:     "runc state file missing - lowercase",
-			err:      fmt.Errorf("no such file or directory"),
-			expected: true,
-		},
-		{
-			name:     "wrapped state file missing",
-			err:      fmt.Errorf("failed to kill process: %w", fmt.Errorf("No such file or directory")),
-			expected: true,
-		},
-		{
-			name:     "actual runc error from node logs",
-			err:      fmt.Errorf("rpc error: code = Unknown desc = failed to kill task 8882359: No such file or directory"),
-			expected: true,
-		},
-		{
-			name:     "unrelated error",
-			err:      fmt.Errorf("connection refused"),
-			expected: false,
-		},
-		{
-			name:     "errdefs not found - different error type",
-			err:      fmt.Errorf("task not found"),
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, IsRuntimeStateMissing(tt.err))
-		})
-	}
-}
-
 func TestIsShimTTRPCClosed(t *testing.T) {
 	tests := []struct {
 		name     string

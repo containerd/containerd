@@ -239,11 +239,8 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 
 		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
 		if _, err = task.Delete(ctx, c.nri.WithContainerExit(&cntr, e), containerd.WithProcessKill); err != nil {
-			if !errdefs.IsNotFound(err) && !ctrdutil.IsRuntimeStateMissing(err) {
+			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to stop container: %w", err)
-			}
-			if ctrdutil.IsRuntimeStateMissing(err) {
-				log.L.WithError(err).Warnf("Container %q runtime state already removed, treating as dead", cntr.Container.ID())
 			}
 			// Move on to make sure container status is updated.
 		}
@@ -282,11 +279,11 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 	// REF:
 	// 1. https://github.com/containerd/containerd/issues/7496#issuecomment-1671100968
 	// 2. https://github.com/containerd/containerd/issues/8931
-	if errdefs.IsNotFound(err) || ctrdutil.IsRuntimeStateMissing(err) {
+	if errdefs.IsNotFound(err) {
 		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: cntr.Container.ID()})
 		if err != nil {
 			err = errgrpc.ToNative(err)
-			if !errdefs.IsNotFound(err) && !ctrdutil.IsRuntimeStateMissing(err) {
+			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to cleanup container %s in task-service: %w", cntr.Container.ID(), err)
 			}
 		}
