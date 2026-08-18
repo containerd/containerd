@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/platforms"
@@ -129,6 +130,16 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 		return nil, fmt.Errorf("failed to get sandbox controllers from plugins %v", err)
 	}
 
+	tasksPlugin, err := ic.GetByID(plugins.ServicePlugin, services.TasksService)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tasks service plugin: %w", err)
+	}
+	restoredTaskManager, ok := tasksPlugin.(server.RestoredTaskManager)
+	if !ok {
+		log.G(ctx).Warn("tasks service does not support restored task adoption; RestorePod will return Unimplemented")
+		restoredTaskManager = nil
+	}
+
 	streamingConfig, err := config.StreamingConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get streaming config: %w", err)
@@ -151,14 +162,15 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	}
 
 	options := &server.CRIServiceOptions{
-		RuntimeService:     runtimeSvc,
-		ImageService:       imageSvc,
-		StreamingConfig:    streamingConfig,
-		NRI:                getNRIAPI(ic),
-		Client:             client,
-		SandboxControllers: sbControllers,
-		ShimPath:           shimPath,
-		WarningService:     warn,
+		RuntimeService:      runtimeSvc,
+		ImageService:        imageSvc,
+		StreamingConfig:     streamingConfig,
+		NRI:                 getNRIAPI(ic),
+		Client:              client,
+		SandboxControllers:  sbControllers,
+		ShimPath:            shimPath,
+		RestoredTaskManager: restoredTaskManager,
+		WarningService:      warn,
 	}
 	is := criImagePlugin.(imageService).GRPCService()
 

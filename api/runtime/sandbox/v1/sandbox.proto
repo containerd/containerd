@@ -58,6 +58,12 @@ service Sandbox {
 
   // SandboxMetrics retrieves metrics about a sandbox instance.
   rpc SandboxMetrics(SandboxMetricsRequest) returns (SandboxMetricsResponse);
+
+  // CheckpointSandbox checkpoints a consistent set of tasks in a sandbox.
+  rpc CheckpointSandbox(CheckpointSandboxRequest) returns (CheckpointSandboxResponse);
+
+  // RestoreSandbox restores a sandbox and all requested tasks in CREATED state.
+  rpc RestoreSandbox(RestoreSandboxRequest) returns (RestoreSandboxResponse);
 }
 
 message CreateSandboxRequest {
@@ -146,4 +152,51 @@ message SandboxMetricsRequest {
 
 message SandboxMetricsResponse {
   containerd.types.Metric metrics = 1;
+}
+
+message SandboxCheckpointTask {
+  string checkpoint_key = 1;
+  string task_id = 2;
+}
+
+message CheckpointSandboxRequest {
+  string sandbox_id = 1;
+  string output_path = 2;
+  repeated SandboxCheckpointTask tasks = 3;
+  map<string, string> options = 4;
+}
+
+message CheckpointSandboxResponse {}
+
+message SandboxRestoreTask {
+  string checkpoint_key = 1;
+  string task_id = 2;
+  string bundle = 3;
+  bool terminal = 4;
+  string stdin = 5;
+  string stdout = 6;
+  string stderr = 7;
+  google.protobuf.Any options = 8;
+}
+
+message RestoreSandboxRequest {
+  string sandbox_id = 1;
+  string bundle_path = 2;
+  string checkpoint_path = 3;
+  google.protobuf.Any sandbox_options = 4;
+  string netns_path = 5;
+  map<string, string> options = 6;
+  repeated SandboxRestoreTask tasks = 7;
+}
+
+message RestoredSandboxTask {
+  string checkpoint_key = 1;
+  string task_id = 2;
+}
+
+message RestoreSandboxResponse {
+  uint32 pid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Any spec = 3;
+  repeated RestoredSandboxTask tasks = 4;
 }

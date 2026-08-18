@@ -107,6 +107,48 @@ func TestReleasePanic(t *testing.T) {
 	km.Unlock(t.Name())
 }
 
+func TestKeyedRWLocker(t *testing.T) {
+	km := NewRW()
+	ctx := context.Background()
+	if err := km.RLock(ctx, "c1"); err != nil {
+		t.Fatalf("lock first reader: %v", err)
+	}
+	if err := km.RLock(ctx, "c1"); err != nil {
+		km.RUnlock("c1")
+		t.Fatalf("lock second reader: %v", err)
+	}
+
+	result := make(chan error, 1)
+	go func() {
+		result <- km.Lock(ctx, "c1")
+	}()
+	select {
+	case err := <-result:
+		km.RUnlock("c1")
+		km.RUnlock("c1")
+		t.Fatalf("writer bypassed readers: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	km.RUnlock("c1")
+	select {
+	case err := <-result:
+		km.RUnlock("c1")
+		t.Fatalf("writer bypassed remaining reader: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	km.RUnlock("c1")
+
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("lock writer: %v", err)
+		}
+		km.Unlock("c1")
+	case <-time.After(time.Second):
+		t.Fatal("writer did not acquire after readers unlocked")
+	}
+}
+
 func TestMultileAcquireOnKeys(t *testing.T) {
 	t.Parallel()
 

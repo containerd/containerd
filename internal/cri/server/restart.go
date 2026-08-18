@@ -25,6 +25,8 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/leases"
+	coresandbox "github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox"
@@ -100,12 +102,36 @@ func (c *criService) recover(ctx context.Context) error {
 		return fmt.Errorf("failed to list sandboxes from API: %w", err)
 	}
 	for _, sbx := range storedSandboxes {
+		metadata := sandboxstore.Metadata{}
+		metadataErr := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
+		restoreLabel := sbx.Labels[restoreStateLabel]
+		if metadataErr == nil && (metadata.Restore != nil || restoreLabel == restoreStateRestoring || restoreLabel == restoreStateRestoredCreated) {
+			unlock, lockErr := c.lockSandboxOperation(ctx, sbx.ID)
+			if lockErr != nil {
+				return lockErr
+			}
+			preserve, reconcileErr := c.reconcileInterruptedRestore(ctx, sbx, &metadata)
+			unlock()
+			if reconcileErr != nil {
+				// Keep the durable marker and don't expose partial state. A later
+				// restart retries the same idempotent reconciliation.
+				log.G(ctx).WithError(reconcileErr).Errorf("failed to reconcile interrupted restore %q", sbx.ID)
+				continue
+			}
+			if !preserve {
+				continue
+			}
+			metadata.Restore = nil
+		}
+		if metadataErr != nil && (restoreLabel == restoreStateRestoring || restoreLabel == restoreStateRestoredCreated) {
+			log.G(ctx).WithError(metadataErr).Errorf("failed to decode interrupted restore %q; keeping restoring record", sbx.ID)
+			continue
+		}
 		if _, err := c.sandboxStore.Get(sbx.ID); err == nil {
 			continue
 		}
 
-		metadata := sandboxstore.Metadata{}
-		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
+		err := metadataErr
 		if err != nil {
 			if errors.Is(err, errdefs.ErrNotFound) {
 				log.G(ctx).WithError(err).Errorf("failed to get metadata for stored sandbox %q", sbx.ID)
@@ -501,4 +527,87 @@ func (c *criService) createContainerIO(containerID, sandboxID string, config *ru
 		return nil, fmt.Errorf("failed to create container io: %w", err)
 	}
 	return containerIO, nil
+}
+
+// reconcileInterruptedRestore implements the MVP cleanup-only restart policy.
+// Prepared task, IO and CRI publication state is process-local, so no durable
+// restore marker is sufficient to prove that the full transaction can be
+// reconstructed safely after a daemon restart.
+func (c *criService) reconcileInterruptedRestore(ctx context.Context, sbx coresandbox.Sandbox, metadata *sandboxstore.Metadata) (bool, error) {
+	return false, c.cleanupInterruptedRestore(ctx, sbx)
+}
+
+// cleanupInterruptedRestore implements the MVP cleanup-only crash policy. It
+// removes child resources first and the durable Restoring record last.
+func (c *criService) cleanupInterruptedRestore(ctx context.Context, sbx coresandbox.Sandbox) error {
+	metadata := sandboxstore.Metadata{}
+	if err := sbx.GetExtension(podsandbox.MetadataKey, &metadata); err != nil {
+		return fmt.Errorf("get restoring metadata: %w", err)
+	}
+	var cleanupErr error
+	record := func(err error) {
+		if err != nil && !errdefs.IsNotFound(err) {
+			cleanupErr = errors.Join(cleanupErr, err)
+		}
+	}
+	containerIDs := map[string]struct{}{}
+	if metadata.Restore != nil {
+		for _, expected := range metadata.Restore.ExpectedContainers {
+			containerIDs[expected.ID] = struct{}{}
+		}
+	}
+	matchedContainers := map[string]containerd.Container{}
+	containers, err := c.client.Containers(ctx)
+	if err != nil {
+		return fmt.Errorf("list containers for restore cleanup: %w", err)
+	}
+	for _, cntr := range containers {
+		info, err := cntr.Info(ctx)
+		if err != nil {
+			record(err)
+			continue
+		}
+		if info.SandboxID != sbx.ID {
+			continue
+		}
+		containerIDs[info.ID] = struct{}{}
+		matchedContainers[info.ID] = cntr
+	}
+	if c.restoredTaskManager == nil && len(containerIDs) != 0 {
+		record(fmt.Errorf("tasks service does not support cleanup of interrupted restore: %w", errdefs.ErrNotImplemented))
+	} else {
+		for id := range containerIDs {
+			record(c.restoredTaskManager.CleanupRestoredTask(ctx, id))
+		}
+	}
+	record(c.sandboxService.ShutdownSandbox(ctx, sbx.Sandboxer, sbx.ID))
+	for _, cntr := range matchedContainers {
+		record(cntr.Delete(ctx))
+	}
+	for id := range containerIDs {
+		record(ensureRemoveAll(ctx, c.getContainerRootDir(id)))
+		record(ensureRemoveAll(ctx, c.getVolatileContainerRootDir(id)))
+	}
+	ociRuntime, runtimeErr := c.config.GetSandboxRuntime(metadata.Config, metadata.RuntimeHandler)
+	if runtimeErr != nil {
+		record(fmt.Errorf("resolve runtime for image mount cleanup: %w", runtimeErr))
+	} else {
+		record(c.cleanupImageMountsWithSnapshotter(
+			ctx, sbx.ID, c.RuntimeSnapshotter(ctx, ociRuntime),
+		))
+	}
+	sandbox := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: sandboxstore.StateUnknown})
+	sandbox.Sandboxer = sbx.Sandboxer
+	sandbox.NetNS = getNetNS(&metadata)
+	if sandbox.NetNS != nil && !hostNetwork(sandbox.Config) {
+		record(c.teardownPodNetwork(ctx, sandbox))
+	}
+	if sandbox.NetNS != nil {
+		record(sandbox.NetNS.Remove())
+	}
+	record(c.client.LeasesService().Delete(ctx, leases.Lease{ID: sbx.ID}))
+	if cleanupErr != nil {
+		return cleanupErr
+	}
+	return c.client.SandboxStore().Delete(ctx, sbx.ID)
 }

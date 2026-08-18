@@ -42,6 +42,8 @@ func NewAPI(nri.API, CRIImplementation) *API {
 	return nil
 }
 
+func (*API) IsDisabled() bool { return true }
+
 func (a *API) Register() error {
 	return nil
 }
@@ -109,6 +111,10 @@ func (*API) WithContainerAdjustment() containerd.NewContainerOpts {
 	return func(ctx context.Context, _ *containerd.Client, c *containers.Container) error {
 		return nil
 	}
+}
+
+func (*API) WithContainerAdjustmentForSandbox(*sstore.Sandbox) containerd.NewContainerOpts {
+	return func(context.Context, *containerd.Client, *containers.Container) error { return nil }
 }
 
 func (*API) WithContainerExit(*cstore.Container, *eventtypes.TaskExit) containerd.ProcessDeleteOpts {

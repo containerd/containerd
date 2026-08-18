@@ -79,3 +79,11 @@ func (g *grpcBridge) ShutdownSandbox(ctx context.Context, request *api.ShutdownS
 func (g *grpcBridge) SandboxMetrics(ctx context.Context, request *api.SandboxMetricsRequest) (*api.SandboxMetricsResponse, error) {
 	return g.client.SandboxMetrics(ctx, request)
 }
+
+func (g *grpcBridge) CheckpointSandbox(ctx context.Context, request *api.CheckpointSandboxRequest) (*api.CheckpointSandboxResponse, error) {
+	return g.client.CheckpointSandbox(ctx, request)
+}
+
+func (g *grpcBridge) RestoreSandbox(ctx context.Context, request *api.RestoreSandboxRequest) (*api.RestoreSandboxResponse, error) {
+	return g.client.RestoreSandbox(ctx, request)
+}

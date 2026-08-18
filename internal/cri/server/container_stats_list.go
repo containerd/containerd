@@ -386,11 +386,13 @@ func (c *criService) linuxContainerMetrics(
 		usedBytes = sn.Size
 		inodesUsed = sn.Inodes
 	}
+	var fsID *runtime.FilesystemIdentifier
+	if mountpoint := c.imageFSPaths[snapshotter]; mountpoint != "" {
+		fsID = &runtime.FilesystemIdentifier{Mountpoint: mountpoint}
+	}
 	cs.WritableLayer = &runtime.FilesystemUsage{
-		Timestamp: sn.Timestamp,
-		FsId: &runtime.FilesystemIdentifier{
-			Mountpoint: c.imageFSPaths[snapshotter],
-		},
+		Timestamp:  sn.Timestamp,
+		FsId:       fsID,
 		UsedBytes:  &runtime.UInt64Value{Value: usedBytes},
 		InodesUsed: &runtime.UInt64Value{Value: inodesUsed},
 	}

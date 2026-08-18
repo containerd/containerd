@@ -26,6 +26,7 @@ import (
 	goruntime "runtime"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -36,6 +37,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 
+	taskapi "github.com/containerd/containerd/api/runtime/task/v3"
 	apitypes "github.com/containerd/containerd/api/types"
 
 	"github.com/containerd/containerd/v2/core/mount"
@@ -132,6 +134,153 @@ type TaskManager struct {
 	state   string
 	manager *ShimManager
 	mounts  mount.Manager
+}
+
+// PreparedRestoredTask contains host-side resources prepared before a sandbox
+// runtime restores the corresponding task. It is deliberately in-memory only.
+type PreparedRestoredTask struct {
+	ID     string
+	Bundle *Bundle
+	Create *taskapi.CreateTaskRequest
+
+	manager     *TaskManager
+	opts        runtime.CreateOpts
+	cleanupOnce sync.Once
+	cleanupErr  error
+}
+
+// Cleanup releases prepared host resources. If the task was adopted, callers
+// must remove it from the runtime before invoking Cleanup.
+func (p *PreparedRestoredTask) Cleanup(ctx context.Context) error {
+	p.cleanupOnce.Do(func() {
+		if p.manager.mounts != nil {
+			cleanupCtx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+			defer cancel()
+			if err := p.manager.mounts.Deactivate(cleanupCtx, p.ID); err != nil && !errdefs.IsNotFound(err) {
+				p.cleanupErr = err
+				return
+			}
+		}
+		if err := p.Bundle.Delete(); err != nil && p.cleanupErr == nil {
+			p.cleanupErr = err
+		}
+	})
+	return p.cleanupErr
+}
+
+// PrepareRestoredTask creates bundle, mount and task request state without
+// starting a shim and without issuing Task.Create.
+func (m *TaskManager) PrepareRestoredTask(ctx context.Context, taskID string, opts runtime.CreateOpts) (_ *PreparedRestoredTask, retErr error) {
+	bundle, err := NewBundle(ctx, m.root, m.state, taskID, opts.Spec)
+	if err != nil {
+		return nil, err
+	}
+	prepared := &PreparedRestoredTask{ID: taskID, Bundle: bundle, manager: m}
+	defer func() {
+		if retErr != nil {
+			_ = prepared.Cleanup(ctx)
+		}
+	}()
+
+	activateOpts := []mount.ActivateOpt{mount.WithLabels(map[string]string{
+		"containerd.io/gc.bref.container": taskID,
+	})}
+	if info, err := m.manager.loadShimInfo(ctx, opts.Runtime); err == nil {
+		for _, mountType := range info.handledMounts {
+			activateOpts = append(activateOpts, mount.WithAllowMountType(mountType))
+		}
+	}
+	if m.mounts != nil && len(opts.Rootfs) != 0 {
+		if activated, err := m.mounts.Activate(ctx, taskID, opts.Rootfs, activateOpts...); err == nil {
+			opts.Rootfs = activated.System
+		} else if errdefs.IsAlreadyExists(err) {
+			activated, err = m.mounts.Info(ctx, taskID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get active mounts for restored task %s: %w", taskID, err)
+			}
+			opts.Rootfs = activated.System
+		} else if !errdefs.IsNotImplemented(err) {
+			return nil, err
+		}
+	}
+
+	if err := m.validateRuntimeFeatures(ctx, opts); err != nil {
+		return nil, fmt.Errorf("failed to validate OCI runtime features: %w", err)
+	}
+
+	taskOptions := opts.TaskOptions
+	if taskOptions == nil || taskOptions.GetValue() == nil {
+		taskOptions = opts.RuntimeOptions
+	}
+	request := &taskapi.CreateTaskRequest{
+		ID:         taskID,
+		Bundle:     bundle.Path,
+		Stdin:      opts.IO.Stdin,
+		Stdout:     opts.IO.Stdout,
+		Stderr:     opts.IO.Stderr,
+		Terminal:   opts.IO.Terminal,
+		Checkpoint: opts.Checkpoint,
+		Options:    typeurl.MarshalProto(taskOptions),
+	}
+	for _, rootfs := range opts.Rootfs {
+		request.Rootfs = append(request.Rootfs, &apitypes.Mount{
+			Type: rootfs.Type, Source: rootfs.Source, Target: rootfs.Target, Options: rootfs.Options,
+		})
+	}
+	prepared.opts = opts
+	prepared.Create = request
+	return prepared, nil
+}
+
+// AdoptRestoredTask registers a task already restored by the sandbox runtime.
+// It connects to the existing sandbox shim and never issues Task.Create.
+func (m *TaskManager) AdoptRestoredTask(ctx context.Context, prepared *PreparedRestoredTask, address string, version uint32) (runtime.Task, error) {
+	if prepared == nil || prepared.manager != m {
+		return nil, fmt.Errorf("invalid prepared restored task: %w", errdefs.ErrInvalidArgument)
+	}
+	opts := prepared.opts
+	opts.Address = address
+	opts.Version = version
+	shim, err := m.manager.Start(ctx, prepared.ID, prepared.Bundle, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register restored task shim: %w", err)
+	}
+	task, err := newShimTask(shim)
+	if err != nil {
+		m.manager.shims.Delete(ctx, prepared.ID)
+		return nil, err
+	}
+	state, err := task.State(ctx)
+	if err != nil {
+		m.manager.shims.Delete(ctx, prepared.ID)
+		return nil, fmt.Errorf("failed to query restored task %s: %w", prepared.ID, err)
+	}
+	if state.Status != runtime.CreatedStatus {
+		m.manager.shims.Delete(ctx, prepared.ID)
+		return nil, fmt.Errorf("restored task %s is %v, expected CREATED: %w", prepared.ID, state.Status, errdefs.ErrFailedPrecondition)
+	}
+	return task, nil
+}
+
+// CleanupRestoredTaskResources removes host-side prepare state by task ID. It
+// is usable after daemon restart when the in-memory PreparedRestoredTask handle
+// no longer exists.
+func (m *TaskManager) CleanupRestoredTaskResources(ctx context.Context, taskID string) error {
+	var cleanupErr error
+	cleanupCtx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+	defer cancel()
+	if m.mounts != nil {
+		if err := m.mounts.Deactivate(cleanupCtx, taskID); err != nil && !errdefs.IsNotFound(err) && !errdefs.IsNotImplemented(err) {
+			return err
+		}
+	}
+	bundle, err := LoadBundle(cleanupCtx, m.state, taskID)
+	if err != nil {
+		cleanupErr = errors.Join(cleanupErr, err)
+	} else if err := bundle.Delete(); err != nil && !errdefs.IsNotFound(err) {
+		cleanupErr = errors.Join(cleanupErr, err)
+	}
+	return cleanupErr
 }
 
 // NewTaskManager creates a new task manager instance.

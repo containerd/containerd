@@ -32,10 +32,7 @@ import (
 )
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
-	var (
-		specOpts []oci.SpecOpts
-		err      error
-	)
+	var specOpts []oci.SpecOpts
 	securityContext := config.GetLinux().GetSecurityContext()
 	userstr := "0" // runtime default
 	if securityContext.GetRunAsUsername() != "" {
@@ -62,6 +59,31 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	default:
 		return nil, fmt.Errorf("not implemented in this containerd release: SupplementalGroupsPolicy=%d", securityContext.GetSupplementalGroupsPolicy())
 	}
+	securitySpecOpts, err := c.containerSecuritySpecOpts(config)
+	if err != nil {
+		return nil, err
+	}
+	return append(specOpts, securitySpecOpts...), nil
+}
+
+// restorePlatformSpecOpts returns late spec options that do not need a mounted
+// container rootfs. Restore staging deliberately has no containerd snapshot;
+// the sandbox runtime owns the checkpointed rootfs and process state.
+func (c *criService) restorePlatformSpecOpts(platform imagespec.Platform, config *runtime.ContainerConfig) ([]oci.SpecOpts, error) {
+	if platform.OS != "linux" {
+		return nil, nil
+	}
+	return c.containerSecuritySpecOpts(config)
+}
+
+// containerSecuritySpecOpts contains Linux security and CDI options that can
+// be generated without resolving users or supplementary groups from rootfs.
+func (c *criService) containerSecuritySpecOpts(config *runtime.ContainerConfig) ([]oci.SpecOpts, error) {
+	var (
+		specOpts []oci.SpecOpts
+		err      error
+	)
+	securityContext := config.GetLinux().GetSecurityContext()
 
 	asp := securityContext.GetApparmor()
 	if asp == nil {

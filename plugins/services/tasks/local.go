@@ -49,6 +49,7 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/runtime"
+	runtimev2 "github.com/containerd/containerd/v2/core/runtime/v2"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
@@ -789,4 +790,121 @@ func formatOptions(runtime string, option *ptypes.Any) (*options.Options, error)
 		return nil, fmt.Errorf("invalid task create option for %s", runtime)
 	}
 	return opts, nil
+}
+
+type restoredTaskRuntime interface {
+	Get(context.Context, string) (runtime.Task, error)
+	PrepareRestoredTask(context.Context, string, runtime.CreateOpts) (*runtimev2.PreparedRestoredTask, error)
+	AdoptRestoredTask(context.Context, *runtimev2.PreparedRestoredTask, string, uint32) (runtime.Task, error)
+	CleanupRestoredTaskResources(context.Context, string) error
+}
+
+func (l *local) restoreRuntime() (restoredTaskRuntime, error) {
+	r, ok := l.v2Runtime.(restoredTaskRuntime)
+	if !ok {
+		return nil, fmt.Errorf("runtime does not support restored tasks: %w", errdefs.ErrNotImplemented)
+	}
+	return r, nil
+}
+
+// PrepareRestoredTask is an in-process extension used by the CRI RestorePod
+// coordinator. It deliberately is not part of the public Tasks gRPC API.
+func (l *local) PrepareRestoredTask(ctx context.Context, request *api.CreateTaskRequest) (*runtimev2.PreparedRestoredTask, error) {
+	container, err := l.getContainer(ctx, request.ContainerID)
+	if err != nil {
+		return nil, err
+	}
+	manager, err := l.restoreRuntime()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := manager.Get(ctx, request.ContainerID); err == nil {
+		return nil, fmt.Errorf("task %s: %w", request.ContainerID, errdefs.ErrAlreadyExists)
+	} else if !errdefs.IsNotFound(err) {
+		return nil, err
+	}
+
+	opts := runtime.CreateOpts{
+		Spec: container.Spec,
+		IO: runtime.IO{
+			Stdin: request.Stdin, Stdout: request.Stdout, Stderr: request.Stderr, Terminal: request.Terminal,
+		},
+		Runtime:        container.Runtime.Name,
+		RuntimeOptions: container.Runtime.Options,
+		TaskOptions:    request.Options,
+		SandboxID:      container.SandboxID,
+		Address:        request.TaskApiAddress,
+		Version:        request.TaskApiVersion,
+	}
+	if request.RuntimePath != "" {
+		opts.Runtime = request.RuntimePath
+	}
+	for _, rootfs := range request.Rootfs {
+		opts.Rootfs = append(opts.Rootfs, mount.Mount{
+			Type: rootfs.Type, Source: rootfs.Source, Target: rootfs.Target, Options: rootfs.Options,
+		})
+	}
+	return manager.PrepareRestoredTask(ctx, request.ContainerID, opts)
+}
+
+// AdoptRestoredTask registers a task already created by RestoreSandbox.
+func (l *local) AdoptRestoredTask(ctx context.Context, prepared *runtimev2.PreparedRestoredTask, address string, version uint32) (_ runtime.Task, retErr error) {
+	manager, err := l.restoreRuntime()
+	if err != nil {
+		return nil, err
+	}
+	task, err := manager.AdoptRestoredTask(ctx, prepared, address, version)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if retErr == nil {
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		_ = l.monitor.Stop(task)
+		_, _ = l.v2Runtime.Delete(cleanupCtx, prepared.ID)
+	}()
+	container, err := l.getContainer(ctx, prepared.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := l.monitor.Monitor(task, map[string]string{"runtime": container.Runtime.Name}); err != nil {
+		return nil, fmt.Errorf("monitor restored task: %w", err)
+	}
+	return task, nil
+}
+
+// CleanupRestoredTask removes both an adopted task, if present, and prepare
+// resources that may survive a daemon crash before adoption.
+func (l *local) CleanupRestoredTask(ctx context.Context, taskID string) error {
+	if err := l.removeRestoredTask(ctx, taskID); err != nil {
+		return err
+	}
+	manager, err := l.restoreRuntime()
+	if err != nil {
+		return err
+	}
+	return manager.CleanupRestoredTaskResources(ctx, taskID)
+}
+
+// removeRestoredTask removes an adopted task without shutting down the shared
+// sandbox shim. Prepared host resources are cleaned separately by the caller.
+func (l *local) removeRestoredTask(ctx context.Context, taskID string) error {
+	task, err := l.v2Runtime.Get(ctx, taskID)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if err := l.monitor.Stop(task); err != nil {
+		return err
+	}
+	_, err = l.v2Runtime.Delete(ctx, taskID)
+	if errdefs.IsNotFound(err) {
+		return nil
+	}
+	return err
 }

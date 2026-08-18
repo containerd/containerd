@@ -35,11 +35,14 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	streaming "k8s.io/cri-streaming/pkg/streaming"
 
+	tasksapi "github.com/containerd/containerd/api/services/tasks/v1"
 	apitypes "github.com/containerd/containerd/api/types"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/introspection"
 	_ "github.com/containerd/containerd/v2/core/runtime" // for typeurl init
+	coreruntime "github.com/containerd/containerd/v2/core/runtime"
+	runtimev2 "github.com/containerd/containerd/v2/core/runtime/v2"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/nri"
@@ -52,6 +55,7 @@ import (
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/eventq"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
@@ -86,6 +90,27 @@ type sandboxService interface {
 	SandboxStatus(ctx context.Context, sandboxer string, sandboxID string, verbose bool) (sandbox.ControllerStatus, error)
 	SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (imagespec.Platform, error)
 	SandboxController(sandboxer string) (sandbox.Controller, error)
+}
+
+// checkpointRestoreSandboxService is kept separate from sandboxService so
+// existing sandbox service implementations and test fakes remain compatible.
+type checkpointRestoreSandboxService interface {
+	CheckpointSandbox(ctx context.Context, sandboxer, sandboxID string, opts sandbox.CheckpointOptions) error
+	RestoreSandbox(ctx context.Context, sandboxer string, info sandbox.Sandbox, opts sandbox.RestoreOptions) (sandbox.RestoreResult, error)
+}
+
+type stagedRestoreSandboxService interface {
+	PrepareRestoreSandbox(ctx context.Context, sandboxer string, info sandbox.Sandbox, opts sandbox.RestoreOptions) (sandbox.ControllerInstance, error)
+	CompleteRestoreSandbox(ctx context.Context, sandboxer string, info sandbox.Sandbox, opts sandbox.RestoreOptions) ([]sandbox.RestoredTask, error)
+}
+
+// RestoredTaskManager exposes the in-process restore staging operations. They
+// intentionally aren't part of the public Tasks gRPC service: restored tasks
+// already exist in the restored sandbox and must be adopted without Task.Create.
+type RestoredTaskManager interface {
+	PrepareRestoredTask(context.Context, *tasksapi.CreateTaskRequest) (*runtimev2.PreparedRestoredTask, error)
+	AdoptRestoredTask(context.Context, *runtimev2.PreparedRestoredTask, string, uint32) (coreruntime.Task, error)
+	CleanupRestoredTask(context.Context, string) error
 }
 
 // RuntimeService specifies dependencies to runtime service which provides
@@ -165,6 +190,17 @@ type criService struct {
 	nri *nri.API
 	// sandboxService is the sandbox related service for CRI
 	sandboxService sandboxService
+	// restoredTaskManager stages and adopts tasks restored by a sandbox runtime.
+	restoredTaskManager RestoredTaskManager
+	// sandboxOperations makes checkpoint/restore exclusive with ordinary
+	// lifecycle operations while allowing lifecycle operations to run together.
+	sandboxOperations kmutex.KeyedRWLocker
+	// sandboxExecs tracks exec processes admitted while briefly holding the
+	// sandbox operation lock. Checkpoint rejects an active exec, while lifecycle
+	// operations remain able to stop the container that owns that exec.
+	sandboxExecMu sync.Mutex
+	// sandboxExecs tracks the number of active exec processes for each sandbox.
+	sandboxExecs map[string]int
 	// runtimeHandlers contains runtime handler info
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
@@ -202,6 +238,9 @@ type CRIServiceOptions struct {
 
 	// WarningService is used to emit deprecation warnings.
 	WarningService warning.Service
+
+	// RestoredTaskManager is the in-process restored task manager for sandbox restore adoption.
+	RestoredTaskManager RestoredTaskManager
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -215,22 +254,25 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	statsCollector := NewStatsCollector(config)
 
 	c := &criService{
-		RuntimeService:     options.RuntimeService,
-		ImageService:       options.ImageService,
-		config:             config,
-		client:             options.Client,
-		imageFSPaths:       options.ImageService.ImageFSPaths(),
-		os:                 osinterface.RealOS{},
-		sandboxStore:       sandboxstore.NewStore(labels, statsCollector),
-		containerStore:     containerstore.NewStore(labels, statsCollector),
-		sandboxNameIndex:   registrar.NewRegistrar(),
-		containerNameIndex: registrar.NewRegistrar(),
-		netPlugin:          make(map[string]cni.CNI),
-		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
-		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
-		statsCollector:     statsCollector,
-		shimPath:           options.ShimPath,
-		warningService:     options.WarningService,
+		RuntimeService:      options.RuntimeService,
+		ImageService:        options.ImageService,
+		config:              config,
+		client:              options.Client,
+		imageFSPaths:        options.ImageService.ImageFSPaths(),
+		os:                  osinterface.RealOS{},
+		sandboxStore:        sandboxstore.NewStore(labels, statsCollector),
+		containerStore:      containerstore.NewStore(labels, statsCollector),
+		sandboxNameIndex:    registrar.NewRegistrar(),
+		containerNameIndex:  registrar.NewRegistrar(),
+		netPlugin:           make(map[string]cni.CNI),
+		sandboxService:      newCriSandboxService(&config, options.SandboxControllers),
+		restoredTaskManager: options.RestoredTaskManager,
+		sandboxOperations:   kmutex.NewRW(),
+		sandboxExecs:        make(map[string]int),
+		runtimeHandlers:     make(map[string]*runtime.RuntimeHandler),
+		statsCollector:      statsCollector,
+		shimPath:            options.ShimPath,
+		warningService:      options.WarningService,
 	}
 
 	// TODO: Make discard time configurable
@@ -456,6 +498,112 @@ func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introsp
 	}
 
 	return nil
+}
+
+// Run starts the CRI service.
+func (c *criService) lockSandboxOperation(ctx context.Context, sandboxID string) (func(), error) {
+	if c.sandboxOperations == nil {
+		return func() {}, nil
+	}
+	if err := c.sandboxOperations.Lock(ctx, sandboxID); err != nil {
+		return nil, err
+	}
+	return func() { c.sandboxOperations.Unlock(sandboxID) }, nil
+}
+
+func (c *criService) lockSandboxLifecycle(ctx context.Context, sandboxID string) (func(), error) {
+	if c.sandboxOperations == nil {
+		return func() {}, nil
+	}
+	if err := c.sandboxOperations.RLock(ctx, sandboxID); err != nil {
+		return nil, err
+	}
+	return func() { c.sandboxOperations.RUnlock(sandboxID) }, nil
+}
+
+// lockSandboxOperationByID resolves a possibly truncated CRI sandbox ID before
+// taking the keyed lock. All operations for one sandbox must use its canonical
+// ID or two aliases could bypass serialization. The second lookup closes the
+// race with a concurrent removal between resolution and lock acquisition.
+func (c *criService) lockSandboxOperationByID(ctx context.Context, sandboxID string) (sandboxstore.Sandbox, func(), error) {
+	sbx, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return sandboxstore.Sandbox{}, nil, err
+	}
+	unlock, err := c.lockSandboxOperation(ctx, sbx.ID)
+	if err != nil {
+		return sandboxstore.Sandbox{}, nil, err
+	}
+	sbx, err = c.sandboxStore.Get(sbx.ID)
+	if err != nil {
+		unlock()
+		return sandboxstore.Sandbox{}, nil, err
+	}
+	return sbx, unlock, nil
+}
+
+// lockSandboxLifecycleByID resolves a possibly truncated CRI sandbox ID before
+// admitting an ordinary lifecycle operation under the sandbox's shared gate.
+func (c *criService) lockSandboxLifecycleByID(ctx context.Context, sandboxID string) (sandboxstore.Sandbox, func(), error) {
+	sbx, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return sandboxstore.Sandbox{}, nil, err
+	}
+	unlock, err := c.lockSandboxLifecycle(ctx, sbx.ID)
+	if err != nil {
+		return sandboxstore.Sandbox{}, nil, err
+	}
+	sbx, err = c.sandboxStore.Get(sbx.ID)
+	if err != nil {
+		unlock()
+		return sandboxstore.Sandbox{}, nil, err
+	}
+	return sbx, unlock, nil
+}
+
+// lockContainerSandboxOperation resolves the container first, then admits the
+// lifecycle operation under the owning sandbox's shared gate. Re-reading the
+// container after locking prevents use of an entry removed while waiting.
+func (c *criService) lockContainerSandboxOperation(ctx context.Context, containerID string) (containerstore.Container, func(), error) {
+	cntr, err := c.containerStore.Get(containerID)
+	if err != nil {
+		return containerstore.Container{}, nil, err
+	}
+	unlock, err := c.lockSandboxLifecycle(ctx, cntr.SandboxID)
+	if err != nil {
+		return containerstore.Container{}, nil, err
+	}
+	cntr, err = c.containerStore.Get(cntr.ID)
+	if err != nil {
+		unlock()
+		return containerstore.Container{}, nil, err
+	}
+	return cntr, unlock, nil
+}
+
+func (c *criService) beginSandboxExec(sandboxID string) {
+	c.sandboxExecMu.Lock()
+	defer c.sandboxExecMu.Unlock()
+	if c.sandboxExecs == nil {
+		c.sandboxExecs = make(map[string]int)
+	}
+	c.sandboxExecs[sandboxID]++
+}
+
+func (c *criService) endSandboxExec(sandboxID string) {
+	c.sandboxExecMu.Lock()
+	defer c.sandboxExecMu.Unlock()
+	if c.sandboxExecs[sandboxID] <= 1 {
+		delete(c.sandboxExecs, sandboxID)
+		return
+	}
+	c.sandboxExecs[sandboxID]--
+}
+
+func (c *criService) hasActiveSandboxExec(sandboxID string) bool {
+	c.sandboxExecMu.Lock()
+	defer c.sandboxExecMu.Unlock()
+	return c.sandboxExecs[sandboxID] != 0
 }
 
 func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r criconfig.Runtime) (*features.Features, error) {

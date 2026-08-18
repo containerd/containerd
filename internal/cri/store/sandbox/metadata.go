@@ -62,6 +62,20 @@ type Metadata struct {
 	CNIResult *cni.Result
 	// ProcessLabel is the SELinux process label for the container
 	ProcessLabel string
+	// Restore is non-nil while a pod-level restore transaction is incomplete.
+	// It is persisted before any external resource is allocated and removed last.
+	Restore *RestoreMetadata
+}
+
+type RestoreContainer struct {
+	Name string
+	ID   string
+}
+
+type RestoreMetadata struct {
+	State              string
+	CheckpointPath     string
+	ExpectedContainers []RestoreContainer
 }
 
 // MarshalJSON encodes Metadata into bytes in json format.

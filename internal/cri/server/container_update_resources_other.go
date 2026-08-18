@@ -29,10 +29,11 @@ import (
 
 // UpdateContainerResources updates ContainerConfig of the container.
 func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.UpdateContainerResourcesRequest) (retRes *runtime.UpdateContainerResourcesResponse, retErr error) {
-	container, err := c.containerStore.Get(r.GetContainerId())
+	container, unlock, err := c.lockContainerSandboxOperation(ctx, r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container: %w", err)
 	}
+	defer unlock()
 	// Update resources in status update transaction, so that:
 	// 1) There won't be race condition with container start.
 	// 2) There won't be concurrent resource update to the same container.

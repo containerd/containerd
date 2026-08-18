@@ -116,6 +116,76 @@ type Controller interface {
 	Update(ctx context.Context, sandboxID string, sandbox Sandbox, fields ...string) error
 }
 
+// CheckpointRestoreController is an optional sandbox controller capability.
+// Controllers that do not implement it do not support pod-level checkpoint
+// and restore.
+type CheckpointRestoreController interface {
+	Checkpoint(ctx context.Context, sandboxID string, opts CheckpointOptions) error
+	Restore(ctx context.Context, sandboxInfo Sandbox, opts RestoreOptions) (RestoreResult, error)
+}
+
+// StagedRestoreController is an optional capability for runtimes that can
+// restore the sandbox before restoring its task records. It lets CRI preserve
+// RunPodSandbox-before-CreateContainer ordering when NRI is enabled.
+type StagedRestoreController interface {
+	SupportsStagedRestore(ctx context.Context, runtime string) error
+	PrepareRestore(ctx context.Context, sandboxInfo Sandbox, opts RestoreOptions) (ControllerInstance, error)
+	CompleteRestore(ctx context.Context, sandboxInfo Sandbox, opts RestoreOptions) ([]RestoredTask, error)
+}
+
+const (
+	// RestorePhaseOption is an internal transport-compatible extension used by
+	// the sandbox controller and shim while staged restore has no typed Sandbox
+	// API RPCs. CRI callers must not set it.
+	RestorePhaseOption   = "io.containerd.pod-restore.phase"
+	RestorePhasePrepare  = "prepare"
+	RestorePhaseComplete = "complete"
+
+	// StagedRestoreRuntimeAnnotation is advertised through the shim runtime
+	// info when the runtime honors RestorePhaseOption.
+	StagedRestoreRuntimeAnnotation = "io.containerd.pod-restore.staged"
+)
+
+type CheckpointTask struct {
+	CheckpointKey string
+	TaskID        string
+}
+
+type CheckpointOptions struct {
+	OutputPath string
+	Tasks      []CheckpointTask
+	Options    map[string]string
+}
+
+type RestoreTask struct {
+	CheckpointKey string
+	TaskID        string
+	Bundle        string
+	Terminal      bool
+	Stdin         string
+	Stdout        string
+	Stderr        string
+	Options       typeurl.Any
+}
+
+type RestoreOptions struct {
+	CheckpointPath string
+	SandboxOptions typeurl.Any
+	NetNSPath      string
+	Options        map[string]string
+	Tasks          []RestoreTask
+}
+
+type RestoredTask struct {
+	CheckpointKey string
+	TaskID        string
+}
+
+type RestoreResult struct {
+	Controller ControllerInstance
+	Tasks      []RestoredTask
+}
+
 type ControllerInstance struct {
 	SandboxID string
 	Pid       uint32

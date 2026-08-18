@@ -98,6 +98,12 @@ type Status struct {
 	Unknown bool `json:"-"`
 	// Resources has container runtime resource constraints
 	Resources *runtime.ContainerResources
+	// Restore marks this container as a container to be restored from a
+	// checkpoint and not started.
+	Restore bool
+	// ActiveExecIDs persists exec processes admitted by CRI so checkpoint can
+	// still reject them after a containerd restart.
+	ActiveExecIDs []string `json:",omitempty"`
 }
 
 // State returns current state of the container based on the container status.
@@ -211,6 +217,7 @@ func (s *statusStorage) Get() Status {
 
 func deepCopyOf(s Status) Status {
 	copy := s
+	copy.ActiveExecIDs = append([]string(nil), s.ActiveExecIDs...)
 	// Resources is the only field that is a pointer, and therefore needs
 	// a manual deep copy.
 	// This will need updates when new fields are added to ContainerResources.

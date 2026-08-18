@@ -199,6 +199,18 @@ func (c *criService) cleanupImageMounts(
 		return nil
 	}
 	snapshotter := c.RuntimeSnapshotter(ctx, ociRuntime)
+	return c.cleanupImageMountsWithSnapshotter(ctx, sandboxID, snapshotter)
+}
+
+// cleanupImageMountsWithSnapshotter cleans image-volume resources when the
+// sandbox has not yet been published in the CRI sandbox store. Restore rollback
+// and restart recovery already know the selected runtime and snapshotter from
+// their durable restore metadata.
+func (c *criService) cleanupImageMountsWithSnapshotter(
+	ctx context.Context,
+	sandboxID string,
+	snapshotter string,
+) (retErr error) {
 	s := c.client.SnapshotService(snapshotter)
 	if s == nil {
 		return nil

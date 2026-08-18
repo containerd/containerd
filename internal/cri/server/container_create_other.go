@@ -30,6 +30,10 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	return []oci.SpecOpts{}, nil
 }
 
+func (c *criService) restorePlatformSpecOpts(platform imagespec.Platform, config *runtime.ContainerConfig) ([]oci.SpecOpts, error) {
+	return []oci.SpecOpts{}, nil
+}
+
 // snapshotterOpts returns snapshotter options for the rootfs snapshot
 func snapshotterOpts(config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
 	return []snapshots.Opt{}, nil

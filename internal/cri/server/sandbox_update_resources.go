@@ -31,10 +31,11 @@ import (
 
 func (c *criService) UpdatePodSandboxResources(ctx context.Context, r *runtime.UpdatePodSandboxResourcesRequest) (*runtime.UpdatePodSandboxResourcesResponse, error) {
 	span := tracing.SpanFromContext(ctx)
-	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	sandbox, unlock, err := c.lockSandboxLifecycleByID(ctx, r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox: %w", err)
 	}
+	defer unlock()
 
 	span.SetAttributes(tracing.Attribute("sandbox.id", sandbox.ID))
 

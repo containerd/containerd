@@ -62,11 +62,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	config := r.GetConfig()
 	log.G(ctx).Debugf("Container config %+v", config)
 	sandboxConfig := r.GetSandboxConfig()
-	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	sandbox, unlock, err := c.lockSandboxLifecycleByID(ctx, r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
-
+	defer unlock()
 	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get controller status: %w", err)
@@ -185,10 +185,16 @@ type createContainerRequest struct {
 	containerdImage       *containerd.Image
 	meta                  *containerstore.Metadata
 	start                 time.Time
+	platform              *imagespec.Platform
+	deferPublish          bool
+	stagedContainer       *containerstore.Container
+	ociRuntime            *criconfig.Runtime
+	noSnapshot            bool
 }
 
 func (c *criService) createContainer(r *createContainerRequest) (_ string, retErr error) {
 	span := tracing.SpanFromContext(r.ctx)
+	var err error
 	// Create container root directory.
 	containerRootDir := c.getContainerRootDir(r.containerID)
 	if err := c.os.MkdirAll(containerRootDir, 0755); err != nil {
@@ -229,13 +235,23 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	platform, err := c.sandboxService.SandboxPlatform(r.ctx, r.sandbox.Sandboxer, r.sandboxID)
-	if err != nil {
-		return "", fmt.Errorf("failed to query sandbox platform: %w", err)
+	var platform imagespec.Platform
+	if r.platform != nil {
+		platform = *r.platform
+	} else {
+		platform, err = c.sandboxService.SandboxPlatform(r.ctx, r.sandbox.Sandboxer, r.sandboxID)
+		if err != nil {
+			return "", fmt.Errorf("failed to query sandbox platform: %w", err)
+		}
 	}
-	ociRuntime, err := c.getPodSandboxRuntime(r.sandboxID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get sandbox runtime: %w", err)
+	var ociRuntime criconfig.Runtime
+	if r.ociRuntime != nil {
+		ociRuntime = *r.ociRuntime
+	} else {
+		ociRuntime, err = c.getPodSandboxRuntime(r.sandboxID)
+		if err != nil {
+			return "", fmt.Errorf("failed to get sandbox runtime: %w", err)
+		}
 	}
 
 	// mutate the extra CRI volume mounts from the runtime spec to properly specify the OCI image volume mount requests as bind mounts for this container
@@ -281,6 +297,9 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container %q spec: %w", r.containerID, err)
 	}
+	if r.noSnapshot {
+		prepareRestoredContainerNamespaces(spec, r.NetNSPath)
+	}
 
 	r.meta.ProcessLabel = spec.Process.SelinuxLabel
 
@@ -308,15 +327,15 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		return "", err
 	}
 
-	// Set snapshotter before any other options.
-	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.RuntimeSnapshotter(r.ctx, ociRuntime)),
-		// Prepare container rootfs. This is always writeable even if
-		// the container wants a readonly rootfs since we want to give
-		// the runtime (runc) a chance to modify (e.g. to create mount
-		// points corresponding to spec.Mounts) before making the
-		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(r.containerID, *r.containerdImage, !c.ImageService.Config().DisableSnapshotAnnotations, sOpts...),
+	var opts []containerd.NewContainerOpts
+	if !r.noSnapshot {
+		// Set snapshotter before any other options. Restored sandbox tasks
+		// deliberately omit this: their writable rootfs is checkpoint-owned
+		// and managed by the sandbox runtime.
+		opts = append(opts,
+			containerd.WithSnapshotter(c.RuntimeSnapshotter(r.ctx, ociRuntime)),
+			customopts.WithNewSnapshot(r.containerID, *r.containerdImage, !c.ImageService.Config().DisableSnapshotAnnotations, sOpts...),
+		)
 	}
 	if len(volumeMounts) > 0 {
 		mountMap := make(map[string]string)
@@ -326,7 +345,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		opts = append(opts, customopts.WithVolumes(mountMap, platform))
 	}
 	r.meta.ImageRef = r.imageID
-	if signal := r.containerConfig.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
+	if signal := r.containerConfig.GetStopSignal(); signal != runtime.Signal_SIGNAL_RUNTIME_DEFAULT {
 		stopSignal, err := criSignalToOCIStopSignal(signal)
 		if err != nil {
 			return "", err
@@ -366,12 +385,24 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	specOpts, err := c.platformSpecOpts(platform, r.containerConfig, r.imageConfig)
+	var specOpts []oci.SpecOpts
+	if r.noSnapshot {
+		// Restore staging has no host snapshot: the sandbox checkpoint owns the
+		// rootfs. Preserve late options that do not inspect the rootfs (security
+		// profiles and CDI), while skipping user/group resolution that requires a
+		// mounted snapshot.
+		specOpts, err = c.restorePlatformSpecOpts(platform, r.containerConfig)
+	} else {
+		specOpts, err = c.platformSpecOpts(platform, r.containerConfig, r.imageConfig)
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to get container spec opts: %w", err)
 	}
 
 	containerLabels := util.BuildLabels(r.containerConfig.Labels, r.imageConfig.Labels, crilabels.ContainerKindContainer)
+	// This label changes StartContainer semantics and must only be written by
+	// the successful RestorePod adoption path, never by an untrusted CRI config.
+	stripUntrustedRestoreLabels(containerLabels)
 
 	// TODO the sandbox in the cache should hold this info
 	runtimeName, runtimeOption, err := c.runtimeInfo(r.ctx, r.sandboxID)
@@ -388,7 +419,11 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 
 	opts = append(opts, containerd.WithSandbox(r.sandboxID))
 
-	opts = append(opts, c.nri.WithContainerAdjustment())
+	if r.deferPublish {
+		opts = append(opts, c.nri.WithContainerAdjustmentForSandbox(r.sandbox))
+	} else {
+		opts = append(opts, c.nri.WithContainerAdjustment())
+	}
 	defer func() {
 		if retErr != nil {
 			deferCtx, deferCancel := util.DeferContext()
@@ -407,7 +442,11 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		if retErr != nil {
 			deferCtx, deferCancel := util.DeferContext()
 			defer deferCancel()
-			if err := cntr.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
+			deleteOpts := []containerd.DeleteOpts{}
+			if !r.noSnapshot {
+				deleteOpts = append(deleteOpts, containerd.WithSnapshotCleanup)
+			}
+			if err := cntr.Delete(deferCtx, deleteOpts...); err != nil {
 				log.G(r.ctx).WithError(err).Errorf("Failed to delete containerd container %q", r.containerID)
 			}
 		}
@@ -432,16 +471,22 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	// Add container into container store.
-	if err := c.containerStore.Add(container); err != nil {
-		return "", fmt.Errorf("failed to add container %q into store: %w", r.containerID, err)
-	}
-
-	c.generateAndSendContainerEvent(r.ctx, r.containerID, r.sandboxID, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
-
-	err = c.nri.PostCreateContainer(r.ctx, r.sandbox, &container)
-	if err != nil {
-		log.G(r.ctx).WithError(err).Errorf("NRI post-create notification failed")
+	if r.deferPublish {
+		if r.stagedContainer == nil {
+			return "", fmt.Errorf("staged container output is required for deferred publication")
+		}
+		*r.stagedContainer = container
+	} else {
+		// Add ordinary containers immediately. Restore staging deliberately skips
+		// this store so ListContainers cannot observe a partially restored pod.
+		if err := c.containerStore.Add(container); err != nil {
+			return "", fmt.Errorf("failed to add container %q into store: %w", r.containerID, err)
+		}
+		c.generateAndSendContainerEvent(r.ctx, r.containerID, r.sandboxID, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
+		err = c.nri.PostCreateContainer(r.ctx, r.sandbox, &container)
+		if err != nil {
+			log.G(r.ctx).WithError(err).Errorf("NRI post-create notification failed")
+		}
 	}
 
 	containerCreateTimer.WithValues(ociRuntime.Type).UpdateSince(r.start)
@@ -451,6 +496,25 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	)
 
 	return containerRootDir, nil
+}
+
+// prepareRestoredContainerNamespaces removes host PID-derived namespace paths
+// from a task bundle prepared before RestoreSandbox has created the restored
+// sandbox process. The restored runtime owns IPC/UTS/PID namespace recovery;
+// the CRI adapter only supplies the newly allocated CNI network namespace.
+func prepareRestoredContainerNamespaces(spec *runtimespec.Spec, netNSPath string) {
+	if spec == nil || spec.Linux == nil {
+		return
+	}
+	for i := range spec.Linux.Namespaces {
+		ns := &spec.Linux.Namespaces[i]
+		switch ns.Type {
+		case runtimespec.NetworkNamespace:
+			ns.Path = netNSPath
+		case runtimespec.IPCNamespace, runtimespec.UTSNamespace, runtimespec.PIDNamespace:
+			ns.Path = ""
+		}
+	}
 }
 
 // volumeMounts sets up image volumes for container. Rely on the removal of container
