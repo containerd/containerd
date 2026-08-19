@@ -502,6 +502,7 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 func dumpStacks(logger *log.Entry) {
 	buf := stackdump.Dump()
 	logger.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+	writeStackDump(logger, buf)
 }
 
 type server interface {
