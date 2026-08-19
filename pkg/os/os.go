@@ -17,6 +17,7 @@
 package os
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -30,7 +31,7 @@ import (
 type OS interface {
 	MkdirAll(path string, perm os.FileMode) error
 	RemoveAll(path string) error
-	Stat(name string) (os.FileInfo, error)
+	Stat(ctx context.Context, name string) error
 	ResolveSymbolicLink(name string) (string, error)
 	FollowSymlinkInScope(path, scope string) (string, error)
 	CopyFile(src, dest string, perm os.FileMode) error
@@ -52,11 +53,6 @@ func (RealOS) MkdirAll(path string, perm os.FileMode) error {
 // RemoveAll will call os.RemoveAll to remove the path and its children.
 func (RealOS) RemoveAll(path string) error {
 	return os.RemoveAll(path)
-}
-
-// Stat will call os.Stat to get the status of the given file.
-func (RealOS) Stat(name string) (os.FileInfo, error) {
-	return os.Stat(name)
 }
 
 // FollowSymlinkInScope will call symlink.FollowSymlinkInScope.

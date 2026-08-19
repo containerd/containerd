@@ -253,7 +253,7 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	// for archiving and do not need to be copied out of the container state dir.
 
 	// Save the existing container log file
-	_, err = c.os.Stat(criContainerStatus.GetStatus().GetLogPath())
+	err = c.os.Stat(ctx, criContainerStatus.GetStatus().GetLogPath())
 	if err == nil {
 		if err := c.os.CopyFile(
 			criContainerStatus.GetStatus().GetLogPath(),

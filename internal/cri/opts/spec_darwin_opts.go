@@ -86,7 +86,7 @@ func WithDarwinMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra
 			)
 
 			// Create the host path if it doesn't exist.
-			if _, err := osi.Stat(src); err != nil {
+			if err := osi.Stat(ctx, src); err != nil {
 				if !os.IsNotExist(err) {
 					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}

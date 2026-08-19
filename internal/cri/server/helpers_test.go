@@ -38,6 +38,11 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	// helpers_test gets compiled for all test OSs. testutil already registers
+	// the test.root flag via init(). Importing it here will ensure that the
+	// flag gets registered for tests for any OS.
+	_ "github.com/containerd/containerd/v2/pkg/testutil"
 )
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.

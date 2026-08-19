@@ -19,6 +19,8 @@
 package podsandbox
 
 import (
+	"context"
+
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -39,7 +41,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 
 // setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts,
 // /etc/resolv.conf and /etc/hostname.
-func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+func (c *Controller) setupSandboxFiles(ctx context.Context, id string, config *runtime.PodSandboxConfig) error {
 	return nil
 }
 
