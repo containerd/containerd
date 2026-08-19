@@ -326,6 +326,8 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		opts = append(opts, customopts.WithVolumes(mountMap, platform))
 	}
 	r.meta.ImageRef = r.imageID
+	r.meta.ImageDigest = (*r.containerdImage).Target().Digest.String()
+	r.meta.ImageName = (*r.containerdImage).Name()
 	if signal := r.containerConfig.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
 		stopSignal, err := criSignalToOCIStopSignal(signal)
 		if err != nil {
