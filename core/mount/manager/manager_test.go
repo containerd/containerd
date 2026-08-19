@@ -617,3 +617,36 @@ func TestClose(t *testing.T) {
 	_, err = db.Begin(false)
 	assert.ErrorIs(t, err, bolterr.ErrDatabaseNotOpen)
 }
+
+func TestActivateTemporaryAllHandled(t *testing.T) {
+	td := t.TempDir()
+	metadb := filepath.Join(td, "mounts.db")
+	targetdir := filepath.Join(td, "m")
+	db, err := bolt.Open(metadb, 0600, nil)
+	require.NoError(t, err)
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	mountC := new(atomic.Int32)
+	m, err := NewManager(db, targetdir, WithMountHandler("noop", &noopHandler{mounts: mountC}))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
+
+	// A temporary activation performs every mount, including a final mount
+	// whose type carries a transform prefix (as returned e.g. by the erofs
+	// snapshotter). All mounts being handled must not panic when applying
+	// the transforms for the first system mount, since there is none.
+	mounts := []mount.Mount{
+		{Type: "noop"},
+		{Type: "format/noop", Source: "{{ mount 0 }}"},
+	}
+
+	info, err := m.Activate(ctx, "tmp1", mounts, mount.WithTemporary)
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(info.Active))
+	// The temporary bind mount to access the mounted filesystem root is
+	// the only system mount.
+	require.Equal(t, 1, len(info.System))
+	assert.Equal(t, "bind", info.System[0].Type)
+
+	assert.NoError(t, m.Deactivate(ctx, "tmp1"))
+}
