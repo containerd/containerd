@@ -18,6 +18,6 @@
 
 package generate
 
-func ensurePropagation(path string, accepted ...string) error {
+func ensurePropagation(string, ...string) error {
 	return nil
 }

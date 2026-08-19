@@ -970,6 +970,23 @@ func (c *criContainer) GetCDIDevices() []*api.CDIDevice {
 	return nil
 }
 
+func (c *criContainer) GetImage() *api.Image {
+	if c.meta == nil {
+		return nil
+	}
+	if c.meta.ImageName == "" && c.meta.ImageDigest == "" && c.meta.ImageRef == "" {
+		return nil
+	}
+	return &api.Image{
+		// normalized image reference
+		Name: c.meta.ImageName,
+		// index/manifest digest
+		Digest: c.meta.ImageDigest,
+		// image config digest
+		ConfigDigest: c.meta.ImageRef,
+	}
+}
+
 func (c *criContainer) GetRdt() *api.LinuxRdt {
 	if c.spec.Linux == nil || c.spec.Linux.IntelRdt == nil {
 		return nil
