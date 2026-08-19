@@ -347,6 +347,14 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	// so use hdrInfo.Mode() (they differ for e.g. setuid bits)
 	hdrInfo := hdr.FileInfo()
 
+	// Reject an out-of-range owner before creating anything, so an invalid
+	// header fails without leaving a partially extracted entry behind.
+	if !noSameOwner {
+		if err := validateHeaderIDs(hdr); err != nil {
+			return err
+		}
+	}
+
 	switch hdr.Typeflag {
 	case tar.TypeDir:
 		// Create directory unless it exists as a directory already.
@@ -408,9 +416,6 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	}
 
 	if !noSameOwner {
-		if err := validateHeaderIDs(hdr); err != nil {
-			return err
-		}
 		if err := os.Lchown(path, hdr.Uid, hdr.Gid); err != nil {
 			err = fmt.Errorf("failed to Lchown %q for UID %d, GID %d: %w", path, hdr.Uid, hdr.Gid, err)
 			if errors.Is(err, syscall.EINVAL) && userns.RunningInUserNS() {
