@@ -669,9 +669,12 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 			}
 			// Credentials belong to the host and scheme the request was created
 			// for, so a redirect that changes either is followed without them.
-			// This mirrors how the pusher drops the authorizer when an upload
-			// location changes host or scheme.
+			// net/http only strips the Authorization header when the host
+			// changes, so drop it explicitly to also cover a scheme change on
+			// the same host. This mirrors how the pusher drops the authorizer
+			// when an upload location changes host or scheme.
 			if req.URL.Host != r.host.Host || req.URL.Scheme != r.host.Scheme {
+				req.Header.Del("Authorization")
 				return nil
 			}
 			if err := r.authorize(ctx, req); err != nil {

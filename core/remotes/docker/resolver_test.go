@@ -1804,7 +1804,7 @@ func TestResolveForbiddenGETFallbackNetworkError(t *testing.T) {
 }
 
 // TestRedirectAuthorization verifies that credentials are only attached to a
-// redirect that stays on the host the request was created for.
+// redirect that stays on the host and scheme the request was created for.
 func TestRedirectAuthorization(t *testing.T) {
 	const (
 		user   = "totallyvaliduser"
@@ -1858,6 +1858,66 @@ func TestRedirectAuthorization(t *testing.T) {
 		defer mu.Unlock()
 		if len(authSeen) > 0 {
 			t.Fatalf("credentials sent to redirect target on another host: %v", authSeen)
+		}
+	})
+
+	t.Run("scheme downgrade", func(t *testing.T) {
+		// A redirect from https to http on the same host keeps the
+		// Authorization header as far as net/http is concerned, so the
+		// redirect hook has to strip it. Both schemes are served from a
+		// single stub transport since one listener cannot speak both.
+		var (
+			mu       sync.Mutex
+			authSeen []string
+		)
+		const host = "registry.example.com"
+		rt := rtFunc(func(req *http.Request) (*http.Response, error) {
+			resp := &http.Response{
+				Header:  http.Header{},
+				Body:    http.NoBody,
+				Request: req,
+			}
+			if req.URL.Scheme == "http" {
+				mu.Lock()
+				if a := req.Header.Get("Authorization"); a != "" {
+					authSeen = append(authSeen, a)
+				}
+				mu.Unlock()
+				resp.StatusCode = http.StatusUnauthorized
+				resp.Header.Set("WWW-Authenticate", `Basic realm="downgraded"`)
+				return resp, nil
+			}
+			if req.Header.Get("Authorization") == "" {
+				resp.StatusCode = http.StatusUnauthorized
+				resp.Header.Set("WWW-Authenticate", `Basic realm="registry"`)
+				return resp, nil
+			}
+			resp.StatusCode = http.StatusFound
+			resp.Header.Set("Location", "http://"+host+req.URL.Path)
+			return resp, nil
+		})
+
+		resolver := NewResolver(ResolverOptions{
+			Hosts: func(string) ([]RegistryHost, error) {
+				return []RegistryHost{{
+					Client:       &http.Client{Transport: rt},
+					Host:         host,
+					Scheme:       "https",
+					Path:         "/v2",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve,
+					Authorizer:   NewDockerAuthorizer(WithAuthCreds(creds)),
+				}}, nil
+			},
+		})
+
+		if _, _, err := resolver.Resolve(context.Background(), host+"/somerepo:sometag"); err == nil {
+			t.Fatal("expected resolve to fail")
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if len(authSeen) > 0 {
+			t.Fatalf("credentials sent over downgraded scheme: %v", authSeen)
 		}
 	})
 
