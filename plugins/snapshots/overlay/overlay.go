@@ -20,6 +20,7 @@ package overlay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
+	"golang.org/x/sys/unix"
 )
 
 // upperdirKey is a key of an optional label to each snapshot.
@@ -107,6 +109,7 @@ func WithSlowChown(config *SnapshotterConfig) error {
 
 type snapshotter struct {
 	root          string
+	rwPath        string
 	ms            MetaStore
 	asyncRemove   bool
 	upperdirLabel bool
@@ -118,7 +121,7 @@ type snapshotter struct {
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
 // diffs are stored under the provided root. A metadata file is stored under
 // the root.
-func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
+func NewSnapshotter(root string, rwPath string, opts ...Opt) (snapshots.Snapshotter, error) {
 	var config SnapshotterConfig
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
@@ -129,6 +132,12 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
+	if rwPath != "" {
+		if err := os.MkdirAll(rwPath, 0700); err != nil {
+			return nil, err
+		}
+	}
+
 	supportsDType, err := fs.SupportsDType(root)
 	if err != nil {
 		return nil, err
@@ -145,6 +154,12 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 
 	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
 		return nil, err
+	}
+
+	if rwPath != "" {
+		if err := os.Mkdir(filepath.Join(rwPath, "snapshots"), 0700); err != nil && !os.IsExist(err) {
+			return nil, err
+		}
 	}
 
 	if !hasOption(config.mountOptions, "userxattr") {
@@ -166,6 +181,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 
 	return &snapshotter{
 		root:          root,
+		rwPath:        rwPath,
 		ms:            config.ms,
 		asyncRemove:   config.asyncRemove,
 		upperdirLabel: config.upperdirLabel,
@@ -317,6 +333,17 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	})
 }
 
+func unmountBind(target string) error {
+	err := unix.Unmount(target, unix.MNT_DETACH)
+	if err != nil {
+		if errors.Is(err, unix.EINVAL) {
+			return nil
+		}
+		return fmt.Errorf("unmount %q failed: %w", target, err)
+	}
+	return nil
+}
+
 // Remove abandons the snapshot identified by key. The snapshot will
 // immediately become unavailable and unrecoverable. Disk space will
 // be freed up on the next call to `Cleanup`.
@@ -335,6 +362,16 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		}
 	}()
 	return o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		id, info, _, err := storage.GetInfo(ctx, key)
+		if err != nil {
+			return err
+		}
+		if _, split := info.Labels[snapshots.LabelSnapshotSplit]; split {
+			path := filepath.Join(filepath.Join(o.root, "snapshots"), id)
+			if err := unmountBind(path); err != nil {
+				return err
+			}
+		}
 		_, _, err = storage.Remove(ctx, key)
 		if err != nil {
 			return fmt.Errorf("failed to remove snapshot %s: %w", key, err)
@@ -418,6 +455,24 @@ func (o *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, erro
 	}
 
 	cleanup := []string{}
+
+	if o.rwPath != "" {
+		snapshotSplitDir := filepath.Join(o.rwPath, "snapshots")
+		if sfd, err := os.Open(snapshotSplitDir); err == nil {
+			defer sfd.Close()
+			dirsSplit, err := sfd.Readdirnames(0)
+			if err != nil {
+				return nil, err
+			}
+			for _, sd := range dirsSplit {
+				if _, ok := ids[sd]; ok {
+					continue
+				}
+				cleanup = append(cleanup, filepath.Join(snapshotSplitDir, sd))
+			}
+		}
+	}
+
 	for _, d := range dirs {
 		if _, ok := ids[d]; ok {
 			continue
@@ -430,9 +485,9 @@ func (o *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, erro
 
 func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
 	var (
-		s        storage.Snapshot
-		td, path string
-		info     snapshots.Info
+		s                storage.Snapshot
+		td, path, rwPath string
+		info             snapshots.Info
 	)
 
 	defer func() {
@@ -440,6 +495,13 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			if td != "" {
 				if err1 := os.RemoveAll(td); err1 != nil {
 					log.G(ctx).WithError(err1).Warn("failed to cleanup temp snapshot directory")
+				}
+			}
+			if rwPath != "" {
+				_ = unmountBind(path)
+				if err1 := os.RemoveAll(rwPath); err1 != nil {
+					log.G(ctx).WithError(err1).WithField("path", rwPath).Error("failed to reclaim snapshot directory, directory may need removal")
+					err = fmt.Errorf("failed to remove path: %v: %w", err1, err)
 				}
 			}
 			if path != "" {
@@ -453,10 +515,6 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 	if err := o.ms.WithTransaction(ctx, true, func(ctx context.Context) (err error) {
 		snapshotDir := filepath.Join(o.root, "snapshots")
-		td, err = o.prepareDirectory(ctx, snapshotDir, kind)
-		if err != nil {
-			return fmt.Errorf("failed to create prepare snapshot dir: %w", err)
-		}
 
 		s, err = storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 		if err != nil {
@@ -514,18 +572,56 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			}
 		}
 
-		if mappedUID != -1 && mappedGID != -1 {
-			if err := os.Lchown(filepath.Join(td, "fs"), mappedUID, mappedGID); err != nil {
-				return fmt.Errorf("failed to chown: %w", err)
+		createTempDir := func(tempParent, finalDest string) (tmpDir string, err error) {
+			tmpDir, err = os.MkdirTemp(tempParent, "new-")
+			if err != nil {
+				return "", fmt.Errorf("failed to create temp dir: %w", err)
 			}
+
+			defer func() {
+				if err != nil {
+					_ = os.RemoveAll(tmpDir)
+				}
+			}()
+
+			if err = o.prepareDirectory(ctx, tmpDir, snapshotDir, kind); err != nil {
+				return "", fmt.Errorf("failed to create prepare snapshot dir: %w", err)
+			}
+
+			if mappedUID != -1 && mappedGID != -1 {
+				if err := os.Lchown(filepath.Join(tmpDir, "fs"), mappedUID, mappedGID); err != nil {
+					return "", fmt.Errorf("failed to chown: %w", err)
+				}
+			}
+			if err = os.Rename(tmpDir, finalDest); err != nil {
+				return "", fmt.Errorf("failed to rename: %w", err)
+			}
+			return tmpDir, nil
 		}
 
+		_, split := info.Labels[snapshots.LabelSnapshotSplit]
+		if split && o.rwPath != "" {
+			path = filepath.Join(snapshotDir, s.ID)
+			if err = os.MkdirAll(path, 0700); err != nil {
+				return err
+			}
+			rwPath = o.snapshotRWPath(s.ID)
+			tempParent := filepath.Join(o.rwPath, "snapshots")
+			if _, err = createTempDir(tempParent, rwPath); err != nil {
+				return err
+			}
+			if err := bindMount(rwPath, path, false); err != nil {
+				_ = os.RemoveAll(rwPath)
+				return err
+			}
+			return nil
+		}
 		path = filepath.Join(snapshotDir, s.ID)
-		if err = os.Rename(td, path); err != nil {
-			return fmt.Errorf("failed to rename: %w", err)
+		td, err = createTempDir(snapshotDir, path)
+		if err != nil {
+			return err
 		}
 		td = ""
-
 		return nil
 	}); err != nil {
 		return nil, err
@@ -533,23 +629,26 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	return o.mounts(s, info), nil
 }
 
-func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, kind snapshots.Kind) (string, error) {
-	td, err := os.MkdirTemp(snapshotDir, "new-")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir: %w", err)
-	}
-
+func (o *snapshotter) prepareDirectory(ctx context.Context, td string, snapshotDir string, kind snapshots.Kind) error {
 	if err := os.Mkdir(filepath.Join(td, "fs"), 0755); err != nil {
-		return td, err
+		return err
 	}
 
 	if kind == snapshots.KindActive {
 		if err := os.Mkdir(filepath.Join(td, "work"), 0711); err != nil {
-			return td, err
+			return err
 		}
 	}
 
-	return td, nil
+	return nil
+}
+
+func bindMount(source, target string, recursive bool) error {
+	flags := uintptr(unix.MS_BIND)
+	if recursive {
+		flags |= unix.MS_REC
+	}
+	return unix.Mount(source, target, "", flags, "")
 }
 
 func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mount {
@@ -619,6 +718,10 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 
 func (o *snapshotter) upperPath(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "fs")
+}
+
+func (o *snapshotter) snapshotRWPath(id string) string {
+	return filepath.Join(o.rwPath, "snapshots", id)
 }
 
 func (o *snapshotter) workPath(id string) string {
