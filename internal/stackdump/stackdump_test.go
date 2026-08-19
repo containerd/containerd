@@ -138,6 +138,42 @@ func TestWriteFileOverwrites(t *testing.T) {
 	}
 }
 
+// TestWriteFileDoesNotFollowSymlink covers a symlink planted at the dump's
+// predictable path in a shared temp directory. Writing through it would let an
+// unprivileged user choose a file for a root process to truncate.
+func TestWriteFileDoesNotFollowSymlink(t *testing.T) {
+	dir := t.TempDir()
+	setTempDir(t, dir)
+
+	victim := filepath.Join(t.TempDir(), "victim")
+	const sentinel = "untouched"
+	if err := os.WriteFile(victim, []byte(sentinel), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	target := filepath.Join(dir, fmt.Sprintf("test-prefix.%d.stacks.log", os.Getpid()))
+	if err := os.Symlink(victim, target); err != nil {
+		t.Skipf("cannot create symlinks here: %v", err)
+	}
+
+	name, err := WriteFile("test-prefix", []byte("dump"))
+	if err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	got, err := os.ReadFile(victim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != sentinel {
+		t.Fatalf("wrote through the symlink: target now contains %q", got)
+	}
+	// The dump must still land at the documented path.
+	if b, err := os.ReadFile(name); err != nil || string(b) != "dump" {
+		t.Fatalf("dump not written to %s: %q, %v", name, b, err)
+	}
+}
+
 func TestWriteFileReturnsErrorOnUnwritableDir(t *testing.T) {
 	// Point the temp dir at a path that cannot hold files so the caller's
 	// error handling is exercised rather than a silent failure.

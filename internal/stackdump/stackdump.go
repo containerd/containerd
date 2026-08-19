@@ -51,14 +51,37 @@ func Dump() []byte {
 //
 // Stacks are worth reading precisely when a process's log output may not be, so
 // the dump also goes where diagnostics collection can retrieve it.
+//
+// The file is owner-only because a dump exposes the internals of a process that
+// usually runs as root. That is a unix guarantee: Go's file mode reaches Windows
+// only as FILE_ATTRIBUTE_READONLY, and not even that for a writable mode, so
+// there the file simply inherits the temp directory's ACL.
 func WriteFile(prefix string, buf []byte) (string, error) {
 	name := filepath.Join(os.TempDir(), fmt.Sprintf("%s.%d.stacks.log", prefix, os.Getpid()))
-	f, err := os.Create(name)
+
+	// Write a fresh file and rename it into place rather than opening name
+	// directly. The temp directory is shared and the name is predictable, so
+	// opening it would follow a symlink planted there and truncate whatever it
+	// points at, with the privileges of a process that usually runs as root.
+	// CreateTemp opens with O_EXCL and mode 0600, and the rename replaces any
+	// symlink sitting at name instead of writing through it.
+	f, err := os.CreateTemp(filepath.Dir(name), filepath.Base(name)+".")
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	tmp := f.Name()
+	defer func() {
+		f.Close()
+		os.Remove(tmp) // no-op once the rename below has succeeded
+	}()
+
 	if _, err := f.Write(buf); err != nil {
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp, name); err != nil {
 		return "", err
 	}
 	return name, nil

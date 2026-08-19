@@ -378,6 +378,7 @@ func dumpStacks(writeToFile bool) {
 	if writeToFile {
 		name, err := stackdump.WriteFile("containerd", buf)
 		if err != nil {
+			log.L.WithError(err).Warn("failed to write goroutine stack dump")
 			return
 		}
 		log.L.WithField("path", name).Info("goroutine stack dump written")
