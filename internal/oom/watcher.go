@@ -113,7 +113,6 @@ func (w *watcher) start() {
 			eventBuf   [unix.SizeofInotifyEvent * 10]byte
 		)
 		for !shouldExit {
-			clear(eventBuf[:])
 			bytesRead, err := w.eventFD.Read(eventBuf[:])
 			if err != nil {
 				if !errors.Is(err, os.ErrClosed) {
@@ -121,6 +120,7 @@ func (w *watcher) start() {
 					return
 				}
 				shouldExit = true
+				continue
 			} else if bytesRead < unix.SizeofInotifyEvent {
 				continue
 			}
