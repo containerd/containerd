@@ -50,12 +50,6 @@ const (
 	protoUnix        = "unix"
 )
 
-func getSysProcAttr() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{
-		Setpgid: true,
-	}
-}
-
 // AdjustOOMScore sets the OOM score for the process to the parents OOM score +1
 // to ensure that they parent has a lower* score than the shim
 // if not already at the maximum OOM Score

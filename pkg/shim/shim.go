@@ -118,8 +118,6 @@ var (
 const (
 	ttrpcAddressEnv = "TTRPC_ADDRESS"
 	grpcAddressEnv  = "GRPC_ADDRESS"
-	namespaceEnv    = "NAMESPACE"
-	maxVersionEnv   = "MAX_SHIM_VERSION"
 )
 
 func parseFlags() {
