@@ -101,6 +101,7 @@ func (c *criService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (
 // execOptions specifies how to execute command in container.
 type execOptions struct {
 	cmd     []string
+	env     []string
 	stdin   io.Reader
 	stdout  io.WriteCloser
 	stderr  io.WriteCloser
@@ -147,6 +148,10 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	pspec.Args = opts.cmd
 	// CommandLine may already be set on the container's spec, but we want to only use Args here.
 	pspec.CommandLine = ""
+
+	if len(opts.env) > 0 {
+		pspec.Env = mergeExecEnv(pspec.Env, opts.env)
+	}
 
 	if opts.stdout == nil {
 		opts.stdout = cio.NewDiscardLogger()
