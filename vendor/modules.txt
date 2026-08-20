@@ -1000,7 +1000,6 @@ k8s.io/streaming/pkg/runtime
 # k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 ## explicit; go 1.23
 k8s.io/utils/clock
-k8s.io/utils/clock/testing
 k8s.io/utils/dump
 k8s.io/utils/exec
 k8s.io/utils/internal/third_party/forked/golang/net
