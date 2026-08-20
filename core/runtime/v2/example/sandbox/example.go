@@ -217,16 +217,13 @@ func (s *exampleService) WaitSandbox(ctx context.Context, req *sandboxapi.WaitSa
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	sb, err = s.getSandbox(req.GetSandboxID())
-	if err != nil {
-		return nil, err
-	}
+	exitStatus := sb.exitStatus
+	exitedAt := sb.exitedAt
+	s.mu.Unlock()
 
 	return &sandboxapi.WaitSandboxResponse{
-		ExitStatus: sb.exitStatus,
-		ExitedAt:   protobuf.ToTimestamp(sb.exitedAt),
+		ExitStatus: exitStatus,
+		ExitedAt:   protobuf.ToTimestamp(exitedAt),
 	}, nil
 }
 
