@@ -18,8 +18,14 @@ package shim
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"testing"
+
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
+	googleproto "google.golang.org/protobuf/proto"
 )
 
 func TestRuntimeWithEmptyMaxEnvProcs(t *testing.T) {
@@ -59,4 +65,73 @@ func TestShimOptWithValue(t *testing.T) {
 	if !op.Debug {
 		t.Fatal("opts.Debug should be true")
 	}
+}
+
+func TestParseBootstrapParams(t *testing.T) {
+	const (
+		id        = "container-id"
+		namespace = "moby"
+	)
+
+	t.Run("bootstrap protocol", func(t *testing.T) {
+		input, err := proto.Marshal(&bootapi.BootstrapParams{
+			InstanceID: id,
+			Namespace:  namespace,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		params, err := parseBootstrapParams(input, id, namespace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if params.InstanceID != id || params.Namespace != namespace {
+			t.Fatalf("bootstrap params not preserved: %+v", params)
+		}
+	})
+
+	t.Run("mismatched identity", func(t *testing.T) {
+		input, err := proto.Marshal(&bootapi.BootstrapParams{
+			InstanceID: id,
+			Namespace:  namespace,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = parseBootstrapParams(input, "different-id", namespace)
+		if err == errDeprecatedBootstrapAPI {
+			t.Fatal("expected details for mismatched bootstrap parameters")
+		}
+		if !errors.Is(err, errDeprecatedBootstrapAPI) {
+			t.Fatalf("expected deprecated bootstrap API error, got %v", err)
+		}
+	})
+
+	t.Run("deprecated protocol", func(t *testing.T) {
+		input, err := proto.Marshal(&types.Any{
+			TypeUrl: "types.containerd.io/containerd.runc.v1.Options",
+			Value:   []byte("runc options"),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = parseBootstrapParams(input, id, namespace)
+		if !errors.Is(err, errDeprecatedBootstrapAPI) {
+			t.Fatalf("expected deprecated bootstrap API error, got %v", err)
+		}
+	})
+
+	t.Run("malformed bootstrap protocol", func(t *testing.T) {
+		input := []byte{0xff}
+		_, err := parseBootstrapParams(input, id, namespace)
+		if !errors.Is(err, errDeprecatedBootstrapAPI) {
+			t.Fatalf("expected deprecated bootstrap API error, got %v", err)
+		}
+		if !errors.Is(err, googleproto.Error) {
+			t.Fatalf("expected protobuf error, got %v", err)
+		}
+	})
 }

@@ -271,20 +271,16 @@ func run(ctx context.Context, manager Shim, config Config) error {
 		}
 		return nil
 	case "start":
-		// We try reading stdin twice: first for the new boot API, then runc Options.
-		// The stdin pipe is not seekable, so this should be read into memory first.
+		// Read stdin into memory so the bootstrap payload can be validated.
 		// Protect against unbounded memory consumption with a limit (e.g., 10MB).
 		input, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
 		if err != nil {
 			return fmt.Errorf("failed to read stdin: %w", err)
 		}
 
-		var params bootapi.BootstrapParams
-		if len(input) == 0 || proto.Unmarshal(input, &params) != nil {
-			// TODO: Return error once the new API is stable
-			if err := readBootstrapParamsFromDeprecatedFields(input, &params, id, namespaceFlag, containerdBinaryFlag, debugFlag); err != nil {
-				return err
-			}
+		params, err := parseBootstrapParams(input, id, namespaceFlag)
+		if err != nil {
+			return err
 		}
 
 		// Persist the socket directory so the long-running server process
@@ -295,7 +291,7 @@ func run(ctx context.Context, manager Shim, config Config) error {
 			}
 		}
 
-		result, err := manager.Start(ctx, &params)
+		result, err := manager.Start(ctx, params)
 		if err != nil {
 			return err
 		}
