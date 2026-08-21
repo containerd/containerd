@@ -284,6 +284,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	c.runtimeFeatures = &runtime.RuntimeFeatures{
 		SupplementalGroupsPolicy:  true,
 		UserNamespacesHostNetwork: goruntime.GOOS == "linux",
+		CgroupMountMode:           goruntime.GOOS == "linux",
 	}
 
 	if c.config.EnableCDI != nil && !*c.config.EnableCDI {
