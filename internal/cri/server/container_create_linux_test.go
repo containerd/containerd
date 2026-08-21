@@ -487,6 +487,88 @@ func TestPrivilegedBindMount(t *testing.T) {
 	}
 }
 
+// TestCgroupMountMode verifies that a container whose security context sets
+// CgroupMountMode to CGROUP_MOUNT_MODE_WRITABLE gets a read-write
+// /sys/fs/cgroup, and that creating such a container fails when the host's
+// cgroup mount lacks nsdelegate.
+func TestCgroupMountMode(t *testing.T) {
+	if !isUnifiedCgroupsMode() {
+		t.Skip("requires cgroups v2")
+	}
+
+	const (
+		withNsdelegate    = "rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot"
+		withoutNsdelegate = "rw,nosuid,nodev,noexec,relatime,memory_recursiveprot"
+	)
+
+	testPid := uint32(1234)
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+
+	tests := []struct {
+		desc           string
+		mountMode      runtime.CgroupMountMode
+		configWritable bool
+		hostMountOpts  string
+		expectErr      string
+		expectWritable bool
+	}{
+		{
+			desc:          "read-only mount mode should keep /sys/fs/cgroup read-only",
+			mountMode:     runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+			hostMountOpts: withNsdelegate,
+		},
+		{
+			desc:           "writable mount mode should be honored when the host has nsdelegate",
+			mountMode:      runtime.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE,
+			hostMountOpts:  withNsdelegate,
+			expectWritable: true,
+		},
+		{
+			desc:          "writable mount mode should be rejected when the host lacks nsdelegate",
+			mountMode:     runtime.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE,
+			hostMountOpts: withoutNsdelegate,
+			expectErr:     "nsdelegate",
+		},
+		{
+			desc:           "runtime handler CgroupWritable should not require nsdelegate",
+			mountMode:      runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+			configWritable: true,
+			hostMountOpts:  withoutNsdelegate,
+			expectWritable: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+			containerConfig.Linux.SecurityContext.CgroupMountMode = tt.mountMode
+
+			c := newTestCRIService()
+			c.os.(*ostesting.FakeOS).LookupMountFn = func(path string) (mount.Info, error) {
+				if path == "/sys/fs/cgroup" {
+					return mount.Info{VFSOptions: tt.hostMountOpts}, nil
+				}
+				return mount.Info{}, nil
+			}
+
+			ociRuntime := config.Runtime{CgroupWritable: tt.configWritable}
+			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			if tt.expectErr != "" {
+				require.ErrorContains(t, err, tt.expectErr)
+				return
+			}
+			require.NoError(t, err)
+
+			if tt.expectWritable {
+				checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", []string{"rw"}, []string{"ro"})
+			} else {
+				checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", []string{"ro"}, []string{"rw"})
+			}
+		})
+	}
+}
+
 // TestCgroupNamespace verifies that a cgroup namespace is only assigned to
 // non-privileged containers on cgroupv2 hosts.
 func TestCgroupNamespace(t *testing.T) {

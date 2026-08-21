@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -767,8 +768,16 @@ func (c *criService) buildLinuxSpec(
 		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
 	}
 
+	cgroupWritable := ociRuntime.CgroupWritable
+	if securityContext.GetCgroupMountMode() == runtime.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE {
+		if err := c.checkWritableCgroupsSupported(); err != nil {
+			return nil, err
+		}
+		cgroupWritable = true
+	}
+
 	var ociSpecOpts oci.SpecOpts
-	if ociRuntime.CgroupWritable {
+	if cgroupWritable {
 		ociSpecOpts = customopts.WithMountsCgroupWritable(c.os, config, extraMounts, mountLabel, runtimeHandler)
 	} else {
 		ociSpecOpts = customopts.WithMounts(c.os, config, extraMounts, mountLabel, runtimeHandler)
@@ -928,6 +937,21 @@ func (c *criService) buildLinuxSpec(
 	)
 
 	return specOpts, nil
+}
+
+func (c *criService) checkWritableCgroupsSupported() error {
+	if !isUnifiedCgroupsMode() {
+		return errors.New("writable cgroups are only supported on cgroup v2")
+	}
+	mountInfo, err := c.os.LookupMount("/sys/fs/cgroup")
+	if err != nil {
+		return fmt.Errorf("failed to look up the cgroup mount: %w", err)
+	}
+	// Ensure containers with writable cgroups cannot modify their own resource limits.
+	if !slices.Contains(strings.Split(mountInfo.VFSOptions, ","), "nsdelegate") {
+		return errors.New("writable cgroups require /sys/fs/cgroup to be mounted with nsdelegate")
+	}
+	return nil
 }
 
 func (c *criService) buildWindowsSpec(
