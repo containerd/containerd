@@ -567,6 +567,19 @@ func WithSecurityContext(privileged bool) ContainerOpts {
 	}
 }
 
+// WithCgroupMountMode sets how the container's cgroup filesystem is mounted.
+func WithCgroupMountMode(mode runtime.CgroupMountMode) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.CgroupMountMode = mode
+	}
+}
+
 // WithDevice adds a device mount.
 func WithDevice(containerPath, hostPath, permissions string) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {

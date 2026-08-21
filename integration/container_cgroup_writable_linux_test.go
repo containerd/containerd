@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/integration/remote"
 	"github.com/stretchr/testify/assert"
@@ -135,6 +138,75 @@ func TestContainerCgroupWritable(t *testing.T) {
 			} else {
 				require.Error(t, err)
 				require.Contains(t, string(stderr), "mkdir: can't create directory 'sys/fs/cgroup/dummy-group': Read-only file system")
+			}
+		})
+	}
+}
+
+func TestContainerCgroupMountMode(t *testing.T) {
+	if cgroups.Mode() != cgroups.Unified {
+		t.Skip("requires cgroup v2")
+	}
+
+	mountInfo, err := mount.Lookup("/sys/fs/cgroup")
+	require.NoError(t, err)
+	if !slices.Contains(strings.Split(mountInfo.VFSOptions, ","), "nsdelegate") {
+		t.Skip("requires /sys/fs/cgroup to be mounted with nsdelegate")
+	}
+
+	testCases := []struct {
+		name      string
+		ns        string
+		mountMode runtime.CgroupMountMode
+		writable  bool
+	}{
+		{
+			name:      "writable cgroup",
+			ns:        "cgroup-mount-mode-writable",
+			mountMode: runtime.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE,
+			writable:  true,
+		},
+		{
+			name:      "readonly cgroup",
+			ns:        "cgroup-mount-mode-readonly",
+			mountMode: runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+			writable:  false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Log("Create a pod sandbox")
+			sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", testCase.ns)
+
+			testImage := images.Get(images.BusyBox)
+			EnsureImageExists(t, testImage)
+
+			t.Log("Create a container requesting the cgroup mount mode")
+			cnConfig := ContainerConfig(
+				"cgroup-mount-mode-test",
+				testImage,
+				WithCommand("sh", "-c", "sleep 1d"),
+				WithCgroupMountMode(testCase.mountMode),
+			)
+			cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+			require.NoError(t, err)
+			defer func() {
+				assert.NoError(t, runtimeService.RemoveContainer(cn))
+			}()
+
+			require.NoError(t, runtimeService.StartContainer(cn))
+			defer func() {
+				assert.NoError(t, runtimeService.StopContainer(cn, 30))
+			}()
+
+			_, stderr, err := runtimeService.ExecSync(cn, []string{"mkdir", "/sys/fs/cgroup/dummy-group"}, 2*time.Second)
+			if testCase.writable {
+				require.NoError(t, err)
+				require.Empty(t, stderr)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, string(stderr), "Read-only file system")
 			}
 		})
 	}
