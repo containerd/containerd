@@ -217,8 +217,8 @@ github.com/containerd/go-dmverity/pkg/dm
 github.com/containerd/go-dmverity/pkg/keyring
 github.com/containerd/go-dmverity/pkg/utils
 github.com/containerd/go-dmverity/pkg/verity
-# github.com/containerd/go-runc v1.1.0
-## explicit; go 1.18
+# github.com/containerd/go-runc v1.2.0
+## explicit; go 1.21
 github.com/containerd/go-runc
 # github.com/containerd/imgcrypt/v2 v2.0.3
 ## explicit; go 1.25.0
