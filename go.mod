@@ -88,7 +88,7 @@ require (
 	k8s.io/cri-streaming v0.36.3
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/streaming v0.36.3
-	tags.cncf.io/container-device-interface v1.1.1-0.20260720132747-49ac08dcf160
+	tags.cncf.io/container-device-interface v1.1.1-0.20260821104259-05ae4b5bb730
 )
 
 require (
@@ -147,7 +147,6 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.36.3 // indirect
 	k8s.io/component-base v0.36.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9 // indirect

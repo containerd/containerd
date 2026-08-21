@@ -25,7 +25,7 @@ import (
 	"sync"
 
 	oci "github.com/opencontainers/runtime-spec/specs-go"
-	orderedyaml "gopkg.in/yaml.v3"
+	orderedyaml "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 
 	"tags.cncf.io/container-device-interface/internal/validation"
@@ -207,7 +207,10 @@ func (s *Spec) edits() *ContainerEdits {
 }
 
 // MinimumRequiredVersion determines the minimum spec version for the input spec.
-// Deprecated: use cdi.MinimumRequiredVersion instead
+//
+// Deprecated: use [cdi.MinimumRequiredVersion] instead.
+//
+//go:fix inline
 func MinimumRequiredVersion(spec *cdi.Spec) (string, error) {
 	return cdi.MinimumRequiredVersion(spec)
 }
