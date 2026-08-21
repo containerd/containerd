@@ -970,7 +970,7 @@ k8s.io/client-go/util/workqueue
 # k8s.io/component-base v0.36.3
 ## explicit; go 1.26.0
 k8s.io/component-base/logs/logreduction
-# k8s.io/cri-api v0.36.3
+# k8s.io/cri-api v0.36.3 => github.com/chrishenzie/cri-api v0.0.0-20260826223750-db04887813dd
 ## explicit; go 1.26.0
 k8s.io/cri-api/pkg/apis
 k8s.io/cri-api/pkg/apis/runtime/v1
@@ -1038,3 +1038,4 @@ tags.cncf.io/container-device-interface/pkg/parser
 # tags.cncf.io/container-device-interface/specs-go v1.1.0
 ## explicit; go 1.19
 tags.cncf.io/container-device-interface/specs-go
+# k8s.io/cri-api => github.com/chrishenzie/cri-api v0.0.0-20260826223750-db04887813dd
