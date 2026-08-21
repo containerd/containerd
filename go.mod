@@ -88,7 +88,6 @@ require (
 	k8s.io/cri-streaming v0.36.3
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/streaming v0.36.3
-	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 	tags.cncf.io/container-device-interface v1.1.1-0.20260720132747-49ac08dcf160
 )
 
@@ -152,6 +151,7 @@ require (
 	k8s.io/api v0.36.3 // indirect
 	k8s.io/component-base v0.36.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9 // indirect
+	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.3 // indirect
