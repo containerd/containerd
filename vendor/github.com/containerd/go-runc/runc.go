@@ -228,6 +228,7 @@ func (r *Runc) Start(context context.Context, id string) error {
 // ExecOpts holds optional settings when starting an exec process with runc
 type ExecOpts struct {
 	IO
+	LogFile       string
 	PidFile       string
 	ConsoleSocket ConsoleSocket
 	Detach        bool
@@ -280,7 +281,7 @@ func (r *Runc) Exec(context context.Context, id string, spec specs.Process, opts
 		return err
 	}
 	args = append(args, oargs...)
-	cmd := r.command(context, append(args, id)...)
+	cmd := r.commandWithCustomLogFile(context, opts.LogFile, append(args, id)...)
 	if opts.IO != nil {
 		opts.Set(cmd)
 	}
@@ -765,7 +766,7 @@ func (r *Runc) Features(context context.Context) (*features.Features, error) {
 	return &feat, nil
 }
 
-func (r *Runc) args() (out []string) {
+func (r *Runc) args(logFile string) (out []string) {
 	if r.Root != "" {
 		out = append(out, "--root", r.Root)
 	}
@@ -773,7 +774,12 @@ func (r *Runc) args() (out []string) {
 		out = append(out, "--debug")
 	}
 	if r.Log != "" {
-		out = append(out, "--log", r.Log)
+		if logFile == "" {
+			out = append(out, "--log", r.Log)
+		}
+	}
+	if logFile != "" {
+		out = append(out, "--log", logFile)
 	}
 	if r.LogFormat != none {
 		out = append(out, "--log-format", string(r.LogFormat))

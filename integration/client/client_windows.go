@@ -34,6 +34,15 @@
 
 package client
 
+import (
+	"os"
+	"path/filepath"
+)
+
 const (
 	defaultAddress = `\\.\pipe\containerd-containerd-test`
 )
+
+func GetDefaultState() string {
+	return filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
+}
