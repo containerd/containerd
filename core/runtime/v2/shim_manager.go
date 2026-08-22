@@ -26,7 +26,6 @@ import (
 	"strings"
 	"sync"
 
-	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
@@ -185,8 +184,6 @@ type ShimManager struct {
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
 	runtimePaths sync.Map
 	sandboxStore sandbox.Store
-	// shimInfos is a cache of the shim info
-	shimInfos sync.Map
 }
 
 // ID of the shim manager
@@ -482,41 +479,4 @@ func (m *ShimManager) Delete(ctx context.Context, id string) error {
 	m.shims.Delete(ctx, id)
 
 	return err
-}
-
-type shimInfo struct {
-	handledMounts []string
-}
-
-func (m *ShimManager) loadShimInfo(ctx context.Context, shim string) (*shimInfo, error) {
-	if i, ok := m.shimInfos.Load(shim); ok {
-		return i.(*shimInfo), nil
-	}
-	// Avoid fetching info for default shims with known behavior
-	if shim == "io.containerd.runc.v2" || shim == "io.containerd.runhcs.v1" {
-		sinfo := &shimInfo{}
-		m.shimInfos.Store(shim, sinfo)
-		return sinfo, nil
-	}
-
-	rinfo, err := getRuntimeInfo(ctx, m, &apitypes.RuntimeRequest{RuntimePath: shim})
-	if err != nil {
-		return nil, err
-	}
-	sinfo := &shimInfo{}
-
-	if rinfo.Annotations != nil {
-		if v, ok := rinfo.Annotations[allowedMounts]; ok {
-			sinfo.handledMounts = strings.Split(v, ",")
-		}
-	}
-
-	fields := log.Fields{}
-	for k, v := range rinfo.Annotations {
-		fields[k] = v
-	}
-	log.G(ctx).WithFields(fields).WithField("shim", shim).Debug("loaded shim info")
-
-	m.shimInfos.Store(shim, sinfo)
-	return sinfo, nil
 }
