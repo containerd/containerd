@@ -21,8 +21,6 @@
 package apparmor
 
 import (
-	"bufio"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -46,7 +44,7 @@ const defaultTemplate = `
 {{$value}}
 {{end}}
 
-profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
+profile "{{.Name}}" flags=(attach_disconnected,mediate_deleted) {
 {{range $value := .InnerImports}}
   {{$value}}
 {{end}}
@@ -62,12 +60,12 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   # crun may send signals to container processes.
   signal (receive) peer=crun,
   # Manager may send signals to container processes.
-  signal (receive) peer={{.DaemonProfile}},
+  signal (receive) peer="{{.DaemonProfile}}",
   # Container processes may send signals amongst themselves.
-  signal (send,receive) peer={{.Name}},
+  signal (send,receive) peer="{{.Name}}",
 {{if .RootlessKit}}
   # https://github.com/containerd/nerdctl/issues/2730
-  signal (receive) peer={{.RootlessKit}},
+  signal (receive) peer="{{.RootlessKit}}",
 {{end}}
 
   deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
@@ -91,7 +89,7 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 
   # allow processes within the container to trace each other,
   # provided all other LSM and yama setting allow it.
-  ptrace (trace,tracedby,read,readby) peer={{.Name}},
+  ptrace (trace,tracedby,read,readby) peer="{{.Name}}",
 }
 `
 
@@ -104,14 +102,53 @@ type data struct {
 	RootlessKit   string
 }
 
+// cleanProfileName returns the AppArmor profile name from a confinement
+// context as reported by /proc/self/attr/current.
+//
+// The value may be either a bare profile name, "unconfined", or a profile name
+// with a trailing mode suffix of the form " (<mode>)". If profile is empty,
+// cleanProfileName returns "unconfined".
 func cleanProfileName(profile string) string {
-	// Normally profiles are suffixed by " (enforce)". AppArmor profiles cannot
-	// contain spaces so this doesn't restrict daemon profile names.
-	profile, _, _ = strings.Cut(profile, " ")
-	if profile == "" {
-		profile = "unconfined"
+	label, _ := splitCon(profile)
+	if label == "" {
+		return "unconfined"
 	}
-	return profile
+	return label
+}
+
+// splitCon splits an AppArmor confinement context into a label and mode,
+// similar to libapparmor [splitcon]. splitCon follows libapparmor's parsing
+// semantics and does not validate the returned mode.
+//
+// /proc/self/attr/current returns the current confinement context for the
+// process. Unlike /sys/kernel/security/apparmor/profiles, this value may not
+// include a " (<mode>)" suffix.
+//
+// Supported forms:
+//
+//	<profile>
+//	<profile> (<mode>)
+//	unconfined
+//
+// splitCon strips one trailing newline before parsing.
+//
+// [splitcon]: https://gitlab.com/apparmor/apparmor/-/blob/v5.0.1/libraries/libapparmor/src/kernel.c#L562-615
+func splitCon(con string) (label, mode string) {
+	// Value includes a trailing newline.
+	con = strings.TrimSuffix(con, "\n")
+	if con == "" || con == "unconfined" {
+		return con, ""
+	}
+
+	if strings.HasSuffix(con, ")") {
+		// Profile names may contain spaces, so split on the last " (" before
+		// the trailing ")" rather than the first space.
+		if i := strings.LastIndex(con[:len(con)-1], " ("); i >= 0 {
+			return con[:i], con[i+2 : len(con)-1]
+		}
+	}
+
+	return con, ""
 }
 
 func loadData(name string) (*data, error) {
@@ -163,43 +200,8 @@ func generate(p *data, o io.Writer) error {
 	return t.Execute(o, p)
 }
 
-func load(path string) error {
-	out, err := aaParser("-Kr", path)
-	if err != nil {
-		return fmt.Errorf("parser error(%q): %w", strings.TrimSpace(out), err)
-	}
-	return nil
-}
-
 // macroExists checks if the passed macro exists.
 func macroExists(m string) bool {
 	_, err := os.Stat(path.Join(dir, m))
 	return err == nil
-}
-
-func aaParser(args ...string) (string, error) {
-	out, err := exec.Command("apparmor_parser", args...).CombinedOutput()
-	return string(out), err
-}
-
-func isLoaded(name string) (bool, error) {
-	f, err := os.Open("/sys/kernel/security/apparmor/profiles")
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-	r := bufio.NewReader(f)
-	for {
-		p, err := r.ReadString('\n')
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return false, err
-		}
-		if strings.HasPrefix(p, name+" ") {
-			return true, nil
-		}
-	}
-	return false, nil
 }
