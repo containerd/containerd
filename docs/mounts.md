@@ -258,16 +258,15 @@ up when the references are removed.
 ### Relationship with runtimes
 
 The runtime should use the mount manager to initiate activation of the mounts
-before setting up the rootfs for a container. The runtime name should be passed
-along to the activation call so that the mount manager may be configured for
-runtime specific behavior.
+before setting up the rootfs for a container.
 
-The `ActivateOptions` allow runtimes to indicate which mount types they can handle:
+The `ActivateOptions` allow runtimes to indicate which mount types and
+transforms they can handle:
 
 ```go
 // Runtime can handle formatting, so don't let mount manager do it
 info, err := mountManager.Activate(ctx, name, mounts,
-    mount.WithAllowMountType("format/*"),
+    mount.WithAllowTransform("format"),
 )
 
 // Runtime can handle loop devices
@@ -276,6 +275,10 @@ info, err := mountManager.Activate(ctx, name, mounts,
 )
 ```
 
+A claimed mount or transform is still performed by the mount manager if a
+subsequent mount depends on it, since the runtime cannot supply a mount point
+that does not exist yet.
+
 #### Support with containerd shims
 
 By default, the containerd runtime will call the mount manager to activate mounts,
@@ -283,10 +286,16 @@ which will perform any transformations and custom mounts. However, a runtime shi
 choose to handle some mount types or transformations itself in order to optimize
 performance based on the runtime environment. For example, a VM based runtime may
 choose to handle loopback mounts itself by passing the disk image file directly to
-the VM instead of setting up a loop device on the host. The runtime shim may export
-the annotation `containerd.io/runtime-allow-mounts` in its runtime info to indicate
-which mount types the shim can handle. The values are comma separated and passed to
-via the `mount.WithAllowMountType` option when activating mounts.
+the VM instead of setting up a loop device on the host.
+
+A shim declares what it handles by attaching a `containerd.types.MountCapabilities`
+extension to its bootstrap result, naming the mount types and transforms it performs
+itself. containerd translates that into the `mount.WithAllowMountType` and
+`mount.WithAllowTransform` options above. See
+[shim-capabilities.md](shim-capabilities.md) for the details.
+
+The shim is started before its mounts are activated, so that what it advertises can
+be taken into account.
 
 ### Mount Manager Interface
 
