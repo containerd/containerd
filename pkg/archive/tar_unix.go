@@ -148,7 +148,7 @@ func setxattr(path, key, value string) error {
 	if strings.HasPrefix(key, "trusted.") {
 		return fmt.Errorf("admin attributes from archive not supported: %w", unix.ENOTSUP)
 	}
-	return unix.Lsetxattr(path, key, []byte(value), 0)
+	return unix.ENOTSUP
 }
 
 func copyDirInfo(fi os.FileInfo, path string) error {
