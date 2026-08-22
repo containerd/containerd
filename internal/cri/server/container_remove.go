@@ -104,6 +104,15 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	// so we don't need the "Dead" state for now.
 
 	// Delete containerd container.
+	// Try to clean up the task first if it still exists (e.g. if previous deletion failed due to EBUSY)
+	if task, err := container.Container.Task(ctx, nil); err == nil {
+		if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to delete orphaned task for container %q: %w", id, err)
+		}
+	} else if !errdefs.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get task for container %q: %w", id, err)
+	}
+
 	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to delete containerd container %q: %w", id, err)
