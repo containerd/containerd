@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
-	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -300,7 +299,10 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	log.G(r.ctx).Debugf("Container %q spec: %#+v", r.containerID, spew.NewFormatter(spec))
+	logger := log.G(r.ctx)
+	if logger.Logger.IsLevelEnabled(log.DebugLevel) {
+		logger.WithField("spec", spec).Debugf("Container %q spec", r.containerID)
+	}
 
 	// Grab any platform specific snapshotter opts.
 	sOpts, err := snapshotterOpts(r.containerConfig)

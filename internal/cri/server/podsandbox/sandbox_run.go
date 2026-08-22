@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl/v2"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/opencontainers/selinux/go-selinux"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -144,7 +143,13 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
 
-	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
+	logger := log.G(ctx)
+	if logger.Logger.IsLevelEnabled(log.DebugLevel) {
+		log.G(ctx).WithFields(log.Fields{
+			"podsandboxid": id,
+			"spec":         spec,
+		}).Debug("sandbox container spe")
+	}
 
 	metadata.ProcessLabel = spec.Process.SelinuxLabel
 	defer func() {
