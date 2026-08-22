@@ -21,6 +21,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -54,6 +55,7 @@ type hostConfig struct {
 	skipVerify  *bool
 
 	dialTimeout *time.Duration
+	dnsServers  []string
 
 	header http.Header
 
@@ -66,9 +68,131 @@ type HostOptions struct {
 	Credentials   func(host string) (string, string, error)
 	DefaultTLS    *tls.Config
 	DefaultScheme string
+	// DialContext overrides the default dialer used for all registry connections.
+	// If nil, the net.Dialer defaults are used. A per-host dial_timeout in
+	// hosts.toml takes precedence over this value for that specific host.
+	DialContext func(ctx context.Context, network, addr string) (net.Conn, error)
 	// UpdateClient will be called after creating http.Client object, so clients can provide extra configuration
 	UpdateClient   UpdateClientFunc
 	AuthorizerOpts []docker.AuthorizerOpt
+}
+
+// NewDNSDialContext returns a DialContext function whose resolver tries each of
+// the provided DNS servers in order before falling back to the system nameserver
+// that Go's resolver would have used for that connection.
+func NewDNSDialContext(dnsServers []string) func(context.Context, string, string) (net.Conn, error) {
+	return newDNSDialContext(dnsServers, 30*time.Second)
+}
+
+type hostLookup func(context.Context, string) ([]string, error)
+type dnsDialContext func(context.Context, string, string) (net.Conn, error)
+
+func newDNSHostLookup(server string) hostLookup {
+	return newDNSHostLookupWithDial(server, (&net.Dialer{}).DialContext)
+}
+
+func newDNSHostLookupWithDial(server string, dial dnsDialContext) hostLookup {
+	// Do not wrap the returned connection: Go's resolver selects UDP or TCP
+	// wire framing by type asserting net.PacketConn on it, and a wrapper that
+	// hides that interface makes every UDP query malformed.
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return dial(ctx, network, net.JoinHostPort(server, "53"))
+		},
+	}
+	return resolver.LookupHost
+}
+
+// newDNSDialContext builds a DialContext with a custom DNS resolver and the
+// given connection timeout. Used internally to combine dns_servers with a
+// per-host dial_timeout.
+func newDNSDialContext(dnsServers []string, timeout time.Duration) func(context.Context, string, string) (net.Conn, error) {
+	// One resolver per server so we can probe each at the resolution level.
+	// Checking reachability via net.Dialer.DialContext does not work for UDP;
+	// it always succeeds, thus an unreachable server is never
+	// detected and fallback to the system resolver is never reached.
+	lookups := make([]hostLookup, len(dnsServers))
+	for i, server := range dnsServers {
+		lookups[i] = newDNSHostLookup(server)
+	}
+	return newDNSDialContextWithLookups(lookups, timeout)
+}
+
+func newDNSDialContextWithLookups(lookups []hostLookup, timeout time.Duration) func(context.Context, string, string) (net.Conn, error) {
+	// FallbackDelay only takes effect when the dialer resolves a hostname
+	// itself, i.e. on the system-resolver fallback below. Addresses resolved
+	// through lookups are dialed one IP literal at a time.
+	d := &net.Dialer{
+		Timeout:       timeout,
+		KeepAlive:     30 * time.Second,
+		FallbackDelay: 300 * time.Millisecond,
+	}
+
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if timeout != 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, timeout)
+			defer cancel()
+		}
+
+		host, port, _ := net.SplitHostPort(addr)
+		// Only apply custom resolution for hostnames; IP literals need no DNS.
+		if host != "" && net.ParseIP(host) == nil {
+			// answered records that some configured server refused the query
+			// outright. The system resolver is only used when none of them
+			// could answer.
+			var answered bool
+			var lastErr error
+			for _, lookup := range lookups {
+				if ctx.Err() != nil {
+					break
+				}
+				rCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				ips, err := lookup(rCtx, host)
+				cancel()
+				lastErr = err
+				var dnsErr *net.DNSError
+				if errors.As(err, &dnsErr) {
+					// A definitive NXDOMAIN is an answer
+					if dnsErr.IsNotFound {
+						return nil, err
+					}
+					// A refusal is a policy decision by a working server, so
+					// respect it rather than look for a resolver that answers
+					// differently.
+					if !dnsErr.IsTimeout && !dnsErr.IsTemporary {
+						answered = true
+					}
+				}
+				if err == nil && len(ips) > 0 {
+					var dialErrors []error
+					// Try addresses until one connects. Give each non-final attempt
+					// a share of the remaining deadline so later addresses get tried.
+					for i, ip := range ips {
+						dialCtx := ctx
+						dialCancel := func() {}
+						if deadline, ok := ctx.Deadline(); ok && i < len(ips)-1 {
+							remaining := time.Until(deadline) / time.Duration(len(ips)-i)
+							dialCtx, dialCancel = context.WithTimeout(ctx, remaining)
+						}
+						conn, err := d.DialContext(dialCtx, network, net.JoinHostPort(ip, port))
+						dialCancel()
+						if err == nil {
+							return conn, nil
+						}
+						dialErrors = append(dialErrors, err)
+					}
+					return nil, errors.Join(dialErrors...)
+				}
+			}
+			if answered {
+				return nil, lastErr
+			}
+		}
+
+		return d.DialContext(ctx, network, addr)
+	}
 }
 
 // ConfigureHosts creates a registry hosts function from the provided
@@ -148,6 +272,9 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		}
 
 		defaultTransport := docker.DefaultHTTPTransport(defaultTLSConfig)
+		if options.DialContext != nil {
+			defaultTransport.DialContext = options.DialContext
+		}
 
 		client := &http.Client{
 			Transport: defaultTransport,
@@ -171,9 +298,9 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
 			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
+			if explicitTLSFromHost || host.dialTimeout != nil || host.dnsServers != nil || len(host.header) != 0 {
 				c := *client
-				if explicitTLSFromHost || host.dialTimeout != nil {
+				if explicitTLSFromHost || host.dialTimeout != nil || host.dnsServers != nil {
 					tr := defaultTransport.Clone()
 
 					if explicitTLSFromHost {
@@ -182,12 +309,33 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 						}
 					}
 
-					if host.dialTimeout != nil {
-						tr.DialContext = (&net.Dialer{
-							Timeout:       *host.dialTimeout,
-							KeepAlive:     30 * time.Second,
-							FallbackDelay: 300 * time.Millisecond,
-						}).DialContext
+					if host.dialTimeout != nil || host.dnsServers != nil {
+						timeout := 30 * time.Second
+						if host.dialTimeout != nil {
+							timeout = *host.dialTimeout
+						}
+						if host.dnsServers != nil {
+							tr.DialContext = newDNSDialContext(host.dnsServers, timeout)
+						} else if options.DialContext != nil {
+							// A per-host dial_timeout is set but no per-host dns_servers.
+							// The cloned transport already carries the global DialContext;
+							// wrap it with the per-host timeout via context deadline rather
+							// than replacing it outright, which would discard the global
+							// dns_servers configuration.
+							globalDial := options.DialContext
+							perHostTimeout := timeout
+							tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+								ctx, cancel := context.WithTimeout(ctx, perHostTimeout)
+								defer cancel()
+								return globalDial(ctx, network, addr)
+							}
+						} else {
+							tr.DialContext = (&net.Dialer{
+								Timeout:       timeout,
+								KeepAlive:     30 * time.Second,
+								FallbackDelay: 300 * time.Millisecond,
+							}).DialContext
+						}
 					}
 
 					c.Transport = tr
@@ -374,6 +522,12 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
+	// DNSServers is a list of DNS server IP addresses used when resolving
+	// this registry host. These servers are tried before the system resolver,
+	// falling back to it if all are unreachable. Overrides any dns_servers
+	// set in the global registry config for this specific host.
+	DNSServers []string `toml:"dns_servers"`
+
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -542,6 +696,10 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			return hostConfig{}, err
 		}
 		result.dialTimeout = &dialTimeout
+	}
+
+	if config.DNSServers != nil {
+		result.dnsServers = config.DNSServers
 	}
 
 	return result, nil
