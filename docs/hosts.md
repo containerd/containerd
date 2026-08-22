@@ -373,6 +373,17 @@ A shorter timeout helps reduce delays when falling back to the original registry
 dial_timeout = "1s"
 ```
 
+## pass_upstream_credentials field
+
+`pass_upstream_credentials` allows a configured host to use credentials for the
+upstream registry namespace instead of credentials for the host itself. This is
+intended for trusted mirrors which require the same credentials as the upstream
+registry to serve private content. (Defaults to `false`)
+
+```toml
+pass_upstream_credentials = true
+```
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host]."http://namespace"` entries in the
@@ -414,6 +425,11 @@ for this registry host namespace:
 [host."https://non-compliant-mirror.registry/v2/upstream"]
   capabilities = ["pull"]
   override_path = true
+
+[host."https://trusted-mirror.registry/v2/upstream"]
+  capabilities = ["pull", "resolve"]
+  override_path = true
+  pass_upstream_credentials = true
 ```
 
 **Note**: Recursion is not supported in the specification of host mirror
