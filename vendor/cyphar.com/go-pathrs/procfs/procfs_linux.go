@@ -127,7 +127,7 @@ func (proc *Handle) fd() int {
 }
 
 // TODO: Should we expose open?
-func (proc *Handle) open(base ProcBase, path string, flags int) (_ *os.File, Closer ThreadCloser, Err error) {
+func (proc *Handle) open(base ProcBase, path string, flags uint64) (_ *os.File, Closer ThreadCloser, Err error) {
 	var closer ThreadCloser
 	if base == ProcThreadSelf {
 		runtime.LockOSThread()
@@ -154,7 +154,7 @@ func (proc *Handle) open(base ProcBase, path string, flags int) (_ *os.File, Clo
 // (such as /proc/cpuinfo) or information about other processes (such as
 // /proc/1). Accessing your own process information should be done using
 // [Handle.OpenSelf] or [Handle.OpenThreadSelf].
-func (proc *Handle) OpenRoot(path string, flags int) (*os.File, error) {
+func (proc *Handle) OpenRoot(path string, flags uint64) (*os.File, error) {
 	file, closer, err := proc.open(ProcRoot, path, flags)
 	if closer != nil {
 		// should not happen
@@ -180,7 +180,7 @@ func (proc *Handle) OpenRoot(path string, flags int) (*os.File, error) {
 // Unlike [Handle.OpenThreadSelf], this method does not involve locking
 // the goroutine to the current OS thread and so is simpler to use and
 // theoretically has slightly less overhead.
-func (proc *Handle) OpenSelf(path string, flags int) (*os.File, error) {
+func (proc *Handle) OpenSelf(path string, flags uint64) (*os.File, error) {
 	file, closer, err := proc.open(ProcSelf, path, flags)
 	if closer != nil {
 		// should not happen
@@ -198,7 +198,7 @@ func (proc *Handle) OpenSelf(path string, flags int) (*os.File, error) {
 // Be aware that due to PID recycling, using this is generally not safe except
 // in certain circumstances. See the documentation of [ProcPid] for more
 // details.
-func (proc *Handle) OpenPid(pid int, path string, flags int) (*os.File, error) {
+func (proc *Handle) OpenPid(pid int, path string, flags uint64) (*os.File, error) {
 	file, closer, err := proc.open(ProcPid(pid), path, flags)
 	if closer != nil {
 		// should not happen
@@ -225,7 +225,7 @@ func (proc *Handle) OpenPid(pid int, path string, flags int) (*os.File, error) {
 // callback MUST be called AFTER you have finished using the returned
 // [os.File]. This callback is completely separate to [os.File.Close], so it
 // must be called regardless of how you close the handle.
-func (proc *Handle) OpenThreadSelf(path string, flags int) (*os.File, ThreadCloser, error) {
+func (proc *Handle) OpenThreadSelf(path string, flags uint64) (*os.File, ThreadCloser, error) {
 	return proc.open(ProcThreadSelf, path, flags)
 }
 
