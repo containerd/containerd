@@ -473,7 +473,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	}
 
 	// If first system mount is converted, fill in the format
-	if mountConv != nil {
+	if mountConv != nil && firstSystemMount < len(mounts) {
 		for _, tr := range mountConv[firstSystemMount] {
 			newM, err := tr.Transform(ctx, mounts[firstSystemMount], mounted)
 			if err != nil {
