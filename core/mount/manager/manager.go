@@ -152,14 +152,11 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		opt(&config)
 	}
 
+	// shouldTransform reports whether the mount manager must apply transform p,
+	// which appeared as a prefix of the full mount type t. The caller may
+	// claim it either by name, or by naming the whole mount type t.
 	shouldTransform := func(p string, t string) bool {
-		p = p + "/*"
-		for _, mt := range config.AllowMountTypes {
-			if mt == p || mt == t {
-				return false
-			}
-		}
-		return true
+		return !slices.Contains(config.AllowTransforms, p) && !slices.Contains(config.AllowMountTypes, t)
 	}
 
 	shouldHandle := func(t string) bool {
