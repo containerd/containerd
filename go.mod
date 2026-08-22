@@ -157,3 +157,6 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 	tags.cncf.io/container-device-interface/specs-go v1.1.0 // indirect
 )
+replace k8s.io/cri-api => github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260717143731-0771cf9d1a26
+
+replace k8s.io/cri-client => github.com/checkpoint-restore/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260717143731-0771cf9d1a26

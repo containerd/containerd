@@ -100,6 +100,7 @@ type controllerLocal struct {
 }
 
 var _ sandbox.Controller = (*controllerLocal)(nil)
+var _ sandbox.CheckpointController = (*controllerLocal)(nil)
 
 func (c *controllerLocal) cleanupShim(ctx context.Context, sandboxID string, svc runtimeAPI.TTRPCSandboxService) {
 	// Let the shim exit, then we can clean up the bundle after.
@@ -344,6 +345,65 @@ func (c *controllerLocal) Update(
 	return nil
 }
 
+func (c *controllerLocal) Checkpoint(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) error {
+	svc, err := c.getCheckpointService(ctx, sandboxID)
+	if err != nil {
+		return err
+	}
+	containers := make([]*runtimeAPI.CheckpointContainer, 0, len(opts.Containers))
+	for _, container := range opts.Containers {
+		containers = append(containers, &runtimeAPI.CheckpointContainer{
+			ID:     container.ID,
+			Name:   container.Name,
+			Config: typeurl.MarshalProto(container.Config),
+			Status: typeurl.MarshalProto(container.Status),
+		})
+	}
+	_, err = svc.Checkpoint(ctx, &runtimeAPI.CheckpointRequest{
+		SandboxID:     sandboxID,
+		OutputPath:    opts.OutputPath,
+		SandboxConfig: typeurl.MarshalProto(opts.SandboxConfig),
+		Containers:    containers,
+		Options:       opts.Options,
+	})
+	return errgrpc.ToNative(err)
+}
+
+func (c *controllerLocal) Restore(ctx context.Context, sandboxID string, opts sandbox.RestoreOptions) (sandbox.RestoreResult, error) {
+	svc, err := c.getCheckpointService(ctx, sandboxID)
+	if err != nil {
+		return sandbox.RestoreResult{}, err
+	}
+	containers := make([]*runtimeAPI.RestoreContainer, 0, len(opts.Containers))
+	for _, container := range opts.Containers {
+		containers = append(containers, &runtimeAPI.RestoreContainer{
+			ID:     container.ID,
+			Name:   container.Name,
+			Config: typeurl.MarshalProto(container.Config),
+		})
+	}
+	resp, err := svc.Restore(ctx, &runtimeAPI.RestoreRequest{
+		SandboxID:      sandboxID,
+		CheckpointPath: opts.CheckpointPath,
+		SandboxConfig:  typeurl.MarshalProto(opts.SandboxConfig),
+		Containers:     containers,
+		Options:        opts.Options,
+	})
+	if err != nil {
+		return sandbox.RestoreResult{}, errgrpc.ToNative(err)
+	}
+	result := sandbox.RestoreResult{
+		RestoredContainers: make([]sandbox.RestoredContainer, 0, len(resp.GetContainers())),
+	}
+	for _, container := range resp.GetContainers() {
+		result.RestoredContainers = append(result.RestoredContainers, sandbox.RestoredContainer{
+			Name:                container.GetName(),
+			TaskCheckpointImage: container.GetTaskCheckpointImage(),
+		})
+	}
+	return result, nil
+}
+
 func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI.TTRPCSandboxService, error) {
 	shim, err := c.shims.Get(ctx, id)
 	if err != nil {
@@ -351,4 +411,12 @@ func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI
 	}
 
 	return sandbox.NewClient(shim.Client())
+}
+
+func (c *controllerLocal) getCheckpointService(ctx context.Context, id string) (runtimeAPI.TTRPCCheckpointService, error) {
+	shim, err := c.shims.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return sandbox.NewCheckpointClient(shim.Client())
 }
