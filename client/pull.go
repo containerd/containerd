@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/images"
@@ -75,13 +76,15 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		}
 	}
 
-	span.SetAttributes(
-		tracing.Attribute("image.ref", ref),
-		tracing.Attribute("unpack", pullCtx.Unpack),
+	attrs := []attribute.KeyValue{
+		tracing.Attribute("containerd.image.ref", ref),
+		tracing.Attribute("containerd.pull.unpack", pullCtx.Unpack),
 		tracing.Attribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
 		tracing.Attribute("concurrent.layer.fetch.buffer", pullCtx.ConcurrentLayerFetchBuffer),
 		tracing.Attribute("platforms.count", len(pullCtx.Platforms)),
-	)
+	}
+	span.SetAttributes(attrs...)
+	span.SetAttributes(tracing.LegacyAttributes(attrs)...)
 
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
@@ -96,7 +99,9 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if err != nil {
 			return nil, fmt.Errorf("unable to resolve snapshotter: %w", err)
 		}
-		span.SetAttributes(tracing.Attribute("snapshotter.name", snapshotterName))
+		attrs := []attribute.KeyValue{tracing.Attribute("containerd.snapshotter.name", snapshotterName)}
+		span.SetAttributes(attrs...)
+		span.SetAttributes(tracing.LegacyAttributes(attrs)...)
 
 		snCapabilities, err := c.GetSnapshotterCapabilities(ctx, snapshotterName)
 		if err != nil {
@@ -177,7 +182,9 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	i := NewImageWithPlatform(c, img, pullCtx.PlatformMatcher)
-	span.SetAttributes(tracing.Attribute("image.ref", i.Name()))
+	attrs = []attribute.KeyValue{tracing.Attribute("containerd.image.ref", i.Name())}
+	span.SetAttributes(attrs...)
+	span.SetAttributes(tracing.LegacyAttributes(attrs)...)
 
 	if unpacker != nil && ur.Unpacks == 0 {
 		// Unpack was tried previously but nothing was unpacked
