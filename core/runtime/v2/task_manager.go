@@ -46,13 +46,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 )
 
-const (
-	// allowedMounts are the custom mount types allowed by the runtime. These
-	// types should not be handled by the mount manager.
-	// To include prepare mount types, use "/*" suffix, such as "format/*"
-	allowedMounts = "containerd.io/runtime-allow-mounts"
-)
-
 // TaskConfig for the runtime task manager
 type TaskConfig struct {
 	// Supported platforms
@@ -176,13 +169,6 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		mount.WithLabels(map[string]string{
 			"containerd.io/gc.bref.container": taskID,
 		}),
-	}
-	if info, err := m.manager.loadShimInfo(ctx, opts.Runtime); err == nil {
-		for _, t := range info.handledMounts {
-			activateOpts = append(activateOpts, mount.WithAllowMountType(t))
-		}
-	} else {
-		log.G(ctx).WithError(err).WithField("runtime", opts.Runtime).Error("failed to load runtime info")
 	}
 
 	// Add options based on runtime
