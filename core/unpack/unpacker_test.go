@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/opencontainers/go-digest"
@@ -232,6 +234,112 @@ func TestIsStaged(t *testing.T) {
 	}
 }
 
+// stubSnapshotter and stubApplier satisfy the interfaces WithUnpackPlatform
+// requires. Every test using them gives the unpacker a platform the image
+// config won't match, so unpack takes the fetch-only path and never calls
+// either one. The embedded interfaces are nil, so a test that calls them
+// panics.
+type stubSnapshotter struct{ snapshots.Snapshotter }
+
+type stubApplier struct{ diff.Applier }
+
+// TestUnpackFetchesLayersOfEveryManifestSharingConfig covers an index whose
+// manifests resolve to the same config digest (for example compression
+// variants of the same image). The layers of every manifest must reach the
+// content store. If only the first manifest's layers arrived, a later export
+// or push of the image would fail with NotFound.
+//
+// A manifest may reach the unpacker before or after the config it names, so
+// test both orders.
+func TestUnpackFetchesLayersOfEveryManifestSharingConfig(t *testing.T) {
+	layer := func(id string) ocispec.Descriptor {
+		return ocispec.Descriptor{MediaType: ocispec.MediaTypeImageLayerGzip, Digest: digest.FromString(id), Size: 1}
+	}
+	manifest := func(id string) ocispec.Descriptor {
+		return ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: digest.FromString(id), Size: 1}
+	}
+	manifestA, manifestB := manifest("manifest-a"), manifest("manifest-b")
+	setA := []ocispec.Descriptor{layer("a-0"), layer("a-1")}
+	setB := []ocispec.Descriptor{layer("b-0"), layer("b-1")}
+
+	for _, tc := range []struct {
+		name  string
+		order func(config ocispec.Descriptor) []ocispec.Descriptor
+	}{
+		{
+			// Both manifests are siblings under one index, so both are handled
+			// before their shared config.
+			name: "config after both manifests",
+			order: func(config ocispec.Descriptor) []ocispec.Descriptor {
+				return []ocispec.Descriptor{manifestA, manifestB, config}
+			},
+		},
+		{
+			// manifestB sits deeper in the graph, so manifestA reaches the
+			// shared config first and the config is visited before manifestB
+			// is handled.
+			name: "config between the manifests",
+			order: func(config ocispec.Descriptor) []ocispec.Descriptor {
+				return []ocispec.Descriptor{manifestA, config, manifestB}
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			cs := imagetest.NewContentStore(ctx, t)
+
+			diffIDs := []digest.Digest{digest.FromString("diff-0"), digest.FromString("diff-1")}
+			config := cs.JSONObject(ocispec.MediaTypeImageConfig, ocispec.Image{
+				Platform: ocispec.Platform{OS: "linux", Architecture: "amd64"},
+				RootFS:   ocispec.RootFS{Type: "layers", DiffIDs: diffIDs},
+			})
+
+			children := map[digest.Digest][]ocispec.Descriptor{
+				manifestA.Digest: append([]ocispec.Descriptor{config.Descriptor}, setA...),
+				manifestB.Digest: append([]ocispec.Descriptor{config.Descriptor}, setB...),
+			}
+
+			var mu sync.Mutex
+			fetched := map[digest.Digest]struct{}{}
+			h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+				mu.Lock()
+				fetched[desc.Digest] = struct{}{}
+				mu.Unlock()
+				return children[desc.Digest], nil
+			})
+
+			u, err := NewUnpacker(ctx, cs.Store, WithUnpackPlatform(Platform{
+				Platform:    platforms.OnlyStrict(platforms.MustParse("linux/arm64")),
+				Snapshotter: stubSnapshotter{},
+				Applier:     stubApplier{},
+			}))
+			require.NoError(t, err)
+
+			wrapped := u.Unpack(h)
+			for _, desc := range tc.order(config.Descriptor) {
+				_, err := wrapped.Handle(ctx, desc)
+				require.NoError(t, err)
+			}
+			_, err = u.Wait()
+			require.NoError(t, err)
+
+			expected := map[digest.Digest]bool{
+				manifestA.Digest:         true,
+				manifestB.Digest:         true,
+				config.Descriptor.Digest: true,
+			}
+			for _, l := range slices.Concat(setA, setB) {
+				expected[l.Digest] = true
+				_, ok := fetched[l.Digest]
+				assert.Truef(t, ok, "layer %s from a config-sharing manifest was never fetched", l.Digest)
+			}
+			for d := range fetched {
+				assert.Truef(t, expected[d], "%s was fetched but belongs to neither manifest", d)
+			}
+		})
+	}
+}
+
 // stagedSnapshotter reports every layer as staged (read-only mounts) and
 // records the Prepare/Commit calls. Only Prepare and Commit are exercised on
 // the staged path, so the embedded (nil) Snapshotter covers the rest of the
@@ -398,4 +506,50 @@ func TestUnpackParallelPrepareError(t *testing.T) {
 	// The layer prepared before the failure is still committed.
 	require.Len(t, sn.commits, 1)
 	assert.Equal(t, chainIDs[0].String(), sn.commits[0].name)
+}
+
+// TestUnpackIgnoresManifestWithoutLayers covers a manifest whose layers have
+// been filtered away before the unpacker sees it, leaving only the config.
+// FilterManifestByPlatformHandler strips the layers from every manifest built
+// for another platform, so an ordinary pull of a multi-platform image produces
+// one. There is nothing to unpack, and an empty set reaching unpack fails the
+// pull, because unpack requires as many layers as the config lists diffIDs.
+func TestUnpackIgnoresManifestWithoutLayers(t *testing.T) {
+	ctx := context.Background()
+	cs := imagetest.NewContentStore(ctx, t)
+
+	config := cs.JSONObject(ocispec.MediaTypeImageConfig, ocispec.Image{
+		Platform: ocispec.Platform{OS: "linux", Architecture: "s390x"},
+		RootFS:   ocispec.RootFS{Type: "layers", DiffIDs: []digest.Digest{digest.FromString("diff-0")}},
+	})
+	manifest := ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: digest.FromString("manifest"), Size: 1}
+
+	var mu sync.Mutex
+	fetched := map[digest.Digest]struct{}{}
+	h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		mu.Lock()
+		fetched[desc.Digest] = struct{}{}
+		mu.Unlock()
+		if desc.Digest == manifest.Digest {
+			return []ocispec.Descriptor{config.Descriptor}, nil
+		}
+		return nil, nil
+	})
+
+	u, err := NewUnpacker(ctx, cs.Store, WithUnpackPlatform(Platform{
+		Platform:    platforms.OnlyStrict(platforms.MustParse("linux/amd64")),
+		Snapshotter: stubSnapshotter{},
+		Applier:     stubApplier{},
+	}))
+	require.NoError(t, err)
+
+	wrapped := u.Unpack(h)
+	for _, desc := range []ocispec.Descriptor{manifest, config.Descriptor} {
+		_, err := wrapped.Handle(ctx, desc)
+		require.NoError(t, err)
+	}
+	_, err = u.Wait()
+	require.NoError(t, err)
+
+	assert.Len(t, fetched, 2, "only the manifest and its config should be fetched")
 }

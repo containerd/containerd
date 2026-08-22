@@ -193,8 +193,14 @@ func NewUnpacker(ctx context.Context, cs content.Store, opts ...UnpackerOpt) (*U
 // process will be started in a goroutine.
 func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 	var (
-		lock   sync.Mutex
-		layers = map[digest.Digest][]ocispec.Descriptor{}
+		lock sync.Mutex
+		// Maps a config's digest to the layers waiting on it, one set per
+		// manifest. Layers are stored here because a manifest cannot unpack
+		// until its config supplies the diffIDs. Manifests can share a config
+		// (compression variants of one image have identical diffIDs and so
+		// identical configs), so a digest can map to more than one set.
+		layerSets      = map[digest.Digest][][]ocispec.Descriptor{}
+		visitedConfigs = map[digest.Digest]struct{}{}
 	)
 
 	var layerTypes map[string]bool
@@ -248,21 +254,54 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 				}
 			}
 
+			if len(manifestLayers) == 0 {
+				return nonLayers, nil
+			}
+
+			var layersDeferred bool
 			lock.Lock()
 			for _, nl := range nonLayers {
-				layers[nl.Digest] = manifestLayers
+				if !images.IsConfigType(nl.MediaType) && !configTypes[nl.MediaType] {
+					continue
+				}
+				if _, ok := visitedConfigs[nl.Digest]; ok {
+					continue
+				}
+				layerSets[nl.Digest] = append(layerSets[nl.Digest], manifestLayers)
+				layersDeferred = true
 			}
 			lock.Unlock()
+
+			// No config visit remains to schedule these layers, either because
+			// this manifest's config was already visited or because it names no
+			// config at all. Fetch them here instead.
+			if len(nonLayers) > 0 && !layersDeferred {
+				u.eg.Go(func() error {
+					return u.fetch(u.ctx, h, manifestLayers, nil)
+				})
+			}
 
 			children = nonLayers
 		} else if images.IsConfigType(desc.MediaType) || configTypes[desc.MediaType] {
 			lock.Lock()
-			l := layers[desc.Digest]
+			sets := layerSets[desc.Digest]
+			delete(layerSets, desc.Digest)
+			visitedConfigs[desc.Digest] = struct{}{}
 			lock.Unlock()
-			if len(l) > 0 {
+			if len(sets) > 0 {
 				u.eg.Go(func() error {
-					return u.unpack(h, desc, l)
+					return u.unpack(h, desc, sets[0])
 				})
+				// The remaining sets share this config, so they resolve to the
+				// same snapshot chain. Their blobs still need to reach the
+				// content store, so fetch them without unpacking again.
+				// Pulling an index with several config-sharing manifests will
+				// fetch one layer set per manifest.
+				for _, l := range sets[1:] {
+					u.eg.Go(func() error {
+						return u.fetch(u.ctx, h, l, nil)
+					})
+				}
 			}
 		}
 		return children, nil
