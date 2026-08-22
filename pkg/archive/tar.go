@@ -350,12 +350,15 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 			return err
 		}
 
-		_, err = copyBuffered(ctx, file, reader)
+		nWritten, err := copyBuffered(ctx, file, reader)
 		if err1 := file.Close(); err == nil {
 			err = err1
 		}
 		if err != nil {
 			return err
+		}
+		if hdr.Size != nWritten {
+			return fmt.Errorf("file %s incomplete: expect %d bytes wrote %d", file.Name(), hdr.Size, nWritten)
 		}
 
 	case tar.TypeBlock, tar.TypeChar:
