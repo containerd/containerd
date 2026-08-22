@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -148,6 +149,17 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	layer, err := erofsutils.MountsToLayer(mounts)
 	if err != nil {
 		return emptyDesc, err
+	}
+
+	// A staged blob is shared with every other snapshot of that layer, so
+	// applying would truncate the cache entry through the symlink. Callers are
+	// expected to notice the read-only mounts and skip the layer entirely.
+	staged, err := erofsutils.StagedLayerBlob(layer)
+	if err != nil {
+		return emptyDesc, err
+	}
+	if staged {
+		return emptyDesc, fmt.Errorf("layer %q is already populated from the layer content cache: %w", layer, errdefs.ErrFailedPrecondition)
 	}
 
 	ra, err := s.store.ReaderAt(ctx, desc)
