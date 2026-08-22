@@ -159,6 +159,69 @@ spec:
 
 See also [the Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/).
 
+### Per-runtime image platform and snapshotter
+
+`runtime_platforms` maps a CRI runtime handler (the `handler` of a `RuntimeClass`)
+to the platform an image should be pulled for and the snapshotter it should be
+unpacked into. Both keys are optional: an unset `snapshotter` means the default
+snapshotter, and an unset `platform` means the platform of the node, which is the
+behaviour when `runtime_platforms` is not configured at all.
+
+```toml
+version = 3
+[plugins."io.containerd.cri.v1.images".runtime_platforms]
+  # Pull images for linux/amd64 for pods scheduled to the "runc-amd64"
+  # RuntimeClass, whatever the platform of the node is.
+  [plugins."io.containerd.cri.v1.images".runtime_platforms."runc-amd64"]
+    platform = "linux/amd64"
+  # Use a dedicated snapshotter for Kata Containers, on the platform of the node.
+  [plugins."io.containerd.cri.v1.images".runtime_platforms.kata]
+    snapshotter = "devmapper"
+```
+
+The runtime handler still has to exist under
+`plugins."io.containerd.cri.v1.runtime".containerd.runtimes`, and a `RuntimeClass`
+pointing at it has to exist in the cluster:
+
+```toml
+[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc-amd64]
+  runtime_type = "io.containerd.runc.v2"
+```
+
+```yaml
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: runc-amd64
+handler: runc-amd64
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: amd64-only
+spec:
+  runtimeClassName: runc-amd64
+  containers:
+    - name: app
+      image: example.com/amd64-only:latest
+```
+
+A non-native `platform` only makes sense on a host that can execute foreign-architecture
+binaries, through Rosetta on Apple Silicon or a `binfmt_misc` handler such as
+`qemu-user-static` registered with the `F` flag so that it applies inside container
+namespaces. containerd selects the image, it does not provide the emulation.
+
+Some caveats apply when a `platform` differs from the platform of the node:
+
+* The node keeps advertising its own architecture through `kubernetes.io/arch`, so
+  the scheduler and any architecture-based `nodeAffinity` are unaware that a pod
+  runs a foreign-architecture image. Selecting a `RuntimeClass` is the opt-in.
+* Pinned images, including the sandbox (pause) image, are always pulled for the
+  platform of the node. They are shared by every pod on the node and are part of
+  containerd's own infrastructure.
+* An image reference can only be resolved for one platform at a time. If the same
+  reference is pulled both for the platform of the node and for a configured
+  platform, `ImageStatus` and `ListImages` report the one matching the node.
 
 ## Image Pull Configuration (since containerd v2.1)
 

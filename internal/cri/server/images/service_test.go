@@ -25,6 +25,7 @@ import (
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -123,6 +124,53 @@ func TestRuntimeSnapshotter(t *testing.T) {
 			cri, _ := newTestCRIService()
 			cri.config = criconfig.DefaultImageConfig()
 			assert.Equal(t, test.expectSnapshotter, cri.RuntimeSnapshotter(context.Background(), test.runtime))
+		})
+	}
+}
+
+func TestUpdateRuntimeSnapshotter(t *testing.T) {
+	const (
+		defaultSnapshotter = "overlayfs"
+		runtimeSnapshotter = "devmapper"
+	)
+	foreign := imagespec.Platform{OS: "linux", Architecture: "mips64le"}
+
+	for _, tt := range []struct {
+		desc                string
+		existing            *ImagePlatform
+		expectedSnapshotter string
+		expectedPlatform    imagespec.Platform
+	}{
+		{
+			desc:                "runtime without a runtime_platforms entry is registered",
+			expectedSnapshotter: runtimeSnapshotter,
+			expectedPlatform:    platforms.DefaultSpec(),
+		},
+		{
+			desc:                "a runtime_platforms entry with only a platform takes the runtime snapshotter",
+			existing:            &ImagePlatform{Platform: foreign},
+			expectedSnapshotter: runtimeSnapshotter,
+			expectedPlatform:    foreign,
+		},
+		{
+			desc:                "an explicit snapshotter in runtime_platforms is not overridden",
+			existing:            &ImagePlatform{Platform: foreign, Snapshotter: defaultSnapshotter},
+			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    foreign,
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			c, _ := newTestCRIService()
+			if tt.existing != nil {
+				c.runtimePlatforms["runc-foreign"] = *tt.existing
+			}
+			c.UpdateRuntimeSnapshotter("runc-foreign", ImagePlatform{
+				Snapshotter: runtimeSnapshotter,
+				Platform:    platforms.DefaultSpec(),
+			})
+			got := c.runtimePlatforms["runc-foreign"]
+			assert.Equal(t, tt.expectedSnapshotter, got.Snapshotter)
+			assert.Equal(t, tt.expectedPlatform, got.Platform)
 		})
 	}
 }

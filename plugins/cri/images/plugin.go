@@ -157,7 +157,11 @@ func init() {
 				}
 
 				options.RuntimePlatforms[runtimeName] = images.ImagePlatform{
-					Snapshotter: snapshotter,
+					// Keep the snapshotter unset when runtime_platforms does
+					// not configure one, so that a snapshotter configured on
+					// the runtime itself can still be propagated. An unset
+					// snapshotter resolves to the default at pull time.
+					Snapshotter: rp.Snapshotter,
 					Platform:    platform,
 				}
 			}
@@ -238,22 +242,23 @@ func migrateConfig(dst, src map[string]any) {
 	}
 
 	var runtimePlatforms map[string]any
-	if v, ok := dst["runtime_platform"]; ok {
+	if v, ok := dst["runtime_platforms"]; ok {
 		runtimePlatforms = v.(map[string]any)
 	} else {
 		runtimePlatforms = map[string]any{}
 	}
 	for runtime, v := range runtimesConf.(map[string]any) {
 		runtimeConf := v.(map[string]any)
-		if snapshotter, ok := runtimeConf["snapshot"]; ok && snapshotter != "" {
+		if snapshotter, ok := runtimeConf["snapshotter"]; ok && snapshotter != "" {
+			// Leave the platform unset so that it defaults to the platform
+			// of the node, which is what a v2 config implies.
 			runtimePlatforms[runtime] = map[string]any{
-				"platform":    platforms.DefaultStrict(),
 				"snapshotter": snapshotter,
 			}
 		}
 	}
 	if len(runtimePlatforms) > 0 {
-		dst["runtime_platform"] = runtimePlatforms
+		dst["runtime_platforms"] = runtimePlatforms
 	}
 
 	for _, key := range []string{

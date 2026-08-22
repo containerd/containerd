@@ -18,6 +18,8 @@ package images
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -29,6 +31,7 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"golang.org/x/sync/semaphore"
@@ -65,6 +68,11 @@ type CRIImageService struct {
 	imageFSPaths map[string]string
 	// runtimePlatforms are the platforms configured for a runtime.
 	runtimePlatforms map[string]ImagePlatform
+	// imagePlatforms are the platform matchers to consider when resolving an
+	// image from local content, in preference order. The platform of the
+	// node always comes first, followed by any distinct platform configured
+	// through runtime_platforms.
+	imagePlatforms []platforms.MatchComparer
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
@@ -115,13 +123,15 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	if config.MaxConcurrentDownloads > 0 {
 		downloadLimiter = semaphore.NewWeighted(int64(config.MaxConcurrentDownloads))
 	}
+	imagePlatforms := imagePlatformMatchers(options.RuntimePlatforms)
 	svc := CRIImageService{
 		config:                      config,
 		images:                      options.Images,
 		client:                      options.Client,
-		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
+		imageStore:                  imagestore.NewStore(options.Images, options.Content, imagePlatforms...),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
+		imagePlatforms:              imagePlatforms,
 		snapshotStore:               snapshotstore.NewStore(),
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
@@ -139,16 +149,90 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	return &svc, nil
 }
 
+// imagePlatformMatchers returns the platform matchers to consider when resolving
+// an image from local content, in preference order.
+//
+// The platform of the node always comes first so that the common case is
+// unaffected. Any platform configured through runtime_platforms that differs
+// from the node platform is appended, so that an image pulled for such a
+// runtime remains resolvable by ImageStatus, ListImages and image reload.
+func imagePlatformMatchers(runtimePlatforms map[string]ImagePlatform) []platforms.MatchComparer {
+	matchers := []platforms.MatchComparer{platforms.Default()}
+	seen := map[string]struct{}{
+		platforms.FormatAll(platforms.Normalize(platforms.DefaultSpec())): {},
+	}
+	// Sort by runtime name so the matcher order is deterministic.
+	for _, runtimeName := range slices.Sorted(maps.Keys(runtimePlatforms)) {
+		p := runtimePlatforms[runtimeName].Platform
+		if p.OS == "" && p.Architecture == "" {
+			continue
+		}
+		key := platforms.FormatAll(platforms.Normalize(p))
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		matchers = append(matchers, platforms.Only(p))
+		log.L.Infof("Runtime %q adds image platform %q", runtimeName, key)
+	}
+	return matchers
+}
+
+// platformMatchers returns the platform matchers to consider when resolving an
+// image from local content, in preference order.
+func (c *CRIImageService) platformMatchers() []platforms.MatchComparer {
+	if len(c.imagePlatforms) == 0 {
+		return []platforms.MatchComparer{platforms.Default()}
+	}
+	return c.imagePlatforms
+}
+
+// imageConfig resolves the config descriptor of an image against the first of
+// the configured image platforms whose content is present locally.
+//
+// containerd.Image carries the platform matcher of the client, which is always
+// the platform of the node, so it cannot be used to resolve an image that was
+// pulled for a different platform.
+func (c *CRIImageService) imageConfig(ctx context.Context, img containerd.Image) (imagespec.Descriptor, error) {
+	var firstErr error
+	for _, matcher := range c.platformMatchers() {
+		desc, err := images.Config(ctx, img.ContentStore(), img.Target(), matcher)
+		if err == nil {
+			return desc, nil
+		}
+		if !errdefs.IsNotFound(err) {
+			return imagespec.Descriptor{}, err
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	return imagespec.Descriptor{}, firstErr
+}
+
 // UpdateRuntimeSnapshotter adds or updates the snapshotter mapping for a runtime.
 // This is called by the main CRI plugin after both image and runtime plugins are initialized,
 // to propagate runtime-specific snapshotters configured in the runtime plugin's config.
+//
+// NOTE: only the snapshotter is propagated this way; the platform of the given
+// ImagePlatform is expected to be the platform of the node. The set of image
+// platforms is fixed when the service is created, so a non-default platform can
+// only be configured through the runtime_platforms image config.
 func (c *CRIImageService) UpdateRuntimeSnapshotter(runtimeName string, imagePlatform ImagePlatform) {
 	if c.runtimePlatforms == nil {
 		c.runtimePlatforms = make(map[string]ImagePlatform)
 	}
-	// Don't override if already configured
-	if _, exists := c.runtimePlatforms[runtimeName]; exists {
-		log.L.Debugf("Runtime %q already has snapshotter configured, not overriding", runtimeName)
+	if existing, exists := c.runtimePlatforms[runtimeName]; exists {
+		// Don't override a snapshotter that runtime_platforms configured.
+		if existing.Snapshotter != "" {
+			log.L.Debugf("Runtime %q already has snapshotter %q configured, not overriding", runtimeName, existing.Snapshotter)
+			return
+		}
+		// The runtime_platforms entry only configured a platform, so the
+		// snapshotter of the runtime still applies to it.
+		existing.Snapshotter = imagePlatform.Snapshotter
+		c.runtimePlatforms[runtimeName] = existing
+		log.L.Infof("Registered runtime %q with snapshotter %q", runtimeName, existing.Snapshotter)
 		return
 	}
 	c.runtimePlatforms[runtimeName] = imagePlatform
