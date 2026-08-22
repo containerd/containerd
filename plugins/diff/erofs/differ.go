@@ -54,6 +54,15 @@ type erofsDiff struct {
 	enableTarIndex bool
 	// enableDmverity enables formatting layers with dm-verity after creation
 	enableDmverity bool
+	// linkBlobs hardlinks uncompressed native EROFS layers from the content
+	// store into the snapshot instead of copying them, when the content
+	// store exposes the blob's backing file. Content blobs are immutable
+	// and content garbage collection unlinks rather than truncates, so an
+	// extra link is safe; any link failure falls back to the copy path.
+	// This removes the only data-sized operation from the chain-serialized
+	// apply step: even on reflink filesystems, copying a freshly-ingested
+	// blob forces writeback of its dirty extents.
+	linkBlobs bool
 }
 
 // DifferOpt is an option for configuring the erofs differ
@@ -77,6 +86,15 @@ func WithTarIndexMode() DifferOpt {
 func WithDmverity() DifferOpt {
 	return func(d *erofsDiff) {
 		d.enableDmverity = true
+	}
+}
+
+// WithBlobLinks hardlinks uncompressed native EROFS layers from the content
+// store instead of copying them, whenever the content store exposes the
+// blob's backing file on the same filesystem.
+func WithBlobLinks() DifferOpt {
+	return func(d *erofsDiff) {
+		d.linkBlobs = true
 	}
 }
 
@@ -159,6 +177,19 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	layerBlobPath := path.Join(layer, "layer.erofs")
 	// Allow copy file range when there is an uncompressed native EROFS layer
 	if fastcopy {
+		// Never share the inode when this differ formats layers with
+		// dm-verity: verity data is appended to the layer blob, which must
+		// not reach the content store's copy.
+		if s.linkBlobs && !s.enableDmverity {
+			if src, ok := ra.(interface{ Name() string }); ok {
+				if lerr := os.Link(src.Name(), layerBlobPath); lerr == nil {
+					log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer by hardlinking uncompressed EROFS blob")
+					return desc, nil
+				} else {
+					log.G(ctx).WithError(lerr).WithField("src", src.Name()).Debug("hardlink of EROFS blob failed, falling back to copy")
+				}
+			}
+		}
 		f, err := os.Create(layerBlobPath)
 		if err != nil {
 			return emptyDesc, err
