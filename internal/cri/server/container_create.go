@@ -67,6 +67,12 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
 
+	// The CRI spec requires that containers are only created in a running
+	// sandbox. Reject the request otherwise, matching StartContainer.
+	if sandbox.Status.Get().State != sandboxstore.StateReady {
+		return nil, fmt.Errorf("sandbox container %q is not running", sandbox.ID)
+	}
+
 	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get controller status: %w", err)
