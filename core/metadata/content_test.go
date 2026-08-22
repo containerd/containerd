@@ -296,7 +296,8 @@ func TestGarbageCollectHangingDelete(t *testing.T) {
 		}
 	}()
 
-	_, err = db.GarbageCollect(ctx)
+	cs := db.ContentStore().(*contentStore)
+	_, err = cs.garbageCollect(ctx)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("expected the bounded Delete to fail with DeadlineExceeded, got %v", err)
 	}
