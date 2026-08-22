@@ -37,7 +37,23 @@ import (
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/timeout"
 )
+
+// gcContentTimeoutKey bounds each content Store.Walk and Store.Delete during
+// garbage collection, which holds the content store exclusive lock. An
+// unresponsive content store (e.g. a hung proxy plugin RPC) would otherwise
+// block all content operations (pull, ingest, etc.) forever. On timeout the
+// rest of the pass is abandoned; remaining orphaned blobs are retried on the
+// next GC pass.
+const (
+	gcContentWalkTimeoutKey   = "io.containerd.timeout.gc.content.walk"
+	defaultGCContentWalkTimeout = 30 * time.Minute
+)
+
+func init() {
+	timeout.Set(gcContentWalkTimeoutKey, defaultGCContentWalkTimeout)
+}
 
 type contentStore struct {
 	content.Store
@@ -913,9 +929,11 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 		return 0, err
 	}
 
-	err = cs.Store.Walk(ctx, func(info content.Info) error {
+	walkCtx, cancel := timeout.WithContext(ctx, gcContentWalkTimeoutKey)
+	defer cancel()
+	err = cs.Store.Walk(walkCtx, func(info content.Info) error {
 		if _, ok := contentSeen[info.Digest.String()]; !ok {
-			if err := cs.Store.Delete(ctx, info.Digest); err != nil {
+			if err := cs.Store.Delete(walkCtx, info.Digest); err != nil {
 				return err
 			}
 			log.G(ctx).WithField("digest", info.Digest).Debug("removed content")
@@ -944,13 +962,13 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 		})
 	} else {
 		var statuses []content.Status
-		statuses, err = cs.Store.ListStatuses(ctx)
+		statuses, err = cs.Store.ListStatuses(walkCtx)
 		if err != nil {
 			return 0, err
 		}
 		for _, status := range statuses {
 			if _, ok := ingestSeen[status.Ref]; !ok {
-				if err = cs.Store.Abort(ctx, status.Ref); err != nil {
+				if err = cs.Store.Abort(walkCtx, status.Ref); err != nil {
 					return
 				}
 				log.G(ctx).WithField("ref", status.Ref).Debug("cleanup aborting ingest")
