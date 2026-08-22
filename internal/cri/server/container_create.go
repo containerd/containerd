@@ -37,6 +37,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
@@ -307,6 +308,9 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	if err != nil {
 		return "", err
 	}
+	snapShotLabel := make(map[string]string)
+	snapShotLabel[snapshots.LabelSnapshotSplit] = "true"
+	sOpts = append(sOpts, snapshots.WithLabels(snapshots.FilterInheritedLabels(snapShotLabel)))
 
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
@@ -374,7 +378,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	}
 
 	containerLabels := util.BuildLabels(r.containerConfig.Labels, r.imageConfig.Labels, crilabels.ContainerKindContainer)
-
+	containerLabels[snapshots.LabelSnapshotSplit] = "true"
 	// TODO the sandbox in the cache should hold this info
 	runtimeName, runtimeOption, err := c.runtimeInfo(r.ctx, r.sandboxID)
 	if err != nil {

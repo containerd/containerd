@@ -44,6 +44,9 @@ const (
 	// LabelSnapshotDiffID is set by the unpacker on the extraction Prepare to
 	// the uncompressed digest (diffID) of the layer being unpacked.
 	LabelSnapshotDiffID = "containerd.io/snapshot/diff-id"
+	// LabelSnapshotSplit is a snapshot label that instructs a snapshotter to place the
+	// snapshot's writable layer outside the default snapshot root (implementation-specific).
+	LabelSnapshotSplit = "containerd.io/snapshot/split"
 
 	// LabelSnapshotUIDMapping is the label used for UID mappings
 	LabelSnapshotUIDMapping = "containerd.io/snapshot/uidmapping"
