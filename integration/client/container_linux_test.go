@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -42,6 +43,7 @@ import (
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	coreimages "github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/runtime/restart"
 	"github.com/containerd/containerd/v2/integration/failpoint"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/pkg/archive"
@@ -173,6 +175,120 @@ func TestTaskUpdate(t *testing.T) {
 	}
 
 	<-statusC
+}
+
+func TestContainerRestartPolicyAlways(t *testing.T) {
+	t.Parallel()
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cOpts []NewContainerOpts
+
+	policy, err := restart.NewPolicy("always")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cOpts = append(cOpts, restart.WithPolicy(policy))
+	cOpts = append(cOpts, WithNewSnapshot(id, image))
+	cOpts = append(cOpts, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "1d")))
+	container, err := client.NewContainer(ctx, id, cOpts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		task.Delete(ctx)
+	}()
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := updateStatusLabel(ctx, container, Running); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+	// should be longer than interval (10 seconds) time
+	time.Sleep(time.Second * 12)
+	newTask, err := container.Task(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newStatus, err := newTask.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newStatus.Status != Running {
+		t.Errorf("expected status %s but get %s", Running, newStatus.Status)
+	}
+
+	// update  restart label and kill task
+	if err := updateExplicitlyStoppedLabel(ctx, container, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := newTask.Kill(ctx, unix.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	// should be longer than interval (10 seconds) time
+	time.Sleep(time.Second * 12)
+	newTask, err = container.Task(ctx, nil)
+
+	newStatus, err = newTask.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newStatus.Status != Stopped {
+		t.Errorf("expected status %s but get %s", Stopped, newStatus.Status)
+	}
+}
+
+func updateExplicitlyStoppedLabel(ctx context.Context, container Container, explicitlyStopped bool) error {
+	opt := WithAdditionalContainerLabels(map[string]string{
+		restart.ExplicitlyStoppedLabel: strconv.FormatBool(explicitlyStopped),
+	})
+	return container.Update(ctx, UpdateContainerOpts(opt))
+}
+
+// UpdateStatusLabel updates the "containerd.io/restart.status"
+// label of the container according to the value of restart desired status.
+func updateStatusLabel(ctx context.Context, container Container, status ProcessStatus) error {
+	opt := WithAdditionalContainerLabels(map[string]string{
+		restart.StatusLabel: string(status),
+	})
+	return container.Update(ctx, UpdateContainerOpts(opt))
 }
 
 func TestShimInCgroup(t *testing.T) {
