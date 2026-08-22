@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -400,6 +401,7 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 		return nil, err
 	}
 
+	var parseHost []string
 	// Parse hosts array
 	for _, host := range orderedHosts {
 		config := c.HostConfigs[host]
@@ -409,6 +411,7 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 			return nil, err
 		}
 		hosts = append(hosts, parsed)
+		parseHost = append(parseHost, parsed.host)
 	}
 
 	// Parse root host config and append it as the last element
@@ -416,7 +419,14 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	hosts = append(hosts, parsed)
+
+	// If server is empty skip to add it to hosts
+	if parsed.host != "" {
+		if slices.Contains(parseHost, parsed.host) {
+			return nil, fmt.Errorf("conflict server %s already exist in host", parsed.host)
+		}
+		hosts = append(hosts, parsed)
+	}
 
 	return hosts, nil
 }
