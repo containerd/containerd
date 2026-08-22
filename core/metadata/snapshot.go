@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	bolt "go.etcd.io/bbolt"
@@ -40,6 +41,20 @@ import (
 const (
 	inheritedLabelsPrefix = "containerd.io/snapshot/"
 )
+
+// gcSnapshotterRemoveTimeoutKey bounds each Snapshotter.Remove during garbage
+// collection, which holds the snapshotter write lock: an unresponsive
+// snapshotter (e.g. a hung proxy plugin RPC) would otherwise block all
+// snapshot operations forever. On timeout the rest of the pass is abandoned;
+// remaining snapshots stay orphaned and are retried on the next GC pass.
+const (
+	gcSnapshotterRemoveTimeoutKey     = "io.containerd.timeout.gc.snapshotter.remove"
+	defaultGCSnapshotterRemoveTimeout = 30 * time.Minute
+)
+
+func init() {
+	timeout.Set(gcSnapshotterRemoveTimeoutKey, defaultGCSnapshotterRemoveTimeout)
+}
 
 type snapshotter struct {
 	snapshots.Snapshotter
@@ -989,7 +1004,10 @@ func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode) error {
 
 	if node.remove {
 		logger := log.G(ctx).WithField("snapshotter", s.name)
-		if err := s.Snapshotter.Remove(ctx, node.info.Name); err != nil {
+		removeCtx, cancel := timeout.WithContext(ctx, gcSnapshotterRemoveTimeoutKey)
+		err := s.Snapshotter.Remove(removeCtx, node.info.Name)
+		cancel()
+		if err != nil {
 			if !errdefs.IsFailedPrecondition(err) {
 				return err
 			}
