@@ -125,7 +125,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 
 	hostOptions := config.HostOptions{}
 	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+		hostOptions.HostDir = config.HostDirFromConfigPath(ropts.hostDir)
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
