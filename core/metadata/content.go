@@ -951,9 +951,9 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 		WalkStatusRefs(context.Context, func(string) error) error
 	}
 	if w, ok := cs.Store.(statusWalker); ok {
-		err = w.WalkStatusRefs(ctx, func(ref string) error {
+		err = w.WalkStatusRefs(walkCtx, func(ref string) error {
 			if _, ok := ingestSeen[ref]; !ok {
-				if err := cs.Store.Abort(ctx, ref); err != nil {
+				if err := cs.Store.Abort(walkCtx, ref); err != nil {
 					return err
 				}
 				log.G(ctx).WithField("ref", ref).Debug("cleanup aborting ingest")
