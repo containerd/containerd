@@ -77,6 +77,10 @@ make
 
 This is going to build all the project binaries in the `./bin/` directory.
 
+You can build a single binary via the matching `bin/` target, for example
+`make bin/containerd`, and `make build` compiles all the Go packages (except
+`integration/`) without producing binaries.
+
 You can move them in your global path, `/usr/local/bin` with:
 
 ```sh
@@ -124,8 +128,9 @@ make generate
 > Makefile target will disable the btrfs driver within the containerd Go build.
 
 Vendoring of external imports uses the [Go Modules](https://golang.org/ref/mod#vendoring). You need
-to use `go mod` command to modify the dependencies. After modifition, you should run `go mod tidy`
-and `go mod vendor` to ensure the `go.mod`, `go.sum` files and `vendor` directory are up to date.
+to use `go mod` command to modify the dependencies. After modification, run `make vendor`: it runs
+`go mod tidy` and `go mod vendor` for the root module and also tidies the `api/` module's `go.mod`.
+`make verify-vendor` runs the same consistency check CI uses.
 Changes to these files should become a single commit for a PR which relies on vendored updates.
 
 Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
@@ -258,11 +263,18 @@ containerd --config config.toml
 During the automated CI the unit tests and integration tests are run as part of the PR validation. As a developer you can run these tests locally by using any of the following `Makefile` targets:
  - `make test`: run all non-integration tests that do not require `root` privileges
  - `make root-test`: run all non-integration tests which require `root`
- - `make integration`: run all tests, including integration tests and those which require `root`. `TESTFLAGS_PARALLEL` can be used to control parallelism. For example, `TESTFLAGS_PARALLEL=1 make integration` will lead a non-parallel execution. The default value of `TESTFLAGS_PARALLEL` is **8**.
+ - `make integration`: run all tests, including integration tests and those which require `root`. `TESTFLAGS_PARALLEL` can be used to control parallelism. For example, `TESTFLAGS_PARALLEL=1 make integration` will lead a non-parallel execution. The default value of `TESTFLAGS_PARALLEL` is **8**. The integration tests spawn a containerd daemon resolved from `PATH`, so build the binaries first and put them on the path: `make binaries && sudo -E PATH="$PWD/bin:$PATH" make integration`. On Linux the test daemon uses separate root and state directories (`/var/lib/containerd-test`, `/run/containerd-test`), so it does not disturb a system containerd.
  - `make cri-integration`: [CRI Integration Tests](https://github.com/containerd/containerd/blob/main/docs/cri/testing.md#cri-integration-test) run cri integration tests
 
+A test that needs `root` calls `testutil.RequiresRoot`, which skips it unless
+`-test.root` is passed. `make test` skips those tests and still succeeds, so check
+whether the tests covering your change are among them. `make root-test` selects
+the packages that call the helper and runs them with `-test.root`.
+
 To execute a specific test or set of tests you can use the `go test` capabilities
-without using the `Makefile` targets. The following examples show how to specify a test
+without using the `Makefile` targets, or pass extra flags to `go test` through a
+`Makefile` target with `EXTRA_TESTFLAGS`, e.g. `EXTRA_TESTFLAGS='-run TestName' make test`.
+The following examples show how to specify a test
 name and also how to use the flag directly against `go test` to run root-requiring tests.
 
 ```sh
