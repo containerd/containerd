@@ -472,8 +472,10 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		mounted = append(mounted, active)
 	}
 
-	// If first system mount is converted, fill in the format
-	if mountConv != nil {
+	// If first system mount is converted, fill in the format. When all
+	// mounts were performed (e.g. a temporary activation whose final mount
+	// carries a transform prefix), there is no system mount to transform.
+	if mountConv != nil && firstSystemMount < len(mounts) {
 		for _, tr := range mountConv[firstSystemMount] {
 			newM, err := tr.Transform(ctx, mounts[firstSystemMount], mounted)
 			if err != nil {
