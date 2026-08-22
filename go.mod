@@ -51,7 +51,7 @@ require (
 	github.com/moby/sys/signal v0.7.1
 	github.com/moby/sys/symlink v0.3.0
 	github.com/moby/sys/user v0.4.1
-	github.com/moby/sys/userns v0.1.0
+	github.com/moby/sys/userns v0.2.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/opencontainers/runtime-spec v1.3.0
