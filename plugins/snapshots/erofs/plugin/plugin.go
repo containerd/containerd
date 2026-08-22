@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/snapshots/erofs"
 	"github.com/docker/go-units"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -69,13 +70,26 @@ type Config struct {
 	LayerContentCaches []string `toml:"layer_content_caches"`
 }
 
+// snapshotterPlatforms returns the platforms the erofs snapshotter
+// advertises: the default platform, plus a Linux platform carrying the erofs
+// OS feature so that native erofs images, whose configs the erofs converter
+// stamps with os.features=["erofs"], unpack with this snapshotter. The
+// feature-bearing platform is pinned to Linux like the erofs differ's:
+// native erofs images are Linux images regardless of host.
+func snapshotterPlatforms() []ocispec.Platform {
+	erofsPlatform := platforms.DefaultSpec()
+	erofsPlatform.OS = "linux"
+	erofsPlatform.OSFeatures = []string{"erofs"}
+	return []ocispec.Platform{platforms.DefaultSpec(), erofsPlatform}
+}
+
 func init() {
 	registry.Register(&plugin.Registration{
 		Type:   plugins.SnapshotPlugin,
 		ID:     "erofs",
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
-			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
+			ic.Meta.Platforms = append(ic.Meta.Platforms, snapshotterPlatforms()...)
 
 			config, ok := ic.Config.(*Config)
 			if !ok {
