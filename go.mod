@@ -8,7 +8,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.3-0.20251027160822-ad3df93bed29
 	github.com/Microsoft/hcsshim v0.15.0-rc.4
 	github.com/checkpoint-restore/checkpointctl v1.5.0
-	github.com/checkpoint-restore/go-criu/v7 v7.2.0
+	github.com/checkpoint-restore/go-criu/v8 v8.4.0
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.1.3
 	github.com/containerd/console v1.0.5
@@ -95,6 +95,7 @@ require (
 	cyphar.com/go-pathrs v0.2.4 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
+	github.com/aperturerobotics/protobuf-go-lite v0.15.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
