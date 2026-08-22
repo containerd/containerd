@@ -21,9 +21,13 @@ package v2
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/containerd/fifo"
+
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 func TestCheckCopyShimLogError(t *testing.T) {
@@ -49,5 +53,59 @@ func TestCheckCopyShimLogError(t *testing.T) {
 	}
 	if err := checkCopyShimLogError(ctx, fifo.ErrRdFrmWRONLY); err != fifo.ErrRdFrmWRONLY {
 		t.Fatalf("should return the actual error after context is done, but %v", err)
+	}
+}
+
+func TestBinaryDeleteWorkDirFallback(t *testing.T) {
+	testCases := []struct {
+		name              string
+		createBundle      bool
+		wantBundleWorkDir bool
+	}{
+		{name: "bundle exists", createBundle: true, wantBundleWorkDir: true},
+		{name: "bundle removed", wantBundleWorkDir: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			runtimePath := filepath.Join(tempDir, "containerd-shim-test-v2")
+			outputPath := runtimePath + ".output"
+			if err := os.WriteFile(runtimePath, []byte("#!/bin/sh\npwd > \"$0.output\"\nprintf '%s\\n' \"$@\" >> \"$0.output\"\n"), 0700); err != nil {
+				t.Fatal(err)
+			}
+
+			bundlePath := filepath.Join(tempDir, "bundle")
+			if tc.createBundle {
+				if err := os.Mkdir(bundlePath, 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			b := &binary{
+				runtime: runtimePath,
+				bundle: &Bundle{
+					ID:        "test",
+					Path:      bundlePath,
+					Namespace: "test",
+				},
+			}
+			ctx := namespaces.WithNamespace(context.Background(), "test")
+			if _, err := b.Delete(ctx); err != nil {
+				t.Fatalf("delete failed: %v", err)
+			}
+
+			data, err := os.ReadFile(outputPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			output := string(data)
+			usedBundleWorkDir := strings.HasPrefix(output, bundlePath+"\n")
+			if usedBundleWorkDir != tc.wantBundleWorkDir {
+				t.Fatalf("unexpected delete shim cwd: %q", output)
+			}
+			if !strings.Contains(output, "\n-bundle\n"+bundlePath+"\n") {
+				t.Fatalf("delete shim did not receive bundle path: %q", output)
+			}
+		})
 	}
 }
