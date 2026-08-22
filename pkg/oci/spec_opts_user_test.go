@@ -133,6 +133,7 @@ func TestWithUserID(t *testing.T) {
 
 	expectedPasswd := `root:x:0:0:root:/root:/bin/ash
 guest:x:405:100:guest:/dev/null:/sbin/nologin
+guest2:x:2147483647:101:guest2:/dev/null:/sbin/nologin
 `
 	td := t.TempDir()
 	apply := fstest.Apply(
@@ -147,6 +148,7 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 		userID      uint32
 		expectedUID uint32
 		expectedGID uint32
+		expErr      string
 	}{
 		{
 			userID:      0,
@@ -163,6 +165,15 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 			expectedUID: 1000,
 			expectedGID: 0,
 		},
+		{
+			userID:      2147483647, // maxUserID
+			expectedUID: 2147483647,
+			expectedGID: 101,
+		},
+		{
+			userID: 2147483648, // maxUserID + 1
+			expErr: `invalid uid value "2147483648": uid out of range`,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(fmt.Sprintf("user %d", testCase.userID), func(t *testing.T) {
@@ -175,6 +186,15 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 				Linux: &specs.Linux{},
 			}
 			err := WithUserID(testCase.userID)(context.Background(), nil, &c, &s)
+			if testCase.expErr != "" {
+				assert.EqualError(t, err, testCase.expErr)
+				if s.Process != nil {
+					assert.Zero(t, s.Process.User.UID)
+					assert.Zero(t, s.Process.User.GID)
+				}
+				return
+			}
+
 			assert.NoError(t, err)
 			assert.Equal(t, testCase.expectedUID, s.Process.User.UID)
 			assert.Equal(t, testCase.expectedGID, s.Process.User.GID)
