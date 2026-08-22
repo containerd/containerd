@@ -431,6 +431,16 @@ func (c *criService) extractCPUMetrics(stats cgroupMetrics, labels []string, tim
 					Value:       &runtime.UInt64Value{Value: s.CPU.ThrottledUsec * 1000 / uint64(time.Second)},
 				},
 			}...)
+
+			if s.CPU.PSI != nil {
+				metrics = append(metrics, extractPSIMetrics(
+					s.CPU.PSI,
+					containerPressureCPUStalledSecondsTotal,
+					containerPressureCPUWaitingSecondsTotal,
+					labels,
+					timestamp,
+				)...)
+			}
 		}
 	}
 
@@ -666,6 +676,15 @@ func (c *criService) extractMemoryMetrics(stats cgroupMetrics, labels []string, 
 				},
 			}...)
 
+			if s.Memory.PSI != nil {
+				metrics = append(metrics, extractPSIMetrics(
+					s.Memory.PSI,
+					containerPressureMemoryStalledSecondsTotal,
+					containerPressureMemoryWaitingSecondsTotal,
+					labels,
+					timestamp,
+				)...)
+			}
 		}
 
 		if s.MemoryEvents != nil {
@@ -787,10 +806,45 @@ func (c *criService) extractDiskIOMetrics(stats cgroupMetrics, labels []string, 
 				}...)
 
 			}
+
+			if s.Io.PSI != nil {
+				metrics = append(metrics, extractPSIMetrics(
+					s.Io.PSI,
+					containerPressureIOStalledSecondsTotal,
+					containerPressureIOWaitingSecondsTotal,
+					labels,
+					timestamp,
+				)...)
+			}
 		}
 	}
 
 	return metrics, nil
+}
+
+// extractPSIMetrics converts cgroupv2 PSI stats into cadvisor-compatible pressure metrics.
+// PSI Total is in microseconds, cadvisor returns seconds.
+func extractPSIMetrics(psi *cg2.PSIStats, stalledDesc, waitingDesc *runtime.MetricDescriptor, labels []string, timestamp int64) []*runtime.Metric {
+	var metrics []*runtime.Metric
+	if psi.Full != nil {
+		metrics = append(metrics, &runtime.Metric{
+			Name:        stalledDesc.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_COUNTER,
+			LabelValues: labels,
+			Value:       &runtime.UInt64Value{Value: psi.Full.Total * 1000 / uint64(time.Second)},
+		})
+	}
+	if psi.Some != nil {
+		metrics = append(metrics, &runtime.Metric{
+			Name:        waitingDesc.Name,
+			Timestamp:   timestamp,
+			MetricType:  runtime.MetricType_COUNTER,
+			LabelValues: labels,
+			Value:       &runtime.UInt64Value{Value: psi.Some.Total * 1000 / uint64(time.Second)},
+		})
+	}
+	return metrics
 }
 
 func (c *criService) extractProcessMetrics(ctx context.Context, task containerd.Task, stats cgroupMetrics, labels []string, timestamp int64) ([]*runtime.Metric, error) {
