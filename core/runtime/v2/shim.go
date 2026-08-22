@@ -132,10 +132,11 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	address := fmt.Sprintf("%s+%s", params.Protocol, params.Address)
 
 	shim := &shim{
-		bundle:  bundle,
-		client:  conn,
-		address: address,
-		version: int(params.Version),
+		bundle:    bundle,
+		client:    conn,
+		address:   address,
+		version:   int(params.Version),
+		bootstrap: params,
 	}
 
 	return shim, nil
@@ -242,6 +243,18 @@ type ShimInstance interface {
 	// Endpoint returns shim's endpoint information,
 	// including address and version.
 	Endpoint() (string, int)
+}
+
+// shimCapabilities is implemented by shim instances that retain what the shim
+// advertised when it started.
+//
+// This is a separate interface rather than a method on [ShimInstance] so that
+// external implementations of ShimInstance keep compiling; a shim instance
+// that does not implement it is treated as having advertised nothing.
+type shimCapabilities interface {
+	// BootstrapResult returns the result the shim returned when it started,
+	// carrying the extensions it advertised. It may be nil.
+	BootstrapResult() *bootapi.BootstrapResult
 }
 
 type clientVersionDowngrader interface {
@@ -452,10 +465,20 @@ type shim struct {
 	client  any
 	address string
 	version int
+	// bootstrap is what the shim advertised when it started. Retained whole
+	// rather than decoded into fields here so that a new capability needs no
+	// further plumbing through the shim instance.
+	bootstrap *bootapi.BootstrapResult
 }
 
 var _ ShimInstance = (*shim)(nil)
 var _ clientVersionDowngrader = (*shim)(nil)
+var _ shimCapabilities = (*shim)(nil)
+
+// BootstrapResult returns what the shim advertised when it started.
+func (s *shim) BootstrapResult() *bootapi.BootstrapResult {
+	return s.bootstrap
+}
 
 // ID of the shim/task
 func (s *shim) ID() string {
