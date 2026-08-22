@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 
 	"github.com/google/uuid"
 )
@@ -97,15 +98,30 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 	return d
 }
 
+// spanPrefix names this package's tracing spans.
+const spanPrefix = "plugins.diff.erofs"
+
 func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(spanPrefix, "Apply"))
+	span.SetAttributes(
+		tracing.Attribute("layer.media.type", desc.MediaType),
+		tracing.Attribute("layer.media.size", desc.Size),
+		tracing.Attribute("layer.media.digest", desc.Digest.String()),
+	)
+
 	t1 := time.Now()
+	var mode string
 	defer func() {
+		span.SetStatus(err)
+		span.End()
+
 		if err == nil {
 			log.G(ctx).WithFields(log.Fields{
 				"d":      time.Since(t1),
 				"digest": desc.Digest,
 				"size":   desc.Size,
 				"media":  desc.MediaType,
+				"mode":   mode,
 			}).Debugf("diff applied")
 		}
 	}()
@@ -137,6 +153,18 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	} else if _, err := images.DiffCompression(ctx, diffLayerType); err != nil {
 		return emptyDesc, fmt.Errorf("unsupported media type: %s", desc.MediaType)
 	}
+
+	switch {
+	case fastcopy:
+		mode = "fastcopy"
+	case native:
+		mode = "native"
+	case s.enableTarIndex:
+		mode = "tar-index"
+	default:
+		mode = "convert"
+	}
+	span.SetAttributes(tracing.Attribute("erofs.apply.mode", mode))
 
 	var config diff.ApplyConfig
 	for _, o := range opts {
