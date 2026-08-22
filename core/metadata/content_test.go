@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
@@ -276,7 +277,7 @@ func TestGarbageCollectHangingDelete(t *testing.T) {
 	if _, err := ww.Write(blob); err != nil {
 		t.Fatal(err)
 	}
-	if err := ww.Commit(ctx, 0, dgst, ""); err != nil {
+	if err := ww.Commit(ctx, 0, dgst); err != nil {
 		t.Fatal(err)
 	}
 
