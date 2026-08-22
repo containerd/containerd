@@ -22,6 +22,7 @@ import (
 	"archive/tar"
 	"errors"
 	"math"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -48,5 +49,52 @@ func TestHandleTarTypeBlockCharFifoDeviceRange(t *testing.T) {
 				t.Fatalf("expected errInvalidArchive for %d:%d, got %v", tc.devmajor, tc.devminor, err)
 			}
 		})
+	}
+}
+
+func TestLchmodPreservesSpecialBits(t *testing.T) {
+	// A directory rather than a regular file: FreeBSD rejects setting the
+	// sticky bit on non-directories for unprivileged callers with EFTYPE.
+	p := filepath.Join(t.TempDir(), "dir")
+	if err := os.Mkdir(p, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	want := os.FileMode(0o750) | os.ModeSetuid | os.ModeSticky
+	if err := lchmod(p, want); err != nil {
+		t.Fatal(err)
+	}
+
+	fi, err := os.Lstat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := fi.Mode() & (os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
+	if got != want {
+		t.Fatalf("mode = %o, want %o", got, want)
+	}
+}
+
+func TestLchmodDoesNotFollowSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	if err := os.WriteFile(target, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := lchmod(link, 0o777); err != nil {
+		t.Fatal(err)
+	}
+
+	fi, err := os.Lstat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o600 {
+		t.Fatalf("symlink target mode changed to %o, want 0600", got)
 	}
 }
