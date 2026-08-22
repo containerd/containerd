@@ -1,4 +1,4 @@
-# containerd-config 8 01/30/2018
+# containerd-config 8 07/25/2026
 
 ## NAME
 
@@ -10,22 +10,33 @@ containerd config [command]
 
 ## DESCRIPTION
 
-The *containerd config* command has one subcommand, named *default*, which
-will display on standard output the default containerd config for this version
-of the containerd daemon.
+The *containerd config* command prints configuration for the containerd
+daemon. Plugin options depend on which plugins are compiled into the binary,
+so the subcommands below are the authoritative way to list defaults for a
+given install.
 
-This output can be piped to a __containerd-config.toml(5)__ file and placed in
-**/etc/containerd** to be used as the configuration for containerd on daemon
-startup. The configuration can be placed in any filesystem location and used
-with the **--config** option to the containerd daemon as well.
-
-See __containerd-config.toml(5)__ for more information on the containerd
-configuration options.
+See __containerd-config.toml(5)__ for global settings and the plugin
+configuration model. Documentation: https://containerd.io/docs/
 
 ## OPTIONS
 
 **default**
-: This subcommand will output the TOML formatted containerd configuration to standard output
+: Print the complete default TOML configuration for this containerd binary,
+including every compiled-in plugin. Use this to discover configuration keys:
+
+```
+containerd config default > /etc/containerd/config.toml
+```
+
+**dump**
+: Load the active configuration file (default **/etc/containerd/config.toml**,
+or the path from **--config** / **-c**), apply **imports**, and print the
+merged configuration.
+
+**migrate**
+: Currently an alias of **dump**. Both load the active configuration and
+print it at the latest supported config version. Does not rewrite files
+listed under **imports**.
 
 ## BUGS
 
@@ -39,3 +50,5 @@ Phil Estes <estesp@gmail.com>
 ## SEE ALSO
 
 ctr(8), containerd(8), containerd-config.toml(5)
+
+https://containerd.io/docs/
