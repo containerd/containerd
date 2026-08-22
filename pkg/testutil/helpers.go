@@ -43,6 +43,10 @@ func init() {
 				break
 			}
 		}
+		_, exists := os.LookupEnv("AS_ROOT")
+		if exists {
+			rootEnabled = true
+		}
 	}
 }
 
