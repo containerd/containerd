@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
@@ -35,6 +36,8 @@ import (
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/v2/pkg/timeout"
 )
 
 func createContentStore(ctx context.Context, root string, opts ...DBOpt) (context.Context, content.Store, func() error, error) {
@@ -233,4 +236,72 @@ func checkIngestLeased(ctx context.Context, db *DB, ref string) error {
 
 		return nil
 	})
+}
+
+type hangingDeleteContentStore struct {
+	content.Store
+	deletes atomic.Int32
+}
+
+func (s *hangingDeleteContentStore) Delete(ctx context.Context, dgst digest.Digest) error {
+	s.deletes.Add(1)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+// TestGarbageCollectHangingDelete verifies that a content store whose Delete
+// never returns cannot hold the content store lock forever: the GC pass is
+// bounded by io.containerd.timeout.gc.content.walk and returns
+// DeadlineExceeded instead of blocking all content operations.
+func TestGarbageCollectHangingDelete(t *testing.T) {
+	timeout.Set(gcContentWalkTimeoutKey, 100*time.Millisecond)
+	defer timeout.Set(gcContentWalkTimeoutKey, defaultGCContentWalkTimeout)
+
+	ctx := t.Context()
+
+	dirname := t.TempDir()
+	base, err := local.NewStore(filepath.Join(dirname, "content"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write an orphan blob that exists in the backing store but has no metadata
+	// reference, so GC tries to delete it.
+	blob := []byte("orphaned-and-unreferenced")
+	dgst := digest.FromBytes(blob)
+	ww, err := base.Writer(ctx, content.WithRef("orphan"),
+		content.WithDescriptor(ocispec.Descriptor{Size: int64(len(blob)), Digest: dgst}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ww.Write(blob); err != nil {
+		t.Fatal(err)
+	}
+	if err := ww.Commit(ctx, 0, dgst); err != nil {
+		t.Fatal(err)
+	}
+
+	st := &hangingDeleteContentStore{Store: base}
+	bdb, err := bolt.Open(filepath.Join(dirname, "metadata.db"), 0644, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := NewDB(bdb, st, nil)
+	if err := db.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	cs := db.ContentStore().(*contentStore)
+	_, err = cs.garbageCollect(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected the bounded Delete to fail with DeadlineExceeded, got %v", err)
+	}
+	if n := st.deletes.Load(); n != 1 {
+		t.Fatalf("expected 1 delete attempt before abandoning the pass, got %d", n)
+	}
 }
