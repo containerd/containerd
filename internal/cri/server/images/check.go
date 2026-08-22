@@ -42,13 +42,18 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 	for _, i := range cImages {
 		wg.Go(func() {
 			// TODO: Check platform/snapshot combination. Snapshot check should come first
-			ok, _, _, _, err := images.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
+			// available alone is not enough; require no missing blobs (same as ctr).
+			ok, _, _, missing, err := images.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
 				return
 			}
 			if !ok {
 				log.G(ctx).Warnf("The image content readiness for %q is not ok", i.Name())
+				return
+			}
+			if len(missing) > 0 {
+				log.G(ctx).Warnf("The image content for %q is incomplete (missing %d descriptors)", i.Name(), len(missing))
 				return
 			}
 			// Checking existence of top-level snapshot for each image being recovered.
