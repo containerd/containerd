@@ -30,6 +30,7 @@ import (
 	"time"
 
 	winio "github.com/Microsoft/go-winio"
+	"github.com/containerd/containerd/v2/internal/stackdump"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
@@ -62,12 +63,44 @@ func subreaper() error {
 	return nil
 }
 
-// setupDumpStacks is currently not implemented for Windows.
-// Windows doesn't have SIGUSR1, so stack dumping would need to use
-// a different mechanism (e.g., a named event or debug console).
-func setupDumpStacks(_ chan<- os.Signal) {
-	// No-op on Windows - SIGUSR1 doesn't exist
-	// Future: could implement using Windows events or console signals
+// dumpStacksSignal is delivered on the dump channel when the stackdump event is
+// signaled. The value is arbitrary and only has to be an os.Signal: Windows
+// raises no such signal, and the dump loop ignores a signal's identity.
+const dumpStacksSignal = syscall.Signal(0xa)
+
+// setupDumpStacks requests a goroutine stack dump on the dump channel whenever
+// this shim's stackdump event is signaled.
+//
+// Windows has no SIGUSR1 to trap, so the named event from internal/stackdump
+// stands in for it. Requests go onto the same channel the unix build wires
+// SIGUSR1 to, so both platforms share one dump loop.
+func setupDumpStacks(dump chan<- os.Signal) {
+	err := stackdump.Notify(func() {
+		select {
+		case dump <- dumpStacksSignal:
+		default:
+			// Never block the watcher: a request is already queued and will
+			// report the same state, so dropping this one loses nothing.
+		}
+	})
+	if err != nil {
+		log.L.WithError(err).Error("failed to set up debug stackdump event, stack dumps unavailable")
+	}
+}
+
+// writeStackDump persists a stack dump alongside the shim's log output.
+//
+// The shim's log here is a named pipe that drops writes when containerd is not
+// attached (see reconnectingLogWriter) — the very situation a hand-triggered dump
+// is meant to diagnose — so the log alone is not somewhere a dump can be relied
+// on to land.
+func writeStackDump(logger *log.Entry, buf []byte) {
+	name, err := stackdump.WriteFile("containerd-shim", buf)
+	if err != nil {
+		logger.WithError(err).Warn("failed to write goroutine stack dump")
+		return
+	}
+	logger.WithField("path", name).Info("goroutine stack dump written")
 }
 
 // serveListener creates a named pipe listener for Windows at the given path.

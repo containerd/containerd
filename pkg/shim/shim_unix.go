@@ -49,6 +49,11 @@ func setupDumpStacks(dump chan<- os.Signal) {
 	signal.Notify(dump, syscall.SIGUSR1)
 }
 
+// writeStackDump is a no-op on unix, where a dump goes to the log only. The
+// Windows build also writes a file because its log pipe drops writes while no
+// reader is attached.
+func writeStackDump(_ *log.Entry, _ []byte) {}
+
 func serveListener(path string, fd uintptr) (net.Listener, error) {
 	var (
 		l   net.Listener

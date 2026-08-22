@@ -18,17 +18,15 @@ package command
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"unsafe"
 
 	"github.com/Microsoft/go-winio/pkg/etw"
 	"github.com/Microsoft/go-winio/pkg/etwlogrus"
 	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
+	"github.com/containerd/containerd/v2/internal/stackdump"
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows"
 )
 
 var (
@@ -63,33 +61,13 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 	return done
 }
 
+// setupDumpStacks dumps stacks whenever this process's stackdump event is
+// signaled. Windows has no SIGUSR1 to trap, so the named event from
+// internal/stackdump stands in for it.
 func setupDumpStacks() {
-	// Windows does not support signals like *nix systems. So instead of
-	// trapping on SIGUSR1 to dump stacks, we wait on a Win32 event to be
-	// signaled. ACL'd to builtin administrators and local system
-	event := "Global\\stackdump-" + fmt.Sprint(os.Getpid())
-	ev, _ := windows.UTF16PtrFromString(event)
-	sd, err := windows.SecurityDescriptorFromString("D:P(A;;GA;;;BA)(A;;GA;;;SY)")
-	if err != nil {
-		log.L.Errorf("failed to get security descriptor for debug stackdump event %s: %s", event, err.Error())
-		return
+	if err := stackdump.Notify(func() { dumpStacks(true) }); err != nil {
+		log.L.WithError(err).Error("failed to set up debug stackdump event, stack dumps unavailable")
 	}
-	var sa windows.SecurityAttributes
-	sa.Length = uint32(unsafe.Sizeof(sa))
-	sa.InheritHandle = 1
-	sa.SecurityDescriptor = sd
-	h, err := windows.CreateEvent(&sa, 0, 0, ev)
-	if h == 0 || err != nil {
-		log.L.Errorf("failed to create debug stackdump event %s: %s", event, err.Error())
-		return
-	}
-	go func() {
-		log.L.Debugf("Stackdump - waiting signal at %s", event)
-		for {
-			windows.WaitForSingleObject(h, windows.INFINITE)
-			dumpStacks(true)
-		}
-	}()
 }
 
 func etwCallback(sourceID guid.GUID, state etw.ProviderState, level etw.Level, matchAnyKeyword uint64, matchAllKeyword uint64, filterData uintptr) {

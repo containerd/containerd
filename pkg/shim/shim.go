@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 
 	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/containerd/v2/internal/stackdump"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
@@ -495,18 +496,9 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 }
 
 func dumpStacks(logger *log.Entry) {
-	var (
-		buf       []byte
-		stackSize int
-	)
-	bufferLen := 16384
-	for stackSize == len(buf) {
-		buf = make([]byte, bufferLen)
-		stackSize = runtime.Stack(buf, true)
-		bufferLen *= 2
-	}
-	buf = buf[:stackSize]
+	buf := stackdump.Dump()
 	logger.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+	writeStackDump(logger, buf)
 }
 
 type server interface {
