@@ -145,10 +145,11 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	// The address is in the form like ttrpc+unix://<uds-path> or grpc+vsock://<cid>:<port>
 	address := fmt.Sprintf("%s+%s", params.Protocol, params.Address)
 	return &shim{
-		bundle:  b.bundle,
-		client:  conn,
-		address: address,
-		version: int(params.Version),
+		bundle:    b.bundle,
+		client:    conn,
+		address:   address,
+		version:   int(params.Version),
+		bootstrap: params,
 	}, nil
 }
 
