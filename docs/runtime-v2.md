@@ -212,10 +212,13 @@ containerd can pass additional, shim-specific configuration via the `extensions`
 `google.protobuf.Any` messages. This allows new configuration types (e.g. runtime options, CRI config,
 sandbox config) to be introduced without changing the core protocol.
 
-`BootstrapResult` carries the shim's listening address and protocol (`ttrpc` or `grpc`), along with
-an optional `capabilities` field. The capabilities field is reserved for future use to allow containerd
-and shims to negotiate supported behaviors — for example, containerd could tailor its interactions
-with a shim based on the capabilities the shim advertises.
+`BootstrapResult` carries the shim's listening address and protocol (`ttrpc` or `grpc`), along with an
+optional `extensions` field — a list of `google.protobuf.Any` messages, the same mechanism `BootstrapParams`
+uses. A shim attaches a typed extension to tell containerd what it is able to do, so that containerd can
+adjust its own behavior; for example, a shim that performs a mount type itself makes the mount manager
+skip that mount rather than performing it on the shim's behalf. containerd ignores an extension whose
+type it does not recognize, so a shim can advertise unconditionally and an older daemon simply keeps its
+previous behavior. See [shim-capabilities.md](shim-capabilities.md) for the registry of extension types.
 
 The `pkg/shim` package handles the bootstrap protocol automatically — it tries the new protocol first and
 falls back to the legacy mechanism (described below) to ease migration. containerd 2.3 still provides the

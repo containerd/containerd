@@ -132,10 +132,11 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	address := fmt.Sprintf("%s+%s", params.Protocol, params.Address)
 
 	shim := &shim{
-		bundle:  bundle,
-		client:  conn,
-		address: address,
-		version: int(params.Version),
+		bundle:    bundle,
+		client:    conn,
+		address:   address,
+		version:   int(params.Version),
+		bootstrap: params,
 	}
 
 	return shim, nil
@@ -244,6 +245,18 @@ type ShimInstance interface {
 	Endpoint() (string, int)
 }
 
+// shimCapabilities is implemented by shim instances that retain what the shim
+// advertised when it started.
+//
+// This is a separate interface rather than a method on [ShimInstance] so that
+// external implementations of ShimInstance keep compiling; a shim instance
+// that does not implement it is treated as having advertised nothing.
+type shimCapabilities interface {
+	// BootstrapResult returns the result the shim returned when it started,
+	// carrying the extensions it advertised. It may be nil.
+	BootstrapResult() *bootapi.BootstrapResult
+}
+
 type clientVersionDowngrader interface {
 	// Downgrade is to lower shim's client version.
 	//
@@ -271,23 +284,24 @@ func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
 	// Fallback to legacy parsing for backward compatibility with legacy shims that return the address as a plain string or JSON.
 	response = bytes.TrimSpace(response)
 
-	var params client.BootstrapParams //nolint:staticcheck // Used for backward compatibility with legacy shims
-	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
+	// Decode into the whole message rather than a subset of its fields. A
+	// bundle's bootstrap.json is written with encoding/json and read back
+	// through here, so a field that is not decoded is silently lost on reload.
+	params := &bootapi.BootstrapResult{}
+	if err := json.Unmarshal(response, params); err != nil || params.Version < 2 {
 		// Use TTRPC for legacy shims
-		params.Address = string(response)
-		params.Protocol = "ttrpc"
-		params.Version = 2
+		params = &bootapi.BootstrapResult{
+			Address:  string(response),
+			Protocol: "ttrpc",
+			Version:  2,
+		}
 	}
 
 	if params.Version > CurrentShimVersion {
 		return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
 	}
 
-	return &bootapi.BootstrapResult{
-		Version:  int32(params.Version),
-		Address:  params.Address,
-		Protocol: params.Protocol,
-	}, nil
+	return params, nil
 }
 
 // writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
@@ -451,10 +465,20 @@ type shim struct {
 	client  any
 	address string
 	version int
+	// bootstrap is what the shim advertised when it started. Retained whole
+	// rather than decoded into fields here so that a new capability needs no
+	// further plumbing through the shim instance.
+	bootstrap *bootapi.BootstrapResult
 }
 
 var _ ShimInstance = (*shim)(nil)
 var _ clientVersionDowngrader = (*shim)(nil)
+var _ shimCapabilities = (*shim)(nil)
+
+// BootstrapResult returns what the shim advertised when it started.
+func (s *shim) BootstrapResult() *bootapi.BootstrapResult {
+	return s.bootstrap
+}
 
 // ID of the shim/task
 func (s *shim) ID() string {
