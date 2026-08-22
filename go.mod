@@ -83,11 +83,11 @@ require (
 	google.golang.org/protobuf v1.36.12
 	k8s.io/apimachinery v0.36.3
 	k8s.io/client-go v0.36.3
-	k8s.io/cri-api v0.36.3
+	k8s.io/cri-api v0.36.4
 	k8s.io/cri-client v0.36.3
 	k8s.io/cri-streaming v0.36.3
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/streaming v0.36.3
+	k8s.io/streaming v0.36.4
 	tags.cncf.io/container-device-interface v1.1.1-0.20260821104259-05ae4b5bb730
 )
 
