@@ -186,6 +186,41 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	})
 }
 
+// cleanupShimTask reaps a shim task we have given up on, after a failed start or
+// when loading a bundle left behind by a previous containerd. An unresponsive
+// shim must not block the caller — on the load path that would stall containerd
+// startup — so each call is bounded, and detached from the caller's context,
+// which by then may be cancelled or out of budget.
+//
+// A failed delete returns before shutting the shim down and closing its client,
+// so both are done here. It also leaves the bundle in place (only a successful
+// delete removes it), so callers that own one must remove it on error. The shim
+// map is untouched: callers reach this having already removed the task, or never
+// added it.
+func cleanupShimTask(ctx context.Context, st *shimTask) error {
+	dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+	defer cancel()
+
+	_, err := st.delete(dctx, func(context.Context, string) {})
+	if err == nil {
+		return nil
+	}
+
+	// Shutting down needs a context with time left on it. Check the deadline
+	// rather than the error: a timeout only survives as context.DeadlineExceeded
+	// over GRPC. Over TTRPC it arrives as the raw context error, which carries no
+	// GRPC status, so errgrpc.ToNative flattens it into errdefs.ErrUnknown.
+	if dctx.Err() != nil {
+		dctx, cancel = timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+		defer cancel()
+	}
+
+	st.Shutdown(dctx)
+	st.Close()
+
+	return err
+}
+
 // CurrentShimVersion is the latest shim version supported by containerd (e.g. TaskService v3).
 const CurrentShimVersion = 3
 
@@ -544,7 +579,7 @@ func (s *shimTask) PID(ctx context.Context) (uint32, error) {
 	return response.TaskPid, nil
 }
 
-func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
+func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
 	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
@@ -578,21 +613,12 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		removeTask(ctx, s.ID())
 	}
 
-	const supportSandboxAPIVersion = 3
-	if _, apiVer := s.ShimInstance.Endpoint(); apiVer < supportSandboxAPIVersion {
-		sandboxed = false
-	}
-
-	// Don't shutdown sandbox as there may be other containers running.
-	// Let controller decide when to shutdown.
-	if !sandboxed {
-		if err := s.waitShutdown(ctx); err != nil {
-			// FIXME(fuweid):
-			//
-			// If the error is context canceled, should we use context.TODO()
-			// to wait for it?
-			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
-		}
+	if err := s.waitShutdown(ctx); err != nil {
+		// FIXME(fuweid):
+		//
+		// If the error is context canceled, should we use context.TODO()
+		// to wait for it?
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
 	}
 
 	if err := s.ShimInstance.Delete(ctx); err != nil {

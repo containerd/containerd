@@ -397,7 +397,9 @@ type IntelRdt struct {
 
 // ValidateIntelRdt validates the IntelRdt configuration.
 //
-// Deprecated: ValidateIntelRdt is deprecated use IntelRdt.Validate() instead.
+// Deprecated: use [*IntelRdt.Validate] instead.
+//
+//go:fix inline
 func ValidateIntelRdt(i *cdi.IntelRdt) error {
 	return (&IntelRdt{i}).Validate()
 }

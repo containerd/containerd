@@ -30,12 +30,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package bandwidth provides utilities for bandwidth shaping
 package bandwidth
 
 import (
 	"fmt"
 
-	resource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var minRsrc = resource.MustParse("1k")

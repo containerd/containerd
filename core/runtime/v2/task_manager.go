@@ -253,21 +253,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		// NOTE: ctx contains required namespace information.
 		m.manager.shims.Delete(ctx, taskID)
 
-		dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
-		defer cancel()
-
-		sandboxed := opts.SandboxID != ""
-		_, errShim := shimTask.delete(dctx, sandboxed, func(context.Context, string) {})
-		if errShim != nil {
-			if errdefs.IsDeadlineExceeded(errShim) {
-				dctx, cancel = timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
-				defer cancel()
-			}
-
-			shimTask.Shutdown(dctx)
-			shimTask.Close()
-		}
-
+		_ = cleanupShimTask(ctx, shimTask)
 		return nil, fmt.Errorf("failed to create shim task: %w", err)
 	}
 
@@ -307,7 +293,7 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 		return nil, err
 	}
 
-	container, err := m.manager.containers.Get(ctx, taskID)
+	_, err = m.manager.containers.Get(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -317,9 +303,7 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 		return nil, err
 	}
 
-	sandboxed := container.SandboxID != ""
-
-	exit, err := shimTask.delete(ctx, sandboxed, func(ctx context.Context, id string) {
+	exit, err := shimTask.delete(ctx, func(ctx context.Context, id string) {
 		m.manager.shims.Delete(ctx, id)
 	})
 
