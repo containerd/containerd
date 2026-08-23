@@ -147,7 +147,7 @@ containerd CLI
 	}, extraCmds...)
 	app.Before = func(cliContext *cli.Context) error {
 		if cliContext.Bool("debug") {
-			return log.SetLevel("debug")
+			return log.SetLevel(log.DebugLevel)
 		}
 		return nil
 	}
