@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -152,9 +153,16 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to clean up after shim disconnected")
 	}
 
-	if _, err := rt.Get(ctx, id); err != nil {
-		// Task was never started or was already successfully deleted
-		// No need to publish events
+	s, err := rt.Get(ctx, id)
+	if err != nil {
+		// Task was never started, or its record has already been removed.
+		// No need to publish events.
+		return
+	}
+
+	// If the task delete already succeeded, the shim itself has delivered the
+	// exit and delete events. No need to publish duplicates.
+	if s.(taskDeleteState).taskDeleteResult() != nil {
 		return
 	}
 
@@ -272,6 +280,14 @@ type clientVersionDowngrader interface {
 	// that still uses the v2 protocol, resulting in a failure to start.
 	// In this case, we should also downgrade the shim version and retry.
 	Downgrade() error
+}
+
+// taskDeleteState caches the result of a successful task delete on the shim
+// instance, so that a Delete retried after a failed shutdown can still return
+// the original exit.
+type taskDeleteState interface {
+	recordTaskDeleteResult(*runtime.Exit)
+	taskDeleteResult() *runtime.Exit
 }
 
 func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
@@ -469,11 +485,14 @@ type shim struct {
 	// rather than decoded into fields here so that a new capability needs no
 	// further plumbing through the shim instance.
 	bootstrap *bootapi.BootstrapResult
+
+	taskDeleteExit atomic.Pointer[runtime.Exit]
 }
 
 var _ ShimInstance = (*shim)(nil)
 var _ clientVersionDowngrader = (*shim)(nil)
 var _ shimCapabilities = (*shim)(nil)
+var _ taskDeleteState = (*shim)(nil)
 
 // BootstrapResult returns what the shim advertised when it started.
 func (s *shim) BootstrapResult() *bootapi.BootstrapResult {
@@ -554,6 +573,25 @@ func (s *shim) Delete(ctx context.Context) error {
 	return errors.Join(result...)
 }
 
+// recordTaskDeleteResult caches the result of a successful task delete. The
+// value is copied both in and out so that neither the caller that recorded it
+// nor a later retry can mutate the cached result.
+func (s *shim) recordTaskDeleteResult(exit *runtime.Exit) {
+	cached := *exit
+	s.taskDeleteExit.Store(&cached)
+}
+
+// taskDeleteResult returns a copy of the cached delete result, or nil if this
+// containerd process has never deleted the task successfully.
+func (s *shim) taskDeleteResult() *runtime.Exit {
+	cached := s.taskDeleteExit.Load()
+	if cached == nil {
+		return nil
+	}
+	exit := *cached
+	return &exit
+}
+
 var _ runtime.Task = &shimTask{}
 
 // shimTask wraps shim process and adds task service client for compatibility with existing shim manager.
@@ -617,6 +655,8 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 		}
 	}
 
+	deleteState := s.ShimInstance.(taskDeleteState)
+
 	// NOTE: If the shim has been killed and ttrpc connection has been
 	// closed, the shimErr will not be nil. For this case, the event
 	// subscriber, like moby/moby, might have received the exit or delete
@@ -624,8 +664,8 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 	// send the exit and delete events again. And the exit status will
 	// depend on result of shimV2.Delete.
 	//
-	// If not, the shim has been delivered the exit and delete events.
-	// So we should remove the record and prevent duplicate events from
+	// If not, the shim has delivered the exit and delete events. Cache the
+	// delete result so a retry can return it and prevent duplicate events from
 	// ttrpc-callback-on-close.
 	//
 	// TODO: It's hard to guarantee that the event is unique and sent only
@@ -633,16 +673,22 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 	// only one exit event. The moby/moby should handle the duplicate events.
 	//
 	// REF: https://github.com/containerd/containerd/issues/4769
+	var exit *runtime.Exit
 	if shimErr == nil {
-		removeTask(ctx, s.ID())
+		exit = &runtime.Exit{
+			Status:    response.ExitStatus,
+			Timestamp: protobuf.FromTimestamp(response.ExitedAt),
+			Pid:       response.Pid,
+		}
+		deleteState.recordTaskDeleteResult(exit)
 	}
 
+	// NOTE: Returning here deliberately leaves the shim record, the ttrpc
+	// client and the bundle in place, so that the caller can retry Delete.
+	// The result cached above lets that retry return the original exit, even
+	// though the shim reports NotFound for the task by then.
 	if err := s.waitShutdown(ctx); err != nil {
-		// FIXME(fuweid):
-		//
-		// If the error is context canceled, should we use context.TODO()
-		// to wait for it?
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
+		return nil, fmt.Errorf("failed to invoke shutdown: %w", err)
 	}
 
 	if err := s.ShimInstance.Delete(ctx); err != nil {
@@ -653,15 +699,15 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
 	removeTask(ctx, s.ID())
 
-	if shimErr != nil {
+	if exit == nil {
+		// An earlier attempt already deleted the task in the shim, so shimErr
+		// is NotFound. Return the exit recorded by that attempt instead.
+		exit = deleteState.taskDeleteResult()
+	}
+	if exit == nil {
 		return nil, shimErr
 	}
-
-	return &runtime.Exit{
-		Status:    response.ExitStatus,
-		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
-		Pid:       response.Pid,
-	}, nil
+	return exit, nil
 }
 
 func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Task, error) {
