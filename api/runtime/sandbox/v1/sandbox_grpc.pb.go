@@ -44,6 +44,10 @@ type SandboxClient interface {
 	ShutdownSandbox(ctx context.Context, in *ShutdownSandboxRequest, opts ...grpc.CallOption) (*ShutdownSandboxResponse, error)
 	// SandboxMetrics retrieves metrics about a sandbox instance.
 	SandboxMetrics(ctx context.Context, in *SandboxMetricsRequest, opts ...grpc.CallOption) (*SandboxMetricsResponse, error)
+	// PortForward bridges a port inside the sandbox network onto a stream pair served
+	// by the sandbox streaming endpoint. Shims that do not own the workload network
+	// may leave it unimplemented; containerd then forwards from the host.
+	PortForward(ctx context.Context, in *PortForwardRequest, opts ...grpc.CallOption) (*PortForwardResponse, error)
 }
 
 type sandboxClient struct {
@@ -135,6 +139,15 @@ func (c *sandboxClient) SandboxMetrics(ctx context.Context, in *SandboxMetricsRe
 	return out, nil
 }
 
+func (c *sandboxClient) PortForward(ctx context.Context, in *PortForwardRequest, opts ...grpc.CallOption) (*PortForwardResponse, error) {
+	out := new(PortForwardResponse)
+	err := c.cc.Invoke(ctx, "/containerd.runtime.sandbox.v1.Sandbox/PortForward", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SandboxServer is the server API for Sandbox service.
 // All implementations must embed UnimplementedSandboxServer
 // for forward compatibility
@@ -159,6 +172,10 @@ type SandboxServer interface {
 	ShutdownSandbox(context.Context, *ShutdownSandboxRequest) (*ShutdownSandboxResponse, error)
 	// SandboxMetrics retrieves metrics about a sandbox instance.
 	SandboxMetrics(context.Context, *SandboxMetricsRequest) (*SandboxMetricsResponse, error)
+	// PortForward bridges a port inside the sandbox network onto a stream pair served
+	// by the sandbox streaming endpoint. Shims that do not own the workload network
+	// may leave it unimplemented; containerd then forwards from the host.
+	PortForward(context.Context, *PortForwardRequest) (*PortForwardResponse, error)
 	mustEmbedUnimplementedSandboxServer()
 }
 
@@ -192,6 +209,9 @@ func (UnimplementedSandboxServer) ShutdownSandbox(context.Context, *ShutdownSand
 }
 func (UnimplementedSandboxServer) SandboxMetrics(context.Context, *SandboxMetricsRequest) (*SandboxMetricsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SandboxMetrics not implemented")
+}
+func (UnimplementedSandboxServer) PortForward(context.Context, *PortForwardRequest) (*PortForwardResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PortForward not implemented")
 }
 func (UnimplementedSandboxServer) mustEmbedUnimplementedSandboxServer() {}
 
@@ -368,6 +388,24 @@ func _Sandbox_SandboxMetrics_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sandbox_PortForward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PortForwardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxServer).PortForward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.runtime.sandbox.v1.Sandbox/PortForward",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxServer).PortForward(ctx, req.(*PortForwardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Sandbox_ServiceDesc is the grpc.ServiceDesc for Sandbox service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -410,6 +448,10 @@ var Sandbox_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SandboxMetrics",
 			Handler:    _Sandbox_SandboxMetrics_Handler,
+		},
+		{
+			MethodName: "PortForward",
+			Handler:    _Sandbox_PortForward_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

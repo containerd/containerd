@@ -21,19 +21,17 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"time"
 
 	"github.com/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
+
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
-// portForward uses netns to enter the sandbox namespace, and forwards a stream inside the
-// namespace to a specific port. It keeps forwarding until it exits or client disconnect.
-func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
-	s, err := c.sandboxStore.Get(id)
-	if err != nil {
-		return fmt.Errorf("failed to find sandbox %q in store: %w", id, err)
-	}
+// hostPortForward enters the sandbox network namespace on the host and forwards a stream
+// to port inside it.
+func (c *criService) hostPortForward(ctx context.Context, s sandboxstore.Sandbox, port int32, stream io.ReadWriteCloser) error {
+	id := s.ID
 
 	var (
 		netNSDo func(func(ns.NetNS) error) error
@@ -57,7 +55,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	}
 
 	log.G(ctx).Infof("Executing port forwarding in network namespace %q", netNSPath)
-	err = netNSDo(func(_ ns.NetNS) error {
+	err := netNSDo(func(_ ns.NetNS) error {
 		defer stream.Close()
 		// localhost can resolve to both IPv4 and IPv6 addresses in dual-stack systems
 		// but the application can be listening in one of the IP families only.
@@ -80,50 +78,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 		}
 		defer conn.Close()
 
-		errCh := make(chan error, 2)
-		// Copy from the namespace port connection to the client stream
-		go func() {
-			log.G(ctx).Debugf("PortForward copying data from namespace %q port %d to the client stream", id, port)
-			_, err := io.Copy(stream, conn)
-			errCh <- err
-		}()
-
-		// Copy from the client stream to the namespace port connection
-		go func() {
-			log.G(ctx).Debugf("PortForward copying data from client stream to namespace %q port %d", id, port)
-			_, err := io.Copy(conn, stream)
-			errCh <- err
-		}()
-
-		// Wait until the first error is returned by one of the connections
-		// we use errFwd to store the result of the port forwarding operation
-		// if the context is cancelled close everything and return
-		var errFwd error
-		select {
-		case errFwd = <-errCh:
-			log.G(ctx).Debugf("PortForward stop forwarding in one direction in network namespace %q port %d: %v", id, port, errFwd)
-		case <-ctx.Done():
-			log.G(ctx).Debugf("PortForward cancelled in network namespace %q port %d: %v", id, port, ctx.Err())
-			return ctx.Err()
-		}
-		// give a chance to terminate gracefully or timeout
-		// after 1s
-		// https://linux.die.net/man/1/socat
-		const timeout = time.Second
-		select {
-		case e := <-errCh:
-			if errFwd == nil {
-				errFwd = e
-			}
-			log.G(ctx).Debugf("PortForward stopped forwarding in both directions in network namespace %q port %d: %v", id, port, e)
-		case <-time.After(timeout):
-			log.G(ctx).Debugf("PortForward timed out waiting to close the connection in network namespace %q port %d", id, port)
-		case <-ctx.Done():
-			log.G(ctx).Debugf("PortForward cancelled in network namespace %q port %d: %v", id, port, ctx.Err())
-			errFwd = ctx.Err()
-		}
-
-		return errFwd
+		return copyPortForward(ctx, id, port, conn, stream)
 	})
 
 	if err != nil {

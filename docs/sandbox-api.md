@@ -140,6 +140,48 @@ when no active tasks remain.
 `SandboxService.ShutdownSandbox` is independent from `TaskService.Shutdown` and
 shuts down the sandbox instance.
 
+## Port forwarding
+
+By default containerd serves `kubectl port-forward` from the sandbox's network namespace
+on the host. Runtimes whose network is not reachable from there — a VM-isolated sandbox
+such as Kata, or a userspace netstack such as gVisor — implement
+`SandboxService.PortForward` instead, enabled per runtime handler with
+`port_forward_type = "sandbox"` in the CRI config.
+
+The RPC carries no data. Bytes travel over the shim's
+[streaming service](../api/services/streaming/v1/streaming.proto), at the address the shim
+returned from `SandboxService.StartSandbox`. A stream carries bulk data one way only, so
+containerd names a pair:
+
+- `<stream_id>-in` — containerd to sandbox
+- `<stream_id>-out` — sandbox to containerd
+
+```mermaid
+sequenceDiagram
+    kubelet->>containerd: RuntimeService.PortForward
+    containerd-->>kubelet: streaming URL
+    kubelet->>containerd: POST the streaming URL
+    containerd->>shim: SandboxService.PortForward(sandbox_id, port, stream_id)
+    shim->>shim: connect to port inside the sandbox
+    shim-->>containerd: OK
+    containerd->>shim: Streaming.Stream("<stream_id>-in")
+    containerd->>shim: Streaming.Stream("<stream_id>-out")
+    containerd->>shim: copy client bytes over "-in"
+    shim->>containerd: copy sandbox bytes over "-out"
+```
+
+A shim implementing this must:
+
+- Connect to the port before returning, and return an error if it is unreachable.
+- Wait for the streams off the handler goroutine, since containerd opens them only after
+  `PortForward` returns.
+- Return `Unimplemented` if it does not own the workload network. containerd warns and
+  falls back to the host network namespace, so enabling `port_forward_type = "sandbox"`
+  against an older shim keeps working.
+
+[`pkg/shim.StreamManager`](../pkg/shim/streaming.go) serves the streaming service on a
+shim's ttrpc server; its `OpenPortForward` returns the stream pair as one duplex pipe.
+
 ## Controller Implementations
 
 There are two `Controller` implementations today:

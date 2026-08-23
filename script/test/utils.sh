@@ -104,6 +104,14 @@ if [ $IS_WINDOWS -eq 0 ]; then
   runtime_type = "${FAILPOINT_CONTAINERD_RUNTIME}"
 EOF
 
+  # A runtime that asks the sandbox to forward ports. Its podsandbox sandboxer cannot,
+  # so this exercises the fallback to the host network namespace.
+  cat << EOF | tee -a "${CONTAINERD_CONFIG_FILE}"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc-pf]
+  runtime_type = "io.containerd.runc.v2"
+  port_forward_type = "sandbox"
+EOF
+
   cat << EOF | tee "${FAILPOINT_CNI_CONF_DIR}/10-containerd-net.conflist"
 {
   "cniVersion": "1.0.0",

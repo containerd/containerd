@@ -85,6 +85,7 @@ type sandboxService interface {
 	ShutdownSandbox(ctx context.Context, sandboxer string, sandboxID string) error
 	SandboxStatus(ctx context.Context, sandboxer string, sandboxID string, verbose bool) (sandbox.ControllerStatus, error)
 	SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (imagespec.Platform, error)
+	PortForwardSandbox(ctx context.Context, sandboxer string, sandboxID string, port int32, streamID string) error
 	SandboxController(sandboxer string) (sandbox.Controller, error)
 }
 

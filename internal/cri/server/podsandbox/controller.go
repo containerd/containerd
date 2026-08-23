@@ -155,6 +155,12 @@ func (c *Controller) Update(
 	return nil
 }
 
+// PortForward is not implemented: the pod sandbox's network namespace is owned by
+// the CRI plugin, which forwards from it directly.
+func (c *Controller) PortForward(ctx context.Context, sandboxID string, port int32, streamID string) error {
+	return fmt.Errorf("port forward: %w", errdefs.ErrNotImplemented)
+}
+
 func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, exitCh <-chan containerd.ExitStatus) error {
 	select {
 	case e := <-exitCh:

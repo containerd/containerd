@@ -263,6 +263,7 @@ type ControllerClient interface {
 	Shutdown(ctx context.Context, in *ControllerShutdownRequest, opts ...grpc.CallOption) (*ControllerShutdownResponse, error)
 	Metrics(ctx context.Context, in *ControllerMetricsRequest, opts ...grpc.CallOption) (*ControllerMetricsResponse, error)
 	Update(ctx context.Context, in *ControllerUpdateRequest, opts ...grpc.CallOption) (*ControllerUpdateResponse, error)
+	PortForward(ctx context.Context, in *ControllerPortForwardRequest, opts ...grpc.CallOption) (*ControllerPortForwardResponse, error)
 }
 
 type controllerClient struct {
@@ -354,6 +355,15 @@ func (c *controllerClient) Update(ctx context.Context, in *ControllerUpdateReque
 	return out, nil
 }
 
+func (c *controllerClient) PortForward(ctx context.Context, in *ControllerPortForwardRequest, opts ...grpc.CallOption) (*ControllerPortForwardResponse, error) {
+	out := new(ControllerPortForwardResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/PortForward", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControllerServer is the server API for Controller service.
 // All implementations must embed UnimplementedControllerServer
 // for forward compatibility
@@ -367,6 +377,7 @@ type ControllerServer interface {
 	Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error)
 	Metrics(context.Context, *ControllerMetricsRequest) (*ControllerMetricsResponse, error)
 	Update(context.Context, *ControllerUpdateRequest) (*ControllerUpdateResponse, error)
+	PortForward(context.Context, *ControllerPortForwardRequest) (*ControllerPortForwardResponse, error)
 	mustEmbedUnimplementedControllerServer()
 }
 
@@ -400,6 +411,9 @@ func (UnimplementedControllerServer) Metrics(context.Context, *ControllerMetrics
 }
 func (UnimplementedControllerServer) Update(context.Context, *ControllerUpdateRequest) (*ControllerUpdateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+}
+func (UnimplementedControllerServer) PortForward(context.Context, *ControllerPortForwardRequest) (*ControllerPortForwardResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PortForward not implemented")
 }
 func (UnimplementedControllerServer) mustEmbedUnimplementedControllerServer() {}
 
@@ -576,6 +590,24 @@ func _Controller_Update_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Controller_PortForward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerPortForwardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServer).PortForward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.sandbox.v1.Controller/PortForward",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServer).PortForward(ctx, req.(*ControllerPortForwardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Controller_ServiceDesc is the grpc.ServiceDesc for Controller service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -618,6 +650,10 @@ var Controller_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Update",
 			Handler:    _Controller_Update_Handler,
+		},
+		{
+			MethodName: "PortForward",
+			Handler:    _Controller_PortForward_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -78,6 +78,11 @@ const (
 	IOTypeFifo = "fifo"
 	// IOTypeStreaming is container io implemented by connecting the streaming api to sandbox endpoint
 	IOTypeStreaming = "streaming"
+	// PortForwardTypeHost forwards ports from the sandbox network namespace on the host.
+	PortForwardTypeHost = "host"
+	// PortForwardTypeSandbox forwards ports through the sandbox controller, for runtimes
+	// whose network is not reachable from the host namespace.
+	PortForwardTypeSandbox = "sandbox"
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
@@ -136,6 +141,10 @@ type Runtime struct {
 	// we can also set it to "streaming" to create a stream by streaming api,
 	// and use it as a channel to transfer the io stream
 	IOType string `toml:"io_type" json:"io_type"`
+	// PortForwardType defines how containerd forwards ports into the sandbox.
+	// "host" (the default) dials from the sandbox network namespace on the host,
+	// "sandbox" delegates to the sandbox controller.
+	PortForwardType string `toml:"port_forward_type" json:"port_forward_type"`
 }
 
 // ContainerdConfig contains toml config related to containerd
@@ -684,6 +693,13 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		}
 		if r.IOType != IOTypeStreaming && r.IOType != IOTypeFifo {
 			return warnings, errors.New("`io_type` can only be `streaming` or `named_pipe`")
+		}
+
+		// Empty means PortForwardTypeHost.
+		switch r.PortForwardType {
+		case "", PortForwardTypeHost, PortForwardTypeSandbox:
+		default:
+			return warnings, errors.New("`port_forward_type` can only be `host` or `sandbox`")
 		}
 	}
 

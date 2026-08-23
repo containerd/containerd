@@ -114,6 +114,11 @@ type Controller interface {
 	// Update changes a part of sandbox, such as extensions/annotations/labels/spec of
 	// Sandbox object, controllers may have to update the running sandbox according to the changes.
 	Update(ctx context.Context, sandboxID string, sandbox Sandbox, fields ...string) error
+	// PortForward connects to port inside the sandbox network and bridges it onto the
+	// stream pair named by streamID, served on the sandbox streaming endpoint.
+	// Implementations that do not own the workload network must return
+	// errdefs.ErrNotImplemented so the caller can fall back to the host.
+	PortForward(ctx context.Context, sandboxID string, port int32, streamID string) error
 }
 
 type ControllerInstance struct {
