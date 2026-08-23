@@ -21,7 +21,7 @@ require (
 	github.com/containerd/go-dmverity v0.1.0
 	github.com/containerd/go-runc v1.2.1
 	github.com/containerd/imgcrypt/v2 v2.0.3
-	github.com/containerd/log v0.1.0
+	github.com/containerd/log v0.1.1-0.20260828142140-8b5d6538fa1f //main
 	github.com/containerd/log/otel v0.0.0-20260828142140-8b5d6538fa1f // main
 	github.com/containerd/nri v0.12.2
 	github.com/containerd/otelttrpc v0.1.0
