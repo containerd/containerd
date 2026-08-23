@@ -208,12 +208,12 @@ func main() {
 		},
 		Before: func(cmd *cli.Context) error {
 			if cmd.Bool("json") {
-				if err := log.SetLevel("warn"); err != nil {
+				if err := log.SetLevel(log.WarnLevel); err != nil {
 					return err
 				}
 			}
 			if cmd.Bool("debug") {
-				if err := log.SetLevel("debug"); err != nil {
+				if err := log.SetLevel(log.DebugLevel); err != nil {
 					return err
 				}
 			}

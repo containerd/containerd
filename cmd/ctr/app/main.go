@@ -147,7 +147,7 @@ containerd CLI
 		}, extraCmds...),
 		Before: func(cmd *cli.Context) error {
 			if cmd.Bool("debug") {
-				return log.SetLevel("debug")
+				return log.SetLevel(log.DebugLevel)
 			}
 			return nil
 		},
