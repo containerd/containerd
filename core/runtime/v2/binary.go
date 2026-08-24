@@ -167,18 +167,18 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 
 	// containerd daemon is the intended caller of client.Command; the deprecation
 	// targets external callers.
-	cmd, err := client.Command(ctx, //nolint:staticcheck // SA1019
-		&client.CommandConfig{
-			ID:           b.bundle.ID,
-			RuntimePath:  b.runtime,
-			BundlePath:   b.bundle.Path,
-			GRPCAddress:  b.containerdAddress,
-			TTRPCAddress: b.containerdTTRPCAddress,
-			WorkDir:      bundlePath,
-			Opts:         nil,
-			LogLevel:     log.GetLevel(),
-			Action:       "delete",
-		})
+	cmdConfig := &client.CommandConfig{
+		ID:           b.bundle.ID,
+		RuntimePath:  b.runtime,
+		BundlePath:   b.bundle.Path,
+		GRPCAddress:  b.containerdAddress,
+		TTRPCAddress: b.containerdTTRPCAddress,
+		WorkDir:      bundlePath,
+		Opts:         nil,
+		LogLevel:     log.GetLevel(),
+		Action:       "delete",
+	}
+	cmd, err := client.Command(ctx, cmdConfig) //nolint:staticcheck // SA1019
 
 	if err != nil {
 		return nil, err
@@ -189,14 +189,33 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	)
 	cmd.Stdout = out
 	cmd.Stderr = errb
-	if err := cmd.Run(); err != nil {
+	runErr := cmd.Run()
+	// A create rollback can remove the bundle after the delete command has
+	// been prepared but before it starts. Preserve the bundle cwd on the first
+	// attempt for older shims that still rely on os.Getwd(), then retry with the
+	// default cwd only when exec failed before starting because that cwd is gone.
+	if runErr != nil && bundlePath != "" && cmd.Process == nil && os.IsNotExist(runErr) {
+		if _, statErr := os.Stat(bundlePath); os.IsNotExist(statErr) {
+			cmdConfig.WorkDir = ""
+			cmd, err = client.Command(ctx, cmdConfig) //nolint:staticcheck // SA1019
+			if err != nil {
+				return nil, err
+			}
+			out.Reset()
+			errb.Reset()
+			cmd.Stdout = out
+			cmd.Stderr = errb
+			runErr = cmd.Run()
+		}
+	}
+	if runErr != nil {
 		log.G(ctx).WithFields(log.Fields{
 			"cmd":    cmd.String(),
-			"error":  err,
+			"error":  runErr,
 			"id":     b.bundle.ID,
 			"stderr": errb.String(),
 		}).Error("failed to delete dead shim")
-		return nil, shimCallError(ctx.Err(), errb.Bytes(), err)
+		return nil, shimCallError(ctx.Err(), errb.Bytes(), runErr)
 	}
 	if s := errb.String(); s != "" {
 		log.G(ctx).WithFields(log.Fields{
