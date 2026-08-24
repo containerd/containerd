@@ -234,6 +234,15 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 					Protocol: protocol,
 					Address:  address,
 				}
+
+				// The sandbox controller only returns connection details, not
+				// what its shim advertised at startup. Recover that from the
+				// shim instance containerd already has in memory for this
+				// sandbox, so a container joining it is not treated as if the
+				// shim advertised nothing.
+				if process, err := m.Get(ctx, opts.SandboxID); err == nil {
+					params.Extensions = sandboxShimExtensions(process)
+				}
 			} else {
 				process, err := m.Get(ctx, opts.SandboxID)
 				if err != nil {
@@ -301,6 +310,19 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 	}
 
 	return shim, nil
+}
+
+// sandboxShimExtensions returns the extensions process's shim advertised when
+// it started, or nil if process does not retain that (for example, an
+// external sandboxer's shim instance that predates capability extensions).
+// This is best effort: a container joining a sandbox whose shim instance
+// cannot be asked degrades to no extensions rather than failing to start.
+func sandboxShimExtensions(process ShimInstance) []*bootapi.Extension {
+	sc, ok := process.(shimCapabilities)
+	if !ok {
+		return nil
+	}
+	return sc.BootstrapResult().GetExtensions()
 }
 
 func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, opts runtime.CreateOpts) (*shim, error) {
