@@ -498,7 +498,7 @@ func TestGarbageCollectHangingRemove(t *testing.T) {
 			}
 		}
 
-		// The fake clock reaches the removal deadline as soon as Remove blocks,
+		// The fake clock reaches the GC pass deadline as soon as Remove blocks,
 		// so this runs against the real default instead of a shortened one. An
 		// unbounded Remove would deadlock the bubble rather than pass.
 		msn := db.Snapshotter("tmp").(*snapshotter)
@@ -512,11 +512,77 @@ func TestGarbageCollectHangingRemove(t *testing.T) {
 			t.Fatalf("expected 1 remove attempt before abandoning the pass, got %d", n)
 		}
 		// Cleanup must be skipped after an abandoned pass: the snapshotter just
-		// failed to answer a bounded Remove, and Cleanup has no bound.
+		// failed to answer a Remove, and the pass's shared deadline has expired.
 		if n := sn.cleanups.Load(); n != 0 {
 			t.Fatalf("expected no Cleanup call after abandoned pass, got %d", n)
 		}
 		// Skipped snapshots stay orphaned for the next GC pass.
+		for _, key := range []string{"orphan-1", "orphan-2"} {
+			if _, err := sn.Snapshotter.Stat(ctx, key); err != nil {
+				t.Fatalf("orphan %q should survive for the next GC pass: %v", key, err)
+			}
+		}
+	})
+}
+
+type hangingWalkSnapshotter struct {
+	snapshots.Snapshotter
+	walks    atomic.Int32
+	removes  atomic.Int32
+	cleanups atomic.Int32
+}
+
+func (s *hangingWalkSnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
+	s.walks.Add(1)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (s *hangingWalkSnapshotter) Remove(ctx context.Context, key string) error {
+	s.removes.Add(1)
+	return s.Snapshotter.Remove(ctx, key)
+}
+
+// Cleanup makes the wrapper a snapshots.Cleaner so its skip can be asserted.
+func (s *hangingWalkSnapshotter) Cleanup(ctx context.Context) error {
+	s.cleanups.Add(1)
+	return nil
+}
+
+func TestGarbageCollectHangingWalk(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, bdb := testEnv(t)
+
+		sn := &hangingWalkSnapshotter{Snapshotter: NewTmpSnapshotter()}
+		db := NewDB(bdb, nil, map[string]snapshots.Snapshotter{"tmp": sn})
+		if err := db.Init(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		// Orphan snapshots GC would normally remove.
+		for _, key := range []string{"orphan-1", "orphan-2"} {
+			if _, err := sn.Snapshotter.Prepare(ctx, key, ""); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// The fake clock reaches the GC pass deadline as soon as Walk blocks;
+		// an unbounded Walk would deadlock the bubble rather than pass.
+		msn := db.Snapshotter("tmp").(*snapshotter)
+		_, err := msn.garbageCollect(ctx)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected the bounded Walk to fail with DeadlineExceeded, got %v", err)
+		}
+
+		if n := sn.walks.Load(); n != 1 {
+			t.Fatalf("expected exactly 1 Walk attempt, got %d", n)
+		}
+		if n := sn.removes.Load(); n != 0 {
+			t.Fatalf("expected no Remove call after a timed-out Walk, got %d", n)
+		}
+		if n := sn.cleanups.Load(); n != 0 {
+			t.Fatalf("expected no Cleanup call after a failed pass, got %d", n)
+		}
 		for _, key := range []string{"orphan-1", "orphan-2"} {
 			if _, err := sn.Snapshotter.Stat(ctx, key); err != nil {
 				t.Fatalf("orphan %q should survive for the next GC pass: %v", key, err)
