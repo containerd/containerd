@@ -228,6 +228,9 @@ github.com/containerd/imgcrypt/v2/images/encryption
 ## explicit; go 1.20
 github.com/containerd/log
 github.com/containerd/log/logtest
+# github.com/containerd/log/otel v0.0.0-20260828142140-8b5d6538fa1f
+## explicit; go 1.23
+github.com/containerd/log/otel
 # github.com/containerd/nri v0.12.2
 ## explicit; go 1.24.0
 github.com/containerd/nri
