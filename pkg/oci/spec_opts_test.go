@@ -434,6 +434,12 @@ func TestWithCPUs(t *testing.T) {
 			assert.NoError(t, err)
 			if name == "linux" {
 				assert.Equal(t, expected, spec.Linux.Resources.CPU.Cpus)
+				for _, cpu := range []int{0, 1} {
+					path := fmt.Sprintf("/sys/devices/system/cpu/cpu%d/thermal_throttle", cpu)
+					if _, err := os.Stat(path); err == nil {
+						assert.Contains(t, spec.Linux.MaskedPaths, path)
+					}
+				}
 			} else {
 				assert.Empty(t, spec.Linux, "should not have modified spec")
 			}
