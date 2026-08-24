@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
@@ -185,6 +186,130 @@ func createLease(ctx context.Context, db *DB, name string) (context.Context, fun
 			ID: name,
 		})
 	}, nil
+}
+
+type hangingDeleteStore struct {
+	content.Store
+	deletes atomic.Int32
+}
+
+func (s *hangingDeleteStore) Delete(ctx context.Context, dgst digest.Digest) error {
+	s.deletes.Add(1)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestGarbageCollectHangingDelete(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, bdb := testEnv(t)
+
+		lcs, err := local.NewStore(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		cs := &hangingDeleteStore{Store: lcs}
+		db := NewDB(bdb, cs, nil)
+		if err := db.Init(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		// Orphan blobs: exist in the backend but not in metadata, so GC deletes them.
+		var orphans []digest.Digest
+		for _, data := range []string{"orphan-1", "orphan-2"} {
+			blob := []byte(data)
+			dgst := digest.FromBytes(blob)
+			if err := content.WriteBlob(ctx, lcs, data, bytes.NewReader(blob),
+				ocispec.Descriptor{Size: int64(len(blob)), Digest: dgst}); err != nil {
+				t.Fatal(err)
+			}
+			orphans = append(orphans, dgst)
+		}
+
+		// The fake clock reaches the delete deadline as soon as Delete blocks,
+		// so this runs against the real default instead of a shortened one. An
+		// unbounded Delete would deadlock the bubble rather than pass.
+		mcs := db.ContentStore().(*contentStore)
+		_, err = mcs.garbageCollect(ctx)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected the bounded Delete to fail with DeadlineExceeded, got %v", err)
+		}
+
+		if n := cs.deletes.Load(); n != 1 {
+			t.Fatalf("expected 1 delete attempt before abandoning the pass, got %d", n)
+		}
+		for _, dgst := range orphans {
+			if _, err := lcs.Info(ctx, dgst); err != nil {
+				t.Fatalf("orphan %q should survive for the next GC pass: %v", dgst, err)
+			}
+		}
+	})
+}
+
+type hangingAbortStore struct {
+	content.Store
+	aborts atomic.Int32
+}
+
+func (s *hangingAbortStore) Abort(ctx context.Context, ref string) error {
+	s.aborts.Add(1)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestGarbageCollectHangingAbort(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, bdb := testEnv(t)
+
+		lcs, err := local.NewStore(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		cs := &hangingAbortStore{Store: lcs}
+		db := NewDB(bdb, cs, nil)
+		if err := db.Init(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		// Commit one blob so the backend's blobs directory exists and the
+		// Walk phase can run; it is unreferenced, so GC deletes it (through
+		// the real local Delete) before reaching the ingest phase.
+		blob := []byte("walked")
+		if err := content.WriteBlob(ctx, lcs, "walked", bytes.NewReader(blob),
+			ocispec.Descriptor{Size: int64(len(blob)), Digest: digest.FromBytes(blob)}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Orphan ingests: open in the backend but unknown to metadata, so GC
+		// aborts them. The wrapper does not promote WalkStatusRefs, so this
+		// exercises the ListStatuses fallback.
+		refs := []string{"orphan-ingest-1", "orphan-ingest-2"}
+		for _, ref := range refs {
+			w, err := lcs.Writer(ctx, content.WithRef(ref))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		mcs := db.ContentStore().(*contentStore)
+		_, err = mcs.garbageCollect(ctx)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected the bounded Abort to fail with DeadlineExceeded, got %v", err)
+		}
+
+		if n := cs.aborts.Load(); n != 1 {
+			t.Fatalf("expected 1 abort attempt before abandoning the pass, got %d", n)
+		}
+		statuses, err := lcs.ListStatuses(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(statuses) != len(refs) {
+			t.Fatalf("expected %d ingests to survive for the next GC pass, got %d", len(refs), len(statuses))
+		}
+	})
 }
 
 func checkContentLeased(ctx context.Context, db *DB, dgst digest.Digest) error {
