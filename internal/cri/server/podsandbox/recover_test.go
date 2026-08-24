@@ -217,6 +217,7 @@ func TestRecoverContainer(t *testing.T) {
 	controller := &Controller{
 		config: criconfig.Config{},
 		store:  NewStore(),
+		ctx:    context.Background(),
 	}
 	containers := []struct {
 		container        fakeContainer

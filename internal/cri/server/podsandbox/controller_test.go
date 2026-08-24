@@ -48,6 +48,7 @@ func newControllerService() *Controller {
 		config: testConfig,
 		os:     ostesting.NewFakeOS(),
 		store:  NewStore(),
+		ctx:    context.Background(),
 	}
 }
 

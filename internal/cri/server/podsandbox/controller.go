@@ -90,6 +90,7 @@ func init() {
 				os:             osinterface.RealOS{},
 				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
+				ctx:            ic.Context,
 			}
 
 			// There is no need to subscribe to the exit event for the pause container,
@@ -122,6 +123,8 @@ type Controller struct {
 	eventMonitor *events.EventMonitor
 
 	store *Store
+
+	ctx context.Context
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
