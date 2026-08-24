@@ -81,12 +81,14 @@ func mountManagementResult(t *testing.T, caps *apitypes.MountCapabilities) *boot
 	return r
 }
 
+const testRuntimeName = "io.containerd.example.v1"
+
 func TestTaskMountControllerActivate(t *testing.T) {
 	rootfs := []mount.Mount{{Type: "bind", Source: "/src"}}
 
 	t.Run("nil manager returns rootfs unchanged", func(t *testing.T) {
 		c := &taskMountController{}
-		activation, err := c.Activate(context.Background(), "task", nil, rootfs)
+		activation, err := c.Activate(context.Background(), "task", testRuntimeName, nil, rootfs)
 		require.NoError(t, err)
 		assert.Equal(t, rootfs, activation.rootfs)
 		assert.False(t, activation.owned)
@@ -97,7 +99,7 @@ func TestTaskMountControllerActivate(t *testing.T) {
 		fm := &fakeMountManager{activateAI: mount.ActivationInfo{System: system}}
 		c := &taskMountController{manager: fm}
 
-		activation, err := c.Activate(context.Background(), "task", nil, rootfs)
+		activation, err := c.Activate(context.Background(), "task", testRuntimeName, nil, rootfs)
 		require.NoError(t, err)
 		assert.Equal(t, system, activation.rootfs)
 		assert.True(t, activation.owned)
@@ -111,7 +113,7 @@ func TestTaskMountControllerActivate(t *testing.T) {
 		}
 		c := &taskMountController{manager: fm}
 
-		activation, err := c.Activate(context.Background(), "task", nil, rootfs)
+		activation, err := c.Activate(context.Background(), "task", testRuntimeName, nil, rootfs)
 		require.NoError(t, err)
 		assert.Equal(t, system, activation.rootfs)
 		assert.False(t, activation.owned)
@@ -124,7 +126,7 @@ func TestTaskMountControllerActivate(t *testing.T) {
 		}
 		c := &taskMountController{manager: fm}
 
-		_, err := c.Activate(context.Background(), "task", nil, rootfs)
+		_, err := c.Activate(context.Background(), "task", testRuntimeName, nil, rootfs)
 		require.Error(t, err)
 	})
 
@@ -132,7 +134,7 @@ func TestTaskMountControllerActivate(t *testing.T) {
 		fm := &fakeMountManager{activateErr: errdefs.ErrNotImplemented}
 		c := &taskMountController{manager: fm}
 
-		activation, err := c.Activate(context.Background(), "task", nil, rootfs)
+		activation, err := c.Activate(context.Background(), "task", testRuntimeName, nil, rootfs)
 		require.NoError(t, err)
 		assert.Equal(t, rootfs, activation.rootfs)
 		assert.False(t, activation.owned)
@@ -142,7 +144,7 @@ func TestTaskMountControllerActivate(t *testing.T) {
 		fm := &fakeMountManager{activateErr: errdefs.ErrUnavailable}
 		c := &taskMountController{manager: fm}
 
-		_, err := c.Activate(context.Background(), "task", nil, rootfs)
+		_, err := c.Activate(context.Background(), "task", testRuntimeName, nil, rootfs)
 		require.Error(t, err)
 	})
 
@@ -155,7 +157,7 @@ func TestTaskMountControllerActivate(t *testing.T) {
 			Transforms: []string{"format", "mkfs"},
 		})
 
-		_, err := c.Activate(context.Background(), "task", bootstrap, rootfs)
+		_, err := c.Activate(context.Background(), "task", testRuntimeName, bootstrap, rootfs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"erofs", "loop"}, fm.lastActivateOpts.AllowMountTypes)
 		assert.Equal(t, []string{"format", "mkfs"}, fm.lastActivateOpts.AllowTransforms)
@@ -167,7 +169,7 @@ func TestTaskMountControllerActivate(t *testing.T) {
 
 		bootstrap := mountManagementResult(t, nil)
 
-		_, err := c.Activate(context.Background(), "task", bootstrap, rootfs)
+		_, err := c.Activate(context.Background(), "task", testRuntimeName, bootstrap, rootfs)
 		require.NoError(t, err)
 		assert.Empty(t, fm.lastActivateOpts.AllowMountTypes)
 		assert.Empty(t, fm.lastActivateOpts.AllowTransforms)
@@ -187,10 +189,103 @@ func TestTaskMountControllerActivate(t *testing.T) {
 			}},
 		}
 
-		_, err := c.Activate(context.Background(), "task", bootstrap, rootfs)
+		_, err := c.Activate(context.Background(), "task", testRuntimeName, bootstrap, rootfs)
 		require.NoError(t, err)
 		assert.Empty(t, fm.lastActivateOpts.AllowMountTypes)
 		assert.Empty(t, fm.lastActivateOpts.AllowTransforms)
+	})
+
+	t.Run("extension present takes precedence, legacy is not consulted", func(t *testing.T) {
+		fm := &fakeMountManager{}
+		legacyCalled := false
+		c := &taskMountController{
+			manager: fm,
+			legacy: &deprecatedMountCapabilities{
+				queryRuntimeInfo: func(context.Context, string) (*apitypes.RuntimeInfo, error) {
+					legacyCalled = true
+					return &apitypes.RuntimeInfo{}, nil
+				},
+			},
+		}
+
+		bootstrap := mountManagementResult(t, &apitypes.MountCapabilities{Types: []string{"erofs"}})
+
+		_, err := c.Activate(context.Background(), "task", testRuntimeName, bootstrap, rootfs)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"erofs"}, fm.lastActivateOpts.AllowMountTypes)
+		assert.False(t, legacyCalled, "legacy annotation lookup must not run when the extension is present")
+	})
+
+	t.Run("no extension falls back to the deprecated annotation", func(t *testing.T) {
+		fm := &fakeMountManager{}
+		c := &taskMountController{
+			manager: fm,
+			legacy: &deprecatedMountCapabilities{
+				queryRuntimeInfo: func(context.Context, string) (*apitypes.RuntimeInfo, error) {
+					return &apitypes.RuntimeInfo{
+						Annotations: map[string]string{
+							deprecatedAllowedMounts: "block,format/*",
+						},
+					}, nil
+				},
+			},
+		}
+
+		_, err := c.Activate(context.Background(), "task", testRuntimeName, nil, rootfs)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"block"}, fm.lastActivateOpts.AllowMountTypes)
+		assert.Equal(t, []string{"format"}, fm.lastActivateOpts.AllowTransforms)
+	})
+
+	t.Run("no extension and no annotation claims nothing", func(t *testing.T) {
+		fm := &fakeMountManager{}
+		c := &taskMountController{
+			manager: fm,
+			legacy: &deprecatedMountCapabilities{
+				queryRuntimeInfo: func(context.Context, string) (*apitypes.RuntimeInfo, error) {
+					return &apitypes.RuntimeInfo{}, nil
+				},
+			},
+		}
+
+		_, err := c.Activate(context.Background(), "task", testRuntimeName, nil, rootfs)
+		require.NoError(t, err)
+		assert.Empty(t, fm.lastActivateOpts.AllowMountTypes)
+		assert.Empty(t, fm.lastActivateOpts.AllowTransforms)
+	})
+
+	t.Run("a failed legacy lookup claims nothing rather than failing", func(t *testing.T) {
+		fm := &fakeMountManager{}
+		c := &taskMountController{
+			manager: fm,
+			legacy: &deprecatedMountCapabilities{
+				queryRuntimeInfo: func(context.Context, string) (*apitypes.RuntimeInfo, error) {
+					return nil, errdefs.ErrUnavailable
+				},
+			},
+		}
+
+		_, err := c.Activate(context.Background(), "task", testRuntimeName, nil, rootfs)
+		require.NoError(t, err)
+		assert.Empty(t, fm.lastActivateOpts.AllowMountTypes)
+	})
+
+	t.Run("well known default runtimes are never queried for the annotation", func(t *testing.T) {
+		fm := &fakeMountManager{}
+		queried := false
+		c := &taskMountController{
+			manager: fm,
+			legacy: &deprecatedMountCapabilities{
+				queryRuntimeInfo: func(context.Context, string) (*apitypes.RuntimeInfo, error) {
+					queried = true
+					return &apitypes.RuntimeInfo{}, nil
+				},
+			},
+		}
+
+		_, err := c.Activate(context.Background(), "task", "io.containerd.runc.v2", nil, rootfs)
+		require.NoError(t, err)
+		assert.False(t, queried)
 	})
 }
 

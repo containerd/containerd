@@ -111,10 +111,13 @@ func init() {
 			emitPlatformWarnings(ic.Context, warnings)
 
 			return &TaskManager{
-				root:       root,
-				state:      state,
-				manager:    shimManager,
-				taskMounts: &taskMountController{manager: mounts},
+				root:    root,
+				state:   state,
+				manager: shimManager,
+				taskMounts: &taskMountController{
+					manager: mounts,
+					legacy:  newDeprecatedMountCapabilities(shimManager),
+				},
 			}, nil
 		},
 	})
@@ -137,10 +140,12 @@ func NewTaskManager(ctx context.Context, root, state string, shims *ShimManager)
 		return nil, fmt.Errorf("failed to load existing shims for task manager")
 	}
 	m := &TaskManager{
-		root:       root,
-		state:      state,
-		manager:    shims,
-		taskMounts: &taskMountController{},
+		root:    root,
+		state:   state,
+		manager: shims,
+		taskMounts: &taskMountController{
+			legacy: newDeprecatedMountCapabilities(shims),
+		},
 	}
 	return m, nil
 }
@@ -198,7 +203,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	if sc, ok := shim.(shimCapabilities); ok {
 		bootstrap = sc.BootstrapResult()
 	}
-	activation, err = m.taskMounts.Activate(ctx, taskID, bootstrap, opts.Rootfs)
+	activation, err = m.taskMounts.Activate(ctx, taskID, opts.Runtime, bootstrap, opts.Rootfs)
 	if err != nil {
 		return nil, err
 	}

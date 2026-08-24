@@ -36,6 +36,11 @@ import (
 // Activate then returns rootfs unchanged.
 type taskMountController struct {
 	manager mount.Manager
+
+	// legacy discovers mount capabilities from the deprecated
+	// runtime-allow-mounts annotation, for a shim that does not attach a
+	// MountCapabilities extension. A nil legacy disables the fallback.
+	legacy *deprecatedMountCapabilities
 }
 
 // mountActivation is the result of activating a task's rootfs mounts.
@@ -51,10 +56,14 @@ type mountActivation struct {
 }
 
 // Activate activates rootfs for taskID, translating the mount types and
-// transforms named in bootstrap's MountCapabilities extension, if any, into
-// claims the mount manager will not perform on the caller's behalf. bootstrap
-// may be nil, meaning the shim advertised nothing.
-func (c *taskMountController) Activate(ctx context.Context, taskID string, bootstrap *bootapi.BootstrapResult, rootfs []mount.Mount) (mountActivation, error) {
+// transforms named in bootstrap's MountCapabilities extension into claims the
+// mount manager will not perform on the caller's behalf. bootstrap may be
+// nil, meaning the shim advertised nothing over bootstrap.
+//
+// If bootstrap carries no such extension, runtimeName is checked against the
+// deprecated runtime-allow-mounts annotation as a migration path; see
+// [deprecatedMountCapabilities].
+func (c *taskMountController) Activate(ctx context.Context, taskID string, runtimeName string, bootstrap *bootapi.BootstrapResult, rootfs []mount.Mount) (mountActivation, error) {
 	if c.manager == nil {
 		return mountActivation{rootfs: rootfs}, nil
 	}
@@ -64,7 +73,7 @@ func (c *taskMountController) Activate(ctx context.Context, taskID string, boots
 			"containerd.io/gc.bref.container": taskID,
 		}),
 	}
-	activateOpts = append(activateOpts, mountClaimOpts(ctx, bootstrap)...)
+	activateOpts = append(activateOpts, c.mountClaimOpts(ctx, runtimeName, bootstrap)...)
 
 	ai, err := c.manager.Activate(ctx, taskID, rootfs, activateOpts...)
 	switch {
@@ -95,12 +104,12 @@ func (c *taskMountController) Deactivate(ctx context.Context, taskID string) err
 	return c.manager.Deactivate(ctx, taskID)
 }
 
-// mountClaimOpts translates the MountCapabilities extension carried in
-// bootstrap, if any, into activation options describing the mount types and
-// transforms the shim performs itself. bootstrap may be nil.
-func mountClaimOpts(ctx context.Context, bootstrap *bootapi.BootstrapResult) []mount.ActivateOpt {
-	var caps apitypes.MountCapabilities
-	found, err := bootstrap.FindExtension(&caps)
+// mountClaimOpts translates the mount capabilities of runtimeName's shim into
+// activation options describing the mount types and transforms it performs
+// itself. bootstrap's MountCapabilities extension is authoritative when
+// present; otherwise c.legacy is consulted as a migration path.
+func (c *taskMountController) mountClaimOpts(ctx context.Context, runtimeName string, bootstrap *bootapi.BootstrapResult) []mount.ActivateOpt {
+	caps, err := mountCapabilitiesExtension(bootstrap)
 	if err != nil {
 		// The shim's mount capabilities are unreadable. Claiming nothing means
 		// the mount manager does the work, which is the safe direction to
@@ -108,7 +117,10 @@ func mountClaimOpts(ctx context.Context, bootstrap *bootapi.BootstrapResult) []m
 		log.G(ctx).WithError(err).Error("failed to read shim mount capabilities, assuming none")
 		return nil
 	}
-	if !found {
+	if caps == nil {
+		caps = c.legacy.lookup(ctx, runtimeName)
+	}
+	if caps == nil {
 		return nil
 	}
 
@@ -120,4 +132,18 @@ func mountClaimOpts(ctx context.Context, bootstrap *bootapi.BootstrapResult) []m
 		opts = append(opts, mount.WithAllowTransform(t))
 	}
 	return opts
+}
+
+// mountCapabilitiesExtension extracts the MountCapabilities extension from
+// bootstrap, if any. bootstrap may be nil.
+func mountCapabilitiesExtension(bootstrap *bootapi.BootstrapResult) (*apitypes.MountCapabilities, error) {
+	var caps apitypes.MountCapabilities
+	found, err := bootstrap.FindExtension(&caps)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return &caps, nil
 }
