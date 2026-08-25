@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -152,17 +151,6 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		opt(&config)
 	}
 
-	// shouldTransform reports whether the mount manager must apply transform p,
-	// which appeared as a prefix of the full mount type t. The caller may
-	// claim it either by name, or by naming the whole mount type t.
-	shouldTransform := func(p string, t string) bool {
-		return !slices.Contains(config.AllowTransforms, p) && !slices.Contains(config.AllowMountTypes, t)
-	}
-
-	shouldHandle := func(t string) bool {
-		return !slices.Contains(config.AllowMountTypes, t)
-	}
-
 	transforms := map[string]mount.Transformer{
 		"format": mountFormatter{},
 		"mkfs": &mkfs{
@@ -174,59 +162,10 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	}
 
 	start := time.Now()
-	// highest index of a mount
-	// first system mount is the first index which should be mounted by the system
-	var firstSystemMount = -1
-	var mountConv [][]mount.Transformer
-	var handlers []mount.Handler
-	for i := range mounts {
-		mountType := mounts[i].Type
-
-		// Check is the source needs transformation, any transform operation requires
-		// mounting with the mount manager.
-		for transformType, mt, ok := strings.Cut(mountType, "/"); ok; transformType, mt, ok = strings.Cut(mountType, "/") {
-			if tr, ok := transforms[transformType]; ok {
-				if shouldTransform(transformType, mounts[i].Type) {
-					// At least everything before this must be mounted
-					// by the mount manager
-					firstSystemMount = i
-				}
-
-				if handlers == nil {
-					handlers = make([]mount.Handler, len(mounts))
-				}
-
-				if mountConv == nil {
-					mountConv = make([][]mount.Transformer, len(mounts))
-				}
-
-				mountConv[i] = append(mountConv[i], typeTransformer{
-					Transformer: tr,
-					mountType:   mt,
-				})
-
-				mountType = mt
-			} else {
-				log.G(ctx).Warnf("unknown transform %q for mount %v", transformType, mounts[i])
-				break
-			}
-		}
-
-		var handler mount.Handler
-		if mm.handlers != nil {
-			handler = mm.handlers[mountType]
-		}
-
-		if handler != nil || config.Temporary {
-			if handlers == nil {
-				handlers = make([]mount.Handler, len(mounts))
-			}
-			handlers[i] = handler
-			if shouldHandle(mountType) || config.Temporary {
-				firstSystemMount = i + 1
-			}
-		}
-	}
+	plan := planActivation(ctx, mounts, config, transforms, mm.handlers)
+	firstSystemMount := plan.firstSystemMount
+	mountConv := plan.transforms
+	handlers := plan.handlers
 	// If no mounts are handled here, return not implemented and caller
 	// may just perform system mounts as normal.
 	if firstSystemMount == -1 {
