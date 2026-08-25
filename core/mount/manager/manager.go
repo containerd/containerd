@@ -408,9 +408,17 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		mounted = append(mounted, active)
 	}
 
-	// If first system mount is converted, fill in the format
-	if mountConv != nil {
-		for _, tr := range mountConv[firstSystemMount] {
+	// If the first system mount has transforms, apply the ones the caller
+	// has not claimed. A claim can only be honored as a suffix of the
+	// chain: applyCount always covers at least every transform up to and
+	// including the last unclaimed one, since each depends on the last's
+	// output; see planActivation.
+	//
+	// firstSystemMount can reach len(mounts) when every mount is handled
+	// inside the manager (for example, every mount claimed via Temporary);
+	// there is then no system mount left to transform.
+	if mountConv != nil && firstSystemMount < len(mounts) {
+		for _, tr := range mountConv[firstSystemMount][:plan.applyCount[firstSystemMount]] {
 			newM, err := tr.Transform(ctx, mounts[firstSystemMount], mounted)
 			if err != nil {
 				return mount.ActivationInfo{}, err

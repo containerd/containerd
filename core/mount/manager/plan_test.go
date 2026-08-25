@@ -65,30 +65,47 @@ func TestPlanActivationTransformChain(t *testing.T) {
 		name              string
 		opts              []mount.ActivateOpt
 		expectFirstSystem int
+		expectApplyCount  int
 	}{
 		{
-			name:              "nothing claimed requires the manager",
+			// Nothing claimed: the manager must apply the whole chain, the
+			// same as it always has.
+			name:              "nothing claimed applies the whole chain",
 			expectFirstSystem: 0,
+			expectApplyCount:  2,
 		},
 		{
-			name:              "a claimed transform still requires the manager for now",
+			// Claiming the innermost transform lets the manager stop after
+			// the one before it: mkdir is left for the caller.
+			name:              "innermost transform claimed is honored",
 			opts:              []mount.ActivateOpt{mount.WithAllowTransform("mkdir")},
 			expectFirstSystem: 0,
+			expectApplyCount:  1,
 		},
 		{
-			name: "every transform claimed no longer requires the manager",
+			// Claiming the outermost transform alone cannot be honored:
+			// mkdir's input depends on format having already run.
+			name:              "outermost transform claimed alone is not honored",
+			opts:              []mount.ActivateOpt{mount.WithAllowTransform("format")},
+			expectFirstSystem: 0,
+			expectApplyCount:  2,
+		},
+		{
+			name: "both transforms claimed applies neither",
 			opts: []mount.ActivateOpt{
 				mount.WithAllowTransform("format"),
 				mount.WithAllowTransform("mkdir"),
 			},
 			expectFirstSystem: -1,
+			expectApplyCount:  0,
 		},
 		{
 			// Claiming the full literal mount type is equivalent to
 			// claiming every transform in its chain.
-			name:              "full mount type claimed no longer requires the manager",
+			name:              "full mount type claimed applies neither",
 			opts:              []mount.ActivateOpt{mount.WithAllowMountType("format/mkdir/overlay")},
 			expectFirstSystem: -1,
+			expectApplyCount:  0,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -99,9 +116,31 @@ func TestPlanActivationTransformChain(t *testing.T) {
 
 			plan := planActivation(context.Background(), mounts, config, testTransforms, nil)
 			assert.Equal(t, tc.expectFirstSystem, plan.firstSystemMount)
-			require.Len(t, plan.transforms[0], 2)
+			if tc.expectFirstSystem >= 0 {
+				require.NotNil(t, plan.applyCount)
+				assert.Equal(t, tc.expectApplyCount, plan.applyCount[0])
+				require.Len(t, plan.transforms[0], 2)
+			}
 		})
 	}
+}
+
+// TestPlanActivationClaimedGapInMiddle covers a three transform chain where
+// an unclaimed transform sits between two claimed ones: the middle one still
+// forces the manager to apply everything up to and including it, regardless
+// of the outer claim, and only the true suffix after it is left claimed.
+func TestPlanActivationClaimedGapInMiddle(t *testing.T) {
+	mounts := []mount.Mount{{Type: "format/mkfs/mkdir/overlay"}}
+	config := mount.ActivateOptions{}
+	mount.WithAllowTransform("format")(&config)
+	mount.WithAllowTransform("mkdir")(&config)
+	// mkfs is left unclaimed.
+
+	plan := planActivation(context.Background(), mounts, config, testTransforms, nil)
+	require.Equal(t, 0, plan.firstSystemMount)
+	require.Len(t, plan.transforms[0], 3)
+	// format(0) and mkfs(1) must be applied; mkdir(2) is left to the caller.
+	assert.Equal(t, 2, plan.applyCount[0])
 }
 
 func TestPlanActivationUnknownTransform(t *testing.T) {
@@ -172,4 +211,20 @@ func TestPlanActivationTemporary(t *testing.T) {
 	plan := planActivation(context.Background(), mounts, config, testTransforms, nil)
 	require.Len(t, plan.handlers, 1)
 	assert.Equal(t, 1, plan.firstSystemMount)
+}
+
+func TestPlanActivationTemporaryIgnoresTransformClaims(t *testing.T) {
+	mounts := []mount.Mount{{Type: "format/mkdir/overlay"}}
+	config := mount.ActivateOptions{}
+	mount.WithTemporary(&config)
+	mount.WithAllowTransform("format")(&config)
+	mount.WithAllowTransform("mkdir")(&config)
+
+	plan := planActivation(context.Background(), mounts, config, testTransforms, nil)
+	// Temporary forces this, the only mount, to be handled, advancing
+	// firstSystemMount past it. It does not change how much of a transform
+	// chain is required, which is governed solely by what is claimed: both
+	// transforms here are claimed, so applyCount stays at 0.
+	assert.Equal(t, 1, plan.firstSystemMount)
+	assert.Equal(t, 0, plan.applyCount[0])
 }

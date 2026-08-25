@@ -42,6 +42,18 @@ type activationPlan struct {
 	// prefix.
 	transforms [][]mount.Transformer
 
+	// applyCount[i] is how many of transforms[i], from the start, the
+	// manager must apply itself: through the last transform in the chain the
+	// caller did not claim. Meaningful only for mounts[firstSystemMount],
+	// the one mount returned to the caller with some of its own transforms
+	// possibly still unapplied; every earlier mount's transforms are always
+	// applied in full; they are internal to the manager and never exposed
+	// to the caller. A transform, once applied, resolves the input the next
+	// one in the chain depends on, so a run of claimed transforms can only
+	// be honored as a suffix: transforms strictly after the last unclaimed
+	// one in the chain.
+	applyCount []int
+
 	// handlers[i] is the Handler to use for mounts[i], or nil to perform a
 	// plain system mount.
 	handlers []mount.Handler
@@ -51,6 +63,16 @@ type activationPlan struct {
 // must apply and whether the manager or the caller performs the mount
 // itself, honoring the mount types and transforms config.AllowMountTypes and
 // config.AllowTransforms claim.
+//
+// A claimed transform is honored only for mounts[firstSystemMount] in the
+// result, and only as a suffix of its transform chain: transforms apply
+// outside-in, so an inner transform's input depends on an outer, unclaimed
+// transform's output, and the manager must still apply that outer transform
+// even though the caller performs the suffix itself. For example, in
+// "format/mkdir/overlay", claiming "mkdir" causes the manager to apply
+// "format" and hand the caller "mkdir/overlay" to finish; claiming "format"
+// alone does nothing, since "mkdir" cannot run without it having already
+// run.
 func planActivation(ctx context.Context, mounts []mount.Mount, config mount.ActivateOptions, transforms map[string]mount.Transformer, handlers map[string]mount.Handler) activationPlan {
 	shouldTransform := func(p string, t string) bool {
 		return !slices.Contains(config.AllowTransforms, p) && !slices.Contains(config.AllowMountTypes, t)
@@ -73,7 +95,10 @@ func planActivation(ctx context.Context, mounts []mount.Mount, config mount.Acti
 				break
 			}
 
-			if shouldTransform(transformType, mounts[i].Type) { //nolint:gosec // G602: i is bounded by range mounts
+			// mustApply reports whether the manager itself must apply this
+			// transform, as opposed to the caller having claimed it.
+			mustApply := shouldTransform(transformType, mounts[i].Type) //nolint:gosec // G602: i is bounded by range mounts
+			if mustApply {
 				// At least everything before this must be mounted
 				// by the mount manager
 				plan.firstSystemMount = i
@@ -85,11 +110,21 @@ func planActivation(ctx context.Context, mounts []mount.Mount, config mount.Acti
 			if plan.transforms == nil {
 				plan.transforms = make([][]mount.Transformer, len(mounts))
 			}
+			if plan.applyCount == nil {
+				plan.applyCount = make([]int, len(mounts))
+			}
 
 			plan.transforms[i] = append(plan.transforms[i], typeTransformer{
 				Transformer: tr,
 				mountType:   mt,
 			})
+			if mustApply {
+				// Every transform up to and including this one must be
+				// applied by the manager: this one because it is unclaimed,
+				// and every one before it because this one's input depends
+				// on their output.
+				plan.applyCount[i] = len(plan.transforms[i])
+			}
 
 			mountType = mt
 		}
