@@ -19,7 +19,7 @@ require (
 	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.13
 	github.com/containerd/go-dmverity v0.1.0
-	github.com/containerd/go-runc v1.2.0
+	github.com/containerd/go-runc v1.2.1
 	github.com/containerd/imgcrypt/v2 v2.0.3
 	github.com/containerd/log v0.1.0
 	github.com/containerd/nri v0.12.2

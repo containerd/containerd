@@ -64,13 +64,13 @@ func newTempSocket(prefix, name string) (*Socket, error) {
 	}
 	s, err := newSocket(filepath.Join(dir, name))
 	if err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir) // #nosec G703 -- dir was created by os.MkdirTemp above.
 		return nil, err
 	}
 	s.rmdir = true
 	if runtimeDir != "" {
-		if err := os.Chmod(s.Path(), 0o755|os.ModeSticky); err != nil {
-			s.Close()
+		if err := os.Chmod(s.Path(), 0o755|os.ModeSticky); err != nil { // #nosec G703 -- the path identifies the socket created in the temporary directory.
+			_ = s.Close()
 			return nil, err
 		}
 	}
@@ -86,8 +86,8 @@ func (c *Socket) Path() string {
 func (c *Socket) Close() error {
 	err := c.l.Close()
 	if c.rmdir {
-		if rerr := os.RemoveAll(filepath.Dir(c.Path())); err == nil {
-			err = rerr
+		if rErr := os.RemoveAll(filepath.Dir(c.Path())); err == nil { // #nosec G703 -- rmdir is set only for sockets created in a private temporary directory.
+			err = rErr
 		}
 	}
 	return err
