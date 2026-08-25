@@ -277,7 +277,13 @@ info, err := mountManager.Activate(ctx, name, mounts,
 
 A claimed mount or transform is still performed by the mount manager if a
 subsequent mount depends on it, since the runtime cannot supply a mount point
-that does not exist yet.
+that does not exist yet. Similarly, a claimed transform is only honored as a
+suffix of the transform chain it appears in: transforms apply outside-in, so
+an inner one's input is an outer one's output, and the manager still applies
+an outer, unclaimed transform even when an inner one is claimed. Claiming
+`format` alone in `format/mkdir/overlay` does nothing, since `mkdir` cannot
+run without `format` having already run; claiming `mkdir` gets the manager to
+apply `format` and hand back `mkdir/overlay`.
 
 #### Support with containerd shims
 
