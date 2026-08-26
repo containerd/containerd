@@ -33,6 +33,16 @@ import (
 // networkNotReadyReason is the reason reported when network is not ready.
 const networkNotReadyReason = "NetworkPluginNotReady"
 
+// verboseConfig returns the configuration reported by a verbose Status. It
+// reports the effective checkpoint/restore setting under both names; enableCRIU
+// stays until the deprecated enable_criu option is removed.
+func (c *criService) verboseConfig() ([]byte, error) {
+	config := c.config
+	enabled := config.CheckpointRestoreEnabled()
+	config.EnableCheckpointRestore, config.EnableCRIU = &enabled, &enabled
+	return json.Marshal(config)
+}
+
 // Status returns the status of the runtime.
 func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*runtime.StatusResponse, error) {
 	// As a containerd plugin, if CRI plugin is serving request,
@@ -70,7 +80,7 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 	})
 
 	if r.Verbose {
-		configByt, err := json.Marshal(c.config)
+		configByt, err := c.verboseConfig()
 		if err != nil {
 			return nil, err
 		}
