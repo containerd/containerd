@@ -532,11 +532,11 @@ func TestCheckLocalImagePullConfigs(t *testing.T) {
 	}
 }
 
-func TestDefaultConfigEnableCRIU(t *testing.T) {
+func TestDefaultConfigEnableCheckpointRestore(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("only supported on Linux")
 	}
 	cfg := DefaultRuntimeConfig()
-	assert.NotNil(t, cfg.EnableCRIU)
-	assert.True(t, *cfg.EnableCRIU)
+	assert.NotNil(t, cfg.EnableCheckpointRestore)
+	assert.True(t, *cfg.EnableCheckpointRestore)
 }
