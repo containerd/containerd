@@ -28,8 +28,8 @@ func (c *criService) checkPodCheckpointSupport() error {
 	if c.podCheckpointSupportCheck != nil {
 		return c.podCheckpointSupportCheck()
 	}
-	if c.config.EnableCRIU != nil && !*c.config.EnableCRIU {
-		return fmt.Errorf("criu support is disabled by configuration: %w", errdefs.ErrFailedPrecondition)
+	if !c.config.CheckpointRestoreEnabled() {
+		return fmt.Errorf("checkpoint/restore support is disabled by configuration: %w", errdefs.ErrFailedPrecondition)
 	}
 	return nil
 }

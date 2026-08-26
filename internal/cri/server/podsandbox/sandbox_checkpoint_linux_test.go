@@ -778,7 +778,7 @@ func TestWritePodCheckpointMetadata(t *testing.T) {
 func TestControllerChecksCheckpointRestoreSetting(t *testing.T) {
 	disabled := false
 	c := &Controller{checkpoint: new(CheckpointService)}
-	c.config.EnableCRIU = &disabled
+	c.config.EnableCheckpointRestore = &disabled
 
 	err := c.Checkpoint(t.Context(), "sandbox", sandbox.CheckpointOptions{})
 	require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)

@@ -166,7 +166,7 @@ func (c *Controller) Checkpoint(ctx context.Context, sandboxID string, opts sand
 // checkpointRestoreEnabled applies the CRI runtime setting to callers of the
 // sandbox controller API as well as to CRI requests.
 func (c *Controller) checkpointRestoreEnabled() error {
-	if c.config.EnableCRIU != nil && !*c.config.EnableCRIU {
+	if !c.config.CheckpointRestoreEnabled() {
 		return fmt.Errorf("checkpoint/restore support is disabled by configuration: %w", errdefs.ErrFailedPrecondition)
 	}
 	return nil
