@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"unsafe"
@@ -25,6 +26,7 @@ import (
 	"github.com/containerd/containerd/api/services/introspection/v1"
 	containerd "github.com/containerd/containerd/v2/client"
 	coreintrospection "github.com/containerd/containerd/v2/core/introspection"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -136,4 +138,28 @@ func TestStatusRuntimeHandlersOrdering(t *testing.T) {
 
 	// Fail if runtime handlers order varies across calls to Status()
 	assert.True(t, sameOrder, "RuntimeHandlers order is unstable across Status() calls")
+}
+
+func TestVerboseConfigReportsCheckpointRestore(t *testing.T) {
+	disabled := false
+	for _, test := range []struct {
+		name    string
+		setting *bool
+		want    bool
+	}{
+		{name: "default", want: new(criconfig.RuntimeConfig).CheckpointRestoreEnabled()},
+		{name: "disabled", setting: &disabled, want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := newStatusTestCRIService()
+			c.config.EnableCheckpointRestore = test.setting
+			data, err := c.verboseConfig()
+			assert.NoError(t, err)
+			var config map[string]any
+			assert.NoError(t, json.Unmarshal(data, &config))
+			assert.Equal(t, test.want, config["enableCheckpointRestore"])
+			assert.Equal(t, test.want, config["enableCRIU"], "the deprecated name is still reported")
+			assert.Equal(t, test.setting, c.config.EnableCheckpointRestore, "the service config is not modified")
+		})
+	}
 }

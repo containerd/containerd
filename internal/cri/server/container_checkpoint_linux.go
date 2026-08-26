@@ -98,8 +98,8 @@ func (c *criService) checkCriu() error {
 }
 
 func (c *criService) doCheckCriu() error {
-	if c.config.EnableCRIU != nil && !*c.config.EnableCRIU {
-		return errors.New("criu support is disabled by configuration")
+	if !c.config.CheckpointRestoreEnabled() {
+		return errors.New("checkpoint/restore support is disabled by configuration")
 	}
 	path := resolveCriuPath(c.shimPath)
 	if path == "" {

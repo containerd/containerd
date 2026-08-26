@@ -283,7 +283,9 @@ version = 3
     ignore_deprecation_warnings = []
     stats_collect_period = '1s'
     stats_retention_period = '2m'
-    enable_criu = true
+    # enable_checkpoint_restore gates CheckpointContainer. When unset, it is
+    # enabled except on Windows. Checkpoint/restore is implemented only on Linux.
+    enable_checkpoint_restore = true
 
     [plugins.'io.containerd.cri.v1.runtime'.containerd]
       default_runtime_name = 'runc'
@@ -795,3 +797,9 @@ policy of "admin-facing CLI components"](https://kubernetes.io/docs/reference/us
 In summary, when a config option is announced to be deprecated:
 * It is kept functional for 6 months or 1 release (whichever is longer);
 * A warning is emitted when it is used.
+
+The `enable_criu` option is accepted as a deprecated alias for
+`enable_checkpoint_restore` until containerd v2.6. If both options are set to
+different values, the CRI runtime plugin fails to load. The verbose CRI status
+(`crictl info`) reports the effective value as both `enableCheckpointRestore`
+and `enableCRIU` until the alias is removed.
