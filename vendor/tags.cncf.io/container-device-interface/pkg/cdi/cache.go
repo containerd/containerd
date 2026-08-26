@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -37,7 +38,7 @@ type Option func(*Cache)
 
 // Cache stores CDI Specs loaded from Spec directories.
 type Cache struct {
-	mu        sync.Mutex
+	mu        sync.RWMutex
 	specDirs  []string
 	specs     map[string][]*Spec
 	devices   map[string]*Device
@@ -89,15 +90,15 @@ func NewCache(options ...Option) (*Cache, error) {
 // This function allows testing without handling the nil error returned by the
 // NewCache function.
 func newCache(options ...Option) *Cache {
+	specDirs := slices.Clone(DefaultSpecDirs)
+	for i := range specDirs {
+		specDirs[i] = filepath.Clean(specDirs[i])
+	}
 	c := &Cache{
+		specDirs:    specDirs,
 		autoRefresh: true,
 		watch:       &watch{},
 	}
-
-	WithSpecDirs(DefaultSpecDirs...)(c)
-	c.Lock()
-	defer c.Unlock()
-
 	c.configure(options...)
 	return c
 }
@@ -239,22 +240,21 @@ func (c *Cache) refreshIfRequired(force bool) (bool, error) {
 // any of the devices. Might trigger a cache refresh, in which case any
 // errors encountered can be obtained using GetErrors().
 func (c *Cache) InjectDevices(ociSpec *oci.Spec, devices ...string) ([]string, error) {
-	var unresolved []string
-
 	if ociSpec == nil {
 		return devices, fmt.Errorf("can't inject devices, nil OCI Spec")
 	}
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	_, _ = c.refreshIfRequired(false) // we record but ignore errors
+	cachedDevices := c.devices
+	c.mu.Unlock()
 
 	edits := &ContainerEdits{}
 	specs := map[*Spec]struct{}{}
 
+	var unresolved []string
 	for _, device := range devices {
-		d := c.devices[device]
+		d := cachedDevices[device]
 		if d == nil {
 			unresolved = append(unresolved, device)
 			continue
@@ -266,7 +266,7 @@ func (c *Cache) InjectDevices(ociSpec *oci.Spec, devices ...string) ([]string, e
 		edits.Append(d.edits())
 	}
 
-	if unresolved != nil {
+	if len(unresolved) > 0 {
 		return unresolved, fmt.Errorf("unresolvable CDI devices %s",
 			strings.Join(unresolved, ", "))
 	}
@@ -281,8 +281,8 @@ func (c *Cache) InjectDevices(ociSpec *oci.Spec, devices ...string) ([]string, e
 // highestPrioritySpecDir returns the Spec directory with highest priority
 // and its priority.
 func (c *Cache) highestPrioritySpecDir() (string, int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if len(c.specDirs) == 0 {
 		return "", -1
 	}
@@ -440,40 +440,37 @@ func (c *Cache) GetVendorSpecs(vendor string) []*Spec {
 // GetSpecErrors returns all errors encountered for the spec during the
 // last cache refresh.
 func (c *Cache) GetSpecErrors(spec *Spec) []error {
-	var errors []error
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if errs, ok := c.errors[spec.GetPath()]; ok {
-		errors = make([]error, len(errs))
-		copy(errors, errs)
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	var errs []error
+	if e, ok := c.errors[spec.GetPath()]; ok {
+		errs = make([]error, len(e))
+		copy(errs, e)
 	}
-
-	return errors
+	return errs
 }
 
 // GetErrors returns all errors encountered during the last
 // cache refresh.
 func (c *Cache) GetErrors() map[string][]error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-	errors := map[string][]error{}
+	errsByPath := make(map[string][]error, len(c.errors)+len(c.dirErrors))
 	for path, errs := range c.errors {
-		errors[path] = errs
+		errsByPath[path] = slices.Clone(errs)
 	}
 	for path, err := range c.dirErrors {
-		errors[path] = []error{err}
+		errsByPath[path] = append(errsByPath[path], err)
 	}
 
-	return errors
+	return errsByPath
 }
 
 // GetSpecDirectories returns the CDI Spec directories currently in use.
 func (c *Cache) GetSpecDirectories() []string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	dirs := make([]string, len(c.specDirs))
 	copy(dirs, c.specDirs)
@@ -482,18 +479,17 @@ func (c *Cache) GetSpecDirectories() []string {
 
 // GetSpecDirErrors returns any errors related to configured Spec directories.
 func (c *Cache) GetSpecDirErrors() map[string]error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if c.dirErrors == nil {
 		return nil
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	errors := make(map[string]error)
+	errs := make(map[string]error)
 	for dir, err := range c.dirErrors {
-		errors[dir] = err
+		errs[dir] = err
 	}
-	return errors
+	return errs
 }
 
 // Our fsnotify helper wrapper.
@@ -525,7 +521,7 @@ func (w *watch) setup(dirs []string, dirErrors map[string]error) {
 }
 
 // Start watching Spec directories for relevant changes.
-func (w *watch) start(m *sync.Mutex, refresh func() error, dirErrors map[string]error) {
+func (w *watch) start(m sync.Locker, refresh func() error, dirErrors map[string]error) {
 	go w.watch(w.watcher, m, refresh, dirErrors)
 }
 
@@ -540,7 +536,7 @@ func (w *watch) stop() {
 }
 
 // Watch Spec directory changes, triggering a refresh if necessary.
-func (w *watch) watch(fsw *fsnotify.Watcher, m *sync.Mutex, refresh func() error, dirErrors map[string]error) {
+func (w *watch) watch(fsw *fsnotify.Watcher, m sync.Locker, refresh func() error, dirErrors map[string]error) {
 	watch := fsw
 	if watch == nil {
 		return

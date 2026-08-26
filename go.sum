@@ -483,7 +483,7 @@ sigs.k8s.io/structured-merge-diff/v6 v6.3.3 h1:u08YRbVUi59ri4YD6cg0UqNM4Dimn0sIl
 sigs.k8s.io/structured-merge-diff/v6 v6.3.3/go.mod h1:M3W8sfWvn2HhQDIbGWj3S099YozAsymCo/wrT5ohRUE=
 sigs.k8s.io/yaml v1.6.0 h1:G8fkbMSAFqgEFgh4b1wmtzDnioxFCUgTZhlbj5P9QYs=
 sigs.k8s.io/yaml v1.6.0/go.mod h1:796bPqUfzR/0jLAl6XjHl3Ck7MiyVv8dbTdyT3/pMf4=
-tags.cncf.io/container-device-interface v1.1.1-0.20260821104259-05ae4b5bb730 h1:NuSCUaVzBFW1LiMcDX/wZ3VdA/q458KECnyUdrwEido=
-tags.cncf.io/container-device-interface v1.1.1-0.20260821104259-05ae4b5bb730/go.mod h1:jVY9hjUihztt6IeqoTpMXrS8Yy3aRlwfqrLGs15fyOY=
+tags.cncf.io/container-device-interface v1.1.1-0.20260826075544-04278701a635 h1:BSdEG36pYJ3iFfMvua9IqGV/3XgK9p32+OKH+bS9Ubw=
+tags.cncf.io/container-device-interface v1.1.1-0.20260826075544-04278701a635/go.mod h1:HA0pPeZss+nHZlCo/jQcm8aWXfHLZfIH9U7pGokV/V4=
 tags.cncf.io/container-device-interface/specs-go v1.1.0 h1:QRZVeAceQM+zTZe12eyfuJuuzp524EKYwhmvLd+h+yQ=
 tags.cncf.io/container-device-interface/specs-go v1.1.0/go.mod h1:u86hoFWqnh3hWz3esofRFKbI261bUlvUfLKGrDhJkgQ=
