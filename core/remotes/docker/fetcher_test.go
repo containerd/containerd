@@ -34,12 +34,16 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/pkg/reference"
 )
 
 func TestFetcherOpen(t *testing.T) {
@@ -284,6 +288,235 @@ func TestFetcherOpenParallel(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = io.ReadAll(body)
 	assert.Error(t, err, "this should have failed")
+}
+
+func TestFetcherDescURLsDoesNotForwardResolverHeaders(t *testing.T) {
+	body := []byte("ok")
+
+	headersCh := make(chan http.Header, 1)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		headersCh <- r.Header.Clone()
+		rw.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = rw.Write(body)
+	}))
+	defer s.Close()
+
+	refspec, err := reference.Parse("example.com/library/test:latest")
+	require.NoError(t, err)
+
+	f := dockerFetcher{&dockerBase{
+		refspec:    refspec,
+		repository: "library/test",
+		header: http.Header{
+			"Authorization":       {"Bearer should-strip"},
+			"Proxy-Authorization": {"Basic should-strip"},
+			"Cookie":              {"a=b"},
+			"Cookie2":             {"c=d"},
+			"X-Test":              {"should-stay"},
+		},
+		hosts: []RegistryHost{{
+			Host:         "example.com",
+			Scheme:       "https",
+			Capabilities: HostCapabilityPull,
+		}},
+	}}
+
+	desc := ocispec.Descriptor{
+		MediaType: "application/octet-stream",
+		Size:      int64(len(body)),
+		URLs:      []string{s.URL},
+	}
+
+	rc, err := f.Fetch(context.Background(), desc)
+	require.NoError(t, err)
+	_, err = io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+
+	select {
+	case hdr := <-headersCh:
+		assert.Empty(t, hdr.Get("Authorization"))
+		assert.Empty(t, hdr.Get("Proxy-Authorization"))
+		assert.Empty(t, hdr.Get("Cookie"))
+		assert.Empty(t, hdr.Get("Cookie2"))
+		assert.Equal(t, "should-stay", hdr.Get("X-Test"))
+	case <-time.After(time.Second):
+		t.Fatal("descriptor URL server did not receive a request")
+	}
+}
+
+func TestIsRegistryOrigin(t *testing.T) {
+	tests := []struct {
+		name          string
+		descriptorURL string
+		registryHost  RegistryHost
+		want          bool
+	}{
+		{
+			name:          "https implicit and explicit default port",
+			descriptorURL: "https://example.com/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com:443"},
+			want:          true,
+		},
+		{
+			name:          "https explicit and implicit default port",
+			descriptorURL: "https://example.com:443/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          true,
+		},
+		{
+			name:          "http implicit and explicit default port",
+			descriptorURL: "http://example.com/layer",
+			registryHost:  RegistryHost{Scheme: "http", Host: "example.com:80"},
+			want:          true,
+		},
+		{
+			name:          "matching non-default port",
+			descriptorURL: "https://example.com:8443/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com:8443"},
+			want:          true,
+		},
+		{
+			name:          "different non-default port",
+			descriptorURL: "https://example.com:8443/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          false,
+		},
+		{
+			name:          "different scheme",
+			descriptorURL: "http://example.com/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          false,
+		},
+		{
+			name:          "different hostname",
+			descriptorURL: "https://cdn.example.com/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			u, err := url.Parse(test.descriptorURL)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, isRegistryOrigin(u, []RegistryHost{test.registryHost}))
+		})
+	}
+}
+
+func TestFetcherDescURLsForwardsResolverHeadersToRegistryOrigin(t *testing.T) {
+	body := []byte("ok")
+
+	headersCh := make(chan http.Header, 1)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		headersCh <- r.Header.Clone()
+		rw.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = rw.Write(body)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+	refspec, err := reference.Parse("example.com/library/test:latest")
+	require.NoError(t, err)
+
+	f := dockerFetcher{&dockerBase{
+		refspec:    refspec,
+		repository: "library/test",
+		header: http.Header{
+			"Authorization":       {"Bearer should-stay"},
+			"Proxy-Authorization": {"Basic should-stay"},
+			"Cookie":              {"a=b"},
+			"Cookie2":             {"c=d"},
+			"X-Test":              {"should-stay"},
+		},
+		hosts: []RegistryHost{{
+			Host:         u.Host,
+			Scheme:       u.Scheme,
+			Capabilities: HostCapabilityPull,
+		}},
+	}}
+
+	desc := ocispec.Descriptor{
+		MediaType: "application/octet-stream",
+		Size:      int64(len(body)),
+		URLs:      []string{s.URL},
+	}
+
+	rc, err := f.Fetch(context.Background(), desc)
+	require.NoError(t, err)
+	_, err = io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+
+	select {
+	case hdr := <-headersCh:
+		assert.Equal(t, "Bearer should-stay", hdr.Get("Authorization"))
+		assert.Equal(t, "Basic should-stay", hdr.Get("Proxy-Authorization"))
+		assert.Equal(t, "a=b", hdr.Get("Cookie"))
+		assert.Equal(t, "c=d", hdr.Get("Cookie2"))
+		assert.Equal(t, "should-stay", hdr.Get("X-Test"))
+	case <-time.After(time.Second):
+		t.Fatal("descriptor URL server did not receive a request")
+	}
+}
+
+func TestFetcherBlobEndpointForwardsResolverHeaders(t *testing.T) {
+	body := []byte("ok")
+
+	headersCh := make(chan http.Header, 1)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		headersCh <- r.Header.Clone()
+		rw.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = rw.Write(body)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+	refspec, err := reference.Parse("example.com/library/test:latest")
+	require.NoError(t, err)
+
+	f := dockerFetcher{&dockerBase{
+		refspec:    refspec,
+		repository: "library/test",
+		header: http.Header{
+			"Authorization":       {"Bearer should-stay"},
+			"Proxy-Authorization": {"Basic should-stay"},
+			"Cookie":              {"a=b"},
+			"Cookie2":             {"c=d"},
+			"X-Test":              {"should-stay"},
+		},
+		hosts: []RegistryHost{{
+			Client:       s.Client(),
+			Host:         u.Host,
+			Scheme:       u.Scheme,
+			Capabilities: HostCapabilityPull,
+		}},
+	}}
+
+	desc := ocispec.Descriptor{
+		MediaType: "application/octet-stream",
+		Size:      int64(len(body)),
+	}
+
+	rc, err := f.Fetch(context.Background(), desc)
+	require.NoError(t, err)
+	_, err = io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+
+	select {
+	case hdr := <-headersCh:
+		assert.Equal(t, "Bearer should-stay", hdr.Get("Authorization"))
+		assert.Equal(t, "Basic should-stay", hdr.Get("Proxy-Authorization"))
+		assert.Equal(t, "a=b", hdr.Get("Cookie"))
+		assert.Equal(t, "c=d", hdr.Get("Cookie2"))
+		assert.Equal(t, "should-stay", hdr.Get("X-Test"))
+	case <-time.After(time.Second):
+		t.Fatal("blob server did not receive a request")
+	}
 }
 
 func TestContentEncoding(t *testing.T) {
