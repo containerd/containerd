@@ -186,39 +186,39 @@ func TestResolveCriuPath(t *testing.T) {
 
 func TestCheckCriuDisabled(t *testing.T) {
 	c := newTestCRIService()
-	c.config.EnableCRIU = func() *bool { v := false; return &v }()
+	c.config.EnableCheckpointRestore = func() *bool { v := false; return &v }()
 	err := c.checkCriu()
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
-		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
+	if !strings.Contains(err.Error(), "checkpoint/restore support is disabled by configuration") {
+		t.Errorf("expected error containing 'checkpoint/restore support is disabled by configuration', got: %v", err)
 	}
 }
 
 func TestCheckCriuEnabled(t *testing.T) {
 	t.Setenv("PATH", "")
 	c := newTestCRIService()
-	c.config.EnableCRIU = func() *bool { v := true; return &v }()
+	c.config.EnableCheckpointRestore = func() *bool { v := true; return &v }()
 	err := c.checkCriu()
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if strings.Contains(err.Error(), "criu support is disabled by configuration") {
-		t.Errorf("did not expect error containing 'criu support is disabled by configuration', got: %v", err)
+	if strings.Contains(err.Error(), "checkpoint/restore support is disabled by configuration") {
+		t.Errorf("did not expect error containing 'checkpoint/restore support is disabled by configuration', got: %v", err)
 	}
 }
 
 func TestCheckpointContainerDisabled(t *testing.T) {
 	c := newTestCRIService()
-	c.config.EnableCRIU = func() *bool { v := false; return &v }()
+	c.config.EnableCheckpointRestore = func() *bool { v := false; return &v }()
 	_, err := c.CheckpointContainer(context.Background(), &runtime.CheckpointContainerRequest{
 		ContainerId: "test-container",
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
-		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
+	if !strings.Contains(err.Error(), "checkpoint/restore support is disabled by configuration") {
+		t.Errorf("expected error containing 'checkpoint/restore support is disabled by configuration', got: %v", err)
 	}
 }
