@@ -48,11 +48,11 @@ func TestPodCheckpointAPIsDisabledByConfiguration(t *testing.T) {
 	cri := newTestCRIService()
 	cri.podCheckpointSupportCheck = nil
 	enabled := false
-	cri.config.EnableCRIU = &enabled
+	cri.config.EnableCheckpointRestore = &enabled
 	cri.shimPath = t.TempDir()
 
 	_, err := cri.CheckpointPod(checkpointAPIContext(t), &runtime.CheckpointPodRequest{PodSandboxId: "sandbox"})
-	require.ErrorContains(t, err, "criu support is disabled by configuration")
+	require.ErrorContains(t, err, "checkpoint/restore support is disabled by configuration")
 	_, err = cri.RestorePod(checkpointAPIContext(t), restoreTransactionRequest())
-	require.ErrorContains(t, err, "criu support is disabled by configuration")
+	require.ErrorContains(t, err, "checkpoint/restore support is disabled by configuration")
 }

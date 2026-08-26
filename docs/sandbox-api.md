@@ -187,7 +187,7 @@ markers, checkpoint layout, checkpoint-image import and export, writable-layer
 recovery, and the runtime checkpoint operation. A VM-based controller can
 implement the same capability without inheriting any of those assumptions.
 
-The `enable_criu` setting applies to all controllers. The
+The `enable_checkpoint_restore` setting applies to all controllers. The
 pause-container controller checks host CRIU availability and version; custom
 controllers are responsible for their own runtime requirements.
 
