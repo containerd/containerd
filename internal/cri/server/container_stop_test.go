@@ -99,9 +99,9 @@ func TestCRISignalToOCIStopSignal(t *testing.T) {
 		expectErr      bool
 	}{
 		{name: "runtime default", signal: runtime.Signal_SIGNAL_RUNTIME_DEFAULT, expectedSignal: ""},
-		{name: "standard signal", signal: runtime.Signal_SIGNAL_SIGTERM, expectedSignal: "SIGNAL_SIGTERM"},
-		{name: "rtmin plus", signal: runtime.Signal_SIGNAL_SIGRTMINPLUS1, expectedSignal: "SIGNAL_SIGRTMIN+1"},
-		{name: "rtmax minus", signal: runtime.Signal_SIGNAL_SIGRTMAXMINUS1, expectedSignal: "SIGNAL_SIGRTMAX-1"},
+		{name: "standard signal", signal: runtime.Signal_SIGNAL_SIGTERM, expectedSignal: "SIGTERM"},
+		{name: "rtmin plus", signal: runtime.Signal_SIGNAL_SIGRTMINPLUS1, expectedSignal: "SIGRTMIN+1"},
+		{name: "rtmax minus", signal: runtime.Signal_SIGNAL_SIGRTMAXMINUS1, expectedSignal: "SIGRTMAX-1"},
 		{name: "unknown signal", signal: runtime.Signal(999), expectErr: true},
 	}
 

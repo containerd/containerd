@@ -33,7 +33,7 @@ func criSignalToOCIStopSignal(signal runtime.Signal) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unknown CRI stop signal %d: %w", signal, errdefs.ErrInvalidArgument)
 	}
-	return convertFromCRISignal(name), nil
+	return convertFromCRISignal(strings.TrimPrefix(name, "SIGNAL_")), nil
 }
 
 func convertFromCRISignal(criSignal string) string {
