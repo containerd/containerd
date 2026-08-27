@@ -17,36 +17,37 @@
 package integration
 
 import (
-	"context"
+	"fmt"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/require"
 
+	eventtypes "github.com/containerd/containerd/api/events"
 	apitask "github.com/containerd/containerd/api/runtime/task/v3"
+	"github.com/containerd/containerd/v2/core/events"
+	ctrdruntime "github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // TestIssue7496_ShouldRetryShutdown is based on https://github.com/containerd/containerd/issues/7496.
 //
-// Assume that the shim.Delete takes almost 10 seconds and returns successfully
-// and there is no container in shim. However, the context is close to be
-// canceled. It will fail to call Shutdown. If we ignores the Canceled error,
-// the shim will be leaked. In order to reproduce this, this case will use
-// failpoint to inject error into Shutdown API, and then check whether the shim
-// is leaked.
+// The first task Delete succeeds, but an injected Shutdown failure prevents the
+// shim from exiting. The CRI retry then sees the task as NotFound and must still
+// shut down the shim without publishing duplicate exit or delete events.
 func TestIssue7496_ShouldRetryShutdown(t *testing.T) {
-	// TODO: re-enable if we can retry Shutdown API.
-	t.Skipf("Please re-enable me if we can retry Shutdown API")
+	const eventBarrierTopic = "/tests/issue7496/event-barrier"
 
-	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
+	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
 
 	t.Logf("Create a pod config with shutdown failpoint")
-	sbConfig := PodSandboxConfig("sandbox", "issue7496_shouldretryshutdown")
+	sbConfig := PodSandboxConfig("sandbox", "issue7496_shouldretryshutdown", WithHostNetwork)
 	injectShimFailpoint(t, sbConfig, map[string]string{
 		"Shutdown": "1*error(please retry)",
 	})
@@ -60,13 +61,135 @@ func TestIssue7496_ShouldRetryShutdown(t *testing.T) {
 
 	t.Logf("Log shim %s's pid: %d", sbID, shimPid(ctx, t, shimCli))
 
+	t.Logf("Subscribe task exit/delete events")
+	eventCh, eventErrCh := containerdClient.EventService().Subscribe(ctx,
+		fmt.Sprintf(`topic=="%s",event.container_id=="%s"`, ctrdruntime.TaskExitEventTopic, sbID),
+		fmt.Sprintf(`topic=="%s",event.container_id=="%s"`, ctrdruntime.TaskDeleteEventTopic, sbID),
+		fmt.Sprintf(`topic=="%s"`, eventBarrierTopic),
+	)
+
 	t.Logf("StopPodSandbox and RemovePodSandbox")
 	require.NoError(t, runtimeService.StopPodSandbox(sbID))
 	require.NoError(t, runtimeService.RemovePodSandbox(sbID))
 
 	t.Logf("Check the shim connection")
 	_, err = shimCli.Connect(ctx, &apitask.ConnectRequest{})
-	require.Error(t, err, "should failed to call shim connect API")
+	require.Error(t, err, "should fail to call the shim Connect API")
+	require.ErrorContains(t, err, "ttrpc: closed")
+
+	// The task delete succeeded on the first attempt, so the shim itself has
+	// already delivered the exit and delete events. When the retry finally
+	// shuts the shim down, ttrpc-callback-on-close must not publish them a
+	// second time.
+	//
+	// REF: https://github.com/containerd/containerd/issues/4769
+	t.Logf("Check that task exit/delete events are not duplicated")
+	require.NoError(t, containerdClient.EventService().Publish(ctx,
+		eventBarrierTopic, &ptypes.Empty{},
+	))
+	exits, deletes := countTaskExitDeleteEventsUntilBarrier(
+		t, sbID, eventBarrierTopic, eventCh, eventErrCh, 10*time.Second,
+	)
+	require.Equal(t, 1, exits, "task exit event should be published only once")
+	require.Equal(t, 1, deletes, "task delete event should be published only once")
+}
+
+func TestKillShimPublishesTaskExitAndDeleteEvents(t *testing.T) {
+	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
+
+	sbConfig := PodSandboxConfig("sandbox", t.Name(), WithHostNetwork)
+	sbID, err := runtimeService.RunPodSandbox(sbConfig, "")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, runtimeService.StopPodSandbox(sbID))
+		require.NoError(t, runtimeService.RemovePodSandbox(sbID))
+	})
+
+	shimCli := connectToShim(ctx, t, containerdEndpoint, 3, sbID)
+	shimPID := shimPid(ctx, t, shimCli)
+
+	eventCh, eventErrCh := containerdClient.EventService().Subscribe(ctx,
+		fmt.Sprintf(`topic=="%s",event.container_id=="%s"`, ctrdruntime.TaskExitEventTopic, sbID),
+		fmt.Sprintf(`topic=="%s",event.container_id=="%s"`, ctrdruntime.TaskDeleteEventTopic, sbID),
+	)
+
+	require.NoError(t, syscall.Kill(int(shimPID), syscall.SIGKILL))
+	waitForTaskExitDeleteEvents(t, sbID, eventCh, eventErrCh, 10*time.Second)
+}
+
+func waitForTaskExitDeleteEvents(t *testing.T, id string,
+	ch <-chan *events.Envelope, errCh <-chan error, timeout time.Duration,
+) {
+	t.Helper()
+
+	pending := map[string]struct{}{
+		ctrdruntime.TaskExitEventTopic:   {},
+		ctrdruntime.TaskDeleteEventTopic: {},
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for len(pending) != 0 {
+		select {
+		case <-timer.C:
+			t.Fatalf("timed out waiting for task exit/delete events for %q", id)
+		case err, ok := <-errCh:
+			if !ok {
+				t.Fatalf("event subscription closed while waiting for %q", id)
+			}
+			require.NoError(t, err, "event subscription failed")
+		case env, ok := <-ch:
+			require.True(t, ok, "event subscription closed while waiting for %q", id)
+			t.Logf("received event %q for %q", env.Topic, id)
+			delete(pending, env.Topic)
+		}
+	}
+}
+
+// countTaskExitDeleteEventsUntilBarrier counts task exit and delete events for
+// the given container ID until the event stream reaches barrierTopic. The
+// barrier is published after shim deletion has waited for its close callback,
+// so any duplicate events from cleanupAfterDeadShim are ordered before it.
+func countTaskExitDeleteEventsUntilBarrier(t *testing.T, id, barrierTopic string,
+	ch <-chan *events.Envelope, errCh <-chan error, timeout time.Duration,
+) (exits, deletes int) {
+	t.Helper()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			t.Fatalf("timed out waiting for event barrier %q", barrierTopic)
+		case err, ok := <-errCh:
+			if !ok {
+				t.Fatalf("event subscription closed before barrier %q", barrierTopic)
+			}
+			require.NoError(t, err, "event subscription failed")
+		case env, ok := <-ch:
+			require.True(t, ok, "event subscription closed before barrier %q", barrierTopic)
+			if env.Topic == barrierTopic {
+				return exits, deletes
+			}
+
+			evt, err := typeurl.UnmarshalAny(env.Event)
+			require.NoError(t, err, "failed to unmarshal event")
+
+			switch e := evt.(type) {
+			case *eventtypes.TaskExit:
+				if e.ContainerID == id {
+					t.Logf("received task exit event: %+v", e)
+					exits++
+				}
+			case *eventtypes.TaskDelete:
+				if e.ContainerID == id {
+					t.Logf("received task delete event: %+v", e)
+					deletes++
+				}
+			}
+		}
+	}
 }
 
 func TestShutdownShimWhenPauseExitsBeforeWorkload(t *testing.T) {

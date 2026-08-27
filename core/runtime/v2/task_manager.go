@@ -320,14 +320,25 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 		m.manager.shims.Delete(ctx, id)
 	})
 
-	if err != nil {
+	// An ErrNotFound here means the shim has no record of the task and there
+	// was no cached delete result to fall back to. For example, the task was
+	// never created successfully in the shim, or a previous containerd process
+	// deleted it. The runtime side has still been cleaned up, so we should
+	// deactivate the mounts before returning the error.
+	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to delete task: %w", err)
 	}
 
-	if err := m.taskMounts.Deactivate(ctx, taskID); err != nil && !errdefs.IsNotFound(err) {
-		log.G(ctx).WithError(err).WithField("task", taskID).Errorf("failed to deactivate mounts")
+	// FIXME(fuweid): It seems that cleaning this up is best-effort because
+	// GC can guarantee that the mount is deleted when the container is deleted.
+	// What if we reuse the container and restart the task?
+	if merr := m.taskMounts.Deactivate(ctx, taskID); merr != nil && !errdefs.IsNotFound(merr) {
+		log.G(ctx).WithError(merr).WithField("task", taskID).Errorf("failed to deactivate mounts")
 	}
 
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete task: %w", err)
+	}
 	return exit, nil
 }
 
