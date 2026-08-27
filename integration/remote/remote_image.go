@@ -52,7 +52,12 @@ type ImageService struct {
 // NewImageService creates a legacy-style CRI image client backed by the
 // upstream Kubernetes CRI client.
 func NewImageService(endpoint string, connectionTimeout time.Duration) (*ImageService, error) {
-	imageService, err := upstreamcri.NewRemoteImageService(context.Background(), endpoint, connectionTimeout, nil, false)
+	imageService, err := upstreamcri.NewRemoteImageServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(connectionTimeout).
+		WithTracerProvider(nil).
+		WithUseStreaming(false).
+		Build(context.Background())
 	if err != nil {
 		return nil, err
 	}
