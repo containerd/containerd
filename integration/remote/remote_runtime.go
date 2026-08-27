@@ -59,7 +59,12 @@ type RuntimeService struct {
 // NewRuntimeService creates a legacy-style CRI runtime client backed by the
 // upstream Kubernetes CRI client.
 func NewRuntimeService(endpoint string, connectionTimeout time.Duration) (*RuntimeService, error) {
-	runtimeService, err := upstreamcri.NewRemoteRuntimeService(context.Background(), endpoint, connectionTimeout, nil, false)
+	runtimeService, err := upstreamcri.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(connectionTimeout).
+		WithTracerProvider(nil).
+		WithUseStreaming(false).
+		Build(context.Background())
 	if err != nil {
 		return nil, err
 	}
