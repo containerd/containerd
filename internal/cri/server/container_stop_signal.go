@@ -25,7 +25,7 @@ import (
 )
 
 func criSignalToOCIStopSignal(signal runtime.Signal) (string, error) {
-	if signal == runtime.Signal_RUNTIME_DEFAULT {
+	if signal == runtime.Signal_SIGNAL_RUNTIME_DEFAULT {
 		return "", nil
 	}
 
@@ -48,7 +48,11 @@ func toCRISignal(stopsignal string) runtime.Signal {
 
 	signalValue, ok := runtime.Signal_value[stopsignal]
 	if !ok {
-		return runtime.Signal_RUNTIME_DEFAULT
+		// also check if this is an older stopsignal missing the SIGNAL_ prefix
+		signalValue, ok = runtime.Signal_value["SIGNAL_"+stopsignal]
+		if !ok {
+			return runtime.Signal_SIGNAL_RUNTIME_DEFAULT
+		}
 	}
 	return runtime.Signal(signalValue)
 }

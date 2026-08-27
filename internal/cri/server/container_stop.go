@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -164,7 +165,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	// task from containerd after it handles the Exited event.
 	if timeout > 0 {
 		stopSignal := "SIGTERM"
-		if signal := container.Config.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
+		if signal := container.Config.GetStopSignal(); signal != runtime.Signal_SIGNAL_RUNTIME_DEFAULT {
 			stopSignal, err = criSignalToOCIStopSignal(signal)
 			if err != nil {
 				return err
@@ -194,7 +195,11 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		}
 		sig, err := signal.ParseSignal(stopSignal)
 		if err != nil {
-			return fmt.Errorf("failed to parse stop signal %q: %w", stopSignal, err)
+			sig2, err2 := signal.ParseSignal(strings.TrimPrefix(stopSignal, "SIGNAL_"))
+			if err2 != nil {
+				return fmt.Errorf("failed to parse stop signal %q: %w", stopSignal, err)
+			}
+			sig = sig2
 		}
 
 		var sswt bool
