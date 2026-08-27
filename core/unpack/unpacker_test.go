@@ -108,8 +108,7 @@ func BenchmarkUnpackWithChainIDs(b *testing.B) {
 func TestLayerSnapshotLabels(t *testing.T) {
 	// Layer annotations come from the (untrusted) image manifest. The id-mapping
 	// labels drive a host-side chown of the extracted layer in the snapshotter's
-	// Prepare, so they must not be honored when they originate from image content;
-	// other inherited snapshot labels must still be passed through.
+	// Prepare, so they must be filtered out.
 	got := layerSnapshotLabels(map[string]string{
 		snapshots.LabelSnapshotUIDMapping: "0:1000:1",
 		snapshots.LabelSnapshotGIDMapping: "0:1000:1",
