@@ -635,7 +635,7 @@ func requestWithMountFrom(req *request, mount, from string) *request {
 		sep = "&"
 	}
 
-	creq.path = creq.path + sep + "mount=" + mount + "&from=" + from
+	creq.path = creq.path + sep + "mount=" + url.QueryEscape(mount) + "&from=" + url.QueryEscape(from)
 
 	return &creq
 }
