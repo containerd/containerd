@@ -76,6 +76,9 @@ func CompInfo() (*Win32_ComputerSystem, error) {
 	if err := wmi.Query(wmi.CreateQuery(&result, ""), &result); err != nil {
 		return nil, err
 	}
+	if len(result) == 0 {
+		return nil, errors.New("no computer system information found")
+	}
 	if result[0].DNSHostName == "" {
 		return nil, errors.New("could not determine the DNS Host Name")
 	}
@@ -98,6 +101,9 @@ func CompProdInfo() (*Win32_ComputerSystemProduct, error) {
 	var compProdInfo []Win32_ComputerSystemProduct
 	if err := wmi.Query(wmi.CreateQuery(&compProdInfo, ""), &compProdInfo); err != nil {
 		return nil, err
+	}
+	if len(compProdInfo) == 0 {
+		return nil, errors.New("no computer system product information found")
 	}
 	return &compProdInfo[0], nil
 }
