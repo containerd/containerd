@@ -481,12 +481,19 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		tracing.Attribute("runtime.handler", sandbox.RuntimeHandler),
 	)
 
+	if isHermetic(config) {
+		log.G(ctx).WithField("podsandboxid", id).Debugf("skipping cni setup for hermetic sandbox")
+
+		if err := c.bringUpLoopback(path); err != nil {
+			return fmt.Errorf("unable to set lo to up: %w", err)
+		}
+		return nil
+	}
 	if netPlugin == nil {
 		return errors.New("cni config not initialized")
 	}
 	if c.config.UseInternalLoopback {
-		err := c.bringUpLoopback(path)
-		if err != nil {
+		if err := c.bringUpLoopback(path); err != nil {
 			return fmt.Errorf("unable to set lo to up: %w", err)
 		}
 	}
