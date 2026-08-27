@@ -98,7 +98,7 @@ func (m *StreamManager) Register(id string, s streaming.Stream) error {
 }
 
 // Get returns the stream registered under id, blocking until containerd opens it or ctx
-// is done.
+// is done. Waiting reserves id; the reservation is dropped if ctx ends first.
 func (m *StreamManager) Get(ctx context.Context, id string) (streaming.Stream, error) {
 	m.mu.Lock()
 	e := m.entryLocked(id)

@@ -69,7 +69,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 
 // copyPortForward copies between the client stream and conn until both directions stop,
 // one direction stops and the other does not follow within a grace period, or ctx is
-// cancelled. Neither conn nor stream is closed.
+// cancelled. A copy still in flight ends when the caller tears down conn and stream.
 func copyPortForward(ctx context.Context, id string, port int32, conn io.ReadWriter, stream io.ReadWriter) error {
 	errCh := make(chan error, 2)
 	go func() {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"google.golang.org/grpc"
@@ -272,7 +273,7 @@ func (s *controllerService) PortForward(ctx context.Context, req *api.Controller
 		return nil, errgrpc.ToGRPC(err)
 	}
 	port := req.GetPort()
-	if port == 0 || port > 65535 {
+	if port == 0 || port > math.MaxUint16 {
 		return nil, errgrpc.ToGRPC(fmt.Errorf("%w: port %d is out of range", errdefs.ErrInvalidArgument, port))
 	}
 	return &api.ControllerPortForwardResponse{}, errgrpc.ToGRPC(ctrl.PortForward(ctx, req.GetSandboxID(), int32(port), req.GetStreamID()))

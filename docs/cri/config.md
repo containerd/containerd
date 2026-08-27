@@ -614,7 +614,7 @@ version = 2
 
       # port_forward_type is how containerd reaches a port inside the sandbox for `kubectl port-forward`.
       # The default value is "host", in which containerd dials the port from the sandbox's network namespace on the host.
-      # The value of "sandbox" is supported for runtimes whose network is not reachable from that namespace, such as VM-isolated or userspace-netstack sandboxes. In this way, the sandbox should serve the PortForward api defined in runtime/sandbox/v1/sandbox.proto, and bridge the port onto a pair of streams on its streaming endpoint. A sandbox that does not implement that api falls back to "host".
+      # The value of "sandbox" is supported for runtimes whose network is not reachable from that namespace, such as sandboxes isolated in a virtual machine or running their own network stack in userspace. In this way, the sandbox should serve the PortForward api defined in runtime/sandbox/v1/sandbox.proto, and bridge the port onto a pair of streams on its streaming endpoint. A sandbox that does not implement that api falls back to "host".
       port_forward_type = ""
 
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to

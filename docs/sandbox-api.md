@@ -143,8 +143,8 @@ shuts down the sandbox instance.
 ## Port forwarding
 
 By default containerd serves `kubectl port-forward` from the sandbox's network namespace
-on the host. Runtimes whose network is not reachable from there — a VM-isolated sandbox
-such as Kata, or a userspace netstack such as gVisor — implement
+on the host. Runtimes whose network is not reachable from there — a sandbox isolated in a
+virtual machine, or one running its own network stack in userspace — implement
 `SandboxService.PortForward` instead, enabled per runtime handler with
 `port_forward_type = "sandbox"` in the CRI config.
 
@@ -176,8 +176,9 @@ A shim implementing this must:
 - Wait for the streams off the handler goroutine, since containerd opens them only after
   `PortForward` returns.
 - Return `Unimplemented` if it does not own the workload network. containerd warns and
-  falls back to the host network namespace, so enabling `port_forward_type = "sandbox"`
-  against an older shim keeps working.
+  falls back to the host network namespace, which only reaches the workload when the host
+  namespace can, as for a host-network pod. Runtimes that own their network should
+  implement this rather than rely on it.
 
 [`pkg/shim.StreamManager`](../pkg/shim/streaming.go) serves the streaming service on a
 shim's ttrpc server; its `OpenPortForward` returns the stream pair as one duplex pipe.
