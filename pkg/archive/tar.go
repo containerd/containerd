@@ -736,11 +736,8 @@ func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written in
 	defer bufPool.Put(buf)
 
 	for {
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
+		if err = ctx.Err(); err != nil {
 			return
-		default:
 		}
 
 		nr, er := src.Read(*buf)
