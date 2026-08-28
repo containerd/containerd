@@ -19,6 +19,7 @@ package local
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -194,23 +195,19 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		if len(unpacks) > 0 {
 			uopts := []unpack.UnpackerOpt{}
 			enableRemoteSnapshotAnnotations := false
-			// Only unpack if requested unpackconfig matches default/supported unpackconfigs
-			for _, u := range unpacks {
-				matched, mu := getSupportedPlatform(ctx, u, ts.config.UnpackPlatforms)
-				if matched {
-					if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
-						enableRemoteSnapshotAnnotations = true
-					}
-					if progressTracker != nil {
-						mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
-					}
-					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
-				} else {
-					log.G(ctx).WithFields(log.Fields{
-						"platform":    platforms.FormatAll(u.Platform),
-						"snapshotter": u.Snapshotter,
-					}).Warn("Unpack configuration not supported, skipping")
+
+			matches, err := resolveUnpackPlatforms(ctx, unpacks, ts.config.UnpackPlatforms)
+			if err != nil {
+				return err
+			}
+			for _, mu := range matches {
+				if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
+					enableRemoteSnapshotAnnotations = true
 				}
+				if progressTracker != nil {
+					mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
+				}
+				uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 			}
 
 			if ts.config.DuplicationSuppressor != nil {
@@ -296,6 +293,38 @@ func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *Progre
 		}
 		return nil, err
 	}
+}
+
+// resolveUnpackPlatforms resolves each of the caller's requested unpack
+// configurations to a matching entry in supportedPlatforms.
+//
+// Unlike the platform/manifest selection used to decide which content to
+// fetch, requested is the set of unpack configurations the caller
+// explicitly asked for (see transfer.ImageUnpacker, image.Store.unpacks):
+// every entry must resolve to a supported platform, or an error - wrapping
+// errdefs.ErrNotImplemented - is returned naming every configuration that
+// could not be satisfied. Silently skipping one, as previously done, would
+// leave the caller believing an image was unpacked as requested when it
+// was not, rather than surfacing the misconfiguration.
+func resolveUnpackPlatforms(ctx context.Context, requested []transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) ([]unpack.Platform, error) {
+	matches := make([]unpack.Platform, 0, len(requested))
+	var unsupported []transfer.UnpackConfiguration
+	for _, u := range requested {
+		matched, mu := getSupportedPlatform(ctx, u, supportedPlatforms)
+		if !matched {
+			unsupported = append(unsupported, u)
+			continue
+		}
+		matches = append(matches, mu)
+	}
+	if len(unsupported) > 0 {
+		descs := make([]string, 0, len(unsupported))
+		for _, u := range unsupported {
+			descs = append(descs, fmt.Sprintf("%s on snapshotter %q", platforms.FormatAll(u.Platform), u.Snapshotter))
+		}
+		return nil, fmt.Errorf("unpack configuration(s) not supported: %s: %w", strings.Join(descs, ", "), errdefs.ErrNotImplemented)
+	}
+	return matches, nil
 }
 
 // getSupportedPlatform returns a matched platform comparing input UnpackConfiguration to the supported platform/snapshotter combinations

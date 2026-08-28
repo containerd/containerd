@@ -19,6 +19,7 @@ package local
 import (
 	"testing"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 
 	"github.com/containerd/containerd/v2/core/transfer"
@@ -150,4 +151,58 @@ func TestGetSupportedPlatform(t *testing.T) {
 		})
 	}
 
+}
+
+func TestResolveUnpackPlatforms(t *testing.T) {
+	supportedPlatforms := []unpack.Platform{
+		{
+			Platform:       platforms.OnlyStrict(platforms.MustParse("linux/amd64")),
+			SnapshotterKey: "native",
+		},
+		{
+			Platform:       platforms.OnlyStrict(platforms.MustParse("linux/arm64")),
+			SnapshotterKey: "native",
+		},
+	}
+
+	t.Run("every requested config matches", func(t *testing.T) {
+		requested := []transfer.UnpackConfiguration{
+			{Platform: platforms.MustParse("linux/amd64"), Snapshotter: "native"},
+			{Platform: platforms.MustParse("linux/arm64"), Snapshotter: "native"},
+		}
+		matches, err := resolveUnpackPlatforms(t.Context(), requested, supportedPlatforms)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if len(matches) != len(requested) {
+			t.Fatalf("expected %d matches, got %d", len(requested), len(matches))
+		}
+	})
+
+	t.Run("no requested configs is a no-op", func(t *testing.T) {
+		matches, err := resolveUnpackPlatforms(t.Context(), nil, supportedPlatforms)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if len(matches) != 0 {
+			t.Fatalf("expected no matches, got %d", len(matches))
+		}
+	})
+
+	t.Run("an unsupported requested config errors instead of being skipped", func(t *testing.T) {
+		requested := []transfer.UnpackConfiguration{
+			{Platform: platforms.MustParse("linux/amd64"), Snapshotter: "native"},
+			{Platform: platforms.MustParse("linux/riscv64"), Snapshotter: "native"},
+		}
+		matches, err := resolveUnpackPlatforms(t.Context(), requested, supportedPlatforms)
+		if err == nil {
+			t.Fatal("expected an error for the unsupported riscv64 request")
+		}
+		if !errdefs.IsNotImplemented(err) {
+			t.Fatalf("expected an ErrNotImplemented-wrapping error, got %v", err)
+		}
+		if matches != nil {
+			t.Fatalf("expected no matches to be returned alongside the error, got %v", matches)
+		}
+	})
 }
