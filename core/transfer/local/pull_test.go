@@ -153,6 +153,40 @@ func TestGetSupportedPlatform(t *testing.T) {
 
 }
 
+// TestGetSupportedPlatformExplicitSnapshotterNeverCrossesToAnother pins
+// the snapshotter/platform pairing an explicit --snapshotter relies on: a
+// caller who explicitly asked for the overlayfs snapshotter must never be
+// matched to a platform configured for a different snapshotter (e.g. one
+// erofs advertises, requiring OSFeatures ["erofs"]), even if that other
+// snapshotter's platform would otherwise be a "better" (richer) match for
+// the same requested platform. Without this, a caller explicitly opting
+// out of the erofs snapshotter could still end up selecting (and, when
+// unpacking, becoming reliant on the presence of) an EROFS-native
+// manifest it never asked to be unpacked with erofs.
+func TestGetSupportedPlatformExplicitSnapshotterNeverCrossesToAnother(t *testing.T) {
+	supportedPlatforms := []unpack.Platform{
+		{
+			Platform:       platforms.OnlyStrict(platforms.MustParse("linux/amd64")),
+			SnapshotterKey: "overlayfs",
+		},
+		{
+			Platform:       platforms.OnlyStrict(platforms.MustParse("linux(+erofs)/amd64")),
+			SnapshotterKey: "erofs",
+		},
+	}
+
+	matched, sp := getSupportedPlatform(t.Context(), transfer.UnpackConfiguration{
+		Platform:    platforms.MustParse("linux/amd64"),
+		Snapshotter: "overlayfs",
+	}, supportedPlatforms)
+	if !matched {
+		t.Fatal("expected a match for the explicitly requested overlayfs snapshotter")
+	}
+	if sp.SnapshotterKey != "overlayfs" {
+		t.Fatalf("expected the overlayfs snapshotter's own (plain) platform, got snapshotter %q", sp.SnapshotterKey)
+	}
+}
+
 func TestResolveUnpackPlatforms(t *testing.T) {
 	supportedPlatforms := []unpack.Platform{
 		{

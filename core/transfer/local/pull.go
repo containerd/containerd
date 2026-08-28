@@ -131,10 +131,42 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 	}
 	defer cancel()
 
+	// Resolve the caller's requested unpack configurations - if any -
+	// before building the image/manifest selection filter below, so that
+	// a matched unpack configuration's OSFeatures (e.g. "erofs", see the
+	// EROFS image layer format specification,
+	// https://github.com/erofs/erofs-image-spec) can be factored into
+	// which manifest variant for a given platform is selected for
+	// fetching in the first place, not just into whether the manifest
+	// that happens to get fetched can later be unpacked.
+	var (
+		unpacks []transfer.UnpackConfiguration
+		matches []unpack.Platform
+	)
+	if iu, ok := is.(transfer.ImageUnpacker); ok {
+		unpacks = iu.UnpackPlatforms()
+		if len(unpacks) > 0 {
+			matches, err = resolveUnpackPlatforms(ctx, unpacks, ts.config.UnpackPlatforms)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// Get all the children for a descriptor
 	childrenHandler := images.ChildrenHandler(store)
 
-	if f, ok := is.(transfer.ImageFilterer); ok {
+	if pf, ok := is.(transfer.PlatformImageFilterer); ok {
+		// Every matched unpack configuration's platform is a candidate
+		// refinement (see transfer.PlatformImageFilterer): the filterer
+		// itself decides whether, and to which of its own configured
+		// platforms, each one actually applies.
+		refinements := make([]ocispec.Platform, 0, len(matches))
+		for _, mu := range matches {
+			refinements = append(refinements, mu.PlatformSpec)
+		}
+		childrenHandler = pf.ImageFilterWithPlatforms(childrenHandler, store, refinements)
+	} else if f, ok := is.(transfer.ImageFilterer); ok {
 		childrenHandler = f.ImageFilter(childrenHandler, store)
 	}
 
@@ -188,46 +220,38 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		appendDistSrcLabelHandler,
 	)...)
 
-	// First find suitable platforms to unpack into
-	// If image storer is also an unpacker type, i.e implemented UnpackPlatforms() func
-	if iu, ok := is.(transfer.ImageUnpacker); ok {
-		unpacks := iu.UnpackPlatforms()
-		if len(unpacks) > 0 {
-			uopts := []unpack.UnpackerOpt{}
-			enableRemoteSnapshotAnnotations := false
+	// Set up unpacking using the unpack configurations resolved above.
+	if len(matches) > 0 {
+		uopts := []unpack.UnpackerOpt{}
+		enableRemoteSnapshotAnnotations := false
 
-			matches, err := resolveUnpackPlatforms(ctx, unpacks, ts.config.UnpackPlatforms)
-			if err != nil {
-				return err
+		for _, mu := range matches {
+			if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
+				enableRemoteSnapshotAnnotations = true
 			}
-			for _, mu := range matches {
-				if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
-					enableRemoteSnapshotAnnotations = true
-				}
-				if progressTracker != nil {
-					mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
-				}
-				uopts = append(uopts, unpack.WithUnpackPlatform(mu))
+			if progressTracker != nil {
+				mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
 			}
-
-			if ts.config.DuplicationSuppressor != nil {
-				uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
-			}
-
-			if ts.limiterP != nil {
-				uopts = append(uopts, unpack.WithUnpackLimiter(ts.limiterP))
-			}
-
-			if enableRemoteSnapshotAnnotations {
-				handler = snpkg.AppendInfoHandlerWrapper(name)(handler)
-			}
-
-			unpacker, err = unpack.NewUnpacker(ctx, ts.content, uopts...)
-			if err != nil {
-				return fmt.Errorf("unable to initialize unpacker: %w", err)
-			}
-			handler = unpacker.Unpack(handler)
+			uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 		}
+
+		if ts.config.DuplicationSuppressor != nil {
+			uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
+		}
+
+		if ts.limiterP != nil {
+			uopts = append(uopts, unpack.WithUnpackLimiter(ts.limiterP))
+		}
+
+		if enableRemoteSnapshotAnnotations {
+			handler = snpkg.AppendInfoHandlerWrapper(name)(handler)
+		}
+
+		unpacker, err = unpack.NewUnpacker(ctx, ts.content, uopts...)
+		if err != nil {
+			return fmt.Errorf("unable to initialize unpacker: %w", err)
+		}
+		handler = unpacker.Unpack(handler)
 	}
 
 	if err := images.Dispatch(ctx, handler, nil, desc); err != nil {

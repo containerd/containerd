@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/imagetest"
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -496,4 +497,283 @@ func (is *simpleImageStore) Delete(ctx context.Context, name string, opts ...ima
 	delete(is.images, name)
 
 	return nil
+}
+
+// visitedDigests dispatches h over root and returns the digest of every
+// descriptor h.Handle was called for.
+func visitedDigests(t *testing.T, ctx context.Context, h images.HandlerFunc, root ocispec.Descriptor) []digest.Digest {
+	t.Helper()
+
+	var (
+		mu      sync.Mutex
+		visited []digest.Digest
+	)
+	record := images.HandlerFunc(func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		mu.Lock()
+		visited = append(visited, desc.Digest)
+		mu.Unlock()
+		return nil, nil
+	})
+	if err := images.Dispatch(ctx, images.Handlers(record, h), nil, root); err != nil {
+		t.Fatal(err)
+	}
+	return visited
+}
+
+func containsDigest(digests []digest.Digest, d digest.Digest) bool {
+	for _, v := range digests {
+		if v == d {
+			return true
+		}
+	}
+	return false
+}
+
+// plainAndErofsManifests builds two distinguishable (different digest
+// throughout) manifests for the same linux/amd64 platform: one plain, and
+// one additionally requiring OSFeatures ["erofs"].
+func plainAndErofsManifests(tc imagetest.ContentStore) (plain, erofs imagetest.Content) {
+	plain = imagetest.AddPlatform(tc.Manifest(
+		tc.JSONObject(ocispec.MediaTypeImageConfig, ocispec.ImageConfig{Env: []string{"plain"}}),
+		tc.Blob(ocispec.MediaTypeImageLayerGzip, []byte("plain-layer-content")),
+	), ocispec.Platform{OS: "linux", Architecture: "amd64"})
+	erofs = imagetest.AddPlatform(tc.Manifest(
+		tc.JSONObject(ocispec.MediaTypeImageConfig, ocispec.ImageConfig{Env: []string{"erofs"}}),
+		tc.Blob(ocispec.MediaTypeImageLayerGzip, []byte("erofs-layer-content")),
+	), ocispec.Platform{OS: "linux", Architecture: "amd64", OSFeatures: []string{"erofs"}})
+	return plain, erofs
+}
+
+var (
+	amd64Spec      = ocispec.Platform{OS: "linux", Architecture: "amd64"}
+	amd64ErofsSpec = ocispec.Platform{OS: "linux", Architecture: "amd64", OSFeatures: []string{"erofs"}}
+	arm64Spec      = ocispec.Platform{OS: "linux", Architecture: "arm64"}
+)
+
+// TestImageFilterWithPlatformsPrefersRefinedOSFeatureMatch verifies that,
+// given a refinement describing the same platform as a configured one
+// (see WithPlatforms) but with OSFeatures ["erofs"] (e.g. the platform of
+// a matched unpack configuration), an index containing both a plain
+// manifest and one requiring OSFeatures ["erofs"] for that platform has
+// its layer fetched for the erofs manifest only, while - in
+// WithAllMetadata mode - both manifests and their configs remain
+// reachable.
+func TestImageFilterWithPlatformsPrefersRefinedOSFeatureMatch(t *testing.T) {
+	ctx := context.Background()
+	tc := imagetest.NewContentStore(ctx, t)
+
+	plain, erofs := plainAndErofsManifests(tc)
+	idx := tc.Index(plain, erofs)
+
+	is := NewStore("", WithAllMetadata, WithPlatforms(amd64Spec))
+	h := is.ImageFilterWithPlatforms(images.ChildrenHandler(tc.Store), tc.Store, []ocispec.Platform{amd64ErofsSpec})
+
+	visited := visitedDigests(t, ctx, h, idx.Descriptor)
+
+	for _, want := range []ocispec.Descriptor{
+		idx.Descriptor, plain.Descriptor, plain.Children[0].Descriptor, erofs.Descriptor, erofs.Children[0].Descriptor, erofs.Children[1].Descriptor,
+	} {
+		if !containsDigest(visited, want.Digest) {
+			t.Errorf("expected %s (%s) to be visited", want.Digest, want.MediaType)
+		}
+	}
+	if plainLayer := plain.Children[1].Descriptor; containsDigest(visited, plainLayer.Digest) {
+		t.Errorf("expected the non-preferred plain manifest's layer %s not to be fetched", plainLayer.Digest)
+	}
+}
+
+// TestImageFilterWithPlatformsDefaultKeepsSingleBestVariant verifies that,
+// outside of WithAllMetadata mode, only the single best variant of a
+// configured platform - and none of its non-preferred siblings - remains
+// reachable at all, preserving the existing minimal (non-metadata) fetch
+// behavior.
+func TestImageFilterWithPlatformsDefaultKeepsSingleBestVariant(t *testing.T) {
+	ctx := context.Background()
+	tc := imagetest.NewContentStore(ctx, t)
+
+	plain, erofs := plainAndErofsManifests(tc)
+	idx := tc.Index(plain, erofs)
+
+	is := NewStore("", WithPlatforms(amd64Spec))
+	h := is.ImageFilterWithPlatforms(images.ChildrenHandler(tc.Store), tc.Store, []ocispec.Platform{amd64ErofsSpec})
+
+	visited := visitedDigests(t, ctx, h, idx.Descriptor)
+
+	if !containsDigest(visited, erofs.Descriptor.Digest) || !containsDigest(visited, erofs.Children[1].Descriptor.Digest) {
+		t.Errorf("expected the preferred erofs manifest and its layer to be visited, got %v", visited)
+	}
+	if containsDigest(visited, plain.Descriptor.Digest) {
+		t.Errorf("expected the non-preferred plain manifest not to be visited at all, got %v", visited)
+	}
+}
+
+// TestImageFilterWithPlatformsAllPlatformsKeepsEveryVariant is a
+// regression test: with no configured platforms (WithPlatforms not used,
+// i.e. `ctr pull --all-platforms`), every manifest's layers must be
+// fetched, including every variant of a platform sharing OSFeatures with
+// another - not just a single "global best" - since nothing was actually
+// requested to narrow selection to one.
+func TestImageFilterWithPlatformsAllPlatformsKeepsEveryVariant(t *testing.T) {
+	ctx := context.Background()
+	tc := imagetest.NewContentStore(ctx, t)
+
+	plain, erofs := plainAndErofsManifests(tc)
+	idx := tc.Index(plain, erofs)
+
+	is := &Store{}
+	h := is.ImageFilterWithPlatforms(images.ChildrenHandler(tc.Store), tc.Store, nil)
+
+	visited := visitedDigests(t, ctx, h, idx.Descriptor)
+
+	for _, want := range []ocispec.Descriptor{
+		plain.Children[1].Descriptor, erofs.Children[1].Descriptor,
+	} {
+		if !containsDigest(visited, want.Digest) {
+			t.Errorf("expected layer %s to be fetched with no configured platforms", want.Digest)
+		}
+	}
+}
+
+// TestImageFilterWithPlatformsMultiplePlatformsKeepsEachPlatform is a
+// regression test: with more than one configured platform (`ctr pull
+// --platform linux/amd64 --platform linux/arm64`), each distinct
+// platform's manifest must keep its layers - the best-variant selection
+// must not collapse to a single manifest across unrelated platforms.
+func TestImageFilterWithPlatformsMultiplePlatformsKeepsEachPlatform(t *testing.T) {
+	ctx := context.Background()
+	tc := imagetest.NewContentStore(ctx, t)
+
+	amd64 := imagetest.AddPlatform(tc.Manifest(
+		tc.JSONObject(ocispec.MediaTypeImageConfig, ocispec.ImageConfig{Env: []string{"amd64"}}),
+		tc.Blob(ocispec.MediaTypeImageLayerGzip, []byte("amd64-layer-content")),
+	), amd64Spec)
+	arm64 := imagetest.AddPlatform(tc.Manifest(
+		tc.JSONObject(ocispec.MediaTypeImageConfig, ocispec.ImageConfig{Env: []string{"arm64"}}),
+		tc.Blob(ocispec.MediaTypeImageLayerGzip, []byte("arm64-layer-content")),
+	), arm64Spec)
+	idx := tc.Index(amd64, arm64)
+
+	is := NewStore("", WithPlatforms(amd64Spec, arm64Spec))
+	h := is.ImageFilterWithPlatforms(images.ChildrenHandler(tc.Store), tc.Store, nil)
+
+	visited := visitedDigests(t, ctx, h, idx.Descriptor)
+
+	for _, want := range []ocispec.Descriptor{
+		amd64.Children[1].Descriptor, arm64.Children[1].Descriptor,
+	} {
+		if !containsDigest(visited, want.Digest) {
+			t.Errorf("expected layer %s to be fetched, got %v", want.Digest, visited)
+		}
+	}
+}
+
+// TestImageFilterWithPlatformsMultiplePlatformsWithVariantDoesNotCrowdOut
+// is a regression test for a specific failure mode a single combined sort
+// across every requested platform is prone to: with amd64 requesting an
+// erofs refinement (so both a plain and an erofs amd64 manifest are
+// acceptable substitutes) alongside a plain arm64 request, the two amd64
+// candidates must not both outrank - and so crowd out - arm64's sole
+// candidate. Each configured platform is selected independently instead
+// (see images.SelectManifestsPerPlatform), so amd64 keeps only its best
+// (erofs) variant and arm64 keeps its own manifest regardless.
+func TestImageFilterWithPlatformsMultiplePlatformsWithVariantDoesNotCrowdOut(t *testing.T) {
+	ctx := context.Background()
+	tc := imagetest.NewContentStore(ctx, t)
+
+	plain, erofs := plainAndErofsManifests(tc)
+	arm64 := imagetest.AddPlatform(tc.Manifest(
+		tc.JSONObject(ocispec.MediaTypeImageConfig, ocispec.ImageConfig{Env: []string{"arm64"}}),
+		tc.Blob(ocispec.MediaTypeImageLayerGzip, []byte("arm64-layer-content")),
+	), arm64Spec)
+	idx := tc.Index(plain, erofs, arm64)
+
+	is := NewStore("", WithPlatforms(amd64Spec, arm64Spec))
+	h := is.ImageFilterWithPlatforms(images.ChildrenHandler(tc.Store), tc.Store, []ocispec.Platform{amd64ErofsSpec})
+
+	visited := visitedDigests(t, ctx, h, idx.Descriptor)
+
+	if !containsDigest(visited, erofs.Children[1].Descriptor.Digest) {
+		t.Errorf("expected amd64's erofs variant to keep its layers, got %v", visited)
+	}
+	if !containsDigest(visited, arm64.Children[1].Descriptor.Digest) {
+		t.Errorf("expected arm64 to keep its layers even though amd64 had two candidates, got %v", visited)
+	}
+	if containsDigest(visited, plain.Descriptor.Digest) {
+		t.Errorf("expected the non-preferred amd64 plain manifest not to be visited at all, got %v", visited)
+	}
+}
+
+func TestRefinePlatforms(t *testing.T) {
+	t.Run("no refinements returns configured unchanged", func(t *testing.T) {
+		configured := []ocispec.Platform{amd64Spec}
+		got := refinePlatforms(configured, nil)
+		if len(got) != 1 || got[0].OS != "linux" || got[0].Architecture != "amd64" || len(got[0].OSFeatures) != 0 {
+			t.Fatalf("expected configured unchanged, got %v", got)
+		}
+	})
+
+	t.Run("adopts OSFeatures from a same-platform refinement", func(t *testing.T) {
+		got := refinePlatforms([]ocispec.Platform{amd64Spec}, []ocispec.Platform{amd64ErofsSpec})
+		if len(got) != 1 {
+			t.Fatalf("expected 1 platform, got %d", len(got))
+		}
+		if len(got[0].OSFeatures) != 1 || got[0].OSFeatures[0] != "erofs" {
+			t.Fatalf("expected OSFeatures [erofs], got %v", got[0].OSFeatures)
+		}
+	})
+
+	t.Run("ignores a refinement for a different architecture", func(t *testing.T) {
+		arm64ErofsSpec := ocispec.Platform{OS: "linux", Architecture: "arm64", OSFeatures: []string{"erofs"}}
+		got := refinePlatforms([]ocispec.Platform{amd64Spec}, []ocispec.Platform{arm64ErofsSpec})
+		if len(got[0].OSFeatures) != 0 {
+			t.Fatalf("expected the amd64 entry untouched by an arm64 refinement, got %v", got[0])
+		}
+	})
+
+	t.Run("ignores a refinement whose OSFeatures are not a superset", func(t *testing.T) {
+		configured := []ocispec.Platform{amd64ErofsSpec}
+		got := refinePlatforms(configured, []ocispec.Platform{amd64Spec})
+		if len(got[0].OSFeatures) != 1 || got[0].OSFeatures[0] != "erofs" {
+			t.Fatalf("expected the configured entry's OSFeatures preserved, got %v", got[0])
+		}
+	})
+
+	t.Run("prefers the richest qualifying refinement", func(t *testing.T) {
+		richer := ocispec.Platform{OS: "linux", Architecture: "amd64", OSFeatures: []string{"erofs", "extra"}}
+		got := refinePlatforms([]ocispec.Platform{amd64Spec}, []ocispec.Platform{amd64ErofsSpec, richer})
+		if len(got[0].OSFeatures) != 2 {
+			t.Fatalf("expected the richer refinement to win, got %v", got[0])
+		}
+	})
+
+	t.Run("only refines the matching entry among several configured platforms", func(t *testing.T) {
+		got := refinePlatforms([]ocispec.Platform{amd64Spec, arm64Spec}, []ocispec.Platform{amd64ErofsSpec})
+		if len(got[0].OSFeatures) != 1 {
+			t.Fatalf("expected amd64 refined, got %v", got[0])
+		}
+		if len(got[1].OSFeatures) != 0 {
+			t.Fatalf("expected arm64 untouched, got %v", got[1])
+		}
+	})
+}
+
+func TestIsSupersetOSFeatures(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		superset, subset []string
+		want             bool
+	}{
+		{"empty subset always satisfied", []string{}, []string{}, true},
+		{"empty subset satisfied by non-empty superset", []string{"erofs"}, []string{}, true},
+		{"identical", []string{"erofs"}, []string{"erofs"}, true},
+		{"proper superset", []string{"a", "erofs"}, []string{"erofs"}, true},
+		{"missing feature", []string{"a"}, []string{"erofs"}, false},
+		{"superset shorter than subset", []string{"erofs"}, []string{"a", "erofs"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isSupersetOSFeatures(tc.superset, tc.subset); got != tc.want {
+				t.Errorf("isSupersetOSFeatures(%v, %v) = %v, want %v", tc.superset, tc.subset, got, tc.want)
+			}
+		})
+	}
 }
