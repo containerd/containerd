@@ -73,6 +73,18 @@ type unpackerConfig struct {
 type Platform struct {
 	Platform platforms.Matcher
 
+	// PlatformSpec is the platform this unpack configuration was
+	// configured for, before it was compiled into the Platform matcher
+	// above. Unlike the matcher - which only answers whether a given
+	// platform is supported - this retains the configured OS, OSVersion,
+	// OSFeatures, Architecture, and Variant values themselves, so that a
+	// caller resolving which of an image's manifests to fetch can factor
+	// this configuration's OSFeatures (e.g. "erofs", see the EROFS image
+	// layer format specification, https://github.com/erofs/erofs-image-spec)
+	// into that resolution, not just into whether unpacking is later
+	// possible.
+	PlatformSpec ocispec.Platform
+
 	SnapshotterKey          string
 	Snapshotter             snapshots.Snapshotter
 	SnapshotOpts            []snapshots.Opt
