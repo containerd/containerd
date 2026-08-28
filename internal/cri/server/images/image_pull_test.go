@@ -375,38 +375,45 @@ func TestEncryptedImagePullOpts(t *testing.T) {
 	}
 }
 
-func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
+func TestRuntimeImagePlatform(t *testing.T) {
 	defaultSnapshotter := "native"
 	runtimeSnapshotter := "devmapper"
+	erofsPlatform := platforms.DefaultSpec()
+	erofsPlatform.OSFeatures = []string{"erofs"}
 	tests := []struct {
 		desc                string
 		podSandboxConfig    *runtime.PodSandboxConfig
 		runtimeHandler      string
 		expectedSnapshotter string
+		expectedPlatform    ocispec.Platform
 		expectedErr         bool
 	}{
 		{
-			desc:                "should return default snapshotter for nil podSandboxConfig",
+			desc:                "should return default snapshotter and platform for nil podSandboxConfig",
 			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    platforms.DefaultSpec(),
 		},
 		{
-			desc:                "should return default snapshotter for empty runtimeHandler",
+			desc:                "should return default snapshotter and platform for empty runtimeHandler",
 			podSandboxConfig:    &runtime.PodSandboxConfig{},
 			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    platforms.DefaultSpec(),
 		},
 		{
-			desc:                "should return default snapshotter for runtime not found",
+			desc:                "should return default snapshotter and platform for runtime not found",
 			podSandboxConfig:    &runtime.PodSandboxConfig{},
 			runtimeHandler:      "runtime-not-exists",
 			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    platforms.DefaultSpec(),
 		},
 		{
-			desc:                "should return snapshotter for existing runtime",
+			desc:                "should return snapshotter and platform for existing runtime",
 			podSandboxConfig:    &runtime.PodSandboxConfig{},
 			runtimeHandler:      "existing-runtime",
 			expectedSnapshotter: runtimeSnapshotter,
+			expectedPlatform:    erofsPlatform,
 		},
 		{
 			desc: "should fall back to annotation when runtimeHandler is empty",
@@ -417,6 +424,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			},
 			runtimeHandler:      "",
 			expectedSnapshotter: runtimeSnapshotter,
+			expectedPlatform:    erofsPlatform,
 		},
 		{
 			desc: "should prefer runtimeHandler parameter over annotation",
@@ -427,6 +435,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			},
 			runtimeHandler:      "existing-runtime",
 			expectedSnapshotter: runtimeSnapshotter,
+			expectedPlatform:    erofsPlatform,
 		},
 		{
 			desc: "should return default when annotation has unknown runtime and runtimeHandler is empty",
@@ -437,6 +446,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			},
 			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    platforms.DefaultSpec(),
 		},
 	}
 
@@ -445,11 +455,12 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			cri, _ := newTestCRIService()
 			cri.config.Snapshotter = defaultSnapshotter
 			cri.runtimePlatforms["existing-runtime"] = ImagePlatform{
-				Platform:    platforms.DefaultSpec(),
+				Platform:    erofsPlatform,
 				Snapshotter: runtimeSnapshotter,
 			}
-			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig, tt.runtimeHandler)
-			assert.Equal(t, tt.expectedSnapshotter, snapshotter)
+			imgPlatform, err := cri.runtimeImagePlatform(context.Background(), "test-image", tt.podSandboxConfig, tt.runtimeHandler)
+			assert.Equal(t, tt.expectedSnapshotter, imgPlatform.Snapshotter)
+			assert.Equal(t, tt.expectedPlatform, imgPlatform.Platform)
 			if tt.expectedErr {
 				assert.Error(t, err)
 			}
