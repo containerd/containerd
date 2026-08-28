@@ -27,11 +27,6 @@ linters:
         linters:
           - govet
         text: "copylocks: .*protobuf/internal/impl.MessageState.*"
-      # We dot-import ginkgo and gomega in some tests. Silence any related errors.
-      - path: 'pkg/adaptation|pkg/runtime-tools/generate|pkg/net/multiplex'
-        linters:
-          - revive
-        text: "dot-imports:"
       - linters:
           - revive
         text: "package-comments:"
