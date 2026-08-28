@@ -1018,8 +1018,8 @@ sigs.k8s.io/structured-merge-diff/v6/value
 # sigs.k8s.io/yaml v1.6.0
 ## explicit; go 1.22
 sigs.k8s.io/yaml
-# tags.cncf.io/container-device-interface v1.1.1-0.20260826075544-04278701a635
-## explicit; go 1.21
+# tags.cncf.io/container-device-interface v1.1.1-0.20260828125525-73444d1f71f2
+## explicit; go 1.23
 tags.cncf.io/container-device-interface/internal/ociedit
 tags.cncf.io/container-device-interface/internal/validation
 tags.cncf.io/container-device-interface/internal/validation/k8s

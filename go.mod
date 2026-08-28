@@ -89,7 +89,7 @@ require (
 	k8s.io/cri-streaming v0.37.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/streaming v0.37.0
-	tags.cncf.io/container-device-interface v1.1.1-0.20260826075544-04278701a635
+	tags.cncf.io/container-device-interface v1.1.1-0.20260828125525-73444d1f71f2
 )
 
 require (
