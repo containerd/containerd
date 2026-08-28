@@ -97,6 +97,9 @@ github.com/ProtonMail/go-crypto/openpgp/x448
 # github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
 ## explicit
 github.com/StackExchange/wmi
+# github.com/aperturerobotics/protobuf-go-lite v0.15.0
+## explicit; go 1.23
+github.com/aperturerobotics/protobuf-go-lite
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -109,12 +112,13 @@ github.com/cespare/xxhash/v2
 # github.com/checkpoint-restore/checkpointctl v1.6.0
 ## explicit; go 1.25.0
 github.com/checkpoint-restore/checkpointctl/lib
-# github.com/checkpoint-restore/go-criu/v7 v7.2.0
-## explicit; go 1.20
-github.com/checkpoint-restore/go-criu/v7
-github.com/checkpoint-restore/go-criu/v7/rpc
-github.com/checkpoint-restore/go-criu/v7/stats
-github.com/checkpoint-restore/go-criu/v7/utils
+# github.com/checkpoint-restore/go-criu/v8 v8.4.0
+## explicit; go 1.25.0
+github.com/checkpoint-restore/go-criu/v8
+github.com/checkpoint-restore/go-criu/v8/internal/proto
+github.com/checkpoint-restore/go-criu/v8/rpc
+github.com/checkpoint-restore/go-criu/v8/stats
+github.com/checkpoint-restore/go-criu/v8/utils
 # github.com/cilium/ebpf v0.17.3
 ## explicit; go 1.22
 github.com/cilium/ebpf
