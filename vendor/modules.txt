@@ -94,8 +94,8 @@ github.com/ProtonMail/go-crypto/openpgp/packet
 github.com/ProtonMail/go-crypto/openpgp/s2k
 github.com/ProtonMail/go-crypto/openpgp/x25519
 github.com/ProtonMail/go-crypto/openpgp/x448
-# github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
-## explicit
+# github.com/StackExchange/wmi v1.2.1
+## explicit; go 1.13
 github.com/StackExchange/wmi
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
@@ -365,17 +365,17 @@ github.com/go-logr/logr/funcr
 # github.com/go-logr/stdr v1.2.2
 ## explicit; go 1.16
 github.com/go-logr/stdr
-# github.com/go-ole/go-ole v1.2.6
+# github.com/go-ole/go-ole v1.3.0
 ## explicit; go 1.12
 github.com/go-ole/go-ole
 github.com/go-ole/go-ole/oleutil
 # github.com/godbus/dbus/v5 v5.1.0
 ## explicit; go 1.12
 github.com/godbus/dbus/v5
-# github.com/google/certtostore v1.0.6
-## explicit; go 1.18
+# github.com/google/certtostore v1.0.7
+## explicit; go 1.25.3
 github.com/google/certtostore
-# github.com/google/deck v0.0.0-20230104221208-105ad94aa8ae
+# github.com/google/deck v1.1.0
 ## explicit; go 1.19
 github.com/google/deck
 # github.com/google/go-cmp v0.7.0
