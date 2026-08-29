@@ -1066,6 +1066,16 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (any,
 			ssbkt := sbkt.Bucket([]byte(ss))
 			if ssbkt != nil {
 				log.G(ctx).WithField("key", key).WithField("snapshotter", ss).Debug("remove snapshot")
+				// Unlink from the parent before deleting, the same way an
+				// explicit Remove does. Without this the parent keeps a child
+				// entry naming a snapshot that no longer exists, and because
+				// Remove refuses any snapshot whose children bucket is
+				// non-empty, that parent can never be deleted again -- while
+				// Walk, which enumerates snapshot buckets, cannot see the
+				// dangling child that is blocking it. See containerd#11908.
+				if err := unlinkSnapshotFromParent(ssbkt, key); err != nil {
+					return nil, err
+				}
 				return &eventstypes.SnapshotRemove{
 					Key:         key,
 					Snapshotter: ss,
@@ -1155,4 +1165,32 @@ func gcnode(t gc.ResourceType, ns, key string) gc.Node {
 		Namespace: ns,
 		Key:       key,
 	}
+}
+
+// unlinkSnapshotFromParent removes key's entry from its parent's children
+// bucket. Mirrors the unlink an explicit snapshot Remove performs; the garbage
+// collector previously deleted the snapshot bucket without it, stranding the
+// child link. A missing parent or missing children bucket is not an error --
+// there is simply nothing to unlink.
+func unlinkSnapshotFromParent(ssbkt *bolt.Bucket, key string) error {
+	sbkt := ssbkt.Bucket([]byte(key))
+	if sbkt == nil {
+		return nil
+	}
+	parent := sbkt.Get(bucketKeyParent)
+	if len(parent) == 0 {
+		return nil
+	}
+	pbkt := ssbkt.Bucket(parent)
+	if pbkt == nil {
+		return nil
+	}
+	cbkt := pbkt.Bucket(bucketKeyChildren)
+	if cbkt == nil {
+		return nil
+	}
+	if err := cbkt.Delete([]byte(key)); err != nil {
+		return fmt.Errorf("failed to remove child link: %w", err)
+	}
+	return nil
 }
