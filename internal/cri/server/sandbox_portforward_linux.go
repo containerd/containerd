@@ -85,7 +85,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	if !skipLocalhost {
 		err = netNSDo(func(_ ns.NetNS) error {
 			var dialErr error
-			conn, dialErr = dialLocalhost(port)
+			conn, dialErr = dialLocalhost(ctx, port)
 			return dialErr
 		})
 	} else {
@@ -105,7 +105,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 		// destined connection is delivered via the kernel's loopback shortcut
 		// and never traverses the veth's ingress path.
 		log.G(ctx).Debugf("localhost unreachable for sandbox %q port %d (%v), falling back to pod IPs %v from host netns", id, port, err, podIPs)
-		conn, err = dialPodIPs(podIPs, port)
+		conn, err = dialPodIPs(ctx, podIPs, port)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to execute portforward in network namespace %q: %w", netNSPath, err)
@@ -169,13 +169,18 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	return nil
 }
 
+// dialTimeout bounds each individual connect attempt below, so a
+// silently-dropped connection can't hang the whole request.
+const dialTimeout = 5 * time.Second
+
 // dialPodIPs tries each of ips in order, returning the first successful
 // connection to ip:port. Each ip is a literal (never a hostname), so its
 // family is unambiguous and a single "tcp" dial suffices for both IPv4 and IPv6.
-func dialPodIPs(ips []string, port int32) (net.Conn, error) {
+func dialPodIPs(ctx context.Context, ips []string, port int32) (net.Conn, error) {
+	d := net.Dialer{Timeout: dialTimeout}
 	var errs error
 	for _, ip := range ips {
-		conn, err := net.Dial("tcp", net.JoinHostPort(ip, fmt.Sprintf("%d", port)))
+		conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(ip, fmt.Sprintf("%d", port)))
 		if err == nil {
 			return conn, nil
 		}
@@ -197,12 +202,13 @@ func dialPodIPs(ips []string, port int32) (net.Conn, error) {
 // try to connect serially. We try IPv4 first to keep current behavior and we
 // fallback to IPv6 if the connection fails.
 // xref https://github.com/golang/go/issues/44922
-func dialLocalhost(port int32) (net.Conn, error) {
-	conn, errV4 := net.Dial("tcp4", fmt.Sprintf("localhost:%d", port))
+func dialLocalhost(ctx context.Context, port int32) (net.Conn, error) {
+	d := net.Dialer{Timeout: dialTimeout}
+	conn, errV4 := d.DialContext(ctx, "tcp4", fmt.Sprintf("localhost:%d", port))
 	if errV4 == nil {
 		return conn, nil
 	}
-	conn, errV6 := net.Dial("tcp6", fmt.Sprintf("localhost:%d", port))
+	conn, errV6 := d.DialContext(ctx, "tcp6", fmt.Sprintf("localhost:%d", port))
 	if errV6 == nil {
 		return conn, nil
 	}
