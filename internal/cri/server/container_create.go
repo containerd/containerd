@@ -36,6 +36,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
@@ -304,8 +305,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		logger.WithField("spec", spec).Debugf("Container %q spec", r.containerID)
 	}
 
-	// Grab any platform specific snapshotter opts.
-	sOpts, err := snapshotterOpts(r.containerConfig)
+	sOpts, err := snapshotOpts(r.containerConfig)
 	if err != nil {
 		return "", err
 	}
@@ -1190,4 +1190,22 @@ func (c *criService) runtimeInfo(ctx context.Context, id string) (string, typeur
 	}
 
 	return "", nil, err
+}
+
+// snapshotOpts returns the options for the container's rootfs snapshot: the
+// snapshot labels inherited from the container annotations, followed by any
+// platform specific options, which take precedence.
+//
+// Inheriting the annotations mirrors what the sandbox already does for its own
+// snapshot, and on Linux it is the only way to configure the snapshotter per
+// container: the CRI API has no equivalent of the Windows-only
+// WindowsContainerResources.rootfs_size_in_bytes.
+func snapshotOpts(config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
+	opts := []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.GetAnnotations()))}
+
+	extraOpts, err := snapshotterOpts(config)
+	if err != nil {
+		return nil, err
+	}
+	return append(opts, extraOpts...), nil
 }
