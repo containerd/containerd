@@ -131,6 +131,10 @@ type Runtime struct {
 	// This is useful for sandboxers that do not require the host-level pause image.
 	// Default: false (CRI pre-pulls the pause image for all runtimes).
 	DisablePauseImagePull bool `toml:"disable_pause_image_pull" json:"disablePauseImagePull"`
+	// SkipLocalhostForPortForward causes port forwarding to connect directly to the pod IP from
+	// the host network namespace. Enable this for runtimes whose workloads are not reachable
+	// through the sandbox network namespace, such as VM-isolated runtimes.
+	SkipLocalhostForPortForward bool `toml:"skip_localhost_for_port_forward" json:"skipLocalhostForPortForward"`
 	// IOType defines how containerd transfer the io streams of the container
 	// if it is not set, the named pipe will be created for the container
 	// we can also set it to "streaming" to create a stream by streaming api,
