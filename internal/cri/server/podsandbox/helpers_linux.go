@@ -282,12 +282,14 @@ func ensureRemoveAll(ctx context.Context, dir string) error {
 	}
 }
 
-var vmbasedRuntimes = []string{
+var kvmbasedRuntimes = []string{
 	"io.containerd.kata",
+	"io.containerd.firecracker",
+	"io.containerd.nabla",
 }
 
-func isVMBasedRuntime(runtimeType string) bool {
-	for _, rt := range vmbasedRuntimes {
+func isKVMBasedRuntime(runtimeType string) bool {
+	for _, rt := range kvmbasedRuntimes {
 		if strings.Contains(runtimeType, rt) {
 			return true
 		}
@@ -296,7 +298,7 @@ func isVMBasedRuntime(runtimeType string) bool {
 }
 
 func modifyProcessLabel(runtimeType string, spec *runtimespec.Spec) error {
-	if !selinux.GetEnabled() || !isVMBasedRuntime(runtimeType) {
+	if !selinux.GetEnabled() || !isKVMBasedRuntime(runtimeType) {
 		return nil
 	}
 	l, err := selinux.SetProcessKind(spec.Process.SelinuxLabel, selinux.ProcessKindKVM)
