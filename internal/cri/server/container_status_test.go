@@ -286,6 +286,9 @@ func TestToCRISignal(t *testing.T) {
 		input    string
 		expected runtime.Signal
 	}{
+		{input: "SIGTERM", expected: runtime.Signal_SIGNAL_SIGTERM},
+		{input: "SIGRTMIN+1", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS1},
+		{input: "SIGRTMAX-1", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS1},
 		{input: "SIGNAL_SIGABRT", expected: runtime.Signal_SIGNAL_SIGABRT},
 		{input: "SIGNAL_SIGALRM", expected: runtime.Signal_SIGNAL_SIGALRM},
 		{input: "SIGNAL_SIGBUS", expected: runtime.Signal_SIGNAL_SIGBUS},
