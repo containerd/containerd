@@ -93,6 +93,7 @@ func (c *ServerConfig) StreamingConfig() (streaming.Config, error) {
 			return streaming.Config{}, fmt.Errorf("failed to load x509 key pair for stream server: %w", err)
 		}
 		config.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
 			Certificates: []tls.Certificate{tlsCert},
 		}
 	case selfSignTLS:
@@ -101,6 +102,7 @@ func (c *ServerConfig) StreamingConfig() (streaming.Config, error) {
 			return streaming.Config{}, fmt.Errorf("failed to generate tls certificate for stream server: %w", err)
 		}
 		config.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
 			Certificates: []tls.Certificate{tlsCert},
 		}
 	case withoutTLS:

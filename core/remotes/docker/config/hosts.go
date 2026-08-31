@@ -144,7 +144,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			tlsConfigured = true
 			defaultTLSConfig = options.DefaultTLS
 		} else {
-			defaultTLSConfig = &tls.Config{}
+			defaultTLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 		}
 
 		defaultTransport := docker.DefaultHTTPTransport(defaultTLSConfig)
