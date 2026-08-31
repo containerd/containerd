@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -56,28 +57,62 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 		netNSPath = "host"
 	}
 
+	// podIPs are used as fallback dial targets below, for workloads that
+	// don't listen on loopback (e.g. bind only to a pod IP, or run inside
+	// a VM under Kata/other VM-isolated runtimes). getIPs can return more
+	// than one IP for dual-stack sandboxes or additional pod networks.
+	podIP, additionalPodIPs, err := c.getIPs(s)
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox ip for %q: %w", id, err)
+	}
+	var podIPs []string
+	if podIP != "" {
+		podIPs = append(podIPs, podIP)
+	}
+	podIPs = append(podIPs, additionalPodIPs...)
+
+	// The sandbox's own loopback is never reachable from this, host-side,
+	// network namespace for VM-isolated runtimes, so skip straight to the
+	// pod IP fallback for those instead of dialing localhost first.
+	ociRuntime, err := c.config.GetSandboxRuntime(s.Config, s.Metadata.RuntimeHandler)
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox runtime for %q: %w", id, err)
+	}
+	skipLocalhost := len(podIPs) > 0 && isVMBasedRuntime(ociRuntime.Type)
+
 	log.G(ctx).Infof("Executing port forwarding in network namespace %q", netNSPath)
-	err = netNSDo(func(_ ns.NetNS) error {
+	var conn net.Conn
+	if !skipLocalhost {
+		err = netNSDo(func(_ ns.NetNS) error {
+			var dialErr error
+			conn, dialErr = dialLocalhost(port)
+			return dialErr
+		})
+	} else {
+		err = fmt.Errorf("skipped for VM-isolated runtime %q", ociRuntime.Type)
+	}
+	if err != nil && len(podIPs) > 0 {
+		// localhost isn't reachable from inside the sandbox's own netns, either
+		// because the workload only binds a pod IP, or because it runs in a
+		// VM (Kata) whose loopback isn't reachable at all from this host-side
+		// namespace. Dial the pod IPs from containerd's own (host root) network
+		// namespace instead: this is the same path kubelet's liveness/readiness
+		// probes use to reach a pod, so any CNI setup where those work will
+		// route this the same way. For VM-isolated runtimes, this traffic
+		// genuinely arrives on the sandbox's veth, which is what a tc-based
+		// redirect (e.g. Kata's tcfilter network model) forwards into the VM;
+		// a dial from inside the netns cannot do this, since a locally
+		// destined connection is delivered via the kernel's loopback shortcut
+		// and never traverses the veth's ingress path.
+		log.G(ctx).Debugf("localhost unreachable for sandbox %q port %d (%v), falling back to pod IPs %v from host netns", id, port, err, podIPs)
+		conn, err = dialPodIPs(podIPs, port)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to execute portforward in network namespace %q: %w", netNSPath, err)
+	}
+
+	err = func() error {
 		defer stream.Close()
-		// localhost can resolve to both IPv4 and IPv6 addresses in dual-stack systems
-		// but the application can be listening in one of the IP families only.
-		// golang has enabled RFC 6555 Fast Fallback (aka HappyEyeballs) by default in 1.12
-		// It means that if a host resolves to both IPv6 and IPv4, it will try to connect to any
-		// of those addresses and use the working connection.
-		// However, the implementation uses goroutines to start both connections in parallel,
-		// and this cases that the connection is done outside the namespace, so we try to connect
-		// serially.
-		// We try IPv4 first to keep current behavior and we fallback to IPv6 if the connection fails.
-		// xref https://github.com/golang/go/issues/44922
-		var conn net.Conn
-		conn, err := net.Dial("tcp4", fmt.Sprintf("localhost:%d", port))
-		if err != nil {
-			var errV6 error
-			conn, errV6 = net.Dial("tcp6", fmt.Sprintf("localhost:%d", port))
-			if errV6 != nil {
-				return fmt.Errorf("failed to connect to localhost:%d inside namespace %q, IPv4: %v IPv6 %v ", port, id, err, errV6)
-			}
-		}
 		defer conn.Close()
 
 		errCh := make(chan error, 2)
@@ -124,12 +159,52 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 		}
 
 		return errFwd
-	})
+	}()
 
 	if err != nil {
-		return fmt.Errorf("failed to execute portforward in network namespace %q: %w", netNSPath, err)
+		return fmt.Errorf("failed to execute portforward for %q port %d: %w", id, port, err)
 	}
 	log.G(ctx).Infof("Finish port forwarding for %q port %d", id, port)
 
 	return nil
+}
+
+// dialPodIPs tries each of ips in order, returning the first successful
+// connection to ip:port. Each ip is a literal (never a hostname), so its
+// family is unambiguous and a single "tcp" dial suffices for both IPv4 and IPv6.
+func dialPodIPs(ips []string, port int32) (net.Conn, error) {
+	var errs error
+	for _, ip := range ips {
+		conn, err := net.Dial("tcp", net.JoinHostPort(ip, fmt.Sprintf("%d", port)))
+		if err == nil {
+			return conn, nil
+		}
+		errs = errors.Join(errs, err)
+	}
+	return nil, errs
+}
+
+// dialLocalhost connects to localhost:port. It must be called from inside the
+// sandbox network namespace (see ns.NetNS.Do).
+//
+// localhost can resolve to both IPv4 and IPv6 addresses in dual-stack systems,
+// but the application can be listening in one of the IP families only. golang
+// has enabled RFC 6555 Fast Fallback (aka HappyEyeballs) by default in 1.12.
+// It means that if a host resolves to both IPv6 and IPv4, it will try to
+// connect to any of those addresses and use the working connection. However,
+// the implementation uses goroutines to start both connections in parallel,
+// and this causes the connection to be dialed outside the namespace, so we
+// try to connect serially. We try IPv4 first to keep current behavior and we
+// fallback to IPv6 if the connection fails.
+// xref https://github.com/golang/go/issues/44922
+func dialLocalhost(port int32) (net.Conn, error) {
+	conn, errV4 := net.Dial("tcp4", fmt.Sprintf("localhost:%d", port))
+	if errV4 == nil {
+		return conn, nil
+	}
+	conn, errV6 := net.Dial("tcp6", fmt.Sprintf("localhost:%d", port))
+	if errV6 == nil {
+		return conn, nil
+	}
+	return nil, fmt.Errorf("IPv4: %v IPv6: %v", errV4, errV6)
 }
