@@ -814,10 +814,8 @@ func (c *criService) buildLinuxSpec(
 	var ociSpecOpts oci.SpecOpts
 	if ociRuntime.CgroupWritable {
 		ociSpecOpts = customopts.WithMountsCgroupWritable(c.os, config, extraMounts, mountLabel, runtimeHandler)
-		if isUnifiedCgroupsMode() && !securityContext.GetPrivileged() {
-			specOpts = append(specOpts, oci.WithAnnotations(map[string]string{
-				"org.systemd.property.Delegate": "true",
-			}))
+		if annotations := cgroupDelegateAnnotations(ociRuntime.CgroupWritable, isUnifiedCgroupsMode(), securityContext.GetPrivileged()); annotations != nil {
+			specOpts = append(specOpts, oci.WithAnnotations(annotations))
 		}
 	} else {
 		ociSpecOpts = customopts.WithMounts(c.os, config, extraMounts, mountLabel, runtimeHandler)
