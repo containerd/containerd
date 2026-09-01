@@ -60,6 +60,7 @@ func TestCgroupDelegateAnnotations(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, tc.wantAnnotations, cgroupDelegateAnnotations(tc.cgroupWritable, tc.unifiedCgroups, tc.privileged))
