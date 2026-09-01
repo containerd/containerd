@@ -36,7 +36,7 @@ import (
 var emptyResponse typeurl.Any
 
 func init() {
-	// save marshalled empty response to avoid marshaling everytime
+	// save marshalled empty response to avoid marshaling every time
 	var err error
 	emptyResponse, err = typeurl.MarshalAny(&ptypes.Empty{})
 	if err != nil {
