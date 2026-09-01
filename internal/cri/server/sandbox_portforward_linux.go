@@ -179,12 +179,20 @@ const dialTimeout = 5 * time.Second
 func dialPodIPs(ctx context.Context, ips []string, port int32) (net.Conn, error) {
 	d := net.Dialer{Timeout: dialTimeout}
 	var errs error
+	tried := 0
 	for _, ip := range ips {
+		if ip == "" {
+			continue
+		}
+		tried++
 		conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(ip, fmt.Sprintf("%d", port)))
 		if err == nil {
 			return conn, nil
 		}
 		errs = errors.Join(errs, err)
+	}
+	if tried == 0 {
+		return nil, fmt.Errorf("no pod IPs provided")
 	}
 	return nil, errs
 }
