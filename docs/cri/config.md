@@ -297,6 +297,7 @@ version = 3
           sandboxer = 'podsandbox'
           disable_pause_image_pull = false
           io_type = ''
+          port_forward_type = ''
 
           [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
             BinaryName = ''
@@ -610,6 +611,11 @@ version = 2
       # The default value is "fifo", in which containerd will create a set of named pipes and transfer io by them.
       # Currently the value of "streaming" is supported, in this way, sandbox should serve streaming api defined in services/streaming/v1/streaming.proto, and containerd will connect to sandbox's endpoint and create a set of streams to it, as channels to transfer io of container or process.
       io_type = ""
+
+      # port_forward_type is how containerd reaches a port inside the sandbox for `kubectl port-forward`.
+      # The default value is "host", in which containerd dials the port from the sandbox's network namespace on the host.
+      # The value of "sandbox" is supported for runtimes whose network is not reachable from that namespace, such as sandboxes isolated in a virtual machine or running their own network stack in userspace. In this way, the sandbox should serve the PortForward api defined in runtime/sandbox/v1/sandbox.proto, and bridge the port onto a pair of streams on its streaming endpoint. A sandbox that does not implement that api falls back to "host".
+      port_forward_type = ""
 
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
       # "io.containerd.runc.v1" and "io.containerd.runc.v2". Its corresponding options type is:

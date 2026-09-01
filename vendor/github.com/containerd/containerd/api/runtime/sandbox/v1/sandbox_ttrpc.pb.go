@@ -17,6 +17,7 @@ type TTRPCSandboxService interface {
 	PingSandbox(context.Context, *PingRequest) (*PingResponse, error)
 	ShutdownSandbox(context.Context, *ShutdownSandboxRequest) (*ShutdownSandboxResponse, error)
 	SandboxMetrics(context.Context, *SandboxMetricsRequest) (*SandboxMetricsResponse, error)
+	PortForward(context.Context, *PortForwardRequest) (*PortForwardResponse, error)
 }
 
 func RegisterTTRPCSandboxService(srv *ttrpc.Server, svc TTRPCSandboxService) {
@@ -84,6 +85,13 @@ func RegisterTTRPCSandboxService(srv *ttrpc.Server, svc TTRPCSandboxService) {
 					return nil, err
 				}
 				return svc.SandboxMetrics(ctx, &req)
+			},
+			"PortForward": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req PortForwardRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.PortForward(ctx, &req)
 			},
 		},
 	})
@@ -166,6 +174,14 @@ func (c *ttrpcsandboxClient) ShutdownSandbox(ctx context.Context, req *ShutdownS
 func (c *ttrpcsandboxClient) SandboxMetrics(ctx context.Context, req *SandboxMetricsRequest) (*SandboxMetricsResponse, error) {
 	var resp SandboxMetricsResponse
 	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "SandboxMetrics", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpcsandboxClient) PortForward(ctx context.Context, req *PortForwardRequest) (*PortForwardResponse, error) {
+	var resp PortForwardResponse
+	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "PortForward", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

@@ -79,3 +79,7 @@ func (g *grpcBridge) ShutdownSandbox(ctx context.Context, request *api.ShutdownS
 func (g *grpcBridge) SandboxMetrics(ctx context.Context, request *api.SandboxMetricsRequest) (*api.SandboxMetricsResponse, error) {
 	return g.client.SandboxMetrics(ctx, request)
 }
+
+func (g *grpcBridge) PortForward(ctx context.Context, request *api.PortForwardRequest) (*api.PortForwardResponse, error) {
+	return g.client.PortForward(ctx, request)
+}

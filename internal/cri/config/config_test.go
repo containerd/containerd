@@ -297,6 +297,43 @@ func TestValidateConfig(t *testing.T) {
 			},
 			runtimeExpectedErr: "invalid `drain_exec_sync_io_timeout`",
 		},
+		"invalid port_forward_type": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Type:            "default",
+							PortForwardType: "bogus",
+						},
+					},
+				},
+			},
+			runtimeExpectedErr: "`port_forward_type` can only be `host` or `sandbox`",
+		},
+		"port_forward_type sandbox": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							PortForwardType: PortForwardTypeSandbox,
+						},
+					},
+				},
+			},
+			runtimeExpected: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							PortForwardType: PortForwardTypeSandbox,
+							Sandboxer:       string(ModePodSandbox),
+						},
+					},
+				},
+			},
+		},
 		"deprecated enable_cdi false": {
 			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{

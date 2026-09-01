@@ -1604,6 +1604,118 @@ func (*ControllerUpdateResponse) Descriptor() ([]byte, []int) {
 	return file_services_sandbox_v1_sandbox_proto_rawDescGZIP(), []int{27}
 }
 
+type ControllerPortForwardRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SandboxID string `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	// port is the port to connect to inside the sandbox network.
+	Port uint32 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	// stream_id names the stream pair to open on the sandbox streaming endpoint:
+	// "<stream_id>-in" carries client -> sandbox, "<stream_id>-out" the reverse.
+	StreamID  string `protobuf:"bytes,3,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
+	Sandboxer string `protobuf:"bytes,10,opt,name=sandboxer,proto3" json:"sandboxer,omitempty"`
+}
+
+func (x *ControllerPortForwardRequest) Reset() {
+	*x = ControllerPortForwardRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_services_sandbox_v1_sandbox_proto_msgTypes[28]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ControllerPortForwardRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ControllerPortForwardRequest) ProtoMessage() {}
+
+func (x *ControllerPortForwardRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_services_sandbox_v1_sandbox_proto_msgTypes[28]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ControllerPortForwardRequest.ProtoReflect.Descriptor instead.
+func (*ControllerPortForwardRequest) Descriptor() ([]byte, []int) {
+	return file_services_sandbox_v1_sandbox_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ControllerPortForwardRequest) GetSandboxID() string {
+	if x != nil {
+		return x.SandboxID
+	}
+	return ""
+}
+
+func (x *ControllerPortForwardRequest) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *ControllerPortForwardRequest) GetStreamID() string {
+	if x != nil {
+		return x.StreamID
+	}
+	return ""
+}
+
+func (x *ControllerPortForwardRequest) GetSandboxer() string {
+	if x != nil {
+		return x.Sandboxer
+	}
+	return ""
+}
+
+type ControllerPortForwardResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *ControllerPortForwardResponse) Reset() {
+	*x = ControllerPortForwardResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_services_sandbox_v1_sandbox_proto_msgTypes[29]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ControllerPortForwardResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ControllerPortForwardResponse) ProtoMessage() {}
+
+func (x *ControllerPortForwardResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_services_sandbox_v1_sandbox_proto_msgTypes[29]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ControllerPortForwardResponse.ProtoReflect.Descriptor instead.
+func (*ControllerPortForwardResponse) Descriptor() ([]byte, []int) {
+	return file_services_sandbox_v1_sandbox_proto_rawDescGZIP(), []int{29}
+}
+
 var File_services_sandbox_v1_sandbox_proto protoreflect.FileDescriptor
 
 var file_services_sandbox_v1_sandbox_proto_rawDesc = []byte{
@@ -1819,6 +1931,17 @@ var file_services_sandbox_v1_sandbox_proto_rawDesc = []byte{
 	0x62, 0x6f, 0x78, 0x12, 0x16, 0x0a, 0x06, 0x66, 0x69, 0x65, 0x6c, 0x64, 0x73, 0x18, 0x04, 0x20,
 	0x03, 0x28, 0x09, 0x52, 0x06, 0x66, 0x69, 0x65, 0x6c, 0x64, 0x73, 0x22, 0x1a, 0x0a, 0x18, 0x43,
 	0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x8c, 0x01, 0x0a, 0x1c, 0x43, 0x6f, 0x6e, 0x74,
+	0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72, 0x50, 0x6f, 0x72, 0x74, 0x46, 0x6f, 0x72, 0x77, 0x61, 0x72,
+	0x64, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x73, 0x61, 0x6e, 0x64,
+	0x62, 0x6f, 0x78, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x73, 0x61,
+	0x6e, 0x64, 0x62, 0x6f, 0x78, 0x49, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x6f, 0x72, 0x74, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x04, 0x70, 0x6f, 0x72, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x73,
+	0x74, 0x72, 0x65, 0x61, 0x6d, 0x5f, 0x69, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08,
+	0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x49, 0x64, 0x12, 0x1c, 0x0a, 0x09, 0x73, 0x61, 0x6e, 0x64,
+	0x62, 0x6f, 0x78, 0x65, 0x72, 0x18, 0x0a, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x73, 0x61, 0x6e,
+	0x64, 0x62, 0x6f, 0x78, 0x65, 0x72, 0x22, 0x1f, 0x0a, 0x1d, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f,
+	0x6c, 0x6c, 0x65, 0x72, 0x50, 0x6f, 0x72, 0x74, 0x46, 0x6f, 0x72, 0x77, 0x61, 0x72, 0x64, 0x52,
 	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x32, 0xb7, 0x04, 0x0a, 0x05, 0x53, 0x74, 0x6f, 0x72,
 	0x65, 0x12, 0x71, 0x0a, 0x06, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x12, 0x32, 0x2e, 0x63, 0x6f,
 	0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65,
@@ -1855,7 +1978,7 @@ var file_services_sandbox_v1_sandbox_proto_rawDesc = []byte{
 	0x30, 0x2e, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2e, 0x73, 0x65, 0x72,
 	0x76, 0x69, 0x63, 0x65, 0x73, 0x2e, 0x73, 0x61, 0x6e, 0x64, 0x62, 0x6f, 0x78, 0x2e, 0x76, 0x31,
 	0x2e, 0x53, 0x74, 0x6f, 0x72, 0x65, 0x47, 0x65, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
-	0x65, 0x32, 0xf3, 0x08, 0x0a, 0x0a, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72,
+	0x65, 0x32, 0x80, 0x0a, 0x0a, 0x0a, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72,
 	0x12, 0x7b, 0x0a, 0x06, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x12, 0x37, 0x2e, 0x63, 0x6f, 0x6e,
 	0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73,
 	0x2e, 0x73, 0x61, 0x6e, 0x64, 0x62, 0x6f, 0x78, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x74,
@@ -1926,12 +2049,20 @@ var file_services_sandbox_v1_sandbox_proto_rawDesc = []byte{
 	0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69,
 	0x63, 0x65, 0x73, 0x2e, 0x73, 0x61, 0x6e, 0x64, 0x62, 0x6f, 0x78, 0x2e, 0x76, 0x31, 0x2e, 0x43,
 	0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52,
-	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x42, 0x42, 0x5a, 0x40, 0x67, 0x69, 0x74, 0x68, 0x75,
-	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64,
-	0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x61, 0x70, 0x69, 0x2f,
-	0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73, 0x2f, 0x73, 0x61, 0x6e, 0x64, 0x62, 0x6f, 0x78,
-	0x2f, 0x76, 0x31, 0x3b, 0x73, 0x61, 0x6e, 0x64, 0x62, 0x6f, 0x78, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x8a, 0x01, 0x0a, 0x0b, 0x50, 0x6f, 0x72, 0x74,
+	0x46, 0x6f, 0x72, 0x77, 0x61, 0x72, 0x64, 0x12, 0x3c, 0x2e, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69,
+	0x6e, 0x65, 0x72, 0x64, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73, 0x2e, 0x73, 0x61,
+	0x6e, 0x64, 0x62, 0x6f, 0x78, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c,
+	0x6c, 0x65, 0x72, 0x50, 0x6f, 0x72, 0x74, 0x46, 0x6f, 0x72, 0x77, 0x61, 0x72, 0x64, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x3d, 0x2e, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65,
+	0x72, 0x64, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73, 0x2e, 0x73, 0x61, 0x6e, 0x64,
+	0x62, 0x6f, 0x78, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65,
+	0x72, 0x50, 0x6f, 0x72, 0x74, 0x46, 0x6f, 0x72, 0x77, 0x61, 0x72, 0x64, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x42, 0x42, 0x5a, 0x40, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63,
+	0x6f, 0x6d, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x63, 0x6f,
+	0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x73, 0x65, 0x72,
+	0x76, 0x69, 0x63, 0x65, 0x73, 0x2f, 0x73, 0x61, 0x6e, 0x64, 0x62, 0x6f, 0x78, 0x2f, 0x76, 0x31,
+	0x3b, 0x73, 0x61, 0x6e, 0x64, 0x62, 0x6f, 0x78, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1946,68 +2077,70 @@ func file_services_sandbox_v1_sandbox_proto_rawDescGZIP() []byte {
 	return file_services_sandbox_v1_sandbox_proto_rawDescData
 }
 
-var file_services_sandbox_v1_sandbox_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_services_sandbox_v1_sandbox_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_services_sandbox_v1_sandbox_proto_goTypes = []interface{}{
-	(*StoreCreateRequest)(nil),         // 0: containerd.services.sandbox.v1.StoreCreateRequest
-	(*StoreCreateResponse)(nil),        // 1: containerd.services.sandbox.v1.StoreCreateResponse
-	(*StoreUpdateRequest)(nil),         // 2: containerd.services.sandbox.v1.StoreUpdateRequest
-	(*StoreUpdateResponse)(nil),        // 3: containerd.services.sandbox.v1.StoreUpdateResponse
-	(*StoreDeleteRequest)(nil),         // 4: containerd.services.sandbox.v1.StoreDeleteRequest
-	(*StoreDeleteResponse)(nil),        // 5: containerd.services.sandbox.v1.StoreDeleteResponse
-	(*StoreListRequest)(nil),           // 6: containerd.services.sandbox.v1.StoreListRequest
-	(*StoreListResponse)(nil),          // 7: containerd.services.sandbox.v1.StoreListResponse
-	(*StoreGetRequest)(nil),            // 8: containerd.services.sandbox.v1.StoreGetRequest
-	(*StoreGetResponse)(nil),           // 9: containerd.services.sandbox.v1.StoreGetResponse
-	(*ControllerCreateRequest)(nil),    // 10: containerd.services.sandbox.v1.ControllerCreateRequest
-	(*ControllerCreateResponse)(nil),   // 11: containerd.services.sandbox.v1.ControllerCreateResponse
-	(*ControllerStartRequest)(nil),     // 12: containerd.services.sandbox.v1.ControllerStartRequest
-	(*ControllerStartResponse)(nil),    // 13: containerd.services.sandbox.v1.ControllerStartResponse
-	(*ControllerPlatformRequest)(nil),  // 14: containerd.services.sandbox.v1.ControllerPlatformRequest
-	(*ControllerPlatformResponse)(nil), // 15: containerd.services.sandbox.v1.ControllerPlatformResponse
-	(*ControllerStopRequest)(nil),      // 16: containerd.services.sandbox.v1.ControllerStopRequest
-	(*ControllerStopResponse)(nil),     // 17: containerd.services.sandbox.v1.ControllerStopResponse
-	(*ControllerWaitRequest)(nil),      // 18: containerd.services.sandbox.v1.ControllerWaitRequest
-	(*ControllerWaitResponse)(nil),     // 19: containerd.services.sandbox.v1.ControllerWaitResponse
-	(*ControllerStatusRequest)(nil),    // 20: containerd.services.sandbox.v1.ControllerStatusRequest
-	(*ControllerStatusResponse)(nil),   // 21: containerd.services.sandbox.v1.ControllerStatusResponse
-	(*ControllerShutdownRequest)(nil),  // 22: containerd.services.sandbox.v1.ControllerShutdownRequest
-	(*ControllerShutdownResponse)(nil), // 23: containerd.services.sandbox.v1.ControllerShutdownResponse
-	(*ControllerMetricsRequest)(nil),   // 24: containerd.services.sandbox.v1.ControllerMetricsRequest
-	(*ControllerMetricsResponse)(nil),  // 25: containerd.services.sandbox.v1.ControllerMetricsResponse
-	(*ControllerUpdateRequest)(nil),    // 26: containerd.services.sandbox.v1.ControllerUpdateRequest
-	(*ControllerUpdateResponse)(nil),   // 27: containerd.services.sandbox.v1.ControllerUpdateResponse
-	nil,                                // 28: containerd.services.sandbox.v1.ControllerCreateRequest.AnnotationsEntry
-	nil,                                // 29: containerd.services.sandbox.v1.ControllerStartResponse.LabelsEntry
-	nil,                                // 30: containerd.services.sandbox.v1.ControllerStatusResponse.InfoEntry
-	(*types.Sandbox)(nil),              // 31: containerd.types.Sandbox
-	(*types.Mount)(nil),                // 32: containerd.types.Mount
-	(*anypb.Any)(nil),                  // 33: google.protobuf.Any
-	(*timestamppb.Timestamp)(nil),      // 34: google.protobuf.Timestamp
-	(*types.Platform)(nil),             // 35: containerd.types.Platform
-	(*types.Metric)(nil),               // 36: containerd.types.Metric
+	(*StoreCreateRequest)(nil),            // 0: containerd.services.sandbox.v1.StoreCreateRequest
+	(*StoreCreateResponse)(nil),           // 1: containerd.services.sandbox.v1.StoreCreateResponse
+	(*StoreUpdateRequest)(nil),            // 2: containerd.services.sandbox.v1.StoreUpdateRequest
+	(*StoreUpdateResponse)(nil),           // 3: containerd.services.sandbox.v1.StoreUpdateResponse
+	(*StoreDeleteRequest)(nil),            // 4: containerd.services.sandbox.v1.StoreDeleteRequest
+	(*StoreDeleteResponse)(nil),           // 5: containerd.services.sandbox.v1.StoreDeleteResponse
+	(*StoreListRequest)(nil),              // 6: containerd.services.sandbox.v1.StoreListRequest
+	(*StoreListResponse)(nil),             // 7: containerd.services.sandbox.v1.StoreListResponse
+	(*StoreGetRequest)(nil),               // 8: containerd.services.sandbox.v1.StoreGetRequest
+	(*StoreGetResponse)(nil),              // 9: containerd.services.sandbox.v1.StoreGetResponse
+	(*ControllerCreateRequest)(nil),       // 10: containerd.services.sandbox.v1.ControllerCreateRequest
+	(*ControllerCreateResponse)(nil),      // 11: containerd.services.sandbox.v1.ControllerCreateResponse
+	(*ControllerStartRequest)(nil),        // 12: containerd.services.sandbox.v1.ControllerStartRequest
+	(*ControllerStartResponse)(nil),       // 13: containerd.services.sandbox.v1.ControllerStartResponse
+	(*ControllerPlatformRequest)(nil),     // 14: containerd.services.sandbox.v1.ControllerPlatformRequest
+	(*ControllerPlatformResponse)(nil),    // 15: containerd.services.sandbox.v1.ControllerPlatformResponse
+	(*ControllerStopRequest)(nil),         // 16: containerd.services.sandbox.v1.ControllerStopRequest
+	(*ControllerStopResponse)(nil),        // 17: containerd.services.sandbox.v1.ControllerStopResponse
+	(*ControllerWaitRequest)(nil),         // 18: containerd.services.sandbox.v1.ControllerWaitRequest
+	(*ControllerWaitResponse)(nil),        // 19: containerd.services.sandbox.v1.ControllerWaitResponse
+	(*ControllerStatusRequest)(nil),       // 20: containerd.services.sandbox.v1.ControllerStatusRequest
+	(*ControllerStatusResponse)(nil),      // 21: containerd.services.sandbox.v1.ControllerStatusResponse
+	(*ControllerShutdownRequest)(nil),     // 22: containerd.services.sandbox.v1.ControllerShutdownRequest
+	(*ControllerShutdownResponse)(nil),    // 23: containerd.services.sandbox.v1.ControllerShutdownResponse
+	(*ControllerMetricsRequest)(nil),      // 24: containerd.services.sandbox.v1.ControllerMetricsRequest
+	(*ControllerMetricsResponse)(nil),     // 25: containerd.services.sandbox.v1.ControllerMetricsResponse
+	(*ControllerUpdateRequest)(nil),       // 26: containerd.services.sandbox.v1.ControllerUpdateRequest
+	(*ControllerUpdateResponse)(nil),      // 27: containerd.services.sandbox.v1.ControllerUpdateResponse
+	(*ControllerPortForwardRequest)(nil),  // 28: containerd.services.sandbox.v1.ControllerPortForwardRequest
+	(*ControllerPortForwardResponse)(nil), // 29: containerd.services.sandbox.v1.ControllerPortForwardResponse
+	nil,                                   // 30: containerd.services.sandbox.v1.ControllerCreateRequest.AnnotationsEntry
+	nil,                                   // 31: containerd.services.sandbox.v1.ControllerStartResponse.LabelsEntry
+	nil,                                   // 32: containerd.services.sandbox.v1.ControllerStatusResponse.InfoEntry
+	(*types.Sandbox)(nil),                 // 33: containerd.types.Sandbox
+	(*types.Mount)(nil),                   // 34: containerd.types.Mount
+	(*anypb.Any)(nil),                     // 35: google.protobuf.Any
+	(*timestamppb.Timestamp)(nil),         // 36: google.protobuf.Timestamp
+	(*types.Platform)(nil),                // 37: containerd.types.Platform
+	(*types.Metric)(nil),                  // 38: containerd.types.Metric
 }
 var file_services_sandbox_v1_sandbox_proto_depIdxs = []int32{
-	31, // 0: containerd.services.sandbox.v1.StoreCreateRequest.sandbox:type_name -> containerd.types.Sandbox
-	31, // 1: containerd.services.sandbox.v1.StoreCreateResponse.sandbox:type_name -> containerd.types.Sandbox
-	31, // 2: containerd.services.sandbox.v1.StoreUpdateRequest.sandbox:type_name -> containerd.types.Sandbox
-	31, // 3: containerd.services.sandbox.v1.StoreUpdateResponse.sandbox:type_name -> containerd.types.Sandbox
-	31, // 4: containerd.services.sandbox.v1.StoreListResponse.list:type_name -> containerd.types.Sandbox
-	31, // 5: containerd.services.sandbox.v1.StoreGetResponse.sandbox:type_name -> containerd.types.Sandbox
-	32, // 6: containerd.services.sandbox.v1.ControllerCreateRequest.rootfs:type_name -> containerd.types.Mount
-	33, // 7: containerd.services.sandbox.v1.ControllerCreateRequest.options:type_name -> google.protobuf.Any
-	28, // 8: containerd.services.sandbox.v1.ControllerCreateRequest.annotations:type_name -> containerd.services.sandbox.v1.ControllerCreateRequest.AnnotationsEntry
-	31, // 9: containerd.services.sandbox.v1.ControllerCreateRequest.sandbox:type_name -> containerd.types.Sandbox
-	34, // 10: containerd.services.sandbox.v1.ControllerStartResponse.created_at:type_name -> google.protobuf.Timestamp
-	29, // 11: containerd.services.sandbox.v1.ControllerStartResponse.labels:type_name -> containerd.services.sandbox.v1.ControllerStartResponse.LabelsEntry
-	33, // 12: containerd.services.sandbox.v1.ControllerStartResponse.spec:type_name -> google.protobuf.Any
-	35, // 13: containerd.services.sandbox.v1.ControllerPlatformResponse.platform:type_name -> containerd.types.Platform
-	34, // 14: containerd.services.sandbox.v1.ControllerWaitResponse.exited_at:type_name -> google.protobuf.Timestamp
-	30, // 15: containerd.services.sandbox.v1.ControllerStatusResponse.info:type_name -> containerd.services.sandbox.v1.ControllerStatusResponse.InfoEntry
-	34, // 16: containerd.services.sandbox.v1.ControllerStatusResponse.created_at:type_name -> google.protobuf.Timestamp
-	34, // 17: containerd.services.sandbox.v1.ControllerStatusResponse.exited_at:type_name -> google.protobuf.Timestamp
-	33, // 18: containerd.services.sandbox.v1.ControllerStatusResponse.extra:type_name -> google.protobuf.Any
-	36, // 19: containerd.services.sandbox.v1.ControllerMetricsResponse.metrics:type_name -> containerd.types.Metric
-	31, // 20: containerd.services.sandbox.v1.ControllerUpdateRequest.sandbox:type_name -> containerd.types.Sandbox
+	33, // 0: containerd.services.sandbox.v1.StoreCreateRequest.sandbox:type_name -> containerd.types.Sandbox
+	33, // 1: containerd.services.sandbox.v1.StoreCreateResponse.sandbox:type_name -> containerd.types.Sandbox
+	33, // 2: containerd.services.sandbox.v1.StoreUpdateRequest.sandbox:type_name -> containerd.types.Sandbox
+	33, // 3: containerd.services.sandbox.v1.StoreUpdateResponse.sandbox:type_name -> containerd.types.Sandbox
+	33, // 4: containerd.services.sandbox.v1.StoreListResponse.list:type_name -> containerd.types.Sandbox
+	33, // 5: containerd.services.sandbox.v1.StoreGetResponse.sandbox:type_name -> containerd.types.Sandbox
+	34, // 6: containerd.services.sandbox.v1.ControllerCreateRequest.rootfs:type_name -> containerd.types.Mount
+	35, // 7: containerd.services.sandbox.v1.ControllerCreateRequest.options:type_name -> google.protobuf.Any
+	30, // 8: containerd.services.sandbox.v1.ControllerCreateRequest.annotations:type_name -> containerd.services.sandbox.v1.ControllerCreateRequest.AnnotationsEntry
+	33, // 9: containerd.services.sandbox.v1.ControllerCreateRequest.sandbox:type_name -> containerd.types.Sandbox
+	36, // 10: containerd.services.sandbox.v1.ControllerStartResponse.created_at:type_name -> google.protobuf.Timestamp
+	31, // 11: containerd.services.sandbox.v1.ControllerStartResponse.labels:type_name -> containerd.services.sandbox.v1.ControllerStartResponse.LabelsEntry
+	35, // 12: containerd.services.sandbox.v1.ControllerStartResponse.spec:type_name -> google.protobuf.Any
+	37, // 13: containerd.services.sandbox.v1.ControllerPlatformResponse.platform:type_name -> containerd.types.Platform
+	36, // 14: containerd.services.sandbox.v1.ControllerWaitResponse.exited_at:type_name -> google.protobuf.Timestamp
+	32, // 15: containerd.services.sandbox.v1.ControllerStatusResponse.info:type_name -> containerd.services.sandbox.v1.ControllerStatusResponse.InfoEntry
+	36, // 16: containerd.services.sandbox.v1.ControllerStatusResponse.created_at:type_name -> google.protobuf.Timestamp
+	36, // 17: containerd.services.sandbox.v1.ControllerStatusResponse.exited_at:type_name -> google.protobuf.Timestamp
+	35, // 18: containerd.services.sandbox.v1.ControllerStatusResponse.extra:type_name -> google.protobuf.Any
+	38, // 19: containerd.services.sandbox.v1.ControllerMetricsResponse.metrics:type_name -> containerd.types.Metric
+	33, // 20: containerd.services.sandbox.v1.ControllerUpdateRequest.sandbox:type_name -> containerd.types.Sandbox
 	0,  // 21: containerd.services.sandbox.v1.Store.Create:input_type -> containerd.services.sandbox.v1.StoreCreateRequest
 	2,  // 22: containerd.services.sandbox.v1.Store.Update:input_type -> containerd.services.sandbox.v1.StoreUpdateRequest
 	4,  // 23: containerd.services.sandbox.v1.Store.Delete:input_type -> containerd.services.sandbox.v1.StoreDeleteRequest
@@ -2022,22 +2155,24 @@ var file_services_sandbox_v1_sandbox_proto_depIdxs = []int32{
 	22, // 32: containerd.services.sandbox.v1.Controller.Shutdown:input_type -> containerd.services.sandbox.v1.ControllerShutdownRequest
 	24, // 33: containerd.services.sandbox.v1.Controller.Metrics:input_type -> containerd.services.sandbox.v1.ControllerMetricsRequest
 	26, // 34: containerd.services.sandbox.v1.Controller.Update:input_type -> containerd.services.sandbox.v1.ControllerUpdateRequest
-	1,  // 35: containerd.services.sandbox.v1.Store.Create:output_type -> containerd.services.sandbox.v1.StoreCreateResponse
-	3,  // 36: containerd.services.sandbox.v1.Store.Update:output_type -> containerd.services.sandbox.v1.StoreUpdateResponse
-	5,  // 37: containerd.services.sandbox.v1.Store.Delete:output_type -> containerd.services.sandbox.v1.StoreDeleteResponse
-	7,  // 38: containerd.services.sandbox.v1.Store.List:output_type -> containerd.services.sandbox.v1.StoreListResponse
-	9,  // 39: containerd.services.sandbox.v1.Store.Get:output_type -> containerd.services.sandbox.v1.StoreGetResponse
-	11, // 40: containerd.services.sandbox.v1.Controller.Create:output_type -> containerd.services.sandbox.v1.ControllerCreateResponse
-	13, // 41: containerd.services.sandbox.v1.Controller.Start:output_type -> containerd.services.sandbox.v1.ControllerStartResponse
-	15, // 42: containerd.services.sandbox.v1.Controller.Platform:output_type -> containerd.services.sandbox.v1.ControllerPlatformResponse
-	17, // 43: containerd.services.sandbox.v1.Controller.Stop:output_type -> containerd.services.sandbox.v1.ControllerStopResponse
-	19, // 44: containerd.services.sandbox.v1.Controller.Wait:output_type -> containerd.services.sandbox.v1.ControllerWaitResponse
-	21, // 45: containerd.services.sandbox.v1.Controller.Status:output_type -> containerd.services.sandbox.v1.ControllerStatusResponse
-	23, // 46: containerd.services.sandbox.v1.Controller.Shutdown:output_type -> containerd.services.sandbox.v1.ControllerShutdownResponse
-	25, // 47: containerd.services.sandbox.v1.Controller.Metrics:output_type -> containerd.services.sandbox.v1.ControllerMetricsResponse
-	27, // 48: containerd.services.sandbox.v1.Controller.Update:output_type -> containerd.services.sandbox.v1.ControllerUpdateResponse
-	35, // [35:49] is the sub-list for method output_type
-	21, // [21:35] is the sub-list for method input_type
+	28, // 35: containerd.services.sandbox.v1.Controller.PortForward:input_type -> containerd.services.sandbox.v1.ControllerPortForwardRequest
+	1,  // 36: containerd.services.sandbox.v1.Store.Create:output_type -> containerd.services.sandbox.v1.StoreCreateResponse
+	3,  // 37: containerd.services.sandbox.v1.Store.Update:output_type -> containerd.services.sandbox.v1.StoreUpdateResponse
+	5,  // 38: containerd.services.sandbox.v1.Store.Delete:output_type -> containerd.services.sandbox.v1.StoreDeleteResponse
+	7,  // 39: containerd.services.sandbox.v1.Store.List:output_type -> containerd.services.sandbox.v1.StoreListResponse
+	9,  // 40: containerd.services.sandbox.v1.Store.Get:output_type -> containerd.services.sandbox.v1.StoreGetResponse
+	11, // 41: containerd.services.sandbox.v1.Controller.Create:output_type -> containerd.services.sandbox.v1.ControllerCreateResponse
+	13, // 42: containerd.services.sandbox.v1.Controller.Start:output_type -> containerd.services.sandbox.v1.ControllerStartResponse
+	15, // 43: containerd.services.sandbox.v1.Controller.Platform:output_type -> containerd.services.sandbox.v1.ControllerPlatformResponse
+	17, // 44: containerd.services.sandbox.v1.Controller.Stop:output_type -> containerd.services.sandbox.v1.ControllerStopResponse
+	19, // 45: containerd.services.sandbox.v1.Controller.Wait:output_type -> containerd.services.sandbox.v1.ControllerWaitResponse
+	21, // 46: containerd.services.sandbox.v1.Controller.Status:output_type -> containerd.services.sandbox.v1.ControllerStatusResponse
+	23, // 47: containerd.services.sandbox.v1.Controller.Shutdown:output_type -> containerd.services.sandbox.v1.ControllerShutdownResponse
+	25, // 48: containerd.services.sandbox.v1.Controller.Metrics:output_type -> containerd.services.sandbox.v1.ControllerMetricsResponse
+	27, // 49: containerd.services.sandbox.v1.Controller.Update:output_type -> containerd.services.sandbox.v1.ControllerUpdateResponse
+	29, // 50: containerd.services.sandbox.v1.Controller.PortForward:output_type -> containerd.services.sandbox.v1.ControllerPortForwardResponse
+	36, // [36:51] is the sub-list for method output_type
+	21, // [21:36] is the sub-list for method input_type
 	21, // [21:21] is the sub-list for extension type_name
 	21, // [21:21] is the sub-list for extension extendee
 	0,  // [0:21] is the sub-list for field type_name
@@ -2385,6 +2520,30 @@ func file_services_sandbox_v1_sandbox_proto_init() {
 				return nil
 			}
 		}
+		file_services_sandbox_v1_sandbox_proto_msgTypes[28].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ControllerPortForwardRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_services_sandbox_v1_sandbox_proto_msgTypes[29].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ControllerPortForwardResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2392,7 +2551,7 @@ func file_services_sandbox_v1_sandbox_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_services_sandbox_v1_sandbox_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   31,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

@@ -37,7 +37,19 @@ import (
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 )
 
-type fakeSandboxService struct{}
+type fakeSandboxService struct {
+	// portForwardErr is returned by PortForwardSandbox.
+	portForwardErr error
+	// portForwardCalls records each PortForwardSandbox call.
+	portForwardCalls []fakePortForwardCall
+}
+
+type fakePortForwardCall struct {
+	sandboxer string
+	sandboxID string
+	port      int32
+	streamID  string
+}
 
 func (f *fakeSandboxService) CreateSandbox(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
 	return errdefs.ErrNotImplemented
@@ -69,6 +81,16 @@ func (f *fakeSandboxService) SandboxStatus(ctx context.Context, sandboxer string
 
 func (f *fakeSandboxService) SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (imagespec.Platform, error) {
 	return platforms.DefaultSpec(), nil
+}
+
+func (f *fakeSandboxService) PortForwardSandbox(ctx context.Context, sandboxer string, sandboxID string, port int32, streamID string) error {
+	f.portForwardCalls = append(f.portForwardCalls, fakePortForwardCall{
+		sandboxer: sandboxer,
+		sandboxID: sandboxID,
+		port:      port,
+		streamID:  streamID,
+	})
+	return f.portForwardErr
 }
 
 func (f *fakeSandboxService) SandboxController(sandboxer string) (sandbox.Controller, error) {
@@ -107,6 +129,10 @@ func (f fakeSandboxController) Shutdown(ctx context.Context, sandboxID string) e
 
 func (f fakeSandboxController) Metrics(ctx context.Context, sandboxID string) (*types.Metric, error) {
 	return &types.Metric{}, errdefs.ErrNotImplemented
+}
+
+func (f *fakeSandboxController) PortForward(ctx context.Context, sandboxID string, port int32, streamID string) error {
+	return errdefs.ErrNotImplemented
 }
 
 func (f *fakeSandboxController) Update(

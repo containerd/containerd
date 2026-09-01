@@ -58,6 +58,11 @@ service Sandbox {
 
   // SandboxMetrics retrieves metrics about a sandbox instance.
   rpc SandboxMetrics(SandboxMetricsRequest) returns (SandboxMetricsResponse);
+
+  // PortForward bridges a port inside the sandbox network onto a stream pair served
+  // by the sandbox streaming endpoint. Shims that do not own the workload network
+  // may leave it unimplemented; containerd then forwards from the host.
+  rpc PortForward(PortForwardRequest) returns (PortForwardResponse);
 }
 
 message CreateSandboxRequest {
@@ -147,3 +152,14 @@ message SandboxMetricsRequest {
 message SandboxMetricsResponse {
   containerd.types.Metric metrics = 1;
 }
+
+message PortForwardRequest {
+  string sandbox_id = 1;
+  // port is the port to connect to inside the sandbox network.
+  uint32 port = 2;
+  // stream_id names the stream pair to open on the sandbox streaming endpoint:
+  // "<stream_id>-in" carries client -> sandbox, "<stream_id>-out" the reverse.
+  string stream_id = 3;
+}
+
+message PortForwardResponse {}

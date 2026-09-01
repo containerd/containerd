@@ -18,6 +18,8 @@ package proxy
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"time"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
@@ -203,6 +205,19 @@ func (s *remoteSandboxController) Metrics(ctx context.Context, sandboxID string)
 		return nil, errgrpc.ToNative(err)
 	}
 	return resp.Metrics, nil
+}
+
+func (s *remoteSandboxController) PortForward(ctx context.Context, sandboxID string, port int32, streamID string) error {
+	if port <= 0 || port > math.MaxUint16 {
+		return fmt.Errorf("%w: port %d is out of range", errdefs.ErrInvalidArgument, port)
+	}
+	_, err := s.client.PortForward(ctx, &api.ControllerPortForwardRequest{
+		SandboxID: sandboxID,
+		Port:      uint32(port),
+		StreamID:  streamID,
+		Sandboxer: s.sandboxerName,
+	})
+	return errgrpc.ToNative(err)
 }
 
 func (s *remoteSandboxController) Update(

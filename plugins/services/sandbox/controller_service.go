@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"google.golang.org/grpc"
@@ -263,6 +264,19 @@ func (s *controllerService) Metrics(ctx context.Context, req *api.ControllerMetr
 	return &api.ControllerMetricsResponse{
 		Metrics: metrics,
 	}, nil
+}
+
+func (s *controllerService) PortForward(ctx context.Context, req *api.ControllerPortForwardRequest) (*api.ControllerPortForwardResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("sandbox port forward")
+	ctrl, err := s.getController(req.Sandboxer)
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+	port := req.GetPort()
+	if port == 0 || port > math.MaxUint16 {
+		return nil, errgrpc.ToGRPC(fmt.Errorf("%w: port %d is out of range", errdefs.ErrInvalidArgument, port))
+	}
+	return &api.ControllerPortForwardResponse{}, errgrpc.ToGRPC(ctrl.PortForward(ctx, req.GetSandboxID(), int32(port), req.GetStreamID()))
 }
 
 func (s *controllerService) Update(

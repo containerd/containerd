@@ -95,6 +95,7 @@ service Controller {
   rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
   rpc Metrics(ControllerMetricsRequest) returns (ControllerMetricsResponse);
   rpc Update(ControllerUpdateRequest) returns (ControllerUpdateResponse);
+  rpc PortForward(ControllerPortForwardRequest) returns (ControllerPortForwardResponse);
 }
 
 message ControllerCreateRequest {
@@ -201,3 +202,15 @@ message ControllerUpdateRequest {
 }
 
 message ControllerUpdateResponse {}
+
+message ControllerPortForwardRequest {
+  string sandbox_id = 1;
+  // port is the port to connect to inside the sandbox network.
+  uint32 port = 2;
+  // stream_id names the stream pair to open on the sandbox streaming endpoint:
+  // "<stream_id>-in" carries client -> sandbox, "<stream_id>-out" the reverse.
+  string stream_id = 3;
+  string sandboxer = 10;
+}
+
+message ControllerPortForwardResponse {}

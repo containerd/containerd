@@ -28,6 +28,7 @@ import (
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	apitypes "github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,12 @@ import (
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
+
+type stubPortForward struct {
+	id       string
+	port     int32
+	streamID string
+}
 
 type stubController struct {
 	lastCreateSandbox sandbox.Sandbox
@@ -50,15 +57,17 @@ type stubController struct {
 	lastUpdateID      string
 	lastUpdateSandbox sandbox.Sandbox
 	lastUpdateFields  []string
+	lastPortForward   stubPortForward
 
-	createErr   error
-	startErr    error
-	stopErr     error
-	waitErr     error
-	statusErr   error
-	shutdownErr error
-	metricsErr  error
-	updateErr   error
+	createErr      error
+	startErr       error
+	stopErr        error
+	waitErr        error
+	statusErr      error
+	shutdownErr    error
+	metricsErr     error
+	portForwardErr error
+	updateErr      error
 }
 
 var createdAt = time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -127,6 +136,11 @@ func (s *stubController) Shutdown(_ context.Context, id string) error {
 	return s.shutdownErr
 }
 
+func (s *stubController) PortForward(_ context.Context, id string, port int32, streamID string) error {
+	s.lastPortForward = stubPortForward{id: id, port: port, streamID: streamID}
+	return s.portForwardErr
+}
+
 func (s *stubController) Metrics(_ context.Context, id string) (*apitypes.Metric, error) {
 	s.lastMetricsID = id
 	if s.metricsErr != nil {
@@ -191,6 +205,19 @@ func TestGetController(t *testing.T) {
 			svc, _ := newTestService(t)
 
 			_, err := svc.Start(nsCtx(), &api.ControllerStartRequest{
+				SandboxID: "sb-1",
+				Sandboxer: tc.sandboxer,
+			})
+			require.Error(t, err)
+			s, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantCode, s.Code())
+		})
+
+		t.Run("PortForward/"+tc.name, func(t *testing.T) {
+			svc, _ := newTestService(t)
+
+			_, err := svc.PortForward(nsCtx(), &api.ControllerPortForwardRequest{
 				SandboxID: "sb-1",
 				Sandboxer: tc.sandboxer,
 			})
@@ -366,6 +393,38 @@ func TestMetrics(t *testing.T) {
 		assert.NotNil(t, resp.Metrics)
 		assert.Equal(t, "sb-1", ctrl.lastMetricsID)
 	})
+}
+
+func TestPortForward(t *testing.T) {
+	t.Run("delegates to controller", func(t *testing.T) {
+		svc, ctrl := newTestService(t)
+
+		_, err := svc.PortForward(nsCtx(), &api.ControllerPortForwardRequest{
+			SandboxID: "sb-1",
+			Sandboxer: "test",
+			Port:      8080,
+			StreamID:  "portforward-abc",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, stubPortForward{id: "sb-1", port: 8080, streamID: "portforward-abc"}, ctrl.lastPortForward)
+	})
+
+	t.Run("propagates ErrNotImplemented so callers can fall back", func(t *testing.T) {
+		svc, ctrl := newTestService(t)
+		ctrl.portForwardErr = errdefs.ErrNotImplemented
+
+		_, err := svc.PortForward(nsCtx(), &api.ControllerPortForwardRequest{
+			SandboxID: "sb-1",
+			Sandboxer: "test",
+			Port:      8080,
+			StreamID:  "portforward-abc",
+		})
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Unimplemented, s.Code())
+	})
+
 }
 
 func TestUpdate(t *testing.T) {

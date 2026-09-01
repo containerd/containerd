@@ -102,6 +102,14 @@ func (c *criSandboxService) SandboxPlatform(ctx context.Context, sandboxer strin
 	return ctrl.Platform(ctx, sandboxID)
 }
 
+func (c *criSandboxService) PortForwardSandbox(ctx context.Context, sandboxer string, sandboxID string, port int32, streamID string) error {
+	ctrl, err := c.SandboxController(sandboxer)
+	if err != nil {
+		return err
+	}
+	return ctrl.PortForward(ctx, sandboxID, port, streamID)
+}
+
 func (c *criSandboxService) ShutdownSandbox(ctx context.Context, sandboxer string, sandboxID string) error {
 	ctrl, err := c.SandboxController(sandboxer)
 	if err != nil {

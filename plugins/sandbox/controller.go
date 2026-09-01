@@ -19,6 +19,7 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -334,6 +335,23 @@ func (c *controllerLocal) Metrics(ctx context.Context, sandboxID string) (*types
 		return nil, err
 	}
 	return resp.Metrics, nil
+}
+
+func (c *controllerLocal) PortForward(ctx context.Context, sandboxID string, port int32, streamID string) error {
+	if port <= 0 || port > math.MaxUint16 {
+		return fmt.Errorf("%w: port %d is out of range", errdefs.ErrInvalidArgument, port)
+	}
+	sb, err := c.getSandbox(ctx, sandboxID)
+	if err != nil {
+		return err
+	}
+	_, err = sb.PortForward(ctx, &runtimeAPI.PortForwardRequest{
+		SandboxID: sandboxID,
+		Port:      uint32(port),
+		StreamID:  streamID,
+	})
+	// Converted to a native error so callers can detect ErrNotImplemented and fall back.
+	return errgrpc.ToNative(err)
 }
 
 func (c *controllerLocal) Update(

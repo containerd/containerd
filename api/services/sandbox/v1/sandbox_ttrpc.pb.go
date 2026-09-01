@@ -117,6 +117,7 @@ type TTRPCControllerService interface {
 	Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error)
 	Metrics(context.Context, *ControllerMetricsRequest) (*ControllerMetricsResponse, error)
 	Update(context.Context, *ControllerUpdateRequest) (*ControllerUpdateResponse, error)
+	PortForward(context.Context, *ControllerPortForwardRequest) (*ControllerPortForwardResponse, error)
 }
 
 func RegisterTTRPCControllerService(srv *ttrpc.Server, svc TTRPCControllerService) {
@@ -184,6 +185,13 @@ func RegisterTTRPCControllerService(srv *ttrpc.Server, svc TTRPCControllerServic
 					return nil, err
 				}
 				return svc.Update(ctx, &req)
+			},
+			"PortForward": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req ControllerPortForwardRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.PortForward(ctx, &req)
 			},
 		},
 	})
@@ -266,6 +274,14 @@ func (c *ttrpccontrollerClient) Metrics(ctx context.Context, req *ControllerMetr
 func (c *ttrpccontrollerClient) Update(ctx context.Context, req *ControllerUpdateRequest) (*ControllerUpdateResponse, error) {
 	var resp ControllerUpdateResponse
 	if err := c.client.Call(ctx, "containerd.services.sandbox.v1.Controller", "Update", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpccontrollerClient) PortForward(ctx context.Context, req *ControllerPortForwardRequest) (*ControllerPortForwardResponse, error) {
+	var resp ControllerPortForwardResponse
+	if err := c.client.Call(ctx, "containerd.services.sandbox.v1.Controller", "PortForward", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
