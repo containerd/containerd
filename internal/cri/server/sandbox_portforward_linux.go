@@ -80,9 +80,9 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	}
 	skipLocalhost := len(podIPs) > 0 && isVMBasedRuntime(ociRuntime.Type)
 
-	log.G(ctx).Infof("Executing port forwarding in network namespace %q", netNSPath)
 	var conn net.Conn
 	if !skipLocalhost {
+		log.G(ctx).Infof("Executing port forwarding in network namespace %q", netNSPath)
 		err = netNSDo(func(_ ns.NetNS) error {
 			var dialErr error
 			conn, dialErr = dialLocalhost(ctx, port)
