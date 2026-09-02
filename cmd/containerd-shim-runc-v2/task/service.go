@@ -44,7 +44,6 @@ import (
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/runtime"
 	oomv2 "github.com/containerd/containerd/v2/internal/oom"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	oomv1 "github.com/containerd/containerd/v2/pkg/oom/v1"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -809,8 +808,7 @@ func (s *service) getContainerPids(ctx context.Context, container *runc.Containe
 }
 
 func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
-	ns, _ := namespaces.Namespace(ctx)
-	ctx = namespaces.WithNamespace(context.Background(), ns)
+	ctx = context.WithoutCancel(ctx)
 	defer publisher.Close()
 
 	publish := func(e any) {

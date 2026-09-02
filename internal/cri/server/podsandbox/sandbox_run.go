@@ -328,9 +328,10 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to marshal spec for sandbox container %s: %w", id, err)
 	}
 
+	exitCtx := ctrdutil.WithNamespace(context.WithoutCancel(ctx))
 	go func() {
-		if err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, exitCh); err != nil {
-			log.G(context.Background()).Warnf("failed to wait pod sandbox exit %v", err)
+		if err := c.waitSandboxExit(exitCtx, podSandbox, exitCh); err != nil {
+			log.G(exitCtx).Warnf("failed to wait pod sandbox exit %v", err)
 		}
 	}()
 
