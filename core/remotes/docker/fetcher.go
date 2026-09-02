@@ -119,11 +119,7 @@ func newPipeWriter(bufPool *bufferPool) (*pipeReader, *pipeWriter) {
 		bufPool: bufPool,
 		buf:     nil,
 	}
-	return &pipeReader{
-			pipe: p,
-		}, &pipeWriter{
-			pipe: p,
-		}
+	return &pipeReader{pipe: p}, &pipeWriter{pipe: p}
 }
 
 // Read implements the standard Read interface: it reads data from the pipe,
@@ -370,7 +366,6 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 		}
 
 		return nil, firstErr
-
 	})
 }
 
