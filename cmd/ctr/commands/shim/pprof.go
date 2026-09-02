@@ -153,12 +153,13 @@ func getPProfClient(cliContext *cli.Context) (*http.Client, error) {
 		return nil, errors.New("container id must be provided")
 	}
 	tr := &http.Transport{
-		Dial: func(_, _ string) (net.Conn, error) {
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			ns := cliContext.String("namespace")
-			ctx := namespaces.WithNamespace(context.Background(), ns)
+			ctx = namespaces.WithNamespace(ctx, ns)
 			s, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, true)
 			s = strings.TrimPrefix(s, "unix://")
-			return net.Dial("unix", s)
+			var dialer net.Dialer
+			return dialer.DialContext(ctx, "unix", s)
 		},
 	}
 	return &http.Client{Transport: tr}, nil
