@@ -600,7 +600,9 @@ func edit(cliContext *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error)
 		return nil, err
 	}
 
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("%s %s", editor, tmp.Name()))
+	// The editor is an explicit user-provided shell command. Pass the temporary
+	// filename as an argument so the shell does not interpret it.
+	cmd := exec.Command("sh", "-c", editor+` "$@"`, "editor", tmp.Name()) //nolint:gosec // G702: the editor is intentionally a shell command.
 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

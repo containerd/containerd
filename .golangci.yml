@@ -41,7 +41,6 @@ linters:
         - G301
         - G302
         - G304
-        - G702
         - G703
         - G122
     modernize:

@@ -85,7 +85,7 @@ func main() {
 
 // defaultRuncInvoker is to call the runc command with same arguments.
 func defaultRuncInvoker(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "runc", os.Args[1:]...)
+	cmd := exec.CommandContext(ctx, "runc", os.Args[1:]...) //nolint:gosec // G702: this test proxy forwards arguments directly to a fixed executable.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
 	return cmd.Run()
 }
