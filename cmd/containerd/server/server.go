@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -280,8 +281,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 // Stop the containerd server canceling any open connections
 func (s *Server) Stop() {
-	for i := len(s.plugins) - 1; i >= 0; i-- {
-		p := s.plugins[i]
+	for _, p := range slices.Backward(s.plugins) {
 		instance, err := p.Instance()
 		if err != nil {
 			log.L.WithFields(log.Fields{"error": err, "id": p.Registration.URI()}).Error("could not get plugin instance")

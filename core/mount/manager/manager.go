@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -720,12 +721,12 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 
 	// TODO: Should this also be backgrounded, no much can do on failure to unmount
 	var mountErrors error
-	for i := len(allActive) - 1; i >= 0; i-- {
+	for _, active := range slices.Backward(allActive) {
 		var err error
-		if h := mm.handlers[allActive[i].Type]; h != nil {
-			err = h.Unmount(ctx, allActive[i].MountPoint)
+		if h := mm.handlers[active.Type]; h != nil {
+			err = h.Unmount(ctx, active.MountPoint)
 		} else {
-			err = mount.Unmount(allActive[i].MountPoint, 0)
+			err = mount.Unmount(active.MountPoint, 0)
 		}
 		if err != nil {
 			mountErrors = errors.Join(mountErrors, err)
