@@ -174,8 +174,7 @@ func RemoveSocket(address string) error {
 // SocketEaddrinuse returns true if the provided error is caused by the
 // EADDRINUSE error number
 func SocketEaddrinuse(err error) bool {
-	var netErr *net.OpError
-	if errors.As(err, &netErr) {
+	if netErr, ok := errors.AsType[*net.OpError](err); ok {
 		if netErr.Op != "listen" {
 			return false
 		}
