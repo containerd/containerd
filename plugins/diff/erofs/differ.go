@@ -127,6 +127,17 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		}
 	}()
 
+	// A read-only active snapshot is one the snapshotter has already populated
+	// (e.g. served from a layer content cache), so there is nothing to apply
+	// into it and its content is shared with every other snapshot of that
+	// layer. Callers are expected to notice the read-only mounts and skip the
+	// layer entirely; refuse rather than write into content we do not own.
+	// Not ErrNotImplemented: no other differ can write this layer either, so
+	// this must not fall through to the next one.
+	if len(mounts) > 0 && mounts[len(mounts)-1].ReadOnly() {
+		return emptyDesc, fmt.Errorf("cannot apply to a read-only snapshot, its content is already populated: %w", errdefs.ErrFailedPrecondition)
+	}
+
 	var (
 		erofsLayerType string
 		fastcopy       bool
@@ -177,17 +188,6 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	layer, err := erofsutils.MountsToLayer(mounts)
 	if err != nil {
 		return emptyDesc, err
-	}
-
-	// A staged blob is shared with every other snapshot of that layer, so
-	// applying would truncate the cache entry through the symlink. Callers are
-	// expected to notice the read-only mounts and skip the layer entirely.
-	staged, err := erofsutils.StagedLayerBlob(layer)
-	if err != nil {
-		return emptyDesc, err
-	}
-	if staged {
-		return emptyDesc, fmt.Errorf("layer %q is already populated from the layer content cache: %w", layer, errdefs.ErrFailedPrecondition)
 	}
 
 	ra, err := s.store.ReaderAt(ctx, desc)
