@@ -40,19 +40,18 @@ func TestCacheBlobPath(t *testing.T) {
 	assert.Equal(t, enc[:2], filepath.Base(filepath.Dir(got)), "blob must live under a 2-char prefix dir")
 }
 
-// TestMountsToLayerStagedBlob covers that resolving the layer directory is
-// unaffected by a staged blob: Compare only reads from it, so refusing belongs
-// on the apply path, not here.
-func TestMountsToLayerStagedBlob(t *testing.T) {
+// TestMountsToLayerErofsMount covers resolving the layer directory from an erofs
+// layer mount, which is what a snapshot holding a single committed layer hands
+// out.
+func TestMountsToLayerErofsMount(t *testing.T) {
 	layer := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(layer, ".erofslayer"), nil, 0644))
-	cached := filepath.Join(t.TempDir(), "cached.erofs")
-	require.NoError(t, os.WriteFile(cached, []byte("shared blob"), 0644))
-	require.NoError(t, os.Symlink(cached, filepath.Join(layer, "layer.erofs")))
+	blob := filepath.Join(layer, "layer.erofs")
+	require.NoError(t, os.WriteFile(blob, []byte("layer"), 0644))
 
 	got, err := MountsToLayer([]mount.Mount{{
 		Type:    "erofs",
-		Source:  filepath.Join(layer, "layer.erofs"),
+		Source:  blob,
 		Options: []string{"ro"},
 	}})
 	require.NoError(t, err)

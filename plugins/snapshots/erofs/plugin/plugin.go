@@ -59,10 +59,15 @@ type Config struct {
 	DmverityMode string `toml:"dmverity_mode"`
 
 	// LayerContentCaches lists directories of pre-converted, diffID-keyed erofs
-	// layer blobs. Each is checked one by one and the first hit is committed
-	// without being converted, in both sequential and parallel unpack modes; a
-	// directory that doesn't exist is treated as a cache miss. Layers missing
-	// from all of them are converted normally.
+	// layer blobs. A layer found in one of them is mounted from that directory
+	// rather than being converted, in both sequential and parallel unpack
+	// modes. The directories are searched in the order given and the first one
+	// holding the layer wins; one that doesn't exist is treated as a miss.
+	// Layers found in none of them are converted normally.
+	//
+	// The blobs are read but never written, and are expected to outlive the
+	// snapshots using them: removing one while an image still refers to it
+	// leaves that image unusable.
 	LayerContentCaches []string `toml:"layer_content_caches"`
 }
 

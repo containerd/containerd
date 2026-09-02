@@ -784,6 +784,8 @@ func TestMountFsMeta(t *testing.T) {
 	parents := []string{"p0", "p1", "p2"}
 	for _, id := range parents {
 		require.NoError(t, os.MkdirAll(filepath.Join(root, "snapshots", id), 0755))
+		// The flattened layers are addressed by device, so each needs a blob.
+		require.NoError(t, os.WriteFile(s.layerBlobPath(id), []byte("layer"), 0644))
 	}
 
 	writeMeta := func(t *testing.T, id string, contents []byte) {
@@ -799,12 +801,15 @@ func TestMountFsMeta(t *testing.T) {
 	}
 
 	snap := storage.Snapshot{ParentIDs: parents}
+	// Every parent's blob is local unless a test says otherwise.
+	infos := make([]snapshots.Info, len(parents))
 
 	t.Run("missing fsmeta returns false", func(t *testing.T) {
 		for _, id := range parents {
 			removeMeta(t, id)
 		}
-		_, ok := s.mountFsMeta(snap, 0)
+		_, ok, err := s.mountFsMeta(snap, infos, 0)
+		require.NoError(t, err)
 		assert.False(t, ok)
 	})
 
@@ -812,7 +817,8 @@ func TestMountFsMeta(t *testing.T) {
 		writeMeta(t, "p0", nil)
 		t.Cleanup(func() { removeMeta(t, "p0") })
 
-		_, ok := s.mountFsMeta(snap, 0)
+		_, ok, err := s.mountFsMeta(snap, infos, 0)
+		require.NoError(t, err)
 		assert.False(t, ok)
 	})
 
@@ -820,7 +826,8 @@ func TestMountFsMeta(t *testing.T) {
 		writeMeta(t, "p0", []byte("merged"))
 		t.Cleanup(func() { removeMeta(t, "p0") })
 
-		m, ok := s.mountFsMeta(snap, 0)
+		m, ok, err := s.mountFsMeta(snap, infos, 0)
+		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, "erofs", m.Type)
 		assert.Equal(t, s.fsMetaPath("p0"), m.Source)
@@ -837,7 +844,8 @@ func TestMountFsMeta(t *testing.T) {
 		writeMeta(t, "p1", []byte("merged"))
 		t.Cleanup(func() { removeMeta(t, "p1") })
 
-		m, ok := s.mountFsMeta(snap, 1)
+		m, ok, err := s.mountFsMeta(snap, infos, 1)
+		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, s.fsMetaPath("p1"), m.Source)
 		assert.Equal(t, []string{
@@ -845,6 +853,46 @@ func TestMountFsMeta(t *testing.T) {
 			"device=" + s.layerBlobPath("p2"),
 			"device=" + s.layerBlobPath("p1"),
 		}, m.Options)
+	})
+
+	t.Run("a parent's blob is addressed wherever it is stored", func(t *testing.T) {
+		// A flattened layer served from a layer content cache has no blob in
+		// its own directory, so the device must point at the cache entry. A
+		// device= that assumed the snapshot dir would simply not exist.
+		external := filepath.Join(t.TempDir(), "cached.erofs")
+		require.NoError(t, os.WriteFile(external, []byte("cached"), 0644))
+		require.NoError(t, os.Remove(s.layerBlobPath("p1")))
+		infos[1] = snapshots.Info{Labels: blobSource{Kind: blobSourceCache, Ref: external}.labels()}
+		t.Cleanup(func() {
+			infos[1] = snapshots.Info{}
+			require.NoError(t, os.WriteFile(s.layerBlobPath("p1"), []byte("layer"), 0644))
+		})
+
+		writeMeta(t, "p0", []byte("merged"))
+		t.Cleanup(func() { removeMeta(t, "p0") })
+
+		m, ok, err := s.mountFsMeta(snap, infos, 0)
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, []string{
+			"ro", "loop",
+			"device=" + s.layerBlobPath("p2"),
+			"device=" + external,
+			"device=" + s.layerBlobPath("p0"),
+		}, m.Options)
+	})
+
+	t.Run("a parent whose blob is gone is an error", func(t *testing.T) {
+		require.NoError(t, os.Remove(s.layerBlobPath("p1")))
+		t.Cleanup(func() {
+			require.NoError(t, os.WriteFile(s.layerBlobPath("p1"), []byte("layer"), 0644))
+		})
+
+		writeMeta(t, "p0", []byte("merged"))
+		t.Cleanup(func() { removeMeta(t, "p0") })
+
+		_, _, err := s.mountFsMeta(snap, infos, 0)
+		assert.Error(t, err, "a device must not be silently dropped from the mount")
 	})
 }
 
@@ -868,8 +916,10 @@ func TestMountsWithMergedFsMeta(t *testing.T) {
 
 	snap := storage.Snapshot{Kind: snapshots.KindView, ParentIDs: parents}
 	info := snapshots.Info{}
+	// Every parent's blob is local.
+	parentInfos := make([]snapshots.Info, len(parents))
 
-	mounts, err := s.mounts(snap, info)
+	mounts, err := s.mounts(snap, info, parentInfos)
 	require.NoError(t, err)
 
 	// Expect: [erofs(p0), erofs(p1), erofs(fsmeta p2, device=p3,p2), overlay]
@@ -913,8 +963,10 @@ func TestMountsWithMergedFsMetaOnTopParent(t *testing.T) {
 
 	snap := storage.Snapshot{Kind: snapshots.KindView, ParentIDs: parents}
 	info := snapshots.Info{}
+	// Every parent's blob is local.
+	parentInfos := make([]snapshots.Info, len(parents))
 
-	mounts, err := s.mounts(snap, info)
+	mounts, err := s.mounts(snap, info, parentInfos)
 	require.NoError(t, err)
 
 	require.Len(t, mounts, 2)
@@ -949,7 +1001,7 @@ func requireErofs(t *testing.T) {
 
 // writeCacheBlob writes a fake erofs blob into cacheDir keyed by diffID and
 // returns its absolute path. The bytes need not be a valid erofs image: the
-// snapshotter only symlinks the blob, so these tests exercise the
+// snapshotter only records and references the blob, so these tests exercise the
 // Prepare/Commit/Remove logic rather than mounting.
 func writeCacheBlob(t *testing.T, cacheDir string, diffID digest.Digest, data []byte) string {
 	t.Helper()
@@ -971,13 +1023,25 @@ func extractionOpt(target string, diffID digest.Digest) snapshots.Opt {
 // snapshotID returns the backend snapshot ID for key.
 func snapshotID(t *testing.T, ctx context.Context, s *snapshotter, key string) string {
 	t.Helper()
-	var id string
+	id, _ := snapshotIDInfo(t, ctx, s, key)
+	return id
+}
+
+// snapshotIDInfo returns a snapshot's id and info, including the labels the
+// snapshotter keeps for itself, which the metadata snapshotter filters out of
+// what a client would see.
+func snapshotIDInfo(t *testing.T, ctx context.Context, s *snapshotter, key string) (string, snapshots.Info) {
+	t.Helper()
+	var (
+		id   string
+		info snapshots.Info
+	)
 	require.NoError(t, s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
 		var err error
-		id, _, _, err = storage.GetInfo(ctx, key)
+		id, info, _, err = storage.GetInfo(ctx, key)
 		return err
 	}))
-	return id
+	return id, info
 }
 
 // newCacheSnapshotter creates an erofs snapshotter rooted in a temp dir with the
@@ -992,18 +1056,28 @@ func newCacheSnapshotter(t *testing.T, opts ...Opt) *snapshotter {
 	return sn.(*snapshotter)
 }
 
-// requireStagedSymlink asserts that the snapshot behind key holds the cache blob
-// as an absolute symlink, i.e. it was staged and never converted in place.
-func requireStagedSymlink(t *testing.T, ctx context.Context, s *snapshotter, key, blob string) {
+// requireCachedBlobSource asserts that the snapshot behind key records blob as
+// its layer's source and holds no copy or link of it: the cache entry is
+// mounted where it lies, so nothing inside the snapshot aliases it.
+func requireCachedBlobSource(t *testing.T, ctx context.Context, s *snapshotter, key, blob string) {
 	t.Helper()
-	link := s.layerBlobPath(snapshotID(t, ctx, s, key))
-	fi, err := os.Lstat(link)
-	require.NoError(t, err, "the cached blob must be staged as layer.erofs")
-	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "layer.erofs should be a symlink")
-	dst, err := os.Readlink(link)
+	id, info := snapshotIDInfo(t, ctx, s, key)
+
+	src, err := blobSourceFromInfo(info)
+	require.NoError(t, err, "the cache hit must be recorded as a blob source")
+	assert.Equal(t, blobSourceCache, src.Kind)
+	assert.True(t, filepath.IsAbs(src.Ref), "the recorded ref should be absolute")
+	assert.Equal(t, blob, src.Ref)
+
+	_, err = os.Lstat(s.layerBlobPath(id))
+	assert.ErrorIs(t, err, os.ErrNotExist, "a cached blob must not be linked or copied into the snapshot")
+
+	// And it resolves back to the cache entry, which is what gets mounted.
+	path, resolved, err := s.resolveBlob(id, info)
 	require.NoError(t, err)
-	assert.True(t, filepath.IsAbs(dst), "symlink target should be absolute")
-	assert.Equal(t, blob, dst)
+	assert.Equal(t, blob, path)
+	assert.False(t, resolved.owned(), "a cached blob is not this snapshot's to write")
+	assert.True(t, resolved.populated(), "a cached blob needs nothing applied into it")
 }
 
 // stageCacheHit runs a parentless extraction Prepare for target/diffID, see
@@ -1014,7 +1088,7 @@ func stageCacheHit(t *testing.T, ctx context.Context, s *snapshotter, target str
 }
 
 // stageCacheHitFrom runs an extraction Prepare for target/diffID on top of
-// parent and asserts the cache staged the blob into the active snapshot: a
+// parent and asserts the cache served the blob into the active snapshot: a
 // read-only mount, with no error (so the unpacker skips fetch+apply but still
 // commits). It returns the extraction key so the caller can Commit it as the
 // target chainID.
@@ -1022,16 +1096,16 @@ func stageCacheHitFrom(t *testing.T, ctx context.Context, s *snapshotter, parent
 	t.Helper()
 	key := "extract-1 " + target
 	mounts, err := s.Prepare(ctx, key, parent, extractionOpt(target, diffID))
-	require.NoError(t, err, "cache hit must stage without an error")
-	require.NotEmpty(t, mounts, "a staged cache hit returns mounts")
+	require.NoError(t, err, "cache hit must be served without an error")
+	require.NotEmpty(t, mounts, "a served cache hit returns mounts")
 	for _, m := range mounts {
-		assert.True(t, m.ReadOnly(), "a staged cache hit returns read-only mounts")
+		assert.True(t, m.ReadOnly(), "a served cache hit returns read-only mounts")
 	}
 	return key
 }
 
 // TestCacheHit covers the happy path: an extraction Prepare whose diffID blob is
-// in the cache stages the blob into the active snapshot (symlinked) and returns
+// in the cache records the cache entry as the snapshot's blob source and returns
 // read-only mounts without committing; a subsequent Commit finalizes the target
 // chainID without re-converting.
 func TestCacheHit(t *testing.T) {
@@ -1046,15 +1120,15 @@ func TestCacheHit(t *testing.T) {
 	target := cacheTestChainID
 	key := stageCacheHit(t, ctx, s, target, diffID)
 
-	// The blob is staged into the active snapshot but the target chainID is not
+	// The blob is served into the active snapshot but the target chainID is not
 	// committed yet.
 	_, err := s.Stat(ctx, target)
 	assert.Error(t, err, "target chainID must not be committed before Commit")
 
-	// layer.erofs is an absolute symlink into the operator-owned cache blob.
-	requireStagedSymlink(t, ctx, s, key, blob)
+	// The operator-owned cache blob is recorded, not linked in.
+	requireCachedBlobSource(t, ctx, s, key, blob)
 
-	// Commit finalizes the staged snapshot as the target chainID, without any
+	// Commit finalizes the snapshot as the target chainID, without any
 	// re-conversion (the blob is already present).
 	require.NoError(t, s.Commit(ctx, target, key))
 	info, err := s.Stat(ctx, target)
@@ -1064,8 +1138,9 @@ func TestCacheHit(t *testing.T) {
 }
 
 // TestCacheSidecar covers a hit in the default "auto" dm-verity mode where the
-// cache entry has a sidecar: it must be copied into the snapshot dir as a plain
-// regular file (not symlinked).
+// cache entry has a sidecar: since the blob is mounted from the cache, the
+// sidecar beside it is used from there too, with nothing copied into the
+// snapshot to fall out of step with the blob it describes.
 func TestCacheSidecar(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
@@ -1080,15 +1155,17 @@ func TestCacheSidecar(t *testing.T) {
 	target := cacheTestChainID
 	key := stageCacheHit(t, ctx, s, target, diffID)
 
-	// The sidecar is copied in as a plain regular file (not a symlink) so mount-time
-	// metadata resolution is independent of the cache filesystem.
-	sidecar := dmverity.MetadataPath(s.layerBlobPath(snapshotID(t, ctx, s, key)))
-	fi, err := os.Lstat(sidecar)
-	require.NoError(t, err, "sidecar should be copied into the snapshot dir")
-	assert.Zero(t, fi.Mode()&os.ModeSymlink, "sidecar should be a regular file, not a symlink")
-	data, err := os.ReadFile(sidecar)
+	mounts, err := s.Mounts(ctx, key)
 	require.NoError(t, err)
-	assert.Equal(t, testDmverityMetadata, string(data))
+	require.NotEmpty(t, mounts)
+	assert.Contains(t, mounts[0].Options, "X-containerd.dmverity="+dmverity.MetadataPath(blob),
+		"the cache entry's own sidecar is used where it lies")
+
+	// Nothing is copied into the snapshot, so the sidecar can never disagree
+	// with the blob it pins.
+	id := snapshotID(t, ctx, s, key)
+	_, err = os.Lstat(dmverity.MetadataPath(s.layerBlobPath(id)))
+	assert.ErrorIs(t, err, os.ErrNotExist, "no sidecar copy may be left in the snapshot dir")
 }
 
 // TestCacheMiss covers the cases that must NOT be served from the cache and
@@ -1102,7 +1179,7 @@ func TestCacheMiss(t *testing.T) {
 
 	// Each case must leave the extraction as a normal active snapshot: mounts are
 	// returned and the target chainID is not committed. wantRO distinguishes a
-	// KindActive miss (no layer.erofs staged yet, so mounts must be writable)
+	// KindActive miss (no layer blob yet, so mounts must be writable)
 	// from the KindView case below (read-only for its own, cache-unrelated reason).
 	assertFellThrough := func(t *testing.T, s *snapshotter, mounts []mount.Mount, err error, wantRO bool) {
 		t.Helper()
@@ -1157,7 +1234,7 @@ func TestCacheMiss(t *testing.T) {
 		assert.False(t, mounts[len(mounts)-1].ReadOnly(), "a Prepare without extraction labels must expose a writable overlay")
 
 		_, err = os.Lstat(s.layerBlobPath(snapshotID(t, ctx, s, key)))
-		assert.ErrorIs(t, err, os.ErrNotExist, "no cached blob may be staged without extraction labels")
+		assert.ErrorIs(t, err, os.ErrNotExist, "no cached blob may be served without extraction labels")
 	})
 
 	t.Run("view is never short-circuited", func(t *testing.T) {
@@ -1173,9 +1250,10 @@ func TestCacheMiss(t *testing.T) {
 
 // TestCacheParentedStage covers a cached blob whose extraction Prepare carries a
 // parent, which is what sequential unpacking does for every layer but the first:
-// it is staged exactly like a parentless one, so an image is served from the
-// cache regardless of the unpack mode. The staged blob is mounted read-only, so
-// the differ can never write through the symlink into the shared cache blob.
+// it is served exactly like a parentless one, so an image is served from the
+// cache regardless of the unpack mode. The cache entry is mounted where it lies
+// and read-only, so nothing can write to a blob shared with every other
+// snapshot of that layer.
 func TestCacheParentedStage(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
@@ -1199,23 +1277,24 @@ func TestCacheParentedStage(t *testing.T) {
 	key := stageCacheHitFrom(t, ctx, s, parentChain, childChain, childDiffID)
 
 	// A parented Prepare must still hand out the parent's content, per the
-	// Snapshotter contract, so the staged blob is stacked as the top lower over
+	// Snapshotter contract, so the cached blob is stacked as the top lower over
 	// the parent rather than returned on its own. Without an upperdir the
-	// resulting overlay is read-only, which is what marks it staged.
+	// resulting overlay is read-only, which is what says it is already
+	// populated.
 	mounts, err := s.Mounts(ctx, key)
 	require.NoError(t, err)
-	require.Len(t, mounts, 3, "staged blob, the parent lower and the overlay")
-	assert.Equal(t, s.layerBlobPath(snapshotID(t, ctx, s, key)), mounts[0].Source,
-		"the staged blob is the top lower")
+	require.Len(t, mounts, 3, "the cached blob, the parent lower and the overlay")
+	assert.Equal(t, childBlob, mounts[0].Source,
+		"the cache entry is mounted where it lies, as the top lower")
 	assert.Equal(t, "erofs", mounts[1].Type, "the parent layer is stacked below it")
 	assert.Equal(t, "format/mkdir/overlay", mounts[2].Type)
 	assert.Contains(t, strings.Join(mounts[2].Options, ","), "lowerdir={{ overlay 0 1 }}",
 		"both layers are in the lowerdir range")
 	assert.NotContains(t, strings.Join(mounts[2].Options, ","), "upperdir=",
-		"a staged snapshot has nothing writable")
-	assert.True(t, mounts[len(mounts)-1].ReadOnly(), "the unpacker detects staging on the last mount")
+		"a populated snapshot has nothing writable")
+	assert.True(t, mounts[len(mounts)-1].ReadOnly(), "the unpacker detects this on the last mount")
 
-	// The unpacker commits a staged snapshot without WithParent when the parent
+	// The unpacker commits such a snapshot without WithParent when the parent
 	// was already given to Prepare, so the chain is linked through that parent.
 	require.NoError(t, s.Commit(ctx, childChain, key))
 	info, err := s.Stat(ctx, childChain)
@@ -1223,18 +1302,91 @@ func TestCacheParentedStage(t *testing.T) {
 	assert.Equal(t, snapshots.KindCommitted, info.Kind)
 	assert.Equal(t, parentChain, info.Parent)
 
-	// Commit ran no conversion: the blob is still the symlinked cache entry and
+	// Commit ran no conversion: the blob is still the recorded cache entry and
 	// the operator-owned blob itself is untouched.
-	requireStagedSymlink(t, ctx, s, childChain, childBlob)
+	requireCachedBlobSource(t, ctx, s, childChain, childBlob)
 	data, err := os.ReadFile(childBlob)
 	require.NoError(t, err)
 	assert.Equal(t, childData, data, "the cache blob must not be written through")
 }
 
-// TestCacheStaleBlob covers a cache entry pruned after it was staged: Mounts must
-// not report a dangling symlink as staged content, since the caller would skip
-// the layer and Commit would then materialize an empty blob through the symlink,
-// poisoning the cache entry for every image using that layer.
+// TestCacheBlobSourceOutlivesCommit covers that a committed snapshot still
+// knows where its blob is. storage.CommitActive replaces an active snapshot's
+// labels with the ones passed to Commit, so a record left behind there would be
+// lost and the layer would afterwards look like one that was never applied.
+func TestCacheBlobSourceOutlivesCommit(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	cacheDir := t.TempDir()
+	diffID := digest.Digest(cacheTestDiffID)
+	blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
+
+	s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
+
+	target := cacheTestChainID
+	key := stageCacheHit(t, ctx, s, target, diffID)
+	// Commit with labels of its own, as the unpacker does, to make sure they
+	// are merged with the snapshotter's rather than replacing them.
+	require.NoError(t, s.Commit(ctx, target, key, snapshots.WithLabels(map[string]string{
+		snapshots.LabelSnapshotRef: target,
+	})))
+
+	requireCachedBlobSource(t, ctx, s, target, blob)
+	_, info := snapshotIDInfo(t, ctx, s, target)
+	assert.Equal(t, target, info.Labels[snapshots.LabelSnapshotRef],
+		"the caller's own labels must survive too")
+
+	// And a child stacks it as a lower from the cache, not from a path inside
+	// the parent's snapshot directory.
+	child := "sha256:0000000000000000000000000000000000000000000000000000000000000009"
+	mounts, err := s.Prepare(ctx, child, target)
+	require.NoError(t, err)
+	require.NotEmpty(t, mounts)
+	assert.Equal(t, blob, mounts[0].Source, "the parent is mounted from the cache")
+}
+
+// TestCacheBlobSourceSurvivesUpdate covers an Update that replaces a snapshot's
+// labels wholesale, which is what a client sending no update mask does. The
+// snapshotter's own labels are filtered out of what such a client can see, so
+// it cannot send them back; dropping them would leave a committed layer unable
+// to find its blob, through no fault of the caller.
+func TestCacheBlobSourceSurvivesUpdate(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+
+	cacheDir := t.TempDir()
+	diffID := digest.Digest(cacheTestDiffID)
+	blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
+
+	s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
+
+	target := cacheTestChainID
+	require.NoError(t, s.Commit(ctx, target, stageCacheHit(t, ctx, s, target, diffID)))
+
+	// A wholesale label replacement, carrying none of the snapshotter's own.
+	_, err := s.Update(ctx, snapshots.Info{
+		Name:   target,
+		Labels: map[string]string{"example.com/mine": "yes"},
+	})
+	require.NoError(t, err)
+
+	requireCachedBlobSource(t, ctx, s, target, blob)
+	_, info := snapshotIDInfo(t, ctx, s, target)
+	assert.Equal(t, "yes", info.Labels["example.com/mine"], "the caller's update must still apply")
+
+	// Including an attempt to clear them outright, which is silently ignored
+	// rather than left to strand the layer.
+	_, err = s.Update(ctx, snapshots.Info{
+		Name:   target,
+		Labels: map[string]string{blobSourceRefLabel: ""},
+	}, "labels."+blobSourceRefLabel)
+	require.NoError(t, err)
+	requireCachedBlobSource(t, ctx, s, target, blob)
+}
+
+// TestCacheStaleBlob covers a cache entry pruned after a snapshot was served
+// from it: Mounts must not report a source that no longer resolves as populated
+// content, since the caller would then skip a layer whose content isn't there.
+// The parented and parentless paths must agree, so both are checked.
 func TestCacheStaleBlob(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
@@ -1257,16 +1409,33 @@ func TestCacheStaleBlob(t *testing.T) {
 	require.NoError(t, os.Remove(childBlob))
 
 	_, err := s.Mounts(ctx, key)
-	require.Error(t, err, "a dangling staged blob must not be served as staged content")
+	require.Error(t, err, "an unresolvable blob source must not pass as populated content")
 	assert.ErrorIs(t, err, os.ErrNotExist)
+
+	// The same must hold with no parent, where the snapshot's own layer is the
+	// whole mount: a source that no longer resolves must not quietly fall
+	// through to a writable mount, which would say the layer is unapplied.
+	t.Run("parentless", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		diffID := digest.Digest(cacheTestDiffID)
+		blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
+		s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
+
+		key := stageCacheHit(t, ctx, s, cacheTestChainID, diffID)
+		require.NoError(t, os.Remove(blob))
+
+		mounts, err := s.Mounts(ctx, key)
+		require.Error(t, err, "an unresolvable blob source must not pass as populated content")
+		assert.ErrorIs(t, err, os.ErrNotExist)
+		assert.Nil(t, mounts, "no writable fallback may be handed out")
+	})
 }
 
 // TestCacheStaleBlobCommit covers a cache entry pruned between Prepare and
 // Commit, which is the window the unpacker actually runs in (it commits the
 // mounts Prepare returned and never calls Mounts). Commit must not fall back to
-// converting the snapshot: mkfs.erofs would write through the dangling symlink,
-// committing an empty layer and leaving that empty blob in the cache for every
-// future pull of the layer.
+// converting the snapshot, which would commit an empty layer for content that
+// was never applied because the snapshotter said it was already there.
 func TestCacheStaleBlobCommit(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
@@ -1283,19 +1452,20 @@ func TestCacheStaleBlobCommit(t *testing.T) {
 	require.NoError(t, os.Remove(blob))
 
 	err := s.Commit(ctx, target, key)
-	require.Error(t, err, "a dangling staged blob must not be converted")
+	require.Error(t, err, "an unresolvable blob source must not be converted")
 	assert.ErrorIs(t, err, os.ErrNotExist)
 
-	// Nothing was written back through the symlink.
+	// And nothing was written back to where the entry used to be.
 	_, err = os.Stat(blob)
 	assert.ErrorIs(t, err, os.ErrNotExist, "the pruned cache entry must not be recreated")
 	_, err = s.Stat(ctx, target)
 	assert.Error(t, err, "the layer must not be committed")
 }
 
-// TestCacheRemove covers removal of a cache-hit snapshot: it succeeds (the
-// setImmutable guard skips the symlink), removes the snapshot dir/symlink, and
-// leaves the operator-owned cache blob and sidecar untouched.
+// TestCacheRemove covers removal of a cache-hit snapshot: it succeeds, removes
+// the snapshot dir, and leaves the operator-owned cache blob and sidecar
+// untouched. Nothing in the snapshot refers to them, so there is nothing for
+// removal to follow.
 func TestCacheRemove(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 
@@ -1313,11 +1483,9 @@ func TestCacheRemove(t *testing.T) {
 
 	snapDir := filepath.Dir(s.layerBlobPath(snapshotID(t, ctx, s, target)))
 
-	// Remove must succeed (the symlinked blob is skipped by the setImmutable guard,
-	// which would otherwise follow the link and ioctl the operator-owned blob).
 	require.NoError(t, s.Remove(ctx, target))
 
-	// The snapshot dir (and its symlink) is gone, but the cache is untouched.
+	// The snapshot dir is gone, but the cache is untouched.
 	_, err := os.Stat(snapDir)
 	assert.True(t, os.IsNotExist(err), "snapshot dir should be removed")
 	_, err = os.Stat(blob)
@@ -1327,8 +1495,8 @@ func TestCacheRemove(t *testing.T) {
 }
 
 // TestCacheDmverity covers dmverity_mode="on": a cache entry with a sidecar is
-// staged (and the sidecar copied), while an entry missing its required sidecar is
-// a hard error (not staged, nothing committed).
+// served, using the sidecar beside it, while an entry missing its required
+// sidecar is a hard error (not served, nothing committed).
 func TestCacheDmverity(t *testing.T) {
 	if supported, err := dmverity.IsSupported(); err != nil || !supported {
 		t.Skip("dm-verity is not supported on this system")
@@ -1337,7 +1505,7 @@ func TestCacheDmverity(t *testing.T) {
 	diffID := digest.Digest(cacheTestDiffID)
 	target := cacheTestChainID
 
-	t.Run("with sidecar stages and copies it", func(t *testing.T) {
+	t.Run("with sidecar is served using it", func(t *testing.T) {
 		cacheDir := t.TempDir()
 		blob := writeCacheBlob(t, cacheDir, diffID, []byte("fake erofs blob"))
 		require.NoError(t, os.WriteFile(dmverity.MetadataPath(blob), []byte(testDmverityMetadata), 0644))
@@ -1345,8 +1513,11 @@ func TestCacheDmverity(t *testing.T) {
 		s := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir), WithDmverityMode("on"))
 		key := stageCacheHit(t, ctx, s, target, diffID)
 
-		_, err := os.Stat(dmverity.MetadataPath(s.layerBlobPath(snapshotID(t, ctx, s, key))))
-		require.NoError(t, err, "sidecar must be present for a dmverity_mode=on hit")
+		mounts, err := s.Mounts(ctx, key)
+		require.NoError(t, err)
+		require.NotEmpty(t, mounts)
+		assert.Contains(t, mounts[0].Options, "X-containerd.dmverity="+dmverity.MetadataPath(blob),
+			"the cache entry's sidecar pins the blob it sits beside")
 	})
 
 	t.Run("without sidecar fails the pull", func(t *testing.T) {
@@ -1374,13 +1545,14 @@ func TestCacheMultipleDirs(t *testing.T) {
 	diffID := digest.Digest(cacheTestDiffID)
 	target := cacheTestChainID
 
-	// stagedBlob returns the cache blob the snapshot's layer.erofs symlink points
-	// at, i.e. which of the configured caches actually served the layer.
-	stagedBlob := func(t *testing.T, s *snapshotter, key string) string {
+	// servedBlob returns the cache blob recorded as the snapshot's layer source,
+	// i.e. which of the configured caches actually served the layer.
+	servedBlob := func(t *testing.T, s *snapshotter, key string) string {
 		t.Helper()
-		dst, err := os.Readlink(s.layerBlobPath(snapshotID(t, ctx, s, key)))
+		_, info := snapshotIDInfo(t, ctx, s, key)
+		src, err := blobSourceFromInfo(info)
 		require.NoError(t, err)
-		return dst
+		return src.Ref
 	}
 
 	t.Run("first cache with the blob wins", func(t *testing.T) {
@@ -1391,7 +1563,7 @@ func TestCacheMultipleDirs(t *testing.T) {
 
 		s := newCacheSnapshotter(t, WithLayerContentCaches(first, second))
 		key := stageCacheHit(t, ctx, s, target, diffID)
-		assert.Equal(t, firstBlob, stagedBlob(t, s, key))
+		assert.Equal(t, firstBlob, servedBlob(t, s, key))
 	})
 
 	t.Run("falls through to a later cache", func(t *testing.T) {
@@ -1400,7 +1572,7 @@ func TestCacheMultipleDirs(t *testing.T) {
 
 		s := newCacheSnapshotter(t, WithLayerContentCaches(empty, populated))
 		key := stageCacheHit(t, ctx, s, target, diffID)
-		assert.Equal(t, blob, stagedBlob(t, s, key))
+		assert.Equal(t, blob, servedBlob(t, s, key))
 	})
 
 	t.Run("miss in every cache falls back to a writable snapshot", func(t *testing.T) {
@@ -1419,9 +1591,10 @@ func TestCacheMultipleDirs(t *testing.T) {
 }
 
 // TestCacheDirMustBeAbsolute covers the one thing NewSnapshotter checks about a
-// configured cache dir: it must be absolute, since a relative one would be
-// symlinked into the snapshot dir and dangle. The empty string is covered by the
-// same check, which otherwise resolves to the daemon's working directory.
+// configured cache dir: it must be absolute, since a relative one is recorded
+// in a snapshot and later mounted from, and would resolve against whatever the
+// working directory happens to be. The empty string is covered by the same
+// check, which otherwise resolves to the daemon's working directory.
 func TestCacheDirMustBeAbsolute(t *testing.T) {
 	requireErofs(t)
 
