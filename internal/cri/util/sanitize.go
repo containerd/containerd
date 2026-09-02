@@ -20,34 +20,43 @@ import (
 	"errors"
 	"net/url"
 	"strings"
+
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 )
 
 // SanitizeError sanitizes an error by redacting sensitive information in URLs.
-// If the error contains a *url.Error, it parses and sanitizes the URL.
-// Otherwise, it returns the error unchanged.
+// If the error contains a *url.Error or an ErrUnexpectedStatus, it parses and
+// sanitizes the embedded URL. Otherwise, it returns the error unchanged.
 func SanitizeError(err error) error {
 	if err == nil {
 		return nil
 	}
 
-	// Check if the error is or contains a *url.Error
+	// Determine the raw URL embedded in the error message, if any.
+	var rawURL string
 	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
-		// Parse and sanitize the URL
-		sanitizedURL := sanitizeURL(urlErr.URL)
-		if sanitizedURL != urlErr.URL {
-			// Wrap with sanitized url.Error
-			return &sanitizedError{
-				original:     err,
-				sanitizedURL: sanitizedURL,
-				urlError:     urlErr,
-			}
-		}
+	var statusErr remoteerrors.ErrUnexpectedStatus
+	switch {
+	case errors.As(err, &urlErr):
+		rawURL = urlErr.URL
+	case errors.As(err, &statusErr):
+		// ErrUnexpectedStatus embeds the raw request URL (including signed
+		// query params) in its message but is not a *url.Error.
+		rawURL = statusErr.RequestURL
+	default:
+		// No sanitization needed for non-URL errors
 		return err
 	}
 
-	// No sanitization needed for non-URL errors
-	return err
+	sanitizedURL := sanitizeURL(rawURL)
+	if sanitizedURL == rawURL {
+		return err
+	}
+	return &sanitizedError{
+		original:     err,
+		originalURL:  rawURL,
+		sanitizedURL: sanitizedURL,
+	}
 }
 
 // sanitizeURL properly parses a URL and redacts all query parameters.
@@ -74,17 +83,17 @@ func sanitizeURL(rawURL string) string {
 	return parsed.String()
 }
 
-// sanitizedError wraps an error containing a *url.Error with a sanitized URL.
+// sanitizedError wraps an error whose message embeds a URL with a sanitized URL.
 type sanitizedError struct {
 	original     error
+	originalURL  string
 	sanitizedURL string
-	urlError     *url.Error
 }
 
 // Error returns the error message with the sanitized URL.
 func (e *sanitizedError) Error() string {
 	// Replace all occurrences of the original URL with the sanitized version
-	return strings.ReplaceAll(e.original.Error(), e.urlError.URL, e.sanitizedURL)
+	return strings.ReplaceAll(e.original.Error(), e.originalURL, e.sanitizedURL)
 }
 
 // Unwrap returns the original error for error chain traversal.
