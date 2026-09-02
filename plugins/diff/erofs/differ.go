@@ -127,6 +127,19 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		}
 	}()
 
+	// Read-only mounts belong to a snapshot the snapshotter populated itself,
+	// for example from a layer content cache. The layer is already there and is
+	// shared with every other snapshot of it. Applying would write to content
+	// this differ does not own. The unpacker reads the same mounts and skips
+	// such a layer before it reaches here.
+	//
+	// The error is ErrFailedPrecondition. The diff service falls through to the
+	// next differ only on ErrNotImplemented. Another differ would fail on this
+	// layer for the same reason.
+	if len(mounts) > 0 && mounts[len(mounts)-1].ReadOnly() {
+		return emptyDesc, fmt.Errorf("cannot apply to a read-only snapshot, its content is already populated: %w", errdefs.ErrFailedPrecondition)
+	}
+
 	var (
 		erofsLayerType string
 		fastcopy       bool
@@ -177,18 +190,6 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	layer, err := erofsutils.MountsToLayer(mounts)
 	if err != nil {
 		return emptyDesc, err
-	}
-
-	// A staged blob is shared with every other snapshot of that layer, so
-	// applying would truncate the cache entry through the symlink. The unpacker
-	// reads the read-only mounts the snapshotter hands out and skips such a
-	// layer before it reaches here.
-	staged, err := erofsutils.StagedLayerBlob(layer)
-	if err != nil {
-		return emptyDesc, err
-	}
-	if staged {
-		return emptyDesc, fmt.Errorf("layer %q is already populated from the layer content cache: %w", layer, errdefs.ErrFailedPrecondition)
 	}
 
 	ra, err := s.store.ReaderAt(ctx, desc)

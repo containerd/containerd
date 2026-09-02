@@ -40,34 +40,6 @@ func TestCacheBlobPath(t *testing.T) {
 	assert.Equal(t, enc[:2], filepath.Base(filepath.Dir(got)), "blob must live under a 2-char prefix dir")
 }
 
-// TestStagedLayerBlob covers detection of a blob staged from the layer content
-// cache. A staged blob is a symlink shared with every other snapshot of that
-// layer, so the differ must refuse to write it.
-func TestStagedLayerBlob(t *testing.T) {
-	layer := t.TempDir()
-
-	// No blob yet.
-	staged, err := StagedLayerBlob(layer)
-	require.NoError(t, err)
-	assert.False(t, staged)
-
-	// A regular layer blob, written by the erofs differ.
-	blob := filepath.Join(layer, "layer.erofs")
-	require.NoError(t, os.WriteFile(blob, nil, 0644))
-	staged, err = StagedLayerBlob(layer)
-	require.NoError(t, err)
-	assert.False(t, staged)
-
-	// A staged one.
-	cached := filepath.Join(t.TempDir(), "cached.erofs")
-	require.NoError(t, os.WriteFile(cached, []byte("shared blob"), 0644))
-	require.NoError(t, os.Remove(blob))
-	require.NoError(t, os.Symlink(cached, blob))
-	staged, err = StagedLayerBlob(layer)
-	require.NoError(t, err)
-	assert.True(t, staged)
-}
-
 // TestMountsToLayerStagedBlob covers resolving the layer directory of a
 // snapshot whose blob is staged. Compare only reads the blob, so it resolves
 // like any other; the apply path is where a staged blob is refused.
