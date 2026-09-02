@@ -215,6 +215,16 @@ func (h *errOnceHandler) Unmount(_ context.Context, mp string) error {
 	return nil
 }
 
+// Mounted reports h.mounted, the same bookkeeping Mount and Unmount
+// keep: without this, reconciliation, which does not know this
+// handler exists outside this test, would find nothing for its type
+// in the real host mount table and release every activation using it
+// before a test ever gets to exercise the unmount failure itself.
+func (h *errOnceHandler) Mounted(_ context.Context, path string) (bool, error) {
+	_, ok := h.mounted[path]
+	return ok, nil
+}
+
 // TestGC tests the garbage collection features of the mount manager,
 // ensuring that mounts are properly cleaned up when no longer needed.
 func TestGC(t *testing.T) {

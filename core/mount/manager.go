@@ -52,17 +52,30 @@ type Handler interface {
 // report whether the mount it manages at path is still in effect. A
 // manager which reuses a Handler's mounts across activations uses this
 // to verify a recorded mount is still live before handing it out
-// again, rather than trusting its own bookkeeping, and to detect and
-// repair a mount which was torn down outside of it, for example by a
-// reboot or an operator's manual unmount.
+// again, rather than trusting its own bookkeeping, to detect and
+// repair a mount which was torn down outside of it (for example by a
+// reboot or an operator's manual unmount), and to recognize, and
+// discard, an activation recorded but never actually mounted because
+// the process died before it got that far.
 //
-// A Handler which does not implement MountedChecker is checked by
-// inspecting the host's mount table instead, which is only accurate
-// for a Handler whose mount point is a real kernel mount. A Handler
-// which leaves something else at the mount point, such as a symlink
-// to a device, must implement this interface: a generic check would
-// otherwise always report it as not mounted and cause it to be
-// needlessly, and possibly unsafely, redone.
+// Not implementing MountedChecker is not "unknown": it is a Handler
+// declaring that its mount point is a real kernel mount, checked by
+// inspecting the host's mount table, the same check performed for a
+// mount with no Handler at all. That is only accurate for a Handler
+// whose mount point really is a kernel mount, such as a real
+// filesystem mount underneath a synthetic path.
+//
+// A Handler which leaves something else at the mount point instead,
+// such as loopback's symlink to a device, must implement this
+// interface: the generic check would otherwise always report it as
+// not mounted, causing it to be needlessly redone, and, once a
+// Manager reconciles its records against reality (see reconcile.go),
+// discarded outright despite being live.
+//
+// The same answer also decides whether Mount is called at all, on
+// every resolution of a record including the first, so it must
+// reflect what is actually at path: a Handler which always reports
+// true is never asked to Mount.
 type MountedChecker interface {
 	Mounted(ctx context.Context, path string) (bool, error)
 }

@@ -604,20 +604,26 @@ func (mm *mountManager) staleCollision(ctx context.Context, namespace, name stri
 // probeMounted reports whether path, the mount point of a mounted
 // record, currently has that mount in effect. A handler which
 // implements mount.MountedChecker is asked directly; otherwise the
-// host's mount table is consulted, which is only accurate for a
-// system mount or a handler whose mount point really is a kernel
-// mount; see mount.MountedChecker's doc for why some handlers must
-// implement it instead of relying on this fallback.
+// host's mount table is consulted. Not implementing MountedChecker is
+// itself a claim, not an omission: that the mount point really is a
+// kernel mount the host's mount table can answer for; see
+// mount.MountedChecker's doc.
+//
+// reconcileLive in reconcile.go asks the same Handler the same
+// question, separately from this, to decide whether to discard a
+// record outright rather than whether to mount it.
 //
 // A path which does not exist at all is reported as not mounted
 // rather than as an error: this is the ordinary state of a mounted
 // record which has never been realized yet.
 //
-// On Windows, the fallback always reports false: mountinfo.Mounted
-// has no implementation there. This is not currently reachable in
-// practice, since nothing this package's own transforms produce on
-// Windows resolves to a managed position at all, but would matter for
-// a handler-less mount activated with WithTemporary, which does.
+// On Windows, the fallback always reports false, silently: unlike
+// every other unsupported platform, mountinfo.Mounted there returns
+// (false, nil) rather than an error. This is not currently reachable
+// in practice, since nothing this package's own transforms produce on
+// Windows resolves to a handler-less managed position, but would
+// matter for one activated with WithTemporary, which does: see
+// reconcile.go's canObserveMountTableOS for where this is guarded.
 func probeMounted(ctx context.Context, handler mount.Handler, path string) (bool, error) {
 	if mc, ok := handler.(mount.MountedChecker); ok {
 		return mc.Mounted(ctx, path)
@@ -752,21 +758,45 @@ func alreadyUnmounted(err error) bool {
 func (mm *mountManager) unmountRecords(ctx context.Context, records []mountedRecord) error {
 	var errs []error
 	for _, b := range records {
-		var err error
-		if h := mm.handlers[b.mount.Type]; h != nil {
-			err = h.Unmount(ctx, b.point)
-		} else {
-			err = mount.Unmount(b.point, 0)
-		}
-		if err != nil && !alreadyUnmounted(err) {
-			errs = append(errs, fmt.Errorf("failed to unmount %q: %w", b.point, err))
-			continue
-		}
-		if err := os.RemoveAll(mm.backingRoot(b.id)); err != nil && !os.IsNotExist(err) {
-			log.G(ctx).WithError(err).WithField("backing", b.id).Warn("failed to remove backing mount dir")
+		if err := mm.unmountRecord(ctx, b); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// unmountRecord unmounts and cleans up a single released record. b was
+// already deleted from the dedup index, in the same transaction that
+// decided to release it, by the time this runs, which is what makes
+// serializing with realizeMount necessary here: without it, a
+// concurrent Activate resolving to the same identity, no longer
+// finding it in the index, mints a fresh record and mounts it while
+// this is still tearing the old one down, both under one path,
+// however briefly. Every caller of this releases the rwlock (see
+// StartCollection, Deactivate, Activate's rollback) before reaching
+// here, so this is the only thing standing between the two.
+func (mm *mountManager) unmountRecord(ctx context.Context, b mountedRecord) error {
+	if shareable(b.mount) {
+		key := mountingKey(b.mount)
+		if err := mm.mounting.Lock(ctx, key); err != nil {
+			return err
+		}
+		defer mm.mounting.Unlock(key)
+	}
+
+	var err error
+	if h := mm.handlers[b.mount.Type]; h != nil {
+		err = h.Unmount(ctx, b.point)
+	} else {
+		err = mount.Unmount(b.point, 0)
+	}
+	if err != nil && !alreadyUnmounted(err) {
+		return fmt.Errorf("failed to unmount %q: %w", b.point, err)
+	}
+	if err := os.RemoveAll(mm.backingRoot(b.id)); err != nil && !os.IsNotExist(err) {
+		log.G(ctx).WithError(err).WithField("backing", b.id).Warn("failed to remove backing mount dir")
+	}
+	return nil
 }
 
 func encodeID(id uint64) ([]byte, error) {
@@ -1060,6 +1090,16 @@ func (mm *mountManager) StartCollection(ctx context.Context) (metadata.Collectio
 	// lock now and collection will unlock on cancel or finish
 	mm.rwlock.Lock()
 
+	// Snapshot the host's mount table now, before opening the write
+	// transaction below, not later: Activate holds this same lock,
+	// for reading, across resolving and realizing an activation's
+	// entire chain (see Activate), so this is the only point at which
+	// every activation recorded so far is guaranteed to already be
+	// exactly as mounted as it is ever going to get. Taken any later,
+	// this snapshot could observe an activation mid-realization and
+	// applyRemove would reconcile it away out from under Activate.
+	mounted, haveMountTable := mm.snapshotMountTable(ctx)
+
 	tx, err := mm.db.Begin(true)
 	if err != nil {
 		mm.rwlock.Unlock()
@@ -1067,11 +1107,13 @@ func (mm *mountManager) StartCollection(ctx context.Context) (metadata.Collectio
 	}
 
 	return &collectionContext{
-		ctx:         ctx,
-		tx:          tx,
-		manager:     mm,
-		removed:     map[string]map[string]struct{}{},
-		remainingV1: map[uint64]struct{}{},
+		ctx:            ctx,
+		tx:             tx,
+		manager:        mm,
+		removed:        map[string]map[string]struct{}{},
+		remainingV1:    map[uint64]struct{}{},
+		mounted:        mounted,
+		haveMountTable: haveMountTable,
 	}, nil
 }
 
@@ -1084,6 +1126,18 @@ type collectionContext struct {
 	tx      *bolt.Tx
 	manager *mountManager
 	removed map[string]map[string]struct{}
+
+	// mounted is a snapshot of the host's mount table under
+	// mm.targets, taken once in StartCollection while the exclusive
+	// rwlock guarantees no activation is being resolved or realized
+	// (see StartCollection). applyRemove uses it, together with any
+	// Handler which implements mount.MountedChecker, to find an
+	// activation which is recorded but was never actually mounted, or
+	// no longer is, and release it exactly as if a caller had
+	// deactivated it. haveMountTable is false when mounted cannot be
+	// trusted at all; see snapshotMountTable.
+	mounted        map[string]struct{}
+	haveMountTable bool
 
 	// Mounted records released during applyRemove; they need
 	// unmounting after the transaction commits.
@@ -1376,7 +1430,7 @@ func (cc *collectionContext) applyRemove() (map[uint64]struct{}, error) {
 				continue
 			}
 			namespace := string(nsk)
-			releasedV1, remainingV1, err := v1ApplyRemoveNamespace(cc.tx, namespace, v1bkt.Bucket(nsk), cc.removed[namespace])
+			releasedV1, remainingV1, err := v1ApplyRemoveNamespace(cc.ctx, cc.manager, cc.tx, namespace, v1bkt.Bucket(nsk), cc.removed[namespace], cc.mounted, cc.haveMountTable)
 			if err != nil {
 				return nil, err
 			}
@@ -1414,7 +1468,20 @@ func (cc *collectionContext) applyRemove() (map[uint64]struct{}, error) {
 				if removed != nil {
 					if _, ok := removed[string(msk)]; ok {
 						remove = append(remove, bytes.Clone(msk))
+						continue
 					}
+				}
+				// Not marked for removal by the caller; reconcile it
+				// against the mount table snapshot regardless, so an
+				// activation recorded but never actually mounted, or
+				// no longer mounted, does not otherwise persist
+				// indefinitely (see reconcile.go).
+				live, err := activationLive(cc.ctx, cc.manager, nsbkt, msbkt.Bucket(msk), cc.mounted, cc.haveMountTable)
+				if err != nil {
+					return nil, err
+				}
+				if !live {
+					remove = append(remove, bytes.Clone(msk))
 				}
 			}
 

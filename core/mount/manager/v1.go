@@ -317,7 +317,7 @@ type v1Released struct {
 // sorting it into schemas first. A v1 and a v2 activation which
 // happen to share a name are unrelated resources, reachable at all
 // only via a rollback to a v1 binary and forward again.
-func v1ApplyRemoveNamespace(tx *bolt.Tx, ns string, nsbkt *bolt.Bucket, removed map[string]struct{}) (released []v1Released, remainingMids map[uint64]struct{}, err error) {
+func v1ApplyRemoveNamespace(ctx context.Context, mm *mountManager, tx *bolt.Tx, ns string, nsbkt *bolt.Bucket, removed map[string]struct{}, mounted map[string]struct{}, haveMountTable bool) (released []v1Released, remainingMids map[uint64]struct{}, err error) {
 	remainingMids = map[uint64]struct{}{}
 	mbkt := nsbkt.Bucket(v1KeyMounts)
 	if mbkt == nil {
@@ -326,18 +326,32 @@ func v1ApplyRemoveNamespace(tx *bolt.Tx, ns string, nsbkt *bolt.Bucket, removed 
 
 	// Collect first: releasing an activation writes to sibling
 	// buckets (its lease membership), which must not happen while a
-	// cursor is open over the mounts bucket.
-	var remove [][]byte
-	if len(removed) > 0 {
-		mc := mbkt.Cursor()
-		for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
-			if mv != nil {
-				continue
-			}
-			if _, ok := removed[string(mk)]; ok {
-				remove = append(remove, bytes.Clone(mk))
-			}
+	// cursor is open over the mounts bucket. keep is gathered in the
+	// same pass rather than by walking mbkt again afterward: it is
+	// exactly the complement of remove, decided before either list is
+	// acted on.
+	var remove, keep [][]byte
+	mc := mbkt.Cursor()
+	for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
+		if mv != nil {
+			continue
 		}
+		if _, ok := removed[string(mk)]; ok {
+			remove = append(remove, bytes.Clone(mk))
+			continue
+		}
+		// Not marked for removal by the caller; reconcile it against
+		// the mount table snapshot regardless, the same as applyRemove
+		// does for v2 (see reconcile.go).
+		live, lerr := v1ActivationLive(ctx, mm, mbkt.Bucket(mk), mounted, haveMountTable)
+		if lerr != nil {
+			return nil, nil, lerr
+		}
+		if !live {
+			remove = append(remove, bytes.Clone(mk))
+			continue
+		}
+		keep = append(keep, bytes.Clone(mk))
 	}
 
 	for _, mk := range remove {
@@ -350,13 +364,7 @@ func v1ApplyRemoveNamespace(tx *bolt.Tx, ns string, nsbkt *bolt.Bucket, removed 
 		}
 	}
 
-	// Whatever is left was not marked for removal and survives;
-	// collect its mid for the orphan directory scan to exclude.
-	mc := mbkt.Cursor()
-	for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
-		if mv != nil {
-			continue
-		}
+	for _, mk := range keep {
 		remainingMids[v1ReadID(mbkt.Bucket(mk))] = struct{}{}
 	}
 
