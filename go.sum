@@ -46,8 +46,8 @@ github.com/containerd/errdefs/pkg v0.3.0 h1:9IKJ06FvyNlexW690DXuQNx2KA2cUJXx151X
 github.com/containerd/errdefs/pkg v0.3.0/go.mod h1:NJw6s9HwNuRhnjJhM7pylWwMyAkmCQvQ4GpJHEqRLVk=
 github.com/containerd/fifo v1.1.0 h1:4I2mbh5stb1u6ycIABlBw9zgtlK8viPI9QkQNRQEEmY=
 github.com/containerd/fifo v1.1.0/go.mod h1:bmC4NWMbXlt2EZ0Hc7Fx7QzTFxgPID13eH0Qu+MAb2o=
-github.com/containerd/go-cni v1.1.13 h1:eFSGOKlhoYNxpJ51KRIMHZNlg5UgocXEIEBGkY7Hnis=
-github.com/containerd/go-cni v1.1.13/go.mod h1:nTieub0XDRmvCZ9VI/SBG6PyqT95N4FIhxsauF1vSBI=
+github.com/containerd/go-cni v1.1.14 h1:jcFWauA5ED2wUHgCdvPB/IyvOtBcXzmgj8LprJ8nJH0=
+github.com/containerd/go-cni v1.1.14/go.mod h1:igdwKOd5qpuMIafFcovqefXeThU/s2MoDSOnkCv77fw=
 github.com/containerd/go-dmverity v0.1.0 h1:aqnpBRI6mmscya/XqvknZ4wQNJnXzx6lKxPa7Q71hDo=
 github.com/containerd/go-dmverity v0.1.0/go.mod h1:vYevYgfeVF244IpQCKshXLvyKoRHwoVrFG0HV6GrUrs=
 github.com/containerd/go-runc v1.2.1 h1:TAnah92bVA7dYDZ7Mm9FrOoFQvnLZdL3z3xT7BS19kA=
@@ -70,8 +70,8 @@ github.com/containerd/typeurl/v2 v2.3.0 h1:HZHPhRWo5XMy3QGQoPrUzbW/2ckwjfweHmOwl
 github.com/containerd/typeurl/v2 v2.3.0/go.mod h1:Qk+PAdUYArVj41TnGi6rJ+48RF0PkcTc4i/taoBcK0w=
 github.com/containerd/zfs/v2 v2.0.0 h1:sI0wKwWNQXR9G4jnPPrXmMSetm6PGAwgqBRTQtFUY/o=
 github.com/containerd/zfs/v2 v2.0.0/go.mod h1:fnUDKF98iYuQqLvNdoXs9MXjtfhRWp1nxSgRf7VZH8s=
-github.com/containernetworking/cni v1.3.0 h1:v6EpN8RznAZj9765HhXQrtXgX+ECGebEYEmnuFjskwo=
-github.com/containernetworking/cni v1.3.0/go.mod h1:Bs8glZjjFfGPHMw6hQu82RUgEPNGEaBb9KS5KtNMnJ4=
+github.com/containernetworking/cni v1.3.1 h1:gnHlU/YC1bJcS+CSh+pYQKeuu4O4gsMGW1NMaLhkzW4=
+github.com/containernetworking/cni v1.3.1/go.mod h1:OtVXL0yXMfQb+p93OC/vRuhjpxsO1gAV0smjt28UQUQ=
 github.com/containernetworking/plugins v1.9.1 h1:8oU6WsIsU3bpnNZuvHp74a6cE1MJwbj2P7s4/yTUNlA=
 github.com/containernetworking/plugins v1.9.1/go.mod h1:fj7kS55qg3o/RgS+WGsF3+ZxwIImMPusQZKzBpcSr4c=
 github.com/containers/ocicrypt v1.3.2 h1:MuqHSfiPpGzoAQdgDSX85FgixSgIm9mSDXTLTgugY5E=

@@ -17,7 +17,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/errdefs/pkg v0.3.0
 	github.com/containerd/fifo v1.1.0
-	github.com/containerd/go-cni v1.1.13
+	github.com/containerd/go-cni v1.1.14
 	github.com/containerd/go-dmverity v0.1.0
 	github.com/containerd/go-runc v1.2.1
 	github.com/containerd/imgcrypt/v2 v2.0.3
@@ -29,7 +29,7 @@ require (
 	github.com/containerd/ttrpc v1.2.9
 	github.com/containerd/typeurl/v2 v2.3.0
 	github.com/containerd/zfs/v2 v2.0.0
-	github.com/containernetworking/cni v1.3.0
+	github.com/containernetworking/cni v1.3.1
 	github.com/containernetworking/plugins v1.9.1
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/distribution/reference v0.6.0
