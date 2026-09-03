@@ -144,106 +144,107 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	ctx := context.Background()
-	app := cli.NewApp()
-	app.Name = "containerd-stress"
-	app.Description = "stress test a containerd daemon"
-	app.Version = version.Version
-	app.Flags = []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "debug",
-			Usage: "Set debug output in the logs",
+	app := &cli.App{
+		Name:        "containerd-stress",
+		Description: "stress test a containerd daemon",
+		Version:     version.Version,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "debug",
+				Usage: "Set debug output in the logs",
+			},
+			&cli.StringFlag{
+				Name:    "address",
+				Aliases: []string{"a"},
+				Value:   defaults.DefaultAddress,
+				Usage:   "Path to the containerd socket",
+			},
+			&cli.IntFlag{
+				Name:    "concurrent",
+				Aliases: []string{"c"},
+				Value:   1,
+				Usage:   "Set the concurrency of the stress test",
+			},
+			&cli.BoolFlag{
+				Name:  "cri",
+				Usage: "Utilize CRI to create pods for the stress test. This requires a runtime that matches CRI runtime handler. Example: --runtime runc",
+			},
+			&cli.DurationFlag{
+				Name:    "duration",
+				Aliases: []string{"d"},
+				Value:   1 * time.Minute,
+				Usage:   "Set the duration of the stress test",
+			},
+			&cli.BoolFlag{
+				Name:  "exec",
+				Usage: "Add execs to the stress tests (non-CRI only)",
+			},
+			&cli.StringFlag{
+				Name:    "image",
+				Aliases: []string{"i"},
+				Value:   "docker.io/library/alpine:latest",
+				Usage:   "Image to be utilized for testing",
+			},
+			&cli.BoolFlag{
+				Name:    "json",
+				Aliases: []string{"j"},
+				Usage:   "Output results in json format",
+			},
+			&cli.StringFlag{
+				Name:    "metrics",
+				Aliases: []string{"m"},
+				Usage:   "Address to serve the metrics API",
+			},
+			&cli.StringFlag{
+				Name:  "runtime",
+				Usage: "Set the runtime to stress test",
+				Value: plugins.RuntimeRuncV2,
+			},
+			&cli.StringFlag{
+				Name:  "snapshotter",
+				Usage: "Set the snapshotter to use",
+				Value: "overlayfs",
+			},
 		},
-		&cli.StringFlag{
-			Name:    "address",
-			Aliases: []string{"a"},
-			Value:   defaults.DefaultAddress,
-			Usage:   "Path to the containerd socket",
-		},
-		&cli.IntFlag{
-			Name:    "concurrent",
-			Aliases: []string{"c"},
-			Value:   1,
-			Usage:   "Set the concurrency of the stress test",
-		},
-		&cli.BoolFlag{
-			Name:  "cri",
-			Usage: "Utilize CRI to create pods for the stress test. This requires a runtime that matches CRI runtime handler. Example: --runtime runc",
-		},
-		&cli.DurationFlag{
-			Name:    "duration",
-			Aliases: []string{"d"},
-			Value:   1 * time.Minute,
-			Usage:   "Set the duration of the stress test",
-		},
-		&cli.BoolFlag{
-			Name:  "exec",
-			Usage: "Add execs to the stress tests (non-CRI only)",
-		},
-		&cli.StringFlag{
-			Name:    "image",
-			Aliases: []string{"i"},
-			Value:   "docker.io/library/alpine:latest",
-			Usage:   "Image to be utilized for testing",
-		},
-		&cli.BoolFlag{
-			Name:    "json",
-			Aliases: []string{"j"},
-			Usage:   "Output results in json format",
-		},
-		&cli.StringFlag{
-			Name:    "metrics",
-			Aliases: []string{"m"},
-			Usage:   "Address to serve the metrics API",
-		},
-		&cli.StringFlag{
-			Name:  "runtime",
-			Usage: "Set the runtime to stress test",
-			Value: plugins.RuntimeRuncV2,
-		},
-		&cli.StringFlag{
-			Name:  "snapshotter",
-			Usage: "Set the snapshotter to use",
-			Value: "overlayfs",
-		},
-	}
-	app.Before = func(cmd *cli.Context) error {
-		if cmd.Bool("json") {
-			if err := log.SetLevel("warn"); err != nil {
-				return err
+		Before: func(cmd *cli.Context) error {
+			if cmd.Bool("json") {
+				if err := log.SetLevel("warn"); err != nil {
+					return err
+				}
 			}
-		}
-		if cmd.Bool("debug") {
-			if err := log.SetLevel("debug"); err != nil {
-				return err
+			if cmd.Bool("debug") {
+				if err := log.SetLevel("debug"); err != nil {
+					return err
+				}
 			}
-		}
-		return nil
-	}
-	app.Commands = []*cli.Command{
-		densityCommand,
-	}
-	app.Action = func(cmd *cli.Context) error {
-		cfg := config{
-			Address:     cmd.String("address"),
-			Duration:    cmd.Duration("duration"),
-			Concurrency: cmd.Int("concurrent"),
-			CRI:         cmd.Bool("cri"),
-			Exec:        cmd.Bool("exec"),
-			Image:       cmd.String("image"),
-			JSON:        cmd.Bool("json"),
-			Metrics:     cmd.String("metrics"),
-			Runtime:     cmd.String("runtime"),
-			Snapshotter: cmd.String("snapshotter"),
-		}
-		if cfg.Metrics != "" {
-			return serve(cfg)
-		}
+			return nil
+		},
+		Commands: []*cli.Command{
+			densityCommand,
+		},
+		Action: func(cmd *cli.Context) error {
+			cfg := config{
+				Address:     cmd.String("address"),
+				Duration:    cmd.Duration("duration"),
+				Concurrency: cmd.Int("concurrent"),
+				CRI:         cmd.Bool("cri"),
+				Exec:        cmd.Bool("exec"),
+				Image:       cmd.String("image"),
+				JSON:        cmd.Bool("json"),
+				Metrics:     cmd.String("metrics"),
+				Runtime:     cmd.String("runtime"),
+				Snapshotter: cmd.String("snapshotter"),
+			}
+			if cfg.Metrics != "" {
+				return serve(cfg)
+			}
 
-		if cfg.CRI {
-			return criTest(cfg)
-		}
+			if cfg.CRI {
+				return criTest(cfg)
+			}
 
-		return test(cfg)
+			return test(cfg)
+		},
 	}
 	if err := app.RunContext(ctx, os.Args); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "containerd-stress:", err)
@@ -318,7 +319,7 @@ func criTest(c config) error {
 	}()
 
 	// get runtime version:
-	version, err := client.Version("")
+	ver, err := client.Version("")
 	if err != nil {
 		return fmt.Errorf("failed to get runtime version: %w", err)
 	}
@@ -334,7 +335,7 @@ func criTest(c config) error {
 			id:             i,
 			wg:             &wg,
 			client:         client,
-			commit:         fmt.Sprintf("%s-%s", version.RuntimeName, version.RuntimeVersion),
+			commit:         fmt.Sprintf("%s-%s", ver.RuntimeName, ver.RuntimeVersion),
 			runtimeHandler: c.Runtime,
 			snapshotter:    c.Snapshotter,
 		}
@@ -449,7 +450,7 @@ func test(c config) error {
 	r.end()
 
 	results := r.gather(workers)
-	if c.Exec {
+	if c.Exec && exec != nil {
 		results.ExecTotal = exec.count
 		results.ExecFailures = exec.failures
 	}

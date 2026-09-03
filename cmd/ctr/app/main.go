@@ -79,15 +79,15 @@ func init() {
 
 // New returns a *cli.App instance.
 func New() *cli.App {
-	app := cli.NewApp()
-	app.Name = "ctr"
-	app.Version = version.Version
-	app.Description = `
+	return &cli.App{
+		Name:    "ctr",
+		Version: version.Version,
+		Description: `
 ctr is an unsupported debug and administrative client for interacting
 with the containerd daemon. Because it is unsupported, the commands,
 options, and operations are not guaranteed to be backward compatible or
-stable from release to release of the containerd project.`
-	app.Usage = `
+stable from release to release of the containerd project.`,
+		Usage: `
         __
   _____/ /______
  / ___/ __/ ___/
@@ -95,61 +95,61 @@ stable from release to release of the containerd project.`
 \___/\__/_/
 
 containerd CLI
-`
-	app.DisableSliceFlagSeparator = true
-	app.EnableBashCompletion = true
-	app.Flags = []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "debug",
-			Usage: "Enable debug output in logs",
+`,
+		DisableSliceFlagSeparator: true,
+		EnableBashCompletion:      true,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "debug",
+				Usage: "Enable debug output in logs",
+			},
+			&cli.StringFlag{
+				Name:    "address",
+				Aliases: []string{"a"},
+				Usage:   "Address for containerd's GRPC server",
+				Value:   defaults.DefaultAddress,
+				EnvVars: []string{"CONTAINERD_ADDRESS"},
+			},
+			&cli.DurationFlag{
+				Name:  "timeout",
+				Usage: "Total timeout for ctr commands",
+			},
+			&cli.DurationFlag{
+				Name:  "connect-timeout",
+				Usage: "Timeout for connecting to containerd",
+			},
+			&cli.StringFlag{
+				Name:    "namespace",
+				Aliases: []string{"n"},
+				Usage:   "Namespace to use with commands",
+				Value:   namespaces.Default,
+				EnvVars: []string{namespaces.NamespaceEnvVar},
+			},
 		},
-		&cli.StringFlag{
-			Name:    "address",
-			Aliases: []string{"a"},
-			Usage:   "Address for containerd's GRPC server",
-			Value:   defaults.DefaultAddress,
-			EnvVars: []string{"CONTAINERD_ADDRESS"},
-		},
-		&cli.DurationFlag{
-			Name:  "timeout",
-			Usage: "Total timeout for ctr commands",
-		},
-		&cli.DurationFlag{
-			Name:  "connect-timeout",
-			Usage: "Timeout for connecting to containerd",
-		},
-		&cli.StringFlag{
-			Name:    "namespace",
-			Aliases: []string{"n"},
-			Usage:   "Namespace to use with commands",
-			Value:   namespaces.Default,
-			EnvVars: []string{namespaces.NamespaceEnvVar},
+		Commands: append([]*cli.Command{
+			plugins.Command,
+			versionCmd.Command,
+			containers.Command,
+			content.Command,
+			events.Command,
+			images.Command,
+			leases.Command,
+			namespacesCmd.Command,
+			pprof.Command,
+			run.Command,
+			snapshots.Command,
+			tasks.Command,
+			install.Command,
+			ociCmd.Command,
+			sandboxes.Command,
+			info.Command,
+			deprecations.Command,
+		}, extraCmds...),
+		Before: func(cmd *cli.Context) error {
+			if cmd.Bool("debug") {
+				return log.SetLevel("debug")
+			}
+			return nil
 		},
 	}
-	app.Commands = append([]*cli.Command{
-		plugins.Command,
-		versionCmd.Command,
-		containers.Command,
-		content.Command,
-		events.Command,
-		images.Command,
-		leases.Command,
-		namespacesCmd.Command,
-		pprof.Command,
-		run.Command,
-		snapshots.Command,
-		tasks.Command,
-		install.Command,
-		ociCmd.Command,
-		sandboxes.Command,
-		info.Command,
-		deprecations.Command,
-	}, extraCmds...)
-	app.Before = func(cmd *cli.Context) error {
-		if cmd.Bool("debug") {
-			return log.SetLevel("debug")
-		}
-		return nil
-	}
-	return app
 }
