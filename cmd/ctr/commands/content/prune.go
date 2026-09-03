@@ -47,7 +47,7 @@ var pruneFlags = []cli.Flag{
 var pruneCommand = &cli.Command{
 	Name:  "prune",
 	Usage: "Prunes content from the content store",
-	Subcommands: cli.Commands{
+	Subcommands: []*cli.Command{
 		pruneReferencesCommand,
 	},
 }

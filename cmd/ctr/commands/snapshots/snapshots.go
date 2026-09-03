@@ -50,7 +50,7 @@ var Command = &cli.Command{
 	Aliases: []string{"snapshot"},
 	Usage:   "Manage snapshots",
 	Flags:   commands.SnapshotterFlags,
-	Subcommands: cli.Commands{
+	Subcommands: []*cli.Command{
 		commitCommand,
 		diffCommand,
 		infoCommand,

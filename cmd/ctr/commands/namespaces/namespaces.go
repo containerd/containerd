@@ -35,7 +35,7 @@ var Command = &cli.Command{
 	Name:    "namespaces",
 	Aliases: []string{"namespace", "ns"},
 	Usage:   "Manage namespaces",
-	Subcommands: cli.Commands{
+	Subcommands: []*cli.Command{
 		createCommand,
 		listCommand,
 		removeCommand,

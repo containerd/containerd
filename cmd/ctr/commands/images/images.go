@@ -38,7 +38,7 @@ var Command = &cli.Command{
 	Name:    "images",
 	Aliases: []string{"image", "i"},
 	Usage:   "Manage images",
-	Subcommands: cli.Commands{
+	Subcommands: []*cli.Command{
 		checkCommand,
 		exportCommand,
 		importCommand,

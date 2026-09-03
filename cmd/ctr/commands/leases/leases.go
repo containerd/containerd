@@ -33,7 +33,7 @@ import (
 var Command = &cli.Command{
 	Name:  "leases",
 	Usage: "Manage leases",
-	Subcommands: cli.Commands{
+	Subcommands: []*cli.Command{
 		listCommand,
 		createCommand,
 		deleteCommand,

@@ -36,7 +36,7 @@ var Command = &cli.Command{
 	Name:    "sandboxes",
 	Aliases: []string{"sandbox", "sb", "s"},
 	Usage:   "Manage sandboxes",
-	Subcommands: cli.Commands{
+	Subcommands: []*cli.Command{
 		runCommand,
 		listCommand,
 		removeCommand,

@@ -43,7 +43,7 @@ var (
 	Command = &cli.Command{
 		Name:  "content",
 		Usage: "Manage content",
-		Subcommands: cli.Commands{
+		Subcommands: []*cli.Command{
 			activeIngestCommand,
 			deleteCommand,
 			editCommand,
