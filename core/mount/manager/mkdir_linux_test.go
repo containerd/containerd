@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -94,4 +95,33 @@ func TestMkdirHandler(t *testing.T) {
 	} else if !errdefs.IsNotImplemented(err) {
 		t.Fatal(err)
 	}
+}
+
+// TestMkdirHandlerTargetIsRoot verifies that mkdir can target the
+// configured root directory itself.
+func TestMkdirHandlerTargetIsRoot(t *testing.T) {
+	ctx := logtest.WithT(context.Background(), t)
+	ctx = namespaces.WithNamespace(ctx, "test")
+	td := t.TempDir()
+
+	testmode := os.FileMode(0751)
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0775))
+	require.NoError(t, os.Chmod(root, testmode))
+
+	r, err := os.OpenRoot(root)
+	require.NoError(t, err)
+	t.Cleanup(func() { r.Close() })
+	mh := mkdir{rootMap: map[string]*os.Root{root: r}}
+
+	m := mount.Mount{
+		Type:   "mkdir/overlay",
+		Source: "overlay",
+		Options: []string{
+			fmt.Sprintf("X-containerd.mkdir.path=%s:%o", root, testmode),
+		},
+	}
+
+	_, err = mh.Transform(ctx, m, nil)
+	require.NoError(t, err)
 }

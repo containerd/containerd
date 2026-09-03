@@ -102,19 +102,9 @@ func (h *mkdir) rewrite(m mount.Mount) (mount.Mount, deferredEnsure, error) {
 				return mount.Mount{}, deferredEnsure{}, fmt.Errorf("invalid mkdir option %q: %w", o, errdefs.ErrInvalidArgument)
 			}
 
-			var r *os.Root
-			var subpath string
-
-			for path, root := range h.rootMap {
-				if strings.HasPrefix(dir, path) {
-					r = root
-					subpath = strings.TrimPrefix(dir, path)
-					subpath, _ = filepath.Rel("/", subpath)
-					break
-				}
-			}
-			if r == nil {
-				return mount.Mount{}, deferredEnsure{}, fmt.Errorf("no root %q configured for mkdir: %w", dir, errdefs.ErrNotImplemented)
+			r, subpath, err := resolveRoot(h.rootMap, dir, "mkdir")
+			if err != nil {
+				return mount.Mount{}, deferredEnsure{}, err
 			}
 
 			actions = append(actions, mkdirAction{
