@@ -37,12 +37,13 @@ var usageCommand = &cli.Command{
 	ArgsUsage: "[flags] <ref>",
 	Flags:     commands.SnapshotterFlags,
 	Action: func(cmd *cli.Context) error {
-		var ref = cmd.Args().First()
+		ctx := cmd.Context
+		ref := cmd.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to mount")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

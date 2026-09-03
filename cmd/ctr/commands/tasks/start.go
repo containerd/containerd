@@ -56,15 +56,15 @@ var startCommand = &cli.Command{
 		},
 	}...),
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
-			err    error
 			id     = cmd.Args().Get(0)
 			detach = cmd.Bool("detach")
 		)
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

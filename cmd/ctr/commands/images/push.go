@@ -78,6 +78,7 @@ var pushCommand = &cli.Command{
 		Usage: "Allow pushing blobs that are marked as non-distributable",
 	}),
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			ref   = cmd.Args().First()
 			local = cmd.Args().Get(1)
@@ -88,7 +89,7 @@ var pushCommand = &cli.Command{
 			return errors.New("please provide a remote image reference to push")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

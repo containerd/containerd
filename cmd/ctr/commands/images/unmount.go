@@ -39,14 +39,13 @@ var unmountCommand = &cli.Command{
 		},
 	),
 	Action: func(cmd *cli.Context) error {
-		var (
-			target = cmd.Args().First()
-		)
+		ctx := cmd.Context
+		target := cmd.Args().First()
 		if target == "" {
 			return errors.New("please provide a target path to unmount from")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

@@ -31,7 +31,8 @@ var Command = &cli.Command{
 	Name:  "info",
 	Usage: "Print the server info",
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

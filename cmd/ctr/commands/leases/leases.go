@@ -55,11 +55,12 @@ var listCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			filters = cmd.Args().Slice()
 			quiet   = cmd.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -118,8 +119,9 @@ var createCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		var labelstr = cmd.Args().Slice()
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		labelstr := cmd.Args().Slice()
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -167,11 +169,12 @@ var deleteCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		var lids = cmd.Args().Slice()
+		ctx := cmd.Context
+		lids := cmd.Args().Slice()
 		if len(lids) == 0 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

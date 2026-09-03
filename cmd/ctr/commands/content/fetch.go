@@ -77,10 +77,8 @@ pull content that will later be used with 'ctr run' or 'ctr images unpack'.`,
 		},
 	),
 	Action: func(cmd *cli.Context) error {
-		var (
-			ref = cmd.Args().First()
-		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -90,6 +88,7 @@ pull content that will later be used with 'ctr run' or 'ctr images unpack'.`,
 			return err
 		}
 
+		ref := cmd.Args().First()
 		_, err = Fetch(ctx, client, ref, config)
 		return err
 	},

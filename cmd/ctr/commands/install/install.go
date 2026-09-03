@@ -45,7 +45,8 @@ var Command = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

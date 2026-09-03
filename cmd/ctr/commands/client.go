@@ -56,8 +56,7 @@ func AppContext(ctx context.Context, cmd *cli.Context) (context.Context, context
 }
 
 // NewClient returns a new containerd client
-func NewClient(cmd *cli.Context, opts ...containerd.Opt) (*containerd.Client, context.Context, context.CancelFunc, error) {
-	ctx := cmd.Context
+func NewClient(ctx context.Context, cmd *cli.Context, opts ...containerd.Opt) (*containerd.Client, context.Context, context.CancelFunc, error) {
 	timeoutOpt := containerd.WithTimeout(cmd.Duration("connect-timeout"))
 	opts = append(opts, timeoutOpt)
 	socketPath := cmd.String("address")

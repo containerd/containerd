@@ -83,6 +83,7 @@ var killCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
@@ -99,7 +100,7 @@ var killCommand = &cli.Command{
 		if all && execID != "" {
 			return errors.New("specify an exec-id or all; not both")
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

@@ -72,11 +72,12 @@ var listCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			filters = cmd.Args().Slice()
 			quiet   = cmd.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -156,11 +157,12 @@ var setLabelsCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			replaceAll   = cmd.Bool("replace-all")
 			name, labels = commands.ObjectWithLabelArgs(cmd)
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -216,11 +218,12 @@ var checkCommand = &cli.Command{
 		},
 	}, commands.SnapshotterFlags...),
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			exitErr error
 			quiet   = cmd.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -330,7 +333,8 @@ var removeCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -375,7 +379,8 @@ var pruneCommand = &cli.Command{
 	// adapted from `nerdctl`:
 	// https://github.com/containerd/nerdctl/blob/272dc9c29fc1434839d3ec63194d7efa24d7c0ef/cmd/nerdctl/image_prune.go#L86
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

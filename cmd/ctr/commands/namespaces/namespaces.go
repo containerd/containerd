@@ -50,11 +50,12 @@ var createCommand = &cli.Command{
 	ArgsUsage:   "<name> [<key>=<value>]",
 	Description: "create a new namespace. it must be unique",
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		namespace, labels := commands.ObjectWithLabelArgs(cmd)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -70,11 +71,12 @@ var setLabelsCommand = &cli.Command{
 	ArgsUsage:   "<name> [<key>=<value>, ...]",
 	Description: "set and clear labels for a namespace. empty value clears the label",
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		namespace, labels := commands.ObjectWithLabelArgs(cmd)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -103,8 +105,8 @@ var listCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		quiet := cmd.Bool("quiet")
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -115,6 +117,7 @@ var listCommand = &cli.Command{
 			return err
 		}
 
+		quiet := cmd.Bool("quiet")
 		if quiet {
 			for _, ns := range nss {
 				fmt.Println(ns)
@@ -156,13 +159,14 @@ var removeCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		var exitErr error
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
+		var exitErr error
 		opts := deleteOpts(cmd)
 		namespaces := client.NamespaceService()
 		for _, target := range cmd.Args().Slice() {

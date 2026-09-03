@@ -32,11 +32,12 @@ var psCommand = &cli.Command{
 	Usage:     "List processes for container",
 	ArgsUsage: "CONTAINER",
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

@@ -69,6 +69,7 @@ var execCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			id     = cmd.Args().First()
 			args   = cmd.Args().Tail()
@@ -78,7 +79,7 @@ var execCommand = &cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

@@ -106,13 +106,14 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 	}, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			in              = cmd.Args().First()
 			opts            []containerd.ImportOpt
 			platformMatcher platforms.MatchComparer
 		)
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

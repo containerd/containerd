@@ -57,6 +57,7 @@ var runCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		if cmd.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -75,7 +76,7 @@ var runCommand = &cli.Command{
 			return fmt.Errorf("failed to parse sandbox config: %w", err)
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -110,7 +111,8 @@ var listCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -158,7 +160,8 @@ var removeCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -200,7 +203,8 @@ var infoCommand = &cli.Command{
 	Usage:     "Get info about a sandbox",
 	ArgsUsage: "<sandbox id>",
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

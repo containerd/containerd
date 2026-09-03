@@ -66,6 +66,7 @@ When you are done, use the unmount command.
 		},
 	),
 	Action: func(cmd *cli.Context) (retErr error) {
+		ctx := cmd.Context
 		var (
 			ref    = cmd.Args().First()
 			target = cmd.Args().Get(1)
@@ -84,7 +85,7 @@ When you are done, use the unmount command.
 			key = target
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

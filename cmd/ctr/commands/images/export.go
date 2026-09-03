@@ -66,6 +66,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			out        = cmd.Args().First()
 			images     = cmd.Args().Tail()
@@ -75,7 +76,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			return errors.New("please provide both an output filename and an image reference to export")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

@@ -56,6 +56,7 @@ var createCommand = &cli.Command{
 	ArgsUsage: "[flags] Image|RootFS CONTAINER [COMMAND] [ARG...]",
 	Flags:     append(commands.RuntimeFlags, append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...), commands.ContainerFlags...)...),
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			id     string
 			ref    string
@@ -77,7 +78,7 @@ var createCommand = &cli.Command{
 		if id == "" {
 			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -103,11 +104,12 @@ var listCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			filters = cmd.Args().Slice()
 			quiet   = cmd.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -157,8 +159,9 @@ var deleteCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var exitErr error
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -213,11 +216,12 @@ var setLabelsCommand = &cli.Command{
 	Description: "set and clear labels for a container",
 	Flags:       []cli.Flag{},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		containerID, labels := commands.ObjectWithLabelArgs(cmd)
 		if containerID == "" {
 			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -255,11 +259,12 @@ var infoCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		id := cmd.Args().First()
 		if id == "" {
 			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

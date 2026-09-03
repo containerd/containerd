@@ -36,7 +36,8 @@ var Command = &cli.Command{
 	Aliases: []string{"event"},
 	Usage:   "Display containerd events",
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

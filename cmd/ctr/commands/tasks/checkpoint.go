@@ -45,11 +45,12 @@ var checkpointCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd, containerd.WithDefaultRuntime(cmd.String("runtime")))
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd, containerd.WithDefaultRuntime(cmd.String("runtime")))
 		if err != nil {
 			return err
 		}

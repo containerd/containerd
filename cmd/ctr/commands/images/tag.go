@@ -48,9 +48,8 @@ var tagCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		var (
-			ref = cmd.Args().First()
-		)
+		ctx := cmd.Context
+		ref := cmd.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to tag from")
 		}
@@ -58,7 +57,7 @@ var tagCommand = &cli.Command{
 			return errors.New("please provide an image reference to tag to")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

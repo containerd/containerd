@@ -43,20 +43,19 @@ var deleteCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		var (
-			execID = cmd.String("exec-id")
-			force  = cmd.Bool("force")
-		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		var opts []containerd.ProcessDeleteOpts
+		force := cmd.Bool("force")
 		if force {
 			opts = append(opts, containerd.WithProcessKill)
 		}
 		var exitErr error
+		execID := cmd.String("exec-id")
 		if execID != "" {
 			task, err := loadTask(ctx, client, cmd.Args().First())
 			if err != nil {

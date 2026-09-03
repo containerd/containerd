@@ -61,11 +61,12 @@ var listCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			quiet    = cmd.Bool("quiet")
 			detailed = cmd.Bool("detailed")
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -173,12 +174,13 @@ var inspectRuntimeCommand = &cli.Command{
 	ArgsUsage: "[flags]",
 	Flags:     commands.RuntimeFlags,
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		rt := cmd.String("runtime")
 		rtOptions, err := commands.RuntimeOptions(cmd)
 		if err != nil {
 			return err
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

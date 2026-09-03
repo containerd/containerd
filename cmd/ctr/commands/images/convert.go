@@ -76,6 +76,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var convertOpts []converter.Opt
 		srcRef := cmd.Args().Get(0)
 		targetRef := cmd.Args().Get(1)
@@ -123,7 +124,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			convertOpts = append(convertOpts, converter.WithDockerToOCI(true))
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

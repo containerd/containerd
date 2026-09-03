@@ -71,7 +71,8 @@ var listCommand = &cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "List snapshots",
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -115,6 +116,7 @@ var diffCommand = &cli.Command{
 		},
 	}, commands.LabelFlag),
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			idA = cmd.Args().First()
 			idB = cmd.Args().Get(1)
@@ -122,7 +124,7 @@ var diffCommand = &cli.Command{
 		if idA == "" {
 			return errors.New("snapshot id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -208,6 +210,7 @@ var usageCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var displaySize func(int64) string
 		if cmd.Bool("b") {
 			displaySize = func(s int64) string {
@@ -218,7 +221,7 @@ var usageCommand = &cli.Command{
 				return progress.Bytes(s).String()
 			}
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -259,7 +262,8 @@ var removeCommand = &cli.Command{
 	ArgsUsage: "<key> [<key>, ...]",
 	Usage:     "Remove snapshots",
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -292,6 +296,7 @@ var prepareCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		if narg := cmd.NArg(); narg < 1 || narg > 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -300,7 +305,7 @@ var prepareCommand = &cli.Command{
 			key    = cmd.Args().Get(0)
 			parent = cmd.Args().Get(1)
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -344,6 +349,7 @@ var viewCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		if narg := cmd.NArg(); narg < 1 || narg > 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -352,7 +358,7 @@ var viewCommand = &cli.Command{
 			key    = cmd.Args().Get(0)
 			parent = cmd.Args().Get(1)
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -388,6 +394,7 @@ var mountCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		if cmd.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -395,7 +402,7 @@ var mountCommand = &cli.Command{
 			target = cmd.Args().Get(0)
 			key    = cmd.Args().Get(1)
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -430,6 +437,7 @@ var commitCommand = &cli.Command{
 	Usage:     "Commit an active snapshot into the provided name",
 	ArgsUsage: "<key> <active>",
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		if cmd.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -437,7 +445,7 @@ var commitCommand = &cli.Command{
 			key    = cmd.Args().Get(0)
 			active = cmd.Args().Get(1)
 		)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -454,7 +462,8 @@ var treeCommand = &cli.Command{
 	Name:  "tree",
 	Usage: "Display tree view of snapshot branches",
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -483,12 +492,13 @@ var infoCommand = &cli.Command{
 	Usage:     "Get info about a snapshot",
 	ArgsUsage: "<key>",
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		if cmd.NArg() != 1 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
 
 		key := cmd.Args().Get(0)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -511,8 +521,8 @@ var setLabelCommand = &cli.Command{
 	ArgsUsage:   "<name> [<label>=<value> ...]",
 	Description: "labels snapshots in the snapshotter",
 	Action: func(cmd *cli.Context) error {
-		key, labels := commands.ObjectWithLabelArgs(cmd)
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -520,6 +530,7 @@ var setLabelCommand = &cli.Command{
 
 		snapshotter := client.SnapshotService(cmd.String("snapshotter"))
 
+		key, labels := commands.ObjectWithLabelArgs(cmd)
 		info := snapshots.Info{
 			Name:   key,
 			Labels: map[string]string{},
@@ -565,11 +576,12 @@ var unpackCommand = &cli.Command{
 		},
 	}, commands.SnapshotterFlags...),
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		dgst, err := digest.Parse(cmd.Args().First())
 		if err != nil {
 			return err
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

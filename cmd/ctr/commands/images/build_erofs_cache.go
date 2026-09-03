@@ -70,6 +70,7 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		ref := cmd.Args().Get(0)
 		cacheDir := cmd.Args().Get(1)
 		if ref == "" || cacheDir == "" {
@@ -93,7 +94,7 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 			opts = append(opts, erofs.WithMkfsOptions(strings.Fields(m)))
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

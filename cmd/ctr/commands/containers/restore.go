@@ -44,6 +44,7 @@ var restoreCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
@@ -52,7 +53,7 @@ var restoreCommand = &cli.Command{
 		if ref == "" {
 			return errors.New("ref must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

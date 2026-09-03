@@ -177,7 +177,7 @@ var Command = &cli.Command{
 			return errors.New("flags --detach and --rm cannot be specified together")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

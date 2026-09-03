@@ -90,14 +90,13 @@ command. As part of this process, we do the following:
 		},
 	),
 	Action: func(cmd *cli.Context) error {
-		var (
-			ref = cmd.Args().First()
-		)
+		ctx := cmd.Context
+		ref := cmd.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to pull")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

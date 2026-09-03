@@ -57,7 +57,8 @@ var pruneReferencesCommand = &cli.Command{
 	Usage: "Prunes preference labels from the content store (layers only by default)",
 	Flags: pruneFlags,
 	Action: func(cmd *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

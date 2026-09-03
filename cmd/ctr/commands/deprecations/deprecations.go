@@ -46,10 +46,11 @@ var listCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		// Suppress automatic warnings, since we print the warnings by ourselves.
-		os.Setenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS", "1")
+		_ = os.Setenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS", "1")
 
-		client, ctx, cancel, err := commands.NewClient(cmd)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

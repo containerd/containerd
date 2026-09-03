@@ -65,11 +65,12 @@ var (
 		ArgsUsage:   "[<digest>, ...]",
 		Description: "display the image object",
 		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			dgst, err := digest.Parse(cmd.Args().First())
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := commands.NewClient(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -104,6 +105,7 @@ var (
 			},
 		},
 		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
 				ref            = cmd.Args().First()
 				expectedSize   = cmd.Int64("expected-size")
@@ -115,7 +117,7 @@ var (
 			if ref == "" {
 				return errors.New("must specify a transaction reference")
 			}
-			client, ctx, cancel, err := commands.NewClient(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -149,8 +151,9 @@ var (
 			},
 		},
 		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			match := cmd.Args().First()
-			client, ctx, cancel, err := commands.NewClient(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -187,11 +190,12 @@ var (
 			},
 		},
 		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
 				quiet = cmd.Bool("quiet")
 				args  = cmd.Args().Slice()
 			)
-			client, ctx, cancel, err := commands.NewClient(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -240,8 +244,9 @@ var (
 		ArgsUsage:   "<digest> [<label>=<value> ...]",
 		Description: "labels blobs in the content store",
 		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			object, labels := commands.ObjectWithLabelArgs(cmd)
-			client, ctx, cancel, err := commands.NewClient(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -305,6 +310,7 @@ var (
 			},
 		},
 		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
 				validate = cmd.String("validate")
 				object   = cmd.Args().First()
@@ -321,7 +327,7 @@ var (
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := commands.NewClient(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -365,11 +371,12 @@ var (
 		Description: `Delete one or more blobs permanently. Successfully deleted
 	blobs are printed to stdout.`,
 		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
 				args      = cmd.Args().Slice()
 				exitError error
 			)
-			client, ctx, cancel, err := commands.NewClient(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -513,6 +520,7 @@ var (
 		Description: `Push objects by identifier to a remote.`,
 		Flags:       commands.RegistryFlags,
 		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
 				ref    = cmd.Args().Get(0)
 				object = cmd.Args().Get(1)
@@ -522,7 +530,7 @@ var (
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := commands.NewClient(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
