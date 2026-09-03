@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 
@@ -118,11 +119,7 @@ func newPipeWriter(bufPool *bufferPool) (*pipeReader, *pipeWriter) {
 		bufPool: bufPool,
 		buf:     nil,
 	}
-	return &pipeReader{
-			pipe: p,
-		}, &pipeWriter{
-			pipe: p,
-		}
+	return &pipeReader{pipe: p}, &pipeWriter{pipe: p}
 }
 
 // Read implements the standard Read interface: it reads data from the pipe,
@@ -369,7 +366,6 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 		}
 
 		return nil, firstErr
-
 	})
 }
 
@@ -637,8 +633,8 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		}
 	}
 
-	for i := len(encoding) - 1; i >= 0; i-- {
-		algorithm := strings.ToLower(encoding[i])
+	for _, value := range slices.Backward(encoding) {
+		algorithm := strings.ToLower(value)
 		switch algorithm {
 		case "zstd":
 			r, err := zstd.NewReader(body.ReadCloser,

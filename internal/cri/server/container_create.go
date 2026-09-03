@@ -101,8 +101,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, err
 	}
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
-		var resErr *registrar.ReservedErr
-		if errors.As(err, &resErr) {
+		if _, ok := errors.AsType[*registrar.ReservedErr](err); ok {
 			log.G(ctx).WithError(err).Warn("possible concurrent CreateContainer request")
 			return nil, fmt.Errorf("failed to reserve container name %q; check if another CreateContainer request is in progress: %w", name, err)
 		}

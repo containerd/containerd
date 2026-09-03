@@ -262,7 +262,7 @@ func getPProfClient(cliContext *cli.Context) (*http.Client, error) {
 	dialer := getPProfDialer(cliContext.String("debug-socket"))
 
 	tr := &http.Transport{
-		Dial: dialer.pprofDial,
+		DialContext: dialer.pprofDial,
 	}
 	client := &http.Client{Transport: tr}
 	return client, nil
