@@ -75,16 +75,16 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Usage: "Exports content from all platforms",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	Action: func(cmd *cli.Context) error {
 		var convertOpts []converter.Opt
-		srcRef := cliContext.Args().Get(0)
-		targetRef := cliContext.Args().Get(1)
+		srcRef := cmd.Args().Get(0)
+		targetRef := cmd.Args().Get(1)
 		if srcRef == "" || targetRef == "" {
 			return errors.New("src and target image need to be specified")
 		}
 
-		if !cliContext.Bool("all-platforms") {
-			if pss := cliContext.StringSlice("platform"); len(pss) > 0 {
+		if !cmd.Bool("all-platforms") {
+			if pss := cmd.StringSlice("platform"); len(pss) > 0 {
 				all, err := platforms.ParseAll(pss)
 				if err != nil {
 					return err
@@ -95,23 +95,23 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			}
 		}
 
-		if cliContext.Bool("uncompress") {
+		if cmd.Bool("uncompress") {
 			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(uncompress.LayerConvertFunc))
 		}
 
-		if cliContext.IsSet("erofs") {
+		if cmd.IsSet("erofs") {
 			var erofsOpts []erofs.ConvertOpt
-			switch cliContext.String("erofs") {
+			switch cmd.String("erofs") {
 			case "raw":
 			case "zstd":
 				erofsOpts = append(erofsOpts, erofs.WithBlobCompression("zstd"))
 			default:
-				return fmt.Errorf("unsupported erofs format %q, supported: raw, zstd", cliContext.String("erofs"))
+				return fmt.Errorf("unsupported erofs format %q, supported: raw, zstd", cmd.String("erofs"))
 			}
-			if compressors := cliContext.String("erofs-compressors"); compressors != "" {
+			if compressors := cmd.String("erofs-compressors"); compressors != "" {
 				erofsOpts = append(erofsOpts, erofs.WithCompressors(compressors))
 			}
-			if mkfsOptsStr := cliContext.String("erofs-mkfs-options"); mkfsOptsStr != "" {
+			if mkfsOptsStr := cmd.String("erofs-mkfs-options"); mkfsOptsStr != "" {
 				mkfsOpts := strings.Fields(mkfsOptsStr)
 				erofsOpts = append(erofsOpts, erofs.WithMkfsOptions(mkfsOpts))
 			}
@@ -119,11 +119,11 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			convertOpts = append(convertOpts, converter.WithUpdateManifest(erofs.UpdateManifestPlatform))
 		}
 
-		if cliContext.Bool("oci") {
+		if cmd.Bool("oci") {
 			convertOpts = append(convertOpts, converter.WithDockerToOCI(true))
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -133,7 +133,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(cliContext.App.Writer, newImg.Target.Digest.String())
+		fmt.Fprintln(cmd.App.Writer, newImg.Target.Digest.String())
 		return nil
 	},
 }

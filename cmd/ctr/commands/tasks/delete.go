@@ -42,12 +42,12 @@ var deleteCommand = &cli.Command{
 			Usage: "Process ID to kill",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	Action: func(cmd *cli.Context) error {
 		var (
-			execID = cliContext.String("exec-id")
-			force  = cliContext.Bool("force")
+			execID = cmd.String("exec-id")
+			force  = cmd.Bool("force")
 		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ var deleteCommand = &cli.Command{
 		}
 		var exitErr error
 		if execID != "" {
-			task, err := loadTask(ctx, client, cliContext.Args().First())
+			task, err := loadTask(ctx, client, cmd.Args().First())
 			if err != nil {
 				return err
 			}
@@ -74,7 +74,7 @@ var deleteCommand = &cli.Command{
 				return cli.Exit("", int(ec))
 			}
 		} else {
-			for _, target := range cliContext.Args().Slice() {
+			for _, target := range cmd.Args().Slice() {
 				task, err := loadTask(ctx, client, target)
 				if err != nil {
 					if exitErr == nil {

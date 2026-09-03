@@ -28,13 +28,13 @@ var attachCommand = &cli.Command{
 	Name:      "attach",
 	Usage:     "Attach to the IO of a running container",
 	ArgsUsage: "CONTAINER",
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(cmd *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		container, err := client.LoadContainer(ctx, cliContext.Args().First())
+		container, err := client.LoadContainer(ctx, cmd.Args().First())
 		if err != nil {
 			return err
 		}

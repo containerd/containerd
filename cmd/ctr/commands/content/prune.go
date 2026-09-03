@@ -56,21 +56,21 @@ var pruneReferencesCommand = &cli.Command{
 	Name:  "references",
 	Usage: "Prunes preference labels from the content store (layers only by default)",
 	Flags: pruneFlags,
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(cmd *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		dryRun := cliContext.Bool("dry")
+		dryRun := cmd.Bool("dry")
 		if dryRun {
 			log.G(ctx).Logger.SetLevel(log.DebugLevel)
 			log.G(ctx).Debug("dry run, no changes will be applied")
 		}
 
 		var deleteOpts []leases.DeleteOpt
-		if !cliContext.Bool("async") {
+		if !cmd.Bool("async") {
 			deleteOpts = append(deleteOpts, leases.SynchronousDelete)
 		}
 

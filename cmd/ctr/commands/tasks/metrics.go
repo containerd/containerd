@@ -49,13 +49,13 @@ var metricsCommand = &cli.Command{
 			Value: formatTable,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(cmd *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		container, err := client.LoadContainer(ctx, cliContext.Args().First())
+		container, err := client.LoadContainer(ctx, cmd.Args().First())
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ var metricsCommand = &cli.Command{
 			return err
 		}
 
-		switch cliContext.String(formatFlag) {
+		switch cmd.String(formatFlag) {
 		case formatTable:
 			w := tabwriter.NewWriter(os.Stdout, 1, 8, 4, ' ', 0)
 			fmt.Fprintf(w, "ID\tTIMESTAMP\t\n")

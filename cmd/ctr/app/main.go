@@ -55,8 +55,8 @@ func init() {
 	// Discard grpc logs so that they don't mess with our stdio
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 
-	cli.VersionPrinter = func(cliContext *cli.Context) {
-		fmt.Println(cliContext.App.Name, version.Package, cliContext.App.Version)
+	cli.VersionPrinter = func(cmd *cli.Context) {
+		fmt.Println(cmd.App.Name, version.Package, cmd.App.Version)
 	}
 
 	// Override the default flag descriptions for '--version' and '--help'
@@ -145,8 +145,8 @@ containerd CLI
 		info.Command,
 		deprecations.Command,
 	}, extraCmds...)
-	app.Before = func(cliContext *cli.Context) error {
-		if cliContext.Bool("debug") {
+	app.Before = func(cmd *cli.Context) error {
+		if cmd.Bool("debug") {
 			return log.SetLevel("debug")
 		}
 		return nil

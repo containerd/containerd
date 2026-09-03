@@ -43,11 +43,11 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
-func withMounts(cliContext *cli.Context) oci.SpecOpts {
+func withMounts(cmd *cli.Context) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
 		mounts := make([]specs.Mount, 0)
 		dests := make([]string, 0)
-		for _, mount := range cliContext.StringSlice("mount") {
+		for _, mount := range cmd.StringSlice("mount") {
 			m, err := parseMountFlag(mount)
 			if err != nil {
 				return err
@@ -143,27 +143,27 @@ var Command = &cli.Command{
 		append(commands.RuntimeFlags,
 			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
 				commands.ContainerFlags...)...)...)...),
-	Action: func(cliContext *cli.Context) error {
+	Action: func(cmd *cli.Context) error {
 		var (
 			err error
 			id  string
 			ref string
 
-			rm        = cliContext.Bool("rm")
-			tty       = cliContext.Bool("tty")
-			detach    = cliContext.Bool("detach")
-			config    = cliContext.IsSet("config")
-			enableCNI = cliContext.Bool("cni")
+			rm        = cmd.Bool("rm")
+			tty       = cmd.Bool("tty")
+			detach    = cmd.Bool("detach")
+			config    = cmd.IsSet("config")
+			enableCNI = cmd.Bool("cni")
 		)
 
 		if config {
-			id = cliContext.Args().First()
-			if cliContext.NArg() > 1 {
+			id = cmd.Args().First()
+			if cmd.NArg() > 1 {
 				return errors.New("with spec config file, only container id should be provided")
 			}
 		} else {
-			id = cliContext.Args().Get(1)
-			ref = cliContext.Args().First()
+			id = cmd.Args().Get(1)
+			ref = cmd.Args().First()
 
 			if ref == "" {
 				return errors.New("image ref must be provided")
@@ -176,13 +176,13 @@ var Command = &cli.Command{
 			return errors.New("flags --detach and --rm cannot be specified together")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		container, err := NewContainer(ctx, client, cliContext)
+		container, err := NewContainer(ctx, client, cmd)
 		if err != nil {
 			return err
 		}
@@ -193,8 +193,8 @@ var Command = &cli.Command{
 				}
 			}()
 		}
-		if cliContext.IsSet("dump-config") {
-			filename := cliContext.String("dump-config")
+		if cmd.IsSet("dump-config") {
+			filename := cmd.String("dump-config")
 			if filename == "" {
 				return errors.New("file name is required with --dump-config")
 			}
@@ -225,9 +225,9 @@ var Command = &cli.Command{
 			}
 		}
 
-		opts := tasks.GetNewTaskOpts(cliContext)
-		ioOpts := []cio.Opt{cio.WithFIFODir(cliContext.String("fifo-dir"))}
-		task, err := tasks.NewTask(ctx, client, container, cliContext.String("checkpoint"), con, cliContext.Bool("null-io"), cliContext.String("log-uri"), ioOpts, opts...)
+		opts := tasks.GetNewTaskOpts(cmd)
+		ioOpts := []cio.Opt{cio.WithFIFODir(cmd.String("fifo-dir"))}
+		task, err := tasks.NewTask(ctx, client, container, cmd.String("checkpoint"), con, cmd.Bool("null-io"), cmd.String("log-uri"), ioOpts, opts...)
 		if err != nil {
 			return err
 		}
@@ -250,8 +250,8 @@ var Command = &cli.Command{
 				return err
 			}
 		}
-		if cliContext.IsSet("pid-file") {
-			if err := commands.WritePidFile(cliContext.String("pid-file"), int(task.Pid())); err != nil {
+		if cmd.IsSet("pid-file") {
+			if err := commands.WritePidFile(cmd.String("pid-file"), int(task.Pid())); err != nil {
 				return err
 			}
 		}

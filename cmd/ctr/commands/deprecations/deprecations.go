@@ -45,11 +45,11 @@ var listCommand = &cli.Command{
 			Usage: "output format to use (Examples: 'default', 'json')",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	Action: func(cmd *cli.Context) error {
 		// Suppress automatic warnings, since we print the warnings by ourselves.
 		os.Setenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS", "1")
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -61,7 +61,7 @@ var listCommand = &cli.Command{
 		}
 		wrn := warnings(resp)
 		if len(wrn) > 0 {
-			switch cliContext.String("format") {
+			switch cmd.String("format") {
 			case "json":
 				commands.PrintAsJSON(warnings(resp))
 				return nil

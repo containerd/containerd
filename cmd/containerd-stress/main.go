@@ -65,8 +65,8 @@ func init() {
 		panic(err)
 	}
 
-	cli.VersionPrinter = func(cliContext *cli.Context) {
-		fmt.Println(cliContext.App.Name, version.Package, cliContext.App.Version)
+	cli.VersionPrinter = func(cmd *cli.Context) {
+		fmt.Println(cmd.App.Name, version.Package, cmd.App.Version)
 	}
 
 	// Override the default flag descriptions for '--version' and '--help'
@@ -206,13 +206,13 @@ func main() {
 			Value: "overlayfs",
 		},
 	}
-	app.Before = func(cliContext *cli.Context) error {
-		if cliContext.Bool("json") {
+	app.Before = func(cmd *cli.Context) error {
+		if cmd.Bool("json") {
 			if err := log.SetLevel("warn"); err != nil {
 				return err
 			}
 		}
-		if cliContext.Bool("debug") {
+		if cmd.Bool("debug") {
 			if err := log.SetLevel("debug"); err != nil {
 				return err
 			}
@@ -222,18 +222,18 @@ func main() {
 	app.Commands = []*cli.Command{
 		densityCommand,
 	}
-	app.Action = func(cliContext *cli.Context) error {
+	app.Action = func(cmd *cli.Context) error {
 		cfg := config{
-			Address:     cliContext.String("address"),
-			Duration:    cliContext.Duration("duration"),
-			Concurrency: cliContext.Int("concurrent"),
-			CRI:         cliContext.Bool("cri"),
-			Exec:        cliContext.Bool("exec"),
-			Image:       cliContext.String("image"),
-			JSON:        cliContext.Bool("json"),
-			Metrics:     cliContext.String("metrics"),
-			Runtime:     cliContext.String("runtime"),
-			Snapshotter: cliContext.String("snapshotter"),
+			Address:     cmd.String("address"),
+			Duration:    cmd.Duration("duration"),
+			Concurrency: cmd.Int("concurrent"),
+			CRI:         cmd.Bool("cri"),
+			Exec:        cmd.Bool("exec"),
+			Image:       cmd.String("image"),
+			JSON:        cmd.Bool("json"),
+			Metrics:     cmd.String("metrics"),
+			Runtime:     cmd.String("runtime"),
+			Snapshotter: cmd.String("snapshotter"),
 		}
 		if cfg.Metrics != "" {
 			return serve(cfg)

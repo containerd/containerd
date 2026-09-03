@@ -58,8 +58,8 @@ func init() {
 	// Discard grpc logs so that they don't mess with our stdio
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 
-	cli.VersionPrinter = func(cliContext *cli.Context) {
-		fmt.Println(cliContext.App.Name, version.Package, cliContext.App.Version, version.Revision)
+	cli.VersionPrinter = func(cmd *cli.Context) {
+		fmt.Println(cmd.App.Name, version.Package, cmd.App.Version, version.Revision)
 	}
 
 	// Override the default flag descriptions for '--version' and '--help'
@@ -129,16 +129,16 @@ can be used and modified as necessary as a custom configuration.`
 		publishCommand,
 		ociHook,
 	}
-	app.Action = func(cliContext *cli.Context) error {
-		if args := cliContext.Args(); args.First() != "" {
-			return cli.ShowCommandHelp(cliContext, args.First())
+	app.Action = func(cmd *cli.Context) error {
+		if args := cmd.Args(); args.First() != "" {
+			return cli.ShowCommandHelp(cmd, args.First())
 		}
 
 		var (
 			start       = time.Now()
 			signals     = make(chan os.Signal, 2048)
 			serverC     = make(chan *server.Server, 1)
-			ctx, cancel = context.WithCancel(cliContext.Context)
+			ctx, cancel = context.WithCancel(cmd.Context)
 			config      = defaultConfig()
 		)
 
@@ -146,9 +146,9 @@ can be used and modified as necessary as a custom configuration.`
 
 		// Only try to load the config if it either exists, or the user explicitly
 		// told us to load this path.
-		configPath := cliContext.String("config")
+		configPath := cmd.String("config")
 		_, err := os.Stat(configPath)
-		if !os.IsNotExist(err) || cliContext.IsSet("config") {
+		if !os.IsNotExist(err) || cmd.IsSet("config") {
 			g := registry.Graph(func(*plugin.Registration) bool { return false })
 			plugins := func() iter.Seq[plugin.Registration] {
 				return slices.Values(g)
@@ -159,7 +159,7 @@ can be used and modified as necessary as a custom configuration.`
 		}
 
 		// Apply flags to the config
-		if err := applyFlags(cliContext, config); err != nil {
+		if err := applyFlags(cmd, config); err != nil {
 			return err
 		}
 
@@ -282,10 +282,10 @@ can be used and modified as necessary as a custom configuration.`
 	return app
 }
 
-func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
+func applyFlags(cmd *cli.Context, config *srvconfig.Config) error {
 	// the order for config vs flag values is that flags will always override
 	// the config values if they are set
-	if err := setLogLevel(cliContext, config); err != nil {
+	if err := setLogLevel(cmd, config); err != nil {
 		return err
 	}
 	if err := setLogFormat(config); err != nil {
@@ -305,7 +305,7 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 			d:    &config.State,
 		},
 	} {
-		if s := cliContext.String(v.name); s != "" {
+		if s := cmd.String(v.name); s != "" {
 			*v.d = s
 			if v.name == "root" || v.name == "state" {
 				absPath, err := filepath.Abs(s)
@@ -317,7 +317,7 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 		}
 	}
 
-	if s := cliContext.String("address"); s != "" {
+	if s := cmd.String("address"); s != "" {
 		var (
 			grpcConfig  map[string]any
 			ttrpcConfig map[string]any
@@ -346,13 +346,13 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 		}
 	}
 
-	applyPlatformFlags(cliContext)
+	applyPlatformFlags(cmd)
 
 	return nil
 }
 
-func setLogLevel(cliContext *cli.Context, config *srvconfig.Config) error {
-	l := cliContext.String("log-level")
+func setLogLevel(cmd *cli.Context, config *srvconfig.Config) error {
+	l := cmd.String("log-level")
 	if l == "" {
 		l = config.Debug.Level
 	}

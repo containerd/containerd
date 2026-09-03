@@ -105,28 +105,28 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		},
 	}, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 
-	Action: func(cliContext *cli.Context) error {
+	Action: func(cmd *cli.Context) error {
 		var (
-			in              = cliContext.Args().First()
+			in              = cmd.Args().First()
 			opts            []containerd.ImportOpt
 			platformMatcher platforms.MatchComparer
 		)
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		if !cliContext.Bool("local") {
+		if !cmd.Bool("local") {
 			unsupportedFlags := []string{"discard-unpacked-layers"}
 			for _, s := range unsupportedFlags {
-				if cliContext.IsSet(s) {
+				if cmd.IsSet(s) {
 					return fmt.Errorf("\"--%s\" requires \"--local\" flag", s)
 				}
 			}
 			var opts []image.StoreOpt
-			prefix := cliContext.String("base-name")
+			prefix := cmd.String("base-name")
 			var overwrite bool
 			if prefix == "" {
 				prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
@@ -134,13 +134,13 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				overwrite = true
 			}
 
-			labels := cliContext.StringSlice("label")
+			labels := cmd.StringSlice("label")
 			if len(labels) > 0 {
 				opts = append(opts, image.WithImageLabels(commands.LabelArgs(labels)))
 			}
 
-			if cliContext.Bool("digests") {
-				opts = append(opts, image.WithDigestRef(prefix, overwrite, !cliContext.Bool("skip-digest-for-named")))
+			if cmd.Bool("digests") {
+				opts = append(opts, image.WithDigestRef(prefix, overwrite, !cmd.Bool("skip-digest-for-named")))
 			} else {
 				opts = append(opts, image.WithNamedPrefix(prefix, overwrite))
 			}
@@ -151,9 +151,9 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			// This is still not fully compatible with --local, which only unpacks
 			// the strict-default platform layers.
 			platUnpack := platforms.DefaultSpec()
-			if !cliContext.Bool("all-platforms") {
+			if !cmd.Bool("all-platforms") {
 				// If platform specified, use that one, if not use default
-				if platform := cliContext.String("platform"); platform != "" {
+				if platform := cmd.String("platform"); platform != "" {
 					platUnpack, err = platforms.Parse(platform)
 					if err != nil {
 						return err
@@ -162,16 +162,16 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				opts = append(opts, image.WithPlatforms(platUnpack))
 			}
 
-			if !cliContext.Bool("no-unpack") {
-				snapshotter := cliContext.String("snapshotter")
+			if !cmd.Bool("no-unpack") {
+				snapshotter := cmd.String("snapshotter")
 				opts = append(opts, image.WithUnpack(platUnpack, snapshotter))
 			}
 
-			is := image.NewStore(cliContext.String("index-name"), opts...)
+			is := image.NewStore(cmd.String("index-name"), opts...)
 
 			var iopts []tarchive.ImportOpt
 
-			if cliContext.Bool("compress-blobs") {
+			if cmd.Bool("compress-blobs") {
 				iopts = append(iopts, tarchive.WithForceCompression)
 			}
 
@@ -201,7 +201,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		// Local logic
 
-		prefix := cliContext.String("base-name")
+		prefix := cmd.String("base-name")
 		if prefix == "" {
 			prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
 			opts = append(opts, containerd.WithImageRefTranslator(archive.AddRefPrefix(prefix)))
@@ -210,25 +210,25 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			opts = append(opts, containerd.WithImageRefTranslator(archive.FilterRefPrefix(prefix)))
 		}
 
-		if cliContext.Bool("digests") {
+		if cmd.Bool("digests") {
 			opts = append(opts, containerd.WithDigestRef(archive.DigestTranslator(prefix)))
 		}
-		if cliContext.Bool("skip-digest-for-named") {
-			if !cliContext.Bool("digests") {
+		if cmd.Bool("skip-digest-for-named") {
+			if !cmd.Bool("digests") {
 				return errors.New("--skip-digest-for-named must be specified with --digests option")
 			}
 			opts = append(opts, containerd.WithSkipDigestRef(func(name string) bool { return name != "" }))
 		}
 
-		if idxName := cliContext.String("index-name"); idxName != "" {
+		if idxName := cmd.String("index-name"); idxName != "" {
 			opts = append(opts, containerd.WithIndexName(idxName))
 		}
 
-		if cliContext.Bool("compress-blobs") {
+		if cmd.Bool("compress-blobs") {
 			opts = append(opts, containerd.WithImportCompression())
 		}
 
-		if platform := cliContext.String("platform"); platform != "" {
+		if platform := cmd.String("platform"); platform != "" {
 			platSpec, err := platforms.Parse(platform)
 			if err != nil {
 				return err
@@ -237,16 +237,16 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			opts = append(opts, containerd.WithImportPlatform(platformMatcher))
 		}
 
-		opts = append(opts, containerd.WithAllPlatforms(cliContext.Bool("all-platforms")))
+		opts = append(opts, containerd.WithAllPlatforms(cmd.Bool("all-platforms")))
 
-		if cliContext.Bool("discard-unpacked-layers") {
-			if cliContext.Bool("no-unpack") {
+		if cmd.Bool("discard-unpacked-layers") {
+			if cmd.Bool("no-unpack") {
 				return errors.New("--discard-unpacked-layers and --no-unpack are incompatible options")
 			}
 			opts = append(opts, containerd.WithDiscardUnpackedLayers())
 		}
 
-		labels := cliContext.StringSlice("label")
+		labels := cmd.StringSlice("label")
 		if len(labels) > 0 {
 			opts = append(opts, containerd.WithImageLabels(commands.LabelArgs(labels)))
 		}
@@ -276,7 +276,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			return closeErr
 		}
 
-		if !cliContext.Bool("no-unpack") {
+		if !cmd.Bool("no-unpack") {
 			log.G(ctx).Debugf("unpacking %d images", len(imgs))
 
 			for _, img := range imgs {
@@ -287,7 +287,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 				// TODO: Show unpack status
 				fmt.Printf("unpacking %s (%s)...", img.Name, img.Target.Digest)
-				err = image.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs"))))
+				err = image.Unpack(ctx, cmd.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cmd.Bool("sync-fs"))))
 				if err != nil {
 					return err
 				}
