@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/moby/sys/signal"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const defaultSignal = "SIGTERM"
@@ -82,8 +82,7 @@ var killCommand = &cli.Command{
 			Usage:   "Send signal to all processes inside the container",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")

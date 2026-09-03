@@ -17,6 +17,7 @@
 package content
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -35,7 +36,7 @@ import (
 	units "github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var (
@@ -43,7 +44,7 @@ var (
 	Command = &cli.Command{
 		Name:  "content",
 		Usage: "Manage content",
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			activeIngestCommand,
 			deleteCommand,
 			editCommand,
@@ -64,8 +65,7 @@ var (
 		Usage:       "Get the data for an object",
 		ArgsUsage:   "[<digest>, ...]",
 		Description: "display the image object",
-		Action: func(cmd *cli.Context) error {
-			ctx := cmd.Context
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			dgst, err := digest.Parse(cmd.Args().First())
 			if err != nil {
 				return err
@@ -104,8 +104,7 @@ var (
 				Usage: "Verify content against expected digest",
 			},
 		},
-		Action: func(cmd *cli.Context) error {
-			ctx := cmd.Context
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
 				ref            = cmd.Args().First()
 				expectedSize   = cmd.Int64("expected-size")
@@ -142,7 +141,7 @@ var (
 				Name:    "timeout",
 				Aliases: []string{"t"},
 				Usage:   "Total timeout for fetch",
-				EnvVars: []string{"CONTAINERD_FETCH_TIMEOUT"},
+				Sources: cli.EnvVars("CONTAINERD_FETCH_TIMEOUT"),
 			},
 			&cli.StringFlag{
 				Name:  "root",
@@ -150,8 +149,7 @@ var (
 				Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
 			},
 		},
-		Action: func(cmd *cli.Context) error {
-			ctx := cmd.Context
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			match := cmd.Args().First()
 			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
@@ -189,8 +187,7 @@ var (
 				Usage:   "Print only the blob digest",
 			},
 		},
-		Action: func(cmd *cli.Context) error {
-			ctx := cmd.Context
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
 				quiet = cmd.Bool("quiet")
 				args  = cmd.Args().Slice()
@@ -243,8 +240,7 @@ var (
 		Usage:       "Add labels to content",
 		ArgsUsage:   "<digest> [<label>=<value> ...]",
 		Description: "labels blobs in the content store",
-		Action: func(cmd *cli.Context) error {
-			ctx := cmd.Context
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			object, labels := commands.ObjectWithLabelArgs(cmd)
 			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
@@ -306,11 +302,10 @@ var (
 			&cli.StringFlag{
 				Name:    "editor",
 				Usage:   "Select editor (vim, emacs, etc.)",
-				EnvVars: []string{"EDITOR"},
+				Sources: cli.EnvVars("EDITOR"),
 			},
 		},
-		Action: func(cmd *cli.Context) error {
-			ctx := cmd.Context
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
 				validate = cmd.String("validate")
 				object   = cmd.Args().First()
@@ -370,8 +365,7 @@ var (
 		ArgsUsage: "[<digest>, ...]",
 		Description: `Delete one or more blobs permanently. Successfully deleted
 	blobs are printed to stdout.`,
-		Action: func(cmd *cli.Context) error {
-			ctx := cmd.Context
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
 				args      = cmd.Args().Slice()
 				exitError error
@@ -419,8 +413,7 @@ var (
 		ArgsUsage:   "[flags] <remote> <object> [<hint>, ...]",
 		Description: `Fetch objects by identifier from a remote.`,
 		Flags:       commands.RegistryFlags,
-		Action: func(cmd *cli.Context) error {
-			ctx := cmd.Context
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			ctx, cancel := commands.AppContext(ctx, cmd)
 			defer cancel()
 
@@ -465,12 +458,11 @@ var (
 				Usage: "Specify target mediatype for request header",
 			},
 		}...),
-		Action: func(cmd *cli.Context) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			digests := cmd.Args().Tail()
 			if len(digests) == 0 {
 				return errors.New("must specify digests")
 			}
-			ctx := cmd.Context
 			ctx, cancel := commands.AppContext(ctx, cmd)
 			defer cancel()
 
@@ -519,8 +511,7 @@ var (
 		ArgsUsage:   "[flags] <remote> <object> <type>",
 		Description: `Push objects by identifier to a remote.`,
 		Flags:       commands.RegistryFlags,
-		Action: func(cmd *cli.Context) error {
-			ctx := cmd.Context
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
 				ref    = cmd.Args().Get(0)
 				object = cmd.Args().Get(1)
@@ -600,7 +591,7 @@ func edit(editor string, rd io.Reader) (_ io.ReadCloser, retErr error) {
 		}
 	}()
 	_, err = io.Copy(tmp, rd)
-	tmp.Close()
+	_ = tmp.Close()
 	if err != nil {
 		return nil, err
 	}

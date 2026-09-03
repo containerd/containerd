@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func outputConfig(ctx context.Context, config *srvconfig.Config) error {
@@ -85,12 +85,11 @@ func defaultConfig() *srvconfig.Config {
 var configCommand = &cli.Command{
 	Name:  "config",
 	Usage: "Information on the containerd config",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		{
 			Name:  "default",
 			Usage: "See the output of the default config",
-			Action: func(cmd *cli.Context) error {
-				ctx := cmd.Context
+			Action: func(ctx context.Context, cmd *cli.Command) error {
 				return outputConfig(ctx, defaultConfig())
 			},
 		},
@@ -108,9 +107,8 @@ var configCommand = &cli.Command{
 	},
 }
 
-func dumpConfig(cmd *cli.Context) error {
+func dumpConfig(ctx context.Context, cmd *cli.Command) error {
 	config := defaultConfig()
-	ctx := cmd.Context
 
 	g := registry.Graph(func(*plugin.Registration) bool { return false })
 	plugins := func() iter.Seq[plugin.Registration] {

@@ -40,7 +40,7 @@ import (
 	"github.com/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -77,8 +77,7 @@ var pushCommand = &cli.Command{
 		Name:  "allow-non-distributable-blobs",
 		Usage: "Allow pushing blobs that are marked as non-distributable",
 	}),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			ref   = cmd.Args().First()
 			local = cmd.Args().Get(1)

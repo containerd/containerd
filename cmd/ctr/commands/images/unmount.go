@@ -17,6 +17,7 @@
 package images
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -24,7 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var unmountCommand = &cli.Command{
@@ -38,8 +39,7 @@ var unmountCommand = &cli.Command{
 			Usage: "Remove the snapshot after a successful unmount",
 		},
 	),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		target := cmd.Args().First()
 		if target == "" {
 			return errors.New("please provide a target path to unmount from")
@@ -66,7 +66,7 @@ var unmountCommand = &cli.Command{
 			}
 		}
 
-		fmt.Fprintln(cmd.App.Writer, target)
+		_, _ = fmt.Fprintln(cmd.Writer, target)
 		return nil
 	},
 }

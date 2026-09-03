@@ -28,7 +28,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	if err := command.App().RunContext(ctx, os.Args); err != nil {
+	if err := command.App().Run(ctx, os.Args); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "containerd:", err)
 		os.Exit(1)
 	}

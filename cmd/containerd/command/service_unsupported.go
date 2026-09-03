@@ -20,7 +20,7 @@ package command
 
 import (
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // serviceFlags returns an array of flags for configuring containerd to run
@@ -30,7 +30,7 @@ func serviceFlags() []cli.Flag {
 }
 
 // applyPlatformFlags applies platform-specific flags.
-func applyPlatformFlags(*cli.Context) {}
+func applyPlatformFlags(*cli.Command) {}
 
 // registerUnregisterService is only relevant on Windows.
 func registerUnregisterService(root string) (bool, error) {

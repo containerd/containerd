@@ -17,12 +17,13 @@
 package images
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/images/archive"
@@ -65,8 +66,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Usage: "Run export locally rather than through transfer API",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			out        = cmd.Args().First()
 			images     = cmd.Args().Tail()

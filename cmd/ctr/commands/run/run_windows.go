@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var platformRunFlags = []cli.Flag{
@@ -46,7 +46,7 @@ var platformRunFlags = []cli.Flag{
 }
 
 // NewContainer creates a new container
-func NewContainer(ctx context.Context, client *containerd.Client, cmd *cli.Context) (containerd.Container, error) {
+func NewContainer(ctx context.Context, client *containerd.Client, cmd *cli.Command) (containerd.Container, error) {
 	var (
 		id    string
 		opts  []oci.SpecOpts
@@ -126,6 +126,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cmd *cli.Conte
 
 			con := console.Current()
 			size, err := con.Size()
+			_ = con.Close()
 			if err != nil {
 				log.L.WithError(err).Error("console size")
 			}
@@ -184,8 +185,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cmd *cli.Conte
 			Debug: cmd.Bool("debug"),
 		}
 		if cmd.IsSet("scrub-logs") {
-			scrubLogs := cmd.Bool("scrub-logs")
-			opts.ScrubLogs = &scrubLogs
+			opts.ScrubLogs = new(cmd.Bool("scrub-logs"))
 		}
 		runtimeOpts = opts
 	}

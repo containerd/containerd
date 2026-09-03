@@ -38,7 +38,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var pullCommand = &cli.Command{
@@ -89,8 +89,7 @@ command. As part of this process, we do the following:
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		ref := cmd.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to pull")

@@ -17,6 +17,7 @@
 package sandboxes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -28,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // Command is a set of subcommands to manage runtimes with sandbox support
@@ -36,7 +37,7 @@ var Command = &cli.Command{
 	Name:    "sandboxes",
 	Aliases: []string{"sandbox", "sb", "s"},
 	Usage:   "Manage sandboxes",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		runCommand,
 		listCommand,
 		removeCommand,
@@ -56,8 +57,7 @@ var runCommand = &cli.Command{
 			Value: defaults.DefaultRuntime,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if cmd.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -110,8 +110,7 @@ var listCommand = &cli.Command{
 			Usage: "The list of filters to apply when querying sandboxes from the store",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -159,8 +158,7 @@ var removeCommand = &cli.Command{
 			Usage:   "Ignore shutdown errors when removing sandbox",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -202,8 +200,7 @@ var infoCommand = &cli.Command{
 	Aliases:   []string{"i"},
 	Usage:     "Get info about a sandbox",
 	ArgsUsage: "<sandbox id>",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err

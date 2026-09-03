@@ -17,6 +17,7 @@
 package tasks
 
 import (
+	"context"
 	"errors"
 
 	"github.com/containerd/console"
@@ -25,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var startCommand = &cli.Command{
@@ -55,8 +56,7 @@ var startCommand = &cli.Command{
 			Usage:   "Detach from the task after it has started execution",
 		},
 	}...),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			id     = cmd.Args().Get(0)
 			detach = cmd.Bool("detach")

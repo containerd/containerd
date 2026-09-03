@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd/api/types/runc/options"
 	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func init() {
@@ -59,7 +59,7 @@ func init() {
 	})
 }
 
-func getRuncOptions(cmd *cli.Context) (*options.Options, error) {
+func getRuncOptions(cmd *cli.Command) (*options.Options, error) {
 	runtimeOpts := &options.Options{}
 	if runcBinary := cmd.String("runc-binary"); runcBinary != "" {
 		runtimeOpts.BinaryName = runcBinary
@@ -78,7 +78,7 @@ func getRuncOptions(cmd *cli.Context) (*options.Options, error) {
 	return runtimeOpts, nil
 }
 
-func RuntimeOptions(cmd *cli.Context) (any, error) {
+func RuntimeOptions(cmd *cli.Command) (any, error) {
 	// validate first
 	if (cmd.String("runc-binary") != "" || cmd.Bool("runc-systemd-cgroup")) &&
 		cmd.String("runtime") != "io.containerd.runc.v2" {

@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/console"
 	gocni "github.com/containerd/go-cni"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -43,7 +43,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
-func withMounts(cmd *cli.Context) oci.SpecOpts {
+func withMounts(cmd *cli.Command) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
 		mounts := make([]specs.Mount, 0)
 		dests := make([]string, 0)
@@ -143,8 +143,7 @@ var Command = &cli.Command{
 		append(commands.RuntimeFlags,
 			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
 				commands.ContainerFlags...)...)...)...),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			err error
 			id  string
