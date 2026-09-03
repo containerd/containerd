@@ -39,19 +39,9 @@ type mkfs struct {
 // will see, and a deferredEnsure that creates and formats the backing
 // file those options describe.
 func (t *mkfs) rewrite(m mount.Mount) (mount.Mount, deferredEnsure, error) {
-	var r *os.Root
-	var subpath string
-
-	for path, root := range t.rootMap {
-		if strings.HasPrefix(m.Source, path) {
-			r = root
-			subpath = strings.TrimPrefix(m.Source, path)
-			subpath, _ = filepath.Rel("/", subpath)
-			break
-		}
-	}
-	if r == nil {
-		return m, deferredEnsure{}, fmt.Errorf("no root %q configured for mkfs: %w", m.Source, errdefs.ErrNotImplemented)
+	r, subpath, err := resolveRoot(t.rootMap, m.Source, "mkfs")
+	if err != nil {
+		return m, deferredEnsure{}, err
 	}
 
 	var (
