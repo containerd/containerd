@@ -333,7 +333,7 @@ var (
 			}
 			defer ra.Close()
 
-			nrc, err := edit(cliContext, content.NewReader(ra))
+			nrc, err := edit(cliContext.String("editor"), content.NewReader(ra))
 			if err != nil {
 				return err
 			}
@@ -578,8 +578,7 @@ var (
 	}
 )
 
-func edit(cliContext *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error) {
-	editor := cliContext.String("editor")
+func edit(editor string, rd io.Reader) (_ io.ReadCloser, retErr error) {
 	if editor == "" {
 		return nil, errors.New("editor is required")
 	}
