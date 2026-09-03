@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -24,7 +25,8 @@ import (
 )
 
 func main() {
-	if err := app.New().Run(os.Args); err != nil {
+	ctx := context.Background()
+	if err := app.New().RunContext(ctx, os.Args); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "ctr:", err)
 		os.Exit(1)
 	}

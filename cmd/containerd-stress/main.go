@@ -143,6 +143,7 @@ func main() {
 	// more power!
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	ctx := context.Background()
 	app := cli.NewApp()
 	app.Name = "containerd-stress"
 	app.Description = "stress test a containerd daemon"
@@ -244,8 +245,8 @@ func main() {
 
 		return test(config)
 	}
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if err := app.RunContext(ctx, os.Args); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, "containerd-stress:", err)
 		os.Exit(1)
 	}
 }
