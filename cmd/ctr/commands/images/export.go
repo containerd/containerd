@@ -55,7 +55,6 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: cli.NewStringSlice(),
 		},
 		&cli.BoolFlag{
 			Name:  "all-platforms",

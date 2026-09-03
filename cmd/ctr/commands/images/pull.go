@@ -58,7 +58,6 @@ command. As part of this process, we do the following:
 		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: cli.NewStringSlice(),
 		},
 		&cli.BoolFlag{
 			Name:  "all-platforms",

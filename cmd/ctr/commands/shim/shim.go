@@ -231,7 +231,6 @@ var execCommand = &cli.Command{
 			Name:    "env",
 			Aliases: []string{"e"},
 			Usage:   "Add environment vars",
-			Value:   cli.NewStringSlice(),
 		},
 		&cli.StringFlag{
 			Name:  "cwd",

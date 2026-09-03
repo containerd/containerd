@@ -67,7 +67,6 @@ var pushCommand = &cli.Command{
 	}, &cli.StringSliceFlag{
 		Name:  "platform",
 		Usage: "Push content from a specific platform",
-		Value: cli.NewStringSlice(),
 	}, &cli.IntFlag{
 		Name:  "max-concurrent-uploaded-layers",
 		Usage: "Set the max concurrent uploaded layers for each push",
