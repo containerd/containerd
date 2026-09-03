@@ -768,6 +768,14 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 	p.SetExited(e.Status)
 	_, isInit := p.(*process.Init)
 	if isInit {
+		e.Timestamp = p.ExitedAt()
+		if err := runc.WriteExitStatus(c.Bundle, e); err != nil {
+			log.G(s.context).
+				WithField("container_id", c.ID).
+				WithError(err).
+				Error("failed to store exit status in bundle")
+		}
+
 		if err := s.cg2oom.Stop(c.ID); err != nil {
 			log.G(context.Background()).
 				WithField("container_id", c.ID).
