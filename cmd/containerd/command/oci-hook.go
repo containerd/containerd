@@ -44,14 +44,14 @@ var ociHook = &cli.Command{
 			return err
 		}
 		var (
-			ctx  = newTemplateContext(state, spec)
+			tc   = newTemplateContext(state, spec)
 			args = cliContext.Args().Slice()
 			env  = os.Environ()
 		)
-		if err := newList(&args).render(ctx); err != nil {
+		if err := newList(&args).render(tc); err != nil {
 			return err
 		}
-		if err := newList(&env).render(ctx); err != nil {
+		if err := newList(&env).render(tc); err != nil {
 			return err
 		}
 		return syscall.Exec(args[0], args, env)

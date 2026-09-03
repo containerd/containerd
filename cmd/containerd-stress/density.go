@@ -57,7 +57,7 @@ var densityCommand = &cli.Command{
 			return errors.New("count cannot be less than one")
 		}
 
-		config := config{
+		cfg := config{
 			Address:     cliContext.String("address"),
 			Duration:    cliContext.Duration("duration"),
 			Concurrency: cliContext.Int("concurrent"),
@@ -67,7 +67,7 @@ var densityCommand = &cli.Command{
 			Metrics:     cliContext.String("metrics"),
 			Snapshotter: cliContext.String("snapshotter"),
 		}
-		client, err := config.newClient()
+		client, err := cfg.newClient()
 		if err != nil {
 			return err
 		}
@@ -76,8 +76,8 @@ var densityCommand = &cli.Command{
 		if err := cleanup(ctx, client); err != nil {
 			return err
 		}
-		log.L.Infof("pulling %s", config.Image)
-		image, err := client.Pull(ctx, config.Image, containerd.WithPullUnpack, containerd.WithPullSnapshotter(config.Snapshotter))
+		log.L.Infof("pulling %s", cfg.Image)
+		image, err := client.Pull(ctx, cfg.Image, containerd.WithPullUnpack, containerd.WithPullSnapshotter(cfg.Snapshotter))
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ var densityCommand = &cli.Command{
 				id := fmt.Sprintf("density-%d", i)
 
 				c, err := client.NewContainer(ctx, id,
-					containerd.WithSnapshotter(config.Snapshotter),
+					containerd.WithSnapshotter(cfg.Snapshotter),
 					containerd.WithNewSnapshot(id, image),
 					containerd.WithNewSpec(
 						oci.WithImageConfig(image),

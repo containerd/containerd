@@ -220,7 +220,7 @@ can be used and modified as necessary as a custom configuration.`
 			defer close(chsrv)
 
 			// TODO: When to set grpc address from flag? Migration should be done first
-			server, err := server.New(ctx, config)
+			srv, err := server.New(ctx, config)
 			if err != nil {
 				select {
 				case chsrv <- srvResp{err: err}:
@@ -230,17 +230,17 @@ can be used and modified as necessary as a custom configuration.`
 			}
 
 			// Launch as a Windows Service if necessary
-			if err := launchService(server, done); err != nil {
+			if err := launchService(srv, done); err != nil {
 				log.L.Fatal(err)
 			}
 			select {
 			case <-ctx.Done():
-				server.Stop()
-			case chsrv <- srvResp{s: server}:
+				srv.Stop()
+			case chsrv <- srvResp{s: srv}:
 			}
 		}()
 
-		var server *server.Server
+		var srv *server.Server
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -248,23 +248,23 @@ can be used and modified as necessary as a custom configuration.`
 			if r.err != nil {
 				return r.err
 			}
-			server = r.s
+			srv = r.s
 		}
 
 		// We don't send the server down serverC directly in the goroutine above because we need it lower down.
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case serverC <- server:
+		case serverC <- srv:
 		}
 
-		if err := server.Start(ctx); err != nil {
+		if err := srv.Start(ctx); err != nil {
 			return err
 		}
 
 		readyC := make(chan struct{})
 		go func() {
-			server.Wait()
+			srv.Wait()
 			close(readyC)
 		}()
 

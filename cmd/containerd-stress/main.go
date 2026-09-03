@@ -223,7 +223,7 @@ func main() {
 		densityCommand,
 	}
 	app.Action = func(cliContext *cli.Context) error {
-		config := config{
+		cfg := config{
 			Address:     cliContext.String("address"),
 			Duration:    cliContext.Duration("duration"),
 			Concurrency: cliContext.Int("concurrent"),
@@ -235,15 +235,15 @@ func main() {
 			Runtime:     cliContext.String("runtime"),
 			Snapshotter: cliContext.String("snapshotter"),
 		}
-		if config.Metrics != "" {
-			return serve(config)
+		if cfg.Metrics != "" {
+			return serve(cfg)
 		}
 
-		if config.CRI {
-			return criTest(config)
+		if cfg.CRI {
+			return criTest(cfg)
 		}
 
-		return test(config)
+		return test(cfg)
 	}
 	if err := app.RunContext(ctx, os.Args); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "containerd-stress:", err)

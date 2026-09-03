@@ -38,11 +38,11 @@ var (
 func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server, cancel func()) chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		var server *server.Server
+		var srv *server.Server
 		for {
 			select {
 			case s := <-serverC:
-				server = s
+				srv = s
 			case s := <-signals:
 				log.G(ctx).WithField("signal", s).Debug("received signal")
 
@@ -51,8 +51,8 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 				}
 
 				cancel()
-				if server != nil {
-					server.Stop()
+				if srv != nil {
+					srv.Stop()
 				}
 				close(done)
 				return
