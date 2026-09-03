@@ -19,7 +19,11 @@ package manager
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/mount"
@@ -32,6 +36,32 @@ const (
 	prefixMkdir = "X-containerd.mkdir."
 	prefixMkfs  = "X-containerd.mkfs."
 )
+
+// resolveRoot returns the *os.Root in roots whose key is the longest
+// path dir is under, and dir's path relative to it ("." if dir is the
+// root itself). what names the caller in the error when nothing
+// matches.
+func resolveRoot(roots map[string]*os.Root, dir, what string) (*os.Root, string, error) {
+	var bestPath, bestRel string
+	var best *os.Root
+	for path, root := range roots {
+		rel, err := filepath.Rel(path, dir)
+		if err != nil {
+			continue
+		}
+		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			// dir is not under path at all.
+			continue
+		}
+		if best == nil || len(path) > len(bestPath) {
+			best, bestPath, bestRel = root, path, rel
+		}
+	}
+	if best == nil {
+		return nil, "", fmt.Errorf("no root %q configured for %s: %w", dir, what, errdefs.ErrNotImplemented)
+	}
+	return best, bestRel, nil
+}
 
 type typeTransformer struct {
 	mount.Transformer
