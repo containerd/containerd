@@ -339,8 +339,25 @@ func (c *controllerLocal) Metrics(ctx context.Context, sandboxID string) (*types
 func (c *controllerLocal) Update(
 	ctx context.Context,
 	sandboxID string,
-	sandbox sandbox.Sandbox,
+	sb sandbox.Sandbox,
 	fields ...string) error {
+	svc, err := c.getSandbox(ctx, sandboxID)
+	if err != nil {
+		return err
+	}
+
+	req := &runtimeAPI.UpdateSandboxRequest{
+		SandboxID: sandboxID,
+		Sandbox:   sandbox.ToProto(&sb),
+		Fields:    fields,
+	}
+
+	// Shims are not required to implement UpdateSandbox, in which case ttrpc
+	// answers with an unimplemented error that callers are expected to tolerate.
+	if _, err := svc.UpdateSandbox(ctx, req); err != nil {
+		return fmt.Errorf("failed to update sandbox %s: %w", sandboxID, errgrpc.ToNative(err))
+	}
+
 	return nil
 }
 
