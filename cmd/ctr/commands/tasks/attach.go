@@ -17,19 +17,20 @@
 package tasks
 
 import (
+	"context"
+
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var attachCommand = &cli.Command{
 	Name:      "attach",
 	Usage:     "Attach to the IO of a running container",
 	ArgsUsage: "CONTAINER",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err

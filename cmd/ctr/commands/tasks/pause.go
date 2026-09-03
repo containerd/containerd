@@ -17,16 +17,17 @@
 package tasks
 
 import (
+	"context"
+
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var pauseCommand = &cli.Command{
 	Name:      "pause",
 	Usage:     "Pause an existing container",
 	ArgsUsage: "CONTAINER",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err

@@ -37,7 +37,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var fetchCommand = &cli.Command{
@@ -76,8 +76,7 @@ pull content that will later be used with 'ctr run' or 'ctr images unpack'.`,
 			Usage: "Pull all metadata including manifests and configs",
 		},
 	),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -115,7 +114,7 @@ type FetchConfig struct {
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
-func NewFetchConfig(ctx context.Context, cmd *cli.Context) (*FetchConfig, error) {
+func NewFetchConfig(ctx context.Context, cmd *cli.Command) (*FetchConfig, error) {
 	resolver, err := commands.GetResolver(ctx, cmd)
 	if err != nil {
 		return nil, err

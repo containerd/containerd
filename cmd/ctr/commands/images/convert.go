@@ -17,6 +17,7 @@
 package images
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -26,7 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images/converter/erofs"
 	"github.com/containerd/containerd/v2/core/images/converter/uncompress"
 	"github.com/containerd/platforms"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var convertCommand = &cli.Command{
@@ -75,8 +76,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Usage: "Exports content from all platforms",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var convertOpts []converter.Opt
 		srcRef := cmd.Args().Get(0)
 		targetRef := cmd.Args().Get(1)
@@ -134,7 +134,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(cmd.App.Writer, newImg.Target.Digest.String())
+		_, _ = fmt.Fprintln(cmd.Writer, newImg.Target.Digest.String())
 		return nil
 	},
 }

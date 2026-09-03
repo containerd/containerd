@@ -43,7 +43,7 @@ import (
 
 	"github.com/intel/goresctrl/pkg/blockio"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"tags.cncf.io/container-device-interface/pkg/cdi"
 	"tags.cncf.io/container-device-interface/pkg/parser"
 )
@@ -90,7 +90,7 @@ var platformRunFlags = []cli.Flag{
 }
 
 // NewContainer creates a new container
-func NewContainer(ctx context.Context, client *containerd.Client, cmd *cli.Context) (containerd.Container, error) {
+func NewContainer(ctx context.Context, client *containerd.Client, cmd *cli.Command) (containerd.Container, error) {
 	var (
 		id     string
 		config = cmd.IsSet("config")

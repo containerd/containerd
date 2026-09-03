@@ -17,11 +17,12 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/containers"
@@ -55,8 +56,8 @@ func init() {
 	// Discard grpc logs so that they don't mess with our stdio
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 
-	cli.VersionPrinter = func(cmd *cli.Context) {
-		fmt.Println(cmd.App.Name, version.Package, cmd.App.Version)
+	cli.VersionPrinter = func(cmd *cli.Command) {
+		_, _ = fmt.Fprintln(cmd.Root().Writer, cmd.Name, version.Package, cmd.Version)
 	}
 
 	// Override the default flag descriptions for '--version' and '--help'
@@ -66,20 +67,20 @@ func init() {
 		Aliases: []string{"v"},
 		Usage:   "Print the version",
 
-		DisableDefaultText: true,
+		HideDefault: true,
 	}
 	cli.HelpFlag = &cli.BoolFlag{
 		Name:    "help",
 		Aliases: []string{"h"},
 		Usage:   "Show help",
 
-		DisableDefaultText: true,
+		HideDefault: true,
 	}
 }
 
 // New returns a *cli.App instance.
-func New() *cli.App {
-	return &cli.App{
+func New() *cli.Command {
+	return &cli.Command{
 		Name:    "ctr",
 		Version: version.Version,
 		Description: `
@@ -97,7 +98,7 @@ stable from release to release of the containerd project.`,
 containerd CLI
 `,
 		DisableSliceFlagSeparator: true,
-		EnableBashCompletion:      true,
+		EnableShellCompletion:     true,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "debug",
@@ -108,7 +109,7 @@ containerd CLI
 				Aliases: []string{"a"},
 				Usage:   "Address for containerd's GRPC server",
 				Value:   defaults.DefaultAddress,
-				EnvVars: []string{"CONTAINERD_ADDRESS"},
+				Sources: cli.EnvVars("CONTAINERD_ADDRESS"),
 			},
 			&cli.DurationFlag{
 				Name:  "timeout",
@@ -123,7 +124,7 @@ containerd CLI
 				Aliases: []string{"n"},
 				Usage:   "Namespace to use with commands",
 				Value:   namespaces.Default,
-				EnvVars: []string{namespaces.NamespaceEnvVar},
+				Sources: cli.EnvVars(namespaces.NamespaceEnvVar),
 			},
 		},
 		Commands: append([]*cli.Command{
@@ -145,11 +146,11 @@ containerd CLI
 			info.Command,
 			deprecations.Command,
 		}, extraCmds...),
-		Before: func(cmd *cli.Context) error {
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 			if cmd.Bool("debug") {
-				return log.SetLevel("debug")
+				return ctx, log.SetLevel("debug")
 			}
-			return nil
+			return ctx, nil
 		},
 	}
 }

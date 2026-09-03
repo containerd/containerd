@@ -27,7 +27,7 @@ import (
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
@@ -51,8 +51,8 @@ var publishCommand = &cli.Command{
 			Usage: "Topic of the event",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := namespaces.WithNamespace(cmd.Context, cmd.String("namespace"))
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		ctx = namespaces.WithNamespace(ctx, cmd.String("namespace"))
 		topic := cmd.String("topic")
 		if topic == "" {
 			return fmt.Errorf("topic required to publish event: %w", errdefs.ErrInvalidArgument)

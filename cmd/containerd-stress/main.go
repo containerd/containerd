@@ -36,7 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
 	metrics "github.com/docker/go-metrics"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var (
@@ -65,8 +65,8 @@ func init() {
 		panic(err)
 	}
 
-	cli.VersionPrinter = func(cmd *cli.Context) {
-		fmt.Println(cmd.App.Name, version.Package, cmd.App.Version)
+	cli.VersionPrinter = func(cmd *cli.Command) {
+		fmt.Println(cmd.Name, version.Package, cmd.Version)
 	}
 
 	// Override the default flag descriptions for '--version' and '--help'
@@ -76,14 +76,14 @@ func init() {
 		Aliases: []string{"v"},
 		Usage:   "Print the version",
 
-		DisableDefaultText: true,
+		HideDefault: true,
 	}
 	cli.HelpFlag = &cli.BoolFlag{
 		Name:    "help",
 		Aliases: []string{"h"},
 		Usage:   "Show help",
 
-		DisableDefaultText: true,
+		HideDefault: true,
 	}
 }
 
@@ -144,7 +144,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	ctx := context.Background()
-	app := &cli.App{
+	app := &cli.Command{
 		Name:        "containerd-stress",
 		Description: "stress test a containerd daemon",
 		Version:     version.Version,
@@ -206,23 +206,23 @@ func main() {
 				Value: "overlayfs",
 			},
 		},
-		Before: func(cmd *cli.Context) error {
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 			if cmd.Bool("json") {
 				if err := log.SetLevel("warn"); err != nil {
-					return err
+					return ctx, err
 				}
 			}
 			if cmd.Bool("debug") {
 				if err := log.SetLevel("debug"); err != nil {
-					return err
+					return ctx, err
 				}
 			}
-			return nil
+			return ctx, nil
 		},
 		Commands: []*cli.Command{
 			densityCommand,
 		},
-		Action: func(cmd *cli.Context) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			cfg := config{
 				Address:     cmd.String("address"),
 				Duration:    cmd.Duration("duration"),
@@ -246,7 +246,7 @@ func main() {
 			return test(cfg)
 		},
 	}
-	if err := app.RunContext(ctx, os.Args); err != nil {
+	if err := app.Run(ctx, os.Args); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "containerd-stress:", err)
 		os.Exit(1)
 	}
@@ -480,10 +480,10 @@ func cleanup(ctx context.Context, client *containerd.Client) error {
 	for _, c := range containers {
 		task, err := c.Task(ctx, nil)
 		if err == nil {
-			task.Delete(ctx, containerd.WithProcessKill)
+			_, _ = task.Delete(ctx, containerd.WithProcessKill)
 		}
 		if err := c.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-			if derr := c.Delete(ctx); derr == nil {
+			if dErr := c.Delete(ctx); dErr == nil {
 				continue
 			}
 			return err

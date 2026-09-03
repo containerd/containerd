@@ -17,9 +17,11 @@
 package info
 
 import (
+	"context"
+
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type Info struct {
@@ -30,8 +32,7 @@ type Info struct {
 var Command = &cli.Command{
 	Name:  "info",
 	Usage: "Print the server info",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err

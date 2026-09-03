@@ -29,7 +29,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/sys/unix"
 )
 
@@ -115,13 +115,13 @@ func NewTask(ctx context.Context, client *containerd.Client, container container
 		return nil, err
 	}
 	stdinC.closer = func() {
-		t.CloseIO(ctx, containerd.WithStdinCloser)
+		_ = t.CloseIO(ctx, containerd.WithStdinCloser)
 	}
 	return t, nil
 }
 
 // GetNewTaskOpts resolves containerd.NewTaskOpts from cli.Context
-func GetNewTaskOpts(cmd *cli.Context) []containerd.NewTaskOpts {
+func GetNewTaskOpts(cmd *cli.Command) []containerd.NewTaskOpts {
 	if cmd.Bool("no-pivot") {
 		return []containerd.NewTaskOpts{containerd.WithNoPivotRoot}
 	}

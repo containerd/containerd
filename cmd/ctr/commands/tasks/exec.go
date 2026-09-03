@@ -17,6 +17,7 @@
 package tasks
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/url"
@@ -28,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var execCommand = &cli.Command{
@@ -68,8 +69,7 @@ var execCommand = &cli.Command{
 			Usage: "User id or name",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			id     = cmd.Args().First()
 			args   = cmd.Args().Tail()

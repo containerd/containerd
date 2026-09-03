@@ -17,6 +17,7 @@
 package leases
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -26,14 +27,14 @@ import (
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/leases"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // Command is the cli command for managing content
 var Command = &cli.Command{
 	Name:  "leases",
 	Usage: "Manage leases",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		listCommand,
 		createCommand,
 		deleteCommand,
@@ -54,8 +55,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the blob digest",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			filters = cmd.Args().Slice()
 			quiet   = cmd.Bool("quiet")
@@ -118,8 +118,7 @@ var createCommand = &cli.Command{
 			Value:   24 * time.Hour,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		labelstr := cmd.Args().Slice()
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
@@ -168,8 +167,7 @@ var deleteCommand = &cli.Command{
 			Usage: "Synchronously remove leases and all unreferenced resources",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		lids := cmd.Args().Slice()
 		if len(lids) == 0 {
 			return cli.ShowSubcommandHelp(cmd)

@@ -17,6 +17,7 @@
 package containers
 
 import (
+	"context"
 	"errors"
 
 	"github.com/containerd/console"
@@ -26,7 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var restoreCommand = &cli.Command{
@@ -43,8 +44,7 @@ var restoreCommand = &cli.Command{
 			Usage: "Restore the runtime and memory data from the checkpoint",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")

@@ -17,6 +17,7 @@
 package content
 
 import (
+	"context"
 	"strings"
 	"time"
 	"unicode"
@@ -25,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const (
@@ -47,7 +48,7 @@ var pruneFlags = []cli.Flag{
 var pruneCommand = &cli.Command{
 	Name:  "prune",
 	Usage: "Prunes content from the content store",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		pruneReferencesCommand,
 	},
 }
@@ -56,8 +57,7 @@ var pruneReferencesCommand = &cli.Command{
 	Name:  "references",
 	Usage: "Prunes preference labels from the content store (layers only by default)",
 	Flags: pruneFlags,
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err

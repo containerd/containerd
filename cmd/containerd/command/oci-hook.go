@@ -18,6 +18,7 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -27,13 +28,13 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var ociHook = &cli.Command{
 	Name:  "oci-hook",
 	Usage: "Provides a base for OCI runtime hooks to allow arguments to be injected.",
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		state, err := loadHookState(os.Stdin)
 		if err != nil {
 			return err

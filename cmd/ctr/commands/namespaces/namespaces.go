@@ -17,6 +17,7 @@
 package namespaces
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -27,7 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // Command is the cli command for managing namespaces
@@ -35,7 +36,7 @@ var Command = &cli.Command{
 	Name:    "namespaces",
 	Aliases: []string{"namespace", "ns"},
 	Usage:   "Manage namespaces",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		createCommand,
 		listCommand,
 		removeCommand,
@@ -49,8 +50,7 @@ var createCommand = &cli.Command{
 	Usage:       "Create a new namespace",
 	ArgsUsage:   "<name> [<key>=<value>]",
 	Description: "create a new namespace. it must be unique",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		namespace, labels := commands.ObjectWithLabelArgs(cmd)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
@@ -70,8 +70,7 @@ var setLabelsCommand = &cli.Command{
 	Usage:       "Set and clear labels for a namespace",
 	ArgsUsage:   "<name> [<key>=<value>, ...]",
 	Description: "set and clear labels for a namespace. empty value clears the label",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		namespace, labels := commands.ObjectWithLabelArgs(cmd)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
@@ -104,8 +103,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the namespace name",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -158,8 +156,7 @@ var removeCommand = &cli.Command{
 			Usage:   "Delete the namespace's cgroup",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err

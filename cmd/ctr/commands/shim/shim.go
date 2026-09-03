@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -76,7 +76,7 @@ var Command = &cli.Command{
 			Usage: "shim address (default: computed from shim ID)",
 		},
 	},
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		deleteCommand,
 		execCommand,
 		startCommand,
@@ -89,7 +89,7 @@ var Command = &cli.Command{
 var startCommand = &cli.Command{
 	Name:  "start",
 	Usage: "Start a container with a task",
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		service, err := getTaskService(cmd)
 		if err != nil {
 			return err
@@ -104,7 +104,7 @@ var startCommand = &cli.Command{
 var deleteCommand = &cli.Command{
 	Name:  "delete",
 	Usage: "Delete a container with a task",
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		service, err := getTaskService(cmd)
 		if err != nil {
 			return err
@@ -128,7 +128,7 @@ var shutdownCommand = &cli.Command{
 			Name:  "api-version",
 			Usage: "shim API version {2,3}",
 			Value: 3,
-			Action: func(cmd *cli.Context, v int) error {
+			Action: func(ctx context.Context, cmd *cli.Command, v int) error {
 				if v != 2 && v != 3 {
 					return fmt.Errorf("api-version must be 2 or 3")
 				}
@@ -136,7 +136,7 @@ var shutdownCommand = &cli.Command{
 			},
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		switch cmd.Int("api-version") {
 		case 2:
 			service, err := getTaskServiceV2(cmd)
@@ -174,7 +174,7 @@ var stateCommand = &cli.Command{
 			Name:  "api-version",
 			Usage: "shim API version {2,3}",
 			Value: 3,
-			Action: func(cmd *cli.Context, v int) error {
+			Action: func(ctx context.Context, cmd *cli.Command, v int) error {
 				if v != 2 && v != 3 {
 					return fmt.Errorf("api-version must be 2 or 3")
 				}
@@ -182,7 +182,7 @@ var stateCommand = &cli.Command{
 			},
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.String("task-id")
 		if id == "" {
 			id = cmd.String("id")
@@ -241,16 +241,12 @@ var execCommand = &cli.Command{
 			Usage: "Runtime spec",
 		},
 	),
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		service, err := getTaskService(cmd)
 		if err != nil {
 			return err
 		}
-		var (
-			id  = cmd.Args().First()
-			ctx = context.Background()
-		)
-
+		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("exec id must be provided")
 		}
@@ -318,14 +314,14 @@ var execCommand = &cli.Command{
 	},
 }
 
-func getTaskService(cmd *cli.Context) (task.TTRPCTaskService, error) {
+func getTaskService(cmd *cli.Command) (task.TTRPCTaskService, error) {
 	client, err := getTTRPCClient(cmd)
 	if err != nil {
 		return nil, err
 	}
 	return task.NewTTRPCTaskClient(client), nil
 }
-func getTaskServiceV2(cmd *cli.Context) (taskv2.TTRPCTaskService, error) {
+func getTaskServiceV2(cmd *cli.Command) (taskv2.TTRPCTaskService, error) {
 	client, err := getTTRPCClient(cmd)
 	if err != nil {
 		return nil, err
@@ -333,7 +329,7 @@ func getTaskServiceV2(cmd *cli.Context) (taskv2.TTRPCTaskService, error) {
 	return taskv2.NewTTRPCTaskClient(client), nil
 }
 
-func getTTRPCClient(cmd *cli.Context) (*ttrpc.Client, error) {
+func getTTRPCClient(cmd *cli.Command) (*ttrpc.Client, error) {
 	id := cmd.String("id")
 	shimAddress := cmd.String("shim-address")
 	if id == "" && shimAddress == "" {

@@ -25,7 +25,8 @@ import (
 
 	"github.com/containerd/containerd/v2/cmd/containerd/command"
 	"github.com/containerd/containerd/v2/cmd/ctr/app"
-	"github.com/urfave/cli/v2"
+	docs "github.com/urfave/cli-docs/v3"
+	"github.com/urfave/cli/v3"
 )
 
 func main() {
@@ -37,7 +38,7 @@ func main() {
 
 func run() error {
 	flag.Parse()
-	apps := map[string]*cli.App{
+	apps := map[string]*cli.Command{
 		"containerd": command.App(),
 		"ctr":        app.New(),
 	}
@@ -55,7 +56,7 @@ func run() error {
 
 	// clear out the usage as we use banners that do not display in man pages
 	appName.Usage = ""
-	data, err := appName.ToMan()
+	data, err := docs.ToMan(appName)
 	if err != nil {
 		return err
 	}

@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var densityCommand = &cli.Command{
@@ -47,7 +47,7 @@ var densityCommand = &cli.Command{
 			Value: 10,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			pids  []uint32
 			count = cmd.Int("count")
@@ -72,16 +72,16 @@ var densityCommand = &cli.Command{
 			return err
 		}
 		defer client.Close()
-		ctx := namespaces.WithNamespace(context.Background(), "density")
+		ctx = namespaces.WithNamespace(ctx, "density")
 		if err := cleanup(ctx, client); err != nil {
 			return err
 		}
-		log.L.Infof("pulling %s", cfg.Image)
+		log.G(ctx).Infof("pulling %s", cfg.Image)
 		image, err := client.Pull(ctx, cfg.Image, containerd.WithPullUnpack, containerd.WithPullSnapshotter(cfg.Snapshotter))
 		if err != nil {
 			return err
 		}
-		log.L.Info("generating spec from image")
+		log.G(ctx).Info("generating spec from image")
 
 		s := make(chan os.Signal, 1)
 		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)

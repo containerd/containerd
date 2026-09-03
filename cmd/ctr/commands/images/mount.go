@@ -17,6 +17,7 @@
 package images
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -26,7 +27,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -65,8 +66,7 @@ When you are done, use the unmount command.
 			Value:   1 * time.Hour,
 		},
 	),
-	Action: func(cmd *cli.Context) (retErr error) {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) (retErr error) {
 		var (
 			ref    = cmd.Args().First()
 			target = cmd.Args().Get(1)
@@ -162,7 +162,7 @@ When you are done, use the unmount command.
 		if target != "" {
 			if err := mount.All(mounts, target); err != nil {
 				if err := s.Remove(ctx, key); err != nil && !errdefs.IsNotFound(err) {
-					fmt.Fprintln(cmd.App.ErrWriter, "Error cleaning up snapshot after mount error:", err)
+					_, _ = fmt.Fprintln(cmd.ErrWriter, "Error cleaning up snapshot after mount error:", err)
 				}
 				return fmt.Errorf("failed to mount %v: %w", mounts, err)
 			}
@@ -172,7 +172,7 @@ When you are done, use the unmount command.
 			return fmt.Errorf("cannot handle returned mounts: %v", mounts)
 		}
 
-		fmt.Fprintln(cmd.App.Writer, target)
+		_, _ = fmt.Fprintln(cmd.Writer, target)
 		return nil
 	},
 }

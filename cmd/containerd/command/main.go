@@ -40,7 +40,7 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -58,8 +58,8 @@ func init() {
 	// Discard grpc logs so that they don't mess with our stdio
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 
-	cli.VersionPrinter = func(cmd *cli.Context) {
-		fmt.Println(cmd.App.Name, version.Package, cmd.App.Version, version.Revision)
+	cli.VersionPrinter = func(cmd *cli.Command) {
+		fmt.Println(cmd.Name, version.Package, cmd.Version, version.Revision)
 	}
 
 	// Override the default flag descriptions for '--version' and '--help'
@@ -69,20 +69,20 @@ func init() {
 		Aliases: []string{"v"},
 		Usage:   "Print the version",
 
-		DisableDefaultText: true,
+		HideDefault: true,
 	}
 	cli.HelpFlag = &cli.BoolFlag{
 		Name:    "help",
 		Aliases: []string{"h"},
 		Usage:   "Show help",
 
-		DisableDefaultText: true,
+		HideDefault: true,
 	}
 }
 
-// App returns a *cli.App instance.
-func App() *cli.App {
-	return &cli.App{
+// App returns a *cli.Command instance.
+func App() *cli.Command {
+	return &cli.Command{
 		Name:    "containerd",
 		Version: version.Version,
 		Usage:   usage,
@@ -128,9 +128,9 @@ can be used and modified as necessary as a custom configuration.`,
 			publishCommand,
 			ociHook,
 		},
-		Action: func(cmd *cli.Context) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if args := cmd.Args(); args.First() != "" {
-				return cli.ShowCommandHelp(cmd, args.First())
+				return cli.ShowCommandHelp(ctx, cmd, args.First())
 			}
 
 			var (
@@ -140,7 +140,7 @@ can be used and modified as necessary as a custom configuration.`,
 				config  = defaultConfig()
 			)
 
-			ctx, cancel := context.WithCancel(cmd.Context)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			// Only try to load the config if it either exists, or the user explicitly
@@ -281,7 +281,7 @@ can be used and modified as necessary as a custom configuration.`,
 	}
 }
 
-func applyFlags(cmd *cli.Context, config *srvconfig.Config) error {
+func applyFlags(cmd *cli.Command, config *srvconfig.Config) error {
 	// the order for config vs flag values is that flags will always override
 	// the config values if they are set
 	if err := setLogLevel(cmd, config); err != nil {
@@ -350,7 +350,7 @@ func applyFlags(cmd *cli.Context, config *srvconfig.Config) error {
 	return nil
 }
 
-func setLogLevel(cmd *cli.Context, config *srvconfig.Config) error {
+func setLogLevel(cmd *cli.Command, config *srvconfig.Config) error {
 	l := cmd.String("log-level")
 	if l == "" {
 		l = config.Debug.Level
@@ -392,7 +392,7 @@ func dumpStacks(writeToFile bool) {
 			return
 		}
 		defer f.Close()
-		f.WriteString(string(buf))
+		_, _ = f.WriteString(string(buf))
 		log.L.Infof("goroutine stack dump written to %s", name)
 	}
 }

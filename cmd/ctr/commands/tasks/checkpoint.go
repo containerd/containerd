@@ -17,13 +17,14 @@
 package tasks
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd/api/types/runc/options"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var checkpointCommand = &cli.Command{
@@ -44,8 +45,7 @@ var checkpointCommand = &cli.Command{
 			Usage: "Path to criu work files and logs",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
@@ -80,7 +80,7 @@ var checkpointCommand = &cli.Command{
 }
 
 // withCheckpointOpts only suitable for runc runtime now
-func withCheckpointOpts(rt string, cmd *cli.Context) containerd.CheckpointTaskOpts {
+func withCheckpointOpts(rt string, cmd *cli.Command) containerd.CheckpointTaskOpts {
 	return func(r *containerd.CheckpointTaskInfo) error {
 		imagePath := cmd.String("image-path")
 		workPath := cmd.String("work-path")
