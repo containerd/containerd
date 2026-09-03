@@ -413,10 +413,8 @@ var (
 		Description: `Fetch objects by identifier from a remote.`,
 		Flags:       commands.RegistryFlags,
 		Action: func(cmd *cli.Context) error {
-			var (
-				ref = cmd.Args().First()
-			)
-			ctx, cancel := commands.AppContext(cmd)
+			ctx := cmd.Context
+			ctx, cancel := commands.AppContext(ctx, cmd)
 			defer cancel()
 
 			resolver, err := commands.GetResolver(ctx, cmd)
@@ -424,6 +422,7 @@ var (
 				return err
 			}
 
+			ref := cmd.Args().First()
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
 			log.G(ctx).Tracef("resolving")
@@ -460,14 +459,12 @@ var (
 			},
 		}...),
 		Action: func(cmd *cli.Context) error {
-			var (
-				ref     = cmd.Args().First()
-				digests = cmd.Args().Tail()
-			)
+			digests := cmd.Args().Tail()
 			if len(digests) == 0 {
 				return errors.New("must specify digests")
 			}
-			ctx, cancel := commands.AppContext(cmd)
+			ctx := cmd.Context
+			ctx, cancel := commands.AppContext(ctx, cmd)
 			defer cancel()
 
 			resolver, err := commands.GetResolver(ctx, cmd)
@@ -475,6 +472,7 @@ var (
 				return err
 			}
 
+			ref := cmd.Args().First()
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
 			log.G(ctx).Tracef("resolving")

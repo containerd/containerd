@@ -46,7 +46,8 @@ var defaultSpecCommand = &cli.Command{
 		},
 	},
 	Action: func(cmd *cli.Context) error {
-		ctx, cancel := commands.AppContext(cmd)
+		ctx := cmd.Context
+		ctx, cancel := commands.AppContext(ctx, cmd)
 		defer cancel()
 
 		platform := platforms.DefaultString()

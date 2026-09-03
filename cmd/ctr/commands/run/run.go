@@ -144,6 +144,7 @@ var Command = &cli.Command{
 			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
 				commands.ContainerFlags...)...)...)...),
 	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
 			err error
 			id  string

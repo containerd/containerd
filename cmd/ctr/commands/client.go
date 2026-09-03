@@ -34,9 +34,8 @@ import (
 //
 // This will ensure the namespace is picked up and set the timeout, if one is
 // defined.
-func AppContext(cmd *cli.Context) (context.Context, context.CancelFunc) {
+func AppContext(ctx context.Context, cmd *cli.Context) (context.Context, context.CancelFunc) {
 	var (
-		ctx       = cmd.Context
 		timeout   = cmd.Duration("timeout")
 		namespace = cmd.String("namespace")
 		cancel    context.CancelFunc
@@ -58,6 +57,7 @@ func AppContext(cmd *cli.Context) (context.Context, context.CancelFunc) {
 
 // NewClient returns a new containerd client
 func NewClient(cmd *cli.Context, opts ...containerd.Opt) (*containerd.Client, context.Context, context.CancelFunc, error) {
+	ctx := cmd.Context
 	timeoutOpt := containerd.WithTimeout(cmd.Duration("connect-timeout"))
 	opts = append(opts, timeoutOpt)
 	socketPath := cmd.String("address")
@@ -68,7 +68,7 @@ func NewClient(cmd *cli.Context, opts ...containerd.Opt) (*containerd.Client, co
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	ctx, cancel := AppContext(cmd)
+	ctx, cancel := AppContext(ctx, cmd)
 	var suppressDeprecationWarnings bool
 	if s := os.Getenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS"); s != "" {
 		suppressDeprecationWarnings, err = strconv.ParseBool(s)
