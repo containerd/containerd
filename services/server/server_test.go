@@ -17,6 +17,8 @@
 package server
 
 import (
+	"os"
+	"runtime"
 	"testing"
 
 	srvconfig "github.com/containerd/containerd/services/server/config"
@@ -52,4 +54,26 @@ func TestCreateTopLevelDirectoriesWithEmptyRootPath(t *testing.T) {
 		State: statePath,
 	})
 	assert.EqualError(t, err, "root must be specified")
+}
+
+func TestSetTempDirEnv(t *testing.T) {
+	const tempDir = "/tmp/path/for/testing/temp"
+
+	var keys []string
+	if runtime.GOOS == "windows" {
+		keys = []string{"TEMP", "TMP", "SystemTemp"}
+	} else {
+		keys = []string{"TMPDIR"}
+	}
+	for _, k := range keys {
+		t.Setenv(k, "")
+	}
+
+	setTempDirEnv(tempDir)
+
+	for _, k := range keys {
+		if got := os.Getenv(k); got != tempDir {
+			t.Errorf("expected %s=%q, got %q", k, tempDir, got)
+		}
+	}
 }
