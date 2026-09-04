@@ -121,12 +121,12 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			Backoff: backoffConfig,
 		}
 		gopts := []grpc.DialOption{
-			grpc.WithBlock(),
+			grpc.WithBlock(), //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.FailOnNonTempDialError(true),
+			grpc.FailOnNonTempDialError(true), //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 			grpc.WithConnectParams(connParams),
 			grpc.WithContextDialer(dialer.ContextDialer),
-			grpc.WithReturnConnectionError(),
+			grpc.WithReturnConnectionError(), //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 		}
 		if len(copts.dialOptions) > 0 {
 			gopts = copts.dialOptions
@@ -146,7 +146,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		connector := func() (*grpc.ClientConn, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), copts.timeout)
 			defer cancel()
-			conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
+			conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...) //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 			if err != nil {
 				return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 			}
