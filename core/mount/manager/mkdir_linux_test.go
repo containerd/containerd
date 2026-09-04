@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/mount"
@@ -124,4 +125,63 @@ func TestMkdirHandlerTargetIsRoot(t *testing.T) {
 
 	_, err = mh.Transform(ctx, m, nil)
 	require.NoError(t, err)
+}
+
+// TestMkdirHandlerTargetNotADirectory verifies that mkdir rejects an
+// existing target which is not a directory.
+func TestMkdirHandlerTargetNotADirectory(t *testing.T) {
+	ctx := logtest.WithT(context.Background(), t)
+	ctx = namespaces.WithNamespace(ctx, "test")
+	td := t.TempDir()
+
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0775))
+
+	testmode := os.FileMode(0751)
+	target := filepath.Join(root, "notadir")
+	require.NoError(t, os.WriteFile(target, nil, testmode))
+
+	r, err := os.OpenRoot(root)
+	require.NoError(t, err)
+	t.Cleanup(func() { r.Close() })
+	mh := mkdir{rootMap: map[string]*os.Root{root: r}}
+
+	m := mount.Mount{
+		Type:   "mkdir/overlay",
+		Source: "overlay",
+		Options: []string{
+			fmt.Sprintf("X-containerd.mkdir.path=%s:%o", target, testmode),
+		},
+	}
+
+	_, err = mh.Transform(ctx, m, nil)
+	require.Error(t, err)
+	assert.True(t, errdefs.IsFailedPrecondition(err), "expected ErrFailedPrecondition, got %v", err)
+}
+
+// TestMkdirActionCreateToleratesConcurrentCreation verifies that
+// create does not fail when a concurrent boundary ensure for the same
+// target creates the directory first: Mkdir's own EEXIST is validated
+// like an already-existing target, not treated as a hard failure.
+func TestMkdirActionCreateToleratesConcurrentCreation(t *testing.T) {
+	td := t.TempDir()
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0775))
+
+	testmode := os.FileMode(0751)
+	target := filepath.Join(root, "concurrent")
+	require.NoError(t, os.MkdirAll(target, testmode))
+
+	r, err := os.OpenRoot(root)
+	require.NoError(t, err)
+	t.Cleanup(func() { r.Close() })
+
+	a := mkdirAction{
+		root:    r,
+		subpath: "concurrent",
+		dir:     target,
+		mode:    testmode,
+		luid:    -1,
+	}
+	assert.NoError(t, a.create(), "losing the mkdir race to a concurrent ensure must not fail apply")
 }

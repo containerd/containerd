@@ -146,31 +146,54 @@ func (h *mkdir) rewrite(m mount.Mount) (mount.Mount, deferredEnsure, error) {
 }
 
 // apply creates a's directory if it does not already exist. An
-// existing directory whose mode disagrees is reported rather than
-// changed, matching the historical behavior: chown and chmod support
-// for an already existing directory are not yet implemented.
+// existing path is accepted only if it is already a directory with
+// matching permissions.
 func (a mkdirAction) apply() error {
-	if st, err := a.root.Stat(a.subpath); err == nil {
-		if st.Mode()&os.ModePerm != a.mode {
-			// TODO: Chmod support added in go1.25
-			return fmt.Errorf("chmod not supported yet for mkdir handler: %w", errdefs.ErrNotImplemented)
+	st, err := a.root.Stat(a.subpath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to stat %q: %w", a.dir, err)
 		}
-		// TODO: check ownership, chown support added in go1.25
-	} else if os.IsNotExist(err) {
-		// TODO: MkdirAll added in go1.25
-		if err := a.root.Mkdir(a.subpath, a.mode); err != nil {
+		return a.create()
+	}
+	return a.validate(st)
+}
+
+// create makes a's directory, tolerating a concurrent boundary ensure
+// for the same target having just created it first.
+func (a mkdirAction) create() error {
+	// TODO: MkdirAll added in go1.25
+	if err := a.root.Mkdir(a.subpath, a.mode); err != nil {
+		if !os.IsExist(err) {
 			return fmt.Errorf("failed to create directory %q: %w", a.dir, err)
 		}
-		if a.luid != -1 && (a.luid != a.uid || a.lgid != a.gid) {
-			// TODO: Chown support added in go1.25
-			//if err := a.root.Chown(a.subpath, a.uid, a.gid); err != nil {
-			//	return fmt.Errorf("failed to chown directory %q: %w", a.dir, err)
-			//}
-			return fmt.Errorf("chown not supported yet for mkdir handler: %w", errdefs.ErrNotImplemented)
+		st, err := a.root.Stat(a.subpath)
+		if err != nil {
+			return fmt.Errorf("failed to stat %q: %w", a.dir, err)
 		}
-	} else {
-		return fmt.Errorf("failed to stat %q: %w", a.dir, err)
+		return a.validate(st)
 	}
+	if a.luid != -1 && (a.luid != a.uid || a.lgid != a.gid) {
+		// TODO: Chown support added in go1.25
+		//if err := a.root.Chown(a.subpath, a.uid, a.gid); err != nil {
+		//	return fmt.Errorf("failed to chown directory %q: %w", a.dir, err)
+		//}
+		return fmt.Errorf("chown not supported yet for mkdir handler: %w", errdefs.ErrNotImplemented)
+	}
+	return nil
+}
+
+// validate reports whether st, describing something already at a's
+// target, satisfies a's directory and mode requirements.
+func (a mkdirAction) validate(st os.FileInfo) error {
+	if !st.IsDir() {
+		return fmt.Errorf("mkdir target %q exists and is not a directory: %w", a.dir, errdefs.ErrFailedPrecondition)
+	}
+	if st.Mode()&os.ModePerm != a.mode {
+		// TODO: Chmod support added in go1.25
+		return fmt.Errorf("chmod not supported yet for mkdir handler: %w", errdefs.ErrNotImplemented)
+	}
+	// TODO: check ownership, chown support added in go1.25
 	return nil
 }
 
