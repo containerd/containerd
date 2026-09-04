@@ -140,6 +140,20 @@ when no active tasks remain.
 `SandboxService.ShutdownSandbox` is independent from `TaskService.Shutdown` and
 shuts down the sandbox instance.
 
+### Optional sandbox updates
+
+`SandboxController.Update` forwards the updated sandbox metadata object to the shim
+via `SandboxService.UpdateSandbox`, together with the fieldpaths that changed. CRI
+uses this path for pod level resource updates (`UpdatePodSandboxResources`), where
+the new resources and overhead travel as a sandbox extension.
+
+Implementing `UpdateSandbox` is optional. As for any other unsupported shim RPC
+(see [Unsupported rpcs](runtime-v2.md#unsupported-rpcs)), a shim that does not
+support updates MUST return a `github.com/containerd/errdefs.ErrNotImplemented`
+error, which maps to gRPC `codes.Unimplemented`; a shim that does not register
+the method at all is answered with the same code by ttrpc. Callers are expected
+to tolerate it.
+
 ## Controller Implementations
 
 There are two `Controller` implementations today:
