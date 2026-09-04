@@ -38,6 +38,19 @@ func NewClient(client any) (api.TTRPCSandboxService, error) {
 	}
 }
 
+// NewCheckpointClient returns a checkpoint client that handles both GRPC and
+// TTRPC shim endpoints.
+func NewCheckpointClient(client any) (api.TTRPCCheckpointService, error) {
+	switch c := client.(type) {
+	case *ttrpc.Client:
+		return api.NewTTRPCCheckpointClient(c), nil
+	case grpc.ClientConnInterface:
+		return &grpcCheckpointBridge{api.NewCheckpointClient(c)}, nil
+	default:
+		return nil, fmt.Errorf("unsupported client type %T", client)
+	}
+}
+
 type grpcBridge struct {
 	client api.SandboxClient
 }
@@ -78,4 +91,18 @@ func (g *grpcBridge) ShutdownSandbox(ctx context.Context, request *api.ShutdownS
 
 func (g *grpcBridge) SandboxMetrics(ctx context.Context, request *api.SandboxMetricsRequest) (*api.SandboxMetricsResponse, error) {
 	return g.client.SandboxMetrics(ctx, request)
+}
+
+type grpcCheckpointBridge struct {
+	client api.CheckpointClient
+}
+
+var _ api.TTRPCCheckpointService = (*grpcCheckpointBridge)(nil)
+
+func (g *grpcCheckpointBridge) Checkpoint(ctx context.Context, request *api.CheckpointRequest) (*api.CheckpointResponse, error) {
+	return g.client.Checkpoint(ctx, request)
+}
+
+func (g *grpcCheckpointBridge) Restore(ctx context.Context, request *api.RestoreRequest) (*api.RestoreResponse, error) {
+	return g.client.Restore(ctx, request)
 }
