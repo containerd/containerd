@@ -139,9 +139,16 @@ func (h *mkdir) rewrite(m mount.Mount) (mount.Mount, func(ctx context.Context) e
 // apply creates a's directory if it does not already exist. An
 // existing directory whose mode disagrees is reported rather than
 // changed, matching the historical behavior: chown and chmod support
-// for an already existing directory are not yet implemented.
+// for an already existing directory are not yet implemented. An
+// existing path which is not a directory at all is reported too,
+// rather than accepted on matching permission bits alone: whatever
+// depends on a.dir actually being a directory would otherwise fail
+// later, with an error that no longer points back to this being why.
 func (a mkdirAction) apply() error {
 	if st, err := a.root.Stat(a.subpath); err == nil {
+		if !st.IsDir() {
+			return fmt.Errorf("mkdir target %q exists and is not a directory: %w", a.dir, errdefs.ErrFailedPrecondition)
+		}
 		if st.Mode()&os.ModePerm != a.mode {
 			// TODO: Chmod support added in go1.25
 			return fmt.Errorf("chmod not supported yet for mkdir handler: %w", errdefs.ErrNotImplemented)

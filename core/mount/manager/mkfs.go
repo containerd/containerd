@@ -109,12 +109,19 @@ func (t *mkfs) Transform(ctx context.Context, m mount.Mount, _ []mount.ActiveMou
 }
 
 // ensureMkfsImage creates and formats the backing file described by
-// subpath if it does not already exist. An existing file is assumed
-// to already be formatted correctly: this is only ever called to
-// bring reality into line with a mount this package's own records
-// describe, never on a path outside its control.
+// subpath if it does not already exist. An existing regular file is
+// assumed to already be formatted correctly: this is only ever called
+// to bring reality into line with a mount this package's own records
+// describe, never on a path outside its control. An existing path
+// which is not a regular file at all is reported rather than accepted
+// as one: whatever depends on subpath actually being the backing file
+// would otherwise fail later, mounting a directory or device instead,
+// with an error that no longer points back to this being why.
 func ensureMkfsImage(ctx context.Context, r *os.Root, subpath, source string, size int64, fs, id string) error {
-	if _, err := r.Stat(subpath); err == nil {
+	if st, err := r.Stat(subpath); err == nil {
+		if !st.Mode().IsRegular() {
+			return fmt.Errorf("mkfs backing file %q exists and is not a regular file: %w", source, errdefs.ErrFailedPrecondition)
+		}
 		return nil
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("failed to stat %q: %w", source, err)
