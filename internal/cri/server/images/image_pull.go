@@ -991,10 +991,10 @@ func (reporter *transferProgressReporter) handleProgress(p transfer.Progress) {
 			delete(reporter.statuses, p.Name)
 		}
 
-	case "complete":
+	case "complete", "extracting", "extracted", "already exists":
 		if node, exists := reporter.statuses[p.Name]; exists {
-			if curProgress := p.Progress - node.Progress; curProgress > 0 {
-				reporter.IncBytesRead(curProgress)
+			if remaining := node.Total - node.Progress; remaining > 0 {
+				reporter.IncBytesRead(remaining)
 			}
 			reporter.reqReporter.decRequest()
 			delete(reporter.statuses, p.Name)
