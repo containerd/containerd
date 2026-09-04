@@ -27,7 +27,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig, _ *imagespec.ImageConfig, _ string, _ []string) (_ *runtimespec.Spec, _ error) {
+func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig, _ *imagespec.ImageConfig, _ string, _ string, _ []string) (_ *runtimespec.Spec, _ error) {
 	return c.runtimeSpec(id, annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...)
 }
 

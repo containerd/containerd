@@ -131,6 +131,11 @@ type criService struct {
 	imageFSPaths map[string]string
 	// os is an interface for all required os operations.
 	os osinterface.OS
+	// labels reserves the MCS levels of the SELinux process labels held by the
+	// sandbox and container stores. It is shared with both, so reservations are
+	// refcounted per level across pods and containers that use the same one.
+	labels *label.Store
+
 	// sandboxStore stores all resources associated with sandboxes.
 	sandboxStore *sandboxstore.Store
 	// sandboxNameIndex stores all sandbox names and make sure each name
@@ -221,6 +226,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		client:             options.Client,
 		imageFSPaths:       options.ImageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
+		labels:             labels,
 		sandboxStore:       sandboxstore.NewStore(labels, statsCollector),
 		containerStore:     containerstore.NewStore(labels, statsCollector),
 		sandboxNameIndex:   registrar.NewRegistrar(),
