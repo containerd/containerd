@@ -324,23 +324,32 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	}
 	req.size = desc.Size
 
-	go func() {
-		resp, err := req.doWithRetries(ctx, true)
-		if err != nil {
-			pushw.setError(err)
-			return
-		}
+	// Defer sending the PUT request until the caller actually starts writing
+	// content (or commits). Issuing the request here would put it on the wire
+	// with an idle body, and a reverse proxy in front of the registry may close
+	// the connection on an inactivity timeout before any content is streamed
+	// (e.g. when many uploads are opened but only a few are fed at a time on a
+	// slow uplink). Starting the request lazily ensures the body streams as soon
+	// as the request is made, so the connection never sits idle.
+	pushw.start = func() {
+		go func() {
+			resp, err := req.doWithRetries(ctx, true)
+			if err != nil {
+				pushw.setError(err)
+				return
+			}
 
-		switch resp.StatusCode {
-		case http.StatusOK, http.StatusCreated, http.StatusNoContent:
-		default:
-			err := unexpectedResponseErr(resp)
-			log.G(ctx).WithError(err).Debug("unexpected response")
-			pushw.setError(err)
-			return
-		}
-		pushw.setResponse(resp)
-	}()
+			switch resp.StatusCode {
+			case http.StatusOK, http.StatusCreated, http.StatusNoContent:
+			default:
+				err := unexpectedResponseErr(resp)
+				log.G(ctx).WithError(err).Debug("unexpected response")
+				pushw.setError(err)
+				return
+			}
+			pushw.setResponse(resp)
+		}()
+	}
 
 	return pushw, nil
 }
@@ -373,6 +382,12 @@ type pushWriter struct {
 	done      chan struct{}
 	closeOnce sync.Once
 
+	// start issues the upload request. It is set by push and invoked lazily,
+	// exactly once, on the first Write or on Commit, so the request body is not
+	// put on the wire until there is content to stream.
+	start     func()
+	startOnce sync.Once
+
 	pipeC chan *io.PipeWriter
 	respC chan *http.Response
 	errC  chan error
@@ -398,10 +413,59 @@ func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker S
 	}
 }
 
+// ensureStarted issues the upload request exactly once. It is safe to call
+// from both Write and Commit; only the first call has any effect.
+func (pw *pushWriter) ensureStarted() {
+	pw.startOnce.Do(func() {
+		// Don't start the request if the writer has already been closed. The
+		// caller checks pw.done before calling ensureStarted, but Close can race
+		// in between; checking again here avoids starting a request (and its
+		// goroutine/connection) that would immediately be torn down.
+		select {
+		case <-pw.done:
+			return
+		default:
+		}
+		if pw.start != nil {
+			pw.start()
+		}
+	})
+}
+
 func (pw *pushWriter) setPipe(p *io.PipeWriter) {
+	// If the writer was closed before the request goroutine installed this pipe
+	// (e.g. Close raced with ensureStarted), close the discarded pipe writer so
+	// the request body reader returns an error instead of blocking forever,
+	// which would leak the request goroutine and its connection. Check done with
+	// priority: pipeC is buffered, so a plain select could otherwise enqueue the
+	// pipe into a slot that no one will drain, leaving it unclosed.
 	select {
 	case <-pw.done:
+		p.CloseWithError(io.ErrClosedPipe)
+		return
+	default:
+	}
+	select {
+	case <-pw.done:
+		p.CloseWithError(io.ErrClosedPipe)
+		return
 	case pw.pipeC <- p:
+	}
+
+	// Close may have closed done after the check above but before Write/Commit
+	// adopted the pipe. In that case the receiver can observe done and return
+	// without draining pipeC, leaving the pipe stranded and its request body
+	// reader blocked forever. Reclaim and close it if it is still buffered; if
+	// Write/Commit already adopted it, the receive yields nothing and they own
+	// closing it. Close performs the same reclaim, so the two cover each other.
+	select {
+	case <-pw.done:
+		select {
+		case orphan := <-pw.pipeC:
+			orphan.CloseWithError(io.ErrClosedPipe)
+		default:
+		}
+	default:
 	}
 }
 
@@ -413,9 +477,31 @@ func (pw *pushWriter) setError(err error) {
 }
 
 func (pw *pushWriter) setResponse(resp *http.Response) {
+	// If the writer was closed before the response was consumed, close the
+	// response body so the underlying connection is not leaked. Mirror setPipe:
+	// check done with priority (respC is buffered) and reclaim after the send in
+	// case Close races in between.
 	select {
 	case <-pw.done:
+		resp.Body.Close()
+		return
+	default:
+	}
+	select {
+	case <-pw.done:
+		resp.Body.Close()
+		return
 	case pw.respC <- resp:
+	}
+
+	select {
+	case <-pw.done:
+		select {
+		case orphan := <-pw.respC:
+			orphan.Body.Close()
+		default:
+		}
+	default:
 	}
 }
 
@@ -441,10 +527,30 @@ func (pw *pushWriter) replacePipe(p *io.PipeWriter) error {
 }
 
 func (pw *pushWriter) Write(p []byte) (n int, err error) {
+	// A zero-length write is a valid no-op. Don't start the request for it;
+	// doing so would reintroduce the idle-body window this change removes.
+	if len(p) == 0 {
+		return 0, nil
+	}
+
 	status, err := pw.tracker.GetStatus(pw.ref)
 	if err != nil {
 		return n, err
 	}
+
+	// Don't start the request if the writer has already been closed. Starting it
+	// here would leave the request goroutine blocked reading from a pipe that is
+	// never written or closed, leaking the goroutine and its connection.
+	select {
+	case <-pw.done:
+		return 0, io.ErrClosedPipe
+	default:
+	}
+
+	// Issue the upload request now that there is content to stream. The pipe is
+	// delivered by the request goroutine, so this must happen before waiting on
+	// pipeC below.
+	pw.ensureStarted()
 
 	if pw.pipe == nil {
 		select {
@@ -488,14 +594,34 @@ func (pw *pushWriter) Close() error {
 	// called multiple times without panicking
 	pw.closeOnce.Do(func() {
 		close(pw.done)
-	})
-	if pw.pipe != nil {
-		status, err := pw.tracker.GetStatus(pw.ref)
-		if err == nil && !status.Committed {
-			// Closing an incomplete writer. Record this as an error so that following write can retry it.
-			status.ErrClosed = errors.New("closed incomplete writer")
-			pw.tracker.SetStatus(pw.ref, status)
+		// Reclaim any pipe setPipe left buffered that Write/Commit will not
+		// adopt (they return once done is closed), so the request body reader
+		// unblocks instead of leaking the request goroutine and its connection.
+		select {
+		case p := <-pw.pipeC:
+			p.CloseWithError(io.ErrClosedPipe)
+		default:
 		}
+		// Likewise reclaim a buffered response that will never be committed and
+		// close its body, otherwise the underlying connection is leaked.
+		select {
+		case resp := <-pw.respC:
+			resp.Body.Close()
+		default:
+		}
+	})
+	// Closing an incomplete writer. Record this as an error so that a following
+	// push of the same ref can retry it. This also covers a writer that was
+	// opened but never fed (pw.pipe == nil): with the request started lazily
+	// that is a normal path, and without this the tracker entry would keep
+	// looking like an in-progress upload and block later pushes with
+	// ErrUnavailable.
+	status, err := pw.tracker.GetStatus(pw.ref)
+	if err == nil && !status.Committed {
+		status.ErrClosed = errors.New("closed incomplete writer")
+		pw.tracker.SetStatus(pw.ref, status)
+	}
+	if pw.pipe != nil {
 		return pw.pipe.Close()
 	}
 	return nil
@@ -516,6 +642,38 @@ func (pw *pushWriter) Digest() digest.Digest {
 }
 
 func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
+	// Don't start the request if the writer has already been closed; starting it
+	// would leak the request goroutine and its connection (see Write).
+	select {
+	case <-pw.done:
+		return io.ErrClosedPipe
+	default:
+	}
+
+	// Ensure the upload request has been issued. For zero-length content Write
+	// is never called, so the request must be started here.
+	pw.ensureStarted()
+
+	// If Write was never called (e.g. a zero-length blob) the request goroutine
+	// still creates a pipe for the request body but it was never adopted. The
+	// goroutine enqueues that pipe on pipeC before it produces a response, so
+	// always adopt the pipe when it is available, even if a response or error is
+	// already queued. Otherwise the response wait below could take its pipeC
+	// branch and return early, skipping validation and leaving the pipe
+	// unclosed. It is then closed below to signal an empty body.
+	if pw.pipe == nil {
+		select {
+		case p := <-pw.pipeC:
+			pw.pipe = p
+		case <-pw.done:
+			return io.ErrClosedPipe
+		case err := <-pw.errC:
+			// Reached only if the request failed before the body pipe was created.
+			pw.Close()
+			return err
+		}
+	}
+
 	// Check whether read has already thrown an error
 	if pw.pipe != nil {
 		if _, err := pw.pipe.Write([]byte{}); err != nil && !errors.Is(err, io.ErrClosedPipe) {
