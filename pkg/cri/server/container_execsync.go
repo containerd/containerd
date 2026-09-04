@@ -293,18 +293,29 @@ func drainExecSyncIO(ctx context.Context, execProcess containerd.Process, drainE
 
 	select {
 	case <-timerCh:
+	case <-ctx.Done():
 	case <-attachDone:
 		log.G(ctx).Tracef("Stream pipe for exec process %q done", execProcess.ID())
 		return nil
 	}
 
 	log.G(ctx).Debugf("Exec process %q exits but the io is still held by other processes. Trying to delete exec process to release io", execProcess.ID())
-	_, err := execProcess.Delete(ctx, containerd.WithProcessKill)
+	deleteCtx := ctx
+	if ctx.Err() != nil {
+		var cancel context.CancelFunc
+		deleteCtx, cancel = util.DeferContext()
+		defer cancel()
+	}
+	_, err := execProcess.Delete(deleteCtx, containerd.WithProcessKill)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return fmt.Errorf("failed to release exec io by deleting exec process %q: %w",
 				execProcess.ID(), err)
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("failed to drain exec process %q io before context cancellation: %w",
+			execProcess.ID(), err)
 	}
 	return fmt.Errorf("failed to drain exec process %q io in %s because io is still held by other processes",
 		execProcess.ID(), drainExecIOTimeout)
