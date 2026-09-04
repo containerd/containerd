@@ -24,7 +24,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	_ "github.com/containerd/containerd/v2/core/metrics" // import containerd build info
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/internal/stackdump"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
@@ -372,28 +372,15 @@ func setLogFormat(config *srvconfig.Config) error {
 }
 
 func dumpStacks(writeToFile bool) {
-	var (
-		buf       []byte
-		stackSize int
-	)
-	bufferLen := 16384
-	for stackSize == len(buf) {
-		buf = make([]byte, bufferLen)
-		stackSize = runtime.Stack(buf, true)
-		bufferLen *= 2
-	}
-	buf = buf[:stackSize]
+	buf := stackdump.Dump()
 	log.L.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 
 	if writeToFile {
-		// Also write to file to aid gathering diagnostics
-		name := filepath.Join(os.TempDir(), fmt.Sprintf("containerd.%d.stacks.log", os.Getpid()))
-		f, err := os.Create(name)
+		name, err := stackdump.WriteFile("containerd", buf)
 		if err != nil {
+			log.L.WithError(err).Warn("failed to write goroutine stack dump")
 			return
 		}
-		defer f.Close()
-		f.WriteString(string(buf))
-		log.L.Infof("goroutine stack dump written to %s", name)
+		log.L.WithField("path", name).Info("goroutine stack dump written")
 	}
 }

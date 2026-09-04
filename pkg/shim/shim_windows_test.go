@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,8 +33,10 @@ import (
 	"time"
 
 	winio "github.com/Microsoft/go-winio"
+	"github.com/containerd/containerd/v2/internal/stackdump"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/log"
+	"golang.org/x/sys/windows"
 )
 
 const (
@@ -566,9 +569,45 @@ func TestNewServer(t *testing.T) {
 }
 
 func TestSetupDumpStacks(t *testing.T) {
-	// setupDumpStacks is a no-op on Windows; it must return without panicking
-	// or blocking on the supplied channel.
+	// setupDumpStacks must return without panicking or blocking on the
+	// supplied channel, and must leave this process's stackdump event in place.
 	setupDumpStacks(make(chan os.Signal, 1))
+
+	// The event is ACL'd to builtin administrators and local system, so an
+	// unelevated run cannot open it. That is the behavior under test, not a
+	// failure of it.
+	name := stackdump.EventName(os.Getpid())
+	n, err := windows.UTF16PtrFromString(name)
+	if err != nil {
+		t.Fatalf("failed to encode event name %s: %v", name, err)
+	}
+	h, err := windows.OpenEvent(windows.EVENT_MODIFY_STATE|windows.SYNCHRONIZE, false, n)
+	if err != nil {
+		// Skip only what an unelevated run produces; ERROR_FILE_NOT_FOUND here
+		// would mean setupDumpStacks never created the event, which is the
+		// regression this test exists to catch.
+		if !errors.Is(err, windows.ERROR_ACCESS_DENIED) && !errors.Is(err, windows.ERROR_PRIVILEGE_NOT_HELD) {
+			t.Fatalf("stackdump event %s was not created: %v", name, err)
+		}
+		t.Skipf("cannot open stackdump event %s, test requires elevation: %v", name, err)
+	}
+	windows.CloseHandle(h)
+}
+
+func TestWriteStackDump(t *testing.T) {
+	t.Setenv("TMP", t.TempDir())
+
+	want := []byte("goroutine 1 [running]:\nmain.main()\n")
+	writeStackDump(log.L, want)
+
+	name := filepath.Join(os.TempDir(), fmt.Sprintf("containerd-shim.%d.stacks.log", os.Getpid()))
+	got, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatalf("stack dump file %s was not written: %v", name, err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("stack dump file contents = %q; want %q", got, want)
+	}
 }
 
 func TestReapReturnsOnContextCancel(t *testing.T) {
