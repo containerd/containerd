@@ -18,7 +18,6 @@ package archive
 
 import (
 	"archive/tar"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -44,8 +43,11 @@ func OverlayConvertWhiteout(hdr *tar.Header, path string) (bool, error) {
 		if err := unix.Mknod(originalPath, unix.S_IFCHR, 0); err != nil {
 			return false, err
 		}
-		// don't write the file itself
-		return false, os.Chown(originalPath, hdr.Uid, hdr.Gid)
+		// don't write the file itself. Chown through Fchownat with
+		// AT_SYMLINK_NOFOLLOW so the ownership change cannot be redirected onto
+		// another file via a symlink swapped in for the device after the mknod
+		// (TOCTOU; cf. ba50a56).
+		return false, unix.Fchownat(unix.AT_FDCWD, originalPath, hdr.Uid, hdr.Gid, unix.AT_SYMLINK_NOFOLLOW)
 	}
 
 	return true, nil

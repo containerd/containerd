@@ -92,9 +92,25 @@ func mkdir(path string, perm os.FileMode) error {
 	if err := os.Mkdir(path, perm); err != nil {
 		return err
 	}
-	// Only final created directory gets explicit permission
-	// call to avoid permission mask
-	return os.Chmod(path, perm)
+	// Only final created directory gets explicit permission call to avoid
+	// permission mask. Apply it through an O_NOFOLLOW fd rather than by
+	// re-resolving path, so a symlink swapped in for the directory between the
+	// Mkdir and the chmod cannot redirect the chmod onto another file (TOCTOU;
+	// cf. ba50a56, which fixed the equivalent race in openFile).
+	return fchmodDir(path, perm)
+}
+
+// fchmodDir applies perm to the directory at path via an O_NOFOLLOW|O_DIRECTORY
+// fd, so the mode change targets that exact inode and can never be redirected
+// through a symlink that raced in after the directory was created. The path is
+// always a directory at every call site.
+func fchmodDir(path string, perm os.FileMode) error {
+	f, err := os.OpenFile(path, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return f.Chmod(perm)
 }
 
 func skipFile(hdr *tar.Header) bool {
@@ -170,7 +186,10 @@ func copyDirInfo(fi os.FileInfo, path string) error {
 		}
 	}
 
-	if err := os.Chmod(path, fi.Mode()); err != nil {
+	// path is the directory we just created; chmod it through an O_NOFOLLOW fd
+	// so the mode cannot be redirected through a symlink swapped in after
+	// creation (TOCTOU; cf. ba50a56).
+	if err := fchmodDir(path, fi.Mode()); err != nil {
 		return fmt.Errorf("failed to chmod %s: %w", path, err)
 	}
 
