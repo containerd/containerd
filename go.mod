@@ -88,7 +88,7 @@ require (
 	k8s.io/cri-streaming v0.37.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/streaming v0.37.0
-	tags.cncf.io/container-device-interface v1.1.1-0.20260828125525-73444d1f71f2
+	tags.cncf.io/container-device-interface v1.1.1
 )
 
 require (
@@ -156,7 +156,7 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
-	tags.cncf.io/container-device-interface/specs-go v1.1.0 // indirect
+	tags.cncf.io/container-device-interface/specs-go v1.1.1 // indirect
 )
 
 replace github.com/containerd/containerd/api => ./api
