@@ -19,6 +19,7 @@
 package reaper
 
 import (
+	"container/list"
 	"errors"
 	"fmt"
 	"maps"
@@ -29,11 +30,16 @@ import (
 	"time"
 
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )
 
-// ErrNoSuchProcess is returned when the process no longer exists
-var ErrNoSuchProcess = errors.New("no such process")
+var (
+	once       sync.Once
+	eventQueue = NewSafeList()
+	// ErrNoSuchProcess is returned when the process no longer exists
+	ErrNoSuchProcess = errors.New("no such process")
+)
 
 const bufferSize = 32
 
@@ -60,23 +66,67 @@ func (s *subscriber) do(fn func()) {
 	s.Unlock()
 }
 
+type SafeList struct {
+	mu    sync.Mutex
+	cond  *sync.Cond
+	queue *list.List
+}
+
+func NewSafeList() *SafeList {
+	sl := &SafeList{
+		queue: list.New(),
+	}
+	sl.cond = sync.NewCond(&sl.mu)
+	return sl
+}
+
+func (sl *SafeList) Push(value any) {
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
+
+	sl.queue.PushBack(value)
+	sl.cond.Signal()
+}
+
+func (sl *SafeList) Pop() any {
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
+
+	for sl.queue.Len() == 0 {
+		sl.cond.Wait()
+	}
+	elem := sl.queue.Front()
+	value := elem.Value
+	sl.queue.Remove(elem)
+	return value
+}
+
+func notify() {
+	go func() {
+		for {
+			event := eventQueue.Pop()
+			if exitEvt, ok := event.(eventExit); ok {
+				done := Default.notify(runc.Exit{
+					Timestamp: exitEvt.EventTime,
+					Pid:       exitEvt.Pid,
+					Status:    exitEvt.Status,
+				})
+				select {
+				case <-done:
+				// TODO: remove timeout
+				case <-time.After(30 * time.Second):
+					log.L.Warnf("event with pid %d status:%d may be lost", exitEvt.Pid, exitEvt.Status)
+				}
+			}
+		}
+	}()
+}
+
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
 // all exited processes and close their wait channels
 func Reap() error {
-	now := time.Now()
-	exits, err := reap(false)
-	for _, e := range exits {
-		done := Default.notify(runc.Exit{
-			Timestamp: now,
-			Pid:       e.Pid,
-			Status:    e.Status,
-		})
-
-		select {
-		case <-done:
-		case <-time.After(1 * time.Second):
-		}
-	}
+	once.Do(notify)
+	err := reap(false)
 	return err
 }
 
@@ -248,9 +298,14 @@ type exit struct {
 	Status int
 }
 
+type eventExit struct {
+	EventTime time.Time
+	exit
+}
+
 // reap reaps all child processes for the calling process and returns their
 // exit information
-func reap(wait bool) (exits []exit, err error) {
+func reap(wait bool) (err error) {
 	var (
 		ws  unix.WaitStatus
 		rus unix.Rusage
@@ -263,16 +318,19 @@ func reap(wait bool) (exits []exit, err error) {
 		pid, err := unix.Wait4(-1, &ws, flag, &rus)
 		if err != nil {
 			if err == unix.ECHILD {
-				return exits, nil
+				return nil
 			}
-			return exits, err
+			return err
 		}
 		if pid <= 0 {
-			return exits, nil
+			return nil
 		}
-		exits = append(exits, exit{
-			Pid:    pid,
-			Status: exitStatus(ws),
+		eventQueue.Push(eventExit{
+			EventTime: time.Now(),
+			exit: exit{
+				Pid:    pid,
+				Status: exitStatus(ws),
+			},
 		})
 	}
 }
