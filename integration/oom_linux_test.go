@@ -126,6 +126,9 @@ version = 3
 					}
 
 					if reason := status.GetReason(); reason != "OOMKilled" {
+						if reason == "Error" {
+							return false, nil
+						}
 						return false, fmt.Errorf("expected OOMKilled but got %s", reason)
 					}
 					return true, nil
