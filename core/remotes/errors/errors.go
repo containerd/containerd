@@ -37,10 +37,15 @@ type ErrUnexpectedStatus struct {
 	Body          []byte `json:"body,omitempty"`
 	RequestURL    string `json:"requestURL,omitempty"`
 	RequestMethod string `json:"requestMethod,omitempty"`
+	RetryAfter    string `json:"retryAfter,omitempty"`
 }
 
 func (e ErrUnexpectedStatus) Error() string {
-	return fmt.Sprintf("unexpected status from %s request to %s: %s", e.RequestMethod, e.RequestURL, e.Status)
+	msg := fmt.Sprintf("unexpected status from %s request to %s: %s", e.RequestMethod, e.RequestURL, e.Status)
+	if e.RetryAfter != "" {
+		msg += fmt.Sprintf(" (Retry-After: %s)", e.RetryAfter)
+	}
+	return msg
 }
 
 // NewUnexpectedStatusErr creates an ErrUnexpectedStatus from HTTP response
@@ -54,6 +59,7 @@ func NewUnexpectedStatusErr(resp *http.Response) error {
 		Status:        resp.Status,
 		StatusCode:    resp.StatusCode,
 		RequestMethod: resp.Request.Method,
+		RetryAfter:    resp.Header.Get("Retry-After"),
 	}
 	if resp.Request.URL != nil {
 		err.RequestURL = resp.Request.URL.String()
