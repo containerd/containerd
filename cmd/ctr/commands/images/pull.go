@@ -463,11 +463,17 @@ func prefixes(index, length int) (prefix string, childPrefix string) {
 }
 
 func displayName(name string) string {
-	parts := strings.Split(name, "-")
-	for i := range parts {
-		parts[i] = shortenName(parts[i])
+	// Progress names from MakeRefKey use the form "prefix-sha256:…"
+	// (e.g. "manifest-sha256:abc…", "layer-sha256:abc…").  Split on
+	// the first dash only when the remainder starts with a digest
+	// reference so that image names containing dashes (e.g.
+	// "quay.io/calico/kube-controllers:v3.30.6") are preserved.
+	if prefix, rest, ok := strings.Cut(name, "-"); ok {
+		if strings.HasPrefix(rest, "sha256:") || strings.HasPrefix(rest, "sha384:") || strings.HasPrefix(rest, "sha512:") {
+			return prefix + " " + shortenName(rest)
+		}
 	}
-	return strings.Join(parts, " ")
+	return shortenName(name)
 }
 
 func shortenName(name string) string {
