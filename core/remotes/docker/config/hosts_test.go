@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -123,6 +124,9 @@ ca = "/etc/path/default"
 
 [host."https://dial-timeout.registry"]
   dial_timeout = "3s"
+
+[host."https://tls-groups.registry"]
+  tls_groups = ["X25519MLKEM768", "P-256"]
 `
 
 	var tb, fb = true, false
@@ -214,6 +218,13 @@ ca = "/etc/path/default"
 			path:         "/v2",
 			capabilities: allCaps,
 			dialTimeout:  &dialTimeout,
+		},
+		{
+			scheme:       "https",
+			host:         "tls-groups.registry",
+			path:         "/v2",
+			capabilities: allCaps,
+			tlsGroups:    []tls.CurveID{tls.X25519MLKEM768, tls.CurveP256},
 		},
 		{
 			scheme:       "https",
@@ -510,6 +521,17 @@ func TestHTTPFallback(t *testing.T) {
 	}
 }
 
+func TestInvalidTLSGroup(t *testing.T) {
+	const testtoml = `
+[host."https://example.com"]
+	tls_groups = ["NotAGroup"]
+`
+	_, err := parseHostsFile("", []byte(testtoml))
+	if err == nil {
+		t.Fatalf("expected error for unknown TLS group")
+	}
+}
+
 func compareRegistryHost(j, k docker.RegistryHost) bool {
 	if j.Scheme != k.Scheme {
 		return false
@@ -587,6 +609,10 @@ func compareHostConfig(j, k hostConfig) bool {
 			return false
 		}
 	} else if j.dialTimeout != nil || k.dialTimeout != nil {
+		return false
+	}
+
+	if !slices.Equal(j.tlsGroups, k.tlsGroups) {
 		return false
 	}
 
