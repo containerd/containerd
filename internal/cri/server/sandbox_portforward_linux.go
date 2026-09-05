@@ -184,6 +184,9 @@ func dialPodIPs(ctx context.Context, ips []string, port int32) (net.Conn, error)
 		if ip == "" {
 			continue
 		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		tried++
 		conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(ip, fmt.Sprintf("%d", port)))
 		if err == nil {
@@ -215,6 +218,9 @@ func dialLocalhost(ctx context.Context, port int32) (net.Conn, error) {
 	conn, errV4 := d.DialContext(ctx, "tcp4", fmt.Sprintf("localhost:%d", port))
 	if errV4 == nil {
 		return conn, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	conn, errV6 := d.DialContext(ctx, "tcp6", fmt.Sprintf("localhost:%d", port))
 	if errV6 == nil {
