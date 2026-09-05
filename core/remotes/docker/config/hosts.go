@@ -53,7 +53,11 @@ type hostConfig struct {
 	clientPairs [][2]string
 	skipVerify  *bool
 
-	dialTimeout *time.Duration
+	dialTimeout           *time.Duration
+	tlsHandshakeTimeout   *time.Duration
+	responseHeaderTimeout *time.Duration
+	expectContinueTimeout *time.Duration
+	idleConnTimeout       *time.Duration
 
 	header http.Header
 
@@ -170,10 +174,10 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			// Allow setting for each host as well
 			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
 			explicitTLS := tlsConfigured || explicitTLSFromHost
-
-			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
+			hasTimeouts := hasTransportTimeouts(host)
+			if explicitTLSFromHost || hasTimeouts || len(host.header) != 0 {
 				c := *client
-				if explicitTLSFromHost || host.dialTimeout != nil {
+				if explicitTLSFromHost || hasTimeouts {
 					tr := defaultTransport.Clone()
 
 					if explicitTLSFromHost {
@@ -188,6 +192,18 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 							KeepAlive:     30 * time.Second,
 							FallbackDelay: 300 * time.Millisecond,
 						}).DialContext
+					}
+					if host.tlsHandshakeTimeout != nil {
+						tr.TLSHandshakeTimeout = *host.tlsHandshakeTimeout
+					}
+					if host.responseHeaderTimeout != nil {
+						tr.ResponseHeaderTimeout = *host.responseHeaderTimeout
+					}
+					if host.expectContinueTimeout != nil {
+						tr.ExpectContinueTimeout = *host.expectContinueTimeout
+					}
+					if host.idleConnTimeout != nil {
+						tr.IdleConnTimeout = *host.idleConnTimeout
 					}
 
 					c.Transport = tr
@@ -237,6 +253,14 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		return rhosts, nil
 	}
 
+}
+
+func hasTransportTimeouts(host hostConfig) bool {
+	return host.dialTimeout != nil ||
+		host.tlsHandshakeTimeout != nil ||
+		host.responseHeaderTimeout != nil ||
+		host.expectContinueTimeout != nil ||
+		host.idleConnTimeout != nil
 }
 
 func updateTLSConfigFromHost(tlsConfig *tls.Config, host *hostConfig) error {
@@ -373,6 +397,21 @@ type hostFileConfig struct {
 	// DialTimeout is the maximum amount of time a dial will wait for
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
+
+	// TLSHandshakeTimeout specifies the maximum amount of time waiting for a TLS handshake.
+	TLSHandshakeTimeout string `toml:"tls_handshake_timeout"`
+
+	// ResponseHeaderTimeout specifies the amount of time to wait for a server's response headers.
+	ResponseHeaderTimeout string `toml:"response_header_timeout"`
+
+	// ExpectContinueTimeout specifies the amount of time to wait for a server's first response
+	// headers after fully writing the request headers when the request contains
+	// an "Expect: 100-continue" header.
+	ExpectContinueTimeout string `toml:"expect_continue_timeout"`
+
+	// IdleConnTimeout specifies the maximum amount of time an idle connection
+	// will remain idle before closing itself.
+	IdleConnTimeout string `toml:"idle_conn_timeout"`
 
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
@@ -539,9 +578,41 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 	if config.DialTimeout != "" {
 		dialTimeout, err := time.ParseDuration(config.DialTimeout)
 		if err != nil {
-			return hostConfig{}, err
+			return hostConfig{}, fmt.Errorf("invalid dial_timeout %q: %w", config.DialTimeout, err)
 		}
 		result.dialTimeout = &dialTimeout
+	}
+
+	if config.TLSHandshakeTimeout != "" {
+		tlsHandshakeTimeout, err := time.ParseDuration(config.TLSHandshakeTimeout)
+		if err != nil {
+			return hostConfig{}, fmt.Errorf("invalid tls_handshake_timeout %q: %w", config.TLSHandshakeTimeout, err)
+		}
+		result.tlsHandshakeTimeout = &tlsHandshakeTimeout
+	}
+
+	if config.ResponseHeaderTimeout != "" {
+		responseHeaderTimeout, err := time.ParseDuration(config.ResponseHeaderTimeout)
+		if err != nil {
+			return hostConfig{}, fmt.Errorf("invalid response_header_timeout %q: %w", config.ResponseHeaderTimeout, err)
+		}
+		result.responseHeaderTimeout = &responseHeaderTimeout
+	}
+
+	if config.IdleConnTimeout != "" {
+		idleConnTimeout, err := time.ParseDuration(config.IdleConnTimeout)
+		if err != nil {
+			return hostConfig{}, fmt.Errorf("invalid idle_conn_timeout %q: %w", config.IdleConnTimeout, err)
+		}
+		result.idleConnTimeout = &idleConnTimeout
+	}
+
+	if config.ExpectContinueTimeout != "" {
+		expectContinueTimeout, err := time.ParseDuration(config.ExpectContinueTimeout)
+		if err != nil {
+			return hostConfig{}, fmt.Errorf("invalid expect_continue_timeout %q: %w", config.ExpectContinueTimeout, err)
+		}
+		result.expectContinueTimeout = &expectContinueTimeout
 	}
 
 	return result, nil
