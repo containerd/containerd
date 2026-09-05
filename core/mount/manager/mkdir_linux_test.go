@@ -26,6 +26,8 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -94,4 +96,40 @@ func TestMkdirHandler(t *testing.T) {
 	} else if !errdefs.IsNotImplemented(err) {
 		t.Fatal(err)
 	}
+}
+
+// TestMkdirHandlerTargetNotADirectory verifies that mkdir reports a
+// clear error when its target already exists but is not a directory,
+// rather than accepting it because its permission bits happen to
+// match: a regular file with the same mode mkdir would have used is
+// exactly the case a mode-only check cannot tell apart from an
+// already-created directory.
+func TestMkdirHandlerTargetNotADirectory(t *testing.T) {
+	ctx := logtest.WithT(context.Background(), t)
+	ctx = namespaces.WithNamespace(ctx, "test")
+	td := t.TempDir()
+
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0775))
+
+	testmode := os.FileMode(0751)
+	target := filepath.Join(root, "notadir")
+	require.NoError(t, os.WriteFile(target, nil, testmode))
+
+	r, err := os.OpenRoot(root)
+	require.NoError(t, err)
+	t.Cleanup(func() { r.Close() })
+	mh := mkdir{rootMap: map[string]*os.Root{root: r}}
+
+	m := mount.Mount{
+		Type:   "mkdir/overlay",
+		Source: "overlay",
+		Options: []string{
+			fmt.Sprintf("X-containerd.mkdir.path=%s:%o", target, testmode),
+		},
+	}
+
+	_, err = mh.Transform(ctx, m, nil)
+	require.Error(t, err)
+	assert.True(t, errdefs.IsFailedPrecondition(err), "expected ErrFailedPrecondition, got %v", err)
 }

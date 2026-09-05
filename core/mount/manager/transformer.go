@@ -18,6 +18,13 @@ package manager
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/mount"
 )
@@ -30,6 +37,55 @@ const (
 	prefixMkfs  = "X-containerd.mkfs."
 )
 
+// resolveRoot finds the *os.Root in roots whose key is the longest
+// path that dir is really under, and dir's path relative to it. what
+// names the caller for the error when nothing matches at all.
+//
+// Matching is on path boundaries, not raw byte prefixes: a root
+// "/a/b" must match "/a/b" itself or anything under "/a/b/", never
+// "/a/b2", which shares only a textual prefix with it and names an
+// unrelated path. The longest matching root wins, rather than
+// whichever roots happens to be visited first: range over a map
+// visits entries in an unspecified order, so nesting one root inside
+// another (however unlikely a configuration that is) would otherwise
+// make the outcome depend on that order rather than on which root
+// dir is actually under.
+func resolveRoot(roots map[string]*os.Root, dir, what string) (*os.Root, string, error) {
+	var bestPath string
+	var best *os.Root
+	for path, root := range roots {
+		if path != dir && !strings.HasPrefix(dir, path+string(filepath.Separator)) {
+			continue
+		}
+		if best == nil || len(path) > len(bestPath) {
+			best, bestPath = root, path
+		}
+	}
+	if best == nil {
+		return nil, "", fmt.Errorf("no root %q configured for %s: %w", dir, what, errdefs.ErrNotImplemented)
+	}
+
+	subpath := strings.TrimPrefix(dir, bestPath)
+	if subpath == "" {
+		// dir is bestPath itself: nothing to make relative to
+		// anything. filepath.Rel("/", "") does not treat this as its
+		// own root case; it errors, the same as it would for any
+		// other path it cannot relate to "/".
+		return best, "", nil
+	}
+	subpath, err := filepath.Rel("/", subpath)
+	if err != nil {
+		// The boundary-safe match above guarantees subpath starts
+		// with a separator whenever it is not empty, and empty is
+		// handled above, so this should not be reachable. Handled
+		// rather than assumed: a future change to the matching rule
+		// should not be able to silently turn this into an operation
+		// against the wrong path instead of a loud error.
+		return nil, "", fmt.Errorf("failed to resolve %q relative to root %q: %w", dir, bestPath, err)
+	}
+	return best, subpath, nil
+}
+
 type typeTransformer struct {
 	mount.Transformer
 
@@ -39,4 +95,68 @@ type typeTransformer struct {
 func (t typeTransformer) Transform(ctx context.Context, m mount.Mount, a []mount.ActiveMount) (mount.Mount, error) {
 	m.Type = t.mountType
 	return t.Transformer.Transform(ctx, m, a)
+}
+
+// rewritePosition applies chain, a position's pending transforms as
+// recorded by the loop which builds mountConv, to m. mountFormatter is
+// already pure, so it is applied directly; mkfs and mkdir also have a
+// pure part, computing the mount value their options imply, and an
+// impure part which actually creates whatever that implies. Only the
+// pure part runs here: the impure part is returned as a closure for
+// the caller to run whenever it, not this function, decides reality
+// needs to change, which lets this run inside a bolt transaction to
+// resolve a mount's final identity without that transaction ever
+// waiting on real filesystem work.
+//
+// A transformer this package does not know how to split this way is
+// run in full immediately as a defensive fallback; none of the
+// transforms this package registers reach that branch.
+func rewritePosition(ctx context.Context, chain []mount.Transformer, m mount.Mount, resolved []mount.ActiveMount) (mount.Mount, []func(context.Context) error, error) {
+	var ensures []func(context.Context) error
+	for _, elem := range chain {
+		tt, ok := elem.(typeTransformer)
+		if !ok {
+			rewritten, err := elem.Transform(ctx, m, resolved)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+			continue
+		}
+		m.Type = tt.mountType
+		switch tr := tt.Transformer.(type) {
+		case mountFormatter:
+			rewritten, err := tr.Transform(ctx, m, resolved)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+		case *mkfs:
+			rewritten, ensure, err := tr.rewrite(m)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+			if ensure != nil {
+				ensures = append(ensures, ensure)
+			}
+		case *mkdir:
+			rewritten, ensure, err := tr.rewrite(m)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+			if ensure != nil {
+				ensures = append(ensures, ensure)
+			}
+		default:
+			log.G(ctx).Warnf("transform %T has no pure rewrite, running it in full", tr)
+			rewritten, err := tt.Transform(ctx, m, resolved)
+			if err != nil {
+				return mount.Mount{}, nil, err
+			}
+			m = rewritten
+		}
+	}
+	return m, ensures, nil
 }
