@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -125,6 +126,17 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 			}).Debugf("diff applied")
 		}
 	}()
+
+	// A read-only active snapshot is one the snapshotter has already populated
+	// (e.g. served from a layer content cache), so there is nothing to apply
+	// into it and its content is shared with every other snapshot of that
+	// layer. Callers are expected to notice the read-only mounts and skip the
+	// layer entirely; refuse rather than write into content we do not own.
+	// Not ErrNotImplemented: no other differ can write this layer either, so
+	// this must not fall through to the next one.
+	if len(mounts) > 0 && mounts[len(mounts)-1].ReadOnly() {
+		return emptyDesc, fmt.Errorf("cannot apply to a read-only snapshot, its content is already populated: %w", errdefs.ErrFailedPrecondition)
+	}
 
 	var (
 		erofsLayerType string

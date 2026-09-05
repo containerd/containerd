@@ -17,11 +17,15 @@
 package erofsutils
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 func TestCacheBlobPath(t *testing.T) {
@@ -34,4 +38,22 @@ func TestCacheBlobPath(t *testing.T) {
 	want := filepath.Join("/cache", "sha256", enc[:2], enc+".erofs")
 	assert.Equal(t, want, got)
 	assert.Equal(t, enc[:2], filepath.Base(filepath.Dir(got)), "blob must live under a 2-char prefix dir")
+}
+
+// TestMountsToLayerErofsMount covers resolving the layer directory from an erofs
+// layer mount, which is what a snapshot holding a single committed layer hands
+// out.
+func TestMountsToLayerErofsMount(t *testing.T) {
+	layer := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(layer, ".erofslayer"), nil, 0644))
+	blob := filepath.Join(layer, "layer.erofs")
+	require.NoError(t, os.WriteFile(blob, []byte("layer"), 0644))
+
+	got, err := MountsToLayer([]mount.Mount{{
+		Type:    "erofs",
+		Source:  blob,
+		Options: []string{"ro"},
+	}})
+	require.NoError(t, err)
+	assert.Equal(t, layer, got)
 }
