@@ -142,7 +142,7 @@ to all committers.
 | [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.9)  | End of Life    | May 7, 2025                    | July 3, 2026                   |                        |
 | [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.5)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
 | [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.2)  | LTS            | April 30, 2026                 | April 30, 2028                 | @containerd/committers |
-| [2.4](https://github.com/containerd/containerd/milestone/51)         | _Future_       | August 26, 2026 (_tentative_)  | April 26, 2027 (_tentative_)   | @containerd/committers |
+| [2.4](https://github.com/containerd/containerd/milestone/51)         | RC             | September 10, 2026             | May 10, 2027                   | @containerd/committers |
 
 \* Support for the 1.7 release branch was provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by [@samuelkarp](https://github.com/samuelkarp) and [@chrishenzie](https://github.com/chrishenzie).  This extended support is focused on usage with Kubernetes 1.32, 1.31, and 1.30 via [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).  Changes may not be accepted if they are not needed for this usage.
 
@@ -166,6 +166,7 @@ of containerd for every supported version of Kubernetes.
 | 1.34               | 2.1.3+, 2.0.6+, 1.7.28+, 1.6.39+ | v1              |
 | 1.35               | 2.2.0+, 2.1.5+, 1.7.28+          | v1              |
 | 1.36               | 2.3.0+, 2.2.0+                   | v1              |
+| 1.37               | 2.4.0+, 2.3.0+                   | v1              |
 
 Deprecated containerd and kubernetes versions
 
