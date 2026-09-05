@@ -122,6 +122,14 @@ func init() {
 				return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
 			}
 
+			// Any snapshotter has to be reachable by name, so that the image
+			// service can check whether an image is unpacked in the
+			// snapshotter of a runtime. That includes snapshotters propagated
+			// from the runtime config after this plugin is initialized.
+			options.SnapshotterProvider = func(name string) snapshots.Snapshotter {
+				return allSnapshotters[name]
+			}
+
 			snapshotRoot := func(snapshotter string) (snapshotRoot string) {
 				if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
 					snapshotRoot = plugin.Meta.Exports["root"]
@@ -146,6 +154,11 @@ func init() {
 					options.ImageFSPaths[snapshotter] = snapshotRoot(snapshotter)
 					log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[snapshotter], snapshotter)
 				}
+				// Collect stats for it too, otherwise ImageFsInfo reports
+				// nothing for images unpacked in this snapshotter.
+				if s, ok := allSnapshotters[snapshotter]; ok {
+					options.Snapshotters[snapshotter] = s
+				}
 
 				platform := platforms.DefaultSpec()
 				if rp.Platform != "" {
@@ -157,7 +170,11 @@ func init() {
 				}
 
 				options.RuntimePlatforms[runtimeName] = images.ImagePlatform{
-					Snapshotter: snapshotter,
+					// Keep the snapshotter unset when runtime_platforms does
+					// not configure one, so that a snapshotter configured on
+					// the runtime itself can still be propagated. An unset
+					// snapshotter resolves to the default at pull time.
+					Snapshotter: rp.Snapshotter,
 					Platform:    platform,
 				}
 			}

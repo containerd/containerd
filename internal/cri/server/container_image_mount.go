@@ -25,9 +25,9 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -88,7 +88,7 @@ func (c *criService) mutateImageMount(
 	if ref == "" {
 		return fmt.Errorf("image not specified in: %+v", imageSpec)
 	}
-	image, err := c.LocalResolve(ref)
+	image, err := c.LocalResolve(ref, platform)
 	if err != nil {
 		return fmt.Errorf("failed to resolve image %q: %w", ref, err)
 	}
@@ -113,7 +113,7 @@ func (c *criService) mutateImageMount(
 			return fmt.Errorf("failed to get image volume ref %q: %w", ref, err)
 		}
 
-		i := containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform))
+		i := containerd.NewImageWithPlatform(c.client, img, util.PlatformMatcher(platform))
 		if err := i.Unpack(ctx, snapshotter); err != nil {
 			return fmt.Errorf("failed to unpack image volume: %w", err)
 		}

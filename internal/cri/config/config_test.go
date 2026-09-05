@@ -234,6 +234,22 @@ func TestValidateConfig(t *testing.T) {
 			},
 			warnings: []deprecation.Warning{deprecation.CRIRegistryConfigs},
 		},
+		"runtime_platforms with an OS version": {
+			imageConfig: &ImageConfig{
+				RuntimePlatforms: map[string]ImagePlatform{
+					"hyperv": {Platform: "windows(10.0.17763)/amd64"},
+				},
+			},
+			imageExpectedErr: "OS version",
+		},
+		"runtime_platforms with an invalid platform": {
+			imageConfig: &ImageConfig{
+				RuntimePlatforms: map[string]ImagePlatform{
+					"bad": {Platform: "linux/amd64/v3/extra"},
+				},
+			},
+			imageExpectedErr: "invalid platform",
+		},
 		"cgroup_writable enabled": {
 			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
