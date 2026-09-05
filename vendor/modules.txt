@@ -224,8 +224,8 @@ github.com/containerd/go-runc
 ## explicit; go 1.25.0
 github.com/containerd/imgcrypt/v2
 github.com/containerd/imgcrypt/v2/images/encryption
-# github.com/containerd/log v0.1.0
-## explicit; go 1.20
+# github.com/containerd/log v0.1.1-0.20260828142140-8b5d6538fa1f
+## explicit; go 1.23
 github.com/containerd/log
 github.com/containerd/log/logtest
 # github.com/containerd/log/otel v0.0.0-20260828142140-8b5d6538fa1f
@@ -532,6 +532,7 @@ github.com/sasha-s/go-deadlock
 # github.com/sirupsen/logrus v1.10.2
 ## explicit; go 1.23
 github.com/sirupsen/logrus
+github.com/sirupsen/logrus/hooks/slog
 # github.com/smallstep/pkcs7 v0.2.1
 ## explicit; go 1.14
 github.com/smallstep/pkcs7
