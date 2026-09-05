@@ -71,6 +71,10 @@ func TestUpgrade(t *testing.T) {
 			t.Run("recover-images", runUpgradeTestCase(version, previousReleaseBinDir, shouldRecoverExistingImages))
 			t.Run("metrics", runUpgradeTestCase(version, previousReleaseBinDir, shouldParseMetricDataCorrectly))
 
+			t.Run("kill-shim-before-delete-task",
+				runUpgradeTestCase(version, previousReleaseBinDir,
+					shouldHandleShimExitStatusAfterUpgrade(previousReleaseBinDir)))
+
 			if version == "1.7" {
 				t.Run("recover-ungroupable-shim", runUpgradeTestCaseWithExistingConfig(version,
 					previousReleaseBinDir, true, shouldManipulateContainersInPodAfterUpgrade("runcv1")))
@@ -713,12 +717,16 @@ type shimConn struct {
 
 // buildShimClientFromBundle builds a shim client from the bundle directory of the container.
 func buildShimClientFromBundle(t *testing.T, rSvc *remote.RuntimeService, cid string) shimConn {
+	return buildShimClientFromNamespacedBundle(t, rSvc, "k8s.io", cid)
+}
+
+func buildShimClientFromNamespacedBundle(t *testing.T, rSvc *remote.RuntimeService, namespace, cid string) shimConn {
 	cfg := criRuntimeInfo(t, rSvc)
 
 	bundleDir := filepath.Join(
 		filepath.Dir(cfg["stateDir"].(string)),
 		"io.containerd.runtime.v2.task",
-		"k8s.io",
+		namespace,
 		cid,
 	)
 
