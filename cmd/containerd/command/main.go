@@ -33,10 +33,10 @@ import (
 	_ "github.com/containerd/containerd/v2/core/metrics" // import containerd build info
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/log/otel"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/sirupsen/logrus"
@@ -166,7 +166,7 @@ can be used and modified as necessary as a custom configuration.`
 		// Register the tracing hook as soon as config is available. Later startup
 		// steps may start goroutines that log, so avoid mutating hooks after hook
 		// reads may have begun.
-		tracingHook := tracing.NewLogrusHook(tracing.WithTraceIDField(config.Debug.LogTraceID))
+		tracingHook := otel.NewLogrusHook(otel.WithTraceIDField(config.Debug.LogTraceID))
 		logrus.StandardLogger().AddHook(tracingHook)
 
 		// Make sure top-level directories are created early.

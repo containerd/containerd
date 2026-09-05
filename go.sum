@@ -56,6 +56,8 @@ github.com/containerd/imgcrypt/v2 v2.0.3 h1:yM6//IOTtca9TpxPP8prJqLDuidbF/VhUQuj
 github.com/containerd/imgcrypt/v2 v2.0.3/go.mod h1:Sjfd3uOiBWtb1dUo1yS5Z/ZxdfMU7MpBr2pzs9HoRDs=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
+github.com/containerd/log/otel v0.0.0-20260828142140-8b5d6538fa1f h1:oVHSzGTiGXsCq6WAycaXmnlDiN1cUpZ3VE2+zl+ZPdc=
+github.com/containerd/log/otel v0.0.0-20260828142140-8b5d6538fa1f/go.mod h1:65C5iYF2xIQByCyxzoO2KKKK1+/tGxD4XqhdlrTtvzE=
 github.com/containerd/nri v0.12.2 h1:piA7h2QUm0m3+e994qWFPYwnoXXwAphwDc1Ydx1eWi4=
 github.com/containerd/nri v0.12.2/go.mod h1:o6Pz0I/iks9g2KlH3WdgvFtc9rB7k0aeoZCAH01xOGk=
 github.com/containerd/otelttrpc v0.1.0 h1:UOX68eVTE8H/T45JveIg+I22Ev2aFj4qPITCmXsskjw=
