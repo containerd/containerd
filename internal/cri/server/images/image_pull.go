@@ -549,6 +549,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 				// Skipping TLS verification for localhost
 				transport.TLSClientConfig = &tls.Config{
 					InsecureSkipVerify: true,
+					MinVersion:         tls.VersionTLS12,
 				}
 			}
 

@@ -112,7 +112,7 @@ func GetResolver(ctx context.Context, cliContext *cli.Context) (remotes.Resolver
 }
 
 func resolverDefaultTLS(cliContext *cli.Context) (*tls.Config, error) {
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
 
 	if cliContext.Bool("skip-verify") {
 		tlsConfig.InsecureSkipVerify = true
