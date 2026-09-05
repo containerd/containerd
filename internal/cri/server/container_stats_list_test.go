@@ -348,6 +348,135 @@ func TestContainerMetricsMemory(t *testing.T) {
 	}
 }
 
+func TestContainerMetricsSwap(t *testing.T) {
+	c := newTestCRIService()
+	timestamp := time.Now()
+
+	for _, test := range []struct {
+		desc     string
+		metrics  cgroupMetrics
+		expected *runtime.SwapUsage
+	}{
+		{
+			desc: "v1 metrics - no swap entry",
+			metrics: cgroupMetrics{v1: &v1.Metrics{
+				Memory: &v1.MemoryStat{
+					Usage: &v1.MemoryEntry{
+						Limit: 5000,
+						Usage: 1000,
+					},
+				},
+			}},
+			expected: nil,
+		},
+		{
+			// memory.memsw.* files missing (swap accounting disabled) leave
+			// a zeroed Swap entry when collected with IgnoreNotExist.
+			desc: "v1 metrics - swap accounting disabled, zeroed swap entry",
+			metrics: cgroupMetrics{v1: &v1.Metrics{
+				Memory: &v1.MemoryStat{
+					Usage: &v1.MemoryEntry{
+						Limit: 5000,
+						Usage: 1000,
+					},
+					Swap: &v1.MemoryEntry{},
+				},
+			}},
+			expected: nil,
+		},
+		{
+			desc: "v1 metrics - no swap limit",
+			metrics: cgroupMetrics{v1: &v1.Metrics{
+				Memory: &v1.MemoryStat{
+					Usage: &v1.MemoryEntry{
+						Limit: math.MaxUint64, // no limit
+						Usage: 1000,
+					},
+					Swap: &v1.MemoryEntry{
+						Limit: math.MaxUint64, // no limit
+						Usage: 1300,
+					},
+				},
+			}},
+			expected: &runtime.SwapUsage{
+				Timestamp: timestamp.UnixNano(),
+				// memsw usage minus memory usage
+				SwapUsageBytes: &runtime.UInt64Value{Value: 300},
+			},
+		},
+		{
+			desc: "v1 metrics - swap limit",
+			metrics: cgroupMetrics{v1: &v1.Metrics{
+				Memory: &v1.MemoryStat{
+					Usage: &v1.MemoryEntry{
+						Limit: 5000,
+						Usage: 1000,
+					},
+					Swap: &v1.MemoryEntry{
+						Limit: 7000,
+						Usage: 1300,
+					},
+				},
+			}},
+			expected: &runtime.SwapUsage{
+				Timestamp:      timestamp.UnixNano(),
+				SwapUsageBytes: &runtime.UInt64Value{Value: 300},
+				// (memsw limit - memory limit) - swap usage
+				SwapAvailableBytes: &runtime.UInt64Value{Value: 1700},
+			},
+		},
+		{
+			desc: "v2 metrics - no swap limit",
+			metrics: cgroupMetrics{v2: &v2.Metrics{
+				Memory: &v2.MemoryStat{
+					Usage:     1000,
+					SwapUsage: 150,
+					SwapLimit: math.MaxUint64, // no limit
+				},
+			}},
+			expected: &runtime.SwapUsage{
+				Timestamp:      timestamp.UnixNano(),
+				SwapUsageBytes: &runtime.UInt64Value{Value: 150},
+			},
+		},
+		{
+			desc: "v2 metrics - swap limit",
+			metrics: cgroupMetrics{v2: &v2.Metrics{
+				Memory: &v2.MemoryStat{
+					Usage:     1000,
+					SwapUsage: 150,
+					SwapLimit: 500,
+				},
+			}},
+			expected: &runtime.SwapUsage{
+				Timestamp:          timestamp.UnixNano(),
+				SwapUsageBytes:     &runtime.UInt64Value{Value: 150},
+				SwapAvailableBytes: &runtime.UInt64Value{Value: 350},
+			},
+		},
+		{
+			desc: "v2 metrics - swap disabled with zero limit",
+			metrics: cgroupMetrics{v2: &v2.Metrics{
+				Memory: &v2.MemoryStat{
+					Usage:     1000,
+					SwapUsage: 0,
+					SwapLimit: 0,
+				},
+			}},
+			expected: &runtime.SwapUsage{
+				Timestamp:          timestamp.UnixNano(),
+				SwapUsageBytes:     &runtime.UInt64Value{Value: 0},
+				SwapAvailableBytes: &runtime.UInt64Value{Value: 0},
+			},
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			got := c.swapContainerStats(test.metrics, timestamp)
+			assert.Equal(t, test.expected, got)
+		})
+	}
+}
+
 func TestListContainerStats(t *testing.T) {
 	if goruntime.GOOS == "darwin" {
 		t.Skip("not implemented on Darwin")
