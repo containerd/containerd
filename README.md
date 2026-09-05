@@ -86,6 +86,11 @@ is supported by containerd.
 
 For configuring registries, see [registry host configuration documentation](docs/hosts.md)
 
+## Runtime Handler Configuration
+
+For configuring runtime handlers, see the
+[runtime handler configuration documentation](docs/runtime-config.md).
+
 ## Features
 
 For a detailed overview of containerd's core concepts and the features it supports,
