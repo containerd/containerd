@@ -42,18 +42,21 @@ const (
 	inheritedLabelsPrefix = "containerd.io/snapshot/"
 )
 
-// gcSnapshotterRemoveTimeoutKey bounds each Snapshotter.Remove during garbage
-// collection, which holds the snapshotter write lock: an unresponsive
-// snapshotter (e.g. a hung proxy plugin RPC) would otherwise block all
-// snapshot operations forever. On timeout the rest of the pass is abandoned;
-// remaining snapshots stay orphaned and are retried on the next GC pass.
+// gcSnapshotterTimeoutKey bounds one full snapshot garbage collection pass:
+// Walk and each Remove under the snapshotter write lock, and the final
+// Cleanup after it is released. The deadline starts before lock acquisition;
+// the wait itself is not interruptible, but its duration counts against the
+// budget of the pass. An unresponsive snapshotter (e.g. a hung proxy plugin
+// RPC) would otherwise hold the lock and block all snapshot operations
+// forever. On timeout the pass is abandoned; remaining snapshots stay
+// orphaned and are retried on the next GC pass.
 const (
-	gcSnapshotterRemoveTimeoutKey     = "io.containerd.timeout.gc.snapshotter.remove"
-	defaultGCSnapshotterRemoveTimeout = 30 * time.Minute
+	gcSnapshotterTimeoutKey     = "io.containerd.timeout.gc.snapshotter"
+	defaultGCSnapshotterTimeout = 30 * time.Minute
 )
 
 func init() {
-	timeout.Set(gcSnapshotterRemoveTimeoutKey, defaultGCSnapshotterRemoveTimeout)
+	timeout.Set(gcSnapshotterTimeoutKey, defaultGCSnapshotterTimeout)
 }
 
 type snapshotter struct {
@@ -875,13 +878,16 @@ func validateSnapshot(info *snapshots.Info) error {
 
 // garbageCollect removes all snapshots that are no longer used.
 func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err error) {
+	gcCtx, cancel := timeout.WithContext(ctx, gcSnapshotterTimeoutKey)
+	defer cancel()
+
 	s.l.Lock()
 	t1 := time.Now()
 	defer func() {
 		s.l.Unlock()
 		if err == nil {
 			if c, ok := s.Snapshotter.(snapshots.Cleaner); ok {
-				err = c.Cleanup(ctx)
+				err = c.Cleanup(gcCtx)
 				if errdefs.IsNotImplemented(err) {
 					err = nil
 				}
@@ -936,7 +942,7 @@ func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err 
 		return 0, err
 	}
 
-	roots, err := s.walkTree(ctx, seen)
+	roots, err := s.walkTree(gcCtx, seen)
 	if err != nil {
 		return 0, err
 	}
@@ -947,7 +953,7 @@ func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err 
 	// deletions on the snapshotters which support it.
 
 	for _, node := range roots {
-		if err := s.pruneBranch(ctx, node); err != nil {
+		if err := s.pruneBranch(gcCtx, node); err != nil {
 			return 0, err
 		}
 	}
@@ -1004,10 +1010,7 @@ func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode) error {
 
 	if node.remove {
 		logger := log.G(ctx).WithField("snapshotter", s.name)
-		removeCtx, cancel := timeout.WithContext(ctx, gcSnapshotterRemoveTimeoutKey)
-		err := s.Snapshotter.Remove(removeCtx, node.info.Name)
-		cancel()
-		if err != nil {
+		if err := s.Snapshotter.Remove(ctx, node.info.Name); err != nil {
 			if !errdefs.IsFailedPrecondition(err) {
 				return err
 			}
