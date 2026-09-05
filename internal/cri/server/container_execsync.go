@@ -207,7 +207,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 			log.G(ctx).WithError(err).Errorf("Failed to resize process %q console for container %q", execID, id)
 		}
 	})
-
+	exited := make(chan struct{})
 	attachDone := execIO.Attach(cio.AttachOptions{
 		Stdin:     opts.stdin,
 		Stdout:    opts.stdout,
@@ -217,7 +217,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		CloseStdin: func() error {
 			return process.CloseIO(ctx, containerd.WithStdinCloser)
 		},
-	})
+	}, exited)
 
 	execCtx := ctx
 	if opts.timeout > 0 {
@@ -234,6 +234,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		}
 		// Wait for the process to be killed.
 		exitRes := <-exitCh
+		close(exited)
 		log.G(ctx).Debugf("Timeout received while waiting for exec process kill %q code %d and error %v",
 			execID, exitRes.ExitCode(), exitRes.Error())
 
@@ -243,6 +244,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 
 		return nil, fmt.Errorf("timeout %v exceeded: %w", opts.timeout, execCtx.Err())
 	case exitRes := <-exitCh:
+		close(exited)
 		code, _, err := exitRes.Result()
 		log.G(ctx).Debugf("Exec process %q exits with exit code %d and error %v", execID, code, err)
 		if err != nil {
