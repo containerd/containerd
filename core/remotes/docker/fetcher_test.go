@@ -295,6 +295,92 @@ func TestFetcherOpenParallel(t *testing.T) {
 	assert.Error(t, err, "this should have failed")
 }
 
+// TestFetcherOpenParallelUsesBoundedRange is a regression test for
+// https://github.com/containerd/containerd/issues/12476: parallel chunked
+// requests (chunk index >= 1) used to send an open-ended Range header
+// ("bytes=<offset>-") even though the goroutine only ever reads chunkSize
+// bytes from the response before closing it. A well-behaved server honors
+// an open-ended range by streaming everything from the offset to the end
+// of the blob, so every chunk beyond the first wasted server-side
+// bandwidth/CPU preparing data the client would immediately discard after
+// its chunkSize bytes. This asserts every non-initial chunk request now
+// carries an explicit, bounded end in its Range header.
+func TestFetcherOpenParallelUsesBoundedRange(t *testing.T) {
+	const chunkSize = 64 * 1024
+	const numChunks = 3
+	size := int64(numChunks * chunkSize)
+	content := make([]byte, size)
+	rand.New(rand.NewSource(2)).Read(content)
+
+	var mu sync.Mutex
+	var ranges []string
+
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rangeHeader := r.Header.Get("Range")
+		mu.Lock()
+		ranges = append(ranges, rangeHeader)
+		mu.Unlock()
+
+		rng, err := parseRange(rangeHeader, size)
+		if errors.Is(err, errNoOverlap) {
+			err = nil
+		}
+		require.NoError(t, err)
+		if len(rng) == 0 {
+			rw.Header().Set("content-length", strconv.Itoa(len(content)))
+			_, _ = rw.Write(content)
+			return
+		}
+		b := content[rng[0].start : rng[0].start+rng[0].length]
+		rw.Header().Set("content-range", rng[0].contentRange(size))
+		rw.Header().Set("content-length", strconv.Itoa(len(b)))
+		_, _ = rw.Write(b)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+
+	f := dockerFetcher{
+		&dockerBase{
+			repository: "nonempty",
+			performances: transfer.ImageResolverPerformanceSettings{
+				MaxConcurrentDownloads:     numChunks,
+				ConcurrentLayerFetchBuffer: chunkSize,
+			},
+			limiter: semaphore.NewWeighted(numChunks),
+		},
+	}
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+	req := f.request(host, http.MethodGet)
+
+	rc, _, err := f.open(context.Background(), req, "", 0, true)
+	require.NoError(t, err)
+	got, err := io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+	require.Equal(t, content, got)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, ranges, numChunks)
+	for i, rangeHeader := range ranges {
+		if i == 0 {
+			// The very first request doesn't yet know the total size, so
+			// it's necessarily open-ended - that's how the total size is
+			// discovered in the first place.
+			continue
+		}
+		require.NotEmpty(t, rangeHeader, "chunk %d: expected a Range header", i)
+		require.Falsef(t, strings.HasSuffix(rangeHeader, "-"), "chunk %d: Range header %q must specify an explicit end, not be open-ended", i, rangeHeader)
+	}
+}
+
 func TestFetcherOpenParallel_CloseAfterCopyError(t *testing.T) {
 	size := int64(10 * 1024 * 1024)
 	content := make([]byte, size)
