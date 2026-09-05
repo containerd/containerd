@@ -44,6 +44,7 @@ export PATH="/usr/local/go/bin:${GOPATH}/bin:/usr/local/bin:/usr/local/sbin:${PA
 dnf -y makecache --refresh
 # shellcheck disable=SC2086
 dnf -y install \
+	cargo \
 	container-selinux \
 	curl \
 	gcc \
@@ -51,10 +52,13 @@ dnf -y install \
 	iptables \
 	libseccomp-devel \
 	libselinux-devel \
+	lld \
 	lsof \
 	make \
 	strace \
+	wget \
 	which \
+	xz \
 	"kernel-modules-extra-$(uname -r)" \
 	${INSTALL_PACKAGES}
 modprobe xt_comment

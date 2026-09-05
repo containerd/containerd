@@ -41,8 +41,14 @@ FROM ${GOLANG_IMAGE}:${GOLANG_VERSION} AS golang
 
 # Install runc
 FROM golang AS runc
+# cargo, wget and xz-utils are needed to build libpathrs, which runc 1.5+
+# links against.
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    cargo \
     libseccomp-dev \
+    lld \
+    wget \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY script/setup/runc-version script/setup/install-runc ./
@@ -77,6 +83,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lsof \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=runc       /build/ /
+# refresh the ld.so cache so runc finds libpathrs in /usr/local/lib
+RUN ldconfig
 COPY contrib/Dockerfile.test.d/docker-entrypoint.sh /docker-entrypoint.sh
 COPY . .
 RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
@@ -148,4 +156,6 @@ ENTRYPOINT ["/critest.sh","start"]
 
 FROM build-env AS dev
 COPY --from=runc   /build/ /
+# refresh the ld.so cache so runc finds libpathrs in /usr/local/lib
+RUN ldconfig
 COPY . .
