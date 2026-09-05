@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
+	bolt "go.etcd.io/bbolt"
 )
 
 func snapshotLease(ctx context.Context, t *testing.T, db *DB, sn string) (context.Context, func(string) bool) {
@@ -549,5 +550,229 @@ func TestGarbageCollectFailedPreconditionRemove(t *testing.T) {
 	msn := db.Snapshotter("tmp").(*snapshotter)
 	if _, err := msn.garbageCollect(ctx); err != nil {
 		t.Fatalf("FailedPrecondition on Remove must not fail garbage collection: %v", err)
+	}
+}
+
+// childrenOf reads a snapshot's children bucket directly. The bug this file
+// guards is invisible through the public API -- Walk cannot see a stranded
+// child, and Remove only reports that one exists -- so the assertions have to
+// look at the stored link itself.
+func childrenOf(t *testing.T, db *DB, ns, snapshotter, key string) []string {
+	t.Helper()
+	var out []string
+	if err := db.View(func(tx *bolt.Tx) error {
+		bkt := getSnapshotterBucket(tx, ns, snapshotter)
+		if bkt == nil {
+			return nil
+		}
+		sbkt := bkt.Bucket([]byte(key))
+		if sbkt == nil {
+			return nil
+		}
+		cbkt := sbkt.Bucket(bucketKeyChildren)
+		if cbkt == nil {
+			return nil
+		}
+		return cbkt.ForEach(func(k, _ []byte) error {
+			out = append(out, string(k))
+			return nil
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func commitSnapshot(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, key, parent string) {
+	t.Helper()
+	if _, err := sn.Prepare(ctx, key+"-active", parent); err != nil {
+		t.Fatalf("prepare %s: %v", key, err)
+	}
+	if err := sn.Commit(ctx, key, key+"-active"); err != nil {
+		t.Fatalf("commit %s: %v", key, err)
+	}
+}
+
+func walkKeys(ctx context.Context, t *testing.T, sn snapshots.Snapshotter) map[string]bool {
+	t.Helper()
+	seen := map[string]bool{}
+	if err := sn.Walk(ctx, func(_ context.Context, info snapshots.Info) error {
+		seen[info.Name] = true
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return seen
+}
+
+// A snapshot removed by the garbage collector must be unlinked from its parent,
+// or the parent becomes permanently unremovable: Remove refuses any snapshot
+// whose children bucket is non-empty, and Walk -- which enumerates snapshot
+// buckets -- cannot see a child whose bucket is already gone. The parent is then
+// stuck behind a blocker nothing can observe. See containerd#11908.
+func TestGarbageCollectedSnapshotUnlinksFromParent(t *testing.T) {
+	ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+		return NewTmpSnapshotter(), nil
+	}))
+	sn := db.Snapshotter("tmp")
+
+	// base is leased so it survives collection; child is not, so the GC takes
+	// it. Both must hold, or the Remove below proves nothing.
+	leasedCtx, _ := snapshotLease(ctx, t, db, "tmp")
+	commitSnapshot(leasedCtx, t, sn, "base", "")
+	commitSnapshot(ctx, t, sn, "child", "base")
+
+	if got := childrenOf(t, db, "testing", "tmp", "base"); len(got) != 1 {
+		t.Fatalf("expected base to have one child before collection, got %v", got)
+	}
+
+	if _, err := db.GarbageCollect(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	seen := walkKeys(ctx, t, sn)
+	if seen["child"] {
+		t.Fatal("child survived collection; this test cannot exercise the bug")
+	}
+	if !seen["base"] {
+		t.Fatal("base was collected too; this test cannot exercise the bug")
+	}
+
+	// The stored link, not just the symptom: a stranded entry here is what
+	// makes base unremovable forever.
+	if got := childrenOf(t, db, "testing", "tmp", "base"); len(got) != 0 {
+		t.Errorf("base still links to collected children: %v", got)
+	}
+	if err := sn.Remove(ctx, "base"); err != nil {
+		t.Fatalf("base unremovable after its child was garbage collected: %v", err)
+	}
+}
+
+// The real shape: an image's layer chain, where only the tip is collected.
+func TestGarbageCollectedSnapshotUnlinksThroughAChain(t *testing.T) {
+	ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+		return NewTmpSnapshotter(), nil
+	}))
+	sn := db.Snapshotter("tmp")
+
+	leasedCtx, _ := snapshotLease(ctx, t, db, "tmp")
+	commitSnapshot(leasedCtx, t, sn, "base", "")
+	commitSnapshot(leasedCtx, t, sn, "mid", "base")
+	commitSnapshot(ctx, t, sn, "leaf", "mid")
+
+	if _, err := db.GarbageCollect(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	seen := walkKeys(ctx, t, sn)
+	if seen["leaf"] || !seen["mid"] || !seen["base"] {
+		t.Fatalf("unexpected survivors after collection: %v", seen)
+	}
+	if got := childrenOf(t, db, "testing", "tmp", "mid"); len(got) != 0 {
+		t.Errorf("mid still links to the collected leaf: %v", got)
+	}
+	// Leaf-first, exactly as a caller emptying a snapshotter must do.
+	if err := sn.Remove(ctx, "mid"); err != nil {
+		t.Fatalf("mid unremovable: %v", err)
+	}
+	if err := sn.Remove(ctx, "base"); err != nil {
+		t.Fatalf("base unremovable: %v", err)
+	}
+}
+
+// A parent with one collected and one surviving child must still refuse
+// removal -- for the surviving child, which is a real blocker, not a stale
+// link. Unlinking must be precise, not a wipe of the children bucket.
+func TestGarbageCollectedSnapshotLeavesSurvivingSiblingsLinked(t *testing.T) {
+	ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+		return NewTmpSnapshotter(), nil
+	}))
+	sn := db.Snapshotter("tmp")
+
+	leasedCtx, _ := snapshotLease(ctx, t, db, "tmp")
+	commitSnapshot(leasedCtx, t, sn, "base", "")
+	commitSnapshot(leasedCtx, t, sn, "keeper", "base")
+	commitSnapshot(ctx, t, sn, "doomed", "base")
+
+	if _, err := db.GarbageCollect(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	seen := walkKeys(ctx, t, sn)
+	if seen["doomed"] || !seen["keeper"] {
+		t.Fatalf("unexpected survivors: %v", seen)
+	}
+	children := childrenOf(t, db, "testing", "tmp", "base")
+	if len(children) != 1 || children[0] != "keeper" {
+		t.Fatalf("base children = %v, want exactly [keeper]", children)
+	}
+	if err := sn.Remove(ctx, "base"); err == nil {
+		t.Fatal("base removed while a live child still exists")
+	}
+	// ...and once the survivor goes, the parent is free.
+	if err := sn.Remove(ctx, "keeper"); err != nil {
+		t.Fatal(err)
+	}
+	if err := sn.Remove(ctx, "base"); err != nil {
+		t.Fatalf("base unremovable after all children are gone: %v", err)
+	}
+}
+
+// Parent and child collected together: the unlink must not care which bucket
+// bolt deletes first.
+func TestGarbageCollectingParentAndChildTogetherIsClean(t *testing.T) {
+	ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+		return NewTmpSnapshotter(), nil
+	}))
+	sn := db.Snapshotter("tmp")
+
+	commitSnapshot(ctx, t, sn, "base", "")
+	commitSnapshot(ctx, t, sn, "child", "base")
+
+	if _, err := db.GarbageCollect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if seen := walkKeys(ctx, t, sn); len(seen) != 0 {
+		t.Fatalf("expected an empty snapshotter, got %v", seen)
+	}
+}
+
+// A root snapshot has no parent to unlink from; collecting it must not error.
+func TestGarbageCollectedRootSnapshotNeedsNoUnlink(t *testing.T) {
+	ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+		return NewTmpSnapshotter(), nil
+	}))
+	sn := db.Snapshotter("tmp")
+
+	commitSnapshot(ctx, t, sn, "solo", "")
+
+	if _, err := db.GarbageCollect(ctx); err != nil {
+		t.Fatalf("collecting a parentless snapshot failed: %v", err)
+	}
+	if seen := walkKeys(ctx, t, sn); seen["solo"] {
+		t.Fatal("solo survived collection")
+	}
+}
+
+// Regression guard: the explicit Remove path already unlinked, and must keep
+// doing so. This fix is about the collector matching it, not replacing it.
+func TestExplicitRemoveStillUnlinksFromParent(t *testing.T) {
+	ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+		return NewTmpSnapshotter(), nil
+	}))
+	sn := db.Snapshotter("tmp")
+
+	leasedCtx, _ := snapshotLease(ctx, t, db, "tmp")
+	commitSnapshot(leasedCtx, t, sn, "base", "")
+	commitSnapshot(leasedCtx, t, sn, "child", "base")
+
+	if err := sn.Remove(ctx, "child"); err != nil {
+		t.Fatal(err)
+	}
+	if got := childrenOf(t, db, "testing", "tmp", "base"); len(got) != 0 {
+		t.Errorf("explicit Remove left a stale child link: %v", got)
+	}
+	if err := sn.Remove(ctx, "base"); err != nil {
+		t.Fatalf("base unremovable after its child was explicitly removed: %v", err)
 	}
 }
