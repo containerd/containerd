@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
@@ -34,6 +35,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -232,5 +234,37 @@ func checkIngestLeased(ctx context.Context, db *DB, ref string) error {
 		}
 
 		return nil
+	})
+}
+
+type hangingDeleteStore struct {
+	content.Store
+	deletes atomic.Int32
+}
+
+func (s *hangingDeleteStore) Delete(ctx context.Context, dgst digest.Digest) error {
+	s.deletes.Add(1)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestContentGarbageCollectHangingDelete(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, bdb := testEnv(t)
+
+		backend, err := local.NewStore(t.TempDir())
+		require.NoError(t, err)
+
+		cs := &hangingDeleteStore{Store: backend}
+		db := NewDB(bdb, cs, nil)
+		require.NoError(t, db.Init(ctx))
+
+		blob := []byte("unreferenced")
+		desc := ocispec.Descriptor{Digest: digest.FromBytes(blob), Size: int64(len(blob))}
+		require.NoError(t, content.WriteBlob(ctx, backend, "unreferenced", bytes.NewReader(blob), desc))
+
+		_, err = db.cs.garbageCollect(ctx)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Equal(t, int32(1), cs.deletes.Load())
 	})
 }

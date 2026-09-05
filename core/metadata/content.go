@@ -37,7 +37,22 @@ import (
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/timeout"
 )
+
+// gcContentCleanupTimeoutKey bounds the whole content cleanup pass during
+// garbage collection, which holds the content store write lock: an
+// unresponsive backing store (e.g. a hung proxy plugin RPC) would otherwise
+// block all content operations forever. On timeout the rest of the pass is
+// abandoned; remaining blobs stay orphaned and are retried on the next GC pass.
+const (
+	gcContentCleanupTimeoutKey     = "io.containerd.timeout.gc.content.cleanup"
+	defaultGCContentCleanupTimeout = 30 * time.Minute
+)
+
+func init() {
+	timeout.Set(gcContentCleanupTimeoutKey, defaultGCContentCleanupTimeout)
+}
 
 type contentStore struct {
 	content.Store
@@ -912,6 +927,9 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 	}); err != nil {
 		return 0, err
 	}
+
+	ctx, cancel := timeout.WithContext(ctx, gcContentCleanupTimeoutKey)
+	defer cancel()
 
 	err = cs.Store.Walk(ctx, func(info content.Info) error {
 		if _, ok := contentSeen[info.Digest.String()]; !ok {
