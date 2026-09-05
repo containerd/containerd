@@ -100,6 +100,14 @@ func (c *criService) getMetricDescriptors() map[string][]*runtime.MetricDescript
 			containerSpecMemoryReservationLimitBytes,
 			containerSpecMemorySwapLimitBytes,
 		},
+		PressureMetrics: {
+			containerPressureCPUStalledSecondsTotal,
+			containerPressureCPUWaitingSecondsTotal,
+			containerPressureMemoryStalledSecondsTotal,
+			containerPressureMemoryWaitingSecondsTotal,
+			containerPressureIOStalledSecondsTotal,
+			containerPressureIOWaitingSecondsTotal,
+		},
 	}
 	return descriptors
 }
