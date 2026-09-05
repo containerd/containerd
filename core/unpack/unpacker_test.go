@@ -232,6 +232,52 @@ func TestIsStaged(t *testing.T) {
 	}
 }
 
+func TestParentChainIDsForLayers(t *testing.T) {
+	layer := func(mt string) ocispec.Descriptor { return ocispec.Descriptor{MediaType: mt} }
+	const (
+		real = ocispec.MediaTypeImageLayerGzip
+		skip = images.MediaTypeErofsChunkIndex
+	)
+
+	for _, tc := range []struct {
+		name  string
+		types []string
+	}{
+		{name: "no skips", types: []string{real, real, real}},
+		{name: "skip in middle", types: []string{real, skip, real}},
+		{name: "consecutive skips in middle", types: []string{real, skip, skip, real}},
+		{name: "leading skip", types: []string{skip, real, real}},
+		{name: "trailing skip", types: []string{real, real, skip}},
+		{name: "all skip", types: []string{skip, skip, skip}},
+		{name: "single real layer", types: []string{real}},
+		{name: "single skip layer", types: []string{skip}},
+		{name: "empty", types: nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			layers := make([]ocispec.Descriptor, len(tc.types))
+			diffIDs := make([]digest.Digest, len(tc.types))
+			for i, mt := range tc.types {
+				layers[i] = layer(mt)
+				diffIDs[i] = digest.FromString(fmt.Sprintf("layer-%d", i))
+			}
+			// chainIDs is always computed over every layer, skip or not,
+			// exactly as core/unpack.unpack does.
+			chainIDs := identity.ChainIDs(diffIDs)
+
+			got := parentChainIDsForLayers(layers, chainIDs)
+			assert.Len(t, got, len(layers))
+
+			var want string
+			for i, mt := range tc.types {
+				assert.Equal(t, want, got[i], "layer %d", i)
+				if mt != skip {
+					want = chainIDs[i].String()
+				}
+			}
+		})
+	}
+}
+
 // stagedSnapshotter reports every layer as staged (read-only mounts) and
 // records the Prepare/Commit calls. Only Prepare and Commit are exercised on
 // the staged path, so the embedded (nil) Snapshotter covers the rest of the

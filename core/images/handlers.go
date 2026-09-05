@@ -23,10 +23,12 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
+	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -344,6 +346,132 @@ func LimitManifests(f HandlerFunc, m platforms.MatchComparer, n int) HandlerFunc
 				if len(children) > n {
 					children = children[:n]
 				}
+			}
+		}
+		return children, nil
+	}
+}
+
+// selectManifestsByPlatform reorders children in place so that the best
+// manifest for each of platformSpecs comes first - at most one per spec,
+// in spec order - and returns how many were selected. A descriptor not
+// selected keeps its relative order among the others after the selected
+// prefix.
+//
+// It selects the best match for each spec independently, one at a time,
+// rather than sorting children as a whole, because each spec has its own
+// matching order: for each spec, in turn, it scans the not-yet-selected
+// remainder of children for that spec's best match - using
+// platforms.Ordered(spec), the exact-match, most-OSFeatures-wins ordering
+// LimitManifests already applies for a single platform - and rotates it
+// to the front of that remainder.
+//
+// A descriptor with a nil Platform is never selected.
+func selectManifestsByPlatform(children []ocispec.Descriptor, platformSpecs []ocispec.Platform) int {
+	selected := 0
+	for _, spec := range platformSpecs {
+		m := platforms.Ordered(spec)
+
+		best := -1
+		var bestPlatform *ocispec.Platform
+		for i := selected; i < len(children); i++ {
+			p := children[i].Platform
+			if p == nil || !m.Match(*p) {
+				continue
+			}
+			if best < 0 || m.Less(*p, *bestPlatform) {
+				best, bestPlatform = i, p
+			}
+		}
+		if best < 0 {
+			continue
+		}
+
+		// Rotate the winner to the front of the not-yet-selected
+		// remainder, preserving the relative order of everything it
+		// passes over.
+		winner := children[best]
+		copy(children[selected+1:best+1], children[selected:best])
+		children[selected] = winner
+		selected++
+	}
+	return selected
+}
+
+// SelectManifestsPerPlatform is a handler wrapper which, for each of
+// platformSpecs, keeps only its single best manifest child of an index
+// (see selectManifestsByPlatform), dropping every manifest not selected
+// for any of them entirely. Children which are not manifests directly
+// under an index - including a standalone manifest's own children - are
+// returned unfiltered.
+func SelectManifestsPerPlatform(f HandlerFunc, platformSpecs []ocispec.Platform) HandlerFunc {
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		children, err := f(ctx, desc)
+		if err != nil {
+			return nil, err
+		}
+		if !IsIndexType(desc.MediaType) {
+			return children, nil
+		}
+
+		selected := selectManifestsByPlatform(children, platformSpecs)
+		var descs []ocispec.Descriptor
+		for i, d := range children {
+			if i < selected || d.Platform == nil {
+				descs = append(descs, d)
+			}
+		}
+		return descs, nil
+	}
+}
+
+// SelectManifestLayersPerPlatform is like SelectManifestsPerPlatform,
+// except - like FilterManifestByPlatformHandler - it keeps every manifest
+// (and so its own configuration) reachable regardless of whether it was
+// selected for its platform, pruning only the children of one which was
+// not down to its configuration.
+//
+// It is meant to be layered on top of a handler which already keeps every
+// manifest reachable for metadata purposes, such as
+// remotes.FilterManifestByPlatformHandler, to additionally avoid fetching
+// (and, when unpacking, applying) the layers of every acceptable manifest
+// for a platform rather than just its selected one.
+func SelectManifestLayersPerPlatform(f HandlerFunc, platformSpecs []ocispec.Platform) HandlerFunc {
+	var (
+		mu   sync.Mutex
+		keep = map[digest.Digest]bool{}
+	)
+
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		children, err := f(ctx, desc)
+		if err != nil {
+			return nil, err
+		}
+
+		if IsIndexType(desc.MediaType) {
+			selected := selectManifestsByPlatform(children, platformSpecs)
+			mu.Lock()
+			for i, d := range children {
+				if d.Platform != nil {
+					keep[d.Digest] = i < selected
+				}
+			}
+			mu.Unlock()
+			return children, nil
+		}
+
+		if IsManifestType(desc.MediaType) {
+			mu.Lock()
+			keepLayers, wasChild := keep[desc.Digest]
+			mu.Unlock()
+			if wasChild && !keepLayers {
+				var descs []ocispec.Descriptor
+				for _, child := range children {
+					if IsConfigType(child.MediaType) {
+						descs = append(descs, child)
+					}
+				}
+				return descs, nil
 			}
 		}
 		return children, nil

@@ -165,14 +165,14 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
-	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
+	imgPlatform, err := c.runtimeImagePlatform(ctx, ref, sandboxConfig, runtimeHandler)
 	if err != nil {
 		return "", err
 	}
 
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
-		tracing.Attribute("snapshotter.name", snapshotter),
+		tracing.Attribute("snapshotter.name", imgPlatform.Snapshotter),
 	)
 	labels := c.getLabels(ctx, ref)
 
@@ -185,9 +185,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		bytesPulled uint64
 	)
 	if c.config.UseLocalImagePull {
-		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, credentials, imgPlatform, labels, imagePullProgressTimeout)
 	} else {
-		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, imgPlatform, labels, imagePullProgressTimeout)
 	}
 
 	if err != nil {
@@ -247,7 +247,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	ctx context.Context,
 	ref string,
 	credentials func(string) (string, string, error),
-	snapshotter string,
+	imgPlatform ImagePlatform,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, uint64, error) {
@@ -259,10 +259,11 @@ func (c *CRIImageService) pullImageWithLocalPull(
 		Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
 	})
 
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, snapshotter)
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, imgPlatform.Snapshotter)
 	pullOpts := []containerd.RemoteOpt{
 		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(snapshotter),
+		containerd.WithPullSnapshotter(imgPlatform.Snapshotter),
+		containerd.WithPlatform(platforms.FormatAll(imgPlatform.Platform)),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabels(labels),
 		containerd.WithDownloadLimiter(c.downloadLimiter),
@@ -305,19 +306,19 @@ func (c *CRIImageService) pullImageWithTransferService(
 	ctx context.Context,
 	ref string,
 	credentials func(string) (string, string, error),
-	snapshotter string,
+	imgPlatform ImagePlatform,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, uint64, error) {
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, imgPlatform.Snapshotter)
 	rctx, rcancel := context.WithCancel(ctx)
 	defer rcancel()
 	transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
 
 	// Set image store opts
 	sopts := []transferimage.StoreOpt{
-		transferimage.WithPlatforms(platforms.DefaultSpec()),
-		transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter),
+		transferimage.WithPlatforms(imgPlatform.Platform),
+		transferimage.WithUnpack(imgPlatform.Platform, imgPlatform.Snapshotter),
 		transferimage.WithImageLabels(labels),
 	}
 
@@ -854,9 +855,11 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 	return resp, err
 }
 
-// snapshotterFromPodSandboxConfig returns the snapshotter to use for the given
-// runtime handler. If a runtime-specific snapshotter is configured, it will be
-// returned; otherwise the default snapshotter is used.
+// runtimeImagePlatform returns the snapshotter and platform to use for the
+// given runtime handler when pulling imageRef. If a runtime-specific
+// snapshotter and/or platform is configured (see ImagePlatform,
+// runtime_platforms.<handler> in the CRI image config), it is returned;
+// otherwise the default snapshotter and platforms.DefaultSpec() are used.
 //
 // The runtimeHandler parameter (from CRI PullImageRequest, available since cri-api v0.29.0)
 // takes precedence. If empty, we fall back to the experimental annotation for backward
@@ -866,22 +869,25 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 // deprecated and will be removed in containerd 2.5.
 //
 // See https://github.com/containerd/containerd/issues/6657
-func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig, runtimeHandler string) (string, error) {
-	snapshotter := c.config.Snapshotter
+func (c *CRIImageService) runtimeImagePlatform(ctx context.Context, imageRef string,
+	s *runtime.PodSandboxConfig, runtimeHandler string) (ImagePlatform, error) {
+	imgPlatform := ImagePlatform{
+		Snapshotter: c.config.Snapshotter,
+		Platform:    platforms.DefaultSpec(),
+	}
 	if s == nil {
-		return snapshotter, nil
+		return imgPlatform, nil
 	}
 
 	// If runtimeHandler parameter is empty, fall back to annotation for backward compatibility
 	if runtimeHandler == "" {
 		if s.Annotations == nil {
-			return snapshotter, nil
+			return imgPlatform, nil
 		}
 		var ok bool
 		runtimeHandler, ok = s.Annotations[annotations.RuntimeHandler]
 		if !ok {
-			return snapshotter, nil
+			return imgPlatform, nil
 		}
 		log.G(ctx).Warnf("Using deprecated annotation %q for runtime handler. "+
 			"This will be removed in a future release (2.5). "+
@@ -890,13 +896,18 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	}
 
 	if c.runtimePlatforms != nil {
-		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
-			snapshotter = p.Snapshotter
-			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
+		if p, ok := c.runtimePlatforms[runtimeHandler]; ok {
+			if p.Snapshotter != "" && p.Snapshotter != imgPlatform.Snapshotter {
+				imgPlatform.Snapshotter = p.Snapshotter
+				log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, imgPlatform.Snapshotter)
+			}
+			if p.Platform.OS != "" {
+				imgPlatform.Platform = p.Platform
+			}
 		}
 	}
 
-	return snapshotter, nil
+	return imgPlatform, nil
 }
 
 type criCredentials struct {
