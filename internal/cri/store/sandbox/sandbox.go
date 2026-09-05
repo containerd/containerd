@@ -45,7 +45,8 @@ type Sandbox struct {
 	// Stats contains (mutable) stats for the (pause) sandbox container
 	Stats *stats.ContainerStats
 	// Endpoint is the sandbox endpoint, for task or streaming api connection
-	Endpoint Endpoint
+	Endpoint     Endpoint
+	NetworkReady chan struct{}
 }
 
 type Endpoint struct {

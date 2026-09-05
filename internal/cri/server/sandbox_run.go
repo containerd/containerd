@@ -153,7 +153,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		},
 	)
 	sandbox.Sandboxer = ociRuntime.Sandboxer
-
+	sandbox.NetworkReady = make(chan struct{})
 	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
 		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 	}
@@ -263,10 +263,24 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
-		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
-			return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
-		}
-		sandboxCreateNetworkTimer.UpdateSince(netStart)
+		setCtx := context.WithoutCancel(ctx)
+		go func(sid string, ret error) {
+			if err := c.setupPodNetwork(setCtx, &sandbox); err != nil {
+				log.G(setCtx).Errorf("failed to setup network for sandbox %q: %s", id, err.Error())
+				if retErr == nil {
+					r := &runtime.StopPodSandboxRequest{PodSandboxId: sid}
+					c.StopPodSandbox(setCtx, r)
+				} else {
+					deferCtx, deferCancel := util.DeferContext()
+					defer deferCancel()
+					if cleanupErr = c.teardownPodNetwork(deferCtx, sandbox); cleanupErr != nil {
+						log.G(setCtx).WithError(cleanupErr).Errorf("Failed to destroy network for sandbox %q", id)
+					}
+				}
+			}
+			close(sandbox.NetworkReady)
+			sandboxCreateNetworkTimer.UpdateSince(netStart)
+		}(id, retErr)
 
 		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
 			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
