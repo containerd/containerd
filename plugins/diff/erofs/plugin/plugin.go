@@ -42,6 +42,14 @@ type Config struct {
 	// EnableDmverity enables dm-verity formatting for EROFS layers
 	// Linux only
 	EnableDmverity bool `toml:"enable_dmverity"`
+
+	// LinkBlobs hardlinks uncompressed native EROFS layers from the content
+	// store into snapshots instead of copying them, making the apply step a
+	// metadata operation. Applies are serialized along the snapshot parent
+	// chain, so this directly shortens image unpack. Falls back to copying
+	// whenever linking is not possible (e.g. the content store is on a
+	// different filesystem).
+	LinkBlobs bool `toml:"link_blobs"`
 }
 
 func init() {
@@ -94,6 +102,10 @@ func init() {
 					return nil, fmt.Errorf("dm-verity is not supported on this system (dm_verity module not loaded): %w", plugin.ErrSkipPlugin)
 				}
 				opts = append(opts, erofs.WithDmverity())
+			}
+
+			if config.LinkBlobs {
+				opts = append(opts, erofs.WithBlobLinks())
 			}
 
 			return erofs.NewErofsDiffer(cs, opts...), nil

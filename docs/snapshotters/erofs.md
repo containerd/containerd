@@ -166,6 +166,22 @@ improved performance, as shown below:
     mkfs_options = ["-T0", "--mkfs-time", "--sort=none"]
 ```
 
+For images with native (uncompressed) EROFS layers, the differ can hardlink
+the layer blob from the content store into the snapshot instead of copying
+it, which makes applying such a layer a metadata operation:
+
+``` toml
+  [plugins."io.containerd.differ.v1.erofs"]
+    link_blobs = true
+```
+
+Content blobs are immutable and content garbage collection unlinks rather
+than modifies them, so the extra link is safe; whenever linking is not
+possible (for example, the content store lives on a different filesystem),
+the differ falls back to copying. Layers are given back their own inode
+before the snapshotter seals them with `enable_fsverity` or `set_immutable`,
+and layers formatted with the differ's `enable_dmverity` are never linked.
+
 ### Running a container
 
 To run a container using the EROFS snapshotter, it needs to be explicitly
