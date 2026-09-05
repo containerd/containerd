@@ -65,6 +65,15 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   signal (receive) peer={{.DaemonProfile}},
   # Container processes may send signals amongst themselves.
   signal (send,receive) peer={{.Name}},
+  # In stacking mode, exec'd processes may have a stacked profile, whose
+  # label lists this profile alongside the others it is stacked with.
+  # The components are ordered lexically, not by stacking order, so this
+  # profile can appear at either end or in the middle; all three positions
+  # need a rule. ** rather than *, because * stops at "/", and both profile
+  # names and the remaining components can contain one.
+  signal (send,receive) peer={{.Name}}//&**,
+  signal (send,receive) peer=**//&{{.Name}},
+  signal (send,receive) peer=**//&{{.Name}}//&**,
 {{if .RootlessKit}}
   # https://github.com/containerd/nerdctl/issues/2730
   signal (receive) peer={{.RootlessKit}},
@@ -92,6 +101,10 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   # allow processes within the container to trace each other,
   # provided all other LSM and yama setting allow it.
   ptrace (trace,tracedby,read,readby) peer={{.Name}},
+  # Same three stacked-label positions as the signal rules above.
+  ptrace (trace,tracedby,read,readby) peer={{.Name}}//&**,
+  ptrace (trace,tracedby,read,readby) peer=**//&{{.Name}},
+  ptrace (trace,tracedby,read,readby) peer=**//&{{.Name}}//&**,
 }
 `
 
