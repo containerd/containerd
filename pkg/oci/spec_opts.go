@@ -1661,6 +1661,9 @@ func WithCPUs(cpus string) SpecOpts {
 		}
 		setCPU(s)
 		s.Linux.Resources.CPU.Cpus = cpus
+		if parsed, err := parsePossibleCPUs(cpus); err == nil {
+			s.Linux.MaskedPaths = appendCPUThrottlePaths(s.Linux.MaskedPaths, parsed)
+		}
 		return nil
 	}
 }
