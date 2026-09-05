@@ -117,7 +117,9 @@ func init() {
 				"ScheduleDelay":     fmt.Sprint(m.scheduleDelay),
 			}
 
-			go m.run(ic.Context)
+			runCtx, cancel := context.WithCancel(ic.Context)
+			m.cancel = cancel
+			go m.run(runCtx)
 
 			return m, nil
 		},
@@ -140,6 +142,13 @@ type gcScheduler struct {
 
 	eventC chan mutationEvent
 
+	// cancel stops the background run loop. It is set during plugin
+	// initialization and invoked by Close.
+	cancel context.CancelFunc
+	// doneC is closed by run when the background loop has exited and no
+	// garbage collection is in flight.
+	doneC chan struct{}
+
 	waiterL sync.Mutex
 	waiters []chan gc.Stats
 
@@ -156,6 +165,7 @@ func newScheduler(c collector, cfg *config) *gcScheduler {
 	s := &gcScheduler{
 		c:                 c,
 		eventC:            eventC,
+		doneC:             make(chan struct{}),
 		pauseThreshold:    cfg.PauseThreshold,
 		deletionThreshold: cfg.DeletionThreshold,
 		mutationThreshold: cfg.MutationThreshold,
@@ -188,9 +198,34 @@ func (s *gcScheduler) ScheduleAndWait(ctx context.Context) (gc.Stats, error) {
 	return s.wait(ctx, true)
 }
 
+// Close stops the background garbage collection loop and waits for any
+// in-flight collection to finish before returning.
+func (s *gcScheduler) Close() error {
+	if s.cancel == nil {
+		return nil
+	}
+	s.cancel()
+	<-s.doneC
+	return nil
+}
+
+// errSchedulerClosed is returned to wait callers when the scheduler's run
+// loop has exited and no further collections will be scheduled.
+var errSchedulerClosed = errors.New("gc scheduler closed")
+
 func (s *gcScheduler) wait(ctx context.Context, trigger bool) (gc.Stats, error) {
+	var gcStats gc.Stats
+
 	wc := make(chan gc.Stats, 1)
 	s.waiterL.Lock()
+	// Don't register a waiter once the run loop has exited; nothing would
+	// ever complete or close it.
+	select {
+	case <-s.doneC:
+		s.waiterL.Unlock()
+		return gcStats, errSchedulerClosed
+	default:
+	}
 	s.waiters = append(s.waiters, wc)
 	s.waiterL.Unlock()
 
@@ -198,12 +233,9 @@ func (s *gcScheduler) wait(ctx context.Context, trigger bool) (gc.Stats, error) 
 		e := mutationEvent{
 			ts: time.Now(),
 		}
-		go func() {
-			s.eventC <- e
-		}()
+		go s.sendEvent(e)
 	}
 
-	var gcStats gc.Stats
 	select {
 	case stats, ok := <-wc:
 		if !ok {
@@ -212,6 +244,8 @@ func (s *gcScheduler) wait(ctx context.Context, trigger bool) (gc.Stats, error) 
 		gcStats = stats
 	case <-ctx.Done():
 		return gcStats, ctx.Err()
+	case <-s.doneC:
+		return gcStats, errSchedulerClosed
 	}
 
 	return gcStats, nil
@@ -223,9 +257,17 @@ func (s *gcScheduler) mutationCallback(dirty bool) {
 		mutation: true,
 		dirty:    dirty,
 	}
-	go func() {
-		s.eventC <- e
-	}()
+	go s.sendEvent(e)
+}
+
+// sendEvent delivers an event to the run loop, abandoning the send if the
+// scheduler is closed. This prevents goroutines from leaking on an unbuffered
+// eventC once run has exited and is no longer receiving.
+func (s *gcScheduler) sendEvent(e mutationEvent) {
+	select {
+	case s.eventC <- e:
+	case <-s.doneC:
+	}
 }
 
 func schedule(d time.Duration) (<-chan time.Time, *time.Time) {
@@ -233,7 +275,21 @@ func schedule(d time.Duration) (<-chan time.Time, *time.Time) {
 	return time.After(d), &next
 }
 
+// shutdown marks the scheduler closed and is called when the run loop exits.
+// Closing doneC under waiterL serializes it against waiter registration in
+// wait: a caller either observes doneC before appending (and bails out) or
+// appends first and is then released by the doneC case of its select. Either
+// way no waiter is left stranded in s.waiters after the loop is gone.
+func (s *gcScheduler) shutdown() {
+	s.waiterL.Lock()
+	close(s.doneC)
+	s.waiters = nil
+	s.waiterL.Unlock()
+}
+
 func (s *gcScheduler) run(ctx context.Context) {
+	defer s.shutdown()
+
 	const minimumGCTime = float64(5 * time.Millisecond)
 	var (
 		schedC <-chan time.Time
