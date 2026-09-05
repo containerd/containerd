@@ -81,7 +81,7 @@ func clientWithTrace() error {
         grpc.WithTransportCredentials(insecure.NewCredentials()),
         grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
     }
-    client, ctx, cancel, err := commands.NewClient(context, containerd.WithDialOpts(dialOpts))
+    client, ctx, cancel, err := commands.NewClient(ctx, cmd, containerd.WithDialOpts(dialOpts))
     if err != nil {
         return err
     }

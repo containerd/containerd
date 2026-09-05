@@ -33,7 +33,7 @@ import (
 var Command = &cli.Command{
 	Name:  "leases",
 	Usage: "Manage leases",
-	Subcommands: cli.Commands{
+	Subcommands: []*cli.Command{
 		listCommand,
 		createCommand,
 		deleteCommand,
@@ -54,12 +54,13 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the blob digest",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
-			filters = cliContext.Args().Slice()
-			quiet   = cliContext.Bool("quiet")
+			filters = cmd.Args().Slice()
+			quiet   = cmd.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -117,9 +118,10 @@ var createCommand = &cli.Command{
 			Value:   24 * time.Hour,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		var labelstr = cliContext.Args().Slice()
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
+		labelstr := cmd.Args().Slice()
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -136,10 +138,10 @@ var createCommand = &cli.Command{
 			opts = append(opts, leases.WithLabels(labels))
 		}
 
-		if id := cliContext.String("id"); id != "" {
+		if id := cmd.String("id"); id != "" {
 			opts = append(opts, leases.WithID(id))
 		}
-		if exp := cliContext.Duration("expires"); exp > 0 {
+		if exp := cmd.Duration("expires"); exp > 0 {
 			opts = append(opts, leases.WithExpiration(exp))
 		}
 
@@ -166,19 +168,20 @@ var deleteCommand = &cli.Command{
 			Usage: "Synchronously remove leases and all unreferenced resources",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		var lids = cliContext.Args().Slice()
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
+		lids := cmd.Args().Slice()
 		if len(lids) == 0 {
-			return cli.ShowSubcommandHelp(cliContext)
+			return cli.ShowSubcommandHelp(cmd)
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
 		ls := client.LeasesService()
-		sync := cliContext.Bool("sync")
+		sync := cmd.Bool("sync")
 		for i, lid := range lids {
 			var opts []leases.DeleteOpt
 			if sync && i == len(lids)-1 {

@@ -43,7 +43,7 @@ var (
 	Command = &cli.Command{
 		Name:  "content",
 		Usage: "Manage content",
-		Subcommands: cli.Commands{
+		Subcommands: []*cli.Command{
 			activeIngestCommand,
 			deleteCommand,
 			editCommand,
@@ -64,12 +64,13 @@ var (
 		Usage:       "Get the data for an object",
 		ArgsUsage:   "[<digest>, ...]",
 		Description: "display the image object",
-		Action: func(cliContext *cli.Context) error {
-			dgst, err := digest.Parse(cliContext.Args().First())
+		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
+			dgst, err := digest.Parse(cmd.Args().First())
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -103,11 +104,12 @@ var (
 				Usage: "Verify content against expected digest",
 			},
 		},
-		Action: func(cliContext *cli.Context) error {
+		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
-				ref            = cliContext.Args().First()
-				expectedSize   = cliContext.Int64("expected-size")
-				expectedDigest = digest.Digest(cliContext.String("expected-digest"))
+				ref            = cmd.Args().First()
+				expectedSize   = cmd.Int64("expected-size")
+				expectedDigest = digest.Digest(cmd.String("expected-digest"))
 			)
 			if err := expectedDigest.Validate(); expectedDigest != "" && err != nil {
 				return err
@@ -115,7 +117,7 @@ var (
 			if ref == "" {
 				return errors.New("must specify a transaction reference")
 			}
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -148,9 +150,10 @@ var (
 				Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
 			},
 		},
-		Action: func(cliContext *cli.Context) error {
-			match := cliContext.Args().First()
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
+			match := cmd.Args().First()
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -186,12 +189,13 @@ var (
 				Usage:   "Print only the blob digest",
 			},
 		},
-		Action: func(cliContext *cli.Context) error {
+		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
-				quiet = cliContext.Bool("quiet")
-				args  = cliContext.Args().Slice()
+				quiet = cmd.Bool("quiet")
+				args  = cmd.Args().Slice()
 			)
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -239,9 +243,10 @@ var (
 		Usage:       "Add labels to content",
 		ArgsUsage:   "<digest> [<label>=<value> ...]",
 		Description: "labels blobs in the content store",
-		Action: func(cliContext *cli.Context) error {
-			object, labels := commands.ObjectWithLabelArgs(cliContext)
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
+			object, labels := commands.ObjectWithLabelArgs(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -304,10 +309,11 @@ var (
 				EnvVars: []string{"EDITOR"},
 			},
 		},
-		Action: func(cliContext *cli.Context) error {
+		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
-				validate = cliContext.String("validate")
-				object   = cliContext.Args().First()
+				validate = cmd.String("validate")
+				object   = cmd.Args().First()
 			)
 
 			if validate != "" {
@@ -321,7 +327,7 @@ var (
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -333,7 +339,7 @@ var (
 			}
 			defer ra.Close()
 
-			nrc, err := edit(cliContext, content.NewReader(ra))
+			nrc, err := edit(cmd.String("editor"), content.NewReader(ra))
 			if err != nil {
 				return err
 			}
@@ -364,12 +370,13 @@ var (
 		ArgsUsage: "[<digest>, ...]",
 		Description: `Delete one or more blobs permanently. Successfully deleted
 	blobs are printed to stdout.`,
-		Action: func(cliContext *cli.Context) error {
+		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
-				args      = cliContext.Args().Slice()
+				args      = cmd.Args().Slice()
 				exitError error
 			)
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -412,18 +419,17 @@ var (
 		ArgsUsage:   "[flags] <remote> <object> [<hint>, ...]",
 		Description: `Fetch objects by identifier from a remote.`,
 		Flags:       commands.RegistryFlags,
-		Action: func(cliContext *cli.Context) error {
-			var (
-				ref = cliContext.Args().First()
-			)
-			ctx, cancel := commands.AppContext(cliContext)
+		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
+			ctx, cancel := commands.AppContext(ctx, cmd)
 			defer cancel()
 
-			resolver, err := commands.GetResolver(ctx, cliContext)
+			resolver, err := commands.GetResolver(ctx, cmd)
 			if err != nil {
 				return err
 			}
 
+			ref := cmd.Args().First()
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
 			log.G(ctx).Tracef("resolving")
@@ -459,22 +465,21 @@ var (
 				Usage: "Specify target mediatype for request header",
 			},
 		}...),
-		Action: func(cliContext *cli.Context) error {
-			var (
-				ref     = cliContext.Args().First()
-				digests = cliContext.Args().Tail()
-			)
+		Action: func(cmd *cli.Context) error {
+			digests := cmd.Args().Tail()
 			if len(digests) == 0 {
 				return errors.New("must specify digests")
 			}
-			ctx, cancel := commands.AppContext(cliContext)
+			ctx := cmd.Context
+			ctx, cancel := commands.AppContext(ctx, cmd)
 			defer cancel()
 
-			resolver, err := commands.GetResolver(ctx, cliContext)
+			resolver, err := commands.GetResolver(ctx, cmd)
 			if err != nil {
 				return err
 			}
 
+			ref := cmd.Args().First()
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
 			log.G(ctx).Tracef("resolving")
@@ -493,7 +498,7 @@ var (
 				if err != nil {
 					return err
 				}
-				rc, desc, err := fetcherByDigest.FetchByDigest(ctx, dgst, remotes.WithMediaType(cliContext.String("media-type")))
+				rc, desc, err := fetcherByDigest.FetchByDigest(ctx, dgst, remotes.WithMediaType(cmd.String("media-type")))
 				if err != nil {
 					return err
 				}
@@ -514,23 +519,24 @@ var (
 		ArgsUsage:   "[flags] <remote> <object> <type>",
 		Description: `Push objects by identifier to a remote.`,
 		Flags:       commands.RegistryFlags,
-		Action: func(cliContext *cli.Context) error {
+		Action: func(cmd *cli.Context) error {
+			ctx := cmd.Context
 			var (
-				ref    = cliContext.Args().Get(0)
-				object = cliContext.Args().Get(1)
-				media  = cliContext.Args().Get(2)
+				ref    = cmd.Args().Get(0)
+				object = cmd.Args().Get(1)
+				media  = cmd.Args().Get(2)
 			)
 			dgst, err := digest.Parse(object)
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
 			defer cancel()
 
-			resolver, err := commands.GetResolver(ctx, cliContext)
+			resolver, err := commands.GetResolver(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -578,8 +584,7 @@ var (
 	}
 )
 
-func edit(cliContext *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error) {
-	editor := cliContext.String("editor")
+func edit(editor string, rd io.Reader) (_ io.ReadCloser, retErr error) {
 	if editor == "" {
 		return nil, errors.New("editor is required")
 	}

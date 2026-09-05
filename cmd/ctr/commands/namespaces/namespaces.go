@@ -35,7 +35,7 @@ var Command = &cli.Command{
 	Name:    "namespaces",
 	Aliases: []string{"namespace", "ns"},
 	Usage:   "Manage namespaces",
-	Subcommands: cli.Commands{
+	Subcommands: []*cli.Command{
 		createCommand,
 		listCommand,
 		removeCommand,
@@ -49,12 +49,13 @@ var createCommand = &cli.Command{
 	Usage:       "Create a new namespace",
 	ArgsUsage:   "<name> [<key>=<value>]",
 	Description: "create a new namespace. it must be unique",
-	Action: func(cliContext *cli.Context) error {
-		namespace, labels := commands.ObjectWithLabelArgs(cliContext)
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
+		namespace, labels := commands.ObjectWithLabelArgs(cmd)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -69,12 +70,13 @@ var setLabelsCommand = &cli.Command{
 	Usage:       "Set and clear labels for a namespace",
 	ArgsUsage:   "<name> [<key>=<value>, ...]",
 	Description: "set and clear labels for a namespace. empty value clears the label",
-	Action: func(cliContext *cli.Context) error {
-		namespace, labels := commands.ObjectWithLabelArgs(cliContext)
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
+		namespace, labels := commands.ObjectWithLabelArgs(cmd)
 		if namespace == "" {
 			return errors.New("please specify a namespace")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -102,9 +104,9 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the namespace name",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		quiet := cliContext.Bool("quiet")
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -115,6 +117,7 @@ var listCommand = &cli.Command{
 			return err
 		}
 
+		quiet := cmd.Bool("quiet")
 		if quiet {
 			for _, ns := range nss {
 				fmt.Println(ns)
@@ -155,17 +158,18 @@ var removeCommand = &cli.Command{
 			Usage:   "Delete the namespace's cgroup",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		var exitErr error
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		opts := deleteOpts(cliContext)
+		var exitErr error
+		opts := deleteOpts(cmd)
 		namespaces := client.NamespaceService()
-		for _, target := range cliContext.Args().Slice() {
+		for _, target := range cmd.Args().Slice() {
 			if err := namespaces.Delete(ctx, target, opts...); err != nil {
 				if !errdefs.IsNotFound(err) {
 					if exitErr == nil {

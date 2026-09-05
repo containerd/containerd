@@ -55,8 +55,8 @@ func passwordPrompt() (string, error) {
 }
 
 // GetResolver prepares the resolver from the environment and options
-func GetResolver(ctx context.Context, cliContext *cli.Context) (remotes.Resolver, error) {
-	username := cliContext.String("user")
+func GetResolver(ctx context.Context, cmd *cli.Context) (remotes.Resolver, error) {
+	username := cmd.String("user")
 	var secret string
 	if i := strings.IndexByte(username, ':'); i > 0 {
 		secret = username[i+1:]
@@ -77,7 +77,7 @@ func GetResolver(ctx context.Context, cliContext *cli.Context) (remotes.Resolver
 
 			fmt.Print("\n")
 		}
-	} else if rt := cliContext.String("refresh"); rt != "" {
+	} else if rt := cmd.String("refresh"); rt != "" {
 		secret = rt
 	}
 
@@ -87,19 +87,19 @@ func GetResolver(ctx context.Context, cliContext *cli.Context) (remotes.Resolver
 		// Only one host
 		return username, secret, nil
 	}
-	if cliContext.Bool("plain-http") {
+	if cmd.Bool("plain-http") {
 		hostOptions.DefaultScheme = "http"
 	}
-	defaultTLS, err := resolverDefaultTLS(cliContext)
+	defaultTLS, err := resolverDefaultTLS(cmd)
 	if err != nil {
 		return nil, err
 	}
 	hostOptions.DefaultTLS = defaultTLS
-	if hostDir := cliContext.String("hosts-dir"); hostDir != "" {
+	if hostDir := cmd.String("hosts-dir"); hostDir != "" {
 		hostOptions.HostDir = config.HostDirFromRoot(hostDir)
 	}
 
-	if cliContext.Bool("http-dump") {
+	if cmd.Bool("http-dump") {
 		hostOptions.UpdateClient = func(client *http.Client) error {
 			httpdbg.DumpRequests(ctx, client, nil)
 			return nil
@@ -111,14 +111,14 @@ func GetResolver(ctx context.Context, cliContext *cli.Context) (remotes.Resolver
 	return docker.NewResolver(options), nil
 }
 
-func resolverDefaultTLS(cliContext *cli.Context) (*tls.Config, error) {
+func resolverDefaultTLS(cmd *cli.Context) (*tls.Config, error) {
 	tlsConfig := &tls.Config{}
 
-	if cliContext.Bool("skip-verify") {
+	if cmd.Bool("skip-verify") {
 		tlsConfig.InsecureSkipVerify = true
 	}
 
-	if tlsRootPath := cliContext.String("tlscacert"); tlsRootPath != "" {
+	if tlsRootPath := cmd.String("tlscacert"); tlsRootPath != "" {
 		tlsRootData, err := os.ReadFile(tlsRootPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read %q: %w", tlsRootPath, err)
@@ -130,8 +130,8 @@ func resolverDefaultTLS(cliContext *cli.Context) (*tls.Config, error) {
 		}
 	}
 
-	tlsCertPath := cliContext.String("tlscert")
-	tlsKeyPath := cliContext.String("tlskey")
+	tlsCertPath := cmd.String("tlscert")
+	tlsKeyPath := cmd.String("tlskey")
 	if tlsCertPath != "" || tlsKeyPath != "" {
 		if tlsCertPath == "" || tlsKeyPath == "" {
 			return nil, errors.New("flags --tlscert and --tlskey must be set together")
@@ -158,8 +158,8 @@ type staticCredentials struct {
 }
 
 // NewStaticCredentials gets credentials from passing in cli context
-func NewStaticCredentials(ctx context.Context, cliContext *cli.Context, ref string) (registry.CredentialHelper, error) {
-	username := cliContext.String("user")
+func NewStaticCredentials(ctx context.Context, cmd *cli.Context, ref string) (registry.CredentialHelper, error) {
+	username := cmd.String("user")
 	var secret string
 	if i := strings.IndexByte(username, ':'); i > 0 {
 		secret = username[i+1:]
@@ -177,7 +177,7 @@ func NewStaticCredentials(ctx context.Context, cliContext *cli.Context, ref stri
 
 			fmt.Print("\n")
 		}
-	} else if rt := cliContext.String("refresh"); rt != "" {
+	} else if rt := cmd.String("refresh"); rt != "" {
 		secret = rt
 	}
 
