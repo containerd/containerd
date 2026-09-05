@@ -174,7 +174,9 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		log.G(ctx).WithError(err).Errorf("NRI container start failed")
 		return nil, fmt.Errorf("NRI container start failed: %w", err)
 	}
-
+	if sandbox.NetworkReady != nil && !hostNetwork(sandbox.Config) {
+		<-sandbox.NetworkReady
+	}
 	// Start containerd task.
 	if err := task.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start containerd task %q: %w", id, err)
