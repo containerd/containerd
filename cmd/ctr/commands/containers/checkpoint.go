@@ -17,13 +17,14 @@
 package containers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/errdefs"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var checkpointCommand = &cli.Command{
@@ -44,16 +45,16 @@ var checkpointCommand = &cli.Command{
 			Usage: "Checkpoint container task",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		id := cliContext.Args().First()
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		ref := cliContext.Args().Get(1)
+		ref := cmd.Args().Get(1)
 		if ref == "" {
 			return errors.New("ref must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -62,13 +63,13 @@ var checkpointCommand = &cli.Command{
 			containerd.WithCheckpointRuntime,
 		}
 
-		if cliContext.Bool("image") {
+		if cmd.Bool("image") {
 			opts = append(opts, containerd.WithCheckpointImage)
 		}
-		if cliContext.Bool("rw") {
+		if cmd.Bool("rw") {
 			opts = append(opts, containerd.WithCheckpointRW)
 		}
-		if cliContext.Bool("task") {
+		if cmd.Bool("task") {
 			opts = append(opts, containerd.WithCheckpointTask)
 		}
 		container, err := client.LoadContainer(ctx, id)

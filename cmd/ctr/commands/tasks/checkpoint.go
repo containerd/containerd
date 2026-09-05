@@ -17,13 +17,14 @@
 package tasks
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd/api/types/runc/options"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var checkpointCommand = &cli.Command{
@@ -44,12 +45,12 @@ var checkpointCommand = &cli.Command{
 			Usage: "Path to criu work files and logs",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		id := cliContext.Args().First()
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext, containerd.WithDefaultRuntime(cliContext.String("runtime")))
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd, containerd.WithDefaultRuntime(cmd.String("runtime")))
 		if err != nil {
 			return err
 		}
@@ -66,12 +67,12 @@ var checkpointCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		opts := []containerd.CheckpointTaskOpts{withCheckpointOpts(info.Runtime.Name, cliContext)}
+		opts := []containerd.CheckpointTaskOpts{withCheckpointOpts(info.Runtime.Name, cmd)}
 		checkpoint, err := task.Checkpoint(ctx, opts...)
 		if err != nil {
 			return err
 		}
-		if cliContext.String("image-path") == "" {
+		if cmd.String("image-path") == "" {
 			fmt.Println(checkpoint.Name())
 		}
 		return nil
@@ -79,17 +80,17 @@ var checkpointCommand = &cli.Command{
 }
 
 // withCheckpointOpts only suitable for runc runtime now
-func withCheckpointOpts(rt string, cliContext *cli.Context) containerd.CheckpointTaskOpts {
+func withCheckpointOpts(rt string, cmd *cli.Command) containerd.CheckpointTaskOpts {
 	return func(r *containerd.CheckpointTaskInfo) error {
-		imagePath := cliContext.String("image-path")
-		workPath := cliContext.String("work-path")
+		imagePath := cmd.String("image-path")
+		workPath := cmd.String("work-path")
 
 		if r.Options == nil {
 			r.Options = &options.CheckpointOptions{}
 		}
 		opts, _ := r.Options.(*options.CheckpointOptions)
 
-		if cliContext.Bool("exit") {
+		if cmd.Bool("exit") {
 			opts.Exit = true
 		}
 		if imagePath != "" {

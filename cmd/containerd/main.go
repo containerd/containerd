@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -26,9 +27,9 @@ import (
 )
 
 func main() {
-	app := command.App()
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
+	ctx := context.Background()
+	if err := command.App().Run(ctx, os.Args); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, "containerd:", err)
 		os.Exit(1)
 	}
 }

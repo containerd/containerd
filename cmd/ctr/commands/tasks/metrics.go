@@ -17,6 +17,7 @@
 package tasks
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +29,7 @@ import (
 	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/typeurl/v2"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const (
@@ -49,13 +50,13 @@ var metricsCommand = &cli.Command{
 			Value: formatTable,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		container, err := client.LoadContainer(ctx, cliContext.Args().First())
+		container, err := client.LoadContainer(ctx, cmd.Args().First())
 		if err != nil {
 			return err
 		}
@@ -83,7 +84,7 @@ var metricsCommand = &cli.Command{
 			return err
 		}
 
-		switch cliContext.String(formatFlag) {
+		switch cmd.String(formatFlag) {
 		case formatTable:
 			w := tabwriter.NewWriter(os.Stdout, 1, 8, 4, ' ', 0)
 			fmt.Fprintf(w, "ID\tTIMESTAMP\t\n")

@@ -17,11 +17,12 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/containers"
@@ -55,8 +56,8 @@ func init() {
 	// Discard grpc logs so that they don't mess with our stdio
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 
-	cli.VersionPrinter = func(cliContext *cli.Context) {
-		fmt.Println(cliContext.App.Name, version.Package, cliContext.App.Version)
+	cli.VersionPrinter = func(cmd *cli.Command) {
+		_, _ = fmt.Fprintln(cmd.Root().Writer, cmd.Name, version.Package, cmd.Version)
 	}
 
 	// Override the default flag descriptions for '--version' and '--help'
@@ -66,28 +67,28 @@ func init() {
 		Aliases: []string{"v"},
 		Usage:   "Print the version",
 
-		DisableDefaultText: true,
+		HideDefault: true,
 	}
 	cli.HelpFlag = &cli.BoolFlag{
 		Name:    "help",
 		Aliases: []string{"h"},
 		Usage:   "Show help",
 
-		DisableDefaultText: true,
+		HideDefault: true,
 	}
 }
 
 // New returns a *cli.App instance.
-func New() *cli.App {
-	app := cli.NewApp()
-	app.Name = "ctr"
-	app.Version = version.Version
-	app.Description = `
+func New() *cli.Command {
+	return &cli.Command{
+		Name:    "ctr",
+		Version: version.Version,
+		Description: `
 ctr is an unsupported debug and administrative client for interacting
 with the containerd daemon. Because it is unsupported, the commands,
 options, and operations are not guaranteed to be backward compatible or
-stable from release to release of the containerd project.`
-	app.Usage = `
+stable from release to release of the containerd project.`,
+		Usage: `
         __
   _____/ /______
  / ___/ __/ ___/
@@ -95,61 +96,61 @@ stable from release to release of the containerd project.`
 \___/\__/_/
 
 containerd CLI
-`
-	app.DisableSliceFlagSeparator = true
-	app.EnableBashCompletion = true
-	app.Flags = []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "debug",
-			Usage: "Enable debug output in logs",
+`,
+		DisableSliceFlagSeparator: true,
+		EnableShellCompletion:     true,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "debug",
+				Usage: "Enable debug output in logs",
+			},
+			&cli.StringFlag{
+				Name:    "address",
+				Aliases: []string{"a"},
+				Usage:   "Address for containerd's GRPC server",
+				Value:   defaults.DefaultAddress,
+				Sources: cli.EnvVars("CONTAINERD_ADDRESS"),
+			},
+			&cli.DurationFlag{
+				Name:  "timeout",
+				Usage: "Total timeout for ctr commands",
+			},
+			&cli.DurationFlag{
+				Name:  "connect-timeout",
+				Usage: "Timeout for connecting to containerd",
+			},
+			&cli.StringFlag{
+				Name:    "namespace",
+				Aliases: []string{"n"},
+				Usage:   "Namespace to use with commands",
+				Value:   namespaces.Default,
+				Sources: cli.EnvVars(namespaces.NamespaceEnvVar),
+			},
 		},
-		&cli.StringFlag{
-			Name:    "address",
-			Aliases: []string{"a"},
-			Usage:   "Address for containerd's GRPC server",
-			Value:   defaults.DefaultAddress,
-			EnvVars: []string{"CONTAINERD_ADDRESS"},
-		},
-		&cli.DurationFlag{
-			Name:  "timeout",
-			Usage: "Total timeout for ctr commands",
-		},
-		&cli.DurationFlag{
-			Name:  "connect-timeout",
-			Usage: "Timeout for connecting to containerd",
-		},
-		&cli.StringFlag{
-			Name:    "namespace",
-			Aliases: []string{"n"},
-			Usage:   "Namespace to use with commands",
-			Value:   namespaces.Default,
-			EnvVars: []string{namespaces.NamespaceEnvVar},
+		Commands: append([]*cli.Command{
+			plugins.Command,
+			versionCmd.Command,
+			containers.Command,
+			content.Command,
+			events.Command,
+			images.Command,
+			leases.Command,
+			namespacesCmd.Command,
+			pprof.Command,
+			run.Command,
+			snapshots.Command,
+			tasks.Command,
+			install.Command,
+			ociCmd.Command,
+			sandboxes.Command,
+			info.Command,
+			deprecations.Command,
+		}, extraCmds...),
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+			if cmd.Bool("debug") {
+				return ctx, log.SetLevel("debug")
+			}
+			return ctx, nil
 		},
 	}
-	app.Commands = append([]*cli.Command{
-		plugins.Command,
-		versionCmd.Command,
-		containers.Command,
-		content.Command,
-		events.Command,
-		images.Command,
-		leases.Command,
-		namespacesCmd.Command,
-		pprof.Command,
-		run.Command,
-		snapshots.Command,
-		tasks.Command,
-		install.Command,
-		ociCmd.Command,
-		sandboxes.Command,
-		info.Command,
-		deprecations.Command,
-	}, extraCmds...)
-	app.Before = func(cliContext *cli.Context) error {
-		if cliContext.Bool("debug") {
-			return log.SetLevel("debug")
-		}
-		return nil
-	}
-	return app
 }

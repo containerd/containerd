@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var (
@@ -35,7 +35,7 @@ var (
 		&cli.StringFlag{
 			Name:    "snapshotter",
 			Usage:   "Snapshotter name. Empty value stands for the default value.",
-			EnvVars: []string{"CONTAINERD_SNAPSHOTTER"},
+			Sources: cli.EnvVars("CONTAINERD_SNAPSHOTTER"),
 		},
 	}
 
@@ -232,10 +232,10 @@ var (
 )
 
 // ObjectWithLabelArgs returns the first arg and a LabelArgs object
-func ObjectWithLabelArgs(cliContext *cli.Context) (string, map[string]string) {
+func ObjectWithLabelArgs(cmd *cli.Command) (string, map[string]string) {
 	var (
-		first        = cliContext.Args().First()
-		labelStrings = cliContext.Args().Tail()
+		first        = cmd.Args().First()
+		labelStrings = cmd.Args().Tail()
 	)
 
 	return first, LabelArgs(labelStrings)

@@ -37,7 +37,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var fetchCommand = &cli.Command{
@@ -76,20 +76,18 @@ pull content that will later be used with 'ctr run' or 'ctr images unpack'.`,
 			Usage: "Pull all metadata including manifests and configs",
 		},
 	),
-	Action: func(cliContext *cli.Context) error {
-		var (
-			ref = cliContext.Args().First()
-		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		config, err := NewFetchConfig(ctx, cliContext)
+		config, err := NewFetchConfig(ctx, cmd)
 		if err != nil {
 			return err
 		}
 
+		ref := cmd.Args().First()
 		_, err = Fetch(ctx, client, ref, config)
 		return err
 	},
@@ -116,37 +114,37 @@ type FetchConfig struct {
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
-func NewFetchConfig(ctx context.Context, cliContext *cli.Context) (*FetchConfig, error) {
-	resolver, err := commands.GetResolver(ctx, cliContext)
+func NewFetchConfig(ctx context.Context, cmd *cli.Command) (*FetchConfig, error) {
+	resolver, err := commands.GetResolver(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
 	config := &FetchConfig{
 		Resolver:  resolver,
-		Labels:    cliContext.StringSlice("label"),
-		TraceHTTP: cliContext.Bool("http-trace"),
+		Labels:    cmd.StringSlice("label"),
+		TraceHTTP: cmd.Bool("http-trace"),
 	}
-	if !cliContext.Bool("debug") {
+	if !cmd.Bool("debug") {
 		config.ProgressOutput = os.Stdout
 	}
-	if !cliContext.Bool("all-platforms") {
-		p := cliContext.StringSlice("platform")
+	if !cmd.Bool("all-platforms") {
+		p := cmd.StringSlice("platform")
 		if len(p) == 0 {
 			p = append(p, platforms.DefaultString())
 		}
 		config.Platforms = p
 	}
 
-	if cliContext.Bool("metadata-only") {
+	if cmd.Bool("metadata-only") {
 		config.AllMetadata = true
 		// Any with an empty set is None
 		config.PlatformMatcher = platforms.Any()
-	} else if !cliContext.Bool("skip-metadata") {
+	} else if !cmd.Bool("skip-metadata") {
 		config.AllMetadata = true
 	}
 
-	if cliContext.IsSet("max-concurrent-uploaded-layers") {
-		mcu := cliContext.Int("max-concurrent-uploaded-layers")
+	if cmd.IsSet("max-concurrent-uploaded-layers") {
+		mcu := cmd.Int("max-concurrent-uploaded-layers")
 		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentUploadedLayers(mcu))
 	}
 

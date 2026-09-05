@@ -17,6 +17,7 @@
 package images
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -28,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/progress"
 
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var usageCommand = &cli.Command{
@@ -36,19 +37,19 @@ var usageCommand = &cli.Command{
 	Usage:     "Display usage of snapshots for a given image ref",
 	ArgsUsage: "[flags] <ref>",
 	Flags:     commands.SnapshotterFlags,
-	Action: func(cliContext *cli.Context) error {
-		var ref = cliContext.Args().First()
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		ref := cmd.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to mount")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		snapshotter := cliContext.String("snapshotter")
+		snapshotter := cmd.String("snapshotter")
 		if snapshotter == "" {
 			snapshotter = defaults.DefaultSnapshotter
 		}

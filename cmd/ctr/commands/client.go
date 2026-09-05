@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // AppContext returns the context for a command. Should only be called once per
@@ -34,11 +34,10 @@ import (
 //
 // This will ensure the namespace is picked up and set the timeout, if one is
 // defined.
-func AppContext(cliContext *cli.Context) (context.Context, context.CancelFunc) {
+func AppContext(ctx context.Context, cmd *cli.Command) (context.Context, context.CancelFunc) {
 	var (
-		ctx       = cliContext.Context
-		timeout   = cliContext.Duration("timeout")
-		namespace = cliContext.String("namespace")
+		timeout   = cmd.Duration("timeout")
+		namespace = cmd.String("namespace")
 		cancel    context.CancelFunc
 	)
 	ctx = namespaces.WithNamespace(ctx, namespace)
@@ -57,10 +56,10 @@ func AppContext(cliContext *cli.Context) (context.Context, context.CancelFunc) {
 }
 
 // NewClient returns a new containerd client
-func NewClient(cliContext *cli.Context, opts ...containerd.Opt) (*containerd.Client, context.Context, context.CancelFunc, error) {
-	timeoutOpt := containerd.WithTimeout(cliContext.Duration("connect-timeout"))
+func NewClient(ctx context.Context, cmd *cli.Command, opts ...containerd.Opt) (*containerd.Client, context.Context, context.CancelFunc, error) {
+	timeoutOpt := containerd.WithTimeout(cmd.Duration("connect-timeout"))
 	opts = append(opts, timeoutOpt)
-	socketPath := cliContext.String("address")
+	socketPath := cmd.String("address")
 	if _, err := os.Stat(socketPath); err != nil {
 		return nil, nil, nil, fmt.Errorf("cannot access socket %s: %w", socketPath, err)
 	}
@@ -68,7 +67,7 @@ func NewClient(cliContext *cli.Context, opts ...containerd.Opt) (*containerd.Cli
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	ctx, cancel := AppContext(cliContext)
+	ctx, cancel := AppContext(ctx, cmd)
 	var suppressDeprecationWarnings bool
 	if s := os.Getenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS"); s != "" {
 		suppressDeprecationWarnings, err = strconv.ParseBool(s)

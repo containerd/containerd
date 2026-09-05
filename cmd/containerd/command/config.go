@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func outputConfig(ctx context.Context, config *srvconfig.Config) error {
@@ -85,12 +85,11 @@ func defaultConfig() *srvconfig.Config {
 var configCommand = &cli.Command{
 	Name:  "config",
 	Usage: "Information on the containerd config",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		{
 			Name:  "default",
 			Usage: "See the output of the default config",
-			Action: func(cliContext *cli.Context) error {
-				ctx := cliContext.Context
+			Action: func(ctx context.Context, cmd *cli.Command) error {
 				return outputConfig(ctx, defaultConfig())
 			},
 		},
@@ -108,15 +107,14 @@ var configCommand = &cli.Command{
 	},
 }
 
-func dumpConfig(cliContext *cli.Context) error {
+func dumpConfig(ctx context.Context, cmd *cli.Command) error {
 	config := defaultConfig()
-	ctx := cliContext.Context
 
 	g := registry.Graph(func(*plugin.Registration) bool { return false })
 	plugins := func() iter.Seq[plugin.Registration] {
 		return slices.Values(g)
 	}
-	if err := srvconfig.LoadConfigWithPlugins(ctx, cliContext.String("config"), plugins, config); err != nil && !os.IsNotExist(err) {
+	if err := srvconfig.LoadConfigWithPlugins(ctx, cmd.String("config"), plugins, config); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 

@@ -17,6 +17,7 @@
 package sandboxes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -28,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // Command is a set of subcommands to manage runtimes with sandbox support
@@ -36,7 +37,7 @@ var Command = &cli.Command{
 	Name:    "sandboxes",
 	Aliases: []string{"sandbox", "sb", "s"},
 	Usage:   "Manage sandboxes",
-	Subcommands: cli.Commands{
+	Commands: []*cli.Command{
 		runCommand,
 		listCommand,
 		removeCommand,
@@ -56,16 +57,16 @@ var runCommand = &cli.Command{
 			Value: defaults.DefaultRuntime,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		if cliContext.NArg() != 2 {
-			return cli.ShowSubcommandHelp(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		if cmd.NArg() != 2 {
+			return cli.ShowSubcommandHelp(cmd)
 		}
 		var (
-			id      = cliContext.Args().Get(1)
-			runtime = cliContext.String("runtime")
+			id      = cmd.Args().Get(1)
+			runtime = cmd.String("runtime")
 		)
 
-		spec, err := os.ReadFile(cliContext.Args().First())
+		spec, err := os.ReadFile(cmd.Args().First())
 		if err != nil {
 			return fmt.Errorf("failed to read sandbox config: %w", err)
 		}
@@ -75,7 +76,7 @@ var runCommand = &cli.Command{
 			return fmt.Errorf("failed to parse sandbox config: %w", err)
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -109,8 +110,8 @@ var listCommand = &cli.Command{
 			Usage: "The list of filters to apply when querying sandboxes from the store",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -118,7 +119,7 @@ var listCommand = &cli.Command{
 
 		var (
 			writer  = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-			filters = cliContext.StringSlice("filters")
+			filters = cmd.StringSlice("filters")
 		)
 
 		defer func() {
@@ -157,16 +158,16 @@ var removeCommand = &cli.Command{
 			Usage:   "Ignore shutdown errors when removing sandbox",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		force := cliContext.Bool("force")
+		force := cmd.Bool("force")
 
-		for _, id := range cliContext.Args().Slice() {
+		for _, id := range cmd.Args().Slice() {
 			sandbox, err := client.LoadSandbox(ctx, id)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to load sandbox %s", id)
@@ -199,14 +200,14 @@ var infoCommand = &cli.Command{
 	Aliases:   []string{"i"},
 	Usage:     "Get info about a sandbox",
 	ArgsUsage: "<sandbox id>",
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		id := cliContext.Args().First()
+		id := cmd.Args().First()
 		if id == "" {
 			return fmt.Errorf("sandbox id must be provided: %w", errdefs.ErrInvalidArgument)
 		}

@@ -17,6 +17,7 @@
 package tasks
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/url"
@@ -28,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var execCommand = &cli.Command{
@@ -68,17 +69,17 @@ var execCommand = &cli.Command{
 			Usage: "User id or name",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
-			id     = cliContext.Args().First()
-			args   = cliContext.Args().Tail()
-			tty    = cliContext.Bool("tty")
-			detach = cliContext.Bool("detach")
+			id     = cmd.Args().First()
+			args   = cmd.Args().Tail()
+			tty    = cmd.Bool("tty")
+			detach = cmd.Bool("detach")
 		)
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -91,7 +92,7 @@ var execCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		if user := cliContext.String("user"); user != "" {
+		if user := cmd.String("user"); user != "" {
 			c, err := container.Info(ctx)
 			if err != nil {
 				return err
@@ -105,7 +106,7 @@ var execCommand = &cli.Command{
 		pspec.Terminal = tty
 		pspec.Args = args
 
-		if cwd := cliContext.String("cwd"); cwd != "" {
+		if cwd := cmd.String("cwd"); cwd != "" {
 			pspec.Cwd = cwd
 		}
 
@@ -122,8 +123,8 @@ var execCommand = &cli.Command{
 			con console.Console
 		)
 
-		fifoDir := cliContext.String("fifo-dir")
-		logURI := cliContext.String("log-uri")
+		fifoDir := cmd.String("fifo-dir")
+		logURI := cmd.String("log-uri")
 		ioOpts := []cio.Opt{cio.WithFIFODir(fifoDir)}
 		switch {
 		case tty && logURI != "":
@@ -150,7 +151,7 @@ var execCommand = &cli.Command{
 			ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStreams(stdinC, os.Stdout, os.Stderr)}, ioOpts...)...)
 		}
 
-		process, err := task.Exec(ctx, cliContext.String("exec-id"), pspec, ioCreator)
+		process, err := task.Exec(ctx, cmd.String("exec-id"), pspec, ioCreator)
 		if err != nil {
 			return err
 		}

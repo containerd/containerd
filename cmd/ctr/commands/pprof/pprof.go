@@ -17,6 +17,7 @@
 package pprof
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,7 +25,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type pprofDialer struct {
@@ -44,7 +45,7 @@ var Command = &cli.Command{
 			Value:   defaults.DefaultDebugAddress,
 		},
 	},
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		pprofBlockCommand,
 		pprofGoroutinesCommand,
 		pprofHeapCommand,
@@ -64,8 +65,8 @@ var pprofGoroutinesCommand = &cli.Command{
 			Value: 2,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return GoroutineProfile(cliContext, getPProfClient)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		return GoroutineProfile(cmd, getPProfClient)
 	},
 }
 
@@ -79,8 +80,8 @@ var pprofHeapCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return HeapProfile(cliContext, getPProfClient)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		return HeapProfile(cmd, getPProfClient)
 	},
 }
 
@@ -100,8 +101,8 @@ var pprofProfileCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return CPUProfile(cliContext, getPProfClient)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		return CPUProfile(cmd, getPProfClient)
 	},
 }
 
@@ -121,8 +122,8 @@ var pprofTraceCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return TraceProfile(cliContext, getPProfClient)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		return TraceProfile(cmd, getPProfClient)
 	},
 }
 
@@ -136,8 +137,8 @@ var pprofBlockCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return BlockProfile(cliContext, getPProfClient)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		return BlockProfile(cmd, getPProfClient)
 	},
 }
 
@@ -151,21 +152,21 @@ var pprofThreadcreateCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return ThreadcreateProfile(cliContext, getPProfClient)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		return ThreadcreateProfile(cmd, getPProfClient)
 	},
 }
 
 // Client is a func that returns a http client for a pprof server
-type Client func(cliContext *cli.Context) (*http.Client, error)
+type Client func(cmd *cli.Command) (*http.Client, error)
 
 // GoroutineProfile dumps goroutine stack dump
-func GoroutineProfile(cliContext *cli.Context, clientFunc Client) error {
-	client, err := clientFunc(cliContext)
+func GoroutineProfile(cmd *cli.Command, clientFunc Client) error {
+	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
 	}
-	debug := cliContext.Uint("debug")
+	debug := cmd.Uint("debug")
 	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/goroutine?debug=%d", debug))
 	if err != nil {
 		return err
@@ -176,12 +177,12 @@ func GoroutineProfile(cliContext *cli.Context, clientFunc Client) error {
 }
 
 // HeapProfile dumps the heap profile
-func HeapProfile(cliContext *cli.Context, clientFunc Client) error {
-	client, err := clientFunc(cliContext)
+func HeapProfile(cmd *cli.Command, clientFunc Client) error {
+	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
 	}
-	debug := cliContext.Uint("debug")
+	debug := cmd.Uint("debug")
 	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/heap?debug=%d", debug))
 	if err != nil {
 		return err
@@ -192,13 +193,13 @@ func HeapProfile(cliContext *cli.Context, clientFunc Client) error {
 }
 
 // CPUProfile dumps CPU profile
-func CPUProfile(cliContext *cli.Context, clientFunc Client) error {
-	client, err := clientFunc(cliContext)
+func CPUProfile(cmd *cli.Command, clientFunc Client) error {
+	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
 	}
-	seconds := cliContext.Duration("seconds").Seconds()
-	debug := cliContext.Uint("debug")
+	seconds := cmd.Duration("seconds").Seconds()
+	debug := cmd.Uint("debug")
 	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/profile?seconds=%v&debug=%d", seconds, debug))
 	if err != nil {
 		return err
@@ -209,13 +210,13 @@ func CPUProfile(cliContext *cli.Context, clientFunc Client) error {
 }
 
 // TraceProfile collects execution trace
-func TraceProfile(cliContext *cli.Context, clientFunc Client) error {
-	client, err := clientFunc(cliContext)
+func TraceProfile(cmd *cli.Command, clientFunc Client) error {
+	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
 	}
-	seconds := cliContext.Duration("seconds").Seconds()
-	debug := cliContext.Uint("debug")
+	seconds := cmd.Duration("seconds").Seconds()
+	debug := cmd.Uint("debug")
 	uri := fmt.Sprintf("/debug/pprof/trace?seconds=%v&debug=%d", seconds, debug)
 	output, err := httpGetRequest(client, uri)
 	if err != nil {
@@ -227,12 +228,12 @@ func TraceProfile(cliContext *cli.Context, clientFunc Client) error {
 }
 
 // BlockProfile collects goroutine blocking profile
-func BlockProfile(cliContext *cli.Context, clientFunc Client) error {
-	client, err := clientFunc(cliContext)
+func BlockProfile(cmd *cli.Command, clientFunc Client) error {
+	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
 	}
-	debug := cliContext.Uint("debug")
+	debug := cmd.Uint("debug")
 	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/block?debug=%d", debug))
 	if err != nil {
 		return err
@@ -243,12 +244,12 @@ func BlockProfile(cliContext *cli.Context, clientFunc Client) error {
 }
 
 // ThreadcreateProfile collects goroutine thread creating profile
-func ThreadcreateProfile(cliContext *cli.Context, clientFunc Client) error {
-	client, err := clientFunc(cliContext)
+func ThreadcreateProfile(cmd *cli.Command, clientFunc Client) error {
+	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
 	}
-	debug := cliContext.Uint("debug")
+	debug := cmd.Uint("debug")
 	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/threadcreate?debug=%d", debug))
 	if err != nil {
 		return err
@@ -258,8 +259,8 @@ func ThreadcreateProfile(cliContext *cli.Context, clientFunc Client) error {
 	return err
 }
 
-func getPProfClient(cliContext *cli.Context) (*http.Client, error) {
-	dialer := getPProfDialer(cliContext.String("debug-socket"))
+func getPProfClient(cmd *cli.Command) (*http.Client, error) {
+	dialer := getPProfDialer(cmd.String("debug-socket"))
 
 	tr := &http.Transport{
 		DialContext: dialer.pprofDial,

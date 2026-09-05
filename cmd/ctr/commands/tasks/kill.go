@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/moby/sys/signal"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const defaultSignal = "SIGTERM"
@@ -82,8 +82,8 @@ var killCommand = &cli.Command{
 			Usage:   "Send signal to all processes inside the container",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		id := cliContext.Args().First()
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
@@ -92,14 +92,14 @@ var killCommand = &cli.Command{
 			return err
 		}
 		var (
-			all    = cliContext.Bool("all")
-			execID = cliContext.String("exec-id")
+			all    = cmd.Bool("all")
+			execID = cmd.String("exec-id")
 			opts   []containerd.KillOpts
 		)
 		if all && execID != "" {
 			return errors.New("specify an exec-id or all; not both")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -114,8 +114,8 @@ var killCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		if cliContext.String("signal") != "" {
-			sig, err = signal.ParseSignal(cliContext.String("signal"))
+		if cmd.String("signal") != "" {
+			sig, err = signal.ParseSignal(cmd.String("signal"))
 			if err != nil {
 				return err
 			}

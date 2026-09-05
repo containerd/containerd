@@ -19,7 +19,7 @@ package tasks
 import (
 	"context"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type resizer interface {
@@ -31,7 +31,7 @@ var Command = &cli.Command{
 	Name:    "tasks",
 	Usage:   "Manage tasks",
 	Aliases: []string{"t", "task"},
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		attachCommand,
 		checkpointCommand,
 		deleteCommand,

@@ -17,6 +17,7 @@
 package containers
 
 import (
+	"context"
 	"errors"
 
 	"github.com/containerd/console"
@@ -26,7 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var restoreCommand = &cli.Command{
@@ -43,16 +44,16 @@ var restoreCommand = &cli.Command{
 			Usage: "Restore the runtime and memory data from the checkpoint",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		id := cliContext.Args().First()
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		ref := cliContext.Args().Get(1)
+		ref := cmd.Args().Get(1)
 		if ref == "" {
 			return errors.New("ref must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -76,7 +77,7 @@ var restoreCommand = &cli.Command{
 			containerd.WithRestoreSpec,
 			containerd.WithRestoreRuntime,
 		}
-		if cliContext.Bool("rw") {
+		if cmd.Bool("rw") {
 			opts = append(opts, containerd.WithRestoreRW)
 		}
 
@@ -85,7 +86,7 @@ var restoreCommand = &cli.Command{
 			return err
 		}
 		topts := []containerd.NewTaskOpts{}
-		if cliContext.Bool("live") {
+		if cmd.Bool("live") {
 			topts = append(topts, containerd.WithTaskCheckpoint(checkpoint))
 		}
 		spec, err := ctr.Spec(ctx)
