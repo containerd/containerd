@@ -165,14 +165,17 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
-	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
+	imagePlatform, err := c.imagePlatformFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
 	if err != nil {
 		return "", err
 	}
+	snapshotter := imagePlatform.Snapshotter
+	platformMatcher := util.PlatformMatcher(imagePlatform.Platform)
 
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
+		tracing.Attribute("image.platform", platforms.FormatAll(imagePlatform.Platform)),
 	)
 	labels := c.getLabels(ctx, ref)
 
@@ -185,9 +188,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		bytesPulled uint64
 	)
 	if c.config.UseLocalImagePull {
-		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, imagePlatform.Platform, labels, imagePullProgressTimeout)
 	} else {
-		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, imagePlatform.Platform, labels, imagePullProgressTimeout)
 	}
 
 	if err != nil {
@@ -196,7 +199,10 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 
 	span.AddEvent("Pull and unpack image complete")
 
-	configDesc, err := image.Config(ctx)
+	// Resolve the config against the platform that was pulled rather than
+	// against the platform the client was created with, which is always the
+	// platform of the node.
+	configDesc, err := containerdimages.Config(ctx, image.ContentStore(), image.Target(), platformMatcher)
 	if err != nil {
 		return "", fmt.Errorf("get image config descriptor: %w", err)
 	}
@@ -215,7 +221,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		// No need to use `updateImage`, because the image reference must
 		// have been managed by the cri plugin.
 		// TODO: Use image service directly
-		if err := c.imageStore.Update(ctx, r); err != nil {
+		if err := c.imageStore.Update(ctx, r, imagePlatform.Platform); err != nil {
 			return "", fmt.Errorf("failed to update image store %q: %w", r, err)
 		}
 	}
@@ -224,12 +230,16 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	recordImagePullThroughput(imagePullThroughput, bytesPulled, elapsed)
 	recordImagePullThroughput(imagePullThroughputMiBps, bytesPulled, elapsed)
 
-	size, sizeErr := image.Size(ctx)
-	if sizeErr == nil {
+	// Report the size recorded by the image store, which resolved the image
+	// against the platform it was pulled for. image.Size resolves against the
+	// platform of the node, which is not necessarily the platform pulled.
+	var size int64
+	if storedImage, err := c.imageStore.Get(imageID); err == nil {
+		size = storedImage.Size
 		span.SetAttributes(tracing.Attribute("image.size.bytes", size))
 	}
-	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", name, imageID,
-		repoTag, repoDigest, strconv.FormatInt(size, 10), elapsed)
+	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, platform %q, size %q in %s", name, imageID,
+		repoTag, repoDigest, platforms.FormatAll(imagePlatform.Platform), strconv.FormatInt(size, 10), elapsed)
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
 	// by someone else anytime, before/during/after we create the metadata. We should always
@@ -248,6 +258,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	ref string,
 	credentials func(string) (string, string, error),
 	snapshotter string,
+	platform imagespec.Platform,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, uint64, error) {
@@ -259,9 +270,10 @@ func (c *CRIImageService) pullImageWithLocalPull(
 		Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
 	})
 
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, snapshotter)
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s and platform %s using client.Pull()", ref, snapshotter, platforms.FormatAll(platform))
 	pullOpts := []containerd.RemoteOpt{
 		containerd.WithResolver(resolver),
+		containerd.WithPlatformMatcher(util.PlatformMatcher(platform)),
 		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabels(labels),
@@ -306,18 +318,19 @@ func (c *CRIImageService) pullImageWithTransferService(
 	ref string,
 	credentials func(string) (string, string, error),
 	snapshotter string,
+	platform imagespec.Platform,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, uint64, error) {
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s and platform %s using transfer service", ref, snapshotter, platforms.FormatAll(platform))
 	rctx, rcancel := context.WithCancel(ctx)
 	defer rcancel()
 	transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
 
 	// Set image store opts
 	sopts := []transferimage.StoreOpt{
-		transferimage.WithPlatforms(platforms.DefaultSpec()),
-		transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter),
+		transferimage.WithPlatforms(platform),
+		transferimage.WithUnpack(platform, snapshotter),
 		transferimage.WithImageLabels(labels),
 	}
 
@@ -437,12 +450,72 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 // getLabels get image labels to be added on CRI image
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
-	for _, pinned := range c.config.PinnedImages {
-		if pinned == name {
-			labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
-		}
+	if c.isPinnedImage(name) {
+		labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
 	}
 	return labels
+}
+
+// updateImageStore refreshes a reference on every platform images may be
+// stored for. A reference that does not resolve on a platform is dropped from
+// that platform, which is the normal state of an image pulled for another one.
+func (c *CRIImageService) updateImageStore(ctx context.Context, r string) error {
+	for _, platform := range c.platformsForImages() {
+		if !c.storesImageForPlatform(ctx, r, platform) {
+			continue
+		}
+		if err := c.imageStore.Update(ctx, r, platform); err != nil {
+			return fmt.Errorf("update image store for %q on %s: %w", r, platforms.FormatAll(platform), err)
+		}
+	}
+	return nil
+}
+
+// storesImageForPlatform reports whether a reference should be stored for a
+// platform when the platform it was pulled for is not known, as on reload.
+//
+// Resolving is not enough on its own for a platform other than the one of the
+// node: an image may carry the manifest and the config of a platform it was
+// never pulled for, and storing that would list an image that cannot be run.
+// Requiring it to be unpacked distinguishes the two. The platform of the node
+// keeps resolving alone, which is what it did before images were stored per
+// platform.
+func (c *CRIImageService) storesImageForPlatform(ctx context.Context, r string, platform imagespec.Platform) bool {
+	if util.IsNodePlatform(platform) {
+		return true
+	}
+	image, err := c.imageStore.Lookup(ctx, r, platform)
+	if err != nil {
+		// Let Update record that the reference no longer resolves here.
+		return true
+	}
+	for _, snapshotter := range c.snapshottersForPlatform(platform) {
+		if unpacked, err := c.IsImageUnpacked(ctx, image, snapshotter); err == nil && unpacked {
+			return true
+		}
+	}
+	log.G(ctx).Debugf("Not storing image %q for platform %s, it is not unpacked in any snapshotter of that platform",
+		r, platforms.FormatAll(platform))
+	return false
+}
+
+// snapshottersForPlatform returns the snapshotters images on that platform may
+// be unpacked into.
+func (c *CRIImageService) snapshottersForPlatform(platform imagespec.Platform) []string {
+	var result []string
+	seen := map[string]struct{}{}
+	for handler, p := range c.runtimePlatforms {
+		if util.PlatformKey(p.Platform) != util.PlatformKey(platform) {
+			continue
+		}
+		snapshotter := c.SnapshotterForRuntimeHandler(handler)
+		if _, ok := seen[snapshotter]; ok {
+			continue
+		}
+		seen[snapshotter] = struct{}{}
+		result = append(result, snapshotter)
+	}
+	return result
 }
 
 // UpdateImage updates image store to reflect the newest state of an image reference
@@ -457,8 +530,8 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 		}
 		// If the image is not found, we should continue updating the cache,
 		// so that the image can be removed from the cache.
-		if err := c.imageStore.Update(ctx, r); err != nil {
-			return fmt.Errorf("update image store for %q: %w", r, err)
+		if err := c.updateImageStore(ctx, r); err != nil {
+			return err
 		}
 		return nil
 	}
@@ -469,7 +542,7 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 		if labels[key] != value {
 			// Make sure the image has the image id as its unique
 			// identifier that references the image in its lifetime.
-			configDesc, err := img.Config(ctx)
+			configDesc, err := c.imageConfig(ctx, img)
 			if err != nil {
 				return fmt.Errorf("get image id: %w", err)
 			}
@@ -477,8 +550,8 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 			if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
 				return fmt.Errorf("create image id reference %q: %w", id, err)
 			}
-			if err := c.imageStore.Update(ctx, id); err != nil {
-				return fmt.Errorf("update image store for %q: %w", id, err)
+			if err := c.updateImageStore(ctx, id); err != nil {
+				return err
 			}
 			// The image id is ready, add the label to mark the image as managed.
 			if err := c.createOrUpdateImageReference(ctx, r, img.Target(), criLabels); err != nil {
@@ -487,10 +560,7 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 			break
 		}
 	}
-	if err := c.imageStore.Update(ctx, r); err != nil {
-		return fmt.Errorf("update image store for %q: %w", r, err)
-	}
-	return nil
+	return c.updateImageStore(ctx, r)
 }
 
 func hostDirFromRoots(roots []string) func(string) (string, error) {
@@ -854,9 +924,11 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 	return resp, err
 }
 
-// snapshotterFromPodSandboxConfig returns the snapshotter to use for the given
-// runtime handler. If a runtime-specific snapshotter is configured, it will be
-// returned; otherwise the default snapshotter is used.
+// imagePlatformFromPodSandboxConfig returns the snapshotter and the image
+// platform to use for the given runtime handler. If a runtime-specific
+// snapshotter or platform is configured through runtime_platforms, it will be
+// returned; otherwise the default snapshotter and the platform of the node are
+// used.
 //
 // The runtimeHandler parameter (from CRI PullImageRequest, available since cri-api v0.29.0)
 // takes precedence. If empty, we fall back to the experimental annotation for backward
@@ -866,22 +938,22 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 // deprecated and will be removed in containerd 2.5.
 //
 // See https://github.com/containerd/containerd/issues/6657
-func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig, runtimeHandler string) (string, error) {
-	snapshotter := c.config.Snapshotter
-	if s == nil {
-		return snapshotter, nil
+func (c *CRIImageService) imagePlatformFromPodSandboxConfig(ctx context.Context, imageRef string,
+	s *runtime.PodSandboxConfig, runtimeHandler string) (ImagePlatform, error) {
+	imagePlatform := ImagePlatform{
+		Snapshotter: c.config.Snapshotter,
+		Platform:    platforms.DefaultSpec(),
 	}
 
 	// If runtimeHandler parameter is empty, fall back to annotation for backward compatibility
 	if runtimeHandler == "" {
-		if s.Annotations == nil {
-			return snapshotter, nil
+		if s == nil || s.Annotations == nil {
+			return imagePlatform, nil
 		}
 		var ok bool
 		runtimeHandler, ok = s.Annotations[annotations.RuntimeHandler]
 		if !ok {
-			return snapshotter, nil
+			return imagePlatform, nil
 		}
 		log.G(ctx).Warnf("Using deprecated annotation %q for runtime handler. "+
 			"This will be removed in a future release (2.5). "+
@@ -889,14 +961,45 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 			annotations.RuntimeHandler)
 	}
 
-	if c.runtimePlatforms != nil {
-		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
-			snapshotter = p.Snapshotter
-			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
-		}
+	p, ok := c.runtimePlatforms[runtimeHandler]
+	if !ok {
+		return imagePlatform, nil
 	}
 
-	return snapshotter, nil
+	if p.Snapshotter != "" && p.Snapshotter != imagePlatform.Snapshotter {
+		imagePlatform.Snapshotter = p.Snapshotter
+		log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, imagePlatform.Snapshotter)
+	}
+
+	imagePlatform.Platform = c.PlatformForImage(imageRef, runtimeHandler)
+	if !util.IsNodePlatform(imagePlatform.Platform) {
+		log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using platform %s",
+			imageRef, runtimeHandler, platforms.FormatAll(imagePlatform.Platform))
+	}
+	return imagePlatform, nil
+}
+
+// isPinnedImage reports whether the given reference is configured as a pinned
+// image. Both sides are compared normalized as well, since PullImage sees the
+// normalized reference while the other image requests see it as written.
+func (c *CRIImageService) isPinnedImage(name string) bool {
+	normalized := normalizeImageRef(name)
+	for _, pinned := range c.config.PinnedImages {
+		if pinned == name || normalizeImageRef(pinned) == normalized {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeImageRef returns the normalized form of a reference, or the
+// reference itself when it does not parse as one.
+func normalizeImageRef(ref string) string {
+	named, err := distribution.ParseDockerRef(ref)
+	if err != nil {
+		return ref
+	}
+	return named.String()
 }
 
 type criCredentials struct {

@@ -30,7 +30,7 @@ func (c *GRPCCRIImageService) StreamImages(r *runtime.StreamImagesRequest, s grp
 
 	var images []*runtime.Image
 	for _, image := range imagesInStore {
-		images = append(images, toCRIImage(image))
+		images = append(images, toCRIImage(image, ""))
 	}
 
 	return criutil.SendInBatches(ctx, images, criutil.DefaultStreamBatchSize, func(batch []*runtime.Image) error {
