@@ -39,7 +39,7 @@ import (
 
 func newSnapshotterWithOpts(opts ...Opt) testsuite.SnapshotterFunc {
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-		snapshotter, err := NewSnapshotter(root, opts...)
+		snapshotter, err := NewSnapshotter(root, "", opts...)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -58,7 +58,7 @@ func TestOverlayConfiguredIndexNotOverridden(t *testing.T) {
 	if !supportsIndex() {
 		t.Skip("kernel does not expose the overlay index parameter")
 	}
-	sn, err := NewSnapshotter(t.TempDir(), WithMountOptions([]string{"index=on", "nfs_export=on"}))
+	sn, err := NewSnapshotter(t.TempDir(), "", WithMountOptions([]string{"index=on", "nfs_export=on"}))
 	if err != nil {
 		t.Fatal(err)
 	}
