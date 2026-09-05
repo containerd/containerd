@@ -163,7 +163,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	defer func() {
 		if retErr != nil && cleanupErr == nil {
-			cleanupErr = c.client.SandboxStore().Delete(ctx, id)
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+			cleanupErr = c.client.SandboxStore().Delete(deferCtx, id)
 		}
 	}()
 
