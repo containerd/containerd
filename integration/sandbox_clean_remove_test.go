@@ -172,6 +172,7 @@ func TestSandboxStopWithNilCNIResult(t *testing.T) {
 	require.Len(t, l, 1)
 
 	sb := l[0]
+	t.Logf("test001 sb.State is %v",sb.State)
 	require.Equal(t, runtime.PodSandboxState_SANDBOX_NOTREADY, sb.State)
 
 	t.Log("Get sandbox info and verify CNIResult is nil")
