@@ -17,14 +17,47 @@
 package sys
 
 import (
+	"fmt"
 	"net"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/Microsoft/go-winio"
 )
 
-// GetLocalListener returns a Listernet out of a named pipe.
-// `path` must be of the form of `\\.\pipe\<pipename>`
-// (see https://msdn.microsoft.com/en-us/library/windows/desktop/aa365150)
+func isNamedPipePath(path string) bool {
+	return strings.HasPrefix(filepath.ToSlash(path), "//./pipe/")
+}
+
+// GetLocalListener returns a listener for the given path. If the path is a
+// Windows named pipe (\\.\pipe\...), it creates a named pipe listener.
+// Otherwise, it creates an AF_UNIX socket listener, which is supported on
+// Windows 10 1803+ and Windows Server 2019+.
 func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
-	return winio.ListenPipe(path, nil)
+	if isNamedPipePath(path) {
+		return winio.ListenPipe(path, nil)
+	}
+
+	return createUnixSocket(path)
+}
+
+func createUnixSocket(path string) (net.Listener, error) {
+	// Windows embraced the 108 limit, same as Linux
+	// see https://lwn.net/Articles/987098/
+	if len(path) > 108 {
+		return nil, fmt.Errorf("%q: unix socket path too long (> 108)", path)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0660); err != nil {
+		return nil, err
+	}
+	// Remove existing socket file if present.
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	l, err := net.Listen("unix", path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen on unix socket %s: %w", path, err)
+	}
+	return l, nil
 }
