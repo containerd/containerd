@@ -106,6 +106,31 @@ func BenchmarkUnpackWithChainIDs(b *testing.B) {
 	}
 }
 
+func TestLayerSnapshotLabels(t *testing.T) {
+	// Layer annotations come from the (untrusted) image manifest. The id-mapping
+	// labels drive a host-side chown of the extracted layer in the snapshotter's
+	// Prepare, so they must be filtered out.
+	got := layerSnapshotLabels(map[string]string{
+		snapshots.LabelSnapshotUIDMapping: "0:1000:1",
+		snapshots.LabelSnapshotGIDMapping: "0:1000:1",
+		"containerd.io/snapshot/remote":   "keep",
+		"unrelated":                       "drop",
+	})
+
+	if _, ok := got[snapshots.LabelSnapshotUIDMapping]; ok {
+		t.Errorf("uid mapping label from image annotations must be dropped, got %q", got[snapshots.LabelSnapshotUIDMapping])
+	}
+	if _, ok := got[snapshots.LabelSnapshotGIDMapping]; ok {
+		t.Errorf("gid mapping label from image annotations must be dropped, got %q", got[snapshots.LabelSnapshotGIDMapping])
+	}
+	if got["containerd.io/snapshot/remote"] != "keep" {
+		t.Errorf("inherited snapshot label must be preserved, got %q", got["containerd.io/snapshot/remote"])
+	}
+	if _, ok := got["unrelated"]; ok {
+		t.Error("non-snapshot annotation must not be inherited")
+	}
+}
+
 func TestBindToOverlay(t *testing.T) {
 	testCases := []struct {
 		name   string
