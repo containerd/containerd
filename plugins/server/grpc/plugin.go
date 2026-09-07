@@ -190,7 +190,7 @@ func init() {
 				if err != nil {
 					return nil, err
 				}
-				tlsConfig := &tls.Config{Certificates: []tls.Certificate{tlsCert}}
+				tlsConfig := &tls.Config{Certificates: []tls.Certificate{tlsCert}, MinVersion: tls.VersionTLS12}
 
 				if c.TLSCA != "" {
 					caCertPool := x509.NewCertPool()

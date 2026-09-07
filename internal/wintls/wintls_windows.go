@@ -118,6 +118,7 @@ func SetupTLSFromWindowsCertStore(ctx context.Context, commonName string) (*tls.
 	}
 	// Create TLS configuration
 	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
 		Certificates: []tls.Certificate{tlsCert},
 	}
 	// Create the resource manager for cleanup
