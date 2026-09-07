@@ -17,6 +17,7 @@
 package content
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -36,6 +38,13 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli/v2"
+)
+
+const (
+	defaultIngestLeaseDuration = 5 * time.Minute
+	ingestLeaseCleanupTimeout  = 10 * time.Second
+	ingestLeaseLabel           = "containerd.io/ctr/content-ingest"
+	ingestLeaseRefLabel        = "containerd.io/ctr/content-ingest.ref"
 )
 
 var (
@@ -102,6 +111,11 @@ var (
 				Name:  "expected-digest",
 				Usage: "Verify content against expected digest",
 			},
+			&cli.DurationFlag{
+				Name:  "lease-duration",
+				Usage: "Protect ingested content with a temporary lease (0 disables)",
+				Value: defaultIngestLeaseDuration,
+			},
 		},
 		Action: func(cliContext *cli.Context) error {
 			var (
@@ -121,12 +135,10 @@ var (
 			}
 			defer cancel()
 
-			cs := client.ContentStore()
-
 			// TODO(stevvooe): Allow ingest to be reentrant. Currently, we expect
 			// all data to be written in a single invocation. Allow multiple writes
 			// to the same transaction key followed by a commit.
-			return content.WriteBlob(ctx, cs, ref, os.Stdin, ocispec.Descriptor{Size: expectedSize, Digest: expectedDigest})
+			return ingestContent(ctx, client.ContentStore(), client.LeasesService(), cliContext.Duration("lease-duration"), ref, os.Stdin, ocispec.Descriptor{Size: expectedSize, Digest: expectedDigest})
 		},
 	}
 
@@ -577,6 +589,38 @@ var (
 		},
 	}
 )
+
+func ingestContent(ctx context.Context, cs content.Ingester, lm leases.Manager, leaseDuration time.Duration, ref string, r io.Reader, desc ocispec.Descriptor) error {
+	if leaseDuration < 0 {
+		return fmt.Errorf("--lease-duration must be >= 0, got %s", leaseDuration)
+	}
+	if leaseDuration == 0 {
+		return content.WriteBlob(ctx, cs, ref, r, desc)
+	}
+
+	lease, err := lm.Create(ctx,
+		leases.WithRandomID(),
+		leases.WithExpiration(leaseDuration),
+		leases.WithLabels(map[string]string{
+			ingestLeaseLabel:    "true",
+			ingestLeaseRefLabel: ref,
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create temporary lease: %w", err)
+	}
+
+	if err := content.WriteBlob(leases.WithLease(ctx, lease.ID), cs, ref, r, desc); err != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), ingestLeaseCleanupTimeout)
+		defer cancel()
+		if cleanupErr := lm.Delete(cleanupCtx, lease, leases.SynchronousDelete); cleanupErr != nil {
+			return errors.Join(err, fmt.Errorf("failed to delete temporary lease: %w", cleanupErr))
+		}
+		return err
+	}
+
+	return nil
+}
 
 func edit(cliContext *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error) {
 	editor := cliContext.String("editor")
