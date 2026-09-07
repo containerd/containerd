@@ -106,7 +106,7 @@ command. As part of this process, we do the following:
 
 		if !cliContext.Bool("local") {
 			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid",
-				"skip-verify", "tlscacert", "tlscert", "tlskey", // RegistryFlags
+				"skip-verify", "tlscacert", "tlscert", "tlskey", "sslkeylogfile", // RegistryFlags
 			}
 			for _, s := range unsupportedFlags {
 				if cliContext.IsSet(s) {
