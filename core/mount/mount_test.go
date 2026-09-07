@@ -235,7 +235,7 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 					},
 				},
 				{
-					Type:   "underlay",
+					Type:   "fuse.nydus-overlayfs",
 					Source: "underlay",
 					Options: []string{
 						"index=on",
@@ -256,12 +256,11 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 					},
 				},
 				{
-					Type:   "underlay",
+					Type:   "fuse.nydus-overlayfs",
 					Source: "underlay",
 					Options: []string{
 						"index=on",
 						"lowerdir=/another/path/to/snapshots/2/fs",
-						"volatile",
 					},
 				},
 			},

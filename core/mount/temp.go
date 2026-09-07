@@ -84,7 +84,7 @@ func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) erro
 func RemoveVolatileOption(mounts []Mount) []Mount {
 	var out []Mount
 	for i, m := range mounts {
-		if m.Type != "overlay" {
+		if !strings.Contains(m.Type, "overlay") {
 			continue
 		}
 		for j, opt := range m.Options {
