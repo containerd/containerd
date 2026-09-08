@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestDialPodIPs(t *testing.T) {
@@ -248,6 +249,49 @@ func TestSkipLocalhostForVMBasedRuntime(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			skipLocalhost := len(tc.podIPs) > 0 && isVMBasedRuntime(tc.runtimeType)
 			assert.Equal(t, tc.expectedSkip, skipLocalhost)
+		})
+	}
+}
+
+func TestUnsupportedHostNetworkRuntime(t *testing.T) {
+	testCases := []struct {
+		name        string
+		runtimeType string
+		networkMode runtime.NamespaceMode
+		expected    bool
+	}{
+		{
+			name:        "VM runtime with host network is unsupported",
+			runtimeType: "io.containerd.kata.v2",
+			networkMode: runtime.NamespaceMode_NODE,
+			expected:    true,
+		},
+		{
+			name:        "VM runtime with pod network is supported",
+			runtimeType: "io.containerd.kata.v2",
+			networkMode: runtime.NamespaceMode_POD,
+			expected:    false,
+		},
+		{
+			name:        "Process runtime with host network is supported",
+			runtimeType: "io.containerd.runc.v2",
+			networkMode: runtime.NamespaceMode_NODE,
+			expected:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := &runtime.PodSandboxConfig{
+				Linux: &runtime.LinuxPodSandboxConfig{
+					SecurityContext: &runtime.LinuxSandboxSecurityContext{
+						NamespaceOptions: &runtime.NamespaceOption{
+							Network: tc.networkMode,
+						},
+					},
+				},
+			}
+			assert.Equal(t, tc.expected, isUnsupportedHostNetworkRuntime(config, tc.runtimeType))
 		})
 	}
 }

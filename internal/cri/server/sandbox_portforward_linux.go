@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // portForward uses netns to enter the sandbox namespace, and forwards a stream inside the
@@ -41,7 +42,8 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 		// netNSPath is the network namespace path for logging.
 		netNSPath string
 	)
-	if !hostNetwork(s.Config) {
+	isHostNetwork := hostNetwork(s.Config)
+	if !isHostNetwork {
 		if closed, err := s.NetNS.Closed(); err != nil {
 			return fmt.Errorf("failed to check netwok namespace closed for sandbox %q: %w", id, err)
 		} else if closed {
@@ -77,6 +79,9 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	ociRuntime, err := c.config.GetSandboxRuntime(s.Config, s.Metadata.RuntimeHandler)
 	if err != nil {
 		return fmt.Errorf("failed to get sandbox runtime for %q: %w", id, err)
+	}
+	if isUnsupportedHostNetworkRuntime(s.Config, ociRuntime.Type) {
+		return fmt.Errorf("port forwarding host-network sandbox %q with VM-isolated runtime %q is not supported", id, ociRuntime.Type)
 	}
 	skipLocalhost := len(podIPs) > 0 && isVMBasedRuntime(ociRuntime.Type)
 
@@ -166,6 +171,10 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	log.G(ctx).Infof("Finish port forwarding for %q port %d", id, port)
 
 	return nil
+}
+
+func isUnsupportedHostNetworkRuntime(config *runtime.PodSandboxConfig, runtimeType string) bool {
+	return hostNetwork(config) && isVMBasedRuntime(runtimeType)
 }
 
 // dialTimeout bounds each individual connect attempt below, so a
