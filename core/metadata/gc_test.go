@@ -53,10 +53,10 @@ func TestSendLabelRefsNilBucket(t *testing.T) {
 	c := startGCContext(ctx, nil)
 
 	// A nil bucket (e.g. reached from an inconsistent metadata database) must
-	// be handled gracefully rather than panicking mid-transaction, which can
+	// fail the GC transaction rather than panicking mid-transaction, which can
 	// leave the database unopenable on subsequent starts.
 	require.NotPanics(t, func() {
-		require.NoError(t, c.sendLabelRefs("ns", nil, labelRefCallbacks{
+		require.Error(t, c.sendLabelRefs("ns", nil, labelRefCallbacks{
 			bref: func(gc.Node) {},
 		}))
 	})

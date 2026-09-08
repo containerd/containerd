@@ -1109,7 +1109,7 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (any,
 // sendLabelRefs sends all snapshot and content references referred to by the labels in the bkt
 func (c *gcContext) sendLabelRefs(ns string, bkt *bolt.Bucket, cb labelRefCallbacks) error {
 	if bkt == nil {
-		return nil
+		return fmt.Errorf("nil label bucket in sendLabelRefs during GC")
 	}
 
 	lbkt := bkt.Bucket(bucketKeyObjectLabels)
