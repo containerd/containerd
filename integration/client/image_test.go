@@ -31,7 +31,55 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/require"
 )
+
+func TestPullFetchAllContent(t *testing.T) {
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	client, err := newClient(t, address)
+	require.NoError(t, err)
+	defer client.Close()
+
+	imageName := imagelist.Get(imagelist.Pause)
+	image, err := client.Pull(ctx, imageName, WithPullUnpack, WithPullSnapshotter(testSnapshotter))
+	require.NoError(t, err)
+	defer client.ImageService().Delete(ctx, imageName, images.SynchronousDelete())
+
+	cs := client.ContentStore()
+	manifest, err := images.Manifest(ctx, cs, image.Target(), platforms.Default())
+	require.NoError(t, err)
+	require.NotEmpty(t, manifest.Layers)
+	layer := manifest.Layers[0]
+	_, err = cs.Info(ctx, layer.Digest)
+	require.NoError(t, err)
+
+	// Keep subsequent pulls on the same image even if the tag changes.
+	ref := imageName + "@" + image.Target().Digest.String()
+	defer client.ImageService().Delete(ctx, ref, images.SynchronousDelete())
+
+	require.NoError(t, cs.Delete(ctx, layer.Digest))
+	_, err = cs.Info(ctx, layer.Digest)
+	require.True(t, errdefs.IsNotFound(err), "layer should be missing: %v", err)
+	unpacked, err := image.IsUnpacked(ctx, testSnapshotter)
+	require.NoError(t, err)
+	require.True(t, unpacked, "deleting the blob must leave the snapshot intact")
+
+	_, err = client.Pull(ctx, ref, WithPullUnpack, WithPullSnapshotter(testSnapshotter))
+	require.NoError(t, err)
+	_, err = cs.Info(ctx, layer.Digest)
+	require.True(t, errdefs.IsNotFound(err), "default pull should leave the layer missing: %v", err)
+
+	_, err = client.Pull(ctx, ref,
+		WithPullUnpack,
+		WithPullSnapshotter(testSnapshotter),
+		WithUnpackOpts([]UnpackOpt{WithUnpackFetchAllContent()}),
+	)
+	require.NoError(t, err)
+	_, err = cs.Info(ctx, layer.Digest)
+	require.NoError(t, err, "fetch-all pull should restore the layer")
+}
 
 func TestImageIsUnpacked(t *testing.T) {
 	imageName := imagelist.Get(imagelist.Pause)

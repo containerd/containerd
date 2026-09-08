@@ -125,6 +125,9 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			SnapshotterCapabilities: snCapabilities,
 		}
 		uopts := []unpack.UnpackerOpt{unpack.WithUnpackPlatform(platform)}
+		if uconfig.FetchAllContent {
+			uopts = append(uopts, unpack.WithFetchAllContent())
+		}
 		if uconfig.DuplicationSuppressor != nil {
 			uopts = append(uopts, unpack.WithDuplicationSuppressor(uconfig.DuplicationSuppressor))
 		}
