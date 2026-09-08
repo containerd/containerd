@@ -97,8 +97,13 @@ func (c *criService) mutateImageMount(
 		return fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
-	// This is a digest of the manifest
+	// This is the digest of the image manifest, used to key the host mount
+	// path so a retagged image gets a fresh mount.
 	imageID := containerdImage.Target().Digest.Encoded()
+
+	// Report the resolved config digest so callers can identify the content
+	// mounted even when the image was requested by a mutable tag.
+	imageSpec.ImageRef = image.ID
 
 	target := c.getImageVolumeHostPath(sandboxID, imageID)
 
@@ -111,12 +116,7 @@ func (c *criService) mutateImageMount(
 		return fmt.Errorf("failed to ensure %s is mounted: %w", target, err)
 	}
 	if !mounted {
-		img, err := c.client.ImageService().Get(ctx, ref)
-		if err != nil {
-			return fmt.Errorf("failed to get image volume ref %q: %w", ref, err)
-		}
-
-		i := containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform))
+		i := containerd.NewImageWithPlatform(c.client, containerdImage.Metadata(), platforms.Only(platform))
 		if err := i.Unpack(ctx, snapshotter); err != nil {
 			return fmt.Errorf("failed to unpack image volume: %w", err)
 		}
