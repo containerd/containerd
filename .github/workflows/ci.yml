@@ -425,7 +425,7 @@ jobs:
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y gperf dmsetup strace xfsprogs
+          sudo apt-get install -y gperf dmsetup strace xfsprogs lld
           script/setup/install-seccomp
           script/setup/install-runc
           script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')

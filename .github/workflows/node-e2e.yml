@@ -60,7 +60,7 @@ jobs:
           # Disable swap to allow kubelet to start.
           sudo swapoff -a
           sudo apt-get update
-          sudo apt-get install -y gperf build-essential pkg-config
+          sudo apt-get install -y gperf build-essential pkg-config lld
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
