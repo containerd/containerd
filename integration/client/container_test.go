@@ -1977,6 +1977,8 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 		if code != 0 {
 			t.Errorf("expected exec exit code 0 but received %d", code)
 		}
+		// Wait for all output to be copied before Delete cancels the IO.
+		process.IO().Wait()
 		if _, err := process.Delete(ctx); err != nil {
 			t.Fatal(err)
 		}
