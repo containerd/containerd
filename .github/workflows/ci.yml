@@ -615,6 +615,12 @@ jobs:
           - template: fedora-44
             cgroup_driver: systemd
             runc: crun
+          - template: fedora-44
+            cgroup_driver: cgroupfs
+            runc: runsc
+          - template: fedora-44
+            cgroup_driver: systemd
+            runc: runsc
             # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
           - template: almalinux-8
             cgroup_driver: cgroupfs
