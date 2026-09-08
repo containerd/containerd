@@ -48,6 +48,20 @@ func TestResourceMax(t *testing.T) {
 	}
 }
 
+func TestSendLabelRefsNilBucket(t *testing.T) {
+	ctx := context.Background()
+	c := startGCContext(ctx, nil)
+
+	// A nil bucket (e.g. reached from an inconsistent metadata database) must
+	// be handled gracefully rather than panicking mid-transaction, which can
+	// leave the database unopenable on subsequent starts.
+	require.NotPanics(t, func() {
+		require.NoError(t, c.sendLabelRefs("ns", nil, labelRefCallbacks{
+			bref: func(gc.Node) {},
+		}))
+	})
+}
+
 func TestGCRoots(t *testing.T) {
 	db, err := newDatabase(t)
 	require.NoError(t, err)
