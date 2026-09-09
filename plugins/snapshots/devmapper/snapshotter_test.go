@@ -41,7 +41,7 @@ import (
 func TestSnapshotterSuite(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	assert.NoError(t, log.SetLevel("debug"))
+	assert.NoError(t, log.SetLevel(log.DebugLevel))
 
 	snapshotterFn := func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 		poolName := fmt.Sprintf("containerd-snapshotter-suite-pool-%d", time.Now().Nanosecond())
@@ -138,7 +138,7 @@ func TestMkfsXfsNonDefault(t *testing.T) {
 func TestMultipleXfsMounts(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	assert.NoError(t, log.SetLevel("debug"))
+	assert.NoError(t, log.SetLevel(log.DebugLevel))
 
 	ctx := context.Background()
 	ctx = namespaces.WithNamespace(ctx, "testsuite")

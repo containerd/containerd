@@ -165,7 +165,7 @@ func setLogger(ctx context.Context, id string) (context.Context, error) {
 	l := log.G(ctx)
 	_ = log.SetFormat(log.TextFormat)
 	if debugFlag {
-		_ = log.SetLevel("debug")
+		_ = log.SetLevel(log.DebugLevel)
 	}
 	f, err := openLog(ctx, id)
 	if err != nil {
