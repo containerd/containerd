@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -112,8 +113,8 @@ func init() {
 
 			ic.Meta.Exports = map[string]string{
 				"PauseThreshold":    fmt.Sprint(m.pauseThreshold),
-				"DeletionThreshold": fmt.Sprint(m.deletionThreshold),
-				"MutationThreshold": fmt.Sprint(m.mutationThreshold),
+				"DeletionThreshold": strconv.Itoa(m.deletionThreshold),
+				"MutationThreshold": strconv.Itoa(m.mutationThreshold),
 				"ScheduleDelay":     fmt.Sprint(m.scheduleDelay),
 			}
 

@@ -21,6 +21,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -84,7 +85,7 @@ func init() {
 
 			config, ok := ic.Config.(*BlockCIMSnapshotterConfig)
 			if !ok {
-				return nil, fmt.Errorf("invalid block CIM snapshotter configuration")
+				return nil, errors.New("invalid block CIM snapshotter configuration")
 			}
 
 			log.G(ic.Context).WithField("config", config).Trace("initializing blockcim snapshotter")
@@ -225,7 +226,7 @@ func (s *blockCIMSnapshotter) Mounts(ctx context.Context, key string) (_ []mount
 
 func (s *blockCIMSnapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
 	if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
-		return fmt.Errorf("committing a scratch snapshot to read-only cim layer isn't supported yet")
+		return errors.New("committing a scratch snapshot to read-only cim layer isn't supported yet")
 	}
 
 	return s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
@@ -295,7 +296,7 @@ func (s *blockCIMSnapshotter) createSnapshot(ctx context.Context, kind snapshots
 		}
 
 		if len(newSnapshot.ParentIDs) == 0 {
-			return fmt.Errorf("scratch snapshot without any parents isn't supported")
+			return errors.New("scratch snapshot without any parents isn't supported")
 		}
 
 		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
@@ -472,7 +473,7 @@ const (
 // index.  already exists in the 0th snapshot's directory, nothing is done.
 func (s *blockCIMSnapshotter) prepareMergedCIM(ctx context.Context, snapshotIDs []string) (rErr error) {
 	if len(snapshotIDs) < 2 {
-		return fmt.Errorf("merging CIM requires at least 2 snapshots")
+		return errors.New("merging CIM requires at least 2 snapshots")
 	}
 	log.G(ctx).WithFields(log.Fields{
 		"source snapshots": snapshotIDs,
