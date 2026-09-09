@@ -816,6 +816,13 @@ func (c *criService) extractProcessMetrics(ctx context.Context, task containerd.
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Pids.Limit},
 				},
+				{
+					Name:        containerThreads.Name,
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Pids.Current},
+				},
 			}...)
 		}
 
