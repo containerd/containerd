@@ -60,18 +60,19 @@ var listCommand = &cli.Command{
 			Usage:   "Print detailed information about each plugin",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
 		var (
-			quiet    = cliContext.Bool("quiet")
-			detailed = cliContext.Bool("detailed")
+			quiet    = cmd.Bool("quiet")
+			detailed = cmd.Bool("detailed")
 		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		ps := client.IntrospectionService()
-		response, err := ps.Plugins(ctx, cliContext.Args().Slice()...)
+		response, err := ps.Plugins(ctx, cmd.Args().Slice()...)
 		if err != nil {
 			return err
 		}
@@ -172,13 +173,14 @@ var inspectRuntimeCommand = &cli.Command{
 	Usage:     "Display runtime info",
 	ArgsUsage: "[flags]",
 	Flags:     commands.RuntimeFlags,
-	Action: func(cliContext *cli.Context) error {
-		rt := cliContext.String("runtime")
-		rtOptions, err := commands.RuntimeOptions(cliContext)
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
+		rt := cmd.String("runtime")
+		rtOptions, err := commands.RuntimeOptions(cmd)
 		if err != nil {
 			return err
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -191,7 +193,7 @@ var inspectRuntimeCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintln(cliContext.App.Writer, string(j))
+		_, err = fmt.Fprintln(cmd.App.Writer, string(j))
 		return err
 	},
 }

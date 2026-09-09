@@ -38,9 +38,9 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the task id",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		quiet := cliContext.Bool("quiet")
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -50,6 +50,7 @@ var listCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
+		quiet := cmd.Bool("quiet")
 		if quiet {
 			for _, task := range response.Tasks {
 				fmt.Println(task.ID)

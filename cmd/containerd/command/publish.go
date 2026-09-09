@@ -51,9 +51,9 @@ var publishCommand = &cli.Command{
 			Usage: "Topic of the event",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		ctx := namespaces.WithNamespace(cliContext.Context, cliContext.String("namespace"))
-		topic := cliContext.String("topic")
+	Action: func(cmd *cli.Context) error {
+		ctx := namespaces.WithNamespace(cmd.Context, cmd.String("namespace"))
+		topic := cmd.String("topic")
 		if topic == "" {
 			return fmt.Errorf("topic required to publish event: %w", errdefs.ErrInvalidArgument)
 		}
@@ -61,7 +61,7 @@ var publishCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := connectEvents(cliContext.String("address"))
+		client, err := connectEvents(cmd.String("address"))
 		if err != nil {
 			return err
 		}

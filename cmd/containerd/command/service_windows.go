@@ -79,8 +79,8 @@ func serviceFlags() []cli.Flag {
 }
 
 // applyPlatformFlags applies platform-specific flags.
-func applyPlatformFlags(cliContext *cli.Context) {
-	serviceNameFlag = cliContext.String("service-name")
+func applyPlatformFlags(cmd *cli.Context) {
+	serviceNameFlag = cmd.String("service-name")
 	if serviceNameFlag == "" {
 		serviceNameFlag = defaultServiceName
 	}
@@ -101,9 +101,9 @@ func applyPlatformFlags(cliContext *cli.Context) {
 			d:    &runServiceFlag,
 		},
 	} {
-		*v.d = cliContext.Bool(v.name)
+		*v.d = cmd.Bool(v.name)
 	}
-	logFileFlag = cliContext.String("log-file")
+	logFileFlag = cmd.String("log-file")
 }
 
 type handler struct {

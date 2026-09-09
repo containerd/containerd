@@ -55,8 +55,8 @@ var pprofGoroutinesCommand = &cli.Command{
 			Value: 2,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return pprof.GoroutineProfile(cliContext, getPProfClient)
+	Action: func(cmd *cli.Context) error {
+		return pprof.GoroutineProfile(cmd, getPProfClient)
 	},
 }
 
@@ -70,8 +70,8 @@ var pprofHeapCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return pprof.HeapProfile(cliContext, getPProfClient)
+	Action: func(cmd *cli.Context) error {
+		return pprof.HeapProfile(cmd, getPProfClient)
 	},
 }
 
@@ -91,8 +91,8 @@ var pprofProfileCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return pprof.CPUProfile(cliContext, getPProfClient)
+	Action: func(cmd *cli.Context) error {
+		return pprof.CPUProfile(cmd, getPProfClient)
 	},
 }
 
@@ -112,8 +112,8 @@ var pprofTraceCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return pprof.TraceProfile(cliContext, getPProfClient)
+	Action: func(cmd *cli.Context) error {
+		return pprof.TraceProfile(cmd, getPProfClient)
 	},
 }
 
@@ -127,8 +127,8 @@ var pprofBlockCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return pprof.BlockProfile(cliContext, getPProfClient)
+	Action: func(cmd *cli.Context) error {
+		return pprof.BlockProfile(cmd, getPProfClient)
 	},
 }
 
@@ -142,21 +142,21 @@ var pprofThreadcreateCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		return pprof.ThreadcreateProfile(cliContext, getPProfClient)
+	Action: func(cmd *cli.Context) error {
+		return pprof.ThreadcreateProfile(cmd, getPProfClient)
 	},
 }
 
-func getPProfClient(cliContext *cli.Context) (*http.Client, error) {
-	id := cliContext.String("id")
+func getPProfClient(cmd *cli.Context) (*http.Client, error) {
+	id := cmd.String("id")
 	if id == "" {
 		return nil, errors.New("container id must be provided")
 	}
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			ns := cliContext.String("namespace")
+			ns := cmd.String("namespace")
 			ctx = namespaces.WithNamespace(ctx, ns)
-			s, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, true)
+			s, _ := shim.SocketAddress(ctx, cmd.String("address"), id, true)
 			s = strings.TrimPrefix(s, "unix://")
 			var dialer net.Dialer
 			return dialer.DialContext(ctx, "unix", s)

@@ -46,32 +46,32 @@ var platformRunFlags = []cli.Flag{
 }
 
 // NewContainer creates a new container
-func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cli.Context) (containerd.Container, error) {
+func NewContainer(ctx context.Context, client *containerd.Client, cmd *cli.Context) (containerd.Container, error) {
 	var (
 		id    string
 		opts  []oci.SpecOpts
 		cOpts []containerd.NewContainerOpts
 		spec  containerd.NewContainerOpts
 
-		config = cliContext.IsSet("config")
+		config = cmd.IsSet("config")
 	)
 
-	if sandbox := cliContext.String("sandbox"); sandbox != "" {
+	if sandbox := cmd.String("sandbox"); sandbox != "" {
 		cOpts = append(cOpts, containerd.WithSandbox(sandbox))
 	}
 
 	if config {
-		id = cliContext.Args().First()
-		opts = append(opts, oci.WithSpecFromFile(cliContext.String("config")))
-		cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(cliContext.StringSlice("label"))))
+		id = cmd.Args().First()
+		opts = append(opts, oci.WithSpecFromFile(cmd.String("config")))
+		cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(cmd.StringSlice("label"))))
 	} else {
 		var (
-			ref  = cliContext.Args().First()
-			args = cliContext.Args().Slice()[2:]
+			ref  = cmd.Args().First()
+			args = cmd.Args().Slice()[2:]
 		)
 
-		id = cliContext.Args().Get(1)
-		snapshotter := cliContext.String("snapshotter")
+		id = cmd.Args().Get(1)
+		snapshotter := cmd.String("snapshotter")
 		if snapshotter == "windows-lcow" {
 			opts = append(opts, oci.WithDefaultSpecForPlatform("linux/amd64"))
 			// Clear the rootfs section.
@@ -81,11 +81,11 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			opts = append(opts, oci.WithWindowNetworksAllowUnqualifiedDNSQuery())
 			opts = append(opts, oci.WithWindowsIgnoreFlushesDuringBoot())
 		}
-		if ef := cliContext.String("env-file"); ef != "" {
+		if ef := cmd.String("env-file"); ef != "" {
 			opts = append(opts, oci.WithEnvFile(ef))
 		}
-		opts = append(opts, oci.WithEnv(cliContext.StringSlice("env")))
-		opts = append(opts, withMounts(cliContext))
+		opts = append(opts, oci.WithEnv(cmd.StringSlice("env")))
+		opts = append(opts, withMounts(cmd))
 
 		image, err := client.GetImage(ctx, ref)
 		if err != nil {
@@ -96,12 +96,12 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			return nil, err
 		}
 		if !unpacked {
-			if err := image.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs")))); err != nil {
+			if err := image.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(cmd.Bool("sync-fs")))); err != nil {
 				return nil, err
 			}
 		}
 		opts = append(opts, oci.WithImageConfig(image))
-		labels := buildLabels(commands.LabelArgs(cliContext.StringSlice("label")), image.Labels())
+		labels := buildLabels(commands.LabelArgs(cmd.StringSlice("label")), image.Labels())
 		cOpts = append(cOpts,
 			containerd.WithImage(image),
 			containerd.WithImageConfigLabels(image),
@@ -109,19 +109,19 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			containerd.WithNewSnapshot(
 				id,
 				image,
-				snapshots.WithLabels(commands.LabelArgs(cliContext.StringSlice("snapshotter-label")))),
+				snapshots.WithLabels(commands.LabelArgs(cmd.StringSlice("snapshotter-label")))),
 			containerd.WithAdditionalContainerLabels(labels))
 
 		if len(args) > 0 {
 			opts = append(opts, oci.WithProcessArgs(args...))
 		}
-		if cwd := cliContext.String("cwd"); cwd != "" {
+		if cwd := cmd.String("cwd"); cwd != "" {
 			opts = append(opts, oci.WithProcessCwd(cwd))
 		}
-		if user := cliContext.String("user"); user != "" {
+		if user := cmd.String("user"); user != "" {
 			opts = append(opts, oci.WithUser(user))
 		}
-		if cliContext.Bool("tty") {
+		if cmd.Bool("tty") {
 			opts = append(opts, oci.WithTTY)
 
 			con := console.Current()
@@ -131,36 +131,36 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			}
 			opts = append(opts, oci.WithTTYSize(int(size.Width), int(size.Height)))
 		}
-		if cliContext.Bool("net-host") {
+		if cmd.Bool("net-host") {
 			return nil, errors.New("cannot use host mode networking with Windows containers")
 		}
-		if cliContext.Bool("cni") {
+		if cmd.Bool("cni") {
 			ns, err := netns.NewNetNS("")
 			if err != nil {
 				return nil, err
 			}
 			opts = append(opts, oci.WithWindowsNetworkNamespace(ns.GetPath()))
 		}
-		if cliContext.Bool("isolated") {
+		if cmd.Bool("isolated") {
 			opts = append(opts, oci.WithWindowsHyperV)
 		}
-		limit := cliContext.Uint64("memory-limit")
+		limit := cmd.Uint64("memory-limit")
 		if limit != 0 {
 			opts = append(opts, oci.WithMemoryLimit(limit))
 		}
-		ccount := cliContext.Uint64("cpu-count")
+		ccount := cmd.Uint64("cpu-count")
 		if ccount != 0 {
 			opts = append(opts, oci.WithWindowsCPUCount(ccount))
 		}
-		cshares := cliContext.Uint64("cpu-shares")
+		cshares := cmd.Uint64("cpu-shares")
 		if cshares != 0 {
 			opts = append(opts, oci.WithWindowsCPUShares(uint16(cshares)))
 		}
-		cmax := cliContext.Uint64("cpu-max")
+		cmax := cmd.Uint64("cpu-max")
 		if cmax != 0 {
 			opts = append(opts, oci.WithWindowsCPUMaximum(uint16(cmax)))
 		}
-		for _, dev := range cliContext.StringSlice("device") {
+		for _, dev := range cmd.StringSlice("device") {
 			idType, devID, ok := strings.Cut(dev, "://")
 			if !ok {
 				return nil, errors.New("devices must be in the format IDType://ID")
@@ -172,19 +172,19 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		}
 	}
 
-	if cliContext.Bool("cni") {
+	if cmd.Bool("cni") {
 		cniMeta := &commands.NetworkMetaData{EnableCni: true}
 		cOpts = append(cOpts, containerd.WithContainerExtension(commands.CtrCniMetadataExtension, cniMeta))
 	}
 
-	runtime := cliContext.String("runtime")
+	runtime := cmd.String("runtime")
 	var runtimeOpts any
 	if runtime == "io.containerd.runhcs.v1" {
 		opts := &options.Options{
-			Debug: cliContext.Bool("debug"),
+			Debug: cmd.Bool("debug"),
 		}
-		if cliContext.IsSet("scrub-logs") {
-			scrubLogs := cliContext.Bool("scrub-logs")
+		if cmd.IsSet("scrub-logs") {
+			scrubLogs := cmd.Bool("scrub-logs")
 			opts.ScrubLogs = &scrubLogs
 		}
 		runtimeOpts = opts

@@ -89,8 +89,8 @@ var configCommand = &cli.Command{
 		{
 			Name:  "default",
 			Usage: "See the output of the default config",
-			Action: func(cliContext *cli.Context) error {
-				ctx := cliContext.Context
+			Action: func(cmd *cli.Context) error {
+				ctx := cmd.Context
 				return outputConfig(ctx, defaultConfig())
 			},
 		},
@@ -108,15 +108,15 @@ var configCommand = &cli.Command{
 	},
 }
 
-func dumpConfig(cliContext *cli.Context) error {
+func dumpConfig(cmd *cli.Context) error {
 	config := defaultConfig()
-	ctx := cliContext.Context
+	ctx := cmd.Context
 
 	g := registry.Graph(func(*plugin.Registration) bool { return false })
 	plugins := func() iter.Seq[plugin.Registration] {
 		return slices.Values(g)
 	}
-	if err := srvconfig.LoadConfigWithPlugins(ctx, cliContext.String("config"), plugins, config); err != nil && !os.IsNotExist(err) {
+	if err := srvconfig.LoadConfigWithPlugins(ctx, cmd.String("config"), plugins, config); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 

@@ -37,6 +37,6 @@ func init() {
 		})
 }
 
-func RuntimeOptions(cliContext *cli.Context) (any, error) {
+func RuntimeOptions(cmd *cli.Context) (any, error) {
 	return nil, nil
 }

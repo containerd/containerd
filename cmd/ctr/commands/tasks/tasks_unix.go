@@ -121,8 +121,8 @@ func NewTask(ctx context.Context, client *containerd.Client, container container
 }
 
 // GetNewTaskOpts resolves containerd.NewTaskOpts from cli.Context
-func GetNewTaskOpts(cliContext *cli.Context) []containerd.NewTaskOpts {
-	if cliContext.Bool("no-pivot") {
+func GetNewTaskOpts(cmd *cli.Context) []containerd.NewTaskOpts {
+	if cmd.Bool("no-pivot") {
 		return []containerd.NewTaskOpts{containerd.WithNoPivotRoot}
 	}
 	return nil

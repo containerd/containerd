@@ -58,7 +58,6 @@ command. As part of this process, we do the following:
 		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: cli.NewStringSlice(),
 		},
 		&cli.BoolFlag{
 			Name:  "all-platforms",
@@ -90,41 +89,40 @@ command. As part of this process, we do the following:
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	),
-	Action: func(cliContext *cli.Context) error {
-		var (
-			ref = cliContext.Args().First()
-		)
+	Action: func(cmd *cli.Context) error {
+		ctx := cmd.Context
+		ref := cmd.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to pull")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		if !cliContext.Bool("local") {
+		if !cmd.Bool("local") {
 			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid",
 				"skip-verify", "tlscacert", "tlscert", "tlskey", // RegistryFlags
 			}
 			for _, s := range unsupportedFlags {
-				if cliContext.IsSet(s) {
+				if cmd.IsSet(s) {
 					return fmt.Errorf("\"--%s\" requires \"--local\" flag", s)
 				}
 			}
 
-			ch, err := commands.NewStaticCredentials(ctx, cliContext, ref)
+			ch, err := commands.NewStaticCredentials(ctx, cmd, ref)
 			if err != nil {
 				return err
 			}
 
 			var sopts []image.StoreOpt
-			p, err := platforms.ParseAll(cliContext.StringSlice("platform"))
+			p, err := platforms.ParseAll(cmd.StringSlice("platform"))
 			if err != nil {
 				return err
 			}
-			allPlatforms := cliContext.Bool("all-platforms")
+			allPlatforms := cmd.Bool("all-platforms")
 			if len(p) > 0 && allPlatforms {
 				return errors.New("cannot specify both --platform and --all-platforms")
 			}
@@ -141,34 +139,34 @@ command. As part of this process, we do the following:
 			// TODO: Support unpack for all platforms..?
 			// Pass in a *?
 			for _, platform := range p {
-				sopts = append(sopts, image.WithUnpack(platform, cliContext.String("snapshotter")))
+				sopts = append(sopts, image.WithUnpack(platform, cmd.String("snapshotter")))
 			}
 
-			if cliContext.Bool("metadata-only") {
+			if cmd.Bool("metadata-only") {
 				sopts = append(sopts, image.WithAllMetadata)
 				// Any with an empty set is None
 				// TODO: Specify way to specify not default platform
 				// config.PlatformMatcher = platforms.Any()
-			} else if !cliContext.Bool("skip-metadata") {
+			} else if !cmd.Bool("skip-metadata") {
 				sopts = append(sopts, image.WithAllMetadata)
 			}
-			labels := cliContext.StringSlice("label")
+			labels := cmd.StringSlice("label")
 			if len(labels) > 0 {
 				sopts = append(sopts, image.WithImageLabels(commands.LabelArgs(labels)))
 			}
 
 			opts := []registry.Opt{
 				registry.WithCredentials(ch),
-				registry.WithHostDir(cliContext.String("hosts-dir")),
+				registry.WithHostDir(cmd.String("hosts-dir")),
 			}
-			if cliContext.Bool("plain-http") {
+			if cmd.Bool("plain-http") {
 				opts = append(opts, registry.WithDefaultScheme("http"))
 			}
 			logStream := log.G(ctx).Writer()
-			if cliContext.Bool("http-dump") {
+			if cmd.Bool("http-dump") {
 				opts = append(opts, registry.WithHTTPDebug(), registry.WithClientStream(logStream))
 			}
-			if cliContext.Bool("http-trace") {
+			if cmd.Bool("http-trace") {
 				opts = append(opts, registry.WithHTTPTrace(), registry.WithClientStream(logStream))
 			}
 			reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
@@ -190,7 +188,7 @@ command. As part of this process, we do the following:
 		defer done(ctx)
 
 		// TODO: Handle this locally via transfer config
-		config, err := content.NewFetchConfig(ctx, cliContext)
+		config, err := content.NewFetchConfig(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -205,13 +203,13 @@ command. As part of this process, we do the following:
 		// TODO: Show unpack status
 
 		var p []ocispec.Platform
-		if cliContext.Bool("all-platforms") {
+		if cmd.Bool("all-platforms") {
 			p, err = images.Platforms(ctx, client.ContentStore(), img.Target)
 			if err != nil {
 				return fmt.Errorf("unable to resolve image platforms: %w", err)
 			}
 		} else {
-			p, err = platforms.ParseAll(cliContext.StringSlice("platform"))
+			p, err = platforms.ParseAll(cmd.StringSlice("platform"))
 			if err != nil {
 				return err
 			}
@@ -224,11 +222,11 @@ command. As part of this process, we do the following:
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs"))))
+			err = i.Unpack(ctx, cmd.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cmd.Bool("sync-fs"))))
 			if err != nil {
 				return err
 			}
-			if cliContext.Bool("print-chainid") {
+			if cmd.Bool("print-chainid") {
 				diffIDs, err := i.RootFS(ctx)
 				if err != nil {
 					return err
