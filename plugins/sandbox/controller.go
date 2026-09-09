@@ -18,6 +18,7 @@ package sandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -258,8 +260,11 @@ func (c *controllerLocal) Shutdown(ctx context.Context, sandboxID string) error 
 		return err
 	}
 
+	// A shim may exit as soon as it has shut its sandbox down, before the
+	// response is read; a closed connection means the shutdown happened, as
+	// for the task Shutdown RPC.
 	_, err = svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{SandboxID: sandboxID})
-	if err != nil {
+	if err != nil && !errors.Is(err, ttrpc.ErrClosed) {
 		return fmt.Errorf("failed to shutdown sandbox: %w", errgrpc.ToNative(err))
 	}
 
