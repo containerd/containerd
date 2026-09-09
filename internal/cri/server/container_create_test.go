@@ -70,7 +70,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
-	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil, nil)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -146,7 +146,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations: test.podAnnotations,
 			}
 			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
-				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, testSandboxID, testPid, spec)
@@ -508,7 +508,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				ContainerAnnotations: test.containerAnnotations,
 			}
 			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
-				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, testSandboxID, testPid, spec)
@@ -759,7 +759,7 @@ func TestLinuxContainerMounts(t *testing.T) {
 			}
 			c := newTestCRIService()
 			c.os.(*ostesting.FakeOS).StatFn = test.statFn
-			mounts := c.linuxContainerMounts(testSandboxID, config)
+			mounts := c.linuxContainerMounts(testSandboxID, config, nil)
 			assert.Equal(t, test.expectedMounts, mounts, test.desc)
 		})
 	}
