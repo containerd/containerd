@@ -751,7 +751,7 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 
 func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName string, id string) error {
 	opts := []diff.Opt{
-		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", id)),
+		diff.WithReference("checkpoint-rw-" + id),
 	}
 	rw, err := rootfs.CreateDiff(ctx, id, t.client.SnapshotService(snapshotterName), t.client.DiffService(), opts...)
 	if err != nil {
@@ -767,7 +767,7 @@ func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapsh
 
 func (t *task) checkpointImage(ctx context.Context, index *v1.Index, image string) error {
 	if image == "" {
-		return fmt.Errorf("cannot checkpoint image with empty name")
+		return errors.New("cannot checkpoint image with empty name")
 	}
 	ir, err := t.client.ImageService().Get(ctx, image)
 	if err != nil {
