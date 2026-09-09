@@ -100,7 +100,7 @@ func init() {
 			}
 
 			if err := shimManager.LoadExistingShims(ic.Context, state, root); err != nil {
-				return nil, fmt.Errorf("failed to load existing shims for task manager")
+				return nil, fmt.Errorf("failed to load existing shims for task manager: %w", err)
 			}
 
 			warningsI, err := ic.GetSingle(plugins.WarningPlugin)
@@ -137,7 +137,7 @@ type TaskManager struct {
 // shims is  ShimManager for TaskManager to create/delete shims
 func NewTaskManager(ctx context.Context, root, state string, shims *ShimManager) (*TaskManager, error) {
 	if err := shims.LoadExistingShims(ctx, state, root); err != nil {
-		return nil, fmt.Errorf("failed to load existing shims for task manager")
+		return nil, fmt.Errorf("failed to load existing shims for task manager: %w", err)
 	}
 	m := &TaskManager{
 		root:    root,

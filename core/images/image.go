@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -396,7 +397,7 @@ func validateMediaType(b []byte, mt string) error {
 		return err
 	}
 	if len(doc.FSLayers) != 0 {
-		return fmt.Errorf("media-type: schema 1 not supported")
+		return errors.New("media-type: schema 1 not supported")
 	}
 	if IsManifestType(mt) && (len(doc.Manifests) != 0 || IsIndexType(doc.MediaType)) {
 		return fmt.Errorf("media-type: expected manifest but found index (%s)", mt)
