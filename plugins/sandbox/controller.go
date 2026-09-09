@@ -337,7 +337,7 @@ func (c *controllerLocal) Metrics(ctx context.Context, sandboxID string) (*types
 	req := &runtimeAPI.SandboxMetricsRequest{SandboxID: sandboxID}
 	resp, err := sb.SandboxMetrics(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errgrpc.ToNative(err)
 	}
 	return resp.Metrics, nil
 }
