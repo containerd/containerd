@@ -159,7 +159,7 @@ func (b *Bundle) Delete() error {
 // atomicDelete renames the path to a hidden file before removal
 func atomicDelete(path string) error {
 	// create a hidden dir for an atomic removal
-	atomicPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
+	atomicPath := filepath.Join(filepath.Dir(path), "."+filepath.Base(path))
 	if err := os.Rename(path, atomicPath); err != nil {
 		if os.IsNotExist(err) {
 			return nil

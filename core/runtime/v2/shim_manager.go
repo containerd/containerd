@@ -97,7 +97,7 @@ func init() {
 			} else {
 				config.SocketDir = defaultSocketDir()
 				if config.SocketDir == "" {
-					return nil, fmt.Errorf("failed to find a suitable socket directory for shim, please configure one")
+					return nil, errors.New("failed to find a suitable socket directory for shim, please configure one")
 				}
 			}
 
@@ -226,8 +226,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 				// we should get the protocol from the url first.
 				protocol, address, ok := strings.Cut(opts.Address, "+")
 				if !ok {
-					return nil, fmt.Errorf("the scheme of sandbox address should be in " +
-						" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
+					return nil, errors.New("the scheme of sandbox address should be in the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
 				}
 				params = &bootapi.BootstrapResult{
 					Version:  int32(opts.Version),
@@ -421,7 +420,7 @@ func restoreBootstrapParams(bundlePath string) (*bootapi.BootstrapResult, error)
 
 func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 	if runtime == "" {
-		return "", fmt.Errorf("no runtime name")
+		return "", errors.New("no runtime name")
 	}
 
 	// Custom path to runtime binary

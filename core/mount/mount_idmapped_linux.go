@@ -17,6 +17,7 @@
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -31,7 +32,7 @@ func parseIDMapping(mapping string) (syscall.SysProcIDMap, error) {
 
 	parts := strings.Split(mapping, ":")
 	if len(parts) != 3 {
-		return retval, fmt.Errorf("user namespace mappings require the format `container-id:host-id:size`")
+		return retval, errors.New("user namespace mappings require the format `container-id:host-id:size`")
 	}
 
 	cID, err := strconv.Atoi(parts[0])
