@@ -17,6 +17,7 @@
 WHALE="+"
 ONI="-"
 COMMANDS += containerd-shim-runc-v2
+COMMANDS += containerd-shim-sandboxed-runc-v2
 
 # check GOOS for cross compile builds
 ifeq ($(GOOS),linux)
