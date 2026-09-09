@@ -130,7 +130,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			prefix := cmd.String("base-name")
 			var overwrite bool
 			if prefix == "" {
-				prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
+				prefix = "import-" + time.Now().Format("2006-01-02")
 				// Allow overwriting auto-generated prefix with named annotation
 				overwrite = true
 			}
@@ -204,7 +204,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		prefix := cmd.String("base-name")
 		if prefix == "" {
-			prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
+			prefix = "import-" + time.Now().Format("2006-01-02")
 			opts = append(opts, containerd.WithImageRefTranslator(archive.AddRefPrefix(prefix)))
 		} else {
 			// When provided, filter out references which do not match

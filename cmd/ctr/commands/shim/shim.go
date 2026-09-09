@@ -130,7 +130,7 @@ var shutdownCommand = &cli.Command{
 			Value: 3,
 			Action: func(ctx context.Context, cmd *cli.Command, v int) error {
 				if v != 2 && v != 3 {
-					return fmt.Errorf("api-version must be 2 or 3")
+					return errors.New("api-version must be 2 or 3")
 				}
 				return nil
 			},
@@ -176,7 +176,7 @@ var stateCommand = &cli.Command{
 			Value: 3,
 			Action: func(ctx context.Context, cmd *cli.Command, v int) error {
 				if v != 2 && v != 3 {
-					return fmt.Errorf("api-version must be 2 or 3")
+					return errors.New("api-version must be 2 or 3")
 				}
 				return nil
 			},
@@ -333,7 +333,7 @@ func getTTRPCClient(cmd *cli.Command) (*ttrpc.Client, error) {
 	id := cmd.String("id")
 	shimAddress := cmd.String("shim-address")
 	if id == "" && shimAddress == "" {
-		return nil, fmt.Errorf("shim ID (--id) or address (--shim-address) must be specified")
+		return nil, errors.New("shim ID (--id) or address (--shim-address) must be specified")
 	}
 	ns := cmd.String("namespace")
 
