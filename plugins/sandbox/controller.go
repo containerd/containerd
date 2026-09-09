@@ -124,7 +124,9 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 	var coptions sandbox.CreateOptions
 	sandboxID := info.ID
 	for _, opt := range opts {
-		opt(&coptions)
+		if err := opt(&coptions); err != nil {
+			return err
+		}
 	}
 
 	if _, err := c.shims.Get(ctx, sandboxID); err == nil {
@@ -141,10 +143,16 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 		}
 	}()
 
+	// The shim manager accepts an absolute binary path in place of a
+	// runtime name.
+	runtimeName := info.Runtime.Name
+	if coptions.RuntimePath != "" {
+		runtimeName = coptions.RuntimePath
+	}
 	shim, err := c.shims.Start(ctx, sandboxID, bundle, runtime.CreateOpts{
 		Spec:           info.Spec,
 		RuntimeOptions: info.Runtime.Options,
-		Runtime:        info.Runtime.Name,
+		Runtime:        runtimeName,
 		TaskOptions:    nil,
 	})
 	if err != nil {
