@@ -151,6 +151,29 @@ func (c *criService) mutateImageMount(
 			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 		}
 
+		mm := c.client.MountManager()
+		id := fmt.Sprintf("cri-image-mount-%s", target)
+		activateOpts := []mount.ActivateOpt{
+			mount.WithLabels(map[string]string{
+				"containerd.io/gc.bref.snapshot." + snapshotter: target,
+			}),
+		}
+
+		info, err := mm.Activate(ctx, id, mounts, activateOpts...)
+		if err == nil {
+			mounts = info.System
+		} else if errdefs.IsAlreadyExists(err) {
+			// Reuse an existing activation (e.g. after a restart or a
+			// previous failed attempt that left state behind).
+			info, err = mm.Info(ctx, id)
+			if err != nil {
+				return fmt.Errorf("failed to get activation info for %q: %w", target, err)
+			}
+			mounts = info.System
+		} else if !errdefs.IsNotImplemented(err) {
+			return fmt.Errorf("failed to activate mounts %q: %w", target, err)
+		}
+
 		mounts = addVolatileOptionOnImageVolumeMount(mounts)
 
 		// if mutateImageMount() fails, do not leak the new mounts
