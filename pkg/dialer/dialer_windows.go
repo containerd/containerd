@@ -17,7 +17,6 @@
 package dialer
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -41,7 +40,7 @@ func dialer(address string, timeout time.Duration) (net.Conn, error) {
 func DialAddress(address string) string {
 	address = filepath.ToSlash(address)
 	if !strings.HasPrefix(address, "npipe://") {
-		address = fmt.Sprintf("npipe://%s", address)
+		address = "npipe://" + address
 	}
 	return address
 }
