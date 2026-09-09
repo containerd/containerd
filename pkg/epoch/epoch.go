@@ -18,6 +18,7 @@
 package epoch
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -46,7 +47,7 @@ func SourceDateEpoch() (*time.Time, error) {
 // It returns an error if sourceDateEpoch is empty or not well-formatted.
 func ParseSourceDateEpoch(sourceDateEpoch string) (*time.Time, error) {
 	if sourceDateEpoch == "" {
-		return nil, fmt.Errorf("value is empty")
+		return nil, errors.New("value is empty")
 	}
 	i64, err := strconv.ParseInt(sourceDateEpoch, 10, 64)
 	if err != nil {
@@ -61,7 +62,7 @@ func ParseSourceDateEpoch(sourceDateEpoch string) (*time.Time, error) {
 
 // SetSourceDateEpoch sets the SOURCE_DATE_EPOCH env var.
 func SetSourceDateEpoch(tm time.Time) {
-	_ = os.Setenv(SourceDateEpochEnv, fmt.Sprintf("%d", tm.Unix()))
+	_ = os.Setenv(SourceDateEpochEnv, strconv.FormatInt(tm.Unix(), 10))
 }
 
 // UnsetSourceDateEpoch unsets the SOURCE_DATE_EPOCH env var.
