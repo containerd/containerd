@@ -313,7 +313,7 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 		return nil, fmt.Errorf("failed to read from logging binary: %w", err)
 	}
 	if uri.Scheme == "binary-v2" && n == 0 {
-		return nil, fmt.Errorf("logging binary did not call ready (it may have crashed or exited prematurely)")
+		return nil, errors.New("logging binary did not call ready (it may have crashed or exited prematurely)")
 	}
 
 	return &binaryIO{
