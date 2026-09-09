@@ -18,16 +18,16 @@
 
 package fsverity
 
-import "fmt"
+import "errors"
 
 func IsSupported(rootPath string) (bool, error) {
-	return false, fmt.Errorf("fsverity is only supported on Linux systems")
+	return false, errors.New("fsverity is only supported on Linux systems")
 }
 
 func IsEnabled(path string) (bool, error) {
-	return false, fmt.Errorf("fsverity is only supported on Linux systems")
+	return false, errors.New("fsverity is only supported on Linux systems")
 }
 
 func Enable(_ string) error {
-	return fmt.Errorf("fsverity is only supported on Linux systems")
+	return errors.New("fsverity is only supported on Linux systems")
 }
