@@ -93,5 +93,46 @@ func TestEnsureMkfsImagePassesAbsolutePath(t *testing.T) {
 	require.NotEmpty(t, fields)
 	imgPath := fields[len(fields)-1]
 	assert.True(t, filepath.IsAbs(imgPath), "path passed to mkfs.ext4 must be absolute, got %q", imgPath)
-	assert.Equal(t, filepath.Join(root, "img"), imgPath)
+	assert.Equal(t, filepath.Join(root, "img.tmp"), imgPath)
+}
+
+// TestEnsureMkfsImagePublishesAtomically verifies that the final
+// backing file path exists only once mkfs.* has succeeded, with no
+// leftover temp file either way.
+func TestEnsureMkfsImagePublishesAtomically(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("relies on a #!/bin/sh fake mkfs.ext4, not runnable on Windows")
+	}
+
+	td := t.TempDir()
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0700))
+	r, err := os.OpenRoot(root)
+	require.NoError(t, err)
+	t.Cleanup(func() { r.Close() })
+
+	bin := filepath.Join(td, "bin")
+	require.NoError(t, os.MkdirAll(bin, 0700))
+	failing := filepath.Join(bin, "mkfs.ext4")
+	require.NoError(t, os.WriteFile(failing, []byte("#!/bin/sh\nexit 1\n"), 0700))
+	t.Setenv("PATH", bin)
+
+	final := filepath.Join(root, "img")
+	tmp := final + ".tmp"
+
+	err = ensureMkfsImage(context.Background(), r, "img", "img", 4096, "ext4", "")
+	require.Error(t, err, "a failing mkfs.ext4 must surface as an error")
+	_, statErr := os.Stat(final)
+	assert.True(t, os.IsNotExist(statErr), "the final path must not exist after a failed format")
+	_, statErr = os.Stat(tmp)
+	assert.True(t, os.IsNotExist(statErr), "the temp file must be cleaned up after a failed format, not left orphaned")
+
+	succeeding := "#!/bin/sh\nexit 0\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "mkfs.ext4"), []byte(succeeding), 0700))
+
+	require.NoError(t, ensureMkfsImage(context.Background(), r, "img", "img", 4096, "ext4", ""))
+	_, statErr = os.Stat(final)
+	assert.NoError(t, statErr, "a succeeding mkfs.ext4 must be published to the final path")
+	_, statErr = os.Stat(tmp)
+	assert.True(t, os.IsNotExist(statErr), "the temp file must not survive a successful publish")
 }

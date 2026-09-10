@@ -149,19 +149,30 @@ func ensureMkfsImage(ctx context.Context, r *os.Root, subpath, source string, si
 		return fmt.Errorf("unsupported filesystem %q: %w", fs, errdefs.ErrInvalidArgument)
 	}
 
-	f, err := r.OpenFile(subpath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
+	// Formatted at a sibling temp path and renamed into place, so
+	// subpath only ever exists once fully formatted.
+	tmpSubpath := subpath + ".tmp"
+	f, err := r.OpenFile(tmpSubpath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
 	if err != nil {
 		return fmt.Errorf("failed to create file %q: %w", source, err)
 	}
+	removeTmp := true
+	defer func() {
+		if !removeTmp {
+			return
+		}
+		// Best effort; a leftover temp file is harmless.
+		if err := r.Remove(tmpSubpath); err != nil && !os.IsNotExist(err) {
+			log.G(ctx).WithError(err).WithField("path", tmpSubpath).Warn("failed to remove mkfs temp file")
+		}
+	}()
 
-	// Absolute, since createWritableImage runs mkfs.* as a subprocess
-	// without setting its working directory.
-	imgPath, err := filepath.Abs(filepath.Join(r.Name(), subpath))
+	tmpImgPath, err := filepath.Abs(filepath.Join(r.Name(), tmpSubpath))
 	if err != nil {
 		f.Close()
 		return fmt.Errorf("failed to resolve absolute path for %q: %w", source, err)
 	}
-	createArgs = append(createArgs, imgPath)
+	createArgs = append(createArgs, tmpImgPath)
 
 	err = f.Truncate(size)
 	f.Close()
@@ -172,6 +183,11 @@ func ensureMkfsImage(ctx context.Context, r *os.Root, subpath, source string, si
 	if err := createWritableImage(ctx, binary, createArgs...); err != nil {
 		return fmt.Errorf("failed format %q: %w", source, err)
 	}
+
+	if err := r.Rename(tmpSubpath, subpath); err != nil {
+		return fmt.Errorf("failed to publish formatted image %q: %w", source, err)
+	}
+	removeTmp = false
 
 	return nil
 }
