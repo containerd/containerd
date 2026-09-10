@@ -173,8 +173,10 @@ $ tree -L 3 /tmp/snapshots
 ## Built-in Plugins
 
 containerd uses plugins internally to ensure that internal implementations are
-decoupled, stable, and treated equally with external plugins. To see all the
-plugins containerd has, use `ctr plugins ls`
+decoupled, stable, and treated equally with external plugins. A built-in plugin
+registers itself in `init()` via `registry.Register` and is linked into the
+daemon by a blank import in [`cmd/containerd/builtins`](../cmd/containerd/builtins).
+To see all the plugins containerd has, use `ctr plugins ls`.
 
 ```
 $ ctr plugins ls
