@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
    Copyright The containerd Authors.
 
@@ -19,21 +17,18 @@
 package docker
 
 import (
-	"errors"
-	"syscall"
+	"net"
+	"os"
+	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/windows"
 )
 
-func isConnError(err error) bool {
-	return errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, windows.WSAECONNREFUSED)
-}
-
-// isConnResetError reports whether err represents a connection reset by
-// peer. On Windows a reset surfaces as WSAECONNRESET; syscall.ECONNRESET
-// is also matched for callers that construct portable errors. The errno
-// typically arrives wrapped in *net.OpError and *os.SyscallError;
-// errors.Is unwraps it.
-func isConnResetError(err error) bool {
-	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, windows.WSAECONNRESET)
+func TestIsRetryableReadErrorWindowsReset(t *testing.T) {
+	assert.True(t, isRetryableReadError(windows.WSAECONNRESET))
+	assert.True(t, isRetryableReadError(&net.OpError{
+		Op: "read", Net: "tcp",
+		Err: os.NewSyscallError("wsarecv", windows.WSAECONNRESET),
+	}))
 }

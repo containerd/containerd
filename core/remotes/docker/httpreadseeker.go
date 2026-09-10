@@ -18,6 +18,7 @@ package docker
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 
@@ -59,9 +60,9 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 	if n > 0 || err == nil {
 		hrs.errsWithNoProgress = 0
 	}
-	switch err {
-	case io.ErrUnexpectedEOF:
-		// connection closed unexpectedly. try reconnecting.
+	switch {
+	case isRetryableReadError(err):
+		// connection closed or reset unexpectedly. try reconnecting.
 		if n == 0 {
 			hrs.errsWithNoProgress++
 			if hrs.errsWithNoProgress > maxRetry {
@@ -77,7 +78,7 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 		if _, err2 := hrs.reader(); err2 == nil {
 			return n, nil
 		}
-	case io.EOF:
+	case err == io.EOF:
 		// The CRI's imagePullProgressTimeout relies on responseBody.Close to
 		// update the process monitor's status. If the err is io.EOF, close
 		// the connection since there is no more available data.
@@ -89,6 +90,16 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 		}
 	}
 	return
+}
+
+// isRetryableReadError reports whether a read error may be resolved by reopening the
+// request body at the current offset: an unexpected EOF (the connection was
+// closed before the full body was received) or a connection reset by peer.
+// Reopening issues a ranged request at the current offset and resumes the
+// transfer rather than discarding it, with consecutive retries that make no
+// progress bounded by maxRetry.
+func isRetryableReadError(err error) bool {
+	return errors.Is(err, io.ErrUnexpectedEOF) || isConnResetError(err)
 }
 
 func (hrs *httpReadSeeker) Close() error {
