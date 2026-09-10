@@ -373,6 +373,19 @@ A shorter timeout helps reduce delays when falling back to the original registry
 dial_timeout = "1s"
 ```
 
+## tls_groups field
+
+`tls_groups` restricts the set of TLS key exchange groups offered when
+negotiating TLS with this host. Go selects among the listed groups using its
+internal preference order; the order of the list is ignored. When not set,
+Go's default key exchange groups are used. Supported values are `P-256`,
+`P-384`, `P-521`, `X25519`, `X25519MLKEM768`, `SecP256r1MLKEM768`, and
+`SecP384r1MLKEM1024`.
+
+```toml
+tls_groups = ["X25519MLKEM768", "X25519", "P-256"]
+```
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host]."http://namespace"` entries in the
