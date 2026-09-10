@@ -320,6 +320,17 @@ define pack_release
 	@rm -rf releases/$(1)
 endef
 
+# pack_release_zip creates a .zip archive for Windows releases.
+# This enables WinGet and other Windows package managers that do not support
+# .tar.gz to consume containerd releases.
+define pack_release_zip
+	@rm -rf releases/$(1) releases/$(1).zip
+	@$(INSTALL) -d releases/$(1)/bin
+	@$(INSTALL) $(BINARIES) releases/$(1)/bin
+	@cd releases/$(1) && zip -r ../$(1).zip bin
+	@rm -rf releases/$(1)
+endef
+
 
 releases/$(RELEASE).tar.gz: $(BINARIES)
 	@echo "$(WHALE) $@"
@@ -328,6 +339,10 @@ releases/$(RELEASE).tar.gz: $(BINARIES)
 release: releases/$(RELEASE).tar.gz
 	@echo "$(WHALE) $@"
 	@cd releases && sha256sum $(RELEASE).tar.gz >$(RELEASE).tar.gz.sha256sum
+ifeq ($(GOOS),windows)
+	$(call pack_release_zip,$(RELEASE))
+	@cd releases && sha256sum $(RELEASE).zip >$(RELEASE).zip.sha256sum
+endif
 
 releases/$(STATICRELEASE).tar.gz:
 ifeq ($(GOOS),linux)
