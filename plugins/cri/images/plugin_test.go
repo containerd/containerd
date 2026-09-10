@@ -68,3 +68,41 @@ func TestRegistryConfigMigration(t *testing.T) {
 	configPath := v.(string)
 	assert.Equal(t, path, configPath)
 }
+
+func TestRuntimePlatformsConfigMigration(t *testing.T) {
+	grpcCri := map[string]any{
+		"containerd": map[string]any{
+			"runtimes": map[string]any{
+				"kata": map[string]any{
+					"snapshotter": "devmapper",
+				},
+				"runc": map[string]any{
+					"snapshotter": "",
+				},
+			},
+		},
+	}
+	pluginConfigs := map[string]any{
+		string(plugins.GRPCPlugin) + ".cri": grpcCri,
+	}
+	configMigration(context.Background(), 2, pluginConfigs)
+	v, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".images"]
+	require.True(t, ok)
+	images := v.(map[string]any)
+
+	// The key has to match the `runtime_platforms` toml tag of ImageConfig,
+	// otherwise the migrated snapshotters are silently dropped.
+	v, ok = images["runtime_platforms"]
+	require.True(t, ok)
+	runtimePlatforms := v.(map[string]any)
+
+	// A runtime without a snapshotter does not need an entry.
+	assert.NotContains(t, runtimePlatforms, "runc")
+
+	v, ok = runtimePlatforms["kata"]
+	require.True(t, ok)
+	kata := v.(map[string]any)
+	assert.Equal(t, "devmapper", kata["snapshotter"])
+	// An unset platform means the platform of the node.
+	assert.NotContains(t, kata, "platform")
+}

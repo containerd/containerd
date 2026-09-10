@@ -21,7 +21,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/opencontainers/go-digest/digestset"
 	assertlib "github.com/stretchr/testify/assert"
@@ -293,7 +295,7 @@ func TestImageStore(t *testing.T) {
 		t.Run(desc, func(t *testing.T) {
 			s, err := NewFakeStore([]Image{image})
 			assert.NoError(err)
-			assert.NoError(s.update(test.ref, test.image))
+			assert.NoError(s.update(refKey{ref: test.ref, platform: util.PlatformKey(imagespec.Platform{})}, test.image))
 
 			assert.Len(s.List(), len(test.expected))
 			for _, expect := range test.expected {
@@ -301,7 +303,7 @@ func TestImageStore(t *testing.T) {
 				assert.NoError(err)
 				equal(got, expect)
 				for _, ref := range expect.References {
-					id, err := s.Resolve(ref)
+					id, err := s.Resolve(ref, imagespec.Platform{})
 					assert.NoError(err)
 					assert.Equal(expect.ID, id)
 				}
@@ -309,7 +311,7 @@ func TestImageStore(t *testing.T) {
 
 			if test.image == nil {
 				// Shouldn't be able to index by removed ref.
-				id, err := s.Resolve(test.ref)
+				id, err := s.Resolve(test.ref, imagespec.Platform{})
 				assert.Equal(errdefs.ErrNotFound, err)
 				assert.Empty(id)
 			}

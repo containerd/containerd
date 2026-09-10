@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"sync"
 
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 )
 
 // CheckImages checks all existing images to ensure they are ready to
@@ -42,25 +43,37 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 	for _, i := range cImages {
 		wg.Go(func() {
 			// TODO: Check platform/snapshot combination. Snapshot check should come first
-			ok, _, _, _, err := images.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
+			onNodePlatform, matched, err := c.checkImagePlatforms(ctx, i)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
 				return
 			}
-			if !ok {
+			if !matched {
 				log.G(ctx).Warnf("The image content readiness for %q is not ok", i.Name())
 				return
 			}
-			// Checking existence of top-level snapshot for each image being recovered.
-			// TODO: This logic should be done elsewhere and owned by the image service
-			unpacked, err := i.IsUnpacked(ctx, snapshotter)
-			if err != nil {
-				log.G(ctx).WithError(err).Warnf("Failed to check whether image is unpacked for image %s", i.Name())
-				return
-			}
-			if !unpacked {
-				log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
-				// TODO(random-liu): Consider whether we should try unpack here.
+			if onNodePlatform {
+				// Checking existence of top-level snapshot for each image being recovered.
+				// TODO: This logic should be done elsewhere and owned by the image service
+				unpacked, err := i.IsUnpacked(ctx, snapshotter)
+				if err != nil {
+					log.G(ctx).WithError(err).Warnf("Failed to check whether image %s is unpacked in snapshotter %q", i.Name(), snapshotter)
+					return
+				}
+				if !unpacked {
+					// Only the default snapshotter is checked, so an image
+					// unpacked in the snapshotter of a runtime reaches here too.
+					log.G(ctx).Warnf("The image %s is not unpacked in snapshotter %q.", i.Name(), snapshotter)
+					// TODO(random-liu): Consider whether we should try unpack here.
+				}
+			} else {
+				// The image is only present for a platform configured through
+				// runtime_platforms. The containerd client resolves images
+				// against the platform of the node, so the top-level snapshot
+				// cannot be checked here. The image still has to be recovered,
+				// otherwise ImageStatus would not report it and the kubelet
+				// would keep pulling it.
+				log.G(ctx).Debugf("Skipping unpack check for image %q, which is not present for the platform of the node", i.Name())
 			}
 			if err := c.UpdateImage(ctx, i.Name()); err != nil {
 				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())
@@ -71,4 +84,25 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 	}
 	wg.Wait()
 	return nil
+}
+
+// checkImagePlatforms reports whether the content of the image is complete for
+// at least one of the platforms images may be stored for, and whether the
+// platform that matched is the platform of the node.
+//
+// An image is only present locally for the platforms it was actually pulled
+// for, so an image pulled for a platform configured through runtime_platforms
+// would not be recovered if only the platform of the node were checked.
+func (c *CRIImageService) checkImagePlatforms(ctx context.Context, i containerd.Image) (onNodePlatform, matched bool, err error) {
+	for idx, platform := range c.platformsForImages() {
+		ok, _, _, _, err := images.Check(ctx, i.ContentStore(), i.Target(), util.PlatformMatcher(platform))
+		if err != nil {
+			return false, false, err
+		}
+		if ok {
+			// platformsForImages always returns the platform of the node first.
+			return idx == 0, true, nil
+		}
+	}
+	return false, false, nil
 }

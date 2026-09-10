@@ -51,8 +51,20 @@ type Image struct {
 	Size int64
 	// ImageSpec is the oci image structure which describes basic information about the image.
 	ImageSpec imagespec.Image
+	// Platform is the platform the image was resolved for.
+	Platform imagespec.Platform
 	// Pinned image to prevent it from garbage collection
 	Pinned bool
+}
+
+// refKey identifies an image reference for a given platform. The same
+// reference can name a different image on each platform it was pulled for.
+//
+// The image id does not need this treatment: it is the digest of the image
+// config, which differs per platform, so an id already names one platform.
+type refKey struct {
+	ref      string
+	platform string
 }
 
 // Getter is used to get images but does not make changes
@@ -63,8 +75,9 @@ type Getter interface {
 // Store stores all images.
 type Store struct {
 	lock sync.RWMutex
-	// refCache is a containerd image reference to image id cache.
-	refCache map[string]string
+	// refCache maps a reference on a platform to the id of the image it
+	// resolves to.
+	refCache map[refKey]string
 
 	// images is the local image store
 	images Getter
@@ -72,21 +85,20 @@ type Store struct {
 	// content provider
 	provider content.InfoReaderProvider
 
-	// platform represents the currently supported platform for images
-	// TODO: Make this store multi-platform
-	platform platforms.MatchComparer
-
 	// store is the internal image store indexed by image id.
 	store *store
 }
 
 // NewStore creates an image store.
-func NewStore(img Getter, provider content.InfoReaderProvider, platform platforms.MatchComparer) *Store {
+//
+// An image is stored per platform it was pulled for, so the same reference can
+// name a different image on each platform. Callers name the platform they want
+// on every lookup; an unset platform means the platform of the node.
+func NewStore(img Getter, provider content.InfoReaderProvider) *Store {
 	return &Store{
-		refCache: make(map[string]string),
+		refCache: make(map[refKey]string),
 		images:   img,
 		provider: provider,
-		platform: platform,
 		store: &store{
 			images:     make(map[string]Image),
 			digestSet:  digestset.NewSet(),
@@ -95,8 +107,9 @@ func NewStore(img Getter, provider content.InfoReaderProvider, platform platform
 	}
 }
 
-// Update updates cache for a reference.
-func (s *Store) Update(ctx context.Context, ref string) error {
+// Update updates the cache for a reference on a platform. An unset platform
+// means the platform of the node.
+func (s *Store) Update(ctx context.Context, ref string, platform imagespec.Platform) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -107,59 +120,94 @@ func (s *Store) Update(ctx context.Context, ref string) error {
 
 	var img *Image
 	if err == nil {
-		img, err = s.getImage(ctx, i)
+		img, err = s.getImageForRef(ctx, i, ref, platform)
 		if err != nil {
-			return fmt.Errorf("get image info from containerd: %w", err)
+			// The image exists in containerd but not for this platform,
+			// which is the normal state of an image that was pulled for
+			// another one. Drop whatever this reference used to resolve to
+			// on this platform rather than failing the caller.
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("get image info from containerd: %w", err)
+			}
+			img = nil
 		}
 	}
-	return s.update(ref, img)
+	return s.update(refKey{ref: ref, platform: util.PlatformKey(platform)}, img)
 }
 
 // update updates the internal cache. img == nil means that
-// the image does not exist in containerd.
-func (s *Store) update(ref string, img *Image) error {
-	oldID, oldExist := s.refCache[ref]
+// the image does not exist in containerd for that platform.
+func (s *Store) update(key refKey, img *Image) error {
+	oldID, oldExist := s.refCache[key]
 	if img == nil {
 		// The image reference doesn't exist in containerd.
 		if oldExist {
 			// Remove the reference from the store.
-			s.store.delete(oldID, ref)
-			delete(s.refCache, ref)
+			s.store.delete(oldID, key.ref)
+			delete(s.refCache, key)
 		}
 		return nil
 	}
 	if oldExist {
 		if oldID == img.ID {
-			if s.store.isPinned(img.ID, ref) == img.Pinned {
+			if s.store.isPinned(img.ID, key.ref) == img.Pinned {
 				return nil
 			}
 			if img.Pinned {
-				return s.store.pin(img.ID, ref)
+				return s.store.pin(img.ID, key.ref)
 			}
-			return s.store.unpin(img.ID, ref)
+			return s.store.unpin(img.ID, key.ref)
 		}
 		// Updated. Remove tag from old image.
-		s.store.delete(oldID, ref)
+		s.store.delete(oldID, key.ref)
 	}
 	// New image. Add new image.
-	s.refCache[ref] = img.ID
+	s.refCache[key] = img.ID
 	return s.store.add(*img)
 }
 
-// getImage gets image information from containerd for current platform.
-func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
-	diffIDs, err := i.RootFS(ctx, s.provider, s.platform)
+// getImage gets image information from containerd for the given platform.
+//
+// An image is only present locally for the platforms it was actually pulled
+// for, so a platform that is not backed by local content reports ErrNotFound.
+func (s *Store) getImage(ctx context.Context, i images.Image, platform imagespec.Platform) (*Image, error) {
+	return s.getImageForPlatform(ctx, i, platform, util.PlatformMatcher(platform))
+}
+
+// getImageForRef is getImage with the constraint that a reference which is a
+// bare digest is an image id, and an image id names the image config of one
+// platform.
+//
+// Resolving such a reference on another platform would map it to that
+// platform's id and add the digest to that image's references, which would
+// make the id name the wrong image. There is nothing to record for it there.
+func (s *Store) getImageForRef(ctx context.Context, i images.Image, ref string, platform imagespec.Platform) (*Image, error) {
+	img, err := s.getImage(ctx, i, platform)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := imagedigest.Parse(ref); err == nil && img.ID != ref {
+		return nil, fmt.Errorf("image id %s does not name the image of platform %s: %w",
+			ref, util.PlatformKey(platform), errdefs.ErrNotFound)
+	}
+	return img, nil
+}
+
+// getImageForPlatform gets image information from containerd using the given
+// matcher, and records platform as the platform it was resolved for.
+func (s *Store) getImageForPlatform(ctx context.Context, i images.Image, platform imagespec.Platform, matcher platforms.MatchComparer) (*Image, error) {
+	diffIDs, err := i.RootFS(ctx, s.provider, matcher)
 	if err != nil {
 		return nil, fmt.Errorf("get image diffIDs: %w", err)
 	}
 	chainID := imageidentity.ChainID(diffIDs)
 
-	size, err := usage.CalculateImageUsage(ctx, i, s.provider, usage.WithManifestLimit(s.platform, 1), usage.WithManifestUsage())
+	size, err := usage.CalculateImageUsage(ctx, i, s.provider, usage.WithManifestLimit(matcher, 1), usage.WithManifestUsage())
 	if err != nil {
 		return nil, fmt.Errorf("get image compressed resource size: %w", err)
 	}
 
-	desc, err := i.Config(ctx, s.provider, s.platform)
+	desc, err := i.Config(ctx, s.provider, matcher)
 	if err != nil {
 		return nil, fmt.Errorf("get image config descriptor: %w", err)
 	}
@@ -183,20 +231,50 @@ func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
 		ChainID:    chainID.String(),
 		Size:       size,
 		ImageSpec:  spec,
+		Platform:   platformOf(spec, platform),
 		Pinned:     pinned,
 	}, nil
 
 }
 
-// Resolve resolves a image reference to image id.
-func (s *Store) Resolve(ref string) (string, error) {
+// Lookup resolves a reference on a platform against containerd without
+// changing the store. It returns errdefs.ErrNotFound when the reference does
+// not resolve on that platform.
+func (s *Store) Lookup(ctx context.Context, ref string, platform imagespec.Platform) (Image, error) {
+	i, err := s.images.Get(ctx, ref)
+	if err != nil {
+		return Image{}, err
+	}
+	img, err := s.getImage(ctx, i, platform)
+	if err != nil {
+		return Image{}, err
+	}
+	return *img, nil
+}
+
+// Resolve resolves an image reference on a platform to an image id. An unset
+// platform means the platform of the node.
+func (s *Store) Resolve(ref string, platform imagespec.Platform) (string, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	id, ok := s.refCache[ref]
+	id, ok := s.refCache[refKey{ref: ref, platform: util.PlatformKey(platform)}]
 	if !ok {
 		return "", errdefs.ErrNotFound
 	}
 	return id, nil
+}
+
+// platformOf reports the platform an image was resolved for. The image config
+// is authoritative, since it is the config of the manifest that was selected,
+// and the requested platform may be partially specified.
+func platformOf(spec imagespec.Image, requested imagespec.Platform) imagespec.Platform {
+	if spec.Platform.OS != "" && spec.Platform.Architecture != "" {
+		return spec.Platform
+	}
+	if requested.OS == "" || requested.Architecture == "" {
+		return util.NodePlatform()
+	}
+	return requested
 }
 
 // Get gets image metadata by image id. The id can be truncated.

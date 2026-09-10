@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -549,6 +550,22 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 	if c.ImagePullProgressTimeout != "" {
 		if _, err := time.ParseDuration(c.ImagePullProgressTimeout); err != nil {
 			return warnings, fmt.Errorf("invalid image pull progress timeout: %w", err)
+		}
+	}
+
+	// Validation for runtime_platforms. Images are keyed by OS, architecture
+	// and variant, and selected by the OS version of the node, so a
+	// configured OS version would be silently ignored. Reject it instead.
+	for name, rp := range c.RuntimePlatforms {
+		if rp.Platform == "" {
+			continue
+		}
+		p, err := platforms.Parse(rp.Platform)
+		if err != nil {
+			return warnings, fmt.Errorf("invalid platform %q in `runtime_platforms.%s`: %w", rp.Platform, name, err)
+		}
+		if p.OSVersion != "" || len(p.OSFeatures) > 0 {
+			return warnings, fmt.Errorf("invalid platform %q in `runtime_platforms.%s`: an OS version or OS features cannot be configured, images are selected by the OS version of the node", rp.Platform, name)
 		}
 	}
 
