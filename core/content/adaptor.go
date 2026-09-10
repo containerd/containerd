@@ -17,6 +17,7 @@
 package content
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/containerd/containerd/v2/pkg/filters"
@@ -33,7 +34,7 @@ func AdaptInfo(info Info) filters.Adaptor {
 		case "digest":
 			return info.Digest.String(), true
 		case "size":
-			// TODO: support size based filtering
+			return fmt.Sprint(info.Size), true
 		case "labels":
 			return checkMap(fieldpath[1:], info.Labels)
 		}
