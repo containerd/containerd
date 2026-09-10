@@ -229,6 +229,46 @@ func TestWithCapabilitiesNil(t *testing.T) {
 	}
 }
 
+func TestWithCapabilityProfile(t *testing.T) {
+	t.Parallel()
+
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+
+	for _, tc := range []struct {
+		name       string
+		profile    string
+		wantNetRaw bool
+		wantErr    bool
+	}{
+		{name: "unset", profile: "", wantNetRaw: true},
+		{name: CapabilityProfileDefault, profile: CapabilityProfileDefault, wantNetRaw: true},
+		{name: CapabilityProfileReduced, profile: CapabilityProfileReduced, wantNetRaw: false},
+		{name: "bogus", profile: "bogus", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()},
+				WithCapabilityProfile(tc.profile),
+			)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error for unknown capability profile")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if runtime.GOOS != "linux" {
+				return
+			}
+			hasNetRaw := capsContain(s.Process.Capabilities.Bounding, "CAP_NET_RAW")
+			if hasNetRaw != tc.wantNetRaw {
+				t.Errorf("CAP_NET_RAW presence = %v, want %v", hasNetRaw, tc.wantNetRaw)
+			}
+		})
+	}
+}
+
 func TestPopulateDefaultWindowsSpec(t *testing.T) {
 	var (
 		c   = containers.Container{ID: "TestWithDefaultSpec"}

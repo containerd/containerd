@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1384,6 +1385,32 @@ func TestBaseOCISpec(t *testing.T) {
 	assert.Len(t, spec.Process.Capabilities.Permitted, 1)
 
 	assert.Equal(t, *spec.Linux.Resources.Memory.Limit, containerConfig.Linux.Resources.MemoryLimitInBytes)
+}
+
+func TestCapabilityProfile(t *testing.T) {
+	c := newTestCRIService()
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	testPid := uint32(1234)
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+
+	for _, test := range []struct {
+		desc         string
+		profile      string
+		expectNetRaw bool
+	}{
+		{desc: "unset defaults to the default profile", profile: "", expectNetRaw: true},
+		{desc: "explicit default profile", profile: oci.CapabilityProfileDefault, expectNetRaw: true},
+		{desc: "reduced profile drops CAP_NET_RAW", profile: oci.CapabilityProfileReduced, expectNetRaw: false},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			ociRuntime := config.Runtime{CapabilityProfile: test.profile}
+			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.expectNetRaw, slices.Contains(spec.Process.Capabilities.Bounding, "CAP_NET_RAW"))
+		})
+	}
 }
 
 func writeFilesToTempDir(t *testing.T, content []string) (string, error) {
