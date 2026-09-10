@@ -89,6 +89,74 @@ func WithTimeout(timeout time.Duration) StopOpt {
 	}
 }
 
+// CheckpointContainer contains the caller-owned data for one container selected
+// for a sandbox checkpoint.
+//
+// Config and Status are opaque to the generic sandbox API. A CRI caller uses
+// them for ContainerConfig and ContainerStatus, while another caller or
+// controller implementation may use different message types.
+type CheckpointContainer struct {
+	ID     string
+	Name   string
+	Config typeurl.Any
+	Status typeurl.Any
+}
+
+// CheckpointOptions contains the data needed by a controller implementation to
+// checkpoint a sandbox and its selected containers.
+type CheckpointOptions struct {
+	OutputPath    string
+	SandboxConfig typeurl.Any
+	Containers    []CheckpointContainer
+	Options       map[string]string
+}
+
+// RestoreContainer contains the caller-owned data for one container in a
+// sandbox restore. ID identifies the container that the caller created before
+// invoking Restore.
+type RestoreContainer struct {
+	ID     string
+	Name   string
+	Config typeurl.Any
+}
+
+// RestoreOptions contains the data needed by a controller implementation to
+// validate and prepare a sandbox restore.
+type RestoreOptions struct {
+	CheckpointPath string
+	Options        map[string]string
+	SandboxConfig  typeurl.Any
+	Containers     []RestoreContainer
+}
+
+// RestoredContainer contains the optional containerd task checkpoint prepared
+// by Restore. A controller owns TaskCheckpointImage until Restore succeeds;
+// after success, the caller owns the image and must consume or delete it.
+// Controllers that restore a container without a containerd task checkpoint
+// leave TaskCheckpointImage empty.
+type RestoredContainer struct {
+	Name                string
+	TaskCheckpointImage string
+}
+
+// RestoreResult contains data produced while preparing caller-created
+// containers for restore. On success, ownership of every non-empty task
+// checkpoint image transfers to the caller.
+type RestoreResult struct {
+	RestoredContainers []RestoredContainer
+}
+
+// CheckpointController is an optional capability implemented by sandbox
+// controllers that support Pod checkpoint and restore.
+//
+// Existing sandbox controllers remain valid without implementing this
+// interface. All inputs and outputs are data so implementations can live in a
+// separate process without access to caller stores or lifecycle callbacks.
+type CheckpointController interface {
+	Checkpoint(ctx context.Context, sandboxID string, opts CheckpointOptions) error
+	Restore(ctx context.Context, sandboxID string, opts RestoreOptions) (RestoreResult, error)
+}
+
 // Controller is an interface to manage sandboxes at runtime.
 // When running in sandbox mode, shim expected to implement `SandboxService`.
 // Shim lifetimes are now managed manually via sandbox API by the containerd's client.

@@ -98,8 +98,8 @@ func (c *criService) checkCriu() error {
 }
 
 func (c *criService) doCheckCriu() error {
-	if c.config.EnableCRIU != nil && !*c.config.EnableCRIU {
-		return errors.New("criu support is disabled by configuration")
+	if c.config.EnableCheckpointRestore != nil && !*c.config.EnableCheckpointRestore {
+		return errors.New("checkpoint/restore support is disabled by configuration")
 	}
 	path := resolveCriuPath(c.shimPath)
 	if path == "" {
@@ -160,6 +160,11 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when trying to find container %q: %w", r.GetContainerId(), err)
 	}
+	release, err := c.reserveContainerCheckpoints([]string{container.ID})
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 
 	state := container.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
