@@ -112,15 +112,8 @@ func (e *execProcess) Delete(ctx context.Context) error {
 }
 
 func (e *execProcess) delete(ctx context.Context) error {
-	if err := waitTimeout(ctx, &e.wg, 10*time.Second); err != nil {
-		log.G(ctx).WithError(err).Errorf("failed to drain exec process %s io", e.id)
-	}
-	if e.io != nil {
-		for _, c := range e.closers {
-			c.Close()
-		}
-		e.io.Close()
-	}
+	// Drain sync: callers read captured stdout immediately after Delete returns.
+	drainAndCloseStdio(ctx, &e.wg, e.io, e.closers, log.G(ctx), fmt.Sprintf("exec process %s", e.id), drainStdioTimeout)
 	pidfile := filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
 	// silently ignore error
 	os.Remove(pidfile)
