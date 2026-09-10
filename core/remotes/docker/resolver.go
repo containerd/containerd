@@ -29,6 +29,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -855,6 +856,9 @@ func isTransientTransportErr(err error) bool {
 		return true
 	}
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) {
 		return true
 	}
 	return false
