@@ -177,9 +177,11 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	shim, err := loadShimTask(ctx, bundle, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, binaryCall)
-		// Remove self from the runtime task list.
-		m.shims.Delete(ctx, id)
+		err := cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, binaryCall)
+		if err == nil {
+			// Remove self from the runtime task list.
+			m.shims.Delete(ctx, id)
+		}
 	})
 	if err != nil {
 		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, binaryCall)
