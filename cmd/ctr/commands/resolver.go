@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/pkg/httpdbg"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // PushTracker returns a new InMemoryTracker which tracks the ref status
@@ -55,7 +55,7 @@ func passwordPrompt() (string, error) {
 }
 
 // GetResolver prepares the resolver from the environment and options
-func GetResolver(ctx context.Context, cmd *cli.Context) (remotes.Resolver, error) {
+func GetResolver(ctx context.Context, cmd *cli.Command) (remotes.Resolver, error) {
 	username := cmd.String("user")
 	var secret string
 	if i := strings.IndexByte(username, ':'); i > 0 {
@@ -111,7 +111,7 @@ func GetResolver(ctx context.Context, cmd *cli.Context) (remotes.Resolver, error
 	return docker.NewResolver(options), nil
 }
 
-func resolverDefaultTLS(cmd *cli.Context) (*tls.Config, error) {
+func resolverDefaultTLS(cmd *cli.Command) (*tls.Config, error) {
 	tlsConfig := &tls.Config{}
 
 	if cmd.Bool("skip-verify") {
@@ -158,7 +158,7 @@ type staticCredentials struct {
 }
 
 // NewStaticCredentials gets credentials from passing in cli context
-func NewStaticCredentials(ctx context.Context, cmd *cli.Context, ref string) (registry.CredentialHelper, error) {
+func NewStaticCredentials(ctx context.Context, cmd *cli.Command, ref string) (registry.CredentialHelper, error) {
 	username := cmd.String("user")
 	var secret string
 	if i := strings.IndexByte(username, ':'); i > 0 {

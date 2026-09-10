@@ -17,6 +17,7 @@
 package pprof
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,7 +25,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type pprofDialer struct {
@@ -44,7 +45,7 @@ var Command = &cli.Command{
 			Value:   defaults.DefaultDebugAddress,
 		},
 	},
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		pprofBlockCommand,
 		pprofGoroutinesCommand,
 		pprofHeapCommand,
@@ -64,7 +65,7 @@ var pprofGoroutinesCommand = &cli.Command{
 			Value: 2,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return GoroutineProfile(cmd, getPProfClient)
 	},
 }
@@ -79,7 +80,7 @@ var pprofHeapCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return HeapProfile(cmd, getPProfClient)
 	},
 }
@@ -100,7 +101,7 @@ var pprofProfileCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return CPUProfile(cmd, getPProfClient)
 	},
 }
@@ -121,7 +122,7 @@ var pprofTraceCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return TraceProfile(cmd, getPProfClient)
 	},
 }
@@ -136,7 +137,7 @@ var pprofBlockCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return BlockProfile(cmd, getPProfClient)
 	},
 }
@@ -151,16 +152,16 @@ var pprofThreadcreateCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return ThreadcreateProfile(cmd, getPProfClient)
 	},
 }
 
 // Client is a func that returns a http client for a pprof server
-type Client func(cmd *cli.Context) (*http.Client, error)
+type Client func(cmd *cli.Command) (*http.Client, error)
 
 // GoroutineProfile dumps goroutine stack dump
-func GoroutineProfile(cmd *cli.Context, clientFunc Client) error {
+func GoroutineProfile(cmd *cli.Command, clientFunc Client) error {
 	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
@@ -176,7 +177,7 @@ func GoroutineProfile(cmd *cli.Context, clientFunc Client) error {
 }
 
 // HeapProfile dumps the heap profile
-func HeapProfile(cmd *cli.Context, clientFunc Client) error {
+func HeapProfile(cmd *cli.Command, clientFunc Client) error {
 	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
@@ -192,7 +193,7 @@ func HeapProfile(cmd *cli.Context, clientFunc Client) error {
 }
 
 // CPUProfile dumps CPU profile
-func CPUProfile(cmd *cli.Context, clientFunc Client) error {
+func CPUProfile(cmd *cli.Command, clientFunc Client) error {
 	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
@@ -209,7 +210,7 @@ func CPUProfile(cmd *cli.Context, clientFunc Client) error {
 }
 
 // TraceProfile collects execution trace
-func TraceProfile(cmd *cli.Context, clientFunc Client) error {
+func TraceProfile(cmd *cli.Command, clientFunc Client) error {
 	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
@@ -227,7 +228,7 @@ func TraceProfile(cmd *cli.Context, clientFunc Client) error {
 }
 
 // BlockProfile collects goroutine blocking profile
-func BlockProfile(cmd *cli.Context, clientFunc Client) error {
+func BlockProfile(cmd *cli.Command, clientFunc Client) error {
 	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
@@ -243,7 +244,7 @@ func BlockProfile(cmd *cli.Context, clientFunc Client) error {
 }
 
 // ThreadcreateProfile collects goroutine thread creating profile
-func ThreadcreateProfile(cmd *cli.Context, clientFunc Client) error {
+func ThreadcreateProfile(cmd *cli.Command, clientFunc Client) error {
 	client, err := clientFunc(cmd)
 	if err != nil {
 		return err
@@ -258,7 +259,7 @@ func ThreadcreateProfile(cmd *cli.Context, clientFunc Client) error {
 	return err
 }
 
-func getPProfClient(cmd *cli.Context) (*http.Client, error) {
+func getPProfClient(cmd *cli.Command) (*http.Client, error) {
 	dialer := getPProfDialer(cmd.String("debug-socket"))
 
 	tr := &http.Transport{

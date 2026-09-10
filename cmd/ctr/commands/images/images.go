@@ -17,6 +17,7 @@
 package images
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -30,7 +31,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // Command is the cli command for managing images
@@ -38,7 +39,7 @@ var Command = &cli.Command{
 	Name:    "images",
 	Aliases: []string{"image", "i"},
 	Usage:   "Manage images",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		checkCommand,
 		exportCommand,
 		importCommand,
@@ -71,8 +72,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the image refs",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			filters = cmd.Args().Slice()
 			quiet   = cmd.Bool("quiet")
@@ -156,8 +156,7 @@ var setLabelsCommand = &cli.Command{
 			Usage:   "Replace all labels",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			replaceAll   = cmd.Bool("replace-all")
 			name, labels = commands.ObjectWithLabelArgs(cmd)
@@ -217,8 +216,7 @@ var checkCommand = &cli.Command{
 			Usage:   "Print only the ready image refs (fully downloaded and unpacked)",
 		},
 	}, commands.SnapshotterFlags...),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			exitErr error
 			quiet   = cmd.Bool("quiet")
@@ -332,8 +330,7 @@ var removeCommand = &cli.Command{
 			Usage: "Synchronously remove image and all associated resources",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -378,8 +375,7 @@ var pruneCommand = &cli.Command{
 	},
 	// adapted from `nerdctl`:
 	// https://github.com/containerd/nerdctl/blob/272dc9c29fc1434839d3ec63194d7efa24d7c0ef/cmd/nerdctl/image_prune.go#L86
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err

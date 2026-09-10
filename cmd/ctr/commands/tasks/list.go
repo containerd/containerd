@@ -17,13 +17,14 @@
 package tasks
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"text/tabwriter"
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var listCommand = &cli.Command{
@@ -38,8 +39,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the task id",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err

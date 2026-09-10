@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/errdefs"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -79,7 +79,7 @@ func serviceFlags() []cli.Flag {
 }
 
 // applyPlatformFlags applies platform-specific flags.
-func applyPlatformFlags(cmd *cli.Context) {
+func applyPlatformFlags(cmd *cli.Command) {
 	serviceNameFlag = cmd.String("service-name")
 	if serviceNameFlag == "" {
 		serviceNameFlag = defaultServiceName

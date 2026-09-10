@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -50,7 +50,7 @@ var Command = &cli.Command{
 	Aliases: []string{"snapshot"},
 	Usage:   "Manage snapshots",
 	Flags:   commands.SnapshotterFlags,
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		commitCommand,
 		diffCommand,
 		infoCommand,
@@ -70,8 +70,7 @@ var listCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List snapshots",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -115,8 +114,7 @@ var diffCommand = &cli.Command{
 			Usage: "Keep diff content. up to creator to delete it.",
 		},
 	}, commands.LabelFlag),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			idA = cmd.Args().First()
 			idB = cmd.Args().Get(1)
@@ -209,8 +207,7 @@ var usageCommand = &cli.Command{
 			Usage: "Display size in bytes",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var displaySize func(int64) string
 		if cmd.Bool("b") {
 			displaySize = func(s int64) string {
@@ -261,8 +258,7 @@ var removeCommand = &cli.Command{
 	Aliases:   []string{"del", "remove", "rm"},
 	ArgsUsage: "<key> [<key>, ...]",
 	Usage:     "Remove snapshots",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -295,8 +291,7 @@ var prepareCommand = &cli.Command{
 			Usage: "Print out snapshot mounts as JSON",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if narg := cmd.NArg(); narg < 1 || narg > 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -348,8 +343,7 @@ var viewCommand = &cli.Command{
 			Usage: "Print out snapshot mounts as JSON",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if narg := cmd.NArg(); narg < 1 || narg > 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -393,8 +387,7 @@ var mountCommand = &cli.Command{
 			Usage: "Mounts the snapshot mounts as a temp mount and returns a bind mount",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if cmd.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -436,8 +429,7 @@ var commitCommand = &cli.Command{
 	Name:      "commit",
 	Usage:     "Commit an active snapshot into the provided name",
 	ArgsUsage: "<key> <active>",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if cmd.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -461,8 +453,7 @@ var commitCommand = &cli.Command{
 var treeCommand = &cli.Command{
 	Name:  "tree",
 	Usage: "Display tree view of snapshot branches",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -491,8 +482,7 @@ var infoCommand = &cli.Command{
 	Name:      "info",
 	Usage:     "Get info about a snapshot",
 	ArgsUsage: "<key>",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if cmd.NArg() != 1 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
@@ -520,8 +510,7 @@ var setLabelCommand = &cli.Command{
 	Usage:       "Add labels to content",
 	ArgsUsage:   "<name> [<label>=<value> ...]",
 	Description: "labels snapshots in the snapshotter",
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
@@ -575,8 +564,7 @@ var unpackCommand = &cli.Command{
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	}, commands.SnapshotterFlags...),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		dgst, err := digest.Parse(cmd.Args().First())
 		if err != nil {
 			return err

@@ -26,7 +26,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var platformStartFlags = []cli.Flag{}
@@ -83,6 +83,6 @@ func NewTask(ctx context.Context, client *containerd.Client, container container
 }
 
 // GetNewTaskOpts resolves containerd.NewTaskOpts from cli.Context
-func GetNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
+func GetNewTaskOpts(_ *cli.Command) []containerd.NewTaskOpts {
 	return nil
 }

@@ -29,13 +29,13 @@ import (
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/pprof"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/shim"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var pprofCommand = &cli.Command{
 	Name:  "pprof",
 	Usage: "Provide golang pprof outputs for containerd-shim",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		pprofBlockCommand,
 		pprofGoroutinesCommand,
 		pprofHeapCommand,
@@ -55,7 +55,7 @@ var pprofGoroutinesCommand = &cli.Command{
 			Value: 2,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.GoroutineProfile(cmd, getPProfClient)
 	},
 }
@@ -70,7 +70,7 @@ var pprofHeapCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.HeapProfile(cmd, getPProfClient)
 	},
 }
@@ -91,7 +91,7 @@ var pprofProfileCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.CPUProfile(cmd, getPProfClient)
 	},
 }
@@ -112,7 +112,7 @@ var pprofTraceCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.TraceProfile(cmd, getPProfClient)
 	},
 }
@@ -127,7 +127,7 @@ var pprofBlockCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.BlockProfile(cmd, getPProfClient)
 	},
 }
@@ -142,12 +142,12 @@ var pprofThreadcreateCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(cmd *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.ThreadcreateProfile(cmd, getPProfClient)
 	},
 }
 
-func getPProfClient(cmd *cli.Context) (*http.Client, error) {
+func getPProfClient(cmd *cli.Command) (*http.Client, error) {
 	id := cmd.String("id")
 	if id == "" {
 		return nil, errors.New("container id must be provided")

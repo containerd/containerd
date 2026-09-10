@@ -17,10 +17,11 @@
 package images
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/transfer/image"
@@ -47,8 +48,7 @@ var tagCommand = &cli.Command{
 			Usage: "Skip the strict check for reference names",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		ref := cmd.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to tag from")

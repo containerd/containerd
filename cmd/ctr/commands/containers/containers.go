@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // Command is the cli command for managing containers
@@ -39,7 +39,7 @@ var Command = &cli.Command{
 	Name:    "containers",
 	Usage:   "Manage containers",
 	Aliases: []string{"c", "container"},
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		createCommand,
 		deleteCommand,
 		infoCommand,
@@ -55,8 +55,7 @@ var createCommand = &cli.Command{
 	Usage:     "Create container",
 	ArgsUsage: "[flags] Image|RootFS CONTAINER [COMMAND] [ARG...]",
 	Flags:     append(commands.RuntimeFlags, append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...), commands.ContainerFlags...)...),
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			id     string
 			ref    string
@@ -103,8 +102,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the container id",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			filters = cmd.Args().Slice()
 			quiet   = cmd.Bool("quiet")
@@ -158,8 +156,7 @@ var deleteCommand = &cli.Command{
 			Usage: "Do not clean up snapshot with container",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var exitErr error
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
@@ -215,8 +212,7 @@ var setLabelsCommand = &cli.Command{
 	ArgsUsage:   "[flags] CONTAINER [<key>=<value>, ...]",
 	Description: "set and clear labels for a container",
 	Flags:       []cli.Flag{},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		containerID, labels := commands.ObjectWithLabelArgs(cmd)
 		if containerID == "" {
 			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
@@ -258,8 +254,7 @@ var infoCommand = &cli.Command{
 			Usage: "Only display the spec",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.Args().First()
 		if id == "" {
 			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)

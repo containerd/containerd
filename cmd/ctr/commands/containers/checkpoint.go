@@ -17,13 +17,14 @@
 package containers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/errdefs"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var checkpointCommand = &cli.Command{
@@ -44,8 +45,7 @@ var checkpointCommand = &cli.Command{
 			Usage: "Checkpoint container task",
 		},
 	},
-	Action: func(cmd *cli.Context) error {
-		ctx := cmd.Context
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")

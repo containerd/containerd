@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // AppContext returns the context for a command. Should only be called once per
@@ -34,7 +34,7 @@ import (
 //
 // This will ensure the namespace is picked up and set the timeout, if one is
 // defined.
-func AppContext(ctx context.Context, cmd *cli.Context) (context.Context, context.CancelFunc) {
+func AppContext(ctx context.Context, cmd *cli.Command) (context.Context, context.CancelFunc) {
 	var (
 		timeout   = cmd.Duration("timeout")
 		namespace = cmd.String("namespace")
@@ -56,7 +56,7 @@ func AppContext(ctx context.Context, cmd *cli.Context) (context.Context, context
 }
 
 // NewClient returns a new containerd client
-func NewClient(ctx context.Context, cmd *cli.Context, opts ...containerd.Opt) (*containerd.Client, context.Context, context.CancelFunc, error) {
+func NewClient(ctx context.Context, cmd *cli.Command, opts ...containerd.Opt) (*containerd.Client, context.Context, context.CancelFunc, error) {
 	timeoutOpt := containerd.WithTimeout(cmd.Duration("connect-timeout"))
 	opts = append(opts, timeoutOpt)
 	socketPath := cmd.String("address")
