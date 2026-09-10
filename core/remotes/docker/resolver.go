@@ -22,11 +22,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -152,6 +156,7 @@ type dockerResolver struct {
 	tracker        StatusTracker
 	config         transfer.ImageResolverOptions
 	warningHandler WarningHandler
+	sleeper        func(context.Context, time.Duration) error
 }
 
 // NewResolver returns a new resolver to a Docker registry
@@ -540,6 +545,7 @@ type dockerBase struct {
 	performances   transfer.ImageResolverPerformanceSettings
 	limiter        *semaphore.Weighted
 	warningHandler WarningHandler
+	sleeper        func(context.Context, time.Duration) error
 }
 
 func (r *dockerBase) Acquire(ctx context.Context, weight int64) error {
@@ -569,6 +575,7 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 		performances:   r.config.Performances,
 		limiter:        r.config.DownloadLimiter,
 		warningHandler: r.warningHandler,
+		sleeper:        r.sleeper,
 	}, nil
 }
 
@@ -608,6 +615,7 @@ func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *re
 		host:           host,
 		refspec:        r.refspec,
 		warningHandler: r.warningHandler,
+		sleeper:        r.sleeper,
 	}
 }
 
@@ -660,6 +668,7 @@ type request struct {
 	size           int64
 	refspec        reference.Spec
 	warningHandler WarningHandler
+	sleeper        func(context.Context, time.Duration) error
 }
 
 func (r *request) clone() *request {
@@ -808,6 +817,11 @@ func (r *request) doWithRetriesInner(ctx context.Context, responses []*http.Resp
 	}
 	if retry && *attempts > 0 {
 		resp.Body.Close()
+		if resp.StatusCode == http.StatusTooManyRequests {
+			if err := r.delay429(ctx, responses); err != nil {
+				return nil, err
+			}
+		}
 		return r.doWithRetriesInner(ctx, responses, attempts, lastHost)
 	}
 	return resp, err
@@ -881,7 +895,26 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response, 
 			r.method = http.MethodGet
 			return true, nil
 		}
-	case http.StatusRequestTimeout, http.StatusTooManyRequests:
+	case http.StatusRequestTimeout:
+		return true, nil
+	case http.StatusTooManyRequests:
+		// Only retry if this is the last host that will be attempted, allowing
+		// earlier rate-limited mirrors to immediately fall back to another mirror.
+		if !lastHost {
+			return false, nil
+		}
+		if retryAfterStr := last.Header.Get("Retry-After"); retryAfterStr != "" {
+			if d, ok := parseRetryAfter(retryAfterStr); ok && d > default429MaxRetryAfter {
+				log.G(ctx).WithFields(log.Fields{
+					"url":         r.sanitizedURL(),
+					"host":        r.host.Host,
+					"retry-after": retryAfterStr,
+					"delay":       d,
+					"threshold":   default429MaxRetryAfter,
+				}).Debug("rate limited (429), Retry-After exceeds threshold, not retrying")
+				return false, nil
+			}
+		}
 		return true, nil
 	case http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusInternalServerError:
 		// Do not retry if the same error was seen in the last request
@@ -933,6 +966,137 @@ func (r *request) sanitizedURL() string {
 
 	parsed.RawQuery = query.Encode()
 	return parsed.Redacted()
+}
+
+// For a consistent sequence of 429 responses without Retry-After, maxAttempts (5)
+// allows 1 initial request and 4 retries with exponential backoff (0.5s, 1s, 2s, 4s),
+// resulting in a total base sleep delay of ~7.5 seconds (6.0s–7.5s with up to 20%
+// jitter subtracted).
+const (
+	default429BaseDelay     = 500 * time.Millisecond
+	default429MaxDelay      = 5 * time.Second
+	default429MaxRetryAfter = 1 * time.Minute
+	maxJitterFraction       = 5 // up to 20% (1/5) jitter
+)
+
+func (r *request) delay429(ctx context.Context, responses []*http.Response) error {
+	last := responses[len(responses)-1]
+	retryAfterStr := last.Header.Get("Retry-After")
+	var delay time.Duration
+	if d, ok := parseRetryAfter(retryAfterStr); ok {
+		delay = d
+	} else {
+		consecutive := countConsecutive429(responses)
+		delay = calculateBackoff(consecutive, default429BaseDelay, default429MaxDelay)
+	}
+
+	fields := log.Fields{
+		"url":     r.sanitizedURL(),
+		"host":    r.host.Host,
+		"attempt": len(responses),
+		"delay":   delay,
+	}
+	// r.refspec is propagated from dockerBase, initialized from the image
+	// reference provided to Resolver.Resolve or Resolver.Fetcher.
+	if r.refspec.Locator != "" {
+		fields["image"] = r.refspec.Locator
+	}
+	if d := r.refspec.Digest(); d != "" {
+		fields["digest"] = d.String()
+	} else if r.refspec.Object != "" {
+		fields["object"] = r.refspec.Object
+	}
+	if retryAfterStr != "" {
+		fields["retry-after"] = retryAfterStr
+	}
+	log.G(ctx).WithFields(fields).Debug("rate limited (429), delaying retry")
+
+	return r.sleep(ctx, delay)
+}
+
+// countConsecutive429 counts consecutive 429 responses at the end of the response chain
+// so that exponential backoff doubles only across consecutive rate-limiting responses
+// and resets if an intervening non-429 error was encountered.
+func countConsecutive429(responses []*http.Response) int {
+	count := 0
+	for _, resp := range slices.Backward(responses) {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			count++
+		} else {
+			break
+		}
+	}
+	return count
+}
+
+// calculateBackoff computes the exponential backoff duration for the given 429 retry
+// attempt (1-indexed). The delay doubles with each attempt starting from baseDelay
+// up to maxDelay, with up to 20% jitter subtracted.
+func calculateBackoff(attempt int, baseDelay, maxDelay time.Duration) time.Duration {
+	if attempt <= 0 {
+		attempt = 1
+	}
+	// Cap shift at 30 to prevent 1<<shift from overflowing time.Duration before
+	// the maxDelay check clamps it.
+	shift := min(attempt-1, 30)
+	delay := baseDelay * time.Duration(1<<shift)
+	if delay > maxDelay || delay <= 0 {
+		delay = maxDelay
+	}
+
+	if delay > 0 {
+		// Subtract full jitter up to 20% (1/maxJitterFraction) of the calculated delay.
+		jitter := time.Duration(rand.Int64N(int64(delay/maxJitterFraction) + 1))
+		delay -= jitter
+	}
+	return delay
+}
+
+const maxRetryAfterSeconds = math.MaxInt64 / int64(time.Second)
+
+func parseRetryAfter(header string) (time.Duration, bool) {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return 0, false
+	}
+	if seconds, err := strconv.ParseInt(header, 10, 64); err == nil {
+		if seconds < 0 || seconds > maxRetryAfterSeconds {
+			return 0, false
+		}
+		return time.Duration(seconds) * time.Second, true
+	}
+	if t, err := http.ParseTime(header); err == nil {
+		d := time.Until(t)
+		if d < 0 {
+			return 0, true
+		}
+		return d, true
+	}
+	return 0, false
+}
+
+func (r *request) sleep(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return nil
+	}
+	if r.sleeper != nil {
+		return r.sleeper(ctx, d)
+	}
+	return defaultSleep(ctx, d)
+}
+
+func defaultSleep(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return nil
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
 
 func (r *request) setMediaType(mediatype string) {

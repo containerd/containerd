@@ -873,6 +873,7 @@ func TestDockerFetcherOpen(t *testing.T) {
 
 			f := dockerFetcher{&dockerBase{
 				repository: "ns",
+				sleeper:    func(context.Context, time.Duration) error { return nil },
 			}}
 
 			host := RegistryHost{
