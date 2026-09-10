@@ -20,7 +20,6 @@ package config
 
 import (
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -92,10 +91,9 @@ func DefaultRuntimeConfig() RuntimeConfig {
 			DefaultRuntimeName: "runc",
 			Runtimes: map[string]Runtime{
 				"runc": {
-					Type:              "io.containerd.runc.v2",
-					Options:           m,
-					Sandboxer:         string(ModePodSandbox),
-					CapabilityProfile: oci.CapabilityProfileDefault,
+					Type:      "io.containerd.runc.v2",
+					Options:   m,
+					Sandboxer: string(ModePodSandbox),
 				},
 			},
 		},

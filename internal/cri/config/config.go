@@ -111,9 +111,11 @@ type Runtime struct {
 	// CapabilityProfile selects the default set of Linux capabilities granted
 	// to containers. Valid values are "default" (historical default, including
 	// CAP_NET_RAW) and "reduced" (drops CAP_NET_RAW, CAP_MKNOD,
-	// CAP_AUDIT_WRITE and CAP_SETFCAP). if this field is unset, the behavior is the same as "default"
-	// and capabilities from BaseRuntimeSpec (if set) are preserved.
-	// unset is equivalent to "default"
+	// CAP_AUDIT_WRITE and CAP_SETFCAP). This field only applies to containerd's
+	// internal default capability set: if left unset (empty string), no
+	// profile override is applied and capabilities from BaseRuntimeSpec (if
+	// set) are preserved. Setting "default" or "reduced" explicitly always
+	// overrides capabilities from BaseRuntimeSpec.
 	CapabilityProfile string `toml:"capability_profile" json:"capabilityProfile"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
