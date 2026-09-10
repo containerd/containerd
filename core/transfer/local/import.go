@@ -29,6 +29,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 )
@@ -86,6 +87,8 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 	if f, ok := is.(transfer.ImageFilterer); ok {
 		handlerFunc = f.ImageFilter(handlerFunc, ts.content)
 	}
+
+	handlerFunc = docker.DistributionSourceHandler(ts.content, handlerFunc)
 
 	handler = images.Handlers(handlerFunc)
 
