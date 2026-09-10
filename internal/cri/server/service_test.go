@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/containerd/errdefs"
-	"github.com/containerd/go-cni"
 	"github.com/containerd/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -151,10 +150,12 @@ func newTestCRIService(opts ...testOpt) *criService {
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(labels, nil),
 		containerNameIndex: registrar.NewRegistrar(),
-		netPlugin: map[string]cni.CNI{
-			defaultNetworkPlugin: servertesting.NewFakeCNIPlugin(),
-		},
-		sandboxService: &fakeSandboxService{},
+		cniNetPlugin:       newCNINetPlugin(),
+		sandboxService:     &fakeSandboxService{},
+	}
+	err := service.cniNetPlugin.add(defaultNetworkPlugin, "", servertesting.NewFakeCNIPlugin(), service.cniLoadOptions())
+	if err != nil {
+		panic(err)
 	}
 	for _, opt := range opts {
 		opt(service)
