@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
@@ -53,7 +55,9 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 		}
 		return fmt.Errorf("can not resolve %q locally: %w", imageSpec.GetImage(), err)
 	}
-	span.SetAttributes(tracing.Attribute("image.id", image.ID))
+	attrs := []attribute.KeyValue{tracing.Attribute("container.image.id", image.ID)}
+	span.SetAttributes(attrs...)
+	span.SetAttributes(tracing.LegacyAttributes(attrs)...)
 	// Remove all image references.
 	for i, ref := range image.References {
 		var opts []images.DeleteOpt

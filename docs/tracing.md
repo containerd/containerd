@@ -201,6 +201,24 @@ OpenTelemetry maintains a set of recommended [semantic conventions](https://open
 
 Manually instrumented spans in Containerd follow the conventions defined for [Spans](https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/) and [Attributes](https://opentelemetry.io/docs/reference/specification/common/attribute-naming/)
 
+Concepts defined by the OpenTelemetry semantic conventions use the corresponding semantic convention attribute keys. Containerd-specific concepts, such as snapshotters, pull references, and unpack operations, use the `containerd.` namespace.
+
+The following legacy attribute keys are deprecated in favor of semantic convention or containerd-namespaced keys:
+
+| Deprecated key | New key |
+| --- | --- |
+| `task.container.id` | `container.id` |
+| `task.runtime.name` | `container.runtime.name` |
+| `task.pid` | `process.pid` |
+| `task.process.id` | `process.pid` |
+| `image.ref` | `containerd.image.ref` |
+| `snapshotter.name` | `containerd.snapshotter.name` |
+| `container.snapshotter.name` | `containerd.snapshotter.name` |
+| `image.id` | `container.image.id` |
+| `unpack` | `containerd.pull.unpack` |
+
+During the migration period, both the new and legacy keys are emitted. The legacy keys will be removed in a future release.
+
 ### Span Names
 * Dot-separated notation.
 * Span Names may include relative path to the package.
