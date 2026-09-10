@@ -222,6 +222,51 @@ $ cat /etc/containerd/certs.d/_default/hosts.toml
 server = "https://registry.example.com"
 ```
 
+## Route Registry Traffic Through a Proxy Example
+
+To route traffic for a registry at `my-registry.io` through a proxy at
+`http://my-proxy:8080`, create a path and `hosts.toml` text at the path
+`/etc/containerd/certs.d/my-registry.io/hosts.toml` with the following contents:
+
+```toml
+server = "https://my-registry.io"
+proxy = "http://my-proxy:8080"
+```
+
+To route traffic through a proxy only for a specific host, configure the `proxy`
+field within that host's `[host."..."]` section.
+
+In the following example, containerd first attempts to resolve and pull images
+from the mirror at `https://mirror.my-registry.io`, routing those requests
+through the proxy at `http://my-proxy:8080`. If the request to the mirror fails
+for any reason (including a proxy failure), containerd falls back to connecting
+directly to the upstream server (`https://my-registry.io`) without a proxy.
+
+```toml
+server = "https://my-registry.io"
+
+[host."https://mirror.my-registry.io"]
+  capabilities = ["pull", "resolve"]
+  proxy = "http://my-proxy:8080"
+```
+
+If proxies fail, the host will not be tried directly. In the following example,
+both the mirror and server have associated proxies. containerd first attempts
+the mirror, directing the request through the proxy at `http://my-proxy:8080`.
+If this proxy fails, containerd will fallback and attempt the server
+`https://my-registry.io`, in this case routing that request through the proxy
+configured for it at `http://different-proxy:8080`. If _that_ proxy _also_
+fails, containerd will return the relevant network error.
+
+```toml
+server = "https://my-registry.io"
+proxy = "http://different-proxy:8080"
+
+[host."https://mirror.my-registry.io"]
+  capabilities = ["pull", "resolve"]
+  proxy = "http://my-proxy:8080"
+```
+
 ## Bypass TLS Verification Example
 
 To bypass the TLS verification for a private registry at `192.168.31.250:5000`
@@ -371,6 +416,19 @@ A shorter timeout helps reduce delays when falling back to the original registry
 
 ```
 dial_timeout = "1s"
+```
+
+## proxy field
+
+`proxy` specifies the address of the proxy server to use for the registry host.
+It must be an absolute URL with a scheme of either `http` or `https` and a
+non-empty host, and it must not include a path (other than an optional trailing
+`/`), query string, or fragment. This explicit config will override any
+environmental configuration for that registry host, including `NO_PROXY`,
+`HTTP_PROXY`, and `HTTPS_PROXY`.
+
+```toml
+proxy = "http://my-proxy:8080"
 ```
 
 ## host field(s) (in the toml table format)
