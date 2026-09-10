@@ -373,6 +373,46 @@ A shorter timeout helps reduce delays when falling back to the original registry
 dial_timeout = "1s"
 ```
 
+## tls_handshake_timeout field
+
+`tls_handshake_timeout` specifies the maximum time allowed for completing a TLS handshake.
+This can be increased when communicating with registries over high-latency networks or through intermediaries that may delay TLS negotiation.
+(Defaults to `10s`)
+
+```
+tls_handshake_timeout = "15s"
+```
+
+## response_header_timeout field
+
+`response_header_timeout` specifies the amount of time to wait for a registry to return response headers after a request has been sent.
+A shorter timeout can help detect unresponsive registries more quickly and reduce delays before falling back to another mirror or retrying the request.
+(Defaults to `30s`)
+
+```
+response_header_timeout = "10s"
+```
+
+## expect_continue_timeout field
+
+`expect_continue_timeout` specifies the amount of time to wait for a server's initial response when using requests with the `Expect: 100-continue` header.
+This setting is primarily relevant for requests that send a request body and use the HTTP `100-continue` mechanism.
+(Defaults to `5s`)
+
+```
+expect_continue_timeout = "2s"
+```
+
+## idle_conn_timeout field
+
+`idle_conn_timeout` specifies the maximum amount of time an idle keep-alive connection is kept open before being closed.
+Increasing this value may help reduce connection establishment overhead for registries that are accessed frequently.
+(Defaults to `30s`)
+
+```
+idle_conn_timeout = "60s"
+```
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host]."http://namespace"` entries in the
