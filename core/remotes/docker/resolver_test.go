@@ -764,6 +764,29 @@ func TestRequestSanitize(t *testing.T) {
 	}
 }
 
+// TestRequestSetRange is a regression test for
+// https://github.com/containerd/containerd/issues/12476: parallel chunked
+// downloads (concurrent_layer_fetch_buffer) issued an open-ended Range
+// header ("bytes=<offset>-") for every chunk, even though each chunk
+// request only ever reads a bounded number of bytes before closing the
+// response. An open-ended range lets a well-behaved server prepare and
+// stream the entire remainder of the blob for every single chunk, wasting
+// bandwidth that scales with the number of chunks. setRange must produce an
+// explicit, bounded "bytes=<start>-<end>" range instead.
+func TestRequestSetRange(t *testing.T) {
+	r := &request{header: http.Header{}}
+
+	r.setOffset(100)
+	if got, want := r.header.Get("Range"), "bytes=100-"; got != want {
+		t.Fatalf("setOffset: unexpected Range header %q, want %q", got, want)
+	}
+
+	r.setRange(100, 199)
+	if got, want := r.header.Get("Range"), "bytes=100-199"; got != want {
+		t.Fatalf("setRange: unexpected Range header %q, want %q", got, want)
+	}
+}
+
 type fakeTimeoutErr struct{}
 
 func (fakeTimeoutErr) Error() string   { return "fake timeout" }
