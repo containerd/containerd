@@ -62,6 +62,25 @@ func checkCompatibility(root string) error {
 	return nil
 }
 
+// unshareIfLinked replaces a multiply-linked file with a private copy, so
+// that sealing it (fsverity, IMMUTABLE_FL) cannot affect the other links'
+// owner: the content store, when the differ hardlinks blobs.
+func unshareIfLinked(path string) error {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if st, ok := fi.Sys().(*syscall.Stat_t); !ok || st.Nlink == 1 {
+		return nil
+	}
+	tmp := path + ".unshare"
+	if err := fs.CopyFile(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
 func setImmutable(path string, enable bool) error {
 	//nolint:revive,staticcheck	// silence "don't use ALL_CAPS in Go names; use CamelCase"
 	const (

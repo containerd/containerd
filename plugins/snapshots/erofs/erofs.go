@@ -836,6 +836,16 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 	}
 
+	// A layer blob hardlinked from the content store (see the differ's
+	// link_blobs option) shares its inode with the blob; sealing it below
+	// would also seal the content store's copy (IMMUTABLE_FL even makes
+	// content garbage collection fail). Give the layer its own inode first.
+	if s.enableFsverity || s.setImmutable {
+		if err := unshareIfLinked(layerBlob); err != nil {
+			return fmt.Errorf("failed to unshare hardlinked layer blob: %w", err)
+		}
+	}
+
 	// Enable fsverity on the EROFS layer if configured
 	if s.enableFsverity {
 		if err := fsverity.Enable(layerBlob); err != nil {
