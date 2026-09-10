@@ -893,10 +893,7 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 				username = userstr
 			}
 			gids, err := getSupplementalGroupsFromFS(root, func(g user.Group) bool {
-				// we only want supplemental groups
-				if g.Name == username {
-					return false
-				}
+				// Primary GID dedup is handled by ensureAdditionalGids, do not filter by group name.
 				return slices.Contains(g.List, username)
 			})
 			if err != nil {
