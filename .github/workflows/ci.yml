@@ -558,6 +558,26 @@ jobs:
           env
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
+      # Experimental: the same critest suite through the pause-less sandbox
+      # shim (containerd-shim-sandboxed-runc-v2 selected with runtime_path,
+      # with the shim sandboxer). Specs that need what the shim does not
+      # support yet are skipped by their full name; the list shrinks as the
+      # features land:
+      #  - "runtime should support PodPID": a shared pod PID namespace needs
+      #    a durable PID 1 (sandbox-init).
+      # The user namespace specs skip themselves: the handler does not
+      # advertise user namespaces until the shim supports them.
+      - name: cri-tools critest (sandbox shim)
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          TEST_RUNTIME_PATH: /usr/local/bin/containerd-shim-sandboxed-runc-v2
+          SANDBOXER: shim
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+          SKIP_TEST: "NamespaceOption runtime should support PodPID"
+        run: |
+          env
+          sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report-sandbox-shim"
+
       - if: matrix.os != 'ubuntu-24.04-arm'
         name: Checkpoint/Restore Disable via CRI
         env:
@@ -591,6 +611,8 @@ jobs:
             *-gotest.json
             ${{github.workspace}}/report/*.xml
             ${{github.workspace}}/report/*.log
+            ${{github.workspace}}/report-sandbox-shim/*.xml
+            ${{github.workspace}}/report-sandbox-shim/*.log
 
   integration-vm:
     name: VM integration

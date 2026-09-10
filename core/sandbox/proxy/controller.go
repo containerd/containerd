@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -48,6 +49,11 @@ func (s *remoteSandboxController) Create(ctx context.Context, sandboxInfo sandbo
 	var options sandbox.CreateOptions
 	for _, opt := range opts {
 		opt(&options)
+	}
+	if options.RuntimePath != "" {
+		// ControllerCreateRequest has no field for it; the remote controller
+		// starts whatever its runtime name resolves to.
+		log.G(ctx).WithField("runtime_path", options.RuntimePath).Warn("runtime path is not forwarded to a remote sandbox controller")
 	}
 	apiSandbox := sandbox.ToProto(&sandboxInfo)
 	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{

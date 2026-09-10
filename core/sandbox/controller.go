@@ -19,10 +19,12 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -36,9 +38,27 @@ type CreateOptions struct {
 	Options     typeurl.Any
 	NetNSPath   string
 	Annotations map[string]string
+	// RuntimePath is an absolute path to the shim binary to start for the
+	// sandbox instead of resolving it from the runtime name, the same way a
+	// task can be created with a runtime path.
+	RuntimePath string
 }
 
 type CreateOpt func(*CreateOptions) error
+
+// WithRuntimePath starts the sandbox with the shim binary at the given
+// absolute path instead of the one resolved from the runtime name. An empty
+// path keeps the runtime name; a relative one is rejected, since the shim
+// manager would take it for a runtime name.
+func WithRuntimePath(path string) CreateOpt {
+	return func(co *CreateOptions) error {
+		if path != "" && !filepath.IsAbs(path) {
+			return fmt.Errorf("runtime path %q is not absolute: %w", path, errdefs.ErrInvalidArgument)
+		}
+		co.RuntimePath = path
+		return nil
+	}
+}
 
 // WithRootFS is used to create a sandbox with the provided rootfs mount
 func WithRootFS(m []mount.Mount) CreateOpt {
