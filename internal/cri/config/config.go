@@ -113,6 +113,7 @@ type Runtime struct {
 	// CAP_NET_RAW) and "reduced" (drops CAP_NET_RAW, CAP_MKNOD,
 	// CAP_AUDIT_WRITE and CAP_SETFCAP). If unset, no profile override is applied
 	// and capabilities from BaseRuntimeSpec (if set) are preserved.
+	// unset is equivalent to "default"
 	CapabilityProfile string `toml:"capability_profile" json:"capabilityProfile"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
