@@ -103,7 +103,11 @@ func DiffCompression(ctx context.Context, mediaType string) (string, error) {
 				return "zstd", nil
 			}
 		}
-		return "", nil
+		// This media type should be uncompressed, but the actual blob
+		// may be gzip-compressed due to mislabeling (e.g. tools that
+		// incorrectly record the media type). Return "unknown" so the
+		// decompression function can auto-detect and handle it.
+		return "unknown", nil
 	default:
 		return "", fmt.Errorf("unrecognised mediatype %s: %w", mediaType, errdefs.ErrNotImplemented)
 	}
