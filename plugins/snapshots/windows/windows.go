@@ -21,10 +21,13 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Microsoft/go-winio"
@@ -41,16 +44,44 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/docker/go-units"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+type Config struct {
+	RootFSSize string `toml:"rootfs_size"`
+}
+
 func init() {
 	registry.Register(&plugin.Registration{
-		Type: plugins.SnapshotPlugin,
-		ID:   "windows",
+		Type:   plugins.SnapshotPlugin,
+		ID:     "windows",
+		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
-			return NewWindowsSnapshotter(ic.Properties[plugins.PropertyRootDir])
+
+			config, ok := ic.Config.(*Config)
+			if !ok {
+				return nil, errors.New("invalid windows snapshotter configuration")
+			}
+
+			var opts []snapshots.Opt
+
+			if len(config.RootFSSize) > 0 {
+				rootfsSize, err := units.RAMInBytes(config.RootFSSize)
+				if err != nil {
+					return nil, fmt.Errorf("invalid rootfs_size in config %q: %w", config.RootFSSize, err)
+				}
+
+				if rootfsSize > 0 {
+					opts = append(opts, snapshots.WithLabels(map[string]string{
+						rootfsSizeInBytesLabel: strconv.FormatInt(rootfsSize, 10),
+					}))
+				}
+			}
+
+			root := ic.Properties[plugins.PropertyRootDir]
+			return NewWindowsSnapshotter(root, opts...)
 		},
 	})
 }
@@ -73,7 +104,7 @@ type wcowSnapshotter struct {
 }
 
 // NewWindowsSnapshotter returns a new windows snapshotter
-func NewWindowsSnapshotter(root string) (snapshots.Snapshotter, error) {
+func NewWindowsSnapshotter(root string, opts ...snapshots.Opt) (snapshots.Snapshotter, error) {
 	fsType, err := winfs.GetFileSystemType(root)
 	if err != nil {
 		return nil, err
@@ -82,7 +113,7 @@ func NewWindowsSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, fmt.Errorf("%s is not on an NTFS volume - only NTFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
 	}
 
-	baseSn, err := newBaseSnapshotter(root)
+	baseSn, err := newBaseSnapshotter(root, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -142,8 +173,9 @@ func (s *wcowSnapshotter) Commit(ctx context.Context, name, key string, opts ...
 
 func (s *wcowSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
 	var newSnapshot storage.Snapshot
+	mergedOpts := slices.Concat(s.opts, opts)
 	err = s.ms.WithTransaction(ctx, true, func(ctx context.Context) (retErr error) {
-		newSnapshot, err = storage.CreateSnapshot(ctx, kind, key, parent, opts...)
+		newSnapshot, err = storage.CreateSnapshot(ctx, kind, key, parent, mergedOpts...)
 		if err != nil {
 			return fmt.Errorf("failed to create snapshot: %w", err)
 		}
@@ -183,7 +215,7 @@ func (s *wcowSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Kin
 
 		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
 		var snapshotInfo snapshots.Info
-		for _, o := range opts {
+		for _, o := range mergedOpts {
 			o(&snapshotInfo)
 		}
 
