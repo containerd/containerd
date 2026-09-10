@@ -290,6 +290,7 @@ version = 3
           privileged_without_host_devices = false
           privileged_without_host_devices_all_devices_allowed = false
           cgroup_writable = false
+          capability_profile = 'default'
           base_runtime_spec = ''
           cni_conf_dir = ''
           cni_max_conf_num = 0
@@ -575,6 +576,12 @@ version = 2
 
       # cgroup_writable field enables the support for writable cgroups in unprivileged containers with cgroup v2 enabled. When disabled, the cgroup interface (/sys/fs/cgroup) is mounted as read-only, preventing containers from managing their own cgroup hierarchies.
       cgroup_writable = false
+
+      # capability_profile selects the default set of Linux capabilities granted to containers.
+      # Valid values are "default" (historical default, including CAP_NET_RAW) and "reduced" (drops
+      # CAP_NET_RAW, CAP_MKNOD, CAP_AUDIT_WRITE and CAP_SETFCAP). If unset, no profile override is
+      # applied and capabilities from base_runtime_spec (if set) are preserved.
+      capability_profile = 'default'
 
       # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
       # container's are created from.

@@ -1399,7 +1399,7 @@ func TestCapabilityProfile(t *testing.T) {
 		profile      string
 		expectNetRaw bool
 	}{
-		{desc: "unset defaults to the default profile", profile: "", expectNetRaw: true},
+		{desc: "unset does not override the base/default capability set", profile: "", expectNetRaw: true},
 		{desc: "explicit default profile", profile: oci.CapabilityProfileDefault, expectNetRaw: true},
 		{desc: "reduced profile drops CAP_NET_RAW", profile: oci.CapabilityProfileReduced, expectNetRaw: false},
 	} {

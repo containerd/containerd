@@ -120,8 +120,7 @@ func ApplyOpts(ctx context.Context, client Client, c *containers.Container, s *S
 const CapabilityProfileDefault = "default"
 
 // CapabilityProfileReduced is a capability profile that drops capabilities
-// that are not needed by most workloads and are disallowed by the Kubernetes
-// baseline Pod Security Standard, namely CAP_NET_RAW, CAP_MKNOD,
+// that are not needed by most workloads, namely CAP_NET_RAW, CAP_MKNOD,
 // CAP_AUDIT_WRITE and CAP_SETFCAP.
 const CapabilityProfileReduced = "reduced"
 

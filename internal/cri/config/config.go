@@ -109,11 +109,10 @@ type Runtime struct {
 	// CgroupWritable enables writable cgroups in non-privileged containers
 	CgroupWritable bool `toml:"cgroup_writable" json:"cgroupWritable"`
 	// CapabilityProfile selects the default set of Linux capabilities granted
-	// to containers. Valid values are "default" (the historical default,
-	// including CAP_NET_RAW) and "reduced" (drops CAP_NET_RAW, CAP_MKNOD,
-	// CAP_AUDIT_WRITE and CAP_SETFCAP, matching the Kubernetes baseline Pod
-	// Security Standard). If unset, no profile is applied and capabilities
-	// granted by BaseRuntimeSpec (or the "default" profile if unset) are used.
+	// to containers. Valid values are "default" (historical default, including
+	// CAP_NET_RAW) and "reduced" (drops CAP_NET_RAW, CAP_MKNOD,
+	// CAP_AUDIT_WRITE and CAP_SETFCAP). If unset, no profile override is applied
+	// and capabilities from BaseRuntimeSpec (if set) are preserved.
 	CapabilityProfile string `toml:"capability_profile" json:"capabilityProfile"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
