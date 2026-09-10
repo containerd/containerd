@@ -443,6 +443,15 @@ func hostNetwork(config *runtime.PodSandboxConfig) bool {
 	return hostNet
 }
 
+// sandboxHermeticAnnotation marks a sandbox as requesting no CNI-managed networking.
+const sandboxHermeticAnnotation = "io.kubernetes.cri.sandbox.hermetic"
+
+// isHermetic handles checking if the sandbox was requested to be hermetic, i.e.
+// the CNI plugin should not be invoked to set up or tear down its networking.
+func isHermetic(config *runtime.PodSandboxConfig) bool {
+	return config.GetAnnotations()[sandboxHermeticAnnotation] == "true"
+}
+
 // getCgroupsPath generates container cgroups path.
 func getCgroupsPath(cgroupsParent, id string) string {
 	base := path.Base(cgroupsParent)
