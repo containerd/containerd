@@ -22,7 +22,7 @@ import (
 	"context"
 	"crypto/rand"
 	_ "crypto/sha256" // required for digest package
-	_ "crypto/sha512" // required for sha512 digest support
+	_ "crypto/sha512" // required for sha384 and sha512 digest support
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -141,7 +142,7 @@ func TestInvalidPermissionRootDir(t *testing.T) {
 }
 
 func TestContentWriter(t *testing.T) {
-	for _, alg := range []digest.Algorithm{digest.SHA256, digest.SHA512} {
+	for _, alg := range []digest.Algorithm{digest.SHA256, digest.SHA384, digest.SHA512} {
 		t.Run(alg.String(), func(t *testing.T) {
 			ctx, tmpdir, cs, cleanup := contentStoreEnv(t)
 			defer cleanup()
@@ -246,6 +247,87 @@ func TestContentWriter(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+// TestContentWriterBlobDigestAlgorithm verifies that
+// content.WithBlobDigestAlgorithm steers the writer to hash with a
+// caller-chosen algorithm when no expected digest is supplied, and that the
+// resulting blob is filed under the requested algorithm's namespace.
+//
+// This exercises the "requested" case in the writer's precedence chain.
+// Cases 1 (expected.Algorithm wins) and 3 (canonical fallback) are already
+// exercised by TestContentWriter above.
+func TestContentWriterBlobDigestAlgorithm(t *testing.T) {
+	for _, alg := range []digest.Algorithm{digest.SHA384, digest.SHA512} {
+		t.Run(alg.String(), func(t *testing.T) {
+			if !alg.Available() {
+				t.Skipf("algorithm %q not registered in this binary", alg)
+			}
+
+			ctx, tmpdir, cs, cleanup := contentStoreEnv(t)
+			defer cleanup()
+			defer testutil.DumpDirOnFailure(t, tmpdir)
+
+			cw, err := cs.Writer(ctx,
+				content.WithRef("alg-"+alg.String()),
+				content.WithBlobDigestAlgorithm(alg),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			payload := make([]byte, 1<<16)
+			if _, err := rand.Read(payload); err != nil {
+				t.Fatal(err)
+			}
+			expected := alg.FromBytes(payload)
+
+			checkCopy(t, int64(len(payload)), cw, bufio.NewReader(io.NopCloser(bytes.NewReader(payload))))
+
+			if got := cw.Digest(); got != expected {
+				t.Fatalf("writer hashed with wrong algorithm: got %s, want %s", got, expected)
+			}
+			// Empty expected — the writer's chosen algorithm decides the
+			// final digest.
+			if err := cw.Commit(ctx, int64(len(payload)), ""); err != nil {
+				t.Fatal(err)
+			}
+			if err := cw.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			path := checkBlobPath(t, cs, expected)
+			// Blobs live at <root>/blobs/<algorithm>/<hex>; check the
+			// algorithm segment specifically so a temp-dir name that
+			// happens to contain the algo string can't false-match.
+			algoDir := string(filepath.Separator) + "blobs" + string(filepath.Separator) + string(alg) + string(filepath.Separator)
+			if !strings.Contains(path, algoDir) {
+				t.Fatalf("blob path %q does not live under %s", path, algoDir)
+			}
+		})
+	}
+}
+
+// TestContentWriterBlobDigestAlgorithmUnavailable verifies that an explicit
+// request for an unregistered algorithm fails fast rather than silently
+// falling back to canonical (which would compute the wrong digest and only
+// fail at commit-time verification, or — worse — not fail at all when no
+// expected digest is supplied).
+func TestContentWriterBlobDigestAlgorithmUnavailable(t *testing.T) {
+	ctx, tmpdir, cs, cleanup := contentStoreEnv(t)
+	defer cleanup()
+	defer testutil.DumpDirOnFailure(t, tmpdir)
+
+	_, err := cs.Writer(ctx,
+		content.WithRef("unavailable-alg"),
+		content.WithBlobDigestAlgorithm(digest.Algorithm("not-a-real-algorithm")),
+	)
+	if err == nil {
+		t.Fatal("expected error for unavailable algorithm, got nil")
+	}
+	if !errdefs.IsInvalidArgument(err) {
+		t.Fatalf("expected ErrInvalidArgument, got: %v", err)
 	}
 }
 

@@ -97,6 +97,11 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 		}
 	}
 
+	algo := config.DigestAlgorithm
+	if algo == "" {
+		algo = digest.Canonical
+	}
+
 	var ocidesc ocispec.Descriptor
 	if err := mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
 		return mount.WithReadonlyTempMount(ctx, upper, func(upperRoot string) error {
@@ -110,7 +115,8 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				content.WithRef(config.Reference),
 				content.WithDescriptor(ocispec.Descriptor{
 					MediaType: config.MediaType, // most contentstore implementations just ignore this
-				}))
+				}),
+				content.WithBlobDigestAlgorithm(algo))
 			if err != nil {
 				return fmt.Errorf("failed to open writer: %w", err)
 			}
@@ -135,7 +141,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			}
 
 			if compressionType != compression.Uncompressed {
-				dgstr := digest.SHA256.Digester()
+				dgstr := algo.Digester()
 				var compressed io.WriteCloser
 				if config.Compressor != nil {
 					compressed, errOpen = config.Compressor(cw, config.MediaType)
