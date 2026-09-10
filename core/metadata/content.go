@@ -842,11 +842,11 @@ func writeExpireAt(expire time.Time, bkt *bolt.Bucket) error {
 }
 
 // garbageCollect removes all contents that are no longer used.
-func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, err error) {
+func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, retErr error) {
 	cs.l.Lock()
 	t1 := time.Now()
 	defer func() {
-		if err == nil {
+		if retErr == nil {
 			d = time.Since(t1)
 		}
 		cs.l.Unlock()
@@ -913,7 +913,7 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 		return 0, err
 	}
 
-	err = cs.Store.Walk(ctx, func(info content.Info) error {
+	if err := cs.Store.Walk(ctx, func(info content.Info) error {
 		if _, ok := contentSeen[info.Digest.String()]; !ok {
 			if err := cs.Store.Delete(ctx, info.Digest); err != nil {
 				return err
@@ -921,9 +921,8 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 			log.G(ctx).WithField("digest", info.Digest).Debug("removed content")
 		}
 		return nil
-	})
-	if err != nil {
-		return
+	}); err != nil {
+		return 0, err
 	}
 
 	// If the content store has implemented a more efficient walk function
@@ -933,7 +932,7 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 		WalkStatusRefs(context.Context, func(string) error) error
 	}
 	if w, ok := cs.Store.(statusWalker); ok {
-		err = w.WalkStatusRefs(ctx, func(ref string) error {
+		if err := w.WalkStatusRefs(ctx, func(ref string) error {
 			if _, ok := ingestSeen[ref]; !ok {
 				if err := cs.Store.Abort(ctx, ref); err != nil {
 					return err
@@ -941,21 +940,22 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 				log.G(ctx).WithField("ref", ref).Debug("cleanup aborting ingest")
 			}
 			return nil
-		})
+		}); err != nil {
+			return 0, err
+		}
 	} else {
-		var statuses []content.Status
-		statuses, err = cs.Store.ListStatuses(ctx)
+		statuses, err := cs.Store.ListStatuses(ctx)
 		if err != nil {
 			return 0, err
 		}
 		for _, status := range statuses {
 			if _, ok := ingestSeen[status.Ref]; !ok {
-				if err = cs.Store.Abort(ctx, status.Ref); err != nil {
-					return
+				if err := cs.Store.Abort(ctx, status.Ref); err != nil {
+					return 0, err
 				}
 				log.G(ctx).WithField("ref", status.Ref).Debug("cleanup aborting ingest")
 			}
 		}
 	}
-	return
+	return 0, nil
 }
