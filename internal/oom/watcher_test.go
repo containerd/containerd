@@ -19,7 +19,9 @@
 package oom
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync/atomic"
 	"testing"
@@ -81,6 +83,61 @@ func TestWatcher(t *testing.T) {
 	}, 30*time.Second, time.Second, "should receive oom event (%v)", oomKills.Load())
 
 	require.NoError(t, watchers.Stop(containerID))
+}
+
+// newTestWatcher builds a watcher without starting its goroutine, so a test
+// controls exactly if and when errCh is resolved.
+func newTestWatcher(t *testing.T, cid string) *watcher {
+	t.Helper()
+
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		r.Close()
+		w.Close()
+	})
+
+	return &watcher{
+		cid:     cid,
+		eventFD: r,
+		errCh:   make(chan error, 1),
+	}
+}
+
+// TestWatcherStopDoesNotBlockForever covers the shim wedge reported in #13814.
+// The shim calls Stop from handleProcessExit before it publishes TaskExit, on
+// its single processExits goroutine, so a watcher goroutine which never comes
+// back used to stop that shim from ever publishing another task exit: clients
+// waiting on the task, the container IO fifos and the CRI exit monitors then
+// all leak, and the shim is orphaned with its container already gone.
+func TestWatcherStopDoesNotBlockForever(t *testing.T) {
+	// errCh is never written to and never closed, which is how a watcher
+	// goroutine parked in a read of the container's cgroup files looks to stop.
+	w := newTestWatcher(t, "stuck-container")
+
+	done := make(chan error, 1)
+	go func() {
+		done <- w.stop()
+	}()
+
+	select {
+	case err := <-done:
+		require.ErrorContains(t, err, "timed out")
+	case <-time.After(stopTimeout + 30*time.Second):
+		t.Fatal("watcher.stop never returned: the shim would stop publishing task exits")
+	}
+}
+
+// TestWatcherStopReportsWatcherError makes sure bounding the wait did not stop
+// stop from reporting what the watcher goroutine actually failed with.
+func TestWatcherStopReportsWatcherError(t *testing.T) {
+	w := newTestWatcher(t, "failed-container")
+
+	watcherErr := errors.New("read memory.events: boom")
+	w.errCh <- watcherErr
+	close(w.errCh)
+
+	require.ErrorIs(t, w.stop(), watcherErr)
 }
 
 func skipIfCgroupUnavailable(t *testing.T) {
