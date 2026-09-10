@@ -255,8 +255,11 @@ func TestContainerCapabilities(t *testing.T) {
 			require.NoError(t, err)
 
 			if selinux.GetEnabled() {
-				assert.NotEqual(t, "", spec.Process.SelinuxLabel)
-				assert.NotEqual(t, "", spec.Linux.MountLabel)
+				processLabel, mountLabel := selinux.ContainerLabels()
+				if processLabel != "" && mountLabel != "" {
+					assert.NotEqual(t, "", spec.Process.SelinuxLabel)
+					assert.NotEqual(t, "", spec.Linux.MountLabel)
+				}
 			}
 
 			specCheck(t, testID, testSandboxID, testPid, spec)
