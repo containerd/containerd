@@ -230,6 +230,48 @@ func TestWithCapabilitiesNil(t *testing.T) {
 	}
 }
 
+func TestWithCapabilityProfile(t *testing.T) {
+	t.Parallel()
+
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+
+	for _, tc := range []struct {
+		name        string
+		profile     string
+		wantRemoved bool
+		wantErr     bool
+	}{
+		{name: "unset", profile: "", wantRemoved: false},
+		{name: CapabilityProfileDefault, profile: CapabilityProfileDefault, wantRemoved: false},
+		{name: CapabilityProfileReduced, profile: CapabilityProfileReduced, wantRemoved: true},
+		{name: "bogus", profile: "bogus", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()},
+				WithCapabilityProfile(tc.profile),
+			)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error for unknown capability profile")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if runtime.GOOS != "linux" {
+				return
+			}
+			for _, cap := range reducedCapsRemoved {
+				removed := !capsContain(s.Process.Capabilities.Bounding, cap)
+				if removed != tc.wantRemoved {
+					t.Errorf("%s removed = %v, want %v", cap, removed, tc.wantRemoved)
+				}
+			}
+		})
+	}
+}
+
 func TestPopulateDefaultWindowsSpec(t *testing.T) {
 	var (
 		c   = containers.Container{ID: "TestWithDefaultSpec"}

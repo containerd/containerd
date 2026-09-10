@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/plugins"
 	streaming "k8s.io/cri-streaming/pkg/streaming"
 )
@@ -107,6 +108,15 @@ type Runtime struct {
 	PrivilegedWithoutHostDevicesAllDevicesAllowed bool `toml:"privileged_without_host_devices_all_devices_allowed" json:"privileged_without_host_devices_all_devices_allowed"`
 	// CgroupWritable enables writable cgroups in non-privileged containers
 	CgroupWritable bool `toml:"cgroup_writable" json:"cgroupWritable"`
+	// CapabilityProfile selects the default set of Linux capabilities granted
+	// to containers. Valid values are "default" (historical default, including
+	// CAP_NET_RAW) and "reduced" (drops CAP_NET_RAW, CAP_MKNOD,
+	// CAP_AUDIT_WRITE and CAP_SETFCAP). This field only applies to containerd's
+	// internal default capability set: if left unset (empty string), no
+	// profile override is applied and capabilities from BaseRuntimeSpec (if
+	// set) are preserved. Setting "default" or "reduced" explicitly always
+	// overrides capabilities from BaseRuntimeSpec.
+	CapabilityProfile string `toml:"capability_profile" json:"capabilityProfile"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
 	// NetworkPluginConfDir is a directory containing the CNI network information for the runtime class.
@@ -672,6 +682,9 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
 			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
+		}
+		if r.CapabilityProfile != "" && r.CapabilityProfile != oci.CapabilityProfileDefault && r.CapabilityProfile != oci.CapabilityProfileReduced {
+			return warnings, fmt.Errorf("runtime %s: invalid `capability_profile` %q, must be %q or %q", k, r.CapabilityProfile, oci.CapabilityProfileDefault, oci.CapabilityProfileReduced)
 		}
 		// If empty, use default podSandbox mode
 		if len(r.Sandboxer) == 0 {

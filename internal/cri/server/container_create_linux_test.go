@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1363,27 +1364,73 @@ func TestBaseOCISpec(t *testing.T) {
 		},
 	}))
 
-	ociRuntime := config.Runtime{}
-	ociRuntime.BaseRuntimeSpec = "/etc/containerd/cri-base.json"
-
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
 	testPid := uint32(1234)
-	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 
-	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
-	assert.NoError(t, err)
+	for _, test := range []struct {
+		desc               string
+		capabilityProfile  string
+		expectBaseSpecCaps bool
+	}{
+		{desc: "unset preserves BaseRuntimeSpec capabilities", capabilityProfile: "", expectBaseSpecCaps: true},
+		{desc: "default profile overrides BaseRuntimeSpec capabilities", capabilityProfile: oci.CapabilityProfileDefault, expectBaseSpecCaps: false},
+		{desc: "reduced profile overrides BaseRuntimeSpec capabilities", capabilityProfile: oci.CapabilityProfileReduced, expectBaseSpecCaps: false},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 
-	specCheck(t, testID, testSandboxID, testPid, spec)
+			ociRuntime := config.Runtime{
+				BaseRuntimeSpec:   "/etc/containerd/cri-base.json",
+				CapabilityProfile: test.capabilityProfile,
+			}
 
-	assert.Contains(t, spec.Process.User.AdditionalGids, uint32(9999))
-	assert.Len(t, spec.Process.User.AdditionalGids, 3)
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			assert.NoError(t, err)
 
-	assert.Contains(t, spec.Process.Capabilities.Permitted, "CAP_SETUID")
-	assert.Len(t, spec.Process.Capabilities.Permitted, 1)
+			specCheck(t, testID, testSandboxID, testPid, spec)
 
-	assert.Equal(t, *spec.Linux.Resources.Memory.Limit, containerConfig.Linux.Resources.MemoryLimitInBytes)
+			assert.Contains(t, spec.Process.User.AdditionalGids, uint32(9999))
+			assert.Len(t, spec.Process.User.AdditionalGids, 3)
+
+			if test.expectBaseSpecCaps {
+				assert.Contains(t, spec.Process.Capabilities.Permitted, "CAP_SETUID")
+				assert.Len(t, spec.Process.Capabilities.Permitted, 1)
+			} else {
+				// the profile's full capability set replaces BaseRuntimeSpec's single-cap set.
+				assert.Greater(t, len(spec.Process.Capabilities.Permitted), 1)
+			}
+
+			assert.Equal(t, *spec.Linux.Resources.Memory.Limit, containerConfig.Linux.Resources.MemoryLimitInBytes)
+		})
+	}
+}
+
+func TestCapabilityProfile(t *testing.T) {
+	c := newTestCRIService()
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	testPid := uint32(1234)
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+
+	for _, test := range []struct {
+		desc         string
+		profile      string
+		expectNetRaw bool
+	}{
+		{desc: "unset does not override the base/default capability set", profile: "", expectNetRaw: true},
+		{desc: "explicit default profile", profile: oci.CapabilityProfileDefault, expectNetRaw: true},
+		{desc: "reduced profile drops CAP_NET_RAW", profile: oci.CapabilityProfileReduced, expectNetRaw: false},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			ociRuntime := config.Runtime{CapabilityProfile: test.profile}
+			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.expectNetRaw, slices.Contains(spec.Process.Capabilities.Bounding, "CAP_NET_RAW"))
+		})
+	}
 }
 
 func writeFilesToTempDir(t *testing.T, content []string) (string, error) {
