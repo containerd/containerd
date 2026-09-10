@@ -1,0 +1,33 @@
+name: zizmor
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "release/**"
+    tags:
+      - "api/v*" # Push events to matching api/v*, i.e. api/v1.0, api/v20.15.10
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - "release/**"
+
+jobs:
+  run:
+    uses: crazy-max/.github/.github/workflows/zizmor.yml@46267a6e61cd56aac2fc79943df180152f4c89d6 # v1.10.1
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      min-severity: medium
+      min-confidence: medium
+      persona: pedantic
