@@ -171,7 +171,7 @@ func setupDmVerityDevice(ctx context.Context, source string, metadata *dmverity.
 	// Extract snapshot ID from source path
 	// Path format: {root}/snapshots/{id}/layer.erofs
 	snapshotID := filepath.Base(filepath.Dir(source))
-	deviceName := fmt.Sprintf("containerd-erofs-%s", snapshotID)
+	deviceName := "containerd-erofs-" + snapshotID
 	devicePath = dmverity.DevicePath(deviceName)
 
 	log.G(ctx).WithFields(log.Fields{

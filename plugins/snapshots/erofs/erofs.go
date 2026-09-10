@@ -162,7 +162,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 			return nil, fmt.Errorf("failed to check dm-verity support: %w", err)
 		}
 		if !supported {
-			return nil, fmt.Errorf("dmverity_mode is 'on' but dm-verity is not supported on this system")
+			return nil, errors.New("dmverity_mode is 'on' but dm-verity is not supported on this system")
 		}
 	}
 
@@ -183,10 +183,10 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	// skipping; dm-verity is the cache's integrity mechanism.
 	if len(config.layerContentCaches) > 0 {
 		if config.enableFsverity {
-			return nil, fmt.Errorf("enable_fsverity is incompatible with layer_content_caches; use dm-verity for cache integrity")
+			return nil, errors.New("enable_fsverity is incompatible with layer_content_caches; use dm-verity for cache integrity")
 		}
 		if config.setImmutable {
-			return nil, fmt.Errorf("set_immutable is incompatible with layer_content_caches")
+			return nil, errors.New("set_immutable is incompatible with layer_content_caches")
 		}
 
 		// A cache dir is symlinked into snapshots, so a relative one would resolve
@@ -215,7 +215,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	}
 
 	if config.setImmutable && runtime.GOOS != "linux" {
-		return nil, fmt.Errorf("setting IMMUTABLE_FL is only supported on Linux")
+		return nil, errors.New("setting IMMUTABLE_FL is only supported on Linux")
 	}
 
 	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
@@ -390,7 +390,7 @@ func (s *snapshotter) applyDmverityPolicy(layerBlob string) (string, error) {
 	// If metadata exists, return the metadata path to a mount option.
 	// The format is: X-containerd.dmverity=<metadata-path>
 	if metadataExists {
-		return fmt.Sprintf("X-containerd.dmverity=%s", metadataPath), nil
+		return "X-containerd.dmverity=" + metadataPath, nil
 	}
 
 	return "", nil
@@ -498,8 +498,8 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 			)
 		} else {
 			options = append(options,
-				fmt.Sprintf("workdir=%s", s.workPath(snap.ID)),
-				fmt.Sprintf("upperdir=%s", s.upperPath(snap.ID)),
+				"workdir="+s.workPath(snap.ID),
+				"upperdir="+s.upperPath(snap.ID),
 			)
 		}
 		writable = true
@@ -541,10 +541,10 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 
 	if s.remapIDs {
 		if v, ok := info.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
-			options = append(options, fmt.Sprintf("uidmap=%s", v))
+			options = append(options, "uidmap="+v)
 		}
 		if v, ok := info.Labels[snapshots.LabelSnapshotGIDMapping]; ok {
-			options = append(options, fmt.Sprintf("gidmap=%s", v))
+			options = append(options, "gidmap="+v)
 		}
 	}
 

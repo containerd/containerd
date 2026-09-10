@@ -274,7 +274,7 @@ func (s *controllerService) Update(
 		return nil, errgrpc.ToGRPC(err)
 	}
 	if req.Sandbox == nil {
-		return nil, fmt.Errorf("sandbox can not be nil")
+		return nil, errors.New("sandbox must not be nil")
 	}
 	err = ctrl.Update(ctx, req.SandboxID, sandbox.FromProto(req.Sandbox), req.Fields...)
 	if err != nil {

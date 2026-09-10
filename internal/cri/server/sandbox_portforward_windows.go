@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/containerd/log"
@@ -47,7 +48,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 
 	err = func() error {
 		var conn net.Conn
-		conn, err = net.Dial("tcp", net.JoinHostPort(podIP, fmt.Sprintf("%d", port)))
+		conn, err = net.Dial("tcp", net.JoinHostPort(podIP, strconv.Itoa(int(port))))
 		if err != nil {
 			return fmt.Errorf("failed to connect to %s:%d for pod %q: %v", podIP, port, id, err)
 		}

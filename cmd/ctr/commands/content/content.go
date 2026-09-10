@@ -262,7 +262,7 @@ var (
 
 			var paths []string
 			for k, v := range labels {
-				paths = append(paths, fmt.Sprintf("labels.%s", k))
+				paths = append(paths, "labels."+k)
 				if v != "" {
 					info.Labels[k] = v
 				}

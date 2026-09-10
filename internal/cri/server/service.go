@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -482,14 +483,14 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 		return nil, fmt.Errorf("failed to call PluginInfo: %w", err)
 	}
 	if infoResp.Extra == nil {
-		return nil, fmt.Errorf("runtime plugin info has no extra data")
+		return nil, errors.New("runtime plugin info has no extra data")
 	}
 	var info apitypes.RuntimeInfo
 	if err := typeurl.UnmarshalTo(infoResp.Extra, &info); err != nil {
 		return nil, fmt.Errorf("failed to get runtime info from plugin info: %w", err)
 	}
 	if info.Features == nil {
-		return nil, fmt.Errorf("runtime info has no features")
+		return nil, errors.New("runtime info has no features")
 	}
 	featuresX, err := typeurl.UnmarshalAny(info.Features)
 	if err != nil {

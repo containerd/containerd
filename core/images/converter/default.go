@@ -430,7 +430,7 @@ func WriteJSON(ctx context.Context, cs content.Store, x any, oldDesc ocispec.Des
 		return nil, err
 	}
 	dgst := digest.SHA256.FromBytes(b)
-	ref := fmt.Sprintf("converter-write-json-%s", dgst.String())
+	ref := "converter-write-json-" + dgst.String()
 	w, err := content.OpenWriter(ctx, cs, content.WithRef(ref))
 	if err != nil {
 		return nil, err

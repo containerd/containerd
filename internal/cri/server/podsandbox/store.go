@@ -17,7 +17,7 @@
 package podsandbox
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
@@ -33,7 +33,7 @@ func NewStore() *Store {
 
 func (s *Store) Save(p *types.PodSandbox) error {
 	if p == nil {
-		return fmt.Errorf("pod sandbox should not be nil")
+		return errors.New("pod sandbox should not be nil")
 	}
 	s.m.Store(p.ID, p)
 	return nil

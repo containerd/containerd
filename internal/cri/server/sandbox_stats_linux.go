@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -202,7 +203,7 @@ func getAllContainerNetIO(ctx context.Context, netNsPath string) ([]interfaceSta
 
 func decodeSandboxCgroupMetrics(m *types.Metric) (*cgroupMetrics, error) {
 	if m == nil || m.Data == nil {
-		return nil, fmt.Errorf("sandbox metric is empty")
+		return nil, errors.New("sandbox metric is empty")
 	}
 	a, err := typeurl.UnmarshalAny(m.Data)
 	if err != nil {

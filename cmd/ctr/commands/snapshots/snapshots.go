@@ -187,7 +187,7 @@ func withMounts(ctx context.Context, id string, sn snapshots.Snapshotter, f func
 			return ocispec.Descriptor{}, err
 		}
 	} else {
-		key := fmt.Sprintf("%s-view-key", id)
+		key := id + "-view-key"
 		mounts, err = sn.View(ctx, key, id)
 		if err != nil {
 			return ocispec.Descriptor{}, err
@@ -527,7 +527,7 @@ var setLabelCommand = &cli.Command{
 
 		var paths []string
 		for k, v := range labels {
-			paths = append(paths, fmt.Sprintf("labels.%s", k))
+			paths = append(paths, "labels."+k)
 			if v != "" {
 				info.Labels[k] = v
 			}
@@ -673,7 +673,7 @@ func printMounts(target string, mounts []mount.Mount) {
 	for _, m := range mounts {
 		var opt string
 		if len(m.Options) > 0 {
-			opt = fmt.Sprintf(" -o %s", strings.Join(m.Options, ","))
+			opt = " -o " + strings.Join(m.Options, ",")
 		}
 		fmt.Printf("mount -t %s %s %s%s\n", m.Type, m.Source, filepath.Join(target, m.Target), opt)
 	}

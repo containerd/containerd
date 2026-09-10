@@ -34,7 +34,7 @@ limitations under the License.
 package bandwidth
 
 import (
-	"fmt"
+	"errors"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -44,10 +44,10 @@ var maxRsrc = resource.MustParse("1P")
 
 func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
 	if rsrc.Value() < minRsrc.Value() {
-		return fmt.Errorf("resource is unreasonably small (< 1kbit)")
+		return errors.New("resource is unreasonably small (< 1kbit)")
 	}
 	if rsrc.Value() > maxRsrc.Value() {
-		return fmt.Errorf("resource is unreasonably large (> 1Pbit)")
+		return errors.New("resource is unreasonably large (> 1Pbit)")
 	}
 	return nil
 }
