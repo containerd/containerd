@@ -191,27 +191,145 @@ func (is *Store) String() string {
 }
 
 func (is *Store) ImageFilter(h images.HandlerFunc, cs content.Store) images.HandlerFunc {
-	var p platforms.MatchComparer
-	if len(is.platforms) == 0 {
-		p = platforms.All
-	} else {
-		p = platforms.Ordered(is.platforms...)
-	}
+	return is.ImageFilterWithPlatforms(h, cs, nil)
+}
+
+// ImageFilterWithPlatforms behaves like ImageFilter, except that each of
+// is.platforms (see WithPlatforms) is refined by refinements before being
+// used to select manifests: see refinePlatforms. is.platforms remains
+// authoritative - refinements never adds, removes, or reorders an entry -
+// so passing nil is exactly ImageFilter.
+//
+// It is used by the transfer service to factor the OSFeatures of a
+// matched unpack configuration (see transfer.PlatformImageFilterer) into
+// manifest selection, without otherwise changing what this Store was
+// configured to fetch.
+func (is *Store) ImageFilterWithPlatforms(h images.HandlerFunc, cs content.Store, refinements []ocispec.Platform) images.HandlerFunc {
 	h = images.SetChildrenMappedLabels(cs, h, is.labelMap)
+
+	// With no configured platforms ("all platforms", see WithPlatforms),
+	// there is no per-platform top-n to select: every manifest - every
+	// variant included - is wanted, exactly as before.
+	if len(is.platforms) == 0 {
+		p := platforms.All
+		if is.allMetadata {
+			h = remotes.FilterManifestByPlatformHandler(h, p)
+		} else {
+			h = images.FilterPlatforms(h, p)
+		}
+		if is.manifestLimit > 0 {
+			h = images.LimitManifests(h, p, is.manifestLimit)
+		}
+		return h
+	}
+
+	refined := refinePlatforms(is.platforms, refinements)
+
 	if is.allMetadata {
-		// Filter manifests by platforms but allow to handle manifest
-		// and configuration for not-target platforms
-		h = remotes.FilterManifestByPlatformHandler(h, p)
+		// Filter manifests by platforms but allow to handle manifest and
+		// configuration for not-target platforms.
+		h = remotes.FilterManifestByPlatformHandler(h, platforms.Ordered(refined...))
+		// Additionally, for each configured platform, only fetch (and,
+		// when unpacking, apply) the layers of its single best manifest:
+		// platforms.Matcher.Match is a subset check, not an equality
+		// check, so once OSFeatures only narrow which manifests are
+		// acceptable substitutes rather than describe an entirely
+		// different platform, more than one manifest can be an
+		// acceptable substitute for the same requested platform - e.g.
+		// both a plain manifest and one requiring OSFeatures ["erofs"]
+		// satisfy a "supported" set that includes "erofs".
+		h = images.SelectManifestLayersPerPlatform(h, refined)
 	} else {
-		// Filter children by platforms if specified.
-		h = images.FilterPlatforms(h, p)
+		// Filter children to each configured platform's single best
+		// manifest (see above), independently per platform so that one
+		// platform's manifests never compete with, or crowd out, another
+		// requested platform's own selection.
+		h = images.SelectManifestsPerPlatform(h, refined)
 	}
 
 	// Sort and limit manifests if a finite number is needed
 	if is.manifestLimit > 0 {
-		h = images.LimitManifests(h, p, is.manifestLimit)
+		h = images.LimitManifests(h, platforms.Ordered(refined...), is.manifestLimit)
 	}
 	return h
+}
+
+// refinePlatforms returns configured with each entry replaced by a spec
+// from refinements - if any - describing the same OS, OS version,
+// architecture and variant, but declaring a superset of its OSFeatures.
+// When more than one refinement qualifies for an entry, the one with the
+// most OSFeatures is used.
+//
+// configured is otherwise authoritative: refinePlatforms never adds,
+// removes, or reorders an entry, and never uses a refinement that is not
+// a superset - in particular, one of a different architecture, which
+// platforms.OnlyOS-built matchers (see plugins/transfer's
+// CheckPlatformSupported) ignore entirely - since doing so could widen
+// selection to a manifest that would not otherwise have been accepted for
+// that entry at all.
+func refinePlatforms(configured, refinements []ocispec.Platform) []ocispec.Platform {
+	if len(refinements) == 0 {
+		return configured
+	}
+
+	// Pairing each refinement with its normalized form in a single slice,
+	// rather than keeping two slices in parallel, means the candidate
+	// found below is always addressed directly by the same range loop
+	// that is bounded by its length, never by an index computed - and
+	// potentially left unset - across iterations.
+	type candidate struct {
+		raw        ocispec.Platform
+		normalized ocispec.Platform
+	}
+	candidates := make([]candidate, len(refinements))
+	for i, r := range refinements {
+		candidates[i] = candidate{raw: r, normalized: platforms.Normalize(r)}
+	}
+
+	result := make([]ocispec.Platform, len(configured))
+	copy(result, configured)
+	for i, c := range configured {
+		nc := platforms.Normalize(c)
+		var best *candidate
+		for k := range candidates {
+			cand := &candidates[k]
+			if cand.normalized.OS != nc.OS || cand.normalized.OSVersion != nc.OSVersion || cand.normalized.Architecture != nc.Architecture || cand.normalized.Variant != nc.Variant {
+				continue
+			}
+			if !isSupersetOSFeatures(cand.normalized.OSFeatures, nc.OSFeatures) {
+				continue
+			}
+			if best == nil || len(cand.normalized.OSFeatures) > len(best.normalized.OSFeatures) {
+				best = cand
+			}
+		}
+		if best != nil {
+			result[i] = best.raw
+		}
+	}
+	return result
+}
+
+// isSupersetOSFeatures reports whether superset contains every feature in
+// subset. Both must already be sorted (see platforms.Normalize).
+func isSupersetOSFeatures(superset, subset []string) bool {
+	if len(subset) == 0 {
+		return true
+	}
+	if len(superset) < len(subset) {
+		return false
+	}
+	i := 0
+	for _, f := range subset {
+		for i < len(superset) && superset[i] < f {
+			i++
+		}
+		if i >= len(superset) || superset[i] != f {
+			return false
+		}
+		i++
+	}
+	return true
 }
 
 func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store images.Store) ([]images.Image, error) {

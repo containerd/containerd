@@ -151,6 +151,7 @@ func configureUnpackPlatforms(ic *plugin.InitContext, ms *metadata.DB, config *t
 
 		up := unpack.Platform{
 			Platform:                target,
+			PlatformSpec:            p,
 			SnapshotterKey:          uc.Snapshotter,
 			Snapshotter:             sn,
 			SnapshotterExports:      snExports,

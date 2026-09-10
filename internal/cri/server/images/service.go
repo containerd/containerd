@@ -30,7 +30,6 @@ import (
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 	"golang.org/x/sync/semaphore"
 
 	docker "github.com/distribution/reference"
@@ -119,7 +118,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		config:                      config,
 		images:                      options.Images,
 		client:                      options.Client,
-		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
+		imageStore:                  imagestore.NewStore(options.Images, options.Content, imageStorePlatform(options.RuntimePlatforms)),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
 		snapshotStore:               snapshotstore.NewStore(),

@@ -327,6 +327,82 @@ In other words, the EROFS differ can only be used with the EROFS snapshotter;
 otherwise, it will skip to the next differ.  The EROFS snapshotter can work
 with or without the EROFS differ.
 
+## EROFS Image Layer Format Specification
+
+The EROFS differ and snapshotter support pulling and running images that
+conform to the [EROFS image layer format
+specification](https://github.com/erofs/erofs-image-spec), an extension of
+the OCI Image Format Specification for distributing EROFS filesystem images
+as layers directly (instead of tar archives), including its `device` and
+`overlay-data` composition roles (see the specification's §2.4) for
+multi-device addressing and overlayfs data-only lowers.
+
+A layer's role - carried in the `org.erofs.role` layer descriptor annotation
+- determines which file its blob is written to in the snapshot directory:
+
+| `org.erofs.role`         | File           | Snapshotter treatment                                                    |
+|--------------------------|----------------|---------------------------------------------------------------------------|
+| absent or `overlay-lower`| `layer.erofs`  | mounted as a regular overlayfs `lowerdir` (as described above)             |
+| `overlay-data`           | `data.erofs`   | mounted and supplied to the overlayfs mount as a data-only lower, using the `::` lowerdir separator and `metacopy=on` |
+| `device`                 | `device.blob`  | not mounted; its path is passed as a `device=` option on the mount of the first subsequent non-device layer |
+
+For example, a three-layer chain consisting of a `device`-role layer
+followed by an `overlay-data`-role layer and a metadata layer would have a
+snapshot directory tree like:
+
+```
+  snapshots/1/.erofslayer  snapshots/1/device.blob   (device)
+  snapshots/2/.erofslayer  snapshots/2/data.erofs    (overlay-data)
+  snapshots/3/.erofslayer  snapshots/3/layer.erofs   (metadata; device= and the data-only lower attach here)
+```
+
+A standalone `application/vnd.erofs.chunk-index.v1` layer (see the
+specification's §2.2) is handled differently: since a consumer that does not
+implement chunk indexes silently skips such a layer during composition
+entirely, `core/unpack` never creates a snapshot for it in the first place,
+so it never reaches the EROFS differ or snapshotter at all. The layer's ID
+still occupies a link in the ChainID recursion, so the snapshot committed
+for the next real layer is simply parented directly on the last real
+layer's snapshot. Since a skipped layer's content is never applied, and so
+never independently verified, its ID is always its own blob digest -
+verified by the content store on ingest - regardless of any
+`org.erofs.uncompressed-digest` annotation or `rootfs.diff_ids` entry a
+producer may also have supplied for it; if that declared value disagrees
+with the blob digest, the image is rejected outright, since a mismatch would
+mean adopting a ChainID (and so a snapshot) its producer did not intend.
+For every other, applied layer, a missing annotation or `rootfs.diff_ids`
+entry falls back to the blob digest too, deferring to the differ's own
+digest check on the applied content instead of rejecting the image upfront.
+
+### Platform Selection
+
+Images that declare `os.features: ["erofs"]` on a manifest - typically an
+image index containing both a plain manifest and one built specifically for
+the EROFS image layer format specification for the same platform - are only
+ever selected when pulling with `--snapshotter erofs`: the EROFS snapshotter
+advertises a second platform for exactly that OS feature (alongside its
+plain default platform), which is what makes `client.Image.Unpack` willing
+to unpack such a manifest onto it in the first place. `ctr image pull` and
+`ctr run`/`create --snapshotter erofs` propagate that OS feature into which
+manifest is fetched: when an index contains both a plain and an
+`os.features: ["erofs"]` manifest for the requested platform, the one
+requiring "erofs" is preferred, and only its layers - never the plain
+manifest's - are fetched and unpacked.
+
+CRI pulls can request the same behavior per runtime handler via
+`runtime_platforms.<handler>.platform` in the CRI image plugin
+configuration:
+
+```toml
+[plugins."io.containerd.cri.v1.images".runtime_platforms.erofs-handler]
+  snapshotter = "erofs"
+  platform = "linux(+erofs)/amd64"
+```
+
+A pod using the `erofs-handler` runtime handler then pulls the
+`os.features: ["erofs"]` manifest variant (when present) using the `erofs`
+snapshotter, exactly as `ctr run --snapshotter erofs` does.
+
 ## Tar Index Mode
 
 The EROFS differ also supports a "tar index" mode that offers a unique approach
