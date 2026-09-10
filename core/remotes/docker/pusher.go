@@ -218,8 +218,8 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			}
 			if resp != nil {
 				switch resp.StatusCode {
-				case http.StatusUnauthorized:
-					log.G(ctx).Debugf("failed to mount from repository %s, not authorized", fromRepo)
+				case http.StatusUnauthorized, http.StatusForbidden:
+					log.G(ctx).Debugf("failed to mount from repository %s, not authorized (status %d)", fromRepo, resp.StatusCode)
 
 					resp.Body.Close()
 					resp = nil
