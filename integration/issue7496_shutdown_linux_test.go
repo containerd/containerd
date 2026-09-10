@@ -17,22 +17,31 @@
 package integration
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	apitask "github.com/containerd/containerd/api/runtime/task/v3"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/events"
 	ctrdruntime "github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/integration/images"
+	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/plugins"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -105,6 +114,13 @@ func TestKillShimPublishesTaskExitAndDeleteEvents(t *testing.T) {
 		require.NoError(t, runtimeService.RemovePodSandbox(sbID))
 	})
 
+	container, err := containerdClient.LoadContainer(ctx, sbID)
+	require.NoError(t, err)
+	task, err := container.Task(ctx, nil)
+	require.NoError(t, err)
+	sandboxPID := task.Pid()
+	require.NotZero(t, sandboxPID)
+
 	shimCli := connectToShim(ctx, t, containerdEndpoint, 3, sbID)
 	shimPID := shimPid(ctx, t, shimCli)
 
@@ -114,7 +130,27 @@ func TestKillShimPublishesTaskExitAndDeleteEvents(t *testing.T) {
 	)
 
 	require.NoError(t, syscall.Kill(int(shimPID), syscall.SIGKILL))
-	waitForTaskExitDeleteEvents(t, sbID, eventCh, eventErrCh, 10*time.Second)
+	gotEvents := waitForTaskExitDeleteEvents(t, sbID, eventCh, eventErrCh, 2, 10*time.Second)
+	wantEvents := []taskEvent{
+		{Exit: &eventtypes.TaskExit{
+			ContainerID: sbID,
+			ID:          sbID,
+			Pid:         sandboxPID,
+			ExitStatus:  uint32(128 + syscall.SIGKILL),
+		}},
+		{Delete: &eventtypes.TaskDelete{
+			ContainerID: sbID,
+			Pid:         sandboxPID,
+			ExitStatus:  uint32(128 + syscall.SIGKILL),
+		}},
+	}
+	if diff := cmp.Diff(wantEvents, gotEvents,
+		protocmp.Transform(),
+		protocmp.IgnoreFields(&eventtypes.TaskExit{}, "exited_at"),
+		protocmp.IgnoreFields(&eventtypes.TaskDelete{}, "exited_at"),
+	); diff != "" {
+		t.Fatalf("unexpected task events (-want +got):\n%s", diff)
+	}
 }
 
 // Regression test for https://github.com/containerd/containerd/issues/13293 (orphaned shim state after shim SIGKILL).
@@ -145,6 +181,13 @@ func TestKillShimPublishesTaskExitAndDeleteEventsForContainer(t *testing.T) {
 	t.Log("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cnID))
 
+	container, err := containerdClient.LoadContainer(ctx, cnID)
+	require.NoError(t, err)
+	task, err := container.Task(ctx, nil)
+	require.NoError(t, err)
+	workloadPID := task.Pid()
+	require.NotZero(t, workloadPID)
+
 	shimCli := connectToShim(ctx, t, containerdEndpoint, 3, sbID)
 	shimPID := shimPid(ctx, t, shimCli)
 
@@ -154,7 +197,28 @@ func TestKillShimPublishesTaskExitAndDeleteEventsForContainer(t *testing.T) {
 	)
 
 	require.NoError(t, syscall.Kill(int(shimPID), syscall.SIGKILL))
-	waitForTaskExitDeleteEvents(t, cnID, eventCh, eventErrCh, 10*time.Second)
+	gotEvents := waitForTaskExitDeleteEvents(t, cnID, eventCh, eventErrCh, 2, 10*time.Second)
+
+	wantEvents := []taskEvent{
+		{Exit: &eventtypes.TaskExit{
+			ContainerID: cnID,
+			ID:          cnID,
+			Pid:         workloadPID,
+			ExitStatus:  uint32(128 + syscall.SIGKILL),
+		}},
+		{Delete: &eventtypes.TaskDelete{
+			ContainerID: cnID,
+			Pid:         workloadPID,
+			ExitStatus:  uint32(128 + syscall.SIGKILL),
+		}},
+	}
+	if diff := cmp.Diff(wantEvents, gotEvents,
+		protocmp.Transform(),
+		protocmp.IgnoreFields(&eventtypes.TaskExit{}, "exited_at"),
+		protocmp.IgnoreFields(&eventtypes.TaskDelete{}, "exited_at"),
+	); diff != "" {
+		t.Fatalf("unexpected task events (-want +got):\n%s", diff)
+	}
 
 	// Wait for the container to exit and ensure it is fully cleaned up.
 	require.NoError(t, Eventually(func() (bool, error) {
@@ -169,22 +233,125 @@ func TestKillShimPublishesTaskExitAndDeleteEventsForContainer(t *testing.T) {
 	}, 1000*time.Millisecond, 30*time.Second))
 }
 
+func TestKillShimPreservesExitStatusForMultipleContainers(t *testing.T) {
+	const groupAnnotation = "io.containerd.runc.v2.group"
+
+	ctx := namespaces.WithNamespace(t.Context(), namespaces.Default)
+	cleanupCtx := namespaces.WithNamespace(context.Background(), namespaces.Default)
+	shimPath := filepath.Join(*buildDir, "containerd-shim-runc-v2")
+	require.FileExists(t, shimPath)
+
+	image, err := containerdClient.Pull(ctx, images.Get(images.BusyBox), containerd.WithPullUnpack)
+	require.NoError(t, err)
+
+	type testTask struct {
+		id         string
+		exitStatus uint32
+		task       containerd.Task
+		eventCh    <-chan *events.Envelope
+		eventErrCh <-chan error
+	}
+	groupID := t.Name()
+	newTask := func(id string, exitStatus uint32) testTask {
+		container, err := containerdClient.NewContainer(ctx, id,
+			containerd.WithNewSnapshot(id, image),
+			containerd.WithNewSpec(
+				oci.WithImageConfig(image),
+				oci.WithProcessArgs("sh", "-c", fmt.Sprintf("exit %d", exitStatus)),
+				oci.WithAnnotations(map[string]string{groupAnnotation: groupID}),
+			),
+			containerd.WithRuntime(plugins.RuntimeRuncV2, nil),
+		)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = container.Delete(cleanupCtx, containerd.WithSnapshotCleanup)
+		})
+
+		t.Logf("Use the shim built from the current source: %s", shimPath)
+		task, err := container.NewTask(ctx, cio.NullIO, containerd.WithRuntimePath(shimPath))
+		require.NoError(t, err)
+		require.NotZero(t, task.Pid())
+		t.Cleanup(func() {
+			_, _ = task.Delete(cleanupCtx, containerd.WithProcessKill)
+		})
+
+		eventCh, eventErrCh := containerdClient.EventService().Subscribe(ctx,
+			fmt.Sprintf(`topic=="%s",event.container_id=="%s"`, ctrdruntime.TaskExitEventTopic, id),
+			fmt.Sprintf(`topic=="%s",event.container_id=="%s"`, ctrdruntime.TaskDeleteEventTopic, id),
+		)
+		return testTask{id, exitStatus, task, eventCh, eventErrCh}
+	}
+	tasks := []testTask{
+		newTask("multi-container-exit-42", 42),
+		newTask("multi-container-exit-43", 43),
+	}
+
+	t.Log("Start two containers in the same shim with different exit statuses")
+	shimClient := connectToShim(ctx, t, containerdEndpoint, 3, groupID)
+	for _, tc := range tasks {
+		require.NoError(t, tc.task.Start(ctx))
+	}
+
+	checkEvents := func(tc testTask, afterShimExit bool) {
+		wantEvents := []taskEvent{{Exit: &eventtypes.TaskExit{
+			ContainerID: tc.id,
+			ID:          tc.id,
+			Pid:         tc.task.Pid(),
+			ExitStatus:  tc.exitStatus,
+		}}}
+		if afterShimExit {
+			wantEvents = append(wantEvents, taskEvent{Delete: &eventtypes.TaskDelete{
+				ContainerID: tc.id,
+				Pid:         tc.task.Pid(),
+				ExitStatus:  tc.exitStatus,
+			}})
+		}
+
+		gotEvents := waitForTaskExitDeleteEvents(t, tc.id, tc.eventCh, tc.eventErrCh, len(wantEvents), 10*time.Second)
+
+		if diff := cmp.Diff(wantEvents, gotEvents,
+			protocmp.Transform(),
+			protocmp.IgnoreFields(&eventtypes.TaskExit{}, "exited_at"),
+			protocmp.IgnoreFields(&eventtypes.TaskDelete{}, "exited_at"),
+		); diff != "" {
+			t.Fatalf("unexpected task events for %q (-want +got):\n%s", tc.id, diff)
+		}
+	}
+	for _, tc := range tasks {
+		checkEvents(tc, false)
+	}
+
+	t.Log("Kill the shared shim after both containers have exited")
+	shimProcess, err := os.FindProcess(int(shimPid(ctx, t, shimClient)))
+	require.NoError(t, err)
+	defer shimProcess.Release()
+
+	t.Log("Verify dead-shim cleanup preserves each container's exit status")
+	require.NoError(t, shimProcess.Signal(syscall.SIGKILL))
+	for _, tc := range tasks {
+		checkEvents(tc, true)
+	}
+}
+
+// taskEvent is either a task exit or delete event.
+type taskEvent struct {
+	Exit   *eventtypes.TaskExit
+	Delete *eventtypes.TaskDelete
+}
+
 func waitForTaskExitDeleteEvents(t *testing.T, id string,
-	ch <-chan *events.Envelope, errCh <-chan error, timeout time.Duration,
-) {
+	ch <-chan *events.Envelope, errCh <-chan error, eventCount int, timeout time.Duration,
+) []taskEvent {
 	t.Helper()
 
-	pending := map[string]struct{}{
-		ctrdruntime.TaskExitEventTopic:   {},
-		ctrdruntime.TaskDeleteEventTopic: {},
-	}
+	received := make([]taskEvent, 0, eventCount)
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
-	for len(pending) != 0 {
+	for len(received) < eventCount {
 		select {
 		case <-timer.C:
-			t.Fatalf("timed out waiting for task exit/delete events for %q", id)
+			t.Fatalf("timed out waiting for %d task exit/delete events for %q", eventCount, id)
 		case err, ok := <-errCh:
 			if !ok {
 				t.Fatalf("event subscription closed while waiting for %q", id)
@@ -193,9 +360,26 @@ func waitForTaskExitDeleteEvents(t *testing.T, id string,
 		case env, ok := <-ch:
 			require.True(t, ok, "event subscription closed while waiting for %q", id)
 			t.Logf("received event %q for %q", env.Topic, id)
-			delete(pending, env.Topic)
+
+			event, err := typeurl.UnmarshalAny(env.Event)
+			require.NoError(t, err, "failed to unmarshal event")
+
+			switch event := event.(type) {
+			case *eventtypes.TaskExit:
+				require.Equal(t, id, event.ContainerID)
+				require.NoError(t, event.GetExitedAt().CheckValid())
+				received = append(received, taskEvent{Exit: event})
+			case *eventtypes.TaskDelete:
+				require.Equal(t, id, event.ContainerID)
+				require.NoError(t, event.GetExitedAt().CheckValid())
+				received = append(received, taskEvent{Delete: event})
+			default:
+				t.Fatalf("unexpected task event type %T", event)
+			}
 		}
 	}
+
+	return received
 }
 
 // countTaskExitDeleteEventsUntilBarrier counts task exit and delete events for

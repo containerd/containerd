@@ -327,15 +327,38 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	}); err != nil {
 		log.G(ctx).WithError(err).Warn("failed to remove runc container")
 	}
+
+	// Use the time immediately after the forced runc deletion attempt as the
+	// fallback when no recorded exit time is available.
+	fallbackExitedAt := time.Now()
+
 	if err := mount.UnmountRecursive(filepath.Join(path, "rootfs"), 0); err != nil {
 		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
 	}
-	pid, err := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
-	if err != nil {
-		log.G(ctx).WithError(err).Warn("failed to read init pid file")
+
+	// Prefer the exit status recorded by the shim. The record may be unavailable
+	// for bundles created by older shims or if the shim terminated before writing it.
+	exitEvent, exitErr := runc.ReadExitStatus(path)
+	if exitErr == nil {
+		return shim.StopStatus{
+			ExitedAt:   exitEvent.Timestamp,
+			ExitStatus: exitEvent.Status,
+			Pid:        exitEvent.Pid,
+		}, nil
 	}
+
+	if !errors.Is(exitErr, os.ErrNotExist) {
+		log.G(ctx).WithError(exitErr).Warn("failed to read recorded exit status")
+	}
+
+	pid, pidErr := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
+	if pidErr != nil {
+		log.G(ctx).WithError(pidErr).Warn("failed to read init pid file")
+		pid = 0
+	}
+
 	return shim.StopStatus{
-		ExitedAt:   time.Now(),
+		ExitedAt:   fallbackExitedAt,
 		ExitStatus: 128 + int(unix.SIGKILL),
 		Pid:        pid,
 	}, nil
