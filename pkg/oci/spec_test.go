@@ -235,14 +235,14 @@ func TestWithCapabilityProfile(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "testing")
 
 	for _, tc := range []struct {
-		name       string
-		profile    string
-		wantNetRaw bool
-		wantErr    bool
+		name        string
+		profile     string
+		wantRemoved bool
+		wantErr     bool
 	}{
-		{name: "unset", profile: "", wantNetRaw: true},
-		{name: CapabilityProfileDefault, profile: CapabilityProfileDefault, wantNetRaw: true},
-		{name: CapabilityProfileReduced, profile: CapabilityProfileReduced, wantNetRaw: false},
+		{name: "unset", profile: "", wantRemoved: false},
+		{name: CapabilityProfileDefault, profile: CapabilityProfileDefault, wantRemoved: false},
+		{name: CapabilityProfileReduced, profile: CapabilityProfileReduced, wantRemoved: true},
 		{name: "bogus", profile: "bogus", wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -261,9 +261,11 @@ func TestWithCapabilityProfile(t *testing.T) {
 			if runtime.GOOS != "linux" {
 				return
 			}
-			hasNetRaw := capsContain(s.Process.Capabilities.Bounding, "CAP_NET_RAW")
-			if hasNetRaw != tc.wantNetRaw {
-				t.Errorf("CAP_NET_RAW presence = %v, want %v", hasNetRaw, tc.wantNetRaw)
+			for _, cap := range reducedCapsRemoved {
+				removed := !capsContain(s.Process.Capabilities.Bounding, cap)
+				if removed != tc.wantRemoved {
+					t.Errorf("%s removed = %v, want %v", cap, removed, tc.wantRemoved)
+				}
 			}
 		})
 	}
