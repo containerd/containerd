@@ -65,6 +65,8 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   signal (receive) peer={{.DaemonProfile}},
   # Container processes may send signals amongst themselves.
   signal (send,receive) peer={{.Name}},
+  # Exec sessions carry a stacked label on kernels with label stacking (>= 6.17).
+  signal (send,receive) peer="{{.Name}}//&unconfined",
 {{if .RootlessKit}}
   # https://github.com/containerd/nerdctl/issues/2730
   signal (receive) peer={{.RootlessKit}},
@@ -92,6 +94,7 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   # allow processes within the container to trace each other,
   # provided all other LSM and yama setting allow it.
   ptrace (trace,tracedby,read,readby) peer={{.Name}},
+  ptrace (trace,tracedby,read,readby) peer="{{.Name}}//&unconfined",
 }
 `
 
