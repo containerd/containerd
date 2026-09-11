@@ -72,7 +72,7 @@ func (c *criService) mutateImageMount(
 	snapshotter string,
 	sandboxID string,
 	platform imagespec.Platform,
-) (retErr error) {
+) error {
 	imageSpec := extraMount.GetImage()
 	if imageSpec == nil {
 		return nil
@@ -103,6 +103,9 @@ func (c *criService) mutateImageMount(
 	target := c.getImageVolumeHostPath(sandboxID, imageID)
 
 	// Already mounted in another container on the same pod
+	//
+	// TODO: Serialize image volume setup per target to avoid races between
+	// checking the mount and mounting it.
 	mounted, err := ensureImageVolumeMounted(target)
 	if err != nil {
 		return fmt.Errorf("failed to ensure %s is mounted: %w", target, err)
@@ -131,6 +134,10 @@ func (c *criService) mutateImageMount(
 		}
 
 		s := c.client.SnapshotService(snapshotter)
+
+		// Keep the snapshot on failure because the leased mount-manager
+		// activation can back-reference it. Sandbox cleanup and GC
+		// release both resources.
 		mounts, err := s.Prepare(ctx, target, chainID, snapshotOpts...)
 		if err != nil {
 			if errdefs.IsAlreadyExists(err) {
@@ -140,19 +147,41 @@ func (c *criService) mutateImageMount(
 		if err != nil {
 			return fmt.Errorf("failed to prepare for image volume %q: %w", ref, err)
 		}
-		defer func() {
-			if retErr != nil {
-				_ = s.Remove(ctx, target)
-			}
-		}()
 
 		err = os.MkdirAll(target, 0755)
 		if err != nil {
 			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 		}
 
+		id := fmt.Sprintf("cri-image-mount-%s", target)
+		activateOpts := []mount.ActivateOpt{
+			mount.WithLabels(map[string]string{
+				"containerd.io/gc.bref.snapshot." + snapshotter: target,
+			}),
+		}
+
+		mm := c.client.MountManager()
+		info, err := mm.Activate(ctx, id, mounts, activateOpts...)
+		if err == nil {
+			mounts = info.System
+		} else if errdefs.IsAlreadyExists(err) {
+			// Reuse an existing activation (e.g. after a restart or a
+			// previous failed attempt that left state behind).
+			info, err = mm.Info(ctx, id)
+			if err != nil {
+				return fmt.Errorf("failed to get activation info for %q: %w", target, err)
+			}
+			mounts = info.System
+		} else if !errdefs.IsNotImplemented(err) {
+			return fmt.Errorf("failed to activate mounts %q: %w", target, err)
+		}
+
 		mounts = addVolatileOptionOnImageVolumeMount(mounts)
+
 		if err := mount.All(mounts, target); err != nil {
+			if unmountErr := mount.UnmountAll(target, 0); unmountErr != nil {
+				log.G(ctx).WithError(unmountErr).Errorf("failed to unmount image volume component %q", target)
+			}
 			return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
 		}
 	}
