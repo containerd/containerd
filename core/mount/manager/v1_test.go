@@ -542,6 +542,68 @@ func TestV1GCRemove(t *testing.T) {
 	assert.True(t, errdefs.IsNotFound(err))
 }
 
+// TestV1Reconciled verifies that a v1 activation whose recorded mount
+// is not actually in effect is released by garbage collection even
+// when nothing asks for it to be removed.
+func TestV1Reconciled(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	mountC := new(atomic.Int32)
+	unmounts := new(atomic.Int32)
+	m, targetdir := mkTestManager(t, WithMountHandler("noop", &noopHandler{mounts: mountC, unmountAttempts: unmounts}))
+	mm := m.(*mountManager)
+
+	target := filepath.Join(targetdir, "1")
+	require.NoError(t, os.MkdirAll(target, 0700))
+
+	seedV1(t, mm.db, "test", v1Activation{
+		name:   "dead",
+		active: []v1Active{{typ: "noop", mp: filepath.Join(target, "0"), at: time.Now()}},
+	})
+	cc, err := m.(interface {
+		StartCollection(context.Context) (metadata.CollectionContext, error)
+	}).StartCollection(ctx)
+	require.NoError(t, err)
+	require.NoError(t, cc.Finish())
+
+	assert.Equal(t, int32(1), unmounts.Load())
+	_, err = os.Stat(target)
+	assert.True(t, os.IsNotExist(err))
+	_, err = m.Info(ctx, "dead")
+	assert.True(t, errdefs.IsNotFound(err))
+}
+
+// TestV1ReconciledIncomplete verifies that a v1 activation interrupted
+// before it ever completed, with no active bucket at all, is released
+// by reconciliation.
+func TestV1ReconciledIncomplete(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	m, _ := mkTestManager(t)
+	mm := m.(*mountManager)
+
+	seedV1(t, mm.db, "test", v1Activation{name: "gone", active: nil})
+
+	require.NoError(t, startCollection(t, m, ctx).Finish())
+
+	_, err := m.Info(ctx, "gone")
+	assert.True(t, errdefs.IsNotFound(err), "an incomplete v1 activation must be reconciled away, got %v", err)
+}
+
+// TestV1ReconciledEmptyActiveIsLive verifies that an active bucket
+// which exists but has no positions in it is treated as live, not
+// reconciled away like an activation with no active bucket at all.
+func TestV1ReconciledEmptyActiveIsLive(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	m, _ := mkTestManager(t)
+	mm := m.(*mountManager)
+
+	seedV1(t, mm.db, "test", v1Activation{name: "here", active: []v1Active{}})
+
+	require.NoError(t, startCollection(t, m, ctx).Finish())
+
+	_, err := m.Info(ctx, "here")
+	require.NoError(t, err, "an activation with an empty but present active bucket must not be reconciled away")
+}
+
 // TestV1GCBackRefKeepsAlive verifies that a v1 activation's own
 // gc.bref labels are honored by ActiveWithBackRefs.
 func TestV1GCBackRefKeepsAlive(t *testing.T) {
@@ -797,14 +859,19 @@ func TestV1AndV2IDsCanCollideNumerically(t *testing.T) {
 // "v1" bucket itself, completely unchanged.
 func TestV1NeverModified(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
-	m, _ := mkTestManager(t, WithMountHandler("noop", &noopHandler{mounts: new(atomic.Int32)}))
+	handler := &noopHandler{mounts: new(atomic.Int32)}
+	m, _ := mkTestManager(t, WithMountHandler("noop", handler))
 	mm := m.(*mountManager)
 
+	// Marked live on the handler: reconciliation must leave a
+	// still-mounted v1 activation alone.
+	mp := "/legacy/untouched"
+	handler.live = map[string]struct{}{mp: {}}
 	seedV1(t, mm.db, "test", v1Activation{
 		name:   "untouched",
 		lease:  "L",
 		labels: map[string]string{"containerd.io/gc.bref.container": "c1"},
-		active: []v1Active{{typ: "noop", mp: "/legacy/untouched", at: time.Now()}},
+		active: []v1Active{{typ: "noop", mp: mp, at: time.Now()}},
 	})
 
 	var before []byte

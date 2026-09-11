@@ -60,6 +60,8 @@ type mountedRecord struct {
 	mount mount.Mount
 	point string
 	at    *time.Time
+	// created is true when resolvePosition just minted this record.
+	created bool
 }
 
 // active returns the mounted record as an ActiveMount for reporting
@@ -283,7 +285,7 @@ func resolvePosition(tx *bolt.Tx, targetsName, namespace, name string, index int
 		return mountedRecord{}, err
 	}
 
-	return mountedRecord{id: id, mount: m, point: point, at: &start}, nil
+	return mountedRecord{id: id, mount: m, point: point, at: &start, created: true}, nil
 }
 
 // releaseMountedRecords drops the named activation's references from

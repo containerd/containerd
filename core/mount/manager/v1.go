@@ -278,42 +278,38 @@ type v1Released struct {
 }
 
 // v1ApplyRemoveNamespace deletes the v1 activations in namespace ns
-// marked for removal in removed, mirroring applyRemove's own v2 walk
-// in shape: every activation still in nsbkt afterward, not just the
-// ones this releases, has its mid collected, since the orphan
-// directory scan which runs once the caller's transaction commits
-// needs to know about every v1 activation which survives, not only
-// the ones touched here, to avoid mistaking a live one's directory
-// for one nothing references any more.
-//
-// A name in removed which does not name a v1 activation in this
-// namespace, whether because it never did or because it names a v2
-// one instead, is silently ignored: applyRemove calls this once per
-// namespace with the same removed set it uses for v2, rather than
-// sorting it into schemas first. A v1 and a v2 activation which
-// happen to share a name are unrelated resources, reachable at all
-// only via a rollback to a v1 binary and forward again.
-func v1ApplyRemoveNamespace(tx *bolt.Tx, ns string, nsbkt *bolt.Bucket, removed map[string]struct{}) (released []v1Released, remainingMids map[uint64]struct{}, err error) {
+// marked in removed or found no longer mounted, and returns the mid
+// of every v1 activation which survives.
+func v1ApplyRemoveNamespace(ctx context.Context, mm *mountManager, tx *bolt.Tx, ns string, nsbkt *bolt.Bucket, removed map[string]struct{}, mounted map[string]struct{}, haveMountTable bool) (released []v1Released, remainingMids map[uint64]struct{}, err error) {
 	remainingMids = map[uint64]struct{}{}
 	mbkt := nsbkt.Bucket(v1KeyMounts)
 	if mbkt == nil {
 		return nil, remainingMids, nil
 	}
 
-	// Collect first: releasing an activation writes to sibling
-	// buckets (its lease membership), which must not happen while a
-	// cursor is open over the mounts bucket.
-	var remove [][]byte
-	if len(removed) > 0 {
-		mc := mbkt.Cursor()
-		for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
-			if mv != nil {
-				continue
-			}
-			if _, ok := removed[string(mk)]; ok {
-				remove = append(remove, bytes.Clone(mk))
-			}
+	// Collected first, before any cursor-invalidating writes.
+	var remove, keep [][]byte
+	mc := mbkt.Cursor()
+	for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
+		if mv != nil {
+			continue
 		}
+		if _, ok := removed[string(mk)]; ok {
+			remove = append(remove, bytes.Clone(mk))
+			continue
+		}
+		// Not marked for removal by the caller; reconcile it against
+		// the mount table snapshot regardless, the same as applyRemove
+		// does for v2 (see reconcile.go).
+		live, lerr := v1ActivationLive(ctx, mm, mbkt.Bucket(mk), mounted, haveMountTable)
+		if lerr != nil {
+			return nil, nil, lerr
+		}
+		if !live {
+			remove = append(remove, bytes.Clone(mk))
+			continue
+		}
+		keep = append(keep, bytes.Clone(mk))
 	}
 
 	for _, mk := range remove {
@@ -326,13 +322,7 @@ func v1ApplyRemoveNamespace(tx *bolt.Tx, ns string, nsbkt *bolt.Bucket, removed 
 		}
 	}
 
-	// Whatever is left was not marked for removal and survives;
-	// collect its mid for the orphan directory scan to exclude.
-	mc := mbkt.Cursor()
-	for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
-		if mv != nil {
-			continue
-		}
+	for _, mk := range keep {
 		remainingMids[v1ReadID(mbkt.Bucket(mk))] = struct{}{}
 	}
 
