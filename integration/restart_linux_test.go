@@ -30,7 +30,7 @@ import (
 )
 
 func TestContainerdRestartSandboxRecover(t *testing.T) {
-	if *runtimeHandler == "runsc" {
+	if runtimeHandlerIsRunsc() {
 		t.Skip("runsc sandboxes do not survive containerd restart; state recovery is not supported")
 	}
 	sbStatuses := map[string]runtime.PodSandboxState{

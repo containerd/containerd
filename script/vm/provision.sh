@@ -34,6 +34,7 @@ containerd_dir="$(cd -- "${script_dir}/../.." > /dev/null 2>&1; pwd -P)"
 
 : "${GO_VERSION:=1.27.1}"
 : "${RUNC_FLAVOR:=runc}"
+: "${TEST_RUNTIME:=}"
 : "${CGROUP_DRIVER:=}"
 : "${SELINUX:=Enforcing}"
 : "${INSTALL_PACKAGES:=}"
@@ -81,21 +82,17 @@ fi
 
 cd "${containerd_dir}"
 
-if [[ "${RUNC_FLAVOR}" == "runsc" ]]; then
-	# runsc cannot act as a drop-in replacement for runc; install it separately
-	# alongside runc so that the default runc handler still works for the VM tests
-	# that don't use a custom runtime handler.
+if [[ "${TEST_RUNTIME}" == "io.containerd.runsc.v1" ]]; then
+	# runsc is not a drop-in replacement for runc; install it alongside runc
+	# so that the default runc handler still works for other VM test steps.
 	script/setup/install-runsc
 	type runsc
 	runsc --version
 	type containerd-shim-runsc-v1
 	chcon -v -t container_runtime_exec_t /usr/local/sbin/runsc /usr/local/sbin/gvisor-bin/* /usr/local/bin/containerd-shim-runsc-v1
-	# Also install runc itself so the default handler is available
-	RUNC_FLAVOR=runc script/setup/install-runc
-else
-	# Install runc (pass RUNC_FLAVOR=crun to install crun as runc)
-	RUNC_FLAVOR="${RUNC_FLAVOR}" script/setup/install-runc
 fi
+# Install runc (pass RUNC_FLAVOR=crun to install crun as runc)
+RUNC_FLAVOR="${RUNC_FLAVOR}" script/setup/install-runc
 type runc
 runc --version
 # "type -ap" may print the same file under multiple names, e.g., on
@@ -134,6 +131,6 @@ SELINUX="${SELINUX}" script/setup/config-selinux
 script/setup/config-containerd
 
 # Append the runsc runtime handler to /etc/containerd/config.toml when requested
-if [[ "${RUNC_FLAVOR}" == "runsc" ]]; then
+if [[ "${TEST_RUNTIME}" == "io.containerd.runsc.v1" ]]; then
 	CGROUP_DRIVER="${CGROUP_DRIVER}" script/setup/config-containerd-runsc
 fi

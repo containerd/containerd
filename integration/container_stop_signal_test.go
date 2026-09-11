@@ -33,7 +33,7 @@ func TestContainerStopSignals(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipped on Windows.")
 	}
-	if *runtimeHandler == "runsc" {
+	if runtimeHandlerIsRunsc() {
 		t.Skip("runsc does not support host network")
 	}
 
@@ -133,7 +133,7 @@ func TestDefaultContainerStopSignal(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipped on Windows.")
 	}
-	if *runtimeHandler == "runsc" {
+	if runtimeHandlerIsRunsc() {
 		t.Skip("runsc does not support host network")
 	}
 

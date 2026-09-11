@@ -29,7 +29,7 @@ script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 containerd_dir="$(cd -- "${script_dir}/../.." > /dev/null 2>&1; pwd -P)"
 
 export CGROUP_DRIVER="${CGROUP_DRIVER:-}"
-export RUNC_FLAVOR="${RUNC_FLAVOR:-runc}"
+export TEST_RUNTIME="${TEST_RUNTIME:-}"
 export GOTEST="${GOTEST:-go test}"
 export GITHUB_WORKSPACE="${GITHUB_WORKSPACE:-}"
 
@@ -60,12 +60,12 @@ cd "${containerd_dir}"
 make BUILDTAGS="seccomp selinux no_btrfs no_devmapper no_zfs" binaries bin/cri-integration.test
 chcon -v -t container_runtime_exec_t ./bin/{containerd,containerd-shim*}
 
-if [[ "${RUNC_FLAVOR}" == "runsc" ]]; then
-	# runsc requires its own shim and a named runtime handler; it cannot act as
-	# a drop-in replacement for runc.  utils.sh only wires CONTAINERD_RUNTIME
-	# into the runc handler stanza — it has no knowledge of RUNC_FLAVOR=runsc.
-	# Build the full config ourselves and hand it to cri-integration.sh via
-	# CONTAINERD_CONFIG_FILE so that utils.sh skips its own config generation.
+if [[ "${TEST_RUNTIME}" == "io.containerd.runsc.v1" ]]; then
+	# runsc requires its own shim and a named runtime handler.  utils.sh only
+	# wires CONTAINERD_RUNTIME into the runc handler stanza — it has no
+	# knowledge of TEST_RUNTIME=io.containerd.runsc.v1.  Build the full config
+	# ourselves and hand it to cri-integration.sh via CONTAINERD_CONFIG_FILE
+	# so that utils.sh skips its own config generation.
 	runsc_config=$(mktemp /tmp/containerd-config-runsc-XXXXXX.toml)
 
 	cat >"${runsc_config}" <<EOF

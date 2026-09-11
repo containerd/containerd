@@ -134,7 +134,7 @@ func TestImageVolumeBasic(t *testing.T) {
 				if !selinux.GetEnabled() {
 					t.Skip("SELinux is not enabled")
 				}
-				if *runtimeHandler == "runsc" {
+				if runtimeHandlerIsRunsc() {
 					t.Skip("runsc does not support SELinux labels in the OCI spec")
 				}
 			}
@@ -361,7 +361,7 @@ func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {
 }
 
 func TestImageVolumeWithUserNamespace(t *testing.T) {
-	if *runtimeHandler == "runsc" {
+	if runtimeHandlerIsRunsc() {
 		t.Skip("runsc does not support host user namespaces")
 	}
 	// Check if user namespace and idmap are supported

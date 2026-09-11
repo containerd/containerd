@@ -28,7 +28,7 @@ import (
 )
 
 func TestPrivilegedContainerCgroupMountOptions(t *testing.T) {
-	if *runtimeHandler == "runsc" {
+	if runtimeHandlerIsRunsc() {
 		t.Skip("Privileged containers are not supported by runsc")
 	}
 	if cgroups.Mode() != cgroups.Unified {

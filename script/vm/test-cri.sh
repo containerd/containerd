@@ -29,7 +29,7 @@ script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 containerd_dir="$(cd -- "${script_dir}/../.." > /dev/null 2>&1; pwd -P)"
 
 : "${CGROUP_DRIVER:=}"
-: "${RUNC_FLAVOR:=runc}"
+: "${TEST_RUNTIME:=}"
 : "${REPORT_DIR:=}"
 
 export GOPATH="${GOPATH:-/go}"
@@ -73,7 +73,7 @@ skip_tests=(
 if [[ $CGROUP_DRIVER == "systemd" ]]; then
 	skip_tests+=("should terminate with exitCode 137 and reason OOMKilled")
 fi
-if [[ $RUNC_FLAVOR == "runsc" ]]; then
+if [[ $TEST_RUNTIME == "io.containerd.runsc.v1" ]]; then
 	# gVisor does not support: host networking, privileged containers, SELinux,
 	# host PID/IPC namespaces, cgroup memory limits (OOMKilled), sysctls,
 	# rshared/non-recursive-readonly mount semantics, NET_ADMIN capability

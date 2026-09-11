@@ -154,7 +154,7 @@ func isSwapLikelyEnabled() bool {
 }
 
 func TestUpdateContainerResources_MemorySwap(t *testing.T) {
-	if *runtimeHandler == "runsc" {
+	if runtimeHandlerIsRunsc() {
 		t.Skip("runsc does not implement cgroup memory swap limits")
 	}
 	if !isSwapLikelyEnabled() {
@@ -229,7 +229,7 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 }
 
 func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
-	if *runtimeHandler == "runsc" {
+	if runtimeHandlerIsRunsc() {
 		t.Skip("runsc does not implement cgroup memory limits")
 	}
 	t.Log("Create a sandbox")
@@ -312,7 +312,7 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 }
 
 func TestUpdateContainerResources_StatusUpdated(t *testing.T) {
-	if *runtimeHandler == "runsc" {
+	if runtimeHandlerIsRunsc() {
 		t.Skip("runsc does not implement cgroup memory limits")
 	}
 	t.Log("Create a sandbox")

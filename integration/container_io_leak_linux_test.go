@@ -33,6 +33,9 @@ func TestContainerIOLeakAfterStartFailed(t *testing.T) {
 	if f := os.Getenv("RUNC_FLAVOR"); f != "" && f != "runc" {
 		t.Skip("test requires runc")
 	}
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc uses a grouped shim model; per-sandbox shim socket is not available")
+	}
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-io-leak-after-start-failed")
 	testImage := images.Get(images.BusyBox)

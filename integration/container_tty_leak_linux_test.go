@@ -35,7 +35,7 @@ import (
 )
 
 func TestContainerTTYLeakAfterExit(t *testing.T) {
-	if *runtimeHandler == "runsc" {
+	if runtimeHandlerIsRunsc() {
 		t.Skip("runsc uses grouped shims; direct shim socket connection is not supported")
 	}
 	t.Log("Create a sandbox")
