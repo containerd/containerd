@@ -65,6 +65,9 @@ func TestPodHostname(t *testing.T) {
 			if test.needsHostNetwork && goruntime.GOOS == "windows" {
 				t.Skip("Skipped on Windows.")
 			}
+			if test.needsHostNetwork && *runtimeHandler == "runsc" {
+				t.Skip("runsc does not support host network")
+			}
 			testPodLogDir := t.TempDir()
 
 			opts := append(test.opts, WithPodLogDirectory(testPodLogDir))

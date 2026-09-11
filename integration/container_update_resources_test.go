@@ -154,6 +154,9 @@ func isSwapLikelyEnabled() bool {
 }
 
 func TestUpdateContainerResources_MemorySwap(t *testing.T) {
+	if *runtimeHandler == "runsc" {
+		t.Skip("runsc does not implement cgroup memory swap limits")
+	}
 	if !isSwapLikelyEnabled() {
 		t.Skipf("Swap or swap accounting are not enabled. Swap is required for this test")
 		return
@@ -226,6 +229,9 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 }
 
 func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
+	if *runtimeHandler == "runsc" {
+		t.Skip("runsc does not implement cgroup memory limits")
+	}
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 
@@ -306,6 +312,9 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 }
 
 func TestUpdateContainerResources_StatusUpdated(t *testing.T) {
+	if *runtimeHandler == "runsc" {
+		t.Skip("runsc does not implement cgroup memory limits")
+	}
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 

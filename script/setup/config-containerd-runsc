@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+#
+# Appends a runsc (gVisor) runtime handler to /etc/containerd/config.toml
+# and makes it the default CRI runtime.
+# Must be called after script/setup/config-containerd.
+#
+set -eux -o pipefail
+
+: "${CGROUP_DRIVER:=}"
+
+systemd_cgroup=false
+if [[ "${CGROUP_DRIVER}" == "systemd" ]]; then
+	systemd_cgroup=true
+fi
+
+# config-containerd has already written [plugins."io.containerd.grpc.v1.cri"] with
+# enable_selinux derived from the host SELinux mode.  Patch it to false in-place
+# rather than redeclaring the table (duplicate table headers are invalid TOML).
+# gVisor does not support SELinux labels in the OCI spec.
+sudo sed -i 's/^\(\s*enable_selinux\s*=\s*\).*/\1false/' /etc/containerd/config.toml
+
+# Ensure [plugins."io.containerd.grpc.v1.cri".containerd] sets default_runtime_name
+# to "runsc".  Append the whole table if absent; update the value in-place if the
+# key is present with a different value; insert the key if the table exists without it.
+if ! sudo grep -qF '[plugins."io.containerd.grpc.v1.cri".containerd]' /etc/containerd/config.toml 2>/dev/null; then
+	cat << 'EOF' | sudo tee -a /etc/containerd/config.toml
+
+[plugins."io.containerd.grpc.v1.cri".containerd]
+  default_runtime_name = "runsc"
+EOF
+elif sudo grep -qF 'default_runtime_name' /etc/containerd/config.toml 2>/dev/null; then
+	# Key exists — update its value to "runsc" regardless of what it is now.
+	sudo sed -i 's/^\(\s*default_runtime_name\s*=\s*\).*/\1"runsc"/' /etc/containerd/config.toml
+else
+	# Table exists but key is absent — insert it immediately after the table header.
+	sudo sed -i '/^\s*\[plugins\."io\.containerd\.grpc\.v1\.cri"\.containerd\]\s*$/a\  default_runtime_name = "runsc"' /etc/containerd/config.toml
+fi
+
+# Ensure [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc] is present
+# with the correct runtime_type.  Append if absent; update runtime_type if wrong.
+if ! sudo grep -qF '[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]' /etc/containerd/config.toml 2>/dev/null; then
+	cat << 'EOF' | sudo tee -a /etc/containerd/config.toml
+
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+  runtime_type = "io.containerd.runsc.v1"
+EOF
+else
+	# Table exists — ensure runtime_type is set correctly within it, scoped to
+	# the runsc table only to avoid touching other handlers.
+	sudo python3 - /etc/containerd/config.toml << 'PYEOF'
+import sys, re
+
+path = sys.argv[1]
+with open(path) as f:
+    content = f.read()
+
+runsc_header = '[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]'
+sections = re.split(r'(?m)^(?=\[)', content)
+new_sections = []
+for sec in sections:
+    if sec.split('\n', 1)[0].strip() == runsc_header:
+        if re.search(r'^\s*runtime_type\s*=', sec, re.MULTILINE):
+            sec = re.sub(r'(?m)^\s*runtime_type\s*=.*',
+                         '  runtime_type = "io.containerd.runsc.v1"', sec)
+        else:
+            sec = sec.replace(runsc_header,
+                              runsc_header + '\n  runtime_type = "io.containerd.runsc.v1"', 1)
+    new_sections.append(sec)
+
+with open(path, 'w') as f:
+    f.write(''.join(new_sections))
+PYEOF
+fi
+
+# Ensure [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc.options] has
+# SystemdCgroup in sync with CGROUP_DRIVER.  This keeps getCgroupDriverFromRuntimeHandlerOpts
+# reporting the correct driver and ensures ConfigBody is non-empty (preventing fallback to
+# host auto-detection).
+#
+# Use a Python one-liner for the update so we can scope the replacement to the runsc
+# options table only, avoiding false matches on other handlers' SystemdCgroup settings.
+update_systemd_cgroup() {
+	sudo python3 - /etc/containerd/config.toml "${systemd_cgroup}" << 'PYEOF'
+import sys, re
+
+path, value = sys.argv[1], sys.argv[2]
+with open(path) as f:
+    content = f.read()
+
+options_header = '[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc.options]'
+if options_header not in content:
+    # Append the whole options table.
+    content += f'\n{options_header}\n  SystemdCgroup = {value}\n'
+else:
+    # Find the options table and update or insert SystemdCgroup within it.
+    # Split into sections on lines that start a new TOML table ([...]).
+    sections = re.split(r'(?m)^(?=\[)', content)
+    new_sections = []
+    for sec in sections:
+        if sec.startswith(options_header):
+            if re.search(r'^\s*SystemdCgroup\s*=', sec, re.MULTILINE):
+                sec = re.sub(r'(?m)^\s*SystemdCgroup\s*=.*',
+                             f'  SystemdCgroup = {value}', sec)
+            else:
+                # Insert after the header line.
+                sec = sec.replace(options_header,
+                                  options_header + f'\n  SystemdCgroup = {value}', 1)
+        new_sections.append(sec)
+    content = ''.join(new_sections)
+
+with open(path, 'w') as f:
+    f.write(content)
+PYEOF
+}
+update_systemd_cgroup
+
+# Always (re-)write the runsc shim config file.  containerd-shim-runsc-v1
+# does not read SystemdCgroup from the containerd options table; it reads its
+# own config from well-known paths (searched in order):
+#   /run/containerd/runsc/config.toml
+#   /etc/containerd/runsc/config.toml
+# The cgroup driver is controlled by [runsc_config] systemd-cgroup.
+# Note: RunscConfig is map[string]string so the value must be a quoted TOML string.
+sudo mkdir -p /etc/containerd/runsc
+cat << EOF | sudo tee /etc/containerd/runsc/config.toml
+
+[runsc_config]
+  systemd-cgroup = "${systemd_cgroup}"
+EOF

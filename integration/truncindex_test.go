@@ -31,6 +31,9 @@ func genTruncIndex(normalName string) string {
 }
 
 func TestTruncIndex(t *testing.T) {
+	if *runtimeHandler == "runsc" {
+		t.Skip("runsc does not implement cgroup memory limits")
+	}
 	sbConfig := PodSandboxConfig("sandbox", "truncindex")
 
 	t.Logf("Pull an image")

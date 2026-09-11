@@ -43,6 +43,9 @@ import (
 //
 // NOTE: https://github.com/containerd/containerd/issues/8931 is the same issue.
 func TestIssue7496(t *testing.T) {
+	if *runtimeHandler == "runsc" {
+		t.Skip("runsc does not use host umount2; strace injection does not apply")
+	}
 	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
 
 	t.Logf("Create a pod config and run sandbox container")

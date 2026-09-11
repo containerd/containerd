@@ -21,9 +21,11 @@ import (
 	"sort"
 
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
+	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/systemd"
 	"github.com/containerd/log"
+	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -72,11 +74,28 @@ func (c *criService) getCgroupDriver(ctx context.Context) runtime.CgroupDriver {
 func getCgroupDriverFromRuntimeHandlerOpts(opts any) (runtime.CgroupDriver, bool) {
 	switch v := opts.(type) {
 	case *runcoptions.Options:
-		systemdCgroup := v.SystemdCgroup
-		if systemdCgroup {
+		if v.SystemdCgroup {
 			return runtime.CgroupDriver_SYSTEMD, true
 		}
 		return runtime.CgroupDriver_CGROUPFS, true
+	case *runtimeoptions.Options:
+		// Generic shims (e.g. io.containerd.runsc.v1) carry their options as
+		// raw TOML in ConfigBody.  Decode just the SystemdCgroup key so that
+		// runtimes like gVisor can signal their cgroup driver the same way runc
+		// does, without requiring a dedicated options type.
+		// Use *bool so that an absent key (nil) is distinguished from an
+		// explicit false; only return a driver when the key is present.
+		if len(v.ConfigBody) > 0 {
+			var genericOpts struct {
+				SystemdCgroup *bool `toml:"SystemdCgroup"`
+			}
+			if err := toml.Unmarshal(v.ConfigBody, &genericOpts); err == nil && genericOpts.SystemdCgroup != nil {
+				if *genericOpts.SystemdCgroup {
+					return runtime.CgroupDriver_SYSTEMD, true
+				}
+				return runtime.CgroupDriver_CGROUPFS, true
+			}
+		}
 	}
-	return runtime.CgroupDriver_SYSTEMD, false
+	return runtime.CgroupDriver_CGROUPFS, false
 }

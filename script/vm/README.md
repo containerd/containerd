@@ -33,8 +33,10 @@ limactl delete -f default
 
 ## Environment variables
 
-- `provision.sh`: `GO_VERSION`, `RUNC_FLAVOR` (`runc` or `crun`), `SELINUX`
+- `provision.sh`: `GO_VERSION`, `RUNC_FLAVOR` (`runc`, `crun`, or `runsc`),
+  `CGROUP_DRIVER` (empty, `cgroupfs`, or `systemd`; used when `RUNC_FLAVOR=runsc`), `SELINUX`
   (`Enforcing`, `Permissive`, or `Disabled`), `INSTALL_PACKAGES`
 - `test-integration.sh`: `RUNC_FLAVOR`
-- `test-cri-integration.sh`: `CGROUP_DRIVER` (empty or `systemd`), `RUNC_FLAVOR`
-- `test-cri.sh`: `CGROUP_DRIVER` (empty or `systemd`), `REPORT_DIR`
+- `test-cri-integration.sh`: `CGROUP_DRIVER` (empty, `cgroupfs`, or `systemd`), `RUNC_FLAVOR`
+  (`runc`, `crun`, or `runsc`)
+- `test-cri.sh`: `CGROUP_DRIVER` (empty, `cgroupfs`, or `systemd`), `RUNC_FLAVOR`, `REPORT_DIR`
