@@ -52,6 +52,15 @@ func (loopbackHandler) Mount(ctx context.Context, m Mount, mp string, _ []Active
 	}
 	defer loop.Close()
 
+	// A stale symlink from an earlier, no longer live mount may already
+	// be at mp (see Mounted); os.Symlink fails with EEXIST otherwise.
+	// Remove it first, but only if it really is a symlink.
+	if fi, err := os.Lstat(mp); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		if err := os.Remove(mp); err != nil {
+			return ActiveMount{}, err
+		}
+	}
+
 	if err := os.Symlink(loop.Name(), mp); err != nil {
 		return ActiveMount{}, err
 	}
