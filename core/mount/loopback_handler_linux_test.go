@@ -55,3 +55,45 @@ func TestLoopbackUnmountToleratesDetachedDevice(t *testing.T) {
 	_, err = os.Lstat(mp)
 	assert.True(t, os.IsNotExist(err), "the symlink must still be removed even though the device it pointed at was already gone")
 }
+
+// TestLoopbackMountRepairsStaleSymlink verifies that Mount can repair
+// a record found not live: a symlink left at mp from an earlier mount
+// whose device was detached must not make a fresh Mount at the same
+// point fail with EEXIST.
+func TestLoopbackMountRepairsStaleSymlink(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	td := t.TempDir()
+	mp := filepath.Join(td, "mp")
+	h := LoopbackHandler()
+
+	first := createTempFile(t)
+	_, err := h.Mount(context.Background(), Mount{Type: "loop", Source: first}, mp, nil)
+	require.NoError(t, err)
+
+	loopdev, err := os.Readlink(mp)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		// Best effort.
+		_ = DetachLoopDevice(loopdev)
+	})
+	require.NoError(t, DetachLoopDevice(loopdev))
+
+	live, err := h.(MountedChecker).Mounted(context.Background(), mp)
+	require.NoError(t, err)
+	require.False(t, live, "the stale symlink must be reported as not mounted")
+
+	second := createTempFile(t)
+	_, err = h.Mount(context.Background(), Mount{Type: "loop", Source: second}, mp, nil)
+	require.NoError(t, err, "repairing a stale symlink must not fail with EEXIST")
+
+	newLoopdev, err := os.Readlink(mp)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		// Best effort.
+		_ = DetachLoopDevice(newLoopdev)
+	})
+	assert.NotEqual(t, loopdev, newLoopdev, "repair must point the symlink at a new device")
+
+	require.NoError(t, h.Unmount(context.Background(), mp))
+}
