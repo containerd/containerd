@@ -28,8 +28,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
+	"github.com/moby/sys/mountinfo"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/containerd/errdefs"
@@ -88,9 +90,19 @@ func NewManager(db *bolt.DB, targetDir string, opts ...Opt) (mount.Manager, erro
 	if err := os.MkdirAll(targetDir, 0700); err != nil {
 		return nil, err
 	}
+	// Resolved so it matches the canonical paths the host mount table
+	// reports.
+	targetDir, err := filepath.EvalSymlinks(targetDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve target root %q: %w", targetDir, err)
+	}
 	tr, err := os.OpenRoot(targetDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open target root %q: %w", targetDir, err)
+	}
+	if err := tr.Mkdir(backingDir, 0700); err != nil && !os.IsExist(err) {
+		tr.Close()
+		return nil, fmt.Errorf("failed to create backing dir under %q: %w", targetDir, err)
 	}
 	rootMap := map[string]*os.Root{
 		tr.Name(): tr,
@@ -105,17 +117,30 @@ func NewManager(db *bolt.DB, targetDir string, opts ...Opt) (mount.Manager, erro
 		handlers: options.handlers,
 		rootMap:  rootMap,
 		activate: kmutex.New(),
+		mounting: kmutex.New(),
 	}, nil
 }
 
+// boltDB is the subset of *bolt.DB the manager uses.
+type boltDB interface {
+	Update(func(*bolt.Tx) error) error
+	View(func(*bolt.Tx) error) error
+	Begin(writable bool) (*bolt.Tx, error)
+	Close() error
+}
+
 type mountManager struct {
-	db       *bolt.DB
+	db       boltDB
 	targets  *os.Root
 	handlers map[string]mount.Handler
 	rootMap  map[string]*os.Root
 
 	rwlock   sync.RWMutex
 	activate kmutex.KeyedLocker
+	// mounting serializes resolution and mounting of activations which
+	// resolve to the same mount, keyed by mount identity, so that only
+	// one of them performs the underlying mount.
+	mounting kmutex.KeyedLocker
 }
 
 func (mm *mountManager) Close() error {
@@ -129,19 +154,24 @@ func (mm *mountManager) Close() error {
 	return errors.Join(errs...)
 }
 
+// activationKey combines a namespace and an activation name into one
+// key for mm.activate.
+func activationKey(namespace, name string) string {
+	return namespace + "|" + name
+}
+
 func (mm *mountManager) Activate(ctx context.Context, name string, mounts []mount.Mount, opts ...mount.ActivateOpt) (info mount.ActivationInfo, retErr error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return mount.ActivationInfo{}, err
 	}
 
-	// Serialize concurrent activations of the same name to prevent a
-	// racing Activate from misidentifying an in-progress activation as
-	// a stale record and destroying it.
-	if err := mm.activate.Lock(ctx, name); err != nil {
+	// Serializes with a concurrent Activate or Deactivate of the same name.
+	key := activationKey(namespace, name)
+	if err := mm.activate.Lock(ctx, key); err != nil {
 		return mount.ActivationInfo{}, err
 	}
-	defer mm.activate.Unlock(name)
+	defer mm.activate.Unlock(key)
 
 	log.G(ctx).WithField("name", name).WithField("mounts", mounts).Debugf("activating mount")
 
@@ -151,6 +181,10 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	for _, opt := range opts {
 		opt(&config)
 	}
+
+	// Transformers rewrite mounts in place; operate on a copy so the
+	// caller's own slice is untouched.
+	mounts = slices.Clone(mounts)
 
 	transforms := map[string]mount.Transformer{
 		"format": mountFormatter{},
@@ -172,46 +206,70 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	if firstSystemMount == -1 {
 		return mount.ActivationInfo{}, errdefs.ErrNotImplemented
 	}
+	if firstSystemMount > maxMounts {
+		return mount.ActivationInfo{}, fmt.Errorf("too many mounts (%d): maximum %d: %w", firstSystemMount, maxMounts, errdefs.ErrInvalidArgument)
+	}
 
 	// Get read lock to block GC context from starting
 	mm.rwlock.RLock()
 	defer mm.rwlock.RUnlock()
 
-	var mid uint64
-	var staleMID uint64
+	found, isV1, live, err := mm.staleCollision(ctx, namespace, name)
+	if err != nil {
+		return mount.ActivationInfo{}, err
+	}
+	if found && live {
+		return mount.ActivationInfo{}, fmt.Errorf("mount %q: %w", name, errdefs.ErrAlreadyExists)
+	}
+
+	var (
+		mid uint64
+		// Records released while replacing a stale v2 activation;
+		// unmounted once the transaction below commits.
+		staleRecords []mountedRecord
+		// Set while replacing a stale v1 activation; unmounted once
+		// the transaction below commits.
+		staleV1 *v1Released
+
+		// Populated while resolving the chain below, for the realize
+		// step which follows the transaction.
+		records         = make([]mountedRecord, firstSystemMount)
+		posEnsures      = make([][]deferredEnsure, firstSystemMount)
+		boundaryEnsures []deferredEnsure
+		system          []mount.Mount
+	)
 
 	if err := mm.db.Update(func(tx *bolt.Tx) error {
-		v1bkt, err := tx.CreateBucketIfNotExists([]byte("v1"))
+		v2bkt, err := tx.CreateBucketIfNotExists(bucketKeyV2)
 		if err != nil {
 			return err
 		}
 
-		nsbkt, err := v1bkt.CreateBucketIfNotExists([]byte(namespace))
+		nsbkt, err := v2bkt.CreateBucketIfNotExists([]byte(namespace))
 		if err != nil {
 			return err
 		}
-		mbkt, err := nsbkt.CreateBucketIfNotExists(bucketKeyMounts)
+		mbkt, err := nsbkt.CreateBucketIfNotExists(bucketKeyActivations)
 		if err != nil {
 			return err
 		}
+
+		if isV1 {
+			positions, v1mid, releasedV1, err := v1Release(tx, namespace, name)
+			if err != nil {
+				return err
+			}
+			if releasedV1 {
+				staleV1 = &v1Released{positions: positions, mid: v1mid}
+			}
+		}
+
 		bkt, err := mbkt.CreateBucket([]byte(name))
 		if err != nil {
 			existing := mbkt.Bucket([]byte(name))
 			if existing == nil {
 				return err
 			}
-			// If the mount is fully activated, return already exists
-			// so the caller can reuse the existing mount.
-			if existing.Bucket(bucketKeyActive) != nil {
-				return fmt.Errorf("mount %q: %w", name, errdefs.ErrAlreadyExists)
-			}
-			// The mount bucket exists but was never fully activated
-			// (e.g., process crashed between creating the bucket and
-			// completing activation). Clean up the stale entry and
-			// proceed with a fresh activation. Save the old mount ID
-			// so the target directory can be cleaned up after the
-			// transaction commits.
-			staleMID = readID(existing)
 			if lid := existing.Get(bucketKeyLease); len(lid) > 0 {
 				if lsbkt := nsbkt.Bucket(bucketKeyLeases); lsbkt != nil {
 					if lbkt := lsbkt.Bucket(lid); lbkt != nil {
@@ -220,6 +278,10 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 						}
 					}
 				}
+			}
+			staleRecords, err = releaseMountedRecords(tx, namespace, name, activationUses(existing))
+			if err != nil {
+				return err
 			}
 			if err := mbkt.DeleteBucket([]byte(name)); err != nil {
 				return err
@@ -230,7 +292,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			}
 		}
 
-		mid, err = v1bkt.NextSequence()
+		mid, err = v2bkt.NextSequence()
 		if err != nil {
 			return err
 		}
@@ -269,44 +331,112 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			}
 		}
 
-		// TODO: Store mount information including mountpoint
-		// Setup mounts now with generated targets
+		var resolvedActive []mount.ActiveMount
+		for i, m := range mounts[:firstSystemMount] {
+			var chain []mount.Transformer
+			if mountConv != nil {
+				chain = mountConv[i]
+			}
+			rewritten, ensures, err := rewritePosition(ctx, chain, m, resolvedActive)
+			if err != nil {
+				return err
+			}
+			// A position with no Handler is mounted, probed, and
+			// unmounted at its own point, never Target's join of it.
+			if handlers[i] == nil && rewritten.Target != "" {
+				return fmt.Errorf("mount %d: target %q not supported without a handler: %w", i, rewritten.Target, errdefs.ErrInvalidArgument)
+			}
+			mounts[i] = rewritten
+			posEnsures[i] = ensures
+
+			rec, err := resolvePosition(tx, mm.targets.Name(), namespace, name, i, rewritten, start)
+			if err != nil {
+				return err
+			}
+			records[i] = rec
+			resolvedActive = append(resolvedActive, rec.active())
+		}
+
+		system = mounts[firstSystemMount:]
+		if mountConv != nil && firstSystemMount < len(mounts) {
+			rewritten, ensures, err := rewritePosition(ctx, mountConv[firstSystemMount][:plan.applyCount[firstSystemMount]], mounts[firstSystemMount], resolvedActive)
+			if err != nil {
+				return err
+			}
+			system = append([]mount.Mount{rewritten}, mounts[firstSystemMount+1:]...)
+			boundaryEnsures = ensures
+		}
+		// If no system mounts, add a bind mount if temporary
+		// TODO: Add config for whether to add the bind mount?
+		if config.Temporary && firstSystemMount > 0 {
+			system = append(system, mount.Mount{
+				Type:    "bind",
+				Source:  resolvedActive[firstSystemMount-1].MountPoint,
+				Options: []string{"rbind"},
+			})
+		}
+
+		if len(system) > 0 {
+			if len(system) > maxMounts {
+				return fmt.Errorf("too many system mounts (%d): maximum %d: %w", len(system), maxMounts, errdefs.ErrInvalidArgument)
+			}
+			sbkt, err := bkt.CreateBucket(bucketKeySystem)
+			if err != nil {
+				return err
+			}
+			for i, sm := range system {
+				cur, err := sbkt.CreateBucket([]byte{byte(i)})
+				if err != nil {
+					return err
+				}
+				if err = putSystemMount(cur, sm); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Persist the boundary mount's ensure targets; see staleCollision.
+		if len(boundaryEnsures) > 0 {
+			var targets []string
+			for _, ensure := range boundaryEnsures {
+				targets = append(targets, ensure.targets...)
+			}
+			if err := bkt.Put(bucketKeyEnsureTargets, []byte(strings.Join(targets, "\x00"))); err != nil {
+				return err
+			}
+		}
 
 		return nil
 	}); err != nil {
 		return mount.ActivationInfo{}, err
 	}
 
-	// If a stale incomplete activation was found, clean up its target
-	// directory which may contain leftover mounts from before a crash.
-	if staleMID != 0 {
-		staleTarget := filepath.Join(mm.targets.Name(), strconv.FormatUint(staleMID, 10))
-		if err := unmountAll(ctx, staleTarget, mm.handlers); err != nil {
-			if os.IsNotExist(err) {
-				log.G(ctx).WithError(err).WithField("mountid", staleMID).Debug("stale activation target does not exist, skipping cleanup")
-			} else {
-				log.G(ctx).WithError(err).WithField("mountid", staleMID).Warn("failed to unmount stale activation target")
-			}
+	if len(staleRecords) > 0 {
+		if err := mm.unmountRecords(ctx, staleRecords); err != nil {
+			log.G(ctx).WithError(err).WithField("name", name).Warn("failed to clean up stale activation mounts")
+		}
+	}
+	if staleV1 != nil {
+		if err := mm.v1Unmount(ctx, staleV1.positions, staleV1.mid); err != nil {
+			log.G(ctx).WithError(err).WithField("name", name).Warn("failed to clean up stale v1 activation mounts")
 		}
 	}
 
 	defer func() {
-		// If error, rollback and remove by name
+		// This defer only has work to do once the transaction above
+		// commits: a failure inside it rolls the transaction back on
+		// its own and reaches here with nothing left to release.
 		if retErr != nil {
+			var orphaned []mountedRecord
 			if err := mm.db.Update(func(tx *bolt.Tx) error {
-				v1bkt := tx.Bucket([]byte("v1"))
-				if v1bkt == nil {
-					return fmt.Errorf("missing bucket: %w", errdefs.ErrUnknown)
-				}
-
-				nsbkt := v1bkt.Bucket([]byte(namespace))
+				nsbkt := getBucket(tx, bucketKeyV2, []byte(namespace))
 				if nsbkt == nil {
 					return fmt.Errorf("missing namespace %q bucket: %w", namespace, errdefs.ErrUnknown)
 				}
 
-				mbkt := nsbkt.Bucket(bucketKeyMounts)
+				mbkt := nsbkt.Bucket(bucketKeyActivations)
 				if mbkt == nil {
-					return fmt.Errorf("missing mounts bucket: %w", errdefs.ErrUnknown)
+					return fmt.Errorf("missing activations bucket: %w", errdefs.ErrUnknown)
 				}
 
 				if leased {
@@ -320,195 +450,279 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 							lsbkt.DeleteBucket([]byte(lid))
 						}
 					}
+				}
 
+				bkt := mbkt.Bucket([]byte(name))
+				if bkt == nil {
+					return nil
+				}
+
+				var err error
+				orphaned, err = releaseMountedRecords(tx, namespace, name, activationUses(bkt))
+				if err != nil {
+					return err
 				}
 
 				return mbkt.DeleteBucket([]byte(name))
 			}); err != nil {
 				log.G(ctx).WithError(err).WithField("name", name).Errorf("failed to rollback")
 			}
-		}
-	}()
-
-	targetName := strconv.FormatUint(mid, 10)
-	if err := mm.targets.Mkdir(targetName, 0700); err != nil {
-		return mount.ActivationInfo{}, err
-	}
-
-	var mounted []mount.ActiveMount
-	defer func() {
-		// If error, unmount all mounted
-		if retErr != nil {
-			for i, m := range mounted {
-				var err error
-				if h := handlers[i]; h != nil {
-					err = h.Unmount(ctx, m.MountPoint)
-				} else {
-					err = mount.Unmount(m.MountPoint, 0)
-				}
-				if err != nil {
-					log.G(ctx).WithError(err).WithField("MountPoint", m.MountPoint).Error("failed to cleanup mount after failed activation")
-				}
+			if err := mm.unmountRecords(ctx, orphaned); err != nil {
+				log.G(ctx).WithError(err).WithField("name", name).Error("failed to cleanup mounts after failed activation")
 			}
 		}
 	}()
 
-	// Ensure directory order for cleanup when rare case of large number of mounts,
-	// this allows cleanup logic to just scan directories on cleanup.
-	formatMP := "%d"
-	formatType := "%d-type"
-	if firstSystemMount > 100 {
-		formatMP = "%03d"
-		formatType = "%03d-type"
-	} else if firstSystemMount > 10 {
-		formatMP = "%02d"
-		formatType = "%02d-type"
-	}
-
-	for i, m := range mounts[:firstSystemMount] {
-		if mountConv != nil && mountConv[i] != nil {
-			for _, tr := range mountConv[i] {
-				newM, err := tr.Transform(ctx, m, mounted)
-				if err != nil {
-					return mount.ActivationInfo{}, err
-				}
-				m = newM
-			}
-			mounts[i] = m
-		}
-
-		// Use cleanup order for directory names
-		ci := firstSystemMount - i
-		// TODO: Go 1.25 use targetbase.WriteFile
-		if err := os.WriteFile(filepath.Join(mm.targets.Name(), targetName, fmt.Sprintf(formatType, ci)), []byte(m.Type), 0600); err != nil {
+	var active []mount.ActiveMount
+	for i, rec := range records {
+		am, err := mm.realizeMount(ctx, rec, handlers[i], posEnsures[i], active)
+		if err != nil {
 			return mount.ActivationInfo{}, err
 		}
-
-		mname := fmt.Sprintf(formatMP, ci)
-		var active mount.ActiveMount
-		if h := handlers[i]; h != nil {
-			active, err = h.Mount(ctx, m, filepath.Join(mm.targets.Name(), targetName, mname), mounted)
-			if err != nil {
-				return mount.ActivationInfo{}, fmt.Errorf("mount handler failed %v: %w", m, err)
-			}
-		} else {
-			if err := mm.targets.Mkdir(filepath.Join(targetName, mname), 0700); err != nil {
-				return mount.ActivationInfo{}, err
-			}
-			mp := filepath.Join(mm.targets.Name(), targetName, mname)
-			if err := m.Mount(mp); err != nil {
-				return mount.ActivationInfo{}, fmt.Errorf("mount failed %v: %w", m, err)
-			}
-			t := time.Now()
-			active = mount.ActiveMount{
-				Mount:      m,
-				MountPoint: mp,
-				MountedAt:  &t,
-			}
-		}
-		mounted = append(mounted, active)
+		active = append(active, am)
 	}
 
-	// If the first system mount has transforms, apply the ones the caller
-	// has not claimed. A claim can only be honored as a suffix of the
-	// chain: applyCount always covers at least every transform up to and
-	// including the last unclaimed one, since each depends on the last's
-	// output; see planActivation.
-	//
-	// firstSystemMount can reach len(mounts) when every mount is handled
-	// inside the manager (for example, every mount claimed via Temporary);
-	// there is then no system mount left to transform.
-	if mountConv != nil && firstSystemMount < len(mounts) {
-		for _, tr := range mountConv[firstSystemMount][:plan.applyCount[firstSystemMount]] {
-			newM, err := tr.Transform(ctx, mounts[firstSystemMount], mounted)
-			if err != nil {
-				return mount.ActivationInfo{}, err
-			}
-			mounts[firstSystemMount] = newM
+	for _, ensure := range boundaryEnsures {
+		if err := ensure.run(ctx); err != nil {
+			return mount.ActivationInfo{}, err
 		}
-	}
-	// If no system mounts, add a bind mount if temporary
-	// TODO: Add config for whether to add the bind mount?
-	if config.Temporary && firstSystemMount > 0 {
-		mounts = append(mounts, mount.Mount{
-			Type:    "bind",
-			Source:  mounted[firstSystemMount-1].MountPoint,
-			Options: []string{"rbind"},
-		})
 	}
 
 	info.Name = name
-	info.Active = mounted
-	info.System = mounts[firstSystemMount:]
+	info.Active = active
+	info.System = system
 	info.Labels = config.Labels
 
-	// Open another write transaction and update state, or another way to update state?
-	if err := mm.db.Update(func(tx *bolt.Tx) error {
-		v1bkt := tx.Bucket([]byte("v1"))
-		if v1bkt == nil {
-			return fmt.Errorf("missing v1 bucket: %w", errdefs.ErrUnknown)
+	return
+}
+
+// staleCollision reports whether an activation named name exists, in
+// either schema, and whether it is still live: every managed position
+// mounted, and, for v2, every recorded ensure target present.
+func (mm *mountManager) staleCollision(ctx context.Context, namespace, name string) (found, isV1, live bool, err error) {
+	type ref struct {
+		mtype string
+		point string
+	}
+	var (
+		refs          []ref
+		vacuousLive   bool
+		ensureTargets []string
+	)
+	if err := mm.db.View(func(tx *bolt.Tx) error {
+		if bkt := getBucket(tx, bucketKeyV2, []byte(namespace), bucketKeyActivations, []byte(name)); bkt != nil {
+			found = true
+			vacuousLive = true
+			if v := bkt.Get(bucketKeyEnsureTargets); len(v) > 0 {
+				ensureTargets = strings.Split(string(v), "\x00")
+			}
+			nsbkt := getBucket(tx, bucketKeyV2, []byte(namespace))
+			for _, id := range activationUses(bkt) {
+				b, ok, rerr := getMountedRecord(nsbkt, mountedKey(id))
+				if rerr != nil {
+					return rerr
+				}
+				if !ok {
+					// Should not be reachable; treat as stale.
+					refs = append(refs, ref{})
+					continue
+				}
+				refs = append(refs, ref{mtype: b.mount.Type, point: b.point})
+			}
+			return nil
 		}
 
-		nsbkt := v1bkt.Bucket([]byte(namespace))
-		if nsbkt == nil {
-			return fmt.Errorf("missing namespace %q bucket: %w", namespace, errdefs.ErrUnknown)
-		}
-
-		mbkt := nsbkt.Bucket(bucketKeyMounts)
-		if mbkt == nil {
-			return fmt.Errorf("missing mounts bucket: %w", errdefs.ErrUnknown)
-		}
-		bkt := mbkt.Bucket([]byte(name))
+		bkt := getBucket(tx, bucketKeyV1, []byte(namespace), v1KeyMounts, []byte(name))
 		if bkt == nil {
-			return fmt.Errorf("missing mount %q bucket: %w", name, errdefs.ErrUnknown)
+			return nil
 		}
-
-		abkt, err := bkt.CreateBucket(bucketKeyActive)
-		if err != nil {
-			return err
+		found = true
+		isV1 = true
+		vacuousLive = v1HasActive(bkt)
+		for _, p := range v1Positions(bkt) {
+			refs = append(refs, ref{mtype: p.mtype, point: p.point})
 		}
-
-		for i, active := range mounted {
-			// Error is i > uint8 max
-			cur, err := abkt.CreateBucket([]byte{byte(i)})
-			if err != nil {
-				return err
-			}
-			if err = putActiveMount(cur, active); err != nil {
-				return err
-			}
-
-		}
-
-		if err := boltutil.WriteTimestamps(bkt, start, time.Now()); err != nil {
-			return err
-		}
-
-		if len(info.System) > 0 {
-			if len(info.System) > 255 {
-				return fmt.Errorf("too many system mounts (%d): maximum 255", len(info.System))
-			}
-			sbkt, err := bkt.CreateBucket(bucketKeySystem)
-			if err != nil {
-				return err
-			}
-			for i, sm := range info.System {
-				cur, err := sbkt.CreateBucket([]byte{byte(i)})
-				if err != nil {
-					return err
-				}
-				if err = putSystemMount(cur, sm); err != nil {
-					return err
-				}
-			}
-		}
-
 		return nil
 	}); err != nil {
-		return mount.ActivationInfo{}, err
+		return false, false, false, err
+	}
+	if !found {
+		return false, false, false, nil
 	}
 
-	return
+	live = vacuousLive
+	for _, r := range refs {
+		if r.point == "" {
+			live = false
+			continue
+		}
+		ok, perr := probeMounted(ctx, mm.handlers[r.mtype], r.point)
+		if perr != nil {
+			return true, isV1, false, perr
+		}
+		if !ok {
+			live = false
+			break
+		}
+	}
+	for _, target := range ensureTargets {
+		if !live {
+			break
+		}
+		if _, err := os.Stat(target); err != nil {
+			if !os.IsNotExist(err) {
+				return true, isV1, false, err
+			}
+			live = false
+		}
+	}
+
+	return true, isV1, live, nil
+}
+
+// probeMounted reports whether path, the mount point of a mounted
+// record, currently has that mount in effect. A handler which
+// implements mount.MountedChecker is asked directly; otherwise the
+// host's mount table is consulted, which is only accurate for a
+// system mount or a handler whose mount point really is a kernel
+// mount; see mount.MountedChecker's doc for why some handlers must
+// implement it instead of relying on this fallback.
+//
+// A path which does not exist at all is reported as not mounted
+// rather than as an error: this is the ordinary state of a mounted
+// record which has never been realized yet.
+//
+// On Windows, the fallback always reports false: mountinfo.Mounted
+// has no implementation there. This is not currently reachable in
+// practice, since nothing this package's own transforms produce on
+// Windows resolves to a managed position at all, but would matter for
+// a handler-less mount activated with WithTemporary, which does.
+func probeMounted(ctx context.Context, handler mount.Handler, path string) (bool, error) {
+	if mc, ok := handler.(mount.MountedChecker); ok {
+		return mc.Mounted(ctx, path)
+	}
+	live, err := mountinfo.Mounted(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return live, nil
+}
+
+// realizeMount ensures rec's mount is in effect, mounting it if
+// needed, and returns it as an ActiveMount. active holds earlier
+// realized positions in the same chain; concurrent activations
+// resolving to the same identity serialize here. ensures always run,
+// even on a reused record, since mount identity excludes the
+// mkdir/mkfs options they validate or create.
+func (mm *mountManager) realizeMount(ctx context.Context, rec mountedRecord, handler mount.Handler, ensures []deferredEnsure, active []mount.ActiveMount) (mount.ActiveMount, error) {
+	if shareable(rec.mount) {
+		key := mountingKey(rec.mount)
+		if err := mm.mounting.Lock(ctx, key); err != nil {
+			return mount.ActiveMount{}, err
+		}
+		defer mm.mounting.Unlock(key)
+	}
+
+	live, err := probeMounted(ctx, handler, rec.point)
+	if err != nil {
+		return mount.ActiveMount{}, fmt.Errorf("failed to check mount %q: %w", rec.point, err)
+	}
+	if live {
+		log.G(ctx).WithFields(log.Fields{
+			"mounted":    rec.id,
+			"mountpoint": rec.point,
+		}).Debug("reusing mounted record")
+		return rec.active(), nil
+	}
+
+	if err := mm.prepareRecordDir(rec.point, rec.mount.Type, handler == nil); err != nil {
+		return mount.ActiveMount{}, err
+	}
+
+	for _, ensure := range ensures {
+		if err := ensure.run(ctx); err != nil {
+			return mount.ActiveMount{}, err
+		}
+	}
+
+	if handler != nil {
+		am, err := handler.Mount(ctx, rec.mount, rec.point, active)
+		if err != nil {
+			return mount.ActiveMount{}, fmt.Errorf("mount handler failed %v: %w", rec.mount, err)
+		}
+		return am, nil
+	}
+	if err := rec.mount.Mount(rec.point); err != nil {
+		return mount.ActiveMount{}, fmt.Errorf("mount failed %v: %w", rec.mount, err)
+	}
+
+	return rec.active(), nil
+}
+
+// prepareRecordDir creates the parent directory of point and a type
+// file recording mountType, and, if createMountPoint, the mount point
+// itself.
+func (mm *mountManager) prepareRecordDir(point, mountType string, createMountPoint bool) error {
+	rel, err := filepath.Rel(mm.targets.Name(), point)
+	if err != nil {
+		return fmt.Errorf("mount point %q outside target root: %w", point, err)
+	}
+	dir := filepath.Dir(rel)
+	if err := mm.targets.Mkdir(dir, 0700); err != nil && !os.IsExist(err) {
+		return fmt.Errorf("failed to create mounted record dir: %w", err)
+	}
+	typePath := filepath.Join(dir, typeFileName)
+	f, err := mm.targets.OpenFile(typePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	_, werr := f.Write([]byte(mountType))
+	if werr == nil {
+		werr = f.Sync()
+	}
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		return fmt.Errorf("failed to write type file %q: %w", typePath, werr)
+	}
+	if createMountPoint {
+		if err := mm.targets.Mkdir(rel, 0700); err != nil && !os.IsExist(err) {
+			return fmt.Errorf("failed to create mount point: %w", err)
+		}
+	}
+	return nil
+}
+
+// alreadyUnmounted reports whether an unmount error means there was
+// nothing mounted at the path.
+func alreadyUnmounted(err error) bool {
+	return errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.EINVAL) || errors.Is(err, syscall.ENOTDIR)
+}
+
+// unmountRecords unmounts and removes the directories of released
+// records, in the order given.
+func (mm *mountManager) unmountRecords(ctx context.Context, records []mountedRecord) error {
+	var errs []error
+	for _, b := range records {
+		var err error
+		if h := mm.handlers[b.mount.Type]; h != nil {
+			err = h.Unmount(ctx, b.point)
+		} else {
+			err = mount.Unmount(b.point, 0)
+		}
+		if err != nil && !alreadyUnmounted(err) {
+			errs = append(errs, fmt.Errorf("failed to unmount %q: %w", b.point, err))
+			continue
+		}
+		if err := os.RemoveAll(mm.backingRoot(b.id)); err != nil && !os.IsNotExist(err) {
+			log.G(ctx).WithError(err).WithField("backing", b.id).Warn("failed to remove backing mount dir")
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func encodeID(id uint64) ([]byte, error) {
@@ -522,52 +736,6 @@ func encodeID(id uint64) ([]byte, error) {
 		return nil, fmt.Errorf("failed encoding id = %v", id)
 	}
 	return idEncoded, nil
-}
-
-func readID(bkt *bolt.Bucket) uint64 {
-	id, _ := binary.Uvarint(bkt.Get(bucketKeyID))
-	return id
-}
-
-func putActiveMount(bkt *bolt.Bucket, active mount.ActiveMount) error {
-	if err := bkt.Put(bucketKeyType, []byte(active.Type)); err != nil {
-		return err
-	}
-
-	// TODO: Same if device?
-	if err := bkt.Put(bucketKeyMountPoint, []byte(active.MountPoint)); err != nil {
-		return err
-	}
-
-	mountedAt, err := active.MountedAt.MarshalBinary()
-	if err != nil {
-		return err
-	}
-	if err := bkt.Put(bucketKeyMountedAt, mountedAt); err != nil {
-		return err
-	}
-
-	// TODO: Add Source
-	// TODO: Add Target
-	// TODO: Add Options
-
-	return nil
-}
-
-func readActiveMount(bkt *bolt.Bucket) (mount.ActiveMount, error) {
-	var active mount.ActiveMount
-	active.Type = string(bkt.Get(bucketKeyType))
-	active.MountPoint = string(bkt.Get(bucketKeyMountPoint))
-	if v := bkt.Get(bucketKeyMountedAt); v != nil {
-		var mountedAt time.Time
-		if err := mountedAt.UnmarshalBinary(v); err != nil {
-			// TODO: Should this be skipped or otherwise logged and ignored?
-			return mount.ActiveMount{}, err
-		}
-		active.MountedAt = &mountedAt
-	}
-
-	return active, nil
 }
 
 func putSystemMount(bkt *bolt.Bucket, m mount.Mount) error {
@@ -600,17 +768,28 @@ func readSystemMount(bkt *bolt.Bucket) mount.Mount {
 	return m
 }
 
-func readActivationInfo(name string, bkt *bolt.Bucket) (mount.ActivationInfo, error) {
+// readActivationInfo builds the activation info for a mount, resolving
+// the mounted record for each position in its chain. nsbkt is the
+// namespace bucket holding the mounted records.
+func readActivationInfo(nsbkt *bolt.Bucket, name string, bkt *bolt.Bucket) (mount.ActivationInfo, error) {
 	info := mount.ActivationInfo{
 		Name: name,
 	}
 	if abkt := bkt.Bucket(bucketKeyActive); abkt != nil {
 		if err := abkt.ForEachBucket(func(k []byte) error {
-			active, err := readActiveMount(abkt.Bucket(k))
+			key := abkt.Bucket(k).Get(bucketKeyMountID)
+			if len(key) == 0 {
+				return nil
+			}
+			b, ok, err := getMountedRecord(nsbkt, key)
 			if err != nil {
 				return err
 			}
-			info.Active = append(info.Active, active)
+			if !ok {
+				// Should not be reachable; skip rather than fail.
+				return nil
+			}
+			info.Active = append(info.Active, b.active())
 			return nil
 		}); err != nil {
 			return mount.ActivationInfo{}, err
@@ -639,7 +818,11 @@ func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
 		return nil
 	}
 
-	for _, key := range keys[1:] {
+	return getSubBucket(bkt, keys[1:]...)
+}
+
+func getSubBucket(bkt *bolt.Bucket, keys ...[]byte) *bolt.Bucket {
+	for _, key := range keys {
 		bkt = bkt.Bucket(key)
 		if bkt == nil {
 			return nil
@@ -655,94 +838,77 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 		return err
 	}
 
+	// Serializes with a concurrent Activate of the same name.
+	key := activationKey(namespace, name)
+	if err := mm.activate.Lock(ctx, key); err != nil {
+		return err
+	}
+	defer mm.activate.Unlock(key)
+
+	// Get read lock to block GC context from starting
+	mm.rwlock.RLock()
+	defer mm.rwlock.RUnlock()
+
 	var (
-		mid       uint64
-		allActive []mount.ActiveMount
+		released []mountedRecord
+		v1pos    []v1Position
+		v1mid    uint64
+		isV1     bool
+		found    bool
 	)
 
-	// First in a single transaction, mark the mounts as deactivated
 	if err := mm.db.Update(func(tx *bolt.Tx) error {
-		v1bkt := tx.Bucket([]byte("v1"))
-		if v1bkt == nil {
-			return fmt.Errorf("missing v1 bucket: %w", errdefs.ErrNotFound)
-		}
+		bkt := getBucket(tx, bucketKeyV2, []byte(namespace), bucketKeyActivations, []byte(name))
+		if bkt != nil {
+			found = true
+			nsbkt := getBucket(tx, bucketKeyV2, []byte(namespace))
+			mbkt := nsbkt.Bucket(bucketKeyActivations)
 
-		nsbkt := v1bkt.Bucket([]byte(namespace))
-		if nsbkt == nil {
-			return fmt.Errorf("missing namespace %q bucket: %w", namespace, errdefs.ErrNotFound)
-		}
-
-		mbkt := nsbkt.Bucket(bucketKeyMounts)
-		if mbkt == nil {
-			return fmt.Errorf("missing mounts bucket: %w", errdefs.ErrNotFound)
-		}
-		bkt := mbkt.Bucket([]byte(name))
-		if bkt == nil {
-			return fmt.Errorf("missing mount %q bucket: %w", name, errdefs.ErrNotFound)
-		}
-
-		mid = readID(bkt)
-
-		lid := bkt.Get(bucketKeyLease)
-		if lid != nil {
-			lssbkt := nsbkt.Bucket(bucketKeyLeases)
-			if lssbkt != nil {
-				lsbkt := lssbkt.Bucket(lid)
-				if lsbkt != nil {
-					if err = lsbkt.Delete([]byte(name)); err != nil {
+			lid := bkt.Get(bucketKeyLease)
+			if len(lid) > 0 {
+				if lsbkt := getSubBucket(nsbkt, bucketKeyLeases, lid); lsbkt != nil {
+					if err := lsbkt.Delete([]byte(name)); err != nil {
 						return err
 					}
 				}
 			}
+
+			var err error
+			released, err = releaseMountedRecords(tx, namespace, name, activationUses(bkt))
+			if err != nil {
+				return err
+			}
+
+			return mbkt.DeleteBucket([]byte(name))
 		}
 
-		abkt := bkt.Bucket(bucketKeyActive)
-		if abkt != nil {
-			abkt.ForEachBucket(func(k []byte) error {
-				active, err := readActiveMount(abkt.Bucket(k))
-				if err != nil {
-					return err
-				}
-				allActive = append(allActive, active)
-				return nil
-			})
-		}
-
-		if err = mbkt.DeleteBucket([]byte(name)); err != nil {
+		positions, mid, ok, err := v1Release(tx, namespace, name)
+		if err != nil {
 			return err
 		}
-
-		// TODO: Is unmountq really needed or just delete?
-
+		if ok {
+			found = true
+			isV1 = true
+			v1pos = positions
+			v1mid = mid
+		}
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	// TODO: Should this also be backgrounded, no much can do on failure to unmount
-	var mountErrors error
-	for _, active := range slices.Backward(allActive) {
-		var err error
-		if h := mm.handlers[active.Type]; h != nil {
-			err = h.Unmount(ctx, active.MountPoint)
-		} else {
-			err = mount.Unmount(active.MountPoint, 0)
-		}
-		if err != nil {
-			mountErrors = errors.Join(mountErrors, err)
-		}
-	}
-	if mountErrors != nil {
-		// Don't try to cleanup, GC will need to do the rest
-		return mountErrors
+	if !found {
+		return fmt.Errorf("mount %q: %w", name, errdefs.ErrNotFound)
 	}
 
-	// Run in background, GC would handle leftovers?
-	// Make configurable?
-	// TODO: In go 1.25, use mm.targets.RemoveAll()
-	if err := os.RemoveAll(filepath.Join(mm.targets.Name(), fmt.Sprintf("%d", mid))); err != nil {
-		// TODO: Only log here, cleanup would have to occur later
-		log.G(ctx).WithError(err).WithField("mountid", mid).Error("failed to cleanup mount target")
+	if isV1 {
+		return mm.v1Unmount(ctx, v1pos, v1mid)
+	}
+
+	// TODO: Should this also be backgrounded, not much can be done on failure to unmount
+	if err := mm.unmountRecords(ctx, released); err != nil {
+		// Don't try to cleanup, GC will need to do the rest
+		return err
 	}
 
 	return nil
@@ -753,19 +919,30 @@ func (mm *mountManager) Info(ctx context.Context, name string) (mount.Activation
 	if err != nil {
 		return mount.ActivationInfo{}, err
 	}
+
 	var info mount.ActivationInfo
 	if err := mm.db.View(func(tx *bolt.Tx) error {
-		bkt := getBucket(tx, []byte("v1"), []byte(namespace), bucketKeyMounts, []byte(name))
-		if bkt == nil {
-			return fmt.Errorf("mount %q %w", name, errdefs.ErrNotFound)
-		}
 		var err error
-		info, err = readActivationInfo(name, bkt)
+		info, err = infoFromTx(tx, namespace, name)
 		return err
 	}); err != nil {
 		return mount.ActivationInfo{}, err
 	}
 	return info, nil
+}
+
+// infoFromTx reads a single activation's info from either schema,
+// from an already open transaction.
+func infoFromTx(tx *bolt.Tx, namespace, name string) (mount.ActivationInfo, error) {
+	if nsbkt := getBucket(tx, bucketKeyV2, []byte(namespace)); nsbkt != nil {
+		if bkt := getSubBucket(nsbkt, bucketKeyActivations, []byte(name)); bkt != nil {
+			return readActivationInfo(nsbkt, name, bkt)
+		}
+	}
+	if bkt := getBucket(tx, bucketKeyV1, []byte(namespace), v1KeyMounts, []byte(name)); bkt != nil {
+		return v1ActivationInfo(name, bkt)
+	}
+	return mount.ActivationInfo{}, fmt.Errorf("mount %q %w", name, errdefs.ErrNotFound)
 }
 
 func (mm *mountManager) Update(context.Context, mount.ActivationInfo, ...string) (mount.ActivationInfo, error) {
@@ -780,22 +957,53 @@ func (mm *mountManager) List(ctx context.Context, filters ...string) ([]mount.Ac
 
 	var infos []mount.ActivationInfo
 	if err := mm.db.View(func(tx *bolt.Tx) error {
-		mbkt := getBucket(tx, []byte("v1"), []byte(namespace), bucketKeyMounts)
-		if mbkt == nil {
-			return nil
-		}
+		var err error
+		infos, err = listFromTx(tx, namespace)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return infos, nil
+}
 
-		return mbkt.ForEachBucket(func(k []byte) error {
-			info, err := readActivationInfo(string(k), mbkt.Bucket(k))
+// listFromTx reads every activation in a namespace, from both
+// schemas, from an already open transaction.
+func listFromTx(tx *bolt.Tx, namespace string) ([]mount.ActivationInfo, error) {
+	var infos []mount.ActivationInfo
+	seen := map[string]struct{}{}
+
+	if nsbkt := getBucket(tx, bucketKeyV2, []byte(namespace)); nsbkt != nil {
+		if mbkt := nsbkt.Bucket(bucketKeyActivations); mbkt != nil {
+			if err := mbkt.ForEachBucket(func(k []byte) error {
+				info, err := readActivationInfo(nsbkt, string(k), mbkt.Bucket(k))
+				if err != nil {
+					return err
+				}
+				infos = append(infos, info)
+				seen[string(k)] = struct{}{}
+				return nil
+			}); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if v1mbkt := getBucket(tx, bucketKeyV1, []byte(namespace), v1KeyMounts); v1mbkt != nil {
+		if err := v1mbkt.ForEachBucket(func(k []byte) error {
+			if _, ok := seen[string(k)]; ok {
+				return nil
+			}
+			info, err := v1ActivationInfo(string(k), v1mbkt.Bucket(k))
 			if err != nil {
 				return err
 			}
 			infos = append(infos, info)
 			return nil
-		})
-	}); err != nil {
-		return nil, err
+		}); err != nil {
+			return nil, err
+		}
 	}
+
 	return infos, nil
 }
 
@@ -805,14 +1013,16 @@ func (mm *mountManager) StartCollection(ctx context.Context) (metadata.Collectio
 
 	tx, err := mm.db.Begin(true)
 	if err != nil {
+		mm.rwlock.Unlock()
 		return nil, err
 	}
 
 	return &collectionContext{
-		ctx:     ctx,
-		tx:      tx,
-		manager: mm,
-		removed: map[string]map[string]struct{}{},
+		ctx:         ctx,
+		tx:          tx,
+		manager:     mm,
+		removed:     map[string]map[string]struct{}{},
+		remainingV1: map[uint64]struct{}{},
 	}, nil
 }
 
@@ -825,34 +1035,52 @@ type collectionContext struct {
 	tx      *bolt.Tx
 	manager *mountManager
 	removed map[string]map[string]struct{}
+
+	// Mounted records released during applyRemove; they need
+	// unmounting after the transaction commits.
+	released []mountedRecord
+	// v1 activations released during applyRemove; they need
+	// unmounting after the transaction commits, the same as released
+	// above but through v1Unmount instead of unmountRecords.
+	releasedV1 []v1Released
+	// The mid of every v1 activation, across every namespace, which
+	// survives applyRemove, so the v1 orphan directory scan in Finish
+	// does not mistake its directory for one nothing references.
+	remainingV1 map[uint64]struct{}
 }
 
 func (cc *collectionContext) All(fn func(gc.Node)) {
-	v1bkt := cc.tx.Bucket([]byte("v1"))
-	if v1bkt == nil {
-		return
-	}
-	nsc := v1bkt.Cursor()
-	for nsk, nsv := nsc.First(); nsk != nil; nsk, nsv = nsc.Next() {
-		if nsv != nil {
-			continue
-		}
-		mntsbkt := v1bkt.Bucket(nsk).Bucket(bucketKeyMounts)
-		if mntsbkt == nil {
-			continue
-		}
-		mc := mntsbkt.Cursor()
-		for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
-			if mv != nil {
+	if v2bkt := cc.tx.Bucket(bucketKeyV2); v2bkt != nil {
+		nsc := v2bkt.Cursor()
+		for nsk, nsv := nsc.First(); nsk != nil; nsk, nsv = nsc.Next() {
+			if nsv != nil {
 				continue
 			}
-			fn(gc.Node{
-				Type:      metadata.ResourceMount,
-				Namespace: string(nsk),
-				Key:       string(mk),
-			})
+			actbkt := v2bkt.Bucket(nsk).Bucket(bucketKeyActivations)
+			if actbkt == nil {
+				continue
+			}
+			mc := actbkt.Cursor()
+			for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
+				if mv != nil {
+					continue
+				}
+				fn(gc.Node{
+					Type:      metadata.ResourceMount,
+					Namespace: string(nsk),
+					Key:       string(mk),
+				})
+			}
 		}
 	}
+
+	v1All(cc.tx, func(namespace, name string) {
+		fn(gc.Node{
+			Type:      metadata.ResourceMount,
+			Namespace: namespace,
+			Key:       name,
+		})
+	})
 }
 
 func gcnode(t gc.ResourceType, ns, key string) gc.Node {
@@ -863,78 +1091,94 @@ func gcnode(t gc.ResourceType, ns, key string) gc.Node {
 	}
 }
 
+// scanBackRefLabels reports every gc.bref.* label on a mount's labels
+// bucket to bref, associating the resource it names with n.
+func scanBackRefLabels(lbkt *bolt.Bucket, ns string, n gc.Node, bref func(gc.Node, gc.Node)) {
+	if lbkt == nil {
+		return
+	}
+	lc := lbkt.Cursor()
+	for _, h := range []struct {
+		key     []byte
+		handler func([]byte, []byte)
+	}{
+		{
+			key: labelGCContainerBackRef,
+			handler: func(k, v []byte) {
+				if ks := string(k); ks != string(labelGCContainerBackRef) {
+					// Allow reference naming separated by . or /, ignore names
+					if ks[len(labelGCContainerBackRef)] != '.' && ks[len(labelGCContainerBackRef)] != '/' {
+						return
+					}
+				}
+
+				bref(gcnode(metadata.ResourceContainer, ns, string(v)), n)
+			},
+		},
+		{
+			key: labelGCContentBackRef,
+			handler: func(k, v []byte) {
+				if ks := string(k); ks != string(labelGCContentBackRef) {
+					// Allow reference naming separated by . or /, ignore names
+					if ks[len(labelGCContentBackRef)] != '.' && ks[len(labelGCContentBackRef)] != '/' {
+						return
+					}
+				}
+
+				bref(gcnode(metadata.ResourceContent, ns, string(v)), n)
+			},
+		},
+		{
+			key: labelGCImageBackRef,
+			handler: func(k, v []byte) {
+				if ks := string(k); ks != string(labelGCImageBackRef) {
+					// Allow reference naming separated by . or /, ignore names
+					if ks[len(labelGCImageBackRef)] != '.' && ks[len(labelGCImageBackRef)] != '/' {
+						return
+					}
+				}
+
+				bref(gcnode(metadata.ResourceImage, ns, string(v)), n)
+			},
+		},
+		{
+			key: labelGCSnapBackRef,
+			handler: func(k, v []byte) {
+				snapshotter := k[len(labelGCSnapBackRef):]
+				if i := bytes.IndexByte(snapshotter, '/'); i >= 0 {
+					snapshotter = snapshotter[:i]
+				}
+				bref(gcnode(metadata.ResourceSnapshot, ns, fmt.Sprintf("%s/%s", snapshotter, v)), n)
+			},
+		},
+		// TODO: Consider support for root/expire labels
+	} {
+		for k, v := lc.Seek(h.key); k != nil && bytes.HasPrefix(k, h.key); k, v = lc.Next() {
+			h.handler(k, v)
+		}
+	}
+}
+
 func (cc *collectionContext) ActiveWithBackRefs(ns string, fn func(gc.Node), bref func(gc.Node, gc.Node)) {
-	nsbkt := getBucket(cc.tx, []byte("v1"), []byte(ns), bucketKeyMounts)
-	if nsbkt != nil {
+	if nsbkt := getBucket(cc.tx, bucketKeyV2, []byte(ns), bucketKeyActivations); nsbkt != nil {
 		mc := nsbkt.Cursor()
 		for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
 			if mv != nil {
 				continue
 			}
 			n := gcnode(metadata.ResourceMount, ns, string(mk))
-			lbkt := nsbkt.Bucket(mk).Bucket(bucketKeyLabels)
-			if lbkt != nil {
-				lc := lbkt.Cursor()
-				for _, h := range []struct {
-					key     []byte
-					handler func([]byte, []byte)
-				}{
-					{
-						key: labelGCContainerBackRef,
-						handler: func(k, v []byte) {
-							if ks := string(k); ks != string(labelGCContainerBackRef) {
-								// Allow reference naming separated by . or /, ignore names
-								if ks[len(labelGCContainerBackRef)] != '.' && ks[len(labelGCContainerBackRef)] != '/' {
-									return
-								}
-							}
+			scanBackRefLabels(nsbkt.Bucket(mk).Bucket(bucketKeyLabels), ns, n, bref)
+		}
+	}
 
-							bref(gcnode(metadata.ResourceContainer, ns, string(v)), n)
-						},
-					},
-					{
-						key: labelGCContentBackRef,
-						handler: func(k, v []byte) {
-							if ks := string(k); ks != string(labelGCContentBackRef) {
-								// Allow reference naming separated by . or /, ignore names
-								if ks[len(labelGCContentBackRef)] != '.' && ks[len(labelGCContentBackRef)] != '/' {
-									return
-								}
-							}
-
-							bref(gcnode(metadata.ResourceContent, ns, string(v)), n)
-						},
-					},
-					{
-						key: labelGCImageBackRef,
-						handler: func(k, v []byte) {
-							if ks := string(k); ks != string(labelGCImageBackRef) {
-								// Allow reference naming separated by . or /, ignore names
-								if ks[len(labelGCImageBackRef)] != '.' && ks[len(labelGCImageBackRef)] != '/' {
-									return
-								}
-							}
-
-							bref(gcnode(metadata.ResourceImage, ns, string(v)), n)
-						},
-					},
-					{
-						key: labelGCSnapBackRef,
-						handler: func(k, v []byte) {
-							snapshotter := k[len(labelGCSnapBackRef):]
-							if i := bytes.IndexByte(snapshotter, '/'); i >= 0 {
-								snapshotter = snapshotter[:i]
-							}
-							bref(gcnode(metadata.ResourceSnapshot, ns, fmt.Sprintf("%s/%s", snapshotter, v)), n)
-						},
-					},
-					// TODO: Consider support for root/expire labels
-				} {
-					for k, v := lc.Seek(h.key); k != nil && bytes.HasPrefix(k, h.key); k, v = lc.Next() {
-						h.handler(k, v)
-					}
-				}
+	if nsbkt := getBucket(cc.tx, bucketKeyV1, []byte(ns), v1KeyMounts); nsbkt != nil {
+		mc := nsbkt.Cursor()
+		for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
+			if mv != nil {
+				continue
 			}
+			n := gcnode(metadata.ResourceMount, ns, string(mk))
+			scanBackRefLabels(nsbkt.Bucket(mk).Bucket(bucketKeyLabels), ns, n, bref)
 		}
 	}
 }
@@ -944,8 +1188,20 @@ func (cc *collectionContext) Active(ns string, fn func(gc.Node)) {
 }
 
 func (cc *collectionContext) Leased(ns, lease string, fn func(gc.Node)) {
-	bkt := getBucket(cc.tx, []byte("v1"), []byte(ns), []byte("leases"), []byte(lease))
-	if bkt != nil {
+	if bkt := getBucket(cc.tx, bucketKeyV2, []byte(ns), bucketKeyLeases, []byte(lease)); bkt != nil {
+		c := bkt.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			fn(gc.Node{
+				Type:      metadata.ResourceMount,
+				Namespace: ns,
+				Key:       string(k),
+			})
+		}
+	}
+	// v1 activations report their own lease membership too, so one
+	// still in a live lease is not swept just for predating this
+	// schema.
+	if bkt := getBucket(cc.tx, bucketKeyV1, []byte(ns), v1KeyLeases, []byte(lease)); bkt != nil {
 		c := bkt.Cursor()
 		for k, _ := c.First(); k != nil; k, _ = c.Next() {
 			fn(gc.Node{
@@ -981,7 +1237,6 @@ func (cc *collectionContext) Cancel() (err error) {
 }
 
 func (cc *collectionContext) Finish() error {
-	// TODO: Get list of all remaining
 	remaining, err := cc.applyRemove()
 	if err != nil {
 		if rerr := cc.tx.Rollback(); rerr != nil {
@@ -995,8 +1250,23 @@ func (cc *collectionContext) Finish() error {
 		return err
 	}
 
+	// Mounted records released above are unmounted from their
+	// database records, exclude them from the orphan scan so they are
+	// not unmounted twice.
+	for _, b := range cc.released {
+		remaining[b.id] = struct{}{}
+	}
+	for _, v := range cc.releasedV1 {
+		cc.remainingV1[v.mid] = struct{}{}
+	}
+
 	// TODO: Consider using unmount q
-	cleanup, err := cc.getCleanupDirectories(remaining)
+	orphaned, err := cc.orphanBackingMounts(remaining)
+	if err != nil {
+		cc.manager.rwlock.Unlock()
+		return err
+	}
+	orphanedV1, err := v1OrphanDirs(cc.manager, cc.remainingV1)
 
 	cc.manager.rwlock.Unlock()
 
@@ -1004,39 +1274,81 @@ func (cc *collectionContext) Finish() error {
 		return err
 	}
 
-	return cleanupAll(cc.ctx, cleanup, cc.manager.handlers)
+	var errs []error
+	if err := cc.manager.unmountRecords(cc.ctx, cc.released); err != nil {
+		errs = append(errs, err)
+	}
+	if err := cc.manager.unmountRecords(cc.ctx, orphaned); err != nil {
+		errs = append(errs, err)
+	}
+	for _, v := range append(cc.releasedV1, orphanedV1...) {
+		if err := cc.manager.v1Unmount(cc.ctx, v.positions, v.mid); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
+// applyRemove deletes the activations marked for removal and releases
+// the references they held on their mounted records. It returns the
+// set of mounted record ids which are still referenced.
 func (cc *collectionContext) applyRemove() (map[uint64]struct{}, error) {
 	remaining := map[uint64]struct{}{}
-	v1bkt := cc.tx.Bucket([]byte("v1"))
-	if v1bkt == nil {
+
+	if v1bkt := cc.tx.Bucket(bucketKeyV1); v1bkt != nil {
+		nsc := v1bkt.Cursor()
+		for nsk, nsv := nsc.First(); nsk != nil; nsk, nsv = nsc.Next() {
+			if nsv != nil {
+				continue
+			}
+			namespace := string(nsk)
+			releasedV1, remainingV1, err := v1ApplyRemoveNamespace(cc.tx, namespace, v1bkt.Bucket(nsk), cc.removed[namespace])
+			if err != nil {
+				return nil, err
+			}
+			cc.releasedV1 = append(cc.releasedV1, releasedV1...)
+			for id := range remainingV1 {
+				cc.remainingV1[id] = struct{}{}
+			}
+		}
+	}
+
+	v2bkt := cc.tx.Bucket(bucketKeyV2)
+	if v2bkt == nil {
 		return remaining, nil
 	}
-	nsc := v1bkt.Cursor()
+	nsc := v2bkt.Cursor()
 	for nsk, nsv := nsc.First(); nsk != nil; nsk, nsv = nsc.Next() {
 		if nsv != nil {
 			continue
 		}
-		removed := cc.removed[string(nsk)]
-		nsbkt := v1bkt.Bucket(nsk)
-		msbkt := nsbkt.Bucket(bucketKeyMounts)
-		if msbkt == nil {
-			continue
-		}
-		lsbkt := nsbkt.Bucket(bucketKeyLeases)
-		msc := msbkt.Cursor()
-		for msk, msv := msc.First(); msk != nil; msk, msv = msc.Next() {
-			if msv != nil {
-				continue
-			}
-			mbkt := msbkt.Bucket(msk)
-			var remove bool
-			if removed != nil {
-				_, remove = removed[string(msk)]
+		namespace := string(nsk)
+		removed := cc.removed[namespace]
+		nsbkt := v2bkt.Bucket(nsk)
+		msbkt := nsbkt.Bucket(bucketKeyActivations)
+		if msbkt != nil {
+			lsbkt := nsbkt.Bucket(bucketKeyLeases)
+			// Collect first: releasing mounted records writes to
+			// sibling buckets, which must not happen while a cursor is
+			// open over the activations bucket.
+			var remove [][]byte
+			msc := msbkt.Cursor()
+			for msk, msv := msc.First(); msk != nil; msk, msv = msc.Next() {
+				if msv != nil {
+					continue
+				}
+				if removed != nil {
+					if _, ok := removed[string(msk)]; ok {
+						remove = append(remove, bytes.Clone(msk))
+					}
+				}
 			}
 
-			if remove {
+			for _, msk := range remove {
+				mbkt := msbkt.Bucket(msk)
+				if mbkt == nil {
+					continue
+				}
 				if lsbkt != nil {
 					lid := mbkt.Get(bucketKeyLease)
 					if len(lid) > 0 {
@@ -1049,19 +1361,47 @@ func (cc *collectionContext) applyRemove() (map[uint64]struct{}, error) {
 						}
 					}
 				}
-				msbkt.DeleteBucket(msk)
-			} else {
-				remaining[readID(mbkt)] = struct{}{}
+				released, err := releaseMountedRecords(cc.tx, namespace, string(msk), activationUses(mbkt))
+				if err != nil {
+					return nil, err
+				}
+				cc.released = append(cc.released, released...)
+				if err := msbkt.DeleteBucket(msk); err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		// Everything still in the mount table is either used by a
+		// surviving activation or is one an in-flight activation
+		// already resolved, whether or not it has been realized yet.
+		if mtbkt := nsbkt.Bucket(bucketKeyMountTable); mtbkt != nil {
+			bc := mtbkt.Cursor()
+			for bk, bv := bc.First(); bk != nil; bk, bv = bc.Next() {
+				if bv != nil {
+					continue
+				}
+				id, _ := binary.Uvarint(bk)
+				remaining[id] = struct{}{}
 			}
 		}
 	}
 
+	sortUnmountOrder(cc.released)
+
 	return remaining, nil
 }
 
-func (cc *collectionContext) getCleanupDirectories(remaining map[uint64]struct{}) ([]string, error) {
-	fd, err := cc.manager.targets.Open(".")
+// orphanBackingMounts returns mounted records whose directory exists
+// under the target root but which no longer have a database record,
+// reconstructed from the type file written alongside each mount point.
+func (cc *collectionContext) orphanBackingMounts(remaining map[uint64]struct{}) ([]mountedRecord, error) {
+	root := filepath.Join(cc.manager.targets.Name(), backingDir)
+	fd, err := os.Open(root)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer fd.Close()
@@ -1071,7 +1411,7 @@ func (cc *collectionContext) getCleanupDirectories(remaining map[uint64]struct{}
 		return nil, err
 	}
 
-	cleanup := []string{}
+	var orphaned []mountedRecord
 	for _, d := range dirs {
 		id, err := strconv.ParseUint(d, 10, 64)
 		if err != nil {
@@ -1080,81 +1420,21 @@ func (cc *collectionContext) getCleanupDirectories(remaining map[uint64]struct{}
 		if _, ok := remaining[id]; ok {
 			continue
 		}
-		cleanup = append(cleanup, filepath.Join(cc.manager.targets.Name(), d))
-	}
-
-	return cleanup, nil
-}
-
-func cleanupAll(ctx context.Context, roots []string, handlers map[string]mount.Handler) error {
-	var errs []error
-	for _, root := range roots {
-		if err := unmountAll(ctx, root, handlers); err != nil {
-			errs = append(errs, fmt.Errorf("unmount all failed during cleanup up %s: %w", root, err))
+		b := mountedRecord{
+			id:    id,
+			point: filepath.Join(root, d, mountPointName),
+		}
+		if bs, err := os.ReadFile(filepath.Join(root, d, typeFileName)); err == nil {
+			b.mount.Type = string(bs)
+		} else if !os.IsNotExist(err) {
+			return nil, err
 		} else {
-			log.G(ctx).WithField("root", root).Debugf("unmounted")
+			log.G(cc.ctx).WithField("backing", id).Info("missing type file, attempting unmount with no handler")
 		}
-	}
-	return errors.Join(errs...)
-}
-
-func unmountAll(ctx context.Context, root string, handlers map[string]mount.Handler) error {
-	fd, err := os.Open(root)
-	if err != nil {
-		return err
+		orphaned = append(orphaned, b)
 	}
 
-	dirs, err := fd.Readdirnames(0)
-	fd.Close()
-	if err != nil {
-		return err
-	}
+	sortUnmountOrder(orphaned)
 
-	var mountErrs []error
-	for i := len(dirs) - 1; i >= 0; {
-		var (
-			d  = dirs[i]
-			mp string
-			h  mount.Handler
-		)
-		i--
-
-		if strings.HasSuffix(d, "-type") {
-			name := d[:len(d)-5]
-			if i >= 0 && dirs[i] == name {
-				i--
-			}
-			if b, rerr := os.ReadFile(filepath.Join(root, d)); rerr == nil {
-				h = handlers[string(b)]
-			} else {
-				return rerr
-			}
-			mp = filepath.Join(root, name)
-		} else {
-			mp = filepath.Join(root, d)
-			// If type file exists, continue and try again with "-type" file
-			if _, serr := os.Stat(mp + "-type"); serr == nil {
-				continue
-			} else if !os.IsNotExist(serr) {
-				return serr
-			} else {
-				log.G(ctx).WithField("mount", d).Infof("missing type file, attempting unmount with no handler")
-			}
-		}
-
-		if h != nil {
-			err = h.Unmount(ctx, mp)
-		} else {
-			err = mount.Unmount(mp, 0)
-		}
-		if err != nil {
-			// TODO: Ignore already unmounted
-			mountErrs = append(mountErrs, fmt.Errorf("failure unmounting %s: %w", d, err))
-		}
-	}
-	if len(mountErrs) > 0 {
-		return errors.Join(mountErrs...)
-	}
-
-	return os.RemoveAll(root)
+	return orphaned, nil
 }
