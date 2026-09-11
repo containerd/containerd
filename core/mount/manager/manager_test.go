@@ -18,6 +18,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -182,6 +183,7 @@ func (h *noopHandler) Mounted(_ context.Context, _ mount.Mount, path string) (bo
 type errOnceHandler struct {
 	mounts  *atomic.Int32
 	mounted map[string]struct{}
+	failed  map[string]struct{}
 }
 
 func (h *errOnceHandler) Mount(_ context.Context, m mount.Mount, mp string, _ []mount.ActiveMount) (mount.ActiveMount, error) {
@@ -196,13 +198,24 @@ func (h *errOnceHandler) Mount(_ context.Context, m mount.Mount, mp string, _ []
 	}, nil
 }
 
+// Unmount fails the first time for each mount point, leaving it mounted.
 func (h *errOnceHandler) Unmount(_ context.Context, mp string) error {
-	if _, ok := h.mounted[mp]; ok {
-		delete(h.mounted, mp)
+	if _, ok := h.failed[mp]; !ok {
+		if h.failed == nil {
+			h.failed = map[string]struct{}{}
+		}
+		h.failed[mp] = struct{}{}
 		return fmt.Errorf("first unmount always fails")
 	}
+	delete(h.mounted, mp)
 	h.mounts.Add(-1)
 	return nil
+}
+
+// Mounted reports h.mounted, the same bookkeeping Mount and Unmount keep.
+func (h *errOnceHandler) Mounted(_ context.Context, _ mount.Mount, path string) (bool, error) {
+	_, ok := h.mounted[path]
+	return ok, nil
 }
 
 // TestGC tests the garbage collection features of the mount manager,
@@ -1741,6 +1754,95 @@ func TestActivateReusesRecordWithoutHandlerData(t *testing.T) {
 	assert.Equal(t, int32(0), mountC.Load())
 }
 
+// TestProbeMountedAssumesLiveWhenMountTableUnobservable verifies that
+// a handler-less or checker-less mount falls back to assumeLive when
+// the host mount table cannot be consulted.
+func TestProbeMountedAssumesLiveWhenMountTableUnobservable(t *testing.T) {
+	ctx := context.Background()
+	live, err := probeMounted(ctx, nil, mount.Mount{}, "/some/path/nothing/wrote", false, true)
+	require.NoError(t, err)
+	assert.True(t, live, "must assume live when told to and the mount table is unobservable")
+
+	live, err = probeMounted(ctx, nil, mount.Mount{}, "/some/path/nothing/wrote", false, false)
+	require.NoError(t, err)
+	assert.False(t, live, "must not assume live for a brand new record even when the mount table is unobservable")
+}
+
+// TestActivateRunsEnsureForReusedSharedRecord verifies that a managed
+// position's own mkdir ensure runs even when it resolves to a record
+// another activation already mounted, since the mount identity does
+// not distinguish the mkdir options an activation used to get there.
+func TestActivateRunsEnsureForReusedSharedRecord(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	td := t.TempDir()
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0700))
+
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	mountC := new(atomic.Int32)
+	m, err := NewManager(db, filepath.Join(td, "m"), WithAllowedRoot(root), WithMountHandler("vol", &noopHandler{mounts: mountC}))
+	require.NoError(t, err)
+	t.Cleanup(func() { m.(io.Closer).Close() })
+
+	dirA := filepath.Join(root, "a-dir")
+	dirB := filepath.Join(root, "b-dir")
+	vol := func(dir string) mount.Mount {
+		return mount.Mount{
+			Type:    "mkdir/vol",
+			Source:  testDevNull,
+			Options: []string{fmt.Sprintf("X-containerd.mkdir.path=%s", dir), "rw"},
+		}
+	}
+
+	_, err = m.Activate(ctx, "a", []mount.Mount{vol(dirA)})
+	require.NoError(t, err)
+	_, err = os.Stat(dirA)
+	require.NoError(t, err)
+
+	_, err = m.Activate(ctx, "b", []mount.Mount{vol(dirB)})
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), mountC.Load(), "second activation must reuse the mount, not repeat it")
+	_, err = os.Stat(dirB)
+	assert.NoError(t, err, "a reused record must still run the reusing activation's own mkdir ensure")
+
+	require.NoError(t, m.Deactivate(ctx, "a"))
+	require.NoError(t, m.Deactivate(ctx, "b"))
+	assert.Equal(t, int32(0), mountC.Load())
+}
+
+// TestActivateReusedRecordValidatesConflictingMkdirRequest verifies
+// that reusing a shared record does not silently skip a conflicting
+// mkdir request: a second activation naming the same target with a
+// different mode must still hit apply's own validation.
+func TestActivateReusedRecordValidatesConflictingMkdirRequest(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	td := t.TempDir()
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0700))
+
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	m, err := NewManager(db, filepath.Join(td, "m"), WithAllowedRoot(root), WithMountHandler("vol", &noopHandler{mounts: new(atomic.Int32)}))
+	require.NoError(t, err)
+	t.Cleanup(func() { m.(io.Closer).Close() })
+
+	dir := filepath.Join(root, "shared-dir")
+	volWithMode := func(mode string) mount.Mount {
+		return mount.Mount{
+			Type:    "mkdir/vol",
+			Source:  testDevNull,
+			Options: []string{fmt.Sprintf("X-containerd.mkdir.path=%s:%s", dir, mode), "rw"},
+		}
+	}
+
+	_, err = m.Activate(ctx, "a", []mount.Mount{volWithMode("700")})
+	require.NoError(t, err)
+
+	_, err = m.Activate(ctx, "b", []mount.Mount{volWithMode("755")})
+	assert.True(t, errdefs.IsNotImplemented(err), "a conflicting mkdir mode on a reused record must still be validated, got %v", err)
+}
+
 // TestPodGroupSharesOneMount verifies that a shared image mount at
 // the bottom of each container's chain is mounted exactly once no
 // matter how many containers reference it.
@@ -1786,4 +1888,36 @@ func TestPodGroupSharesOneMount(t *testing.T) {
 		require.NoError(t, m.Deactivate(ctx, fmt.Sprintf("container%d", i)))
 	}
 	assert.Equal(t, int32(0), mountC.Load())
+}
+
+// cancelThenFailHandler cancels the activation's context from inside
+// Mount and then fails, so Activate rolls back with a cancelled ctx.
+type cancelThenFailHandler struct {
+	cancel context.CancelFunc
+}
+
+func (h *cancelThenFailHandler) Mount(context.Context, mount.Mount, string, []mount.ActiveMount) (mount.ActiveMount, error) {
+	h.cancel()
+	return mount.ActiveMount{}, errors.New("mount failed after cancellation")
+}
+
+func (h *cancelThenFailHandler) Unmount(context.Context, string) error {
+	return nil
+}
+
+// TestActivateRollbackUnmountsWithCancelledContext verifies that a
+// failed Activate whose context was cancelled still unmounts what it
+// already mounted.
+func TestActivateRollbackUnmountsWithCancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(namespaces.WithNamespace(context.Background(), "test"))
+	defer cancel()
+	noop := &noopHandler{mounts: new(atomic.Int32)}
+	m, _ := mkTestManager(t, WithMountHandler("noop", noop), WithMountHandler("cancel", &cancelThenFailHandler{cancel: cancel}))
+
+	_, err := m.Activate(ctx, "a", []mount.Mount{
+		{Type: "noop", Source: testDevNull},
+		{Type: "cancel", Source: testDevNull},
+	})
+	require.Error(t, err)
+	assert.Equal(t, int32(0), noop.mounts.Load(), "the rollback must unmount the first position even though ctx was cancelled")
 }
