@@ -37,16 +37,32 @@ type mkdir struct {
 	rootMap map[string]*os.Root
 }
 
-func (h *mkdir) Transform(ctx context.Context, m mount.Mount, _ []mount.ActiveMount) (mount.Mount, error) {
+// mkdirAction is one X-containerd.mkdir.* option, parsed but not yet
+// applied to the filesystem.
+type mkdirAction struct {
+	root    *os.Root
+	subpath string
+	dir     string // original, unresolved-relative path, for error messages
+	mode    os.FileMode
+	uid     int
+	gid     int
+	luid    int
+	lgid    int
+}
 
+// rewrite parses m's mkdir options into the mount value the kernel
+// will see, and a deferredEnsure that creates the directories those
+// options describe.
+func (h *mkdir) rewrite(m mount.Mount) (mount.Mount, deferredEnsure, error) {
 	var options []string
+	var actions []mkdirAction
 	for _, o := range m.Options {
 		if mkdirOption, isMkdir := strings.CutPrefix(o, prefixMkdir); isMkdir {
 			// Format is X-containerd.mkdir.path=value[:mode[:uid:gid]]
 
 			value, isPath := strings.CutPrefix(mkdirOption, "path=")
 			if !isPath {
-				return mount.Mount{}, fmt.Errorf("invalid mkdir option %q: %w", o, errdefs.ErrInvalidArgument)
+				return mount.Mount{}, deferredEnsure{}, fmt.Errorf("invalid mkdir option %q: %w", o, errdefs.ErrInvalidArgument)
 			}
 			parts := strings.SplitN(value, ":", 4)
 			var (
@@ -61,11 +77,11 @@ func (h *mkdir) Transform(ctx context.Context, m mount.Mount, _ []mount.ActiveMo
 			case 4:
 				gid, err = strconv.Atoi(parts[3])
 				if err != nil {
-					return mount.Mount{}, fmt.Errorf("invalid gid %q: %w", parts[3], errdefs.ErrInvalidArgument)
+					return mount.Mount{}, deferredEnsure{}, fmt.Errorf("invalid gid %q: %w", parts[3], errdefs.ErrInvalidArgument)
 				}
 				uid, err = strconv.Atoi(parts[2])
 				if err != nil {
-					return mount.Mount{}, fmt.Errorf("invalid uid %q: %w", parts[2], errdefs.ErrInvalidArgument)
+					return mount.Mount{}, deferredEnsure{}, fmt.Errorf("invalid uid %q: %w", parts[2], errdefs.ErrInvalidArgument)
 				}
 				fallthrough
 			case 2:
@@ -74,16 +90,16 @@ func (h *mkdir) Transform(ctx context.Context, m mount.Mount, _ []mount.ActiveMo
 				if err == nil {
 					mode = os.FileMode(p)
 					if mode != mode&os.ModePerm {
-						return mount.Mount{}, fmt.Errorf("invalid mode %o", p)
+						return mount.Mount{}, deferredEnsure{}, fmt.Errorf("invalid mode %o", p)
 					}
 				} else {
-					return mount.Mount{}, fmt.Errorf("invalid mode %s: %w", parts[1], err)
+					return mount.Mount{}, deferredEnsure{}, fmt.Errorf("invalid mode %s: %w", parts[1], err)
 				}
 				fallthrough
 			case 1:
 				dir = parts[0]
 			default:
-				return mount.Mount{}, fmt.Errorf("invalid mkdir option %q: %w", o, errdefs.ErrInvalidArgument)
+				return mount.Mount{}, deferredEnsure{}, fmt.Errorf("invalid mkdir option %q: %w", o, errdefs.ErrInvalidArgument)
 			}
 
 			var r *os.Root
@@ -98,35 +114,85 @@ func (h *mkdir) Transform(ctx context.Context, m mount.Mount, _ []mount.ActiveMo
 				}
 			}
 			if r == nil {
-				return mount.Mount{}, fmt.Errorf("no root %q configured for mkdir: %w", dir, errdefs.ErrNotImplemented)
+				return mount.Mount{}, deferredEnsure{}, fmt.Errorf("no root %q configured for mkdir: %w", dir, errdefs.ErrNotImplemented)
 			}
 
-			if st, err := r.Stat(subpath); err == nil {
-				if st.Mode()&os.ModePerm != mode {
-					// TODO: Chmod support added in go1.25
-					return mount.Mount{}, fmt.Errorf("chmod not supported yet for mkdir handler: %w", errdefs.ErrNotImplemented)
-				}
-				// TODO: check ownership, chown support added in go1.25
-			} else if os.IsNotExist(err) {
-				// TODO: MkdirAll added in go1.25
-				if err := r.Mkdir(subpath, mode); err != nil {
-					return mount.Mount{}, fmt.Errorf("failed to create directory %q: %w", dir, err)
-				}
-				if luid != -1 && (luid != uid || lgid != gid) {
-					// TODO: Chown support added in go1.25
-					//if err := r.Chown(subpath, uid, gid); err != nil {
-					//	return fmt.Errorf("failed to chown directory %q: %w", m.Source, err)
-					//}
-					return mount.Mount{}, fmt.Errorf("chown not supported yet for mkdir handler: %w", errdefs.ErrNotImplemented)
-				}
-			} else {
-				return mount.Mount{}, fmt.Errorf("failed to stat %q: %w", dir, err)
-			}
+			actions = append(actions, mkdirAction{
+				root:    r,
+				subpath: subpath,
+				dir:     dir,
+				mode:    mode,
+				uid:     uid,
+				gid:     gid,
+				luid:    luid,
+				lgid:    lgid,
+			})
 		} else {
 			options = append(options, o)
 		}
 	}
 	m.Options = options
 
-	return m, nil
+	targets := make([]string, len(actions))
+	for i, a := range actions {
+		target, err := filepath.Abs(filepath.Join(a.root.Name(), a.subpath))
+		if err != nil {
+			return mount.Mount{}, deferredEnsure{}, fmt.Errorf("failed to resolve absolute path for %q: %w", a.dir, err)
+		}
+		targets[i] = target
+	}
+	ensure := deferredEnsure{
+		targets: targets,
+		run: func(ctx context.Context) error {
+			for _, a := range actions {
+				if err := a.apply(); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+	return m, ensure, nil
+}
+
+// apply creates a's directory if it does not already exist. An
+// existing directory whose mode disagrees is reported rather than
+// changed, matching the historical behavior: chown and chmod support
+// for an already existing directory are not yet implemented.
+func (a mkdirAction) apply() error {
+	if st, err := a.root.Stat(a.subpath); err == nil {
+		if st.Mode()&os.ModePerm != a.mode {
+			// TODO: Chmod support added in go1.25
+			return fmt.Errorf("chmod not supported yet for mkdir handler: %w", errdefs.ErrNotImplemented)
+		}
+		// TODO: check ownership, chown support added in go1.25
+	} else if os.IsNotExist(err) {
+		// TODO: MkdirAll added in go1.25
+		if err := a.root.Mkdir(a.subpath, a.mode); err != nil {
+			return fmt.Errorf("failed to create directory %q: %w", a.dir, err)
+		}
+		if a.luid != -1 && (a.luid != a.uid || a.lgid != a.gid) {
+			// TODO: Chown support added in go1.25
+			//if err := a.root.Chown(a.subpath, a.uid, a.gid); err != nil {
+			//	return fmt.Errorf("failed to chown directory %q: %w", a.dir, err)
+			//}
+			return fmt.Errorf("chown not supported yet for mkdir handler: %w", errdefs.ErrNotImplemented)
+		}
+	} else {
+		return fmt.Errorf("failed to stat %q: %w", a.dir, err)
+	}
+	return nil
+}
+
+// Transform implements mount.Transformer by running rewrite and its
+// ensure together.
+func (h *mkdir) Transform(ctx context.Context, m mount.Mount, _ []mount.ActiveMount) (mount.Mount, error) {
+	rewritten, ensure, err := h.rewrite(m)
+	if err != nil {
+		return rewritten, err
+	}
+	if err := ensure.run(ctx); err != nil {
+		return mount.Mount{}, err
+	}
+	return rewritten, nil
 }
