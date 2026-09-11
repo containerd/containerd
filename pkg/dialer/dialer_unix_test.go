@@ -18,30 +18,22 @@
 
 package dialer
 
-import (
-	"errors"
-	"fmt"
-	"net"
-	"strings"
-	"syscall"
-	"time"
-)
+import "testing"
 
-// DialAddress returns the address with unix:// prepended to the
-// provided address. An address that already carries the scheme is
-// returned unchanged.
-func DialAddress(address string) string {
-	if strings.HasPrefix(address, "unix://") {
-		return address
+func TestDialAddressScheme(t *testing.T) {
+	testcases := []struct {
+		name    string
+		address string
+		want    string
+	}{
+		{name: "bare path gets unix", address: "/run/containerd/containerd.sock", want: "unix:///run/containerd/containerd.sock"},
+		{name: "unix scheme idempotent", address: "unix:///run/containerd/containerd.sock", want: "unix:///run/containerd/containerd.sock"},
 	}
-	return fmt.Sprintf("unix://%s", address)
-}
-
-func isNoent(err error) bool {
-	return errors.Is(err, syscall.ENOENT)
-}
-
-func dialer(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(address, "unix://")
-	return net.DialTimeout("unix", address, timeout)
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := DialAddress(tc.address); got != tc.want {
+				t.Errorf("DialAddress(%q) = %q, want %q", tc.address, got, tc.want)
+			}
+		})
+	}
 }
