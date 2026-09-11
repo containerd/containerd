@@ -34,6 +34,9 @@ import (
 // Restart test must run sequentially.
 
 func TestContainerdRestart(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc sandboxes do not survive containerd restart; state recovery is not supported")
+	}
 	type container struct {
 		name  string
 		id    string

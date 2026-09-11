@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+#
+# Appends a runsc (gVisor) runtime handler to /etc/containerd/config.toml
+# and makes it the default CRI runtime.
+# Must be called after script/setup/config-containerd.
+#
+set -eux -o pipefail
+
+: "${CGROUP_DRIVER:=}"
+
+systemd_cgroup=false
+if [[ "${CGROUP_DRIVER}" == "systemd" ]]; then
+	systemd_cgroup=true
+fi
+
+# config-containerd has already written [plugins."io.containerd.grpc.v1.cri"] with
+# enable_selinux derived from the host SELinux mode.  Patch it to false in-place
+# rather than redeclaring the table (duplicate table headers are invalid TOML).
+# gVisor does not support SELinux labels in the OCI spec.
+sudo sed -i 's/^\(\s*enable_selinux\s*=\s*\).*/\1false/' /etc/containerd/config.toml
+
+# Ensure the three runsc-related TOML tables are present and correct in a single
+# atomic Python pass.  Using one pass avoids ordering problems (a parent must never
+# appear after an implicitly-defined child) and handles indented headers correctly.
+#
+# Tables managed:
+#   [plugins."io.containerd.grpc.v1.cri".containerd]
+#       default_runtime_name = "runsc"
+#   [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+#       runtime_type = "io.containerd.runsc.v1"
+#   [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc.options]
+#       SystemdCgroup = true|false
+sudo python3 - /etc/containerd/config.toml "${systemd_cgroup}" << 'PYEOF'
+import sys, re
+
+path, systemd_cgroup = sys.argv[1], sys.argv[2]
+with open(path) as f:
+    content = f.read()
+
+# Split on lines that begin a TOML table header (leading horizontal whitespace
+# included).  Use [^\S\n]* rather than \s* so that blank lines before a header
+# are kept with the preceding section and do not produce empty leading sections
+# that would cause the header-matching logic to miss the table.
+sections = re.split(r'(?m)^(?=[^\S\n]*\[)', content)
+
+H_containerd = '[plugins."io.containerd.grpc.v1.cri".containerd]'
+H_runsc      = '[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]'
+H_options    = '[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc.options]'
+# Prefix shared by all three descendant tables of H_containerd.
+descendant_prefix = '[plugins."io.containerd.grpc.v1.cri".containerd.'
+# Prefix shared by H_options (child of H_runsc).
+runsc_descendant_prefix = '[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc.'
+
+found_containerd = False
+found_runsc      = False
+found_options    = False
+new_sections = []
+
+for i, sec in enumerate(sections):
+    raw_header = sec.split('\n', 1)[0]   # first line, preserving any indentation
+    header = raw_header.strip()
+
+    if header == H_containerd:
+        found_containerd = True
+        if re.search(r'^\s*default_runtime_name\s*=', sec, re.MULTILINE):
+            sec = re.sub(r'(?m)^\s*default_runtime_name\s*=.*',
+                         '  default_runtime_name = "runsc"', sec)
+        else:
+            sec = sec.replace(raw_header, raw_header + '\n  default_runtime_name = "runsc"', 1)
+
+    elif header == H_runsc:
+        found_runsc = True
+        if re.search(r'^\s*runtime_type\s*=', sec, re.MULTILINE):
+            sec = re.sub(r'(?m)^\s*runtime_type\s*=.*',
+                         '  runtime_type = "io.containerd.runsc.v1"', sec)
+        else:
+            sec = sec.replace(raw_header, raw_header + '\n  runtime_type = "io.containerd.runsc.v1"', 1)
+
+    elif header == H_options:
+        found_options = True
+        if re.search(r'^\s*SystemdCgroup\s*=', sec, re.MULTILINE):
+            sec = re.sub(r'(?m)^\s*SystemdCgroup\s*=.*',
+                         f'  SystemdCgroup = {systemd_cgroup}', sec)
+        else:
+            sec = sec.replace(raw_header, raw_header + f'\n  SystemdCgroup = {systemd_cgroup}', 1)
+
+    new_sections.append((i, sec, header))
+
+# Insert any missing tables.  Each parent must appear before its children.
+# Work from outermost to innermost; after each insertion re-scan for the
+# correct insertion point so indices remain valid.
+def insert_before_descendants(sections, missing_header, new_text, child_prefix):
+    idx = next(
+        (i for i, (_, _, h) in enumerate(sections) if h.startswith(child_prefix)),
+        None,
+    )
+    entry = (None, new_text, missing_header)
+    if idx is not None:
+        sections.insert(idx, entry)
+    else:
+        sections.append(entry)
+
+if not found_containerd:
+    insert_before_descendants(
+        new_sections,
+        H_containerd,
+        f'\n{H_containerd}\n  default_runtime_name = "runsc"\n',
+        descendant_prefix,
+    )
+
+if not found_runsc:
+    insert_before_descendants(
+        new_sections,
+        H_runsc,
+        f'\n{H_runsc}\n  runtime_type = "io.containerd.runsc.v1"\n',
+        runsc_descendant_prefix,
+    )
+
+if not found_options:
+    new_sections.append(
+        (None, f'\n{H_options}\n  SystemdCgroup = {systemd_cgroup}\n', H_options)
+    )
+
+with open(path, 'w') as f:
+    f.write(''.join(sec for _, sec, _ in new_sections))
+PYEOF
+
+# Always (re-)write the runsc shim config file.  containerd-shim-runsc-v1
+# does not read SystemdCgroup from the containerd options table; it reads its
+# own config from well-known paths (searched in order):
+#   /run/containerd/runsc/config.toml
+#   /etc/containerd/runsc/config.toml
+# The cgroup driver is controlled by [runsc_config] systemd-cgroup.
+# Note: RunscConfig is map[string]string so the value must be a quoted TOML string.
+sudo mkdir -p /etc/containerd/runsc
+cat << EOF | sudo tee /etc/containerd/runsc/config.toml
+
+[runsc_config]
+  systemd-cgroup = "${systemd_cgroup}"
+EOF

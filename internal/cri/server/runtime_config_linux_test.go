@@ -38,6 +38,18 @@ func newFakeRuntimeConfig(runcV2, systemdCgroup bool) criconfig.Runtime {
 	return r
 }
 
+// newFakeGenericRuntimeConfig returns a runtime config for a generic shim
+// (e.g. io.containerd.runsc.v1) that uses runtimeoptions.Options with
+// SystemdCgroup stored in ConfigBody.  A non-empty options map is always
+// provided so that ConfigBody is non-empty, signalling that the shim has an
+// explicit cgroup-driver preference.
+func newFakeGenericRuntimeConfig(runtimeType string, systemdCgroup bool) criconfig.Runtime {
+	r := criconfig.Runtime{Type: runtimeType, Options: map[string]any{
+		"SystemdCgroup": systemdCgroup,
+	}}
+	return r
+}
+
 func TestRuntimeConfig(t *testing.T) {
 	autoDetected := runtime.CgroupDriver_CGROUPFS
 	if systemd.IsRunningSystemd() {
@@ -89,6 +101,42 @@ func TestRuntimeConfig(t *testing.T) {
 				"runc-2":   newFakeRuntimeConfig(true, true),
 			},
 			expectedCgroupDriver: runtime.CgroupDriver_SYSTEMD,
+		},
+		{
+			desc:           "generic shim (runsc), cgroupfs",
+			defaultRuntime: "runsc",
+			runtimes: map[string]criconfig.Runtime{
+				"runsc": newFakeGenericRuntimeConfig("io.containerd.runsc.v1", false),
+			},
+			expectedCgroupDriver: runtime.CgroupDriver_CGROUPFS,
+		},
+		{
+			desc:           "generic shim (runsc), systemd",
+			defaultRuntime: "runsc",
+			runtimes: map[string]criconfig.Runtime{
+				"runsc": newFakeGenericRuntimeConfig("io.containerd.runsc.v1", true),
+			},
+			expectedCgroupDriver: runtime.CgroupDriver_SYSTEMD,
+		},
+		{
+			desc:           "generic shim (runsc) default overrides runc",
+			defaultRuntime: "runsc",
+			runtimes: map[string]criconfig.Runtime{
+				"runc":  newFakeRuntimeConfig(true, true),
+				"runsc": newFakeGenericRuntimeConfig("io.containerd.runsc.v1", false),
+			},
+			expectedCgroupDriver: runtime.CgroupDriver_CGROUPFS,
+		},
+		{
+			// A generic shim with non-empty options that do NOT include
+			// SystemdCgroup must fall through to host auto-detection, not be
+			// silently treated as cgroupfs.
+			desc:           "generic shim without SystemdCgroup key falls through to auto-detect",
+			defaultRuntime: "other",
+			runtimes: map[string]criconfig.Runtime{
+				"other": {Type: "io.containerd.other.v1", Options: map[string]any{"SomeOtherKey": "value"}},
+			},
+			expectedCgroupDriver: autoDetected,
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {

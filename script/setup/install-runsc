@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+#
+# Downloads and installs runsc (gVisor) and containerd-shim-runsc-v1
+# from the official gVisor GCS release bucket.
+# The version is read from script/setup/runsc-version or overridden via $RUNSC_VERSION.
+#
+set -eu -o pipefail
+
+script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
+
+# e2e and Cirrus will fail with "sudo: command not found"
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='sudo'
+fi
+
+: "${RUNSC_VERSION:=$(cat "${script_dir}/runsc-version")}"
+: "${RUNSC_REPO:=https://storage.googleapis.com/gvisor/releases/release}"
+
+# GCS uses Linux arch names (x86_64/aarch64), not Go arch names (amd64/arm64)
+case "$(uname -m)" in
+	x86_64|aarch64) ARCH="$(uname -m)" ;;
+	amd64) ARCH="x86_64" ;;
+	arm64) ARCH="aarch64" ;;
+	*) echo >&2 "unsupported arch for runsc: $(uname -m)"; exit 1 ;;
+esac
+
+# Download the release tarball (includes runsc, containerd-shim-runsc-v1, and
+# the required gvisor-bin/ sidecar executables) and verify its checksum.
+tarball="$(mktemp /tmp/gvisor-XXXXXX.tar.bz2)"
+trap 'rm -f "${tarball}"' EXIT
+
+curl -fsSL --retry 5 -o "${tarball}" \
+	"${RUNSC_REPO}/${RUNSC_VERSION}/${ARCH}/gvisor.tar.bz2"
+
+# Verify the sha512 checksum published alongside the tarball.
+expected_sha512="$(curl -fsSL --retry 5 "${RUNSC_REPO}/${RUNSC_VERSION}/${ARCH}/gvisor.tar.bz2.sha512" | awk '{print $1}')"
+actual_sha512="$(sha512sum "${tarball}" | awk '{print $1}')"
+if [[ "${actual_sha512}" != "${expected_sha512}" ]]; then
+	echo >&2 "sha512 mismatch for gvisor.tar.bz2: expected ${expected_sha512}, got ${actual_sha512}"
+	exit 1
+fi
+
+# Extract into a temporary directory, then install.
+tmpdir="$(mktemp -d /tmp/gvisor-XXXXXX)"
+trap 'rm -rf "${tmpdir}" "${tarball}"' EXIT
+
+tar -C "${tmpdir}" -xjf "${tarball}"
+
+$SUDO install -m 0755 "${tmpdir}/runsc" /usr/local/sbin/runsc
+$SUDO install -m 0755 "${tmpdir}/containerd-shim-runsc-v1" /usr/local/bin/containerd-shim-runsc-v1
+
+# Install the gvisor-bin/ sidecar executables that runsc requires at runtime.
+# runsc looks for gvisor-bin/ next to its own executable.
+$SUDO mkdir -p /usr/local/sbin/gvisor-bin
+$SUDO install -m 0755 "${tmpdir}"/gvisor-bin/* /usr/local/sbin/gvisor-bin/

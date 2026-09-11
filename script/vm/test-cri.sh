@@ -29,18 +29,31 @@ script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 containerd_dir="$(cd -- "${script_dir}/../.." > /dev/null 2>&1; pwd -P)"
 
 : "${CGROUP_DRIVER:=}"
+: "${TEST_RUNTIME:=}"
 : "${REPORT_DIR:=}"
 
 export GOPATH="${GOPATH:-/go}"
 export PATH="/usr/local/go/bin:${GOPATH}/bin:/usr/local/bin:/usr/local/sbin:${PATH}"
 
+# Unmount any bind-mounted network namespace files left behind by a previous
+# runsc run (e.g. /run/containerd/runsc/k8s.io/null-netns).  findmnt only
+# lists directory mountpoints, so read /proc/mounts directly to catch file
+# bind-mounts too.
+unmount_containerd_mounts() {
+	awk '$2 ~ "^/run/containerd" {print $2}' /proc/mounts 2>/dev/null |
+		sort -r |
+		xargs -r umount -l 2>/dev/null || true
+}
+
 systemctl disable --now containerd || true
+unmount_containerd_mounts
 rm -rf /var/lib/containerd /run/containerd
 
 cleanup() {
 	journalctl -u containerd > /tmp/containerd.log
 	cat /tmp/containerd.log
 	systemctl stop containerd
+	unmount_containerd_mounts
 }
 
 selinux=$(getenforce)
@@ -59,6 +72,33 @@ skip_tests=(
 )
 if [[ $CGROUP_DRIVER == "systemd" ]]; then
 	skip_tests+=("should terminate with exitCode 137 and reason OOMKilled")
+fi
+if [[ $TEST_RUNTIME == "io.containerd.runsc.v1" ]]; then
+	# gVisor does not support: host networking, privileged containers, SELinux,
+	# host PID/IPC namespaces, cgroup memory limits (OOMKilled), sysctls,
+	# rshared/non-recursive-readonly mount semantics, NET_ADMIN capability
+	# (brctl), MaskedPaths, ReadonlyPaths, NoNewPrivs escalation semantics,
+	# host seccomp profiles, user namespace idmap mounts, port-forwarding into
+	# its own network namespace, or the OOM-events metric.
+	skip_tests+=(
+		'HostNetwork is true'
+		'HostPID'
+		'Privileged is true'
+		'SELinux'
+		'should terminate with exitCode 137 and reason OOMKilled'
+		'should support safe sysctls'
+		'should support unsafe sysctls'
+		'rshared'
+		'non-recursive readonly'
+		'adding capability'
+		'MaskedPaths'
+		'ReadonlyPaths'
+		'should allow privilege escalation when false'
+		'SeccompProfilePath'
+		'UserNamespaces'
+		'portforward'
+		'listing pod sandbox metrics'
+	)
 fi
 skip_test_args=$(
 	IFS='|'

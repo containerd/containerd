@@ -615,6 +615,14 @@ jobs:
           - template: fedora-44
             cgroup_driver: systemd
             runc: crun
+          - template: fedora-44
+            cgroup_driver: cgroupfs
+            runc: runc
+            test_runtime: io.containerd.runsc.v1
+          - template: fedora-44
+            cgroup_driver: systemd
+            runc: runc
+            test_runtime: io.containerd.runsc.v1
             # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
           - template: almalinux-8
             cgroup_driver: cgroupfs
@@ -638,6 +646,7 @@ jobs:
       LIMA_TEMPLATE: ${{ matrix.template }}
       CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
       RUNC_FLAVOR: ${{ matrix.runc }}
+      TEST_RUNTIME: ${{ matrix.test_runtime }}
       LIMA_WORKDIR: /go/src/github.com/containerd/containerd
     steps:
       - name: Show the host info
@@ -667,13 +676,13 @@ jobs:
           limactl cp -r . default:containerd
           lima bash -c 'sudo mkdir -p /go/src/github.com/containerd && sudo mv ~/containerd /go/src/github.com/containerd/containerd'
       - name: Provision the VM
-        run: lima sudo RUNC_FLAVOR="$RUNC_FLAVOR" script/vm/provision.sh
+        run: lima sudo RUNC_FLAVOR="$RUNC_FLAVOR" TEST_RUNTIME="$TEST_RUNTIME" CGROUP_DRIVER="$CGROUP_DRIVER" script/vm/provision.sh
       - name: test-integration
-        run: lima sudo RUNC_FLAVOR="$RUNC_FLAVOR" script/vm/test-integration.sh
+        run: lima sudo RUNC_FLAVOR="$RUNC_FLAVOR" TEST_RUNTIME="$TEST_RUNTIME" script/vm/test-integration.sh
       - name: test-cri-integration
-        run: lima sudo CGROUP_DRIVER="$CGROUP_DRIVER" RUNC_FLAVOR="$RUNC_FLAVOR" script/vm/test-cri-integration.sh
+        run: lima sudo CGROUP_DRIVER="$CGROUP_DRIVER" RUNC_FLAVOR="$RUNC_FLAVOR" TEST_RUNTIME="$TEST_RUNTIME" script/vm/test-cri-integration.sh
       - name: test-cri
-        run: lima sudo CGROUP_DRIVER="$CGROUP_DRIVER" script/vm/test-cri.sh
+        run: lima sudo CGROUP_DRIVER="$CGROUP_DRIVER" TEST_RUNTIME="$TEST_RUNTIME" script/vm/test-cri.sh
       - name: dump-dmesg
         if: always()
         env:

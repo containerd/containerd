@@ -33,8 +33,14 @@ limactl delete -f default
 
 ## Environment variables
 
-- `provision.sh`: `GO_VERSION`, `RUNC_FLAVOR` (`runc` or `crun`), `SELINUX`
-  (`Enforcing`, `Permissive`, or `Disabled`), `INSTALL_PACKAGES`
-- `test-integration.sh`: `RUNC_FLAVOR`
-- `test-cri-integration.sh`: `CGROUP_DRIVER` (empty or `systemd`), `RUNC_FLAVOR`
-- `test-cri.sh`: `CGROUP_DRIVER` (empty or `systemd`), `REPORT_DIR`
+- `provision.sh`: `GO_VERSION`, `RUNC_FLAVOR` (`runc` or `crun`),
+  `TEST_RUNTIME` (set to `io.containerd.runsc.v1` to install runsc alongside runc),
+  `CGROUP_DRIVER` (empty, `cgroupfs`, or `systemd`; used when `TEST_RUNTIME=io.containerd.runsc.v1`),
+  `SELINUX` (`Enforcing`, `Permissive`, or `Disabled`), `INSTALL_PACKAGES`
+- `test-integration.sh`: `RUNC_FLAVOR` (`runc` or `crun`)
+- `test-cri-integration.sh`: `CGROUP_DRIVER` (empty, `cgroupfs`, or `systemd`),
+  `RUNC_FLAVOR` (`runc` or `crun`; forwarded to the test binary to skip runc-only tests),
+  `TEST_RUNTIME` (set to `io.containerd.runsc.v1` to run CRI tests against gVisor)
+- `test-cri.sh`: `CGROUP_DRIVER` (empty, `cgroupfs`, or `systemd`),
+  `TEST_RUNTIME` (set to `io.containerd.runsc.v1` to run CRI conformance tests against gVisor),
+  `REPORT_DIR`

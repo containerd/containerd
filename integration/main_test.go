@@ -73,6 +73,12 @@ var runtimeHandler = flag.String("runtime-handler", "", "The runtime handler to 
 var containerdBin = flag.String("containerd-bin", "containerd", "The containerd binary name. The name is used to restart containerd during test.")
 var buildDir = flag.String("build-dir", "", "Build output directory for containerd binaries")
 
+// runtimeHandlerIsRunsc reports whether the active runtime handler is runsc
+// (gVisor) or any runsc variant (e.g. "runsc-some-option").
+func runtimeHandlerIsRunsc() bool {
+	return *runtimeHandler == "runsc" || strings.HasPrefix(*runtimeHandler, "runsc-")
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if err := ConnectDaemons(); err != nil {
