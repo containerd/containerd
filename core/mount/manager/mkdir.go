@@ -64,7 +64,7 @@ func (h *mkdir) rewrite(m mount.Mount) (mount.Mount, deferredEnsure, error) {
 			if !isPath {
 				return mount.Mount{}, deferredEnsure{}, fmt.Errorf("invalid mkdir option %q: %w", o, errdefs.ErrInvalidArgument)
 			}
-			parts := strings.SplitN(value, ":", 4)
+			parts := splitMkdirPathValue(value)
 			var (
 				dir      string
 				mode     os.FileMode = 0700
