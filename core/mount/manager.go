@@ -49,20 +49,23 @@ type Handler interface {
 }
 
 // MountedChecker is an optional interface a Handler may implement to
-// report whether the mount it manages at path is still in effect. A
-// manager which reuses a Handler's mounts across activations uses this
-// to verify a recorded mount is still live before handing it out
-// again, rather than trusting its own bookkeeping, and to detect and
-// repair a mount which was torn down outside of it, for example by a
-// reboot or an operator's manual unmount.
+// report whether the mount it manages at path is still in effect.
 //
-// A Handler which does not implement MountedChecker is checked by
-// inspecting the host's mount table instead, which is only accurate
-// for a Handler whose mount point is a real kernel mount. A Handler
-// which leaves something else at the mount point, such as a symlink
-// to a device, must implement this interface: a generic check would
-// otherwise always report it as not mounted and cause it to be
-// needlessly, and possibly unsafely, redone.
+// Managers can query whether a recorded mount is still live before
+// handing it out again. If the recorded mount is no longer available
+// (for example, an operator manually unmounted or a reboot occurred),
+// the manager can discard an incorrect activation record.
+//
+// Handlers which implement mount points as real kernel mounts may not
+// implement MountedChecker. Liveness of kernel mount points can be
+// determined by introspecting the host's mount table.
+//
+// Handlers that return something else at the mount point (such as
+// loopback's symlink to a device) must implement this interface.
+//
+// Managers may also invoke Mounted when creating an activation
+// record. If the Handler returns true here, the manager will not
+// invoke Mount.
 type MountedChecker interface {
 	Mounted(ctx context.Context, path string) (bool, error)
 }

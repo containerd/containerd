@@ -205,6 +205,12 @@ func (h *errOnceHandler) Unmount(_ context.Context, mp string) error {
 	return nil
 }
 
+// Mounted reports h.mounted, the same bookkeeping Mount and Unmount keep.
+func (h *errOnceHandler) Mounted(_ context.Context, path string) (bool, error) {
+	_, ok := h.mounted[path]
+	return ok, nil
+}
+
 // TestGC tests the garbage collection features of the mount manager,
 // ensuring that mounts are properly cleaned up when no longer needed.
 func TestGC(t *testing.T) {
@@ -1739,6 +1745,95 @@ func TestActivateReusesRecordWithoutHandlerData(t *testing.T) {
 	require.NoError(t, m.Deactivate(ctx, "a"))
 	require.NoError(t, m.Deactivate(ctx, "b"))
 	assert.Equal(t, int32(0), mountC.Load())
+}
+
+// TestProbeMountedAssumesLiveWhenMountTableUnobservable verifies that
+// a handler-less or checker-less mount falls back to assumeLive when
+// the host mount table cannot be consulted.
+func TestProbeMountedAssumesLiveWhenMountTableUnobservable(t *testing.T) {
+	ctx := context.Background()
+	live, err := probeMounted(ctx, nil, "/some/path/nothing/wrote", false, true)
+	require.NoError(t, err)
+	assert.True(t, live, "must assume live when told to and the mount table is unobservable")
+
+	live, err = probeMounted(ctx, nil, "/some/path/nothing/wrote", false, false)
+	require.NoError(t, err)
+	assert.False(t, live, "must not assume live for a brand new record even when the mount table is unobservable")
+}
+
+// TestActivateRunsEnsureForReusedSharedRecord verifies that a managed
+// position's own mkdir ensure runs even when it resolves to a record
+// another activation already mounted, since the mount identity does
+// not distinguish the mkdir options an activation used to get there.
+func TestActivateRunsEnsureForReusedSharedRecord(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	td := t.TempDir()
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0700))
+
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	mountC := new(atomic.Int32)
+	m, err := NewManager(db, filepath.Join(td, "m"), WithAllowedRoot(root), WithMountHandler("vol", &noopHandler{mounts: mountC}))
+	require.NoError(t, err)
+	t.Cleanup(func() { m.(io.Closer).Close() })
+
+	dirA := filepath.Join(root, "a-dir")
+	dirB := filepath.Join(root, "b-dir")
+	vol := func(dir string) mount.Mount {
+		return mount.Mount{
+			Type:    "mkdir/vol",
+			Source:  testDevNull,
+			Options: []string{fmt.Sprintf("X-containerd.mkdir.path=%s", dir), "rw"},
+		}
+	}
+
+	_, err = m.Activate(ctx, "a", []mount.Mount{vol(dirA)})
+	require.NoError(t, err)
+	_, err = os.Stat(dirA)
+	require.NoError(t, err)
+
+	_, err = m.Activate(ctx, "b", []mount.Mount{vol(dirB)})
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), mountC.Load(), "second activation must reuse the mount, not repeat it")
+	_, err = os.Stat(dirB)
+	assert.NoError(t, err, "a reused record must still run the reusing activation's own mkdir ensure")
+
+	require.NoError(t, m.Deactivate(ctx, "a"))
+	require.NoError(t, m.Deactivate(ctx, "b"))
+	assert.Equal(t, int32(0), mountC.Load())
+}
+
+// TestActivateReusedRecordValidatesConflictingMkdirRequest verifies
+// that reusing a shared record does not silently skip a conflicting
+// mkdir request: a second activation naming the same target with a
+// different mode must still hit apply's own validation.
+func TestActivateReusedRecordValidatesConflictingMkdirRequest(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	td := t.TempDir()
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0700))
+
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	m, err := NewManager(db, filepath.Join(td, "m"), WithAllowedRoot(root), WithMountHandler("vol", &noopHandler{mounts: new(atomic.Int32)}))
+	require.NoError(t, err)
+	t.Cleanup(func() { m.(io.Closer).Close() })
+
+	dir := filepath.Join(root, "shared-dir")
+	volWithMode := func(mode string) mount.Mount {
+		return mount.Mount{
+			Type:    "mkdir/vol",
+			Source:  testDevNull,
+			Options: []string{fmt.Sprintf("X-containerd.mkdir.path=%s:%s", dir, mode), "rw"},
+		}
+	}
+
+	_, err = m.Activate(ctx, "a", []mount.Mount{volWithMode("700")})
+	require.NoError(t, err)
+
+	_, err = m.Activate(ctx, "b", []mount.Mount{volWithMode("755")})
+	assert.True(t, errdefs.IsNotImplemented(err), "a conflicting mkdir mode on a reused record must still be validated, got %v", err)
 }
 
 // TestPodGroupSharesOneMount verifies that a shared image mount at

@@ -554,9 +554,9 @@ func (mm *mountManager) staleCollision(ctx context.Context, namespace, name stri
 	for _, r := range refs {
 		if r.point == "" {
 			live = false
-			continue
+			break
 		}
-		ok, perr := probeMounted(ctx, mm.handlers[r.mtype], r.point)
+		ok, perr := probeMounted(ctx, mm.handlers[r.mtype], r.point, canObserveMountTableOS, true)
 		if perr != nil {
 			return true, isV1, false, perr
 		}
@@ -580,26 +580,16 @@ func (mm *mountManager) staleCollision(ctx context.Context, namespace, name stri
 	return true, isV1, live, nil
 }
 
-// probeMounted reports whether path, the mount point of a mounted
-// record, currently has that mount in effect. A handler which
-// implements mount.MountedChecker is asked directly; otherwise the
-// host's mount table is consulted, which is only accurate for a
-// system mount or a handler whose mount point really is a kernel
-// mount; see mount.MountedChecker's doc for why some handlers must
-// implement it instead of relying on this fallback.
-//
-// A path which does not exist at all is reported as not mounted
-// rather than as an error: this is the ordinary state of a mounted
-// record which has never been realized yet.
-//
-// On Windows, the fallback always reports false: mountinfo.Mounted
-// has no implementation there. This is not currently reachable in
-// practice, since nothing this package's own transforms produce on
-// Windows resolves to a managed position at all, but would matter for
-// a handler-less mount activated with WithTemporary, which does.
-func probeMounted(ctx context.Context, handler mount.Handler, path string) (bool, error) {
+// probeMounted reports whether path currently has its mount in
+// effect: via handler's MountedChecker if it implements one,
+// otherwise via the host's mount table if haveMountTable, or
+// assumeLive if not. A missing path is reported as not mounted.
+func probeMounted(ctx context.Context, handler mount.Handler, path string, haveMountTable, assumeLive bool) (bool, error) {
 	if mc, ok := handler.(mount.MountedChecker); ok {
 		return mc.Mounted(ctx, path)
+	}
+	if !haveMountTable {
+		return assumeLive, nil
 	}
 	live, err := mountinfo.Mounted(path)
 	if err != nil {
@@ -626,7 +616,13 @@ func (mm *mountManager) realizeMount(ctx context.Context, rec mountedRecord, han
 		defer mm.mounting.Unlock(key)
 	}
 
-	live, err := probeMounted(ctx, handler, rec.point)
+	for _, ensure := range ensures {
+		if err := ensure.run(ctx); err != nil {
+			return mount.ActiveMount{}, err
+		}
+	}
+
+	live, err := probeMounted(ctx, handler, rec.point, canObserveMountTableOS, !rec.created)
 	if err != nil {
 		return mount.ActiveMount{}, fmt.Errorf("failed to check mount %q: %w", rec.point, err)
 	}
@@ -640,12 +636,6 @@ func (mm *mountManager) realizeMount(ctx context.Context, rec mountedRecord, han
 
 	if err := mm.prepareRecordDir(rec.point, rec.mount.Type, handler == nil); err != nil {
 		return mount.ActiveMount{}, err
-	}
-
-	for _, ensure := range ensures {
-		if err := ensure.run(ctx); err != nil {
-			return mount.ActiveMount{}, err
-		}
 	}
 
 	if handler != nil {
@@ -708,21 +698,37 @@ func alreadyUnmounted(err error) bool {
 func (mm *mountManager) unmountRecords(ctx context.Context, records []mountedRecord) error {
 	var errs []error
 	for _, b := range records {
-		var err error
-		if h := mm.handlers[b.mount.Type]; h != nil {
-			err = h.Unmount(ctx, b.point)
-		} else {
-			err = mount.Unmount(b.point, 0)
-		}
-		if err != nil && !alreadyUnmounted(err) {
-			errs = append(errs, fmt.Errorf("failed to unmount %q: %w", b.point, err))
-			continue
-		}
-		if err := os.RemoveAll(mm.backingRoot(b.id)); err != nil && !os.IsNotExist(err) {
-			log.G(ctx).WithError(err).WithField("backing", b.id).Warn("failed to remove backing mount dir")
+		if err := mm.unmountRecord(ctx, b); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// unmountRecord unmounts and cleans up a single released record,
+// serializing on its identity with realizeMount.
+func (mm *mountManager) unmountRecord(ctx context.Context, b mountedRecord) error {
+	if shareable(b.mount) {
+		key := mountingKey(b.mount)
+		if err := mm.mounting.Lock(ctx, key); err != nil {
+			return err
+		}
+		defer mm.mounting.Unlock(key)
+	}
+
+	var err error
+	if h := mm.handlers[b.mount.Type]; h != nil {
+		err = h.Unmount(ctx, b.point)
+	} else {
+		err = mount.Unmount(b.point, 0)
+	}
+	if err != nil && !alreadyUnmounted(err) {
+		return fmt.Errorf("failed to unmount %q: %w", b.point, err)
+	}
+	if err := os.RemoveAll(mm.backingRoot(b.id)); err != nil && !os.IsNotExist(err) {
+		log.G(ctx).WithError(err).WithField("backing", b.id).Warn("failed to remove backing mount dir")
+	}
+	return nil
 }
 
 func encodeID(id uint64) ([]byte, error) {
@@ -1011,6 +1017,8 @@ func (mm *mountManager) StartCollection(ctx context.Context) (metadata.Collectio
 	// lock now and collection will unlock on cancel or finish
 	mm.rwlock.Lock()
 
+	mounted, haveMountTable := mm.snapshotMountTable(ctx)
+
 	tx, err := mm.db.Begin(true)
 	if err != nil {
 		mm.rwlock.Unlock()
@@ -1018,11 +1026,13 @@ func (mm *mountManager) StartCollection(ctx context.Context) (metadata.Collectio
 	}
 
 	return &collectionContext{
-		ctx:         ctx,
-		tx:          tx,
-		manager:     mm,
-		removed:     map[string]map[string]struct{}{},
-		remainingV1: map[uint64]struct{}{},
+		ctx:            ctx,
+		tx:             tx,
+		manager:        mm,
+		removed:        map[string]map[string]struct{}{},
+		remainingV1:    map[uint64]struct{}{},
+		mounted:        mounted,
+		haveMountTable: haveMountTable,
 	}, nil
 }
 
@@ -1035,6 +1045,12 @@ type collectionContext struct {
 	tx      *bolt.Tx
 	manager *mountManager
 	removed map[string]map[string]struct{}
+
+	// mounted is a snapshot of the host's mount table, taken once in
+	// StartCollection. haveMountTable is false when it cannot be
+	// trusted; see snapshotMountTable.
+	mounted        map[string]struct{}
+	haveMountTable bool
 
 	// Mounted records released during applyRemove; they need
 	// unmounting after the transaction commits.
@@ -1302,7 +1318,7 @@ func (cc *collectionContext) applyRemove() (map[uint64]struct{}, error) {
 				continue
 			}
 			namespace := string(nsk)
-			releasedV1, remainingV1, err := v1ApplyRemoveNamespace(cc.tx, namespace, v1bkt.Bucket(nsk), cc.removed[namespace])
+			releasedV1, remainingV1, err := v1ApplyRemoveNamespace(cc.ctx, cc.manager, cc.tx, namespace, v1bkt.Bucket(nsk), cc.removed[namespace], cc.mounted, cc.haveMountTable)
 			if err != nil {
 				return nil, err
 			}
@@ -1340,7 +1356,15 @@ func (cc *collectionContext) applyRemove() (map[uint64]struct{}, error) {
 				if removed != nil {
 					if _, ok := removed[string(msk)]; ok {
 						remove = append(remove, bytes.Clone(msk))
+						continue
 					}
+				}
+				live, err := activationLive(cc.ctx, cc.manager, nsbkt, msbkt.Bucket(msk), cc.mounted, cc.haveMountTable)
+				if err != nil {
+					return nil, err
+				}
+				if !live {
+					remove = append(remove, bytes.Clone(msk))
 				}
 			}
 
