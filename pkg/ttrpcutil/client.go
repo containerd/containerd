@@ -88,12 +88,12 @@ func (c *Client) Reconnect() error {
 }
 
 // EventsService creates an EventsService client
-func (c *Client) EventsService() (v1.EventsService, error) {
+func (c *Client) EventsService() (v1.TTRPCEventsService, error) {
 	client, err := c.Client()
 	if err != nil {
 		return nil, err
 	}
-	return v1.NewEventsClient(client), nil
+	return v1.NewTTRPCEventsClient(client), nil
 }
 
 // Client returns the underlying TTRPC client object
