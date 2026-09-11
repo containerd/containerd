@@ -445,9 +445,9 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 						lbkt := lsbkt.Bucket([]byte(lid))
 						if lbkt != nil {
 							lbkt.Delete([]byte(name))
-						}
-						if k, _ := lbkt.Cursor().First(); k == nil {
-							lsbkt.DeleteBucket([]byte(lid))
+							if k, _ := lbkt.Cursor().First(); k == nil {
+								lsbkt.DeleteBucket([]byte(lid))
+							}
 						}
 					}
 				}
