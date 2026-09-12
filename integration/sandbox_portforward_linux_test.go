@@ -107,12 +107,10 @@ func TestContainerPortForward(t *testing.T) {
 	_, err = dataStream.Write([]byte(testMsg))
 	require.NoError(t, err)
 
-	buf := make([]byte, 1024)
-	n, err := dataStream.Read(buf)
-	if err != nil && err != io.EOF {
-		t.Fatalf("failed reading from stream: %v", err)
-	}
+	buf := make([]byte, len(testMsg))
+	_, err = io.ReadFull(dataStream, buf)
+	require.NoError(t, err)
 
-	assert.Equal(t, testMsg, string(buf[:n]))
+	assert.Equal(t, testMsg, string(buf))
 	_ = errorStream.Close()
 }
