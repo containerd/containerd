@@ -17,7 +17,6 @@ type TTRPCSandboxService interface {
 	PingSandbox(context.Context, *PingRequest) (*PingResponse, error)
 	ShutdownSandbox(context.Context, *ShutdownSandboxRequest) (*ShutdownSandboxResponse, error)
 	SandboxMetrics(context.Context, *SandboxMetricsRequest) (*SandboxMetricsResponse, error)
-	UpdateSandbox(context.Context, *UpdateSandboxRequest) (*UpdateSandboxResponse, error)
 }
 
 func RegisterTTRPCSandboxService(srv *ttrpc.Server, svc TTRPCSandboxService) {
@@ -85,13 +84,6 @@ func RegisterTTRPCSandboxService(srv *ttrpc.Server, svc TTRPCSandboxService) {
 					return nil, err
 				}
 				return svc.SandboxMetrics(ctx, &req)
-			},
-			"UpdateSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-				var req UpdateSandboxRequest
-				if err := unmarshal(&req); err != nil {
-					return nil, err
-				}
-				return svc.UpdateSandbox(ctx, &req)
 			},
 		},
 	})
@@ -174,14 +166,6 @@ func (c *ttrpcsandboxClient) ShutdownSandbox(ctx context.Context, req *ShutdownS
 func (c *ttrpcsandboxClient) SandboxMetrics(ctx context.Context, req *SandboxMetricsRequest) (*SandboxMetricsResponse, error) {
 	var resp SandboxMetricsResponse
 	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "SandboxMetrics", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *ttrpcsandboxClient) UpdateSandbox(ctx context.Context, req *UpdateSandboxRequest) (*UpdateSandboxResponse, error) {
-	var resp UpdateSandboxResponse
-	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "UpdateSandbox", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
