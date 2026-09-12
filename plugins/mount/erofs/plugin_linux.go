@@ -18,10 +18,10 @@ package erofs
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -83,7 +83,7 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 			return mount.ActiveMount{}, fmt.Errorf("failed to read dm-verity metadata from %s: %w", metadataPath, err)
 		}
 
-		devicePath, cleanupName, err := setupDmVerityDevice(ctx, m.Source, metadata)
+		devicePath, cleanupName, err := setupDmVerityDevice(ctx, m.Source, mp, metadata)
 		dmverityDevice = cleanupName
 		if err != nil {
 			return mount.ActiveMount{}, err
@@ -159,19 +159,31 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 	}, nil
 }
 
+// dmverityDeviceName names the dm-verity device for a layer mounted from source
+// at mountpoint.
+//
+// The name has to be unique to this mount. Mount closes the device it creates
+// when the mount fails, so a name two mounts share would let one of them close
+// a device the other is using. Neither half is unique alone: a layer content
+// cache serves one blob to every snapshot of that layer, and a mount point is
+// reused once the mount before it is gone. Together they identify the mount,
+// and a device left behind by a crash is reused only for the same blob in the
+// same place, where its root hash still matches.
+func dmverityDeviceName(source, mountpoint string) string {
+	sum := sha256.Sum256([]byte(source + "\x00" + mountpoint))
+	return fmt.Sprintf("containerd-erofs-%x", sum[:16])
+}
+
 // setupDmVerityDevice creates or reuses a dm-verity device for the given EROFS source.
 // It returns the device path to mount from, and a cleanup name (non-empty only when
 // a new device was created, so the caller can close it on error).
-func setupDmVerityDevice(ctx context.Context, source string, metadata *dmverity.DmverityMetadata) (devicePath string, cleanupName string, err error) {
+func setupDmVerityDevice(ctx context.Context, source, mountpoint string, metadata *dmverity.DmverityMetadata) (devicePath string, cleanupName string, err error) {
 	supported, err := dmverity.IsSupported()
 	if err != nil || !supported {
 		return "", "", fmt.Errorf("layer requires dm-verity but system doesn't support it (dm_verity module not loaded): %w", err)
 	}
 
-	// Extract snapshot ID from source path
-	// Path format: {root}/snapshots/{id}/layer.erofs
-	snapshotID := filepath.Base(filepath.Dir(source))
-	deviceName := fmt.Sprintf("containerd-erofs-%s", snapshotID)
+	deviceName := dmverityDeviceName(source, mountpoint)
 	devicePath = dmverity.DevicePath(deviceName)
 
 	log.G(ctx).WithFields(log.Fields{
