@@ -165,118 +165,74 @@ func TestDialLocalhost(t *testing.T) {
 	})
 }
 
-func TestIsVMBasedRuntime(t *testing.T) {
+func TestSkipLocalhostForPortForward(t *testing.T) {
 	testCases := []struct {
-		runtimeType string
-		expected    bool
-	}{
-		{runtimeType: "io.containerd.kata.v2", expected: true},
-		{runtimeType: "io.containerd.kata-qemu.v2", expected: true},
-		{runtimeType: "io.containerd.kata-fc.v2", expected: true},
-		{runtimeType: "io.containerd.runsc.v1", expected: true},
-		{runtimeType: "io.containerd.firecracker.v1", expected: true},
-		{runtimeType: "io.containerd.gvisor.v1", expected: true},
-		{runtimeType: "io.containerd.runc.v2", expected: false},
-		{runtimeType: "io.containerd.runc.v1", expected: false},
-		{runtimeType: "", expected: false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.runtimeType, func(t *testing.T) {
-			assert.Equal(t, tc.expected, isVMBasedRuntime(tc.runtimeType))
-		})
-	}
-}
-
-func TestIsKVMBasedRuntime(t *testing.T) {
-	testCases := []struct {
-		runtimeType string
-		expected    bool
-	}{
-		{runtimeType: "io.containerd.kata.v2", expected: true},
-		{runtimeType: "io.containerd.kata-qemu.v2", expected: true},
-		{runtimeType: "io.containerd.kata-fc.v2", expected: true},
-		{runtimeType: "io.containerd.firecracker.v1", expected: true},
-		{runtimeType: "io.containerd.nabla.v1", expected: true},
-		{runtimeType: "io.containerd.runsc.v1", expected: false},
-		{runtimeType: "io.containerd.gvisor.v1", expected: false},
-		{runtimeType: "io.containerd.runc.v2", expected: false},
-		{runtimeType: "io.containerd.runc.v1", expected: false},
-		{runtimeType: "", expected: false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.runtimeType, func(t *testing.T) {
-			assert.Equal(t, tc.expected, isKVMBasedRuntime(tc.runtimeType))
-		})
-	}
-}
-
-func TestSkipLocalhostForVMBasedRuntime(t *testing.T) {
-	testCases := []struct {
-		name         string
-		runtimeType  string
-		podIPs       []string
-		expectedSkip bool
+		name          string
+		skipLocalhost bool
+		podIPs        []string
+		expectedSkip  bool
+		expectedError bool
 	}{
 		{
-			name:         "VM runtime with pod IPs skips localhost",
-			runtimeType:  "io.containerd.kata.v2",
-			podIPs:       []string{"10.244.0.5"},
-			expectedSkip: true,
+			name:          "opted-in runtime with pod IPs skips localhost",
+			skipLocalhost: true,
+			podIPs:        []string{"10.244.0.5"},
+			expectedSkip:  true,
 		},
 		{
-			name:         "VM runtime without pod IPs does not skip localhost",
-			runtimeType:  "io.containerd.kata.v2",
-			podIPs:       nil,
-			expectedSkip: false,
+			name:          "opted-in runtime without pod IPs returns an error",
+			skipLocalhost: true,
+			podIPs:        nil,
+			expectedSkip:  true,
+			expectedError: true,
 		},
 		{
-			name:         "Process runtime with pod IPs does not skip localhost",
-			runtimeType:  "io.containerd.runc.v2",
-			podIPs:       []string{"10.244.0.5"},
-			expectedSkip: false,
+			name:          "default runtime with pod IPs does not skip localhost",
+			skipLocalhost: false,
+			podIPs:        []string{"10.244.0.5"},
+			expectedSkip:  false,
 		},
 		{
-			name:         "Process runtime without pod IPs does not skip localhost",
-			runtimeType:  "io.containerd.runc.v2",
-			podIPs:       nil,
-			expectedSkip: false,
+			name:          "default runtime without pod IPs does not skip localhost",
+			skipLocalhost: false,
+			podIPs:        nil,
+			expectedSkip:  false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			skipLocalhost := len(tc.podIPs) > 0 && isVMBasedRuntime(tc.runtimeType)
+			skipLocalhost := tc.skipLocalhost
 			assert.Equal(t, tc.expectedSkip, skipLocalhost)
+			assert.Equal(t, tc.expectedError, skipLocalhost && len(tc.podIPs) == 0)
 		})
 	}
 }
 
 func TestUnsupportedHostNetworkRuntime(t *testing.T) {
 	testCases := []struct {
-		name        string
-		runtimeType string
-		networkMode runtime.NamespaceMode
-		expected    bool
+		name          string
+		skipLocalhost bool
+		networkMode   runtime.NamespaceMode
+		expected      bool
 	}{
 		{
-			name:        "VM runtime with host network is unsupported",
-			runtimeType: "io.containerd.kata.v2",
-			networkMode: runtime.NamespaceMode_NODE,
-			expected:    true,
+			name:          "opted-in runtime with host network is unsupported",
+			skipLocalhost: true,
+			networkMode:   runtime.NamespaceMode_NODE,
+			expected:      true,
 		},
 		{
-			name:        "VM runtime with pod network is supported",
-			runtimeType: "io.containerd.kata.v2",
-			networkMode: runtime.NamespaceMode_POD,
-			expected:    false,
+			name:          "opted-in runtime with pod network is supported",
+			skipLocalhost: true,
+			networkMode:   runtime.NamespaceMode_POD,
+			expected:      false,
 		},
 		{
-			name:        "Process runtime with host network is supported",
-			runtimeType: "io.containerd.runc.v2",
-			networkMode: runtime.NamespaceMode_NODE,
-			expected:    false,
+			name:          "default runtime with host network is supported",
+			skipLocalhost: false,
+			networkMode:   runtime.NamespaceMode_NODE,
+			expected:      false,
 		},
 	}
 
@@ -291,7 +247,7 @@ func TestUnsupportedHostNetworkRuntime(t *testing.T) {
 					},
 				},
 			}
-			assert.Equal(t, tc.expected, isUnsupportedHostNetworkRuntime(config, tc.runtimeType))
+			assert.Equal(t, tc.expected, isUnsupportedHostNetworkPortForward(config, tc.skipLocalhost))
 		})
 	}
 }

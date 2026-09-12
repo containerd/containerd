@@ -73,17 +73,17 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	}
 	podIPs = append(podIPs, additionalPodIPs...)
 
-	// The sandbox's own loopback is never reachable from this, host-side,
-	// network namespace for VM-isolated runtimes, so skip straight to the
-	// pod IP fallback for those instead of dialing localhost first.
 	ociRuntime, err := c.config.GetSandboxRuntime(s.Config, s.Metadata.RuntimeHandler)
 	if err != nil {
 		return fmt.Errorf("failed to get sandbox runtime for %q: %w", id, err)
 	}
-	if isUnsupportedHostNetworkRuntime(s.Config, ociRuntime.Type) {
-		return fmt.Errorf("port forwarding host-network sandbox %q with VM-isolated runtime %q is not supported", id, ociRuntime.Type)
+	if isUnsupportedHostNetworkPortForward(s.Config, ociRuntime.SkipLocalhostForPortForward) {
+		return fmt.Errorf("port forwarding host-network sandbox %q with runtime %q configured to skip localhost is not supported", id, ociRuntime.Type)
 	}
-	skipLocalhost := len(podIPs) > 0 && isVMBasedRuntime(ociRuntime.Type)
+	skipLocalhost := ociRuntime.SkipLocalhostForPortForward
+	if skipLocalhost && len(podIPs) == 0 {
+		return fmt.Errorf("port forwarding sandbox %q with runtime %q configured to skip localhost requires a pod IP", id, ociRuntime.Type)
+	}
 
 	var conn net.Conn
 	if !skipLocalhost {
@@ -94,12 +94,11 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 			return dialErr
 		})
 	} else {
-		err = fmt.Errorf("skipped for VM-isolated runtime %q", ociRuntime.Type)
+		err = fmt.Errorf("skipped dialing localhost for runtime %q configured to skip localhost", ociRuntime.Type)
 	}
 	if err != nil && len(podIPs) > 0 {
 		if skipLocalhost {
-			// VM-isolated runtimes need traffic to arrive on the sandbox's veth
-			// from the host netns so VM network forwarding can carry it inward.
+			// This runtime requires traffic to arrive from the host netns.
 			log.G(ctx).Debugf("localhost skipped for sandbox %q port %d (%v), dialing pod IPs %v from host netns", id, port, err, podIPs)
 			conn, err = dialPodIPs(ctx, podIPs, port)
 		} else {
@@ -173,8 +172,8 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	return nil
 }
 
-func isUnsupportedHostNetworkRuntime(config *runtime.PodSandboxConfig, runtimeType string) bool {
-	return hostNetwork(config) && isVMBasedRuntime(runtimeType)
+func isUnsupportedHostNetworkPortForward(config *runtime.PodSandboxConfig, skipLocalhost bool) bool {
+	return hostNetwork(config) && skipLocalhost
 }
 
 // dialTimeout bounds each individual connect attempt below, so a

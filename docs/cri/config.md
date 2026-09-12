@@ -296,6 +296,9 @@ version = 3
           snapshotter = ''
           sandboxer = 'podsandbox'
           disable_pause_image_pull = false
+          # skip_localhost_for_port_forward makes port forwarding dial the pod IP
+          # from the host network namespace. Enable for VM-isolated runtimes.
+          skip_localhost_for_port_forward = false
           io_type = ''
 
           [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
@@ -605,6 +608,10 @@ version = 2
       # We can create our own "shim" sandbox controller by implementing the sandbox api defined in runtime/sandbox/v1/sandbox.proto in our shim, and specifiy the sandboxer to "shim" here.
       # We can also run a grpc or ttrpc server to serve the sandbox controller API defined in services/sandbox/v1/sandbox.proto, and define a ProxyPlugin of "sandbox" type, and specify the name of the ProxyPlugin here.
       sandboxer = ""
+
+      # skip_localhost_for_port_forward makes port forwarding dial the pod IP from
+      # the host network namespace. Enable for VM-isolated runtimes.
+      skip_localhost_for_port_forward = false
 
       # io_type is the way containerd get stdin/stdout/stderr from container or the execed process.
       # The default value is "fifo", in which containerd will create a set of named pipes and transfer io by them.
