@@ -43,7 +43,7 @@ import (
 
 	"github.com/intel/goresctrl/pkg/blockio"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"tags.cncf.io/container-device-interface/pkg/cdi"
 	"tags.cncf.io/container-device-interface/pkg/parser"
 )
@@ -90,18 +90,18 @@ var platformRunFlags = []cli.Flag{
 }
 
 // NewContainer creates a new container
-func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cli.Context) (containerd.Container, error) {
+func NewContainer(ctx context.Context, client *containerd.Client, cmd *cli.Command) (containerd.Container, error) {
 	var (
 		id     string
-		config = cliContext.IsSet("config")
+		config = cmd.IsSet("config")
 	)
 	if config {
-		id = cliContext.Args().First()
+		id = cmd.Args().First()
 	} else {
-		id = cliContext.Args().Get(1)
+		id = cmd.Args().Get(1)
 	}
 
-	platform := cliContext.String("platform")
+	platform := cmd.String("platform")
 	if platform == "" {
 		plat := platforms.DefaultSpec()
 		switch plat.OS {
@@ -125,41 +125,41 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		spec  containerd.NewContainerOpts
 	)
 
-	if sandbox := cliContext.String("sandbox"); sandbox != "" {
+	if sandbox := cmd.String("sandbox"); sandbox != "" {
 		cOpts = append(cOpts, containerd.WithSandbox(sandbox))
 	}
 
 	if config {
-		cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(cliContext.StringSlice("label"))))
-		opts = append(opts, oci.WithSpecFromFile(cliContext.String("config")))
+		cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(cmd.StringSlice("label"))))
+		opts = append(opts, oci.WithSpecFromFile(cmd.String("config")))
 	} else {
 		var (
-			ref = cliContext.Args().First()
+			ref = cmd.Args().First()
 			// for container's id is Args[1]
-			args = cliContext.Args().Slice()[2:]
+			args = cmd.Args().Slice()[2:]
 		)
 		opts = append(opts, oci.WithDefaultSpecForPlatform(platform), oci.WithDefaultUnixDevices)
-		if ef := cliContext.String("env-file"); ef != "" {
+		if ef := cmd.String("env-file"); ef != "" {
 			opts = append(opts, oci.WithEnvFile(ef))
 		}
-		opts = append(opts, oci.WithEnv(cliContext.StringSlice("env")))
-		opts = append(opts, withMounts(cliContext))
+		opts = append(opts, oci.WithEnv(cmd.StringSlice("env")))
+		opts = append(opts, withMounts(cmd))
 
-		if cliContext.Bool("rootfs") {
+		if cmd.Bool("rootfs") {
 			rootfs, err := filepath.Abs(ref)
 			if err != nil {
 				return nil, err
 			}
 			opts = append(opts, oci.WithRootFSPath(rootfs))
-			cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(cliContext.StringSlice("label"))))
+			cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(cmd.StringSlice("label"))))
 		} else {
-			snapshotter := cliContext.String("snapshotter")
+			snapshotter := cmd.String("snapshotter")
 			var image containerd.Image
 			i, err := client.ImageService().Get(ctx, ref)
 			if err != nil {
 				return nil, err
 			}
-			if ps := cliContext.String("platform"); ps != "" {
+			if ps := cmd.String("platform"); ps != "" {
 				platform, err := platforms.Parse(ps)
 				if err != nil {
 					return nil, err
@@ -174,11 +174,11 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				return nil, err
 			}
 			if !unpacked {
-				if err := image.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs")))); err != nil {
+				if err := image.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(cmd.Bool("sync-fs")))); err != nil {
 					return nil, err
 				}
 			}
-			labels := buildLabels(commands.LabelArgs(cliContext.StringSlice("label")), image.Labels())
+			labels := buildLabels(commands.LabelArgs(cmd.StringSlice("label")), image.Labels())
 			opts = append(opts, oci.WithImageConfig(image))
 			cOpts = append(cOpts,
 				containerd.WithImage(image),
@@ -186,7 +186,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				containerd.WithAdditionalContainerLabels(labels),
 				containerd.WithSnapshotter(snapshotter))
 
-			if uidmaps, gidmaps := cliContext.StringSlice("uidmap"), cliContext.StringSlice("gidmap"); len(uidmaps) > 0 && len(gidmaps) > 0 {
+			if uidmaps, gidmaps := cmd.StringSlice("uidmap"), cmd.StringSlice("gidmap"); len(uidmaps) > 0 && len(gidmaps) > 0 {
 				var uidSpec, gidSpec []specs.LinuxIDMapping
 				if uidSpec, err = parseIDMappingOption(uidmaps); err != nil {
 					return nil, err
@@ -199,7 +199,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				// currently the snapshotters known to support the labels are:
 				// fuse-overlayfs - https://github.com/containerd/fuse-overlayfs-snapshotter
 				// overlay - in case of idmapped mount points are supported by host kernel (Linux kernel 5.19)
-				if cliContext.Bool("remap-labels") {
+				if cmd.Bool("remap-labels") {
 					cOpts = append(cOpts, containerd.WithNewSnapshot(id, image, containerd.WithUserNSRemapperLabels(uidSpec, gidSpec)))
 				} else {
 					cOpts = append(cOpts, containerd.WithUserNSRemappedSnapshot(id, image, uidSpec, gidSpec))
@@ -211,28 +211,28 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				// For some snapshotter, such as overlaybd, it can provide 2 kind of writable snapshot(overlayfs dir or block-device)
 				// by command label values.
 				cOpts = append(cOpts, containerd.WithNewSnapshot(id, image,
-					snapshots.WithLabels(commands.LabelArgs(cliContext.StringSlice("snapshotter-label")))))
+					snapshots.WithLabels(commands.LabelArgs(cmd.StringSlice("snapshotter-label")))))
 			}
 			cOpts = append(cOpts, containerd.WithImageStopSignal(image, "SIGTERM"))
 		}
-		if cliContext.Bool("read-only") {
+		if cmd.Bool("read-only") {
 			opts = append(opts, oci.WithRootFSReadonly())
 		}
 		if len(args) > 0 {
 			opts = append(opts, oci.WithProcessArgs(args...))
 		}
-		if cwd := cliContext.String("cwd"); cwd != "" {
+		if cwd := cmd.String("cwd"); cwd != "" {
 			opts = append(opts, oci.WithProcessCwd(cwd))
 		}
-		if user := cliContext.String("user"); user != "" {
+		if user := cmd.String("user"); user != "" {
 			opts = append(opts, oci.WithUser(user), oci.WithAdditionalGIDs(user))
 		}
-		if cliContext.Bool("tty") {
+		if cmd.Bool("tty") {
 			opts = append(opts, oci.WithTTY)
 		}
 
-		privileged := cliContext.Bool("privileged")
-		privilegedWithoutHostDevices := cliContext.Bool("privileged-without-host-devices")
+		privileged := cmd.Bool("privileged")
+		privilegedWithoutHostDevices := cmd.Bool("privileged-without-host-devices")
 		if privilegedWithoutHostDevices && !privileged {
 			return nil, errors.New("can't use 'privileged-without-host-devices' without 'privileged' specified")
 		}
@@ -244,7 +244,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			}
 		}
 
-		if cliContext.Bool("net-host") {
+		if cmd.Bool("net-host") {
 			hostname, err := os.Hostname()
 			if err != nil {
 				return nil, fmt.Errorf("get hostname: %w", err)
@@ -256,7 +256,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				oci.WithEnv([]string{fmt.Sprintf("HOSTNAME=%s", hostname)}),
 			)
 		}
-		if annoStrings := cliContext.StringSlice("annotation"); len(annoStrings) > 0 {
+		if annoStrings := cmd.StringSlice("annotation"); len(annoStrings) > 0 {
 			annos, err := commands.AnnotationArgs(annoStrings)
 			if err != nil {
 				return nil, err
@@ -264,7 +264,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			opts = append(opts, oci.WithAnnotations(annos))
 		}
 
-		if caps := cliContext.StringSlice("cap-add"); len(caps) > 0 {
+		if caps := cmd.StringSlice("cap-add"); len(caps) > 0 {
 			for _, c := range caps {
 				if !strings.HasPrefix(c, "CAP_") {
 					return nil, errors.New("capabilities must be specified with 'CAP_' prefix")
@@ -273,7 +273,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			opts = append(opts, oci.WithAddedCapabilities(caps))
 		}
 
-		if caps := cliContext.StringSlice("cap-drop"); len(caps) > 0 {
+		if caps := cmd.StringSlice("cap-drop"); len(caps) > 0 {
 			for _, c := range caps {
 				if !strings.HasPrefix(c, "CAP_") {
 					return nil, errors.New("capabilities must be specified with 'CAP_' prefix")
@@ -282,13 +282,13 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			opts = append(opts, oci.WithDroppedCapabilities(caps))
 		}
 
-		seccompProfile := cliContext.String("seccomp-profile")
+		seccompProfile := cmd.String("seccomp-profile")
 
-		if !cliContext.Bool("seccomp") && seccompProfile != "" {
+		if !cmd.Bool("seccomp") && seccompProfile != "" {
 			return nil, errors.New("seccomp must be set to true, if using a custom seccomp-profile")
 		}
 
-		if cliContext.Bool("seccomp") {
+		if cmd.Bool("seccomp") {
 			if seccompProfile != "" {
 				opts = append(opts, seccomp.WithProfile(seccompProfile))
 			} else {
@@ -296,18 +296,18 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			}
 		}
 
-		if s := cliContext.String("apparmor-default-profile"); len(s) > 0 {
+		if s := cmd.String("apparmor-default-profile"); len(s) > 0 {
 			opts = append(opts, apparmor.WithDefaultProfile(s))
 		}
 
-		if s := cliContext.String("apparmor-profile"); len(s) > 0 {
-			if len(cliContext.String("apparmor-default-profile")) > 0 {
+		if s := cmd.String("apparmor-profile"); len(s) > 0 {
+			if len(cmd.String("apparmor-default-profile")) > 0 {
 				return nil, errors.New("apparmor-profile conflicts with apparmor-default-profile")
 			}
 			opts = append(opts, apparmor.WithProfile(s))
 		}
 
-		if cpus := cliContext.Float64("cpus"); cpus > 0.0 {
+		if cpus := cmd.Float64("cpus"); cpus > 0.0 {
 			var (
 				period = uint64(100000)
 				quota  = int64(cpus * 100000.0)
@@ -315,32 +315,32 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			opts = append(opts, oci.WithCPUCFS(quota, period))
 		}
 
-		if cpusetCpus := cliContext.String("cpuset-cpus"); len(cpusetCpus) > 0 {
+		if cpusetCpus := cmd.String("cpuset-cpus"); len(cpusetCpus) > 0 {
 			opts = append(opts, oci.WithCPUs(cpusetCpus))
 		}
 
-		if cpusetMems := cliContext.String("cpuset-mems"); len(cpusetMems) > 0 {
+		if cpusetMems := cmd.String("cpuset-mems"); len(cpusetMems) > 0 {
 			opts = append(opts, oci.WithCPUsMems(cpusetMems))
 		}
 
-		if shares := cliContext.Int("cpu-shares"); shares > 0 {
+		if shares := cmd.Int("cpu-shares"); shares > 0 {
 			opts = append(opts, oci.WithCPUShares(uint64(shares)))
 		}
 
-		quota := cliContext.Int64("cpu-quota")
-		period := cliContext.Uint64("cpu-period")
+		quota := cmd.Int64("cpu-quota")
+		period := cmd.Uint64("cpu-period")
 		if quota != -1 || period != 0 {
-			if cpus := cliContext.Float64("cpus"); cpus > 0.0 {
+			if cpus := cmd.Float64("cpus"); cpus > 0.0 {
 				return nil, errors.New("cpus and quota/period should be used separately")
 			}
 			opts = append(opts, oci.WithCPUCFS(quota, period))
 		}
 
-		if burst := cliContext.Uint64("cpu-burst"); burst != 0 {
+		if burst := cmd.Uint64("cpu-burst"); burst != 0 {
 			opts = append(opts, oci.WithCPUBurst(burst))
 		}
 
-		joinNs := cliContext.StringSlice("with-ns")
+		joinNs := cmd.StringSlice("with-ns")
 		for _, ns := range joinNs {
 			nsType, nsPath, ok := strings.Cut(ns, ":")
 			if !ok {
@@ -354,20 +354,20 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				Path: nsPath,
 			}))
 		}
-		if cliContext.IsSet("allow-new-privs") {
+		if cmd.IsSet("allow-new-privs") {
 			opts = append(opts, oci.WithNewPrivileges)
 		}
-		if cliContext.IsSet("cgroup") {
+		if cmd.IsSet("cgroup") {
 			// NOTE: can be set to "" explicitly for disabling cgroup.
-			opts = append(opts, oci.WithCgroup(cliContext.String("cgroup")))
+			opts = append(opts, oci.WithCgroup(cmd.String("cgroup")))
 		}
-		limit := cliContext.Uint64("memory-limit")
+		limit := cmd.Uint64("memory-limit")
 		if limit != 0 {
 			opts = append(opts, oci.WithMemoryLimit(limit))
 		}
 
 		var cdiDeviceIDs []string
-		for _, dev := range cliContext.StringSlice("device") {
+		for _, dev := range cmd.StringSlice("device") {
 			if parser.IsQualifiedName(dev) {
 				cdiDeviceIDs = append(cdiDeviceIDs, dev)
 				continue
@@ -375,11 +375,11 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			opts = append(opts, oci.WithDevices(dev, "", "rwm"))
 		}
 
-		if gpuIDs := cliContext.IntSlice("gpus"); len(cdiDeviceIDs) > 0 || len(gpuIDs) > 0 {
+		if gpuIDs := cmd.IntSlice("gpus"); len(cdiDeviceIDs) > 0 || len(gpuIDs) > 0 {
 			opts = append(opts, withCDIDeviceRequests(cdiDeviceIDs, gpuIDs)...)
 		}
 
-		rootfsPropagation := cliContext.String("rootfs-propagation")
+		rootfsPropagation := cmd.String("rootfs-propagation")
 		if rootfsPropagation != "" {
 			opts = append(opts, func(_ context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
 				if s.Linux != nil {
@@ -394,26 +394,26 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			})
 		}
 
-		if c := cliContext.String("blockio-config-file"); c != "" {
+		if c := cmd.String("blockio-config-file"); c != "" {
 			if err := blockio.SetConfigFromFile(c, false); err != nil {
 				return nil, fmt.Errorf("blockio-config-file error: %w", err)
 			}
 		}
 
-		if c := cliContext.String("blockio-class"); c != "" {
+		if c := cmd.String("blockio-class"); c != "" {
 			if linuxBlockIO, err := blockio.OciLinuxBlockIO(c); err == nil {
 				opts = append(opts, oci.WithBlockIO(linuxBlockIO))
 			} else {
 				return nil, fmt.Errorf("blockio-class error: %w", err)
 			}
 		}
-		if c := cliContext.String("rdt-class"); c != "" {
+		if c := cmd.String("rdt-class"); c != "" {
 			opts = append(opts, oci.WithRdt(c, "", ""))
 		}
-		if hostname := cliContext.String("hostname"); hostname != "" {
+		if hostname := cmd.String("hostname"); hostname != "" {
 			opts = append(opts, oci.WithHostname(hostname))
 		}
-		if c := cliContext.String("rlimit-nofile"); c != "" {
+		if c := cmd.String("rlimit-nofile"); c != "" {
 			softS, hardS, found := strings.Cut(c, ":")
 			if !found {
 				hardS = softS
@@ -435,18 +435,18 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		}
 	}
 
-	if cliContext.Bool("cni") {
+	if cmd.Bool("cni") {
 		cniMeta := &commands.NetworkMetaData{EnableCni: true}
 		cOpts = append(cOpts, containerd.WithContainerExtension(commands.CtrCniMetadataExtension, cniMeta))
 	}
 
-	runtimeOpts, err := commands.RuntimeOptions(cliContext)
+	runtimeOpts, err := commands.RuntimeOptions(cmd)
 	if err != nil {
 		return nil, err
 	}
-	cOpts = append(cOpts, containerd.WithRuntime(cliContext.String("runtime"), runtimeOpts))
+	cOpts = append(cOpts, containerd.WithRuntime(cmd.String("runtime"), runtimeOpts))
 
-	opts = append(opts, oci.WithAnnotations(commands.LabelArgs(cliContext.StringSlice("label"))))
+	opts = append(opts, oci.WithAnnotations(commands.LabelArgs(cmd.StringSlice("label"))))
 	var s specs.Spec
 	spec = containerd.WithSpec(&s, opts...)
 

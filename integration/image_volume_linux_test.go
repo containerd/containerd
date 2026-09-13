@@ -188,6 +188,35 @@ func TestImageVolumeBasic(t *testing.T) {
 	}
 }
 
+func TestImageVolumeReusableAfterFailure(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
+	image := images.Get(images.Alpine)
+	pullImagesByCRI(t, imageService, image)
+
+	img, err := containerdClient.GetImage(ctx, image)
+	require.NoError(t, err)
+	podCtx := newPodTCtx(t, runtimeService, t.Name(), "image-volume")
+	defer podCtx.stop(true)
+
+	target := filepath.Join(podCtx.imageVolumeDir(), img.Target().Digest.Encoded())
+
+	cfg := ContainerConfig("invalid-image-subpath", image,
+		WithImageVolumeMount(image, "does-not-exist", "/image-mount"))
+	_, err = podCtx.rSvc.CreateContainer(podCtx.id, cfg, podCtx.cfg)
+	require.ErrorContains(t, err, "failed to ensure image subpath")
+
+	_, err = containerdClient.SnapshotService("overlayfs").Stat(ctx, target)
+	require.NoError(t, err, "image volume snapshot should remain after the failed attempt")
+
+	cnID := podCtx.createContainer("valid-image-subpath", image,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sleep", "1d"),
+		WithImageVolumeMount(image, "etc", "/image-mount"))
+	stdout, _, err := podCtx.rSvc.ExecSync(cnID, []string{"cat", "/image-mount/os-release"}, 0)
+	require.NoError(t, err)
+	require.Contains(t, string(stdout), "Alpine Linux")
+}
+
 func setupRunningContainerWithImageVolume(t *testing.T, selinuxLevel string, containerImage string, imageVolumeName, imageSubPath, containerPath string) (podCtx *podTCtx, cnID string, err error) {
 	podLogDir := t.TempDir()
 

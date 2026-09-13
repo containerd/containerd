@@ -306,8 +306,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	ctrl, err := c.sandboxService.StartSandbox(ctx, sandbox.Sandboxer, id)
 	if err != nil {
-		var cerr podsandbox.CleanupErr
-		if errors.As(err, &cerr) {
+		if cerr, ok := errors.AsType[podsandbox.CleanupErr](err); ok {
 			cleanupErr = fmt.Errorf("failed to cleanup sandbox: %w", cerr)
 
 			// Strip last error as cleanup error to handle separately

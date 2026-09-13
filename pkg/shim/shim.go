@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"time"
 
 	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
@@ -118,8 +119,6 @@ var (
 const (
 	ttrpcAddressEnv = "TTRPC_ADDRESS"
 	grpcAddressEnv  = "GRPC_ADDRESS"
-	namespaceEnv    = "NAMESPACE"
-	maxVersionEnv   = "MAX_SHIM_VERSION"
 )
 
 func parseFlags() {
@@ -166,7 +165,7 @@ func setLogger(ctx context.Context, id string) (context.Context, error) {
 	l := log.G(ctx)
 	_ = log.SetFormat(log.TextFormat)
 	if debugFlag {
-		_ = log.SetLevel("debug")
+		_ = log.SetLevel(log.DebugLevel)
 	}
 	f, err := openLog(ctx, id)
 	if err != nil {
@@ -406,10 +405,21 @@ func run(ctx context.Context, manager Shim, config Config) error {
 		}
 
 		if src, ok := instance.(TTRPCServerUnaryOptioner); ok {
-			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryServerInterceptor())
+			// Tracing goes first, it establishes the context the others read.
+			at := len(ttrpcUnaryInterceptors)
+			if result.Registration.ID == "otelttrpc" {
+				at = 0
+			}
+			ttrpcUnaryInterceptors = slices.Insert(ttrpcUnaryInterceptors, at, src.UnaryServerInterceptor())
 		}
 
-		if result.Registration.ID == "pprof" {
+		switch result.Registration.ID {
+		case "tracing":
+			// The tracing plugin buffers spans, closing it flushes them.
+			if c, ok := instance.(io.Closer); ok {
+				sd.RegisterCallback(func(context.Context) error { return c.Close() })
+			}
+		case "pprof":
 			if src, ok := instance.(server); ok {
 				pprofHandler = src
 			}

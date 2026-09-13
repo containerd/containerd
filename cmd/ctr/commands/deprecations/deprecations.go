@@ -17,12 +17,13 @@
 package deprecations
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"text/tabwriter"
 	"time"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -32,7 +33,7 @@ import (
 // Command is the parent for all commands under "deprecations"
 var Command = &cli.Command{
 	Name: "deprecations",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		listCommand,
 	},
 }
@@ -45,11 +46,11 @@ var listCommand = &cli.Command{
 			Usage: "output format to use (Examples: 'default', 'json')",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		// Suppress automatic warnings, since we print the warnings by ourselves.
-		os.Setenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS", "1")
+		_ = os.Setenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS", "1")
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -61,7 +62,7 @@ var listCommand = &cli.Command{
 		}
 		wrn := warnings(resp)
 		if len(wrn) > 0 {
-			switch cliContext.String("format") {
+			switch cmd.String("format") {
 			case "json":
 				commands.PrintAsJSON(warnings(resp))
 				return nil

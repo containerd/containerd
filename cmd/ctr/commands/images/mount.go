@@ -17,6 +17,7 @@
 package images
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -26,7 +27,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -65,10 +66,10 @@ When you are done, use the unmount command.
 			Value:   1 * time.Hour,
 		},
 	),
-	Action: func(cliContext *cli.Context) (retErr error) {
+	Action: func(ctx context.Context, cmd *cli.Command) (retErr error) {
 		var (
-			ref    = cliContext.Args().First()
-			target = cliContext.Args().Get(1)
+			ref    = cmd.Args().First()
+			target = cmd.Args().Get(1)
 		)
 		if ref == "" {
 			return errors.New("please provide an image reference to mount")
@@ -84,20 +85,20 @@ When you are done, use the unmount command.
 			key = target
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		snapshotter := cliContext.String("snapshotter")
+		snapshotter := cmd.String("snapshotter")
 		if snapshotter == "" {
 			snapshotter = defaults.DefaultSnapshotter
 		}
 
 		ctx, done, err := client.WithLease(ctx,
 			leases.WithID(key),
-			leases.WithExpiration(cliContext.Duration("expiration")),
+			leases.WithExpiration(cmd.Duration("expiration")),
 		)
 		if err != nil && !errdefs.IsAlreadyExists(err) {
 			return err
@@ -109,7 +110,7 @@ When you are done, use the unmount command.
 			}
 		}()
 
-		ps := cliContext.String("platform")
+		ps := cmd.String("platform")
 		p, err := platforms.Parse(ps)
 		if err != nil {
 			return fmt.Errorf("unable to parse platform %s: %w", ps, err)
@@ -121,7 +122,7 @@ When you are done, use the unmount command.
 		}
 
 		i := containerd.NewImageWithPlatform(client, img, platforms.Only(p))
-		if err := i.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs")))); err != nil {
+		if err := i.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(cmd.Bool("sync-fs")))); err != nil {
 			return fmt.Errorf("error unpacking image: %w", err)
 		}
 
@@ -135,7 +136,7 @@ When you are done, use the unmount command.
 		s := client.SnapshotService(snapshotter)
 
 		var mounts []mount.Mount
-		if cliContext.Bool("rw") {
+		if cmd.Bool("rw") {
 			mounts, err = s.Prepare(ctx, key, chainID)
 		} else {
 			mounts, err = s.View(ctx, key, chainID)
@@ -161,7 +162,7 @@ When you are done, use the unmount command.
 		if target != "" {
 			if err := mount.All(mounts, target); err != nil {
 				if err := s.Remove(ctx, key); err != nil && !errdefs.IsNotFound(err) {
-					fmt.Fprintln(cliContext.App.ErrWriter, "Error cleaning up snapshot after mount error:", err)
+					_, _ = fmt.Fprintln(cmd.ErrWriter, "Error cleaning up snapshot after mount error:", err)
 				}
 				return fmt.Errorf("failed to mount %v: %w", mounts, err)
 			}
@@ -171,7 +172,7 @@ When you are done, use the unmount command.
 			return fmt.Errorf("cannot handle returned mounts: %v", mounts)
 		}
 
-		fmt.Fprintln(cliContext.App.Writer, target)
+		_, _ = fmt.Fprintln(cmd.Writer, target)
 		return nil
 	},
 }

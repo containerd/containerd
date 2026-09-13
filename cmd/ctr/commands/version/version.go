@@ -17,21 +17,22 @@
 package version
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // Command is a cli command to output the client and containerd server version
 var Command = &cli.Command{
 	Name:  "version",
 	Usage: "Print the client and server versions",
-	Action: func(cliContext *cli.Context) error {
-		if cliContext.NArg() != 0 {
-			return fmt.Errorf("extra arguments: %v", cliContext.Args())
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		if cmd.NArg() != 0 {
+			return fmt.Errorf("extra arguments: %v", cmd.Args())
 		}
 
 		fmt.Println("Client:")
@@ -39,7 +40,7 @@ var Command = &cli.Command{
 		fmt.Println("  Revision:", version.Revision)
 		fmt.Println("  Go version:", version.GoVersion)
 		fmt.Println("")
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

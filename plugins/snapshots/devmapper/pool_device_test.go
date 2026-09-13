@@ -57,7 +57,7 @@ const (
 func TestPoolDevice(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	assert.NoError(t, log.SetLevel("debug"))
+	assert.NoError(t, log.SetLevel(log.DebugLevel))
 	ctx := context.Background()
 
 	tempDir := t.TempDir()

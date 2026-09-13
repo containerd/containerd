@@ -33,7 +33,7 @@ func (r *Runc) commandWithCustomLogFile(context context.Context, logFile string,
 	if command == "" {
 		command = DefaultCommand
 	}
-	cmd := exec.CommandContext(context, command, append(r.args(logFile), args...)...)
+	cmd := exec.CommandContext(context, command, append(r.args(logFile), args...)...) // #nosec G702 -- executing the caller-configured runtime is the purpose of this package.
 	cmd.Env = append(os.Environ(), extraEnv(context)...)
 	cmd.Dir = r.WorkDir
 	return cmd

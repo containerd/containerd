@@ -17,9 +17,10 @@
 package oci
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -31,7 +32,7 @@ import (
 var Command = &cli.Command{
 	Name:  "oci",
 	Usage: "OCI tools",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		defaultSpecCommand,
 	},
 }
@@ -45,12 +46,12 @@ var defaultSpecCommand = &cli.Command{
 			Usage: "Platform of the spec to print (Examples: 'linux/arm64', 'windows/amd64')",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		ctx, cancel := commands.AppContext(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		ctx, cancel := commands.AppContext(ctx, cmd)
 		defer cancel()
 
 		platform := platforms.DefaultString()
-		if plat := cliContext.String("platform"); plat != "" {
+		if plat := cmd.String("platform"); plat != "" {
 			platform = plat
 		}
 

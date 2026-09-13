@@ -18,10 +18,14 @@
 
 package pprof
 
-import "net"
+import (
+	"context"
+	"net"
+)
 
-func (d *pprofDialer) pprofDial(proto, addr string) (conn net.Conn, err error) {
-	return net.Dial(d.proto, d.addr)
+func (d *pprofDialer) pprofDial(ctx context.Context, _, _ string) (net.Conn, error) {
+	var dialer net.Dialer
+	return dialer.DialContext(ctx, d.proto, d.addr)
 }
 
 func getPProfDialer(addr string) *pprofDialer {

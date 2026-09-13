@@ -66,8 +66,8 @@ func All(mounts []Mount, target string) error {
 // UnmountMounts unmounts all the mounts under a target in the reverse order of
 // the mounts array provided.
 func UnmountMounts(mounts []Mount, target string, flags int) error {
-	for i := len(mounts) - 1; i >= 0; i-- {
-		mountpoint, err := fs.RootPath(target, mounts[i].Target)
+	for i, m := range slices.Backward(mounts) {
+		mountpoint, err := fs.RootPath(target, m.Target)
 		if err != nil {
 			return err
 		}
@@ -133,9 +133,9 @@ func (m *Mount) Mount(target string) error {
 	return m.mount(target)
 }
 
-// readonlyMounts modifies the received mount options
-// to make them readonly
+// readonlyMounts returns mounts with readonly options applied.
 func readonlyMounts(mounts []Mount) []Mount {
+	mounts = slices.Clone(mounts)
 	for i, m := range mounts {
 		if m.Type == "overlay" {
 			mounts[i].Options = readonlyOverlay(m.Options)

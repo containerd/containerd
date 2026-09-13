@@ -1,0 +1,32 @@
+{{if gt .SectionNum 0}}% {{ .Command.Name }} {{ .SectionNum }}
+
+{{end}}# NAME
+
+{{ .Command.Name }}{{ if .Command.Usage }} - {{ .Command.Usage }}{{ end }}
+
+# SYNOPSIS
+
+{{ .Command.Name }}
+{{ if .SynopsisArgs }}
+```
+{{ range $v := .SynopsisArgs }}{{ $v }}{{ end }}```
+{{ end }}{{ if .Command.Description }}
+# DESCRIPTION
+
+{{ .Command.Description }}
+{{ end }}
+**Usage**:
+
+```{{ if .Command.UsageText }}
+{{ .Command.UsageText }}
+{{ else }}
+{{ .Command.Name }} [GLOBAL OPTIONS] [command [COMMAND OPTIONS]] [ARGUMENTS...]
+{{ end }}```
+{{ if .GlobalArgs }}
+# GLOBAL OPTIONS
+{{ range $v := .GlobalArgs }}
+{{ $v }}{{ end }}
+{{ end }}{{ if .Commands }}
+# COMMANDS
+{{ range $v := .Commands }}
+{{ $v }}{{ end }}{{ end -}}

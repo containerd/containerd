@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/content"
@@ -69,15 +69,15 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 			Usage: "Generate a dm-verity hash tree and .dmverity sidecar for each blob (Linux only)",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		ref := cliContext.Args().Get(0)
-		cacheDir := cliContext.Args().Get(1)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		ref := cmd.Args().Get(0)
+		cacheDir := cmd.Args().Get(1)
 		if ref == "" || cacheDir == "" {
 			return errors.New("image ref and cache dir must be specified")
 		}
 
 		platform := platforms.DefaultStrict()
-		if p := cliContext.String("platform"); p != "" {
+		if p := cmd.String("platform"); p != "" {
 			parsed, err := platforms.Parse(p)
 			if err != nil {
 				return fmt.Errorf("invalid platform %q: %w", p, err)
@@ -86,14 +86,14 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 		}
 
 		var opts []erofs.ConvertOpt
-		if c := cliContext.String("compressors"); c != "" {
+		if c := cmd.String("compressors"); c != "" {
 			opts = append(opts, erofs.WithCompressors(c))
 		}
-		if m := cliContext.String("mkfs-options"); m != "" {
+		if m := cmd.String("mkfs-options"); m != "" {
 			opts = append(opts, erofs.WithMkfsOptions(strings.Fields(m)))
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -104,13 +104,13 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 			return err
 		}
 
-		if err := buildCache(ctx, client.ContentStore(), img.Target, platform, cacheDir, cliContext.Bool("dmverity"), opts...); err != nil {
+		if err := buildCache(ctx, client.ContentStore(), img.Target, platform, cacheDir, cmd.Bool("dmverity"), opts...); err != nil {
 			if errdefs.IsNotFound(err) {
 				return fmt.Errorf("fetch the image content first, e.g. `ctr content fetch %s`: %w", ref, err)
 			}
 			return err
 		}
-		fmt.Fprintln(cliContext.App.Writer, cacheDir)
+		_, _ = fmt.Fprintln(cmd.Writer, cacheDir)
 		return nil
 	},
 }

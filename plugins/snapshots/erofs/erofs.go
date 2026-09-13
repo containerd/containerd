@@ -698,6 +698,13 @@ func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 	return s.createSnapshot(ctx, snapshots.KindActive, key, parent, opts)
 }
 
+// cacheID identifies a layer content cache in metrics by its position in the
+// configured list and the directory's base name. The path itself varies by
+// host, so the same cache wouldn't aggregate across a fleet.
+func cacheID(i int, dir string) string {
+	return strconv.Itoa(i) + ":" + filepath.Base(dir)
+}
+
 // lookupCache returns the absolute path of the cached erofs blob that can serve
 // the layer being prepared, or "" on a miss. It gates on: at least one cache
 // being configured, the Prepare being an image-layer extraction (carries the
@@ -731,21 +738,28 @@ func (s *snapshotter) lookupCache(ctx context.Context, opts ...snapshots.Opt) st
 		return ""
 	}
 
-	for _, dir := range s.layerContentCaches {
+	for i, dir := range s.layerContentCaches {
 		blob := erofsutils.CacheBlobPath(dir, diffID)
-		if _, err := os.Stat(blob); err != nil {
+		fi, err := os.Stat(blob)
+		if err != nil {
 			if !os.IsNotExist(err) {
 				// An unreadable cache (a down FUSE mount, a permission change since
 				// startup) shouldn't fail the pull or mask a hit in a later cache.
+				cacheErrors.WithValues("unreadable", cacheID(i, dir)).Inc()
 				log.G(ctx).WithError(err).WithField("blob", blob).
 					Warn("erofs layer cache: failed to stat cache blob, skipping this cache")
 			}
 			continue
 		}
+		cacheLookups.WithValues("hit").Inc()
+		cacheHits.WithValues(cacheID(i, dir)).Inc()
+		cacheHitBytes.Inc(float64(fi.Size()))
 		// Absolute, since the configured dirs are validated as such: the hit is
 		// symlinked into the snapshot dir, where a relative target would dangle.
 		return blob
 	}
+
+	cacheLookups.WithValues("miss").Inc()
 
 	log.G(ctx).WithField("diffID", diffID.String()).Trace("erofs layer cache miss")
 	return ""

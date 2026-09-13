@@ -219,7 +219,7 @@ integration: ## run integration tests
 	@echo "$(WHALE) $@"
 	@$(GO) -C "${ROOTDIR}/integration/client" mod download
 	@cd "${ROOTDIR}/integration/client" && \
-		$(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
+		$(GOTEST) -v ${TESTFLAGS} ${GO_TAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
 $(CRI_INTEGRATION_TEST_BINARY):
 	@echo "$(WHALE) $@"

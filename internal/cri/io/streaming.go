@@ -37,7 +37,7 @@ import (
 
 // ioStream is a stream created by streaming api for io transfer
 // we add a field c as io.Closer because we do connect the streaming server
-// and create a client everytime we create a stream. so we need to close
+// and create a client every time we create a stream. so we need to close
 // the connection if the stream is closed.
 type ioStream struct {
 	streamingapi.Stream

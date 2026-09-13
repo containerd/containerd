@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -76,7 +76,7 @@ var Command = &cli.Command{
 			Usage: "shim address (default: computed from shim ID)",
 		},
 	},
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		deleteCommand,
 		execCommand,
 		startCommand,
@@ -89,13 +89,13 @@ var Command = &cli.Command{
 var startCommand = &cli.Command{
 	Name:  "start",
 	Usage: "Start a container with a task",
-	Action: func(cliContext *cli.Context) error {
-		service, err := getTaskService(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		service, err := getTaskService(cmd)
 		if err != nil {
 			return err
 		}
 		_, err = service.Start(context.Background(), &task.StartRequest{
-			ID: cliContext.Args().First(),
+			ID: cmd.Args().First(),
 		})
 		return err
 	},
@@ -104,13 +104,13 @@ var startCommand = &cli.Command{
 var deleteCommand = &cli.Command{
 	Name:  "delete",
 	Usage: "Delete a container with a task",
-	Action: func(cliContext *cli.Context) error {
-		service, err := getTaskService(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		service, err := getTaskService(cmd)
 		if err != nil {
 			return err
 		}
 		r, err := service.Delete(context.Background(), &task.DeleteRequest{
-			ID: cliContext.Args().First(),
+			ID: cmd.Args().First(),
 		})
 		if err != nil {
 			return err
@@ -128,7 +128,7 @@ var shutdownCommand = &cli.Command{
 			Name:  "api-version",
 			Usage: "shim API version {2,3}",
 			Value: 3,
-			Action: func(c *cli.Context, v int) error {
+			Action: func(ctx context.Context, cmd *cli.Command, v int) error {
 				if v != 2 && v != 3 {
 					return fmt.Errorf("api-version must be 2 or 3")
 				}
@@ -136,10 +136,10 @@ var shutdownCommand = &cli.Command{
 			},
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		switch cliContext.Int("api-version") {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		switch cmd.Int("api-version") {
 		case 2:
-			service, err := getTaskServiceV2(cliContext)
+			service, err := getTaskServiceV2(cmd)
 			if err != nil {
 				return err
 			}
@@ -148,7 +148,7 @@ var shutdownCommand = &cli.Command{
 				return err
 			}
 		default:
-			service, err := getTaskService(cliContext)
+			service, err := getTaskService(cmd)
 			if err != nil {
 				return err
 			}
@@ -174,7 +174,7 @@ var stateCommand = &cli.Command{
 			Name:  "api-version",
 			Usage: "shim API version {2,3}",
 			Value: 3,
-			Action: func(c *cli.Context, v int) error {
+			Action: func(ctx context.Context, cmd *cli.Command, v int) error {
 				if v != 2 && v != 3 {
 					return fmt.Errorf("api-version must be 2 or 3")
 				}
@@ -182,16 +182,16 @@ var stateCommand = &cli.Command{
 			},
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		id := cliContext.String("task-id")
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		id := cmd.String("task-id")
 		if id == "" {
-			id = cliContext.String("id")
+			id = cmd.String("id")
 		}
 
 		var r any
-		switch cliContext.Int("api-version") {
+		switch cmd.Int("api-version") {
 		case 2:
-			service, err := getTaskServiceV2(cliContext)
+			service, err := getTaskServiceV2(cmd)
 			if err != nil {
 				return err
 			}
@@ -202,7 +202,7 @@ var stateCommand = &cli.Command{
 				return err
 			}
 		default:
-			service, err := getTaskService(cliContext)
+			service, err := getTaskService(cmd)
 			if err != nil {
 				return err
 			}
@@ -231,7 +231,6 @@ var execCommand = &cli.Command{
 			Name:    "env",
 			Aliases: []string{"e"},
 			Usage:   "Add environment vars",
-			Value:   cli.NewStringSlice(),
 		},
 		&cli.StringFlag{
 			Name:  "cwd",
@@ -242,28 +241,24 @@ var execCommand = &cli.Command{
 			Usage: "Runtime spec",
 		},
 	),
-	Action: func(cliContext *cli.Context) error {
-		service, err := getTaskService(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		service, err := getTaskService(cmd)
 		if err != nil {
 			return err
 		}
-		var (
-			id  = cliContext.Args().First()
-			ctx = context.Background()
-		)
-
+		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("exec id must be provided")
 		}
 
-		tty := cliContext.Bool("tty")
-		wg, err := prepareStdio(cliContext.String("stdin"), cliContext.String("stdout"), cliContext.String("stderr"), tty)
+		tty := cmd.Bool("tty")
+		wg, err := prepareStdio(cmd.String("stdin"), cmd.String("stdout"), cmd.String("stderr"), tty)
 		if err != nil {
 			return err
 		}
 
 		// read spec file and extract Any object
-		spec, err := os.ReadFile(cliContext.String("spec"))
+		spec, err := os.ReadFile(cmd.String("spec"))
 		if err != nil {
 			return err
 		}
@@ -278,9 +273,9 @@ var execCommand = &cli.Command{
 				TypeUrl: url,
 				Value:   spec,
 			},
-			Stdin:    cliContext.String("stdin"),
-			Stdout:   cliContext.String("stdout"),
-			Stderr:   cliContext.String("stderr"),
+			Stdin:    cmd.String("stdin"),
+			Stdout:   cmd.String("stdout"),
+			Stderr:   cmd.String("stderr"),
 			Terminal: tty,
 		}
 		if _, err := service.Exec(ctx, rq); err != nil {
@@ -293,7 +288,7 @@ var execCommand = &cli.Command{
 			return err
 		}
 		fmt.Printf("exec running with pid %d\n", r.Pid)
-		if cliContext.Bool("attach") {
+		if cmd.Bool("attach") {
 			log.L.Info("attaching")
 			if tty {
 				current := console.Current()
@@ -319,28 +314,28 @@ var execCommand = &cli.Command{
 	},
 }
 
-func getTaskService(cliContext *cli.Context) (task.TTRPCTaskService, error) {
-	client, err := getTTRPCClient(cliContext)
+func getTaskService(cmd *cli.Command) (task.TTRPCTaskService, error) {
+	client, err := getTTRPCClient(cmd)
 	if err != nil {
 		return nil, err
 	}
 	return task.NewTTRPCTaskClient(client), nil
 }
-func getTaskServiceV2(cliContext *cli.Context) (taskv2.TTRPCTaskService, error) {
-	client, err := getTTRPCClient(cliContext)
+func getTaskServiceV2(cmd *cli.Command) (taskv2.TTRPCTaskService, error) {
+	client, err := getTTRPCClient(cmd)
 	if err != nil {
 		return nil, err
 	}
 	return taskv2.NewTTRPCTaskClient(client), nil
 }
 
-func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
-	id := cliContext.String("id")
-	shimAddress := cliContext.String("shim-address")
+func getTTRPCClient(cmd *cli.Command) (*ttrpc.Client, error) {
+	id := cmd.String("id")
+	shimAddress := cmd.String("shim-address")
 	if id == "" && shimAddress == "" {
 		return nil, fmt.Errorf("shim ID (--id) or address (--shim-address) must be specified")
 	}
-	ns := cliContext.String("namespace")
+	ns := cmd.String("namespace")
 
 	sockets := make([]string, 0)
 	if shimAddress != "" {
@@ -353,7 +348,7 @@ func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
 		s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
 		// this should not error, ctr always get a default ns
 		ctx := namespaces.WithNamespace(context.Background(), ns)
-		s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, false)
+		s2, _ := shim.SocketAddress(ctx, cmd.String("address"), id, false)
 		s2 = strings.TrimPrefix(s2, "unix://")
 		sockets = append(sockets, s2, "\x00"+s1)
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/containerd/log"
@@ -141,9 +142,9 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	}
 	if hasEnv, ok := shimPlugin.(interface{ Env() []string }); ok {
 		env := hasEnv.Env()
-		for i := len(env) - 1; i >= 0; i-- {
+		for _, value := range slices.Backward(env) {
 			// iterate backwards to grab the last PATH=
-			if path, ok := strings.CutPrefix(env[i], "PATH="); ok {
+			if path, ok := strings.CutPrefix(value, "PATH="); ok {
 				shimPath = path
 				break
 			}

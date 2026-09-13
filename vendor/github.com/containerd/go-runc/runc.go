@@ -14,6 +14,10 @@
    limitations under the License.
 */
 
+// Package runc provides Go bindings for invoking and interacting with the
+// [runc] command-line interface.
+//
+// [runc]: https://github.com/opencontainers/runc
 package runc
 
 import (
@@ -730,7 +734,9 @@ func (r *Runc) Update(context context.Context, id string, resources *specs.Linux
 	return r.runOrError(cmd)
 }
 
-// ErrParseRuncVersion is used when the runc version can't be parsed
+// ErrParseRuncVersion is kept for backward compatibility with older versions.
+//
+// Deprecated: ErrParseRuncVersion is never emitted, and should not be used.
 var ErrParseRuncVersion = errors.New("unable to parse runc version")
 
 // Version represents the runc version information
@@ -747,16 +753,16 @@ func (r *Runc) Version(context context.Context) (Version, error) {
 	if err != nil {
 		return Version{}, err
 	}
-	return parseVersion(data.Bytes())
+	return parseVersion(data.Bytes()), nil
 }
 
-func parseVersion(data []byte) (Version, error) {
+func parseVersion(data []byte) Version {
 	var v Version
 	parts := strings.Split(strings.TrimSpace(string(data)), "\n")
 
 	if len(parts) > 0 {
 		if !strings.HasPrefix(parts[0], "runc version ") {
-			return v, nil
+			return v
 		}
 		v.Runc = parts[0][13:]
 
@@ -769,7 +775,7 @@ func parseVersion(data []byte) (Version, error) {
 		}
 	}
 
-	return v, nil
+	return v
 }
 
 // Features shows the features implemented by the runtime.

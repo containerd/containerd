@@ -205,7 +205,7 @@ func appendCPUPodStats(podRuntimeStats *runtime.WindowsContainerStats, container
 	}
 
 	// It is possible the pod sandbox might not be populated with values if it doesn't exist
-	// HostProcess pods are an example where there is no actual pod sandbox running and therefor no stats
+	// HostProcess pods are an example where there is no actual pod sandbox running and therefore no stats
 	if podRuntimeStats.Cpu == nil {
 		podRuntimeStats.Cpu = &runtime.WindowsCpuUsage{
 			Timestamp:            timestamp.UnixNano(),
@@ -227,7 +227,7 @@ func appendMemoryPodStats(podRuntimeStats *runtime.WindowsContainerStats, contai
 	}
 
 	// It is possible the pod sandbox might not be populated with values if it doesn't exist
-	// HostProcess pods are an example where there is no actual pod sandbox running and therefor no stats
+	// HostProcess pods are an example where there is no actual pod sandbox running and therefore no stats
 	if podRuntimeStats.Memory == nil {
 		podRuntimeStats.Memory = &runtime.WindowsMemoryUsage{Timestamp: timestamp.UnixNano()}
 	}

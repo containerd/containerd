@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var deleteCommand = &cli.Command{
@@ -42,23 +42,21 @@ var deleteCommand = &cli.Command{
 			Usage: "Process ID to kill",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		var (
-			execID = cliContext.String("exec-id")
-			force  = cliContext.Bool("force")
-		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		var opts []containerd.ProcessDeleteOpts
+		force := cmd.Bool("force")
 		if force {
 			opts = append(opts, containerd.WithProcessKill)
 		}
 		var exitErr error
+		execID := cmd.String("exec-id")
 		if execID != "" {
-			task, err := loadTask(ctx, client, cliContext.Args().First())
+			task, err := loadTask(ctx, client, cmd.Args().First())
 			if err != nil {
 				return err
 			}
@@ -74,7 +72,7 @@ var deleteCommand = &cli.Command{
 				return cli.Exit("", int(ec))
 			}
 		} else {
-			for _, target := range cliContext.Args().Slice() {
+			for _, target := range cmd.Args().Slice() {
 				task, err := loadTask(ctx, client, target)
 				if err != nil {
 					if exitErr == nil {

@@ -54,7 +54,7 @@ func init() {
 	flag.StringVar(&nativeRootPath, "native.rootPath", "", "Root dir for native snapshotter")
 
 	// Avoid mixing benchmark output and INFO messages
-	if err := log.SetLevel("error"); err != nil {
+	if err := log.SetLevel(log.ErrorLevel); err != nil {
 		panic(fmt.Sprintf("failed to set up log level: %v", err))
 	}
 }

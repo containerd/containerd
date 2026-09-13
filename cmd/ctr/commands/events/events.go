@@ -17,6 +17,7 @@
 package events
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -24,7 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	// Register grpc event types
 	_ "github.com/containerd/containerd/api/events"
@@ -35,14 +36,14 @@ var Command = &cli.Command{
 	Name:    "events",
 	Aliases: []string{"event"},
 	Usage:   "Display containerd events",
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		eventsClient := client.EventService()
-		eventsCh, errCh := eventsClient.Subscribe(ctx, cliContext.Args().Slice()...)
+		eventsCh, errCh := eventsClient.Subscribe(ctx, cmd.Args().Slice()...)
 		for {
 			var e *events.Envelope
 			select {

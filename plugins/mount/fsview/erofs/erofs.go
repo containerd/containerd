@@ -79,6 +79,9 @@ func handleMount(m mount.Mount) (fsview.View, error) {
 		for _, c := range closers {
 			c.Close()
 		}
+		if errors.Is(err, erofs.ErrNotImplemented) {
+			err = fmt.Errorf("%w: %w", errdefs.ErrNotImplemented, err)
+		}
 		return nil, err
 	}
 

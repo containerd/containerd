@@ -37,11 +37,11 @@ var handledSignals = []os.Signal{
 func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server, cancel func()) chan struct{} {
 	done := make(chan struct{}, 1)
 	go func() {
-		var server *server.Server
+		var srv *server.Server
 		for {
 			select {
 			case s := <-serverC:
-				server = s
+				srv = s
 			case s := <-signals:
 
 				// Do not print message when dealing with SIGPIPE, which may cause
@@ -60,8 +60,8 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 					}
 
 					cancel()
-					if server != nil {
-						server.Stop()
+					if srv != nil {
+						srv.Stop()
 					}
 					close(done)
 					return

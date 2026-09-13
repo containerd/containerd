@@ -192,6 +192,11 @@ func newTracer(ctx context.Context, procs []trace.SpanProcessor) (io.Closer, err
 	otel.SetTracerProvider(provider)
 
 	return closerFunc(func() error {
+		// Flushing the buffered spans must not hang on an unreachable
+		// collector, shutdown is on a budget. Cancellation of the context
+		// this was set up with must not cut the flush short either.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+		defer cancel()
 		return provider.Shutdown(ctx)
 	}), nil
 

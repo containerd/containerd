@@ -17,6 +17,7 @@
 package tasks
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -24,19 +25,19 @@ import (
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/typeurl/v2"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var psCommand = &cli.Command{
 	Name:      "ps",
 	Usage:     "List processes for container",
 	ArgsUsage: "CONTAINER",
-	Action: func(cliContext *cli.Context) error {
-		id := cliContext.Args().First()
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		id := cmd.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}

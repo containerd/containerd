@@ -17,6 +17,7 @@
 package tasks
 
 import (
+	"context"
 	"errors"
 
 	"github.com/containerd/console"
@@ -25,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var startCommand = &cli.Command{
@@ -55,16 +56,15 @@ var startCommand = &cli.Command{
 			Usage:   "Detach from the task after it has started execution",
 		},
 	}...),
-	Action: func(cliContext *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
-			err    error
-			id     = cliContext.Args().Get(0)
-			detach = cliContext.Bool("detach")
+			id     = cmd.Args().Get(0)
+			detach = cmd.Bool("detach")
 		)
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -80,8 +80,8 @@ var startCommand = &cli.Command{
 		}
 		var (
 			tty    = spec.Process.Terminal
-			opts   = GetNewTaskOpts(cliContext)
-			ioOpts = []cio.Opt{cio.WithFIFODir(cliContext.String("fifo-dir"))}
+			opts   = GetNewTaskOpts(cmd)
+			ioOpts = []cio.Opt{cio.WithFIFODir(cmd.String("fifo-dir"))}
 		)
 		var con console.Console
 		if tty {
@@ -92,7 +92,7 @@ var startCommand = &cli.Command{
 			}
 		}
 
-		task, err := NewTask(ctx, client, container, "", con, cliContext.Bool("null-io"), cliContext.String("log-uri"), ioOpts, opts...)
+		task, err := NewTask(ctx, client, container, "", con, cmd.Bool("null-io"), cmd.String("log-uri"), ioOpts, opts...)
 		if err != nil {
 			return err
 		}
@@ -108,8 +108,8 @@ var startCommand = &cli.Command{
 				return err
 			}
 		}
-		if cliContext.IsSet("pid-file") {
-			if err := commands.WritePidFile(cliContext.String("pid-file"), int(task.Pid())); err != nil {
+		if cmd.IsSet("pid-file") {
+			if err := commands.WritePidFile(cmd.String("pid-file"), int(task.Pid())); err != nil {
 				return err
 			}
 		}

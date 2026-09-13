@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/errdefs"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -79,8 +79,8 @@ func serviceFlags() []cli.Flag {
 }
 
 // applyPlatformFlags applies platform-specific flags.
-func applyPlatformFlags(cliContext *cli.Context) {
-	serviceNameFlag = cliContext.String("service-name")
+func applyPlatformFlags(cmd *cli.Command) {
+	serviceNameFlag = cmd.String("service-name")
 	if serviceNameFlag == "" {
 		serviceNameFlag = defaultServiceName
 	}
@@ -101,9 +101,9 @@ func applyPlatformFlags(cliContext *cli.Context) {
 			d:    &runServiceFlag,
 		},
 	} {
-		*v.d = cliContext.Bool(v.name)
+		*v.d = cmd.Bool(v.name)
 	}
-	logFileFlag = cliContext.String("log-file")
+	logFileFlag = cmd.String("log-file")
 }
 
 type handler struct {

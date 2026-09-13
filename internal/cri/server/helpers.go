@@ -40,7 +40,7 @@ import (
 	"github.com/containerd/log"
 )
 
-// TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functinal.
+// TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functional.
 
 const (
 	// errorStartReason is the exit reason when fails to start container.
@@ -265,7 +265,7 @@ func unknownContainerStatus() containerstore.Status {
 	}
 }
 
-// copyResourcesToStatus copys container resource contraints from spec to
+// copyResourcesToStatus copies container resource constraints from spec to
 // container status.
 // This will need updates when new fields are added to ContainerResources.
 func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status) containerstore.Status {
