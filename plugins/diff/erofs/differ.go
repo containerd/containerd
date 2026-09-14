@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -125,6 +126,19 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 			}).Debugf("diff applied")
 		}
 	}()
+
+	// Read-only mounts belong to a snapshot the snapshotter populated itself,
+	// for example from a layer content cache. The layer is already there and is
+	// shared with every other snapshot of it. Applying would write to content
+	// this differ does not own. The unpacker reads the same mounts and skips
+	// such a layer before it reaches here.
+	//
+	// The error is ErrFailedPrecondition. The diff service falls through to the
+	// next differ only on ErrNotImplemented. Another differ would fail on this
+	// layer for the same reason.
+	if len(mounts) > 0 && mounts[len(mounts)-1].ReadOnly() {
+		return emptyDesc, fmt.Errorf("cannot apply to a read-only snapshot, its content is already populated: %w", errdefs.ErrFailedPrecondition)
+	}
 
 	var (
 		erofsLayerType string

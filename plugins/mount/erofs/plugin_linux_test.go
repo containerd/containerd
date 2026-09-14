@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/fsmount"
 	"github.com/containerd/containerd/v2/pkg/testutil"
@@ -246,4 +248,45 @@ func TestMountOptionsPageSizeLimit(t *testing.T) {
 
 		mount.Unmount(mountPoint, 0)
 	})
+}
+
+// TestDmverityDeviceName covers the naming rule for dm-verity devices. Mount
+// closes the device it creates when the mount fails, so two mounts that share a
+// name would let one of them close a device the other is using.
+func TestDmverityDeviceName(t *testing.T) {
+	const (
+		snapshotBlob = "/var/lib/containerd/snapshots/42/layer.erofs"
+		// A layer content cache shards blobs by the first two characters of the
+		// digest, so a whole shard shares one directory.
+		cachedBlob      = "/mnt/cache/sha256/ab/abcdef0123456789.erofs"
+		cachedBlobOther = "/mnt/cache/sha256/ab/abfedcba9876543210.erofs"
+	)
+
+	// The same blob mounted in two places is two mounts, each owning a device.
+	assert.NotEqual(t,
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		dmverityDeviceName(cachedBlob, "/run/b"),
+		"one blob mounted in two places names two devices")
+
+	// Two blobs in one cache shard are two layers.
+	assert.NotEqual(t,
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		dmverityDeviceName(cachedBlobOther, "/run/a"),
+		"two blobs in a shard name two devices")
+
+	assert.NotEqual(t,
+		dmverityDeviceName(snapshotBlob, "/run/a"),
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		"a snapshot blob and a cached blob name two devices")
+
+	// A device left behind by a crash is reused for the same blob in the same
+	// place, where its root hash still matches.
+	assert.Equal(t,
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		"one blob in one place names one device")
+
+	name := dmverityDeviceName(cachedBlob, "/run/a")
+	assert.True(t, strings.HasPrefix(name, "containerd-erofs-"), "Unmount finds the device by this prefix")
+	assert.Less(t, len(name), 128, "a device-mapper name is limited to 127 characters")
 }
