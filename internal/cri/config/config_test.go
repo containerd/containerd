@@ -410,6 +410,56 @@ func TestHostAccessingSandbox(t *testing.T) {
 	}
 }
 
+func TestValidateImagePullTimeout(t *testing.T) {
+	testCases := []struct {
+		name        string
+		imageConfig ImageConfig
+		expectErr   bool
+	}{
+		{
+			name:        "zero timeout rejected with transfer service",
+			imageConfig: ImageConfig{UseLocalImagePull: false, ImagePullProgressTimeout: "0s"},
+			expectErr:   true,
+		},
+		{
+			name:        "zero duration in another unit rejected with transfer service",
+			imageConfig: ImageConfig{UseLocalImagePull: false, ImagePullProgressTimeout: "0ms"},
+			expectErr:   true,
+		},
+		{
+			name:        "zero timeout allowed with local image pull",
+			imageConfig: ImageConfig{UseLocalImagePull: true, ImagePullProgressTimeout: "0s"},
+			expectErr:   false,
+		},
+		{
+			name:        "non-zero timeout allowed with transfer service",
+			imageConfig: ImageConfig{UseLocalImagePull: false, ImagePullProgressTimeout: "5m"},
+			expectErr:   false,
+		},
+		{
+			name:        "empty timeout allowed",
+			imageConfig: ImageConfig{UseLocalImagePull: false, ImagePullProgressTimeout: ""},
+			expectErr:   false,
+		},
+		{
+			name:        "invalid timeout rejected with transfer service",
+			imageConfig: ImageConfig{UseLocalImagePull: false, ImagePullProgressTimeout: "abc"},
+			expectErr:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateImagePullTimeout(&tc.imageConfig)
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestCheckLocalImagePullConfigs(t *testing.T) {
 	testCases := []struct {
 		name            string
