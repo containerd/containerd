@@ -70,3 +70,10 @@ func (ra sizeReaderAt) Close() error {
 func (ra sizeReaderAt) Reader() io.Reader {
 	return io.LimitReader(ra.fp, ra.size)
 }
+
+// Name returns the path of the backing file. Blobs are immutable, so
+// consumers may use the path for same-filesystem optimizations such as
+// hardlinking instead of copying.
+func (ra sizeReaderAt) Name() string {
+	return ra.fp.Name()
+}

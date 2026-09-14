@@ -37,6 +37,10 @@ func setImmutable(path string, enable bool) error {
 	return errdefs.ErrNotImplemented
 }
 
+func unshareIfLinked(path string) error {
+	return nil
+}
+
 func cleanupUpper(upper string) error {
 	return nil
 }
