@@ -1009,9 +1009,14 @@ func (reporter *transferProgressReporter) IncBytesRead(bytes int64) {
 }
 
 func (reporter *transferProgressReporter) start(ctx context.Context) {
+	// The consumer goroutine must always run, even without a progress
+	// timeout: the transfer service invokes the progress func
+	// synchronously, so with no reader on pc the first progress event
+	// deadlocks the pull, and handleProgress is also what keeps the
+	// reqReporter bytes-pulled accounting up to date. A zero timeout only
+	// disables the periodic no-progress cancellation check below.
 	if reporter.timeout == 0 {
-		log.G(ctx).Infof("no timeout and will not start pulling image %s reporter", reporter.ref)
-		return
+		log.G(ctx).Debugf("no pull progress timeout configured for pulling image %s; progress timeout check disabled", reporter.ref)
 	}
 
 	go func() {
@@ -1023,7 +1028,7 @@ func (reporter *transferProgressReporter) start(ctx context.Context) {
 		reporter.lastSeenTimestamp = time.Now()
 
 		// check progress more frequently if timeout < default internal
-		if reporter.timeout < reportInterval {
+		if reporter.timeout > 0 && reporter.timeout < reportInterval {
 			reportInterval = reporter.timeout / 2
 		}
 
@@ -1035,7 +1040,9 @@ func (reporter *transferProgressReporter) start(ctx context.Context) {
 			case p := <-reporter.pc:
 				reporter.handleProgress(p)
 			case <-ticker.C:
-				reporter.checkProgress(ctx, reportInterval)
+				if reporter.timeout > 0 {
+					reporter.checkProgress(ctx, reportInterval)
+				}
 				continue
 			case <-ctx.Done():
 				activeReqs, bytesRead := reporter.reqReporter.status()

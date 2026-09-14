@@ -758,6 +758,58 @@ func TestTransferProgressReporter(t *testing.T) {
 	}
 }
 
+// TestTransferProgressReporterZeroTimeout is a regression test for
+// https://github.com/containerd/containerd/issues/14158: with CRI config
+// image_pull_progress_timeout = "0s", the transfer-service pull path
+// deadlocked on the first progress event, because start() returned early
+// and nothing ever consumed the unbuffered pc channel that the
+// synchronously-invoked progress func sends on. The reporter must consume
+// progress events (and keep reqReporter accounting) even with no timeout.
+func TestTransferProgressReporterZeroTimeout(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reporter := newTransferProgressReporter("test-image:latest", cancel, 0)
+	reporter.start(ctx)
+	progressFunc := reporter.createProgressFunc(ctx)
+
+	desc := &ocispec.Descriptor{
+		MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+		Digest:    "sha256:abcdef",
+		Size:      1000,
+	}
+
+	// Send several events through the real progress func. Before the fix
+	// the very first send blocked forever on the unbuffered pc channel.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := int64(1); i <= 4; i++ {
+			progressFunc(transfer.Progress{
+				Name:     "layer1",
+				Desc:     desc,
+				Total:    1000,
+				Progress: i * 250,
+				Event:    "downloading",
+			})
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("progress func blocked with zero timeout: reporter is not consuming progress events")
+	}
+
+	// The consumer goroutine handles events asynchronously; wait for the
+	// final state before asserting that bytes/requests accounting (used
+	// for bytesPulled) still updates without a timeout.
+	assert.Eventually(t, func() bool {
+		activeReqs, totalBytesRead := reporter.reqReporter.status()
+		return activeReqs == 0 && totalBytesRead == 1000
+	}, 5*time.Second, 10*time.Millisecond, "reqReporter accounting did not reflect progress events")
+}
+
 // TestPullProgressReporter covers the core no-progress cancellation
 // behavior of pullProgressReporter: a stuck request (active, no bytes)
 // is eventually cancelled, while a progressing request is not.
