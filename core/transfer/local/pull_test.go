@@ -19,6 +19,7 @@ package local
 import (
 	"testing"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 
 	"github.com/containerd/containerd/v2/core/transfer"
@@ -150,4 +151,92 @@ func TestGetSupportedPlatform(t *testing.T) {
 		})
 	}
 
+}
+
+// TestGetSupportedPlatformExplicitSnapshotterNeverCrossesToAnother pins
+// the snapshotter/platform pairing an explicit --snapshotter relies on: a
+// caller who explicitly asked for the overlayfs snapshotter must never be
+// matched to a platform configured for a different snapshotter (e.g. one
+// erofs advertises, requiring OSFeatures ["erofs"]), even if that other
+// snapshotter's platform would otherwise be a "better" (richer) match for
+// the same requested platform. Without this, a caller explicitly opting
+// out of the erofs snapshotter could still end up selecting (and, when
+// unpacking, becoming reliant on the presence of) an EROFS-native
+// manifest it never asked to be unpacked with erofs.
+func TestGetSupportedPlatformExplicitSnapshotterNeverCrossesToAnother(t *testing.T) {
+	supportedPlatforms := []unpack.Platform{
+		{
+			Platform:       platforms.OnlyStrict(platforms.MustParse("linux/amd64")),
+			SnapshotterKey: "overlayfs",
+		},
+		{
+			Platform:       platforms.OnlyStrict(platforms.MustParse("linux(+erofs)/amd64")),
+			SnapshotterKey: "erofs",
+		},
+	}
+
+	matched, sp := getSupportedPlatform(t.Context(), transfer.UnpackConfiguration{
+		Platform:    platforms.MustParse("linux/amd64"),
+		Snapshotter: "overlayfs",
+	}, supportedPlatforms)
+	if !matched {
+		t.Fatal("expected a match for the explicitly requested overlayfs snapshotter")
+	}
+	if sp.SnapshotterKey != "overlayfs" {
+		t.Fatalf("expected the overlayfs snapshotter's own (plain) platform, got snapshotter %q", sp.SnapshotterKey)
+	}
+}
+
+func TestResolveUnpackPlatforms(t *testing.T) {
+	supportedPlatforms := []unpack.Platform{
+		{
+			Platform:       platforms.OnlyStrict(platforms.MustParse("linux/amd64")),
+			SnapshotterKey: "native",
+		},
+		{
+			Platform:       platforms.OnlyStrict(platforms.MustParse("linux/arm64")),
+			SnapshotterKey: "native",
+		},
+	}
+
+	t.Run("every requested config matches", func(t *testing.T) {
+		requested := []transfer.UnpackConfiguration{
+			{Platform: platforms.MustParse("linux/amd64"), Snapshotter: "native"},
+			{Platform: platforms.MustParse("linux/arm64"), Snapshotter: "native"},
+		}
+		matches, err := resolveUnpackPlatforms(t.Context(), requested, supportedPlatforms)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if len(matches) != len(requested) {
+			t.Fatalf("expected %d matches, got %d", len(requested), len(matches))
+		}
+	})
+
+	t.Run("no requested configs is a no-op", func(t *testing.T) {
+		matches, err := resolveUnpackPlatforms(t.Context(), nil, supportedPlatforms)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if len(matches) != 0 {
+			t.Fatalf("expected no matches, got %d", len(matches))
+		}
+	})
+
+	t.Run("an unsupported requested config errors instead of being skipped", func(t *testing.T) {
+		requested := []transfer.UnpackConfiguration{
+			{Platform: platforms.MustParse("linux/amd64"), Snapshotter: "native"},
+			{Platform: platforms.MustParse("linux/riscv64"), Snapshotter: "native"},
+		}
+		matches, err := resolveUnpackPlatforms(t.Context(), requested, supportedPlatforms)
+		if err == nil {
+			t.Fatal("expected an error for the unsupported riscv64 request")
+		}
+		if !errdefs.IsNotImplemented(err) {
+			t.Fatalf("expected an ErrNotImplemented-wrapping error, got %v", err)
+		}
+		if matches != nil {
+			t.Fatalf("expected no matches to be returned alongside the error, got %v", matches)
+		}
+	})
 }

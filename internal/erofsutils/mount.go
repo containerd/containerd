@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 )
 
@@ -45,10 +46,38 @@ func CacheBlobPath(dir string, diffID digest.Digest) string {
 	return filepath.Join(dir, diffID.Algorithm().String(), enc[:2], enc+".erofs")
 }
 
-// IsErofsMediaType returns true if the media type is an EROFS layer type.
+// IsErofsMediaType returns true if the media type is a mountable EROFS
+// filesystem image layer, i.e. containerd's legacy
+// images.MediaTypeErofsLayer or the EROFS image layer format
+// specification's images.MediaTypeErofs, either optionally suffixed with
+// "+zstd". It does not match images.MediaTypeErofsChunkIndex: a standalone
+// chunk-index layer is not itself a mountable EROFS filesystem image.
 func IsErofsMediaType(mt string) bool {
-	return strings.HasPrefix(mt, "application/vnd.erofs.layer")
+	base, _, _ := strings.Cut(mt, "+")
+	return base == images.MediaTypeErofsLayer || base == images.MediaTypeErofs
 }
+
+// File names, within an EROFS-snapshotter-managed snapshot directory (see
+// plugins/snapshots/erofs), that an EROFS-aware differ (see
+// plugins/diff/erofs) writes a committed layer's blob to. Exactly one of
+// these is written per layer, chosen by the layer's org.erofs.role
+// annotation as defined by the EROFS image layer format specification
+// (https://github.com/erofs/erofs-image-spec, §2.4); these constants are
+// shared between the two packages so they cannot drift apart.
+const (
+	// LayerBlobName holds a committed overlay-lower (or role-less) EROFS
+	// layer blob: a complete, independently mountable EROFS filesystem
+	// image.
+	LayerBlobName = "layer.erofs"
+	// DataBlobName holds a committed overlay-data-role EROFS layer blob:
+	// also a complete EROFS filesystem image, but supplied to the overlay
+	// mount as a data-only lower rather than a regular lowerdir.
+	DataBlobName = "data.erofs"
+	// DeviceBlobName holds a committed device-role layer's raw,
+	// uninterpreted byte stream, supplied to the consuming layer's mount
+	// via the device= mount option rather than mounted on its own.
+	DeviceBlobName = "device.blob"
+)
 
 func mkfsEnv(layerPath string) []string {
 	if runtime.GOOS != "windows" {

@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"slices"
 
@@ -77,6 +78,15 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			return nil, nil
 		}
 
+		// A standalone chunk-index layer (see the EROFS image layer format
+		// specification, https://github.com/erofs/erofs-image-spec, §2.2)
+		// is not a mountable filesystem image and has nothing to convert;
+		// leave it untouched, matching how an EROFS-unaware consumer must
+		// skip it during composition (§8.2).
+		if images.IsSkippableLayerType(desc.MediaType) {
+			return nil, nil
+		}
+
 		if images.IsNonDistributable(desc.MediaType) {
 			return nil, nil
 		}
@@ -125,7 +135,11 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			return nil, fmt.Errorf("failed to truncate writer: %w", err)
 		}
 
-		mediaType := images.MediaTypeErofsLayer
+		// Emit the EROFS image layer format specification's media type
+		// (https://github.com/erofs/erofs-image-spec) rather than
+		// containerd's legacy pre-standard MediaTypeErofsLayer.
+		mediaType := images.MediaTypeErofs
+		var uncompressedDigest digest.Digest
 
 		if convertOpts.blobCompression == "zstd" {
 			zw, err := compression.CompressStream(w, compression.Zstd)
@@ -140,8 +154,9 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			if err := zw.Close(); err != nil {
 				return nil, fmt.Errorf("failed to finalize zstd stream: %w", err)
 			}
-			labelz[labels.LabelUncompressed] = digester.Digest().String()
-			mediaType = images.MediaTypeErofsLayer + "+" + convertOpts.blobCompression
+			uncompressedDigest = digester.Digest()
+			labelz[labels.LabelUncompressed] = uncompressedDigest.String()
+			mediaType = images.MediaTypeErofs + "+" + convertOpts.blobCompression
 		} else {
 			if _, err = io.Copy(w, erofsFile); err != nil {
 				return nil, fmt.Errorf("failed to copy to content store: %w", err)
@@ -162,6 +177,19 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 		newDesc.MediaType = mediaType
 		newDesc.Digest = w.Digest()
 		newDesc.Size = cInfo.Size
+		if uncompressedDigest != "" {
+			// Per the specification, producers SHOULD emit this annotation
+			// on every application/vnd.erofs+zstd layer descriptor; it is
+			// authoritative over rootfs.diff_ids, which is also still
+			// populated below for compatibility with consumers that do not
+			// yet recognize the annotation.
+			annotations := maps.Clone(newDesc.Annotations)
+			if annotations == nil {
+				annotations = make(map[string]string, 1)
+			}
+			annotations[images.AnnotationErofsUncompressedDigest] = uncompressedDigest.String()
+			newDesc.Annotations = annotations
+		}
 		return &newDesc, nil
 	}
 }

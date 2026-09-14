@@ -59,8 +59,18 @@ const (
 	MediaTypeImageLayerEncrypted     = ocispec.MediaTypeImageLayer + "+encrypted"
 	MediaTypeImageLayerGzipEncrypted = ocispec.MediaTypeImageLayerGzip + "+encrypted"
 
-	// EROFS media type
-	MediaTypeErofsLayer = "application/vnd.erofs.layer.v1"
+	// EROFS media types.
+	//
+	// MediaTypeErofsLayer is containerd's legacy, pre-standard EROFS layer
+	// media type (retained for backwards compatibility with images produced
+	// by earlier releases). MediaTypeErofs and MediaTypeErofsChunkIndex are
+	// defined by the EROFS image layer format specification
+	// (https://github.com/erofs/erofs-image-spec); both MediaTypeErofsLayer
+	// and MediaTypeErofs support an optional "+zstd" suffix for a
+	// zstd-compressed layer.
+	MediaTypeErofsLayer      = "application/vnd.erofs.layer.v1"
+	MediaTypeErofs           = "application/vnd.erofs"
+	MediaTypeErofsChunkIndex = "application/vnd.erofs.chunk-index.v1"
 
 	// In-toto attestation
 	MediaTypeInToto = "application/vnd.in-toto+json"
@@ -147,11 +157,28 @@ func IsLayerType(mt string) bool {
 	case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
 		MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip, MediaTypeDockerSchema2LayerZstd:
 		return true
-	// Allow EROFS native layers for efficient container image distribution.
-	case MediaTypeErofsLayer:
+	// Allow EROFS native layers (and their standalone chunk-index layers, see
+	// the EROFS image layer format specification) for efficient container
+	// image distribution.
+	case MediaTypeErofsLayer, MediaTypeErofs, MediaTypeErofsChunkIndex:
 		return true
 	}
 	return false
+}
+
+// IsSkippableLayerType returns true if the media type is a layer type (see
+// IsLayerType) that a consumer not implementing it may skip entirely during
+// rootfs composition, contributing no content and requiring no snapshot,
+// while still participating in the DiffID/ChainID recursion like any other
+// layer.
+//
+// Currently this is exactly the standalone chunk-index layer defined by the
+// EROFS image layer format specification
+// (https://github.com/erofs/erofs-image-spec): per §2.2 and §8.2, a consumer
+// that does not implement application/vnd.erofs.chunk-index.v1 MUST
+// silently skip it during composition.
+func IsSkippableLayerType(mt string) bool {
+	return mt == MediaTypeErofsChunkIndex
 }
 
 // IsDockerType returns true if the media type has "application/vnd.docker." prefix

@@ -19,6 +19,7 @@ package local
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -130,10 +131,42 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 	}
 	defer cancel()
 
+	// Resolve the caller's requested unpack configurations - if any -
+	// before building the image/manifest selection filter below, so that
+	// a matched unpack configuration's OSFeatures (e.g. "erofs", see the
+	// EROFS image layer format specification,
+	// https://github.com/erofs/erofs-image-spec) can be factored into
+	// which manifest variant for a given platform is selected for
+	// fetching in the first place, not just into whether the manifest
+	// that happens to get fetched can later be unpacked.
+	var (
+		unpacks []transfer.UnpackConfiguration
+		matches []unpack.Platform
+	)
+	if iu, ok := is.(transfer.ImageUnpacker); ok {
+		unpacks = iu.UnpackPlatforms()
+		if len(unpacks) > 0 {
+			matches, err = resolveUnpackPlatforms(ctx, unpacks, ts.config.UnpackPlatforms)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// Get all the children for a descriptor
 	childrenHandler := images.ChildrenHandler(store)
 
-	if f, ok := is.(transfer.ImageFilterer); ok {
+	if pf, ok := is.(transfer.PlatformImageFilterer); ok {
+		// Every matched unpack configuration's platform is a candidate
+		// refinement (see transfer.PlatformImageFilterer): the filterer
+		// itself decides whether, and to which of its own configured
+		// platforms, each one actually applies.
+		refinements := make([]ocispec.Platform, 0, len(matches))
+		for _, mu := range matches {
+			refinements = append(refinements, mu.PlatformSpec)
+		}
+		childrenHandler = pf.ImageFilterWithPlatforms(childrenHandler, store, refinements)
+	} else if f, ok := is.(transfer.ImageFilterer); ok {
 		childrenHandler = f.ImageFilter(childrenHandler, store)
 	}
 
@@ -187,50 +220,38 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		appendDistSrcLabelHandler,
 	)...)
 
-	// First find suitable platforms to unpack into
-	// If image storer is also an unpacker type, i.e implemented UnpackPlatforms() func
-	if iu, ok := is.(transfer.ImageUnpacker); ok {
-		unpacks := iu.UnpackPlatforms()
-		if len(unpacks) > 0 {
-			uopts := []unpack.UnpackerOpt{}
-			enableRemoteSnapshotAnnotations := false
-			// Only unpack if requested unpackconfig matches default/supported unpackconfigs
-			for _, u := range unpacks {
-				matched, mu := getSupportedPlatform(ctx, u, ts.config.UnpackPlatforms)
-				if matched {
-					if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
-						enableRemoteSnapshotAnnotations = true
-					}
-					if progressTracker != nil {
-						mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
-					}
-					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
-				} else {
-					log.G(ctx).WithFields(log.Fields{
-						"platform":    platforms.FormatAll(u.Platform),
-						"snapshotter": u.Snapshotter,
-					}).Warn("Unpack configuration not supported, skipping")
-				}
-			}
+	// Set up unpacking using the unpack configurations resolved above.
+	if len(matches) > 0 {
+		uopts := []unpack.UnpackerOpt{}
+		enableRemoteSnapshotAnnotations := false
 
-			if ts.config.DuplicationSuppressor != nil {
-				uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
+		for _, mu := range matches {
+			if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
+				enableRemoteSnapshotAnnotations = true
 			}
-
-			if ts.limiterP != nil {
-				uopts = append(uopts, unpack.WithUnpackLimiter(ts.limiterP))
+			if progressTracker != nil {
+				mu.ApplyOpts = append(mu.ApplyOpts, diff.WithProgress(progressTracker.ExtractProgress))
 			}
-
-			if enableRemoteSnapshotAnnotations {
-				handler = snpkg.AppendInfoHandlerWrapper(name)(handler)
-			}
-
-			unpacker, err = unpack.NewUnpacker(ctx, ts.content, uopts...)
-			if err != nil {
-				return fmt.Errorf("unable to initialize unpacker: %w", err)
-			}
-			handler = unpacker.Unpack(handler)
+			uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 		}
+
+		if ts.config.DuplicationSuppressor != nil {
+			uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
+		}
+
+		if ts.limiterP != nil {
+			uopts = append(uopts, unpack.WithUnpackLimiter(ts.limiterP))
+		}
+
+		if enableRemoteSnapshotAnnotations {
+			handler = snpkg.AppendInfoHandlerWrapper(name)(handler)
+		}
+
+		unpacker, err = unpack.NewUnpacker(ctx, ts.content, uopts...)
+		if err != nil {
+			return fmt.Errorf("unable to initialize unpacker: %w", err)
+		}
+		handler = unpacker.Unpack(handler)
 	}
 
 	if err := images.Dispatch(ctx, handler, nil, desc); err != nil {
@@ -296,6 +317,38 @@ func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *Progre
 		}
 		return nil, err
 	}
+}
+
+// resolveUnpackPlatforms resolves each of the caller's requested unpack
+// configurations to a matching entry in supportedPlatforms.
+//
+// Unlike the platform/manifest selection used to decide which content to
+// fetch, requested is the set of unpack configurations the caller
+// explicitly asked for (see transfer.ImageUnpacker, image.Store.unpacks):
+// every entry must resolve to a supported platform, or an error - wrapping
+// errdefs.ErrNotImplemented - is returned naming every configuration that
+// could not be satisfied. Silently skipping one, as previously done, would
+// leave the caller believing an image was unpacked as requested when it
+// was not, rather than surfacing the misconfiguration.
+func resolveUnpackPlatforms(ctx context.Context, requested []transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) ([]unpack.Platform, error) {
+	matches := make([]unpack.Platform, 0, len(requested))
+	var unsupported []transfer.UnpackConfiguration
+	for _, u := range requested {
+		matched, mu := getSupportedPlatform(ctx, u, supportedPlatforms)
+		if !matched {
+			unsupported = append(unsupported, u)
+			continue
+		}
+		matches = append(matches, mu)
+	}
+	if len(unsupported) > 0 {
+		descs := make([]string, 0, len(unsupported))
+		for _, u := range unsupported {
+			descs = append(descs, fmt.Sprintf("%s on snapshotter %q", platforms.FormatAll(u.Platform), u.Snapshotter))
+		}
+		return nil, fmt.Errorf("unpack configuration(s) not supported: %s: %w", strings.Join(descs, ", "), errdefs.ErrNotImplemented)
+	}
+	return matches, nil
 }
 
 // getSupportedPlatform returns a matched platform comparing input UnpackConfiguration to the supported platform/snapshotter combinations

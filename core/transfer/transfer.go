@@ -94,6 +94,32 @@ type ImageFilterer interface {
 	ImageFilter(images.HandlerFunc, content.Store) images.HandlerFunc
 }
 
+// PlatformImageFilterer is an ImageFilterer whose filtering can be told to
+// prefer more specific variants - beyond what it was itself configured
+// with (see ImagePlatformsGetter) - of the platforms it selects manifests
+// for, without otherwise changing its configuration.
+//
+// This is used to factor a matched unpack configuration's OSFeatures
+// (e.g. "erofs", see the EROFS image layer format specification,
+// https://github.com/erofs/erofs-image-spec) into which of an image's
+// manifests is fetched, since a caller may configure unpacking (see
+// ImageUnpacker) for OSFeatures beyond what it configured for content
+// selection (see ImagePlatformsGetter).
+type PlatformImageFilterer interface {
+	ImageFilterer
+
+	// ImageFilterWithPlatforms behaves like ImageFilter, except that each
+	// of this filterer's own configured platforms is refined by
+	// refinements before being used to select manifests: refinements
+	// only ever replaces a configured platform with one describing the
+	// same OS, OS version, architecture and variant but a superset of
+	// its OSFeatures - it never adds, removes, or reorders a configured
+	// platform, and never widens selection to a platform that would not
+	// otherwise have been accepted. A nil or empty refinements is exactly
+	// ImageFilter.
+	ImageFilterWithPlatforms(h images.HandlerFunc, cs content.Store, refinements []ocispec.Platform) images.HandlerFunc
+}
+
 // ImageStorer is a type which is capable of storing images for
 // the provided descriptor. The descriptor may be any type of manifest
 // including an index with multiple image references.

@@ -19,6 +19,7 @@ package transfer
 import (
 	"errors"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/diff"
@@ -121,6 +122,21 @@ func TestConfigureUnpackPlatforms(t *testing.T) {
 			if tt.expectedApplier {
 				if _, ok := lc.UnpackPlatforms[0].Applier.(testApplier); !ok {
 					t.Fatalf("expected test applier, got %T", lc.UnpackPlatforms[0].Applier)
+				}
+				// PlatformSpec must retain the configured platform, not
+				// just the compiled matcher, so callers can inspect e.g.
+				// its OSFeatures. Compare against platforms.Parse of the
+				// same formatted spec configureUnpackPlatforms itself
+				// parses - not platforms.Normalize(platforms.DefaultSpec())
+				// directly - since on arm64 those two disagree: Parse of an
+				// explicit ".../v8" preserves the variant, while Normalize
+				// canonicalizes v8 (the assumed baseline) away.
+				want, wantErr := platforms.Parse(platforms.Format(platforms.DefaultSpec()))
+				if wantErr != nil {
+					t.Fatalf("failed to parse expected platform: %v", wantErr)
+				}
+				if !reflect.DeepEqual(lc.UnpackPlatforms[0].PlatformSpec, want) {
+					t.Fatalf("expected PlatformSpec %v, got %v", want, lc.UnpackPlatforms[0].PlatformSpec)
 				}
 			}
 		})
