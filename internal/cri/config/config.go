@@ -448,9 +448,12 @@ type RuntimeConfig struct {
 	// Default: "2m"
 	StatsRetentionPeriod string `toml:"stats_retention_period" json:"statsRetentionPeriod"`
 
-	// EnableCRIU enables CRIU (Checkpoint/Restore In Userspace) support.
+	// EnableCheckpointRestore enables checkpoint/restore support.
 	// When set to false, checkpoint/restore operations will be disabled.
-	EnableCRIU *bool `toml:"enable_criu" json:"enableCRIU"`
+	EnableCheckpointRestore *bool `toml:"enable_checkpoint_restore" json:"enableCheckpointRestore"`
+
+	// EnableCRIU is the deprecated name for EnableCheckpointRestore.
+	EnableCRIU *bool `toml:"enable_criu" json:"enableCRIU,omitempty"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -631,6 +634,14 @@ func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
 // ValidateRuntimeConfig validates the given runtime configuration.
 func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
+	if c.EnableCRIU != nil {
+		warnings = append(warnings, deprecation.CRIEnableCRIU)
+		log.G(ctx).Warning("`enable_criu` is deprecated, please use `enable_checkpoint_restore` instead")
+		// Prefer the deprecated option so configurations written before the
+		// rename continue to override the populated default configuration.
+		c.EnableCheckpointRestore = c.EnableCRIU
+		c.EnableCRIU = nil
+	}
 	if c.ContainerdConfig.Runtimes == nil {
 		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
 	}

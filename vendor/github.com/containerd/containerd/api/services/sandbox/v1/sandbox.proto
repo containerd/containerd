@@ -97,6 +97,14 @@ service Controller {
   rpc Update(ControllerUpdateRequest) returns (ControllerUpdateResponse);
 }
 
+// Checkpoint is an optional sandbox-controller capability. It is a separate
+// service so existing Controller implementations do not need to implement
+// checkpoint and restore methods.
+service Checkpoint {
+  rpc Checkpoint(ControllerCheckpointRequest) returns (ControllerCheckpointResponse);
+  rpc Restore(ControllerRestoreRequest) returns (ControllerRestoreResponse);
+}
+
 message ControllerCreateRequest {
   string sandbox_id = 1;
   repeated containerd.types.Mount rootfs = 2;
@@ -201,3 +209,47 @@ message ControllerUpdateRequest {
 }
 
 message ControllerUpdateResponse {}
+
+message ControllerCheckpointContainer {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Any config = 3;
+  google.protobuf.Any status = 4;
+}
+
+message ControllerCheckpointRequest {
+  string sandbox_id = 1;
+  string output_path = 2;
+  google.protobuf.Any sandbox_config = 3;
+  repeated ControllerCheckpointContainer containers = 4;
+  map<string, string> options = 5;
+  string sandboxer = 10;
+}
+
+message ControllerCheckpointResponse {}
+
+message ControllerRestoreContainer {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Any config = 3;
+}
+
+message ControllerRestoreRequest {
+  string sandbox_id = 1;
+  string checkpoint_path = 2;
+  google.protobuf.Any sandbox_config = 3;
+  repeated ControllerRestoreContainer containers = 4;
+  map<string, string> options = 5;
+  string sandboxer = 10;
+}
+
+message ControllerRestoredContainer {
+  string name = 1;
+  // Ownership transfers from the controller to the caller when Restore
+  // succeeds. Empty when no containerd task checkpoint is required.
+  string task_checkpoint_image = 2;
+}
+
+message ControllerRestoreResponse {
+  repeated ControllerRestoredContainer containers = 1;
+}
