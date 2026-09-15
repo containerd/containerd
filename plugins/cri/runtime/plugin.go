@@ -246,6 +246,9 @@ func migrateConfig(dst, src map[string]any) {
 			"x509_key_pair_streaming":
 			// skip (moved to cri ServerConfig)
 			continue
+		case "enable_cdi":
+			// skip (CDI is always enabled)
+			continue
 		default:
 			if _, ok := dst[k]; !ok {
 				dst[k] = v

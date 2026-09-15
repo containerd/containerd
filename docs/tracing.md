@@ -9,14 +9,12 @@ containerd daemon can send traces to collection endpoints by configuring
 [OpenTelemetry exporter environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/)
 within the daemon's process space.
 
-The following options are supported.
+The following environment variables are supported.
 
-- `endpoint`: The address of a server that receives [OpenTelemetry Protocol](https://github.com/open-telemetry/opentelemetry-specification/blob/v1.8.0/specification/protocol/otlp.md).
-- `protocol`: OpenTelemetry supports multiple protocols.
+- `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`): The address of a server that receives [OpenTelemetry Protocol](https://github.com/open-telemetry/opentelemetry-specification/blob/v1.8.0/specification/protocol/otlp.md).
+- `OTEL_EXPORTER_OTLP_PROTOCOL` (or `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`): OpenTelemetry supports multiple protocols.
   The default value is "http/protobuf". "grpc" is also supported.
-- `insecure`: Disable transport security when the protocol is "grpc". The default is false.
-  "http/protobuf" always uses the schema provided by the endpoint and
-  the value of this setting being ignored.
+- `OTEL_EXPORTER_OTLP_INSECURE` (or `OTEL_EXPORTER_OTLP_TRACES_INSECURE`): Disable transport security when connecting to the collector. The default is false.
 
 The sampling ratio and the service name on the traces can be configured by setting
 [OpenTelemetry environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/).
