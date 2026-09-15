@@ -411,12 +411,6 @@ type RuntimeConfig struct {
 	// for all containers which are not using host network, are not running in user namespace
 	// and if it is not overwritten by PodSandboxConfig
 	EnableUnprivilegedICMP bool `toml:"enable_unprivileged_icmp" json:"enableUnprivilegedICMP"`
-	// EnableCDI indicates to enable injection of the Container Device Interface Specifications
-	// into the OCI config
-	// For more details about CDI and the syntax of CDI Spec files please refer to
-	// https://tags.cncf.io/container-device-interface.
-	// DEPRECATED: CDI support will always be enabled in a future release.
-	EnableCDI *bool `toml:"enable_cdi" json:"enableCDI"`
 	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
 	// For more details about CDI configuration please refer to
 	// https://tags.cncf.io/container-device-interface#containerd-configuration
@@ -707,11 +701,6 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	}
 	if err := ValidateEnableUnprivileged(ctx, c); err != nil {
 		return warnings, err
-	}
-
-	// Validation for enable_cdi
-	if c.EnableCDI != nil && !*c.EnableCDI {
-		warnings = append(warnings, deprecation.CRIEnableCDI)
 	}
 
 	return warnings, nil

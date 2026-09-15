@@ -54,7 +54,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/eventq"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/internal/registrar"
-	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
@@ -284,11 +283,6 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	c.runtimeFeatures = &runtime.RuntimeFeatures{
 		SupplementalGroupsPolicy:  true,
 		UserNamespacesHostNetwork: goruntime.GOOS == "linux",
-	}
-
-	if c.config.EnableCDI != nil && !*c.config.EnableCDI {
-		msg, _ := deprecation.Message(deprecation.CRIEnableCDI)
-		log.L.Warnf("enable_cdi set to false. %s", msg)
 	}
 
 	return c, c, nil
