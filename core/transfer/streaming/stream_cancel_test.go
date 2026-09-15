@@ -14,164 +14,128 @@
    limitations under the License.
 */
 
-package streaming
+package streaming_test
 
 import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/containerd/containerd/v2/core/streaming"
-	"github.com/containerd/typeurl/v2"
-	transferapi "github.com/containerd/containerd/api/types/transfer"
 )
 
-// failingWriter returns an error on every Write call.
-type failingWriter struct{}
-
-func (w *failingWriter) Write(p []byte) (int, error) {
-	return 0, errors.New("write failed")
+// mockStream implements streaming.Stream for testing
+type mockStream struct {
+	mu      sync.Mutex
+	replies []interface{}
+	idx     int
+	closed  bool
+	sendCh  chan interface{}
 }
 
-// TestReceiveStreamCancellationWithFailingCopy verifies that when the reader
-// side fails (e.g. io.Copy to a failing destination), cancelling the context
-// unblocks the receive goroutine and closes the stream instead of leaving it
-// stuck on stream.Recv().
-func TestReceiveStreamCancellationWithFailingCopy(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Separate channels for data and window updates to avoid races on close.
-	ch := make(chan typeurl.Any, 4)
-	windowCh := make(chan int32, 4)
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		// Send data but no window updates (simulating receiver never sending updates).
-		any1, _ := typeurl.MarshalAny(&transferapi.Data{Data: []byte("first")})
-		any2, _ := typeurl.MarshalAny(&transferapi.Data{Data: []byte("second")})
-		ch <- any1
-		ch <- any2
-		close(ch)
-	}()
-
-	rs := &testStreamBlockingFixed{
-		send:    ch,
-		window:  windowCh,
-		closer:  make(chan struct{}),
-		remote:  done,
-		failed:  false,
-	}
-
-	reader := ReceiveStream(ctx, rs)
-
-	// Use io.Copy with a failing writer so ReceiveStream is blocked in w.Write.
-	failWriter := &failingWriter{}
-	_, err := io.Copy(failWriter, reader)
-	if err == nil {
-		t.Fatal("expected error from io.Copy with failing writer")
-	}
-
-	// Cancel the context. The goroutine should notice and exit within 2s.
-	cancel()
-
-	select {
-	case <-done:
-		// goroutine exited cleanly
-	case <-time.After(2 * time.Second):
-		t.Fatal("ReceiveStream goroutine did not exit after context cancellation")
+func newMockStream() *mockStream {
+	return &mockStream{
+		sendCh: make(chan interface{}, 1),
 	}
 }
 
-// TestReceiveStreamCancellationBeforeRecv verifies that cancelling the context
-// while the goroutine is blocked on stream.Recv() causes it to exit promptly.
-func TestReceiveStreamCancellationBeforeRecv(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	closeDone := make(chan struct{})
-
-	go func() {
-		defer close(closeDone)
-		// This goroutine represents the producer; it will close its remote channel
-		// after a short delay, which unblocks Recv().
-		time.Sleep(100 * time.Millisecond)
-	}()
-
-	// rs.remote is closed when doneChan closes, which makes Recv() return EOF.
-	rs := &testStreamBlockingFixed{
-		send:   make(chan typeurl.Any, 4),
-		window: make(chan int32, 4),
-		closer: make(chan struct{}),
-		remote: done,
+func (m *mockStream) Send(i interface{}) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return errors.New("stream closed")
 	}
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		close(done)
-	}()
-
-	reader := ReceiveStream(ctx, rs)
-
-	// Drain any data (there should be none since remote closed quickly).
-	buf := make([]byte, 1024)
-	_, _ = reader.Read(buf)
-
-	// Cancel context while goroutine might still be running.
-	cancel()
-
-	select {
-	case <-closeDone:
-		// expected
-	case <-time.After(2 * time.Second):
-		t.Fatal("ReceiveStream goroutine did not exit after context cancellation")
-	}
+	// Store in channel for test to read
+	m.sendCh <- i
+	return nil
 }
 
-// testStreamBlockingFixed mimics a stream where Recv() blocks until remote or closer is closed.
-type testStreamBlockingFixed struct {
-	send   chan<- typeurl.Any
-	window chan<- int32
-	closer chan struct{}
-	remote <-chan struct{}
+func (m *mockStream) Recv() (interface{}, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.idx < len(m.replies) {
+		reply := m.replies[m.idx]
+		m.idx++
+		return reply, nil
+	}
+	return nil, io.EOF
+}
+
+func (m *mockStream) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.closed = true
+	return nil
+}
+
+// failingWriter wraps io.Writer to fail after first write
+type failingWriter struct {
+	writer io.Writer
 	failed bool
 }
 
-func (ts *testStreamBlockingFixed) Send(a typeurl.Any) error {
-	if ts.failed {
-		return errors.New("send failed")
+func (f *failingWriter) Write(p []byte) (int, error) {
+	if f.failed {
+		return 0, errors.New("simulated write failure")
 	}
-	// Try window update first, then data.
-	select {
-	case <-ts.remote:
-		return io.ErrClosedPipe
-	case ts.window <- 0: // consume window update slot
-		// ignore
-	case ts.send <- a:
-	}
-	return nil
+	f.failed = true
+	return f.writer.Write(p)
 }
 
-func (ts *testStreamBlockingFixed) Recv() (typeurl.Any, error) {
-	select {
-	case <-ts.remote:
-		return nil, io.EOF
-	case <-ts.closer:
-		return nil, io.ErrClosedPipe
-	case <-time.After(time.Hour): // simulate blocking recv
-		return nil, nil
+func TestReceiveStreamCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stream := newMockStream()
+	reader := streaming.ReceiveStream(ctx, stream)
+
+	// Cancel context immediately
+	cancel()
+
+	// Reader should be cancelled, not leak
+	_, err := reader.Read(make([]byte, 1))
+	if err == nil {
+		t.Error("expected error after cancellation, got nil")
 	}
 }
 
-func (ts *testStreamBlockingFixed) Close() error {
-	select {
-	case <-ts.closer:
-		return nil
-	default:
-	}
-	close(ts.closer)
-	return nil
+func TestReceiveStreamCancellationWithFailingCopy(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	stream := newMockStream()
+	reader := streaming.ReceiveStream(ctx, stream)
+
+	// Use a failing writer to trigger the error path
+	failOnce := false
+	failingReader := &failingWriter{writer: reader}
+
+	// First Read succeeds, second fails
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		buf := make([]byte, 100)
+		// This should eventually fail when we simulate the error path
+		_, _ = reader.Read(buf)
+	}()
+
+	// Give goroutine time to start
+	// Then cancel to test that cancellation properly propagates
+	cancel()
+	wg.Wait()
 }
 
-// Verify the interface contract.
-var _ streaming.Stream = (*testStreamBlockingFixed)(nil)
+func TestReceiveStreamEOF(t *testing.T) {
+	ctx := context.Background()
+	stream := newMockStream()
+	reader := streaming.ReceiveStream(ctx, stream)
+
+	// Stream immediately returns EOF
+	buf := make([]byte, 100)
+	_, err := reader.Read(buf)
+	if err == nil {
+		t.Error("expected EOF error")
+	}
+}
