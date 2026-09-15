@@ -164,7 +164,16 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 					werr = nil
 				}
 			}
-			anyType, err := stream.Recv()
+			// Check context cancellation before blocking on Recv().
+		// This prevents the goroutine from getting stuck when the
+		// reader has given up (e.g., due to an error from io.Copy).
+		select {
+		case <-ctx.Done():
+			w.CloseWithError(ctx.Err())
+			return
+		default:
+		}
+		anyType, err := stream.Recv()
 			if err != nil {
 				if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
 					err = nil
