@@ -27,8 +27,6 @@ const (
 	CRIRegistryAuths Warning = Prefix + "cri-registry-auths"
 	// CRIRegistryConfigs is a warning for the use of the `configs` property
 	CRIRegistryConfigs Warning = Prefix + "cri-registry-configs"
-	// OTLPTracingConfig is a warning for the use of the `otlp` property
-	TracingOTLPConfig Warning = Prefix + "tracing-processor-config"
 	// TracingServiceConfig is a warning for the use of the `tracing` property
 	TracingServiceConfig Warning = Prefix + "tracing-service-config"
 	// NRIV010Plugin is a warning for the use of NRI 0.1.0-style plugins
@@ -55,8 +53,6 @@ var messages = map[Warning]string{
 	CRIRegistryConfigs: "The `configs` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.7. " +
 		"Use `config_path` instead.",
 
-	TracingOTLPConfig: "The `otlp` property of `[plugins.\"io.containerd.tracing.processor.v1\".otlp]` is deprecated since containerd v1.6 and will be removed in containerd v2.4. " +
-		"Use OTLP environment variables instead: https://opentelemetry.io/docs/specs/otel/protocol/exporter/",
 	TracingServiceConfig: "The `tracing` property of `[plugins.\"io.containerd.internal.v1\".tracing]` is deprecated since containerd v1.6 and will be removed in containerd v2.4. " +
 		"Use OTEL environment variables instead: https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/",
 	NRIV010Plugin:      "NRI 0.1.0-style plugins are deprecated since containerd 2.2 and should only be used through the v010-adapter plugin.",

@@ -56,13 +56,9 @@ const (
 
 func init() {
 	registry.Register(&plugin.Registration{
-		ID:     exporterPlugin,
-		Type:   plugins.TracingProcessorPlugin,
-		Config: &OTLPConfig{},
+		ID:   exporterPlugin,
+		Type: plugins.TracingProcessorPlugin,
 		InitFn: func(ic *plugin.InitContext) (any, error) {
-			if err := warnOTLPConfig(ic); err != nil {
-				return nil, err
-			}
 			if err := checkDisabled(); err != nil {
 				return nil, err
 			}
@@ -108,13 +104,6 @@ func init() {
 			return newTracer(ic.Context, procs)
 		},
 	})
-}
-
-// OTLPConfig holds the configurations for the built-in otlp span processor
-type OTLPConfig struct {
-	Endpoint string `toml:"endpoint,omitempty"`
-	Protocol string `toml:"protocol,omitempty"`
-	Insecure bool   `toml:"insecure,omitempty"`
 }
 
 // TraceConfig is the common configuration for open telemetry.
@@ -226,35 +215,5 @@ func warnTraceConfig(ic *plugin.InitContext) error {
 	}
 	ws := wp.(warning.Service)
 	ws.Emit(ctx, deprecation.TracingServiceConfig)
-	return nil
-}
-
-func warnOTLPConfig(ic *plugin.InitContext) error {
-	if ic.Config == nil {
-		return nil
-	}
-	ctx := ic.Context
-	cfg := ic.Config.(*OTLPConfig)
-	var warn bool
-	if cfg.Endpoint != "" {
-		warn = true
-	}
-	if cfg.Protocol != "" {
-		warn = true
-	}
-	if cfg.Insecure {
-		warn = true
-	}
-
-	if !warn {
-		return nil
-	}
-
-	wp, err := ic.GetSingle(plugins.WarningPlugin)
-	if err != nil {
-		return err
-	}
-	ws := wp.(warning.Service)
-	ws.Emit(ctx, deprecation.TracingOTLPConfig)
 	return nil
 }
