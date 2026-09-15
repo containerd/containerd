@@ -308,8 +308,6 @@ version = 3
             ShimCgroup = ''
 
     [plugins.'io.containerd.cri.v1.runtime'.cni]
-      # DEPRECATED, use `bin_dirs` instead (since containerd v2.1).
-      bin_dir = ''
       bin_dirs = ['/opt/cni/bin']
       conf_dir = '/etc/cni/net.d'
       max_conf_num = 1
