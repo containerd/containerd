@@ -146,6 +146,17 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 		defer stream.Close()
 		var window int32
 		for {
+			// Proactively check context cancellation so that if the consumer
+			// has given up (e.g. io.Copy returned an error), we close the
+			// pipe and unblock any in-flight w.Write call rather than
+			// waiting on stream.Recv().
+			select {
+			case <-ctx.Done():
+				w.CloseWithError(ctx.Err())
+				return
+			default:
+			}
+
 			var werr error
 			if window < windowSize {
 				update := &transferapi.WindowUpdate{
@@ -164,16 +175,7 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 					werr = nil
 				}
 			}
-			// Check context cancellation before blocking on Recv().
-		// This prevents the goroutine from getting stuck when the
-		// reader has given up (e.g., due to an error from io.Copy).
-		select {
-		case <-ctx.Done():
-			w.CloseWithError(ctx.Err())
-			return
-		default:
-		}
-		anyType, err := stream.Recv()
+			anyType, err := stream.Recv()
 			if err != nil {
 				if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
 					err = nil
@@ -196,7 +198,7 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 			case *transferapi.Data:
 				n, err := w.Write(v.Data)
 				if err != nil {
-					w.CloseWithError(fmt.Errorf("failed to unmarshal received object: %w", err))
+					w.CloseWithError(fmt.Errorf("failed to write received data: %w", err))
 					// Close will error out sender
 					return
 				}

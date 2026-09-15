@@ -28,53 +28,51 @@ import (
 	transferapi "github.com/containerd/containerd/api/types/transfer"
 )
 
-// blockingWriter returns an error on every Write call.
-type blockingWriter struct{}
+// failingWriter returns an error on every Write call.
+type failingWriter struct{}
 
-func (w *blockingWriter) Write(p []byte) (int, error) {
+func (w *failingWriter) Write(p []byte) (int, error) {
 	return 0, errors.New("write failed")
 }
 
-// TestReceiveStreamCancellation verifies that when the reader side
-// has given up (io.Copy returned an error), cancelling the context
-// unblocks the receive goroutine and closes the stream instead of
-// leaving it stuck on stream.Recv().
-func TestReceiveStreamCancellation(t *testing.T) {
+// TestReceiveStreamCancellationWithFailingCopy verifies that when the reader
+// side fails (e.g. io.Copy to a failing destination), cancelling the context
+// unblocks the receive goroutine and closes the stream instead of leaving it
+// stuck on stream.Recv().
+func TestReceiveStreamCancellationWithFailingCopy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Send two chunks then close, but the reader will abort on the first write.
+	// Separate channels for data and window updates to avoid races on close.
 	ch := make(chan typeurl.Any, 4)
-	rc := make(chan struct{})
+	windowCh := make(chan int32, 4)
 	done := make(chan struct{})
 
 	go func() {
 		defer close(done)
+		// Send data but no window updates (simulating receiver never sending updates).
 		any1, _ := typeurl.MarshalAny(&transferapi.Data{Data: []byte("first")})
 		any2, _ := typeurl.MarshalAny(&transferapi.Data{Data: []byte("second")})
 		ch <- any1
 		ch <- any2
 		close(ch)
-		// signal that remote is done
-		time.Sleep(50 * time.Millisecond)
-		cancel()
 	}()
 
-	rs := &testStreamBlocking{
-		send:   ch,
-		recv:   nil,
-		closer: rc,
-		remote: done,
+	rs := &testStreamBlockingFixed{
+		send:    ch,
+		window:  windowCh,
+		closer:  make(chan struct{}),
+		remote:  done,
+		failed:  false,
 	}
 
 	reader := ReceiveStream(ctx, rs)
 
-	// Read until we get an error — should fail fast because the pipe write
-	// side (our fake stream) doesn't actually block; we just verify the
-	// goroutine exits after cancellation.
-	buf := make([]byte, 1024)
-	n, readErr := reader.Read(buf)
-	_ = n
-	_ = readErr
+	// Use io.Copy with a failing writer so ReceiveStream is blocked in w.Write.
+	failWriter := &failingWriter{}
+	_, err := io.Copy(failWriter, reader)
+	if err == nil {
+		t.Fatal("expected error from io.Copy with failing writer")
+	}
 
 	// Cancel the context. The goroutine should notice and exit within 2s.
 	cancel()
@@ -87,25 +85,74 @@ func TestReceiveStreamCancellation(t *testing.T) {
 	}
 }
 
-// testStreamBlocking mimics a stream where Recv() blocks indefinitely,
-// so context cancellation is the only way out.
-type testStreamBlocking struct {
-	send   chan<- typeurl.Any
-	recv   <-chan typeurl.Any
-	closer chan struct{}
-	remote <-chan struct{}
+// TestReceiveStreamCancellationBeforeRecv verifies that cancelling the context
+// while the goroutine is blocked on stream.Recv() causes it to exit promptly.
+func TestReceiveStreamCancellationBeforeRecv(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	closeDone := make(chan struct{})
+
+	go func() {
+		defer close(closeDone)
+		// This goroutine represents the producer; it will close its remote channel
+		// after a short delay, which unblocks Recv().
+		time.Sleep(100 * time.Millisecond)
+	}()
+
+	// rs.remote is closed when doneChan closes, which makes Recv() return EOF.
+	rs := &testStreamBlockingFixed{
+		send:   make(chan typeurl.Any, 4),
+		window: make(chan int32, 4),
+		closer: make(chan struct{}),
+		remote: done,
+	}
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		close(done)
+	}()
+
+	reader := ReceiveStream(ctx, rs)
+
+	// Drain any data (there should be none since remote closed quickly).
+	buf := make([]byte, 1024)
+	_, _ = reader.Read(buf)
+
+	// Cancel context while goroutine might still be running.
+	cancel()
+
+	select {
+	case <-closeDone:
+		// expected
+	case <-time.After(2 * time.Second):
+		t.Fatal("ReceiveStream goroutine did not exit after context cancellation")
+	}
 }
 
-func (ts *testStreamBlocking) Send(a typeurl.Any) error {
+// testStreamBlockingFixed mimics a stream where Recv() blocks until remote or closer is closed.
+type testStreamBlockingFixed struct {
+	send   chan<- typeurl.Any
+	window chan<- int32
+	closer chan struct{}
+	remote <-chan struct{}
+	failed bool
+}
+
+func (ts *testStreamBlockingFixed) Send(a typeurl.Any) error {
+	if ts.failed {
+		return errors.New("send failed")
+	}
+	// Try window update first, then data.
 	select {
 	case <-ts.remote:
 		return io.ErrClosedPipe
+	case ts.window <- 0: // consume window update slot
+		// ignore
 	case ts.send <- a:
 	}
 	return nil
 }
 
-func (ts *testStreamBlocking) Recv() (typeurl.Any, error) {
+func (ts *testStreamBlockingFixed) Recv() (typeurl.Any, error) {
 	select {
 	case <-ts.remote:
 		return nil, io.EOF
@@ -116,7 +163,7 @@ func (ts *testStreamBlocking) Recv() (typeurl.Any, error) {
 	}
 }
 
-func (ts *testStreamBlocking) Close() error {
+func (ts *testStreamBlockingFixed) Close() error {
 	select {
 	case <-ts.closer:
 		return nil
@@ -127,4 +174,4 @@ func (ts *testStreamBlocking) Close() error {
 }
 
 // Verify the interface contract.
-var _ streaming.Stream = (*testStreamBlocking)(nil)
+var _ streaming.Stream = (*testStreamBlockingFixed)(nil)
