@@ -24,9 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -76,16 +74,12 @@ func init() {
 		},
 	})
 	registry.Register(&plugin.Registration{
-		ID:     "tracing",
-		Type:   plugins.InternalPlugin,
-		Config: &TraceConfig{},
+		ID:   "tracing",
+		Type: plugins.InternalPlugin,
 		Requires: []plugin.Type{
 			plugins.TracingProcessorPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
-			if err := warnTraceConfig(ic); err != nil {
-				return nil, err
-			}
 			if err := checkDisabled(); err != nil {
 				return nil, err
 			}
@@ -104,12 +98,6 @@ func init() {
 			return newTracer(ic.Context, procs)
 		},
 	})
-}
-
-// TraceConfig is the common configuration for open telemetry.
-type TraceConfig struct {
-	ServiceName        string  `toml:"service_name,omitempty"`
-	TraceSamplingRatio float64 `toml:"sampling_ratio,omitempty"`
 }
 
 func checkDisabled() error {
@@ -189,31 +177,4 @@ func newTracer(ctx context.Context, procs []trace.SpanProcessor) (io.Closer, err
 		return provider.Shutdown(ctx)
 	}), nil
 
-}
-
-func warnTraceConfig(ic *plugin.InitContext) error {
-	if ic.Config == nil {
-		return nil
-	}
-	ctx := ic.Context
-	cfg := ic.Config.(*TraceConfig)
-	var warn bool
-	if cfg.ServiceName != "" {
-		warn = true
-	}
-	if cfg.TraceSamplingRatio != 0 {
-		warn = true
-	}
-
-	if !warn {
-		return nil
-	}
-
-	wp, err := ic.GetSingle(plugins.WarningPlugin)
-	if err != nil {
-		return err
-	}
-	ws := wp.(warning.Service)
-	ws.Emit(ctx, deprecation.TracingServiceConfig)
-	return nil
 }

@@ -19,65 +19,191 @@ package plugin
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/plugin"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func TestNewExporter(t *testing.T) {
 	for _, tc := range []struct {
-		name           string
-		protocol       string
-		tracesProtocol string
-		output         error
+		name          string
+		protocol      string
+		traceProtocol string
+		expectedErr   error
 	}{
 		{
-			name:     "Test http/protobuf protocol, expect no error",
-			protocol: "http/protobuf",
-			output:   nil,
+			name:        "default protocol",
+			expectedErr: nil,
 		},
 		{
-			name:     "Test default protocol, expect no error",
-			protocol: "",
-			output:   nil,
+			name:        "http/protobuf protocol",
+			protocol:    "http/protobuf",
+			expectedErr: nil,
 		},
 		{
-			name:     "Test grpc protocol, expect no error",
-			protocol: "grpc",
-			output:   nil,
+			name:        "grpc protocol",
+			protocol:    "grpc",
+			expectedErr: nil,
 		},
 		{
-			name:     "Test http/json protocol which is not supported, expect not implemented error",
-			protocol: "http/json",
-			output:   errdefs.ErrNotImplemented,
+			name:          "traces protocol overrides generic protocol",
+			protocol:      "http/protobuf",
+			traceProtocol: "grpc",
+			expectedErr:   nil,
 		},
 		{
-			name:           "Test traces protocol takes precedence over protocol",
-			protocol:       "http/json",
-			tracesProtocol: "http/protobuf",
-			output:         nil,
+			name:        "unsupported protocol http/json",
+			protocol:    "http/json",
+			expectedErr: errdefs.ErrNotImplemented,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv(otlpProtocolEnv, tc.protocol)
-			t.Setenv(otlpTracesProtocolEnv, tc.tracesProtocol)
+			t.Setenv(otlpTracesProtocolEnv, tc.traceProtocol)
 
-			ctx := context.TODO()
+			ctx := context.Background()
 			exp, err := newExporter(ctx)
-			if tc.output == nil {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
+			if tc.expectedErr != nil {
+				if !errors.Is(err, tc.expectedErr) {
+					t.Fatalf("expected error %v, got %v", tc.expectedErr, err)
 				}
-				if exp == nil {
-					t.Fatal("expected exporter to be created, got nil")
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if exp == nil {
+				t.Fatal("expected exporter, got nil")
+			}
+		})
+	}
+}
+
+func TestNewTracerServiceName(t *testing.T) {
+	if os.Getenv("TEST_SERVICE_NAME_HELPER") == "1" {
+		expectedService := os.Getenv("EXPECTED_SERVICE_NAME")
+		rec := tracetest.NewSpanRecorder()
+		closer, err := newTracer(context.Background(), []trace.SpanProcessor{rec})
+		if err != nil {
+			t.Fatalf("unexpected error creating tracer: %v", err)
+		}
+		defer closer.Close()
+
+		ctx := context.Background()
+		tracer := otel.GetTracerProvider().Tracer("test-tracer")
+		_, span := tracer.Start(ctx, "test-span")
+		span.End()
+
+		ended := rec.Ended()
+		if len(ended) != 1 {
+			t.Fatalf("expected 1 ended span, got %d", len(ended))
+		}
+
+		val, ok := ended[0].Resource().Set().Value("service.name")
+		if !ok {
+			t.Fatalf("expected service.name attribute on resource, but found none")
+		}
+		svc := val.AsString()
+		if svc != expectedService {
+			t.Fatalf("expected service name %q, got %q", expectedService, svc)
+		}
+		return
+	}
+
+	for _, tc := range []struct {
+		name            string
+		envServiceName  string
+		expectedService string
+	}{
+		{
+			name:            "default service name",
+			envServiceName:  "",
+			expectedService: "containerd",
+		},
+		{
+			name:            "custom service name",
+			envServiceName:  "custom-containerd",
+			expectedService: "custom-containerd",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := exec.Command(os.Args[0], "-test.run=^TestNewTracerServiceName$")
+			var env []string
+			for _, e := range os.Environ() {
+				if !strings.HasPrefix(e, "OTEL_SERVICE_NAME=") &&
+					!strings.HasPrefix(e, "TEST_SERVICE_NAME_HELPER=") &&
+					!strings.HasPrefix(e, "EXPECTED_SERVICE_NAME=") {
+					env = append(env, e)
 				}
-			} else {
-				if !errors.Is(err, tc.output) {
-					t.Fatalf("expected error %v, got %v", tc.output, err)
-				}
+			}
+			env = append(env, "TEST_SERVICE_NAME_HELPER=1", "EXPECTED_SERVICE_NAME="+tc.expectedService)
+			if tc.envServiceName != "" {
+				env = append(env, "OTEL_SERVICE_NAME="+tc.envServiceName)
+			}
+			cmd.Env = env
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("helper process failed: %v\nOutput: %s", err, string(out))
+			}
+		})
+	}
+}
+
+func TestNewTracerSampling(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		sampler     string
+		samplerArg  string
+		wantSampled bool
+	}{
+		{
+			name:        "always_on sampler",
+			sampler:     "always_on",
+			wantSampled: true,
+		},
+		{
+			name:        "always_off sampler",
+			sampler:     "always_off",
+			wantSampled: false,
+		},
+		{
+			name:        "traceidratio 1.0",
+			sampler:     "traceidratio",
+			samplerArg:  "1.0",
+			wantSampled: true,
+		},
+		{
+			name:        "traceidratio 0.0",
+			sampler:     "traceidratio",
+			samplerArg:  "0.0",
+			wantSampled: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("OTEL_TRACES_SAMPLER", tc.sampler)
+			t.Setenv("OTEL_TRACES_SAMPLER_ARG", tc.samplerArg)
+
+			rec := tracetest.NewSpanRecorder()
+			closer, err := newTracer(context.Background(), []trace.SpanProcessor{rec})
+			if err != nil {
+				t.Fatalf("unexpected error creating tracer: %v", err)
+			}
+			defer closer.Close()
+
+			ctx := context.Background()
+			tracer := otel.GetTracerProvider().Tracer("test-tracer")
+			_, span := tracer.Start(ctx, "test-span")
+			defer span.End()
+
+			if got := span.SpanContext().IsSampled(); got != tc.wantSampled {
+				t.Fatalf("expected span sampled=%v, got %v", tc.wantSampled, got)
 			}
 		})
 	}
@@ -86,78 +212,65 @@ func TestNewExporter(t *testing.T) {
 func TestCheckDisabled(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
+		sdkDisabled    string
 		endpoint       string
 		tracesEndpoint string
-		sdkDisabled    string
-		output         error
+		expectedErr    error
 	}{
 		{
-			name:   "No endpoint configured, expect ErrSkipPlugin",
-			output: plugin.ErrSkipPlugin,
+			name:        "endpoints not configured",
+			expectedErr: plugin.ErrSkipPlugin,
 		},
 		{
-			name:     "OTEL_EXPORTER_OTLP_ENDPOINT configured, expect no error",
-			endpoint: "http://localhost:4318",
-			output:   nil,
+			name:        "endpoint configured",
+			endpoint:    "http://localhost:4318",
+			expectedErr: nil,
 		},
 		{
-			name:           "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT configured, expect no error",
+			name:           "traces endpoint configured",
 			tracesEndpoint: "http://localhost:4318",
-			output:         nil,
+			expectedErr:    nil,
 		},
 		{
-			name:        "OTEL_SDK_DISABLED=true with endpoint, expect ErrSkipPlugin",
-			endpoint:    "http://localhost:4318",
+			name:        "sdk disabled true",
 			sdkDisabled: "true",
-			output:      plugin.ErrSkipPlugin,
+			endpoint:    "http://localhost:4318",
+			expectedErr: plugin.ErrSkipPlugin,
 		},
 		{
-			name:        "OTEL_SDK_DISABLED=1 with endpoint, expect ErrSkipPlugin",
-			endpoint:    "http://localhost:4318",
+			name:        "sdk disabled 1",
 			sdkDisabled: "1",
-			output:      plugin.ErrSkipPlugin,
+			endpoint:    "http://localhost:4318",
+			expectedErr: plugin.ErrSkipPlugin,
 		},
 		{
-			name:        "OTEL_SDK_DISABLED=false with endpoint, expect no error",
-			endpoint:    "http://localhost:4318",
+			name:        "sdk disabled false",
 			sdkDisabled: "false",
-			output:      nil,
+			endpoint:    "http://localhost:4318",
+			expectedErr: nil,
 		},
 		{
-			name:        "OTEL_SDK_DISABLED invalid value, expect ErrInvalidArgument",
-			endpoint:    "http://localhost:4318",
+			name:        "sdk disabled invalid",
 			sdkDisabled: "invalid",
-			output:      errdefs.ErrInvalidArgument,
+			endpoint:    "http://localhost:4318",
+			expectedErr: errdefs.ErrInvalidArgument,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(sdkDisabledEnv, tc.sdkDisabled)
 			t.Setenv(otlpEndpointEnv, tc.endpoint)
 			t.Setenv(otlpTracesEndpointEnv, tc.tracesEndpoint)
-			t.Setenv(sdkDisabledEnv, tc.sdkDisabled)
 
 			err := checkDisabled()
-			if tc.output == nil {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
+			if tc.expectedErr != nil {
+				if !errors.Is(err, tc.expectedErr) {
+					t.Fatalf("expected error %v, got %v", tc.expectedErr, err)
 				}
-			} else {
-				if !errors.Is(err, tc.output) {
-					t.Fatalf("expected error %v, got %v", tc.output, err)
-				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}
-}
-
-func TestNewTracer(t *testing.T) {
-	exp := tracetest.NewInMemoryExporter()
-	proc := trace.NewBatchSpanProcessor(exp)
-	procs := []trace.SpanProcessor{proc}
-
-	ctx := context.TODO()
-	tracerCloser, err := newTracer(ctx, procs)
-	if err != nil {
-		t.Fatalf("unexpected error creating tracer: %v", err)
-	}
-	defer tracerCloser.Close()
 }

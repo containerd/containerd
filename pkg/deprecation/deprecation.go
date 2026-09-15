@@ -27,8 +27,6 @@ const (
 	CRIRegistryAuths Warning = Prefix + "cri-registry-auths"
 	// CRIRegistryConfigs is a warning for the use of the `configs` property
 	CRIRegistryConfigs Warning = Prefix + "cri-registry-configs"
-	// TracingServiceConfig is a warning for the use of the `tracing` property
-	TracingServiceConfig Warning = Prefix + "tracing-service-config"
 	// NRIV010Plugin is a warning for the use of NRI 0.1.0-style plugins
 	NRIV010Plugin Warning = Prefix + "nri-v010-plugin"
 	// NRIPluginInterface is a warning for the use of a deprecated NRI interface.
@@ -53,8 +51,6 @@ var messages = map[Warning]string{
 	CRIRegistryConfigs: "The `configs` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.7. " +
 		"Use `config_path` instead.",
 
-	TracingServiceConfig: "The `tracing` property of `[plugins.\"io.containerd.internal.v1\".tracing]` is deprecated since containerd v1.6 and will be removed in containerd v2.4. " +
-		"Use OTEL environment variables instead: https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/",
 	NRIV010Plugin:      "NRI 0.1.0-style plugins are deprecated since containerd 2.2 and should only be used through the v010-adapter plugin.",
 	NRIPluginInterface: "NRI plugin uses a deprecated interface.",
 	CgroupV1:           "The support for cgroup v1 is deprecated since containerd v2.2 and will be removed by no later than May 2029. Upgrade the host to use cgroup v2.",
