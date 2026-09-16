@@ -9,7 +9,7 @@ ignore_deps = [ "github.com/containerd/containerd" ]
 # previous release
 previous = "v2.3.0"
 
-pre_release = true
+pre_release = false
 
 preface = """\
 containerd 2.4 is a regular (non-LTS) release with a shorter support window,
@@ -21,8 +21,6 @@ current version before upgrading.
 
 Users prioritizing stability and a longer support lifecycle should stay on the
 2.3 LTS release.
-
-This is a beta release and some functionality is still under development.
 """
 
 postface = """\
