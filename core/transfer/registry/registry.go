@@ -47,7 +47,7 @@ func init() {
 type registryOpts struct {
 	headers       http.Header
 	creds         CredentialHelper
-	hostDir       string
+	hostDirs      []string
 	defaultScheme string
 	httpDebug     bool
 	httpTrace     bool
@@ -73,10 +73,13 @@ func WithCredentials(creds CredentialHelper) Opt {
 	}
 }
 
-// WithHostDir specifies the host configuration directory.
+// WithHostDir adds a host configuration directory. It may be called multiple times;
+// directories are searched in the order provided. Empty directories are ignored.
 func WithHostDir(hostDir string) Opt {
 	return func(o *registryOpts) error {
-		o.hostDir = hostDir
+		if hostDir != "" {
+			o.hostDirs = append(o.hostDirs, hostDir)
+		}
 		return nil
 	}
 }
@@ -124,8 +127,8 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	}
 
 	hostOptions := config.HostOptions{}
-	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+	if len(ropts.hostDirs) > 0 {
+		hostOptions.HostDir = config.HostDirFromRoots(ropts.hostDirs)
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
@@ -162,7 +165,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		headers:       ropts.headers,
 		creds:         ropts.creds,
 		resolver:      resolver,
-		hostDir:       ropts.hostDir,
+		hostDirs:      ropts.hostDirs,
 		defaultScheme: ropts.defaultScheme,
 		httpDebug:     ropts.httpDebug,
 		httpTrace:     ropts.httpTrace,
@@ -191,7 +194,7 @@ type OCIRegistry struct {
 
 	resolver remotes.Resolver
 
-	hostDir string
+	hostDirs []string
 
 	defaultScheme string
 
@@ -338,7 +341,10 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 		}
 	}
 
-	res.HostDir = r.hostDir
+	if len(r.hostDirs) > 0 {
+		res.HostDir = r.hostDirs[0]
+		res.HostDirs = r.hostDirs[1:]
+	}
 	res.DefaultScheme = r.defaultScheme
 	s := &transfertypes.OCIRegistry{
 		Reference: r.reference,
@@ -355,9 +361,18 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 	}
 
 	hostOptions := config.HostOptions{}
+	r.hostDirs = nil
 	if s.Resolver != nil {
 		if s.Resolver.HostDir != "" {
-			hostOptions.HostDir = config.HostDirFromRoot(s.Resolver.HostDir)
+			r.hostDirs = append(r.hostDirs, s.Resolver.HostDir)
+		}
+		for _, dir := range s.Resolver.HostDirs {
+			if dir != "" {
+				r.hostDirs = append(r.hostDirs, dir)
+			}
+		}
+		if len(r.hostDirs) > 0 {
+			hostOptions.HostDir = config.HostDirFromRoots(r.hostDirs)
 		}
 		if s.Resolver.DefaultScheme != "" {
 			hostOptions.DefaultScheme = s.Resolver.DefaultScheme
