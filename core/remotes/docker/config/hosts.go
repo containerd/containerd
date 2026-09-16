@@ -303,6 +303,30 @@ func HostDirFromRoot(root string) func(string) (string, error) {
 	}
 }
 
+// HostDirFromRoots returns a function which searches for a host directory in order,
+// including each root's _default directory before trying the next root.
+func HostDirFromRoots(roots []string) func(string) (string, error) {
+	rootfn := make([]func(string) (string, error), 0, len(roots))
+	for _, root := range roots {
+		if root != "" {
+			rootfn = append(rootfn, HostDirFromRoot(root))
+		}
+	}
+	if len(rootfn) == 1 {
+		return rootfn[0]
+	}
+	return func(host string) (dir string, err error) {
+		err = errdefs.ErrNotFound
+		for _, fn := range rootfn {
+			dir, err = fn(host)
+			if (err != nil && !errdefs.IsNotFound(err)) || (dir != "") {
+				break
+			}
+		}
+		return
+	}
+}
+
 // hostDirectory converts ":port" to "_port_" in directory names
 func hostDirectory(host string) string {
 	idx := strings.LastIndex(host, ":")

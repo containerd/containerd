@@ -27,12 +27,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 )
 
 const allCaps = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush | docker.HostCapabilityReferrers
+
+func TestHostDirFromRootsEmptyEntries(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.Mkdir("_default", 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, roots := range [][]string{nil, {""}, {"", t.TempDir(), ""}} {
+		dir, err := HostDirFromRoots(roots)("registry.invalid")
+		if dir != "" || !errdefs.IsNotFound(err) {
+			t.Fatalf("roots %q: got (%q, %v), want not found", roots, dir, err)
+		}
+	}
+}
 
 func TestDefaultHosts(t *testing.T) {
 	ctx := logtest.WithT(context.Background(), t)
