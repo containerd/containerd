@@ -142,7 +142,7 @@ to all committers.
 | [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.9)  | End of Life    | May 7, 2025                    | July 3, 2026                   |                        |
 | [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.5)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
 | [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.2)  | LTS            | April 30, 2026                 | April 30, 2028                 | @containerd/committers |
-| [2.4](https://github.com/containerd/containerd/milestone/51)         | RC             | September 15, 2026             | May 15, 2027                   | @containerd/committers |
+| [2.4](https://github.com/containerd/containerd/milestone/51)         | Active         | September 16, 2026             | May 16, 2027                   | @containerd/committers |
 
 \* Support for the 1.7 release branch was provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by [@samuelkarp](https://github.com/samuelkarp) and [@chrishenzie](https://github.com/chrishenzie).  This extended support is focused on usage with Kubernetes 1.32, 1.31, and 1.30 via [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).  Changes may not be accepted if they are not needed for this usage.
 
@@ -473,7 +473,7 @@ releases for prior API versions should be avoided if possible.
 | v2.1               | 1.9                    |
 | v2.2               | 1.10                   |
 | v2.3               | 1.11                   |
-| _v2.4_             | _1.12_                 |
+| v2.4               | 1.12                   |
 
 
 ### Metrics API
