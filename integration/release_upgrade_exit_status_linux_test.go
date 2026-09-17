@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	eventtypes "github.com/containerd/containerd/api/events"
@@ -41,11 +42,21 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 )
 
-func shouldHandleShimExitStatusAfterUpgrade(previousReleaseBinDir string) setupUpgradeVerifyCase {
+func shouldHandleShimExitStatusAfterUpgrade(previousReleaseBinDir, previousVersion string) setupUpgradeVerifyCase {
 	const (
 		shimExitStatus          uint32 = 42
 		shimExitStatusNamespace        = "kill-shim-before-delete-task"
 	)
+
+	// Shims from v2.4.0 on record the task's exit status in the bundle, so
+	// cleaning up after the killed shim reports the status the task actually
+	// exited with. Bundles left by older shims carry no such record and the
+	// cleanup falls back to a synthesized SIGKILL status. Both branches live in
+	// manager.Stop in cmd/containerd-shim-runc-v2/manager.
+	killedShimExitStatus := uint32(128 + syscall.SIGKILL)
+	if semver.Compare("v"+previousVersion, "v2.4") >= 0 {
+		killedShimExitStatus = shimExitStatus
+	}
 
 	return func(t *testing.T, _ int, rSvc *remote.RuntimeService, _ *remote.ImageService) ([]upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
 		client := newUpgradeContainerdClient(t, rSvc, shimExitStatusNamespace)
@@ -130,12 +141,12 @@ func shouldHandleShimExitStatusAfterUpgrade(previousReleaseBinDir string) setupU
 					ContainerID: id,
 					ID:          id,
 					Pid:         taskPID,
-					ExitStatus:  uint32(128 + syscall.SIGKILL),
+					ExitStatus:  killedShimExitStatus,
 				}},
 				{Delete: &eventtypes.TaskDelete{
 					ContainerID: id,
 					Pid:         taskPID,
-					ExitStatus:  uint32(128 + syscall.SIGKILL),
+					ExitStatus:  killedShimExitStatus,
 				}},
 			}
 			if diff := cmp.Diff(wantEvents, gotEvents, cmpOpts...); diff != "" {
