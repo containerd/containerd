@@ -26,6 +26,8 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateSpec(t *testing.T) {
@@ -323,5 +325,77 @@ func TestWithPrivileged(t *testing.T) {
 	}
 	if !foundCgroup {
 		t.Error("Did not find mount for cgroupfs")
+	}
+}
+func TestParsePossibleCPUs(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expected    []int
+		expectError bool
+	}{
+		{
+			name:     "continuous range",
+			input:    "0-3",
+			expected: []int{0, 1, 2, 3},
+		},
+		{
+			name:     "large range",
+			input:    "0-127",
+			expected: func() []int {
+				res := make([]int, 128)
+				for i := range res {
+					res[i] = i
+				}
+				return res
+			}(),
+		},
+		{
+			name:     "non-continuous range",
+			input:    "0-2,4,6-7",
+			expected: []int{0, 1, 2, 4, 6, 7},
+		},
+		{
+			name:     "single cpu",
+			input:    "5",
+			expected: []int{5},
+		},
+		{
+			name:        "empty input",
+			input:       "",
+			expectError: true,
+		},
+		{
+			name:        "invalid range",
+			input:       "0-2,invalid",
+			expectError: true,
+		},
+		{
+			name:        "malformed range with multiple dashes",
+			input:       "0-2-3",
+			expectError: true,
+		},
+		{
+			name:        "reversed range",
+			input:       "3-0",
+			expectError: true,
+		},
+		{
+			name:        "negative start",
+			input:       "-1-3",
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := parsePossibleCPUs(test.input)
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.expected, result)
+			}
+		})
 	}
 }
