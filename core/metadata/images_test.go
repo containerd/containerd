@@ -664,3 +664,118 @@ func checkImagesEqual(t *testing.T, a, b *images.Image, format string, args ...a
 		t.Fatalf("images not equal \n\t%v != \n\t%v: "+format, append([]any{a, b}, args...)...)
 	}
 }
+
+func TestImageCreateTimestampHandling(t *testing.T) {
+	ctx, db := testEnv(t)
+	store := NewImageStore(NewDB(db, nil, nil))
+
+	testCases := []struct {
+		name          string
+		createdAt     time.Time
+		expectedCheck func(t *testing.T, created time.Time)
+		description   string
+	}{
+		{
+			name:      "ZeroTimestamp",
+			createdAt: time.Time{}, // Zero value (not set)
+			expectedCheck: func(t *testing.T, created time.Time) {
+				// Should be set to current time, not zero
+				if created.IsZero() {
+					t.Fatal("CreatedAt should not be zero when not explicitly set")
+				}
+				// Should be close to now (within a reasonable window)
+				if d := time.Since(created); d < 0 || d > 10*time.Second {
+					t.Fatalf("CreatedAt should be recent, got: %v (age %s)", created, d)
+				}
+			},
+			description: "When CreatedAt is zero (not set), should use current time",
+		},
+		{
+			name:      "EpochTimestamp",
+			createdAt: time.Unix(0, 0).UTC(), // 1970-01-01 00:00:00 UTC
+			expectedCheck: func(t *testing.T, created time.Time) {
+				// Epoch is treated as valid timestamp and is preserved as-is.
+				expected := time.Unix(0, 0).UTC()
+				if !created.Equal(expected) {
+					t.Fatalf("CreatedAt should preserve epoch time: got %v, expected %v", created, expected)
+				}
+			},
+			description: "When CreatedAt is set to epoch (1970-01-01), timestamp is preserved",
+		},
+		{
+			name:      "CustomPastTimestamp",
+			createdAt: time.Date(2022, 1, 15, 10, 30, 0, 0, time.UTC),
+			expectedCheck: func(t *testing.T, created time.Time) {
+				expected := time.Date(2022, 1, 15, 10, 30, 0, 0, time.UTC)
+				if !created.Equal(expected) {
+					t.Fatalf("CreatedAt not preserved: got %v, expected %v", created, expected)
+				}
+			},
+			description: "When CreatedAt is set to a past date, should be preserved",
+		},
+		{
+			name:      "CustomFutureTimestamp",
+			createdAt: time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC),
+			expectedCheck: func(t *testing.T, created time.Time) {
+				expected := time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC)
+				if !created.Equal(expected) {
+					t.Fatalf("CreatedAt not preserved: got %v, expected %v", created, expected)
+				}
+			},
+			description: "When CreatedAt is set to a future date, should be preserved",
+		},
+		{
+			name:      "NonUTCTimestamp",
+			createdAt: time.Date(2022, 6, 15, 10, 30, 0, 0, time.FixedZone("EST", -5*3600)),
+			expectedCheck: func(t *testing.T, created time.Time) {
+				// Should be converted to UTC
+				expected := time.Date(2022, 6, 15, 15, 30, 0, 0, time.UTC) // 5 hours later in UTC
+				if !created.Equal(expected) {
+					t.Fatalf("CreatedAt not converted to UTC: got %v, expected %v", created, expected)
+				}
+			},
+			description: "When CreatedAt is in non-UTC timezone, should be converted to UTC",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create image with specific timestamp
+			img := images.Image{
+				Name:      "test-" + tc.name,
+				CreatedAt: tc.createdAt,
+				Target: ocispec.Descriptor{
+					Size:      10,
+					MediaType: "application/vnd.containerd.test",
+					Digest:    digest.FromString(tc.name),
+				},
+			}
+
+			created, err := store.Create(ctx, img)
+			if err != nil {
+				t.Fatalf("Failed to create image: %v", err)
+			}
+
+			// Run the test check
+			t.Logf("Test: %s - %s", tc.name, tc.description)
+			tc.expectedCheck(t, created.CreatedAt)
+
+			// Verify UpdatedAt is set to CreatedAt on creation
+			if !created.UpdatedAt.Equal(created.CreatedAt) {
+				t.Fatalf("UpdatedAt should equal CreatedAt on creation: %v != %v", 
+					created.UpdatedAt, created.CreatedAt)
+			}
+
+			// Verify persistence - Get the image and check the timestamp is preserved
+			retrieved, err := store.Get(ctx, img.Name)
+			if err != nil {
+				t.Fatalf("Failed to retrieve image: %v", err)
+			}
+
+			if !retrieved.CreatedAt.Equal(created.CreatedAt) {
+				t.Fatalf("Retrieved CreatedAt doesn't match: got %v, expected %v", 
+					retrieved.CreatedAt, created.CreatedAt)
+			}
+		})
+	}
+}
