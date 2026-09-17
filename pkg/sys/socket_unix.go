@@ -23,6 +23,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/unix"
 )
@@ -42,8 +43,12 @@ func CreateUnixSocket(path string) (net.Listener, error) {
 	return net.Listen("unix", path)
 }
 
-// GetLocalListener returns a listener out of a unix socket.
+// GetLocalListener returns a listener out of a unix socket. The path may
+// optionally carry a "unix://" prefix, matching the addresses produced by
+// dialer.DialAddress.
 func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
+	path = strings.TrimPrefix(path, "unix://")
+
 	// Ensure parent directory is created
 	if err := mkdirAs(filepath.Dir(path), uid, gid); err != nil {
 		return nil, err
