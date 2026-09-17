@@ -41,8 +41,13 @@ func downloadPreviousLatestReleaseBinary(t *testing.T, version, targetDir string
 }
 
 // downloadReleaseBinary downloads containerd binary with a given release.
+//
+// NOTE: Use the static build. Release binaries are built on Ubuntu 22.04, so
+// the dynamically linked containerd needs GLIBC_2.32 and GLIBC_2.34, which the
+// EL8 hosts kept in the VM integration matrix for their old glibc cannot
+// provide. The static build has no libc dependency and runs everywhere.
 func downloadReleaseBinary(t *testing.T, targetDir string, ver string) {
-	targetURL := fmt.Sprintf("https://github.com/containerd/containerd/releases/download/%s/containerd-%s-linux-%s.tar.gz",
+	targetURL := fmt.Sprintf("https://github.com/containerd/containerd/releases/download/%s/containerd-static-%s-linux-%s.tar.gz",
 		ver, strings.TrimPrefix(ver, "v"), runtime.GOARCH,
 	)
 
