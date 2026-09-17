@@ -26,3 +26,10 @@ import (
 func isConnError(err error) bool {
 	return errors.Is(err, syscall.ECONNREFUSED)
 }
+
+// isConnResetError reports whether err represents a connection reset by
+// peer. The errno typically arrives wrapped in *net.OpError and
+// *os.SyscallError; errors.Is unwraps it.
+func isConnResetError(err error) bool {
+	return errors.Is(err, syscall.ECONNRESET)
+}
