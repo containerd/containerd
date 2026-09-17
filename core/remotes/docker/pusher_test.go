@@ -33,6 +33,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -813,4 +814,261 @@ func TestPusherForbiddenGETFallbackProxy(t *testing.T) {
 	assert.Contains(t, err.Error(), errorMessage)
 	assert.Equal(t, samplePusherHostname, gotNsParam,
 		"GET fallback on proxy must include ?ns= query parameter")
+}
+
+// TestPusherPutDeferredUntilWrite verifies that the blob upload PUT request is
+// not put on the wire until the caller writes content. Issuing it eagerly with
+// an idle body lets a reverse proxy close the connection on an inactivity
+// timeout before any content is streamed.
+func TestPusherPutDeferredUntilWrite(t *testing.T) {
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.uploadable = true
+
+	postedC := make(chan struct{}, 1)
+	putC := make(chan struct{}, 1)
+
+	// Observe when the upload session POST is received.
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodPost {
+			select {
+			case postedC <- struct{}{}:
+			default:
+			}
+		}
+		return false
+	}
+	// Observe when the blob PUT is received, then fall through to the default
+	// handler so the upload completes normally.
+	reg.putHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		select {
+		case putC <- struct{}{}:
+		default:
+		}
+		return false
+	}
+
+	layerContent := []byte("layer-content")
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes(layerContent),
+		Size:      int64(len(layerContent)),
+	}
+
+	cw, err := p.push(context.Background(), desc, "layer-"+desc.Digest.String(), false)
+	require.NoError(t, err)
+	defer cw.Close()
+
+	// The POST that reserves the upload location is issued eagerly by push.
+	select {
+	case <-postedC:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected upload session POST to be sent by push")
+	}
+
+	// The PUT must not be sent until content is written.
+	select {
+	case <-putC:
+		t.Fatal("PUT request was sent before any content was written")
+	case <-time.After(time.Second):
+	}
+
+	// Writing content triggers the deferred PUT.
+	_, err = cw.Write(layerContent)
+	require.NoError(t, err)
+
+	select {
+	case <-putC:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected PUT to be sent after writing content")
+	}
+}
+
+// TestPusherZeroLengthCommit verifies that a zero-length blob, for which Write
+// is never called, is uploaded and its response validated by Commit rather
+// than returning early without sending or checking the PUT.
+func TestPusherZeroLengthCommit(t *testing.T) {
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.uploadable = true
+
+	var empty []byte
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes(empty),
+		Size:      0,
+	}
+
+	cw, err := p.push(context.Background(), desc, "empty-"+desc.Digest.String(), false)
+	require.NoError(t, err)
+	defer cw.Close()
+
+	// No Write call; Commit must start the request, close the body and validate.
+	err = cw.Commit(context.Background(), 0, desc.Digest)
+	require.NoError(t, err)
+
+	assert.Contains(t, reg.availableContents, desc.Digest.String(),
+		"zero-length blob should have been uploaded")
+}
+
+// TestPushWriterSetPipeClosesDiscardedPipe verifies that when the writer is
+// already closed, setPipe closes the pipe it discards. Otherwise the request
+// goroutine using the reader end as its body would block forever, leaking the
+// goroutine and its connection.
+func TestPushWriterSetPipeClosesDiscardedPipe(t *testing.T) {
+	pw := &pushWriter{
+		done:  make(chan struct{}),
+		pipeC: make(chan *io.PipeWriter, 1),
+	}
+	close(pw.done) // simulate Close() having already happened
+
+	r, w := io.Pipe()
+	pw.setPipe(w)
+
+	readErr := make(chan error, 1)
+	go func() {
+		_, err := r.Read(make([]byte, 1))
+		readErr <- err
+	}()
+
+	select {
+	case err := <-readErr:
+		assert.Error(t, err, "read on discarded pipe should return an error")
+	case <-time.After(2 * time.Second):
+		t.Fatal("read on discarded pipe blocked; pipe writer was not closed")
+	}
+}
+
+// TestPushWriterCloseReclaimsBufferedPipe verifies that Close closes a pipe
+// that setPipe left buffered but that Write/Commit never adopted, so the
+// request body reader unblocks instead of leaking.
+func TestPushWriterCloseReclaimsBufferedPipe(t *testing.T) {
+	tracker := NewInMemoryTracker()
+	tracker.SetStatus("r", Status{})
+	pw := &pushWriter{
+		ref:     "r",
+		tracker: tracker,
+		done:    make(chan struct{}),
+		pipeC:   make(chan *io.PipeWriter, 1),
+	}
+
+	r, w := io.Pipe()
+	pw.pipeC <- w // simulate setPipe having enqueued the pipe
+
+	require.NoError(t, pw.Close())
+
+	readErr := make(chan error, 1)
+	go func() {
+		_, err := r.Read(make([]byte, 1))
+		readErr <- err
+	}()
+
+	select {
+	case err := <-readErr:
+		assert.Error(t, err, "buffered pipe should be closed by Close")
+	case <-time.After(2 * time.Second):
+		t.Fatal("read on buffered pipe blocked; Close did not reclaim it")
+	}
+}
+
+// TestPushWriterEmptyWriteDoesNotStart verifies that a zero-length Write is a
+// no-op and does not start the upload request.
+func TestPushWriterEmptyWriteDoesNotStart(t *testing.T) {
+	started := false
+	pw := &pushWriter{
+		done:  make(chan struct{}),
+		pipeC: make(chan *io.PipeWriter, 1),
+	}
+	pw.start = func() { started = true }
+
+	n, err := pw.Write(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, n)
+	assert.False(t, started, "empty write must not start the request")
+}
+
+// TestPusherCloseWithoutWriteAllowsRetry verifies that closing a writer that
+// was opened but never fed marks the tracker entry as closed, so a later push
+// of the same ref is not blocked with ErrUnavailable.
+func TestPusherCloseWithoutWriteAllowsRetry(t *testing.T) {
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.uploadable = true
+
+	layerContent := []byte("layer-content")
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes(layerContent),
+		Size:      int64(len(layerContent)),
+	}
+	ref := "layer-" + desc.Digest.String()
+
+	// Open a writer and close it without writing (opened but never fed). Writer
+	// uses unavailableOnFail=true, which is the path that would otherwise stay
+	// blocked.
+	cw, err := p.Writer(context.Background(), content.WithRef(ref), content.WithDescriptor(desc))
+	require.NoError(t, err)
+	require.NoError(t, cw.Close())
+
+	// A subsequent Writer for the same ref must succeed rather than return
+	// ErrUnavailable.
+	cw2, err := p.Writer(context.Background(), content.WithRef(ref), content.WithDescriptor(desc))
+	require.NoError(t, err)
+	require.NoError(t, cw2.Close())
+}
+
+type bodyCloseTracker struct{ closed bool }
+
+func (b *bodyCloseTracker) Read([]byte) (int, error) { return 0, io.EOF }
+func (b *bodyCloseTracker) Close() error             { b.closed = true; return nil }
+
+// TestPushWriterSetResponseClosesBodyWhenClosed verifies that a response
+// arriving after the writer is closed has its body closed, rather than being
+// dropped and leaking the connection.
+func TestPushWriterSetResponseClosesBodyWhenClosed(t *testing.T) {
+	pw := &pushWriter{
+		done:  make(chan struct{}),
+		respC: make(chan *http.Response, 1),
+	}
+	close(pw.done)
+
+	body := &bodyCloseTracker{}
+	pw.setResponse(&http.Response{Body: body})
+
+	assert.True(t, body.closed, "response body should be closed when the writer is already closed")
+}
+
+// TestPushWriterCloseDrainsResponse verifies that Close closes the body of a
+// response left buffered by a completed request that the caller never
+// committed.
+func TestPushWriterCloseDrainsResponse(t *testing.T) {
+	pw := &pushWriter{
+		done:    make(chan struct{}),
+		pipeC:   make(chan *io.PipeWriter, 1),
+		respC:   make(chan *http.Response, 1),
+		tracker: NewInMemoryTracker(),
+		ref:     "test-ref",
+	}
+
+	body := &bodyCloseTracker{}
+	pw.respC <- &http.Response{Body: body}
+
+	require.NoError(t, pw.Close())
+	assert.True(t, body.closed, "buffered response body should be closed by Close")
+}
+
+// TestEnsureStartedSkipsWhenClosed verifies that the request is not started if
+// the writer was already closed, even though the start func is set.
+func TestEnsureStartedSkipsWhenClosed(t *testing.T) {
+	started := false
+	pw := &pushWriter{done: make(chan struct{})}
+	pw.start = func() { started = true }
+
+	close(pw.done)
+	pw.ensureStarted()
+
+	assert.False(t, started, "request must not start after the writer is closed")
 }
