@@ -63,6 +63,12 @@ func (c *Controller) Shutdown(ctx context.Context, sandboxID string) error {
 
 	c.store.Remove(sandboxID)
 
+	// Reclaim the goroutines waiting for the sandbox exit. The sandbox can
+	// no longer deliver an exit event, so a task wait request that the shim
+	// never answers must not park them for the remaining lifetime of the
+	// daemon.
+	sandbox.CancelWait()
+
 	return nil
 }
 
