@@ -42,6 +42,7 @@ var Command = &cli.Command{
 		removeCommand,
 		setLabelsCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var createCommand = &cli.Command{
@@ -63,6 +64,7 @@ var createCommand = &cli.Command{
 		namespaces := client.NamespaceService()
 		return namespaces.Create(ctx, namespace, labels)
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var setLabelsCommand = &cli.Command{
@@ -88,6 +90,7 @@ var setLabelsCommand = &cli.Command{
 		}
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var listCommand = &cli.Command{
@@ -103,6 +106,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the namespace name",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
@@ -156,6 +160,7 @@ var removeCommand = &cli.Command{
 			Usage:   "Delete the namespace's cgroup",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {

@@ -57,6 +57,7 @@ var Command = &cli.Command{
 		buildErofsCacheCommand,
 		usageCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var listCommand = &cli.Command{
@@ -72,6 +73,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the image refs",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			filters = cmd.Args().Slice()
@@ -156,6 +158,7 @@ var setLabelsCommand = &cli.Command{
 			Usage:   "Replace all labels",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			replaceAll   = cmd.Bool("replace-all")
@@ -216,6 +219,7 @@ var checkCommand = &cli.Command{
 			Usage:   "Print only the ready image refs (fully downloaded and unpacked)",
 		},
 	}, commands.SnapshotterFlags...),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			exitErr error
@@ -330,6 +334,7 @@ var removeCommand = &cli.Command{
 			Usage: "Synchronously remove image and all associated resources",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
@@ -373,6 +378,7 @@ var pruneCommand = &cli.Command{
 			Usage: "Remove all unused images, not just dangling ones (if all is not specified no images will be pruned)",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	// adapted from `nerdctl`:
 	// https://github.com/containerd/nerdctl/blob/272dc9c29fc1434839d3ec63194d7efa24d7c0ef/cmd/nerdctl/image_prune.go#L86
 	Action: func(ctx context.Context, cmd *cli.Command) error {

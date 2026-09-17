@@ -64,6 +64,7 @@ var Command = &cli.Command{
 		usageCommand,
 		viewCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var listCommand = &cli.Command{
@@ -93,6 +94,7 @@ var listCommand = &cli.Command{
 
 		return tw.Flush()
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var diffCommand = &cli.Command{
@@ -114,6 +116,7 @@ var diffCommand = &cli.Command{
 			Usage: "Keep diff content. up to creator to delete it.",
 		},
 	}, commands.LabelFlag),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			idA = cmd.Args().First()
@@ -207,6 +210,7 @@ var usageCommand = &cli.Command{
 			Usage: "Display size in bytes",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var displaySize func(int64) string
 		if cmd.Bool("b") {
@@ -274,6 +278,7 @@ var removeCommand = &cli.Command{
 
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var prepareCommand = &cli.Command{
@@ -291,6 +296,7 @@ var prepareCommand = &cli.Command{
 			Usage: "Print out snapshot mounts as JSON",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if narg := cmd.NArg(); narg < 1 || narg > 2 {
 			return cli.ShowSubcommandHelp(cmd)
@@ -343,6 +349,7 @@ var viewCommand = &cli.Command{
 			Usage: "Print out snapshot mounts as JSON",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if narg := cmd.NArg(); narg < 1 || narg > 2 {
 			return cli.ShowSubcommandHelp(cmd)
@@ -387,6 +394,7 @@ var mountCommand = &cli.Command{
 			Usage: "Mounts the snapshot mounts as a temp mount and returns a bind mount",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if cmd.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cmd)
@@ -448,6 +456,7 @@ var commitCommand = &cli.Command{
 		}
 		return snapshotter.Commit(ctx, key, active, snapshots.WithLabels(labels))
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var treeCommand = &cli.Command{
@@ -476,6 +485,7 @@ var treeCommand = &cli.Command{
 
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var infoCommand = &cli.Command{
@@ -503,6 +513,7 @@ var infoCommand = &cli.Command{
 
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var setLabelCommand = &cli.Command{
@@ -552,6 +563,7 @@ var setLabelCommand = &cli.Command{
 
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var unpackCommand = &cli.Command{
@@ -564,6 +576,7 @@ var unpackCommand = &cli.Command{
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	}, commands.SnapshotterFlags...),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		dgst, err := digest.Parse(cmd.Args().First())
 		if err != nil {

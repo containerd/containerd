@@ -44,6 +44,7 @@ var restoreCommand = &cli.Command{
 			Usage: "Restore the runtime and memory data from the checkpoint",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.Args().First()
 		if id == "" {

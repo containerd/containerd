@@ -76,4 +76,5 @@ var Command = &cli.Command{
 			}
 		}
 	},
+	DisableSliceFlagSeparator: true,
 }

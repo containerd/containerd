@@ -77,6 +77,7 @@ var pushCommand = &cli.Command{
 		Name:  "allow-non-distributable-blobs",
 		Usage: "Allow pushing blobs that are marked as non-distributable",
 	}),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			ref   = cmd.Args().First()

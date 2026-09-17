@@ -39,6 +39,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the task id",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {

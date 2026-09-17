@@ -58,6 +58,7 @@ var (
 			setLabelsCommand,
 			pruneCommand,
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	getCommand = &cli.Command{
@@ -87,6 +88,7 @@ var (
 			_, err = io.CopyBuffer(os.Stdout, content.NewReader(ra), buf)
 			return err
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	ingestCommand = &cli.Command{
@@ -104,6 +106,7 @@ var (
 				Usage: "Verify content against expected digest",
 			},
 		},
+		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
 				ref            = cmd.Args().First()
@@ -149,6 +152,7 @@ var (
 				Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
 			},
 		},
+		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			match := cmd.Args().First()
 			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
@@ -187,6 +191,7 @@ var (
 				Usage:   "Print only the blob digest",
 			},
 		},
+		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
 				quiet = cmd.Bool("quiet")
@@ -287,6 +292,7 @@ var (
 
 			return nil
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	editCommand = &cli.Command{
@@ -305,6 +311,7 @@ var (
 				Sources: cli.EnvVars("EDITOR"),
 			},
 		},
+		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
 				validate = cmd.String("validate")
@@ -402,6 +409,7 @@ var (
 
 			return exitError
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	// TODO(stevvooe): Create "multi-fetch" mode that just takes a remote
@@ -445,6 +453,7 @@ var (
 			_, err = io.Copy(os.Stdout, rc)
 			return err
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	fetchBlobCommand = &cli.Command{
@@ -458,6 +467,7 @@ var (
 				Usage: "Specify target mediatype for request header",
 			},
 		}...),
+		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			digests := cmd.Args().Tail()
 			if len(digests) == 0 {
@@ -572,6 +582,7 @@ var (
 
 			return nil
 		},
+		DisableSliceFlagSeparator: true,
 	}
 )
 

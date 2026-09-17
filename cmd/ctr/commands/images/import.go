@@ -105,6 +105,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	}, append(commands.SnapshotterFlags, commands.LabelFlag)...),
+	DisableSliceFlagSeparator: true,
 
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (

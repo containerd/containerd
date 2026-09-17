@@ -65,4 +65,5 @@ var Command = &cli.Command{
 		}
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
