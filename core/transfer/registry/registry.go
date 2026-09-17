@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -73,7 +74,10 @@ func WithCredentials(creds CredentialHelper) Opt {
 	}
 }
 
-// WithHostDir specifies the host configuration directory.
+// WithHostDir specifies the host configuration directory. The value may be a
+// single directory or a list of directories separated by os.PathListSeparator
+// (e.g. "/etc/containerd/certs.d:/etc/docker/certs.d" on Unix), which are
+// searched in order for a matching host configuration.
 func WithHostDir(hostDir string) Opt {
 	return func(o *registryOpts) error {
 		o.hostDir = hostDir
@@ -125,7 +129,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 
 	hostOptions := config.HostOptions{}
 	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+		hostOptions.HostDir = config.HostDirFromRoots(filepath.SplitList(ropts.hostDir))
 	}
 	if ropts.creds != nil {
 		// TODO: Support bearer
