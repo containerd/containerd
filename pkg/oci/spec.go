@@ -121,6 +121,22 @@ func ApplyOpts(ctx context.Context, client Client, c *containers.Container, s *S
 	return nil
 }
 
+// CapabilityProfileDefault is the capability profile matching the historical
+// default capability set, including CAP_NET_RAW.
+const CapabilityProfileDefault = "default"
+
+// CapabilityProfileReduced is a capability profile that drops capabilities
+// that are not needed by most workloads, namely CAP_NET_RAW, CAP_MKNOD,
+// CAP_AUDIT_WRITE and CAP_SETFCAP.
+const CapabilityProfileReduced = "reduced"
+
+// capabilityProfiles maps a capability profile name to the set of
+// capabilities it grants by default.
+var capabilityProfiles = map[string]func() []string{
+	CapabilityProfileDefault: defaultUnixCaps,
+	CapabilityProfileReduced: defaultReducedUnixCaps,
+}
+
 func defaultUnixCaps() []string {
 	return []string{
 		"CAP_CHOWN",
@@ -138,6 +154,25 @@ func defaultUnixCaps() []string {
 		"CAP_KILL",
 		"CAP_AUDIT_WRITE",
 	}
+}
+
+// reducedCapsRemoved is the set of capabilities dropped from defaultUnixCaps
+// to form the reduced profile.
+var reducedCapsRemoved = []string{
+	"CAP_NET_RAW",
+	"CAP_MKNOD",
+	"CAP_AUDIT_WRITE",
+	"CAP_SETFCAP",
+}
+
+// defaultReducedUnixCaps derives the reduced profile by filtering
+// defaultUnixCaps, so the two stay in sync if defaultUnixCaps changes.
+func defaultReducedUnixCaps() []string {
+	caps := defaultUnixCaps()
+	for _, c := range reducedCapsRemoved {
+		removeCap(&caps, c)
+	}
+	return caps
 }
 
 func defaultUnixNamespaces() []specs.LinuxNamespace {
