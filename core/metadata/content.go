@@ -37,7 +37,25 @@ import (
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/timeout"
 )
+
+// gcContentTimeoutKey bounds one full content garbage collection pass: the
+// backend Walk/Delete sweep and the ingest Abort sweep, all under the content
+// store write lock. The deadline starts before lock acquisition; the wait
+// itself is not interruptible, but its duration counts against the budget of
+// the pass. An unresponsive content store (e.g. a hung proxy plugin RPC)
+// would otherwise hold the lock and block all content operations forever. On
+// timeout the pass is abandoned; remaining blobs and ingests stay orphaned
+// and are retried on the next GC pass.
+const (
+	gcContentTimeoutKey     = "io.containerd.timeout.gc.content"
+	defaultGCContentTimeout = 30 * time.Minute
+)
+
+func init() {
+	timeout.Set(gcContentTimeoutKey, defaultGCContentTimeout)
+}
 
 type contentStore struct {
 	content.Store
@@ -843,6 +861,9 @@ func writeExpireAt(expire time.Time, bkt *bolt.Bucket) error {
 
 // garbageCollect removes all contents that are no longer used.
 func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, err error) {
+	gcCtx, cancel := timeout.WithContext(ctx, gcContentTimeoutKey)
+	defer cancel()
+
 	cs.l.Lock()
 	t1 := time.Now()
 	defer func() {
@@ -913,9 +934,9 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 		return 0, err
 	}
 
-	err = cs.Store.Walk(ctx, func(info content.Info) error {
+	err = cs.Store.Walk(gcCtx, func(info content.Info) error {
 		if _, ok := contentSeen[info.Digest.String()]; !ok {
-			if err := cs.Store.Delete(ctx, info.Digest); err != nil {
+			if err := cs.Store.Delete(gcCtx, info.Digest); err != nil {
 				return err
 			}
 			log.G(ctx).WithField("digest", info.Digest).Debug("removed content")
@@ -933,9 +954,9 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 		WalkStatusRefs(context.Context, func(string) error) error
 	}
 	if w, ok := cs.Store.(statusWalker); ok {
-		err = w.WalkStatusRefs(ctx, func(ref string) error {
+		err = w.WalkStatusRefs(gcCtx, func(ref string) error {
 			if _, ok := ingestSeen[ref]; !ok {
-				if err := cs.Store.Abort(ctx, ref); err != nil {
+				if err := cs.Store.Abort(gcCtx, ref); err != nil {
 					return err
 				}
 				log.G(ctx).WithField("ref", ref).Debug("cleanup aborting ingest")
@@ -944,13 +965,13 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 		})
 	} else {
 		var statuses []content.Status
-		statuses, err = cs.Store.ListStatuses(ctx)
+		statuses, err = cs.Store.ListStatuses(gcCtx)
 		if err != nil {
 			return 0, err
 		}
 		for _, status := range statuses {
 			if _, ok := ingestSeen[status.Ref]; !ok {
-				if err = cs.Store.Abort(ctx, status.Ref); err != nil {
+				if err = cs.Store.Abort(gcCtx, status.Ref); err != nil {
 					return
 				}
 				log.G(ctx).WithField("ref", status.Ref).Debug("cleanup aborting ingest")
