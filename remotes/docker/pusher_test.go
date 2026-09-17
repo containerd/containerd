@@ -40,6 +40,7 @@ import (
 	ocispecv "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetManifestPath(t *testing.T) {
@@ -248,7 +249,7 @@ func samplePusher(t *testing.T) (dockerPusher, *uploadableMockRegistry, StatusTr
 	return dockerPusher{
 		dockerBase: &dockerBase{
 			refspec: reference.Spec{
-				Locator: "example.com/samplerepository:latest",
+				Locator: samplePusherHostname + "/samplerepository:latest",
 			},
 			repository: "samplerepository",
 			hosts: []RegistryHost{
@@ -269,14 +270,17 @@ func samplePusher(t *testing.T) (dockerPusher, *uploadableMockRegistry, StatusTr
 var manifestRegexp = regexp.MustCompile(`/([a-z0-9]+)/manifests/(.*)`)
 var blobUploadRegexp = regexp.MustCompile(`/([a-z0-9]+)/blobs/uploads/(.*)`)
 
+const samplePusherHostname = "example.com"
+
 // uploadableMockRegistry provides minimal registry APIs which are enough to serve requests from dockerPusher.
 type uploadableMockRegistry struct {
-	availableContents []string
-	uploadable        bool
-	putHandlerFunc    func(w http.ResponseWriter, r *http.Request) bool
-	locationPrefix    string
-	username          string
-	secret            string
+	availableContents  []string
+	uploadable         bool
+	putHandlerFunc     func(w http.ResponseWriter, r *http.Request) bool
+	defaultHandlerFunc func(w http.ResponseWriter, r *http.Request) bool
+	locationPrefix     string
+	username           string
+	secret             string
 }
 
 func (u *uploadableMockRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -293,6 +297,9 @@ func (u *uploadableMockRegistry) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		if u.putHandlerFunc(w, r) {
 			return
 		}
+	}
+	if u.defaultHandlerFunc != nil && u.defaultHandlerFunc(w, r) {
+		return
 	}
 	u.defaultHandler(w, r)
 }
@@ -564,4 +571,79 @@ func Test_dockerPusher_push(t *testing.T) {
 
 		})
 	}
+}
+
+func TestPusherForbiddenGETFallbackForErrorBody(t *testing.T) {
+	// When the existence-check HEAD returns 403, the pusher should issue
+	// a follow-up GET to retrieve the registry's error body for diagnostics.
+	const errorMessage = "encryption key is disabled"
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			// HEAD: no body
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage,
+		"expected registry error body from GET fallback")
+	assert.Contains(t, err.Error(), "403")
+}
+
+func TestPusherForbiddenGETFallbackProxy(t *testing.T) {
+	// When the pusher is configured as a proxy (Host != image hostname),
+	// the GET fallback must include the ?ns= query parameter so the proxy
+	// can route the request to the correct upstream registry.
+	const errorMessage = "encryption key is disabled"
+
+	var gotNsParam string
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			if r.Method == http.MethodGet {
+				gotNsParam = r.URL.Query().Get("ns")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage)
+	assert.Equal(t, samplePusherHostname, gotNsParam,
+		"GET fallback on proxy must include ?ns= query parameter")
 }
