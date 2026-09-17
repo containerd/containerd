@@ -36,6 +36,72 @@ fi
 CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-""}
 # The runtime to use (ignored when CONTAINERD_CONFIG_FILE is set)
 CONTAINERD_RUNTIME=${CONTAINERD_RUNTIME:-""}
+# _config_copy holds the path of the temp copy created for a pre-supplied config
+# so that test_teardown can remove it.
+_config_copy=""
+if [ -n "${CONTAINERD_CONFIG_FILE}" ] && [ $IS_WINDOWS -eq 0 ]; then
+  # A pre-supplied config is caller-owned and may be read-only or reused across
+  # runs.  Copy it to a test-owned temp file so that test-only settings (NRI,
+  # etc.) can be appended without mutating the original or causing permission
+  # errors on root-owned paths.
+  #
+  # Prefer placing the copy in the same directory as the original so that
+  # relative imports entries (e.g. ./conf.d/*.toml) continue to resolve
+  # correctly against the same base directory that containerd would use.
+  # If the original directory is not writable (e.g. /etc/containerd owned by
+  # root), fall back to CONTAINERD_CONFIG_DIR — but only when the config
+  # contains no relative imports entries.
+  #
+  # containerd resolves every non-absolute import path relative to the config
+  # file's directory (cmd/containerd/server/config/config.go:resolveImports),
+  # so bare paths like "conf.d/*.toml" are also relative — not just "./…".
+  # Use awk to extract quoted strings from the imports array and check each one.
+  _config_orig_dir="$(dirname "${CONTAINERD_CONFIG_FILE}")"
+  _has_relative_imports() {
+    # \047 is octal for single-quote, safe inside awk's single-quoted program.
+    # Match each quoted string in the imports array; treat any value that does
+    # not start with / as a relative path (mirrors resolveImports behaviour).
+    # Use [ \t] instead of \s — POSIX awk does not support \s in regex.
+    awk '
+      /^[ \t]*imports[ \t]*=/ { in_imports=1 }
+      in_imports {
+        line = $0
+        gsub(/#.*/, "", line)
+        # Match complete quoted strings (opening quote, contents, closing quote).
+        # Without the closing quote in the pattern the scanner advances one byte
+        # too far and the inter-value punctuation is misread as the next value.
+        while (match(line, /["\047][^"\047]*["\047]/)) {
+          val = substr(line, RSTART+1, RLENGTH-2)
+          if (substr(val,1,1) != "/") { found=1; exit }
+          line = substr(line, RSTART+RLENGTH)
+        }
+        if (/\]/) { exit }
+      }
+      END { exit !found }
+    ' "$1"
+  }
+  if [ -w "${_config_orig_dir}" ]; then
+    # Use a .tmp extension so the temp copy is not picked up by wildcard import
+    # globs in the original config (e.g. imports = ["*.toml"]) — containerd
+    # loads the copy directly via --config so the extension is irrelevant to it.
+    _config_copy="$(mktemp "${_config_orig_dir}/containerd-config-cri-XXXXXX.tmp")"
+  else
+    if _has_relative_imports "${CONTAINERD_CONFIG_FILE}"; then
+      echo "error: CONTAINERD_CONFIG_FILE '${CONTAINERD_CONFIG_FILE}' is in a" \
+           "non-writable directory and contains relative imports entries." \
+           "Resolve imports to absolute paths or set CONTAINERD_CONFIG_DIR to" \
+           "the config's directory." >&2
+      exit 1
+    fi
+    _config_copy="$(mktemp "${CONTAINERD_CONFIG_DIR}/containerd-config-cri-XXXXXX.tmp")"
+  fi
+  # Use cat redirection rather than cp so that the temp file retains the
+  # permissions set by mktemp (0600) regardless of the source file's mode.
+  # A caller-supplied config with mode 0444 would otherwise produce a
+  # read-only copy, causing subsequent edits (NRI, SystemdCgroup, etc.) to fail.
+  cat "${CONTAINERD_CONFIG_FILE}" > "${_config_copy}"
+  CONTAINERD_CONFIG_FILE="${_config_copy}"
+fi
 if [ -z "${CONTAINERD_CONFIG_FILE}" ]; then
   config_file="${CONTAINERD_CONFIG_DIR}/containerd-config-cri.toml"
   truncate --size 0 "${config_file}"
@@ -79,31 +145,50 @@ EOF
 runtime_type = "${CONTAINERD_RUNTIME}"
 EOF
   fi
-  if [ $IS_WINDOWS -eq 0 ]; then
-    cat >>${config_file} <<EOF
-[plugins."io.containerd.nri.v1.nri"]
-  disable = false
-  socket_path = "/var/run/nri-test.sock"
-  plugin_path = "/no/pre-launched/nri/plugins"
-EOF
-  fi
+
   CONTAINERD_CONFIG_FILE="${config_file}"
 fi
 
+# Append the runc-fp failpoint runtime to whichever config is in use, unless it
+# is already present.  The failpoint tests skip themselves under runsc via
+# t.Skip, so appending the table to a runsc config is harmless; callers that
+# supply their own config still need the runtime for the failpoint test suite.
+#
+# containerd 2.x configs (version = 3) use io.containerd.cri.v1.runtime while
+# 1.x configs (version = 2) use io.containerd.grpc.v1.cri.  Detect which is
+# active and emit the runc-fp table under the correct namespace.
+FAILPOINT_CONTAINERD_RUNTIME="runc-fp.v1"
+FAILPOINT_CNI_CONF_DIR=${FAILPOINT_CNI_CONF_DIR:-"/tmp/failpoint-cni-net.d"}
+# Determine the CRI plugin namespace used by this config.
+# Prefer the explicit v3 namespace if present; fall back to checking the version
+# field; otherwise default to the legacy v2 namespace for generated configs.
 if [ $IS_WINDOWS -eq 0 ]; then
-  FAILPOINT_CONTAINERD_RUNTIME="runc-fp.v1"
-  FAILPOINT_CNI_CONF_DIR=${FAILPOINT_CNI_CONF_DIR:-"/tmp/failpoint-cni-net.d"}
+  if grep -Eq '^[[:space:]]*\[plugins\.["'"'"'](io\.containerd\.cri\.v1\.runtime)["'"'"']' \
+       "${CONTAINERD_CONFIG_FILE}"; then
+    _cri_ns="io.containerd.cri.v1.runtime"
+  elif grep -Eq '^[[:space:]]*version[[:space:]]*=[[:space:]]*3' \
+       "${CONTAINERD_CONFIG_FILE}"; then
+    _cri_ns="io.containerd.cri.v1.runtime"
+  else
+    _cri_ns="io.containerd.grpc.v1.cri"
+  fi
+fi
+if [ $IS_WINDOWS -eq 0 ] && \
+   ! grep -Eq '^[[:space:]]*\[plugins\.["'"'"'](io\.containerd\.grpc\.v1\.cri|io\.containerd\.cri\.v1\.runtime)["'"'"']\.containerd\.runtimes\.runc-fp\][[:space:]]*(#.*)?$' \
+     "${CONTAINERD_CONFIG_FILE}"; then
   mkdir -p "${FAILPOINT_CNI_CONF_DIR}"
-
-  # Add runtime with failpoint
-  cat << EOF | tee -a "${CONTAINERD_CONFIG_FILE}"
-[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc-fp]
+  # Ensure the file ends with a newline before appending.
+  if [ -s "${CONTAINERD_CONFIG_FILE}" ] && \
+     [ "$(tail -c1 "${CONTAINERD_CONFIG_FILE}" | wc -l)" -eq 0 ]; then
+    echo >> "${CONTAINERD_CONFIG_FILE}"
+  fi
+  cat >> "${CONTAINERD_CONFIG_FILE}" <<EOF
+[plugins."${_cri_ns}".containerd.runtimes.runc-fp]
   cni_conf_dir = "${FAILPOINT_CNI_CONF_DIR}"
   cni_max_conf_num = 1
   pod_annotations = ["io.containerd.runtime.v2.shim.failpoint.*"]
   runtime_type = "${FAILPOINT_CONTAINERD_RUNTIME}"
 EOF
-
   cat << EOF | tee "${FAILPOINT_CNI_CONF_DIR}/10-containerd-net.conflist"
 {
   "cniVersion": "1.0.0",
@@ -143,6 +228,97 @@ EOF
 EOF
 fi
 
+# Ensure SystemdCgroup = true is in effect under the runc.options table when
+# CGROUP_DRIVER=systemd is set.  Three cases to handle:
+#   1. Key is absent from the table → insert it (append or inject after header).
+#   2. Key is present with value = true → nothing to do.
+#   3. Key is present with value = false → overwrite it to true.
+# Both double-quoted and single-quoted TOML key spellings are recognised.
+# A pure grep would be fooled by commented-out keys or keys in other tables.
+# _cri_ns is set above (in the failpoint block) to the active CRI plugin
+# namespace: io.containerd.cri.v1.runtime (v3) or io.containerd.grpc.v1.cri (v2).
+_runc_opts_table_dq="[plugins.\"${_cri_ns:-io.containerd.grpc.v1.cri}\".containerd.runtimes.runc.options]"
+_runc_opts_table_sq="[plugins.'${_cri_ns:-io.containerd.grpc.v1.cri}'.containerd.runtimes.runc.options]"
+# Returns 0 (true) when SystemdCgroup = true is already active in the table.
+_systemd_cgroup_is_true() {
+  awk -v tbl_dq="${_runc_opts_table_dq}" -v tbl_sq="${_runc_opts_table_sq}" '
+    { line=$0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line); sub(/[[:space:]]+#.*$/, "", line) }
+    line == tbl_dq || line == tbl_sq { in_table=1; next }
+    in_table && /^[[:space:]]*\[/    { exit }
+    in_table && /^[[:space:]]*#/     { next }
+    in_table && line ~ /SystemdCgroup[[:space:]]*=[[:space:]]*true/ { found=1; exit }
+    END { exit !found }
+  ' "$1"
+}
+# Returns 0 (true) when SystemdCgroup = false is active in the table.
+_systemd_cgroup_is_false() {
+  awk -v tbl_dq="${_runc_opts_table_dq}" -v tbl_sq="${_runc_opts_table_sq}" '
+    { line=$0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line); sub(/[[:space:]]+#.*$/, "", line) }
+    line == tbl_dq || line == tbl_sq { in_table=1; next }
+    in_table && /^[[:space:]]*\[/    { exit }
+    in_table && /^[[:space:]]*#/     { next }
+    in_table && line ~ /SystemdCgroup[[:space:]]*=[[:space:]]*false/ { found=1; exit }
+    END { exit !found }
+  ' "$1"
+}
+if [ $IS_WINDOWS -eq 0 ] && [ "${CGROUP_DRIVER:-}" = "systemd" ]; then
+  # Escape dots in _cri_ns for use in sed/grep regex addresses.
+  _cri_ns_re="$(echo "${_cri_ns:-io.containerd.grpc.v1.cri}" | sed 's/\./\\./g')"
+  if _systemd_cgroup_is_false "${CONTAINERD_CONFIG_FILE}"; then
+    # Key exists but is set to false — overwrite the value in-place, restricted
+    # to the runc.options table range so other runtimes are not affected.
+    # The sed address is a prefix match (no $), so a trailing inline comment on
+    # the header line does not prevent the range from being entered.
+    sed -i \
+      -e "/^[[:space:]]*\[plugins\.\"${_cri_ns_re}\"\.containerd\.runtimes\.runc\.options\][[:space:]]*/,/^[[:space:]]*\[/s/\(SystemdCgroup[[:space:]]*=[[:space:]]*\)false/\1true/" \
+      -e "/^[[:space:]]*\[plugins\.'${_cri_ns_re}'\.containerd\.runtimes\.runc\.options\][[:space:]]*/,/^[[:space:]]*\[/s/\(SystemdCgroup[[:space:]]*=[[:space:]]*\)false/\1true/" \
+      "${CONTAINERD_CONFIG_FILE}"
+  elif ! _systemd_cgroup_is_true "${CONTAINERD_CONFIG_FILE}"; then
+    # Key is absent — insert it.
+    # Ensure the file ends with a newline before appending.
+    if [ -s "${CONTAINERD_CONFIG_FILE}" ] && \
+       [ "$(tail -c1 "${CONTAINERD_CONFIG_FILE}" | wc -l)" -eq 0 ]; then
+      echo >> "${CONTAINERD_CONFIG_FILE}"
+    fi
+    # If the runc.options table header already exists (but lacks SystemdCgroup),
+    # insert the key after the header line.  The grep and sed patterns use the
+    # character class ['"'"'"] to match either TOML quote style ("…" or '…').
+    # Otherwise append a new double-quoted table block.
+    if grep -Eq "^[[:space:]]*\\[plugins\\.['\"]${_cri_ns_re}['\"]\.containerd\.runtimes\.runc\.options\\][[:space:]]*(#.*)?$" "${CONTAINERD_CONFIG_FILE}"; then
+      sed -i "/^[[:space:]]*\\[plugins\\.['\"]${_cri_ns_re}['\"]\.containerd\.runtimes\.runc\.options\\][[:space:]]*/a\\
+  SystemdCgroup = true" "${CONTAINERD_CONFIG_FILE}"
+    else
+      cat >> "${CONTAINERD_CONFIG_FILE}" <<EOF
+[plugins."${_cri_ns:-io.containerd.grpc.v1.cri}".containerd.runtimes.runc.options]
+  SystemdCgroup = true
+EOF
+    fi
+  fi
+fi
+
+# Append the NRI test config to whichever config file is in use (self-generated
+# or pre-supplied).  This must run for both paths so that NRI integration tests
+# work regardless of which runtime is under test.
+# Only add the NRI table if the config does not already contain it; a duplicate
+# TOML table causes containerd to reject the config on startup.
+# Ensure the file ends with a newline before appending so that the table header
+# is never concatenated onto an existing value line (which produces invalid TOML).
+if [ $IS_WINDOWS -eq 0 ]; then
+  if ! grep -Eq '^[[:space:]]*\[plugins\.("io\.containerd\.nri\.v1\.nri"|'"'"'io\.containerd\.nri\.v1\.nri'"'"')\][[:space:]]*(#.*)?$' "${CONTAINERD_CONFIG_FILE}"; then
+    # Add a newline if the file does not already end with one.
+    if [ -s "${CONTAINERD_CONFIG_FILE}" ] && \
+       [ "$(tail -c1 "${CONTAINERD_CONFIG_FILE}" | wc -l)" -eq 0 ]; then
+      echo >> "${CONTAINERD_CONFIG_FILE}"
+    fi
+    cat >> "${CONTAINERD_CONFIG_FILE}" <<EOF
+[plugins."io.containerd.nri.v1.nri"]
+  disable = false
+  socket_path = "/var/run/nri-test.sock"
+  plugin_path = "/no/pre-launched/nri/plugins"
+EOF
+  fi
+fi
+
 if [ ${IS_WINDOWS} -eq 1 -a ${USE_HYPERV} -eq 1 ];then
   cat >> ${CONTAINERD_CONFIG_FILE} << EOF
 version = 2
@@ -163,11 +339,6 @@ fi
 # To allow the cri-integration test to run via CLI without explicitly setting CGROUP_DRIVER
 if [ $IS_WINDOWS -eq 0 ] && [ ! -v CGROUP_DRIVER ]; then
   echo "CGROUP_DRIVER is unset"
-elif [ "${CGROUP_DRIVER:-}" = "systemd" ]; then
-  cat >> ${CONTAINERD_CONFIG_FILE} << EOF
-[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
-   SystemdCgroup = true
-EOF
 fi
 
 # CONTAINERD_TEST_SUFFIX is the suffix appended to the root/state directory used
@@ -306,7 +477,7 @@ test_setup() {
   run_crictl
 }
 
-# test_teardown kills containerd.
+# test_teardown kills containerd and removes any temp config copy.
 test_teardown() {
   if [ -n "${pid}" ]; then
     if [ $IS_WINDOWS -eq 1 ]; then
@@ -322,6 +493,11 @@ test_teardown() {
         echo "pid(${pid}) not found, skipping pkill"
       fi
     fi
+  fi
+  # Remove the temp copy of a pre-supplied config created at sourcing time.
+  if [ -n "${_config_copy}" ]; then
+    ${sudo} rm -f "${_config_copy}"
+    _config_copy=""
   fi
 }
 

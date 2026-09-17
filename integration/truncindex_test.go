@@ -73,8 +73,11 @@ func TestTruncIndex(t *testing.T) {
 	assert.Equal(t, sb, sbStatus.Id)
 
 	t.Logf("Forward port for sandbox by truncindex")
-	_, err = runtimeService.PortForward(&runtimeapi.PortForwardRequest{PodSandboxId: sbTruncIndex, Port: []int32{80}})
-	assert.NoError(t, err)
+	if !runtimeHandlerIsRunsc() {
+		// runsc does not support port-forwarding into its own network namespace.
+		_, err = runtimeService.PortForward(&runtimeapi.PortForwardRequest{PodSandboxId: sbTruncIndex, Port: []int32{80}})
+		assert.NoError(t, err)
+	}
 
 	// TODO(yanxuean): add test case for ListPodSandbox
 
@@ -108,21 +111,27 @@ func TestTruncIndex(t *testing.T) {
 	}()
 
 	t.Logf("Stats the container")
-	cStats, err := runtimeService.ContainerStats(cnTruncIndex)
-	require.NoError(t, err)
-	assert.Equal(t, cn, cStats.Attributes.Id)
+	if !runtimeHandlerIsRunsc() {
+		// runsc does not expose per-container stats.
+		cStats, err := runtimeService.ContainerStats(cnTruncIndex)
+		require.NoError(t, err)
+		assert.Equal(t, cn, cStats.Attributes.Id)
+	}
 
 	t.Logf("Update container memory limit after started")
-	if goruntime.GOOS != "windows" {
-		err = runtimeService.UpdateContainerResources(cnTruncIndex, &runtimeapi.LinuxContainerResources{
-			MemoryLimitInBytes: 50 * 1024 * 1024,
-		}, nil)
-		assert.NoError(t, err)
-	} else {
-		err = runtimeService.UpdateContainerResources(cnTruncIndex, nil, &runtimeapi.WindowsContainerResources{
-			MemoryLimitInBytes: 50 * 1024 * 1024,
-		})
-		assert.NoError(t, err)
+	if !runtimeHandlerIsRunsc() {
+		// runsc does not implement cgroup memory limits.
+		if goruntime.GOOS != "windows" {
+			err = runtimeService.UpdateContainerResources(cnTruncIndex, &runtimeapi.LinuxContainerResources{
+				MemoryLimitInBytes: 50 * 1024 * 1024,
+			}, nil)
+			assert.NoError(t, err)
+		} else {
+			err = runtimeService.UpdateContainerResources(cnTruncIndex, nil, &runtimeapi.WindowsContainerResources{
+				MemoryLimitInBytes: 50 * 1024 * 1024,
+			})
+			assert.NoError(t, err)
+		}
 	}
 
 	t.Logf("Execute cmd in container")

@@ -303,6 +303,9 @@ func TestNriLinuxDeviceInjection(t *testing.T) {
 
 // Test linux cpuset adjustment by NRI plugins.
 func TestNriLinuxCpusetAdjustment(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not propagate NRI cpuset adjustments to the container's /proc/self/status")
+	}
 	skipNriTestIfNecessary(t,
 		map[string]bool{
 			"not enough online CPUs for test": len(getAvailableCpuset(t)) < 2,
@@ -348,6 +351,9 @@ func TestNriLinuxCpusetAdjustment(t *testing.T) {
 
 // Test linux memset adjustment by NRI plugins.
 func TestNriLinuxMemsetAdjustment(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not propagate NRI memset adjustments to the container's /proc/self/status")
+	}
 	skipNriTestIfNecessary(t,
 		map[string]bool{
 			"not enough online memory nodes for test": len(getAvailableMemset(t)) < 2,
@@ -393,6 +399,9 @@ func TestNriLinuxMemsetAdjustment(t *testing.T) {
 
 // Test creation-time linux cpuset update of existing containers by NRI plugins.
 func TestNriLinuxCpusetAdjustmentUpdate(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not propagate NRI cpuset adjustments to the container's /proc/self/status")
+	}
 	skipNriTestIfNecessary(t,
 		map[string]bool{
 			"not enough online CPUs for test": len(getAvailableCpuset(t)) < 2,
@@ -464,6 +473,9 @@ func TestNriLinuxCpusetAdjustmentUpdate(t *testing.T) {
 
 // Test creation-time linux memset update of existing containers by NRI plugins.
 func TestNriLinuxMemsetAdjustmentUpdate(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not propagate NRI memset adjustments to the container's /proc/self/status")
+	}
 	skipNriTestIfNecessary(t,
 		map[string]bool{
 			"not enough online memory nodes for test": len(getAvailableMemset(t)) < 2,
@@ -532,6 +544,9 @@ func TestNriLinuxMemsetAdjustmentUpdate(t *testing.T) {
 
 // Test pod sandbox updates received by NRI plugins.
 func TestNriUpdatePodSandbox(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not implement cgroup memory limits")
+	}
 	skipNriTestIfNecessary(t)
 
 	t.Log("Test that NRI plugins receive pod sandbox updates.")
@@ -574,6 +589,9 @@ func TestNriUpdatePodSandbox(t *testing.T) {
 
 // Test pod sandbox resource updates persist across containerd restarts.
 func TestUpdatePodSandboxWithRestart(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc sandboxes do not survive containerd restart; state recovery is not supported")
+	}
 	skipNriTestIfNecessary(t)
 
 	t.Log("Test that pod sandbox resource updates persist across containerd restarts.")
@@ -613,6 +631,9 @@ func TestUpdatePodSandboxWithRestart(t *testing.T) {
 
 // Test NRI vs. containerd restart.
 func TestNriPluginContainerdRestart(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc sandboxes do not survive containerd restart; state recovery is not supported")
+	}
 	skipNriTestIfNecessary(t)
 
 	t.Log("Test NRI plugins vs. containerd restart.")

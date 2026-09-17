@@ -52,6 +52,9 @@ func TestRunPodSandboxWithSetupCNIFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip()
 	}
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runc-fp failpoint shim is not available under runsc")
+	}
 
 	t.Logf("Inject CNI failpoint")
 	conf := &failpointConf{
@@ -81,6 +84,9 @@ func TestRunPodSandboxWithShimStartFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip()
 	}
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runc-fp failpoint shim is not available under runsc")
+	}
 
 	t.Logf("Inject Shim failpoint")
 
@@ -100,6 +106,9 @@ func TestRunPodSandboxWithShimStartFailure(t *testing.T) {
 func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip()
+	}
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runc-fp failpoint shim is not available under runsc")
 	}
 
 	testCase := func(restart bool) func(*testing.T) {
@@ -177,6 +186,9 @@ func TestRunPodSandboxWithShimStartAndTeardownCNIFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip()
 	}
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runc-fp failpoint shim is not available under runsc")
+	}
 
 	testCase := func(restart bool) func(*testing.T) {
 		return func(t *testing.T) {
@@ -239,6 +251,9 @@ func TestRunPodSandboxWithShimStartAndTeardownCNIFailure(t *testing.T) {
 func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip()
+	}
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runc-fp failpoint shim is not available under runsc")
 	}
 
 	t.Log("Init PodSandboxConfig with specific key")

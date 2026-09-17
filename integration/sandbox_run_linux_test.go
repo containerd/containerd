@@ -23,6 +23,9 @@ import (
 )
 
 func TestPodSandboxController_ShouldBackoffExitEventWhenFail(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runc-fp failpoint shim is not available under runsc")
+	}
 	t.Logf("Inject Shim failpoint")
 
 	sbConfig := PodSandboxConfig(t.Name(), "failpoint")
