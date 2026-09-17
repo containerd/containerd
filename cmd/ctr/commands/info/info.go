@@ -46,4 +46,5 @@ var Command = &cli.Command{
 		commands.PrintAsJSON(info)
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }

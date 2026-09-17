@@ -66,6 +66,7 @@ When you are done, use the unmount command.
 			Value:   1 * time.Hour,
 		},
 	),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) (retErr error) {
 		var (
 			ref    = cmd.Args().First()

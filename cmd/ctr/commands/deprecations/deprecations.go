@@ -36,6 +36,7 @@ var Command = &cli.Command{
 	Commands: []*cli.Command{
 		listCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 var listCommand = &cli.Command{
 	Name:  "list",
@@ -46,6 +47,7 @@ var listCommand = &cli.Command{
 			Usage: "output format to use (Examples: 'default', 'json')",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		// Suppress automatic warnings, since we print the warnings by ourselves.
 		_ = os.Setenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS", "1")

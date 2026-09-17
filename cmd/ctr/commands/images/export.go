@@ -66,6 +66,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Usage: "Run export locally rather than through transfer API",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			out        = cmd.Args().First()

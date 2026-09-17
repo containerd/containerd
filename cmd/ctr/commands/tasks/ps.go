@@ -70,4 +70,5 @@ var psCommand = &cli.Command{
 		}
 		return w.Flush()
 	},
+	DisableSliceFlagSeparator: true,
 }
