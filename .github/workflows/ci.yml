@@ -658,7 +658,15 @@ jobs:
           key: lima-${{ steps.lima-actions-setup.outputs.version }}-${{ matrix.template }}
       - name: Boot VM
         # --plain keeps the guest pristine (no guest agent, no mounts, no port forwards)
-        run: limactl start --plain --name=default --cpus=2 --memory=4 --disk=60 "template:$LIMA_TEMPLATE"
+        #
+        # The Fedora images are fetched via the download.fedoraproject.org mirror redirector,
+        # which intermittently returns 404. For those entries only, append a copy pointing at
+        # Fedora's canonical dl.fedoraproject.org: Lima walks the images in order and falls
+        # back to the next entry of the same arch when a download fails.
+        run: |
+          limactl start --plain --name=default --cpus=2 --memory=4 --disk=60 \
+            --set='.images += (.images | map(select(.location | test("^https://download\.fedoraproject\.org/"))) | map(.location |= sub("^https://download\.fedoraproject\.org/"; "https://dl.fedoraproject.org/")))' \
+            "template:$LIMA_TEMPLATE"
       - name: Copy the source code to the VM
         env:
           # $LIMA_WORKDIR does not exist yet
