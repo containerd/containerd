@@ -127,12 +127,12 @@ linters:
         text: 'use of `regexp.MustCompile` forbidden'
         path: _test\.go
     paths:
-      - api
-      - cluster
-      - docs
-      - docs/man
-      - releases
-      - test
+      - ^api/
+      - ^cluster/
+      - ^docs/
+      - ^docs/man/
+      - ^releases/
+      - ^test/
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
@@ -143,9 +143,9 @@ formatters:
   exclusions:
     generated: strict
     paths:
-      - api
-      - cluster
-      - docs
-      - docs/man
-      - releases
-      - test
+      - ^api/
+      - ^cluster/
+      - ^docs/
+      - ^docs/man/
+      - ^releases/
+      - ^test/
