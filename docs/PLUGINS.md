@@ -69,7 +69,14 @@ version = 2
   [proxy_plugins.customsnapshot]
     type = "snapshot"
     address = "/var/run/mysnapshotter.sock"
+    default_timeout = ""
 ```
+
+`default_timeout` is optional and honored by `snapshot` proxy plugins today. When
+set to a duration != "", for example to "30m", each call to the plugin gets that deadline if the caller has not set one of
+its own, so a stuck plugin cannot hold its lock for good. A caller that already
+has a deadline keeps it. Leaving the key out, or giving it a zero or negative
+duration, keeps calls unbounded.
 
 #### Implementation
 
