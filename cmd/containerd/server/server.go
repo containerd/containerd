@@ -327,8 +327,16 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		case string(plugins.SnapshotPlugin), "snapshot":
 			t = plugins.SnapshotPlugin
 			ssname := name
+			var ssopts []ssproxy.Opt
+			if pp.DefaultTimeout != "" {
+				d, perr := time.ParseDuration(pp.DefaultTimeout)
+				if perr != nil {
+					return nil, fmt.Errorf("proxy plugin %q: unable to parse default_timeout %q into a time duration: %w", name, pp.DefaultTimeout, perr)
+				}
+				ssopts = append(ssopts, ssproxy.WithDefaultTimeout(d))
+			}
 			f = func(conn *grpc.ClientConn) any {
-				return ssproxy.NewSnapshotter(ssapi.NewSnapshotsClient(conn), ssname)
+				return ssproxy.NewSnapshotter(ssapi.NewSnapshotsClient(conn), ssname, ssopts...)
 			}
 
 		case string(plugins.ContentPlugin), "content":
