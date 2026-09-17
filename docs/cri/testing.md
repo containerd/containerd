@@ -8,6 +8,7 @@ Before sending pull requests you should at least make sure your changes have pas
 Follow the [building](../../BUILDING.md) instructions.
 
 ## CRI Integration Test
+The tests need the host dependencies installed by `make install-deps` (see [CONTRIBUTING.md](../../CONTRIBUTING.md#setting-up-your-local-environment)).
 * Run all CRI integration tests:
 ```bash
 make cri-integration
