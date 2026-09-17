@@ -170,6 +170,9 @@ documentation.
 
 - **type** (Default: "")
 - **address** (Default: "")
+- **default_timeout** (Default: "") a duration bounding each call to the plugin
+  when the caller's context carries no deadline of its own, for example "30m".
+  Empty leaves calls unbounded. Currently honored by snapshot proxy plugins.
 
 **timeouts**
 : Timeouts specified as a duration

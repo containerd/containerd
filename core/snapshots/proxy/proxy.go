@@ -19,6 +19,7 @@ package proxy
 import (
 	"context"
 	"io"
+	"time"
 
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/errdefs/pkg/errgrpc"
@@ -28,21 +29,56 @@ import (
 	protobuftypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 )
 
+// Opt configures a proxy snapshotter.
+type Opt func(*proxySnapshotter)
+
+// WithDefaultTimeout bounds each call to the proxy snapshotter when the
+// caller's context carries no deadline of its own. A non-positive duration
+// leaves calls unbounded.
+func WithDefaultTimeout(d time.Duration) Opt {
+	return func(p *proxySnapshotter) {
+		p.defaultTimeout = d
+	}
+}
+
 // NewSnapshotter returns a new Snapshotter which communicates over a GRPC
 // connection using the containerd snapshot GRPC API.
 func NewSnapshotter(client snapshotsapi.SnapshotsClient, snapshotterName string) snapshots.Snapshotter {
-	return &proxySnapshotter{
+	return NewSnapshotterWithOpts(client, snapshotterName)
+}
+
+// NewSnapshotterWithOpts is NewSnapshotter with options applied.
+func NewSnapshotterWithOpts(client snapshotsapi.SnapshotsClient, snapshotterName string, opts ...Opt) snapshots.Snapshotter {
+	p := &proxySnapshotter{
 		client:          client,
 		snapshotterName: snapshotterName,
 	}
+	for _, o := range opts {
+		o(p)
+	}
+	return p
 }
 
 type proxySnapshotter struct {
 	client          snapshotsapi.SnapshotsClient
 	snapshotterName string
+	defaultTimeout  time.Duration
+}
+
+func (p *proxySnapshotter) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if p.defaultTimeout <= 0 {
+		return ctx, func() {}
+	}
+	if _, ok := ctx.Deadline(); ok {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, p.defaultTimeout)
 }
 
 func (p *proxySnapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	resp, err := p.client.Stat(ctx,
 		&snapshotsapi.StatSnapshotRequest{
 			Snapshotter: p.snapshotterName,
@@ -55,6 +91,9 @@ func (p *proxySnapshotter) Stat(ctx context.Context, key string) (snapshots.Info
 }
 
 func (p *proxySnapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	resp, err := p.client.Update(ctx,
 		&snapshotsapi.UpdateSnapshotRequest{
 			Snapshotter: p.snapshotterName,
@@ -70,6 +109,9 @@ func (p *proxySnapshotter) Update(ctx context.Context, info snapshots.Info, fiel
 }
 
 func (p *proxySnapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	resp, err := p.client.Usage(ctx, &snapshotsapi.UsageRequest{
 		Snapshotter: p.snapshotterName,
 		Key:         key,
@@ -81,6 +123,9 @@ func (p *proxySnapshotter) Usage(ctx context.Context, key string) (snapshots.Usa
 }
 
 func (p *proxySnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	resp, err := p.client.Mounts(ctx, &snapshotsapi.MountsRequest{
 		Snapshotter: p.snapshotterName,
 		Key:         key,
@@ -92,6 +137,9 @@ func (p *proxySnapshotter) Mounts(ctx context.Context, key string) ([]mount.Moun
 }
 
 func (p *proxySnapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	var local snapshots.Info
 	for _, opt := range opts {
 		if err := opt(&local); err != nil {
@@ -111,6 +159,9 @@ func (p *proxySnapshotter) Prepare(ctx context.Context, key, parent string, opts
 }
 
 func (p *proxySnapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	var local snapshots.Info
 	for _, opt := range opts {
 		if err := opt(&local); err != nil {
@@ -130,6 +181,9 @@ func (p *proxySnapshotter) View(ctx context.Context, key, parent string, opts ..
 }
 
 func (p *proxySnapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	var local snapshots.Info
 	for _, opt := range opts {
 		if err := opt(&local); err != nil {
@@ -147,6 +201,9 @@ func (p *proxySnapshotter) Commit(ctx context.Context, name, key string, opts ..
 }
 
 func (p *proxySnapshotter) Remove(ctx context.Context, key string) error {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	_, err := p.client.Remove(ctx, &snapshotsapi.RemoveSnapshotRequest{
 		Snapshotter: p.snapshotterName,
 		Key:         key,
@@ -155,6 +212,9 @@ func (p *proxySnapshotter) Remove(ctx context.Context, key string) error {
 }
 
 func (p *proxySnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	sc, err := p.client.List(ctx, &snapshotsapi.ListSnapshotsRequest{
 		Snapshotter: p.snapshotterName,
 		Filters:     fs,
@@ -186,6 +246,9 @@ func (p *proxySnapshotter) Close() error {
 }
 
 func (p *proxySnapshotter) Cleanup(ctx context.Context) error {
+	ctx, cancel := p.withTimeout(ctx)
+	defer cancel()
+
 	_, err := p.client.Cleanup(ctx, &snapshotsapi.CleanupRequest{
 		Snapshotter: p.snapshotterName,
 	})

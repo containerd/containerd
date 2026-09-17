@@ -22,6 +22,7 @@ import (
 	"os"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
@@ -193,5 +194,27 @@ func TestSetTempDirEnv(t *testing.T) {
 		if got := os.Getenv(k); got != tempDir {
 			t.Errorf("expected %s=%q, got %q", k, tempDir, got)
 		}
+	}
+}
+
+// A bad default_timeout must fail daemon startup rather than be ignored. Only
+// the error path is exercised here: LoadPlugins returns before it reaches the
+// global plugin registry, which panics if a test registers the same id twice.
+func TestLoadPluginsRejectsMalformedProxyDefaultTimeout(t *testing.T) {
+	cfg := &srvconfig.Config{
+		ProxyPlugins: map[string]srvconfig.ProxyPlugin{
+			"customsnapshot": {
+				Type:           "snapshot",
+				Address:        "/run/mysnapshotter.sock",
+				DefaultTimeout: "banana",
+			},
+		},
+	}
+	_, err := LoadPlugins(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("LoadPlugins accepted a malformed default_timeout")
+	}
+	if !strings.Contains(err.Error(), "default_timeout") {
+		t.Fatalf("error does not name the offending key: %v", err)
 	}
 }
