@@ -37,6 +37,9 @@ else
 fi
 # RUNTIME is the runtime handler to use in the test.
 RUNTIME=${RUNTIME:-""}
+# RUNTIME_TYPE is the OCI runtime type for the default handler (e.g. io.containerd.runsc.v1).
+# Passed to --runtime-type so that runtimeHandlerIsRunsc() detects runsc regardless of handler name.
+RUNTIME_TYPE=${RUNTIME_TYPE:-""}
 
 mkdir -p "${REPORT_DIR}"
 test_setup "${REPORT_DIR}"
@@ -55,6 +58,7 @@ CMD+="${PWD}/bin/cri-integration.test${EXE_SUFFIX}"
 ${CMD} --test.run="${FOCUS}" --test.v \
   --cri-endpoint="${CONTAINERD_SOCK}" \
   --runtime-handler="${RUNTIME}" \
+  --runtime-type="${RUNTIME_TYPE}" \
   --containerd-bin="${CONTAINERD_BIN}" \
   --build-dir="${ROOT}/bin" \
   --image-list="${TEST_IMAGE_LIST:-}" "@" && test_exit_code=$? || test_exit_code=$?

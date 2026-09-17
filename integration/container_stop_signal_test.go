@@ -33,6 +33,9 @@ func TestContainerStopSignals(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipped on Windows.")
 	}
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not support host network")
+	}
 
 	testCases := []struct {
 		name           string
@@ -129,6 +132,9 @@ func TestContainerStopSignals(t *testing.T) {
 func TestDefaultContainerStopSignal(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipped on Windows.")
+	}
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not support host network")
 	}
 
 	t.Logf("Create a pod config")

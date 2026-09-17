@@ -68,3 +68,41 @@ func TestRegistryConfigMigration(t *testing.T) {
 	configPath := v.(string)
 	assert.Equal(t, path, configPath)
 }
+
+func TestRuntimePlatformsConfigMigration(t *testing.T) {
+	snapshotter := "devmapper"
+	grpcCri := map[string]any{
+		"containerd": map[string]any{
+			"runtimes": map[string]any{
+				"kata": map[string]any{
+					// Old per-runtime snapshotter key is "snapshotter", not "snapshot".
+					"snapshotter": snapshotter,
+				},
+				// Runtime with no snapshotter should not appear in runtime_platforms.
+				"runc": map[string]any{},
+			},
+		},
+	}
+	pluginConfigs := map[string]any{
+		string(plugins.GRPCPlugin) + ".cri": grpcCri,
+	}
+	configMigration(context.Background(), 2, pluginConfigs)
+
+	v, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".images"]
+	require.True(t, ok)
+	images := v.(map[string]any)
+
+	// The destination key is "runtime_platforms" (plural), matching the TOML
+	// tag on ImageConfig.RuntimePlatforms.
+	v, ok = images["runtime_platforms"]
+	require.True(t, ok, "runtime_platforms key must be present after migration")
+	runtimePlatforms := v.(map[string]any)
+
+	kata, ok := runtimePlatforms["kata"]
+	require.True(t, ok, "kata runtime must be present in runtime_platforms")
+	kataConf := kata.(map[string]any)
+	assert.Equal(t, snapshotter, kataConf["snapshotter"])
+
+	_, ok = runtimePlatforms["runc"]
+	assert.False(t, ok, "runc has no snapshotter and must not appear in runtime_platforms")
+}
