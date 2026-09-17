@@ -39,6 +39,7 @@ var unmountCommand = &cli.Command{
 			Usage: "Remove the snapshot after a successful unmount",
 		},
 	),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		target := cmd.Args().First()
 		if target == "" {

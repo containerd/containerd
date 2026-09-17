@@ -48,6 +48,7 @@ var tagCommand = &cli.Command{
 			Usage: "Skip the strict check for reference names",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		ref := cmd.Args().First()
 		if ref == "" {

@@ -44,4 +44,5 @@ var Command = &cli.Command{
 		resumeCommand,
 		startCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }

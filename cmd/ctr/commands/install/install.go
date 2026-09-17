@@ -46,6 +46,7 @@ var Command = &cli.Command{
 			Usage: "Set an optional install path other than the managed opt directory",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {

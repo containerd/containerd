@@ -56,6 +56,7 @@ var startCommand = &cli.Command{
 			Usage:   "Detach from the task after it has started execution",
 		},
 	}...),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			id     = cmd.Args().Get(0)

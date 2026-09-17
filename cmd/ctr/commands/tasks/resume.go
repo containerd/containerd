@@ -43,4 +43,5 @@ var resumeCommand = &cli.Command{
 		}
 		return task.Resume(ctx)
 	},
+	DisableSliceFlagSeparator: true,
 }

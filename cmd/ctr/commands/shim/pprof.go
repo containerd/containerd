@@ -43,6 +43,7 @@ var pprofCommand = &cli.Command{
 		pprofThreadcreateCommand,
 		pprofTraceCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var pprofGoroutinesCommand = &cli.Command{
@@ -55,6 +56,7 @@ var pprofGoroutinesCommand = &cli.Command{
 			Value: 2,
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.GoroutineProfile(cmd, getPProfClient)
 	},
@@ -70,6 +72,7 @@ var pprofHeapCommand = &cli.Command{
 			Value: 0,
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.HeapProfile(cmd, getPProfClient)
 	},
@@ -91,6 +94,7 @@ var pprofProfileCommand = &cli.Command{
 			Value: 0,
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.CPUProfile(cmd, getPProfClient)
 	},
@@ -112,6 +116,7 @@ var pprofTraceCommand = &cli.Command{
 			Value: 0,
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.TraceProfile(cmd, getPProfClient)
 	},
@@ -127,6 +132,7 @@ var pprofBlockCommand = &cli.Command{
 			Value: 0,
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.BlockProfile(cmd, getPProfClient)
 	},
@@ -142,6 +148,7 @@ var pprofThreadcreateCommand = &cli.Command{
 			Value: 0,
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		return pprof.ThreadcreateProfile(cmd, getPProfClient)
 	},

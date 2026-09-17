@@ -43,6 +43,7 @@ var Command = &cli.Command{
 		listCommand,
 		inspectRuntimeCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var listCommand = &cli.Command{
@@ -61,6 +62,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print detailed information about each plugin",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			quiet    = cmd.Bool("quiet")
@@ -195,4 +197,5 @@ var inspectRuntimeCommand = &cli.Command{
 		_, err = fmt.Fprintln(cmd.Writer, string(j))
 		return err
 	},
+	DisableSliceFlagSeparator: true,
 }

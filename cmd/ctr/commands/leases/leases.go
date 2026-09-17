@@ -39,6 +39,7 @@ var Command = &cli.Command{
 		createCommand,
 		deleteCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var listCommand = &cli.Command{
@@ -55,6 +56,7 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the blob digest",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			filters = cmd.Args().Slice()
@@ -118,6 +120,7 @@ var createCommand = &cli.Command{
 			Value:   24 * time.Hour,
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		labelstr := cmd.Args().Slice()
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
@@ -167,6 +170,7 @@ var deleteCommand = &cli.Command{
 			Usage: "Synchronously remove leases and all unreferenced resources",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		lids := cmd.Args().Slice()
 		if len(lids) == 0 {

@@ -43,6 +43,7 @@ var Command = &cli.Command{
 		removeCommand,
 		infoCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var runCommand = &cli.Command{
@@ -57,6 +58,7 @@ var runCommand = &cli.Command{
 			Value: defaults.DefaultRuntime,
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		if cmd.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cmd)
@@ -110,6 +112,7 @@ var listCommand = &cli.Command{
 			Usage: "The list of filters to apply when querying sandboxes from the store",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
@@ -158,6 +161,7 @@ var removeCommand = &cli.Command{
 			Usage:   "Ignore shutdown errors when removing sandbox",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
@@ -220,4 +224,5 @@ var infoCommand = &cli.Command{
 		commands.PrintAsJSON(info)
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }

@@ -82,6 +82,7 @@ var killCommand = &cli.Command{
 			Usage:   "Send signal to all processes inside the container",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.Args().First()
 		if id == "" {

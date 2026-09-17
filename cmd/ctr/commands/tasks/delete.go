@@ -42,6 +42,7 @@ var deleteCommand = &cli.Command{
 			Usage: "Process ID to kill",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {

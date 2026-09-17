@@ -69,6 +69,7 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 			Usage: "Generate a dm-verity hash tree and .dmverity sidecar for each blob (Linux only)",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		ref := cmd.Args().Get(0)
 		cacheDir := cmd.Args().Get(1)

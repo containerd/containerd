@@ -76,6 +76,7 @@ var Command = &cli.Command{
 			Usage: "shim address (default: computed from shim ID)",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Commands: []*cli.Command{
 		deleteCommand,
 		execCommand,
@@ -99,6 +100,7 @@ var startCommand = &cli.Command{
 		})
 		return err
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var deleteCommand = &cli.Command{
@@ -118,6 +120,7 @@ var deleteCommand = &cli.Command{
 		fmt.Printf("container deleted and returned exit status %d\n", r.ExitStatus)
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var shutdownCommand = &cli.Command{
@@ -136,6 +139,7 @@ var shutdownCommand = &cli.Command{
 			},
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		switch cmd.Int("api-version") {
 		case 2:
@@ -182,6 +186,7 @@ var stateCommand = &cli.Command{
 			},
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.String("task-id")
 		if id == "" {
@@ -241,6 +246,7 @@ var execCommand = &cli.Command{
 			Usage: "Runtime spec",
 		},
 	),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		service, err := getTaskService(cmd)
 		if err != nil {

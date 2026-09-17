@@ -85,4 +85,5 @@ var attachCommand = &cli.Command{
 		}
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }

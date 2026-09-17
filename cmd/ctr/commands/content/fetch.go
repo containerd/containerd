@@ -76,6 +76,7 @@ pull content that will later be used with 'ctr run' or 'ctr images unpack'.`,
 			Usage: "Pull all metadata including manifests and configs",
 		},
 	),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
