@@ -721,3 +721,41 @@ func testEnv(t *testing.T) (context.Context, *bolt.DB) {
 
 	return ctx, db
 }
+
+// TestContainerNilRuntimeOptionsRoundTrip verifies that a container stored
+// without Runtime.Options round-trips back with a genuinely nil interface
+// value, not a typed-nil *types.Any wrapped in a typeurl.Any interface.
+//
+// checkContainersEqual uses compareNil, which treats a typed-nil pointer
+// wrapped in an interface as equal to a true nil interface and therefore would
+// not catch this regression. A non-nil interface with a nil underlying pointer
+// causes type-URL lookup failures at runtime.
+func TestContainerNilRuntimeOptionsRoundTrip(t *testing.T) {
+	ctx, db := testEnv(t)
+	store := NewContainerStore(NewDB(db, nil, nil))
+
+	spec := &specs.Spec{}
+	encoded, err := typeurl.MarshalAnyToProto(spec)
+	require.NoError(t, err)
+
+	in := containers.Container{
+		ID:   "nil-runtime-opts",
+		Spec: encoded,
+		Runtime: containers.RuntimeInfo{
+			Name: "testruntime",
+			// Options intentionally left nil.
+		},
+	}
+
+	_, err = store.Create(ctx, in)
+	require.NoError(t, err)
+
+	out, err := store.Get(ctx, "nil-runtime-opts")
+	require.NoError(t, err)
+
+	// Use direct interface comparison — not compareNil — to distinguish a
+	// true nil interface from a typed-nil pointer wrapped in an interface.
+	if out.Runtime.Options != nil {
+		t.Errorf("Runtime.Options: want nil interface, got %T(%v)", out.Runtime.Options, out.Runtime.Options)
+	}
+}

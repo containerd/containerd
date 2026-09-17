@@ -18,12 +18,15 @@ package server
 
 import (
 	"context"
+	"os"
 	"sort"
 
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
+	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/systemd"
 	"github.com/containerd/log"
+	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -72,11 +75,60 @@ func (c *criService) getCgroupDriver(ctx context.Context) runtime.CgroupDriver {
 func getCgroupDriverFromRuntimeHandlerOpts(opts any) (runtime.CgroupDriver, bool) {
 	switch v := opts.(type) {
 	case *runcoptions.Options:
-		systemdCgroup := v.SystemdCgroup
-		if systemdCgroup {
+		if v.SystemdCgroup {
 			return runtime.CgroupDriver_SYSTEMD, true
 		}
 		return runtime.CgroupDriver_CGROUPFS, true
+	case *runtimeoptions.Options:
+		// Generic shims (e.g. io.containerd.runsc.v1) carry their config
+		// either as an inline TOML body or via a path to a config file.
+		// In both cases we look for a top-level SystemdCgroup key.
+		// Only return a driver when the key is explicitly present.
+		var body []byte
+		switch {
+		case v.ConfigPath != "":
+			// Config is in a file; read it to inspect SystemdCgroup.
+			data, err := os.ReadFile(v.ConfigPath)
+			if err != nil {
+				return runtime.CgroupDriver_CGROUPFS, false
+			}
+			body = data
+		case len(v.ConfigBody) > 0:
+			body = v.ConfigBody
+		default:
+			return runtime.CgroupDriver_CGROUPFS, false
+		}
+		var decoded map[string]any
+		if err := toml.Unmarshal(body, &decoded); err != nil {
+			return runtime.CgroupDriver_CGROUPFS, false
+		}
+		if val, ok := decoded["SystemdCgroup"]; ok {
+			if b, ok := val.(bool); ok {
+				if b {
+					return runtime.CgroupDriver_SYSTEMD, true
+				}
+				return runtime.CgroupDriver_CGROUPFS, true
+			}
+		}
+		// The runsc shim stores the cgroup driver under [runsc_config].systemd-cgroup.
+		// containerd-shim-runsc-v1 expects this value as a TOML string ("true"/"false")
+		// because its config struct maps the field to a Go string; accept both forms.
+		if rc, ok := decoded["runsc_config"].(map[string]any); ok {
+			if val, ok := rc["systemd-cgroup"]; ok {
+				switch v := val.(type) {
+				case bool:
+					if v {
+						return runtime.CgroupDriver_SYSTEMD, true
+					}
+					return runtime.CgroupDriver_CGROUPFS, true
+				case string:
+					if v == "true" {
+						return runtime.CgroupDriver_SYSTEMD, true
+					}
+					return runtime.CgroupDriver_CGROUPFS, true
+				}
+			}
+		}
 	}
-	return runtime.CgroupDriver_SYSTEMD, false
+	return runtime.CgroupDriver_CGROUPFS, false
 }
