@@ -74,6 +74,27 @@ func TestGetManifestPath(t *testing.T) {
 	}
 }
 
+func TestRequestWithMountFrom(t *testing.T) {
+	// from comes from the distribution-source annotation, which is propagated
+	// out of registry-supplied manifest content, so it must be escaped before
+	// it lands in the upload query string.
+	mount := "sha256:" + strings.Repeat("a", 64)
+	from := "library/redis&ns=attacker.example.com"
+
+	creq := requestWithMountFrom(&request{path: "/v2/target/blobs/uploads/"}, mount, from)
+
+	_, rawQuery, ok := strings.Cut(creq.path, "?")
+	require.True(t, ok, "expected a query string in %q", creq.path)
+
+	q, err := url.ParseQuery(rawQuery)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{mount}, q["mount"])
+	assert.Equal(t, []string{from}, q["from"])
+	// The '&'/'=' in from must not be interpreted as extra query parameters.
+	assert.NotContains(t, q, "ns")
+}
+
 // TestPusherErrClosedRetry tests if retrying work when error occurred on close.
 func TestPusherErrClosedRetry(t *testing.T) {
 	ctx := context.Background()
