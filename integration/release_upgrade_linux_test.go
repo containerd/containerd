@@ -60,7 +60,7 @@ type setupUpgradeVerifyCase func(*testing.T, int, *remote.RuntimeService, *remot
 
 // TODO: Support Windows
 func TestUpgrade(t *testing.T) {
-	for _, version := range []string{"2.0"} {
+	for _, version := range []string{"2.3", "2.4"} {
 		t.Run(version, func(t *testing.T) {
 			previousReleaseBinDir := t.TempDir()
 			downloadPreviousLatestReleaseBinary(t, version, previousReleaseBinDir)
@@ -73,7 +73,7 @@ func TestUpgrade(t *testing.T) {
 
 			t.Run("kill-shim-before-delete-task",
 				runUpgradeTestCase(previousReleaseBinDir,
-					shouldHandleShimExitStatusAfterUpgrade(previousReleaseBinDir)))
+					shouldHandleShimExitStatusAfterUpgrade(previousReleaseBinDir, version)))
 		})
 	}
 }
@@ -755,12 +755,12 @@ func currentReleaseCtrdDefaultConfig(t *testing.T, targetDir string) {
 // previousReleaseCtrdConfig generates containerd config with previous release
 // shim binary.
 func previousReleaseCtrdConfig(t *testing.T, previousReleaseBinDir, targetDir string) {
-	// TODO(fuweid):
-	//
-	// We should choose correct config version based on previous release.
-	// Currently, we're focusing on v1.x -> v2.0 so we use version = 2 here.
+	// NOTE: Config version 3 is the oldest version understood by every
+	// release in the test matrix (see the configuration version table in
+	// RELEASES.md). Bump it once the matrix no longer includes a release
+	// predating the next version.
 	rawCfg := fmt.Sprintf(`
-version = 2
+version = 3
 
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
   runtime_type = "io.containerd.runc.v2"
