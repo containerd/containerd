@@ -45,6 +45,7 @@ var checkpointCommand = &cli.Command{
 			Usage: "Checkpoint container task",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		id := cmd.Args().First()
 		if id == "" {

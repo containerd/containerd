@@ -76,6 +76,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Usage: "Exports content from all platforms",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var convertOpts []converter.Opt
 		srcRef := cmd.Args().Get(0)

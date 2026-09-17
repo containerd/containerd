@@ -89,6 +89,7 @@ command. As part of this process, we do the following:
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	),
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		ref := cmd.Args().First()
 		if ref == "" {

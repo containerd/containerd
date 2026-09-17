@@ -97,4 +97,5 @@ var usageCommand = &cli.Command{
 		}
 		return tw.Flush()
 	},
+	DisableSliceFlagSeparator: true,
 }

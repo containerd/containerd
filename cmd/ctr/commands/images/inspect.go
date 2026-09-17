@@ -37,6 +37,7 @@ var inspectCommand = &cli.Command{
 			Usage: "Show JSON content",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {

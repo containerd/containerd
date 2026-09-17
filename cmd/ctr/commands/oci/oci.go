@@ -35,6 +35,7 @@ var Command = &cli.Command{
 	Commands: []*cli.Command{
 		defaultSpecCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var defaultSpecCommand = &cli.Command{
@@ -46,6 +47,7 @@ var defaultSpecCommand = &cli.Command{
 			Usage: "Platform of the spec to print (Examples: 'linux/arm64', 'windows/amd64')",
 		},
 	},
+	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		ctx, cancel := commands.AppContext(ctx, cmd)
 		defer cancel()

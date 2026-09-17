@@ -51,6 +51,7 @@ var pruneCommand = &cli.Command{
 	Commands: []*cli.Command{
 		pruneReferencesCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var pruneReferencesCommand = &cli.Command{
@@ -110,6 +111,7 @@ var pruneReferencesCommand = &cli.Command{
 		}
 		return ls.Delete(ctx, l, deleteOpts...)
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 func isLayerLabel(key string) bool {
