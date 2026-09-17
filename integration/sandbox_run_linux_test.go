@@ -23,6 +23,9 @@ import (
 )
 
 func TestPodSandboxController_ShouldBackoffExitEventWhenFail(t *testing.T) {
+	if !failpointShimAvailable() {
+		t.Skip("containerd-shim-runc-fp-v1 is not installed")
+	}
 	t.Logf("Inject Shim failpoint")
 
 	sbConfig := PodSandboxConfig(t.Name(), "failpoint")

@@ -57,12 +57,22 @@ kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/
 > runtime and the `KubeletConfiguration` configuration step above is not
 > needed.
 >
-> When determining the cgroup driver, containerd uses the `SystemdCgroup`
-> setting from runc-based runtime classes, starting from the default runtime
-> class. If no runc-based runtime classes have been configured containerd
-> relies on auto-detection based on determining if systemd is running.
-> Note that all runc-based runtime classes should be configured to have the
-> same `SystemdCgroup` setting in order to avoid unexpected behavior.
+> When determining the cgroup driver, containerd inspects the runtime classes
+> in order, starting from the default runtime class:
+>
+> - For runc-based runtime classes (`io.containerd.runc.v2`), containerd reads
+>   the `SystemdCgroup` field from the runtime's `options` block.
+> - For generic shims that use `runtimeoptions/v1` (e.g. `io.containerd.runsc.v1`
+>   for gVisor), containerd reads the cgroup driver from the shim's config file
+>   (`ConfigPath`) or inline config body (`ConfigBody`). It first looks for a
+>   top-level `SystemdCgroup` key (boolean), then for
+>   `[runsc_config] systemd-cgroup` which the runsc shim stores as a TOML string
+>   (`"true"` or `"false"`).
+> - If no runtime class provides cgroup driver information, containerd falls back
+>   to auto-detection based on whether systemd is running.
+>
+> Note that all runtime classes should be configured with the same cgroup driver
+> setting in order to avoid unexpected behavior.
 >
 > The automatic cgroup driver configuration for kubelet feature is supported in
 > containerd v2.0 and later.
