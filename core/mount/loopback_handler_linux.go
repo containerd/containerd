@@ -18,12 +18,14 @@ package mount
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"golang.org/x/sys/unix"
 )
 
 func LoopbackHandler() Handler {
@@ -50,6 +52,15 @@ func (loopbackHandler) Mount(ctx context.Context, m Mount, mp string, _ []Active
 	}
 	defer loop.Close()
 
+	// A stale symlink from an earlier, no longer live mount may already
+	// be at mp (see Mounted); os.Symlink fails with EEXIST otherwise.
+	// Remove it first, but only if it really is a symlink.
+	if fi, err := os.Lstat(mp); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		if err := os.Remove(mp); err != nil {
+			return ActiveMount{}, err
+		}
+	}
+
 	if err := os.Symlink(loop.Name(), mp); err != nil {
 		return ActiveMount{}, err
 	}
@@ -65,6 +76,44 @@ func (loopbackHandler) Mount(ctx context.Context, m Mount, mp string, _ []Active
 	}, nil
 }
 
+// Mounted reports whether path is still a symlink to a loop device
+// which is attached and not marked for auto clear.
+func (loopbackHandler) Mounted(ctx context.Context, path string) (bool, error) {
+	loopdev, err := os.Readlink(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	loop, err := os.Open(loopdev)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	defer loop.Close()
+
+	info, err := unix.IoctlLoopGetStatus64(int(loop.Fd()))
+	if err != nil {
+		// ENXIO: no backing file is attached to the device, so
+		// whatever this symlink once pointed to is gone.
+		if errors.Is(err, unix.ENXIO) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	if info.Flags&unix.LO_FLAGS_AUTOCLEAR != 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// Unmount tolerates the loop device already being gone, whether the
+// device node is missing or IoctlLoopGetStatus64 reports ENXIO.
 func (loopbackHandler) Unmount(ctx context.Context, path string) error {
 	loopdev, err := os.Readlink(path)
 	if err != nil {
@@ -73,14 +122,17 @@ func (loopbackHandler) Unmount(ctx context.Context, path string) error {
 		}
 		return err
 	}
-	loop, err := os.Open(loopdev)
-	if err != nil {
-		return err
-	}
-	defer loop.Close()
 
-	if err := setLoopAutoclear(loop, true); err != nil {
-		return fmt.Errorf("failed to set auto clear on loop device %q: %w", loopdev, err)
+	loop, err := os.Open(loopdev)
+	switch {
+	case err == nil:
+		defer loop.Close()
+		if err := setLoopAutoclear(loop, true); err != nil && !errors.Is(err, unix.ENXIO) {
+			return fmt.Errorf("failed to set auto clear on loop device %q: %w", loopdev, err)
+		}
+	case os.IsNotExist(err):
+	default:
+		return err
 	}
 
 	if err := os.Remove(path); err != nil {
@@ -91,10 +143,12 @@ func (loopbackHandler) Unmount(ctx context.Context, path string) error {
 		// if removal of the symlink has failed, its possible for the loop device to get cleaned
 		// up and re-used. Leave the loop device around to prevent re-use and let a retry of
 		// Unmount clear it.`
-		if err := setLoopAutoclear(loop, false); err != nil {
-			// Very unlikely but log to track in case there is a problem with
-			// the loop being cleared and re-used.
-			log.G(ctx).WithError(err).Errorf("Failed to unset auto clear flag on symlink removal failure, loopback %q may be cleaned up while still being tracked", loopdev)
+		if loop != nil {
+			if err := setLoopAutoclear(loop, false); err != nil {
+				// Very unlikely but log to track in case there is a problem with
+				// the loop being cleared and re-used.
+				log.G(ctx).WithError(err).Errorf("Failed to unset auto clear flag on symlink removal failure, loopback %q may be cleaned up while still being tracked", loopdev)
+			}
 		}
 
 		return err
