@@ -123,6 +123,14 @@ func (t *mkfs) Transform(ctx context.Context, m mount.Mount, a []mount.ActiveMou
 
 		createArgs = append(createArgs, f.Name())
 
+		// Mark the file as sparse before extending it. On Windows (NTFS/ReFS),
+		// this prevents the filesystem from zero-filling the entire file on
+		// disk when Truncate extends it, which is extremely slow for large files.
+		// On other platforms this is a no-op.
+		if err := setSparseFile(f); err != nil {
+			log.G(ctx).WithError(err).Debug("failed to set sparse file attribute (non-fatal)")
+		}
+
 		err = f.Truncate(size)
 		f.Close()
 		if err != nil {
