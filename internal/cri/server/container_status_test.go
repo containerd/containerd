@@ -28,6 +28,7 @@ import (
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/typeurl/v2"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -381,7 +382,11 @@ func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.S
 	return snapshotstore.Snapshot{}, errors.New("not implemented")
 }
 
-func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
+func (s *fakeImageService) PlatformForImage(string, string) imagespec.Platform {
+	return imagespec.Platform{}
+}
+
+func (s *fakeImageService) LocalResolve(refOrID string, _ imagespec.Platform) (imagestore.Image, error) {
 	return imagestore.Image{}, errors.New("not implemented")
 }
 

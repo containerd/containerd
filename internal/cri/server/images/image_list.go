@@ -33,7 +33,7 @@ func (c *GRPCCRIImageService) ListImages(ctx context.Context, r *runtime.ListIma
 	for _, image := range imagesInStore {
 		// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 		// doesn't exist?
-		images = append(images, toCRIImage(image))
+		images = append(images, toCRIImage(image, ""))
 	}
 
 	return &runtime.ListImagesResponse{Images: images}, nil

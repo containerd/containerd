@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/containerd/typeurl/v2"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -36,8 +37,10 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 // TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functional.
@@ -171,7 +174,29 @@ func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Ima
 	if len(image.References) == 0 {
 		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
 	}
-	return c.client.GetImage(ctx, image.References[0])
+	img, err := c.client.GetImage(ctx, image.References[0])
+	if err != nil {
+		return nil, err
+	}
+
+	if matcher := containerImagePlatform(image.Platform); matcher != nil {
+		return containerd.NewImageWithPlatform(c.client, img.Metadata(), matcher), nil
+	}
+	return img, nil
+}
+
+// containerImagePlatform returns the platform matcher to use for an image the
+// CRI image store resolved, or nil to keep the matcher of the client.
+//
+// The client matches the platform of the node, which on Windows also carries
+// the OS version handling that picks the right image out of an index. That is
+// only replaced when the image was resolved for a different platform, through
+// the runtime_platforms config, which the client cannot match at all.
+func containerImagePlatform(platform imagespec.Platform) platforms.MatchComparer {
+	if util.IsNodePlatform(platform) {
+		return nil
+	}
+	return util.PlatformMatcher(platform)
 }
 
 // getUserFromImage gets uid or user name of the image user.
