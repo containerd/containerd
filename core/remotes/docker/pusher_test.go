@@ -279,6 +279,19 @@ func TestPusherInvalidAuthorizationOnMount(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "Registry returns 403 Forbidden on mount",
+			setup: func(t *testing.T, p *dockerPusher, reg *uploadableMockRegistry, triggered func()) {
+				reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+					if isCrossRepoMount(r) {
+						triggered()
+						w.WriteHeader(http.StatusForbidden)
+						return true
+					}
+					return false
+				}
+			},
+		},
 	}
 
 	for _, tc := range testCases {
