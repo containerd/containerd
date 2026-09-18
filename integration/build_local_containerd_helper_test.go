@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	"io"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -134,6 +135,23 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 		containerd.WithInMemoryServices(lastInitContext),
 	)
 	require.NoError(t, err)
+
+	// Tear down the in-memory containerd before the test completes. This stops
+	// background goroutines before the state dir is removed.
+	t.Cleanup(func() {
+		require.NoError(t, client.Close())
+
+		plugins := initialized.GetAll()
+		for i := len(plugins) - 1; i >= 0; i-- {
+			instance, err := plugins[i].Instance()
+			if err != nil {
+				continue
+			}
+			if closer, ok := instance.(io.Closer); ok {
+				require.NoError(t, closer.Close())
+			}
+		}
+	})
 
 	return client
 }
