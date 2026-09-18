@@ -457,3 +457,123 @@ func (s *tmpSnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...
 func (s *tmpSnapshotter) Close() error {
 	return nil
 }
+
+type remoteSimulator struct {
+	*tmpSnapshotter
+}
+
+func (s *remoteSimulator) create(ctx context.Context, key, parent string, kind snapshots.Kind, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	s.l.Lock()
+	defer s.l.Unlock()
+
+	var base snapshots.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return nil, err
+		}
+	}
+	base.Name = key
+	base.Kind = kind
+
+	target := base.Labels[labelSnapshotRef]
+	if target != "" {
+		for _, name := range s.targets[target] {
+			existing := s.snapshots[name]
+			labelParent := base.Labels[labelSnapshotParent]
+			if labelParent != "" {
+				if existing.Labels[labelSnapshotRef] == target &&
+					existing.Labels[labelSnapshotParent] == labelParent {
+					return nil, fmt.Errorf("found target: %w", errdefs.ErrAlreadyExists)
+				}
+			} else if existing.Parent == parent {
+				return nil, fmt.Errorf("found target: %w", errdefs.ErrAlreadyExists)
+			}
+		}
+	}
+
+	if parent == "" && base.Labels[labelSnapshotParent] != "" {
+		labelParent := base.Labels[labelSnapshotParent]
+		if names, ok := s.targets[labelParent]; ok && len(names) > 0 {
+			parent = names[len(names)-1]
+		}
+	}
+
+	if parent != "" {
+		_, ok := s.snapshots[parent]
+		if !ok {
+			return nil, errdefs.ErrNotFound
+		}
+		base.Parent = parent
+	}
+
+	ts := time.Now().UTC()
+	base.Created = ts
+	base.Updated = ts
+
+	s.snapshots[base.Name] = base
+
+	return []mount.Mount{}, nil
+}
+
+func (s *remoteSimulator) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	return s.create(ctx, key, parent, snapshots.KindActive, opts...)
+}
+
+func (s *remoteSimulator) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	return s.create(ctx, key, parent, snapshots.KindView, opts...)
+}
+
+func TestPrepareWithParentChainIDLabel(t *testing.T) {
+	var backend snapshots.Snapshotter
+	ctx, db := testDB(t, withSnapshotter("remote", func(string) (snapshots.Snapshotter, error) {
+		backend = &remoteSimulator{tmpSnapshotter: &tmpSnapshotter{
+			snapshots: map[string]snapshots.Info{},
+			targets:   map[string][]string{},
+		}}
+		return backend, nil
+	}))
+	snapshotter := "remote"
+	ctx1, _ := snapshotLease(ctx, t, db, snapshotter)
+	sn := db.Snapshotter(snapshotter)
+
+	parentKey := "parent-key"
+	parentOpt := snapshots.WithLabels(map[string]string{labelSnapshotRef: parentKey})
+	_, err := sn.Prepare(ctx1, "parent-tmp", "", parentOpt)
+	if err != nil {
+		t.Fatalf("failed to prepare parent: %v", err)
+	}
+	err = sn.Commit(ctx1, parentKey, "parent-tmp", parentOpt)
+	if err != nil {
+		t.Fatalf("failed to commit parent: %v", err)
+	}
+
+	childKey := "child-key"
+	childOpt := snapshots.WithLabels(map[string]string{
+		labelSnapshotRef:    childKey,
+		labelSnapshotParent: parentKey,
+	})
+
+	_, err = backend.Prepare(ctx1, "child-tmp-1", "", childOpt)
+	if err != nil {
+		t.Fatalf("failed to prepare child in backend: %v", err)
+	}
+	err = backend.Commit(ctx1, "child-key-backend", "child-tmp-1", childOpt)
+	if err != nil {
+		t.Fatalf("failed to commit child in backend: %v", err)
+	}
+
+	_, err = sn.Prepare(ctx1, "child-tmp-2", "", childOpt)
+	if err == nil {
+		t.Fatal("expected AlreadyExists error")
+	} else if !errdefs.IsAlreadyExists(err) {
+		t.Fatalf("expected AlreadyExists, got: %v", err)
+	}
+
+	info, err := sn.Stat(ctx1, childKey)
+	if err != nil {
+		t.Fatalf("failed to stat child: %v", err)
+	}
+	if info.Parent != parentKey {
+		t.Errorf("expected parent %q, got %q", parentKey, info.Parent)
+	}
+}
