@@ -295,6 +295,18 @@ func (c *criService) Run(ready func()) error {
 	// then you have to manually filter namespace foo
 	c.eventMonitor.Subscribe(c.client, []string{`topic=="/tasks/oom"`, `topic~="/images/"`})
 
+	log.L.Infof("Start recovering state")
+	if err := c.recover(ctrdutil.NamespacedContext()); err != nil {
+		return fmt.Errorf("failed to recover state: %w", err)
+	}
+
+	// Register the CRI domain with NRI before starting any background service.
+	// If registration fails, Run returns here rather than leaving the stats
+	// collector, event monitor, CNI syncers, or streaming server running.
+	if err := c.nri.Register(); err != nil {
+		return fmt.Errorf("failed to set up NRI for CRI service: %w", err)
+	}
+
 	// Start the background stats collector for UsageNanoCores calculation
 	log.L.Info("Start stats collector")
 	if c.statsCollector != nil {
@@ -306,11 +318,6 @@ func (c *criService) Run(ready func()) error {
 			c.sandboxService.SandboxController,
 		)
 		c.statsCollector.Start()
-	}
-
-	log.L.Infof("Start recovering state")
-	if err := c.recover(ctrdutil.NamespacedContext()); err != nil {
-		return fmt.Errorf("failed to recover state: %w", err)
 	}
 
 	// Start event handler.
@@ -350,11 +357,6 @@ func (c *criService) Run(ready func()) error {
 			streamServerErrCh <- err
 		}
 	}()
-
-	// register CRI domain with NRI
-	if err := c.nri.Register(); err != nil {
-		return fmt.Errorf("failed to set up NRI for CRI service: %w", err)
-	}
 
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Store(true)
