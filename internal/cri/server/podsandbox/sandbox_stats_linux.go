@@ -51,7 +51,10 @@ func (c *Controller) Metrics(ctx context.Context, sandboxID string) (*types.Metr
 		if err != nil {
 			return nil, fmt.Errorf("failed to load sandbox cgroup %q: %w", cgroupPath, err)
 		}
-		stats, err := cg.StatFiltered(cgroupsv2.StatCPU | cgroupsv2.StatMemory)
+		// StatIO is needed so io.pressure (PSI) reaches the pod-level IO
+		// stats in ListPodSandboxStats. StatCPU and StatMemory already
+		// include their pressure files.
+		stats, err := cg.StatFiltered(cgroupsv2.StatCPU | cgroupsv2.StatMemory | cgroupsv2.StatIO)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read sandbox cgroup %q: %w", cgroupPath, err)
 		}

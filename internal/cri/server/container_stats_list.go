@@ -443,6 +443,8 @@ func (c *criService) linuxContainerMetrics(
 	// IO stats (only has PSI for cgroupv2)
 	cs.Io = c.ioContainerStats(metrics, protobuf.FromTimestamp(stats.Timestamp))
 
+	cs.Swap = c.swapContainerStats(metrics, protobuf.FromTimestamp(stats.Timestamp))
+
 	return containerStats{&cs, pids}, nil
 }
 
@@ -611,4 +613,52 @@ func (c *criService) ioContainerStats(stats cgroupMetrics, timestamp time.Time) 
 		}
 	}
 	return nil
+}
+
+func (c *criService) swapContainerStats(stats cgroupMetrics, timestamp time.Time) *runtime.SwapUsage {
+	switch {
+	case stats.v1 != nil:
+		metrics := stats.v1
+		// cgroupv1 memory.memsw.* accounts memory+swap combined, so the
+		// swap-only values are the memsw values minus the memory values.
+		//
+		// When the memory.memsw.* files are missing (e.g. swap accounting
+		// disabled), stats collected with IgnoreNotExist leave the Swap
+		// entry present but zeroed. A genuinely read memsw limit is never
+		// zero because it must be at least the memory limit, so a zero
+		// limit means swap stats are unavailable rather than zero.
+		if metrics.Memory != nil && metrics.Memory.Swap != nil && metrics.Memory.Swap.Limit > 0 && metrics.Memory.Usage != nil {
+			swapUsage := saturatingSub(metrics.Memory.Swap.Usage, metrics.Memory.Usage.Usage)
+			swap := &runtime.SwapUsage{
+				Timestamp:      timestamp.UnixNano(),
+				SwapUsageBytes: &runtime.UInt64Value{Value: swapUsage},
+			}
+			if !isMemoryUnlimited(metrics.Memory.Swap.Limit) {
+				swapLimit := saturatingSub(metrics.Memory.Swap.Limit, metrics.Memory.Usage.Limit)
+				swap.SwapAvailableBytes = &runtime.UInt64Value{Value: saturatingSub(swapLimit, swapUsage)}
+			}
+			return swap
+		}
+	case stats.v2 != nil:
+		metrics := stats.v2
+		// cgroupv2 memory.swap.* accounts swap only.
+		if metrics.Memory != nil {
+			swap := &runtime.SwapUsage{
+				Timestamp:      timestamp.UnixNano(),
+				SwapUsageBytes: &runtime.UInt64Value{Value: metrics.Memory.SwapUsage},
+			}
+			if !isMemoryUnlimited(metrics.Memory.SwapLimit) {
+				swap.SwapAvailableBytes = &runtime.UInt64Value{Value: saturatingSub(metrics.Memory.SwapLimit, metrics.Memory.SwapUsage)}
+			}
+			return swap
+		}
+	}
+	return nil
+}
+
+func saturatingSub(a, b uint64) uint64 {
+	if a < b {
+		return 0
+	}
+	return a - b
 }
