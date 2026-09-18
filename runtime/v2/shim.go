@@ -251,7 +251,7 @@ func makeConnection(ctx context.Context, params client.BootstrapParams, onClose 
 
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
+			grpc.WithBlock(), //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 		}
 		return grpcDialContext(ctx, params.Address, onClose, gopts...)
 	default:
@@ -287,7 +287,7 @@ func grpcDialContext(
 	conn.Close()
 
 	target := dialer.DialAddress(address)
-	client, err := grpc.DialContext(ctx, target, gopts...)
+	client, err := grpc.DialContext(ctx, target, gopts...) //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GRPC connection: %w", err)
 	}
