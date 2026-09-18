@@ -159,9 +159,25 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	// with the default work dir and forward the bundle path on the cmdline.
 	// Windows cannot delete the current working directory while an executable
 	// is in use with it. On FreeBSD, fork/exec can fail.
+	//
+	// Elsewhere the bundle is usable as the working directory only for as long
+	// as it exists. This is a best-effort cleanup path driven by the shim's
+	// connection close callback, so it races the callers that remove the bundle
+	// themselves, such as the create rollback in TaskManager.Create. Losing that
+	// race failed in the child's chdir(2), before the shim binary was ever
+	// executed, and surfaced as a misleading "fork/exec <shim>: no such file or
+	// directory". The bundle path is forwarded with -bundle either way, so fall
+	// back to the default work dir rather than skipping the delete entirely.
 	var bundlePath string
 	if gruntime.GOOS != "windows" && gruntime.GOOS != "freebsd" {
-		bundlePath = b.bundle.Path
+		if fi, serr := os.Stat(b.bundle.Path); serr == nil && fi.IsDir() {
+			bundlePath = b.bundle.Path
+		} else {
+			log.G(ctx).WithFields(log.Fields{
+				"id":     b.bundle.ID,
+				"bundle": b.bundle.Path,
+			}).Debug("bundle is not usable as a working directory, running shim delete with the default one")
+		}
 	}
 
 	cmd, err := command(ctx,
