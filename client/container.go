@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	ver "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/images"
@@ -289,19 +290,20 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		request.Checkpoint = info.Checkpoint
 	}
 
-	span.SetAttributes(
-		tracing.Attribute("task.container.id", request.ContainerID),
+	attrs := []attribute.KeyValue{
+		tracing.Attribute("container.id", request.ContainerID),
 		tracing.Attribute("task.request.options", request.Options.String()),
-		tracing.Attribute("task.runtime.name", info.runtime),
-	)
+		tracing.Attribute("container.runtime.name", info.runtime),
+	}
+	span.SetAttributes(attrs...)
+	span.SetAttributes(tracing.LegacyAttributes(attrs)...)
 	response, err := c.client.TaskService().Create(ctx, request)
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
 	}
 
-	span.AddEvent("task created",
-		tracing.Attribute("task.process.id", int(response.Pid)),
-	)
+	eventAttrs := []attribute.KeyValue{tracing.Attribute("process.pid", int(response.Pid))}
+	span.AddEvent("task created", append(eventAttrs, tracing.LegacyAttributes(eventAttrs)...)...)
 	t.pid = response.Pid
 	return t, nil
 }
