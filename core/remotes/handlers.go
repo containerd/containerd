@@ -173,6 +173,9 @@ func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 	if err != nil {
 		return err
 	}
+
+	// Keep the reader usable until Copy finishes: a writer may request a
+	// reset after EOF, including while committing the content.
 	defer rc.Close()
 
 	return content.Copy(ctx, cw, rc, desc.Size, desc.Digest)
