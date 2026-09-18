@@ -51,6 +51,9 @@ type Config struct {
 
 	// MountOptions are options used for the overlay mount (not used on bind mounts)
 	MountOptions []string `toml:"mount_options"`
+	// RwPath, if set, is an alternate base directory used for writable snapshot data when
+	// the snapshot is created with the split label.
+	RwPath string `toml:"rw_path"`
 }
 
 func init() {
@@ -69,6 +72,10 @@ func init() {
 			root := ic.Properties[plugins.PropertyRootDir]
 			if config.RootPath != "" {
 				root = config.RootPath
+			}
+			var rwPath string
+			if config.RwPath != "" {
+				rwPath = config.RwPath
 			}
 
 			var oOpts []overlay.Opt
@@ -103,7 +110,7 @@ func init() {
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
-			return overlay.NewSnapshotter(root, oOpts...)
+			return overlay.NewSnapshotter(root, rwPath, oOpts...)
 		},
 	})
 }

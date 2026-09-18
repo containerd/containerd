@@ -189,8 +189,12 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	}
 
 	sandboxLabels := ctrdutil.BuildLabels(config.Labels, imageSpec.Config.Labels, crilabels.ContainerKindSandbox)
-
-	snapshotterOpt := []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))}
+	labels = snapshots.FilterInheritedLabels(config.Annotations)
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels[snapshots.LabelSnapshotSplit] = "true"
+	snapshotterOpt := []snapshots.Opt{snapshots.WithLabels(labels)}
 	extraSOpts, err := sandboxSnapshotterOpts(config)
 	if err != nil {
 		return cin, err
