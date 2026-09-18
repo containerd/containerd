@@ -132,6 +132,9 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 // CNIResult causes the teardown error to be logged as a warning instead of
 // returned as a hard error.
 func TestSandboxStopWithNilCNIResult(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runc-fp failpoint shim is not available under runsc")
+	}
 	t.Log("Init PodSandboxConfig with specific label")
 	sbName := t.Name()
 	labels := map[string]string{

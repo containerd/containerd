@@ -40,8 +40,22 @@ BDIR="$(mktemp -d -p $PWD)"
 # that does the right thing.
 traverse_path "$BDIR"
 
+containerd_pid=
+
 function cleanup() {
-    pkill containerd || true
+    if [[ -n "${containerd_pid}" ]]; then
+        kill "${containerd_pid}" 2>/dev/null || true
+        # Bounded wait: a background sleep fires SIGKILL after 10 s if containerd
+        # has not yet exited.  'wait' returns immediately when containerd is
+        # already a zombie (unlike kill -0), so normal exits do not incur delay.
+        { sleep 10; kill -KILL "${containerd_pid}" 2>/dev/null || true; } &
+        _timeout_pid=$!
+        wait "${containerd_pid}" 2>/dev/null || true
+        kill "${_timeout_pid}" 2>/dev/null || true
+        wait "${_timeout_pid}" 2>/dev/null || true
+    fi
+    # Reap any shims or other processes still referencing the test state dir.
+    pkill -KILL -f "${BDIR}" 2>/dev/null || true
     echo ::group::containerd logs
     cat "$report_dir/containerd.log"
     echo ::endgroup::
@@ -124,11 +138,20 @@ ls /etc/cni/net.d
     --root ${BDIR}/root \
     --state ${BDIR}/state \
     --log-level debug &> "$report_dir/containerd.log" &
+containerd_pid=$!
 
 # Make sure containerd is ready before calling critest.
-for i in $(seq 1 10)
-do
-    crictl --runtime-endpoint ${BDIR}/c.sock info && break || sleep 1
+for i in $(seq 1 10); do
+    if ! kill -0 "${containerd_pid}" 2>/dev/null; then
+        echo "containerd exited unexpectedly" >&2
+        exit 1
+    fi
+    crictl --runtime-endpoint ${BDIR}/c.sock info 2>/dev/null && break
+    if [[ "${i}" -eq 10 ]]; then
+        echo "containerd did not become ready after 10 seconds" >&2
+        exit 1
+    fi
+    sleep 1
 done
 
 critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8 "${GINKGO_SKIP_TEST[@]}" "${GINKGO_FOCUS_TEST[@]}" ${EXTRA_CRITEST_OPTIONS:-}

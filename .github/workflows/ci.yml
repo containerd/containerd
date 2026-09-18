@@ -681,6 +681,76 @@ jobs:
           LIMA_WORKDIR: /
         run: lima sudo dmesg -T -f kern
 
+
+  integration-runsc:
+    name: runsc (gVisor) integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [project, linters, protos, man]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cgroup_driver: [systemd]
+
+    env:
+      CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+      TEST_RUNTIME: io.containerd.runsc.v1
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-go
+
+      - name: Install containerd dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gperf dmsetup strace xfsprogs
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
+
+      - name: Install runsc (gVisor)
+        run: script/runsc/install-runsc
+
+      - name: Build containerd
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
+          sudo -E PATH=$PATH make install
+
+      - name: CRI integration (runsc)
+        run: |
+          # Generate the runsc containerd config and pass it to cri-integration
+          # so utils.sh skips its own config generation.
+          cfg=$(mktemp /tmp/containerd-config-runsc-XXXXXX.toml)
+          trap 'rm -f "$cfg"' EXIT
+          script/runsc/write-runsc-shim-config.sh "$CGROUP_DRIVER" systrap
+          script/runsc/write-containerd-runsc-config.sh "$cfg" "$CGROUP_DRIVER"
+          CONTAINERD_CONFIG_FILE="$cfg" RUNTIME=runsc RUNTIME_TYPE=io.containerd.runsc.v1 make cri-integration
+
+      - name: critest (runsc)
+        run: |
+          mkdir -p "${{github.workspace}}/report"
+          script/runsc/write-runsc-shim-config.sh "$CGROUP_DRIVER" systrap
+          sudo -E CGROUP_DRIVER="$CGROUP_DRIVER" PATH=$PATH \
+            script/runsc/critest-runsc.sh "${{github.workspace}}/report"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: TestResults-runsc-${{ matrix.cgroup_driver }}
+          path: |
+            *-junit.xml
+            *-gotest.json
+            ${{github.workspace}}/report/*.xml
+            ${{github.workspace}}/report/*.log
+
+
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
 
