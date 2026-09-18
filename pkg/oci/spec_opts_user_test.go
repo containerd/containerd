@@ -281,7 +281,7 @@ sys:x:3:root,bin,adm
 		},
 		{
 			user:     "bin",
-			expected: []uint32{0, 2, 3},
+			expected: []uint32{0, 1, 2, 3},
 		},
 		{
 			user:     "bin:root",
@@ -289,7 +289,7 @@ sys:x:3:root,bin,adm
 		},
 		{
 			user:     "daemon",
-			expected: []uint32{0, 1},
+			expected: []uint32{0, 1, 2},
 		},
 	}
 	for _, testCase := range testCases {
@@ -306,6 +306,52 @@ sys:x:3:root,bin,adm
 			assert.Equal(t, testCase.expected, s.Process.User.AdditionalGids)
 		})
 	}
+}
+
+// TestWithAdditionalGIDsSameNameSupplementalGroup is a regression test for
+// https://github.com/containerd/containerd/issues/11937. When the user's
+// primary group is *not* the group that happens to share the user's name,
+// and the user is listed as a member of that same-name group, the same-name
+// group's GID must end up in the additional GIDs.
+//
+//nolint:gosec
+func TestWithAdditionalGIDsSameNameSupplementalGroup(t *testing.T) {
+	t.Parallel()
+	// Mirrors the mongodb image setup: primary GID points at nogroup,
+	// and "mongodb" is a separate group whose member list contains the user.
+	passwd := `mongodb:x:101:65534::/home/mongodb:/usr/sbin/nologin
+`
+	group := `nogroup:x:65534:
+mongodb:x:101:mongodb
+`
+	td := t.TempDir()
+	apply := fstest.Apply(
+		fstest.CreateDir("/etc", 0777),
+		fstest.CreateFile("/etc/passwd", []byte(passwd), 0777),
+		fstest.CreateFile("/etc/group", []byte(group), 0777),
+	)
+	if err := apply.Apply(td); err != nil {
+		t.Fatalf("failed to apply: %v", err)
+	}
+
+	c := containers.Container{ID: t.Name()}
+	s := Spec{
+		Version: specs.Version,
+		Root: &specs.Root{
+			Path: td,
+		},
+		Process: &specs.Process{
+			User: specs.User{
+				UID: 101,
+				GID: 65534,
+			},
+		},
+	}
+	err := WithAdditionalGIDs("mongodb")(context.Background(), nil, &c, &s)
+	assert.NoError(t, err)
+	// Primary GID (65534) is prepended by ensureAdditionalGids; the same-name
+	// "mongodb" group (GID 101) must be present as a supplemental.
+	assert.Equal(t, []uint32{65534, 101}, s.Process.User.AdditionalGids)
 }
 
 func TestWithAppendAdditionalGroups(t *testing.T) {
