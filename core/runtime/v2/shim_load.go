@@ -158,7 +158,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		runtime = container.Runtime.Name
 	}
 
-	runtime, err := m.resolveRuntimePath(runtime)
+	runtime, err := m.resolveRuntimeWithFallback(ctx, runtime, id)
 	if err != nil {
 		bundle.Delete()
 
@@ -223,6 +223,42 @@ func shouldCleanupShim(sgetErr, pidErr error, pInfo []runtimeapi.ProcessInfo) bo
 	return errors.Is(sgetErr, errdefs.ErrNotFound) &&
 		(errors.Is(pidErr, errdefs.ErrNotFound) ||
 			(pidErr == nil && len(pInfo) == 0))
+}
+
+// resolveRuntimeWithFallback resolves the shim binary path for runtime. If
+// runtime is a pinned absolute path that no longer resolves (e.g. an update
+// moved or replaced the binary that the path was resolved to at task start), it
+// falls back to re-resolving from the runtime name recorded in metadata for id,
+// which stays valid across such moves. If the fallback also fails, the original
+// resolution error is returned.
+func (m *ShimManager) resolveRuntimeWithFallback(ctx context.Context, runtime, id string) (string, error) {
+	resolved, err := m.resolveRuntimePath(runtime)
+	if err == nil {
+		return resolved, nil
+	}
+	if name := m.runtimeName(ctx, id); name != "" && name != runtime {
+		if r, rerr := m.resolveRuntimePath(name); rerr == nil {
+			log.G(ctx).WithField("id", id).WithField("runtime", name).
+				Info("pinned shim binary path is stale; re-resolved from runtime name")
+			return r, nil
+		}
+	}
+	return "", err
+}
+
+// runtimeName returns the runtime name recorded for id in metadata, trying the
+// container store first and the sandbox store second (a shim bundle is one or
+// the other). It returns "" if neither has a record.
+func (m *ShimManager) runtimeName(ctx context.Context, id string) string {
+	if c, err := m.containers.Get(ctx, id); err == nil {
+		return c.Runtime.Name
+	} else if !errdefs.IsNotFound(err) {
+		log.G(ctx).WithError(err).Errorf("loading container %s for runtime name", id)
+	}
+	if sb, err := m.sandboxStore.Get(ctx, id); err == nil {
+		return sb.Runtime.Name
+	}
+	return ""
 }
 
 func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask, retErr error) {
