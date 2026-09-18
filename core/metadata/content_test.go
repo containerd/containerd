@@ -25,8 +25,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
+	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -34,8 +36,117 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 )
+
+type recordedEvent struct {
+	namespace string
+	topic     string
+	event     events.Event
+}
+
+type recordingPublisher struct {
+	recorded []recordedEvent
+	err      error
+}
+
+func (p *recordingPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
+	namespace, _ := namespaces.Namespace(ctx)
+	p.recorded = append(p.recorded, recordedEvent{
+		namespace: namespace,
+		topic:     topic,
+		event:     event,
+	})
+	return p.err
+}
+
+func newContentEventTestDB(t *testing.T) (context.Context, *DB, *recordingPublisher) {
+	dir := t.TempDir()
+	cs, err := local.NewStore(filepath.Join(dir, "content"))
+	require.NoError(t, err)
+
+	bdb, err := bolt.Open(filepath.Join(dir, "metadata.db"), 0644, nil)
+	require.NoError(t, err)
+
+	publisher := &recordingPublisher{}
+	db := NewDB(bdb, cs, nil, WithEventsPublisher(publisher))
+	ctx := namespaces.WithNamespace(t.Context(), "testing")
+	require.NoError(t, db.Init(ctx))
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	return ctx, db, publisher
+}
+
+func assertContentDeleteEvent(t *testing.T, recorded recordedEvent, namespace string, dgst digest.Digest) {
+	t.Helper()
+	assert.Equal(t, namespace, recorded.namespace)
+	assert.Equal(t, "/content/delete", recorded.topic)
+
+	deleted, ok := recorded.event.(*eventstypes.ContentDelete)
+	require.True(t, ok)
+	assert.Equal(t, dgst.String(), deleted.Digest)
+}
+
+func TestContentDeleteEventPublishedOnExplicitDelete(t *testing.T) {
+	ctx, db, publisher := newContentEventTestDB(t)
+
+	blob := []byte("content that is collected")
+	dgst := digest.FromBytes(blob)
+	require.NoError(t, content.WriteBlob(ctx, db.ContentStore(), "test", bytes.NewReader(blob), ocispec.Descriptor{
+		Size:   int64(len(blob)),
+		Digest: dgst,
+	}))
+	publisher.recorded = nil
+	require.NoError(t, db.ContentStore().Delete(ctx, dgst))
+	require.Len(t, publisher.recorded, 1)
+	assertContentDeleteEvent(t, publisher.recorded[0], "testing", dgst)
+}
+
+func TestContentDeleteEventPublishedAfterMetadataGarbageCollection(t *testing.T) {
+	ctx, db, publisher := newContentEventTestDB(t)
+
+	blob := []byte("content that metadata GC collects")
+	dgst := digest.FromBytes(blob)
+	require.NoError(t, content.WriteBlob(ctx, db.ContentStore(), "test", bytes.NewReader(blob), ocispec.Descriptor{
+		Size:   int64(len(blob)),
+		Digest: dgst,
+	}))
+	publisher.recorded = nil
+
+	// The GC scheduler does not provide a namespace. The event must use the
+	// namespace of the metadata node that was removed.
+	_, err := db.GarbageCollect(context.Background())
+	require.NoError(t, err)
+	require.Len(t, publisher.recorded, 1)
+	assertContentDeleteEvent(t, publisher.recorded[0], "testing", dgst)
+
+	_, err = db.ContentStore().Info(ctx, dgst)
+	require.Error(t, err)
+	assert.True(t, errdefs.IsNotFound(err))
+}
+
+func TestContentDeleteEventPublishFailureDoesNotAbortMetadataGarbageCollection(t *testing.T) {
+	ctx, db, publisher := newContentEventTestDB(t)
+
+	blob := []byte("content collected despite event failure")
+	dgst := digest.FromBytes(blob)
+	require.NoError(t, content.WriteBlob(ctx, db.ContentStore(), "test", bytes.NewReader(blob), ocispec.Descriptor{
+		Size:   int64(len(blob)),
+		Digest: dgst,
+	}))
+	publisher.recorded = nil
+	publisher.err = errors.New("publish failed")
+
+	_, err := db.GarbageCollect(context.Background())
+	require.NoError(t, err)
+	require.Len(t, publisher.recorded, 1)
+	assertContentDeleteEvent(t, publisher.recorded[0], "testing", dgst)
+
+	_, err = db.ContentStore().Info(ctx, dgst)
+	require.Error(t, err)
+	assert.True(t, errdefs.IsNotFound(err))
+}
 
 func createContentStore(ctx context.Context, root string, opts ...DBOpt) (context.Context, content.Store, func() error, error) {
 	// TODO: Use mocked or in-memory store
