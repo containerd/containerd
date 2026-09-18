@@ -439,6 +439,14 @@ func (p *Init) checkpoint(ctx context.Context, r *CheckpointConfig) error {
 	if !r.Exit {
 		actions = append(actions, runc.LeaveRunning)
 	}
+
+	// Check if the process is using io_uring, which CRIU cannot handle
+	if has, err := hasIoUring(p.pid); err != nil {
+		log.G(ctx).WithError(err).Warn("failed to check for io_uring usage")
+	} else if has {
+		return fmt.Errorf("cannot checkpoint container: process is using io_uring which is not supported by CRIU (see issue #12162)")
+	}
+
 	// keep criu work directory if criu work dir is set
 	work := r.WorkDir
 	if work == "" {
