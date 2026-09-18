@@ -96,41 +96,119 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 `
 
 type data struct {
-	Abi           string
-	Name          string
-	Imports       []string
-	InnerImports  []string
-	DaemonProfile string
-	RootlessKit   string
+	abi           string
+	name          string
+	imports       []string
+	innerImports  []string
+	daemonProfile string
+	rootlessKit   string
 }
 
-func cleanProfileName(profile string) string {
-	// Normally profiles are suffixed by " (enforce)". AppArmor profiles cannot
-	// contain spaces so this doesn't restrict daemon profile names.
-	profile, _, _ = strings.Cut(profile, " ")
-	if profile == "" {
-		profile = "unconfined"
+func (d data) Abi() string {
+	return d.abi
+}
+
+func (d data) Name() string {
+	return quote(d.name)
+}
+
+func (d data) Imports() []string {
+	return d.imports
+}
+
+func (d data) InnerImports() []string {
+	return d.innerImports
+}
+
+func (d data) DaemonProfile() string {
+	return quote(d.daemonProfile)
+}
+
+func (d data) RootlessKit() string {
+	return quote(d.rootlessKit)
+}
+
+// quote returns s as an AppArmor quoted identifier. Embedded backslashes
+// and double quotes are escaped; empty strings are returned unchanged.
+//
+// AppArmor quoted identifiers may contain any character other than NUL.
+// See ALLOWED_QUOTED_ID and QUOTED_ID in parser/parser_lex.l:
+// https://gitlab.com/apparmor/apparmor/-/blob/v5.0.2/parser/parser_lex.l?ref_type=tags#L286-287
+func quote(s string) string {
+	if s == "" {
+		return ""
 	}
-	return profile
+
+	// Callers are expected to pass valid profile names, which excludes NUL.
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
+}
+
+// cleanProfileName returns the AppArmor profile name from a confinement
+// context as reported by /proc/self/attr/current.
+//
+// The value may be either a bare profile name, "unconfined", or a profile name
+// with a trailing mode suffix of the form " (<mode>)". If profile is empty,
+// cleanProfileName returns "unconfined".
+func cleanProfileName(profile string) string {
+	label, _ := splitCon(profile)
+	if label == "" {
+		return "unconfined"
+	}
+	return label
+}
+
+// splitCon splits an AppArmor confinement context into a label and mode,
+// similar to libapparmor [splitcon]. splitCon follows libapparmor's parsing
+// semantics and does not validate the returned mode.
+//
+// /proc/self/attr/current returns the current confinement context for the
+// process. Unlike /sys/kernel/security/apparmor/profiles, this value may not
+// include a " (<mode>)" suffix.
+//
+// Supported forms:
+//
+//	<profile>
+//	<profile> (<mode>)
+//	unconfined
+//
+// splitCon strips one trailing newline before parsing.
+//
+// [splitcon]: https://gitlab.com/apparmor/apparmor/-/blob/v5.0.1/libraries/libapparmor/src/kernel.c#L562-615
+func splitCon(con string) (label, mode string) {
+	// Value includes a trailing newline.
+	con = strings.TrimSuffix(con, "\n")
+	if con == "" || con == "unconfined" {
+		return con, ""
+	}
+
+	if strings.HasSuffix(con, ")") {
+		// Profile names may contain spaces, so split on the last " (" before
+		// the trailing ")" rather than the first space.
+		if i := strings.LastIndex(con[:len(con)-1], " ("); i >= 0 {
+			return con[:i], con[i+2 : len(con)-1]
+		}
+	}
+
+	return con, ""
 }
 
 func loadData(name string) (*data, error) {
 	p := data{
-		Name: name,
+		name: name,
 	}
 
 	const abi = "abi/3.0"
 	if macroExists(abi) {
-		p.Abi = abi
+		p.abi = abi
 	}
 
 	if macroExists("tunables/global") {
-		p.Imports = append(p.Imports, "#include <tunables/global>")
+		p.imports = append(p.imports, "#include <tunables/global>")
 	} else {
-		p.Imports = append(p.Imports, "@{PROC}=/proc/")
+		p.imports = append(p.imports, "@{PROC}=/proc/")
 	}
 	if macroExists("abstractions/base") {
-		p.InnerImports = append(p.InnerImports, "#include <abstractions/base>")
+		p.innerImports = append(p.innerImports, "#include <abstractions/base>")
 	}
 
 	// Figure out the daemon profile.
@@ -140,17 +218,17 @@ func loadData(name string) (*data, error) {
 		// unconfined which is generally the default.
 		currentProfile = nil
 	}
-	p.DaemonProfile = cleanProfileName(string(currentProfile))
+	p.daemonProfile = cleanProfileName(string(currentProfile))
 
 	// If we were running in Rootless mode, we could read `/proc/$(cat ${ROOTLESSKIT_STATE_DIR}/child_pid)/exe`,
 	// but `nerdctl apparmor load` has to be executed as the root.
 	// So, do not check ${ROOTLESSKIT_STATE_DIR} (nor EUID) here.
-	p.RootlessKit, err = exec.LookPath("rootlesskit")
+	p.rootlessKit, err = exec.LookPath("rootlesskit")
 	if err != nil {
 		log.L.WithError(err).Debug("apparmor: failed to determine the RootlessKit binary path")
-		p.RootlessKit = ""
+		p.rootlessKit = ""
 	}
-	log.L.Debugf("apparmor: RootlessKit=%q", p.RootlessKit)
+	log.L.Debugf("apparmor: RootlessKit=%q", p.rootlessKit)
 
 	return &p, nil
 }
@@ -187,19 +265,20 @@ func isLoaded(name string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer f.Close()
-	r := bufio.NewReader(f)
-	for {
-		p, err := r.ReadString('\n')
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return false, err
-		}
-		if strings.HasPrefix(p, name+" ") {
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		// Entries are of the form "<profile> (<mode>)", e.g. "foo (enforce)".
+		// Profile names may contain spaces (quoted names are supported in AppArmor);
+		// use splitCon to correctly handle profile names containing spaces and/or parentheses.
+		label, _ := splitCon(scanner.Text())
+		if label == name {
 			return true, nil
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return false, err
 	}
 	return false, nil
 }
