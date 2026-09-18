@@ -114,7 +114,7 @@ func WithUnpackPlatform(u Platform) UnpackerOpt {
 			u.Platform = platforms.All
 		}
 		if u.Snapshotter == nil {
-			return fmt.Errorf("snapshotter must be provided to unpack")
+			return errors.New("snapshotter must be provided to unpack")
 		}
 		if u.SnapshotterKey == "" {
 			if s, ok := u.Snapshotter.(fmt.Stringer); ok {
@@ -124,7 +124,7 @@ func WithUnpackPlatform(u Platform) UnpackerOpt {
 			}
 		}
 		if u.Applier == nil {
-			return fmt.Errorf("applier must be provided to unpack")
+			return errors.New("applier must be provided to unpack")
 		}
 
 		c.platforms = append(c.platforms, &u)
@@ -659,7 +659,7 @@ func (u *Unpacker) unpack(
 			err = s.err
 		} else if prevErrs != nil {
 			s.bottomF(true)
-			err = fmt.Errorf("aborted")
+			err = errors.New("aborted")
 		} else {
 			err = s.bottomF(false)
 		}
@@ -745,10 +745,10 @@ func (u *Unpacker) unpack(
 	cinfo := content.Info{
 		Digest: config.Digest,
 		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", unpack.SnapshotterKey): chainID,
+			"containerd.io/gc.ref.snapshot." + unpack.SnapshotterKey: chainID,
 		},
 	}
-	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", unpack.SnapshotterKey))
+	_, err = cs.Update(ctx, cinfo, "labels.containerd.io/gc.ref.snapshot."+unpack.SnapshotterKey)
 	if err != nil {
 		return err
 	}

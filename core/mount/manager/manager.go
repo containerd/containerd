@@ -740,7 +740,7 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 	// Run in background, GC would handle leftovers?
 	// Make configurable?
 	// TODO: In go 1.25, use mm.targets.RemoveAll()
-	if err := os.RemoveAll(filepath.Join(mm.targets.Name(), fmt.Sprintf("%d", mid))); err != nil {
+	if err := os.RemoveAll(filepath.Join(mm.targets.Name(), strconv.FormatUint(mid, 10))); err != nil {
 		// TODO: Only log here, cleanup would have to occur later
 		log.G(ctx).WithError(err).WithField("mountid", mid).Error("failed to cleanup mount target")
 	}

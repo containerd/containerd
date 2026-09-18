@@ -75,7 +75,7 @@ func setupDumpStacks(_ chan<- os.Signal) {
 // inherited-descriptor fallback, so an empty path is an error.
 func serveListener(path string, _ uintptr) (net.Listener, error) {
 	if path == "" {
-		return nil, fmt.Errorf("named pipe path is required on Windows")
+		return nil, errors.New("named pipe path is required on Windows")
 	}
 
 	// Require the canonical Windows named pipe prefix: \\.\pipe\<name>.

@@ -20,6 +20,7 @@ package overlay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -507,7 +508,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				}
 				stat, ok := st.Sys().(*syscall.Stat_t)
 				if !ok {
-					return fmt.Errorf("incompatible types after stat call: *syscall.Stat_t expected")
+					return errors.New("incompatible types after stat call: *syscall.Stat_t expected")
 				}
 				mappedUID = int(stat.Uid)
 				mappedGID = int(stat.Gid)
@@ -557,10 +558,10 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 
 	if o.remapIDs {
 		if v, ok := info.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
-			options = append(options, fmt.Sprintf("uidmap=%s", v))
+			options = append(options, "uidmap="+v)
 		}
 		if v, ok := info.Labels[snapshots.LabelSnapshotGIDMapping]; ok {
-			options = append(options, fmt.Sprintf("gidmap=%s", v))
+			options = append(options, "gidmap="+v)
 		}
 	}
 
@@ -585,8 +586,8 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 
 	if s.Kind == snapshots.KindActive {
 		options = append(options,
-			fmt.Sprintf("workdir=%s", o.workPath(s.ID)),
-			fmt.Sprintf("upperdir=%s", o.upperPath(s.ID)),
+			"workdir="+o.workPath(s.ID),
+			"upperdir="+o.upperPath(s.ID),
 		)
 	} else if len(s.ParentIDs) == 1 {
 		return []mount.Mount{
@@ -605,7 +606,7 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 	for i := range s.ParentIDs {
 		parentPaths[i] = o.upperPath(s.ParentIDs[i])
 	}
-	options = append(options, fmt.Sprintf("lowerdir=%s", strings.Join(parentPaths, ":")))
+	options = append(options, "lowerdir="+strings.Join(parentPaths, ":"))
 	options = append(options, o.options...)
 
 	return []mount.Mount{

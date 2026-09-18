@@ -135,7 +135,7 @@ func newPidFile(bundle string) *pidFile {
 
 func newExecPidFile(bundle, id string) *pidFile {
 	return &pidFile{
-		path: filepath.Join(bundle, fmt.Sprintf("%s.pid", id)),
+		path: filepath.Join(bundle, id+".pid"),
 	}
 }
 
