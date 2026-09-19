@@ -26,13 +26,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -45,6 +49,59 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Fetch can also copy local content to a pusher-backed ingester, as BuildKit's
+// registry cache exporter does. The source must remain seekable after EOF so
+// content.Copy can replay it when the push writer returns content.ErrReset.
+func TestFetchPushRetryAfterEOF(t *testing.T) {
+	for _, size := range []int{128, 2 << 20} {
+		t.Run(strconv.Itoa(size), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			payload := bytes.Repeat([]byte("x"), size)
+			desc := ocispec.Descriptor{
+				MediaType: ocispec.MediaTypeImageLayer,
+				Digest:    digest.FromBytes(payload),
+				Size:      int64(len(payload)),
+			}
+			path := filepath.Join(t.TempDir(), "layer")
+			require.NoError(t, os.WriteFile(path, payload, 0600))
+			var attempts atomic.Int32
+			registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodPost:
+					w.Header().Set("Location", "/v2/cache/blobs/uploads/test")
+					w.WriteHeader(http.StatusAccepted)
+				case http.MethodPut:
+					body, err := io.ReadAll(r.Body)
+					if !assert.NoError(t, err) || !assert.Equal(t, payload, body) {
+						w.WriteHeader(http.StatusBadRequest)
+						return
+					}
+					if attempts.Add(1) == 1 {
+						w.WriteHeader(http.StatusRequestTimeout)
+						return
+					}
+					w.Header().Set("Docker-Content-Digest", desc.Digest.String())
+					w.WriteHeader(http.StatusCreated)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer registry.Close()
+			resolver := NewResolver(ResolverOptions{PlainHTTP: true})
+			pusher, err := resolver.Pusher(ctx, strings.TrimPrefix(registry.URL, "http://")+"/cache:latest")
+			require.NoError(t, err)
+			ingester, ok := pusher.(content.Ingester)
+			require.True(t, ok)
+			fetcher := remotes.FetcherFunc(func(context.Context, ocispec.Descriptor) (io.ReadCloser, error) {
+				return os.Open(path)
+			})
+			require.NoError(t, remotes.Fetch(ctx, ingester, fetcher, desc))
+			require.EqualValues(t, 2, attempts.Load())
+		})
+	}
+}
 
 func TestGetManifestPath(t *testing.T) {
 	for _, tc := range []struct {
