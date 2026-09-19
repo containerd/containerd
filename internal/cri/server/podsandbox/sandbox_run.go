@@ -272,7 +272,19 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	}()
 
 	// wait is a long running background request, no timeout needed.
-	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
+	// It lives until the sandbox exits and is reclaimed through CancelWait
+	// when the sandbox is removed from the store, so it must be cancellable
+	// and must not be bound to the Start context.
+	waitCtx, waitCancel := context.WithCancel(ctrdutil.NamespacedContext())
+	// Until the exit monitor takes ownership of waitCancel below, cancel it
+	// on any early error return so the wait request is not leaked.
+	waitHandedOver := false
+	defer func() {
+		if !waitHandedOver {
+			waitCancel()
+		}
+	}()
+	exitCh, err := task.Wait(waitCtx)
 	if err != nil {
 		return cin, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 	}
@@ -328,12 +340,23 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to marshal spec for sandbox container %s: %w", id, err)
 	}
 
-	exitCtx := ctrdutil.WithNamespace(context.WithoutCancel(ctx))
+	exitCtx, exitCancel := context.WithCancel(waitCtx)
+	stopCh := make(chan struct{})
 	go func() {
-		if err := c.waitSandboxExit(exitCtx, podSandbox, exitCh); err != nil {
+		defer close(stopCh)
+		if err := c.waitSandboxExit(exitCtx, podSandbox, exitCh); err != nil && err != context.Canceled {
 			log.G(exitCtx).Warnf("failed to wait pod sandbox exit %v", err)
 		}
 	}()
+	podSandbox.RegisterCancelWait(func() {
+		exitCancel()
+		// This ensures that the exit monitor is stopped before the task
+		// wait is cancelled, so no exit event is generated because of
+		// the wait cancellation.
+		<-stopCh
+		waitCancel()
+	})
+	waitHandedOver = true
 
 	return
 }

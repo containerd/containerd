@@ -61,13 +61,15 @@ func (c *Controller) Shutdown(ctx context.Context, sandboxID string) error {
 		}
 	}
 
-	c.store.Remove(sandboxID)
-
 	// Reclaim the goroutines waiting for the sandbox exit. The sandbox can
 	// no longer deliver an exit event, so a task wait request that the shim
 	// never answers must not park them for the remaining lifetime of the
-	// daemon.
-	sandbox.CancelWait()
+	// daemon. Cancel the instance actually removed from the store: Get and
+	// Remove are separate operations, so a concurrent recovery/replacement
+	// could otherwise leave the removed sandbox's waiter running.
+	if removed := c.store.Remove(sandboxID); removed != nil {
+		removed.CancelWait()
+	}
 
 	return nil
 }
