@@ -79,7 +79,12 @@ func FSMounts(m []mount.Mount) (View, error) {
 	if len(m) == 0 {
 		return nil, nil
 	}
-	return resolveMount(m[len(m)-1], m[:len(m)-1])
+
+	root := m[len(m)-1]
+	if root.Target != "" && root.Target != "/" {
+		return nil, fmt.Errorf("last mount target %q is not root: %w", root.Target, errdefs.ErrNotImplemented)
+	}
+	return resolveMount(root, m[:len(m)-1])
 }
 
 // resolveMount tries registered handlers first, then built-in handlers.
