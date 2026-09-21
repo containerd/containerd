@@ -284,14 +284,12 @@ func (c *controllerLocal) Wait(ctx context.Context, sandboxID string) (sandbox.E
 	}, nil
 }
 
+// Status reports the status of a sandbox from its shim. A sandbox whose shim
+// is gone, because it exited or was never started, is reported as
+// ErrNotFound. Callers can then tell a stopped sandbox from one this
+// controller does not have an instance for.
 func (c *controllerLocal) Status(ctx context.Context, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {
 	svc, err := c.getSandbox(ctx, sandboxID)
-	if errdefs.IsNotFound(err) {
-		return sandbox.ControllerStatus{
-			SandboxID: sandboxID,
-			ExitedAt:  time.Now(),
-		}, nil
-	}
 	if err != nil {
 		return sandbox.ControllerStatus{}, err
 	}
