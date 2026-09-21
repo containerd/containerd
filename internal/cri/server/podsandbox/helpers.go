@@ -23,7 +23,6 @@ import (
 
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -39,26 +38,12 @@ const (
 	// directory of the sandbox, all files created for the sandbox will be
 	// placed under this directory.
 	sandboxesDir = "sandboxes"
-	// MetadataKey is the key used for storing metadata in the sandbox extensions
-	MetadataKey = "metadata"
-	// UpdatedResourcesKey is the key for the sandbox extension storing updated resources.
-	UpdatedResourcesKey = "updated-resources"
 )
 
 const (
 	// unknownExitCode is the exit code when exit reason is unknown.
 	unknownExitCode = 255
 )
-
-// UpdatedResources holds the updated Linux resource constraints for a PodSandbox.
-type UpdatedResources struct {
-	Overhead  *runtime.LinuxContainerResources
-	Resources *runtime.LinuxContainerResources
-}
-
-func init() {
-	typeurl.Register(&UpdatedResources{}, "io.containerd.cri.v1", "UpdatedResources")
-}
 
 // getSandboxRootDir returns the root directory for managing sandbox files,
 // e.g. hosts files.

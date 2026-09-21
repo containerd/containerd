@@ -22,7 +22,6 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox"
 	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
@@ -149,10 +148,10 @@ func TestUpdatePodSandboxResources(t *testing.T) {
 
 		// Assert core store was updated with correct extensions.
 		require.NotNil(t, fakeStore.updatedSandbox)
-		ext, ok := fakeStore.updatedSandbox.Extensions[podsandbox.UpdatedResourcesKey]
+		ext, ok := fakeStore.updatedSandbox.Extensions[sstore.UpdatedResourcesKey]
 		require.True(t, ok, "expected UpdatedResourcesKey in extensions")
 
-		var updatedRes podsandbox.UpdatedResources
+		var updatedRes sstore.UpdatedResources
 		err = typeurl.UnmarshalTo(ext, &updatedRes)
 		require.NoError(t, err)
 
