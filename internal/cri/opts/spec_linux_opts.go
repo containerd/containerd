@@ -202,8 +202,8 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 			}
 
 			if mount.GetSelinuxRelabel() {
-				ENOTSUP := syscall.Errno(0x5f) // Linux specific error code, this branch will not execute on non Linux platforms.
-				if err := label.Relabel(src, mountLabel, false); err != nil && err != ENOTSUP {
+				if err := label.Relabel(src, mountLabel, false); err != nil &&
+					!errors.Is(err, syscall.ENOTSUP) {
 					return fmt.Errorf("relabel %q with %q failed: %w", src, mountLabel, err)
 				}
 			}
