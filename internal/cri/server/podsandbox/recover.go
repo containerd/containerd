@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	goruntime "runtime"
+	"sync"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -27,8 +28,8 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	sandbox2 "github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/internal/cri/config"
+	"github.com/containerd/containerd/v2/core/sandbox"
+	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
@@ -48,48 +49,48 @@ import (
 // * Event monitor: We should set a timeout for each container/sandbox event handling.
 const loadContainerTimeout = 10 * time.Second
 
-func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Container) (sandboxstore.Sandbox, error) {
+// recover loads the pause sandboxes that survived a containerd restart into
+// the controller, in parallel and each under its own timeout. It runs before
+// the CRI server replays the sandbox store. A sandbox that cannot be
+// recovered is logged and skipped.
+func (c *Controller) recover(ctx context.Context) error {
+	cntrs, err := c.client.Containers(ctx, crilabels.Filter(crilabels.ContainerKindLabel, crilabels.ContainerKindSandbox))
+	if err != nil {
+		return fmt.Errorf("failed to list sandbox containers: %w", err)
+	}
+	var wg sync.WaitGroup
+	for _, cntr := range cntrs {
+		wg.Go(func() {
+			if err := c.recoverContainer(ctx, cntr); err != nil {
+				log.G(ctx).WithError(err).WithField("sandbox", cntr.ID()).Error("Failed to recover pod sandbox")
+			}
+		})
+	}
+	wg.Wait()
+	return nil
+}
+
+// recoverContainer recovers one pause sandbox from its container: it loads
+// the state of the pause task, caches the sandbox in the controller and keeps
+// watching the task if it is still running.
+func (c *Controller) recoverContainer(ctx context.Context, cntr containerd.Container) error {
 	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
 	defer cancel()
-	var sandbox sandboxstore.Sandbox
+
 	meta, err := getMetadata(ctx, cntr)
 	if err != nil {
-		return sandbox, err
+		return err
 	}
 
 	// Load sandbox created timestamp.
 	info, err := cntr.Info(ctx)
 	if err != nil {
-		return sandbox, fmt.Errorf("failed to get sandbox container info: %w", err)
-	}
-
-	var updatedRes sandboxstore.UpdatedResources
-	if c.client != nil {
-		sb, err := c.client.SandboxStore().Get(ctx, meta.ID)
-		if err != nil {
-			log.G(ctx).WithError(err).Warnf("failed to get sandbox %s from sandbox store", meta.ID)
-		} else {
-			if err := sb.GetExtension(sandboxstore.UpdatedResourcesKey, &updatedRes); err != nil {
-				if !errdefs.IsNotFound(err) {
-					return sandbox, fmt.Errorf("failed to get updated sandbox resources extension: %w", err)
-				}
-			}
-		}
+		return fmt.Errorf("failed to get sandbox container info: %w", err)
 	}
 
 	s, ch, err := func() (sandboxstore.Status, <-chan containerd.ExitStatus, error) {
 		status := sandboxstore.Status{
 			State: sandboxstore.StateUnknown,
-		}
-		if updatedRes.Resources != nil {
-			status.Resources = &runtime.ContainerResources{
-				Linux: updatedRes.Resources,
-			}
-		}
-		if updatedRes.Overhead != nil {
-			status.Overhead = &runtime.ContainerResources{
-				Linux: updatedRes.Overhead,
-			}
 		}
 		var channel <-chan containerd.ExitStatus
 
@@ -149,10 +150,8 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 	// save it to cache in the podsandbox controller
 	podSandbox := types.NewPodSandbox(cntr.ID(), s)
 	podSandbox.Container = cntr
-	if meta != nil {
-		podSandbox.Metadata = *meta
-	}
-	podSandbox.Runtime = sandbox2.RuntimeOpts{
+	podSandbox.Metadata = *meta
+	podSandbox.Runtime = sandbox.RuntimeOpts{
 		Name:    info.Runtime.Name,
 		Options: info.Runtime.Options,
 	}
@@ -165,20 +164,14 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 		}()
 	}
 
-	if err := c.store.Save(podSandbox); err != nil {
-		return sandbox, fmt.Errorf("failed to save pod sandbox container in mem store: %w", err)
-	}
-
-	sandbox = sandboxstore.NewSandbox(*meta, s)
-	sandbox.Sandboxer = string(config.ModePodSandbox)
-
-	// Load network namespace.
-	sandbox.NetNS = getNetNS(meta)
-
 	// It doesn't matter whether task is running or not. If it is running, sandbox
 	// status will be `READY`; if it is not running, sandbox status will be `NOT_READY`,
 	// kubelet will stop the sandbox which will properly cleanup everything.
-	return sandbox, nil
+	if err := c.store.Save(podSandbox); err != nil {
+		return fmt.Errorf("failed to save pod sandbox container in mem store: %w", err)
+	}
+	log.G(ctx).WithField("sandbox", cntr.ID()).Infof("Recovered pod sandbox %q in state %s", meta.Name, s.State)
+	return nil
 }
 
 func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
