@@ -27,7 +27,6 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
-	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/errdefs"
@@ -105,7 +104,7 @@ func (c *criService) recover(ctx context.Context) error {
 		}
 
 		metadata := sandboxstore.Metadata{}
-		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
+		err := sbx.GetExtension(sandboxstore.MetadataKey, &metadata)
 		if err != nil {
 			if errors.Is(err, errdefs.ErrNotFound) {
 				log.G(ctx).WithError(err).Errorf("failed to get metadata for stored sandbox %q", sbx.ID)
