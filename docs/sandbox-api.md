@@ -154,6 +154,30 @@ error, which maps to gRPC `codes.Unimplemented`; a shim that does not register
 the method at all is answered with the same code by ttrpc. Callers are expected
 to tolerate it.
 
+### Recovery after a containerd restart
+
+The sandbox store is the inventory of the sandboxes and the source of truth
+about which ones exist. A record is created before the controller is asked to
+create the sandbox and deleted after the controller has shut it down.
+
+- A controller recovers its own backend state in its plugin initialization,
+  before it becomes available to the CRI plugin: `podsandbox` loads its pause
+  containers and the `shim` controller reconnects to its shims. Recovery never
+  creates or starts a sandbox. A sandbox that cannot be recovered is logged
+  and skipped. The controller becomes available without it.
+- The CRI plugin then replays the store. For every record it asks the record's
+  controller for the status of the sandbox, rebuilds its cache from the record
+  and that status, and watches every sandbox that is ready or in the unknown
+  state with `Wait`. A record that cannot be replayed is logged and skipped.
+  The plugin starts without it.
+- `Status` is the controller's answer on liveness. It returns the state of a
+  sandbox the controller knows about, `SANDBOX_NOTREADY` with the exit time
+  once the sandbox stopped, and `github.com/containerd/errdefs.ErrNotFound`
+  when the controller does not have an instance for the id: never known, shut
+  down, or its shim died. The CRI plugin treats `ErrNotFound` as not ready.
+  Any other error leaves the sandbox in the unknown state and it keeps being
+  watched.
+
 ## Controller Implementations
 
 There are two `Controller` implementations today:
