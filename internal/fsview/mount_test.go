@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/internal/fsview"
 	_ "github.com/containerd/containerd/v2/plugins/mount/fsview/erofs"
+	"github.com/containerd/errdefs"
 
 	"github.com/containerd/containerd/v2/pkg/archive/tartest"
 	"github.com/stretchr/testify/assert"
@@ -54,8 +55,8 @@ func TestFSMountsLast(t *testing.T) {
 	}
 
 	mounts := []mount.Mount{
-		{Type: "bind", Source: dir1, Target: "/mnt/dir1"},
-		{Type: "bind", Source: dir2, Target: "/mnt/dir2"},
+		{Type: "bind", Source: dir1},
+		{Type: "bind", Source: dir2},
 	}
 
 	// Should pick the last one (dir2)
@@ -71,6 +72,51 @@ func TestFSMountsLast(t *testing.T) {
 	if _, err := fs.Open("f1"); err == nil {
 		t.Error("expected NOT to find f1 (should only have dir2)")
 	}
+}
+
+func TestFSMountsNonRootTarget(t *testing.T) {
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "root")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "etc"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "etc", "passwd"), []byte("root\n"), 0644))
+
+	fileBind := filepath.Join(tmp, "hello.nu")
+	require.NoError(t, os.WriteFile(fileBind, []byte("print hello\n"), 0644))
+
+	child := filepath.Join(tmp, "store-dir")
+	require.NoError(t, os.MkdirAll(child, 0755))
+
+	for _, tt := range []struct {
+		name   string
+		source string
+		target string
+	}{
+		{name: "file bind", source: fileBind, target: "/nix/store/hello.nu"},
+		{name: "directory bind", source: child, target: "/nix/store/store-dir"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v, err := fsview.FSMounts([]mount.Mount{
+				{Type: "bind", Source: root},
+				{Type: "bind", Source: tt.source, Target: tt.target, Options: []string{"ro", "rbind"}},
+			})
+			if v != nil {
+				v.Close()
+			}
+			require.ErrorIs(t, err, errdefs.ErrNotImplemented)
+		})
+	}
+
+	t.Run("root target still opens the last mount", func(t *testing.T) {
+		v, err := fsview.FSMounts([]mount.Mount{
+			{Type: "bind", Source: child},
+			{Type: "bind", Source: root, Target: "/"},
+		})
+		require.NoError(t, err)
+		defer v.Close()
+		data, err := fs.ReadFile(v, "etc/passwd")
+		require.NoError(t, err)
+		assert.Equal(t, "root\n", string(data))
+	})
 }
 
 func skipIfNoMkfsErofs(t *testing.T) {
