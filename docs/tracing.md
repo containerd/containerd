@@ -40,6 +40,28 @@ export OTEL_TRACES_SAMPLER="traceidratio"
 export OTEL_TRACES_SAMPLER_ARG=1.0
 ```
 
+## Sending traces from the runc shim
+
+Build `containerd-shim-runc-v2` with the `shim_tracing` build tag to enable
+shim tracing. The shim inherits the daemon's OpenTelemetry exporter settings,
+but uses the stable service name `containerd-shim-runc-v2`.
+
+Each newly launched shim sets these resource attributes:
+
+- `service.instance.id`: the ID passed to the shim at startup.
+- `service.version`: the shim's build version.
+
+These attributes override matching keys inherited through
+`OTEL_RESOURCE_ATTRIBUTES`; other inherited attributes are preserved.
+A shared shim retains its identity while serving multiple containers, so
+`service.instance.id` does not identify the target container of every operation.
+The startup ID is not guaranteed to be unique across hosts or containerd
+namespaces; include that context when correlating shim instances.
+
+Previously, shim service names included the startup ID (`containerd-shim-<id>`).
+Update queries using those names to select `service.name=containerd-shim-runc-v2` and
+filter by `service.instance.id` as needed.
+
 ## Sending traces from containerd client
 
 By configuring its underlying gRPC client, containerd's Go client can send
