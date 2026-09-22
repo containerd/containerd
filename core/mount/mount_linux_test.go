@@ -404,6 +404,64 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 	}
 }
 
+// TestPrepareIDMappedOverlayAliasesCallerOptions proves that
+// prepareIDMappedOverlay mutates the backing array of the []string it is
+// given, even though the caller (Mount.mount, via `options := m.Options`)
+// keeps no explicit copy and an upstream caller holding the original
+// []Mount slice (e.g. mount.All's caller) still points at the same backing
+// array. This is the same "shallow copy of mount Options" bug class fixed in
+// RemoveVolatileOption, RemoveIDMapOption, and readonlyMounts; its sibling in
+// this file, compactLowerdirOption, already guards against it via
+// copyOptions(opts) before mutating, but prepareIDMappedOverlay did not.
+func TestPrepareIDMappedOverlayAliasesCallerOptions(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	fakeLowerDirsDir := t.TempDir()
+	if !supportsIDMap(fakeLowerDirsDir) {
+		t.Skip("IDmapped mounts not supported on filesystem selected by t.TempDir()")
+	}
+
+	lower1 := filepath.Join(fakeLowerDirsDir, "lower1")
+	lower2 := filepath.Join(fakeLowerDirsDir, "lower2")
+	for _, dir := range []string{lower1, lower2} {
+		require.NoError(t, os.Mkdir(dir, 0755))
+	}
+
+	usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
+	require.NoError(t, err)
+	defer usernsFD.Close()
+
+	// Simulate exactly what mount.All + Mount.mount do: a caller holds a
+	// []Mount slice and retains it (e.g. to unmount, log, or re-mount
+	// later). Mount.mount does `options := m.Options` (mount_linux.go:92)
+	// and passes that slice straight into prepareIDMappedOverlay without
+	// cloning it first.
+	original := []Mount{
+		{
+			Type:   "overlay",
+			Source: "overlay",
+			Options: []string{
+				"index=off",
+				"uidmap=0:1000:1",
+				"gidmap=0:1000:1",
+				"lowerdir=" + lower1 + ":" + lower2,
+			},
+		},
+	}
+	expectedUnchanged := append([]string{}, original[0].Options...)
+
+	options := original[0].Options
+	newOptions, cleanup, err := prepareIDMappedOverlay(int(usernsFD.Fd()), options)
+	require.NoError(t, err)
+	defer cleanup()
+
+	t.Logf("prepareIDMappedOverlay returned: %v", newOptions)
+	t.Logf("original caller's Mount.Options after the call: %v", original[0].Options)
+
+	assert.Equal(t, expectedUnchanged, original[0].Options,
+		"prepareIDMappedOverlay mutated the caller's original Mount.Options via shared backing array")
+}
+
 func TestGetUnprivilegedMountFlags(t *testing.T) {
 	testutil.RequiresRoot(t)
 
