@@ -90,6 +90,7 @@ var createCommand = &cli.Command{
 		return nil
 	},
 	DisableSliceFlagSeparator: true,
+	StopOnNthArg:              new(2),
 }
 
 var listCommand = &cli.Command{
