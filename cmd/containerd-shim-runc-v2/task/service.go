@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
+
+	"go.opentelemetry.io/otel"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
@@ -100,6 +103,18 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 			return shim.RemoveSocket(address)
 		})
 	}
+	sd.RegisterCallback(func(cbCtx context.Context) error {
+		if tp := otel.GetTracerProvider(); tp != nil {
+			if shutdowner, ok := tp.(interface{ Shutdown(context.Context) error }); ok {
+				ctx, cancel := context.WithTimeout(cbCtx, 1*time.Second)
+				defer cancel()
+				if err := shutdowner.Shutdown(ctx); err != nil {
+					log.G(cbCtx).WithError(err).Warn("Failed to shutdown tracer provider")
+				}
+			}
+		}
+		return nil
+	})
 	return s, nil
 }
 
