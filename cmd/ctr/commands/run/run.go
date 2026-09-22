@@ -144,6 +144,7 @@ var Command = &cli.Command{
 			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
 				commands.ContainerFlags...)...)...)...),
 	DisableSliceFlagSeparator: true,
+	StopOnNthArg:              new(2),
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			err error
