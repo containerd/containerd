@@ -170,19 +170,45 @@ func (c *criService) recover(ctx context.Context) error {
 	return nil
 }
 
+// sandboxRecoveryConcurrency is the number of sandbox controllers queried at
+// a time during recovery.
+const sandboxRecoveryConcurrency = 16
+
 // recoverSandboxes rebuilds the sandbox cache from the sandbox store records:
 // each one is loaded, cached and has its name reserved. A record that cannot
 // be replayed is logged and skipped. Its directories stay in place for
 // inspection.
 func (c *criService) recoverSandboxes(ctx context.Context, records []sandbox.Sandbox) {
-	for _, record := range records {
+	// Each query may take the whole recovery timeout. Run them in parallel,
+	// sandboxRecoveryConcurrency at a time.
+	var eg errgroup.Group
+	eg.SetLimit(sandboxRecoveryConcurrency)
+	loaded := make([]*sandboxstore.Sandbox, len(records))
+	for i, record := range records {
 		var metadata sandboxstore.Metadata
 		if err := record.GetExtension(sandboxstore.MetadataKey, &metadata); err != nil {
 			log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to read the metadata of the stored sandbox, skipping it")
 			continue
 		}
 
-		sb := c.loadSandbox(ctx, record, metadata)
+		eg.Go(func() error {
+			sb := c.loadSandbox(ctx, record, metadata)
+			loaded[i] = &sb
+			return nil
+		})
+	}
+	// A failed query leaves the sandbox in the unknown state; eg.Wait always
+	// returns nil.
+	_ = eg.Wait()
+
+	// Cache the sandboxes in record order so that the first of two records
+	// with the same name keeps the name.
+	for i, recovered := range loaded {
+		if recovered == nil {
+			continue
+		}
+		record := records[i]
+		sb := *recovered
 		log.G(ctx).Debugf("Loaded sandbox %+v", sb)
 		if err := c.sandboxStore.Add(sb); err != nil {
 			log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to cache the stored sandbox, skipping it")
