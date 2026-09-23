@@ -57,6 +57,7 @@ var ociHook = &cli.Command{
 		}
 		return syscall.Exec(args[0], args, env)
 	},
+	StopOnNthArg: new(1),
 }
 
 // hookSpec is a shallow version of [oci.Spec] containing only the
