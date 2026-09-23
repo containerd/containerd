@@ -101,12 +101,12 @@ func (f *fakeTasksClient) Wait(context.Context, *tasks.WaitRequest, ...grpc.Call
 }
 
 // newTestCRIServiceWithClient creates a test criService with a containerd client
-// backed by the given mock task service.
-func newTestCRIServiceWithClient(taskSvc tasks.TasksClient) *criService {
+// backed by the given mock task service and any additional services.
+func newTestCRIServiceWithClient(taskSvc tasks.TasksClient, opts ...containerd.ServicesOpt) *criService {
 	c := newTestCRIService()
 	cli, err := containerd.New("",
 		containerd.WithServices(
-			containerd.WithTaskClient(taskSvc),
+			append([]containerd.ServicesOpt{containerd.WithTaskClient(taskSvc)}, opts...)...,
 		),
 	)
 	if err != nil {
