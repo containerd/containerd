@@ -165,3 +165,42 @@ func TestRunCommandFlagParsing(t *testing.T) {
 	}
 	assert.Equal(t, wantAnnotations, capturedAnnotations)
 }
+
+func TestRunCommandProcessArgsWithFlags(t *testing.T) {
+	cmd := *Command
+	var (
+		capturedRef    string
+		capturedID     string
+		capturedArgs   []string
+		capturedRM     bool
+		capturedDetach bool
+	)
+
+	cmd.Action = func(ctx context.Context, c *cli.Command) error {
+		capturedRef = c.Args().First()
+		capturedID = c.Args().Get(1)
+		capturedArgs = c.Args().Slice()[2:]
+		capturedRM = c.Bool("rm")
+		capturedDetach = c.Bool("detach")
+		return nil
+	}
+
+	args := []string{
+		"run",
+		"--rm",
+		"docker.io/library/busybox:latest",
+		"test-container",
+		"sh",
+		"-uexc",
+		"echo -n hello && ls -d /tmp",
+	}
+
+	err := cmd.Run(context.Background(), args)
+	require.NoError(t, err)
+
+	assert.True(t, capturedRM)
+	assert.False(t, capturedDetach)
+	assert.Equal(t, "docker.io/library/busybox:latest", capturedRef)
+	assert.Equal(t, "test-container", capturedID)
+	assert.Equal(t, []string{"sh", "-uexc", "echo -n hello && ls -d /tmp"}, capturedArgs)
+}
