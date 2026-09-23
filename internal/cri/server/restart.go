@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -167,6 +168,10 @@ func (c *criService) recover(ctx context.Context) error {
 	return nil
 }
 
+// sandboxRecoveryConcurrency is the number of sandbox controllers queried at
+// a time during recovery.
+const sandboxRecoveryConcurrency = 16
+
 // recoverSandboxes rebuilds the sandbox cache from the sandbox store records:
 // each one is loaded, cached and has its name reserved. A record that cannot
 // be replayed is logged and skipped. A record without CRI metadata cannot be
@@ -174,6 +179,10 @@ func (c *criService) recover(ctx context.Context) error {
 // of the records that are still in the store are returned.
 func (c *criService) recoverSandboxes(ctx context.Context, records []sandbox.Sandbox) map[string]struct{} {
 	live := make(map[string]struct{}, len(records))
+	// Each query may take the whole recovery timeout. Run them in parallel,
+	// sandboxRecoveryConcurrency at a time.
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, sandboxRecoveryConcurrency)
 	for _, record := range records {
 		live[record.ID] = struct{}{}
 		var metadata sandboxstore.Metadata
@@ -189,18 +198,23 @@ func (c *criService) recoverSandboxes(ctx context.Context, records []sandbox.San
 			continue
 		}
 
-		sb := c.loadSandbox(ctx, record, metadata)
-		log.G(ctx).Debugf("Loaded sandbox %+v", sb)
-		if err := c.sandboxStore.Add(sb); err != nil {
-			log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to cache the stored sandbox, skipping it")
-			continue
-		}
-		if err := c.sandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
-			// Another stored sandbox has the same name. Both are served and
-			// kubelet removes the one it does not want.
-			log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to reserve the name of the stored sandbox")
-		}
+		sem <- struct{}{}
+		wg.Go(func() {
+			defer func() { <-sem }()
+			sb := c.loadSandbox(ctx, record, metadata)
+			log.G(ctx).Debugf("Loaded sandbox %+v", sb)
+			if err := c.sandboxStore.Add(sb); err != nil {
+				log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to cache the stored sandbox, skipping it")
+				return
+			}
+			if err := c.sandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
+				// Another stored sandbox has the same name. Both are served and
+				// kubelet removes the one it does not want.
+				log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to reserve the name of the stored sandbox")
+			}
+		})
 	}
+	wg.Wait()
 	return live
 }
 
