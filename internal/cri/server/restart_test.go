@@ -19,8 +19,10 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -37,12 +39,19 @@ import (
 // sandboxer each query was addressed to.
 type statusSandboxService struct {
 	fakeSandboxService
+	mu         sync.Mutex
+	status     func(context.Context, string) (sandbox.ControllerStatus, error)
 	statuses   map[string]sandbox.ControllerStatus
 	errs       map[string]error
 	sandboxers map[string]string
 }
 
-func (s *statusSandboxService) SandboxStatus(_ context.Context, sandboxer, id string, _ bool) (sandbox.ControllerStatus, error) {
+func (s *statusSandboxService) SandboxStatus(ctx context.Context, sandboxer, id string, _ bool) (sandbox.ControllerStatus, error) {
+	if s.status != nil {
+		return s.status(ctx, id)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.sandboxers[id] = sandboxer
 	if err, ok := s.errs[id]; ok {
 		return sandbox.ControllerStatus{}, err
@@ -80,6 +89,89 @@ func sandboxRecord(t *testing.T, id, sandboxer string, hostNetwork bool) sandbox
 		},
 	}))
 	return record
+}
+
+func TestRecoverSandboxesParallel(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	records := make([]sandbox.Sandbox, sandboxRecoveryConcurrency+1)
+	// Zero-padded so that no id is a prefix of another in the store index.
+	for i := range records {
+		records[i] = sandboxRecord(t, fmt.Sprintf("sandbox-%02d", i), "shim", true)
+	}
+	started := make(chan struct{}, len(records))
+	release := make(chan struct{})
+	var mu sync.Mutex
+	var active, peak int
+	c := newTestCRIService()
+	c.sandboxService = &statusSandboxService{
+		status: func(ctx context.Context, id string) (sandbox.ControllerStatus, error) {
+			mu.Lock()
+			active++
+			peak = max(peak, active)
+			mu.Unlock()
+			defer func() {
+				mu.Lock()
+				active--
+				mu.Unlock()
+			}()
+			started <- struct{}{}
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return sandbox.ControllerStatus{}, ctx.Err()
+			}
+			if id == records[0].ID {
+				return sandbox.ControllerStatus{}, context.DeadlineExceeded
+			}
+			return sandbox.ControllerStatus{State: runtime.PodSandboxState_SANDBOX_READY.String()}, nil
+		},
+	}
+	done := make(chan struct{})
+	go func() {
+		c.recoverSandboxes(ctx, records)
+		close(done)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+	// Fill every worker with a blocked query.
+	for range sandboxRecoveryConcurrency {
+		select {
+		case <-started:
+		case <-ctx.Done():
+			t.Fatal("sandbox status queries did not run concurrently")
+		}
+	}
+	// Free one worker and ensure the queued record is also queried.
+	select {
+	case release <- struct{}{}:
+	case <-ctx.Done():
+		t.Fatal("no status query waiting for release")
+	}
+	select {
+	case <-started:
+	case <-ctx.Done():
+		t.Fatal("queued sandbox was not queried")
+	}
+	close(release)
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("sandbox recovery did not finish")
+	}
+	assert.Equal(t, sandboxRecoveryConcurrency, peak)
+	for i, record := range records {
+		sb, err := c.sandboxStore.Get(record.ID)
+		require.NoError(t, err)
+		want := sandboxstore.StateReady
+		if i == 0 {
+			want = sandboxstore.StateUnknown
+		}
+		assert.Equal(t, want, sb.Status.Get().State)
+		assert.Error(t, c.sandboxNameIndex.Reserve(sb.Name, "another-id"))
+	}
 }
 
 func TestRecoverSandboxes(t *testing.T) {
@@ -226,6 +318,7 @@ func TestRecoverSandboxes(t *testing.T) {
 	sameNameSb, err := c.sandboxStore.Get("same-name")
 	require.NoError(t, err)
 	assert.Equal(t, "name-ready", sameNameSb.Name)
+	assert.NoError(t, c.sandboxNameIndex.Reserve("name-ready", "ready"), "the first record retains the name reservation")
 
 	// A record the cache cannot index is skipped. The other records are
 	// unaffected.
