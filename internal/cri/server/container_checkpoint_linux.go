@@ -28,7 +28,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
@@ -356,7 +355,24 @@ func writeCriuCheckpointData(ctx context.Context, store content.Store, desc v1.D
 	if err := os.MkdirAll(checkpointDirectory, 0o700); err != nil {
 		return err
 	}
-	tr := tar.NewReader(content.NewReader(ra))
+	return unpackCheckpointData(content.NewReader(ra), checkpointDirectory)
+}
+
+// unpackCheckpointData extracts the CRIU data tarball into dir. The entries come
+// from a checkpoint archive or OCI image and are externally provided (see the
+// copyNoFollow comment above), so each one is written through an os.Root rather
+// than a plain filepath.Join + os.Create. os.Root confines every write to dir: a
+// name containing "..", an absolute path, or a symlink component pointing out of
+// dir is rejected instead of followed, which the previous "does the name contain
+// .." check did not cover.
+func unpackCheckpointData(r io.Reader, dir string) error {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
+	tr := tar.NewReader(r)
 	for {
 		header, err := tr.Next()
 		if err != nil {
@@ -365,17 +381,15 @@ func writeCriuCheckpointData(ctx context.Context, store content.Store, desc v1.D
 			}
 			return err
 		}
-		if strings.Contains(header.Name, "..") {
-			return fmt.Errorf("found illegal string '..' in checkpoint archive")
-		}
-		destFile, err := os.Create(filepath.Join(checkpointDirectory, header.Name))
+		destFile, err := root.Create(header.Name)
 		if err != nil {
 			return err
 		}
-		defer destFile.Close()
-
-		_, err = io.CopyN(destFile, tr, header.Size)
-		if err != nil {
+		if _, err := io.CopyN(destFile, tr, header.Size); err != nil {
+			destFile.Close()
+			return err
+		}
+		if err := destFile.Close(); err != nil {
 			return err
 		}
 	}
