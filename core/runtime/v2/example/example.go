@@ -85,7 +85,7 @@ func (m manager) Info(ctx context.Context, optionsR io.Reader) (*apitypes.Runtim
 	return info, nil
 }
 
-func newTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TaskService, error) {
+func newTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TTRPCTaskService, error) {
 	// The shim.Publisher and shutdown.Service are usually useful for your task service,
 	// but we don't need them in the exampleTaskService.
 	return &exampleTaskService{}, nil
@@ -100,7 +100,7 @@ type exampleTaskService struct {
 
 // RegisterTTRPC allows TTRPC services to be registered with the underlying server
 func (s *exampleTaskService) RegisterTTRPC(server *ttrpc.Server) error {
-	taskAPI.RegisterTaskService(server, s)
+	taskAPI.RegisterTTRPCTaskService(server, s)
 	return nil
 }
 
