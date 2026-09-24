@@ -74,7 +74,7 @@ func NewRuntimeService(endpoint string, connectionTimeout time.Duration) (intern
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr,
+	conn, err := grpc.DialContext(ctx, addr, //nolint:staticcheck // Ignore SA1019. Deprecated but supported throughout 1.x; migrating to grpc.NewClient changes dial behavior.
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
