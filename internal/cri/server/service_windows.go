@@ -28,6 +28,11 @@ const windowsNetworkAttachCount = 1
 
 // initPlatform handles windows specific initialization for the CRI service.
 func (c *criService) initPlatform() error {
+	return c.initCNIPlugins()
+}
+
+// initCNIPlugins handles windows specific CNI plugin initializations.
+func (c *criService) initCNIPlugins() error {
 	pluginDirs := map[string]string{
 		defaultNetworkPlugin: c.config.NetworkPluginConfDir,
 	}
@@ -37,7 +42,6 @@ func (c *criService) initPlatform() error {
 		}
 	}
 
-	c.netPlugin = make(map[string]cni.CNI)
 	for name, dir := range pluginDirs {
 		max := c.config.NetworkPluginMaxConfNum
 		if name != defaultNetworkPlugin {
@@ -57,7 +61,9 @@ func (c *criService) initPlatform() error {
 		if err != nil {
 			return fmt.Errorf("failed to initialize cni: %w", err)
 		}
-		c.netPlugin[name] = i
+		if err := c.cniNetPlugin.add(name, dir, i, c.cniLoadOptions()); err != nil {
+			return err
+		}
 	}
 
 	return nil
