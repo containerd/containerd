@@ -504,6 +504,7 @@ func TestCgroupMountMode(t *testing.T) {
 	tests := []struct {
 		desc           string
 		mountMode      runtime.CgroupMountMode
+		privileged     bool
 		configWritable bool
 		hostMountOpts  string
 		containerPath  string
@@ -545,6 +546,13 @@ func TestCgroupMountMode(t *testing.T) {
 			mountMode:      runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
 			configWritable: true,
 			hostMountOpts:  withNsdelegate,
+		},
+		{
+			desc:          "read-only mount mode should be rejected for a privileged container",
+			mountMode:     runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+			privileged:    true,
+			hostMountOpts: withNsdelegate,
+			expectErr:     "not supported for privileged containers",
 		},
 		{
 			desc:          "unknown mount mode should be rejected",
@@ -593,6 +601,8 @@ func TestCgroupMountMode(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 			containerConfig.Linux.SecurityContext.CgroupMountMode = tt.mountMode
+			containerConfig.Linux.SecurityContext.Privileged = tt.privileged
+			sandboxConfig.Linux.SecurityContext.Privileged = tt.privileged
 			if tt.containerPath != "" {
 				containerConfig.Mounts = append(containerConfig.Mounts, &runtime.Mount{
 					HostPath:      "/test-host-path",
