@@ -773,6 +773,9 @@ func (c *criService) buildLinuxSpec(
 	case runtime.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED:
 		cgroupWritable = ociRuntime.CgroupWritable
 	case runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY:
+		if securityContext.GetPrivileged() {
+			return nil, errors.New("read-only cgroups are not supported for privileged containers")
+		}
 		cgroupWritable = false
 	case runtime.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE:
 		if err := c.checkWritableCgroupsSupported(); err != nil {
