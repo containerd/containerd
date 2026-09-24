@@ -67,10 +67,11 @@ func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), e
 		return options, idMapCleanUp, fmt.Errorf("failed to create idmapped mount: %w", err)
 	}
 
-	options = append(options[:lowerIdx], options[lowerIdx+1:]...)
-	options = append(options, fmt.Sprintf("lowerdir=%s", strings.Join(tmpLowerdirs, ":")))
+	newOptions := copyOptions(options)
+	newOptions = append(newOptions[:lowerIdx], newOptions[lowerIdx+1:]...)
+	newOptions = append(newOptions, fmt.Sprintf("lowerdir=%s", strings.Join(tmpLowerdirs, ":")))
 
-	return options, idMapCleanUp, nil
+	return newOptions, idMapCleanUp, nil
 }
 
 // Mount to the provided target path.
