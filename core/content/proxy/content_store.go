@@ -193,8 +193,10 @@ func (pcs *proxyContentStore) Writer(ctx context.Context, opts ...content.Writer
 			return nil, err
 		}
 	}
+	ctx, cancel := context.WithCancel(ctx)
 	wrclient, offset, err := pcs.negotiate(ctx, wOpts.Ref, wOpts.Desc.Size, wOpts.Desc.Digest)
 	if err != nil {
+		cancel()
 		return nil, errgrpc.ToNative(err)
 	}
 
@@ -202,6 +204,7 @@ func (pcs *proxyContentStore) Writer(ctx context.Context, opts ...content.Writer
 		ref:    wOpts.Ref,
 		client: wrclient,
 		offset: offset,
+		cancel: cancel,
 	}, nil
 }
 
