@@ -52,6 +52,11 @@ type fakeTask struct {
 	waitErr    error
 	deleteErr  error
 	waitExitCh chan struct{}
+	waitCtx    context.Context
+	// waitDone, when non-nil, is closed once the Wait helper goroutine
+	// returns, so tests can observe that the goroutine was reclaimed rather
+	// than only that its context was cancelled.
+	waitDone chan struct{}
 }
 
 func (f *fakeTask) ID() string {
@@ -78,14 +83,25 @@ func (f *fakeTask) Kill(ctx context.Context, signal syscall.Signal, opts ...cont
 }
 
 func (f *fakeTask) Wait(ctx context.Context) (<-chan containerd.ExitStatus, error) {
+	f.waitCtx = ctx
 	if f.waitErr != nil {
 		return nil, f.waitErr
 	}
 	ch := make(chan containerd.ExitStatus, 1)
 	if f.waitExitCh != nil {
 		go func() {
-			<-f.waitExitCh
-			ch <- *containerd.NewExitStatus(f.status.ExitStatus, f.status.ExitTime, nil)
+			if f.waitDone != nil {
+				defer close(f.waitDone)
+			}
+			// Mirror the real ttrpc client wait, which is bound to the
+			// context and returns once it is cancelled. Without honoring
+			// ctx.Done() this helper would park forever whenever the exit
+			// is never delivered, leaking a goroutine per test.
+			select {
+			case <-f.waitExitCh:
+				ch <- *containerd.NewExitStatus(f.status.ExitStatus, f.status.ExitTime, nil)
+			case <-ctx.Done():
+			}
 		}()
 	}
 
@@ -421,4 +437,108 @@ func TestRecoverContainer(t *testing.T) {
 		}
 	}
 
+}
+
+// TestRecoverContainerWaitCancelledOnShutdown verifies that the task wait
+// request and the sandbox exit monitor started during recovery are reclaimed
+// when the sandbox is removed from the store, even if the shim never answers
+// the wait request. See issue #14027.
+func TestRecoverContainerWaitCancelledOnShutdown(t *testing.T) {
+	const id = "sandbox_wait_cancelled_on_shutdown"
+	controller := &Controller{
+		config: criconfig.Config{
+			RootDir:  t.TempDir(),
+			StateDir: t.TempDir(),
+		},
+		store: NewStore(),
+	}
+	cont := fakeContainer{
+		c: containers.Container{
+			ID:         id,
+			Extensions: sandboxExtension(id),
+		},
+		t: fakeTask{
+			id:  "task_wait_cancelled_on_shutdown",
+			pid: 233333,
+			status: containerd.Status{
+				Status: containerd.Running,
+			},
+			// The exit is never delivered, emulating a shim that never
+			// answers the wait request.
+			waitExitCh: make(chan struct{}),
+		},
+	}
+
+	_, err := controller.RecoverContainer(context.Background(), &cont)
+	assert.NoError(t, err)
+	assert.NotNil(t, controller.store.Get(id))
+
+	// The wait must not be bound to the recovery timeout, it lives until
+	// the sandbox exits.
+	select {
+	case <-cont.t.waitCtx.Done():
+		t.Fatal("task wait context cancelled by recovery")
+	default:
+	}
+
+	// Shutdown removes the sandbox from the store and returns only after
+	// the exit monitor goroutine has stopped.
+	assert.NoError(t, controller.Shutdown(context.Background(), id))
+	assert.Nil(t, controller.store.Get(id))
+
+	select {
+	case <-cont.t.waitCtx.Done():
+	default:
+		t.Fatal("task wait context not cancelled on shutdown")
+	}
+}
+
+func TestRecoverContainerReclaimsWaitGoroutineOnShutdown(t *testing.T) {
+	const id = "sandbox_wait_goroutine_reclaimed_on_shutdown"
+	controller := &Controller{
+		config: criconfig.Config{
+			RootDir:  t.TempDir(),
+			StateDir: t.TempDir(),
+		},
+		store: NewStore(),
+	}
+	cont := fakeContainer{
+		c: containers.Container{
+			ID:         id,
+			Extensions: sandboxExtension(id),
+		},
+		t: fakeTask{
+			id:  "task_wait_goroutine_reclaimed_on_shutdown",
+			pid: 233334,
+			status: containerd.Status{
+				Status: containerd.Running,
+			},
+			// The exit is never delivered, emulating a shim that never
+			// answers the wait request: the exact condition that parked
+			// one waiter goroutine per recovered sandbox in #14027.
+			waitExitCh: make(chan struct{}),
+			waitDone:   make(chan struct{}),
+		},
+	}
+
+	_, err := controller.RecoverContainer(context.Background(), &cont)
+	assert.NoError(t, err)
+
+	// While the sandbox is in the store the waiter goroutine is running.
+	select {
+	case <-cont.t.waitDone:
+		t.Fatal("task wait goroutine returned before shutdown")
+	default:
+	}
+
+	// Shutdown removes the sandbox and cancels the wait. The waiter
+	// goroutine must return; otherwise it stays parked for the remaining
+	// lifetime of the daemon (the leak fixed here).
+	assert.NoError(t, controller.Shutdown(context.Background(), id))
+
+	select {
+	case <-cont.t.waitDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("task wait goroutine not reclaimed on shutdown")
+	}
 }
