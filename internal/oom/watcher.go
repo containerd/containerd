@@ -104,23 +104,25 @@ func (w *watcher) start() {
 		defer close(w.errCh)
 		defer w.eventFD.Close()
 
+		// Reuse a stack-allocated inotify read buffer for the lifetime of the
+		// watcher to avoid per-wakeup heap allocations.
+		// See https://github.com/containerd/containerd/issues/13558.
 		var (
 			oomKills   uint64
 			shouldExit bool
+			eventBuf   [unix.SizeofInotifyEvent * 10]byte
 		)
 		for !shouldExit {
-			buffer := make([]byte, unix.SizeofInotifyEvent*10)
-			bytesRead, err := w.eventFD.Read(buffer)
+			bytesRead, err := w.eventFD.Read(eventBuf[:])
 			if err != nil {
 				if !errors.Is(err, os.ErrClosed) {
 					w.errCh <- err
 					return
 				}
 				shouldExit = true
-			} else {
-				if bytesRead < unix.SizeofInotifyEvent {
-					continue
-				}
+				continue
+			} else if bytesRead < unix.SizeofInotifyEvent {
+				continue
 			}
 
 			// TODO: We should export MemoryEventsStat function
