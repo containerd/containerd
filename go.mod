@@ -63,7 +63,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/tchap/go-patricia/v2 v2.3.3
 	github.com/urfave/cli-docs/v3 v3.1.0
-	github.com/urfave/cli/v3 v3.11.0
+	github.com/urfave/cli/v3 v3.12.0
 	github.com/vishvananda/netlink v1.3.1
 	github.com/vishvananda/netns v0.0.5
 	go.etcd.io/bbolt v1.5.0
