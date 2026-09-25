@@ -54,6 +54,7 @@ type hostConfig struct {
 	skipVerify  *bool
 
 	dialTimeout *time.Duration
+	dialAddr    string
 
 	header http.Header
 
@@ -171,9 +172,9 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
 			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
+			if explicitTLSFromHost || host.dialTimeout != nil || host.dialAddr != "" || len(host.header) != 0 {
 				c := *client
-				if explicitTLSFromHost || host.dialTimeout != nil {
+				if explicitTLSFromHost || host.dialTimeout != nil || host.dialAddr != "" {
 					tr := defaultTransport.Clone()
 
 					if explicitTLSFromHost {
@@ -182,7 +183,13 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 						}
 					}
 
-					if host.dialTimeout != nil {
+					if host.dialAddr != "" {
+						timeout := 30 * time.Second
+						if host.dialTimeout != nil {
+							timeout = *host.dialTimeout
+						}
+						applyDialAddr(tr, host.dialAddr, timeout)
+					} else if host.dialTimeout != nil {
 						tr.DialContext = (&net.Dialer{
 							Timeout:       *host.dialTimeout,
 							KeepAlive:     30 * time.Second,
@@ -374,6 +381,12 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
+	// DialAddr, when non-empty, replaces the transport's dialer so
+	// that connections to this host are made to a Unix domain socket
+	// instead of over TCP. Only a pathname socket is accepted, of the
+	// form "unix:///absolute/path/to.sock". Not supported on Windows.
+	DialAddr string `toml:"dial_addr"`
+
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -542,6 +555,14 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			return hostConfig{}, err
 		}
 		result.dialTimeout = &dialTimeout
+	}
+
+	if config.DialAddr != "" {
+		addr, err := parseDialAddr(config.DialAddr)
+		if err != nil {
+			return hostConfig{}, err
+		}
+		result.dialAddr = addr
 	}
 
 	return result, nil
