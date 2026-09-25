@@ -26,12 +26,17 @@ jobs:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
+          - os: ${{ github.event.repository.private && 'macos-latest' || '' }}
+          - os: ${{ github.event.repository.private && 'windows-latest' || '' }}
 
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        if: ${{ !github.event.repository.private }}
       - uses: ./.github/actions/install-go
+        if: ${{ !github.event.repository.private }}
       - uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd  # v7.0.0
+        if: ${{ !github.event.repository.private }}
         with:
           version: v2.9.0
           skip-cache: true
