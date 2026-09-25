@@ -386,24 +386,26 @@ example a co-located local proxy or pull-through cache. It avoids the loopback
 TCP stack for the host-local hop and lets filesystem permissions on the socket
 replace TCP ACLs (no listener needs to be exposed on `lo`).
 
-Accepted forms:
+Accepted form:
 
-- `unix:///absolute/path/to.sock` — pathname socket. Works on Linux, macOS,
-  the BSDs, and Windows 10 / Server 2019 or newer (older Windows has no
-  `AF_UNIX` support). On Windows the URL form is
-  `unix:///C:/path/to.sock` — forward slashes, with a leading `/` before
-  the drive letter — matching the convention `file://` URIs use for
-  Windows paths. The dialer converts this to a native filesystem path
-  (`C:\path\to.sock`) before connecting, so the listener should be bound
-  to the native form. Backslashes are also accepted inside the URL but
-  forward slashes are recommended because TOML basic strings (`"..."`)
-  interpret backslashes as escape characters (`\f`, `\r`, `\t`, etc.).
-- `unix://@name` — abstract socket. A Linux kernel feature. Go's standard
-  library translates the `@` prefix to a leading NUL byte identically on
-  Linux and Windows, so the parser accepts this form on every platform;
-  on platforms whose kernel does not service abstract addresses the
-  connection attempt surfaces as a dial-time error rather than a parse
-  error.
+- `unix:///absolute/path/to.sock` — a pathname socket (note the three
+  slashes). This is the only accepted form.
+
+Abstract sockets (`unix://@name`) are intentionally **not** supported: they have
+no filesystem permissions and live in the network namespace rather than the
+mount namespace, which is the reachability weakness behind
+[CVE-2020-15257](https://github.com/containerd/containerd/security/advisories/GHSA-36xw-fx78-c5r4).
+The security model of `dial_addr` relies on filesystem permissions plus
+mount-namespace isolation, so only filesystem-backed pathname sockets are
+allowed.
+
+**Platform support:** `dial_addr` is available on non-Windows platforms only
+(Linux, macOS, the BSDs). Unix domain sockets are — as the name says — a Unix
+primitive, and the security properties this feature relies on come from
+filesystem permissions and mount-namespace isolation. `AF_UNIX` and the
+surrounding networking stack behave differently on Windows, so support is
+deferred until there is a specific Windows use case and its own design review;
+setting `dial_addr` on Windows is rejected with a clear error.
 
 `dial_addr` composes with `dial_timeout` (the timeout still applies to the
 unix dial).
@@ -426,17 +428,6 @@ server = "https://registry-1.docker.io"
 [host."https://registry-1.docker.io"]
   capabilities = ["pull", "resolve"]
   dial_addr = "unix:///run/registry-cache.sock"
-  dial_timeout = "5s"
-```
-
-On Windows the same configuration uses the drive-letter URL form:
-
-```toml
-server = "https://registry-1.docker.io"
-
-[host."https://registry-1.docker.io"]
-  capabilities = ["pull", "resolve"]
-  dial_addr = "unix:///C:/ProgramData/registry-cache/reg.sock"
   dial_timeout = "5s"
 ```
 
