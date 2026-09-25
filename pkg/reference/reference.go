@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net/url"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/containerd/containerd/v2/internal/lazyregexp"
@@ -111,6 +112,14 @@ func Parse(s string) (Spec, error) {
 			object = object[1:]
 		}
 		u.Path = u.Path[:idx[0]]
+	}
+
+	// A ".." element in the path would let the path.Join below climb past
+	// the host and repoint the reference at a different registry, e.g.
+	// "example.com/../other/image" resolves to "other/image". Valid
+	// references never contain one.
+	if slices.Contains(strings.Split(u.Path, "/"), "..") {
+		return Spec{}, ErrInvalid
 	}
 
 	return Spec{
