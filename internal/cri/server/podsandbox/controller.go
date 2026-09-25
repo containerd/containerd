@@ -101,6 +101,13 @@ func init() {
 				},
 			)
 			c.eventMonitor.Start()
+
+			// Recover the pause sandboxes of the previous run before the CRI
+			// server gets the controller and replays the sandbox store
+			// against it.
+			if err := c.recover(ctrdutil.WithNamespace(ic.Context)); err != nil {
+				return nil, fmt.Errorf("failed to recover pod sandboxes: %w", err)
+			}
 			return &c, nil
 		},
 	})
