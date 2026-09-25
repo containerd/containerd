@@ -51,6 +51,8 @@ var Command = &cli.Command{
 		pushCommand,
 		pruneCommand,
 		removeCommand,
+		repairCommand,
+		verifyCommand,
 		tagCommand,
 		setLabelsCommand,
 		convertCommand,

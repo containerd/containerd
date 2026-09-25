@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"time"
 
@@ -31,6 +32,9 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
+
+// ErrContentMismatch is returned when content does not match its descriptor.
+var ErrContentMismatch = errors.New("content does not match descriptor")
 
 // Image provides the model for how containerd views container images.
 type Image struct {
@@ -54,6 +58,44 @@ type Image struct {
 	Target ocispec.Descriptor
 
 	CreatedAt, UpdatedAt time.Time
+}
+
+// VerifyDescriptor verifies that the content for desc has its expected size
+// and digest.
+func VerifyDescriptor(ctx context.Context, provider content.Provider, desc ocispec.Descriptor) error {
+	if err := desc.Digest.Validate(); err != nil {
+		return fmt.Errorf("invalid descriptor digest %q: %w", desc.Digest, err)
+	}
+
+	ra, err := provider.ReaderAt(ctx, desc)
+	if err != nil {
+		return fmt.Errorf("open content %s: %w", desc.Digest, err)
+	}
+	defer ra.Close()
+
+	if desc.Size >= 0 && ra.Size() != desc.Size {
+		return fmt.Errorf("%w: content %s has size %d, expected %d", ErrContentMismatch, desc.Digest, ra.Size(), desc.Size)
+	}
+
+	digester := desc.Digest.Algorithm().Digester()
+	if _, err := io.Copy(digester.Hash(), content.NewReader(ra)); err != nil {
+		return fmt.Errorf("read content %s: %w", desc.Digest, err)
+	}
+	if actual := digester.Digest(); actual != desc.Digest {
+		return fmt.Errorf("%w: content digest %s, expected %s", ErrContentMismatch, actual, desc.Digest)
+	}
+	if desc.Size >= 0 {
+		var extra [1]byte
+		n, err := ra.ReadAt(extra[:], desc.Size)
+		if n != 0 || err == nil {
+			return fmt.Errorf("%w: content %s has trailing data", ErrContentMismatch, desc.Digest)
+		}
+		if err != io.EOF {
+			return fmt.Errorf("read content %s after expected size: %w", desc.Digest, err)
+		}
+	}
+
+	return nil
 }
 
 // DeleteOptions provide options on image delete
