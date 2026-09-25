@@ -147,7 +147,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
 					if _, err := io.CopyBuffer(wc, rio.Stdout(), *p); err != nil {
-						log.G(ctx).Warn("error copying stdout")
+						log.G(ctx).WithError(err).Warn("error copying stdout")
 					}
 					wg.Done()
 					wc.Close()
@@ -166,7 +166,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
 					if _, err := io.CopyBuffer(wc, rio.Stderr(), *p); err != nil {
-						log.G(ctx).Warn("error copying stderr")
+						log.G(ctx).WithError(err).Warn("error copying stderr")
 					}
 					wg.Done()
 					wc.Close()
@@ -220,7 +220,9 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 		p := bufPool.Get().(*[]byte)
 		defer bufPool.Put(p)
 
-		io.CopyBuffer(rio.Stdin(), f, *p)
+		if _, err := io.CopyBuffer(rio.Stdin(), f, *p); err != nil {
+			log.G(ctx).WithError(err).Warn("error copying stdin")
+		}
 		rio.Stdin().Close()
 		f.Close()
 	}()
