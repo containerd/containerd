@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/platforms"
 	distribution "github.com/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"go.opentelemetry.io/otel/attribute"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -170,10 +171,12 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", err
 	}
 
-	span.SetAttributes(
-		tracing.Attribute("image.ref", ref),
-		tracing.Attribute("snapshotter.name", snapshotter),
-	)
+	attrs := []attribute.KeyValue{
+		tracing.Attribute("containerd.image.ref", ref),
+		tracing.Attribute("containerd.snapshotter.name", snapshotter),
+	}
+	span.SetAttributes(attrs...)
+	span.SetAttributes(tracing.LegacyAttributes(attrs)...)
 	labels := c.getLabels(ctx, ref)
 
 	// If UseLocalImagePull is true, use client.Pull to pull the image, else use transfer service by default.
