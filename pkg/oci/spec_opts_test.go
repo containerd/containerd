@@ -912,3 +912,70 @@ func TestWithWindowsCPUMaximum(t *testing.T) {
 		})
 	}
 }
+
+func TestAmbientCapabilityOptions(t *testing.T) {
+	newCaps := func() *specs.LinuxCapabilities {
+		return &specs.LinuxCapabilities{
+			Bounding:    []string{"CAP_CHOWN"},
+			Permitted:   []string{"CAP_CHOWN"},
+			Effective:   []string{"CAP_CHOWN"},
+			Inheritable: []string{"CAP_CHOWN"},
+			Ambient:     []string{"CAP_CHOWN"},
+		}
+	}
+	for _, tc := range []struct {
+		name        string
+		opt         SpecOpts
+		ambient     []string
+		inheritable []string
+	}{
+		{
+			name:        "ambient additions preserve other sets and deduplicate",
+			opt:         WithAddedAmbientCapabilities([]string{"CAP_CHOWN", "CAP_NET_BIND_SERVICE", "CAP_NET_BIND_SERVICE"}),
+			ambient:     []string{"CAP_CHOWN", "CAP_NET_BIND_SERVICE"},
+			inheritable: []string{"CAP_CHOWN"},
+		},
+		{
+			name:        "ambient drops preserve other sets and ignore missing entries",
+			opt:         WithDroppedAmbientCapabilities([]string{"CAP_CHOWN", "CAP_NET_RAW"}),
+			inheritable: []string{"CAP_CHOWN"},
+		},
+		{
+			name:        "inheritable additions preserve other sets and deduplicate",
+			opt:         WithAddedInheritableCapabilities([]string{"CAP_CHOWN", "CAP_NET_BIND_SERVICE", "CAP_NET_BIND_SERVICE"}),
+			ambient:     []string{"CAP_CHOWN"},
+			inheritable: []string{"CAP_CHOWN", "CAP_NET_BIND_SERVICE"},
+		},
+		{
+			name:        "existing ambient setter still replaces both sets",
+			opt:         WithAmbientCapabilities([]string{"CAP_NET_BIND_SERVICE"}),
+			ambient:     []string{"CAP_NET_BIND_SERVICE"},
+			inheritable: []string{"CAP_NET_BIND_SERVICE"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &Spec{Process: &specs.Process{Capabilities: newCaps()}}
+			require.NoError(t, tc.opt(context.Background(), nil, nil, s))
+			want := newCaps()
+			want.Ambient = tc.ambient
+			want.Inheritable = tc.inheritable
+			assert.Equal(t, want, s.Process.Capabilities)
+		})
+	}
+}
+
+func TestAmbientCapabilityOptionsInitializeSpec(t *testing.T) {
+	for name, opt := range map[string]SpecOpts{
+		"add ambient":     WithAddedAmbientCapabilities([]string{"CAP_CHOWN"}),
+		"drop ambient":    WithDroppedAmbientCapabilities([]string{"CAP_CHOWN"}),
+		"add inheritable": WithAddedInheritableCapabilities([]string{"CAP_CHOWN"}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, s := range []*Spec{{}, {Process: &specs.Process{}}} {
+				require.NoError(t, opt(context.Background(), nil, nil, s))
+				require.NotNil(t, s.Process)
+				require.NotNil(t, s.Process.Capabilities)
+			}
+		})
+	}
+}

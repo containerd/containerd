@@ -1150,6 +1150,45 @@ func WithAmbientCapabilities(caps []string) SpecOpts {
 	}
 }
 
+// WithAddedAmbientCapabilities adds capabilities to only the ambient set.
+// Callers must ensure the resulting ambient set is also included in the
+// permitted and inheritable sets before the spec is passed to the runtime.
+func WithAddedAmbientCapabilities(caps []string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCapabilities(s)
+		for _, c := range caps {
+			if !capsContain(s.Process.Capabilities.Ambient, c) {
+				s.Process.Capabilities.Ambient = append(s.Process.Capabilities.Ambient, c)
+			}
+		}
+		return nil
+	}
+}
+
+// WithDroppedAmbientCapabilities removes capabilities from only the ambient set.
+func WithDroppedAmbientCapabilities(caps []string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCapabilities(s)
+		for _, c := range caps {
+			removeCap(&s.Process.Capabilities.Ambient, c)
+		}
+		return nil
+	}
+}
+
+// WithAddedInheritableCapabilities adds capabilities to only the inheritable set.
+func WithAddedInheritableCapabilities(caps []string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCapabilities(s)
+		for _, c := range caps {
+			if !capsContain(s.Process.Capabilities.Inheritable, c) {
+				s.Process.Capabilities.Inheritable = append(s.Process.Capabilities.Inheritable, c)
+			}
+		}
+		return nil
+	}
+}
+
 // ErrNoUsersFound can be returned from UserFromPath
 var ErrNoUsersFound = errors.New("no users found")
 

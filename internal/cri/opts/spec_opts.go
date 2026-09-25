@@ -250,6 +250,61 @@ func WithoutAmbientCaps(_ context.Context, _ oci.Client, c *containers.Container
 	return nil
 }
 
+// WithAmbientCapabilities grants only the ambient capabilities explicitly requested
+// through CRI. It runs after ordinary and privileged capability configuration.
+// As with ordinary capabilities, drop ALL resets the defaults before additions,
+// while an individual drop takes precedence over an addition.
+func WithAmbientCapabilities(sc *runtime.LinuxContainerSecurityContext, allCaps []string) oci.SpecOpts {
+	capabilities := sc.GetCapabilities()
+	if capabilities == nil {
+		return WithoutAmbientCaps
+	}
+
+	var opts []oci.SpecOpts
+	opts = append(opts, WithoutAmbientCaps)
+	// Add/drop all capabilities if "all" is specified, so that
+	// following individual add/drop could still work. E.g.
+	// AddAmbientCapabilities: []string{"ALL"}, DropCapabilities: []string{"CHOWN"}
+	// will be all ambient capabilities without `CAP_CHOWN`.
+	if util.InStringSlice(capabilities.GetAddAmbientCapabilities(), "ALL") {
+		opts = append(opts, oci.WithAddedAmbientCapabilities(allCaps))
+	}
+	if util.InStringSlice(capabilities.GetDropCapabilities(), "ALL") {
+		opts = append(opts, WithoutAmbientCaps)
+	}
+
+	var caps []string
+	for _, c := range capabilities.GetAddAmbientCapabilities() {
+		if strings.ToUpper(c) == "ALL" {
+			continue
+		}
+		// Capabilities in CRI doesn't have `CAP_` prefix, so add it.
+		caps = append(caps, "CAP_"+strings.ToUpper(c))
+	}
+	opts = append(opts, oci.WithAddedAmbientCapabilities(caps))
+
+	caps = []string{}
+	for _, c := range capabilities.GetDropCapabilities() {
+		if strings.ToUpper(c) == "ALL" {
+			continue
+		}
+		caps = append(caps, "CAP_"+strings.ToUpper(c))
+	}
+	opts = append(opts, oci.WithDroppedAmbientCapabilities(caps))
+	opts = append(opts, withAmbientCapabilitySets)
+	return oci.Compose(opts...)
+}
+
+// withAmbientCapabilitySets grants the final ambient set in the prerequisite
+// sets, preserving existing ordinary and inheritable capabilities.
+func withAmbientCapabilitySets(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	ambient := s.Process.Capabilities.Ambient
+	return oci.Compose(
+		oci.WithAddedCapabilities(ambient),
+		oci.WithAddedInheritableCapabilities(ambient),
+	)(ctx, client, c, s)
+}
+
 // WithSelinuxLabels sets the mount and process labels
 func WithSelinuxLabels(process, mount string) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
