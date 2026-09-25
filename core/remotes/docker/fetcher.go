@@ -633,6 +633,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		}
 	}
 
+	raw := body.ReadCloser
 	for _, value := range slices.Backward(encoding) {
 		algorithm := strings.ToLower(value)
 		switch algorithm {
@@ -658,8 +659,32 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 			return nil, 0, errors.New("unsupported Content-Encoding algorithm: " + algorithm)
 		}
 	}
+	if body.ReadCloser != raw {
+		// The decompression readers above (gzip.Reader, zstd's IOReadCloser,
+		// flate's Reader) only release their own internal state on Close; none
+		// of them close the underlying reader they were constructed from. Make
+		// sure the raw HTTP body (and the semaphore/parallel-fetch resources it
+		// carries) still gets closed when the caller closes the returned body.
+		body.ReadCloser = &closeAlsoReader{ReadCloser: body.ReadCloser, also: raw}
+	}
 
 	return body, remaining, nil
+}
+
+// closeAlsoReader closes an additional io.Closer alongside the wrapped
+// ReadCloser. Used to keep a raw reader reachable for closing after it has
+// been wrapped by a decompressor that does not close what it wraps.
+type closeAlsoReader struct {
+	io.ReadCloser
+	also io.Closer
+}
+
+func (c *closeAlsoReader) Close() error {
+	err := c.ReadCloser.Close()
+	if aerr := c.also.Close(); err == nil {
+		err = aerr
+	}
+	return err
 }
 
 type fnOnClose struct {
