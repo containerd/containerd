@@ -22,6 +22,12 @@ Filesystem-specific:
 [Deprecated](https://github.com/containerd/containerd/blob/main/RELEASES.md#deprecated-features):
 - `aufs`: AUFS. Deprecated since containerd 1.5. Removed in containerd 2.0. See also https://github.com/containerd/aufs .
 
+Windows-specific (see [`windows.md`](./windows.md) for details):
+- `windows`: Legacy Windows container (WCOW) snapshotter using NTFS and WCIFS reparse points.
+- `windows-lcow`: Linux Containers on Windows, for running Linux containers in Hyper-V utility VMs.
+- `cimfs`: CimFS-based snapshotter using Composite Image FileSystem for read-only layers. Requires CimFS support in the host Windows version.
+- `blockcim`: Block CIM snapshotter with merged CIM support, optional data integrity, and VHD footers. Requires block CIM support in the host Windows version.
+
 ## Non-core snapshotter plugins
 
 - `fuse-overlayfs`: [FUSE-OverlayFS Snapshotter](https://github.com/containerd/fuse-overlayfs-snapshotter)
