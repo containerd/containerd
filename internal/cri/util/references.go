@@ -30,10 +30,16 @@ func ParseImageReferences(refs []string) ([]string, []string) {
 		if err != nil {
 			continue
 		}
-		if _, ok := parsed.(reference.Canonical); ok {
-			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(reference.Tagged); ok {
-			tags = append(tags, parsed.String())
+		if canonical, ok := parsed.(reference.Canonical); ok {
+			digests = append(digests, canonical.Name()+"@"+canonical.Digest().String())
+		}
+		if tagged, ok := parsed.(reference.Tagged); ok {
+			// Tagged does not embed Named, retrieve the name via Canonical when available.
+			if canonical, ok := parsed.(reference.Canonical); ok {
+				tags = append(tags, canonical.Name()+":"+tagged.Tag())
+			} else {
+				tags = append(tags, tagged.String())
+			}
 		}
 	}
 	return tags, digests
