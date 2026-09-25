@@ -723,6 +723,102 @@ func TestTransferProgressReporter(t *testing.T) {
 				assert.Equal(t, uint64(2000), totalBytesRead, "Expected 2000 bytes read")
 			},
 		},
+		{
+			name: "ExtractingEventCompletesRequest",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "extracting",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(0), activeReqs, "Expected 0 active requests")
+				assert.Equal(t, uint64(1000), totalBytesRead, "Expected 1000 bytes read")
+			},
+		},
+		{
+			name: "ExtractedEventCompletesRequest",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "extracted",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(0), activeReqs, "Expected 0 active requests")
+				assert.Equal(t, uint64(1000), totalBytesRead, "Expected 1000 bytes read")
+			},
+		},
+		{
+			name: "AlreadyExistsEventCompletesRequest",
+			progress: []transfer.Progress{
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "downloading",
+				},
+				{
+					Name: "layer1",
+					Desc: &ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    "sha256:abcdef",
+						Size:      1000,
+					},
+					Total:    1000,
+					Progress: 500,
+					Event:    "already exists",
+				},
+			},
+			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
+				activeReqs, totalBytesRead := r.reqReporter.status()
+				assert.Equal(t, int32(0), activeReqs, "Expected 0 active requests")
+				assert.Equal(t, uint64(1000), totalBytesRead, "Expected 1000 bytes read")
+			},
+		},
 	}
 
 	for _, tt := range tests {
