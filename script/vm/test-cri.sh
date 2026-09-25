@@ -64,7 +64,8 @@ skip_test_args=$(
 	IFS='|'
 	echo "${skip_tests[*]}"
 )
-critest_args=(--parallel=$(($(nproc) + 2)) --ginkgo.skip="${skip_test_args}")
+ginkgo_procs="${GINKGO_NODES:-$(($(nproc) + 2))}"
+critest_args=(--parallel="${ginkgo_procs}" --ginkgo.skip="${skip_test_args}")
 if [[ -n $REPORT_DIR ]]; then
 	mkdir -p "${REPORT_DIR}"
 	critest_args+=(--report-dir="${REPORT_DIR}")
