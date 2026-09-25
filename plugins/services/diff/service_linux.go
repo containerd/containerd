@@ -1,5 +1,3 @@
-//go:build !windows && !darwin && !linux
-
 /*
    Copyright The containerd Authors.
 
@@ -18,7 +16,11 @@
 
 package diff
 
+// On Linux, prefer the overlay differ first. It uses overlayfs's native
+// upperdir tracking to walk only changed files, avoiding a full scan of the
+// lower layers. It returns ErrNotImplemented for non-overlay mounts and the
+// service falls back automatically to the walking differ.
 var defaultDifferConfig = &config{
-	Order:  []string{"walking"},
+	Order:  []string{"overlay", "walking"},
 	SyncFs: false,
 }
