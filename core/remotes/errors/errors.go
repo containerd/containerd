@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/containerd/typeurl/v2"
 )
@@ -32,15 +33,20 @@ func init() {
 
 // ErrUnexpectedStatus is returned if a registry API request returned with unexpected HTTP status
 type ErrUnexpectedStatus struct {
-	Status        string `json:"status"`
-	StatusCode    int    `json:"statusCode"`
-	Body          []byte `json:"body,omitempty"`
-	RequestURL    string `json:"requestURL,omitempty"`
-	RequestMethod string `json:"requestMethod,omitempty"`
+	Status        string     `json:"status"`
+	StatusCode    int        `json:"statusCode"`
+	Body          []byte     `json:"body,omitempty"`
+	RequestURL    string     `json:"requestURL,omitempty"`
+	RequestMethod string     `json:"requestMethod,omitempty"`
+	RetryAfter    *time.Time `json:"retryAfter,omitempty"`
 }
 
 func (e ErrUnexpectedStatus) Error() string {
-	return fmt.Sprintf("unexpected status from %s request to %s: %s", e.RequestMethod, e.RequestURL, e.Status)
+	msg := fmt.Sprintf("unexpected status from %s request to %s: %s", e.RequestMethod, e.RequestURL, e.Status)
+	if e.RetryAfter != nil {
+		msg += fmt.Sprintf(" (Retry-After: %s)", e.RetryAfter.Format(time.RFC3339))
+	}
+	return msg
 }
 
 // NewUnexpectedStatusErr creates an ErrUnexpectedStatus from HTTP response

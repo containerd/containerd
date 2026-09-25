@@ -35,9 +35,19 @@ import (
 // present in the puller's content store. The registry is shut down when the
 // test completes.
 func ServeImage(t *testing.T, name, tag string, target ocispec.Descriptor, blobs map[digest.Digest][]byte) string {
+	return ServeImageWithInterceptor(t, name, tag, target, blobs, nil)
+}
+
+// ServeImageWithInterceptor is like ServeImage, but allows injecting an HTTP interceptor
+// (for instance, to simulate HTTP 429 Too Many Requests rate limiting and retry behavior).
+// If the interceptor returns true, the request has been handled and normal processing is skipped.
+func ServeImageWithInterceptor(t *testing.T, name, tag string, target ocispec.Descriptor, blobs map[digest.Digest][]byte, interceptor func(w http.ResponseWriter, r *http.Request) bool) string {
 	manifestPath := "/v2/" + name + "/manifests/"
 	blobPath := "/v2/" + name + "/blobs/"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if interceptor != nil && interceptor(w, r) {
+			return
+		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
