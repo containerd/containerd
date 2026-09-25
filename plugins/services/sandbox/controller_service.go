@@ -91,12 +91,15 @@ type controllerService struct {
 	sc        map[string]sandbox.Controller
 	publisher events.Publisher
 	api.UnimplementedControllerServer
+	api.UnimplementedCheckpointServer
 }
 
 var _ api.ControllerServer = (*controllerService)(nil)
+var _ api.CheckpointServer = (*controllerService)(nil)
 
 func (s *controllerService) Register(server *grpc.Server) error {
 	api.RegisterControllerServer(server, s)
+	api.RegisterCheckpointServer(server, s)
 	return nil
 }
 
@@ -281,4 +284,84 @@ func (s *controllerService) Update(
 		return &api.ControllerUpdateResponse{}, errgrpc.ToGRPC(err)
 	}
 	return &api.ControllerUpdateResponse{}, nil
+}
+
+func (s *controllerService) Checkpoint(ctx context.Context, req *api.ControllerCheckpointRequest) (*api.ControllerCheckpointResponse, error) {
+	ctrl, err := s.getCheckpointController(req.GetSandboxer())
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+	containers := make([]sandbox.CheckpointContainer, 0, len(req.GetContainers()))
+	for _, container := range req.GetContainers() {
+		containers = append(containers, sandbox.CheckpointContainer{
+			ID:     container.GetID(),
+			Name:   container.GetName(),
+			Config: container.GetConfig(),
+			Status: container.GetStatus(),
+		})
+	}
+	err = ctrl.Checkpoint(ctx, req.GetSandboxID(), sandbox.CheckpointOptions{
+		OutputPath:    req.GetOutputPath(),
+		SandboxConfig: req.GetSandboxConfig(),
+		Containers:    containers,
+		Options:       req.GetOptions(),
+	})
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+	return &api.ControllerCheckpointResponse{}, nil
+}
+
+func (s *controllerService) Restore(ctx context.Context, req *api.ControllerRestoreRequest) (*api.ControllerRestoreResponse, error) {
+	ctrl, err := s.getCheckpointController(req.GetSandboxer())
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+	result, err := ctrl.Restore(ctx, req.GetSandboxID(), restoreOptionsFromRequest(req))
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+	response := &api.ControllerRestoreResponse{
+		Containers: make([]*api.ControllerRestoredContainer, 0, len(result.RestoredContainers)),
+	}
+	for _, container := range result.RestoredContainers {
+		response.Containers = append(response.Containers, &api.ControllerRestoredContainer{
+			Name:                container.Name,
+			TaskCheckpointImage: container.TaskCheckpointImage,
+		})
+	}
+	return response, nil
+}
+
+func (s *controllerService) getCheckpointController(name string) (sandbox.CheckpointController, error) {
+	ctrl, err := s.getController(name)
+	if err != nil {
+		return nil, err
+	}
+	checkpoint, ok := ctrl.(sandbox.CheckpointController)
+	if !ok {
+		return nil, fmt.Errorf("sandbox controller %q does not support checkpoint and restore: %w", name, errdefs.ErrNotImplemented)
+	}
+	return checkpoint, nil
+}
+
+func restoreOptionsFromRequest(req *api.ControllerRestoreRequest) sandbox.RestoreOptions {
+	return sandbox.RestoreOptions{
+		CheckpointPath: req.GetCheckpointPath(),
+		SandboxConfig:  req.GetSandboxConfig(),
+		Containers:     restoreContainersFromProto(req.GetContainers()),
+		Options:        req.GetOptions(),
+	}
+}
+
+func restoreContainersFromProto(containers []*api.ControllerRestoreContainer) []sandbox.RestoreContainer {
+	result := make([]sandbox.RestoreContainer, 0, len(containers))
+	for _, container := range containers {
+		result = append(result, sandbox.RestoreContainer{
+			ID:     container.GetID(),
+			Name:   container.GetName(),
+			Config: container.GetConfig(),
+		})
+	}
+	return result
 }

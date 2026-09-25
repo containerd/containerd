@@ -26,18 +26,16 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
-	criu "github.com/checkpoint-restore/go-criu/v7"
-	"github.com/checkpoint-restore/go-criu/v7/utils"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -98,48 +96,10 @@ func (c *criService) checkCriu() error {
 }
 
 func (c *criService) doCheckCriu() error {
-	if c.config.EnableCRIU != nil && !*c.config.EnableCRIU {
-		return errors.New("criu support is disabled by configuration")
+	if c.config.EnableCheckpointRestore != nil && !*c.config.EnableCheckpointRestore {
+		return errors.New("checkpoint/restore support is disabled by configuration")
 	}
-	path := resolveCriuPath(c.shimPath)
-	if path == "" {
-		return errors.New("criu binary not found in shim path or system PATH")
-	}
-	client := criu.MakeCriu()
-	client.SetCriuPath(path)
-	version, err := client.GetCriuVersion()
-	if err != nil {
-		return fmt.Errorf("failed to retrieve criu version: %w", err)
-	}
-	if version < utils.PodCriuVersion {
-		return fmt.Errorf("checkpoint/restore requires at least CRIU %d, current version is %d", utils.PodCriuVersion, version)
-	}
-	return nil
-}
-
-func resolveCriuPath(customPath string) string {
-	if customPath != "" {
-		// This logic is Linux-specific. If CRIU is ever supported on other
-		// operating systems, path lookup will need to respect that OS's
-		// conventions.
-		for _, dir := range filepath.SplitList(customPath) {
-			if !filepath.IsAbs(dir) {
-				continue
-			}
-			criuPath := filepath.Join(dir, "criu")
-			if fi, err := os.Stat(criuPath); err == nil && fi.Mode().IsRegular() && fi.Mode()&0111 != 0 {
-				return criuPath
-			}
-		}
-		return ""
-	}
-	if criuPath, err := exec.LookPath("criu"); err == nil {
-		if absPath, err := filepath.Abs(criuPath); err == nil {
-			return absPath
-		}
-		return criuPath
-	}
-	return ""
+	return ctrdutil.CheckCriu(c.shimPath)
 }
 
 func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (*runtime.CheckpointContainerResponse, error) {
@@ -160,6 +120,11 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when trying to find container %q: %w", r.GetContainerId(), err)
 	}
+	release, err := c.reserveContainerCheckpoints([]string{container.ID})
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 
 	state := container.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
