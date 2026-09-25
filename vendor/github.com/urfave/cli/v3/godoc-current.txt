@@ -258,6 +258,13 @@ type AfterFunc func(context.Context, *Command) error
     AfterFunc is an action that executes after any subcommands are run and have
     finished. The AfterFunc is run even if Action() panics.
 
+type ArgValidatorFunc func(context.Context, *Command) error
+    ArgValidatorFunc is an action to validate arguments before the command
+    is run. If non-nil, it is called before the command's After and Action
+    functions. Returning a non-nil error short-circuits the command and
+    propagates as the exit error. If the current command does not set
+    ArgValidator, the nearest ancestor that does is used instead.
+
 type Args interface {
 	// Get returns the nth argument, or else a blank string
 	Get(n int) string
@@ -294,6 +301,7 @@ type ArgumentBase[T any, C any, VC ValueCreator[T, C]] struct {
 	Value       T      `json:"value"`     // the default value of this argument
 	Destination *T     `json:"-"`         // the destination point for this argument
 	UsageText   string `json:"usageText"` // the usage text to show
+	Required    bool   `json:"required"`  // whether the argument is required or not
 	Config      C      `json:"config"`    // config for this argument similar to Flag Config
 
 	// Has unexported fields.
@@ -415,6 +423,17 @@ func (bif *BoolWithInverseFlag) Set(name, val string) error
 
 func (bif *BoolWithInverseFlag) SetCategory(c string)
 
+func (bif *BoolWithInverseFlag) SetStringer(s FlagStringFunc)
+    SetStringer overrides the FlagStringFunc used by this flag's String method.
+    Passing nil restores the default behavior of using the package-level
+    FlagStringer. This is used e.g. by MutuallyExclusiveFlags.Stringer.
+
+    Note: unlike FlagBase, BoolWithInverseFlag.String only honors the
+    stringer partially. The names segment (the part before the first tab, e.g.
+    "--[no-]env, -e") is always recomputed from Name/Aliases/InversePrefix and
+    cannot be overridden; only the tab-delimited details after it come from the
+    stringer's output.
+
 func (bif *BoolWithInverseFlag) String() string
     String implements the standard Stringer interface.
 
@@ -485,6 +504,11 @@ type Command struct {
 	// An action to execute after any subcommands are run, but after the subcommand has finished
 	// It is run even if Action() panics
 	After AfterFunc `json:"-"`
+	// An action to validate arguments before the command is run. If non-nil, it
+	// is called before Before and Action. If the current command does not set
+	// ArgValidator, the nearest ancestor that does is used instead.
+	// Returning a non-nil error short-circuits the command.
+	ArgValidator ArgValidatorFunc `json:"-"`
 	// The function to call when this command is invoked
 	Action ActionFunc `json:"-"`
 	// Execute this function if the proper command cannot be found
@@ -567,6 +591,9 @@ type Command struct {
 
 func (cmd *Command) Args() Args
     Args returns the command line arguments associated with the command.
+    If the command declares named Arguments, the arguments consumed by them
+    are not included in the returned Args and should be retrieved via the
+    command.{Type}Arg(name) functions instead.
 
 func (cmd *Command) Bool(name string) bool
 
@@ -728,6 +755,9 @@ func (cmd *Command) StringMap(name string) map[string]string
 func (cmd *Command) StringSlice(name string) []string
     StringSlice looks up the value of a local StringSliceFlag, returns nil if
     not found
+
+func (cmd *Command) Text(name string) TextMarshalUnmarshaler
+    Text looks up the value of a local TextFlag, returns nil if not found
 
 func (cmd *Command) Timestamp(name string) time.Time
     Timestamp gets the timestamp from a flag name
@@ -1062,6 +1092,11 @@ func (f *FlagBase[T, C, V]) Set(_ string, val string) error
 
 func (f *FlagBase[T, C, V]) SetCategory(c string)
 
+func (f *FlagBase[T, C, V]) SetStringer(s FlagStringFunc)
+    SetStringer overrides the FlagStringFunc used by this flag's String method.
+    Passing nil restores the default behavior of using the package-level
+    FlagStringer. This is used e.g. by MutuallyExclusiveFlags.Stringer.
+
 func (f *FlagBase[T, C, V]) String() string
     String returns a readable representation of this value (for usage defaults)
 
@@ -1299,6 +1334,17 @@ type MutuallyExclusiveFlags struct {
 
 	// Category to apply to all flags within group
 	Category string
+
+	// Stringer overrides how each flag within this group is displayed in
+	// help output. If nil, flags use [FlagStringer] as usual.
+	//
+	// The returned string must be unique per flag within the group (the
+	// default [stringifyFlag] guarantees this by embedding the flag's
+	// name). Help rendering keys flags by their String() output
+	// (flagCategories.AddFlag), so a Stringer that returns identical text
+	// for two or more flags in the same category will cause the later
+	// flag to silently overwrite the earlier one in help output.
+	Stringer FlagStringFunc `json:"-"`
 }
     MutuallyExclusiveFlags defines a mutually exclusive flag group Multiple
     option paths can be provided out of which only one can be defined on cmdline
@@ -1396,9 +1442,31 @@ type StringSlice = SliceBase[string, StringConfig, stringValue]
 
 type StringSliceFlag = FlagBase[[]string, StringConfig, StringSlice]
 
+type StringerSetter interface {
+	// SetStringer overrides the [FlagStringFunc] used by this flag's
+	// String method. Passing nil restores the default behavior of using
+	// the package-level [FlagStringer].
+	SetStringer(FlagStringFunc)
+}
+    StringerSetter is an optional interface that allows an individual flag to be
+    given a per-flag override of FlagStringer. FlagBase and BoolWithInverseFlag
+    implement this. It's used by MutuallyExclusiveFlags.Stringer to customize
+    how flags within a mutually exclusive group are displayed in help output.
+
 type SuggestCommandFunc func(commands []*Command, provided string) string
 
 type SuggestFlagFunc func(flags []Flag, provided string, hideHelp bool) string
+
+type TextFlag = FlagBase[TextMarshalUnmarshaler, StringConfig, textValue]
+
+type TextMarshalUnmarshaler interface {
+	encoding.TextMarshaler
+	encoding.TextUnmarshaler
+}
+    TextMarshalUnmarshaler is the interface implemented by types that can
+    marshal themselves to and from a textual form. It is the value type used by
+    TextFlag, mirroring the standard library's flag.TextVar, and is satisfied by
+    types such as *slog.LevelVar, *net/netip.Addr, and *time.Time.
 
 type TimestampArg = ArgumentBase[time.Time, TimestampConfig, timestampValue]
 

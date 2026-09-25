@@ -125,6 +125,11 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 		// note that we can only do this because the shell autocomplete function
 		// always appends the completion flag at the end of the command
 		tracef("checking osArgs %v (cmd=%[2]q)", osArgs, cmd.Name)
+		// completion request state is per-run: a Command answering several
+		// requests (tests, REPL, embedded use) must not carry one request
+		// into the next
+		cmd.shellCompletion = false
+		cmd.shellCompletionPastDoubleDash = false
 		cmd.shellCompletion, osArgs = checkShellCompleteFlag(cmd, osArgs)
 
 		tracef("setting cmd.shellCompletion=%[1]v from checkShellCompleteFlag (cmd=%[2]q)", cmd.shellCompletion && cmd.EnableShellCompletion, cmd.Name)
@@ -327,6 +332,14 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 	// First, resolve the chain of nested commands up to the parent.
 	cmdChain := commandChain(cmd)
 
+	// Run ArgValidator from the nearest ancestor that sets one.
+	if validator := findArgValidator(cmd); validator != nil {
+		if err := validator(ctx, cmd); err != nil {
+			deferErr = cmd.handleExitCoder(ctx, err)
+			return ctx, deferErr
+		}
+	}
+
 	// Run Before actions in order.
 	if ctx, err = runBefore(ctx, cmdChain); err != nil {
 		deferErr = err
@@ -343,21 +356,14 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 		}
 	}
 
+	var requiredErr error
 	if err := cmd.checkAllRequiredFlags(); err != nil {
-		cmd.isInError = true
-		if cmd.OnUsageError != nil {
-			err = cmd.OnUsageError(ctx, cmd, err, cmd.parent != nil)
-		} else {
-			fmt.Fprintf(cmd.Root().ErrWriter, "Incorrect Usage: %s\n\n", err.Error())
-			if cmd.parent == nil {
-				_ = ShowRootCommandHelp(cmd)
-			} else {
-				if err := ShowCommandHelp(ctx, cmd.parent, cmd.Name); err != nil {
-					_ = ShowSubcommandHelp(cmd)
-				}
-			}
-		}
-		return ctx, err
+		requiredErr = err
+	} else if err := cmd.checkRequiredArguments(); err != nil {
+		requiredErr = err
+	}
+	if requiredErr != nil {
+		return cmd.handleRequiredError(ctx, requiredErr)
 	}
 
 	// Run the command action.
@@ -369,6 +375,9 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 			rargs, err = arg.Parse(rargs)
 			if err != nil {
 				tracef("calling with %[1]v (cmd=%[2]q)", err, cmd.Name)
+				if _, ok := err.(*errRequiredArguments); ok {
+					return cmd.handleRequiredError(ctx, err)
+				}
 				if cmd.OnUsageError != nil {
 					err = cmd.OnUsageError(ctx, cmd, err, cmd.parent != nil)
 				}
@@ -388,6 +397,21 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 	return ctx, deferErr
 }
 
+func (cmd *Command) handleRequiredError(ctx context.Context, err error) (context.Context, error) {
+	cmd.isInError = true
+	if cmd.OnUsageError != nil {
+		err = cmd.OnUsageError(ctx, cmd, err, cmd.parent != nil)
+	} else {
+		fmt.Fprintf(cmd.Root().ErrWriter, "Incorrect Usage: %s\n\n", err.Error())
+		if cmd.parent == nil {
+			_ = ShowRootCommandHelp(cmd)
+		} else if helpErr := ShowCommandHelp(ctx, cmd.parent, cmd.Name); helpErr != nil {
+			_ = ShowSubcommandHelp(cmd)
+		}
+	}
+	return ctx, err
+}
+
 func commandChain(cmd *Command) []*Command {
 	var cmdChain []*Command
 	for p := cmd; p != nil; p = p.parent {
@@ -395,6 +419,15 @@ func commandChain(cmd *Command) []*Command {
 	}
 	slices.Reverse(cmdChain)
 	return cmdChain
+}
+
+func findArgValidator(cmd *Command) ArgValidatorFunc {
+	for c := cmd; c != nil; c = c.parent {
+		if c.ArgValidator != nil {
+			return c.ArgValidator
+		}
+	}
+	return nil
 }
 
 func runBefore(ctx context.Context, cmdChain []*Command) (context.Context, error) {
