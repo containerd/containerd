@@ -75,6 +75,100 @@ func TestDefaultHosts(t *testing.T) {
 	}
 }
 
+func TestHostPassUpstreamCredentials(t *testing.T) {
+	const (
+		upstreamHost = "upstream.registry"
+		mirrorHost   = "mirror.registry"
+	)
+
+	for _, tc := range []struct {
+		name                   string
+		hostsTOML              string
+		requestHost            string
+		expectedCredentialHost string
+	}{
+		{
+			name: "pass upstream credentials uses upstream host for credentials",
+			hostsTOML: `
+[host."https://mirror.registry"]
+  capabilities = ["pull"]
+  pass_upstream_credentials = true
+	`,
+			requestHost:            mirrorHost,
+			expectedCredentialHost: upstreamHost,
+		},
+		{
+			name: "disabled pass upstream credentials uses mirror host for credentials",
+			hostsTOML: `
+[host."https://mirror.registry"]
+  capabilities = ["pull"]
+  pass_upstream_credentials = false
+	`,
+			requestHost:            mirrorHost,
+			expectedCredentialHost: mirrorHost,
+		},
+		{
+			name: "default uses mirror host for credentials",
+			hostsTOML: `
+[host."https://mirror.registry"]
+  capabilities = ["pull"]
+	`,
+			requestHost:            mirrorHost,
+			expectedCredentialHost: mirrorHost,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			hostDir := filepath.Join(dir, hostDirectory(upstreamHost))
+			if err := os.MkdirAll(hostDir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(hostDir, "hosts.toml"), []byte(tc.hostsTOML), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			var credentialHost string
+			resolve := ConfigureHosts(logtest.WithT(context.Background(), t), HostOptions{
+				HostDir: HostDirFromRoot(dir),
+				Credentials: func(host string) (string, string, error) {
+					credentialHost = host
+					return "user", "secret", nil
+				},
+			})
+
+			hosts, err := resolve(upstreamHost)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(hosts) == 0 {
+				t.Fatal("expected at least one registry host")
+			}
+			if hosts[0].Host != tc.requestHost {
+				t.Fatalf("expected registry host %q, got %q", tc.requestHost, hosts[0].Host)
+			}
+
+			req, err := http.NewRequest(http.MethodGet, "https://"+tc.requestHost+"/v2/test/manifests/latest", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			header := http.Header{}
+			header.Set("WWW-Authenticate", `Basic realm="registry"`)
+			resp := &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Request:    req,
+				Header:     header,
+			}
+			if err := hosts[0].Authorizer.AddResponses(context.Background(), []*http.Response{resp}); err != nil {
+				t.Fatal(err)
+			}
+
+			if credentialHost != tc.expectedCredentialHost {
+				t.Fatalf("expected credentials for %q, got %q", tc.expectedCredentialHost, credentialHost)
+			}
+		})
+	}
+}
+
 func TestParseHostFile(t *testing.T) {
 	const testtoml = `
 server = "https://test-default.registry"
