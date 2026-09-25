@@ -121,7 +121,8 @@ func checkKillError(err error) error {
 		strings.Contains(strings.ToLower(err.Error()), "no such process") ||
 		err == unix.ESRCH {
 		return fmt.Errorf("process already finished: %w", errdefs.ErrNotFound)
-	} else if strings.Contains(err.Error(), "does not exist") {
+	} else if strings.Contains(err.Error(), "does not exist") ||
+		strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
 		return fmt.Errorf("no such container: %w", errdefs.ErrNotFound)
 	}
 	return fmt.Errorf("unknown error after kill: %w", err)
