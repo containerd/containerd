@@ -97,22 +97,93 @@ func NewStore(img Getter, provider content.InfoReaderProvider, platform platform
 
 // Update updates cache for a reference.
 func (s *Store) Update(ctx context.Context, ref string) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	i, err := s.images.Get(ctx, ref)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return fmt.Errorf("get image from containerd: %w", err)
+	var (
+		i   images.Image
+		err error
+	)
+	if s.images != nil {
+		i, err = s.images.Get(ctx, ref)
+		if err != nil && !errdefs.IsNotFound(err) {
+			return fmt.Errorf("get image from containerd: %w", err)
+		}
+	} else {
+		err = errdefs.ErrNotFound
 	}
 
 	var img *Image
 	if err == nil {
 		img, err = s.getImage(ctx, i)
 		if err != nil {
-			return fmt.Errorf("get image info from containerd: %w", err)
+			if errdefs.IsNotFound(err) {
+				img = nil
+			} else {
+				return fmt.Errorf("get image info from containerd: %w", err)
+			}
 		}
 	}
-	return s.update(ref, img)
+
+	var (
+		remainingToCheck []string
+		oldID            string
+	)
+
+	s.lock.Lock()
+	var oldExist bool
+	oldID, oldExist = s.refCache[ref]
+	if img == nil {
+		if oldExist {
+			s.store.delete(oldID, ref)
+			delete(s.refCache, ref)
+			if cached, err := s.store.get(oldID); err == nil {
+				remainingToCheck = append(remainingToCheck, cached.References...)
+			}
+		}
+	} else {
+		if err := s.update(ref, img); err != nil {
+			s.lock.Unlock()
+			return err
+		}
+	}
+	s.lock.Unlock()
+
+	if len(remainingToCheck) > 0 && s.images != nil {
+		missingRefs := make(map[string]bool)
+		var checkErr error
+
+		for _, r := range remainingToCheck {
+			_, err := s.images.Get(ctx, r)
+			if err == nil {
+				continue
+			}
+			if errdefs.IsNotFound(err) {
+				missingRefs[r] = true
+			} else {
+				checkErr = err
+				break
+			}
+		}
+
+		if checkErr != nil {
+			return fmt.Errorf("check remaining image references: %w", checkErr)
+		}
+
+		if len(missingRefs) > 0 {
+			s.lock.Lock()
+			for _, r := range remainingToCheck {
+				if !missingRefs[r] {
+					continue
+				}
+				if currID, ok := s.refCache[r]; !ok || currID != oldID {
+					continue
+				}
+				s.store.delete(oldID, r)
+				delete(s.refCache, r)
+			}
+			s.lock.Unlock()
+		}
+	}
+
+	return nil
 }
 
 // update updates the internal cache. img == nil means that
