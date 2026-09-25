@@ -843,6 +843,20 @@ func checkLabel(label string) error {
 	return nil
 }
 
+func checkLabel(label string) error {
+	if len(label) != 0 {
+		con := strings.SplitN(label, ":", 4)
+		if len(con) > 3 {
+			state.Lock()
+			defer state.Unlock()
+			if state.mcsList[con[3]] {
+				return ErrMCSAlreadyExists
+			}
+		}
+	}
+	return nil
+}
+
 func selinuxEnforcePath() string {
 	return filepath.Join(getSelinuxMountPoint(), "enforce")
 }
