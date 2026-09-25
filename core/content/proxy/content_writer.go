@@ -151,5 +151,15 @@ func (rw *remoteWriter) Truncate(size int64) error {
 }
 
 func (rw *remoteWriter) Close() error {
-	return rw.client.CloseSend()
+	err := rw.client.CloseSend()
+	// Drain remaining messages to ensure the server-side stream handler
+	// completes (including deferred writer cleanup) before returning.
+	// Without this, a subsequent Abort could race with the server's
+	// deferred Close writing to the ingest directory.
+	for {
+		if _, recvErr := rw.client.Recv(); recvErr != nil {
+			break
+		}
+	}
+	return err
 }
