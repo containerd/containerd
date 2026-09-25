@@ -36,6 +36,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
@@ -303,8 +304,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		logger.WithField("spec", spec).Debugf("Container %q spec", r.containerID)
 	}
 
-	// Grab any platform specific snapshotter opts.
-	sOpts, err := snapshotterOpts(r.containerConfig)
+	sOpts, err := snapshotOpts(r.containerConfig)
 	if err != nil {
 		return "", err
 	}
@@ -1189,4 +1189,34 @@ func (c *criService) runtimeInfo(ctx context.Context, id string) (string, typeur
 	}
 
 	return "", nil, err
+}
+
+// snapshotOpts returns the options for the container's rootfs snapshot: the
+// writable layer size requested through the container annotations, followed
+// by any platform specific options.
+//
+// On Linux an annotation is the only way to size a container's rootfs: the
+// CRI API has no equivalent of the Windows-only
+// WindowsContainerResources.rootfs_size_in_bytes, which snapshotterOpts
+// translates into a snapshot label on Windows.
+//
+// Only containerd.io/snapshot/max-size is taken, rather than every
+// containerd.io/snapshot/ annotation. Other labels under that prefix are
+// managed by containerd itself: the user namespace ID mappings, for one, are
+// set by snapshotterOpts only when a user namespace is requested, so an
+// inherited mapping label would otherwise reach the snapshotter unchallenged
+// for a container that has none.
+func snapshotOpts(config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
+	var opts []snapshots.Opt
+	if size, ok := config.GetAnnotations()[snapshots.LabelSnapshotMaxSize]; ok {
+		opts = append(opts, snapshots.WithLabels(map[string]string{
+			snapshots.LabelSnapshotMaxSize: size,
+		}))
+	}
+
+	extraOpts, err := snapshotterOpts(config)
+	if err != nil {
+		return nil, err
+	}
+	return append(opts, extraOpts...), nil
 }
