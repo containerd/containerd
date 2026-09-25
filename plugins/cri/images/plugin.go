@@ -89,6 +89,10 @@ func init() {
 				criconfig.CheckLocalImagePullConfigs(ic.Context, &config)
 			}
 
+			if err := criconfig.ValidateImagePullTimeout(&config); err != nil {
+				return nil, err
+			}
+
 			ts, err := ic.GetSingle(plugins.TransferPlugin)
 			if err != nil {
 				return nil, err
