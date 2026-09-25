@@ -72,20 +72,20 @@ func (s *service) ListStream(req *api.ListContainersRequest, stream api.Containe
 		return err
 	}
 	for {
-		select {
-		case <-stream.Context().Done():
+		if err := stream.Context().Err(); err != nil {
 			return nil
-		default:
-			c, err := containers.Recv()
-			if err != nil {
-				if err == io.EOF {
-					return nil
-				}
-				return err
+		}
+
+		c, err := containers.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return nil
 			}
-			if err := stream.Send(c); err != nil {
-				return err
-			}
+			return err
+		}
+
+		if err := stream.Send(c); err != nil {
+			return err
 		}
 	}
 }
