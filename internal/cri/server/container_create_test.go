@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
@@ -763,4 +764,31 @@ func TestLinuxContainerMounts(t *testing.T) {
 			assert.Equal(t, test.expectedMounts, mounts, test.desc)
 		})
 	}
+}
+
+// TestCreateContainerNotReadySandbox verifies that CreateContainer is rejected
+// when its sandbox is not in the ready state, per the CRI spec.
+func TestCreateContainerNotReadySandbox(t *testing.T) {
+	c := newTestCRIService()
+	containerConfig, sandboxConfig, _, _ := getCreateContainerTestData()
+	const sandboxID = "test-not-ready-sandbox-id"
+	sb := sandboxstore.NewSandbox(
+		sandboxstore.Metadata{
+			ID:     sandboxID,
+			Name:   "test-not-ready-sandbox-name",
+			Config: sandboxConfig,
+		},
+		sandboxstore.Status{
+			State: sandboxstore.StateNotReady,
+		},
+	)
+	require.NoError(t, c.sandboxStore.Add(sb))
+
+	_, err := c.CreateContainer(context.Background(), &runtime.CreateContainerRequest{
+		PodSandboxId:  sandboxID,
+		Config:        containerConfig,
+		SandboxConfig: sandboxConfig,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is not running")
 }
