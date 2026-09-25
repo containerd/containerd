@@ -20,9 +20,9 @@ package erofs
 
 import (
 	"context"
-	"fmt"
+	"errors"
 )
 
 func (s *erofsDiff) formatDmverityLayer(_ context.Context, _ string) error {
-	return fmt.Errorf("dm-verity formatting is only supported on Linux systems")
+	return errors.New("dm-verity formatting is only supported on Linux systems")
 }

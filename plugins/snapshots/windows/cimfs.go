@@ -21,6 +21,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -73,7 +74,7 @@ func WithNTFSFormat() scratchCreationOpt {
 func WithSize(size uint64) scratchCreationOpt {
 	return func(opts *scratchCreationOptions) error {
 		if size == 0 {
-			return fmt.Errorf("VHD size cannot be zero")
+			return errors.New("VHD size cannot be zero")
 		}
 		opts.sizeInBytes = size
 		return nil
@@ -209,7 +210,7 @@ func (s *cimFSSnapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mo
 
 func (s *cimFSSnapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
 	if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
-		return fmt.Errorf("committing a scratch snapshot to read-only cim layer isn't supported yet")
+		return errors.New("committing a scratch snapshot to read-only cim layer isn't supported yet")
 	}
 
 	return s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
@@ -289,7 +290,7 @@ func (s *cimFSSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Ki
 		}
 
 		if len(newSnapshot.ParentIDs) == 0 {
-			return fmt.Errorf("scratch snapshot without any parents isn't supported")
+			return errors.New("scratch snapshot without any parents isn't supported")
 		}
 
 		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
