@@ -433,11 +433,13 @@ server = "https://registry-1.docker.io"
 
 As with any `hosts.toml` field that redirects traffic, the socket path is
 trusted to the same degree as the `hosts.toml` file itself, so the file
-and the socket should be protected by appropriate filesystem permissions. Note
-that a pathname socket inherits the permissions of its parent directory: an
-unprivileged proxy cannot `bind()` a socket directly in a root-owned directory
-such as `/run` (it returns `EACCES`); place the socket in a directory the proxy
-owns (for example a systemd `RuntimeDirectory`).
+and the socket should be protected by appropriate filesystem permissions. Two
+separate sets of permissions apply: the parent directory's mode controls
+whether a process may create and `bind()` the socket there (an unprivileged
+proxy cannot `bind()` directly in a root-owned directory such as `/run` — it
+returns `EACCES` — so place the socket in a directory the proxy owns, for
+example a systemd `RuntimeDirectory`), while the socket inode has its own mode
+that controls which clients may `connect()` to it.
 
 ## host field(s) (in the toml table format)
 
