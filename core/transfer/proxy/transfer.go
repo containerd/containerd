@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -40,6 +41,17 @@ import (
 	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
+
+// progressDrainTimeout is the maximum time Transfer will wait for the progress
+// stream consumer goroutine to finish dispatching any remaining progress events
+// after the underlying Transfer RPC has returned.
+//
+// The server closes the progress stream (deferred stream.Close) before the RPC
+// returns, so under normal operation the client Recv loop hits io.EOF promptly
+// and this wait is a no-op. The timeout only guards against pathological cases
+// (server failing to close the stream, or a user Progress callback blocking
+// indefinitely) so that Transfer never hangs forever.
+const progressDrainTimeout = 30 * time.Second
 
 type proxyTransferrer struct {
 	client        transferapi.TTRPCTransferService
@@ -91,6 +103,23 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src any, dst any, opts 
 		opt(o)
 	}
 	apiOpts := &transferapi.TransferOptions{}
+
+	// When a progress callback is configured, a progress stream is created and a
+	// goroutine consumes it, dispatching each event to the caller's callback.
+	//
+	// The server closes the progress stream as the Transfer RPC returns, but the
+	// events it already sent may still be buffered on the client side and not yet
+	// Recv'd/dispatched when Transfer returns. Without waiting for the consumer
+	// goroutine to drain, callers that inspect progress immediately after Transfer
+	// returns can observe a truncated set of events (e.g. missing the final
+	// "saved"/"Completed" events). This was the root cause of the flaky
+	// TestTransferImport/DigestRefs (see issue #10786).
+	//
+	// done is closed when the consumer goroutine exits (on io.EOF once the server
+	// closes the stream, or on any recv error). After the RPC returns we wait for
+	// done (bounded by progressDrainTimeout) so that all already-sent progress
+	// events are delivered before Transfer returns.
+	var done chan struct{}
 	if o.Progress != nil {
 		sid := tstreaming.GenerateID("progress")
 		stream, err := p.streamCreator.Create(ctx, sid)
@@ -98,7 +127,9 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src any, dst any, opts 
 			return err
 		}
 		apiOpts.ProgressStream = sid
+		done = make(chan struct{})
 		go func() {
+			defer close(done)
 			for {
 				a, err := stream.Recv()
 				if err != nil {
@@ -152,6 +183,18 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src any, dst any, opts 
 		Options: apiOpts,
 	}
 	_, err = p.client.Transfer(ctx, req)
+	if done != nil {
+		// Wait for the progress consumer to finish dispatching any events the
+		// server sent before closing the stream. This runs on both success and
+		// error paths so that progress delivery semantics are consistent. The
+		// timeout guards against a server that fails to close the stream or a
+		// user callback that blocks indefinitely.
+		select {
+		case <-done:
+		case <-time.After(progressDrainTimeout):
+			log.G(ctx).Warn("timed out waiting for transfer progress stream to drain")
+		}
+	}
 	return errgrpc.ToNative(err)
 }
 func (p *proxyTransferrer) marshalAny(ctx context.Context, i any) (typeurl.Any, error) {
