@@ -27,6 +27,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
@@ -175,4 +176,20 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 			assert.Equal(t, meta, curMeta)
 		})
 	}
+}
+
+func TestSandboxSnapshotLabels(t *testing.T) {
+	input := map[string]string{
+		snapshots.LabelSnapshotUIDMapping: "0:1000:1",
+		snapshots.LabelSnapshotGIDMapping: "0:1000:1",
+		"containerd.io/snapshot/remote":   "keep",
+		"unrelated":                       "drop",
+	}
+	expected := map[string]string{
+		"containerd.io/snapshot/remote": "keep",
+	}
+
+	got := sandboxSnapshotLabels(input)
+
+	assert.Equal(t, expected, got)
 }
