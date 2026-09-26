@@ -14,7 +14,7 @@ permissions: # added using https://github.com/step-security/secure-workflows
 jobs:
   check:
     name: Check Signed Tag
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v') && !github.event.repository.private
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -58,7 +58,7 @@ jobs:
 
   release:
     name: Create containerd Release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v') && !github.event.repository.private
     permissions:
       contents: write
     runs-on: ubuntu-24.04
