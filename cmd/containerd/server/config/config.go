@@ -404,6 +404,9 @@ type ProxyPlugin struct {
 	Platform     string            `toml:"platform"`
 	Exports      map[string]string `toml:"exports"`
 	Capabilities []string          `toml:"capabilities"`
+	// DefaultTimeout bounds each call to the plugin when the caller's context
+	// carries no deadline of its own. Empty leaves calls unbounded.
+	DefaultTimeout string `toml:"default_timeout"`
 }
 
 // Decode unmarshals a plugin specific configuration by plugin id
