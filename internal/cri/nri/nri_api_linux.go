@@ -40,7 +40,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/runtime-tools/generate"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/nri"
@@ -368,8 +367,7 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 			return nil
 		}
 
-		sgen := generate.Generator{Config: spec}
-		ngen := nrigen.SpecGenerator(&sgen, generatorOptions...)
+		ngen := nrigen.SpecGenerator(newSpecGen(spec), generatorOptions...)
 
 		err = ngen.Adjust(adjust)
 		if err != nil {
@@ -970,6 +968,23 @@ func (c *criContainer) GetCDIDevices() []*api.CDIDevice {
 		return devices
 	}
 	return nil
+}
+
+func (c *criContainer) GetImage() *api.Image {
+	if c.meta == nil {
+		return nil
+	}
+	if c.meta.ImageName == "" && c.meta.ImageDigest == "" && c.meta.ImageRef == "" {
+		return nil
+	}
+	return &api.Image{
+		// normalized image reference
+		Name: c.meta.ImageName,
+		// index/manifest digest
+		Digest: c.meta.ImageDigest,
+		// image config digest
+		ConfigDigest: c.meta.ImageRef,
+	}
 }
 
 func (c *criContainer) GetRdt() *api.LinuxRdt {

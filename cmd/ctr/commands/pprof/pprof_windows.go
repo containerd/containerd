@@ -17,13 +17,14 @@
 package pprof
 
 import (
+	"context"
 	"net"
 
 	winio "github.com/Microsoft/go-winio"
 )
 
-func (d *pprofDialer) pprofDial(proto, addr string) (conn net.Conn, err error) {
-	return winio.DialPipe(d.addr, nil)
+func (d *pprofDialer) pprofDial(ctx context.Context, _, _ string) (net.Conn, error) {
+	return winio.DialPipeContext(ctx, d.addr)
 }
 
 func getPProfDialer(addr string) *pprofDialer {

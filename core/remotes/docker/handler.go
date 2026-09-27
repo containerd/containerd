@@ -18,7 +18,6 @@ package docker
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -71,7 +70,7 @@ func AppendDistributionSourceLabel(manager content.Manager, ref string) (images.
 				key: value,
 			},
 		}
-		_, err = manager.Update(ctx, info, fmt.Sprintf("labels.%s", key))
+		_, err = manager.Update(ctx, info, "labels."+key)
 		return nil, err
 	}, nil
 }

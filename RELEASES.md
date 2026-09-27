@@ -142,7 +142,7 @@ to all committers.
 | [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.9)  | End of Life    | May 7, 2025                    | July 3, 2026                   |                        |
 | [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.5)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
 | [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.2)  | LTS            | April 30, 2026                 | April 30, 2028                 | @containerd/committers |
-| [2.4](https://github.com/containerd/containerd/milestone/51)         | _Future_       | August 26, 2026 (_tentative_)  | April 26, 2027 (_tentative_)   | @containerd/committers |
+| [2.4](https://github.com/containerd/containerd/milestone/51)         | Active         | September 16, 2026             | May 16, 2027                   | @containerd/committers |
 
 \* Support for the 1.7 release branch was provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by [@samuelkarp](https://github.com/samuelkarp) and [@chrishenzie](https://github.com/chrishenzie).  This extended support is focused on usage with Kubernetes 1.32, 1.31, and 1.30 via [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).  Changes may not be accepted if they are not needed for this usage.
 
@@ -166,6 +166,7 @@ of containerd for every supported version of Kubernetes.
 | 1.34               | 2.1.3+, 2.0.6+, 1.7.28+, 1.6.39+ | v1              |
 | 1.35               | 2.2.0+, 2.1.5+, 1.7.28+          | v1              |
 | 1.36               | 2.3.0+, 2.2.0+                   | v1              |
+| 1.37               | 2.4.0+, 2.3.0+                   | v1              |
 
 Deprecated containerd and kubernetes versions
 
@@ -472,7 +473,7 @@ releases for prior API versions should be avoided if possible.
 | v2.1               | 1.9                    |
 | v2.2               | 1.10                   |
 | v2.3               | 1.11                   |
-| _v2.4_             | _1.12_                 |
+| v2.4               | 1.12                   |
 
 
 ### Metrics API
@@ -631,13 +632,13 @@ The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in 
 |`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_root`               | containerd v1.3     | containerd v2.0 ✅         | Use `options.Root`                                   |
 |`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `disable_cgroup`             | -                   | containerd v2.0 ✅         | Use [cgroup v2 delegation](https://rootlesscontaine.rs/getting-started/common/cgroup2/) |
 |`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*.options]` | `CriuPath`                   | containerd v1.7     | containerd v2.0 ✅         | Set `$PATH` to the `criu` binary                     |
-|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `auths`                      | containerd v1.3     | containerd v2.4            | Use [`ImagePullSecrets`](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/). See also [#8228](https://github.com/containerd/containerd/issues/8228). |
-|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `configs`                    | containerd v1.5     | containerd v2.4            | Use [`config_path`](./docs/hosts.md)                 |
-|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `mirrors`                    | containerd v1.5     | containerd v2.4            | Use [`config_path`](./docs/hosts.md)                 |
-|`[plugins."io.containerd.tracing.processor.v1.otlp"]`                 | `endpoint`, `protocol`, `insecure` | containerd v1.6.29 | containerd v2.4       | Use [OTLP environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), e.g. OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, OTEL_EXPORTER_OTLP_PROTOCOL, OTEL_SDK_DISABLED    |
-|`[plugins."io.containerd.cri.v1.runtime".cni]`                        | `bin_dir`                    | containerd v2.1     | containerd v2.4            | Use `bin_dirs`, which supports a list of directories |
-|`[plugins."io.containerd.internal.v1.tracing"]`                       | `service_name`, `sampling_ratio`   | containerd v1.6.29 | containerd v2.4       | Instead use [OTel environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), e.g. OTEL_SERVICE_NAME, OTEL_TRACES_SAMPLER*  |
-|`[plugins."io.containerd.cri.v1.runtime"]`                            | `enable_cdi`                 | containerd v2.2     | containerd v2.4            | CDI support will always be enabled                   |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `auths`                      | containerd v1.3     | containerd v2.7            | Use [`ImagePullSecrets`](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/). See also [#8228](https://github.com/containerd/containerd/issues/8228). |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `configs`                    | containerd v1.5     | containerd v2.7            | Use [`config_path`](./docs/hosts.md)                 |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `mirrors`                    | containerd v1.5     | containerd v2.7            | Use [`config_path`](./docs/hosts.md)                 |
+|`[plugins."io.containerd.tracing.processor.v1.otlp"]`                 | `endpoint`, `protocol`, `insecure` | containerd v1.6.29 | containerd v2.4 ✅    | Use [OTLP environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), e.g. OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, OTEL_EXPORTER_OTLP_PROTOCOL, OTEL_SDK_DISABLED    |
+|`[plugins."io.containerd.cri.v1.runtime".cni]`                        | `bin_dir`                    | containerd v2.1     | containerd v2.4 ✅         | Use `bin_dirs`, which supports a list of directories |
+|`[plugins."io.containerd.internal.v1.tracing"]`                       | `service_name`, `sampling_ratio`   | containerd v1.6.29 | containerd v2.4 ✅    | Instead use [OTel environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), e.g. OTEL_SERVICE_NAME, OTEL_TRACES_SAMPLER*  |
+|`[plugins."io.containerd.cri.v1.runtime"]`                            | `enable_cdi`                 | containerd v2.2     | containerd v2.4 ✅         | CDI support will always be enabled                   |
 
 
 > **Note**

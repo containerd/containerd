@@ -42,32 +42,32 @@ func TestContainerStopSignals(t *testing.T) {
 	}{
 		{
 			name:           "SIGUSR1 stop signal",
-			stopSignal:     runtime.Signal_SIGUSR1,
-			expectedSignal: runtime.Signal_SIGUSR1,
+			stopSignal:     runtime.Signal_SIGNAL_SIGUSR1,
+			expectedSignal: runtime.Signal_SIGNAL_SIGUSR1,
 			trapSignal:     "USR1",
 		},
 		{
 			name:           "SIGUSR2 stop signal",
-			stopSignal:     runtime.Signal_SIGUSR2,
-			expectedSignal: runtime.Signal_SIGUSR2,
+			stopSignal:     runtime.Signal_SIGNAL_SIGUSR2,
+			expectedSignal: runtime.Signal_SIGNAL_SIGUSR2,
 			trapSignal:     "USR2",
 		},
 		{
 			name:           "SIGHUP stop signal",
-			stopSignal:     runtime.Signal_SIGHUP,
-			expectedSignal: runtime.Signal_SIGHUP,
+			stopSignal:     runtime.Signal_SIGNAL_SIGHUP,
+			expectedSignal: runtime.Signal_SIGNAL_SIGHUP,
 			trapSignal:     "HUP",
 		},
 		{
 			name:           "SIGINT stop signal",
-			stopSignal:     runtime.Signal_SIGINT,
-			expectedSignal: runtime.Signal_SIGINT,
+			stopSignal:     runtime.Signal_SIGNAL_SIGINT,
+			expectedSignal: runtime.Signal_SIGNAL_SIGINT,
 			trapSignal:     "INT",
 		},
 		{
 			name:           "SIGTERM stop signal (default)",
-			stopSignal:     runtime.Signal_SIGTERM,
-			expectedSignal: runtime.Signal_SIGTERM,
+			stopSignal:     runtime.Signal_SIGNAL_SIGTERM,
+			expectedSignal: runtime.Signal_SIGNAL_SIGTERM,
 			trapSignal:     "TERM",
 		},
 	}
@@ -158,7 +158,7 @@ func TestDefaultContainerStopSignal(t *testing.T) {
 	status, err := runtimeService.ContainerStatus(cn)
 	require.NoError(t, err)
 
-	assert.Equal(t, runtime.Signal_SIGTERM, status.GetStopSignal())
+	assert.Equal(t, runtime.Signal_SIGNAL_SIGTERM, status.GetStopSignal())
 
 	require.NoError(t, runtimeService.StopContainer(cn, 10))
 

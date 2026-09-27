@@ -18,6 +18,7 @@ package events
 
 import (
 	"testing"
+	"testing/synctest"
 	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
@@ -25,7 +26,6 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 type noopEventHandler struct {
@@ -65,107 +65,104 @@ func TestEventMonitor_SubscribeNothing(t *testing.T) {
 
 // TestBackOff tests the logic of backOff struct.
 func TestBackOff(t *testing.T) {
-	testStartTime := time.Now()
-	testClock := testingclock.NewFakeClock(testStartTime)
-	inputQueues := map[string]*backOffQueue{
-		"container1": {
-			events: []any{
-				&eventtypes.TaskOOM{ContainerID: "container1"},
-				&eventtypes.TaskOOM{ContainerID: "container1"},
+	synctest.Test(t, func(t *testing.T) {
+		testStartTime := time.Now()
+		inputQueues := map[string]*backOffQueue{
+			"container1": {
+				events: []any{
+					&eventtypes.TaskOOM{ContainerID: "container1"},
+					&eventtypes.TaskOOM{ContainerID: "container1"},
+				},
 			},
-		},
-		"container2": {
-			events: []any{
-				&eventtypes.TaskOOM{ContainerID: "container2"},
-				&eventtypes.TaskOOM{ContainerID: "container2"},
+			"container2": {
+				events: []any{
+					&eventtypes.TaskOOM{ContainerID: "container2"},
+					&eventtypes.TaskOOM{ContainerID: "container2"},
+				},
 			},
-		},
-	}
-	expectedQueues := map[string]*backOffQueue{
-		"container2": {
-			events: []any{
-				&eventtypes.TaskOOM{ContainerID: "container2"},
-				&eventtypes.TaskOOM{ContainerID: "container2"},
-			},
-			expireTime: testClock.Now().Add(backOffInitDuration),
-			duration:   backOffInitDuration,
-			clock:      testClock,
-		},
-		"container1": {
-			events: []any{
-				&eventtypes.TaskOOM{ContainerID: "container1"},
-				&eventtypes.TaskOOM{ContainerID: "container1"},
-			},
-			expireTime: testClock.Now().Add(backOffInitDuration),
-			duration:   backOffInitDuration,
-			clock:      testClock,
-		},
-	}
-
-	t.Logf("Should be able to backOff a event")
-	actual := newBackOff()
-	actual.clock = testClock
-	for k, queue := range inputQueues {
-		for _, event := range queue.events {
-			actual.enBackOff(k, event)
 		}
-	}
-	assert.Equal(t, actual.queuePool, expectedQueues)
-
-	t.Logf("Should be able to check if the container is in backOff state")
-	for k, queue := range inputQueues {
-		for _, e := range queue.events {
-			evt, err := typeurl.MarshalAny(e)
-			assert.NoError(t, err)
-			key, _, err := convertEvent(evt)
-			assert.NoError(t, err)
-			assert.Equal(t, k, key)
-			assert.Equal(t, actual.isInBackOff(key), true)
+		expectedQueues := map[string]*backOffQueue{
+			"container2": {
+				events: []any{
+					&eventtypes.TaskOOM{ContainerID: "container2"},
+					&eventtypes.TaskOOM{ContainerID: "container2"},
+				},
+				expireTime: testStartTime.Add(backOffInitDuration),
+				duration:   backOffInitDuration,
+			},
+			"container1": {
+				events: []any{
+					&eventtypes.TaskOOM{ContainerID: "container1"},
+					&eventtypes.TaskOOM{ContainerID: "container1"},
+				},
+				expireTime: testStartTime.Add(backOffInitDuration),
+				duration:   backOffInitDuration,
+			},
 		}
-	}
 
-	t.Logf("Should be able to check that a container isn't in backOff state")
-	notExistKey := "containerNotExist"
-	assert.Equal(t, actual.isInBackOff(notExistKey), false)
-
-	t.Logf("No containers should be expired")
-	assert.Empty(t, actual.getExpiredIDs())
-
-	t.Logf("Should be able to get all keys which are expired for backOff")
-	testClock.Sleep(backOffInitDuration)
-	actKeyList := actual.getExpiredIDs()
-	assert.Equal(t, len(inputQueues), len(actKeyList))
-	for k := range inputQueues {
-		assert.Contains(t, actKeyList, k)
-	}
-
-	t.Logf("Should be able to get out all backOff events")
-	doneQueues := map[string]*backOffQueue{}
-	for k := range inputQueues {
-		actQueue := actual.deBackOff(k)
-		doneQueues[k] = actQueue
-		assert.True(t, cmp.Equal(actQueue.events, expectedQueues[k].events, prototestutil.Compare))
-	}
-
-	t.Logf("Should not get out the event again after having got out the backOff event")
-	for k := range inputQueues {
-		var expect *backOffQueue
-		actQueue := actual.deBackOff(k)
-		assert.Equal(t, actQueue, expect)
-	}
-
-	t.Logf("Should be able to reBackOff")
-	for k, queue := range doneQueues {
-		failEventIndex := 1
-		events := queue.events[failEventIndex:]
-		actual.reBackOff(k, events, queue.duration)
-		actQueue := actual.deBackOff(k)
-		expQueue := &backOffQueue{
-			events:     events,
-			expireTime: testClock.Now().Add(2 * queue.duration),
-			duration:   2 * queue.duration,
-			clock:      testClock,
+		t.Logf("Should be able to backOff a event")
+		actual := newBackOff()
+		for k, queue := range inputQueues {
+			for _, event := range queue.events {
+				actual.enBackOff(k, event)
+			}
 		}
-		assert.Equal(t, actQueue, expQueue)
-	}
+		assert.Equal(t, actual.queuePool, expectedQueues)
+
+		t.Logf("Should be able to check if the container is in backOff state")
+		for k, queue := range inputQueues {
+			for _, e := range queue.events {
+				evt, err := typeurl.MarshalAny(e)
+				assert.NoError(t, err)
+				key, _, err := convertEvent(evt)
+				assert.NoError(t, err)
+				assert.Equal(t, k, key)
+				assert.Equal(t, actual.isInBackOff(key), true)
+			}
+		}
+
+		t.Logf("Should be able to check that a container isn't in backOff state")
+		notExistKey := "containerNotExist"
+		assert.Equal(t, actual.isInBackOff(notExistKey), false)
+
+		t.Logf("No containers should be expired")
+		assert.Empty(t, actual.getExpiredIDs())
+
+		t.Logf("Should be able to get all keys which are expired for backOff")
+		time.Sleep(backOffInitDuration)
+		actKeyList := actual.getExpiredIDs()
+		assert.Equal(t, len(inputQueues), len(actKeyList))
+		for k := range inputQueues {
+			assert.Contains(t, actKeyList, k)
+		}
+
+		t.Logf("Should be able to get out all backOff events")
+		doneQueues := map[string]*backOffQueue{}
+		for k := range inputQueues {
+			actQueue := actual.deBackOff(k)
+			doneQueues[k] = actQueue
+			assert.True(t, cmp.Equal(actQueue.events, expectedQueues[k].events, prototestutil.Compare))
+		}
+
+		t.Logf("Should not get out the event again after having got out the backOff event")
+		for k := range inputQueues {
+			var expect *backOffQueue
+			actQueue := actual.deBackOff(k)
+			assert.Equal(t, actQueue, expect)
+		}
+
+		t.Logf("Should be able to reBackOff")
+		for k, queue := range doneQueues {
+			failEventIndex := 1
+			events := queue.events[failEventIndex:]
+			actual.reBackOff(k, events, queue.duration)
+			actQueue := actual.deBackOff(k)
+			expQueue := &backOffQueue{
+				events:     events,
+				expireTime: time.Now().Add(2 * queue.duration),
+				duration:   2 * queue.duration,
+			}
+			assert.Equal(t, actQueue, expQueue)
+		}
+	})
 }

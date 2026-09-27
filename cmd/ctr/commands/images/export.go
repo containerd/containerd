@@ -17,12 +17,14 @@
 package images
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/images/archive"
@@ -55,7 +57,6 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: cli.NewStringSlice(),
 		},
 		&cli.BoolFlag{
 			Name:  "all-platforms",
@@ -66,17 +67,17 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Usage: "Run export locally rather than through transfer API",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	DisableSliceFlagSeparator: true,
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
-			out        = cliContext.Args().First()
-			images     = cliContext.Args().Tail()
 			exportOpts = []archive.ExportOpt{}
 		)
-		if out == "" || len(images) == 0 {
-			return errors.New("please provide both an output filename and an image reference to export")
+		cmd, out, images, err := resolveExportArgs(ctx, cmd)
+		if err != nil {
+			return err
 		}
 
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -93,12 +94,12 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		}
 		defer w.Close()
 
-		if !cliContext.Bool("local") {
+		if !cmd.Bool("local") {
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
 
 			exportOpts := []tarchive.ExportOpt{}
-			if pss := cliContext.StringSlice("platform"); len(pss) > 0 {
+			if pss := cmd.StringSlice("platform"); len(pss) > 0 {
 				for _, ps := range pss {
 					p, err := platforms.Parse(ps)
 					if err != nil {
@@ -107,15 +108,15 @@ When '--all-platforms' is given all images in a manifest list must be available.
 					exportOpts = append(exportOpts, tarchive.WithPlatform(p))
 				}
 			}
-			if cliContext.Bool("all-platforms") {
+			if cmd.Bool("all-platforms") {
 				exportOpts = append(exportOpts, tarchive.WithAllPlatforms)
 			}
 
-			if cliContext.Bool("skip-manifest-json") {
+			if cmd.Bool("skip-manifest-json") {
 				exportOpts = append(exportOpts, tarchive.WithSkipCompatibilityManifest)
 			}
 
-			if cliContext.Bool("skip-non-distributable") {
+			if cmd.Bool("skip-non-distributable") {
 				exportOpts = append(exportOpts, tarchive.WithSkipNonDistributableBlobs)
 			}
 
@@ -131,7 +132,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			)
 		}
 
-		if pss := cliContext.StringSlice("platform"); len(pss) > 0 {
+		if pss := cmd.StringSlice("platform"); len(pss) > 0 {
 			all, err := platforms.ParseAll(pss)
 			if err != nil {
 				return err
@@ -141,15 +142,15 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			exportOpts = append(exportOpts, archive.WithPlatform(platforms.DefaultStrict()))
 		}
 
-		if cliContext.Bool("all-platforms") {
+		if cmd.Bool("all-platforms") {
 			exportOpts = append(exportOpts, archive.WithAllPlatforms())
 		}
 
-		if cliContext.Bool("skip-manifest-json") {
+		if cmd.Bool("skip-manifest-json") {
 			exportOpts = append(exportOpts, archive.WithSkipDockerManifest())
 		}
 
-		if cliContext.Bool("skip-non-distributable") {
+		if cmd.Bool("skip-non-distributable") {
 			exportOpts = append(exportOpts, archive.WithSkipNonDistributableBlobs())
 		}
 
@@ -160,4 +161,42 @@ When '--all-platforms' is given all images in a manifest list must be available.
 
 		return client.Export(ctx, w, exportOpts...)
 	},
+}
+
+func resolveExportArgs(ctx context.Context, cmd *cli.Command) (*cli.Command, string, []string, error) {
+	out := cmd.Args().First()
+	images := cmd.Args().Tail()
+	// Work around a bug in urfave/cli/v3 where a "-" positional argument
+	// causes parseFlags to break out of the argument loop and drop all
+	// subsequent arguments.
+	// TODO: Remove this workaround once https://github.com/urfave/cli/issues/2418
+	// (https://github.com/urfave/cli/pull/2419) is resolved and vendored.
+	if out == "-" && len(cmd.Lineage()) > 1 {
+		const dashArgSentinel = "\x00-\x00"
+		rawArgs := cmd.Lineage()[1].Args().Slice()
+		end := slices.Index(rawArgs, "--")
+		if end == -1 {
+			end = len(rawArgs)
+		}
+		if dashIdx := slices.Index(rawArgs[:end], "-"); dashIdx != -1 {
+			for i, arg := range rawArgs[dashIdx:end] {
+				if arg == "-" {
+					rawArgs[dashIdx+i] = dashArgSentinel
+				}
+			}
+			sanitized := slices.Concat([]string{cmd.Name}, rawArgs[dashIdx:])
+			reparse := *cmd
+			reparse.Action = func(_ context.Context, c *cli.Command) error {
+				images = c.Args().Tail()
+				return nil
+			}
+			if err := reparse.Run(ctx, sanitized); err != nil {
+				return nil, "", nil, err
+			}
+		}
+	}
+	if out == "" || len(images) == 0 {
+		return nil, "", nil, errors.New("please provide both an output filename and an image reference to export")
+	}
+	return cmd, out, images, nil
 }

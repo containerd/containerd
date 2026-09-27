@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -34,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 
 	"github.com/google/uuid"
 )
@@ -97,18 +99,46 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 	return d
 }
 
+// spanPrefix names this package's tracing spans.
+const spanPrefix = "plugins.diff.erofs"
+
 func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(spanPrefix, "Apply"))
+	span.SetAttributes(
+		tracing.Attribute("layer.media.type", desc.MediaType),
+		tracing.Attribute("layer.media.size", desc.Size),
+		tracing.Attribute("layer.media.digest", desc.Digest.String()),
+	)
+
 	t1 := time.Now()
+	var mode string
 	defer func() {
+		span.SetStatus(err)
+		span.End()
+
 		if err == nil {
 			log.G(ctx).WithFields(log.Fields{
 				"d":      time.Since(t1),
 				"digest": desc.Digest,
 				"size":   desc.Size,
 				"media":  desc.MediaType,
+				"mode":   mode,
 			}).Debugf("diff applied")
 		}
 	}()
+
+	// Read-only mounts belong to a snapshot the snapshotter populated itself,
+	// for example from a layer content cache. The layer is already there and is
+	// shared with every other snapshot of it. Applying would write to content
+	// this differ does not own. The unpacker reads the same mounts and skips
+	// such a layer before it reaches here.
+	//
+	// The error is ErrFailedPrecondition. The diff service falls through to the
+	// next differ only on ErrNotImplemented. Another differ would fail on this
+	// layer for the same reason.
+	if len(mounts) > 0 && mounts[len(mounts)-1].ReadOnly() {
+		return emptyDesc, fmt.Errorf("cannot apply to a read-only snapshot, its content is already populated: %w", errdefs.ErrFailedPrecondition)
+	}
 
 	var (
 		erofsLayerType string
@@ -137,6 +167,18 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	} else if _, err := images.DiffCompression(ctx, diffLayerType); err != nil {
 		return emptyDesc, fmt.Errorf("unsupported media type: %s", desc.MediaType)
 	}
+
+	switch {
+	case fastcopy:
+		mode = "fastcopy"
+	case native:
+		mode = "native"
+	case s.enableTarIndex:
+		mode = "tar-index"
+	default:
+		mode = "convert"
+	}
+	span.SetAttributes(tracing.Attribute("erofs.apply.mode", mode))
 
 	var config diff.ApplyConfig
 	for _, o := range opts {

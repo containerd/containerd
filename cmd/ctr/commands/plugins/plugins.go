@@ -17,6 +17,7 @@
 package plugins
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -29,7 +30,7 @@ import (
 	"github.com/containerd/platforms"
 	pluginutils "github.com/containerd/plugin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc/codes"
 )
 
@@ -38,10 +39,11 @@ var Command = &cli.Command{
 	Name:    "plugins",
 	Aliases: []string{"plugin"},
 	Usage:   "Provides information about containerd plugins",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		listCommand,
 		inspectRuntimeCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var listCommand = &cli.Command{
@@ -60,18 +62,19 @@ var listCommand = &cli.Command{
 			Usage:   "Print detailed information about each plugin",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	DisableSliceFlagSeparator: true,
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
-			quiet    = cliContext.Bool("quiet")
-			detailed = cliContext.Bool("detailed")
+			quiet    = cmd.Bool("quiet")
+			detailed = cmd.Bool("detailed")
 		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		ps := client.IntrospectionService()
-		response, err := ps.Plugins(ctx, cliContext.Args().Slice()...)
+		response, err := ps.Plugins(ctx, cmd.Args().Slice()...)
 		if err != nil {
 			return err
 		}
@@ -172,13 +175,13 @@ var inspectRuntimeCommand = &cli.Command{
 	Usage:     "Display runtime info",
 	ArgsUsage: "[flags]",
 	Flags:     commands.RuntimeFlags,
-	Action: func(cliContext *cli.Context) error {
-		rt := cliContext.String("runtime")
-		rtOptions, err := commands.RuntimeOptions(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		rt := cmd.String("runtime")
+		rtOptions, err := commands.RuntimeOptions(cmd)
 		if err != nil {
 			return err
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -191,7 +194,8 @@ var inspectRuntimeCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintln(cliContext.App.Writer, string(j))
+		_, err = fmt.Fprintln(cmd.Writer, string(j))
 		return err
 	},
+	DisableSliceFlagSeparator: true,
 }

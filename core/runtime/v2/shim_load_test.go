@@ -17,6 +17,7 @@
 package v2
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -75,6 +76,14 @@ func TestShouldCleanupShim(t *testing.T) {
 			Name:     "not a sandbox, pids lookup fails with other error",
 			SgetErr:  errdefs.ErrNotFound,
 			PidErr:   otherErr,
+			PInfo:    nil,
+			Expected: false,
+		},
+		{
+			// Not answering in time is not proof of a dead shim.
+			Name:     "not a sandbox, pids lookup times out",
+			SgetErr:  errdefs.ErrNotFound,
+			PidErr:   context.DeadlineExceeded,
 			PInfo:    nil,
 			Expected: false,
 		},

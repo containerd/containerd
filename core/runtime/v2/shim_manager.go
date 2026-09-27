@@ -26,7 +26,6 @@ import (
 	"strings"
 	"sync"
 
-	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
@@ -98,7 +97,7 @@ func init() {
 			} else {
 				config.SocketDir = defaultSocketDir()
 				if config.SocketDir == "" {
-					return nil, fmt.Errorf("failed to find a suitable socket directory for shim, please configure one")
+					return nil, errors.New("failed to find a suitable socket directory for shim, please configure one")
 				}
 			}
 
@@ -185,8 +184,6 @@ type ShimManager struct {
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
 	runtimePaths sync.Map
 	sandboxStore sandbox.Store
-	// shimInfos is a cache of the shim info
-	shimInfos sync.Map
 }
 
 // ID of the shim manager
@@ -229,13 +226,21 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 				// we should get the protocol from the url first.
 				protocol, address, ok := strings.Cut(opts.Address, "+")
 				if !ok {
-					return nil, fmt.Errorf("the scheme of sandbox address should be in " +
-						" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
+					return nil, errors.New("the scheme of sandbox address should be in the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
 				}
 				params = &bootapi.BootstrapResult{
 					Version:  int32(opts.Version),
 					Protocol: protocol,
 					Address:  address,
+				}
+
+				// The sandbox controller only returns connection details, not
+				// what its shim advertised at startup. Recover that from the
+				// shim instance containerd already has in memory for this
+				// sandbox, so a container joining it is not treated as if the
+				// shim advertised nothing.
+				if process, err := m.Get(ctx, opts.SandboxID); err == nil {
+					params.Extensions = sandboxShimExtensions(process)
 				}
 			} else {
 				process, err := m.Get(ctx, opts.SandboxID)
@@ -277,7 +282,27 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 			return nil, fmt.Errorf("failed to write bootstrap.json for bundle %s: %w", bundle.Path, err)
 		}
 
-		shim, err := loadShim(ctx, bundle, func() {})
+		runtimePath, err := m.resolveRuntimePath(opts.Runtime)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
+		}
+		b := shimBinary(bundle, shimBinaryConfig{
+			runtime:      runtimePath,
+			address:      m.containerdAddress,
+			ttrpcAddress: m.containerdTTRPCAddress,
+			socketDir:    m.socketDir,
+			env:          m.env,
+		})
+		shim, err := loadShim(ctx, bundle, func() {
+			log.G(ctx).WithField("id", id).Info("shim disconnected")
+
+			cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b)
+			// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
+			// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
+			// disconnect and there is no chance to remove this dead task from runtime task lists.
+			// Thus it's better to delete it here.
+			m.shims.Delete(ctx, id)
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to load sandbox task %q: %w", opts.SandboxID, err)
 		}
@@ -304,6 +329,19 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 	}
 
 	return shim, nil
+}
+
+// sandboxShimExtensions returns the extensions process's shim advertised when
+// it started, or nil if process does not retain that (for example, an
+// external sandboxer's shim instance that predates capability extensions).
+// This is best effort: a container joining a sandbox whose shim instance
+// cannot be asked degrades to no extensions rather than failing to start.
+func sandboxShimExtensions(process ShimInstance) []*bootapi.Extension {
+	sc, ok := process.(shimCapabilities)
+	if !ok {
+		return nil
+	}
+	return sc.BootstrapResult().GetExtensions()
 }
 
 func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, opts runtime.CreateOpts) (*shim, error) {
@@ -382,7 +420,7 @@ func restoreBootstrapParams(bundlePath string) (*bootapi.BootstrapResult, error)
 
 func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 	if runtime == "" {
-		return "", fmt.Errorf("no runtime name")
+		return "", errors.New("no runtime name")
 	}
 
 	// Custom path to runtime binary
@@ -482,41 +520,4 @@ func (m *ShimManager) Delete(ctx context.Context, id string) error {
 	m.shims.Delete(ctx, id)
 
 	return err
-}
-
-type shimInfo struct {
-	handledMounts []string
-}
-
-func (m *ShimManager) loadShimInfo(ctx context.Context, shim string) (*shimInfo, error) {
-	if i, ok := m.shimInfos.Load(shim); ok {
-		return i.(*shimInfo), nil
-	}
-	// Avoid fetching info for default shims with known behavior
-	if shim == "io.containerd.runc.v2" || shim == "io.containerd.runhcs.v1" {
-		sinfo := &shimInfo{}
-		m.shimInfos.Store(shim, sinfo)
-		return sinfo, nil
-	}
-
-	rinfo, err := getRuntimeInfo(ctx, m, &apitypes.RuntimeRequest{RuntimePath: shim})
-	if err != nil {
-		return nil, err
-	}
-	sinfo := &shimInfo{}
-
-	if rinfo.Annotations != nil {
-		if v, ok := rinfo.Annotations[allowedMounts]; ok {
-			sinfo.handledMounts = strings.Split(v, ",")
-		}
-	}
-
-	fields := log.Fields{}
-	for k, v := range rinfo.Annotations {
-		fields[k] = v
-	}
-	log.G(ctx).WithFields(fields).WithField("shim", shim).Debug("loaded shim info")
-
-	m.shimInfos.Store(shim, sinfo)
-	return sinfo, nil
 }

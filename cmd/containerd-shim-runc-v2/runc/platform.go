@@ -162,7 +162,7 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 			return nil, fmt.Errorf("failed to read from logging binary: %w", err)
 		}
 		if strictReady && n == 0 {
-			return nil, fmt.Errorf("logging binary did not call ready (it may have crashed or exited prematurely)")
+			return nil, errors.New("logging binary did not call ready (it may have crashed or exited prematurely)")
 		}
 		cwg.Wait()
 

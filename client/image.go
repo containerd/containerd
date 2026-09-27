@@ -261,6 +261,8 @@ type UnpackConfig struct {
 	DuplicationSuppressor kmutex.KeyedLocker
 	// Limiter is used to limit concurrent unpacks
 	Limiter *semaphore.Weighted
+	// FetchAllContent fetches layers during Pull even if their snapshots exist.
+	FetchAllContent bool
 }
 
 // UnpackOpt provides configuration for unpack
@@ -294,6 +296,17 @@ func WithUnpackApplyOpts(opts ...diff.ApplyOpt) UnpackOpt {
 func WithUnpackLimiter(limiter *semaphore.Weighted) UnpackOpt {
 	return func(ctx context.Context, uc *UnpackConfig) error {
 		uc.Limiter = limiter
+		return nil
+	}
+}
+
+// WithUnpackFetchAllContent fetches layers during Pull even if their snapshots
+// already exist, without changing the selected platforms.
+// Use it with WithPullUnpack and WithUnpackOpts.
+// It has no effect on Image.Unpack, which does not fetch content.
+func WithUnpackFetchAllContent() UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.FetchAllContent = true
 		return nil
 	}
 }
@@ -376,11 +389,11 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	cinfo := content.Info{
 		Digest: desc.Digest,
 		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", snapshotterName): rootFS,
+			"containerd.io/gc.ref.snapshot." + snapshotterName: rootFS,
 		},
 	}
 
-	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", snapshotterName))
+	_, err = cs.Update(ctx, cinfo, "labels.containerd.io/gc.ref.snapshot."+snapshotterName)
 	return err
 }
 

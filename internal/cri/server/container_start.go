@@ -61,15 +61,23 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if err := setContainerStarting(cntr); err != nil {
 		return nil, fmt.Errorf("failed to set starting state for container %q: %w", id, err)
 	}
+	// Set by the task cleanup defer below when it cannot confirm the task was
+	// deleted (e.g. the delete timed out on a wedged shim).
+	var taskCleanupFailed bool
 	defer func() {
 		if retErr != nil {
-			// Set container to exited if fail to start.
 			if err := cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+				// Set container to exited if fail to start.
 				status.Pid = 0
 				status.FinishedAt = time.Now().UnixNano()
 				status.ExitCode = errorStartExitCode
 				status.Reason = errorStartReason
 				status.Message = retErr.Error()
+				// Task deletion wasn't confirmed, keep the container unknown so
+				// RemoveContainer retries the task cleanup.
+				if taskCleanupFailed {
+					status.Unknown = true
+				}
 				return status, nil
 			}); err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to set start failure state for container %q", id)
@@ -145,6 +153,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			defer deferCancel()
 			// It's possible that task is deleted by event monitor.
 			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+				taskCleanupFailed = true
 				log.G(ctx).WithError(err).Errorf("Failed to delete containerd task %q", id)
 			}
 		}

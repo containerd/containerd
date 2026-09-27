@@ -103,14 +103,14 @@ func (t *mkfs) Transform(ctx context.Context, m mount.Mount, a []mount.ActiveMou
 		// Check fs
 		switch fs {
 		case "ext2", "ext3", "ext4":
-			binary = fmt.Sprintf("mkfs.%s", fs)
+			binary = "mkfs." + fs
 			if id != "" {
 				createArgs = append(createArgs, []string{"-U", id}...)
 			}
 		case "xfs":
 			binary = "mkfs.xfs"
 			if id != "" {
-				createArgs = append(createArgs, []string{"-m", fmt.Sprintf("uuid=%s", id)}...)
+				createArgs = append(createArgs, []string{"-m", "uuid=" + id}...)
 			}
 		default:
 			return mount.Mount{}, fmt.Errorf("unsupported filesystem %q: %w", fs, errdefs.ErrInvalidArgument)

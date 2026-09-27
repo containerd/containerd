@@ -17,6 +17,7 @@
 package content
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -35,7 +36,7 @@ import (
 	units "github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var (
@@ -43,7 +44,7 @@ var (
 	Command = &cli.Command{
 		Name:  "content",
 		Usage: "Manage content",
-		Subcommands: cli.Commands{
+		Commands: []*cli.Command{
 			activeIngestCommand,
 			deleteCommand,
 			editCommand,
@@ -57,6 +58,7 @@ var (
 			setLabelsCommand,
 			pruneCommand,
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	getCommand = &cli.Command{
@@ -64,12 +66,12 @@ var (
 		Usage:       "Get the data for an object",
 		ArgsUsage:   "[<digest>, ...]",
 		Description: "display the image object",
-		Action: func(cliContext *cli.Context) error {
-			dgst, err := digest.Parse(cliContext.Args().First())
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			dgst, err := digest.Parse(cmd.Args().First())
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -86,6 +88,7 @@ var (
 			_, err = io.CopyBuffer(os.Stdout, content.NewReader(ra), buf)
 			return err
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	ingestCommand = &cli.Command{
@@ -103,11 +106,12 @@ var (
 				Usage: "Verify content against expected digest",
 			},
 		},
-		Action: func(cliContext *cli.Context) error {
+		DisableSliceFlagSeparator: true,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
-				ref            = cliContext.Args().First()
-				expectedSize   = cliContext.Int64("expected-size")
-				expectedDigest = digest.Digest(cliContext.String("expected-digest"))
+				ref            = cmd.Args().First()
+				expectedSize   = cmd.Int64("expected-size")
+				expectedDigest = digest.Digest(cmd.String("expected-digest"))
 			)
 			if err := expectedDigest.Validate(); expectedDigest != "" && err != nil {
 				return err
@@ -115,7 +119,7 @@ var (
 			if ref == "" {
 				return errors.New("must specify a transaction reference")
 			}
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -140,7 +144,7 @@ var (
 				Name:    "timeout",
 				Aliases: []string{"t"},
 				Usage:   "Total timeout for fetch",
-				EnvVars: []string{"CONTAINERD_FETCH_TIMEOUT"},
+				Sources: cli.EnvVars("CONTAINERD_FETCH_TIMEOUT"),
 			},
 			&cli.StringFlag{
 				Name:  "root",
@@ -148,9 +152,10 @@ var (
 				Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
 			},
 		},
-		Action: func(cliContext *cli.Context) error {
-			match := cliContext.Args().First()
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+		DisableSliceFlagSeparator: true,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			match := cmd.Args().First()
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -186,12 +191,13 @@ var (
 				Usage:   "Print only the blob digest",
 			},
 		},
-		Action: func(cliContext *cli.Context) error {
+		DisableSliceFlagSeparator: true,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
-				quiet = cliContext.Bool("quiet")
-				args  = cliContext.Args().Slice()
+				quiet = cmd.Bool("quiet")
+				args  = cmd.Args().Slice()
 			)
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -239,9 +245,9 @@ var (
 		Usage:       "Add labels to content",
 		ArgsUsage:   "<digest> [<label>=<value> ...]",
 		Description: "labels blobs in the content store",
-		Action: func(cliContext *cli.Context) error {
-			object, labels := commands.ObjectWithLabelArgs(cliContext)
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			object, labels := commands.ObjectWithLabelArgs(cmd)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -261,7 +267,7 @@ var (
 
 			var paths []string
 			for k, v := range labels {
-				paths = append(paths, fmt.Sprintf("labels.%s", k))
+				paths = append(paths, "labels."+k)
 				if v != "" {
 					info.Labels[k] = v
 				}
@@ -286,6 +292,7 @@ var (
 
 			return nil
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	editCommand = &cli.Command{
@@ -301,13 +308,14 @@ var (
 			&cli.StringFlag{
 				Name:    "editor",
 				Usage:   "Select editor (vim, emacs, etc.)",
-				EnvVars: []string{"EDITOR"},
+				Sources: cli.EnvVars("EDITOR"),
 			},
 		},
-		Action: func(cliContext *cli.Context) error {
+		DisableSliceFlagSeparator: true,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
-				validate = cliContext.String("validate")
-				object   = cliContext.Args().First()
+				validate = cmd.String("validate")
+				object   = cmd.Args().First()
 			)
 
 			if validate != "" {
@@ -321,7 +329,7 @@ var (
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -333,7 +341,7 @@ var (
 			}
 			defer ra.Close()
 
-			nrc, err := edit(cliContext, content.NewReader(ra))
+			nrc, err := edit(cmd.String("editor"), content.NewReader(ra))
 			if err != nil {
 				return err
 			}
@@ -364,12 +372,12 @@ var (
 		ArgsUsage: "[<digest>, ...]",
 		Description: `Delete one or more blobs permanently. Successfully deleted
 	blobs are printed to stdout.`,
-		Action: func(cliContext *cli.Context) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
-				args      = cliContext.Args().Slice()
+				args      = cmd.Args().Slice()
 				exitError error
 			)
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -401,6 +409,7 @@ var (
 
 			return exitError
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	// TODO(stevvooe): Create "multi-fetch" mode that just takes a remote
@@ -412,18 +421,16 @@ var (
 		ArgsUsage:   "[flags] <remote> <object> [<hint>, ...]",
 		Description: `Fetch objects by identifier from a remote.`,
 		Flags:       commands.RegistryFlags,
-		Action: func(cliContext *cli.Context) error {
-			var (
-				ref = cliContext.Args().First()
-			)
-			ctx, cancel := commands.AppContext(cliContext)
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			ctx, cancel := commands.AppContext(ctx, cmd)
 			defer cancel()
 
-			resolver, err := commands.GetResolver(ctx, cliContext)
+			resolver, err := commands.GetResolver(ctx, cmd)
 			if err != nil {
 				return err
 			}
 
+			ref := cmd.Args().First()
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
 			log.G(ctx).Tracef("resolving")
@@ -446,6 +453,7 @@ var (
 			_, err = io.Copy(os.Stdout, rc)
 			return err
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	fetchBlobCommand = &cli.Command{
@@ -459,22 +467,21 @@ var (
 				Usage: "Specify target mediatype for request header",
 			},
 		}...),
-		Action: func(cliContext *cli.Context) error {
-			var (
-				ref     = cliContext.Args().First()
-				digests = cliContext.Args().Tail()
-			)
+		DisableSliceFlagSeparator: true,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			digests := cmd.Args().Tail()
 			if len(digests) == 0 {
 				return errors.New("must specify digests")
 			}
-			ctx, cancel := commands.AppContext(cliContext)
+			ctx, cancel := commands.AppContext(ctx, cmd)
 			defer cancel()
 
-			resolver, err := commands.GetResolver(ctx, cliContext)
+			resolver, err := commands.GetResolver(ctx, cmd)
 			if err != nil {
 				return err
 			}
 
+			ref := cmd.Args().First()
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
 			log.G(ctx).Tracef("resolving")
@@ -493,7 +500,7 @@ var (
 				if err != nil {
 					return err
 				}
-				rc, desc, err := fetcherByDigest.FetchByDigest(ctx, dgst, remotes.WithMediaType(cliContext.String("media-type")))
+				rc, desc, err := fetcherByDigest.FetchByDigest(ctx, dgst, remotes.WithMediaType(cmd.String("media-type")))
 				if err != nil {
 					return err
 				}
@@ -514,23 +521,23 @@ var (
 		ArgsUsage:   "[flags] <remote> <object> <type>",
 		Description: `Push objects by identifier to a remote.`,
 		Flags:       commands.RegistryFlags,
-		Action: func(cliContext *cli.Context) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var (
-				ref    = cliContext.Args().Get(0)
-				object = cliContext.Args().Get(1)
-				media  = cliContext.Args().Get(2)
+				ref    = cmd.Args().Get(0)
+				object = cmd.Args().Get(1)
+				media  = cmd.Args().Get(2)
 			)
 			dgst, err := digest.Parse(object)
 			if err != nil {
 				return err
 			}
-			client, ctx, cancel, err := commands.NewClient(cliContext)
+			client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
 			defer cancel()
 
-			resolver, err := commands.GetResolver(ctx, cliContext)
+			resolver, err := commands.GetResolver(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -575,11 +582,11 @@ var (
 
 			return nil
 		},
+		DisableSliceFlagSeparator: true,
 	}
 )
 
-func edit(cliContext *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error) {
-	editor := cliContext.String("editor")
+func edit(editor string, rd io.Reader) (_ io.ReadCloser, retErr error) {
 	if editor == "" {
 		return nil, errors.New("editor is required")
 	}
@@ -595,12 +602,14 @@ func edit(cliContext *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error)
 		}
 	}()
 	_, err = io.Copy(tmp, rd)
-	tmp.Close()
+	_ = tmp.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("%s %s", editor, tmp.Name()))
+	// The editor is an explicit user-provided shell command. Pass the temporary
+	// filename as an argument so the shell does not interpret it.
+	cmd := exec.Command("sh", "-c", editor+` "$@"`, "editor", tmp.Name()) //nolint:gosec // G702: the editor is intentionally a shell command.
 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

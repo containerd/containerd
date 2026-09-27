@@ -58,6 +58,12 @@ const (
 	// Ignoring is not a failure — callers that require enforcement must
 	// pick a snapshotter that supports it.
 	LabelSnapshotMaxSize = "containerd.io/snapshot/max-size"
+
+	// RebaseCap is a snapshotter capability (advertised via the plugin's metadata)
+	// indicating that an active snapshot may be committed with a parent supplied at
+	// Commit time (via WithParent). It lets the unpacker prepare and apply layers in
+	// parallel and rebase the chain into place at commit.
+	RebaseCap = "rebase"
 )
 
 // Kind identifies the kind of snapshot.

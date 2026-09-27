@@ -63,7 +63,7 @@ func addVolatileOptionOnImageVolumeMount(mounts []mount.Mount) []mount.Mount {
 
 // ensureImageVolumeMounted ensures target volume is mounted.
 //
-// NOTE: Currently, kubelet creates containers in pod sequencially. It won't
+// NOTE: Currently, kubelet creates containers in pod sequentially. It won't
 // cause multiple mountpoints on same target path.
 func ensureImageVolumeMounted(target string) (bool, error) {
 	_, err := os.Stat(target)

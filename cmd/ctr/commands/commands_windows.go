@@ -17,7 +17,7 @@
 package commands
 
 import (
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func init() {
@@ -37,6 +37,6 @@ func init() {
 		})
 }
 
-func RuntimeOptions(cliContext *cli.Context) (any, error) {
+func RuntimeOptions(cmd *cli.Command) (any, error) {
 	return nil, nil
 }

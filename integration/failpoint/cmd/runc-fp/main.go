@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -85,7 +86,7 @@ func main() {
 
 // defaultRuncInvoker is to call the runc command with same arguments.
 func defaultRuncInvoker(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "runc", os.Args[1:]...)
+	cmd := exec.CommandContext(ctx, "runc", os.Args[1:]...) //nolint:gosec // G702: this test proxy forwards arguments directly to a fixed executable.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
 	return cmd.Run()
 }
@@ -99,7 +100,7 @@ func failpointProfileFromOCIAnnotation() (invokerInterceptor, error) {
 
 	profileName, ok := spec.Annotations[failpointProfileKey]
 	if !ok {
-		return nil, fmt.Errorf("failpoint profile is required")
+		return nil, errors.New("failpoint profile is required")
 	}
 
 	fp, ok := failpointProfiles[profileName]

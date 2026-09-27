@@ -18,9 +18,11 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	goruntime "runtime"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -53,7 +55,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/eventq"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/internal/registrar"
-	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
@@ -281,12 +282,8 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	}
 
 	c.runtimeFeatures = &runtime.RuntimeFeatures{
-		SupplementalGroupsPolicy: true,
-	}
-
-	if c.config.EnableCDI != nil && !*c.config.EnableCDI {
-		msg, _ := deprecation.Message(deprecation.CRIEnableCDI)
-		log.L.Warnf("enable_cdi set to false. %s", msg)
+		SupplementalGroupsPolicy:  true,
+		UserNamespacesHostNetwork: goruntime.GOOS == "linux",
 	}
 
 	return c, c, nil
@@ -480,14 +477,14 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 		return nil, fmt.Errorf("failed to call PluginInfo: %w", err)
 	}
 	if infoResp.Extra == nil {
-		return nil, fmt.Errorf("runtime plugin info has no extra data")
+		return nil, errors.New("runtime plugin info has no extra data")
 	}
 	var info apitypes.RuntimeInfo
 	if err := typeurl.UnmarshalTo(infoResp.Extra, &info); err != nil {
 		return nil, fmt.Errorf("failed to get runtime info from plugin info: %w", err)
 	}
 	if info.Features == nil {
-		return nil, fmt.Errorf("runtime info has no features")
+		return nil, errors.New("runtime info has no features")
 	}
 	featuresX, err := typeurl.UnmarshalAny(info.Features)
 	if err != nil {

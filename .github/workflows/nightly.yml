@@ -12,6 +12,7 @@ permissions: # added using https://github.com/step-security/secure-workflows
 jobs:
   linux:
     name: Linux
+    if: github.repository == 'containerd/containerd' || (github.event_name == 'pull_request' && !github.event.repository.private)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -131,6 +132,7 @@ jobs:
 
   windows:
     name: Windows
+    if: github.repository == 'containerd/containerd' || (github.event_name == 'pull_request' && !github.event.repository.private)
     runs-on: windows-latest
     timeout-minutes: 30
 

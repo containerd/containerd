@@ -31,8 +31,7 @@ func SanitizeError(err error) error {
 	}
 
 	// Check if the error is or contains a *url.Error
-	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
+	if urlErr, ok := errors.AsType[*url.Error](err); ok {
 		// Parse and sanitize the URL
 		sanitizedURL := sanitizeURL(urlErr.URL)
 		if sanitizedURL != urlErr.URL {

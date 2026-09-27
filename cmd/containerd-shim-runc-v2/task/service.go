@@ -44,7 +44,6 @@ import (
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/runtime"
 	oomv2 "github.com/containerd/containerd/v2/internal/oom"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	oomv1 "github.com/containerd/containerd/v2/pkg/oom/v1"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -768,6 +767,14 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 	p.SetExited(e.Status)
 	_, isInit := p.(*process.Init)
 	if isInit {
+		e.Timestamp = p.ExitedAt()
+		if err := runc.WriteExitStatus(c.Bundle, e); err != nil {
+			log.G(s.context).
+				WithField("container_id", c.ID).
+				WithError(err).
+				Error("failed to store exit status in bundle")
+		}
+
 		if err := s.cg2oom.Stop(c.ID); err != nil {
 			log.G(context.Background()).
 				WithField("container_id", c.ID).
@@ -809,8 +816,7 @@ func (s *service) getContainerPids(ctx context.Context, container *runc.Containe
 }
 
 func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
-	ns, _ := namespaces.Namespace(ctx)
-	ctx = namespaces.WithNamespace(context.Background(), ns)
+	ctx = context.WithoutCancel(ctx)
 	defer publisher.Close()
 
 	publish := func(e any) {

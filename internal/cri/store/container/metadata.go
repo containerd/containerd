@@ -53,8 +53,15 @@ type Metadata struct {
 	// NOTE(random-liu): Resource limits are updatable, the source
 	// of truth for resource limits are in containerd.
 	Config *runtime.ContainerConfig
-	// ImageRef is the reference of image used by the container.
+	// ImageRef is the image config digest (the node-local image ID) of the image
+	// used by the container
 	ImageRef string
+	// ImageDigest is the image's target descriptor digest (index digest for
+	// multi-platform images, else the manifest digest), resolved at creation.
+	ImageDigest string
+	// ImageName is the resolved image reference (a repo tag, else the repo
+	// digest); not the raw user-specified image string.
+	ImageName string
 	// LogPath is the container log path.
 	LogPath string
 	// StopSignal is the system call signal that will be sent to the container to exit.

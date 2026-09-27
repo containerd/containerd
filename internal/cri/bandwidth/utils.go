@@ -30,12 +30,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package bandwidth provides utilities for bandwidth shaping
 package bandwidth
 
 import (
-	"fmt"
+	"errors"
 
-	resource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var minRsrc = resource.MustParse("1k")
@@ -43,10 +44,10 @@ var maxRsrc = resource.MustParse("1P")
 
 func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
 	if rsrc.Value() < minRsrc.Value() {
-		return fmt.Errorf("resource is unreasonably small (< 1kbit)")
+		return errors.New("resource is unreasonably small (< 1kbit)")
 	}
 	if rsrc.Value() > maxRsrc.Value() {
-		return fmt.Errorf("resource is unreasonably large (> 1Pbit)")
+		return errors.New("resource is unreasonably large (> 1Pbit)")
 	}
 	return nil
 }

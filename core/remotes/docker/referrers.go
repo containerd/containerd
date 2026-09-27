@@ -57,7 +57,7 @@ func (r dockerFetcher) FetchReferrers(ctx context.Context, dgst digest.Digest, o
 		return nil, fmt.Errorf("failed to decode referrers index: %w", err)
 	}
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("unexpected data after JSON object")
+		return nil, errors.New("unexpected data after JSON object")
 	}
 
 	if len(config.ArtifactTypes) == 0 {

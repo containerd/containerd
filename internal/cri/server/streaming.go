@@ -26,8 +26,42 @@ import (
 	streaming "k8s.io/cri-streaming/pkg/streaming"
 	remotecommand "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	"k8s.io/streaming/pkg/runtime"
-	executil "k8s.io/utils/exec"
 )
+
+// exitError is an interface that presents an API similar to os.ProcessState, which is
+// what exitError from os/exec is. This is designed to make testing a bit easier and
+// probably loses some of the cross-platform properties of the underlying library.
+//
+// exitError matches [k8s.io/utils/exec.ExitError], which is used by
+// [remotecommand.ServeExec] to distinguish a command exiting with a non-zero
+// status from an error executing the command.
+//
+// FIXME(thaJeztah): define this contract in k8s.io/cri-streaming instead.
+// ServeExec only requires Exited and ExitStatus, so the upstream interface
+// could be reduced to those methods in addition to error.
+//
+// - https://github.com/kubernetes/cri-streaming/blob/v0.36.3/pkg/streaming/remotecommand/exec.go#L48-L64
+// - https://github.com/kubernetes/utils/blob/28399d86e0b55e612b83ad94dc6bac8e5de2a5ac/exec/exec.go#L83-L91
+type exitError interface {
+	error
+	fmt.Stringer
+	Exited() bool
+	ExitStatus() int
+}
+
+// codeExitError is an implementation of exitError consisting of an error object
+// and an exit code (the upper bits of os.exec.ExitStatus).
+type codeExitError struct {
+	error
+	code int
+}
+
+func (e codeExitError) String() string  { return e.Error() }
+func (e codeExitError) Exited() bool    { return true }   // Exited is to check if the process has finished
+func (e codeExitError) ExitStatus() int { return e.code } // ExitStatus is for checking the error code
+
+// FIXME(thaJeztah): assert against remotecommand.ExitError once k8s.io/cri-streaming defines the exit-error contract.
+var _ exitError = (*codeExitError)(nil)
 
 type streamRuntime struct {
 	c *criService
@@ -37,8 +71,8 @@ func newStreamRuntime(c *criService) streaming.Runtime {
 	return &streamRuntime{c: c}
 }
 
-// Exec executes a command inside the container. executil.ExitError is returned if the command
-// returns non-zero exit code.
+// Exec executes a command inside the container. An exitError is returned if
+// the command exits with a non-zero status.
 func (s *streamRuntime) Exec(ctx context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser,
 	tty bool, resize <-chan remotecommand.TerminalSize) error {
 	exitCode, err := s.c.execInContainer(ctrdutil.WithNamespace(ctx), containerID, execOptions{
@@ -55,9 +89,9 @@ func (s *streamRuntime) Exec(ctx context.Context, containerID string, cmd []stri
 	if *exitCode == 0 {
 		return nil
 	}
-	return &executil.CodeExitError{
-		Err:  fmt.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
-		Code: int(*exitCode),
+	return &codeExitError{
+		error: fmt.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
+		code:  int(*exitCode),
 	}
 }
 

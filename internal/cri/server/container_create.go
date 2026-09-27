@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
-	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -102,8 +101,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, err
 	}
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
-		var resErr *registrar.ReservedErr
-		if errors.As(err, &resErr) {
+		if _, ok := errors.AsType[*registrar.ReservedErr](err); ok {
 			log.G(ctx).WithError(err).Warn("possible concurrent CreateContainer request")
 			return nil, fmt.Errorf("failed to reserve container name %q; check if another CreateContainer request is in progress: %w", name, err)
 		}
@@ -300,7 +298,10 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	log.G(r.ctx).Debugf("Container %q spec: %#+v", r.containerID, spew.NewFormatter(spec))
+	logger := log.G(r.ctx)
+	if logger.Logger.IsLevelEnabled(log.DebugLevel) {
+		logger.WithField("spec", spec).Debugf("Container %q spec", r.containerID)
+	}
 
 	// Grab any platform specific snapshotter opts.
 	sOpts, err := snapshotterOpts(r.containerConfig)
@@ -326,7 +327,9 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		opts = append(opts, customopts.WithVolumes(mountMap, platform))
 	}
 	r.meta.ImageRef = r.imageID
-	if signal := r.containerConfig.GetStopSignal(); signal != runtime.Signal_RUNTIME_DEFAULT {
+	r.meta.ImageDigest = (*r.containerdImage).Target().Digest.String()
+	r.meta.ImageName = (*r.containerdImage).Name()
+	if signal := r.containerConfig.GetStopSignal(); signal != runtime.Signal_SIGNAL_RUNTIME_DEFAULT {
 		stopSignal, err := criSignalToOCIStopSignal(signal)
 		if err != nil {
 			return "", err

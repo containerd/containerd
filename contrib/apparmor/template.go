@@ -178,7 +178,7 @@ func macroExists(m string) bool {
 }
 
 func aaParser(args ...string) (string, error) {
-	out, err := exec.Command("apparmor_parser", args...).CombinedOutput()
+	out, err := exec.Command("apparmor_parser", args...).CombinedOutput() //nolint:gosec // G702: arguments are passed directly to a fixed executable.
 	return string(out), err
 }
 

@@ -312,7 +312,6 @@ $ crictl info
     "netnsMountsUnderStateDir": false,
     "enableUnprivilegedPorts": false,
     "enableUnprivilegedICMP": false,
-    "enableCDI": false,
     "cdiSpecDirs": [
       "/etc/cdi",
       "/var/run/cdi"

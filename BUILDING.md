@@ -261,6 +261,11 @@ During the automated CI the unit tests and integration tests are run as part of 
  - `make integration`: run all tests, including integration tests and those which require `root`. `TESTFLAGS_PARALLEL` can be used to control parallelism. For example, `TESTFLAGS_PARALLEL=1 make integration` will lead a non-parallel execution. The default value of `TESTFLAGS_PARALLEL` is **8**.
  - `make cri-integration`: [CRI Integration Tests](https://github.com/containerd/containerd/blob/main/docs/cri/testing.md#cri-integration-test) run cri integration tests
 
+A test that needs `root` calls `testutil.RequiresRoot`, which skips it unless
+`-test.root` is passed. `make test` skips those tests and still succeeds, so check
+whether the tests covering your change are among them. `make root-test` selects
+the packages that call the helper and runs them with `-test.root`.
+
 To execute a specific test or set of tests you can use the `go test` capabilities
 without using the `Makefile` targets. The following examples show how to specify a test
 name and also how to use the flag directly against `go test` to run root-requiring tests.

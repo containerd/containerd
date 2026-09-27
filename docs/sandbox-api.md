@@ -109,6 +109,8 @@ sequenceDiagram
     loop for each container in sandbox
         containerd->>shim: TaskService.Kill / Delete
         shim-->>containerd: OK
+        containerd->>shim: TaskService.Shutdown
+        shim-->>containerd: OK (exit only if no tasks remain)
     end
     containerd->>containerd: SandboxController.Stop
     containerd->>shim: SandboxService.StopSandbox
@@ -127,6 +129,31 @@ sequenceDiagram
     containerd-->>kubelet: OK
 ```
 
+### Shutdown behavior for grouped shims
+
+containerd invokes `TaskService.Shutdown` after deleting every task. It may be
+invoked multiple times for a grouped shim. It does not mean that the shim must
+terminate immediately. The shim should return without terminating while it still
+has active tasks. It should terminate only after receiving `TaskService.Shutdown`
+when no active tasks remain.
+
+`SandboxService.ShutdownSandbox` is independent from `TaskService.Shutdown` and
+shuts down the sandbox instance.
+
+### Optional sandbox updates
+
+`SandboxController.Update` forwards the updated sandbox metadata object to the shim
+via `SandboxService.UpdateSandbox`, together with the fieldpaths that changed. CRI
+uses this path for pod level resource updates (`UpdatePodSandboxResources`), where
+the new resources and overhead travel as a sandbox extension.
+
+Implementing `UpdateSandbox` is optional. As for any other unsupported shim RPC
+(see [Unsupported rpcs](runtime-v2.md#unsupported-rpcs)), a shim that does not
+support updates MUST return a `github.com/containerd/errdefs.ErrNotImplemented`
+error, which maps to gRPC `codes.Unimplemented`; a shim that does not register
+the method at all is answered with the same code by ttrpc. Callers are expected
+to tolerate it.
+
 ## Controller Implementations
 
 There are two `Controller` implementations today:
@@ -142,6 +169,10 @@ The `podsandbox` controller technically satisfies the `Controller` interface, bu
 in-memory implementation tightly coupled to the CRI layer. It lives there due to refactoring complexity — moving
 it out cleanly is a large incremental effort that has been ongoing since the Sandbox API was first introduced in
 containerd 1.7, and improves with every release.
+
+### Minimal teaching example
+
+- [Minimal in-memory Runtime v2 shim that also implements the Sandbox API](../core/runtime/v2/example/sandbox/)
 
 ## Status
 

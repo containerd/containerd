@@ -51,9 +51,8 @@ version = 2
     disable_proc_mount = false
     disable_tcp_service = true
     drain_exec_sync_io_timeout = "0s"
-    # Updated in latest release
+    # Removed in latest
     #enable_cdi = false
-    enable_cdi = true
     enable_selinux = false
     enable_tls_streaming = false
     # Updated in latest release

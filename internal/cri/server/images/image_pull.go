@@ -201,6 +201,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", fmt.Errorf("get image config descriptor: %w", err)
 	}
 	imageID := configDesc.Digest.String()
+	span.SetAttributes(tracing.Attribute("image.id", imageID))
 
 	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
@@ -223,7 +224,10 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	recordImagePullThroughput(imagePullThroughput, bytesPulled, elapsed)
 	recordImagePullThroughput(imagePullThroughputMiBps, bytesPulled, elapsed)
 
-	size, _ := image.Size(ctx)
+	size, sizeErr := image.Size(ctx)
+	if sizeErr == nil {
+		span.SetAttributes(tracing.Attribute("image.size.bytes", size))
+	}
 	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", name, imageID,
 		repoTag, repoDigest, strconv.FormatInt(size, 10), elapsed)
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain

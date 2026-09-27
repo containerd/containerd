@@ -127,11 +127,11 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 	var statusStopSignal runtime.Signal
 	stopsignal := container.Config.GetStopSignal()
 
-	if stopsignal == runtime.Signal_RUNTIME_DEFAULT {
+	if stopsignal == runtime.Signal_SIGNAL_RUNTIME_DEFAULT {
 		if container.Metadata.StopSignal != "" {
 			statusStopSignal = toCRISignal(container.Metadata.StopSignal)
 		} else {
-			statusStopSignal = runtime.Signal_SIGTERM
+			statusStopSignal = runtime.Signal_SIGNAL_SIGTERM
 		}
 	} else {
 		statusStopSignal = stopsignal

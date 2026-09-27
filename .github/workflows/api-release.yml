@@ -6,7 +6,7 @@ on:
 name: API Release
 
 env:
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.27.1"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
@@ -14,7 +14,7 @@ permissions: # added using https://github.com/step-security/secure-workflows
 jobs:
   check:
     name: Check Signed Tag
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v') && !github.event.repository.private
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -58,7 +58,7 @@ jobs:
 
   release:
     name: Create containerd Release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/api/v') && !github.event.repository.private
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -70,7 +70,7 @@ jobs:
         with:
           path: builds
       - name: Create Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: true

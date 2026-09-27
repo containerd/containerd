@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -50,7 +50,7 @@ var Command = &cli.Command{
 	Aliases: []string{"snapshot"},
 	Usage:   "Manage snapshots",
 	Flags:   commands.SnapshotterFlags,
-	Subcommands: cli.Commands{
+	Commands: []*cli.Command{
 		commitCommand,
 		diffCommand,
 		infoCommand,
@@ -64,20 +64,21 @@ var Command = &cli.Command{
 		usageCommand,
 		viewCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var listCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List snapshots",
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		var (
-			snapshotter = client.SnapshotService(cliContext.String("snapshotter"))
+			snapshotter = client.SnapshotService(cmd.String("snapshotter"))
 			tw          = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		)
 		fmt.Fprintln(tw, "KEY\tPARENT\tKIND\t")
@@ -93,6 +94,7 @@ var listCommand = &cli.Command{
 
 		return tw.Flush()
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var diffCommand = &cli.Command{
@@ -114,15 +116,16 @@ var diffCommand = &cli.Command{
 			Usage: "Keep diff content. up to creator to delete it.",
 		},
 	}, commands.LabelFlag),
-	Action: func(cliContext *cli.Context) error {
+	DisableSliceFlagSeparator: true,
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
-			idA = cliContext.Args().First()
-			idB = cliContext.Args().Get(1)
+			idA = cmd.Args().First()
+			idB = cmd.Args().Get(1)
 		)
 		if idA == "" {
 			return errors.New("snapshot id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -135,15 +138,15 @@ var diffCommand = &cli.Command{
 		defer done(ctx)
 
 		var desc ocispec.Descriptor
-		labels := commands.LabelArgs(cliContext.StringSlice("label"))
-		snapshotter := client.SnapshotService(cliContext.String("snapshotter"))
+		labels := commands.LabelArgs(cmd.StringSlice("label"))
+		snapshotter := client.SnapshotService(cmd.String("snapshotter"))
 
-		if cliContext.Bool("keep") {
+		if cmd.Bool("keep") {
 			labels["containerd.io/gc.root"] = time.Now().UTC().Format(time.RFC3339)
 		}
 		opts := []diff.Opt{
-			diff.WithMediaType(cliContext.String("media-type")),
-			diff.WithReference(cliContext.String("ref")),
+			diff.WithMediaType(cmd.String("media-type")),
+			diff.WithReference(cmd.String("ref")),
 			diff.WithLabels(labels),
 		}
 		// SOURCE_DATE_EPOCH is propagated via the ctx, so no need to specify diff.WithSourceDateEpoch here
@@ -187,7 +190,7 @@ func withMounts(ctx context.Context, id string, sn snapshots.Snapshotter, f func
 			return ocispec.Descriptor{}, err
 		}
 	} else {
-		key := fmt.Sprintf("%s-view-key", id)
+		key := id + "-view-key"
 		mounts, err = sn.View(ctx, key, id)
 		if err != nil {
 			return ocispec.Descriptor{}, err
@@ -207,9 +210,10 @@ var usageCommand = &cli.Command{
 			Usage: "Display size in bytes",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	DisableSliceFlagSeparator: true,
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var displaySize func(int64) string
-		if cliContext.Bool("b") {
+		if cmd.Bool("b") {
 			displaySize = func(s int64) string {
 				return strconv.FormatInt(s, 10)
 			}
@@ -218,17 +222,17 @@ var usageCommand = &cli.Command{
 				return progress.Bytes(s).String()
 			}
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		var (
-			snapshotter = client.SnapshotService(cliContext.String("snapshotter"))
+			snapshotter = client.SnapshotService(cmd.String("snapshotter"))
 			tw          = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		)
 		fmt.Fprintln(tw, "KEY\tSIZE\tINODES\t")
-		if cliContext.NArg() == 0 {
+		if cmd.NArg() == 0 {
 			if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
 				usage, err := snapshotter.Usage(ctx, info.Name)
 				if err != nil {
@@ -240,7 +244,7 @@ var usageCommand = &cli.Command{
 				return err
 			}
 		} else {
-			for _, id := range cliContext.Args().Slice() {
+			for _, id := range cmd.Args().Slice() {
 				usage, err := snapshotter.Usage(ctx, id)
 				if err != nil {
 					return err
@@ -258,14 +262,14 @@ var removeCommand = &cli.Command{
 	Aliases:   []string{"del", "remove", "rm"},
 	ArgsUsage: "<key> [<key>, ...]",
 	Usage:     "Remove snapshots",
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		snapshotter := client.SnapshotService(cliContext.String("snapshotter"))
-		for _, key := range cliContext.Args().Slice() {
+		snapshotter := client.SnapshotService(cmd.String("snapshotter"))
+		for _, key := range cmd.Args().Slice() {
 			err = snapshotter.Remove(ctx, key)
 			if err != nil {
 				return fmt.Errorf("failed to remove %q: %w", key, err)
@@ -274,6 +278,7 @@ var removeCommand = &cli.Command{
 
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var prepareCommand = &cli.Command{
@@ -291,22 +296,23 @@ var prepareCommand = &cli.Command{
 			Usage: "Print out snapshot mounts as JSON",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		if narg := cliContext.NArg(); narg < 1 || narg > 2 {
-			return cli.ShowSubcommandHelp(cliContext)
+	DisableSliceFlagSeparator: true,
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		if narg := cmd.NArg(); narg < 1 || narg > 2 {
+			return cli.ShowSubcommandHelp(cmd)
 		}
 		var (
-			target = cliContext.String("target")
-			key    = cliContext.Args().Get(0)
-			parent = cliContext.Args().Get(1)
+			target = cmd.String("target")
+			key    = cmd.Args().Get(0)
+			parent = cmd.Args().Get(1)
 		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		snapshotter := client.SnapshotService(cliContext.String("snapshotter"))
+		snapshotter := client.SnapshotService(cmd.String("snapshotter"))
 		labels := map[string]string{
 			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 		}
@@ -320,7 +326,7 @@ var prepareCommand = &cli.Command{
 			printMounts(target, mounts)
 		}
 
-		if cliContext.Bool("mounts") {
+		if cmd.Bool("mounts") {
 			commands.PrintAsJSON(mounts)
 		}
 
@@ -343,22 +349,23 @@ var viewCommand = &cli.Command{
 			Usage: "Print out snapshot mounts as JSON",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		if narg := cliContext.NArg(); narg < 1 || narg > 2 {
-			return cli.ShowSubcommandHelp(cliContext)
+	DisableSliceFlagSeparator: true,
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		if narg := cmd.NArg(); narg < 1 || narg > 2 {
+			return cli.ShowSubcommandHelp(cmd)
 		}
 		var (
-			target = cliContext.String("target")
-			key    = cliContext.Args().Get(0)
-			parent = cliContext.Args().Get(1)
+			target = cmd.String("target")
+			key    = cmd.Args().Get(0)
+			parent = cmd.Args().Get(1)
 		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		snapshotter := client.SnapshotService(cliContext.String("snapshotter"))
+		snapshotter := client.SnapshotService(cmd.String("snapshotter"))
 		mounts, err := snapshotter.View(ctx, key, parent)
 		if err != nil {
 			return err
@@ -368,7 +375,7 @@ var viewCommand = &cli.Command{
 			printMounts(target, mounts)
 		}
 
-		if cliContext.Bool("mounts") {
+		if cmd.Bool("mounts") {
 			commands.PrintAsJSON(mounts)
 		}
 
@@ -387,20 +394,21 @@ var mountCommand = &cli.Command{
 			Usage: "Mounts the snapshot mounts as a temp mount and returns a bind mount",
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
-		if cliContext.NArg() != 2 {
-			return cli.ShowSubcommandHelp(cliContext)
+	DisableSliceFlagSeparator: true,
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		if cmd.NArg() != 2 {
+			return cli.ShowSubcommandHelp(cmd)
 		}
 		var (
-			target = cliContext.Args().Get(0)
-			key    = cliContext.Args().Get(1)
+			target = cmd.Args().Get(0)
+			key    = cmd.Args().Get(1)
 		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		snapshotter := client.SnapshotService(cliContext.String("snapshotter"))
+		snapshotter := client.SnapshotService(cmd.String("snapshotter"))
 		mounts, err := snapshotter.Mounts(ctx, key)
 		if err != nil {
 			return err
@@ -409,7 +417,7 @@ var mountCommand = &cli.Command{
 		mm := client.MountManager()
 
 		var opts []mount.ActivateOpt
-		if cliContext.Bool("temp") {
+		if cmd.Bool("temp") {
 			opts = append(opts, mount.WithTemporary)
 		}
 		info, err := mm.Activate(ctx, "ctr"+key, mounts, opts...)
@@ -429,38 +437,39 @@ var commitCommand = &cli.Command{
 	Name:      "commit",
 	Usage:     "Commit an active snapshot into the provided name",
 	ArgsUsage: "<key> <active>",
-	Action: func(cliContext *cli.Context) error {
-		if cliContext.NArg() != 2 {
-			return cli.ShowSubcommandHelp(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		if cmd.NArg() != 2 {
+			return cli.ShowSubcommandHelp(cmd)
 		}
 		var (
-			key    = cliContext.Args().Get(0)
-			active = cliContext.Args().Get(1)
+			key    = cmd.Args().Get(0)
+			active = cmd.Args().Get(1)
 		)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		snapshotter := client.SnapshotService(cliContext.String("snapshotter"))
+		snapshotter := client.SnapshotService(cmd.String("snapshotter"))
 		labels := map[string]string{
 			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 		}
 		return snapshotter.Commit(ctx, key, active, snapshots.WithLabels(labels))
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var treeCommand = &cli.Command{
 	Name:  "tree",
 	Usage: "Display tree view of snapshot branches",
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		var (
-			snapshotter = client.SnapshotService(cliContext.String("snapshotter"))
+			snapshotter = client.SnapshotService(cmd.String("snapshotter"))
 			tree        = newSnapshotTree()
 		)
 
@@ -476,24 +485,25 @@ var treeCommand = &cli.Command{
 
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var infoCommand = &cli.Command{
 	Name:      "info",
 	Usage:     "Get info about a snapshot",
 	ArgsUsage: "<key>",
-	Action: func(cliContext *cli.Context) error {
-		if cliContext.NArg() != 1 {
-			return cli.ShowSubcommandHelp(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		if cmd.NArg() != 1 {
+			return cli.ShowSubcommandHelp(cmd)
 		}
 
-		key := cliContext.Args().Get(0)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		key := cmd.Args().Get(0)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		snapshotter := client.SnapshotService(cliContext.String("snapshotter"))
+		snapshotter := client.SnapshotService(cmd.String("snapshotter"))
 		info, err := snapshotter.Stat(ctx, key)
 		if err != nil {
 			return err
@@ -503,6 +513,7 @@ var infoCommand = &cli.Command{
 
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var setLabelCommand = &cli.Command{
@@ -510,16 +521,16 @@ var setLabelCommand = &cli.Command{
 	Usage:       "Add labels to content",
 	ArgsUsage:   "<name> [<label>=<value> ...]",
 	Description: "labels snapshots in the snapshotter",
-	Action: func(cliContext *cli.Context) error {
-		key, labels := commands.ObjectWithLabelArgs(cliContext)
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		snapshotter := client.SnapshotService(cliContext.String("snapshotter"))
+		snapshotter := client.SnapshotService(cmd.String("snapshotter"))
 
+		key, labels := commands.ObjectWithLabelArgs(cmd)
 		info := snapshots.Info{
 			Name:   key,
 			Labels: map[string]string{},
@@ -527,7 +538,7 @@ var setLabelCommand = &cli.Command{
 
 		var paths []string
 		for k, v := range labels {
-			paths = append(paths, fmt.Sprintf("labels.%s", k))
+			paths = append(paths, "labels."+k)
 			if v != "" {
 				info.Labels[k] = v
 			}
@@ -552,6 +563,7 @@ var setLabelCommand = &cli.Command{
 
 		return nil
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var unpackCommand = &cli.Command{
@@ -564,12 +576,13 @@ var unpackCommand = &cli.Command{
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	}, commands.SnapshotterFlags...),
-	Action: func(cliContext *cli.Context) error {
-		dgst, err := digest.Parse(cliContext.Args().First())
+	DisableSliceFlagSeparator: true,
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		dgst, err := digest.Parse(cmd.Args().First())
 		if err != nil {
 			return err
 		}
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
@@ -584,7 +597,7 @@ var unpackCommand = &cli.Command{
 		for _, image := range images {
 			if image.Target().Digest == dgst {
 				fmt.Printf("unpacking %s (%s)...", dgst, image.Target().MediaType)
-				if err := image.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs")))); err != nil {
+				if err := image.Unpack(ctx, cmd.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cmd.Bool("sync-fs")))); err != nil {
 					fmt.Println()
 					return err
 				}
@@ -673,7 +686,7 @@ func printMounts(target string, mounts []mount.Mount) {
 	for _, m := range mounts {
 		var opt string
 		if len(m.Options) > 0 {
-			opt = fmt.Sprintf(" -o %s", strings.Join(m.Options, ","))
+			opt = " -o " + strings.Join(m.Options, ",")
 		}
 		fmt.Printf("mount -t %s %s %s%s\n", m.Type, m.Source, filepath.Join(target, m.Target), opt)
 	}

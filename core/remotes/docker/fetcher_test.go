@@ -30,6 +30,8 @@ import (
 	"net/http/httptest"
 	"net/textproto"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,16 +40,123 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/pkg/reference"
+	"github.com/containerd/containerd/v2/plugins/content/local"
 )
 
 type writeFunc func(p []byte) (int, error)
 
 func (f writeFunc) Write(p []byte) (int, error) { return f(p) }
+
+func TestHTTPReadSeekerClosesBodyAtEOF(t *testing.T) {
+	payload := []byte("layer content")
+	path := filepath.Join(t.TempDir(), "body")
+	require.NoError(t, os.WriteFile(path, payload, 0600))
+	var bodies []*os.File
+	rc, err := newHTTPReadSeeker(int64(len(payload)), func(offset int64) (io.ReadCloser, error) {
+		body, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := body.Seek(offset, io.SeekStart); err != nil {
+			body.Close()
+			return nil, err
+		}
+		bodies = append(bodies, body)
+		return body, nil
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	for i := range 2 {
+		data, err := io.ReadAll(rc)
+		require.NoError(t, err)
+		require.Equal(t, payload, data)
+		require.Len(t, bodies, i+1)
+		// The HTTP body must be closed before the caller commits its writer,
+		// without closing the seekable reader needed for a possible reset.
+		_, err = bodies[i].Read(make([]byte, 1))
+		require.ErrorIs(t, err, os.ErrClosed)
+		_, err = rc.(io.Seeker).Seek(0, io.SeekStart)
+		require.NoError(t, err)
+	}
+}
+
+func TestFetchClosesHTTPBodyBeforeCommit(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	payload := []byte("layer content")
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes(payload),
+		Size:      int64(len(payload)),
+	}
+	registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		w.Write(payload)
+	}))
+	defer registry.Close()
+	var closed atomic.Int32
+	client := registry.Client()
+	transport := client.Transport
+	client.Transport = rtFunc(func(r *http.Request) (*http.Response, error) {
+		resp, err := transport.RoundTrip(r)
+		if err == nil {
+			resp.Body = &fnOnClose{
+				ReadCloser:  resp.Body,
+				BeforeClose: func() { closed.Add(1) },
+			}
+		}
+		return resp, err
+	})
+	resolver := NewResolver(ResolverOptions{Client: client, PlainHTTP: true})
+	fetcher, err := resolver.Fetcher(ctx, strings.TrimPrefix(registry.URL, "http://")+"/image:latest")
+	require.NoError(t, err)
+	store, err := local.NewStore(t.TempDir())
+	require.NoError(t, err)
+	committed := false
+	ingester := beforeCommitIngester{Ingester: store, beforeCommit: func() {
+		// Even if Commit blocks, CRI must no longer count this HTTP request
+		// as active. Check before Fetch's deferred reader.Close can run.
+		require.EqualValues(t, 1, closed.Load())
+		committed = true
+	}}
+	require.NoError(t, remotes.Fetch(ctx, ingester, fetcher, desc))
+	require.True(t, committed)
+	require.EqualValues(t, 1, closed.Load())
+}
+
+type beforeCommitIngester struct {
+	content.Ingester
+	beforeCommit func()
+}
+
+func (i beforeCommitIngester) Writer(ctx context.Context, opts ...content.WriterOpt) (content.Writer, error) {
+	w, err := i.Ingester.Writer(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return beforeCommitWriter{Writer: w, beforeCommit: i.beforeCommit}, nil
+}
+
+type beforeCommitWriter struct {
+	content.Writer
+	beforeCommit func()
+}
+
+func (w beforeCommitWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
+	w.beforeCommit()
+	return w.Writer.Commit(ctx, size, expected, opts...)
+}
 
 func TestFetcherOpen(t *testing.T) {
 	content := make([]byte, 128)
@@ -393,6 +502,235 @@ func TestFetcherOpenParallel_CloseAfterCopyError(t *testing.T) {
 		t.Errorf("close blocked after write error")
 		unblockAll()
 		<-closeDone
+	}
+}
+
+func TestFetcherDescURLsDoesNotForwardResolverHeaders(t *testing.T) {
+	body := []byte("ok")
+
+	headersCh := make(chan http.Header, 1)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		headersCh <- r.Header.Clone()
+		rw.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = rw.Write(body)
+	}))
+	defer s.Close()
+
+	refspec, err := reference.Parse("example.com/library/test:latest")
+	require.NoError(t, err)
+
+	f := dockerFetcher{&dockerBase{
+		refspec:    refspec,
+		repository: "library/test",
+		header: http.Header{
+			"Authorization":       {"Bearer should-strip"},
+			"Proxy-Authorization": {"Basic should-strip"},
+			"Cookie":              {"a=b"},
+			"Cookie2":             {"c=d"},
+			"X-Test":              {"should-stay"},
+		},
+		hosts: []RegistryHost{{
+			Host:         "example.com",
+			Scheme:       "https",
+			Capabilities: HostCapabilityPull,
+		}},
+	}}
+
+	desc := ocispec.Descriptor{
+		MediaType: "application/octet-stream",
+		Size:      int64(len(body)),
+		URLs:      []string{s.URL},
+	}
+
+	rc, err := f.Fetch(context.Background(), desc)
+	require.NoError(t, err)
+	_, err = io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+
+	select {
+	case hdr := <-headersCh:
+		assert.Empty(t, hdr.Get("Authorization"))
+		assert.Empty(t, hdr.Get("Proxy-Authorization"))
+		assert.Empty(t, hdr.Get("Cookie"))
+		assert.Empty(t, hdr.Get("Cookie2"))
+		assert.Equal(t, "should-stay", hdr.Get("X-Test"))
+	case <-time.After(time.Second):
+		t.Fatal("descriptor URL server did not receive a request")
+	}
+}
+
+func TestIsRegistryOrigin(t *testing.T) {
+	tests := []struct {
+		name          string
+		descriptorURL string
+		registryHost  RegistryHost
+		want          bool
+	}{
+		{
+			name:          "https implicit and explicit default port",
+			descriptorURL: "https://example.com/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com:443"},
+			want:          true,
+		},
+		{
+			name:          "https explicit and implicit default port",
+			descriptorURL: "https://example.com:443/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          true,
+		},
+		{
+			name:          "http implicit and explicit default port",
+			descriptorURL: "http://example.com/layer",
+			registryHost:  RegistryHost{Scheme: "http", Host: "example.com:80"},
+			want:          true,
+		},
+		{
+			name:          "matching non-default port",
+			descriptorURL: "https://example.com:8443/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com:8443"},
+			want:          true,
+		},
+		{
+			name:          "different non-default port",
+			descriptorURL: "https://example.com:8443/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          false,
+		},
+		{
+			name:          "different scheme",
+			descriptorURL: "http://example.com/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          false,
+		},
+		{
+			name:          "different hostname",
+			descriptorURL: "https://cdn.example.com/layer",
+			registryHost:  RegistryHost{Scheme: "https", Host: "example.com"},
+			want:          false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			u, err := url.Parse(test.descriptorURL)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, isRegistryOrigin(u, []RegistryHost{test.registryHost}))
+		})
+	}
+}
+
+func TestFetcherDescURLsForwardsResolverHeadersToRegistryOrigin(t *testing.T) {
+	body := []byte("ok")
+
+	headersCh := make(chan http.Header, 1)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		headersCh <- r.Header.Clone()
+		rw.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = rw.Write(body)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+	refspec, err := reference.Parse("example.com/library/test:latest")
+	require.NoError(t, err)
+
+	f := dockerFetcher{&dockerBase{
+		refspec:    refspec,
+		repository: "library/test",
+		header: http.Header{
+			"Authorization":       {"Bearer should-stay"},
+			"Proxy-Authorization": {"Basic should-stay"},
+			"Cookie":              {"a=b"},
+			"Cookie2":             {"c=d"},
+			"X-Test":              {"should-stay"},
+		},
+		hosts: []RegistryHost{{
+			Host:         u.Host,
+			Scheme:       u.Scheme,
+			Capabilities: HostCapabilityPull,
+		}},
+	}}
+
+	desc := ocispec.Descriptor{
+		MediaType: "application/octet-stream",
+		Size:      int64(len(body)),
+		URLs:      []string{s.URL},
+	}
+
+	rc, err := f.Fetch(context.Background(), desc)
+	require.NoError(t, err)
+	_, err = io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+
+	select {
+	case hdr := <-headersCh:
+		assert.Equal(t, "Bearer should-stay", hdr.Get("Authorization"))
+		assert.Equal(t, "Basic should-stay", hdr.Get("Proxy-Authorization"))
+		assert.Equal(t, "a=b", hdr.Get("Cookie"))
+		assert.Equal(t, "c=d", hdr.Get("Cookie2"))
+		assert.Equal(t, "should-stay", hdr.Get("X-Test"))
+	case <-time.After(time.Second):
+		t.Fatal("descriptor URL server did not receive a request")
+	}
+}
+
+func TestFetcherBlobEndpointForwardsResolverHeaders(t *testing.T) {
+	body := []byte("ok")
+
+	headersCh := make(chan http.Header, 1)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		headersCh <- r.Header.Clone()
+		rw.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = rw.Write(body)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+	refspec, err := reference.Parse("example.com/library/test:latest")
+	require.NoError(t, err)
+
+	f := dockerFetcher{&dockerBase{
+		refspec:    refspec,
+		repository: "library/test",
+		header: http.Header{
+			"Authorization":       {"Bearer should-stay"},
+			"Proxy-Authorization": {"Basic should-stay"},
+			"Cookie":              {"a=b"},
+			"Cookie2":             {"c=d"},
+			"X-Test":              {"should-stay"},
+		},
+		hosts: []RegistryHost{{
+			Client:       s.Client(),
+			Host:         u.Host,
+			Scheme:       u.Scheme,
+			Capabilities: HostCapabilityPull,
+		}},
+	}}
+
+	desc := ocispec.Descriptor{
+		MediaType: "application/octet-stream",
+		Size:      int64(len(body)),
+	}
+
+	rc, err := f.Fetch(context.Background(), desc)
+	require.NoError(t, err)
+	_, err = io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+
+	select {
+	case hdr := <-headersCh:
+		assert.Equal(t, "Bearer should-stay", hdr.Get("Authorization"))
+		assert.Equal(t, "Basic should-stay", hdr.Get("Proxy-Authorization"))
+		assert.Equal(t, "a=b", hdr.Get("Cookie"))
+		assert.Equal(t, "c=d", hdr.Get("Cookie2"))
+		assert.Equal(t, "should-stay", hdr.Get("X-Test"))
+	case <-time.After(time.Second):
+		t.Fatal("blob server did not receive a request")
 	}
 }
 

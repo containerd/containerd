@@ -32,11 +32,11 @@ import (
 // within a user namespace.
 func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func(pid int) error) (retErr error) {
 	if unshareFlags&syscall.CLONE_NEWUSER == syscall.CLONE_NEWUSER {
-		return fmt.Errorf("unshare flags should not include user namespace")
+		return errors.New("unshare flags should not include user namespace")
 	}
 
 	if !SupportsPidFD() {
-		return fmt.Errorf("kernel doesn't support pidfd")
+		return errors.New("kernel doesn't support pidfd")
 	}
 
 	uidMaps, err := parseIDMapping(uidMap)
@@ -86,7 +86,7 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 func parseIDMapping(mapping string) ([]syscall.SysProcIDMap, error) {
 	parts := strings.Split(mapping, ":")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("user namespace mappings require the format `container-id:host-id:size`")
+		return nil, errors.New("user namespace mappings require the format `container-id:host-id:size`")
 	}
 
 	cID, err := strconv.Atoi(parts[0])
@@ -196,7 +196,7 @@ func startProcessWithUsernsLocked(targetHostUID int, unshareFlags uintptr, uidMa
 	if pidfd == -1 {
 		proc.Kill()
 		proc.Wait()
-		return -1, -1, fmt.Errorf("kernel doesn't support CLONE_PIDFD")
+		return -1, -1, errors.New("kernel doesn't support CLONE_PIDFD")
 	}
 
 	if _, _, errno := syscall.RawSyscall(unix.SYS_SETRESUID, ^uintptr(0), uintptr(originalEUID), ^uintptr(0)); errno != 0 {

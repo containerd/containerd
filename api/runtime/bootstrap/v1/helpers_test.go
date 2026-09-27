@@ -88,3 +88,76 @@ func TestAddExtensionWithAny(t *testing.T) {
 		t.Fatalf("expected TypeUrl to contain %q, got %q", "Options", params.Extensions[0].Value.TypeUrl)
 	}
 }
+
+func TestResultExtensions(t *testing.T) {
+	result := &BootstrapResult{}
+
+	if err := result.AddExtension(&options.Options{ShimCgroup: "test-cgroup"}); err != nil {
+		t.Fatalf("AddExtension: %v", err)
+	}
+
+	got := &options.Options{}
+	found, err := result.FindExtension(got)
+	if err != nil {
+		t.Fatalf("FindExtension: %v", err)
+	}
+	if !found {
+		t.Fatal("expected extension to be found")
+	}
+	if got.ShimCgroup != "test-cgroup" {
+		t.Fatalf("expected ShimCgroup %q, got %q", "test-cgroup", got.ShimCgroup)
+	}
+}
+
+// TestFindExtensionSkipsNilValues ensures a nil Extension.Value, or a nil
+// Extension itself, is skipped rather than dereferenced, and does not stop a
+// valid extension later in the list from being found.
+//
+// anypb's generated getters and (*anypb.Any).MessageIs are nil-safe, so this
+// holds without FindExtension checking for nil itself: (*Extension)(nil) and
+// (*Extension).GetValue() on a nil Value both route through nil-receiver
+// getters that return zero values rather than panicking.
+func TestFindExtensionSkipsNilValues(t *testing.T) {
+	result := &BootstrapResult{
+		Extensions: []*Extension{
+			nil,
+			{Value: nil},
+		},
+	}
+
+	got := &options.Options{}
+	found, err := result.FindExtension(got)
+	if err != nil {
+		t.Fatalf("FindExtension: %v", err)
+	}
+	if found {
+		t.Fatal("expected no extension to be found among nil entries")
+	}
+
+	if err := result.AddExtension(&options.Options{ShimCgroup: "test-cgroup"}); err != nil {
+		t.Fatalf("AddExtension: %v", err)
+	}
+
+	found, err = result.FindExtension(got)
+	if err != nil {
+		t.Fatalf("FindExtension: %v", err)
+	}
+	if !found {
+		t.Fatal("expected the valid extension after the nil entries to be found")
+	}
+	if got.ShimCgroup != "test-cgroup" {
+		t.Fatalf("expected ShimCgroup %q, got %q", "test-cgroup", got.ShimCgroup)
+	}
+}
+
+// TestAddExtensionNil ensures a nil message is rejected with an error rather
+// than panicking. A typed nil *anypb.Any is a different case: it satisfies
+// the *anypb.Any type assertion in AddExtension and is added as-is, which is
+// covered by TestFindExtensionSkipsNilValues.
+func TestAddExtensionNil(t *testing.T) {
+	result := &BootstrapResult{}
+
+	if err := result.AddExtension(nil); err == nil {
+		t.Fatal("expected an error adding a nil message")
+	}
+}

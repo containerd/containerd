@@ -242,6 +242,7 @@ NRI, containerd and CRI-O versions each property was first available in.
 | Linux sysctl                           | v0.11.0   | unimplemented | unimplemented |
 | container user, groups                 | v0.11.0   | unimplemented | unimplemented |
 | container extra status                 | v0.10.0   | unimplemented | unimplemented |
+| container image name and digests       | v0.13.0   | v2.4.0        | unimplemented |
 
 Apart from data identifying the container, these pieces of information
 represent the corresponding data in the container's [OCI Spec](https://github.com/opencontainers/runtime-spec/blob/main/spec.md).

@@ -173,7 +173,7 @@ func loadOCISpec(filename string) (*oci.Spec, error) {
 }
 
 // Set glog level.
-// TODO: mikebrow remove this klog inititialization func once we are no longer vendoring k8s.io/klog
+// TODO: mikebrow remove this klog initialization func once we are no longer vendoring k8s.io/klog
 func setGLogLevel() error {
 	l := log.GetLevel()
 	fs := flag.NewFlagSet("klog", flag.PanicOnError)
@@ -245,6 +245,9 @@ func migrateConfig(dst, src map[string]any) {
 			"enable_tls_streaming",
 			"x509_key_pair_streaming":
 			// skip (moved to cri ServerConfig)
+			continue
+		case "enable_cdi":
+			// skip (CDI is always enabled)
 			continue
 		default:
 			if _, ok := dst[k]; !ok {

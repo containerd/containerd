@@ -19,6 +19,7 @@ permissions:
 jobs:
   breaking:
     name: Detect breaking API changes
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

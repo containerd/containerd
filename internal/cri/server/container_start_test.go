@@ -17,12 +17,24 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	tasks "github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/types/task"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/containers"
+	criio "github.com/containerd/containerd/v2/internal/cri/io"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/cio"
 )
 
 // TestSetContainerStarting tests setContainerStarting sets removing
@@ -100,6 +112,114 @@ func TestSetContainerStarting(t *testing.T) {
 				assert.NoError(t, resetContainerStarting(container))
 				assert.False(t, container.Status.Get().Starting, "starting should be reset")
 			}
+		})
+	}
+}
+
+// startFailureTasksClient is a task service whose Start always fails, with a
+// configurable outcome for the cleanup Delete issued by StartContainer.
+type startFailureTasksClient struct {
+	tasks.TasksClient
+	deleteErr error
+}
+
+func (f *startFailureTasksClient) Create(context.Context, *tasks.CreateTaskRequest, ...grpc.CallOption) (*tasks.CreateTaskResponse, error) {
+	return &tasks.CreateTaskResponse{}, nil
+}
+
+// Wait is called from task.Wait's background goroutine.
+func (f *startFailureTasksClient) Wait(context.Context, *tasks.WaitRequest, ...grpc.CallOption) (*tasks.WaitResponse, error) {
+	return &tasks.WaitResponse{}, nil
+}
+
+func (f *startFailureTasksClient) Start(context.Context, *tasks.StartRequest, ...grpc.CallOption) (*tasks.StartResponse, error) {
+	return nil, errors.New("start failed")
+}
+
+func (f *startFailureTasksClient) Get(context.Context, *tasks.GetRequest, ...grpc.CallOption) (*tasks.GetResponse, error) {
+	return &tasks.GetResponse{Process: &task.Process{Status: task.Status_STOPPED}}, nil
+}
+
+func (f *startFailureTasksClient) Delete(context.Context, *tasks.DeleteTaskRequest, ...grpc.CallOption) (*tasks.DeleteResponse, error) {
+	if f.deleteErr != nil {
+		return nil, f.deleteErr
+	}
+	return &tasks.DeleteResponse{}, nil
+}
+
+type fakeContainersStore struct {
+	containers.Store
+}
+
+func (f *fakeContainersStore) Get(context.Context, string) (containers.Container, error) {
+	return containers.Container{}, nil
+}
+
+// TestStartContainerFailureState verifies the state StartContainer records when
+// the task fails to start: a container whose task was cleaned up is EXITED, but
+// one whose task delete failed (e.g. timed out on a wedged shim) must be left
+// UNKNOWN, so RemoveContainer force-stops and reaps the leftover task instead
+// of failing forever on "cannot delete running task".
+func TestStartContainerFailureState(t *testing.T) {
+	const (
+		containerID = "test-container"
+		sandboxID   = "test-sandbox"
+	)
+
+	for _, test := range []struct {
+		desc          string
+		deleteErr     error
+		expectedState runtime.ContainerState
+	}{
+		{
+			desc:          "task deleted",
+			expectedState: runtime.ContainerState_CONTAINER_EXITED,
+		},
+		{
+			desc:          "task delete failed",
+			deleteErr:     context.DeadlineExceeded,
+			expectedState: runtime.ContainerState_CONTAINER_UNKNOWN,
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			ctx := context.Background()
+			c := newTestCRIServiceWithClient(
+				&startFailureTasksClient{deleteErr: test.deleteErr},
+				containerd.WithContainerStore(&fakeContainersStore{}),
+			)
+
+			require.NoError(t, c.sandboxStore.Add(sandboxstore.NewSandbox(
+				sandboxstore.Metadata{ID: sandboxID, Config: &runtime.PodSandboxConfig{}},
+				sandboxstore.Status{State: sandboxstore.StateReady},
+			)))
+
+			cntr, err := c.client.LoadContainer(ctx, containerID)
+			require.NoError(t, err)
+			containerIO, err := criio.NewContainerIO(containerID, criio.WithFIFOs(cio.NewFIFOSet(cio.Config{}, nil)))
+			require.NoError(t, err)
+			container, err := containerstore.NewContainer(
+				containerstore.Metadata{
+					ID:        containerID,
+					SandboxID: sandboxID,
+					Config:    &runtime.ContainerConfig{},
+				},
+				containerstore.WithContainer(cntr),
+				containerstore.WithContainerIO(containerIO),
+				containerstore.WithFakeStatus(containerstore.Status{CreatedAt: time.Now().UnixNano()}),
+			)
+			require.NoError(t, err)
+			require.NoError(t, c.containerStore.Add(container))
+
+			_, err = c.StartContainer(ctx, &runtime.StartContainerRequest{ContainerId: containerID})
+			require.ErrorContains(t, err, "start failed")
+
+			status := container.Status.Get()
+			assert.Equal(t, test.expectedState, status.State())
+			assert.False(t, status.Starting)
+			assert.NotZero(t, status.FinishedAt)
+			assert.Equal(t, int32(errorStartExitCode), status.ExitCode)
+			assert.Equal(t, errorStartReason, status.Reason)
+			assert.Contains(t, status.Message, "start failed")
 		})
 	}
 }
