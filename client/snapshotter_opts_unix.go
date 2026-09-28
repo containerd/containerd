@@ -142,6 +142,23 @@ type remappedSnapshot struct {
 }
 
 func (s *remappedSnapshot) ID() (string, error) {
+	if err := digest.Digest(s.Parent).Validate(); err != nil {
+		return "", fmt.Errorf("invalid remapped snapshot parent: %w", err)
+	}
+	if len(s.IDMap.UidMap) == 0 || len(s.IDMap.GidMap) == 0 {
+		return "", errors.New("remapped snapshot requires UID and GID mappings")
+	}
+	for _, mappings := range [][]specs.LinuxIDMapping{s.IDMap.UidMap, s.IDMap.GidMap} {
+		for _, mapping := range mappings {
+			if mapping.Size == 0 {
+				return "", errors.New("remapped snapshot mapping has zero size")
+			}
+		}
+	}
+	if _, err := s.IDMap.RootPair(); err != nil {
+		return "", fmt.Errorf("invalid remapped snapshot root mapping: %w", err)
+	}
+
 	compare := func(a, b specs.LinuxIDMapping) int {
 		if a.ContainerID < b.ContainerID {
 			return -1
@@ -153,7 +170,11 @@ func (s *remappedSnapshot) ID() (string, error) {
 	slices.SortStableFunc(s.IDMap.UidMap, compare)
 	slices.SortStableFunc(s.IDMap.GidMap, compare)
 
-	buf, err := json.Marshal(s)
+	buf, err := json.Marshal(struct {
+		*remappedSnapshot
+		// Do not reuse snapshots produced before file capability preservation.
+		Version int `json:"Version"`
+	}{s, 1})
 	if err != nil {
 		return "", err
 	}
