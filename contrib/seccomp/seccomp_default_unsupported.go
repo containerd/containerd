@@ -20,7 +20,14 @@ package seccomp
 
 import specs "github.com/opencontainers/runtime-spec/specs-go"
 
+func defaultProfile(_ *specs.Spec) (*specs.LinuxSeccomp, error) {
+	return &specs.LinuxSeccomp{}, nil
+}
+
 // DefaultProfile defines the allowed syscalls for the default seccomp profile.
+//
+// Deprecated: use [WithDefaultProfile] instead, which returns errors from
+// generating the profile.
 func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 	return &specs.LinuxSeccomp{}
 }

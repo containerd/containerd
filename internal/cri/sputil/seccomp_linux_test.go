@@ -193,8 +193,8 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 						Linux: &runtimespec.Linux{},
 						Process: &runtimespec.Process{
 							Capabilities: &runtimespec.LinuxCapabilities{
-								// This is to ensure the test covers logic in
-								// `contrib/seccomp.DefaultProfile` as much as possible
+								// Include capabilities to exercise Moby's
+								// default seccomp profile generation.
 								Bounding: []string{
 									"CAP_DAC_READ_SEARCH",
 									"CAP_SYS_ADMIN",
