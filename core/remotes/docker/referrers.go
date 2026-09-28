@@ -143,11 +143,7 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, co
 			// The OCI distribution spec recommends assuming no referrers:
 			// https://github.com/opencontainers/distribution-spec/blob/main/spec.md#listing-referrers
 			if errdefs.IsNotFound(err) || (errors.As(err, &status) && status.StatusCode == http.StatusBadRequest) {
-				if firstErr == nil {
-					// Equivalent to empty referrers list
-					firstErr = errdefs.ErrNotFound
-				}
-				break
+				continue
 			}
 			log.G(ctx).WithError(err).WithField("host", host.Host).Debug("error fetching referrers via fallback")
 			if firstErr == nil {
