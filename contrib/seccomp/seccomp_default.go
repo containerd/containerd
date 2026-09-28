@@ -20,6 +20,7 @@ package seccomp
 
 import (
 	"runtime"
+	"slices"
 
 	"golang.org/x/sys/unix"
 
@@ -50,6 +51,111 @@ func arches() []specs.Arch {
 		return []specs.Arch{specs.ArchLOONGARCH64}
 	default:
 		return []specs.Arch{}
+	}
+}
+
+// These are the Linux socket domains currently defined by the UAPI:
+// https://github.com/torvalds/linux/blob/master/include/linux/socket.h
+// AF_UNSPEC is not a creatable domain, AF_MAX is a sentinel, and AF_LOCAL/AF_FILE
+// and AF_ROUTE are aliases of AF_UNIX and AF_NETLINK respectively.
+var allowedSocketDomains = []uint64{
+	unix.AF_UNIX,
+	unix.AF_INET,
+	unix.AF_AX25,
+	unix.AF_IPX,
+	unix.AF_APPLETALK,
+	unix.AF_NETROM,
+	unix.AF_BRIDGE,
+	unix.AF_ATMPVC,
+	unix.AF_X25,
+	unix.AF_INET6,
+	unix.AF_ROSE,
+	unix.AF_DECnet,
+	unix.AF_NETBEUI,
+	unix.AF_SECURITY,
+	unix.AF_KEY,
+	unix.AF_NETLINK,
+	unix.AF_PACKET,
+	unix.AF_ASH,
+	unix.AF_ECONET,
+	unix.AF_ATMSVC,
+	unix.AF_RDS,
+	unix.AF_SNA,
+	unix.AF_IRDA,
+	unix.AF_PPPOX,
+	unix.AF_WANPIPE,
+	unix.AF_LLC,
+	unix.AF_IB,
+	unix.AF_MPLS,
+	unix.AF_CAN,
+	unix.AF_TIPC,
+	unix.AF_BLUETOOTH,
+	unix.AF_IUCV,
+	unix.AF_RXRPC,
+	unix.AF_ISDN,
+	unix.AF_PHONET,
+	unix.AF_IEEE802154,
+	unix.AF_CAIF,
+	// AF_ALG gives userspace direct access to the kernel cryptography API.
+	// The vulnerabilities demonstrated by https://copy.fail/ have been fixed,
+	// but general-purpose containers have no practical need for this interface.
+	// Keep it blocked to avoid exposing an unnecessary kernel attack surface.
+	// unix.AF_ALG,
+	unix.AF_NFC,
+	// AF_VSOCK provides host/guest communication. Before Linux 7.0 it was global
+	// across network namespaces, allowing a container to reach any visible VM by
+	// CID. Linux 7.0 added opt-in namespace isolation for vhost-vsock and
+	// loopback, but global mode remains the default. Keep it blocked for older
+	// kernels and default-global configurations; intentional users can provide
+	// a custom seccomp profile. See https://docs.kernel.org/admin-guide/sysctl/net.html.
+	// unix.AF_VSOCK,
+	unix.AF_KCM,
+	unix.AF_QIPCRTR,
+	unix.AF_SMC,
+	unix.AF_XDP,
+	unix.AF_MCTP,
+}
+
+func socketSyscalls() []specs.LinuxSyscall {
+	domains := slices.Clone(allowedSocketDomains)
+	// Keep range detection independent of the declaration order above.
+	slices.Sort(domains)
+	return socketSyscallsForDomains(domains)
+}
+
+func socketSyscallsForDomains(domains []uint64) []specs.LinuxSyscall {
+	var syscalls []specs.LinuxSyscall
+	if len(domains) > 1 && domains[0] == unix.AF_UNIX && domains[1] == domains[0]+1 {
+		// runc treats repeated comparisons for one argument as separate OR
+		// rules, so bounded ranges cannot use both lower and upper comparisons:
+		// https://github.com/opencontainers/runc/issues/2735
+		// A one-sided range starting at AF_UNIX is safe because AF_UNSPEC is not
+		// creatable. Collapse only when it removes equality rules, and stop at
+		// the first gap. OpLessThan is exclusive.
+		lastDomain := 1
+		for lastDomain+1 < len(domains) && domains[lastDomain+1] == domains[lastDomain]+1 {
+			lastDomain++
+		}
+		syscalls = append(syscalls, socketSyscall(domains[lastDomain]+1, specs.OpLessThan))
+		domains = domains[lastDomain+1:]
+	}
+	for _, domain := range domains {
+		syscalls = append(syscalls, socketSyscall(domain, specs.OpEqualTo))
+	}
+	return syscalls
+}
+
+func socketSyscall(value uint64, op specs.LinuxSeccompOperator) specs.LinuxSyscall {
+	return specs.LinuxSyscall{
+		Names:  []string{"socket"},
+		Action: specs.ActAllow,
+		Args: []specs.LinuxSeccompArg{
+			{
+				Index: 0,
+				Value: value,
+				Op:    op,
+			},
+		},
 	}
 }
 
@@ -426,56 +532,13 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
 		},
-		// Allow socket(2) for all address families except AF_VSOCK and AF_ALG.
-		// NOTE: on socketcall(2)-based ABIs (for example 32-bit x86), socket()
-		// goes through socketcall(2), which is allowed unconditionally above.
-		// These arg filters only apply to the direct socket syscall.
-		//
-		// Do not use one rule with both "arg0 != AF_VSOCK" and "arg0 != AF_ALG".
-		// runc splits repeated argument-index conditions into separate
-		// libseccomp rules, so they behave like OR and allow both blocked
-		// domains.
-		//
-		// Do not combine explicit ERRNO rules with a broad socket ALLOW.
-		// libseccomp can make the ERRNO branch unreachable, collapse an
-		// unconditional ALLOW into a bare syscall allow, or silently reject
-		// repeated not-equal checks.
-		//
-		// These three single-condition ranges make AF_ALG and AF_VSOCK match
-		// none and fall through to the default errno action.
-		{
-			Names:  []string{"socket"},
-			Action: specs.ActAllow,
-			Args: []specs.LinuxSeccompArg{
-				{
-					Index: 0,
-					Value: unix.AF_ALG,
-					Op:    specs.OpLessThan,
-				},
-			},
-		},
-		{
-			Names:  []string{"socket"},
-			Action: specs.ActAllow,
-			Args: []specs.LinuxSeccompArg{
-				{
-					Index: 0,
-					Value: unix.AF_ALG + 1,
-					Op:    specs.OpEqualTo,
-				},
-			},
-		},
-		{
-			Names:  []string{"socket"},
-			Action: specs.ActAllow,
-			Args: []specs.LinuxSeccompArg{
-				{
-					Index: 0,
-					Value: unix.AF_VSOCK,
-					Op:    specs.OpGreaterThan,
-				},
-			},
-		},
+	}
+	// Allow socket(2) for the address families listed in allowedSocketDomains.
+	// On ABIs that use socketcall(2), the socket arguments are behind a pointer
+	// and cannot be filtered by seccomp. Because socketcall(2) is allowed above,
+	// this domain allow-list applies only to the direct socket syscall.
+	syscalls = append(syscalls, socketSyscalls()...)
+	syscalls = append(syscalls, []specs.LinuxSyscall{
 		{
 			Names:  []string{"personality"},
 			Action: specs.ActAllow,
@@ -531,7 +594,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				},
 			},
 		},
-	}
+	}...)
 
 	s := &specs.LinuxSeccomp{
 		DefaultAction: specs.ActErrno,
