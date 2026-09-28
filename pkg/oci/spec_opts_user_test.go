@@ -313,8 +313,6 @@ sys:x:3:root,bin,adm
 // primary group is *not* the group that happens to share the user's name,
 // and the user is listed as a member of that same-name group, the same-name
 // group's GID must end up in the additional GIDs.
-//
-//nolint:gosec
 func TestWithAdditionalGIDsSameNameSupplementalGroup(t *testing.T) {
 	t.Parallel()
 	// Mirrors the mongodb image setup: primary GID points at nogroup,
