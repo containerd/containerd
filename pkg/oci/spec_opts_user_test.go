@@ -326,9 +326,9 @@ mongodb:x:101:mongodb
 `
 	td := t.TempDir()
 	apply := fstest.Apply(
-		fstest.CreateDir("/etc", 0777),
-		fstest.CreateFile("/etc/passwd", []byte(passwd), 0777),
-		fstest.CreateFile("/etc/group", []byte(group), 0777),
+		fstest.CreateDir("/etc", 0755),
+		fstest.CreateFile("/etc/passwd", []byte(passwd), 0644),
+		fstest.CreateFile("/etc/group", []byte(group), 0644),
 	)
 	if err := apply.Apply(td); err != nil {
 		t.Fatalf("failed to apply: %v", err)
