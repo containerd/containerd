@@ -142,8 +142,11 @@ type remappedSnapshot struct {
 }
 
 func (s *remappedSnapshot) ID() (string, error) {
-	if err := digest.Digest(s.Parent).Validate(); err != nil {
-		return "", fmt.Errorf("invalid remapped snapshot parent: %w", err)
+	// An empty parent represents an empty filesystem, as with a layerless image.
+	if s.Parent != "" {
+		if err := digest.Digest(s.Parent).Validate(); err != nil {
+			return "", fmt.Errorf("invalid remapped snapshot parent: %w", err)
+		}
 	}
 	if len(s.IDMap.UidMap) == 0 || len(s.IDMap.GidMap) == 0 {
 		return "", errors.New("remapped snapshot requires UID and GID mappings")

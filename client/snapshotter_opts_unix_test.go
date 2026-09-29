@@ -52,8 +52,18 @@ func TestRemappedSnapshotID(t *testing.T) {
 	otherID, err := other.ID()
 	require.NoError(t, err)
 	require.NotEqual(t, id, otherID)
+	t.Run("empty-parent", func(t *testing.T) {
+		s := newSnapshot()
+		s.Parent = ""
+		emptyID, err := s.ID()
+		require.NoError(t, err)
+		require.NoError(t, digest.Digest(emptyID).Validate())
+		again, err := s.ID()
+		require.NoError(t, err)
+		require.Equal(t, emptyID, again)
+		require.NotEqual(t, id, emptyID)
+	})
 	for name, mutate := range map[string]func(*remappedSnapshot){
-		"missing-parent": func(s *remappedSnapshot) { s.Parent = "" },
 		"invalid-parent": func(s *remappedSnapshot) { s.Parent = "not-a-digest" },
 		"missing-uid":    func(s *remappedSnapshot) { s.IDMap.UidMap = nil },
 		"missing-gid":    func(s *remappedSnapshot) { s.IDMap.GidMap = nil },
