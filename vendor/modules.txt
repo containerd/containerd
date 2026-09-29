@@ -10,8 +10,8 @@ dario.cat/mergo
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
 ## explicit; go 1.20
 github.com/AdaLogics/go-fuzz-headers
-# github.com/Microsoft/go-winio v0.6.3-0.20251027160822-ad3df93bed29
-## explicit; go 1.23.0
+# github.com/Microsoft/go-winio v0.6.3
+## explicit; go 1.26.0
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/backuptar
 github.com/Microsoft/go-winio/internal/fs
