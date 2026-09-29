@@ -87,7 +87,19 @@ func remapFileCapabilities(caps []byte, idMap userns.IDMap) ([]byte, error) {
 	uidMap := userns.IDMap{UidMap: idMap.UidMap}
 	root, err := uidMap.ToHost(userns.User{Uid: rootUID})
 	if err != nil {
-		return nil, err
+		if revision != capRevision3 || rootUID == ^uint32(0) || len(idMap.UidMap) == 0 {
+			return nil, err
+		}
+		for _, m := range idMap.UidMap {
+			if m.Size == 0 || uint64(m.ContainerID)+uint64(m.Size) > uint64(^uint32(0)) ||
+				uint64(m.HostID)+uint64(m.Size) > uint64(^uint32(0)) ||
+				(rootUID >= m.ContainerID && rootUID-m.ContainerID < m.Size) {
+				return nil, err
+			}
+		}
+		// This capability's root cannot be represented in the remapped
+		// namespace. Let Lchown clear it instead of preventing container creation.
+		return nil, nil
 	}
 	mapped := make([]byte, capSize3)
 	copy(mapped, caps)

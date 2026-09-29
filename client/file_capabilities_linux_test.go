@@ -90,9 +90,22 @@ func TestRemapFileCapabilities(t *testing.T) {
 		require.Equal(t, uint32(capRevision3), binary.LittleEndian.Uint32(mapped))
 	})
 	t.Run("unmapped-root", func(t *testing.T) {
-		_, err := remapFileCapabilities(testCapability(capRevision3, 65536), testCapabilityMap())
-		require.Error(t, err)
+		caps, err := remapFileCapabilities(testCapability(capRevision3, 65536), testCapabilityMap())
+		require.NoError(t, err)
+		require.Nil(t, caps)
 	})
+	for name, mapping := range map[string][]specs.LinuxIDMapping{
+		"empty-map":            {},
+		"zero-size":            {{Size: 0}},
+		"source-overflow":      {{ContainerID: 1, Size: ^uint32(0)}},
+		"destination-overflow": {{HostID: ^uint32(0), Size: 2}},
+		"mapped-root-overflow": {{ContainerID: 99999, HostID: ^uint32(0) - 1, Size: 65536}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := remapFileCapabilities(testCapability(capRevision3, 100000), userns.IDMap{UidMap: mapping})
+			require.Error(t, err)
+		})
+	}
 	for _, caps := range [][]byte{nil, {1}, make([]byte, 4), testCapability(capRevision2, 0)[:19], append(testCapability(capRevision2, 0), 0)} {
 		_, err := remapFileCapabilities(caps, testCapabilityMap())
 		require.Error(t, err)
@@ -238,4 +251,25 @@ func TestRemappedFileCapabilitiesExec(t *testing.T) {
 		require.Contains(t, string(out), "CapAmb:\t0000000000000000")
 		require.Contains(t, string(out), "NoNewPrivs:\t1")
 	})
+}
+
+func TestChownDropsUnmappedFileCapabilities(t *testing.T) {
+	testutil.RequiresRoot(t)
+	root := t.TempDir()
+	path := filepath.Join(root, "binary")
+	require.NoError(t, os.WriteFile(path, []byte("executable"), 0755))
+	setTestCapability(t, path)
+	caps := testCapability(capRevision3, 100000)
+	require.NoError(t, sysx.LSetxattr(path, fileCapabilityXattr, caps, 0))
+	before, err := sysx.LGetxattr(path, fileCapabilityXattr)
+	require.NoError(t, err)
+	require.Equal(t, caps, before)
+
+	require.NoError(t, filepath.Walk(root, chown(root, testCapabilityMap())))
+	info, err := os.Lstat(path)
+	require.NoError(t, err)
+	require.Equal(t, uint32(100000), info.Sys().(*syscall.Stat_t).Uid)
+	require.Equal(t, uint32(200000), info.Sys().(*syscall.Stat_t).Gid)
+	_, err = sysx.LGetxattr(path, fileCapabilityXattr)
+	require.ErrorIs(t, err, unix.ENODATA)
 }
