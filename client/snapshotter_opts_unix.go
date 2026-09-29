@@ -148,9 +148,6 @@ func (s *remappedSnapshot) ID() (string, error) {
 			return "", fmt.Errorf("invalid remapped snapshot parent: %w", err)
 		}
 	}
-	if len(s.IDMap.UidMap) == 0 || len(s.IDMap.GidMap) == 0 {
-		return "", errors.New("remapped snapshot requires UID and GID mappings")
-	}
 	for _, mappings := range [][]specs.LinuxIDMapping{s.IDMap.UidMap, s.IDMap.GidMap} {
 		for _, mapping := range mappings {
 			if mapping.Size == 0 {

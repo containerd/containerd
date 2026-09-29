@@ -63,10 +63,29 @@ func TestRemappedSnapshotID(t *testing.T) {
 		require.Equal(t, emptyID, again)
 		require.NotEqual(t, id, emptyID)
 	})
+	identityIDs := map[string]bool{id: true}
+	for name, mutate := range map[string]func(*remappedSnapshot){
+		"identity-uid":  func(s *remappedSnapshot) { s.IDMap.UidMap = nil },
+		"identity-gid":  func(s *remappedSnapshot) { s.IDMap.GidMap = nil },
+		"identity-both": func(s *remappedSnapshot) { s.IDMap = userns.IDMap{} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newSnapshot()
+			mutate(&s)
+			identityID, err := s.ID()
+			require.NoError(t, err)
+			require.NoError(t, digest.Digest(identityID).Validate())
+			again, err := s.ID()
+			require.NoError(t, err)
+			require.Equal(t, identityID, again)
+			require.False(t, identityIDs[identityID], "different mappings must have distinct keys")
+			identityIDs[identityID] = true
+		})
+	}
 	for name, mutate := range map[string]func(*remappedSnapshot){
 		"invalid-parent": func(s *remappedSnapshot) { s.Parent = "not-a-digest" },
-		"missing-uid":    func(s *remappedSnapshot) { s.IDMap.UidMap = nil },
-		"missing-gid":    func(s *remappedSnapshot) { s.IDMap.GidMap = nil },
+		"empty-uid":      func(s *remappedSnapshot) { s.IDMap.UidMap = []specs.LinuxIDMapping{} },
+		"empty-gid":      func(s *remappedSnapshot) { s.IDMap.GidMap = []specs.LinuxIDMapping{} },
 		"empty-range":    func(s *remappedSnapshot) { s.IDMap.UidMap[0].Size = 0 },
 		"unmapped-root":  func(s *remappedSnapshot) { s.IDMap.UidMap[0].ContainerID = 1 },
 	} {
