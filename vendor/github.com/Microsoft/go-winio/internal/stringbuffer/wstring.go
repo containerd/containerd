@@ -16,7 +16,7 @@ const MinWStringCap = 310
 // is copied to heap and then referenced via pointer in the interface header that sync.Pool
 // stores.
 var pathPool = sync.Pool{ // if go1.18+ adds Pool[T], use that to store []uint16 directly
-	New: func() interface{} {
+	New: func() any {
 		b := make([]uint16, MinWStringCap)
 		return &b
 	},
