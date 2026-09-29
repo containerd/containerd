@@ -27,6 +27,10 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	// Register test.root on all platforms, including those that exclude
+	// file_capabilities_linux_test.go.
+	_ "github.com/containerd/containerd/v2/pkg/testutil"
 )
 
 // fakeImage implements the subset of Image used by WithImageConfigLabels:
