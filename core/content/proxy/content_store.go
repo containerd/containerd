@@ -122,12 +122,7 @@ func (pcs *proxyContentStore) ReaderAt(ctx context.Context, desc ocispec.Descrip
 		return nil, err
 	}
 
-	return &remoteReaderAt{
-		ctx:    ctx,
-		digest: desc.Digest,
-		size:   i.Size,
-		client: pcs.client,
-	}, nil
+	return newRemoteReaderAt(ctx, desc.Digest, i.Size, pcs.client), nil
 }
 
 func (pcs *proxyContentStore) Status(ctx context.Context, ref string) (content.Status, error) {
