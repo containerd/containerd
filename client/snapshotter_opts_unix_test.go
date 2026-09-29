@@ -52,6 +52,24 @@ func TestRemappedSnapshotID(t *testing.T) {
 	otherID, err := other.ID()
 	require.NoError(t, err)
 	require.NotEqual(t, id, otherID)
+	t.Run("file-capabilities", func(t *testing.T) {
+		s := newSnapshot()
+		stripped, err := s.id(false)
+		require.NoError(t, err)
+		preserved, err := s.id(true)
+		require.NoError(t, err)
+		require.NotEqual(t, stripped, preserved)
+		for mode, want := range map[bool]string{false: stripped, true: preserved} {
+			again, err := s.id(mode)
+			require.NoError(t, err)
+			require.Equal(t, want, again)
+		}
+		supported, err := supportsNamespacedFileCapabilities()
+		require.NoError(t, err)
+		want, err := s.id(supported)
+		require.NoError(t, err)
+		require.Equal(t, want, id)
+	})
 	t.Run("empty-parent", func(t *testing.T) {
 		s := newSnapshot()
 		s.Parent = ""

@@ -32,6 +32,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/internal/userns"
+	"github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/sysx"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -123,6 +124,8 @@ func setTestCapability(t *testing.T, path string) {
 
 func TestChownPreservesFileCapabilities(t *testing.T) {
 	testutil.RequiresRoot(t)
+	supported, err := kernelversion.GreaterEqualThan(kernelversion.KernelVersion{Kernel: 4, Major: 14})
+	require.NoError(t, err)
 	root := t.TempDir()
 	path := filepath.Join(root, "binary")
 	require.NoError(t, os.WriteFile(path, []byte("executable"), 0755))
@@ -131,9 +134,17 @@ func TestChownPreservesFileCapabilities(t *testing.T) {
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
 	require.NoError(t, chown(root, testCapabilityMap())(path, info, nil))
-	caps, err := sysx.LGetxattr(path, fileCapabilityXattr)
-	require.NoError(t, err)
-	require.Equal(t, testCapability(capRevision3, 100000), caps)
+	checkCaps := func() {
+		t.Helper()
+		caps, err := sysx.LGetxattr(path, fileCapabilityXattr)
+		if supported {
+			require.NoError(t, err)
+			require.Equal(t, testCapability(capRevision3, 100000), caps)
+		} else {
+			require.ErrorIs(t, err, unix.ENODATA)
+		}
+	}
+	checkCaps()
 	info, err = os.Lstat(path)
 	require.NoError(t, err)
 	require.Equal(t, uint32(100000), info.Sys().(*syscall.Stat_t).Uid)
@@ -145,9 +156,7 @@ func TestChownPreservesFileCapabilities(t *testing.T) {
 	info, err = os.Lstat(link)
 	require.NoError(t, err)
 	require.NoError(t, chown(root, testCapabilityMap())(link, info, nil))
-	caps, err = sysx.LGetxattr(path, fileCapabilityXattr)
-	require.NoError(t, err)
-	require.Equal(t, testCapability(capRevision3, 100000), caps)
+	checkCaps()
 	plain := filepath.Join(root, "plain")
 	require.NoError(t, os.WriteFile(plain, nil, 0644))
 	info, err = os.Lstat(plain)
@@ -196,12 +205,18 @@ func TestRemappedFileCapabilitiesExec(t *testing.T) {
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
 	require.NoError(t, chown(root, testCapabilityMap())(path, info, nil))
+	supported, err := kernelversion.GreaterEqualThan(kernelversion.KernelVersion{Kernel: 4, Major: 14})
+	require.NoError(t, err)
+	mappedCaps := "0000000000001000"
+	if !supported {
+		mappedCaps = "0000000000000000"
+	}
 	for _, tc := range []struct {
 		name    string
 		hostUID int
 		want    string
 	}{
-		{"mapped-namespace", 100000, "0000000000001000"},
+		{"mapped-namespace", 100000, mappedCaps},
 		{"unrelated-namespace", 300000, "0000000000000000"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -223,10 +238,15 @@ func TestRemappedFileCapabilitiesExec(t *testing.T) {
 		})
 	}
 	t.Run("no-new-privileges", func(t *testing.T) {
+		ambientSupported, err := kernelversion.GreaterEqualThan(kernelversion.KernelVersion{Kernel: 4, Major: 3})
+		require.NoError(t, err)
+		if !ambientSupported {
+			t.Skip("ambient capabilities require Linux 4.3")
+		}
 		// Supply NET_ADMIN before exec, as the runtime does. A plain launcher
 		// sets no_new_privs before executing the file-capability binary.
 		launcher := filepath.Join(root, "launcher")
-		_, err := src.Seek(0, io.SeekStart)
+		_, err = src.Seek(0, io.SeekStart)
 		require.NoError(t, err)
 		f, err := os.OpenFile(launcher, os.O_CREATE|os.O_WRONLY, 0755)
 		require.NoError(t, err)
@@ -248,7 +268,12 @@ func TestRemappedFileCapabilitiesExec(t *testing.T) {
 		}
 		require.NoError(t, err, string(out))
 		require.Contains(t, string(out), "CapEff:\t0000000000001000")
-		require.Contains(t, string(out), "CapAmb:\t0000000000000000")
+		ambientCaps := "0000000000000000"
+		if !supported {
+			// With no file capabilities, exec retains the supplied ambient set.
+			ambientCaps = "0000000000001000"
+		}
+		require.Contains(t, string(out), "CapAmb:\t"+ambientCaps)
 		require.Contains(t, string(out), "NoNewPrivs:\t1")
 	})
 }

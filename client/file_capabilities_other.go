@@ -20,6 +20,10 @@ package client
 
 import "github.com/containerd/containerd/v2/internal/userns"
 
+func supportsNamespacedFileCapabilities() (bool, error) {
+	return false, nil
+}
+
 func remappedFileCapabilities(string, userns.IDMap) ([]byte, error) {
 	return nil, nil
 }

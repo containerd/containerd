@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/v2/internal/userns"
+	"github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/continuity/sysx"
 	"golang.org/x/sys/unix"
 )
@@ -41,7 +42,20 @@ const (
 	capSize3            = 24
 )
 
+func supportsNamespacedFileCapabilities() (bool, error) {
+	return kernelversion.GreaterEqualThan(kernelversion.KernelVersion{Kernel: 4, Major: 14})
+}
+
 func remappedFileCapabilities(path string, idMap userns.IDMap) ([]byte, error) {
+	supported, err := supportsNamespacedFileCapabilities()
+	if err != nil {
+		return nil, fmt.Errorf("check namespaced file capability support: %w", err)
+	}
+	if !supported {
+		// Older kernels can store revision 3 xattrs but fail to execute the
+		// file. Retain the previous behavior of letting Lchown clear them.
+		return nil, nil
+	}
 	caps, err := sysx.LGetxattr(path, fileCapabilityXattr)
 	if errors.Is(err, unix.ENODATA) || errors.Is(err, unix.EOPNOTSUPP) {
 		return nil, nil

@@ -142,6 +142,14 @@ type remappedSnapshot struct {
 }
 
 func (s *remappedSnapshot) ID() (string, error) {
+	fileCapabilities, err := supportsNamespacedFileCapabilities()
+	if err != nil {
+		return "", fmt.Errorf("check namespaced file capability support: %w", err)
+	}
+	return s.id(fileCapabilities)
+}
+
+func (s *remappedSnapshot) id(fileCapabilities bool) (string, error) {
 	// An empty parent represents an empty filesystem, as with a layerless image.
 	if s.Parent != "" {
 		if err := digest.Digest(s.Parent).Validate(); err != nil {
@@ -174,7 +182,9 @@ func (s *remappedSnapshot) ID() (string, error) {
 		*remappedSnapshot
 		// Do not reuse snapshots produced before file capability preservation.
 		Version int `json:"Version"`
-	}{s, 1})
+		// Separate preserved and stripped snapshots across kernel changes.
+		FileCapabilities bool `json:"FileCapabilities"`
+	}{s, 1, fileCapabilities})
 	if err != nil {
 		return "", err
 	}
