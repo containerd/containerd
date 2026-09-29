@@ -160,6 +160,11 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
 
+	// CRI requires the request to be rejected if the runtime handler is unknown.
+	if err := c.validateRuntimeHandler(runtimeHandler); err != nil {
+		return "", err
+	}
+
 	imagePullProgressTimeout, err := time.ParseDuration(c.config.ImagePullProgressTimeout)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)

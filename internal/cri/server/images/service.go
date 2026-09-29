@@ -18,7 +18,10 @@ package images
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"github.com/containerd/errdefs"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
@@ -65,6 +68,8 @@ type CRIImageService struct {
 	imageFSPaths map[string]string
 	// runtimePlatforms are the platforms configured for a runtime.
 	runtimePlatforms map[string]ImagePlatform
+	// runtimeHandlers are the runtime handlers configured in the CRI runtime service.
+	runtimeHandlers map[string]struct{}
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
@@ -122,6 +127,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
+		runtimeHandlers:             make(map[string]struct{}),
 		snapshotStore:               snapshotstore.NewStore(),
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
@@ -153,6 +159,23 @@ func (c *CRIImageService) UpdateRuntimeSnapshotter(runtimeName string, imagePlat
 	}
 	c.runtimePlatforms[runtimeName] = imagePlatform
 	log.L.Infof("Registered runtime %q with snapshotter %q", runtimeName, imagePlatform.Snapshotter)
+}
+
+// UpdateRuntimeHandlers records the runtime handlers configured in the CRI runtime service.
+func (c *CRIImageService) UpdateRuntimeHandlers(runtimeNames ...string) {
+	for _, name := range runtimeNames {
+		c.runtimeHandlers[name] = struct{}{}
+	}
+}
+
+func (c *CRIImageService) validateRuntimeHandler(runtimeHandler string) error {
+	if runtimeHandler == "" {
+		return nil
+	}
+	if _, ok := c.runtimeHandlers[runtimeHandler]; !ok {
+		return fmt.Errorf("unknown runtime handler %q: %w", runtimeHandler, errdefs.ErrInvalidArgument)
+	}
+	return nil
 }
 
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It

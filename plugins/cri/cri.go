@@ -91,6 +91,7 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	imageSvc := criImagePlugin.(server.ImageService)
 	runtimeConfig := runtimeSvc.Config()
 	for runtimeName, rt := range runtimeConfig.Runtimes {
+		imageSvc.UpdateRuntimeHandlers(runtimeName)
 		if rt.Snapshotter != "" {
 			imagePlatform := images.ImagePlatform{
 				Snapshotter: rt.Snapshotter,
