@@ -34,9 +34,11 @@ import (
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -112,7 +114,7 @@ func (s *testServer) streamCount(method string) int {
 	return s.streams[method]
 }
 
-func (s *testServer) proxy(t testing.TB) content.Store {
+func (s *testServer) proxy(t testing.TB, opts ...Opt) content.Store {
 	t.Helper()
 	conn, err := grpc.NewClient("unix://"+s.address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -124,7 +126,7 @@ func (s *testServer) proxy(t testing.TB) content.Store {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { conn.Close() })
-	return NewContentStore(conn)
+	return NewContentStore(conn, opts...)
 }
 
 type memoryLabelStore struct {
@@ -174,6 +176,13 @@ func TestContentSuite(t *testing.T) {
 	})
 }
 
+func TestContentSuiteLocalBlobs(t *testing.T) {
+	testsuite.ContentSuite(t, "proxy-local-blobs", func(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
+		s := newTestServer(t, root, newMemoryLabelStore())
+		return ctx, s.proxy(t, WithLocalBlobs(filepath.Join(root, "blobs"))), func() error { return nil }, nil
+	})
+}
+
 func randomBlob(t testing.TB, size int) ([]byte, ocispec.Descriptor) {
 	t.Helper()
 	b := make([]byte, size)
@@ -214,6 +223,154 @@ func checkRead(t *testing.T, ra content.ReaderAt, expected []byte) {
 	}
 	if !bytes.Equal(p[:n], expected[off:off+n]) {
 		t.Fatal("ReadAt returned unexpected content")
+	}
+}
+
+func TestReaderAtLocalBlobs(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	s := newTestServer(t, root, nil)
+	cs := s.proxy(t, WithLocalBlobs(filepath.Join(root, "blobs")))
+
+	b, desc := randomBlob(t, 3*1024*1024+17)
+	writeBlob(t, cs, b, desc)
+
+	ra, err := cs.ReaderAt(ctx, desc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ra.Close()
+	if _, ok := ra.(*localReaderAt); !ok {
+		t.Fatalf("expected a local reader, got %T", ra)
+	}
+	checkRead(t, ra, b)
+	if n := s.streamCount(readMethod); n != 0 {
+		t.Fatalf("expected no read streams, got %d", n)
+	}
+}
+
+func TestReaderAtLocalBlobsFallback(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name string
+		// prepare modifies the local blobs directory after the blob is
+		// written to the store rooted at storeRoot.
+		prepare func(t *testing.T, localBlobs, storeRoot string, desc ocispec.Descriptor)
+		// level is the level at which the fallback is logged.
+		level logrus.Level
+	}{
+		{
+			name:    "Missing",
+			prepare: func(*testing.T, string, string, ocispec.Descriptor) {},
+			level:   logrus.DebugLevel,
+		},
+		{
+			name: "SizeMismatch",
+			prepare: func(t *testing.T, localBlobs, _ string, desc ocispec.Descriptor) {
+				p, err := localBlobPath(localBlobs, desc.Digest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte("truncated"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			level: logrus.WarnLevel,
+		},
+		{
+			name: "NotRegular",
+			prepare: func(t *testing.T, localBlobs, _ string, desc ocispec.Descriptor) {
+				p, err := localBlobPath(localBlobs, desc.Digest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.MkdirAll(p, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			},
+			level: logrus.WarnLevel,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			storeRoot := t.TempDir()
+			localBlobs := t.TempDir()
+			s := newTestServer(t, storeRoot, nil)
+			cs := s.proxy(t, WithLocalBlobs(localBlobs))
+
+			b, desc := randomBlob(t, 2*1024*1024+5)
+			writeBlob(t, cs, b, desc)
+			tc.prepare(t, localBlobs, storeRoot, desc)
+
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+			logger.SetLevel(logrus.DebugLevel)
+			hook := &levelHook{}
+			logger.AddHook(hook)
+			ctx := log.WithLogger(ctx, logrus.NewEntry(logger))
+
+			ra, err := cs.ReaderAt(ctx, desc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ra.Close()
+			if _, ok := ra.(*remoteReaderAt); !ok {
+				t.Fatalf("expected a remote reader, got %T", ra)
+			}
+			if !slices.Equal(hook.levels, []logrus.Level{tc.level}) {
+				t.Errorf("fallback logged at levels %v, want [%v]", hook.levels, tc.level)
+			}
+			checkRead(t, ra, b)
+		})
+	}
+}
+
+// levelHook records the level of each log entry.
+type levelHook struct {
+	levels []logrus.Level
+}
+
+func (h *levelHook) Levels() []logrus.Level { return logrus.AllLevels }
+
+func (h *levelHook) Fire(e *logrus.Entry) error {
+	h.levels = append(h.levels, e.Level)
+	return nil
+}
+
+func TestReaderAtLocalBlobsNotFound(t *testing.T) {
+	root := t.TempDir()
+	localBlobs := t.TempDir()
+	s := newTestServer(t, root, nil)
+	cs := s.proxy(t, WithLocalBlobs(localBlobs))
+
+	_, desc := randomBlob(t, 10)
+	// The remote store decides what exists, even when the file is present.
+	p, err := localBlobPath(localBlobs, desc.Digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cs.ReaderAt(context.Background(), desc); !errdefs.IsNotFound(err) {
+		t.Fatalf("expected not found, got %v", err)
+	}
+}
+
+func TestLocalBlobPathInvalid(t *testing.T) {
+	for _, d := range []digest.Digest{
+		"",
+		"sha256:../../etc/passwd",
+		"sha256:abc",
+		digest.Digest("unknown:" + digest.FromString("x").Encoded()),
+		digest.Digest("sha256:" + digest.FromString("x").Encoded() + "/.."),
+	} {
+		if p, err := localBlobPath("/root", d); err == nil {
+			t.Errorf("expected error for %q, got path %q", d, p)
+		}
 	}
 }
 
@@ -546,7 +703,7 @@ func TestRemoteReaderAtCloseWhileOpening(t *testing.T) {
 
 // BenchmarkRead compares reading content through the proxy sequentially, as
 // decompression does, when each ReadAt is a Read stream (the previous
-// behaviour) and over windowed streams.
+// behaviour), over windowed streams, and from local blobs.
 func BenchmarkRead(b *testing.B) {
 	const size = 64 * 1024 * 1024
 	ctx := context.Background()
@@ -557,14 +714,16 @@ func BenchmarkRead(b *testing.B) {
 
 	for _, bc := range []struct {
 		name string
+		opts []Opt
 		// wrap hides optional interfaces of the reader when set.
 		wrap bool
 	}{
 		{name: "ReadAt", wrap: true},
 		{name: "Stream"},
+		{name: "LocalBlobs", opts: []Opt{WithLocalBlobs(filepath.Join(root, "blobs"))}},
 	} {
 		b.Run(bc.name, func(b *testing.B) {
-			cs := s.proxy(b)
+			cs := s.proxy(b, bc.opts...)
 			buf := make([]byte, 32*1024)
 			b.SetBytes(size)
 			b.ResetTimer()

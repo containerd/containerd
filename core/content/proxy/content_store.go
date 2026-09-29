@@ -18,12 +18,15 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -39,31 +42,53 @@ type proxyContentStore struct {
 	// client is the rpc content client
 	// NOTE: ttrpc is used because it is the smaller interface shared with grpc
 	client contentapi.TTRPCContentClient
+
+	// localBlobs, when set, is the directory holding the remote store's
+	// committed blobs, in the layout of containerd's local content store.
+	localBlobs string
+}
+
+// Opt configures a proxy content store.
+type Opt func(*proxyContentStore)
+
+// WithLocalBlobs configures the directory which holds the remote store's
+// committed blobs, in the layout of containerd's local content store,
+// <blobs>/<algorithm>/<encoded>. The remote store must only make complete
+// blobs visible there.
+//
+// This is the blobs directory alone, not the store's root: containerd only
+// reads committed blobs, never ingests, and needs no write access.
+//
+// Readers then open blobs from the directory directly rather than receiving
+// them over the API. The remote store is still asked for the content's info
+// first, so it remains the authority on what is available. Content which
+// cannot be opened locally is read over the API.
+func WithLocalBlobs(blobs string) Opt {
+	return func(pcs *proxyContentStore) {
+		pcs.localBlobs = blobs
+	}
 }
 
 // NewContentStore returns a new content store which communicates over a GRPC
 // connection using the containerd content GRPC API.
-func NewContentStore(client any) content.Store {
+func NewContentStore(client any, opts ...Opt) content.Store {
+	var pcs proxyContentStore
 	switch c := client.(type) {
 	case contentapi.ContentClient:
-		return &proxyContentStore{
-			client: convertClient{c},
-		}
+		pcs.client = convertClient{c}
 	case grpc.ClientConnInterface:
-		return &proxyContentStore{
-			client: convertClient{contentapi.NewContentClient(c)},
-		}
+		pcs.client = convertClient{contentapi.NewContentClient(c)}
 	case contentapi.TTRPCContentClient:
-		return &proxyContentStore{
-			client: c,
-		}
+		pcs.client = c
 	case *ttrpc.Client:
-		return &proxyContentStore{
-			client: contentapi.NewTTRPCContentClient(c),
-		}
+		pcs.client = contentapi.NewTTRPCContentClient(c)
 	default:
 		panic(fmt.Errorf("unsupported content client %T: %w", client, errdefs.ErrNotImplemented))
 	}
+	for _, opt := range opts {
+		opt(&pcs)
+	}
+	return &pcs
 }
 
 func (pcs *proxyContentStore) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
@@ -120,6 +145,24 @@ func (pcs *proxyContentStore) ReaderAt(ctx context.Context, desc ocispec.Descrip
 	i, err := pcs.Info(ctx, desc.Digest)
 	if err != nil {
 		return nil, err
+	}
+
+	if pcs.localBlobs != "" {
+		ra, err := openLocal(pcs.localBlobs, desc.Digest, i.Size)
+		if err == nil {
+			return ra, nil
+		}
+		// The remote store may not have made the blob visible locally
+		// yet. Any other failure points to a misconfigured blobs directory.
+		logger := log.G(ctx).WithError(err).WithFields(log.Fields{
+			"digest": desc.Digest,
+			"blobs":  pcs.localBlobs,
+		})
+		if errors.Is(err, fs.ErrNotExist) {
+			logger.Debug("reading content over the api, local content not found")
+		} else {
+			logger.Warn("reading content over the api, local content unusable")
+		}
 	}
 
 	return newRemoteReaderAt(ctx, desc.Digest, i.Size, pcs.client), nil
