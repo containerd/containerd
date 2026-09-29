@@ -39,6 +39,8 @@ import (
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/internal/tracingutil"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
 type bufferPool struct {
@@ -507,6 +509,23 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	if err := r.Acquire(ctx, 1); err != nil {
 		return nil, 0, err
 	}
+
+	// The span covers the actual fetch, from after the limiter is acquired
+	// until the returned body is closed. If open fails, it ends with the error.
+	ctx, openSpan := tracing.StartSpan(ctx, tracing.Name("remotes.docker.fetcher", "open"))
+	openSpan.SetAttributes(tracingutil.AttributesFromContext(ctx)...)
+	openSpan.SetAttributes(
+		tracing.Attribute("initial_parallelism", r.performances.MaxConcurrentDownloads),
+		tracing.Attribute("chunk_size", chunkSize),
+		tracing.Attribute("offset", offset),
+	)
+	defer func() {
+		if retErr != nil {
+			openSpan.SetStatus(retErr)
+			openSpan.End()
+		}
+	}()
+
 	var remaining int64
 	resp, err := req.doWithRetries(ctx, lastHost, withErrorCheck, withOffsetCheck(offset, parallelism))
 	switch err {
@@ -659,6 +678,20 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		}
 	}
 
+	// End the span when the returned body is closed.
+	// The status is left unset because read errors are not handled here.
+	// TODO: Record read errors and set the status.
+	beforeClose := body.BeforeClose
+	body.BeforeClose = func() {
+		beforeClose()
+		openSpan.End()
+	}
+
+	// Record the effective values, which may have been lowered from the initial values.
+	openSpan.SetAttributes(
+		tracing.Attribute("readable_size", remaining),
+		tracing.Attribute("parallelism", parallelism),
+	)
 	return body, remaining, nil
 }
 
