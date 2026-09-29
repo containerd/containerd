@@ -43,6 +43,9 @@ type proxyContentStore struct {
 
 // NewContentStore returns a new content store which communicates over a GRPC
 // connection using the containerd content GRPC API.
+//
+// Over ttrpc, which closes a stream whose messages are not consumed quickly
+// enough, the server must send read content in chunks of at least 32KiB.
 func NewContentStore(client any) content.Store {
 	switch c := client.(type) {
 	case contentapi.ContentClient:
@@ -122,12 +125,7 @@ func (pcs *proxyContentStore) ReaderAt(ctx context.Context, desc ocispec.Descrip
 		return nil, err
 	}
 
-	return &remoteReaderAt{
-		ctx:    ctx,
-		digest: desc.Digest,
-		size:   i.Size,
-		client: pcs.client,
-	}, nil
+	return newRemoteReaderAt(ctx, desc.Digest, i.Size, pcs.client), nil
 }
 
 func (pcs *proxyContentStore) Status(ctx context.Context, ref string) (content.Status, error) {
