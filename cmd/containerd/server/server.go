@@ -341,8 +341,15 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 
 		case string(plugins.ContentPlugin), "content":
 			t = plugins.ContentPlugin
+			var opts []csproxy.Opt
+			if blobs := pp.Exports["blobs"]; blobs != "" {
+				if err := checkLocalBlobs(ctx, name, blobs); err != nil {
+					return nil, err
+				}
+				opts = append(opts, csproxy.WithLocalBlobs(blobs))
+			}
 			f = func(conn *grpc.ClientConn) any {
-				return csproxy.NewContentStore(conn)
+				return csproxy.NewContentStore(conn, opts...)
 			}
 		case string(plugins.SandboxControllerPlugin), "sandbox":
 			t = plugins.SandboxControllerPlugin
@@ -432,6 +439,25 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 	pc.clients[address] = conn
 
 	return conn, nil
+}
+
+// checkLocalBlobs checks the blobs directory exported by a content proxy
+// plugin. A relative path is an error, as it would resolve against containerd's
+// working directory. A path which is not a directory is only reported: the
+// plugin may create it after containerd starts, and content is read over the
+// API until it can be read from the directory.
+func checkLocalBlobs(ctx context.Context, name, blobs string) error {
+	if !filepath.IsAbs(blobs) {
+		return fmt.Errorf("proxy plugin %q: blobs %q is not an absolute path", name, blobs)
+	}
+	fi, err := os.Stat(blobs)
+	if err == nil && !fi.IsDir() {
+		err = fmt.Errorf("%s is not a directory", blobs)
+	}
+	if err != nil {
+		log.G(ctx).WithError(err).WithField("plugin", name).Warn("content proxy plugin blobs directory is unusable, reading content over the api")
+	}
+	return nil
 }
 
 func readString(properties map[string]any, key ...string) string {
