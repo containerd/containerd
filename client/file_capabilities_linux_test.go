@@ -201,6 +201,7 @@ func TestRemappedFileCapabilitiesExec(t *testing.T) {
 	_, err = io.Copy(dst, src)
 	require.NoError(t, err)
 	require.NoError(t, dst.Close())
+	require.NoError(t, os.Chmod(path, 0755))
 	setTestCapability(t, path)
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
@@ -253,6 +254,7 @@ func TestRemappedFileCapabilitiesExec(t *testing.T) {
 		_, err = io.Copy(f, src)
 		require.NoError(t, err)
 		require.NoError(t, f.Close())
+		require.NoError(t, os.Chmod(launcher, 0755))
 		cmd := exec.Command(launcher, "-test.run=^TestRemappedFileCapabilitiesExec$")
 		cmd.Env = append(os.Environ(), "CONTAINERD_FILECAP_HELPER=1", "CONTAINERD_FILECAP_EXEC_TARGET="+path)
 		cmd.SysProcAttr = &syscall.SysProcAttr{
