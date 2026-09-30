@@ -286,7 +286,12 @@ func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 	// Set DNS options. Maintain a resolv.conf for the sandbox.
 	resolvPath := c.getResolvPath(id)
 
-	if dnsConfig := config.GetDnsConfig(); dnsConfig != nil {
+	dnsConfig := config.GetDnsConfig()
+	if dnsConfig == nil && config.GetPodNetwork() == runtime.PodNetwork_POD_NETWORK_NONE && !hostNetwork(config) {
+		// Isolated sandboxes must not inherit the host's resolver configuration.
+		dnsConfig = &runtime.DNSConfig{}
+	}
+	if dnsConfig != nil {
 		resolvContent, err := parseDNSOptions(dnsConfig.Servers, dnsConfig.Searches, dnsConfig.Options)
 		if err != nil {
 			return fmt.Errorf("failed to parse sandbox DNSConfig %+v: %w", dnsConfig, err)

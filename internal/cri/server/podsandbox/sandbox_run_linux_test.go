@@ -811,6 +811,75 @@ options timeout:1
 	}
 }
 
+func TestSetupSandboxResolver(t *testing.T) {
+	const hostResolver = "nameserver 192.0.2.1\nsearch host.example\n"
+	for _, test := range []struct {
+		name        string
+		podNetwork  runtime.PodNetwork
+		networkMode runtime.NamespaceMode
+		dnsConfig   *runtime.DNSConfig
+		want        string
+	}{
+		{
+			name: "default network inherits host resolver",
+			want: hostResolver,
+		},
+		{
+			name:       "isolated network has empty resolver without DNS config",
+			podNetwork: runtime.PodNetwork_POD_NETWORK_NONE,
+		},
+		{
+			name:        "host network retains host resolver",
+			podNetwork:  runtime.PodNetwork_POD_NETWORK_NONE,
+			networkMode: runtime.NamespaceMode_NODE,
+			want:        hostResolver,
+		},
+		{
+			name:       "isolated network honors explicit DNS config",
+			podNetwork: runtime.PodNetwork_POD_NETWORK_NONE,
+			dnsConfig:  &runtime.DNSConfig{Servers: []string{"192.0.2.2"}},
+			want:       "nameserver 192.0.2.2\n",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := newControllerService()
+			resolvPath := c.getResolvPath("test-id")
+			resolverFile := filepath.Join(t.TempDir(), "resolv.conf")
+			fakeOS := c.os.(*ostesting.FakeOS)
+			fakeOS.WriteFileFn = func(filename string, data []byte, perm os.FileMode) error {
+				if filename == resolvPath {
+					return os.WriteFile(resolverFile, data, perm)
+				}
+				return nil
+			}
+			fakeOS.CopyFileFn = func(src, dest string, perm os.FileMode) error {
+				if dest == resolvPath {
+					assert.Equal(t, resolvConfPath, src)
+					return os.WriteFile(resolverFile, []byte(hostResolver), perm)
+				}
+				return nil
+			}
+			cfg := &runtime.PodSandboxConfig{
+				Hostname:   "test-hostname",
+				PodNetwork: test.podNetwork,
+				DnsConfig:  test.dnsConfig,
+				Linux: &runtime.LinuxPodSandboxConfig{
+					SecurityContext: &runtime.LinuxSandboxSecurityContext{
+						NamespaceOptions: &runtime.NamespaceOption{
+							Network: test.networkMode,
+							Ipc:     runtime.NamespaceMode_NODE,
+						},
+					},
+				},
+			}
+			require.NoError(t, c.setupSandboxFiles("test-id", cfg))
+			content, err := os.ReadFile(resolverFile)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, string(content))
+		})
+	}
+}
+
 func TestParseDNSOption(t *testing.T) {
 	for _, test := range []struct {
 		desc            string
