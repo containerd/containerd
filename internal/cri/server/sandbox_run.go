@@ -68,6 +68,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	name := makeSandboxName(metadata)
 
+	if err := validateCgroupnsOptions(config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetCgroupnsOptions()); err != nil {
+		return nil, err
+	}
+
 	span.SetAttributes(
 		tracing.Attribute("sandbox.id", id),
 		tracing.Attribute("sandbox.name", name),

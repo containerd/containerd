@@ -487,8 +487,9 @@ func TestPrivilegedBindMount(t *testing.T) {
 	}
 }
 
-// TestCgroupNamespace verifies that a cgroup namespace is only assigned to
-// non-privileged containers on cgroupv2 hosts.
+// TestCgroupNamespace verifies that, by default, a cgroup namespace is only
+// assigned to non-privileged containers on cgroupv2 hosts, and that an
+// explicit CgroupnsOptions overrides the default.
 func TestCgroupNamespace(t *testing.T) {
 	testPid := uint32(1234)
 	c := newTestCRIService()
@@ -500,7 +501,9 @@ func TestCgroupNamespace(t *testing.T) {
 	tests := []struct {
 		desc                  string
 		privileged            bool
+		cgroupnsOpts          *runtime.CgroupNamespace
 		requireCgroupV2       bool
+		anyCgroupVersion      bool
 		expectCgroupNamespace bool
 	}{
 		{
@@ -527,20 +530,38 @@ func TestCgroupNamespace(t *testing.T) {
 			requireCgroupV2:       false,
 			expectCgroupNamespace: false,
 		},
+		{
+			desc:                  "privileged container with POD cgroupns mode should get cgroup namespace",
+			privileged:            true,
+			cgroupnsOpts:          &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_POD},
+			anyCgroupVersion:      true,
+			expectCgroupNamespace: true,
+		},
+		{
+			desc:                  "non-privileged container with NODE cgroupns mode should not get cgroup namespace",
+			privileged:            false,
+			cgroupnsOpts:          &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_NODE},
+			anyCgroupVersion:      true,
+			expectCgroupNamespace: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			// Skip if the host's cgroup mode doesn't match what the test case requires.
-			if tt.requireCgroupV2 && !isUnifiedCgroupsMode() {
-				t.Skip("requires cgroups v2")
-			}
-			if !tt.requireCgroupV2 && isUnifiedCgroupsMode() {
-				t.Skip("requires cgroups v1")
+			if !tt.anyCgroupVersion {
+				if tt.requireCgroupV2 && !isUnifiedCgroupsMode() {
+					t.Skip("requires cgroups v2")
+				}
+				if !tt.requireCgroupV2 && isUnifiedCgroupsMode() {
+					t.Skip("requires cgroups v1")
+				}
 			}
 
 			containerConfig.Linux.SecurityContext.Privileged = tt.privileged
 			sandboxConfig.Linux.SecurityContext.Privileged = tt.privileged
+			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{CgroupnsOptions: tt.cgroupnsOpts}
+			sandboxConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{CgroupnsOptions: tt.cgroupnsOpts}
 
 			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			require.NoError(t, err)

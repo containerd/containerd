@@ -762,11 +762,11 @@ func (c *criService) buildLinuxSpec(
 		}
 	}()
 
-	// cgroupns is used for hiding /sys/fs/cgroup from containers.
-	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
-	// https://github.com/containers/libpod/issues/4363
-	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
-	if isUnifiedCgroupsMode() && !securityContext.GetPrivileged() {
+	cgroupnsMode, err := resolveCgroupnsMode(securityContext, isUnifiedCgroupsMode())
+	if err != nil {
+		return nil, err
+	}
+	if cgroupnsMode == runtime.NamespaceMode_POD {
 		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
 	}
 
@@ -1189,4 +1189,44 @@ func (c *criService) runtimeInfo(ctx context.Context, id string) (string, typeur
 	}
 
 	return "", nil, err
+}
+
+// resolveCgroupnsMode returns the cgroup namespace mode for a container.
+//
+// When CgroupnsOptions is not specified, cgroupns is used only for
+// non-privileged containers on cgroup v2 hosts, for compatibility.
+// cgroupns is used for hiding /sys/fs/cgroup from containers.
+// https://github.com/containers/libpod/issues/4363
+// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
+//
+// When CgroupnsOptions is specified, its mode is used as is (KEP-5714).
+// Only POD and NODE are supported.
+// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/5714-cgroupns/README.md
+func resolveCgroupnsMode(securityContext *runtime.LinuxContainerSecurityContext, unifiedCgroups bool) (runtime.NamespaceMode, error) {
+	cgroupnsOpts := securityContext.GetNamespaceOptions().GetCgroupnsOptions()
+	if cgroupnsOpts == nil {
+		if unifiedCgroups && !securityContext.GetPrivileged() {
+			return runtime.NamespaceMode_POD, nil
+		}
+		return runtime.NamespaceMode_NODE, nil
+	}
+	if err := validateCgroupnsOptions(cgroupnsOpts); err != nil {
+		return 0, err
+	}
+	return cgroupnsOpts.GetMode(), nil
+}
+
+// validateCgroupnsOptions validates CgroupnsOptions (KEP-5714).
+// nil is valid, and denotes the default mode.
+// Only POD and NODE are supported.
+func validateCgroupnsOptions(cgroupnsOpts *runtime.CgroupNamespace) error {
+	if cgroupnsOpts == nil {
+		return nil
+	}
+	switch mode := cgroupnsOpts.GetMode(); mode {
+	case runtime.NamespaceMode_POD, runtime.NamespaceMode_NODE:
+		return nil
+	default:
+		return fmt.Errorf("unsupported cgroup namespace mode: %s", mode)
+	}
 }
