@@ -107,15 +107,14 @@ func (w *watchdog) run(ctx context.Context) {
 		cancel()
 
 		if healthErr != nil {
-			log.G(ctx).WithError(healthErr).Warn("watchdog: health check failed,")
+			log.G(ctx).WithError(healthErr).Warn("watchdog: health check failed")
 			continue
 		}
 		notified, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
 		if err != nil {
-			log.G(ctx).WithError(err).Warn("watchdog: failed to watchdog notifiaction to systemd")
+			log.G(ctx).WithError(err).Warn("watchdog: failed to send watchdog notification to systemd")
 		} else {
-			log.G(ctx).WithField("notified", notified).Infof("watchdog: sent WATCHDOG=1 ping")
-
+			log.G(ctx).WithField("notified", notified).Debug("watchdog: sent WATCHDOG=1 ping")
 		}
 	}
 }
