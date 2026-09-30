@@ -68,6 +68,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	name := makeSandboxName(metadata)
 
+	// CgroupnsOptions can be set only for containers (KEP-5714).
+	if cgroupnsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetCgroupnsOptions(); cgroupnsOpts != nil {
+		return nil, fmt.Errorf("cgroup namespace options must not be set for sandbox, got %v", cgroupnsOpts)
+	}
+
 	span.SetAttributes(
 		tracing.Attribute("sandbox.id", id),
 		tracing.Attribute("sandbox.name", name),
