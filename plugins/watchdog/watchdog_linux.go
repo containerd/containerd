@@ -1,3 +1,5 @@
+//go:build linux && !no_systemd
+
 /*
    Copyright The containerd Authors.
 
