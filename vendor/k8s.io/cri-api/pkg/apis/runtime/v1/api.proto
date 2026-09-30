@@ -211,11 +211,11 @@ service RuntimeService {
 
     // RuntimeConfig returns configuration information of the runtime.
     // A couple of notes:
-    // - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
-    //   The former is for having runtime tell Kubelet what to do, the latter vice versa.
-    // - It is the expectation of the Kubelet that these fields are static for the lifecycle of the Kubelet.
-    //   The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
-    //   avoid updating them without a full node reboot.
+    //   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
+    //     The former is for having runtime tell Kubelet what to do, the latter vice versa.
+    //   - It is the expectation of the Kubelet that these fields are static for the lifecycle of the Kubelet.
+    //     The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
+    //     avoid updating them without a full node reboot.
     rpc RuntimeConfig(RuntimeConfigRequest) returns (RuntimeConfigResponse) {}
 
     // UpdatePodSandboxResources synchronously updates the PodSandboxConfig with
@@ -308,12 +308,12 @@ message PortMapping {
     int32 container_port = 2;
     // Port number on the host to map the container port to.
     //
-    // * Valid host port range is 1-65535.
-    // * The value 0 has explicit semantic meaning: it indicates NO host port should be allocated.
-    // * The value 0 does NOT indicate dynamic port allocation. Future implementations
-    //   of dynamic allocation will use different values/semantics.
-    // * Implementations MUST handle the case where this field is explicitly set to 0,
-    //   This field SHOULD be omitted when no port is required.
+    //   - Valid host port range is 1-65535.
+    //   - The value 0 has explicit semantic meaning: it indicates NO host port should be allocated.
+    //   - The value 0 does NOT indicate dynamic port allocation. Future implementations
+    //     of dynamic allocation will use different values/semantics.
+    //   - Implementations MUST handle the case where this field is explicitly set to 0,
+    //     This field SHOULD be omitted when no port is required.
     //
     // Default: If omitted, container port will not be exposed on the host.
     int32 host_port = 3;
@@ -513,10 +513,11 @@ message LinuxSandboxSecurityContext {
     // AppArmor profile for the sandbox.
     SecurityProfile apparmor = 10;
     // Seccomp profile for the sandbox, candidate values are:
-    // * runtime/default: the default profile for the container runtime
-    // * unconfined: unconfined profile, ie, no seccomp sandboxing
-    // * localhost/<full-path-to-profile>: the profile installed on the node.
-    //   <full-path-to-profile> is the full path of the profile.
+    //   - runtime/default: the default profile for the container runtime
+    //   - unconfined: unconfined profile, ie, no seccomp sandboxing
+    //   - localhost/<full-path-to-profile>: the profile installed on the node.
+    //     <full-path-to-profile> is the full path of the profile.
+    //
     // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 7 [deprecated=true];
 }
@@ -591,9 +592,9 @@ message PodSandboxConfig {
     // binary log files with structured logging data from the individual
     // containers. For example, the files might be newline separated JSON
     // structured logs, systemd-journald journal files, gRPC trace files, etc.
-    // E.g.,
-    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
-    //     ContainerConfig.LogPath = `containerName/Instance#.log`
+    // For example:
+    //   - PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
+    //   - ContainerConfig.LogPath = `containerName/Instance#.log`
     string log_directory = 3;
     // DNS config for the sandbox.
     DNSConfig dns_config = 4;
@@ -622,6 +623,15 @@ message PodSandboxConfig {
     LinuxPodSandboxConfig linux = 8;
     // Optional configurations specific to Windows hosts.
     WindowsPodSandboxConfig windows = 9;
+    // default_network selects whether the sandbox network namespace is
+    // attached to the default pod network. It only applies when
+    // NamespaceOption.network is POD; for NODE (host network) sandboxes
+    // there is no sandbox network namespace and runtimes MUST ignore this
+    // field. Kubelets that predate the field leave it unset
+    // (DEFAULT_NETWORK_POD).
+    // Feature gate: PodDefaultNetwork
+    // See https://kep.k8s.io/6313 for more details.
+    PodSandboxDefaultNetwork default_network = 10;
 }
 
 message RunPodSandboxRequest {
@@ -1102,17 +1112,18 @@ message LinuxContainerSecurityContext {
     // AppArmor profile for the container.
     SecurityProfile apparmor = 16;
     // AppArmor profile for the container, candidate values are:
-    // * runtime/default: equivalent to not specifying a profile.
-    // * unconfined: no profiles are loaded
-    // * localhost/<profile_name>: profile loaded on the node
-    //    (localhost) by name. The possible profile names are detailed at
-    //    https://gitlab.com/apparmor/apparmor/-/wikis/AppArmor_Core_Policy_Reference
+    //   - runtime/default: equivalent to not specifying a profile.
+    //   - unconfined: no profiles are loaded
+    //   - localhost/<profile_name>: profile loaded on the node
+    //     (localhost) by name. The possible profile names are detailed at
+    //     https://gitlab.com/apparmor/apparmor/-/wikis/AppArmor_Core_Policy_Reference
     string apparmor_profile = 9 [deprecated=true];
     // Seccomp profile for the container, candidate values are:
-    // * runtime/default: the default profile for the container runtime
-    // * unconfined: unconfined profile, ie, no seccomp sandboxing
-    // * localhost/<full-path-to-profile>: the profile installed on the node.
-    //   <full-path-to-profile> is the full path of the profile.
+    //   - runtime/default: the default profile for the container runtime
+    //   - unconfined: unconfined profile, ie, no seccomp sandboxing
+    //   - localhost/<full-path-to-profile>: the profile installed on the node.
+    //     <full-path-to-profile> is the full path of the profile.
+    //
     // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 10 [deprecated=true];
 }
@@ -1277,10 +1288,10 @@ message ContainerConfig {
     repeated Device devices = 8;
     // Key-value pairs that may be used to scope and select individual resources.
     // Label keys are of the form:
-    //     label-key ::= prefixed-name | name
-    //     prefixed-name ::= prefix '/' name
-    //     prefix ::= DNS_SUBDOMAIN
-    //     name ::= DNS_LABEL
+    //   - label-key ::= prefixed-name | name
+    //   - prefixed-name ::= prefix '/' name
+    //   - prefix ::= DNS_SUBDOMAIN
+    //   - name ::= DNS_LABEL
     map<string, string> labels = 9;
     // Unstructured key-value map that may be used by the kubelet to store and
     // retrieve arbitrary metadata.
@@ -1295,9 +1306,9 @@ message ContainerConfig {
     map<string, string> annotations = 10;
     // Path relative to PodSandboxConfig.LogDirectory for container to store
     // the log (STDOUT and STDERR) on the host.
-    // E.g.,
-    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
-    //     ContainerConfig.LogPath = `containerName/Instance#.log`
+    // For example:
+    //   - PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
+    //   - ContainerConfig.LogPath = `containerName/Instance#.log`
     string log_path = 11;
 
     // Variables for interactive containers, these have very specialized
@@ -1799,10 +1810,11 @@ message PullImageResponse {
     //
     // When referring to the same image, the container runtime MUST always return
     // the same value for:
-    //     - Image.id
-    //     - Container.image_id
-    //     - ContainerStatus.image_id
-    //     - PullImageResponse.image_ref
+    //   - Image.id
+    //   - Container.image_id
+    //   - ContainerStatus.image_id
+    //   - PullImageResponse.image_ref
+    //
     // Note: this field has a stricter meaning starting with v1.36.
     // It used to be image ID OR digest, which are different values,
     // and would not necessarily match other ID fields in the Container,
@@ -1901,6 +1913,9 @@ message RuntimeFeatures {
     // mount_options is set to true if the runtime supports additional bind
     // mount options (noexec, nodev, nosuid) on container mounts.
     bool mount_options = 3;
+    // default_network_none is set to true if the runtime supports creating
+    // sandboxes with PodSandboxDefaultNetwork DEFAULT_NETWORK_NONE.
+    bool default_network_none = 4;
 }
 
 message StatusResponse {
@@ -2393,3 +2408,20 @@ message UpdatePodSandboxResourcesRequest {
 }
 
 message UpdatePodSandboxResourcesResponse {}
+
+// PodSandboxDefaultNetwork selects whether a sandbox network namespace is
+// attached to the default pod network.
+// See https://kep.k8s.io/6313 for more details.
+enum PodSandboxDefaultNetwork {
+    // DEFAULT_NETWORK_POD attaches the sandbox network namespace to the
+    // default pod network. The runtime performs its configured network
+    // plumbing (e.g., invokes CNI plugins on Linux). This is the default and
+    // matches historical behavior.
+    DEFAULT_NETWORK_POD = 0;
+    // DEFAULT_NETWORK_NONE creates the sandbox network namespace with only
+    // the loopback interface configured and does not attach it to the
+    // default pod network. The runtime MUST NOT perform its
+    // default-pod-network plumbing and MUST report an empty IP in
+    // PodSandboxStatus.
+    DEFAULT_NETWORK_NONE = 1;
+}
