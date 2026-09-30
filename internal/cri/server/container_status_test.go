@@ -395,10 +395,7 @@ func (s *fakeImageService) PullImage(context.Context, string, func(string) (stri
 	return "", errors.New("not implemented")
 }
 
-func (s *fakeImageService) UpdateRuntimeSnapshotter(runtimeName string, imagePlatform images.ImagePlatform) {
-}
-
-func (s *fakeImageService) UpdateRuntimeHandlers(runtimeNames ...string) {
+func (s *fakeImageService) UpdateRuntime(runtimeName string, imagePlatform *images.ImagePlatform) {
 }
 
 func patchExceptedWithState(expected *runtime.ContainerStatus, state runtime.ContainerState) {

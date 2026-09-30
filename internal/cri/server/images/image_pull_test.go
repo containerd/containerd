@@ -445,7 +445,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			cri, _ := newTestCRIService()
 			cri.config.Snapshotter = defaultSnapshotter
-			cri.runtimePlatforms["existing-runtime"] = ImagePlatform{
+			cri.runtimePlatforms["existing-runtime"] = &ImagePlatform{
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
@@ -460,7 +460,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 
 func TestValidateRuntimeHandler(t *testing.T) {
 	cri, _ := newTestCRIService()
-	cri.UpdateRuntimeHandlers("existing-runtime")
+	cri.UpdateRuntime("existing-runtime", nil)
 
 	assert.NoError(t, cri.validateRuntimeHandler(""))
 	assert.NoError(t, cri.validateRuntimeHandler("existing-runtime"))

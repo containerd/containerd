@@ -66,10 +66,8 @@ type CRIImageService struct {
 	client imageClient
 	// imageFSPaths contains path to image filesystem for snapshotters.
 	imageFSPaths map[string]string
-	// runtimePlatforms are the platforms configured for a runtime.
-	runtimePlatforms map[string]ImagePlatform
-	// runtimeHandlers are the runtime handlers configured in the CRI runtime service.
-	runtimeHandlers map[string]struct{}
+	// runtimePlatforms are the imageplatforms configured for a runtime.
+	runtimePlatforms map[string]*ImagePlatform
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
@@ -96,7 +94,7 @@ type CRIImageServiceOptions struct {
 
 	ImageFSPaths map[string]string
 
-	RuntimePlatforms map[string]ImagePlatform
+	RuntimePlatforms map[string]*ImagePlatform
 
 	Snapshotters map[string]snapshots.Snapshotter
 
@@ -127,7 +125,6 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
-		runtimeHandlers:             make(map[string]struct{}),
 		snapshotStore:               snapshotstore.NewStore(),
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
@@ -145,26 +142,22 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	return &svc, nil
 }
 
-// UpdateRuntimeSnapshotter adds or updates the snapshotter mapping for a runtime.
-// This is called by the main CRI plugin after both image and runtime plugins are initialized,
-// to propagate runtime-specific snapshotters configured in the runtime plugin's config.
-func (c *CRIImageService) UpdateRuntimeSnapshotter(runtimeName string, imagePlatform ImagePlatform) {
+// UpdateRuntime records a runtime handler and, when configured, the platform used
+// to select images from the platform index manifest during a pull operation. It is
+// called by the main CRI plugin after both image and runtime plugins are initialized.
+// imagePlatform is nil when the runtime has no snapshotter configured.
+func (c *CRIImageService) UpdateRuntime(runtimeName string, imagePlatform *ImagePlatform) {
 	if c.runtimePlatforms == nil {
-		c.runtimePlatforms = make(map[string]ImagePlatform)
+		c.runtimePlatforms = make(map[string]*ImagePlatform)
 	}
 	// Don't override if already configured
 	if _, exists := c.runtimePlatforms[runtimeName]; exists {
-		log.L.Debugf("Runtime %q already has snapshotter configured, not overriding", runtimeName)
+		log.L.Debugf("Runtime %q already configured, not overriding", runtimeName)
 		return
 	}
 	c.runtimePlatforms[runtimeName] = imagePlatform
-	log.L.Infof("Registered runtime %q with snapshotter %q", runtimeName, imagePlatform.Snapshotter)
-}
-
-// UpdateRuntimeHandlers records the runtime handlers configured in the CRI runtime service.
-func (c *CRIImageService) UpdateRuntimeHandlers(runtimeNames ...string) {
-	for _, name := range runtimeNames {
-		c.runtimeHandlers[name] = struct{}{}
+	if imagePlatform != nil {
+		log.L.Infof("Registered runtime %q with snapshotter %q", runtimeName, imagePlatform.Snapshotter)
 	}
 }
 
@@ -172,7 +165,7 @@ func (c *CRIImageService) validateRuntimeHandler(runtimeHandler string) error {
 	if runtimeHandler == "" {
 		return nil
 	}
-	if _, ok := c.runtimeHandlers[runtimeHandler]; !ok {
+	if _, ok := c.runtimePlatforms[runtimeHandler]; !ok {
 		return fmt.Errorf("unknown runtime handler %q: %w", runtimeHandler, errdefs.ErrInvalidArgument)
 	}
 	return nil

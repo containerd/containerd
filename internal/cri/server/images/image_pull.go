@@ -895,7 +895,7 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	}
 
 	if c.runtimePlatforms != nil {
-		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
+		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p != nil && p.Snapshotter != snapshotter {
 			snapshotter = p.Snapshotter
 			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
 		}
