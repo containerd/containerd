@@ -404,15 +404,10 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 	}
 }
 
-// TestPrepareIDMappedOverlayAliasesCallerOptions proves that
-// prepareIDMappedOverlay mutates the backing array of the []string it is
-// given, even though the caller (Mount.mount, via `options := m.Options`)
-// keeps no explicit copy and an upstream caller holding the original
-// []Mount slice (e.g. mount.All's caller) still points at the same backing
-// array. This is the same "shallow copy of mount Options" bug class fixed in
-// RemoveVolatileOption, RemoveIDMapOption, and readonlyMounts; its sibling in
-// this file, compactLowerdirOption, already guards against it via
-// copyOptions(opts) before mutating, but prepareIDMappedOverlay did not.
+// TestPrepareIDMappedOverlayAliasesCallerOptions verifies that preparing an
+// IDmapped overlay leaves the caller's options and their backing array unchanged.
+// Mount.mount passes m.Options directly, so callers retaining the original
+// Mount must not observe temporary lowerdir paths after preparation.
 func TestPrepareIDMappedOverlayAliasesCallerOptions(t *testing.T) {
 	testutil.RequiresRoot(t)
 
