@@ -370,13 +370,13 @@ either a native EROFS blob or an indexed tar (see _the
 [Tar Index Mode](#tar-index-mode) section_). That is an EROFS image build per
 layer, on every node that pulls the image.
 
-The conversion can be done upfront instead and handed to containerd as a
-pre-warmed cache. `layer_content_caches` lists directories of pre-built EROFS
-blobs keyed by layer `diffID`. When a layer is unpacked, the snapshotter checks the
-cache first, and on a hit it just symlinks the cached blob into the snapshot and
-mounts it, with no conversion. A miss is unpacked and converted as usual, so a
-partially populated cache is fine. Cache hits also skip the layer download, so no
-layer blobs are fetched for a fully cached image.
+The conversion can be done upfront and handed to containerd as a pre-warmed
+cache. `layer_content_caches` lists directories of pre-built EROFS blobs keyed
+by layer `diffID`. When a layer is unpacked, the snapshotter checks the cache
+first. On a hit it records the path of the cached blob in the snapshot and
+mounts that blob without converting anything. A miss is unpacked and converted
+as usual, so a partially populated cache works. A hit also skips the layer
+download, which means a fully cached image does not fetch layer blobs.
 
 ```toml
   [plugins."io.containerd.snapshotter.v1.erofs"]
@@ -394,9 +394,9 @@ Populating and maintaining a cache is the operator's responsibility: containerd
 never writes to these directories, so they can be mounted read-only.
 
 > [!IMPORTANT]
-> A hit symlinks the blob instead of copying it, so an entry has to stay in place
-> for as long as any snapshot references it. Removing one that's still in use
-> breaks those layers.
+> A hit mounts the blob from its location in the cache. An entry must stay in
+> place for as long as any snapshot references it. Removing an entry that is
+> still in use breaks those layers.
 
 > [!NOTE]
 > For the same reason `enable_fsverity` and `set_immutable` can't be used
