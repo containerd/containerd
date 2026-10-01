@@ -963,6 +963,48 @@ func TestContentEncodingClosesUnderlyingBody(t *testing.T) {
 	}
 }
 
+func TestContentEncodingErrorClosesUnderlyingBody(t *testing.T) {
+	for _, encoding := range []string{"br,gzip", "gzip,gzip", "br,deflate", "br,zstd"} {
+		t.Run(encoding, func(t *testing.T) {
+			var encoded bytes.Buffer
+			var writer io.WriteCloser
+			switch {
+			case strings.HasSuffix(encoding, "gzip"):
+				writer = gzip.NewWriter(&encoded)
+			case strings.HasSuffix(encoding, "deflate"):
+				var err error
+				writer, err = flate.NewWriter(&encoded, flate.DefaultCompression)
+				require.NoError(t, err)
+			case strings.HasSuffix(encoding, "zstd"):
+				var err error
+				writer, err = zstd.NewWriter(&encoded)
+				require.NoError(t, err)
+			}
+			_, err := writer.Write([]byte("not a nested gzip stream"))
+			require.NoError(t, err)
+			require.NoError(t, writer.Close())
+
+			var rawClosed atomic.Bool
+			client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode:    http.StatusOK,
+					Header:        http.Header{"Content-Encoding": []string{encoding}},
+					ContentLength: int64(encoded.Len()),
+					Body:          trackedCloser{ReadCloser: io.NopCloser(bytes.NewReader(encoded.Bytes())), closed: &rawClosed},
+				}, nil
+			})}
+			limiter := semaphore.NewWeighted(1)
+			fetcher := dockerFetcher{&dockerBase{repository: "test", limiter: limiter}}
+			host := RegistryHost{Client: client, Host: "registry.example", Scheme: "https"}
+			_, _, err = fetcher.open(context.Background(), fetcher.request(host, http.MethodGet), "", 0, true)
+			require.Error(t, err)
+			assert.True(t, rawClosed.Load(), "raw body must close after a decoding error")
+			require.True(t, limiter.TryAcquire(1), "limiter must be released after a decoding error")
+			limiter.Release(1)
+		})
+	}
+}
+
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {

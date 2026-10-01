@@ -633,8 +633,8 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		}
 	}
 
-	raw := body.ReadCloser
 	for _, value := range slices.Backward(encoding) {
+		raw := body.ReadCloser
 		algorithm := strings.ToLower(value)
 		switch algorithm {
 		case "zstd":
@@ -658,14 +658,11 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		default:
 			return nil, 0, errors.New("unsupported Content-Encoding algorithm: " + algorithm)
 		}
-	}
-	if body.ReadCloser != raw {
-		// The decompression readers above (gzip.Reader, zstd's IOReadCloser,
-		// flate's Reader) only release their own internal state on Close; none
-		// of them close the underlying reader they were constructed from. Make
-		// sure the raw HTTP body (and the semaphore/parallel-fetch resources it
-		// carries) still gets closed when the caller closes the returned body.
-		body.ReadCloser = &closeAlsoReader{ReadCloser: body.ReadCloser, also: raw}
+		if body.ReadCloser != raw {
+			// Each decoder owns only its internal state. Chain its closer to the
+			// previous body immediately so later decoding errors close every layer.
+			body.ReadCloser = &closeAlsoReader{ReadCloser: body.ReadCloser, also: raw}
+		}
 	}
 
 	return body, remaining, nil
