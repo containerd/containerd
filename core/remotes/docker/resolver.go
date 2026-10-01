@@ -81,9 +81,10 @@ type Authorizer interface {
 	Authorize(context.Context, *http.Request) error
 
 	// AddResponses adds a 401 response for the authorizer to consider when
-	// authorizing requests. The last response should be unauthorized and
-	// the previous requests are used to consider redirects and retries
-	// that may have led to the 401.
+	// authorizing requests. A 403 response carrying a WWW-Authenticate
+	// challenge is also accepted and handled the same way. The last response
+	// should be unauthorized and the previous requests are used to consider
+	// redirects and retries that may have led to the 401.
 	//
 	// If response is not handled, returns `ErrNotImplemented`
 	AddResponses(context.Context, []*http.Response) error
@@ -866,6 +867,21 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response, 
 	case http.StatusUnauthorized:
 		log.G(ctx).WithField("header", last.Header.Get("WWW-Authenticate")).Debug("Unauthorized")
 		if r.host.Authorizer != nil {
+			if err := r.host.Authorizer.AddResponses(ctx, responses); err == nil {
+				return true, nil
+			} else if !errdefs.IsNotImplemented(err) {
+				return false, err
+			}
+		}
+
+		return false, nil
+	case http.StatusForbidden:
+		// Some registries answer pre-auth requests with 403 instead of a 401
+		// challenge. Only retry when the 403 carries a WWW-Authenticate
+		// header: without a challenge the authorizer has nothing to act on,
+		// and AddResponses must not be called with a challenge-less response
+		// (its contract covers 401 unauthorized responses).
+		if r.host.Authorizer != nil && last.Header.Get("WWW-Authenticate") != "" {
 			if err := r.host.Authorizer.AddResponses(ctx, responses); err == nil {
 				return true, nil
 			} else if !errdefs.IsNotImplemented(err) {
