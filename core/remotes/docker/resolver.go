@@ -64,7 +64,7 @@ var (
 	MaxManifestSize int64 = 4 * 1048 * 1048
 )
 
-// Authorizer is used to authorize HTTP requests based on 401 HTTP responses.
+// Authorizer is used to authorize HTTP requests based on 401 and 403 HTTP responses.
 // An Authorizer is responsible for caching tokens or credentials used by
 // requests.
 type Authorizer interface {
@@ -80,11 +80,11 @@ type Authorizer interface {
 	// can be used by the caller to find out the status code returned by the registry.
 	Authorize(context.Context, *http.Request) error
 
-	// AddResponses adds a 401 response for the authorizer to consider when
+	// AddResponses adds a 401 or 403 response for the authorizer to consider when
 	// authorizing requests. A 403 response carrying a WWW-Authenticate
-	// challenge is also accepted and handled the same way. The last response
-	// should be unauthorized and the previous requests are used to consider
-	// redirects and retries that may have led to the 401.
+	// challenge is accepted and handled the same way as a 401. The last response
+	// should be unauthorized and the previous responses are used to consider
+	// redirects and retries that may have led to the 401 or 403.
 	//
 	// If response is not handled, returns `ErrNotImplemented`
 	AddResponses(context.Context, []*http.Response) error
@@ -880,7 +880,7 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response, 
 		// challenge. Only retry when the 403 carries a WWW-Authenticate
 		// header: without a challenge the authorizer has nothing to act on,
 		// and AddResponses must not be called with a challenge-less response
-		// (its contract covers 401 unauthorized responses).
+		// (its contract covers 401 and challenged 403 responses).
 		if r.host.Authorizer != nil && last.Header.Get("WWW-Authenticate") != "" {
 			if err := r.host.Authorizer.AddResponses(ctx, responses); err == nil {
 				return true, nil
