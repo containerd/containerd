@@ -1,6 +1,6 @@
 module github.com/containerd/containerd/v2
 
-go 1.26.6
+go 1.27.0
 
 require (
 	dario.cat/mergo v1.0.2
@@ -142,11 +142,11 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.56.0 // indirect
-	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/term v0.46.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260825221802-da73d73af1c5 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/api v0.37.0 // indirect
@@ -159,3 +159,5 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 	tags.cncf.io/container-device-interface/specs-go v1.1.1 // indirect
 )
+
+replace k8s.io/cri-api => github.com/AkihiroSuda/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260930053623-4ce50376ca80

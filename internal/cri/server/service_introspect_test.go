@@ -156,3 +156,42 @@ func TestIntrospectRuntimeHandlerUserns(t *testing.T) {
 		})
 	}
 }
+
+// TestIntrospectRuntimeHandlerCgroupns checks that a handler advertises CRI
+// cgroup namespace support only when the shim reports the cgroup namespace.
+func TestIntrospectRuntimeHandlerCgroupns(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		feat *features.Features
+		want bool
+	}{
+		{
+			name: "cgroupns",
+			feat: &features.Features{Linux: &features.Linux{Namespaces: []string{"cgroup"}}},
+			want: true,
+		},
+		{
+			name: "no cgroupns",
+			feat: &features.Features{Linux: &features.Linux{Namespaces: []string{"user"}}},
+			want: false,
+		},
+		{
+			name: "features without linux block",
+			feat: &features.Features{MountOptions: []string{"rro"}},
+			want: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &criService{runtimeHandlers: make(map[string]*runtime.RuntimeHandler)}
+			intro := &fakeRuntimeIntrospection{resp: runtimeInfoResponse(t, tc.feat)}
+
+			err := c.introspectRuntimeHandler(context.Background(), intro, "runsc", criconfig.Runtime{Type: "io.containerd.runsc.v1"})
+			require.NoError(t, err)
+
+			h := c.runtimeHandlers["runsc"]
+			require.NotNil(t, h)
+			require.NotNil(t, h.Features)
+			assert.Equal(t, tc.want, h.Features.CgroupNamespaces)
+		})
+	}
+}

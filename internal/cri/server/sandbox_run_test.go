@@ -233,3 +233,24 @@ func TestDisablePauseImagePullConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestRunPodSandboxUnsupportedCgroupnsMode(t *testing.T) {
+	for _, mode := range []runtime.NamespaceMode{runtime.NamespaceMode_CONTAINER, runtime.NamespaceMode_TARGET} {
+		t.Run(mode.String(), func(t *testing.T) {
+			c := newTestCRIService()
+			_, err := c.RunPodSandbox(context.Background(), &runtime.RunPodSandboxRequest{
+				Config: &runtime.PodSandboxConfig{
+					Metadata: &runtime.PodSandboxMetadata{Name: "name", Uid: "uid", Namespace: "ns"},
+					Linux: &runtime.LinuxPodSandboxConfig{
+						SecurityContext: &runtime.LinuxSandboxSecurityContext{
+							NamespaceOptions: &runtime.NamespaceOption{
+								CgroupnsOptions: &runtime.CgroupNamespace{Mode: mode},
+							},
+						},
+					},
+				},
+			})
+			assert.ErrorContains(t, err, "unsupported cgroup namespace mode")
+		})
+	}
+}
