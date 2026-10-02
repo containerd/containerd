@@ -25,7 +25,17 @@ import (
 // NewFakeStore returns an image store with predefined images.
 // Update is not allowed for this fake store.
 func NewFakeStore(images []Image) (*Store, error) {
-	s := NewStore(nil, nil, platforms.Default())
+	return newFakeStore(images, nil)
+}
+
+// NewFakeStoreWithGetter returns an image store with predefined images that
+// resolves updates through the given getter, so Update may be called.
+func NewFakeStoreWithGetter(images []Image, getter Getter) (*Store, error) {
+	return newFakeStore(images, getter)
+}
+
+func newFakeStore(images []Image, getter Getter) (*Store, error) {
+	s := NewStore(getter, nil, platforms.Default())
 	for _, i := range images {
 		for _, ref := range i.References {
 			s.refCache[ref] = i.ID
