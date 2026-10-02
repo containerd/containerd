@@ -895,10 +895,10 @@ google.golang.org/protobuf/types/pluginpb
 # gopkg.in/inf.v0 v0.9.1
 ## explicit
 gopkg.in/inf.v0
-# k8s.io/api v0.37.0
+# k8s.io/api v0.37.1
 ## explicit; go 1.26.0
 k8s.io/api/core/v1
-# k8s.io/apimachinery v0.37.0
+# k8s.io/apimachinery v0.37.1
 ## explicit; go 1.26.0
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta
@@ -944,7 +944,7 @@ k8s.io/apimachinery/pkg/util/yaml
 k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/client-go v0.37.0
+# k8s.io/client-go v0.37.1
 ## explicit; go 1.26.0
 k8s.io/client-go/features
 k8s.io/client-go/pkg/apis/clientauthentication
@@ -967,7 +967,7 @@ k8s.io/client-go/util/exec
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.37.0
+# k8s.io/component-base v0.37.1
 ## explicit; go 1.26.0
 k8s.io/component-base/logs/logreduction
 # k8s.io/cri-api v0.37.1
@@ -975,11 +975,11 @@ k8s.io/component-base/logs/logreduction
 k8s.io/cri-api/pkg/apis
 k8s.io/cri-api/pkg/apis/runtime/v1
 k8s.io/cri-api/pkg/errors
-# k8s.io/cri-client v0.37.0
+# k8s.io/cri-client v0.37.1
 ## explicit; go 1.26.0
 k8s.io/cri-client/pkg
 k8s.io/cri-client/pkg/util
-# k8s.io/cri-streaming v0.37.0
+# k8s.io/cri-streaming v0.37.1
 ## explicit; go 1.26.0
 k8s.io/cri-streaming/pkg/streaming
 k8s.io/cri-streaming/pkg/streaming/internal/httpresponse
