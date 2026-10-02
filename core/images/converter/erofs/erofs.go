@@ -195,7 +195,6 @@ func ConvertLayerToErofs(ctx context.Context, cs content.Store, desc ocispec.Des
 		return "", fmt.Errorf("failed to get reader: %w", err)
 	}
 	defer ra.Close()
-	sr := io.NewSectionReader(ra, 0, uncompressedDesc.Size)
 
 	var mkfsArgs []string
 	if copts.compressors != "" {
@@ -208,7 +207,7 @@ func ConvertLayerToErofs(ctx context.Context, cs content.Store, desc ocispec.Des
 	// deterministic function of the layer content, independent of how the source
 	// was compressed. This is also the key the layer content cache uses.
 	u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+uncompressedDesc.Digest))
-	if err := erofsutils.ConvertTarErofs(ctx, sr, outPath, u.String(), mkfsArgs); err != nil {
+	if err := erofsutils.ConvertTarErofs(ctx, content.NewReader(ra), outPath, u.String(), mkfsArgs); err != nil {
 		return "", fmt.Errorf("failed to convert to EROFS: %w", err)
 	}
 	log.G(ctx).Debugf("converted %s to EROFS", desc.Digest)
