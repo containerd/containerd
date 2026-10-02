@@ -22,12 +22,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -54,6 +56,8 @@ type hostConfig struct {
 	skipVerify  *bool
 
 	dialTimeout *time.Duration
+
+	tlsGroups []tls.CurveID
 
 	header http.Header
 
@@ -168,7 +172,8 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		rhosts := make([]docker.RegistryHost, len(hosts))
 		for i, host := range hosts {
 			// Allow setting for each host as well
-			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
+			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil ||
+				host.skipVerify != nil || len(host.tlsGroups) > 0
 			explicitTLS := tlsConfigured || explicitTLSFromHost
 
 			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
@@ -285,6 +290,10 @@ func updateTLSConfigFromHost(tlsConfig *tls.Config, host *hostConfig) error {
 		tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
 	}
 
+	if len(host.tlsGroups) > 0 {
+		tlsConfig.CurvePreferences = host.tlsGroups
+	}
+
 	return nil
 }
 
@@ -374,6 +383,10 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
+	// TLSGroups is the list of TLS key exchange groups allowed
+	// when negotiating TLS with this host. Set on the client's tls.Config.
+	TLSGroups []string `toml:"tls_groups"`
+
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -419,6 +432,16 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	hosts = append(hosts, parsed)
 
 	return hosts, nil
+}
+
+var tlsGroupNames = map[string]tls.CurveID{
+	"P-256":              tls.CurveP256,
+	"P-384":              tls.CurveP384,
+	"P-521":              tls.CurveP521,
+	"X25519":             tls.X25519,
+	"X25519MLKEM768":     tls.X25519MLKEM768,
+	"SecP256r1MLKEM768":  tls.SecP256r1MLKEM768,
+	"SecP384r1MLKEM1024": tls.SecP384r1MLKEM1024,
 }
 
 func parseHostConfig(server string, baseDir string, config hostFileConfig) (hostConfig, error) {
@@ -542,6 +565,15 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			return hostConfig{}, err
 		}
 		result.dialTimeout = &dialTimeout
+	}
+
+	for _, name := range config.TLSGroups {
+		group, ok := tlsGroupNames[name]
+		if !ok {
+			return hostConfig{}, fmt.Errorf("unknown TLS group %q, valid groups: %s", name, strings.Join(slices.Sorted(maps.Keys(tlsGroupNames)), ", "))
+		}
+
+		result.tlsGroups = append(result.tlsGroups, group)
 	}
 
 	return result, nil
