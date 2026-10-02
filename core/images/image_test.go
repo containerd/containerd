@@ -17,9 +17,16 @@
 package images
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -124,4 +131,34 @@ func TestValidateMediaType(t *testing.T) {
 		err = validateMediaType(b, "")
 		assert.Error(t, err, "document should not be valid")
 	})
+}
+
+func TestVerifyDescriptor(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	store, err := local.NewStore(root)
+	require.NoError(t, err)
+
+	data := []byte("verified content")
+	desc := ocispec.Descriptor{
+		Digest: digest.Canonical.FromBytes(data),
+		Size:   int64(len(data)),
+	}
+	require.NoError(t, content.WriteBlob(ctx, store, "test", bytes.NewReader(data), desc))
+	require.NoError(t, VerifyDescriptor(ctx, store, desc))
+
+	desc.Size++
+	err = VerifyDescriptor(ctx, store, desc)
+	require.ErrorIs(t, err, ErrContentMismatch)
+
+	desc.Size = int64(len(data))
+	path := filepath.Join(root, "blobs", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
+	require.NoError(t, os.Remove(path))
+	require.NoError(t, os.WriteFile(path, []byte("corrupt content!"), 0o644))
+	err = VerifyDescriptor(ctx, store, desc)
+	require.ErrorIs(t, err, ErrContentMismatch)
+
+	require.NoError(t, os.WriteFile(path, append(data, 'x'), 0o644))
+	err = VerifyDescriptor(ctx, store, desc)
+	require.ErrorIs(t, err, ErrContentMismatch)
 }
