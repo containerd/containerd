@@ -128,7 +128,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
-	image, err := c.LocalResolve(config.GetImage().GetImage())
+	// Resolve the image on the platform of the runtime handler of the
+	// sandbox, which is the platform it was pulled for.
+	platform := c.ImageService.PlatformForImage(config.GetImage().GetImage(), sandbox.Metadata.RuntimeHandler)
+	image, err := c.LocalResolve(config.GetImage().GetImage(), platform)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve image %q: %w", config.GetImage().GetImage(), err)
 	}

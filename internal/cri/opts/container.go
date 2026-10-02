@@ -65,7 +65,12 @@ func unpackImage(ctx context.Context, client *containerd.Client, i containerd.Im
 	}
 	defer done(ctx)
 
-	matcher := platforms.Default()
+	// Unpack for the platform the image was resolved for, which is not
+	// necessarily the platform of the node (see the runtime_platforms config).
+	matcher := i.Platform()
+	if matcher == nil {
+		matcher = platforms.Default()
+	}
 
 	capabilities, err := client.GetSnapshotterCapabilities(ctx, snapshotter)
 	if err != nil {
