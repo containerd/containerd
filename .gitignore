@@ -10,4 +10,6 @@ containerd.test
 _site/
 releases/*.tar.gz
 releases/*.tar.gz.sha256sum
+releases/*.zip
+releases/*.zip.sha256sum
 _output/
