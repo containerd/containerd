@@ -131,6 +131,50 @@ func TestGetManifestPath(t *testing.T) {
 	}
 }
 
+func TestRequestWithMountFrom(t *testing.T) {
+	// from comes from the distribution-source annotation, which is propagated
+	// out of registry-supplied manifest content, so it must be escaped before
+	// it lands in the upload query string.
+	const (
+		from = "library/redis&ns=attacker.example.com"
+		ns   = "registry.example.com"
+	)
+	mount := "sha256:" + strings.Repeat("a", 64)
+
+	for _, tc := range []struct {
+		name       string
+		path       string
+		expectedNS []string
+	}{
+		{
+			name: "no existing query",
+			path: "/v2/target/blobs/uploads/",
+		},
+		{
+			// The real caller runs addNamespace first, so the path already
+			// carries the routing namespace and this appends to it.
+			name:       "existing namespace query",
+			path:       "/v2/target/blobs/uploads/?ns=" + ns,
+			expectedNS: []string{ns},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			creq := requestWithMountFrom(&request{path: tc.path}, mount, from)
+
+			_, rawQuery, ok := strings.Cut(creq.path, "?")
+			require.True(t, ok, "expected a query string in %q", creq.path)
+
+			q, err := url.ParseQuery(rawQuery)
+			require.NoError(t, err)
+
+			assert.Equal(t, []string{mount}, q["mount"])
+			assert.Equal(t, []string{from}, q["from"])
+			// The '&'/'=' in from must not add or override a routing namespace.
+			assert.Equal(t, tc.expectedNS, q["ns"])
+		})
+	}
+}
+
 // TestPusherErrClosedRetry tests if retrying work when error occurred on close.
 func TestPusherErrClosedRetry(t *testing.T) {
 	ctx := context.Background()
