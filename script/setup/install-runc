@@ -38,7 +38,29 @@ function install_runc() {
 	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
-	env -u VERSION make BUILDTAGS='seccomp' runc
+
+	# runc 1.5+ links against libpathrs by default. The version is
+	# pinned by the runc revision that is checked out.
+	local libpathrs_version
+	libpathrs_version="$(sed -n 's/^ARG LIBPATHRS_VERSION=//p' Dockerfile | head -n1)"
+	: "${libpathrs_version:?could not determine libpathrs version from runc Dockerfile}"
+
+	# Install into /usr the same way runc's CI does.
+	# Ref: https://github.com/opencontainers/runc/blob/a7f0be5861d3013d240cfe0b1c31fc409151bf83/.github/workflows/test.yml#L98-L101
+	# DESTDIR is cleared just for this call, because the runc build finds
+	# libpathrs through pkg-config, which only looks under /usr.
+	$SUDO ${SUDO:+-E} env -u DESTDIR "PATH=${PATH}" script/build-libpathrs.sh "${libpathrs_version}" /usr
+
+	# The .so also has to be in the staged DESTDIR tree so runc can load it
+	# at runtime once the tree is unpacked.
+	if [ -n "${DESTDIR:-}" ]; then
+		local libdir
+		libdir="$(pkg-config --variable=libdir pathrs)"
+		$SUDO install -d "${DESTDIR}${libdir}"
+		$SUDO cp -a "${libdir}"/libpathrs.so* "${DESTDIR}${libdir}"/
+	fi
+
+	env -u VERSION make runc
 	$SUDO make install
 	popd
 }
