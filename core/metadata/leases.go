@@ -529,35 +529,29 @@ func removeImageLease(ctx context.Context, tx *bolt.Tx, ref string) error {
 }
 
 func parseLeaseResource(r leases.Resource) ([]string, string, error) {
-	var (
-		ref  = r.ID
-		typ  = r.Type
-		keys = strings.Split(typ, "/")
-	)
-
+	keys := strings.Split(r.Type, "/")
 	switch k := keys[0]; k {
-	case string(bucketKeyObjectContent),
-		string(bucketKeyObjectIngests),
-		string(bucketKeyObjectImages):
-
+	case string(bucketKeyObjectContent):
 		if len(keys) != 1 {
-			return nil, "", fmt.Errorf("invalid resource type %s: %w", typ, errdefs.ErrInvalidArgument)
+			return nil, "", fmt.Errorf("invalid resource type %s: %w", r.Type, errdefs.ErrInvalidArgument)
 		}
 
-		if k == string(bucketKeyObjectContent) {
-			dgst, err := digest.Parse(ref)
-			if err != nil {
-				return nil, "", fmt.Errorf("invalid content resource id %s: %v: %w", ref, err, errdefs.ErrInvalidArgument)
-			}
-			ref = dgst.String()
+		dgst, err := digest.Parse(r.ID)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid content resource id %s: %v: %w", r.ID, err, errdefs.ErrInvalidArgument)
 		}
+		return keys, dgst.String(), nil
+	case string(bucketKeyObjectIngests), string(bucketKeyObjectImages):
+		if len(keys) != 1 {
+			return nil, "", fmt.Errorf("invalid resource type %s: %w", r.Type, errdefs.ErrInvalidArgument)
+		}
+		return keys, r.ID, nil
 	case string(bucketKeyObjectSnapshots):
 		if len(keys) != 2 {
-			return nil, "", fmt.Errorf("invalid snapshot resource type %s: %w", typ, errdefs.ErrInvalidArgument)
+			return nil, "", fmt.Errorf("invalid snapshot resource type %s: %w", r.Type, errdefs.ErrInvalidArgument)
 		}
+		return keys, r.ID, nil
 	default:
-		return nil, "", fmt.Errorf("resource type %s not supported yet: %w", typ, errdefs.ErrNotImplemented)
+		return nil, "", fmt.Errorf("resource type %s not supported yet: %w", r.Type, errdefs.ErrNotImplemented)
 	}
-
-	return keys, ref, nil
 }

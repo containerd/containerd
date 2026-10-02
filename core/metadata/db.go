@@ -159,7 +159,7 @@ func (m *DB) Init(ctx context.Context) error {
 	// back rather than performing a much slower and unnecessary commit.
 	var errSkip = errors.New("skip update")
 
-	err := m.db.Update(func(tx *bolt.Tx) error {
+	if err := m.db.Update(func(tx *bolt.Tx) error {
 		var (
 			// current schema and version
 			schema  = "v0"
@@ -175,9 +175,9 @@ func (m *DB) Init(ctx context.Context) error {
 		i := len(migrations)
 
 		for ; i > 0; i-- {
-			migration := migrations[i-1]
+			mig := migrations[i-1]
 
-			bkt := tx.Bucket([]byte(migration.schema))
+			bkt := tx.Bucket([]byte(mig.schema))
 			if bkt == nil {
 				// Hasn't encountered another schema, go to next migration
 				if schema == "v0" {
@@ -186,7 +186,7 @@ func (m *DB) Init(ctx context.Context) error {
 				break
 			}
 			if schema == "v0" {
-				schema = migration.schema
+				schema = mig.schema
 				vb := bkt.Get(bucketKeyDBVersion)
 				if vb != nil {
 					v, _ := binary.Varint(vb)
@@ -194,7 +194,7 @@ func (m *DB) Init(ctx context.Context) error {
 				}
 			}
 
-			if version >= migration.version {
+			if version >= mig.version {
 				break
 			}
 		}
@@ -208,12 +208,12 @@ func (m *DB) Init(ctx context.Context) error {
 				return errSkip
 			}
 
-			for _, m := range updates {
+			for _, u := range updates {
 				t0 := time.Now()
-				if err := m.migrate(tx); err != nil {
-					return fmt.Errorf("failed to migrate to %s.%d: %w", m.schema, m.version, err)
+				if err := u.migrate(tx); err != nil {
+					return fmt.Errorf("failed to migrate to %s.%d: %w", u.schema, u.version, err)
 				}
-				log.G(ctx).WithField("d", time.Since(t0)).Debugf("finished database migration to %s.%d", m.schema, m.version)
+				log.G(ctx).WithField("d", time.Since(t0)).Debugf("finished database migration to %s.%d", u.schema, u.version)
 			}
 		}
 
@@ -228,11 +228,13 @@ func (m *DB) Init(ctx context.Context) error {
 		}
 
 		return bkt.Put(bucketKeyDBVersion, versionEncoded)
-	})
-	if err == errSkip {
-		err = nil
+	}); err != nil {
+		if errors.Is(err, errSkip) {
+			return nil
+		}
+		return err
 	}
-	return err
+	return nil
 }
 
 // ContentStore returns a namespaced content store
@@ -392,12 +394,12 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 		return nil, err
 	}
 
-	events := []namespacedEvent{}
+	nsEvents := []namespacedEvent{}
 	if err := m.db.Update(func(tx *bolt.Tx) error {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		rm := func(ctx context.Context, n gc.Node) error {
+		if err := c.scanAll(ctx, tx, func(ctx context.Context, n gc.Node) error {
 			if _, ok := marked[n]; ok {
 				return nil
 			}
@@ -410,20 +412,20 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 				// queue event to publish after successful commit
 			case ResourceContent, ResourceIngest:
 				m.dirtyCS = true
+			case ResourceUnknown, ResourceContainer, ResourceTask, ResourceImage,
+				ResourceLease, ResourceStream, ResourceMount,
+				resourceContentFlat, resourceSnapshotFlat, resourceImageFlat, resourceEnd:
+				// nop.
 			}
 
-			event, err := c.remove(ctx, tx, n)
-			if event != nil && err == nil {
-				events = append(events,
-					namespacedEvent{
-						namespace: n.Namespace,
-						event:     event,
-					})
+			if event, err := c.remove(ctx, tx, n); event != nil && err == nil {
+				nsEvents = append(nsEvents, namespacedEvent{
+					namespace: n.Namespace,
+					event:     event,
+				})
 			}
 			return err
-		}
-
-		if err := c.scanAll(ctx, tx, rm); err != nil { // From gc context
+		}); err != nil { // From gc context
 			return fmt.Errorf("failed to scan and remove: %w", err)
 		}
 
@@ -439,7 +441,7 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 
 	// Flush events asynchronously after commit
 	wg.Go(func() {
-		m.publishEvents(events)
+		m.publishEvents(nsEvents)
 	})
 
 	// Reset dirty. Truly don't need to be atomically stored inside of the wlock
@@ -449,32 +451,27 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	if len(m.dirtySS) > 0 {
 		var sl sync.Mutex
 		stats.SnapshotD = map[string]time.Duration{}
-		wg.Add(len(m.dirtySS))
 		for snapshotterName := range m.dirtySS {
 			log.G(ctx).WithField("snapshotter", snapshotterName).Debug("schedule snapshotter cleanup")
-			go func(snapshotterName string) {
+			wg.Go(func() {
 				st1 := time.Now()
 				m.cleanupSnapshotter(ctx, snapshotterName)
 
 				sl.Lock()
 				stats.SnapshotD[snapshotterName] = time.Since(st1)
 				sl.Unlock()
-
-				wg.Done()
-			}(snapshotterName)
+			})
 		}
 		m.dirtySS = map[string]struct{}{}
 	}
 
 	if m.dirtyCS {
-		wg.Add(1)
 		log.G(ctx).Debug("schedule content cleanup")
-		go func() {
+		wg.Go(func() {
 			ct1 := time.Now()
 			m.cleanupContent(ctx)
 			stats.ContentD = time.Since(ct1)
-			wg.Done()
-		}()
+		})
 		m.dirtyCS = false
 	}
 
@@ -513,7 +510,7 @@ func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{},
 		close(roots)
 		wg.Wait()
 
-		refs := func(n gc.Node) ([]gc.Node, error) {
+		reachable, err := gc.Tricolor(nodes, func(n gc.Node) ([]gc.Node, error) {
 			var sn []gc.Node
 			if err := c.references(ctx, tx, n, func(nn gc.Node) { // From gc context
 				sn = append(sn, nn)
@@ -521,9 +518,7 @@ func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{},
 				return nil, err
 			}
 			return sn, nil
-		}
-
-		reachable, err := gc.Tricolor(nodes, refs)
+		})
 		if err != nil {
 			return err
 		}
