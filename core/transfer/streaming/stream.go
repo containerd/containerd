@@ -140,8 +140,28 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 	}()
 }
 
+// receiveResult holds the result of a receive operation for testing.
+type receiveResult struct {
+	n     int
+	err   error
+	done  bool
+}
+
 func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 	r, w := io.Pipe()
+
+	// Create separate channels for data and cancellation signals
+	type dataMsg struct {
+		data []byte
+		ok   bool
+	}
+	type closeMsg struct {
+		err error
+	}
+
+	dataCh := make(chan dataMsg)
+	closeCh := make(chan closeMsg)
+
 	go func() {
 		defer stream.Close()
 		var window int32
@@ -171,27 +191,40 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 				} else {
 					err = fmt.Errorf("received failed: %w", err)
 				}
-				w.CloseWithError(err)
+				// Signal close via channel
+				select {
+				case closeCh <- closeMsg{err: err}:
+				case <-ctx.Done():
+					return
+				}
 				return
 			} else if werr != nil {
 				// Try receive before erroring out
-				w.CloseWithError(fmt.Errorf("failed to send window update: %w", werr))
+				select {
+				case closeCh <- closeMsg{err: fmt.Errorf("failed to send window update: %w", werr)}:
+				case <-ctx.Done():
+					return
+				}
 				return
 			}
 			i, err := typeurl.UnmarshalAny(anyType)
 			if err != nil {
-				w.CloseWithError(fmt.Errorf("failed to unmarshal received object: %w", err))
+				select {
+				case closeCh <- closeMsg{err: fmt.Errorf("failed to unmarshal received object: %w", err)}:
+				case <-ctx.Done():
+					return
+				}
 				return
 			}
 			switch v := i.(type) {
 			case *transferapi.Data:
-				n, err := w.Write(v.Data)
-				if err != nil {
-					w.CloseWithError(fmt.Errorf("failed to unmarshal received object: %w", err))
-					// Close will error out sender
+				// Send data via channel so Write can use ctx cancellation
+				select {
+				case dataCh <- dataMsg{data: v.Data, ok: true}:
+				case <-ctx.Done():
+					w.CloseWithError(ctx.Err())
 					return
 				}
-				window = window - int32(n)
 			// TODO: Handle error case
 			default:
 				log.G(ctx).Warnf("Ignoring unknown stream object of type %T", i)
@@ -199,6 +232,35 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 			}
 		}
 
+	}()
+
+	go func() {
+		defer w.Close()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-dataCh:
+				if !ok {
+					return
+				}
+				n, err := w.Write(msg.data)
+				if err != nil {
+					return
+				}
+				window = window - int32(n)
+			case msg, ok := <-closeCh:
+				if !ok {
+					return
+				}
+				if msg.err != nil {
+					w.CloseWithError(msg.err)
+				} else {
+					w.Close()
+				}
+				return
+			}
+		}
 	}()
 
 	return r
