@@ -83,11 +83,11 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
-	k8s.io/apimachinery v0.37.0
-	k8s.io/client-go v0.37.0
+	k8s.io/apimachinery v0.37.1
+	k8s.io/client-go v0.37.1
 	k8s.io/cri-api v0.37.1
-	k8s.io/cri-client v0.37.0
-	k8s.io/cri-streaming v0.37.0
+	k8s.io/cri-client v0.37.1
+	k8s.io/cri-streaming v0.37.1
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/streaming v0.37.1
 	tags.cncf.io/container-device-interface v1.1.1
@@ -149,8 +149,8 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260825221802-da73d73af1c5 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/api v0.37.0 // indirect
-	k8s.io/component-base v0.37.0 // indirect
+	k8s.io/api v0.37.1 // indirect
+	k8s.io/component-base v0.37.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad // indirect
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
