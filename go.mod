@@ -100,7 +100,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cilium/ebpf v0.17.3 // indirect
+	github.com/cilium/ebpf v0.22.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/containers/ocicrypt v1.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
