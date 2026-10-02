@@ -210,6 +210,11 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		if err != nil {
 			return emptyDesc, err
 		}
+		if config.SyncFs {
+			if err := syncDir(layer); err != nil {
+				return emptyDesc, err
+			}
+		}
 		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer with uncompressed EROFS blob")
 		return desc, nil
 	}
@@ -269,6 +274,14 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	if s.enableDmverity {
 		if err := s.formatDmverityLayer(ctx, layerBlobPath); err != nil {
 			return emptyDesc, fmt.Errorf("failed to format dm-verity layer: %w", err)
+		}
+	}
+
+	// Flush the blob and its directory entry to stable storage when requested,
+	// so a committed snapshot never references truncated data after a crash.
+	if config.SyncFs {
+		if err := syncDir(layer); err != nil {
+			return emptyDesc, err
 		}
 	}
 
