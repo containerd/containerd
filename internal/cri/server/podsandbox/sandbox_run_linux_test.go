@@ -37,6 +37,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/netns"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/testutil"
@@ -339,8 +340,27 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 					SupplementalGroups: []int64{1111, 2222},
 				}
 			},
-			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, c *Controller, spec *runtimespec.Spec) {
 				require.NotNil(t, spec.Process)
+				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(1111))
+				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
+			},
+		},
+		{
+			desc: "should not lose supplemental groups when RunAsUser is set",
+			configChange: func(c *runtime.PodSandboxConfig) {
+				uid := int64(65535)
+				gid := int64(65535)
+				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+					RunAsUser:          &runtime.Int64Value{Value: uid},
+					RunAsGroup:         &runtime.Int64Value{Value: gid},
+					SupplementalGroups: []int64{1111, 2222},
+				}
+			},
+			specCheck: func(t *testing.T, c *Controller, spec *runtimespec.Spec) {
+				require.NotNil(t, spec.Process)
+				assert.Equal(t, uint32(65535), spec.Process.User.UID)
+				assert.Equal(t, uint32(65535), spec.Process.User.GID)
 				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(1111))
 				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
 			},
@@ -524,6 +544,14 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
+
+			// Apply sandboxContainerSpecOpts to simulate the full spec
+			// construction as done in Start().
+			specOpts, err := c.sandboxContainerSpecOpts(config, imageConfig)
+			assert.NoError(t, err)
+			err = oci.ApplyOpts(context.Background(), nil, nil, spec, specOpts...)
+			assert.NoError(t, err)
+
 			specCheck(t, testID, spec)
 			if test.specCheck != nil {
 				test.specCheck(t, c, spec)
