@@ -78,6 +78,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
 		return nil, fmt.Errorf("sandbox container %q is not running", sandboxID)
 	}
+	// A sandbox without a process (pid 0) describes the namespaces and files it
+	// holds in the spec it returned on start; containers are wired up from it.
+	var sandboxSpec *runtimespec.Spec
+	if sandboxPid == 0 {
+		sandboxSpec, err = c.sandboxSpec(ctx, sandboxID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	span.SetAttributes(
 		tracing.Attribute("sandbox.id", sandboxID),
 		tracing.Attribute("sandbox.pid", sandboxPid),
@@ -153,6 +162,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			podSandboxConfig:      sandboxConfig,
 			sandboxRuntimeHandler: sandbox.Metadata.RuntimeHandler,
 			sandboxPid:            sandboxPid,
+			sandboxSpec:           sandboxSpec,
 			NetNSPath:             sandbox.NetNSPath,
 			containerName:         containerName,
 			containerdImage:       &containerdImage,
@@ -183,6 +193,10 @@ type createContainerRequest struct {
 	containerdImage       *containerd.Image
 	meta                  *containerstore.Metadata
 	start                 time.Time
+	// sandboxSpec is the spec returned by the sandbox controller on start. It is
+	// only loaded for sandboxes without a process (sandboxPid == 0), where it is
+	// the source of the pod namespace paths and shared file mounts.
+	sandboxSpec *runtimespec.Spec
 }
 
 func (c *criService) createContainer(r *createContainerRequest) (_ string, retErr error) {
@@ -275,6 +289,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		volumeMounts,
 		ociRuntime,
 		runtimeHandler,
+		r.sandboxSpec,
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container %q spec: %w", r.containerID, err)
@@ -612,6 +627,7 @@ func (c *criService) buildContainerSpec(
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 	runtimeHandler *runtime.RuntimeHandler,
+	sandboxSpec *runtimespec.Spec,
 ) (_ *runtimespec.Spec, retErr error) {
 	var (
 		specOpts []oci.SpecOpts
@@ -627,12 +643,13 @@ func (c *criService) buildContainerSpec(
 	case isLinux:
 		// Generate container mounts.
 		// No mounts are passed for other platforms.
-		linuxMounts := c.linuxContainerMounts(sandboxID, config)
+		linuxMounts := c.linuxContainerMounts(sandboxID, config, sandboxSpec)
 
 		specOpts, err = c.buildLinuxSpec(
 			id,
 			sandboxID,
 			sandboxPid,
+			sandboxSpec,
 			containerName,
 			imageName,
 			config,
@@ -680,6 +697,7 @@ func (c *criService) buildLinuxSpec(
 	id string,
 	sandboxID string,
 	sandboxPid uint32,
+	sandboxSpec *runtimespec.Spec,
 	containerName string,
 	imageName string,
 	config *runtime.ContainerConfig,
@@ -922,7 +940,7 @@ func (c *criService) buildLinuxSpec(
 
 	specOpts = append(specOpts,
 		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
-		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, uids, gids),
+		customopts.WithPodNamespacePaths(securityContext, sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions(), podNamespacePaths(sandboxPid, targetPid, sandboxSpec), uids, gids),
 		customopts.WithSupplementalGroups(supplementalGroups),
 	)
 	specOpts = append(
@@ -1084,9 +1102,94 @@ func (c *criService) buildDarwinSpec(
 	return specOpts, nil
 }
 
+// sandboxSpec loads the OCI spec the sandbox controller returned when the
+// sandbox was started. It is nil when the controller returned none.
+func (c *criService) sandboxSpec(ctx context.Context, sandboxID string) (*runtimespec.Spec, error) {
+	sandboxInfo, err := c.client.SandboxStore().Get(ctx, sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox %q from metadata store: %w", sandboxID, err)
+	}
+	if sandboxInfo.Spec == nil {
+		return nil, nil
+	}
+	var spec runtimespec.Spec
+	if err := typeurl.UnmarshalTo(sandboxInfo.Spec, &spec); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal spec of sandbox %q: %w", sandboxID, err)
+	}
+	return &spec, nil
+}
+
+// podNamespacePaths resolves the namespaces a container joins.
+//
+// A PID-backed sandbox (pause) is a member of every pod namespace, so the
+// paths are derived from its pid exactly as before. A sandbox without a
+// process holds the pod namespaces itself and lists their paths in the Linux
+// section of the spec it returned on start; a namespace missing from that
+// spec is one the sandbox does not hold, which WithPodNamespacePaths turns into
+// the host namespace when the pod asked for it and into an error otherwise.
+//
+// A sandbox that reports no process and returns no spec (or none with a Linux
+// section) is a pre-existing Sandbox API shim that describes neither (VM based
+// shims ignore the paths CRI generates); those keep the historical pid derived
+// construction so that their behavior does not change.
+func podNamespacePaths(sandboxPid, targetPid uint32, sandboxSpec *runtimespec.Spec) customopts.PodNamespacePaths {
+	if sandboxPid != 0 || sandboxSpec == nil || sandboxSpec.Linux == nil {
+		return customopts.PodNamespacePathsFromPid(sandboxPid, targetPid)
+	}
+	var paths customopts.PodNamespacePaths
+	for _, ns := range sandboxSpec.Linux.Namespaces {
+		switch ns.Type {
+		case runtimespec.NetworkNamespace:
+			paths.Network = ns.Path
+		case runtimespec.IPCNamespace:
+			paths.IPC = ns.Path
+		case runtimespec.UTSNamespace:
+			paths.UTS = ns.Path
+		case runtimespec.PIDNamespace:
+			// A PID namespace entry without a path is the sandbox declaring
+			// that it holds none and that each container gets a new one.
+			paths.PID = ns.Path
+			paths.PrivatePID = ns.Path == ""
+		case runtimespec.UserNamespace:
+			paths.User = ns.Path
+		}
+	}
+	// A container targeting another container's PID namespace joins that
+	// container, not the sandbox.
+	if targetPid != sandboxPid {
+		paths.PID = customopts.GetPIDNamespace(targetPid)
+	}
+	return paths
+}
+
+// sandboxSharedFile returns the host path of a pod shared file, i.e. a file
+// the sandbox provides to every container of the pod at destination (for
+// example /etc/hosts). The fixed location under the CRI sandbox directory
+// wins when it exists; otherwise the mount the sandbox declared for that
+// destination in its spec is used, which is how a sandbox implementation that
+// owns the files, such as a Sandbox API shim, hands them over. The result is
+// empty when neither exists.
+func (c *criService) sandboxSharedFile(fixedPath, destination string, sandboxSpec *runtimespec.Spec) string {
+	if _, err := c.os.Stat(fixedPath); err == nil {
+		return fixedPath
+	}
+	if sandboxSpec == nil {
+		return ""
+	}
+	for _, m := range sandboxSpec.Mounts {
+		if m.Destination != destination || m.Source == "" {
+			continue
+		}
+		if _, err := c.os.Stat(m.Source); err == nil {
+			return m.Source
+		}
+	}
+	return ""
+}
+
 // linuxContainerMounts sets up necessary container system file mounts
 // including /dev/shm, /etc/hosts and /etc/resolv.conf.
-func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
+func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.ContainerConfig, sandboxSpec *runtimespec.Spec) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
 	var uidMappings, gidMappings []*runtime.IDMapping
@@ -1101,8 +1204,7 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		// do not mount this in that case.
 		// TODO(random-liu): Remove the check and always mount this when
 		// containerd 1.1 and 1.2 are deprecated.
-		hostpath := c.getSandboxHostname(sandboxID)
-		if _, err := c.os.Stat(hostpath); err == nil {
+		if hostpath := c.sandboxSharedFile(c.getSandboxHostname(sandboxID), etcHostname, sandboxSpec); hostpath != "" {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  etcHostname,
 				HostPath:       hostpath,
@@ -1115,10 +1217,9 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 	}
 
 	if !isInCRIMounts(etcHosts, config.GetMounts()) {
-		hostpath := c.getSandboxHosts(sandboxID)
 		// /etc/hosts could be delegated to remote sandbox controller. That file isn't required to be existed
 		// in host side for some sandbox runtimes. Skip it if we don't need it.
-		if _, err := c.os.Stat(hostpath); err == nil {
+		if hostpath := c.sandboxSharedFile(c.getSandboxHosts(sandboxID), etcHosts, sandboxSpec); hostpath != "" {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  etcHosts,
 				HostPath:       hostpath,
@@ -1133,10 +1234,9 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 	// Mount sandbox resolv.config.
 	// TODO: Need to figure out whether we should always mount it as read-only
 	if !isInCRIMounts(resolvConfPath, config.GetMounts()) {
-		hostpath := c.getResolvPath(sandboxID)
 		// The ownership of /etc/resolv.conf could be delegated to remote sandbox controller. That file isn't
 		// required to be existed in host side for some sandbox runtimes. Skip it if we don't need it.
-		if _, err := c.os.Stat(hostpath); err == nil {
+		if hostpath := c.sandboxSharedFile(c.getResolvPath(sandboxID), resolvConfPath, sandboxSpec); hostpath != "" {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  resolvConfPath,
 				HostPath:       hostpath,
@@ -1152,6 +1252,8 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		sandboxDevShm := c.getSandboxDevShm(sandboxID)
 		if securityContext.GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
 			sandboxDevShm = devShm
+		} else if source := c.sandboxSharedFile(sandboxDevShm, devShm, sandboxSpec); source != "" {
+			sandboxDevShm = source
 		}
 		// The ownership of /dev/shm could be delegated to remote sandbox controller. That file isn't required
 		// to be existed in host side for some sandbox runtimes. Skip it if we don't need it.
