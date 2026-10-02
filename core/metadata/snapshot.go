@@ -39,6 +39,8 @@ import (
 
 const (
 	inheritedLabelsPrefix = "containerd.io/snapshot/"
+	labelSnapshotRef      = "containerd.io/snapshot.ref"
+	labelSnapshotParent   = "containerd.io/snapshot/parent-chain-id"
 )
 
 type snapshotter struct {
@@ -355,6 +357,11 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 				return fmt.Errorf("parent snapshot %v does not exist: %w", parent, errdefs.ErrNotFound)
 			}
 			bparent = string(pbkt.Get(bucketKeyName))
+		} else if parentChainID := base.Labels[labelSnapshotParent]; parentChainID != "" {
+			if pbkt := bkt.Bucket([]byte(parentChainID)); pbkt != nil {
+				parent = parentChainID
+				bparent = string(pbkt.Get(bucketKeyName))
+			}
 		}
 
 		sid, err := bkt.NextSequence()
