@@ -17,12 +17,14 @@
 package util
 
 import (
+	"strings"
+
 	reference "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 )
 
 // ParseImageReferences parses a list of arbitrary image references and returns
-// the repotags and repodigests
+// the repotags and repodigests. It filters out references without an explicit registry.
 func ParseImageReferences(refs []string) ([]string, []string) {
 	var tags, digests []string
 	for _, ref := range refs {
@@ -30,6 +32,20 @@ func ParseImageReferences(refs []string) ([]string, []string) {
 		if err != nil {
 			continue
 		}
+
+		// CRI should only see images with fully-qualified registries. Intercept
+		// the raw string here before any normalization happens, to prevent "short
+		// tags" (like busybox:fixed) from being shown with an automatic
+		// "docker.io" prefix.
+		named, ok := parsed.(reference.Named)
+		if !ok {
+			continue
+		}
+		domain := reference.Domain(named)
+		if domain == "" || !strings.HasPrefix(ref, domain+"/") {
+			continue
+		}
+
 		if _, ok := parsed.(reference.Canonical); ok {
 			digests = append(digests, parsed.String())
 		} else if _, ok := parsed.(reference.Tagged); ok {
