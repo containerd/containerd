@@ -879,6 +879,148 @@ func TestContentEncoding(t *testing.T) {
 	}
 }
 
+// TestContentEncodingClosesUnderlyingBody reproduces a resource-lifecycle gap
+// sibling to the reverted "remotes: close fetch reader immediately on EOF"
+// commit (a989093a9, reverted at 9e8507bea/4783451c9): when the registry
+// response carries a compressed Content-Encoding, open replaces
+// body.ReadCloser with a decompressor (gzip.Reader / zstd IOReadCloser /
+// flate reader) whose Close only releases its own internal state - none of
+// them close the raw reader they decompress from. Once body.ReadCloser is
+// reassigned, the original resp.Body becomes unreachable from the returned
+// io.ReadCloser's Close, so a caller that aborts before EOF (digest
+// mismatch, disk-full, context cancel) and does `defer rc.Close()`, as
+// core/remotes/handlers.go's Fetch handler does, never releases the
+// underlying HTTP connection/fd.
+func TestContentEncodingClosesUnderlyingBody(t *testing.T) {
+	t.Parallel()
+
+	content := make([]byte, 128)
+	rand.New(rand.NewSource(1)).Read(content)
+
+	var gzBuf bytes.Buffer
+	gw := gzip.NewWriter(&gzBuf)
+	if _, err := gw.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := gw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var rawClosed atomic.Bool
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("content-length", fmt.Sprintf("%d", gzBuf.Len()))
+		rw.Header().Set("Content-Encoding", "gzip")
+		rw.Write(gzBuf.Bytes())
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	trackingClient := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		resp, err := http.DefaultTransport.RoundTrip(req)
+		if err != nil {
+			return resp, err
+		}
+		resp.Body = trackedCloser{ReadCloser: resp.Body, closed: &rawClosed}
+		return resp, nil
+	})}
+
+	f := dockerFetcher{&dockerBase{
+		repository: "nonempty",
+	}}
+
+	host := RegistryHost{
+		Client: trackingClient,
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
+	req := f.request(host, http.MethodGet)
+
+	rc, _, err := f.open(context.Background(), req, "", 0, true)
+	if err != nil {
+		t.Fatalf("failed to open: %+v", err)
+	}
+
+	// Simulate a caller that aborts partway through the download (e.g. a
+	// digest mismatch) instead of reading to EOF, then closes as
+	// core/remotes/handlers.go's Fetch handler does on any error return.
+	buf := make([]byte, 4)
+	if _, err := rc.Read(buf); err != nil {
+		t.Fatalf("expected a successful partial read, got %v", err)
+	}
+	if err := rc.Close(); err != nil {
+		t.Fatalf("rc.Close() returned error: %v", err)
+	}
+
+	if !rawClosed.Load() {
+		t.Fatal("rc.Close() did not close the underlying HTTP response body for a compressed " +
+			"Content-Encoding response; the TCP connection/fd for this request was never released")
+	}
+}
+
+func TestContentEncodingErrorClosesUnderlyingBody(t *testing.T) {
+	for _, encoding := range []string{"br,gzip", "gzip,gzip", "br,deflate", "br,zstd"} {
+		t.Run(encoding, func(t *testing.T) {
+			var encoded bytes.Buffer
+			var writer io.WriteCloser
+			switch {
+			case strings.HasSuffix(encoding, "gzip"):
+				writer = gzip.NewWriter(&encoded)
+			case strings.HasSuffix(encoding, "deflate"):
+				var err error
+				writer, err = flate.NewWriter(&encoded, flate.DefaultCompression)
+				require.NoError(t, err)
+			case strings.HasSuffix(encoding, "zstd"):
+				var err error
+				writer, err = zstd.NewWriter(&encoded)
+				require.NoError(t, err)
+			}
+			_, err := writer.Write([]byte("not a nested gzip stream"))
+			require.NoError(t, err)
+			require.NoError(t, writer.Close())
+
+			var rawClosed atomic.Bool
+			client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode:    http.StatusOK,
+					Header:        http.Header{"Content-Encoding": []string{encoding}},
+					ContentLength: int64(encoded.Len()),
+					Body:          trackedCloser{ReadCloser: io.NopCloser(bytes.NewReader(encoded.Bytes())), closed: &rawClosed},
+				}, nil
+			})}
+			limiter := semaphore.NewWeighted(1)
+			fetcher := dockerFetcher{&dockerBase{repository: "test", limiter: limiter}}
+			host := RegistryHost{Client: client, Host: "registry.example", Scheme: "https"}
+			_, _, err = fetcher.open(context.Background(), fetcher.request(host, http.MethodGet), "", 0, true)
+			require.Error(t, err)
+			assert.True(t, rawClosed.Load(), "raw body must close after a decoding error")
+			require.True(t, limiter.TryAcquire(1), "limiter must be released after a decoding error")
+			limiter.Release(1)
+		})
+	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+type trackedCloser struct {
+	io.ReadCloser
+	closed *atomic.Bool
+}
+
+func (t trackedCloser) Close() error {
+	t.closed.Store(true)
+	return t.ReadCloser.Close()
+}
+
 // New set of tests to test new error cases
 func TestDockerFetcherOpen(t *testing.T) {
 	tests := []struct {
