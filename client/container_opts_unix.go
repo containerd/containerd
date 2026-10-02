@@ -134,14 +134,25 @@ func chown(root string, idMap userns.IDMap) filepath.WalkFunc {
 		if cerr != nil {
 			return cerr
 		}
+		// chown clears file capabilities. Read and translate them before changing
+		// ownership, then restore them after all metadata changes.
+		var caps []byte
+		if info.Mode().IsRegular() {
+			caps, cerr = remappedFileCapabilities(path, idMap)
+			if cerr != nil {
+				return cerr
+			}
+		}
 		// be sure the lchown the path as to not de-reference the symlink to a host file
 		if cerr = os.Lchown(path, int(h.Uid), int(h.Gid)); cerr != nil {
 			return cerr
 		}
 		// we must retain special permissions such as setuid, setgid and sticky bits
 		if mode := info.Mode(); mode&os.ModeSymlink == 0 && mode&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
-			return os.Chmod(path, mode)
+			if err := os.Chmod(path, mode); err != nil {
+				return err
+			}
 		}
-		return nil
+		return restoreFileCapabilities(path, caps)
 	}
 }
