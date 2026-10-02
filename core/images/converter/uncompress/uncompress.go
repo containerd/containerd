@@ -48,8 +48,7 @@ func LayerConvertFunc(ctx context.Context, cs content.Store, desc ocispec.Descri
 		return nil, err
 	}
 	defer readerAt.Close()
-	sr := io.NewSectionReader(readerAt, 0, desc.Size)
-	newR, err := compression.DecompressStream(sr)
+	newR, err := compression.DecompressStream(content.NewReader(readerAt))
 	if err != nil {
 		return nil, err
 	}
