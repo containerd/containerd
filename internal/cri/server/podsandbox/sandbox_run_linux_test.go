@@ -28,6 +28,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -516,7 +517,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			if test.configChange != nil {
 				test.configChange(config)
 			}
-			spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)
+			spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, "", nil)
 			if test.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, spec)
@@ -530,6 +531,36 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSandboxContainerSpecPodProcessLabel verifies that the pause spec reuses the pod
+// SELinux label allocated by the CRI server instead of minting a new one.
+func TestSandboxContainerSpecPodProcessLabel(t *testing.T) {
+	if !selinux.GetEnabled() {
+		t.Skip("selinux is not enabled")
+	}
+
+	// Let InitLabels allocate a unique MCS level rather than hardcoding one that a
+	// container running on this host may already hold.
+	podProcessLabel, podMountLabel, err := label.InitLabels(nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, podProcessLabel)
+	defer selinux.ReleaseLabel(podProcessLabel)
+
+	c := newControllerService()
+	c.config.RootDir = t.TempDir()
+	c.config.StateDir = t.TempDir()
+	defer func() {
+		assert.NoError(t, unmountRecursive(context.Background(), c.config.StateDir))
+	}()
+
+	config, imageConfig, _ := getRunPodSandboxTestData(c.config)
+	spec, err := c.sandboxContainerSpec("test-id", config, imageConfig, "test-cni", podProcessLabel, nil)
+	require.NoError(t, err)
+	require.NotNil(t, spec.Linux)
+
+	assert.Equal(t, podProcessLabel, spec.Process.SelinuxLabel)
+	assert.Equal(t, podMountLabel, spec.Linux.MountLabel)
 }
 
 func TestSetupSandboxFiles(t *testing.T) {

@@ -27,6 +27,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -38,7 +39,7 @@ import (
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (_ *runtimespec.Spec, retErr error) {
+	imageConfig *imagespec.ImageConfig, nsPath string, podProcessLabel string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
 	specOpts := []oci.SpecOpts{
@@ -157,15 +158,17 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	specOpts = append(specOpts, oci.WithMounts(mounts))
 
-	processLabel, mountLabel, err := initLabelsFromOpt(securityContext.GetSelinuxOptions())
+	// The pod SELinux label is allocated and owned by the CRI server (it lives in
+	// Metadata.ProcessLabel). Re-derive the process and mount labels from it rather than
+	// minting a new one, so that the reservation has a single owner.
+	labelOptions, err := selinux.DupSecOpt(podProcessLabel)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init selinux options %+v: %w", securityContext.GetSelinuxOptions(), err)
+		return nil, fmt.Errorf("failed to parse pod selinux label %q: %w", podProcessLabel, err)
 	}
-	defer func() {
-		if retErr != nil {
-			selinux.ReleaseLabel(processLabel)
-		}
-	}()
+	processLabel, mountLabel, err := label.InitLabels(labelOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init selinux labels from pod selinux label %q: %w", podProcessLabel, err)
+	}
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
 	specOpts = append(specOpts,
