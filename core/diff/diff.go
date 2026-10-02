@@ -18,12 +18,16 @@ package diff
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 // Config is used to hold parameters needed for a diff operation
@@ -48,6 +52,13 @@ type Config struct {
 
 	// SourceDateEpoch specifies the SOURCE_DATE_EPOCH without touching the env vars.
 	SourceDateEpoch *time.Time
+
+	// DigestAlgorithm is the algorithm used to digest both the uncompressed
+	// diff (the DiffID stored on the LabelUncompressed label) and the
+	// compressed blob committed to the content store. When unset, the
+	// differ falls back to digest.Canonical (sha256), preserving today's
+	// behaviour for callers that do not opt in.
+	DigestAlgorithm digest.Algorithm
 }
 
 // Opt is used to configure a diff operation
@@ -71,6 +82,11 @@ type ApplyConfig struct {
 	SyncFs bool
 	// Progress is a function which reports status of processed read data
 	Progress func(int64)
+	// DigestAlgorithm is the algorithm used to hash the uncompressed stream
+	// while a diff is being applied. The returned descriptor carries this
+	// digest, which a caller compares against the DiffID recorded on the
+	// image config. When unset, digest.Canonical (sha256) is used.
+	DigestAlgorithm digest.Algorithm
 }
 
 // ApplyOpt is used to configure an Apply operation
@@ -157,6 +173,37 @@ func WithProgress(f func(ocispec.Descriptor, int64)) ApplyOpt {
 func WithSourceDateEpoch(tm *time.Time) Opt {
 	return func(c *Config) error {
 		c.SourceDateEpoch = tm
+		return nil
+	}
+}
+
+// WithDigestAlgorithm selects the digest algorithm used when packing a diff.
+// The algorithm must be registered with go-digest. An empty algorithm is a
+// no-op; the differ falls back to digest.Canonical.
+func WithDigestAlgorithm(algo digest.Algorithm) Opt {
+	return func(c *Config) error {
+		if algo == "" {
+			return nil
+		}
+		if !algo.Available() {
+			return fmt.Errorf("digest algorithm %q is not available: %w", algo, errdefs.ErrInvalidArgument)
+		}
+		c.DigestAlgorithm = algo
+		return nil
+	}
+}
+
+// WithApplyDigestAlgorithm selects the digest algorithm used when applying a
+// diff. The same constraints apply as for WithDigestAlgorithm.
+func WithApplyDigestAlgorithm(algo digest.Algorithm) ApplyOpt {
+	return func(_ context.Context, _ ocispec.Descriptor, c *ApplyConfig) error {
+		if algo == "" {
+			return nil
+		}
+		if !algo.Available() {
+			return fmt.Errorf("digest algorithm %q is not available: %w", algo, errdefs.ErrInvalidArgument)
+		}
+		c.DigestAlgorithm = algo
 		return nil
 	}
 }
