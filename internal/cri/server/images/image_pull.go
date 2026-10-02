@@ -337,7 +337,9 @@ func (c *CRIImageService) pullImageWithTransferService(
 		return nil, 0, fmt.Errorf("failed to create OCI registry: %w", err)
 	}
 
-	transferProgressReporter.start(rctx)
+	if err := transferProgressReporter.start(rctx); err != nil {
+		return nil, 0, err
+	}
 	log.G(ctx).Debugf("Calling cri transfer service")
 	err = c.transferrer.Transfer(rctx, reg, is, transfer.WithProgress(transferProgressReporter.createProgressFunc(rctx)))
 	rcancel()
@@ -1008,10 +1010,14 @@ func (reporter *transferProgressReporter) IncBytesRead(bytes int64) {
 	reporter.reqReporter.incByteRead(uint64(bytes))
 }
 
-func (reporter *transferProgressReporter) start(ctx context.Context) {
+// start launches the progress consumer goroutine. A zero timeout is
+// rejected: the transfer service invokes the progress func synchronously,
+// so with the consumer disabled nothing drains pc and the first progress
+// event deadlocks the pull. Zero ("no timeout") remains supported by the
+// legacy local image pull path.
+func (reporter *transferProgressReporter) start(ctx context.Context) error {
 	if reporter.timeout == 0 {
-		log.G(ctx).Infof("no timeout and will not start pulling image %s reporter", reporter.ref)
-		return
+		return fmt.Errorf("zero image_pull_progress_timeout is not supported when using the transfer service")
 	}
 
 	go func() {
@@ -1044,6 +1050,7 @@ func (reporter *transferProgressReporter) start(ctx context.Context) {
 			}
 		}
 	}()
+	return nil
 }
 
 func (reporter *transferProgressReporter) checkProgress(ctx context.Context, reportInterval time.Duration) {

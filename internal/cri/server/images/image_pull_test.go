@@ -758,6 +758,19 @@ func TestTransferProgressReporter(t *testing.T) {
 	}
 }
 
+// TestTransferProgressReporterZeroTimeout is a regression test for
+// https://github.com/containerd/containerd/issues/14158: with the transfer
+// service, a zero image_pull_progress_timeout used to deadlock the pull on
+// the first progress event, because start() skipped the consumer goroutine
+// and nothing drained the unbuffered pc channel that the
+// synchronously-invoked progress func sends on. Zero is now rejected
+// instead of silently disabling the reporter.
+func TestTransferProgressReporterZeroTimeout(t *testing.T) {
+	reporter := newTransferProgressReporter("test-image:latest", func() {}, 0)
+	err := reporter.start(context.Background())
+	assert.Error(t, err, "zero image_pull_progress_timeout must be rejected when using the transfer service")
+}
+
 // TestPullProgressReporter covers the core no-progress cancellation
 // behavior of pullProgressReporter: a stuck request (active, no bytes)
 // is eventually cancelled, while a progressing request is not.
