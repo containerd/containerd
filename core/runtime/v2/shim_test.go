@@ -22,18 +22,51 @@ import (
 	"path/filepath"
 	"testing"
 
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/require"
 )
 
 func TestParseStartResponse(t *testing.T) {
+	protobufResponse, err := proto.Marshal(&bootapi.BootstrapResult{
+		Version:  3,
+		Address:  "unix:///run/containerd/shim.sock",
+		Protocol: "ttrpc",
+	})
+	require.NoError(t, err)
+	futureProtobufResponse, err := proto.Marshal(&bootapi.BootstrapResult{
+		Version:  4,
+		Address:  "unix:///run/containerd/shim.sock",
+		Protocol: "ttrpc",
+	})
+	require.NoError(t, err)
+
 	for _, tc := range []struct {
 		Name     string
 		Response string
 		Expected client.BootstrapParams
 		Err      error
 	}{
+		{
+			Name:     "protobuf bootstrap result",
+			Response: string(protobufResponse),
+			Expected: client.BootstrapParams{
+				Version:  3,
+				Address:  "unix:///run/containerd/shim.sock",
+				Protocol: "ttrpc",
+			},
+		},
+		{
+			Name:     "v2 shim address with valid protobuf wire format",
+			Response: "\" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Expected: client.BootstrapParams{
+				Version:  2,
+				Address:  "\" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				Protocol: "ttrpc",
+			},
+		},
 		{
 			Name:     "v2 shim",
 			Response: "/somedirectory/somesocket",
@@ -73,6 +106,12 @@ func TestParseStartResponse(t *testing.T) {
 		{
 			Name:     "later unsupported shim",
 			Response: `{"Version": 4,"Address":"/somedirectory/somesocket","Protocol":"ttrpc"}`,
+			Expected: client.BootstrapParams{},
+			Err:      errdefs.ErrNotImplemented,
+		},
+		{
+			Name:     "later unsupported protobuf shim",
+			Response: string(futureProtobufResponse),
 			Expected: client.BootstrapParams{},
 			Err:      errdefs.ErrNotImplemented,
 		},

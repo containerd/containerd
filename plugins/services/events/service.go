@@ -78,7 +78,7 @@ func (s *service) Register(server *grpc.Server) error {
 }
 
 func (s *service) RegisterTTRPC(server *ttrpc.Server) error {
-	apittrpc.RegisterEventsService(server, s.ttService)
+	apittrpc.RegisterTTRPCEventsService(server, s.ttService)
 	return nil
 }
 
