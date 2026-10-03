@@ -298,7 +298,7 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 	// ok, let's try io.ReaderAt!
 	readerAt, ok := r.(io.ReaderAt)
 	if ok && size > offset {
-		sr := io.NewSectionReader(readerAt, offset, size)
+		sr := io.NewSectionReader(readerAt, offset, size-offset)
 		return sr, nil
 	}
 

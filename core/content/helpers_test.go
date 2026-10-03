@@ -565,3 +565,76 @@ func TestReadBlob_WithDescriptorData(t *testing.T) {
 		})
 	}
 }
+
+type readerAtOnly struct {
+	data []byte
+}
+
+func (r *readerAtOnly) Read(p []byte) (n int, err error) {
+	return 0, io.EOF
+}
+
+func (r *readerAtOnly) ReadAt(p []byte, off int64) (n int, err error) {
+	if off < 0 || off >= int64(len(r.data)) {
+		return 0, io.EOF
+	}
+	n = copy(p, r.data[off:])
+	if n < len(p) {
+		err = io.EOF
+	}
+	return n, err
+}
+
+func TestSeekReader(t *testing.T) {
+	data := []byte("0123456789ABCDEF")
+
+	t.Run("ReaderAt bounds remaining size", func(t *testing.T) {
+		ra := &readerAtOnly{data: data}
+		offset := int64(4)
+		size := int64(10)
+
+		res, err := seekReader(ra, offset, size)
+		assert.NoError(t, err)
+
+		sr, ok := res.(*io.SectionReader)
+		assert.True(t, ok)
+		assert.Equal(t, size-offset, sr.Size())
+
+		got, err := io.ReadAll(res)
+		assert.NoError(t, err)
+		assert.Equal(t, data[offset:size], got)
+	})
+
+	t.Run("Seeker", func(t *testing.T) {
+		r := bytes.NewReader(data)
+		offset := int64(4)
+		size := int64(10)
+
+		res, err := seekReader(r, offset, size)
+		assert.NoError(t, err)
+
+		buf := make([]byte, 6)
+		n, err := io.ReadFull(res, buf)
+		assert.NoError(t, err)
+		assert.Equal(t, 6, n)
+		assert.Equal(t, data[offset:offset+6], buf)
+	})
+
+	t.Run("Discard", func(t *testing.T) {
+		r := struct {
+			io.Reader
+		}{Reader: bytes.NewReader(data)}
+		offset := int64(4)
+		size := int64(10)
+
+		res, err := seekReader(r, offset, size)
+		assert.NoError(t, err)
+
+		buf := make([]byte, 6)
+		n, err := io.ReadFull(res, buf)
+		assert.NoError(t, err)
+		assert.Equal(t, 6, n)
+		assert.Equal(t, data[offset:offset+6], buf)
+	})
+}
+
