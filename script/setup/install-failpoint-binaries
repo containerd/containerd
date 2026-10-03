@@ -21,6 +21,12 @@
 #
 set -euo pipefail
 
+# Some environments (e2e, Cirrus) run this script as root without sudo available.
+SUDO=''
+if [[ "$(id -u)" != "0" ]]; then
+    SUDO='sudo'
+fi
+
 base_dir="$(dirname "${BASH_SOURCE[0]}")"
 root_dir="$( cd "${base_dir}" && pwd )"/../..
 
@@ -28,16 +34,16 @@ cd "${root_dir}"
 
 CNI_BIN_DIR=${CNI_BIN_DIR:-"/opt/cni/bin"}
 make bin/cni-bridge-fp
-sudo install bin/cni-bridge-fp "${CNI_BIN_DIR}"
+${SUDO} install bin/cni-bridge-fp "${CNI_BIN_DIR}"
 
 SHIM_BIN_DIR=${SHIM_BIN_DIR:-"/usr/local/bin"}
 make bin/containerd-shim-runc-fp-v1
-sudo install bin/containerd-shim-runc-fp-v1 "${SHIM_BIN_DIR}"
+${SUDO} install bin/containerd-shim-runc-fp-v1 "${SHIM_BIN_DIR}"
 
 RUNCFP_BIN_DIR=${RUNCFP_BIN_DIR:-"/usr/local/bin"}
 make bin/runc-fp
-sudo install bin/runc-fp "${RUNCFP_BIN_DIR}"
+${SUDO} install bin/runc-fp "${RUNCFP_BIN_DIR}"
 
 LOOPBACKV2_BIN_DIR=${LOOPBACKV2_BIN_DIR:-"/usr/local/bin"}
 make bin/loopback-v2
-sudo install bin/loopback-v2 "${LOOPBACKV2_BIN_DIR}"
+${SUDO} install bin/loopback-v2 "${LOOPBACKV2_BIN_DIR}"
