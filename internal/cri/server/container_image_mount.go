@@ -25,11 +25,10 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierrors "k8s.io/cri-api/pkg/errors"
 )
@@ -39,7 +38,7 @@ func (c *criService) mutateMounts(
 	extraMounts []*runtime.Mount,
 	snapshotter string,
 	sandboxID string,
-	platform imagespec.Platform,
+	runtimeHandler string,
 ) error {
 	if err := c.ensureLeaseExist(ctx, sandboxID); err != nil {
 		return fmt.Errorf("failed to ensure lease %v for sandbox: %w", sandboxID, err)
@@ -47,7 +46,7 @@ func (c *criService) mutateMounts(
 
 	ctx = leases.WithLease(ctx, sandboxID)
 	for _, m := range extraMounts {
-		err := c.mutateImageMount(ctx, m, snapshotter, sandboxID, platform)
+		err := c.mutateImageMount(ctx, m, snapshotter, sandboxID, runtimeHandler)
 		if err != nil {
 			return fmt.Errorf("%w: %w", crierrors.ErrImageVolumeMountFailed, err)
 		}
@@ -71,7 +70,7 @@ func (c *criService) mutateImageMount(
 	extraMount *runtime.Mount,
 	snapshotter string,
 	sandboxID string,
-	platform imagespec.Platform,
+	runtimeHandler string,
 ) error {
 	imageSpec := extraMount.GetImage()
 	if imageSpec == nil {
@@ -88,7 +87,10 @@ func (c *criService) mutateImageMount(
 	if ref == "" {
 		return fmt.Errorf("image not specified in: %+v", imageSpec)
 	}
-	image, err := c.LocalResolve(ref)
+	// Like the image of the container, an image volume was pulled for the
+	// platform of the runtime handler of the sandbox, which is not the
+	// platform the sandbox reports when the handler sets a foreign one.
+	image, platform, err := c.resolveImageForHandler(ctx, ref, runtimeHandler)
 	if err != nil {
 		return fmt.Errorf("failed to resolve image %q: %w", ref, err)
 	}
@@ -116,7 +118,7 @@ func (c *criService) mutateImageMount(
 			return fmt.Errorf("failed to get image volume ref %q: %w", ref, err)
 		}
 
-		i := containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform))
+		i := containerd.NewImageWithPlatform(c.client, img, util.PlatformMatcher(platform))
 		if err := i.Unpack(ctx, snapshotter); err != nil {
 			return fmt.Errorf("failed to unpack image volume: %w", err)
 		}

@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/core/leases"
@@ -422,7 +423,8 @@ func (c *criService) ensurePauseImageExists(ctx context.Context, config *runtime
 		ref = img
 	}
 
-	_, err := c.ImageService.LocalResolve(ref)
+	// The sandbox image is pinned and always runs on the platform of the node.
+	_, err := c.ImageService.LocalResolve(ref, imagespec.Platform{})
 	if err == nil {
 		return nil
 	} else if !errdefs.IsNotFound(err) {
