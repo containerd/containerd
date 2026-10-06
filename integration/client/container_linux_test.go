@@ -1086,6 +1086,80 @@ func TestContainerKillAll(t *testing.T) {
 	}
 }
 
+// TestContainerKillAllManyInSameShim stops many containers that share a
+// shim and the host PID namespace at once. Each init exit triggers a
+// `runc kill --all`, which must not stall exit processing in the shim.
+// See https://github.com/containerd/containerd/issues/14292
+func TestContainerKillAllManyInSameShim(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const count = 40
+	statusCs := make([]<-chan ExitStatus, count)
+	tasks := make([]Task, count)
+	for i := range count {
+		id := fmt.Sprintf("%s-%d", t.Name(), i)
+		container, err := client.NewContainer(ctx, id,
+			WithNewSnapshot(id, image),
+			WithNewSpec(oci.WithImageConfig(image),
+				withProcessArgs("sleep", "inf"),
+				oci.WithHostNamespace(specs.PIDNamespace),
+				oci.WithAnnotations(map[string]string{"io.containerd.runc.v2.group": t.Name()}),
+			),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer container.Delete(ctx, WithSnapshotCleanup)
+
+		task, err := container.NewTask(ctx, cio.NullIO)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer task.Delete(ctx, WithProcessKill)
+
+		if statusCs[i], err = task.Wait(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := task.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		tasks[i] = task
+	}
+
+	var wg sync.WaitGroup
+	for _, task := range tasks {
+		wg.Go(func() {
+			if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+
+	timeout := time.After(20 * time.Second)
+	for i, statusC := range statusCs {
+		select {
+		case <-statusC:
+		case <-timeout:
+			t.Fatalf("timed out waiting for task %d to exit", i)
+		}
+	}
+}
+
 func TestDaemonRestartWithRunningShim(t *testing.T) {
 	client, err := newClient(t, address)
 	if err != nil {
