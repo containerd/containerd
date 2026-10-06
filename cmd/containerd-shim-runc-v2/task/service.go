@@ -722,12 +722,27 @@ func (s *service) send(evt any) {
 func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Init) {
 	// kill all running container processes
 	if runc.ShouldKillAllOnExit(s.context, c.Bundle) {
-		if err := p.KillAll(s.context); err != nil {
-			log.G(s.context).WithError(err).WithField("id", p.ID()).
-				Error("failed to kill init's children")
-		}
+		// KillAll runs `runc kill --all` and waits for the reaper to deliver
+		// its exit. It must not run on the processExits goroutine: while it is
+		// blocked, s.ec is not drained, and once s.ec is full the reaper stalls
+		// for up to 1s per pending exit before it can deliver the exit KillAll
+		// is waiting for. With many containers exiting at once (e.g. a pod
+		// with a shared PID namespace) this adds up to minutes.
+		go func() {
+			if err := p.KillAll(s.context); err != nil {
+				log.G(s.context).WithError(err).WithField("id", p.ID()).
+					Error("failed to kill init's children")
+			}
+			s.publishInitExit(e, c, p)
+		}()
+		return
 	}
+	s.publishInitExit(e, c, p)
+}
 
+// publishInitExit publishes the init exit once all of the container's running
+// execs have exited.
+func (s *service) publishInitExit(e runcC.Exit, c *runc.Container, p *process.Init) {
 	s.lifecycleMu.Lock()
 	numRunningExecs := s.runningExecs[c]
 	if numRunningExecs == 0 {
