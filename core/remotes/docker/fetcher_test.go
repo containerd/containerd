@@ -34,7 +34,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -403,106 +402,51 @@ func TestFetcherOpenParallel(t *testing.T) {
 }
 
 func TestFetcherOpenParallel_CloseAfterCopyError(t *testing.T) {
-	size := int64(10 * 1024 * 1024)
-	content := make([]byte, size)
-	rr, err := rand.New(rand.NewSource(1)).Read(content)
-	require.NoError(t, err)
-	require.Equal(t, int(size), rr)
-
-	type errWriter struct {
-		max int64
-		n   int64
-	}
-
-	ew := &errWriter{max: 1024}
-	ewWrite := func(p []byte) (int, error) {
-		n := len(p)
-		ew.n += int64(n)
-		if ew.n >= ew.max {
-			return 0, errors.New("simulated write failure after limit reached")
-		}
-		return n, nil
-	}
-
-	// simulate Close should not wait for download to complete after write error
-	unblockOnce := sync.Once{}
+	// The server blocks every chunk after the first until the test ends.
+	// Close must not wait for those downloads after a write error.
 	unblock := make(chan struct{})
-	unblockAll := func() { unblockOnce.Do(func() { close(unblock) }) }
-	defer unblockAll()
-
-	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		rng, err := parseRange(r.Header.Get("Range"), size)
-		if errors.Is(err, errNoOverlap) {
-			err = nil
-		}
-		assert.NoError(t, err)
-		if len(rng) == 0 {
-			rw.Header().Set("content-length", strconv.Itoa(len(content)))
-			_, _ = rw.Write(content)
-			return
-		}
-		if rng[0].start > 0 {
+	t.Cleanup(func() { close(unblock) })
+	s := newWindowServer(t, 10, func(r *http.Request, rng []httpRange) bool {
+		if len(rng) > 0 && rng[0].start > 0 {
 			select {
 			case <-r.Context().Done():
-				return
+				return false
 			case <-unblock:
 			}
 		}
-		b := content[rng[0].start : rng[0].start+rng[0].length]
-		rw.Header().Set("content-range", rng[0].contentRange(size))
-		rw.Header().Set("content-length", strconv.Itoa(len(b)))
-		_, err = rw.Write(b)
-		t.Logf("wrote range %s, err=%v", rng[0].contentRange(size), err)
-	}))
-	defer s.Close()
+		return true
+	})
 
 	u, err := url.Parse(s.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	f := dockerFetcher{
-		&dockerBase{
-			repository: "nonempty",
-			limiter:    semaphore.NewWeighted(4),
-			performances: transfer.ImageResolverPerformanceSettings{
-				MaxConcurrentDownloads:     4,
-				ConcurrentLayerFetchBuffer: 1 * 1024 * 1024,
-			},
+	require.NoError(t, err)
+	f := dockerFetcher{&dockerBase{
+		repository: "nonempty",
+		limiter:    semaphore.NewWeighted(4),
+		performances: transfer.ImageResolverPerformanceSettings{
+			MaxConcurrentDownloads:     4,
+			ConcurrentLayerFetchBuffer: windowChunkSize,
 		},
-	}
-
+	}}
 	host := RegistryHost{
 		Client: s.Client(),
 		Host:   u.Host,
 		Scheme: u.Scheme,
 		Path:   u.Path,
 	}
-
-	req := f.request(host, http.MethodGet)
-	rc, _, err := f.open(context.Background(), req, "", 0, true)
+	rc, _, err := f.open(context.Background(), f.request(host, http.MethodGet), "", 0, true)
 	require.NoError(t, err, "failed to open reader")
 
-	_, copyErr := io.Copy(writeFunc(ewWrite), rc)
-	require.NotNil(t, copyErr, "expected write error during copy")
-
-	closeDone := make(chan error, 1)
-	go func() {
-		closeDone <- rc.Close()
-	}()
-
-	timer := time.NewTimer(10 * time.Second)
-	defer timer.Stop()
-	select {
-	case err := <-closeDone:
-		if err != nil {
-			t.Errorf("close error: %v", err)
+	var written int64
+	_, copyErr := io.Copy(writeFunc(func(p []byte) (int, error) {
+		written += int64(len(p))
+		if written >= 1024 {
+			return 0, errors.New("simulated write failure after limit reached")
 		}
-	case <-timer.C:
-		t.Errorf("close blocked after write error")
-		unblockAll()
-		<-closeDone
-	}
+		return len(p), nil
+	}), rc)
+	require.Error(t, copyErr, "expected write error during copy")
+
+	require.NoError(t, returnsWithin(t, "close", rc.Close))
 }
 
 func TestFetcherDescURLsDoesNotForwardResolverHeaders(t *testing.T) {
@@ -1123,4 +1067,193 @@ func parseRange(s string, size int64) ([]httpRange, error) {
 		return nil, errNoOverlap
 	}
 	return ranges, nil
+}
+
+// windowChunkSize is the chunk size the window tests use. The bound under test
+// does not depend on it.
+const windowChunkSize = 1024 * 1024 // 1 MiB
+
+// windowTestTimeout bounds every wait in the window tests.
+const windowTestTimeout = 10 * time.Second
+
+// windowServer serves random content with range support and counts the
+// responses it has fully written.
+type windowServer struct {
+	*httptest.Server
+	content []byte
+	served  atomic.Int64
+}
+
+// newWindowServer serves numChunks chunks of windowChunkSize. The handler calls
+// onRequest, if set, with the request and the requested range (empty when
+// none) before responding and fails the request when it returns false.
+func newWindowServer(t *testing.T, numChunks int, onRequest func(r *http.Request, rng []httpRange) bool) *windowServer {
+	ws := &windowServer{content: make([]byte, numChunks*windowChunkSize)}
+	rand.New(rand.NewSource(1)).Read(ws.content)
+	size := int64(len(ws.content))
+	ws.Server = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		defer ws.served.Add(1)
+		rng, err := parseRange(r.Header.Get("Range"), size)
+		if errors.Is(err, errNoOverlap) {
+			err = nil
+		}
+		assert.NoError(t, err)
+		if onRequest != nil && !onRequest(r, rng) {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if len(rng) == 0 {
+			rw.Header().Set("content-length", strconv.Itoa(len(ws.content)))
+			_, _ = rw.Write(ws.content)
+			return
+		}
+		b := ws.content[rng[0].start : rng[0].start+rng[0].length]
+		rw.Header().Set("content-range", rng[0].contentRange(size))
+		rw.Header().Set("content-length", strconv.Itoa(len(b)))
+		_, _ = rw.Write(b)
+	}))
+	t.Cleanup(ws.Close)
+	return ws
+}
+
+// openWindowed opens the server's content through a fetcher with the given
+// parallelism and no download limiter. Only the chunk window can then bound
+// the number of requests.
+func openWindowed(t *testing.T, ctx context.Context, s *windowServer, parallelism int) io.ReadCloser {
+	t.Helper()
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+	f := dockerFetcher{&dockerBase{
+		repository: "nonempty",
+		performances: transfer.ImageResolverPerformanceSettings{
+			MaxConcurrentDownloads:     parallelism,
+			ConcurrentLayerFetchBuffer: windowChunkSize,
+		},
+	}}
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+	rc, _, err := f.open(ctx, f.request(host, http.MethodGet), "", 0, true)
+	require.NoError(t, err)
+	// Close is idempotent. Bounding it here fails the test on a hung Close
+	// even when an earlier assertion failed first.
+	t.Cleanup(func() { _ = returnsWithin(t, "close", rc.Close) })
+	return rc
+}
+
+// returnsWithin runs fn and fails the test if it does not return within
+// windowTestTimeout.
+func returnsWithin(t *testing.T, what string, fn func() error) error {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() { done <- fn() }()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(windowTestTimeout):
+		t.Fatalf("%s did not return in time", what)
+		return nil
+	}
+}
+
+// waitCount waits until the counter reaches want.
+func waitCount(t *testing.T, c *atomic.Int64, want int64) {
+	t.Helper()
+	require.Eventually(t, func() bool { return c.Load() == want },
+		windowTestTimeout, time.Millisecond, "count %d not reached", want)
+}
+
+func TestFetcherOpenParallelWindow(t *testing.T) {
+	const (
+		numChunks   = 16
+		parallelism = 4
+	)
+	var started, allowed atomic.Int64
+	allowed.Store(parallelism)
+	s := newWindowServer(t, numChunks, func(*http.Request, []httpRange) bool {
+		if n := started.Add(1); n > allowed.Load() {
+			t.Errorf("request %d started with only %d chunk buffers allowed", n, allowed.Load())
+		}
+		return true
+	})
+	rc := openWindowed(t, context.Background(), s, parallelism)
+
+	// Nothing is consumed yet: the first window fills and no further request
+	// starts.
+	waitCount(t, &started, parallelism)
+
+	// Consuming one chunk admits exactly one more request. The extra byte makes
+	// the MultiReader read past the chunk's EOF, where Read closes drained.
+	got := make([]byte, len(s.content))
+	off := 0
+	for step := int64(1); step <= 2; step++ {
+		allowed.Store(parallelism + step)
+		n, err := io.ReadFull(rc, got[off:off+windowChunkSize+1])
+		require.NoError(t, err)
+		off += n
+		waitCount(t, &started, parallelism+step)
+	}
+
+	allowed.Store(numChunks)
+	_, err := io.ReadFull(rc, got[off:])
+	require.NoError(t, err)
+	n, err := rc.Read(make([]byte, 1))
+	require.Equal(t, 0, n)
+	require.ErrorIs(t, err, io.EOF)
+	require.True(t, bytes.Equal(s.content, got), "content mismatch")
+	require.NoError(t, returnsWithin(t, "close", rc.Close))
+}
+
+func TestFetcherOpenParallelWindowCloseUnblocksProducer(t *testing.T) {
+	const parallelism = 2
+	s := newWindowServer(t, 8, nil)
+	rc := openWindowed(t, context.Background(), s, parallelism)
+
+	// The test reads nothing: once the window is full the producer waits for
+	// the reader to consume chunk 0. Close must still return.
+	waitCount(t, &s.served, parallelism)
+	require.NoError(t, returnsWithin(t, "close", rc.Close))
+}
+
+func TestFetcherOpenParallelWindowCancelThenDrain(t *testing.T) {
+	const parallelism = 2
+	s := newWindowServer(t, 8, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	rc := openWindowed(t, ctx, s, parallelism)
+
+	// Let the first window download completely with nothing consumed. The
+	// producer is then waiting for the reader to consume chunk 0. Cancel the
+	// fetch in that state.
+	waitCount(t, &s.served, parallelism)
+	cancel()
+
+	// Draining must return the cancellation error when the reader reaches the
+	// first chunk no worker took.
+	err := returnsWithin(t, "drain", func() error {
+		_, err := io.ReadAll(rc)
+		return err
+	})
+	require.Error(t, err)
+	require.NoError(t, returnsWithin(t, "close", rc.Close))
+}
+
+func TestFetcherOpenParallelWindowErrorAfterAdvance(t *testing.T) {
+	const parallelism = 2
+	// The server fails every request from chunk 5 on, after the window has
+	// advanced.
+	s := newWindowServer(t, 8, func(_ *http.Request, rng []httpRange) bool {
+		return len(rng) == 0 || rng[0].start < 5*windowChunkSize
+	})
+	rc := openWindowed(t, context.Background(), s, parallelism)
+
+	err := returnsWithin(t, "drain", func() error {
+		_, err := io.ReadAll(rc)
+		return err
+	})
+	require.Error(t, err)
+	require.NoError(t, returnsWithin(t, "close", rc.Close))
 }

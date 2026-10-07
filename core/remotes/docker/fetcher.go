@@ -103,6 +103,7 @@ type pipe struct {
 	bufPool    *bufferPool   // Reusable buffers with initial capacity bufCap
 	buf        *bytes.Buffer // Active data buffer (nil when empty/returned to pool)
 	rerr, werr error         // Terminal read/write errors (sticky once set)
+	drained    chan struct{} // Closed when Read has consumed all data and returned buf to the pool
 }
 
 type pipeReader struct {
@@ -118,6 +119,7 @@ func newPipeWriter(bufPool *bufferPool) (*pipeReader, *pipeWriter) {
 		cond:    sync.NewCond(new(sync.Mutex)),
 		bufPool: bufPool,
 		buf:     nil,
+		drained: make(chan struct{}),
 	}
 	return &pipeReader{pipe: p}, &pipeWriter{pipe: p}
 }
@@ -147,6 +149,11 @@ func (r *pipeReader) Read(data []byte) (n int, err error) {
 		// Put buffer back to pool
 		r.bufPool.Put(r.buf)
 		r.buf = nil
+		select {
+		case <-r.drained:
+		default:
+			close(r.drained)
+		}
 		return n, r.rerr
 	}
 	return n, err
@@ -548,9 +555,10 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	if parallelism > 1 {
 		// If we have a content length, we can use multiple requests to fetch
 		// the content in parallel. This will make download of bigger bodies
-		// faster, at the cost of parallelism more requests and max
-		// ~(max_parallelism * goroutine footprint) memory usage. The goroutine
-		// footprint should be: the goroutine stack + pipe buffer size
+		// faster, at the cost of more requests. The producer sends chunk i to
+		// a worker only after the reader has consumed chunk i-parallelism. A
+		// layer therefore holds at most parallelism chunk buffers of chunkSize
+		// each.
 		numChunks := remaining / chunkSize
 		if numChunks*chunkSize < remaining {
 			numChunks++
@@ -560,7 +568,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		}
 
 		// Prepare channels, buffer pool, and readers/writers for parallel fetching.
-		queue := make(chan int64, parallelism)
+		// A send on the unbuffered queue completes only when a worker takes
+		// the chunk.
+		queue := make(chan int64)
 		ctx, cancel := context.WithCancel(ctx)
 		eg, ctx := errgroup.WithContext(ctx)
 		readers, writers := make([]io.Reader, numChunks), make([]*pipeWriter, numChunks)
@@ -572,14 +582,33 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		ibody := body
 		eg.Go(func() error {
 			defer close(queue)
+			// A reader of an empty pipe blocks in Read until the pipe's writer
+			// is closed. A worker closes the writer of every chunk it takes.
+			// abort closes the writers of any unclaimed chunk.
+			abort := func(from int64) error {
+				err := ctx.Err()
+				for j := from; j < numChunks; j++ {
+					_ = writers[j].CloseWithError(err)
+				}
+				return err
+			}
 			for i := range numChunks {
+				if i >= parallelism {
+					// Wait until the reader has consumed chunk i-parallelism
+					// before sending chunk i.
+					select {
+					case <-writers[i-parallelism].drained:
+					case <-ctx.Done():
+						return abort(i)
+					}
+				}
 				select {
 				case queue <- i:
 				case <-ctx.Done():
 					if i == 0 {
 						ibody.Close()
 					}
-					return ctx.Err()
+					return abort(i)
 				}
 			}
 			return nil
