@@ -96,7 +96,7 @@ func init() {
 
 			options := &images.CRIImageServiceOptions{
 				Content:          mdb.ContentStore(),
-				RuntimePlatforms: map[string]images.ImagePlatform{},
+				RuntimePlatforms: map[string]*images.ImagePlatform{},
 				Snapshotters:     map[string]snapshots.Snapshotter{},
 				ImageFSPaths:     map[string]string{},
 				Transferrer:      ts.(transfer.Transferrer),
@@ -156,7 +156,7 @@ func init() {
 					platform = p
 				}
 
-				options.RuntimePlatforms[runtimeName] = images.ImagePlatform{
+				options.RuntimePlatforms[runtimeName] = &images.ImagePlatform{
 					Snapshotter: snapshotter,
 					Platform:    platform,
 				}
