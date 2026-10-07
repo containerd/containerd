@@ -40,7 +40,7 @@ const (
 func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 	service := &CRIImageService{
 		config:           testImageConfig,
-		runtimePlatforms: map[string]ImagePlatform{},
+		runtimePlatforms: map[string]*ImagePlatform{},
 		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
 		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
 		snapshotStore:    snapshotstore.NewStore(),

@@ -115,7 +115,7 @@ type ImageService interface {
 
 	Config() criconfig.ImageConfig
 
-	UpdateRuntimeSnapshotter(runtimeName string, imagePlatform images.ImagePlatform)
+	UpdateRuntime(runtimeName string, imagePlatform *images.ImagePlatform)
 }
 
 // criService implements CRIService.
