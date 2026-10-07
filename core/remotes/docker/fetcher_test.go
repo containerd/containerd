@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -396,6 +397,221 @@ func TestFetcherOpenParallel_CloseAfterCopyError(t *testing.T) {
 		unblockAll()
 		<-closeDone
 	}
+}
+
+func TestFetcherOpenParallel_LargeContentLength(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "application/octet-stream")
+		rw.Header().Set("Content-Length", strconv.FormatInt(math.MaxInt64, 10))
+		rw.Header().Set("Content-Range", fmt.Sprintf("bytes 0-%d/%d", math.MaxInt64-1, math.MaxInt64))
+		rw.Header().Set("Connection", "close")
+		rw.WriteHeader(http.StatusPartialContent)
+		_, _ = rw.Write([]byte("C"))
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+
+	f := dockerFetcher{
+		&dockerBase{
+			repository: "nonempty",
+			limiter:    semaphore.NewWeighted(3),
+			performances: transfer.ImageResolverPerformanceSettings{
+				MaxConcurrentDownloads:     3,
+				ConcurrentLayerFetchBuffer: 512,
+			},
+		},
+	}
+
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
+	req := f.request(host, http.MethodGet)
+	rc, _, err := f.open(context.Background(), req, "", 0, true)
+	require.NoError(t, err)
+	defer rc.Close()
+
+	_, err = io.ReadAll(rc)
+	assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+}
+
+func TestFetcherOpenParallel_WindowAdvances(t *testing.T) {
+	const (
+		chunkSize   = 512
+		parallelism = 2
+		numChunks   = 6
+		size        = chunkSize * numChunks
+	)
+	content := make([]byte, size)
+	_, err := rand.New(rand.NewSource(1)).Read(content)
+	require.NoError(t, err)
+
+	// chunkReqCh stores the chunk indices of served content so the test can
+	// observe when each chunk is requested.
+	chunkReqCh := make(chan int64, numChunks)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rng, err := parseRange(r.Header.Get("Range"), size)
+		assert.NoError(t, err)
+		require.Len(t, rng, 1)
+
+		// Slice the requested byte range from content and write it back as a
+		// 206 Partial Content response.
+		b := content[rng[0].start : rng[0].start+rng[0].length]
+		rw.Header().Set("Content-Range", rng[0].contentRange(size))
+		rw.Header().Set("Content-Length", strconv.Itoa(len(b)))
+		rw.WriteHeader(http.StatusPartialContent)
+		_, _ = rw.Write(b)
+
+		// Convert the byte offset of the range start into its chunk index.
+		chunkReqCh <- rng[0].start / chunkSize
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+
+	f := dockerFetcher{
+		&dockerBase{
+			repository: "nonempty",
+			limiter:    semaphore.NewWeighted(parallelism),
+			performances: transfer.ImageResolverPerformanceSettings{
+				MaxConcurrentDownloads:     parallelism,
+				ConcurrentLayerFetchBuffer: chunkSize,
+			},
+		},
+	}
+
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
+	req := f.request(host, http.MethodGet)
+	fetchedReader, _, err := f.open(context.Background(), req, "", 0, true)
+	require.NoError(t, err)
+	defer fetchedReader.Close()
+
+	// Chunks 0 and 1 fill the initial window of size 2.
+	assert.Equal(t, int64(0), <-chunkReqCh)
+	assert.Equal(t, int64(1), <-chunkReqCh)
+	assert.Empty(t, chunkReqCh)
+
+	// Read one full chunk (chunk 0) from fetchedReader.
+	got := make([]byte, size)
+	n, err := io.ReadFull(fetchedReader, got[:chunkSize])
+	require.NoError(t, err)
+	assert.Equal(t, chunkSize, n)
+	assert.Equal(t, content[:chunkSize], got[:chunkSize])
+	// io.ReadFull stops once got[:chunkSize] is filled and does not read past
+	// the end of chunk 0. pipeReader returns io.EOF on the first Read after
+	// its buffer is emptied; chunkReader has not observed io.EOF on chunk 0 or
+	// released its slot yet.
+	assert.Empty(t, chunkReqCh)
+
+	// Each subsequent io.ReadFull reads past the end of the previous chunk's
+	// pipe. That read hits io.EOF on the previous pipe and releases one slot
+	// so the dispatcher requests the next chunk.
+	for chunkIdx := int64(1); chunkIdx < numChunks; chunkIdx++ {
+		n, err = io.ReadFull(fetchedReader, got[chunkIdx*chunkSize:(chunkIdx+1)*chunkSize])
+		require.NoError(t, err)
+		assert.Equal(t, chunkSize, n)
+		if chunkIdx+1 < numChunks {
+			assert.Equal(t, chunkIdx+1, <-chunkReqCh)
+			assert.Empty(t, chunkReqCh)
+		}
+	}
+
+	n, err = fetchedReader.Read(make([]byte, 1))
+	assert.Equal(t, 0, n)
+	assert.ErrorIs(t, err, io.EOF)
+	assert.Equal(t, content, got)
+}
+
+func TestFetcherOpenParallel_CancelWaitingForSlot(t *testing.T) {
+	const (
+		chunkSize   = 512
+		parallelism = 2
+		numChunks   = 4
+		size        = chunkSize * numChunks
+	)
+	content := bytes.Repeat([]byte("A"), size)
+
+	chunk1Served := make(chan struct{})
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rng, err := parseRange(r.Header.Get("Range"), size)
+		assert.NoError(t, err)
+		require.Len(t, rng, 1)
+
+		b := content[rng[0].start : rng[0].start+rng[0].length]
+		rw.Header().Set("Content-Range", rng[0].contentRange(size))
+		rw.Header().Set("Content-Length", strconv.Itoa(len(b)))
+		rw.WriteHeader(http.StatusPartialContent)
+		_, _ = rw.Write(b)
+
+		if rng[0].start == chunkSize {
+			close(chunk1Served)
+		}
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+
+	limiter := semaphore.NewWeighted(1)
+	f := dockerFetcher{
+		&dockerBase{
+			repository: "nonempty",
+			limiter:    limiter,
+			performances: transfer.ImageResolverPerformanceSettings{
+				MaxConcurrentDownloads:     parallelism,
+				ConcurrentLayerFetchBuffer: chunkSize,
+			},
+		},
+	}
+
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	req := f.request(host, http.MethodGet)
+	fetchedReader, _, err := f.open(ctx, req, "", 0, true)
+	require.NoError(t, err)
+	defer fetchedReader.Close()
+
+	// Read exactly chunkSize bytes of chunk 0. Because we have not read past
+	// chunkSize, pipe 0 has not returned io.EOF yet and both slots remain
+	// occupied while chunk 1 buffers.
+	buf := make([]byte, chunkSize)
+	n, err := io.ReadFull(fetchedReader, buf)
+	require.NoError(t, err)
+	assert.Equal(t, chunkSize, n)
+
+	<-chunk1Served
+	// Worker 1 acquires the single limiter token before requesting chunk 1 and
+	// releases it via defer after closing pipe 1. Acquiring and holding that
+	// token here waits until chunk 1 is completely buffered in pipe 1 and
+	// prevents any worker from starting chunk 2.
+	require.NoError(t, limiter.Acquire(context.Background(), 1))
+
+	// Cancel while the dispatcher is blocked waiting for a slot for chunk 2.
+	cancel()
+
+	rest, err := io.ReadAll(fetchedReader)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, content[chunkSize:2*chunkSize], rest)
 }
 
 func TestFetcherDescURLsDoesNotForwardResolverHeaders(t *testing.T) {
