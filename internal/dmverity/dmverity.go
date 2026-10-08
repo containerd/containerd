@@ -65,7 +65,7 @@ func MetadataPath(layerBlobPath string) string {
 }
 
 func DevicePath(name string) string {
-	return fmt.Sprintf("/dev/mapper/%s", name)
+	return "/dev/mapper/" + name
 }
 
 type DmverityMetadata struct {

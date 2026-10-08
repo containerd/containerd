@@ -103,7 +103,7 @@ func command(ctx context.Context, config *commandConfig) (*exec.Cmd, error) {
 	cmd.Env = append(
 		os.Environ(),
 		"GOMAXPROCS=2",
-		fmt.Sprintf("%s=2", maxVersionEnv),
+		maxVersionEnv+"=2",
 		// TODO: Remove in a future release in favor of Bootstrap protocol.
 		fmt.Sprintf("%s=%s", ttrpcAddressEnv, config.TTRPCAddress),
 		fmt.Sprintf("%s=%s", grpcAddressEnv, config.GRPCAddress),

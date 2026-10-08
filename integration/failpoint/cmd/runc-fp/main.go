@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -99,7 +100,7 @@ func failpointProfileFromOCIAnnotation() (invokerInterceptor, error) {
 
 	profileName, ok := spec.Annotations[failpointProfileKey]
 	if !ok {
-		return nil, fmt.Errorf("failpoint profile is required")
+		return nil, errors.New("failpoint profile is required")
 	}
 
 	fp, ok := failpointProfiles[profileName]

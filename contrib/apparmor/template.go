@@ -52,6 +52,10 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 {{end}}
 
   network,
+  # Disallow AF_ALG (Linux kernel crypto API); see https://copy.fail/
+  deny network alg,
+  # Disallow AF_VSOCK to prevent host/guest communication.
+  deny network vsock,
   capability,
   file,
   umount,

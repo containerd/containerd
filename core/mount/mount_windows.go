@@ -249,7 +249,7 @@ func GetCimPath(m *Mount) (string, error) {
 	}
 	cimPath, found := getOptionByPrefix(m, LayerCimPathFlag)
 	if !found {
-		return "", fmt.Errorf("cim path not found")
+		return "", errors.New("cim path not found")
 	}
 	return cimPath, nil
 

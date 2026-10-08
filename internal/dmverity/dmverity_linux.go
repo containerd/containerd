@@ -18,7 +18,9 @@ package dmverity
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
@@ -34,7 +36,7 @@ import (
 func IsSupported() (bool, error) {
 	if _, err := os.Stat("/sys/module/dm_verity"); err != nil {
 		if os.IsNotExist(err) {
-			return false, fmt.Errorf("dm_verity module not loaded or built-in")
+			return false, errors.New("dm_verity module not loaded or built-in")
 		}
 		return false, fmt.Errorf("failed to check /sys/module/dm_verity: %w", err)
 	}
@@ -114,7 +116,7 @@ func Format(dataDevice, hashDevice string, opts *DmverityOptions) (string, error
 		return "", fmt.Errorf("failed to format dm-verity device: %w", err)
 	}
 
-	return fmt.Sprintf("%x", rootDigest), nil
+	return hex.EncodeToString(rootDigest), nil
 }
 
 // FormatLayer appends a dm-verity hash tree to the erofs layer blob at
@@ -236,7 +238,7 @@ func FormatLayer(ctx context.Context, layerBlobPath string, opts *DmverityOption
 //     supplied programmatically since there's no superblock to read from.
 func Open(dataDevice string, name string, hashDevice string, rootHash string, hashOffset uint64, opts *DmverityOptions) (string, error) {
 	if rootHash == "" {
-		return "", fmt.Errorf("rootHash cannot be empty")
+		return "", errors.New("rootHash cannot be empty")
 	}
 
 	rootDigest, err := utils.ParseRootHash(rootHash)

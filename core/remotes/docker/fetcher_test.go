@@ -30,6 +30,8 @@ import (
 	"net/http/httptest"
 	"net/textproto"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,18 +40,123 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/pkg/reference"
+	"github.com/containerd/containerd/v2/plugins/content/local"
 )
 
 type writeFunc func(p []byte) (int, error)
 
 func (f writeFunc) Write(p []byte) (int, error) { return f(p) }
+
+func TestHTTPReadSeekerClosesBodyAtEOF(t *testing.T) {
+	payload := []byte("layer content")
+	path := filepath.Join(t.TempDir(), "body")
+	require.NoError(t, os.WriteFile(path, payload, 0600))
+	var bodies []*os.File
+	rc, err := newHTTPReadSeeker(int64(len(payload)), func(offset int64) (io.ReadCloser, error) {
+		body, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := body.Seek(offset, io.SeekStart); err != nil {
+			body.Close()
+			return nil, err
+		}
+		bodies = append(bodies, body)
+		return body, nil
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	for i := range 2 {
+		data, err := io.ReadAll(rc)
+		require.NoError(t, err)
+		require.Equal(t, payload, data)
+		require.Len(t, bodies, i+1)
+		// The HTTP body must be closed before the caller commits its writer,
+		// without closing the seekable reader needed for a possible reset.
+		_, err = bodies[i].Read(make([]byte, 1))
+		require.ErrorIs(t, err, os.ErrClosed)
+		_, err = rc.(io.Seeker).Seek(0, io.SeekStart)
+		require.NoError(t, err)
+	}
+}
+
+func TestFetchClosesHTTPBodyBeforeCommit(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	payload := []byte("layer content")
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes(payload),
+		Size:      int64(len(payload)),
+	}
+	registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		w.Write(payload)
+	}))
+	defer registry.Close()
+	var closed atomic.Int32
+	client := registry.Client()
+	transport := client.Transport
+	client.Transport = rtFunc(func(r *http.Request) (*http.Response, error) {
+		resp, err := transport.RoundTrip(r)
+		if err == nil {
+			resp.Body = &fnOnClose{
+				ReadCloser:  resp.Body,
+				BeforeClose: func() { closed.Add(1) },
+			}
+		}
+		return resp, err
+	})
+	resolver := NewResolver(ResolverOptions{Client: client, PlainHTTP: true})
+	fetcher, err := resolver.Fetcher(ctx, strings.TrimPrefix(registry.URL, "http://")+"/image:latest")
+	require.NoError(t, err)
+	store, err := local.NewStore(t.TempDir())
+	require.NoError(t, err)
+	committed := false
+	ingester := beforeCommitIngester{Ingester: store, beforeCommit: func() {
+		// Even if Commit blocks, CRI must no longer count this HTTP request
+		// as active. Check before Fetch's deferred reader.Close can run.
+		require.EqualValues(t, 1, closed.Load())
+		committed = true
+	}}
+	require.NoError(t, remotes.Fetch(ctx, ingester, fetcher, desc))
+	require.True(t, committed)
+	require.EqualValues(t, 1, closed.Load())
+}
+
+type beforeCommitIngester struct {
+	content.Ingester
+	beforeCommit func()
+}
+
+func (i beforeCommitIngester) Writer(ctx context.Context, opts ...content.WriterOpt) (content.Writer, error) {
+	w, err := i.Ingester.Writer(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return beforeCommitWriter{Writer: w, beforeCommit: i.beforeCommit}, nil
+}
+
+type beforeCommitWriter struct {
+	content.Writer
+	beforeCommit func()
+}
+
+func (w beforeCommitWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
+	w.beforeCommit()
+	return w.Writer.Commit(ctx, size, expected, opts...)
+}
 
 func TestFetcherOpen(t *testing.T) {
 	content := make([]byte, 128)

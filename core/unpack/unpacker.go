@@ -114,7 +114,7 @@ func WithUnpackPlatform(u Platform) UnpackerOpt {
 			u.Platform = platforms.All
 		}
 		if u.Snapshotter == nil {
-			return fmt.Errorf("snapshotter must be provided to unpack")
+			return errors.New("snapshotter must be provided to unpack")
 		}
 		if u.SnapshotterKey == "" {
 			if s, ok := u.Snapshotter.(fmt.Stringer); ok {
@@ -124,7 +124,7 @@ func WithUnpackPlatform(u Platform) UnpackerOpt {
 			}
 		}
 		if u.Applier == nil {
-			return fmt.Errorf("applier must be provided to unpack")
+			return errors.New("applier must be provided to unpack")
 		}
 
 		c.platforms = append(c.platforms, &u)
@@ -352,6 +352,20 @@ type unpackStatus struct {
 	startAt time.Time
 }
 
+// layerSnapshotLabels filters out containerd.io/snapshot/uidmapping and
+// .../gidmapping annotations from the (untrusted) image manifest to prevent
+// snapshotters from incorrectly chowning the extracted layer to the supplied
+// mapped host uid/gid.
+func layerSnapshotLabels(annotations map[string]string) map[string]string {
+	labels := snapshots.FilterInheritedLabels(annotations)
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	delete(labels, snapshots.LabelSnapshotUIDMapping)
+	delete(labels, snapshots.LabelSnapshotGIDMapping)
+	return labels
+}
+
 func (u *Unpacker) unpack(
 	h images.Handler,
 	config ocispec.Descriptor,
@@ -470,11 +484,8 @@ func (u *Unpacker) unpack(
 			}
 		}()
 
-		// inherits annotations which are provided as snapshot labels.
-		snapshotLabels := snapshots.FilterInheritedLabels(desc.Annotations)
-		if snapshotLabels == nil {
-			snapshotLabels = make(map[string]string)
-		}
+		// inherits a filtered set of annotations which are provided as snapshot labels
+		snapshotLabels := layerSnapshotLabels(desc.Annotations)
 		snapshotLabels[snapshots.LabelSnapshotRef] = chainID
 		snapshotLabels[snapshots.LabelSnapshotDiffID] = diffIDs[i].String()
 		if i > 0 {
@@ -659,7 +670,7 @@ func (u *Unpacker) unpack(
 			err = s.err
 		} else if prevErrs != nil {
 			s.bottomF(true)
-			err = fmt.Errorf("aborted")
+			err = errors.New("aborted")
 		} else {
 			err = s.bottomF(false)
 		}
@@ -745,10 +756,10 @@ func (u *Unpacker) unpack(
 	cinfo := content.Info{
 		Digest: config.Digest,
 		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", unpack.SnapshotterKey): chainID,
+			"containerd.io/gc.ref.snapshot." + unpack.SnapshotterKey: chainID,
 		},
 	}
-	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", unpack.SnapshotterKey))
+	_, err = cs.Update(ctx, cinfo, "labels.containerd.io/gc.ref.snapshot."+unpack.SnapshotterKey)
 	if err != nil {
 		return err
 	}

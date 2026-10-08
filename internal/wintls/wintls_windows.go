@@ -23,6 +23,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 
@@ -94,7 +95,7 @@ func SetupTLSFromWindowsCertStore(ctx context.Context, commonName string) (*tls.
 	if key == nil {
 		certtostore.FreeCertContext(certContext)
 		store.Close()
-		return nil, nil, nil, fmt.Errorf("retrieved private key is nil")
+		return nil, nil, nil, errors.New("retrieved private key is nil")
 	}
 
 	// Convert the x509 certificate chain to a CertPool and chain bytes

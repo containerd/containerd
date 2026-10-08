@@ -389,11 +389,11 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	cinfo := content.Info{
 		Digest: desc.Digest,
 		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", snapshotterName): rootFS,
+			"containerd.io/gc.ref.snapshot." + snapshotterName: rootFS,
 		},
 	}
 
-	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", snapshotterName))
+	_, err = cs.Update(ctx, cinfo, "labels.containerd.io/gc.ref.snapshot."+snapshotterName)
 	return err
 }
 

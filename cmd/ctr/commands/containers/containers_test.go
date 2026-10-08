@@ -117,3 +117,35 @@ func TestContainersCommandHierarchyFlagParsing(t *testing.T) {
 	}
 	assert.Equal(t, wantEnvs, capturedEnvs)
 }
+
+func TestContainersCreateCommandProcessArgsWithFlags(t *testing.T) {
+	cmd := *createCommand
+	var (
+		capturedRef  string
+		capturedID   string
+		capturedArgs []string
+	)
+
+	cmd.Action = func(ctx context.Context, c *cli.Command) error {
+		capturedRef = c.Args().First()
+		capturedID = c.Args().Get(1)
+		capturedArgs = c.Args().Slice()[2:]
+		return nil
+	}
+
+	args := []string{
+		"create",
+		"docker.io/library/busybox:latest",
+		"test-container",
+		"sh",
+		"-uexc",
+		"echo hello",
+	}
+
+	err := cmd.Run(context.Background(), args)
+	require.NoError(t, err)
+
+	assert.Equal(t, "docker.io/library/busybox:latest", capturedRef)
+	assert.Equal(t, "test-container", capturedID)
+	assert.Equal(t, []string{"sh", "-uexc", "echo hello"}, capturedArgs)
+}

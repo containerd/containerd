@@ -24,10 +24,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -105,7 +107,20 @@ func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddre
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(), "GOMAXPROCS=4")
-	cmd.Env = append(cmd.Env, "OTEL_SERVICE_NAME=containerd-shim-"+id)
+	// Preserve inherited resource attributes, but override the daemon's identity.
+	// The OpenTelemetry SDK uses the last value for duplicate resource keys.
+	var attrs []string
+	if inherited := strings.TrimSpace(os.Getenv("OTEL_RESOURCE_ATTRIBUTES")); inherited != "" {
+		attrs = append(attrs, inherited)
+	}
+	attrs = append(attrs,
+		"service.instance.id="+url.PathEscape(id),
+		"service.version="+url.PathEscape(version.Version),
+	)
+	cmd.Env = append(cmd.Env,
+		"OTEL_SERVICE_NAME=containerd-shim-runc-v2",
+		"OTEL_RESOURCE_ATTRIBUTES="+strings.Join(attrs, ","),
+	)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,

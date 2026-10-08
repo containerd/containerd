@@ -8,6 +8,7 @@ linters:
     - misspell
     - modernize    # Suggests modernizations to Go code; see https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/modernize
     - nolintlint
+    - perfsprint   # Checks that fmt.Sprintf can be replaced with a faster alternative.
     - revive
     - unconvert
     - usetesting
@@ -45,6 +46,8 @@ linters:
         - G122
     modernize:
       disable:
+        # see https://github.com/containerd/containerd/pull/14268#discussion_r4147027776
+        - embedlit
         # TODO(thaJeztah): enable testingcontext once github.com/AdamKorcz/go-118-fuzz-build is updated.
         # see https://github.com/containerd/containerd/pull/13022#discussion_r2937038804
         - testingcontext

@@ -153,7 +153,7 @@ func (c *criService) mutateImageMount(
 			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 		}
 
-		id := fmt.Sprintf("cri-image-mount-%s", target)
+		id := "cri-image-mount-" + target
 		activateOpts := []mount.ActivateOpt{
 			mount.WithLabels(map[string]string{
 				"containerd.io/gc.bref.snapshot." + snapshotter: target,

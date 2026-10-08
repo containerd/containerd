@@ -20,10 +20,10 @@ package dmverity
 
 import (
 	"context"
-	"fmt"
+	"errors"
 )
 
-var errUnsupported = fmt.Errorf("dmverity is only supported on Linux systems")
+var errUnsupported = errors.New("dmverity is only supported on Linux systems")
 
 func IsSupported() (bool, error) {
 	return false, errUnsupported

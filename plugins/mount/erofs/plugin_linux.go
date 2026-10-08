@@ -19,6 +19,7 @@ package erofs
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -171,7 +172,7 @@ func (h *erofsMountHandler) Mount(ctx context.Context, m mount.Mount, mp string,
 // same place, where its root hash still matches.
 func dmverityDeviceName(source, mountpoint string) string {
 	sum := sha256.Sum256([]byte(source + "\x00" + mountpoint))
-	return fmt.Sprintf("containerd-erofs-%x", sum[:16])
+	return "containerd-erofs-" + hex.EncodeToString(sum[:16])
 }
 
 // setupDmVerityDevice creates or reuses a dm-verity device for the given EROFS source.

@@ -48,7 +48,7 @@ type ErrAmbiguousPrefix struct {
 }
 
 func (e ErrAmbiguousPrefix) Error() string {
-	return fmt.Sprintf("Multiple IDs found with provided prefix: %s", e.prefix)
+	return "Multiple IDs found with provided prefix: " + e.prefix
 }
 
 // TruncIndex allows the retrieval of string identifiers by any of their unique prefixes.

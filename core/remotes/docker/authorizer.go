@@ -265,11 +265,11 @@ func (ah *authHandler) doBasicAuth(ctx context.Context) (string, string, error) 
 	username, secret := ah.common.Username, ah.common.Secret
 
 	if username == "" || secret == "" {
-		return "", "", fmt.Errorf("failed to handle basic auth because missing username or secret")
+		return "", "", errors.New("failed to handle basic auth because missing username or secret")
 	}
 
 	auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + secret))
-	return fmt.Sprintf("Basic %s", auth), "", nil
+	return "Basic " + auth, "", nil
 }
 
 func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken string, err error) {
@@ -299,7 +299,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken st
 	ah.Unlock()
 
 	defer func() {
-		token = fmt.Sprintf("Bearer %s", token)
+		token = "Bearer " + token
 		r.token, r.refreshToken, r.err, r.expirationTime = token, refreshToken, err, expirationTime
 		r.Done()
 	}()

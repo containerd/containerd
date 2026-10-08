@@ -60,51 +60,26 @@ type setupUpgradeVerifyCase func(*testing.T, int, *remote.RuntimeService, *remot
 
 // TODO: Support Windows
 func TestUpgrade(t *testing.T) {
-	for _, version := range []string{"1.7", "2.0"} {
+	for _, version := range []string{"2.3", "2.4"} {
 		t.Run(version, func(t *testing.T) {
 			previousReleaseBinDir := t.TempDir()
 			downloadPreviousLatestReleaseBinary(t, version, previousReleaseBinDir)
-			t.Run("recover", runUpgradeTestCase(version, previousReleaseBinDir, shouldRecoverAllThePodsAfterUpgrade))
-			t.Run("exec", runUpgradeTestCase(version, previousReleaseBinDir, execToExistingContainer))
-			t.Run("manipulate", runUpgradeTestCase(version, previousReleaseBinDir, shouldManipulateContainersInPodAfterUpgrade("" /* default runtime */)))
+			t.Run("recover", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverAllThePodsAfterUpgrade))
+			t.Run("exec", runUpgradeTestCase(previousReleaseBinDir, execToExistingContainer))
+			t.Run("manipulate", runUpgradeTestCase(previousReleaseBinDir, shouldManipulateContainersInPodAfterUpgrade))
 
-			t.Run("recover-images", runUpgradeTestCase(version, previousReleaseBinDir, shouldRecoverExistingImages))
-			t.Run("metrics", runUpgradeTestCase(version, previousReleaseBinDir, shouldParseMetricDataCorrectly))
+			t.Run("recover-images", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverExistingImages))
+			t.Run("metrics", runUpgradeTestCase(previousReleaseBinDir, shouldParseMetricDataCorrectly))
 
 			t.Run("kill-shim-before-delete-task",
-				runUpgradeTestCase(version, previousReleaseBinDir,
-					shouldHandleShimExitStatusAfterUpgrade(previousReleaseBinDir)))
-
-			if version == "1.7" {
-				t.Run("recover-ungroupable-shim", runUpgradeTestCaseWithExistingConfig(version,
-					previousReleaseBinDir, true, shouldManipulateContainersInPodAfterUpgrade("runcv1")))
-
-				t.Run("should-address-shim-version-mismatches",
-					runUpgradeTestCase(version, previousReleaseBinDir, shouldAdjustShimVersionDuringRestarting))
-			}
+				runUpgradeTestCase(previousReleaseBinDir,
+					shouldHandleShimExitStatusAfterUpgrade(previousReleaseBinDir, version)))
 		})
 	}
 }
 
 func runUpgradeTestCase(
-	previousVersion string,
 	previousReleaseBinDir string,
-	setupUpgradeVerifyCase func(*testing.T, int, *remote.RuntimeService, *remote.ImageService) ([]upgradeVerifyCaseFunc, beforeUpgradeHookFunc),
-) func(t *testing.T) {
-	return runUpgradeTestCaseWithExistingConfig(
-		previousVersion,
-		previousReleaseBinDir,
-		// use new empty configuration so that we could use new shim
-		// binary to cleanup resources created by old shim binary
-		false,
-		setupUpgradeVerifyCase,
-	)
-}
-
-func runUpgradeTestCaseWithExistingConfig(
-	previousVersion string,
-	previousReleaseBinDir string,
-	usingExistingConfig bool,
 	setupUpgradeVerifyCase func(*testing.T, int, *remote.RuntimeService, *remote.ImageService) ([]upgradeVerifyCaseFunc, beforeUpgradeHookFunc),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
@@ -113,14 +88,8 @@ func runUpgradeTestCaseWithExistingConfig(
 		workDir := t.TempDir()
 
 		t.Log("Install config for previous release")
-		var taskVersion int
-		if previousVersion == "1.7" {
-			oneSevenCtrdConfig(t, previousReleaseBinDir, workDir)
-			taskVersion = 2
-		} else {
-			previousReleaseCtrdConfig(t, previousReleaseBinDir, workDir)
-			taskVersion = 3
-		}
+		previousReleaseCtrdConfig(t, previousReleaseBinDir, workDir)
+		const taskVersion = 3
 
 		t.Log("Starting the previous release's containerd")
 		previousCtrdBinPath := filepath.Join(previousReleaseBinDir, "bin", "containerd")
@@ -154,10 +123,10 @@ func runUpgradeTestCaseWithExistingConfig(
 			hookFunc(t)
 		}
 
-		if !usingExistingConfig {
-			t.Log("Install default config for current release")
-			currentReleaseCtrdDefaultConfig(t, workDir)
-		}
+		// Use new empty configuration so that we could use new shim
+		// binary to cleanup resources created by old shim binary.
+		t.Log("Install default config for current release")
+		currentReleaseCtrdDefaultConfig(t, workDir)
 
 		t.Log("Starting the current release's containerd")
 		currentProc := newCtrdProc(t, "containerd", workDir, nil)
@@ -186,67 +155,6 @@ func runUpgradeTestCaseWithExistingConfig(
 			require.NoError(t, currentProc.isReady())
 		}
 	}
-}
-
-// shouldAdjustShimVersionDuringRestarting verifies that the shim manager
-// can handle shim proto version mismatches during a containerd restart.
-//
-// Steps:
-//  1. Use containerd-shim-runc-v2 from v1.7.x to set up a running pod.
-//  2. After upgrading, use the new containerd-shim-runc-v2 to create a new container in the same pod.
-//     The new shim returns bootstrap.json with version 3.
-//     The shim manager auto-downgrades the version to 2, but does not update bootstrap.json.
-//  3. Restart the containerd process; the new container should be recovered successfully.
-func shouldAdjustShimVersionDuringRestarting(t *testing.T, _ int,
-	rSvc *remote.RuntimeService, iSvc *remote.ImageService) ([]upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
-
-	var busyboxImage = images.Get(images.BusyBox)
-
-	pullImagesByCRI(t, iSvc, busyboxImage)
-
-	podCtx := newPodTCtx(t, rSvc, "running-pod", "sandbox")
-
-	cntr1 := podCtx.createContainer("running", busyboxImage,
-		criruntime.ContainerState_CONTAINER_RUNNING,
-		WithCommand("sleep", "1d"))
-
-	var cntr2 string
-
-	createNewContainerInPodFunc := func(t *testing.T, rSvc *remote.RuntimeService, _ *remote.ImageService) {
-		t.Log("Creating new container in the previous pod")
-		cntr2 = podCtx.createContainer("new-container", busyboxImage,
-			criruntime.ContainerState_CONTAINER_RUNNING,
-			WithCommand("sleep", "1d"))
-	}
-
-	shouldBeRunningFunc := func(t *testing.T, rSvc *remote.RuntimeService, _ *remote.ImageService) {
-		t.Log("Checking the running container in the previous pod")
-
-		pods, err := rSvc.ListPodSandbox(nil)
-		require.NoError(t, err)
-		require.Len(t, pods, 1)
-
-		cntrs, err := rSvc.ListContainers(&criruntime.ContainerFilter{
-			PodSandboxId: pods[0].Id,
-		})
-		require.NoError(t, err)
-		require.Len(t, cntrs, 2)
-
-		for _, cntr := range cntrs {
-			switch cntr.Id {
-			case cntr1:
-				assert.Equal(t, criruntime.ContainerState_CONTAINER_RUNNING.String(), cntr.State.String())
-			case cntr2:
-				assert.Equal(t, criruntime.ContainerState_CONTAINER_RUNNING.String(), cntr.State.String())
-			default:
-				t.Errorf("unexpected container %s in pod %s", cntr.Id, pods[0].Id)
-			}
-		}
-	}
-	return []upgradeVerifyCaseFunc{
-		createNewContainerInPodFunc,
-		shouldBeRunningFunc,
-	}, nil
 }
 
 func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, taskVersion int,
@@ -405,128 +313,127 @@ func getFileSize(t *testing.T, filePath string) int64 {
 	return st.Size()
 }
 
-func shouldManipulateContainersInPodAfterUpgrade(runtimeHandler string) setupUpgradeVerifyCase {
-	return func(t *testing.T, taskVersion int, rSvc *remote.RuntimeService, iSvc *remote.ImageService) ([]upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
-		shimConns := []shimConn{}
+func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, _ int,
+	rSvc *remote.RuntimeService, iSvc *remote.ImageService) ([]upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+	shimConns := []shimConn{}
 
-		var busyboxImage = images.Get(images.BusyBox)
+	var busyboxImage = images.Get(images.BusyBox)
 
-		pullImagesByCRI(t, iSvc, busyboxImage)
+	pullImagesByCRI(t, iSvc, busyboxImage)
 
-		podCtx := newPodTCtxWithRuntimeHandler(t, rSvc, "running-pod", "sandbox", runtimeHandler)
+	podCtx := newPodTCtx(t, rSvc, "running-pod", "sandbox")
 
-		cntr1 := podCtx.createContainer("running", busyboxImage,
+	cntr1 := podCtx.createContainer("running", busyboxImage,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sleep", "1d"))
+
+	t.Logf("Building shim connect for container %s", cntr1)
+	shimConns = append(shimConns, buildShimClientFromBundle(t, rSvc, cntr1))
+
+	cntr2 := podCtx.createContainer("created", busyboxImage,
+		criruntime.ContainerState_CONTAINER_CREATED,
+		WithCommand("sleep", "1d"))
+
+	cntr3 := podCtx.createContainer("stopped", busyboxImage,
+		criruntime.ContainerState_CONTAINER_EXITED,
+		WithCommand("sleep", "1d"))
+
+	verifyFunc := func(t *testing.T, rSvc *remote.RuntimeService, _ *remote.ImageService) {
+		// TODO(fuweid): make svc re-connect to new socket
+		podCtx.rSvc = rSvc
+
+		t.Log("Manipulating containers in the previous pod")
+
+		// For the running container, we get status and stats of it,
+		// exec and execsync in it, stop and remove it
+		checkContainerState(t, rSvc, cntr1, criruntime.ContainerState_CONTAINER_RUNNING)
+
+		t.Logf("Preparing attachable exec for container %s", cntr1)
+		_, err := rSvc.Exec(&criruntime.ExecRequest{
+			ContainerId: cntr1,
+			Cmd:         []string{"/bin/sh"},
+			Stderr:      false,
+			Stdout:      true,
+			Stdin:       true,
+			Tty:         true,
+		})
+		require.NoError(t, err)
+
+		t.Logf("Stopping container %s", cntr1)
+		require.NoError(t, rSvc.StopContainer(cntr1, 0))
+		checkContainerState(t, rSvc, cntr1, criruntime.ContainerState_CONTAINER_EXITED)
+
+		cntr1DataDir := podCtx.containerDataDir(cntr1)
+		t.Logf("Container %s's data dir %s should be remained until RemoveContainer", cntr1, cntr1DataDir)
+		_, err = os.Stat(cntr1DataDir)
+		require.NoError(t, err)
+
+		t.Logf("Starting created container %s", cntr2)
+		checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_CREATED)
+
+		require.NoError(t, rSvc.StartContainer(cntr2))
+		checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_RUNNING)
+
+		t.Logf("Building shim connect for container %s", cntr2)
+		shimConns = append(shimConns, buildShimClientFromBundle(t, rSvc, cntr2))
+
+		t.Logf("Stopping running container %s", cntr2)
+		require.NoError(t, rSvc.StopContainer(cntr2, 0))
+		checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_EXITED)
+
+		t.Logf("Removing exited container %s", cntr3)
+		checkContainerState(t, rSvc, cntr3, criruntime.ContainerState_CONTAINER_EXITED)
+
+		cntr3DataDir := podCtx.containerDataDir(cntr3)
+		_, err = os.Stat(cntr3DataDir)
+		require.NoError(t, err)
+
+		require.NoError(t, rSvc.RemoveContainer(cntr3))
+
+		t.Logf("Container %s's data dir %s should be deleted after RemoveContainer", cntr3, cntr3DataDir)
+		_, err = os.Stat(cntr3DataDir)
+		require.True(t, os.IsNotExist(err))
+
+		// Create a new container in the previous pod, start, stop, and remove it
+		cntr4 := podCtx.createContainer("runinpreviouspod", busyboxImage,
 			criruntime.ContainerState_CONTAINER_RUNNING,
 			WithCommand("sleep", "1d"))
 
-		t.Logf("Building shim connect for container %s", cntr1)
-		shimConns = append(shimConns, buildShimClientFromBundle(t, rSvc, cntr1))
+		t.Logf("Building shim connect for container %s", cntr4)
+		shimConns = append(shimConns, buildShimClientFromBundle(t, rSvc, cntr4))
 
-		cntr2 := podCtx.createContainer("created", busyboxImage,
-			criruntime.ContainerState_CONTAINER_CREATED,
+		podCtx.stop(true)
+		podDataDir := podCtx.dataDir()
+
+		t.Logf("Pod %s's data dir %s should be deleted", podCtx.id, podDataDir)
+		_, err = os.Stat(podDataDir)
+		require.True(t, os.IsNotExist(err))
+
+		cntrDataDir := filepath.Dir(cntr3DataDir)
+		t.Logf("Containers data dir %s should be empty", cntrDataDir)
+		ents, err := os.ReadDir(cntrDataDir)
+		require.NoError(t, err)
+		require.Len(t, ents, 0, cntrDataDir)
+
+		t.Log("Creating new running container in new pod")
+		pod2Ctx := newPodTCtx(t, rSvc, "running-pod-2", "sandbox")
+		pod2Cntr := pod2Ctx.createContainer("running", busyboxImage,
+			criruntime.ContainerState_CONTAINER_RUNNING,
 			WithCommand("sleep", "1d"))
 
-		cntr3 := podCtx.createContainer("stopped", busyboxImage,
-			criruntime.ContainerState_CONTAINER_EXITED,
-			WithCommand("sleep", "1d"))
+		t.Logf("Building shim connect for container %s", pod2Cntr)
+		shimConns = append(shimConns, buildShimClientFromBundle(t, rSvc, pod2Cntr))
 
-		verifyFunc := func(t *testing.T, rSvc *remote.RuntimeService, _ *remote.ImageService) {
-			// TODO(fuweid): make svc re-connect to new socket
-			podCtx.rSvc = rSvc
+		pod2Ctx.stop(true)
 
-			t.Log("Manipulating containers in the previous pod")
-
-			// For the running container, we get status and stats of it,
-			// exec and execsync in it, stop and remove it
-			checkContainerState(t, rSvc, cntr1, criruntime.ContainerState_CONTAINER_RUNNING)
-
-			t.Logf("Preparing attachable exec for container %s", cntr1)
-			_, err := rSvc.Exec(&criruntime.ExecRequest{
-				ContainerId: cntr1,
-				Cmd:         []string{"/bin/sh"},
-				Stderr:      false,
-				Stdout:      true,
-				Stdin:       true,
-				Tty:         true,
-			})
-			require.NoError(t, err)
-
-			t.Logf("Stopping container %s", cntr1)
-			require.NoError(t, rSvc.StopContainer(cntr1, 0))
-			checkContainerState(t, rSvc, cntr1, criruntime.ContainerState_CONTAINER_EXITED)
-
-			cntr1DataDir := podCtx.containerDataDir(cntr1)
-			t.Logf("Container %s's data dir %s should be remained until RemoveContainer", cntr1, cntr1DataDir)
-			_, err = os.Stat(cntr1DataDir)
-			require.NoError(t, err)
-
-			t.Logf("Starting created container %s", cntr2)
-			checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_CREATED)
-
-			require.NoError(t, rSvc.StartContainer(cntr2))
-			checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_RUNNING)
-
-			t.Logf("Building shim connect for container %s", cntr2)
-			shimConns = append(shimConns, buildShimClientFromBundle(t, rSvc, cntr2))
-
-			t.Logf("Stopping running container %s", cntr2)
-			require.NoError(t, rSvc.StopContainer(cntr2, 0))
-			checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_EXITED)
-
-			t.Logf("Removing exited container %s", cntr3)
-			checkContainerState(t, rSvc, cntr3, criruntime.ContainerState_CONTAINER_EXITED)
-
-			cntr3DataDir := podCtx.containerDataDir(cntr3)
-			_, err = os.Stat(cntr3DataDir)
-			require.NoError(t, err)
-
-			require.NoError(t, rSvc.RemoveContainer(cntr3))
-
-			t.Logf("Container %s's data dir %s should be deleted after RemoveContainer", cntr3, cntr3DataDir)
-			_, err = os.Stat(cntr3DataDir)
-			require.True(t, os.IsNotExist(err))
-
-			// Create a new container in the previous pod, start, stop, and remove it
-			cntr4 := podCtx.createContainer("runinpreviouspod", busyboxImage,
-				criruntime.ContainerState_CONTAINER_RUNNING,
-				WithCommand("sleep", "1d"))
-
-			t.Logf("Building shim connect for container %s", cntr4)
-			shimConns = append(shimConns, buildShimClientFromBundle(t, rSvc, cntr4))
-
-			podCtx.stop(true)
-			podDataDir := podCtx.dataDir()
-
-			t.Logf("Pod %s's data dir %s should be deleted", podCtx.id, podDataDir)
-			_, err = os.Stat(podDataDir)
-			require.True(t, os.IsNotExist(err))
-
-			cntrDataDir := filepath.Dir(cntr3DataDir)
-			t.Logf("Containers data dir %s should be empty", cntrDataDir)
-			ents, err := os.ReadDir(cntrDataDir)
-			require.NoError(t, err)
-			require.Len(t, ents, 0, cntrDataDir)
-
-			t.Log("Creating new running container in new pod")
-			pod2Ctx := newPodTCtxWithRuntimeHandler(t, rSvc, "running-pod-2", "sandbox", runtimeHandler)
-			pod2Cntr := pod2Ctx.createContainer("running", busyboxImage,
-				criruntime.ContainerState_CONTAINER_RUNNING,
-				WithCommand("sleep", "1d"))
-
-			t.Logf("Building shim connect for container %s", pod2Cntr)
-			shimConns = append(shimConns, buildShimClientFromBundle(t, rSvc, pod2Cntr))
-
-			pod2Ctx.stop(true)
-
-			// If connection is closed, it means the shim process exits.
-			for _, shimCli := range shimConns {
-				t.Logf("Checking container %s's shim client", shimCli.cntrID)
-				_, err = shimCli.cli.Connect(context.Background(), &apitask.ConnectRequest{})
-				assert.ErrorContains(t, err, "ttrpc: closed", "should be closed after deleting pod")
-			}
+		// If connection is closed, it means the shim process exits.
+		for _, shimCli := range shimConns {
+			t.Logf("Checking container %s's shim client", shimCli.cntrID)
+			_, err = shimCli.cli.Connect(context.Background(), &apitask.ConnectRequest{})
+			assert.ErrorContains(t, err, "ttrpc: closed", "should be closed after deleting pod")
 		}
-		return []upgradeVerifyCaseFunc{verifyFunc}, nil
 	}
+	return []upgradeVerifyCaseFunc{verifyFunc}, nil
 }
 
 func shouldRecoverExistingImages(t *testing.T, _ int,
@@ -629,14 +536,8 @@ done
 func newPodTCtx(t *testing.T, rSvc *remote.RuntimeService,
 	name, ns string, opts ...PodSandboxOpts) *podTCtx {
 
-	return newPodTCtxWithRuntimeHandler(t, rSvc, name, ns, "", opts...)
-}
-
-func newPodTCtxWithRuntimeHandler(t *testing.T, rSvc *remote.RuntimeService,
-	name, ns, runtimeHandler string, opts ...PodSandboxOpts) *podTCtx {
-
 	sbConfig := PodSandboxConfig(name, ns, opts...)
-	sbID, err := rSvc.RunPodSandbox(sbConfig, runtimeHandler)
+	sbID, err := rSvc.RunPodSandbox(sbConfig, "" /* default runtime */)
 	require.NoError(t, err)
 
 	return &podTCtx{
@@ -854,43 +755,18 @@ func currentReleaseCtrdDefaultConfig(t *testing.T, targetDir string) {
 // previousReleaseCtrdConfig generates containerd config with previous release
 // shim binary.
 func previousReleaseCtrdConfig(t *testing.T, previousReleaseBinDir, targetDir string) {
-	// TODO(fuweid):
-	//
-	// We should choose correct config version based on previous release.
-	// Currently, we're focusing on v1.x -> v2.0 so we use version = 2 here.
+	// NOTE: Config version 3 is the oldest version understood by every
+	// release in the test matrix (see the configuration version table in
+	// RELEASES.md). Bump it once the matrix no longer includes a release
+	// predating the next version.
 	rawCfg := fmt.Sprintf(`
-version = 2
+version = 3
 
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
   runtime_type = "io.containerd.runc.v2"
   runtime_path = "%s/bin/containerd-shim-runc-v2"
 `,
 		previousReleaseBinDir)
-
-	fileName := filepath.Join(targetDir, "config.toml")
-	err := os.WriteFile(fileName, []byte(rawCfg), 0600)
-	require.NoError(t, err, "failed to create config for previous release")
-}
-
-// previousReleaseCtrdConfig generates containerd config with previous release
-// shim binary.
-func oneSevenCtrdConfig(t *testing.T, previousReleaseBinDir, targetDir string) {
-	// TODO(fuweid):
-	//
-	// We should choose correct config version based on previous release.
-	// Currently, we're focusing on v1.x -> v2.0 so we use version = 2 here.
-	rawCfg := fmt.Sprintf(`
-version = 2
-
-[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-  runtime_type = "io.containerd.runc.v2"
-  runtime_path = "%s/bin/containerd-shim-runc-v2"
-
-
-[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runcv1]
-  runtime_type = "io.containerd.runc.v2"
-  runtime_path = "%s/bin/containerd-shim-runc-v1"
-`, previousReleaseBinDir, previousReleaseBinDir)
 
 	fileName := filepath.Join(targetDir, "config.toml")
 	err := os.WriteFile(fileName, []byte(rawCfg), 0600)

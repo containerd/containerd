@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -444,7 +445,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			cri, _ := newTestCRIService()
 			cri.config.Snapshotter = defaultSnapshotter
-			cri.runtimePlatforms["existing-runtime"] = ImagePlatform{
+			cri.runtimePlatforms["existing-runtime"] = &ImagePlatform{
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
@@ -455,6 +456,13 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPullImageRuntimeHandler(t *testing.T) {
+	cri, _ := newTestCRIService()
+
+	_, err := cri.PullImage(context.Background(), "test-image", nil, nil, "runtime-not-exists")
+	assert.ErrorIs(t, err, errdefs.ErrInvalidArgument)
 }
 
 func TestImageGetLabels(t *testing.T) {

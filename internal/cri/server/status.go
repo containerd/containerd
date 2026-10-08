@@ -99,7 +99,7 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			if lerr := h.lastStatus(); lerr != nil {
 				s = lerr.Error()
 			}
-			resp.Info[fmt.Sprintf("lastCNILoadStatus.%s", name)] = s
+			resp.Info["lastCNILoadStatus."+name] = s
 			if name == defaultNetworkPlugin {
 				defaultStatus = s
 			}

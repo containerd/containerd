@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -275,7 +276,7 @@ func (c *criService) convertToCRIStats(stats *wstats.Statistics) (*runtime.Windo
 	if stats != nil && stats.Container != nil {
 		wstats := stats.GetWindows()
 		if wstats == nil {
-			return nil, fmt.Errorf("windows stats is empty")
+			return nil, errors.New("windows stats is empty")
 		}
 		if wstats.Processor != nil {
 			cs.Cpu = &runtime.WindowsCpuUsage{

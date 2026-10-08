@@ -160,6 +160,13 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
 
+	// CRI requires the request to be rejected if the runtime handler is unknown.
+	if runtimeHandler != "" {
+		if _, ok := c.runtimePlatforms[runtimeHandler]; !ok {
+			return "", fmt.Errorf("unknown runtime handler %q: %w", runtimeHandler, errdefs.ErrInvalidArgument)
+		}
+	}
+
 	imagePullProgressTimeout, err := time.ParseDuration(c.config.ImagePullProgressTimeout)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
@@ -890,7 +897,7 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	}
 
 	if c.runtimePlatforms != nil {
-		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
+		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p != nil && p.Snapshotter != snapshotter {
 			snapshotter = p.Snapshotter
 			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
 		}

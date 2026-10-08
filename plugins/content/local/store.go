@@ -709,7 +709,7 @@ func writeTimestampFile(p string, t time.Time) error {
 }
 
 func writeToCompletion(path string, data []byte, mode os.FileMode) error {
-	tmp := fmt.Sprintf("%s.tmp", path)
+	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_SYNC, mode)
 	if err != nil {
 		return fmt.Errorf("create tmp file: %w", err)

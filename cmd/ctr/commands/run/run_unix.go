@@ -253,7 +253,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cmd *cli.Comma
 				oci.WithHostNamespace(specs.NetworkNamespace),
 				oci.WithHostHostsFile,
 				oci.WithHostResolvconf,
-				oci.WithEnv([]string{fmt.Sprintf("HOSTNAME=%s", hostname)}),
+				oci.WithEnv([]string{"HOSTNAME=" + hostname}),
 			)
 		}
 		if annoStrings := cmd.StringSlice("annotation"); len(annoStrings) > 0 {
@@ -525,7 +525,7 @@ func detectGPUVendor(ctx context.Context, availableVendors []string) (string, er
 			return known, nil
 		}
 	}
-	return "", fmt.Errorf("no known GPU vendor detected in CDI specs, only AMD and NVIDIA are supported")
+	return "", errors.New("no known GPU vendor detected in CDI specs, only AMD and NVIDIA are supported")
 }
 
 // gpuDeviceNames converts GPU indices to qualified CDI device names for the given vendor.
@@ -534,7 +534,7 @@ func gpuDeviceNames(ctx context.Context, vendor string, gpuIDs ...int) ([]string
 		return nil, nil
 	}
 	if vendor == "" {
-		return nil, fmt.Errorf("gpu vendor can't be empty")
+		return nil, errors.New("gpu vendor can't be empty")
 	}
 	devices := make([]string, 0, len(gpuIDs))
 	for _, id := range gpuIDs {

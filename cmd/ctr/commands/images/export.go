@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
 	"github.com/urfave/cli/v3"
 
@@ -69,12 +70,11 @@ When '--all-platforms' is given all images in a manifest list must be available.
 	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
-			out        = cmd.Args().First()
-			images     = cmd.Args().Tail()
 			exportOpts = []archive.ExportOpt{}
 		)
-		if out == "" || len(images) == 0 {
-			return errors.New("please provide both an output filename and an image reference to export")
+		cmd, out, images, err := resolveExportArgs(ctx, cmd)
+		if err != nil {
+			return err
 		}
 
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
@@ -161,4 +161,42 @@ When '--all-platforms' is given all images in a manifest list must be available.
 
 		return client.Export(ctx, w, exportOpts...)
 	},
+}
+
+func resolveExportArgs(ctx context.Context, cmd *cli.Command) (*cli.Command, string, []string, error) {
+	out := cmd.Args().First()
+	images := cmd.Args().Tail()
+	// Work around a bug in urfave/cli/v3 where a "-" positional argument
+	// causes parseFlags to break out of the argument loop and drop all
+	// subsequent arguments.
+	// TODO: Remove this workaround once https://github.com/urfave/cli/issues/2418
+	// (https://github.com/urfave/cli/pull/2419) is resolved and vendored.
+	if out == "-" && len(cmd.Lineage()) > 1 {
+		const dashArgSentinel = "\x00-\x00"
+		rawArgs := cmd.Lineage()[1].Args().Slice()
+		end := slices.Index(rawArgs, "--")
+		if end == -1 {
+			end = len(rawArgs)
+		}
+		if dashIdx := slices.Index(rawArgs[:end], "-"); dashIdx != -1 {
+			for i, arg := range rawArgs[dashIdx:end] {
+				if arg == "-" {
+					rawArgs[dashIdx+i] = dashArgSentinel
+				}
+			}
+			sanitized := slices.Concat([]string{cmd.Name}, rawArgs[dashIdx:])
+			reparse := *cmd
+			reparse.Action = func(_ context.Context, c *cli.Command) error {
+				images = c.Args().Tail()
+				return nil
+			}
+			if err := reparse.Run(ctx, sanitized); err != nil {
+				return nil, "", nil, err
+			}
+		}
+	}
+	if out == "" || len(images) == 0 {
+		return nil, "", nil, errors.New("please provide both an output filename and an image reference to export")
+	}
+	return cmd, out, images, nil
 }

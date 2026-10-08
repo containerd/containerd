@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -1006,7 +1007,7 @@ func (c *criService) findContainerTaskRootfs(container containers.Container) (st
 		return rootfsPath, nil
 	}
 
-	return "", fmt.Errorf("could not determine container root path")
+	return "", errors.New("could not determine container root path")
 }
 
 func (c *criService) extractFilesystemMetrics(ctx context.Context, container containerstore.Container, labels []string, timestamp int64) ([]*runtime.Metric, error) {

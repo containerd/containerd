@@ -19,7 +19,6 @@ package io
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -88,7 +87,7 @@ func WithNewFIFOs(root string, tty, stdin bool) ContainerIOOpts {
 func WithStreams(address string, tty, stdin bool) ContainerIOOpts {
 	return func(c *ContainerIO) error {
 		if address == "" {
-			return fmt.Errorf("address can not be empty for io stream")
+			return errors.New("address can not be empty for io stream")
 		}
 		fifos, err := newStreams(address, c.id, tty, stdin)
 		if err != nil {
