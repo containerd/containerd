@@ -298,9 +298,7 @@ func (p *Init) Delete(ctx context.Context) error {
 }
 
 func (p *Init) delete(ctx context.Context) error {
-	if err := waitTimeout(ctx, &p.wg, 10*time.Second); err != nil {
-		log.G(ctx).WithError(err).Errorf("failed to drain init process %s io", p.id)
-	}
+	shutdownAndDrain(ctx, p.Platform, p.console, &p.wg, "init process "+p.id)
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes
@@ -314,12 +312,7 @@ func (p *Init) delete(ctx context.Context) error {
 			err = p.runtimeError(err, "failed to delete task")
 		}
 	}
-	if p.io != nil {
-		for _, c := range p.closers {
-			c.Close()
-		}
-		p.io.Close()
-	}
+	closeIO(p.closers, p.console, p.io)
 	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
 		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
 		if err == nil {

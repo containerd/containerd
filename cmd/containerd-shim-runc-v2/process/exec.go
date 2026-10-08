@@ -35,7 +35,6 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
-	"github.com/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -112,15 +111,8 @@ func (e *execProcess) Delete(ctx context.Context) error {
 }
 
 func (e *execProcess) delete(ctx context.Context) error {
-	if err := waitTimeout(ctx, &e.wg, 10*time.Second); err != nil {
-		log.G(ctx).WithError(err).Errorf("failed to drain exec process %s io", e.id)
-	}
-	if e.io != nil {
-		for _, c := range e.closers {
-			c.Close()
-		}
-		e.io.Close()
-	}
+	shutdownAndDrain(ctx, e.parent.Platform, e.console, &e.wg, "exec process "+e.id)
+	closeIO(e.closers, e.console, e.io)
 	pidfile := filepath.Join(e.path, e.id+".pid")
 	// silently ignore error
 	os.Remove(pidfile)
