@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {
@@ -147,13 +148,14 @@ func init() {
 					log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[snapshotter], snapshotter)
 				}
 
-				platform := platforms.DefaultSpec()
+				// Left unset when runtime_platforms doesn't configure a platform.
+				var platform *imagespec.Platform
 				if rp.Platform != "" {
 					p, err := platforms.Parse(rp.Platform)
 					if err != nil {
 						return nil, fmt.Errorf("unable to parse platform %q: %w", rp.Platform, err)
 					}
-					platform = p
+					platform = &p
 				}
 
 				options.RuntimePlatforms[runtimeName] = &images.ImagePlatform{
