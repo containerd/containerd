@@ -161,10 +161,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	}
 
 	// CRI requires the request to be rejected if the runtime handler is unknown.
-	if runtimeHandler != "" {
-		if _, ok := c.runtimePlatforms[runtimeHandler]; !ok {
-			return "", fmt.Errorf("unknown runtime handler %q: %w", runtimeHandler, errdefs.ErrInvalidArgument)
-		}
+	runtime, err := c.resolveRequestRuntimeHandler(ctx, sandboxConfig, runtimeHandler)
+	if err != nil {
+		return "", err
 	}
 
 	imagePullProgressTimeout, err := time.ParseDuration(c.config.ImagePullProgressTimeout)
@@ -172,10 +171,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
-	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
-	if err != nil {
-		return "", err
-	}
+	snapshotter := runtime.Snapshotter
 
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
@@ -861,49 +857,25 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 	return resp, err
 }
 
-// snapshotterFromPodSandboxConfig returns the snapshotter to use for the given
-// runtime handler. If a runtime-specific snapshotter is configured, it will be
-// returned; otherwise the default snapshotter is used.
-//
-// The runtimeHandler parameter (from CRI PullImageRequest, available since cri-api v0.29.0)
-// takes precedence. If empty, we fall back to the experimental annotation for backward
-// compatibility with clients that don't pass the runtime handler.
+// resolveRequestRuntimeHandler resolves the request field or falls back to the
+// deprecated annotation. The request field always takes precedence.
 //
 // Deprecated: The annotation-based fallback (io.containerd.cri.runtime-handler) is
 // deprecated and will be removed in containerd 2.5.
 //
 // See https://github.com/containerd/containerd/issues/6657
-func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig, runtimeHandler string) (string, error) {
-	snapshotter := c.config.Snapshotter
-	if s == nil {
-		return snapshotter, nil
-	}
-
-	// If runtimeHandler parameter is empty, fall back to annotation for backward compatibility
-	if runtimeHandler == "" {
-		if s.Annotations == nil {
-			return snapshotter, nil
-		}
-		var ok bool
-		runtimeHandler, ok = s.Annotations[annotations.RuntimeHandler]
-		if !ok {
-			return snapshotter, nil
-		}
-		log.G(ctx).Warnf("Using deprecated annotation %q for runtime handler. "+
-			"This will be removed in a future release (2.5). "+
-			"Please update your CRI client to pass runtime handler in PullImageRequest.",
-			annotations.RuntimeHandler)
-	}
-
-	if c.runtimePlatforms != nil {
-		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p != nil && p.Snapshotter != snapshotter {
-			snapshotter = p.Snapshotter
-			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
+func (c *CRIImageService) resolveRequestRuntimeHandler(ctx context.Context,
+	s *runtime.PodSandboxConfig, handler string) (resolvedRuntimeHandler, error) {
+	if handler == "" && s != nil {
+		if h, ok := s.Annotations[annotations.RuntimeHandler]; ok {
+			log.G(ctx).Warnf("Using deprecated annotation %q for runtime handler. "+
+				"This will be removed in a future release (2.5). "+
+				"Please update your CRI client to pass runtime handler in PullImageRequest.",
+				annotations.RuntimeHandler)
+			handler = h
 		}
 	}
-
-	return snapshotter, nil
+	return c.resolveRuntimeHandler(handler)
 }
 
 type criCredentials struct {
