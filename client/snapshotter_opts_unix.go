@@ -142,6 +142,31 @@ type remappedSnapshot struct {
 }
 
 func (s *remappedSnapshot) ID() (string, error) {
+	fileCapabilities, err := supportsNamespacedFileCapabilities()
+	if err != nil {
+		return "", fmt.Errorf("check namespaced file capability support: %w", err)
+	}
+	return s.id(fileCapabilities)
+}
+
+func (s *remappedSnapshot) id(fileCapabilities bool) (string, error) {
+	// An empty parent represents an empty filesystem, as with a layerless image.
+	if s.Parent != "" {
+		if err := digest.Digest(s.Parent).Validate(); err != nil {
+			return "", fmt.Errorf("invalid remapped snapshot parent: %w", err)
+		}
+	}
+	for _, mappings := range [][]specs.LinuxIDMapping{s.IDMap.UidMap, s.IDMap.GidMap} {
+		for _, mapping := range mappings {
+			if mapping.Size == 0 {
+				return "", errors.New("remapped snapshot mapping has zero size")
+			}
+		}
+	}
+	if _, err := s.IDMap.RootPair(); err != nil {
+		return "", fmt.Errorf("invalid remapped snapshot root mapping: %w", err)
+	}
+
 	compare := func(a, b specs.LinuxIDMapping) int {
 		if a.ContainerID < b.ContainerID {
 			return -1
@@ -153,7 +178,13 @@ func (s *remappedSnapshot) ID() (string, error) {
 	slices.SortStableFunc(s.IDMap.UidMap, compare)
 	slices.SortStableFunc(s.IDMap.GidMap, compare)
 
-	buf, err := json.Marshal(s)
+	buf, err := json.Marshal(struct {
+		*remappedSnapshot
+		// Do not reuse snapshots produced before file capability preservation.
+		Version int `json:"Version"`
+		// Separate preserved and stripped snapshots across kernel changes.
+		FileCapabilities bool `json:"FileCapabilities"`
+	}{s, 1, fileCapabilities})
 	if err != nil {
 		return "", err
 	}
