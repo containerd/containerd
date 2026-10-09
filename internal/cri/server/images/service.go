@@ -45,7 +45,20 @@ import (
 type imageClient interface {
 	ListImages(context.Context, ...string) ([]containerd.Image, error)
 	GetImage(context.Context, string) (containerd.Image, error)
+	GetImageWithPlatform(context.Context, string, platforms.MatchComparer) (containerd.Image, error)
 	Pull(context.Context, string, ...containerd.RemoteOpt) (containerd.Image, error)
+}
+
+type platformImageClient struct {
+	*containerd.Client
+}
+
+func (c *platformImageClient) GetImageWithPlatform(ctx context.Context, ref string, platform platforms.MatchComparer) (containerd.Image, error) {
+	i, err := c.ImageService().Get(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return containerd.NewImageWithPlatform(c.Client, i, platform), nil
 }
 
 type ImagePlatform struct {
@@ -107,7 +120,7 @@ type CRIImageServiceOptions struct {
 
 	Snapshotters map[string]snapshots.Snapshotter
 
-	Client imageClient
+	Client *containerd.Client
 
 	Transferrer transfer.Transferrer
 }
@@ -130,7 +143,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	svc := CRIImageService{
 		config:                      config,
 		images:                      options.Images,
-		client:                      options.Client,
+		client:                      &platformImageClient{Client: options.Client},
 		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
@@ -156,9 +169,12 @@ func (c *CRIImageService) UpdateRuntime(runtimeName string, imagePlatform *Image
 	if c.runtimePlatforms == nil {
 		c.runtimePlatforms = make(map[string]*ImagePlatform)
 	}
-	// Don't override if already configured
-	if _, exists := c.runtimePlatforms[runtimeName]; exists {
-		log.L.Debugf("Runtime %q already configured, not overriding", runtimeName)
+	// Fill missing settings without overriding image configuration.
+	if existing, exists := c.runtimePlatforms[runtimeName]; exists {
+		if existing != nil && existing.Snapshotter == "" && imagePlatform != nil {
+			existing.Snapshotter = imagePlatform.Snapshotter
+		}
+		log.L.Debugf("Runtime %q already configured, preserving image settings", runtimeName)
 		return
 	}
 	c.runtimePlatforms[runtimeName] = imagePlatform

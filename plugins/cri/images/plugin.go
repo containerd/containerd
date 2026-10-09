@@ -138,14 +138,11 @@ func init() {
 			log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[defaultSnapshotter], defaultSnapshotter)
 
 			for runtimeName, rp := range config.RuntimePlatforms {
-				snapshotter := rp.Snapshotter
-				if snapshotter == "" {
-					snapshotter = defaultSnapshotter
-				}
-
-				if _, ok := options.ImageFSPaths[snapshotter]; !ok {
-					options.ImageFSPaths[snapshotter] = snapshotRoot(snapshotter)
-					log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[snapshotter], snapshotter)
+				if rp.Snapshotter != "" {
+					if _, ok := options.ImageFSPaths[rp.Snapshotter]; !ok {
+						options.ImageFSPaths[rp.Snapshotter] = snapshotRoot(rp.Snapshotter)
+						log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[rp.Snapshotter], rp.Snapshotter)
+					}
 				}
 
 				// Left unset when runtime_platforms doesn't configure a platform.
@@ -159,7 +156,7 @@ func init() {
 				}
 
 				options.RuntimePlatforms[runtimeName] = &images.ImagePlatform{
-					Snapshotter: snapshotter,
+					Snapshotter: rp.Snapshotter,
 					Platform:    platform,
 				}
 			}

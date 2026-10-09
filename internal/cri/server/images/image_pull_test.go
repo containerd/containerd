@@ -23,10 +23,15 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	containerd "github.com/containerd/containerd/v2/client"
+	ctrdimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/transfer"
+	transferimage "github.com/containerd/containerd/v2/core/transfer/image"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
@@ -494,6 +499,140 @@ func TestPullImageRuntimeHandler(t *testing.T) {
 	assert.ErrorIs(t, err, errdefs.ErrInvalidArgument)
 }
 
+func TestRuntimeHandlerPullBackends(t *testing.T) {
+	platform := ocispec.Platform{
+		OS:           "windows",
+		Architecture: "amd64",
+		OSVersion:    "10.0.20348",
+		OSFeatures:   []string{"win32k"},
+	}
+
+	t.Run("local pull", func(t *testing.T) {
+		client := &pullTestClient{
+			pull: func(_ context.Context, _ string, opts ...containerd.RemoteOpt) (containerd.Image, error) {
+				remote := &containerd.RemoteContext{}
+				for _, opt := range opts {
+					require.NoError(t, opt(nil, remote))
+				}
+				require.Equal(t, "native", remote.Snapshotter)
+				require.True(t, remote.PlatformMatcher.Match(platform))
+				return nil, errdefs.ErrUnavailable
+			},
+		}
+		c := &CRIImageService{
+			client: client,
+			config: criconfig.ImageConfig{DisableSnapshotAnnotations: true},
+		}
+
+		_, _, err := c.pullImageWithLocalPull(context.Background(), "example.com/test:latest", nil, "native", &platform, nil, time.Minute)
+		require.ErrorIs(t, err, errdefs.ErrUnavailable)
+	})
+
+	t.Run("transfer pull", func(t *testing.T) {
+		transferrer := &pullTestTransferrer{
+			transfer: func(_ context.Context, _, destination any, _ ...transfer.Opt) error {
+				store := destination.(*transferimage.Store)
+				require.Equal(t, []ocispec.Platform{platform}, store.Platforms())
+				require.Equal(t, platform, store.UnpackPlatforms()[0].Platform)
+				require.Equal(t, "native", store.UnpackPlatforms()[0].Snapshotter)
+				return nil
+			},
+		}
+		client := &pullTestClient{
+			getImageWithPlatform: func(_ context.Context, ref string, matcher platforms.MatchComparer) (containerd.Image, error) {
+				require.True(t, matcher.Match(platform))
+				return containerd.NewImageWithPlatform(&containerd.Client{}, ctrdimages.Image{Name: ref}, matcher), nil
+			},
+		}
+		c := &CRIImageService{client: client, transferrer: transferrer}
+
+		image, _, err := c.pullImageWithTransferService(context.Background(), "example.com/test:latest", nil, "native", &platform, nil, time.Minute)
+		require.NoError(t, err)
+		require.True(t, image.Platform().Match(platform))
+	})
+
+	t.Run("unsupported unpack", func(t *testing.T) {
+		localCalled := false
+		client := &pullTestClient{
+			pull: func(_ context.Context, _ string, opts ...containerd.RemoteOpt) (containerd.Image, error) {
+				localCalled = true
+				remote := &containerd.RemoteContext{}
+				for _, opt := range opts {
+					require.NoError(t, opt(nil, remote))
+				}
+				require.Equal(t, platforms.FormatAll(platform), remote.Labels[labels.ImagePlatformLabelKey])
+				return nil, errdefs.ErrUnavailable
+			},
+		}
+		transferrer := &pullTestTransferrer{
+			supportsUnpack: func(p ocispec.Platform, snapshotter string) bool {
+				require.Equal(t, platform, p)
+				require.Equal(t, "native", snapshotter)
+				return false
+			},
+			transfer: func(context.Context, any, any, ...transfer.Opt) error {
+				t.Fatal("transfer should not be called")
+				return nil
+			},
+		}
+		c := &CRIImageService{
+			client:           client,
+			transferrer:      transferrer,
+			runtimePlatforms: map[string]*ImagePlatform{"native": {Snapshotter: "native", Platform: &platform}},
+			config:           criconfig.ImageConfig{ImagePullProgressTimeout: "1m", DisableSnapshotAnnotations: true},
+		}
+
+		_, err := c.PullImage(context.Background(), "example.com/test:latest", nil, nil, "native")
+		require.ErrorIs(t, err, errdefs.ErrUnavailable)
+		require.True(t, localCalled)
+	})
+}
+
+func TestPersistedImagePlatform(t *testing.T) {
+	platform := ocispec.Platform{
+		OS:           "windows",
+		Architecture: "amd64",
+		OSVersion:    "10.0.20348",
+		OSFeatures:   []string{"win32k"},
+	}
+	ref := "example.com/test:latest"
+	image := containerd.NewImage(&containerd.Client{}, ctrdimages.Image{
+		Name:   ref,
+		Labels: map[string]string{labels.ImagePlatformLabelKey: platforms.FormatAll(platform)},
+	})
+
+	t.Run("event update", func(t *testing.T) {
+		client := &pullTestClient{
+			getImage: func(context.Context, string) (containerd.Image, error) {
+				return image, nil
+			},
+			getImageWithPlatform: func(_ context.Context, _ string, matcher platforms.MatchComparer) (containerd.Image, error) {
+				require.True(t, matcher.Match(platform))
+				return nil, errdefs.ErrUnavailable
+			},
+		}
+		c := &CRIImageService{client: client}
+		require.ErrorIs(t, c.UpdateImage(context.Background(), ref), errdefs.ErrUnavailable)
+	})
+
+	t.Run("recovery", func(t *testing.T) {
+		called := false
+		client := &pullTestClient{
+			listImages: func(context.Context, ...string) ([]containerd.Image, error) {
+				return []containerd.Image{image}, nil
+			},
+			getImageWithPlatform: func(_ context.Context, _ string, matcher platforms.MatchComparer) (containerd.Image, error) {
+				called = true
+				require.True(t, matcher.Match(platform))
+				return nil, errdefs.ErrUnavailable
+			},
+		}
+		c := &CRIImageService{client: client}
+		require.NoError(t, c.CheckImages(context.Background()))
+		require.True(t, called)
+	})
+}
+
 func TestImageGetLabels(t *testing.T) {
 
 	criService, _ := newTestCRIService()
@@ -870,6 +1009,48 @@ func TestPullProgressReporter(t *testing.T) {
 		case <-done:
 		}
 	})
+}
+
+type pullTestClient struct {
+	listImages           func(context.Context, ...string) ([]containerd.Image, error)
+	getImage             func(context.Context, string) (containerd.Image, error)
+	pull                 func(context.Context, string, ...containerd.RemoteOpt) (containerd.Image, error)
+	getImageWithPlatform func(context.Context, string, platforms.MatchComparer) (containerd.Image, error)
+}
+
+func (c *pullTestClient) ListImages(ctx context.Context, filters ...string) ([]containerd.Image, error) {
+	if c.listImages != nil {
+		return c.listImages(ctx, filters...)
+	}
+	return nil, nil
+}
+
+func (c *pullTestClient) GetImage(ctx context.Context, ref string) (containerd.Image, error) {
+	if c.getImage != nil {
+		return c.getImage(ctx, ref)
+	}
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (c *pullTestClient) GetImageWithPlatform(ctx context.Context, ref string, platform platforms.MatchComparer) (containerd.Image, error) {
+	return c.getImageWithPlatform(ctx, ref, platform)
+}
+
+func (c *pullTestClient) Pull(ctx context.Context, ref string, opts ...containerd.RemoteOpt) (containerd.Image, error) {
+	return c.pull(ctx, ref, opts...)
+}
+
+type pullTestTransferrer struct {
+	transfer       func(context.Context, any, any, ...transfer.Opt) error
+	supportsUnpack func(ocispec.Platform, string) bool
+}
+
+func (t *pullTestTransferrer) Transfer(ctx context.Context, source, destination any, opts ...transfer.Opt) error {
+	return t.transfer(ctx, source, destination, opts...)
+}
+
+func (t *pullTestTransferrer) SupportsUnpack(_ context.Context, platform ocispec.Platform, snapshotter string) bool {
+	return t.supportsUnpack(platform, snapshotter)
 }
 
 // fakeObserver records every Observe call so tests can assert both the
