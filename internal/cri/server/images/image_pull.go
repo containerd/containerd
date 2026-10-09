@@ -172,6 +172,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	}
 
 	snapshotter := runtime.Snapshotter
+	platform := runtime.Platform
 
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
@@ -183,14 +184,35 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	//
 	// Transfer service does not currently support all the CRI image config options.
 	// TODO: Add support for DisableSnapshotAnnotations, DiscardUnpackedLayers, ImagePullWithSyncFs and unpackDuplicationSuppressor
+	//
+	// The transfer service only unpacks the platform/snapshotter combinations it is
+	// configured with, so fall back to the local pull when it can't unpack this one.
+	// A nil platform means no platform is configured for the runtime, which the
+	// pull paths resolve to the default spec. Check the same platform they use,
+	// so the fallback also applies to runtimes which only set a snapshotter.
+	unpackPlatform := platforms.DefaultSpec()
+	if platform != nil {
+		unpackPlatform = *platform
+	}
+	if platform != nil {
+		labels[crilabels.ImagePlatformLabelKey] = platforms.FormatAll(unpackPlatform)
+	}
+	useLocalPull := c.config.UseLocalImagePull
+	if !useLocalPull {
+		if ts, ok := c.transferrer.(unpackSupportChecker); ok && !ts.SupportsUnpack(ctx, unpackPlatform, snapshotter) {
+			log.G(ctx).Infof("Transfer service cannot unpack %s with snapshotter %q, using local pull",
+				platforms.Format(unpackPlatform), snapshotter)
+			useLocalPull = true
+		}
+	}
 	var (
 		image       containerd.Image
 		bytesPulled uint64
 	)
-	if c.config.UseLocalImagePull {
-		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+	if useLocalPull {
+		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, platform, labels, imagePullProgressTimeout)
 	} else {
-		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, platform, labels, imagePullProgressTimeout)
 	}
 
 	if err != nil {
@@ -218,8 +240,14 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		// No need to use `updateImage`, because the image reference must
 		// have been managed by the cri plugin.
 		// TODO: Use image service directly
-		if err := c.imageStore.Update(ctx, r); err != nil {
-			return "", fmt.Errorf("failed to update image store %q: %w", r, err)
+		var updateErr error
+		if platform != nil {
+			updateErr = c.imageStore.UpdateWithPlatform(ctx, r, platforms.Only(*platform))
+		} else {
+			updateErr = c.imageStore.Update(ctx, r)
+		}
+		if updateErr != nil {
+			return "", fmt.Errorf("failed to update image store %q: %w", r, updateErr)
 		}
 	}
 
@@ -251,6 +279,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	ref string,
 	credentials func(string) (string, string, error),
 	snapshotter string,
+	platform *imagespec.Platform,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, uint64, error) {
@@ -275,6 +304,10 @@ func (c *CRIImageService) pullImageWithLocalPull(
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
 			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
 		}),
+	}
+
+	if platform != nil {
+		pullOpts = append(pullOpts, containerd.WithPlatformMatcher(platforms.Only(*platform)))
 	}
 
 	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
@@ -309,6 +342,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	ref string,
 	credentials func(string) (string, string, error),
 	snapshotter string,
+	platform *imagespec.Platform,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, uint64, error) {
@@ -318,9 +352,13 @@ func (c *CRIImageService) pullImageWithTransferService(
 	transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
 
 	// Set image store opts
+	unpackPlatform := platforms.DefaultSpec()
+	if platform != nil {
+		unpackPlatform = *platform
+	}
 	sopts := []transferimage.StoreOpt{
-		transferimage.WithPlatforms(platforms.DefaultSpec()),
-		transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter),
+		transferimage.WithPlatforms(unpackPlatform),
+		transferimage.WithUnpack(unpackPlatform, snapshotter),
 		transferimage.WithImageLabels(labels),
 	}
 
@@ -349,7 +387,12 @@ func (c *CRIImageService) pullImageWithTransferService(
 	}
 
 	// Image should be pulled, unpacked and present in containerd image store at this moment
-	image, err := c.client.GetImage(ctx, ref)
+	var image containerd.Image
+	if platform != nil {
+		image, err = c.client.GetImageWithPlatform(ctx, ref, platforms.Only(*platform))
+	} else {
+		image, err = c.client.GetImage(ctx, ref)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
 	}
@@ -430,6 +473,10 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 		labels[crilabels.PinnedImageLabelKey] == crilabels.PinnedImageLabelValue {
 		fieldpaths = append(fieldpaths, "labels."+crilabels.PinnedImageLabelKey)
 	}
+	if oldImg.Labels[crilabels.ImagePlatformLabelKey] != labels[crilabels.ImagePlatformLabelKey] &&
+		labels[crilabels.ImagePlatformLabelKey] != "" {
+		fieldpaths = append(fieldpaths, "labels."+crilabels.ImagePlatformLabelKey)
+	}
 	if oldImg.Target.Digest == img.Target.Digest && len(fieldpaths) < 2 {
 		return nil
 	}
@@ -448,6 +495,18 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 	return labels
 }
 
+func imagePlatformFromLabels(labels map[string]string) (platforms.MatchComparer, error) {
+	value := labels[crilabels.ImagePlatformLabelKey]
+	if value == "" {
+		return nil, nil
+	}
+	platform, err := platforms.Parse(value)
+	if err != nil {
+		return nil, err
+	}
+	return platforms.Only(platform), nil
+}
+
 // UpdateImage updates image store to reflect the newest state of an image reference
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
@@ -460,14 +519,28 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 		}
 		// If the image is not found, we should continue updating the cache,
 		// so that the image can be removed from the cache.
-		if err := c.imageStore.Update(ctx, r); err != nil {
+		if err := c.imageStore.UpdateWithPlatform(ctx, r, nil); err != nil {
 			return fmt.Errorf("update image store for %q: %w", r, err)
 		}
 		return nil
 	}
 
+	platform, err := imagePlatformFromLabels(img.Labels())
+	if err != nil {
+		return fmt.Errorf("get platform for image %q: %w", r, err)
+	}
+	if platform != nil {
+		img, err = c.client.GetImageWithPlatform(ctx, r, platform)
+		if err != nil {
+			return fmt.Errorf("get image by reference and platform: %w", err)
+		}
+	}
+
 	labels := img.Labels()
 	criLabels := c.getLabels(ctx, r)
+	if value := labels[crilabels.ImagePlatformLabelKey]; value != "" {
+		criLabels[crilabels.ImagePlatformLabelKey] = value
+	}
 	for key, value := range criLabels {
 		if labels[key] != value {
 			// Make sure the image has the image id as its unique
@@ -480,7 +553,7 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 			if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
 				return fmt.Errorf("create image id reference %q: %w", id, err)
 			}
-			if err := c.imageStore.Update(ctx, id); err != nil {
+			if err := c.imageStore.UpdateWithPlatform(ctx, id, platform); err != nil {
 				return fmt.Errorf("update image store for %q: %w", id, err)
 			}
 			// The image id is ready, add the label to mark the image as managed.
@@ -490,7 +563,7 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 			break
 		}
 	}
-	if err := c.imageStore.Update(ctx, r); err != nil {
+	if err := c.imageStore.UpdateWithPlatform(ctx, r, platform); err != nil {
 		return fmt.Errorf("update image store for %q: %w", r, err)
 	}
 	return nil
@@ -876,6 +949,13 @@ func (c *CRIImageService) resolveRequestRuntimeHandler(ctx context.Context,
 		}
 	}
 	return c.resolveRuntimeHandler(handler)
+}
+
+// unpackSupportChecker is implemented by transfer services that can report whether a
+// platform can be unpacked into a snapshotter. Transfer services which don't implement
+// it keep being used as before.
+type unpackSupportChecker interface {
+	SupportsUnpack(context.Context, imagespec.Platform, string) bool
 }
 
 type criCredentials struct {
