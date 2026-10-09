@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"runtime"
@@ -27,6 +28,7 @@ import (
 
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/errdefs"
 	digest "github.com/opencontainers/go-digest"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -36,6 +38,38 @@ import (
 
 type mockContentServer struct {
 	contentapi.UnimplementedContentServer
+}
+
+type failingWriteClient struct {
+	contentapi.TTRPCContentClient
+	ctx context.Context
+	err error
+}
+
+func (c *failingWriteClient) Write(ctx context.Context) (contentapi.TTRPCContent_WriteClient, error) {
+	c.ctx = ctx
+	return nil, c.err
+}
+
+func TestWriterCancelsContextWhenStreamCreationFails(t *testing.T) {
+	injected := status.Error(codes.Unavailable, "stream creation failed")
+	client := &failingWriteClient{err: injected}
+	parent := t.Context()
+	writer, err := NewContentStore(client).Writer(parent, content.WithRef("fail-create"))
+	if !errors.Is(err, errdefs.ErrUnavailable) {
+		t.Fatalf("expected native unavailable error, got %v", err)
+	}
+	if writer != nil {
+		t.Fatal("unexpected writer after stream creation failure")
+	}
+	if parent.Err() != nil {
+		t.Fatalf("parent context was canceled: %v", parent.Err())
+	}
+	select {
+	case <-client.ctx.Done():
+	default:
+		t.Fatal("failed stream creation left the writer context active")
+	}
 }
 
 func (mockContentServer) Write(stream contentapi.Content_WriteServer) error {
