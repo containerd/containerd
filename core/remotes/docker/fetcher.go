@@ -77,6 +77,10 @@ func isRegistryOrigin(u *url.URL, hosts []RegistryHost) bool {
 
 func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", desc.Digest))
+	// Schema 1 layer descriptors use -1 to indicate an unknown size.
+	if desc.Size < -1 {
+		return nil, fmt.Errorf("invalid descriptor size %d: %w", desc.Size, errdefs.ErrInvalidArgument)
+	}
 
 	hosts := r.filterHosts(HostCapabilityPull)
 	if len(hosts) == 0 {
