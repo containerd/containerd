@@ -7,8 +7,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"text/tabwriter"
-	"text/template"
 	"unicode/utf8"
 )
 
@@ -257,12 +255,13 @@ func DefaultCompleteWithFlags(ctx context.Context, cmd *Command) {
 	}
 	argsLen := len(args)
 	lastArg := ""
-	// parent command will have --generate-shell-completion so we need
-	// to account for that
-	if argsLen > 1 {
-		lastArg = args[argsLen-2]
-	} else if argsLen > 0 {
+	// os.Args retains the completion marker, but a child's parsed arguments
+	// have already had it removed.
+	if argsLen > 0 {
 		lastArg = args[argsLen-1]
+		if lastArg == completionFlag && argsLen > 1 {
+			lastArg = args[argsLen-2]
+		}
 	}
 
 	if lastArg == completionFlag {
@@ -271,7 +270,15 @@ func DefaultCompleteWithFlags(ctx context.Context, cmd *Command) {
 
 	if strings.HasPrefix(lastArg, "-") {
 		tracef("printing flag suggestion for flag[%v] on command %[1]q", lastArg, cmd.Name)
-		printFlagSuggestions(lastArg, cmd.Flags, cmd.Root().Writer)
+		flags := cmd.allFlags()
+		if !cmd.SkipFlagParsing {
+			for _, fl := range cmd.VisiblePersistentFlags() {
+				if !hasFlag(flags, fl) {
+					flags = append(flags, fl)
+				}
+			}
+		}
+		printFlagSuggestions(lastArg, flags, cmd.Root().Writer)
 		return
 	}
 
@@ -369,99 +376,6 @@ func handleTemplateError(err error) {
 	}
 }
 
-// DefaultPrintHelpCustom is the default implementation of HelpPrinterCustom.
-//
-// The customFuncs map will be combined with a default template.FuncMap to
-// allow using arbitrary functions in template rendering.
-func DefaultPrintHelpCustom(out io.Writer, templ string, data any, customFuncs map[string]any) {
-	const maxLineLength = 10000
-
-	tracef("building default funcMap")
-	funcMap := template.FuncMap{
-		"join":           strings.Join,
-		"subtract":       subtract,
-		"indent":         indent,
-		"nindent":        nindent,
-		"trim":           strings.TrimSpace,
-		"wrap":           func(input string, offset int) string { return wrap(input, offset, maxLineLength) },
-		"offset":         offset,
-		"offsetCommands": offsetCommands,
-	}
-
-	if wa, ok := customFuncs["wrapAt"]; ok {
-		if wrapAtFunc, ok := wa.(func() int); ok {
-			wrapAt := wrapAtFunc()
-			customFuncs["wrap"] = func(input string, offset int) string {
-				return wrap(input, offset, wrapAt)
-			}
-		}
-	}
-
-	for key, value := range customFuncs {
-		funcMap[key] = value
-	}
-
-	w := tabwriter.NewWriter(out, 1, 8, 2, ' ', 0)
-	t := template.Must(template.New("help").Funcs(funcMap).Parse(templ))
-
-	if _, err := t.New("helpNameTemplate").Parse(helpNameTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("argsTemplate").Parse(argsTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("usageTemplate").Parse(usageTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("descriptionTemplate").Parse(descriptionTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("visibleCommandTemplate").Parse(visibleCommandTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("copyrightTemplate").Parse(copyrightTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("versionTemplate").Parse(versionTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("visibleFlagCategoryTemplate").Parse(visibleFlagCategoryTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("visibleFlagTemplate").Parse(visibleFlagTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("visiblePersistentFlagTemplate").Parse(visiblePersistentFlagTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("visibleGlobalFlagCategoryTemplate").Parse(strings.ReplaceAll(visibleFlagCategoryTemplate, "OPTIONS", "GLOBAL OPTIONS")); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("authorsTemplate").Parse(authorsTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	if _, err := t.New("visibleCommandCategoryTemplate").Parse(visibleCommandCategoryTemplate); err != nil {
-		handleTemplateError(err)
-	}
-
-	tracef("executing template")
-	handleTemplateError(t.Execute(w, data))
-
-	_ = w.Flush()
-}
-
 // DefaultPrintHelp is the default implementation of HelpPrinter.
 func DefaultPrintHelp(out io.Writer, templ string, data any) {
 	HelpPrinterCustom(out, templ, data, nil)
@@ -487,13 +401,16 @@ func checkShellCompleteFlag(c *Command, arguments []string) (bool, []string) {
 		return false, arguments
 	}
 
-	// If arguments include "--" before the token being completed, shell completion
-	// is disabled because after "--" only positional arguments are accepted.
+	// If the token being completed is preceded by a "--", only positional
+	// arguments are accepted after it, so nothing will be suggested.
 	// https://unix.stackexchange.com/a/11382
 	// Note: The token being completed is at position pos-1 (immediately before completionFlag).
-	// We only check arguments before that position, so completing "--" itself still works.
+	// A "--" at exactly that position is the token being completed, not a
+	// separator, so completing "--" itself still suggests flags.
+	// The request is still recognized as a completion so that the command
+	// action is never executed (https://github.com/urfave/cli/issues/1993).
 	if pos >= 1 && slices.Contains(arguments[:pos-1], "--") {
-		return false, arguments[:pos]
+		c.shellCompletionPastDoubleDash = true
 	}
 
 	return true, arguments[:pos]
@@ -520,6 +437,13 @@ func shouldRunCompletion(cmd *Command) bool {
 }
 
 func runCompletion(ctx context.Context, cmd *Command) {
+	// Nothing is suggested past a "--": after it, only positional arguments
+	// are accepted. The request is still treated as a completion so that the
+	// command action is never executed (https://github.com/urfave/cli/issues/1993).
+	if cmd.Root().shellCompletionPastDoubleDash {
+		tracef("completion requested past double dash; suggesting nothing (cmd=%[1]q)", cmd.Name)
+		return
+	}
 	if cmd.ShellComplete != nil {
 		tracef("running shell completion func for command %[1]q", cmd.Name)
 		cmd.ShellComplete(ctx, cmd)
