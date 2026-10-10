@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
@@ -763,4 +764,75 @@ func TestLinuxContainerMounts(t *testing.T) {
 			assert.Equal(t, test.expectedMounts, mounts, test.desc)
 		})
 	}
+}
+
+func TestBuildContainerSpecWithExplicitNamespacePaths(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("linux namespace handling test only on linux")
+	}
+	linuxPlatform := currentPlatform
+	testID := "test-id"
+	testSandboxID := "sandbox-id-explicit"
+	testContainerName := "container-name"
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
+	c := newTestCRIService()
+
+	// Create a sandbox with explicit namespace paths and pid==0 (pauseless)
+	// For this test, make container use CONTAINER pid mode so pid namespace is not required,
+	// otherwise we would need to provide explicit pid path as well.
+	containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{Pid: runtime.NamespaceMode_CONTAINER}
+	sandbox := newTestSandboxForCreateTest(testSandboxID, sandboxConfig)
+	sandbox.Metadata.NetNSPath = "/pinned/net"
+	sandbox.Metadata.IPCNSPath = "/pinned/ipc"
+	sandbox.Metadata.UTSNSPath = "/pinned/uts"
+	require.NoError(t, c.sandboxStore.Add(sandbox))
+
+	// Explicit paths should be used even with pid==0
+	spec, err := c.buildContainerSpec(linuxPlatform, testID, testSandboxID, 0, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+	require.NoError(t, err)
+	require.NotNil(t, spec)
+	require.NotNil(t, spec.Linux)
+	assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{Type: runtimespec.NetworkNamespace, Path: "/pinned/net"})
+	assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{Type: runtimespec.IPCNamespace, Path: "/pinned/ipc"})
+	assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{Type: runtimespec.UTSNamespace, Path: "/pinned/uts"})
+	for _, ns := range spec.Linux.Namespaces {
+		assert.NotContains(t, ns.Path, "/proc/0/")
+	}
+
+	// Missing explicit with pid==0 should fail closed
+	sandbox2ID := "sandbox-id-missing"
+	sandbox2 := newTestSandboxForCreateTest(sandbox2ID, sandboxConfig)
+	sandbox2.Metadata.NetNSPath = ""
+	sandbox2.Metadata.IPCNSPath = ""
+	sandbox2.Metadata.UTSNSPath = ""
+	require.NoError(t, c.sandboxStore.Add(sandbox2))
+	_, err = c.buildContainerSpec(linuxPlatform, testID, sandbox2ID, 0, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "explicit namespace path required")
+	assert.NotContains(t, err.Error(), "/proc/0/")
+
+	// Backward compat: pid-derived fallback when no explicit and pid !=0
+	sandbox3ID := "sandbox-id-compat"
+	sandbox3 := newTestSandboxForCreateTest(sandbox3ID, sandboxConfig)
+	require.NoError(t, c.sandboxStore.Add(sandbox3))
+	// Reset to POD pid mode for this case to test pid namespace fallback
+	containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{Pid: runtime.NamespaceMode_POD}
+	spec, err = c.buildContainerSpec(linuxPlatform, testID, sandbox3ID, 1234, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+	require.NoError(t, err)
+	require.NotNil(t, spec.Linux)
+	assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{Type: runtimespec.NetworkNamespace, Path: "/proc/1234/ns/net"})
+	assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{Type: runtimespec.PIDNamespace, Path: "/proc/1234/ns/pid"})
+}
+
+func newTestSandboxForCreateTest(id string, config *runtime.PodSandboxConfig) sandboxstore.Sandbox {
+	meta := sandboxstore.Metadata{
+		ID:     id,
+		Name:   id,
+		Config: config,
+	}
+	status := sandboxstore.Status{State: sandboxstore.StateReady}
+	sb := sandboxstore.NewSandbox(meta, status)
+	sb.Sandboxer = "podsandbox"
+	return sb
 }
