@@ -344,17 +344,98 @@ func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.Spec
 	}
 }
 
-// WithPodNamespaces sets the pod namespaces for the container
+// PodNamespacePaths are the paths of the pod namespaces a container joins.
+//
+// A pod sandbox is either PID-backed (a process such as pause is a member of
+// every pod namespace, and the paths are derived from its pid with
+// PodNamespacePathsFromPid) or path-backed (the sandbox holds the namespaces
+// without a process and reports their paths, typically bind-mounted namespace
+// files). An empty path means the sandbox does not hold that namespace.
+type PodNamespacePaths struct {
+	Network string
+	IPC     string
+	UTS     string
+	// PID is the pod PID namespace, joined only when the pod shares it
+	// (NamespaceMode_POD or NamespaceMode_TARGET). The container keeps its own
+	// PID namespace otherwise.
+	PID string
+	// PrivatePID is set by a sandbox that holds no PID namespace and declares
+	// that each container gets a new one, even when the pod asked to share
+	// (a sandbox without a process has no PID 1 to hold a shared namespace).
+	// It is an explicit declaration in the sandbox spec, not a fallback.
+	PrivatePID bool
+	User       string
+}
+
+// PodNamespacePathsFromPid derives the pod namespace paths from the pid of a
+// process that is a member of every pod namespace, e.g. the pause container.
+// targetPid is the process whose PID namespace the container joins when the
+// pod shares one; it differs from sandboxPid for NamespaceMode_TARGET.
+func PodNamespacePathsFromPid(sandboxPid, targetPid uint32) PodNamespacePaths {
+	return PodNamespacePaths{
+		Network: GetNetworkNamespace(sandboxPid),
+		IPC:     GetIPCNamespace(sandboxPid),
+		UTS:     GetUTSNamespace(sandboxPid),
+		PID:     GetPIDNamespace(targetPid),
+		User:    GetUserNamespace(sandboxPid),
+	}
+}
+
+// WithPodNamespaces sets the pod namespaces for the container from the pid of
+// the sandbox process. See WithPodNamespacePaths.
 func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid uint32, targetPid uint32, uids, gids []runtimespec.LinuxIDMapping) oci.SpecOpts {
+	return WithPodNamespacePaths(config, config.GetNamespaceOptions(), PodNamespacePathsFromPid(sandboxPid, targetPid), uids, gids)
+}
+
+// WithPodNamespacePaths makes the container join the pod namespaces at the
+// given paths. The network, IPC and UTS namespaces of a container are always
+// those of its pod, whatever the container config says (with a pause
+// container the container joined the namespaces of pause, which was itself in
+// the host namespaces the pod asked for); pod is the namespace options of the
+// pod sandbox and decides which of them are host namespaces. The PID and user
+// namespaces follow the container config as before.
+//
+// Every namespace the container is expected to share with the pod must have a
+// path; a missing path is an error rather than a fallback to a fresh or host
+// namespace, so that a broken sandbox cannot silently weaken isolation. The
+// entry of a host namespace (NamespaceMode_NODE) is removed from the spec
+// when the sandbox provides no path for it.
+func WithPodNamespacePaths(config *runtime.LinuxContainerSecurityContext, pod *runtime.NamespaceOption, paths PodNamespacePaths, uids, gids []runtimespec.LinuxIDMapping) oci.SpecOpts {
 	namespaces := config.GetNamespaceOptions()
 
-	opts := []oci.SpecOpts{
-		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.NetworkNamespace, Path: GetNetworkNamespace(sandboxPid)}),
-		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.IPCNamespace, Path: GetIPCNamespace(sandboxPid)}),
-		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UTSNamespace, Path: GetUTSNamespace(sandboxPid)}),
+	var opts []oci.SpecOpts
+	join := func(t runtimespec.LinuxNamespaceType, path string, host bool) error {
+		switch {
+		case path != "":
+			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: t, Path: path}))
+		case host:
+			opts = append(opts, WithoutNamespace(t))
+		default:
+			return fmt.Errorf("pod sandbox provides no %s namespace for the container to join", t)
+		}
+		return nil
 	}
-	if namespaces.GetPid() != runtime.NamespaceMode_CONTAINER {
-		opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.PIDNamespace, Path: GetPIDNamespace(targetPid)}))
+
+	hostNetwork := pod.GetNetwork() == runtime.NamespaceMode_NODE
+	if err := join(runtimespec.NetworkNamespace, paths.Network, hostNetwork); err != nil {
+		return failSpecOpt(err)
+	}
+	if err := join(runtimespec.IPCNamespace, paths.IPC, pod.GetIpc() == runtime.NamespaceMode_NODE); err != nil {
+		return failSpecOpt(err)
+	}
+	// There is no CRI option for the UTS namespace: a pod shares it unless it
+	// uses the host network, in which case it uses the host UTS namespace too.
+	if err := join(runtimespec.UTSNamespace, paths.UTS, hostNetwork); err != nil {
+		return failSpecOpt(err)
+	}
+	// The default spec already gives the container its own PID namespace,
+	// which is what NamespaceMode_CONTAINER asks for and what a sandbox that
+	// declared it holds no PID namespace to share provides.
+	pidMode := namespaces.GetPid()
+	if pidMode != runtime.NamespaceMode_CONTAINER && (pidMode != runtime.NamespaceMode_POD || !paths.PrivatePID) {
+		if err := join(runtimespec.PIDNamespace, paths.PID, pidMode == runtime.NamespaceMode_NODE); err != nil {
+			return failSpecOpt(err)
+		}
 	}
 
 	if namespaces.GetUsernsOptions() != nil {
@@ -362,12 +443,20 @@ func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid
 		case runtime.NamespaceMode_NODE:
 			// Nothing to do. Not adding userns field uses the node userns.
 		case runtime.NamespaceMode_POD:
-			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UserNamespace, Path: GetUserNamespace(sandboxPid)}))
+			if err := join(runtimespec.UserNamespace, paths.User, false); err != nil {
+				return failSpecOpt(err)
+			}
 			opts = append(opts, oci.WithUserNamespace(uids, gids))
 		}
 	}
 
 	return oci.Compose(opts...)
+}
+
+func failSpecOpt(err error) oci.SpecOpts {
+	return func(context.Context, oci.Client, *containers.Container, *runtimespec.Spec) error {
+		return err
+	}
 }
 
 const (

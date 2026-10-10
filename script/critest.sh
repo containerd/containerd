@@ -50,10 +50,37 @@ function cleanup() {
 trap cleanup EXIT
 
 mkdir -p ${BDIR}/{root,state}
+
+# TEST_RUNTIME_PATH optionally sets runtime_path of the runtime handler: the
+# absolute path of the shim binary to run instead of the one resolved from
+# TEST_RUNTIME, e.g. /usr/local/bin/containerd-shim-sandboxed-runc-v2 with
+# TEST_RUNTIME=io.containerd.runc.v2. containerd treats a relative value as a
+# runtime name and fails to resolve it.
+RUNTIME_CONFIG="runtime_type = \"${TEST_RUNTIME}\""
+if [ -n "${TEST_RUNTIME_PATH:-}" ]; then
+  case "${TEST_RUNTIME_PATH}" in
+    /*) ;;
+    *) echo "TEST_RUNTIME_PATH must be an absolute path, got: ${TEST_RUNTIME_PATH}" >&2; exit 1 ;;
+  esac
+  RUNTIME_CONFIG="${RUNTIME_CONFIG}
+runtime_path = \"${TEST_RUNTIME_PATH}\""
+fi
+
+# SANDBOXER is the sandbox controller of the runtime handler: "podsandbox"
+# (the pause container, the default) or "shim" (the Sandbox API of the shim,
+# which needs no pause image).
+SANDBOXER="${SANDBOXER:-podsandbox}"
+SANDBOX_CONFIG="sandboxer = \"${SANDBOXER}\""
+if [ "${SANDBOXER}" = "shim" ]; then
+  SANDBOX_CONFIG="${SANDBOX_CONFIG}
+disable_pause_image_pull = true"
+fi
+
 cat > ${BDIR}/config.toml <<EOF
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-runtime_type = "${TEST_RUNTIME}"
+${RUNTIME_CONFIG}
+${SANDBOX_CONFIG}
 [plugins."io.containerd.snapshotter.v1.overlayfs"]
 # slow_chown is needed to avoid an error with kernel < 5.19:
 # > "snapshotter \"overlayfs\" doesn't support idmap mounts on this host,
