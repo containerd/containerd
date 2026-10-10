@@ -39,6 +39,7 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/content/local/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/cri/images"
 	_ "github.com/containerd/containerd/v2/plugins/cri/runtime"
+	_ "github.com/containerd/containerd/v2/plugins/diff/overlay/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/events"
 	_ "github.com/containerd/containerd/v2/plugins/gc"
