@@ -19,6 +19,8 @@ package eventq
 import (
 	"io"
 	"time"
+
+	"github.com/containerd/log"
 )
 
 type EventQueue[T any] struct {
@@ -32,13 +34,36 @@ type eventSubscription[T any] struct {
 	closeC chan struct{}
 }
 
+var slowSubscriberTimeout = 5 * time.Second
+
 func (sub eventSubscription[T]) publish(event T) bool {
 	select {
 	case <-sub.closeC:
 		return false
 	case sub.c <- event:
 		return true
+	default:
 	}
+
+	timer := time.NewTimer(slowSubscriberTimeout)
+	defer timer.Stop()
+	select {
+	case <-sub.closeC:
+		return false
+	case sub.c <- event:
+		return true
+	case <-timer.C:
+		return false
+	}
+}
+
+func (sub eventSubscription[T]) remove() {
+	select {
+	case <-sub.closeC:
+	default:
+		log.L.WithField("timeout", slowSubscriberTimeout).Warn("event subscriber did not accept events in time, closing subscription")
+	}
+	close(sub.c)
 }
 
 func (sub eventSubscription[T]) Close() error {
@@ -83,6 +108,8 @@ func New[T any](discardAfter time.Duration, discardFn func(T)) EventQueue[T] {
 					for _, sub := range subscribers {
 						if sub.publish(event) {
 							active = append(active, sub)
+						} else {
+							sub.remove()
 						}
 					}
 					subscribers = active
@@ -102,6 +129,7 @@ func New[T any](discardAfter time.Duration, discardFn func(T)) EventQueue[T] {
 					if !s.publish(event.event) {
 						discardQueue = discardQueue[i:]
 						closed = true
+						s.remove()
 						break
 					}
 				}

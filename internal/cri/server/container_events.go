@@ -17,6 +17,8 @@
 package server
 
 import (
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -29,5 +31,5 @@ func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.R
 			return err
 		}
 	}
-	return nil
+	return status.Error(codes.Unavailable, "container events subscription closed by server")
 }
