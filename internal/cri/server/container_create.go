@@ -38,7 +38,6 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
-	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -349,26 +348,6 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 			r.podSandboxConfig.GetLogDirectory(), r.containerConfig.GetLogPath())
 	}
 
-	var containerIO *cio.ContainerIO
-	switch ociRuntime.IOType {
-	case criconfig.IOTypeStreaming:
-		containerIO, err = cio.NewContainerIO(r.containerID,
-			cio.WithStreams(r.sandbox.Endpoint.Address, r.containerConfig.GetTty(), r.containerConfig.GetStdin()))
-	default:
-		containerIO, err = cio.NewContainerIO(r.containerID,
-			cio.WithNewFIFOs(volatileContainerRootDir, r.containerConfig.GetTty(), r.containerConfig.GetStdin()))
-	}
-	if err != nil {
-		return "", fmt.Errorf("failed to create container io: %w", err)
-	}
-	defer func() {
-		if retErr != nil {
-			if err := containerIO.Close(); err != nil {
-				log.G(r.ctx).WithError(err).Errorf("Failed to close container io %q", r.containerID)
-			}
-		}
-	}()
-
 	specOpts, err := c.platformSpecOpts(platform, r.containerConfig, r.imageConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to get container spec opts: %w", err)
@@ -421,7 +400,6 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	container, err := containerstore.NewContainer(*r.meta,
 		containerstore.WithStatus(status, containerRootDir),
 		containerstore.WithContainer(cntr),
-		containerstore.WithContainerIO(containerIO),
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create internal container object for %q: %w", r.containerID, err)
