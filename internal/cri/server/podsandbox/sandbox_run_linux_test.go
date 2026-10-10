@@ -165,6 +165,9 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.IPCNamespace,
 				})
+				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+					Type: runtimespec.TimeNamespace,
+				})
 				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ip_unprivileged_port_start"], "0")
 				if !userns.RunningInUserNS() {
 					assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "0 2147483647")
