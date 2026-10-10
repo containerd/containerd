@@ -147,6 +147,7 @@ func newTestCRIService(opts ...testOpt) *criService {
 	service := &criService{
 		config:             testConfig,
 		os:                 ostesting.NewFakeOS(),
+		labels:             labels,
 		sandboxStore:       sandboxstore.NewStore(labels, nil),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(labels, nil),
