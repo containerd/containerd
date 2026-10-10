@@ -32,10 +32,42 @@ else
   CONTAINERD_CONFIG_DIR=${CONTAINERD_CONFIG_DIR:-"c:/Windows/Temp"}
 fi
 
-# Use a configuration file for containerd.
 CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-""}
-# The runtime to use (ignored when CONTAINERD_CONFIG_FILE is set)
 CONTAINERD_RUNTIME=${CONTAINERD_RUNTIME:-""}
+_config_copy=""
+if [ -n "${CONTAINERD_CONFIG_FILE}" ] && [ $IS_WINDOWS -eq 0 ]; then
+  _config_orig_dir="$(dirname "${CONTAINERD_CONFIG_FILE}")"
+  _has_relative_imports() {
+    awk '
+      /^[ \t]*imports[ \t]*=/ { in_imports=1 }
+      in_imports {
+        line = $0
+        gsub(/#.*/, "", line)
+        while (match(line, /["\047][^"\047]*["\047]/)) {
+          val = substr(line, RSTART+1, RLENGTH-2)
+          if (substr(val,1,1) != "/") { found=1; exit }
+          line = substr(line, RSTART+RLENGTH)
+        }
+        if (line ~ /\]/) { exit }
+      }
+      END { exit !found }
+    ' "$1"
+  }
+  if [ -w "${_config_orig_dir}" ]; then
+    _config_copy="$(mktemp "${_config_orig_dir}/containerd-config-cri-XXXXXX.tmp")"
+  else
+    if _has_relative_imports "${CONTAINERD_CONFIG_FILE}"; then
+      echo "error: CONTAINERD_CONFIG_FILE '${CONTAINERD_CONFIG_FILE}' is in a" \
+           "non-writable directory and contains relative imports entries." \
+           "Resolve imports to absolute paths or set CONTAINERD_CONFIG_DIR to" \
+           "the config's directory." >&2
+      exit 1
+    fi
+    _config_copy="$(mktemp "${CONTAINERD_CONFIG_DIR}/containerd-config-cri-XXXXXX.tmp")"
+  fi
+  cat "${CONTAINERD_CONFIG_FILE}" > "${_config_copy}"
+  CONTAINERD_CONFIG_FILE="${_config_copy}"
+fi
 if [ -z "${CONTAINERD_CONFIG_FILE}" ]; then
   config_file="${CONTAINERD_CONFIG_DIR}/containerd-config-cri.toml"
   truncate --size 0 "${config_file}"
@@ -79,69 +111,12 @@ EOF
 runtime_type = "${CONTAINERD_RUNTIME}"
 EOF
   fi
-  if [ $IS_WINDOWS -eq 0 ]; then
-    cat >>${config_file} <<EOF
-[plugins."io.containerd.nri.v1.nri"]
-  disable = false
-  socket_path = "/var/run/nri-test.sock"
-  plugin_path = "/no/pre-launched/nri/plugins"
-EOF
-  fi
+
   CONTAINERD_CONFIG_FILE="${config_file}"
 fi
 
-if [ $IS_WINDOWS -eq 0 ]; then
-  FAILPOINT_CONTAINERD_RUNTIME="runc-fp.v1"
-  FAILPOINT_CNI_CONF_DIR=${FAILPOINT_CNI_CONF_DIR:-"/tmp/failpoint-cni-net.d"}
-  mkdir -p "${FAILPOINT_CNI_CONF_DIR}"
-
-  # Add runtime with failpoint
-  cat << EOF | tee -a "${CONTAINERD_CONFIG_FILE}"
-[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc-fp]
-  cni_conf_dir = "${FAILPOINT_CNI_CONF_DIR}"
-  cni_max_conf_num = 1
-  pod_annotations = ["io.containerd.runtime.v2.shim.failpoint.*"]
-  runtime_type = "${FAILPOINT_CONTAINERD_RUNTIME}"
-EOF
-
-  cat << EOF | tee "${FAILPOINT_CNI_CONF_DIR}/10-containerd-net.conflist"
-{
-  "cniVersion": "1.0.0",
-  "name": "containerd-net-failpoint",
-  "plugins": [
-    {
-      "type": "cni-bridge-fp",
-      "bridge": "cni-fp",
-      "isGateway": true,
-      "ipMasq": true,
-      "promiscMode": true,
-      "ipam": {
-        "type": "host-local",
-        "ranges": [
-          [{
-            "subnet": "10.88.0.0/16"
-          }],
-          [{
-            "subnet": "2001:4860:4860::/64"
-          }]
-        ],
-        "routes": [
-          { "dst": "0.0.0.0/0" },
-          { "dst": "::/0" }
-        ]
-      },
-      "capabilities": {
-        "io.kubernetes.cri.pod-annotations": true
-      }
-    },
-    {
-      "type": "portmap",
-      "capabilities": {"portMappings": true}
-    }
-  ]
-}
-EOF
-fi
+# shellcheck source=script/test/config-helpers.sh
+source "$(dirname "${BASH_SOURCE[0]}")/config-helpers.sh"
 
 if [ ${IS_WINDOWS} -eq 1 -a ${USE_HYPERV} -eq 1 ];then
   cat >> ${CONTAINERD_CONFIG_FILE} << EOF
@@ -163,11 +138,6 @@ fi
 # To allow the cri-integration test to run via CLI without explicitly setting CGROUP_DRIVER
 if [ $IS_WINDOWS -eq 0 ] && [ ! -v CGROUP_DRIVER ]; then
   echo "CGROUP_DRIVER is unset"
-elif [ "${CGROUP_DRIVER:-}" = "systemd" ]; then
-  cat >> ${CONTAINERD_CONFIG_FILE} << EOF
-[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
-   SystemdCgroup = true
-EOF
 fi
 
 # CONTAINERD_TEST_SUFFIX is the suffix appended to the root/state directory used
@@ -306,7 +276,7 @@ test_setup() {
   run_crictl
 }
 
-# test_teardown kills containerd.
+# test_teardown kills containerd and removes any temp config copy.
 test_teardown() {
   if [ -n "${pid}" ]; then
     if [ $IS_WINDOWS -eq 1 ]; then
@@ -322,6 +292,16 @@ test_teardown() {
         echo "pid(${pid}) not found, skipping pkill"
       fi
     fi
+  fi
+  # Remove the temp copy of a pre-supplied config created at sourcing time.
+  if [ -n "${_config_copy}" ]; then
+    ${sudo} rm -f "${_config_copy}"
+    _config_copy=""
+  fi
+  # Remove import copies made by _copy_if_needed (only set on Linux+systemd).
+  if [ -n "${_import_copies+set}" ] && [ "${#_import_copies[@]}" -gt 0 ]; then
+    ${sudo} rm -f "${_import_copies[@]}"
+    _import_copies=()
   fi
 }
 

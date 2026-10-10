@@ -371,9 +371,14 @@ func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error
 		return api.Sandbox{}, err
 	}
 
-	inst.Spec, err = boltutil.ReadAny(bucket, bucketKeySpec)
+	spec, err := boltutil.ReadAny(bucket, bucketKeySpec)
 	if err != nil {
 		return api.Sandbox{}, err
+	}
+	// Avoid assigning a typed-nil (*anypb.Any)(nil) to the typeurl.Any interface,
+	// which would produce a non-nil interface value that fails type-URL lookup.
+	if spec != nil {
+		inst.Spec = spec
 	}
 
 	runtimeBucket := bucket.Bucket(bucketKeyRuntime)
@@ -382,9 +387,12 @@ func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error
 	}
 
 	inst.Runtime.Name = string(runtimeBucket.Get(bucketKeyName))
-	inst.Runtime.Options, err = boltutil.ReadAny(runtimeBucket, bucketKeyOptions)
+	runtimeOpts, err := boltutil.ReadAny(runtimeBucket, bucketKeyOptions)
 	if err != nil {
 		return api.Sandbox{}, err
+	}
+	if runtimeOpts != nil {
+		inst.Runtime.Options = runtimeOpts
 	}
 
 	inst.Extensions, err = boltutil.ReadExtensions(bucket)

@@ -70,8 +70,39 @@ var (
 
 var criEndpoint = flag.String("cri-endpoint", "unix:///run/containerd/containerd.sock", "The endpoint of cri plugin.")
 var runtimeHandler = flag.String("runtime-handler", "", "The runtime handler to use in the test.")
+var runtimeType = flag.String("runtime-type", "", "The OCI runtime type of the default runtime handler (e.g. io.containerd.runsc.v1).")
 var containerdBin = flag.String("containerd-bin", "containerd", "The containerd binary name. The name is used to restart containerd during test.")
 var buildDir = flag.String("build-dir", "", "Build output directory for containerd binaries")
+
+func runtimeHandlerIsRunsc() bool {
+	if *runtimeType == "io.containerd.runsc.v1" {
+		return true
+	}
+	// Match documented handler name aliases for gVisor / runsc.
+	switch *runtimeHandler {
+	case "runsc", "gvisor":
+		return true
+	}
+	return strings.HasPrefix(*runtimeHandler, "runsc-")
+}
+
+func failpointShimAvailable() bool {
+	for _, name := range []string{"containerd-shim-runc-fp-v1", "runc-fp"} {
+		if _, err := exec.LookPath(name); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func failpointCNIAvailable() bool {
+	cniBinDir := os.Getenv("CNI_BIN_DIR")
+	if cniBinDir == "" {
+		cniBinDir = "/opt/cni/bin"
+	}
+	_, err := os.Stat(filepath.Join(cniBinDir, "cni-bridge-fp"))
+	return err == nil
+}
 
 func TestMain(m *testing.M) {
 	flag.Parse()
