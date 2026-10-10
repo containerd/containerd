@@ -87,6 +87,10 @@ func checkLabel(string) error {
 	return nil
 }
 
+func checkLabel(string) error {
+	return nil
+}
+
 func isMLSEnabled() bool {
 	return false
 }
