@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
@@ -763,4 +764,46 @@ func TestLinuxContainerMounts(t *testing.T) {
 			assert.Equal(t, test.expectedMounts, mounts, test.desc)
 		})
 	}
+}
+
+func TestSnapshotOpts(t *testing.T) {
+	// Resolve the returned options the way the snapshotter would, so the test
+	// asserts on the labels that actually reach it.
+	resolve := func(t *testing.T, config *runtime.ContainerConfig) map[string]string {
+		t.Helper()
+		opts, err := snapshotOpts(config)
+		require.NoError(t, err)
+		var info snapshots.Info
+		for _, o := range opts {
+			require.NoError(t, o(&info))
+		}
+		return info.Labels
+	}
+
+	t.Run("takes the max-size annotation", func(t *testing.T) {
+		labels := resolve(t, &runtime.ContainerConfig{Annotations: map[string]string{
+			snapshots.LabelSnapshotMaxSize: "268435456",
+		}})
+		assert.Equal(t, map[string]string{
+			snapshots.LabelSnapshotMaxSize: "268435456",
+		}, labels)
+	})
+
+	t.Run("drops other snapshot annotations", func(t *testing.T) {
+		labels := resolve(t, &runtime.ContainerConfig{Annotations: map[string]string{
+			snapshots.LabelSnapshotMaxSize:            "268435456",
+			snapshots.LabelSnapshotUIDMapping:         "0:100000:65536",
+			snapshots.LabelSnapshotGIDMapping:         "0:100000:65536",
+			snapshots.LabelSnapshotRef:                "some-ref",
+			"containerd.io/snapshot/overlay.upperdir": "/somewhere",
+			"io.kubernetes.cri.sandbox-id":            "some-sandbox",
+		}})
+		assert.Equal(t, map[string]string{
+			snapshots.LabelSnapshotMaxSize: "268435456",
+		}, labels)
+	})
+
+	t.Run("no annotations add no labels", func(t *testing.T) {
+		assert.Nil(t, resolve(t, &runtime.ContainerConfig{}))
+	})
 }
