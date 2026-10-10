@@ -143,6 +143,7 @@ to all committers.
 | [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.9)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
 | [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.6)  | LTS            | April 30, 2026                 | April 30, 2028                 | @containerd/committers |
 | [2.4](https://github.com/containerd/containerd/releases/tag/v2.4.1)  | Active         | September 16, 2026             | May 16, 2027                   | @containerd/committers |
+| _[2.5](https://github.com/containerd/containerd/milestone/52)_       | _Planned_      | _January 6, 2027_              | _September 6, 2027_            | @containerd/committers |
 
 \* Support for the 2.0 release branch was provided by @containerd/committers until November 7, 2025. Extended support through March 2027 is provided by [@samuelkarp](https://github.com/samuelkarp) and [@chrishenzie](https://github.com/chrishenzie).  This extended support is focused on usage with Kubernetes 1.33 via [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).  Changes may not be accepted if they are not needed for this usage.
 
