@@ -43,6 +43,8 @@ const (
 	ImageLabelKey = criContainerdPrefix + ".image"
 	// ImageLabelValue is the label value indicating the image is managed by cri plugin.
 	ImageLabelValue = "managed"
+	// ImagePlatformLabelKey is the label key indicating the platform selected when pulling the image.
+	ImagePlatformLabelKey = criContainerdPrefix + ".image-platform"
 	// PinnedImageLabelKey is the label value indicating the image is pinned.
 	PinnedImageLabelKey = criContainerdPrefix + ".pinned"
 	// PinnedImageLabelValue is the label value indicating the image is pinned.

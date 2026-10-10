@@ -18,7 +18,10 @@ package images
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"github.com/containerd/errdefs"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
@@ -42,12 +45,26 @@ import (
 type imageClient interface {
 	ListImages(context.Context, ...string) ([]containerd.Image, error)
 	GetImage(context.Context, string) (containerd.Image, error)
+	GetImageWithPlatform(context.Context, string, platforms.MatchComparer) (containerd.Image, error)
 	Pull(context.Context, string, ...containerd.RemoteOpt) (containerd.Image, error)
+}
+
+type platformImageClient struct {
+	*containerd.Client
+}
+
+func (c *platformImageClient) GetImageWithPlatform(ctx context.Context, ref string, platform platforms.MatchComparer) (containerd.Image, error) {
+	i, err := c.ImageService().Get(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return containerd.NewImageWithPlatform(c.Client, i, platform), nil
 }
 
 type ImagePlatform struct {
 	Snapshotter string
-	Platform    imagespec.Platform
+	// Platform is nil when no platform is explicitly configured.
+	Platform *imagespec.Platform
 }
 
 type CRIImageService struct {
@@ -65,6 +82,9 @@ type CRIImageService struct {
 	imageFSPaths map[string]string
 	// runtimePlatforms maps runtime handlers to their configured image platforms.
 	runtimePlatforms map[string]*ImagePlatform
+	// defaultRuntimeName is the runtime used when a CRI request has an empty
+	// runtime handler.
+	defaultRuntimeName string
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
@@ -78,6 +98,11 @@ type CRIImageService struct {
 
 	// downloadLimiter is used to limit the number of concurrent downloads.
 	downloadLimiter *semaphore.Weighted
+}
+
+type resolvedRuntimeHandler struct {
+	Platform    *imagespec.Platform
+	Snapshotter string
 }
 
 type GRPCCRIImageService struct {
@@ -95,7 +120,7 @@ type CRIImageServiceOptions struct {
 
 	Snapshotters map[string]snapshots.Snapshotter
 
-	Client imageClient
+	Client *containerd.Client
 
 	Transferrer transfer.Transferrer
 }
@@ -118,7 +143,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	svc := CRIImageService{
 		config:                      config,
 		images:                      options.Images,
-		client:                      options.Client,
+		client:                      &platformImageClient{Client: options.Client},
 		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
@@ -139,22 +164,52 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	return &svc, nil
 }
 
-// UpdateRuntime records a runtime handler and its snapshotter, if one is configured.
-// It is called by the main CRI plugin after both image and runtime plugins are initialized.
-// imagePlatform is nil when the runtime has no snapshotter configured.
+// UpdateRuntime records a runtime handler and its image settings.
 func (c *CRIImageService) UpdateRuntime(runtimeName string, imagePlatform *ImagePlatform) {
 	if c.runtimePlatforms == nil {
 		c.runtimePlatforms = make(map[string]*ImagePlatform)
 	}
-	// Don't override if already configured
-	if _, exists := c.runtimePlatforms[runtimeName]; exists {
-		log.L.Debugf("Runtime %q already configured, not overriding", runtimeName)
+	// Fill missing settings without overriding image configuration.
+	if existing, exists := c.runtimePlatforms[runtimeName]; exists {
+		if existing != nil && existing.Snapshotter == "" && imagePlatform != nil {
+			existing.Snapshotter = imagePlatform.Snapshotter
+		}
+		log.L.Debugf("Runtime %q already configured, preserving image settings", runtimeName)
 		return
 	}
 	c.runtimePlatforms[runtimeName] = imagePlatform
 	if imagePlatform != nil {
 		log.L.Infof("Registered runtime %q with snapshotter %q", runtimeName, imagePlatform.Snapshotter)
 	}
+}
+
+// UpdateDefaultRuntimeName records the runtime used for CRI requests with an empty
+// runtime handler.
+func (c *CRIImageService) UpdateDefaultRuntimeName(runtimeName string) {
+	c.defaultRuntimeName = runtimeName
+}
+
+func (c *CRIImageService) resolveRuntimeHandler(handler string) (resolvedRuntimeHandler, error) {
+	if handler != "" {
+		if _, ok := c.runtimePlatforms[handler]; !ok {
+			return resolvedRuntimeHandler{}, fmt.Errorf("unknown runtime handler %q: %w", handler, errdefs.ErrInvalidArgument)
+		}
+	}
+
+	name := handler
+	if name == "" {
+		name = c.defaultRuntimeName
+	}
+	h := resolvedRuntimeHandler{
+		Snapshotter: c.config.Snapshotter,
+	}
+	if p, ok := c.runtimePlatforms[name]; ok && p != nil {
+		h.Platform = p.Platform
+		if p.Snapshotter != "" {
+			h.Snapshotter = p.Snapshotter
+		}
+	}
+	return h, nil
 }
 
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It

@@ -97,6 +97,12 @@ func NewStore(img Getter, provider content.InfoReaderProvider, platform platform
 
 // Update updates cache for a reference.
 func (s *Store) Update(ctx context.Context, ref string) error {
+	return s.UpdateWithPlatform(ctx, ref, nil)
+}
+
+// UpdateWithPlatform updates cache for a reference using the given platform matcher.
+// A nil matcher keeps using the store default.
+func (s *Store) UpdateWithPlatform(ctx context.Context, ref string, platform platforms.MatchComparer) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -107,7 +113,7 @@ func (s *Store) Update(ctx context.Context, ref string) error {
 
 	var img *Image
 	if err == nil {
-		img, err = s.getImage(ctx, i)
+		img, err = s.getImage(ctx, i, platform)
 		if err != nil {
 			return fmt.Errorf("get image info from containerd: %w", err)
 		}
@@ -146,20 +152,24 @@ func (s *Store) update(ref string, img *Image) error {
 	return s.store.add(*img)
 }
 
-// getImage gets image information from containerd for current platform.
-func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
-	diffIDs, err := i.RootFS(ctx, s.provider, s.platform)
+// getImage gets image information from containerd for the given platform matcher.
+// A nil matcher keeps using the store default.
+func (s *Store) getImage(ctx context.Context, i images.Image, platform platforms.MatchComparer) (*Image, error) {
+	if platform == nil {
+		platform = s.platform
+	}
+	diffIDs, err := i.RootFS(ctx, s.provider, platform)
 	if err != nil {
 		return nil, fmt.Errorf("get image diffIDs: %w", err)
 	}
 	chainID := imageidentity.ChainID(diffIDs)
 
-	size, err := usage.CalculateImageUsage(ctx, i, s.provider, usage.WithManifestLimit(s.platform, 1), usage.WithManifestUsage())
+	size, err := usage.CalculateImageUsage(ctx, i, s.provider, usage.WithManifestLimit(platform, 1), usage.WithManifestUsage())
 	if err != nil {
 		return nil, fmt.Errorf("get image compressed resource size: %w", err)
 	}
 
-	desc, err := i.Config(ctx, s.provider, s.platform)
+	desc, err := i.Config(ctx, s.provider, platform)
 	if err != nil {
 		return nil, fmt.Errorf("get image config descriptor: %w", err)
 	}
