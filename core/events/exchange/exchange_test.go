@@ -324,3 +324,36 @@ func TestExchangeValidateTopic(t *testing.T) {
 		})
 	}
 }
+
+func TestExchange_SlowSubscriberDoesNotDeadlock(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), t.Name())
+	exchange := NewExchange()
+
+	// Subscriber A (slow/dead)
+	ctxA, cancelA := context.WithCancel(ctx)
+	defer cancelA()
+	_, _ = exchange.Subscribe(ctxA)
+
+	// Subscriber B (healthy)
+	ctxB, cancelB := context.WithCancel(ctx)
+	defer cancelB()
+	eventqB, errqB := exchange.Subscribe(ctxB)
+
+	// Publish 10 events
+	go func() {
+		for i := 0; i < 10; i++ {
+			_ = exchange.Publish(ctx, "/test", &eventstypes.ContainerCreate{ID: "test"})
+		}
+	}()
+
+	// Read 10 events from Subscriber B
+	for i := 0; i < 10; i++ {
+		select {
+		case <-eventqB:
+		case err := <-errqB:
+			t.Fatalf("unexpected error: %v", err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for event, exchange is deadlocked")
+		}
+	}
+}
