@@ -319,14 +319,18 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 		if r.localStream != nil {
 			res.LogsStream = tstreaming.GenerateID("http-debug-logs")
 
-			stream, err := sm.Create(ctx, res.LogsStream)
+			streamCtx, cancel := context.WithCancel(ctx)
+			stream, err := sm.Create(streamCtx, res.LogsStream)
 			if err != nil {
+				cancel()
 				return nil, fmt.Errorf("failed to create stream for HTTP debug logs: %w", err)
 			}
 
 			go func() {
+				// A failed log destination must not leave the receiver running.
+				defer cancel()
 				// Start pumping logs to the client
-				_, err := io.Copy(r.localStream, tstreaming.ReceiveStream(ctx, stream))
+				_, err := io.Copy(r.localStream, tstreaming.ReceiveStream(streamCtx, stream))
 				if err != nil && !errors.Is(err, io.EOF) {
 					log.G(ctx).WithError(err).Error("failed to copy HTTP debug logs stream")
 				}

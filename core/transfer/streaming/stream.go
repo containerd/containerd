@@ -140,10 +140,19 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 	}()
 }
 
+// ReceiveStream reads data from stream until EOF or cancellation. Callers that
+// stop reading before EOF must cancel ctx. The stream's Send and Recv calls must
+// also be bound to ctx so cancellation can interrupt transport operations.
 func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 	r, w := io.Pipe()
+	// Transport cancellation cannot interrupt a pipe write when the consumer
+	// has stopped reading. Close the pipe as well to release that write.
+	stop := context.AfterFunc(ctx, func() {
+		w.CloseWithError(ctx.Err())
+	})
 	go func() {
 		defer stream.Close()
+		defer stop()
 		var window int32
 		for {
 			var werr error
@@ -166,7 +175,9 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 			}
 			anyType, err := stream.Recv()
 			if err != nil {
-				if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
+				if ctx.Err() != nil {
+					err = ctx.Err()
+				} else if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
 					err = nil
 				} else {
 					err = fmt.Errorf("received failed: %w", err)
