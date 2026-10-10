@@ -18,28 +18,27 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
-	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
-	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox"
-	containerdio "github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/errgroup"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/sandbox"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
+	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
+	containerdio "github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/netns"
 )
 
 // NOTE: The recovery logic has following assumption: when the cri plugin is down:
@@ -53,111 +52,13 @@ import (
 
 // recover recovers system state from containerd and status checkpoint.
 func (c *criService) recover(ctx context.Context) error {
-	// Recover all sandboxes.
-	sandboxes, err := c.client.Containers(ctx, filterLabel(crilabels.ContainerKindLabel, crilabels.ContainerKindSandbox))
-	if err != nil {
-		return fmt.Errorf("failed to list sandbox containers: %w", err)
-	}
-
-	podSandboxController, err := c.sandboxService.SandboxController(string(criconfig.ModePodSandbox))
-	if err != nil {
-		return fmt.Errorf("failed to get podsanbox controller %v", err)
-	}
-	podSandboxLoader, ok := podSandboxController.(podSandboxRecover)
-	if !ok {
-		log.G(ctx).Fatal("pod sandbox controller doesn't support recovery")
-	}
-
-	eg, ctx2 := errgroup.WithContext(ctx)
-	for _, sandbox := range sandboxes {
-		eg.Go(func() error {
-			sb, err := podSandboxLoader.RecoverContainer(ctx2, sandbox)
-			if err != nil {
-				log.G(ctx2).
-					WithError(err).
-					WithField("sandbox", sandbox.ID()).
-					Error("Failed to load sandbox")
-
-				return nil
-			}
-			log.G(ctx2).Debugf("Loaded sandbox %+v", sb)
-			if err := c.sandboxStore.Add(sb); err != nil {
-				return fmt.Errorf("failed to add sandbox %q to store: %w", sandbox.ID(), err)
-			}
-			if err := c.sandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
-				return fmt.Errorf("failed to reserve sandbox name %q: %w", sb.Name, err)
-			}
-			return nil
-		})
-	}
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-
-	// Recover sandboxes in the new SandboxStore
-	storedSandboxes, err := c.client.SandboxStore().List(ctx)
+	// Recover all sandboxes. Every controller rebuilt its own state in its
+	// plugin initialization; the store records are replayed against them here.
+	records, err := c.client.SandboxStore().List(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list sandboxes from API: %w", err)
 	}
-	for _, sbx := range storedSandboxes {
-		if _, err := c.sandboxStore.Get(sbx.ID); err == nil {
-			continue
-		}
-
-		metadata := sandboxstore.Metadata{}
-		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
-		if err != nil {
-			if errors.Is(err, errdefs.ErrNotFound) {
-				log.G(ctx).WithError(err).Errorf("failed to get metadata for stored sandbox %q", sbx.ID)
-				// Since commit https://github.com/containerd/containerd/pull/11612 has been merged metadata may not be nil.
-				// Before 1162 we should delete leaked sandbox from sandbox store to make sure containerd can start successfully.
-				err = c.client.SandboxStore().Delete(ctx, sbx.ID)
-				if err != nil {
-					log.G(ctx).WithError(err).Errorf("failed to delete sandbox %q, in response to failure to retrieve metadata for sandbox", sbx.ID)
-				}
-				continue
-			}
-			return fmt.Errorf("failed to get metadata for stored sandbox %q: %w", sbx.ID, err)
-		}
-
-		var (
-			state    = sandboxstore.StateUnknown
-			endpoint sandboxstore.Endpoint
-		)
-
-		status, err := c.sandboxService.SandboxStatus(ctx, sbx.Sandboxer, sbx.ID, false)
-		if err != nil {
-			log.G(ctx).
-				WithError(err).
-				WithField("sandbox", sbx.ID).
-				Error("failed to recover sandbox state")
-
-			if errdefs.IsNotFound(err) {
-				state = sandboxstore.StateNotReady
-			}
-		} else {
-			endpoint.Version = status.Version
-			endpoint.Address = status.Address
-			if code, ok := runtime.PodSandboxState_value[status.State]; ok {
-				if code == int32(runtime.PodSandboxState_SANDBOX_READY) {
-					state = sandboxstore.StateReady
-				} else if code == int32(runtime.PodSandboxState_SANDBOX_NOTREADY) {
-					state = sandboxstore.StateNotReady
-				}
-			}
-		}
-
-		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
-		sb.Sandboxer = sbx.Sandboxer
-		sb.Endpoint = endpoint
-
-		// Load network namespace.
-		sb.NetNS = getNetNS(&metadata)
-
-		if err := c.sandboxStore.Add(sb); err != nil {
-			return fmt.Errorf("failed to add stored sandbox %q to store: %w", sbx.ID, err)
-		}
-	}
+	c.recoverSandboxes(ctx, records)
 
 	for _, sb := range c.sandboxStore.List() {
 		status := sb.Status.Get()
@@ -172,11 +73,11 @@ func (c *criService) recover(ctx context.Context) error {
 		c.startSandboxExitMonitor(context.Background(), sb.ID, exitCh)
 	}
 	// Recover all containers.
-	containers, err := c.client.Containers(ctx, filterLabel(crilabels.ContainerKindLabel, crilabels.ContainerKindContainer))
+	containers, err := c.client.Containers(ctx, crilabels.Filter(crilabels.ContainerKindLabel, crilabels.ContainerKindContainer))
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
-	eg, ctx2 = errgroup.WithContext(ctx)
+	eg, ctx2 := errgroup.WithContext(ctx)
 	for _, container := range containers {
 		eg.Go(func() error {
 			cntr, exitCh, pid, err := c.loadContainer(ctx2, container)
@@ -205,47 +106,188 @@ func (c *criService) recover(ctx context.Context) error {
 	if err := eg.Wait(); err != nil {
 		return err
 	}
+
 	// Recover all images.
 	if err := c.ImageService.CheckImages(ctx); err != nil {
 		return fmt.Errorf("failed to check images: %w", err)
 	}
 
-	// It's possible that containerd containers are deleted unexpectedly. In that case,
-	// we can't even get metadata, we should cleanup orphaned sandbox/container directories
-	// with best effort.
+	// Clean up, with best effort, the sandbox and container directories left
+	// behind by containers that were deleted unexpectedly. A sandbox directory
+	// is live while its sandbox record exists, whether or not the sandbox could
+	// be recovered, or while a pause container of that id exists.
+	//
+	// TODO: drop the pause container query once podsandbox/ is removed.
+	// RemovePodSandbox deletes the record after the pause container. The query
+	// only matters for a pause container that does not have a record.
+	liveSandboxes := make(map[string]struct{}, len(records))
+	for _, record := range records {
+		liveSandboxes[record.ID] = struct{}{}
+	}
+	pauseContainers, err := c.client.Containers(ctx, crilabels.Filter(crilabels.ContainerKindLabel, crilabels.ContainerKindSandbox))
+	if err != nil {
+		return fmt.Errorf("failed to list sandbox containers: %w", err)
+	}
+	for _, cntr := range pauseContainers {
+		liveSandboxes[cntr.ID()] = struct{}{}
+	}
+	liveContainers := make(map[string]struct{}, len(containers))
+	for _, cntr := range containers {
+		liveContainers[cntr.ID()] = struct{}{}
+	}
 
 	// Cleanup orphaned sandbox and container directories without corresponding containerd container.
 	for _, cleanup := range []struct {
-		cntrs  []containerd.Container
+		live   map[string]struct{}
 		base   string
 		errMsg string
 	}{
 		{
-			cntrs:  sandboxes,
+			live:   liveSandboxes,
 			base:   filepath.Join(c.config.RootDir, sandboxesDir),
 			errMsg: "failed to cleanup orphaned sandbox directories",
 		},
 		{
-			cntrs:  sandboxes,
+			live:   liveSandboxes,
 			base:   filepath.Join(c.config.StateDir, sandboxesDir),
 			errMsg: "failed to cleanup orphaned volatile sandbox directories",
 		},
 		{
-			cntrs:  containers,
+			live:   liveContainers,
 			base:   filepath.Join(c.config.RootDir, containersDir),
 			errMsg: "failed to cleanup orphaned container directories",
 		},
 		{
-			cntrs:  containers,
+			live:   liveContainers,
 			base:   filepath.Join(c.config.StateDir, containersDir),
 			errMsg: "failed to cleanup orphaned volatile container directories",
 		},
 	} {
-		if err := cleanupOrphanedIDDirs(ctx, cleanup.cntrs, cleanup.base); err != nil {
+		if err := cleanupOrphanedIDDirs(ctx, cleanup.live, cleanup.base); err != nil {
 			return fmt.Errorf("%s: %w", cleanup.errMsg, err)
 		}
 	}
 	return nil
+}
+
+// sandboxRecoveryConcurrency is the number of sandbox controllers queried at
+// a time during recovery.
+const sandboxRecoveryConcurrency = 16
+
+// recoverSandboxes rebuilds the sandbox cache from the sandbox store records:
+// each one is loaded, cached and has its name reserved. A record that cannot
+// be replayed is logged and skipped. Its directories stay in place for
+// inspection.
+func (c *criService) recoverSandboxes(ctx context.Context, records []sandbox.Sandbox) {
+	// Each query may take the whole recovery timeout. Run them in parallel,
+	// sandboxRecoveryConcurrency at a time.
+	var eg errgroup.Group
+	eg.SetLimit(sandboxRecoveryConcurrency)
+	loaded := make([]*sandboxstore.Sandbox, len(records))
+	for i, record := range records {
+		var metadata sandboxstore.Metadata
+		if err := record.GetExtension(sandboxstore.MetadataKey, &metadata); err != nil {
+			log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to read the metadata of the stored sandbox, skipping it")
+			continue
+		}
+
+		eg.Go(func() error {
+			sb := c.loadSandbox(ctx, record, metadata)
+			loaded[i] = &sb
+			return nil
+		})
+	}
+	// A failed query leaves the sandbox in the unknown state; eg.Wait always
+	// returns nil.
+	_ = eg.Wait()
+
+	// Cache the sandboxes in record order so that the first of two records
+	// with the same name keeps the name.
+	for i, recovered := range loaded {
+		if recovered == nil {
+			continue
+		}
+		record := records[i]
+		sb := *recovered
+		log.G(ctx).Debugf("Loaded sandbox %+v", sb)
+		if err := c.sandboxStore.Add(sb); err != nil {
+			log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to cache the stored sandbox, skipping it")
+			continue
+		}
+		if err := c.sandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
+			// Another stored sandbox has the same name. Both are served and
+			// kubelet removes the one it does not want.
+			log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to reserve the name of the stored sandbox")
+		}
+	}
+}
+
+// loadSandbox builds the cached view of a stored sandbox from its record, its
+// CRI metadata and the status of its controller. The controller is the
+// authority on liveness. ErrNotFound means the controller does not have an
+// instance for the sandbox and the sandbox is not ready. Any other error
+// leaves the state unknown and the exit monitor keeps watching the sandbox.
+func (c *criService) loadSandbox(ctx context.Context, record sandbox.Sandbox, metadata sandboxstore.Metadata) sandboxstore.Sandbox {
+	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
+	defer cancel()
+
+	status := sandboxstore.Status{
+		State:     sandboxstore.StateUnknown,
+		CreatedAt: record.CreatedAt,
+	}
+	var endpoint sandboxstore.Endpoint
+
+	cstatus, err := c.sandboxService.SandboxStatus(ctx, record.Sandboxer, record.ID, false)
+	switch {
+	case err == nil:
+		switch cstatus.State {
+		case runtime.PodSandboxState_SANDBOX_READY.String():
+			status.State = sandboxstore.StateReady
+		case runtime.PodSandboxState_SANDBOX_NOTREADY.String():
+			status.State = sandboxstore.StateNotReady
+		}
+		if status.State == sandboxstore.StateReady {
+			status.Pid = cstatus.Pid
+		} else {
+			status.ExitedAt = cstatus.ExitedAt
+		}
+		if !cstatus.CreatedAt.IsZero() {
+			status.CreatedAt = cstatus.CreatedAt
+		}
+		endpoint.Version = cstatus.Version
+		endpoint.Address = cstatus.Address
+	case errdefs.IsNotFound(err):
+		log.G(ctx).WithError(err).WithField("sandbox", record.ID).Info("Sandbox controller has no instance for the stored sandbox, it is not ready")
+		status.State = sandboxstore.StateNotReady
+	default:
+		log.G(ctx).WithError(err).WithField("sandbox", record.ID).Error("Failed to recover sandbox state, it is unknown")
+	}
+
+	var updated sandboxstore.UpdatedResources
+	if err := record.GetExtension(sandboxstore.UpdatedResourcesKey, &updated); err == nil {
+		if updated.Resources != nil {
+			status.Resources = &runtime.ContainerResources{Linux: updated.Resources}
+		}
+		if updated.Overhead != nil {
+			status.Overhead = &runtime.ContainerResources{Linux: updated.Overhead}
+		}
+	} else if !errdefs.IsNotFound(err) {
+		log.G(ctx).WithError(err).WithField("sandbox", record.ID).Warn("Failed to read the updated resources of the stored sandbox")
+	}
+
+	// Records written by 2.3 and 2.4 carry the SELinux process label of a
+	// pause sandbox only as a controller label.
+	if metadata.ProcessLabel == "" {
+		metadata.ProcessLabel = record.Labels["selinux_label"]
+	}
+
+	sb := sandboxstore.NewSandbox(metadata, status)
+	sb.Sandboxer = record.Sandboxer
+	sb.Endpoint = endpoint
+
+	// Load network namespace.
+	sb.NetNS = getNetNS(&metadata)
+	return sb
 }
 
 // loadContainerTimeout is the default timeout for loading a container/sandbox.
@@ -432,12 +474,6 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 	return container, exitCh, statusPid, err
 }
 
-// podSandboxRecover is an additional interface implemented by podsandbox/ controller to handle
-// Pod sandbox containers recovery.
-type podSandboxRecover interface {
-	RecoverContainer(ctx context.Context, cntr containerd.Container) (sandboxstore.Sandbox, error)
-}
-
 func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
 	// Don't need to load netns for host network sandbox.
 	if hostNetwork(meta.Config) {
@@ -446,22 +482,20 @@ func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
 	return netns.LoadNetNS(meta.NetNSPath)
 }
 
-func cleanupOrphanedIDDirs(ctx context.Context, cntrs []containerd.Container, base string) error {
+// cleanupOrphanedIDDirs removes the per-id directories under base whose id is
+// not in live.
+func cleanupOrphanedIDDirs(ctx context.Context, live map[string]struct{}, base string) error {
 	// Cleanup orphaned id directories.
 	dirs, err := os.ReadDir(base)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read base directory: %w", err)
-	}
-	idsMap := make(map[string]containerd.Container)
-	for _, cntr := range cntrs {
-		idsMap[cntr.ID()] = cntr
 	}
 	for _, d := range dirs {
 		if !d.IsDir() {
 			log.G(ctx).Warnf("Invalid file %q found in base directory %q", d.Name(), base)
 			continue
 		}
-		if _, ok := idsMap[d.Name()]; ok {
+		if _, ok := live[d.Name()]; ok {
 			// Do not remove id directory if corresponding container is found.
 			continue
 		}

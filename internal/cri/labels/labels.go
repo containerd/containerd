@@ -33,6 +33,8 @@ limitations under the License.
 package labels
 
 import (
+	"fmt"
+
 	clabels "github.com/containerd/containerd/v2/pkg/labels"
 )
 
@@ -68,3 +70,9 @@ const (
 	// PodInfraContainerName is the Kubernetes container name used for infra containers.
 	PodInfraContainerName = "POD"
 )
+
+// Filter returns the containerd filter expression selecting the objects whose
+// label k has the value v.
+func Filter(k, v string) string {
+	return fmt.Sprintf("labels.%q==%q", k, v)
+}
