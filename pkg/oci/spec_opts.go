@@ -893,10 +893,12 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 				username = userstr
 			}
 			gids, err := getSupplementalGroupsFromFS(root, func(g user.Group) bool {
-				// we only want supplemental groups
-				if g.Name == username {
-					return false
-				}
+				// A user belongs to a supplemental group if they are listed as
+				// a member of that group in /etc/group. We must not exclude a
+				// group merely because it shares its name with the user: a
+				// same-named group is not necessarily the user's primary group
+				// (see https://github.com/containerd/containerd/issues/11937).
+				// The primary group is added separately by ensureAdditionalGids.
 				return slices.Contains(g.List, username)
 			})
 			if err != nil {
