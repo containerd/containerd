@@ -634,6 +634,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	}
 
 	for _, value := range slices.Backward(encoding) {
+		raw := body.ReadCloser
 		algorithm := strings.ToLower(value)
 		switch algorithm {
 		case "zstd":
@@ -657,9 +658,30 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		default:
 			return nil, 0, errors.New("unsupported Content-Encoding algorithm: " + algorithm)
 		}
+		if body.ReadCloser != raw {
+			// Each decoder owns only its internal state. Chain its closer to the
+			// previous body immediately so later decoding errors close every layer.
+			body.ReadCloser = &closeAlsoReader{ReadCloser: body.ReadCloser, also: raw}
+		}
 	}
 
 	return body, remaining, nil
+}
+
+// closeAlsoReader closes an additional io.Closer alongside the wrapped
+// ReadCloser. Used to keep a raw reader reachable for closing after it has
+// been wrapped by a decompressor that does not close what it wraps.
+type closeAlsoReader struct {
+	io.ReadCloser
+	also io.Closer
+}
+
+func (c *closeAlsoReader) Close() error {
+	err := c.ReadCloser.Close()
+	if aerr := c.also.Close(); err == nil {
+		err = aerr
+	}
+	return err
 }
 
 type fnOnClose struct {
