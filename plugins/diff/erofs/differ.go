@@ -56,10 +56,19 @@ type erofsDiff struct {
 	enableTarIndex bool
 	// enableDmverity enables formatting layers with dm-verity after creation
 	enableDmverity bool
+	// mount is an optional mount manager used to activate mounts
+	mount mount.Manager
 }
 
 // DifferOpt is an option for configuring the erofs differ
 type DifferOpt func(d *erofsDiff)
+
+// WithMountManager sets the mount manager used to activate mounts
+func WithMountManager(mm mount.Manager) DifferOpt {
+	return func(d *erofsDiff) {
+		d.mount = mm
+	}
+}
 
 // WithMkfsOptions sets extra options for mkfs.erofs
 func WithMkfsOptions(opts []string) DifferOpt {

@@ -17,6 +17,8 @@
 package erofs
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -33,6 +35,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/mount"
 	mountmanager "github.com/containerd/containerd/v2/core/mount/manager"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -46,6 +50,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins/content/local"
 	erofsdiffer "github.com/containerd/containerd/v2/plugins/diff/erofs"
+	"github.com/containerd/containerd/v2/plugins/diff/walking"
 	erofsmount "github.com/containerd/containerd/v2/plugins/mount/erofs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -659,6 +664,100 @@ func testDmverityEndToEndWithMode(t *testing.T, useTarIndex bool) {
 		return err
 	})
 	assert.Error(t, err, "snapshot should be removed from metadata")
+}
+
+func TestCompareWithMultiLayerParent(t *testing.T) {
+	testutil.RequiresRoot(t)
+	if _, err := exec.LookPath("mkfs.erofs"); err != nil {
+		t.Skipf("could not find mkfs.erofs: %v", err)
+	}
+
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	tempDir := t.TempDir()
+
+	db, err := bolt.Open(filepath.Join(tempDir, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	defer db.Close()
+	mm, err := mountmanager.NewManager(db, filepath.Join(tempDir, "mount-manager"),
+		mountmanager.WithMountHandler("erofs", erofsmount.NewErofsMountHandler()))
+	require.NoError(t, err)
+
+	lcs, err := local.NewStore(filepath.Join(tempDir, "content"))
+	require.NoError(t, err)
+	mdb, err := bolt.Open(filepath.Join(tempDir, "meta.db"), 0600, nil)
+	require.NoError(t, err)
+	defer mdb.Close()
+	cs := metadata.NewDB(mdb, lcs, nil).ContentStore()
+
+	sn, err := NewSnapshotter(filepath.Join(tempDir, "snapshots"))
+	require.NoError(t, err)
+	defer sn.Close()
+	s := sn.(*snapshotter)
+
+	erofsDiff := erofsdiffer.NewErofsDiffer(cs, erofsdiffer.WithMountManager(mm))
+
+	var parent string
+	for i := range 2 {
+		name := fmt.Sprintf("layer%d.txt", i)
+		tc := tartest.TarContext{}.WithModTime(time.Now())
+		tarContent, err := io.ReadAll(tartest.TarFromWriterTo(tartest.TarAll(tc.File(name, []byte(name), 0644))))
+		require.NoError(t, err)
+		desc := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Digest:    digest.FromBytes(tarContent),
+			Size:      int64(len(tarContent)),
+		}
+		require.NoError(t, content.WriteBlob(ctx, cs, name, bytes.NewReader(tarContent), desc))
+
+		key := fmt.Sprintf("extract-%d", i)
+		mounts, err := sn.Prepare(ctx, key, parent)
+		require.NoError(t, err)
+		_, err = erofsDiff.Apply(ctx, desc, mounts)
+		require.NoError(t, err)
+		parent = fmt.Sprintf("layer-%d", i)
+		require.NoError(t, sn.Commit(ctx, parent, key))
+	}
+
+	upper, err := sn.Prepare(ctx, "container", parent)
+	require.NoError(t, err)
+	upperDir := s.upperPath(snapshotID(t, ctx, s, "container"))
+	require.NoError(t, os.WriteFile(filepath.Join(upperDir, "marker"), []byte("changed"), 0644))
+
+	lower, err := sn.View(ctx, "container-lower", parent)
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name   string
+		differ diff.Comparer
+	}{
+		{name: "walking", differ: walking.NewWalkingDiffWithMountManager(cs, mm)},
+		{name: "erofs", differ: erofsDiff},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			desc, err := tc.differ.Compare(ctx, lower, upper, diff.WithMediaType(ocispec.MediaTypeImageLayer))
+			require.NoError(t, err)
+
+			ra, err := cs.ReaderAt(ctx, desc)
+			require.NoError(t, err)
+			defer ra.Close()
+
+			var names []string
+			tr := tar.NewReader(content.NewReader(ra))
+			for {
+				hdr, err := tr.Next()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				names = append(names, hdr.Name)
+			}
+			assert.Equal(t, []string{"marker"}, names)
+
+			active, err := mm.List(ctx)
+			require.NoError(t, err)
+			assert.Empty(t, active, "mounts must be deactivated after compare")
+		})
+	}
 }
 
 // TestDmverityModeValidation tests dm-verity mode validation during snapshotter creation

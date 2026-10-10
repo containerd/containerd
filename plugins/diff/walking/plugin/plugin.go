@@ -55,7 +55,7 @@ func init() {
 			cs := md.(*metadata.DB).ContentStore()
 
 			return diffPlugin{
-				Comparer: walking.NewWalkingDiff(cs),
+				Comparer: walking.NewWalkingDiffWithMountManager(cs, mm),
 				Applier:  apply.NewFileSystemApplierWithMountManager(cs, mm),
 			}, nil
 		},
