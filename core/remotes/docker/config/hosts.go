@@ -57,6 +57,7 @@ type hostConfig struct {
 
 	header http.Header
 
+	passUpstreamCredentials bool
 	// TODO: Add credential configuration (domain alias, username)
 }
 
@@ -165,13 +166,14 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		authOpts = append(authOpts, options.AuthorizerOpts...)
 		authorizer := docker.NewDockerAuthorizer(authOpts...)
 
+		upstreamHost := host
 		rhosts := make([]docker.RegistryHost, len(hosts))
 		for i, host := range hosts {
 			// Allow setting for each host as well
 			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
 			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 {
+			if explicitTLSFromHost || host.dialTimeout != nil || len(host.header) != 0 || host.passUpstreamCredentials {
 				c := *client
 				if explicitTLSFromHost || host.dialTimeout != nil {
 					tr := defaultTransport.Clone()
@@ -203,6 +205,11 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				authOpts := authOpts
 				if len(host.header) != 0 {
 					authOpts = append(authOpts, docker.WithAuthHeader(host.header))
+				}
+				if host.passUpstreamCredentials && options.Credentials != nil {
+					authOpts = append(authOpts, docker.WithAuthCreds(func(string) (string, string, error) {
+						return options.Credentials(upstreamHost)
+					}))
 				}
 
 				rhosts[i].Client = &c
@@ -374,6 +381,9 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
+	// PassUpstreamCredentials indicates whether the credentials for
+	// upstream registry should be passed to the mirror registry.
+	PassUpstreamCredentials bool `toml:"pass_upstream_credentials"`
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -543,6 +553,8 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		}
 		result.dialTimeout = &dialTimeout
 	}
+
+	result.passUpstreamCredentials = config.PassUpstreamCredentials
 
 	return result, nil
 }
