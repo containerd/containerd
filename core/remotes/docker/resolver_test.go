@@ -28,8 +28,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -781,6 +783,10 @@ func TestIsTransientTransportErr(t *testing.T) {
 		{name: "io.EOF", err: io.EOF, want: true},
 		{name: "io.ErrUnexpectedEOF", err: io.ErrUnexpectedEOF, want: true},
 		{name: "wrapped io.EOF", err: fmt.Errorf("wrapped: %w", io.EOF), want: true},
+		{name: "connection reset by peer", err: &net.OpError{Op: "read", Net: "tcp", Err: os.NewSyscallError("read", syscall.ECONNRESET)}, want: true},
+		{name: "wrapped connection reset by peer", err: fmt.Errorf("wrapped: %w", syscall.ECONNRESET), want: true},
+		{name: "broken pipe", err: &net.OpError{Op: "write", Net: "tcp", Err: os.NewSyscallError("write", syscall.EPIPE)}, want: true},
+		{name: "connection refused not transient", err: &net.OpError{Op: "dial", Net: "tcp", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)}, want: false},
 		{name: "generic error not transient", err: errors.New("nope"), want: false},
 		{name: "context canceled not transient", err: context.Canceled, want: false},
 		{name: "context deadline exceeded not transient", err: context.DeadlineExceeded, want: false},
@@ -857,6 +863,24 @@ func TestDoWithTransportRetries(t *testing.T) {
 		var calls int
 		attempts := 3
 		results := []error{fakeTimeoutErr{}, nil}
+		r := newTransportRetryRequest(newSequenceRT(t, results, &calls))
+		resp, err := r.doWithTransportRetries(context.Background(), &attempts, true)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		resp.Body.Close()
+		if calls != 2 {
+			t.Errorf("expected 2 calls, got %d", calls)
+		}
+		if attempts != 1 {
+			t.Errorf("expected 2 attempts consumed (1 remaining), got %d", attempts)
+		}
+	})
+
+	t.Run("retries connection reset then succeeds", func(t *testing.T) {
+		var calls int
+		attempts := 3
+		results := []error{&net.OpError{Op: "read", Net: "tcp", Err: os.NewSyscallError("read", syscall.ECONNRESET)}, nil}
 		r := newTransportRetryRequest(newSequenceRT(t, results, &calls))
 		resp, err := r.doWithTransportRetries(context.Background(), &attempts, true)
 		if err != nil {
