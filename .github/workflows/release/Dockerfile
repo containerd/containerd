@@ -24,7 +24,7 @@ COPY --from=xx / /
 SHELL ["/bin/bash", "-xec"]
 ENV DEBIAN_FRONTEND=noninteractive
 RUN	apt-get update && \
-	apt-get install -y dpkg-dev git make pkg-config
+	apt-get install -y dpkg-dev git make pkg-config zip
 ARG TARGETPLATFORM
 # gcc is needed for github.com/containerd/btrfs/v2
 RUN xx-apt-get install -y gcc
