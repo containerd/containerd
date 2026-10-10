@@ -33,6 +33,8 @@ const (
 	NRIPluginInterface Warning = Prefix + "nri-plugin-interface"
 	// CgroupV1 is a warning for the use of cgroup v1
 	CgroupV1 Warning = Prefix + "cgroup-v1"
+	// CRIEnableCRIU is a warning for the deprecated `enable_criu` property.
+	CRIEnableCRIU Warning = Prefix + "enable-criu"
 	// RuncOptionsTaskAPIAddress is a warning for the use of `task_api_address` in runc options
 	RuncOptionsTaskAPIAddress Warning = Prefix + "runc-options-task-api-address"
 	// RuncOptionsTaskAPIVersion is a warning for the use of `task_api_version` in runc options
@@ -54,6 +56,7 @@ var messages = map[Warning]string{
 	NRIV010Plugin:      "NRI 0.1.0-style plugins are deprecated since containerd 2.2 and should only be used through the v010-adapter plugin.",
 	NRIPluginInterface: "NRI plugin uses a deprecated interface.",
 	CgroupV1:           "The support for cgroup v1 is deprecated since containerd v2.2 and will be removed by no later than May 2029. Upgrade the host to use cgroup v2.",
+	CRIEnableCRIU:      "The `enable_criu` property of `[plugins.\"io.containerd.cri.v1.runtime\"]` is deprecated and will be removed in containerd v2.5. Use `enable_checkpoint_restore` instead.",
 
 	RuncOptionsTaskAPIAddress: "The `task_api_address` field in runc options is deprecated since containerd v2.3. Set `task_api_address` on CreateTaskRequest instead.",
 	RuncOptionsTaskAPIVersion: "The `task_api_version` field in runc options is deprecated since containerd v2.3. Set `task_api_version` on CreateTaskRequest instead.",
