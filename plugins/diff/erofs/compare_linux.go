@@ -18,12 +18,9 @@ package erofs
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"path/filepath"
-	"time"
 
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/errdefs"
@@ -187,12 +184,4 @@ func (s erofsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts
 		Size:      info.Size,
 		Digest:    info.Digest,
 	}, nil
-}
-
-func uniqueRef() string {
-	t := time.Now()
-	var b [3]byte
-	// Ignore read failures, just decreases uniqueness
-	rand.Read(b[:])
-	return fmt.Sprintf("%d-%s", t.UnixNano(), base64.URLEncoding.EncodeToString(b[:]))
 }
