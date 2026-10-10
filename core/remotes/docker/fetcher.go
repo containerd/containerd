@@ -282,9 +282,6 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				continue
 			}
 
-			ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
-			log.G(ctx).Info("request")
-
 			// Try this first, parse it
 			host := RegistryHost{
 				Client:       http.DefaultClient,
@@ -301,6 +298,9 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 			if u.RawQuery != "" {
 				req.path = req.path + "?" + u.RawQuery
 			}
+
+			ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", req.sanitizedURL()))
+			log.G(ctx).Info("request")
 
 			rc, _, err := r.open(ctx, req, desc.MediaType, offset, false)
 			if err != nil {
