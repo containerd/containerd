@@ -18,6 +18,8 @@ package command
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"iter"
 	"os"
 	"path/filepath"
@@ -101,24 +103,109 @@ var configCommand = &cli.Command{
 		{
 			Name:  "migrate",
 			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
-			// TODO(vinayakankugoyal): This should not output fields that were not set in the current configuration.
-			Action: dumpConfig,
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				return migrateConfig(ctx, cmd.String("config"), os.Stdout)
+			},
 		},
 	},
 }
 
 func dumpConfig(ctx context.Context, cmd *cli.Command) error {
 	config := defaultConfig()
-
-	g := registry.Graph(func(*plugin.Registration) bool { return false })
-	plugins := func() iter.Seq[plugin.Registration] {
-		return slices.Values(g)
-	}
-	if err := srvconfig.LoadConfigWithPlugins(ctx, cmd.String("config"), plugins, config); err != nil && !os.IsNotExist(err) {
+	if err := loadConfig(ctx, cmd.String("config"), config); err != nil {
 		return err
 	}
 
 	return outputConfig(ctx, config)
+}
+
+// loadConfig loads the config file at path into config, running the config
+// migrations of all registered plugins. A missing file is not an error.
+func loadConfig(ctx context.Context, path string, config *srvconfig.Config) error {
+	g := registry.Graph(func(*plugin.Registration) bool { return false })
+	plugins := func() iter.Seq[plugin.Registration] {
+		return slices.Values(g)
+	}
+	if err := srvconfig.LoadConfigWithPlugins(ctx, path, plugins, config); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// migrateConfig writes the config file at path migrated to the latest
+// version. Only values set in the file and the files it imports are output,
+// no defaults are added.
+func migrateConfig(ctx context.Context, path string, w io.Writer) error {
+	// The version must be set to the latest, a loaded config is only
+	// migrated up to the version of the config it is loaded into.
+	config := &srvconfig.Config{Version: version.ConfigVersion}
+	if err := loadConfig(ctx, path, config); err != nil {
+		return err
+	}
+
+	b, err := toml.Marshal(config)
+	if err != nil {
+		return err
+	}
+	out := map[string]any{}
+	if err := toml.Unmarshal(b, &out); err != nil {
+		return err
+	}
+
+	// The config fields are encoded even when unset. Unset values and empty
+	// values have the same meaning when a config is loaded, so empty values
+	// can be removed. This does not apply to the map fields. The entries of
+	// proxy_plugins, stream_processors and timeouts replace existing entries
+	// as a whole when loaded, and plugin configs are decoded on top of the
+	// plugin defaults, where an empty value overrides a default.
+	for k, v := range out {
+		switch k {
+		case "plugins", "proxy_plugins", "stream_processors", "timeouts":
+			if m, ok := v.(map[string]any); ok && len(m) == 0 {
+				delete(out, k)
+			}
+		default:
+			if isEmptyValue(v) {
+				delete(out, k)
+			}
+		}
+	}
+
+	// The version is written separately to keep it first in the output.
+	delete(out, "version")
+	if _, err := fmt.Fprintf(w, "version = %d\n", config.Version); err != nil {
+		return err
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+	return toml.NewEncoder(w).SetIndentTables(true).Encode(out)
+}
+
+// isEmptyValue returns whether a decoded TOML value is empty, a table is
+// empty when it has no non-empty values. Empty values are removed from tables.
+func isEmptyValue(v any) bool {
+	switch v := v.(type) {
+	case map[string]any:
+		for k, e := range v {
+			if isEmptyValue(e) {
+				delete(v, k)
+			}
+		}
+		return len(v) == 0
+	case []any:
+		return len(v) == 0
+	case string:
+		return v == ""
+	case int64:
+		return v == 0
+	case bool:
+		return !v
+	}
+	return false
 }
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
