@@ -35,6 +35,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -44,6 +45,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/containerd/v2/internal/tracingutil"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 )
@@ -463,7 +465,7 @@ func (u *Unpacker) unpack(
 	copy(chainIDs, diffIDs)
 	chainIDs = identity.ChainIDs(chainIDs)
 
-	topHalf := func(i int, desc ocispec.Descriptor, span *tracing.Span, startAt time.Time) (<-chan *unpackStatus, error) {
+	topHalf := func(layerCtx context.Context, i int, desc ocispec.Descriptor, span *tracing.Span, startAt time.Time) (<-chan *unpackStatus, error) {
 		var (
 			err     error
 			parent  string
@@ -547,17 +549,25 @@ func (u *Unpacker) unpack(
 		// commitF is the bottom half shared by normal and staged layers: it rebases
 		// in the real parent (parallel mode) and commits the snapshot. Staged layers
 		// skip apply's digest verification, so they cannot set the uncompressed label.
-		commitF := func(shouldAbort bool) error {
+		commitF := func(shouldAbort bool) (commitErr error) {
 			defer unlock()
 			if shouldAbort {
 				cleanup.Do(ctx, abort)
 				return nil
 			}
 
+			// The span covers only the commit itself.
+			commitCtx, commitSpan := tracing.StartSpan(layerCtx, tracing.Name(unpackSpanPrefix, "commit"))
+			commitSpan.SetAttributes(layerAttributes(desc)...)
+			defer func() {
+				commitSpan.SetStatus(commitErr)
+				commitSpan.End()
+			}()
+
 			if i > 0 && parallel {
 				opts = append(opts, snapshots.WithParent(chainIDs[i-1].String()))
 			}
-			if err := sn.Commit(ctx, chainID, key, opts...); err != nil {
+			if err := sn.Commit(commitCtx, chainID, key, opts...); err != nil {
 				cleanup.Do(ctx, abort)
 				if errdefs.IsAlreadyExists(err) {
 					return nil
@@ -642,21 +652,27 @@ func (u *Unpacker) unpack(
 				mounts = bindToOverlay(mounts)
 			}
 
-			diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
-			if err != nil {
-				cleanup.Do(ctx, abort)
-				status.err = fmt.Errorf("failed to extract layer (%s %s) to %s as %q: %w", desc.MediaType, desc.Digest, unpack.SnapshotterKey, key, err)
-				resCh <- status
-				return
-			}
+			status.err = func() (applyErr error) {
+				// The span covers only the extraction itself.
+				applyCtx, applySpan := tracing.StartSpan(layerCtx, tracing.Name(unpackSpanPrefix, "apply"))
+				applySpan.SetAttributes(layerAttributes(desc)...)
+				defer func() {
+					applySpan.SetStatus(applyErr)
+					applySpan.End()
+				}()
 
-			if diff.Digest != diffIDs[i] {
+				diff, err := a.Apply(applyCtx, desc, mounts, unpack.ApplyOpts...)
+				if err != nil {
+					return fmt.Errorf("failed to extract layer (%s %s) to %s as %q: %w", desc.MediaType, desc.Digest, unpack.SnapshotterKey, key, err)
+				}
+				if diff.Digest != diffIDs[i] {
+					return fmt.Errorf("wrong diff id %q calculated on extraction %q, desc %q", diff.Digest, diffIDs[i], desc.Digest)
+				}
+				return nil
+			}()
+			if status.err != nil {
 				cleanup.Do(ctx, abort)
-				status.err = fmt.Errorf("wrong diff id %q calculated on extraction %q, desc %q", diff.Digest, diffIDs[i], desc.Digest)
-				resCh <- status
-				return
 			}
-
 			resCh <- status
 		}()
 
@@ -692,14 +708,10 @@ func (u *Unpacker) unpack(
 	)
 
 	for i, desc := range layers {
-		_, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpackLayer"))
+		layerCtx, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpackLayer"))
 		unpackLayerStart := time.Now()
-		layerSpan.SetAttributes(
-			tracing.Attribute("layer.media.type", desc.MediaType),
-			tracing.Attribute("layer.media.size", desc.Size),
-			tracing.Attribute("layer.media.digest", desc.Digest.String()),
-		)
-		statusCh, err := topHalf(i, desc, layerSpan, unpackLayerStart)
+		layerSpan.SetAttributes(layerAttributes(desc)...)
+		statusCh, err := topHalf(layerCtx, i, desc, layerSpan, unpackLayerStart)
 		if err != nil {
 			layerSpan.SetStatus(err)
 			layerSpan.End()
@@ -777,22 +789,26 @@ func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 	eg, ctx2 := errgroup.WithContext(ctx)
 	for i, desc := range layers {
 		ctx2, layerSpan := tracing.StartSpan(ctx2, tracing.Name(unpackSpanPrefix, "fetchLayer"))
-		layerSpan.SetAttributes(
-			tracing.Attribute("layer.media.type", desc.MediaType),
-			tracing.Attribute("layer.media.size", desc.Size),
-			tracing.Attribute("layer.media.digest", desc.Digest.String()),
-		)
+		layerAttrs := layerAttributes(desc)
+		layerSpan.SetAttributes(layerAttrs...)
+		ctx2 = tracingutil.ContextWithAttributes(ctx2, layerAttrs...)
+
 		var ch chan struct{}
 		if done != nil {
 			ch = done[i]
 		}
 
 		if err := u.acquire(ctx, u.limiter); err != nil {
+			layerSpan.SetStatus(err)
+			layerSpan.End()
 			return err
 		}
 
-		eg.Go(func() error {
-			defer layerSpan.End()
+		eg.Go(func() (err error) {
+			defer func() {
+				layerSpan.SetStatus(err)
+				layerSpan.End()
+			}()
 
 			unlock, err := u.lockBlobDescriptor(ctx2, desc)
 			if err != nil {
@@ -918,4 +934,13 @@ func bindToOverlay(mounts []mount.Mount) []mount.Mount {
 	m.Options = append(m.Options, "upperdir="+mounts[0].Source)
 
 	return []mount.Mount{m}
+}
+
+// For tracing span attributes related to a layer.
+func layerAttributes(desc ocispec.Descriptor) []attribute.KeyValue {
+	return []attribute.KeyValue{
+		tracing.Attribute("layer.media.type", desc.MediaType),
+		tracing.Attribute("layer.media.size", desc.Size),
+		tracing.Attribute("layer.media.digest", desc.Digest.String()),
+	}
 }
