@@ -259,22 +259,25 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 
 				req, err := stream.Recv()
 				if err != nil {
-					// If not EOF, log error
+					if !errors.Is(err, io.EOF) {
+						log.G(ctx).WithError(err).Error("credential stream receive failed")
+					}
 					return
 				}
+
+				// Every AuthRequest must be answered with exactly one
+				// AuthResponse; otherwise the peer blocks forever in Recv().
+				// On any failure resolving credentials, fall back to "no
+				// credentials" (NONE) so the transfer can proceed anonymously
+				// (and fail cleanly later) rather than hang.
+				resp := &transfertypes.AuthResponse{AuthType: transfertypes.AuthType_NONE}
 
 				var s transfertypes.AuthRequest
 				if err := typeurl.UnmarshalTo(req, &s); err != nil {
 					log.G(ctx).WithError(err).Error("failed to unmarshal credential request")
-					continue
-				}
-				creds, err := r.creds.GetCredentials(ctx, s.Reference, s.Host)
-				if err != nil {
+				} else if creds, err := r.creds.GetCredentials(ctx, s.Reference, s.Host); err != nil {
 					log.G(ctx).WithError(err).Error("failed to get credentials")
-					continue
-				}
-				var resp transfertypes.AuthResponse
-				if creds.Header != "" {
+				} else if creds.Header != "" {
 					resp.AuthType = transfertypes.AuthType_HEADER
 					resp.Secret = creds.Header
 				} else if creds.Username != "" {
@@ -286,10 +289,13 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 					resp.Secret = creds.Secret
 				}
 
-				a, err := typeurl.MarshalAny(&resp)
+				a, err := typeurl.MarshalAny(resp)
 				if err != nil {
+					// Cannot answer this request; close the stream so the
+					// peer's Recv() returns an error instead of blocking.
 					log.G(ctx).WithError(err).Error("failed to marshal credential response")
-					continue
+					_ = stream.Close()
+					return
 				}
 
 				if err := stream.Send(a); err != nil {
