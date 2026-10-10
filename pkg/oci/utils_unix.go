@@ -55,7 +55,17 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 	}
 
 	if !stat.IsDir() {
-		dev, err := DeviceFromPath(path)
+		// The caller asked for this exact path, so follow symlinks: udev stable
+		// names such as /dev/serial/by-id/... and /dev/disk/by-uuid/... are
+		// symlinks to the real node. This deliberately differs from the
+		// directory walk below, which must not follow symlinks or HostDevices
+		// would emit the same device once per alias.
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return nil, fmt.Errorf("error resolving device path: %w", err)
+		}
+
+		dev, err := DeviceFromPath(resolved)
 		if err != nil {
 			// wrap error with detailed path and container path when it is ErrNotADevice
 			if errors.Is(err, ErrNotADevice) {

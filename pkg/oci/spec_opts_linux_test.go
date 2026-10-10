@@ -438,3 +438,102 @@ func TestWithLinuxDeviceFollowSymlinks(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDevicesSymlink(t *testing.T) {
+	// A udev stable name such as /dev/serial/by-id/usb-... is a symlink to the
+	// real node. Resolve it for an explicitly requested path, the way CRI
+	// already does before it calls WithDevices.
+	zero := "/dev/zero"
+	_, err := os.Stat(zero)
+	require.NoError(t, err, "Host does not have /dev/zero")
+
+	want, err := getDevices(zero, "")
+	require.NoError(t, err)
+	require.Len(t, want, 1)
+
+	dir := t.TempDir()
+	symZero := filepath.Join(dir, "zero-by-id")
+	require.NoError(t, os.Symlink(zero, symZero))
+
+	chained := filepath.Join(dir, "zero-chained")
+	require.NoError(t, os.Symlink(symZero, chained))
+
+	dangling := filepath.Join(dir, "dangling")
+	require.NoError(t, os.Symlink(filepath.Join(dir, "missing"), dangling))
+
+	regular := filepath.Join(dir, "regular")
+	require.NoError(t, os.WriteFile(regular, nil, 0o600))
+	symRegular := filepath.Join(dir, "regular-link")
+	require.NoError(t, os.Symlink(regular, symRegular))
+
+	t.Run("no container path", func(t *testing.T) {
+		devs, err := getDevices(symZero, "")
+		require.NoError(t, err)
+		require.Len(t, devs, 1)
+		// The device is exposed under the resolved path, matching
+		// WithLinuxDeviceFollowSymlinks.
+		assert.Equal(t, zero, devs[0].Path)
+		assert.Equal(t, "c", devs[0].Type)
+		assert.Equal(t, want[0].Major, devs[0].Major)
+		assert.Equal(t, want[0].Minor, devs[0].Minor)
+	})
+
+	t.Run("with container path", func(t *testing.T) {
+		devs, err := getDevices(symZero, "/dev/foo")
+		require.NoError(t, err)
+		require.Len(t, devs, 1)
+		assert.Equal(t, "/dev/foo", devs[0].Path)
+		assert.Equal(t, want[0].Major, devs[0].Major)
+		assert.Equal(t, want[0].Minor, devs[0].Minor)
+	})
+
+	t.Run("chained symlink", func(t *testing.T) {
+		devs, err := getDevices(chained, "")
+		require.NoError(t, err)
+		require.Len(t, devs, 1)
+		assert.Equal(t, zero, devs[0].Path)
+	})
+
+	t.Run("dangling symlink", func(t *testing.T) {
+		_, err := getDevices(dangling, "")
+		assert.Error(t, err)
+	})
+
+	t.Run("symlink to regular file", func(t *testing.T) {
+		_, err := getDevices(symRegular, "")
+		assert.ErrorIs(t, err, ErrNotADevice)
+	})
+}
+
+func TestWithDevicesSymlinkCgroupRule(t *testing.T) {
+	zero := "/dev/zero"
+	_, err := os.Stat(zero)
+	require.NoError(t, err, "Host does not have /dev/zero")
+
+	dir := t.TempDir()
+	symZero := filepath.Join(dir, "zero-by-id")
+	require.NoError(t, os.Symlink(zero, symZero))
+
+	s := Spec{Version: specs.Version, Root: &specs.Root{}, Linux: &specs.Linux{
+		Resources: &specs.LinuxResources{},
+	}}
+	require.NoError(t, WithDevices(symZero, "/dev/foo", "rwm")(context.Background(), nil, nil, &s))
+
+	require.Len(t, s.Linux.Devices, 1)
+	require.Len(t, s.Linux.Resources.Devices, 1)
+
+	dev := s.Linux.Devices[0]
+	assert.Equal(t, "/dev/foo", dev.Path)
+	assert.Equal(t, "c", dev.Type)
+
+	// The cgroup rule has to carry the target's major/minor, or the device is
+	// visible in the container but unusable.
+	rule := s.Linux.Resources.Devices[0]
+	assert.True(t, rule.Allow)
+	assert.Equal(t, "c", rule.Type)
+	assert.Equal(t, "rwm", rule.Access)
+	require.NotNil(t, rule.Major)
+	require.NotNil(t, rule.Minor)
+	assert.Equal(t, dev.Major, *rule.Major)
+	assert.Equal(t, dev.Minor, *rule.Minor)
+}
