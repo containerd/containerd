@@ -5,8 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-
-	"google.golang.org/protobuf/proto"
 )
 
 func readStatisticsFile(imgDir *os.File, fileName string) (*StatsEntry, error) {
@@ -26,7 +24,7 @@ func readStatisticsFile(imgDir *os.File, fileName string) (*StatsEntry, error) {
 	payloadSize := binary.LittleEndian.Uint32(buf[SizeOffset:PayloadOffset])
 
 	st := &StatsEntry{}
-	if err := proto.Unmarshal(buf[PayloadOffset:PayloadOffset+payloadSize], st); err != nil {
+	if err := st.UnmarshalVT(buf[PayloadOffset : PayloadOffset+payloadSize]); err != nil {
 		return nil, err
 	}
 
