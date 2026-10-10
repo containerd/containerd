@@ -165,3 +165,39 @@ func (d *daemon) Restart(stopCb func()) error {
 
 	return nil
 }
+
+// CrashRestart restarts the daemon after an ungraceful termination. The
+// callback runs while the daemon is stopped, before the new process starts.
+func (d *daemon) CrashRestart(stopCb func() error) error {
+	d.Lock()
+	defer d.Unlock()
+	if d.cmd == nil {
+		return errors.New("daemon is not running")
+	}
+
+	if err := d.cmd.Process.Kill(); err != nil {
+		return fmt.Errorf("failed to kill daemon: %w", err)
+	}
+	if err := d.cmd.Wait(); err != nil {
+		if _, ok := err.(*exec.ExitError); !ok {
+			return fmt.Errorf("failed to wait for daemon: %w", err)
+		}
+	}
+
+	if stopCb != nil {
+		if err := stopCb(); err != nil {
+			return err
+		}
+	}
+
+	cmd := exec.Command(d.cmd.Path, d.cmd.Args[1:]...)
+	cmd.Stdout = d.cmd.Stdout
+	cmd.Stderr = d.cmd.Stderr
+	if err := cmd.Start(); err != nil {
+		cmd.Wait()
+		return fmt.Errorf("failed to start new daemon instance: %w", err)
+	}
+	d.cmd = cmd
+
+	return nil
+}
