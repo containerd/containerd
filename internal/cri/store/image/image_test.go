@@ -17,13 +17,20 @@
 package image
 
 import (
+	"context"
+	"errors"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 
+	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	assertlib "github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -315,4 +322,151 @@ func TestImageStore(t *testing.T) {
 			}
 		})
 	}
+}
+
+type fakeGetter struct {
+	imgs map[string]images.Image
+	errs map[string]error
+}
+
+func (f *fakeGetter) Get(ctx context.Context, name string) (images.Image, error) {
+	if f.errs != nil {
+		if err, ok := f.errs[name]; ok {
+			return images.Image{}, err
+		}
+	}
+	img, ok := f.imgs[name]
+	if !ok {
+		return images.Image{}, errdefs.ErrNotFound
+	}
+	return img, nil
+}
+
+type fakeContentProvider struct {
+	err error
+}
+
+func (f *fakeContentProvider) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
+	if f.err != nil {
+		return content.Info{}, f.err
+	}
+	return content.Info{}, errdefs.ErrNotFound
+}
+
+func (f *fakeContentProvider) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return nil, errdefs.ErrNotFound
+}
+
+func TestStoreUpdateMissingContent(t *testing.T) {
+	assert := assertlib.New(t)
+	ctx := context.Background()
+	imgID := "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	ref := "containerd.io/ref-missing-content"
+
+	getter := &fakeGetter{
+		imgs: map[string]images.Image{
+			ref: {
+				Name: ref,
+				Target: ocispec.Descriptor{
+					Digest: digest.Digest(imgID),
+				},
+			},
+		},
+	}
+	provider := &fakeContentProvider{err: errdefs.ErrNotFound}
+
+	s := NewStore(getter, provider, platforms.Default())
+	// Pre-populate store cache with image
+	s.refCache[ref] = imgID
+	assert.NoError(s.store.add(Image{
+		ID:         imgID,
+		References: []string{ref},
+	}))
+
+	// Verify image exists in cache before Update
+	_, err := s.Get(imgID)
+	assert.NoError(err)
+
+	// Update should catch missing content (ErrNotFound from getImage) and purge ref from cache
+	err = s.Update(ctx, ref)
+	assert.NoError(err)
+
+	// Image should no longer exist in cache
+	_, err = s.Get(imgID)
+	assert.Equal(errdefs.ErrNotFound, err)
+	_, err = s.Resolve(ref)
+	assert.Equal(errdefs.ErrNotFound, err)
+}
+
+func TestStoreUpdateStaleReferences(t *testing.T) {
+	assert := assertlib.New(t)
+	ctx := context.Background()
+	imgID := "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	ref1 := "containerd.io/primary"
+	ref2 := "containerd.io/extra@sha256:1123456789abcdef"
+
+	// containerd store has NO images left (both ref1 and ref2 were deleted outside CRI)
+	getter := &fakeGetter{
+		imgs: map[string]images.Image{},
+	}
+	provider := &fakeContentProvider{}
+
+	s := NewStore(getter, provider, platforms.Default())
+	// Cache contains image with BOTH references
+	s.refCache[ref1] = imgID
+	s.refCache[ref2] = imgID
+	assert.NoError(s.store.add(Image{
+		ID:         imgID,
+		References: []string{ref1, ref2},
+	}))
+
+	// Update called for ref1
+	err := s.Update(ctx, ref1)
+	assert.NoError(err)
+
+	// Since ref2 is ALSO deleted from containerd, s.Update should clean up all stale references and remove imgID
+	_, err = s.Get(imgID)
+	assert.Equal(errdefs.ErrNotFound, err)
+	_, err = s.Resolve(ref1)
+	assert.Equal(errdefs.ErrNotFound, err)
+	_, err = s.Resolve(ref2)
+	assert.Equal(errdefs.ErrNotFound, err)
+}
+
+func TestStoreUpdateTransientError(t *testing.T) {
+	assert := assertlib.New(t)
+	ctx := context.Background()
+	imgID := "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	ref1 := "containerd.io/primary"
+	ref2 := "containerd.io/extra@sha256:1123456789abcdef"
+
+	transientErr := errors.New("transient database connection error")
+	getter := &fakeGetter{
+		imgs: map[string]images.Image{},
+		errs: map[string]error{
+			ref2: transientErr,
+		},
+	}
+	provider := &fakeContentProvider{}
+
+	s := NewStore(getter, provider, platforms.Default())
+	s.refCache[ref1] = imgID
+	s.refCache[ref2] = imgID
+	assert.NoError(s.store.add(Image{
+		ID:         imgID,
+		References: []string{ref1, ref2},
+	}))
+
+	// Update called for ref1 (which was deleted), but checking ref2 returns a transient error
+	err := s.Update(ctx, ref1)
+	assert.Error(err)
+	assert.True(errors.Is(err, transientErr) || strings.Contains(err.Error(), transientErr.Error()))
+
+	// ref2 was NOT confirmed missing due to the transient error, so ref2 must NOT be purged from cache
+	resolvedID, err := s.Resolve(ref2)
+	assert.NoError(err)
+	assert.Equal(imgID, resolvedID)
 }
