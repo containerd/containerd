@@ -200,7 +200,11 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		mountedFrom := ""
 		var resp *http.Response
 		if fromRepo := selectRepositoryMountCandidate(p.refspec, desc.Annotations); fromRepo != "" {
-			preq := requestWithMountFrom(req, desc.Digest.String(), fromRepo)
+			var preq *request
+			preq, err = requestWithMountFrom(req, desc.Digest.String(), fromRepo)
+			if err != nil {
+				return nil, err
+			}
 			pctx := ContextWithAppendPullRepositoryScope(ctx, fromRepo)
 
 			// NOTE: the fromRepo might be private repo and
@@ -627,15 +631,15 @@ func withGETErrorBody(ctx context.Context, originalErr error, headResp *http.Res
 	return unexpectedResponseErr(&enriched)
 }
 
-func requestWithMountFrom(req *request, mount, from string) *request {
+func requestWithMountFrom(req *request, mount, from string) (*request, error) {
 	creq := *req
 
-	sep := "?"
-	if strings.Contains(creq.path, sep) {
-		sep = "&"
+	if err := creq.addQuery("mount", mount); err != nil {
+		return nil, err
+	}
+	if err := creq.addQuery("from", from); err != nil {
+		return nil, err
 	}
 
-	creq.path = creq.path + sep + "mount=" + mount + "&from=" + from
-
-	return &creq
+	return &creq, nil
 }
