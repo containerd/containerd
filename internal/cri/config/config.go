@@ -327,7 +327,9 @@ type ImageConfig struct {
 	// ImagePullProgressTimeout is the maximum duration that there is no
 	// image data read from image registry in the open connection. It will
 	// be reset whatever a new byte has been read. If timeout, the image
-	// pulling will be cancelled. A zero value means there is no timeout.
+	// pulling will be cancelled. A zero value means there is no timeout;
+	// this is only supported with the legacy local image pull, not with
+	// the transfer service.
 	//
 	// The string is in the golang duration format, see:
 	//   https://golang.org/pkg/time/#ParseDuration
@@ -540,6 +542,26 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 	}
 
 	return warnings, nil
+}
+
+// ValidateImagePullTimeout validates image_pull_progress_timeout against the
+// effective image pull mode. A zero timeout disables the no-progress
+// watchdog; this is supported by the legacy local image pull, but not by the
+// transfer service, where it deadlocks PullImage
+// (https://github.com/containerd/containerd/issues/14158). It must be called
+// after CheckLocalImagePullConfigs, when the effective pull mode is known.
+func ValidateImagePullTimeout(c *ImageConfig) error {
+	if c.UseLocalImagePull || c.ImagePullProgressTimeout == "" {
+		return nil
+	}
+	timeout, err := time.ParseDuration(c.ImagePullProgressTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to parse image_pull_progress_timeout: %w", err)
+	}
+	if timeout == 0 {
+		return errors.New("failed to validate image_pull_progress_timeout: zero is not supported when using the transfer service; set the timeout to some number of hours less than the CRI client's context timeout")
+	}
+	return nil
 }
 
 // CheckLocalImagePullConfigs checks if there are CRI Image Config options configured that are not supported
