@@ -762,12 +762,20 @@ func (c *criService) buildLinuxSpec(
 		}
 	}()
 
-	// cgroupns is used for hiding /sys/fs/cgroup from containers.
-	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
-	// https://github.com/containers/libpod/issues/4363
-	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
-	if isUnifiedCgroupsMode() && !securityContext.GetPrivileged() {
+	cgroupnsMode, err := resolveCgroupnsMode(securityContext, isUnifiedCgroupsMode())
+	if err != nil {
+		return nil, err
+	}
+	switch cgroupnsMode {
+	case runtime.NamespaceMode_CONTAINER:
 		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
+	case runtime.NamespaceMode_NODE:
+		// When NODE is explicitly specified, remove the cgroupns that might be
+		// inherited from the base runtime spec.
+		// When CgroupnsOptions is nil, the base runtime spec is kept as is, for compatibility.
+		if securityContext.GetNamespaceOptions().GetCgroupnsOptions() != nil {
+			specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.CgroupNamespace))
+		}
 	}
 
 	var ociSpecOpts oci.SpecOpts
@@ -1189,4 +1197,31 @@ func (c *criService) runtimeInfo(ctx context.Context, id string) (string, typeur
 	}
 
 	return "", nil, err
+}
+
+// resolveCgroupnsMode returns the cgroup namespace mode for a container.
+//
+// When CgroupnsOptions is not specified, cgroupns is used only for
+// non-privileged containers on cgroup v2 hosts, for compatibility.
+// cgroupns is used for hiding /sys/fs/cgroup from containers.
+// https://github.com/containers/libpod/issues/4363
+// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
+//
+// When CgroupnsOptions is specified, its mode is used as is (KEP-5714).
+// Only CONTAINER and NODE are supported.
+// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/5714-cgroupns/README.md
+func resolveCgroupnsMode(securityContext *runtime.LinuxContainerSecurityContext, unifiedCgroups bool) (runtime.NamespaceMode, error) {
+	cgroupnsOpts := securityContext.GetNamespaceOptions().GetCgroupnsOptions()
+	if cgroupnsOpts == nil {
+		if unifiedCgroups && !securityContext.GetPrivileged() {
+			return runtime.NamespaceMode_CONTAINER, nil
+		}
+		return runtime.NamespaceMode_NODE, nil
+	}
+	switch mode := cgroupnsOpts.GetMode(); mode {
+	case runtime.NamespaceMode_CONTAINER, runtime.NamespaceMode_NODE:
+		return mode, nil
+	default:
+		return 0, fmt.Errorf("unsupported cgroup namespace mode: %s", mode)
+	}
 }

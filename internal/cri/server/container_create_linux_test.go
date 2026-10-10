@@ -487,8 +487,9 @@ func TestPrivilegedBindMount(t *testing.T) {
 	}
 }
 
-// TestCgroupNamespace verifies that a cgroup namespace is only assigned to
-// non-privileged containers on cgroupv2 hosts.
+// TestCgroupNamespace verifies that, by default, a cgroup namespace is only
+// assigned to non-privileged containers on cgroupv2 hosts, and that an
+// explicit CgroupnsOptions overrides the default.
 func TestCgroupNamespace(t *testing.T) {
 	testPid := uint32(1234)
 	c := newTestCRIService()
@@ -500,7 +501,9 @@ func TestCgroupNamespace(t *testing.T) {
 	tests := []struct {
 		desc                  string
 		privileged            bool
+		cgroupnsOpts          *runtime.CgroupNamespace
 		requireCgroupV2       bool
+		anyCgroupVersion      bool
 		expectCgroupNamespace bool
 	}{
 		{
@@ -527,20 +530,38 @@ func TestCgroupNamespace(t *testing.T) {
 			requireCgroupV2:       false,
 			expectCgroupNamespace: false,
 		},
+		{
+			desc:                  "privileged container with CONTAINER cgroupns mode should get cgroup namespace",
+			privileged:            true,
+			cgroupnsOpts:          &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_CONTAINER},
+			anyCgroupVersion:      true,
+			expectCgroupNamespace: true,
+		},
+		{
+			desc:                  "non-privileged container with NODE cgroupns mode should not get cgroup namespace",
+			privileged:            false,
+			cgroupnsOpts:          &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_NODE},
+			anyCgroupVersion:      true,
+			expectCgroupNamespace: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			// Skip if the host's cgroup mode doesn't match what the test case requires.
-			if tt.requireCgroupV2 && !isUnifiedCgroupsMode() {
-				t.Skip("requires cgroups v2")
-			}
-			if !tt.requireCgroupV2 && isUnifiedCgroupsMode() {
-				t.Skip("requires cgroups v1")
+			if !tt.anyCgroupVersion {
+				if tt.requireCgroupV2 && !isUnifiedCgroupsMode() {
+					t.Skip("requires cgroups v2")
+				}
+				if !tt.requireCgroupV2 && isUnifiedCgroupsMode() {
+					t.Skip("requires cgroups v1")
+				}
 			}
 
 			containerConfig.Linux.SecurityContext.Privileged = tt.privileged
 			sandboxConfig.Linux.SecurityContext.Privileged = tt.privileged
+			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{CgroupnsOptions: tt.cgroupnsOpts}
+			sandboxConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{CgroupnsOptions: tt.cgroupnsOpts}
 
 			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
 			require.NoError(t, err)
@@ -553,6 +574,72 @@ func TestCgroupNamespace(t *testing.T) {
 				}
 			}
 
+			assert.Equal(t, tt.expectCgroupNamespace, hasCgroupNS)
+		})
+	}
+}
+
+// TestCgroupNamespaceWithBaseRuntimeSpec verifies that an explicit NODE mode
+// removes the cgroup namespace inherited from the base runtime spec, while the
+// default mode keeps the base runtime spec as is.
+func TestCgroupNamespaceWithBaseRuntimeSpec(t *testing.T) {
+	c := newTestCRIService(withRuntimeService(&fakeRuntimeService{
+		ocispecs: map[string]*oci.Spec{
+			"/etc/containerd/cri-base.json": {
+				Version: "1.0.2",
+				Linux: &runtimespec.Linux{
+					Namespaces: []runtimespec.LinuxNamespace{
+						{Type: runtimespec.CgroupNamespace},
+					},
+				},
+			},
+		},
+	}))
+	ociRuntime := config.Runtime{BaseRuntimeSpec: "/etc/containerd/cri-base.json"}
+
+	testPid := uint32(1234)
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+
+	tests := []struct {
+		desc                  string
+		cgroupnsOpts          *runtime.CgroupNamespace
+		expectCgroupNamespace bool
+	}{
+		{
+			desc:                  "nil (privileged): base runtime spec is kept",
+			expectCgroupNamespace: true,
+		},
+		{
+			desc:                  "NODE: inherited cgroup namespace is removed",
+			cgroupnsOpts:          &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_NODE},
+			expectCgroupNamespace: false,
+		},
+		{
+			desc:                  "CONTAINER: cgroup namespace is used",
+			cgroupnsOpts:          &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_CONTAINER},
+			expectCgroupNamespace: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// Privileged, so that the default mode is NODE regardless of the host cgroup version.
+			containerConfig.Linux.SecurityContext.Privileged = true
+			sandboxConfig.Linux.SecurityContext.Privileged = true
+			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{CgroupnsOptions: tt.cgroupnsOpts}
+
+			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+			require.NoError(t, err)
+
+			hasCgroupNS := false
+			for _, ns := range spec.Linux.Namespaces {
+				if ns.Type == runtimespec.CgroupNamespace {
+					hasCgroupNS = true
+					break
+				}
+			}
 			assert.Equal(t, tt.expectCgroupNamespace, hasCgroupNS)
 		})
 	}
