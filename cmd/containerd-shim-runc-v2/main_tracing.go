@@ -19,6 +19,19 @@
 package main
 
 import (
+	"os"
+	"strings"
+
 	_ "github.com/containerd/containerd/v2/internal/pprof"
 	_ "github.com/containerd/containerd/v2/pkg/tracing/plugin"
 )
+
+// PR #12299: set a default service name for the shim when tracing is active.
+// Note: manager_linux.go sets OTEL_SERVICE_NAME="containerd-shim-<id>" per sandbox,
+// so we also normalize that prefix to "containerd-shim-runc-v2" to avoid creating
+// a separate Jaeger service per pod.
+func init() {
+	if svc := os.Getenv("OTEL_SERVICE_NAME"); svc == "" || svc == "containerd" || strings.HasPrefix(svc, "containerd-shim-") {
+		os.Setenv("OTEL_SERVICE_NAME", "containerd-shim-runc-v2")
+	}
+}
