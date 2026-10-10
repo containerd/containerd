@@ -41,8 +41,13 @@ FROM ${GOLANG_IMAGE}:${GOLANG_VERSION} AS golang
 
 # Install runc
 FROM golang AS runc
+# cargo, lld and xz-utils are needed to build libpathrs, which runc 1.5+
+# links against
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    cargo \
     libseccomp-dev \
+    lld \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY script/setup/runc-version script/setup/install-runc ./
