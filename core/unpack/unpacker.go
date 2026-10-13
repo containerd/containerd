@@ -465,7 +465,7 @@ func (u *Unpacker) unpack(
 	copy(chainIDs, diffIDs)
 	chainIDs = identity.ChainIDs(chainIDs)
 
-	topHalf := func(layerCtx context.Context, i int, desc ocispec.Descriptor, span *tracing.Span, startAt time.Time) (<-chan *unpackStatus, error) {
+	topHalf := func(ctx context.Context, i int, desc ocispec.Descriptor, span *tracing.Span, startAt time.Time) (<-chan *unpackStatus, error) {
 		var (
 			err     error
 			parent  string
@@ -557,7 +557,7 @@ func (u *Unpacker) unpack(
 			}
 
 			// The span covers the snapshot commit and the label update.
-			commitCtx, commitSpan := tracing.StartSpan(layerCtx, tracing.Name(unpackSpanPrefix, "commitAndUpdate"))
+			ctx, commitSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "commitAndUpdate"))
 			commitSpan.SetAttributes(layerAttributes(desc)...)
 			defer func() {
 				commitSpan.SetStatus(commitErr)
@@ -567,7 +567,7 @@ func (u *Unpacker) unpack(
 			if i > 0 && parallel {
 				opts = append(opts, snapshots.WithParent(chainIDs[i-1].String()))
 			}
-			if err := sn.Commit(commitCtx, chainID, key, opts...); err != nil {
+			if err := sn.Commit(ctx, chainID, key, opts...); err != nil {
 				cleanup.Do(ctx, abort)
 				if errdefs.IsAlreadyExists(err) {
 					return nil
@@ -654,14 +654,14 @@ func (u *Unpacker) unpack(
 
 			status.err = func() (applyErr error) {
 				// The span covers only the extraction itself.
-				applyCtx, applySpan := tracing.StartSpan(layerCtx, tracing.Name(unpackSpanPrefix, "apply"))
+				ctx, applySpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "apply"))
 				applySpan.SetAttributes(layerAttributes(desc)...)
 				defer func() {
 					applySpan.SetStatus(applyErr)
 					applySpan.End()
 				}()
 
-				diff, err := a.Apply(applyCtx, desc, mounts, unpack.ApplyOpts...)
+				diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
 				if err != nil {
 					return fmt.Errorf("failed to extract layer (%s %s) to %s as %q: %w", desc.MediaType, desc.Digest, unpack.SnapshotterKey, key, err)
 				}
