@@ -311,6 +311,17 @@ func (c *criService) CRImportCheckpoint(
 		if err := mount.All(mounts, mountPoint); err != nil {
 			return "", err
 		}
+		// Release the read-only snapshot mount on every return path. Without
+		// this, any error after this point (e.g. the failed anonymous pull of
+		// the checkpoint base image) leaks the mount permanently; the deferred
+		// os.RemoveAll above cannot remove a mounted directory. UnmountAll is a
+		// no-op once the mount is gone, so the explicit UnmountAll on the
+		// success path below is unaffected.
+		defer func() {
+			if err := mount.UnmountAll(mountPoint, 0); err != nil {
+				log.G(ctx).WithError(err).Warnf("failed to unmount %s after checkpoint restore", mountPoint)
+			}
+		}()
 	} else {
 
 		archiveFile, err = os.Open(inputImage)
