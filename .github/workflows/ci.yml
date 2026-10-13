@@ -64,7 +64,7 @@ jobs:
 
       - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
-      - uses: containerd/project-checks@d7751f3c375b8fe4a84c02a068184ee4c1f59bc4 # v1.2.2
+      - uses: containerd/project-checks@9d887fad80ae4e40d6f10a68529082e7fc06a9af # v1.2.3
         if: github.repository == 'containerd/containerd'
         with:
           working-directory: src/github.com/containerd/containerd
